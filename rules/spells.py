@@ -57,6 +57,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import effectspec
+from pathfindergm import files
 
 SCHOOLS = ("abjuration", "conjuration", "divination", "enchantment", "evocation",
            "illusion", "necromancy", "transmutation", "universal")
@@ -1654,7 +1655,7 @@ def write_mechanics() -> dict:
                 "from this file and remains prose in spells.json.",
         "spells": [entries[k] for k in sorted(entries)],
     }
-    path.write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(payload, indent=1, ensure_ascii=False))
     return report
 
 
@@ -1764,7 +1765,8 @@ def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         for sid, got in (data.get("spells") or {}).items():
             key = str(sid).strip().lower()
@@ -1823,7 +1825,8 @@ def all_spells() -> dict[str, Spell]:
             for path in sorted(folder.glob("*.json")):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("spells") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

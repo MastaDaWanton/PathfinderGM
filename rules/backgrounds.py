@@ -41,6 +41,7 @@ from pathlib import Path
 from django.conf import settings
 
 from . import states
+from pathfindergm import files
 
 # What a tie can reach for in the world. Deliberately the same vocabulary the quest
 # schemes fill their slots from (`rules/schemes.PLACE_KINDS`, its role words), because a
@@ -73,7 +74,8 @@ def all_backgrounds() -> dict[str, dict]:
             for path in sorted(folder.glob("*.json")):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("backgrounds") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

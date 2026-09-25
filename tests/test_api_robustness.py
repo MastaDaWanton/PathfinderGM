@@ -135,12 +135,22 @@ def test_abilities_that_are_not_an_object_are_refused_not_raised():
 
 @pytest.mark.parametrize("url", [
     "/api/roll", "/api/combat/act", "/api/craft/preview", "/api/craft/do",
-    "/api/craft/forage", "/api/spells/save", "/api/level-up", "/api/slots",
+    "/api/forage", "/api/spells/save", "/api/level-up", "/api/slots",
     "/api/character/create", "/api/travel",
 ])
 def test_no_endpoint_answers_a_bad_body_with_a_traceback(client, url):
     """One case per endpoint, the shape that broke three of them: a field that should be
-    a container arriving as a bare string."""
+    a container arriving as a bare string.
+
+    Each URL must RESOLVE first. Measured 2026-09-25: this list carried
+    `/api/craft/forage`, a route that has never existed (the forage door is
+    `/api/forage`), and a 404 is `< 500`, so the case passed while testing nothing."""
+    from django.urls import Resolver404, resolve
+
+    try:
+        resolve(url)
+    except Resolver404:
+        pytest.fail(f"{url} is not a route; this case would pass on a 404")
     for body in ({"effects": "x", "actions": "x", "abilities": "x", "choices": "x",
                   "ingredients": "x", "name": "t", "craft": "herbalism"},
                  {}, [1, 2, 3]):

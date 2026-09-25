@@ -20,6 +20,7 @@ from pathlib import Path
 from django.conf import settings
 
 from rules.sheet import Actor, from_dict, to_dict
+from pathfindergm import files
 
 ROSTER_VERSION = 1
 
@@ -126,7 +127,7 @@ class Entry:
 
 
 def path_for(character_id: str) -> Path:
-    return root() / f"{character_id}.json"
+    return files.child(root(), character_id)
 
 
 def save(entry: Entry) -> Path:
@@ -140,19 +141,29 @@ def save(entry: Entry) -> Path:
         "sheet": entry.sheet,
     }
     p = path_for(entry.id)
-    p.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    files.write_text(p, json.dumps(payload, indent=1))
     return p
 
 
 def load(character_id: str) -> Entry | None:
-    p = path_for(character_id)
+    try:
+        p = path_for(character_id)
+    except files.BadName:
+        return None                 # an id that is no file of ours is nobody we know
     if not p.exists():
         return None
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return None
-    if d.get("roster_version") != ROSTER_VERSION:
+    # Only NEWER is refused — the rule `Campaign.load` already learned. Written `!=`
+    # (measured 2026-09-25), bumping ROSTER_VERSION would have made every character on
+    # the shelf disappear at once; older entries are read, as a save of an older build is.
+    try:
+        found = int(d.get("roster_version") or 0)
+    except (TypeError, ValueError):
+        found = 0
+    if found > ROSTER_VERSION:
         return None
     return Entry(
         id=d["id"], name=d.get("name", ""), status=d.get("status", ALIVE),
@@ -269,7 +280,12 @@ def retire_file(character_id: str) -> tuple[bool, str]:
     campaign_dir = Path(settings.CAMPAIGN_DIR)
     for save in (character_id, entry.campaign_id):
         if save:
-            (campaign_dir / f"{save}.json").unlink(missing_ok=True)
+            gone = files.child(campaign_dir, save)
+            # And its backups: a new character minted the same id would otherwise
+            # inherit them, and a failed load would restore the deleted game.
+            for kept in files.backups(gone, keep=campaign_mod.BACKUPS_KEPT):
+                kept.unlink(missing_ok=True)
+            gone.unlink(missing_ok=True)
             campaign_mod._LIVE.pop(save, None)
     return True, f"{entry.name} is deleted, and so is their game."
 
@@ -300,7 +316,7 @@ def pregens() -> list[dict]:
 
 
 def from_pregen(source: str) -> Actor:
-    p = Path(settings.BASE_DIR / "fixtures") / f"{source}.json"
+    p = files.child(Path(settings.BASE_DIR / "fixtures"), source)
     if not p.exists() or not p.name.startswith("pc-"):
         raise FileNotFoundError(f"no such character {source!r}")
     return from_dict(json.loads(p.read_text(encoding="utf-8")), ref="pc")

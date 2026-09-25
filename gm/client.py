@@ -239,6 +239,18 @@ def chat(
             f"settings.MODELS at a running host."
         ) from exc
 
+    # A reply the budget cut off is said in the log. `done_reason` and
+    # `prompt_eval_count` were never read (measured 2026-09-25), so a truncated turn and a
+    # prompt that filled the window both looked, from the log, like a model that simply
+    # wrote badly — the 4,086-token prompt that left ten tokens of room (see num_ctx
+    # above) was found by hand.
+    if body.get("done_reason") == "length":
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "%s stopped at its token limit (prompt %s tokens of %s, reply %s tokens) — "
+            "the reply is cut off", model, body.get("prompt_eval_count"),
+            prompts.NUM_CTX, body.get("eval_count"))
     return Reply(
         text=strip_thinking(body.get("message", {}).get("content", "")),
         seconds=time.monotonic() - started,

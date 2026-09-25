@@ -153,6 +153,32 @@ class _Tee(io.TextIOBase):
             pass
 
 
+def _without_pass(address: str) -> str:
+    """An address with its `?k=` pass masked, for the log."""
+    import re
+
+    return re.sub(r"([?&]k=)[^&\s]+", r"\1(the pass)", address)
+
+
+def _console_only(line: str, redacted: str) -> None:
+    """`line` to the console window, `redacted` to the log file.
+
+    Measured 2026-09-25: the LAN addresses were printed with `?k=PASS` through the tee,
+    so the pass sat in `logs/pathfindergm.log` — the file a player attaches to a bug
+    report. The console is the player's own screen and keeps the whole address."""
+    out = sys.stdout
+    if isinstance(out, _Tee):
+        out._console.write(line + "\n")
+        out._console.flush()
+        try:
+            out._log.write(redacted + "\n")
+            out._log.flush()
+        except OSError:
+            pass
+    else:
+        print(line, flush=True)
+
+
 def _start_log(data_root: Path):
     """The log file the Electron shell needs to exist before it can hide the console.
 
@@ -211,6 +237,74 @@ def _write_portfile(data_root: Path, port: int, url: str) -> Path | None:
         return None
 
 
+def _sweep_stale_unpacks(temp: str | None = None, mine: str | None = None) -> list[str]:
+    """Delete the unpack folders earlier runs of THIS app left behind. Returns them.
+
+    A onefile build unpacks to `%TEMP%\\_MEIxxxxx` and removes it only on a clean exit;
+    the shell's taskkill fallback is not one. Measured 2026-09-05: 154 of them, ~40 MB
+    each, and every launch took 60-160 s while Defender caught up — the shell's startup
+    timeout fired over a game that was running.
+
+    Careful, because the wrong deletion is far worse than the leak:
+      - ours only: a folder is swept only if it holds this app's own play table, never
+        another PyInstaller program's unpack;
+      - not the running one: `sys._MEIPASS` is skipped;
+      - not one in use: on Windows a directory with an open file inside cannot be
+        renamed, so the folder is renamed first and only what could be renamed is
+        deleted — a second copy of the game still running keeps its unpack.
+    Run on a daemon thread after the server is up, never on the path to READY.
+    """
+    import glob
+    import shutil
+    import tempfile
+
+    temp = temp or tempfile.gettempdir()
+    mine = os.path.normcase(os.path.abspath(mine or getattr(sys, "_MEIPASS", "") or ""))
+    swept: list[str] = []
+    for folder in glob.glob(os.path.join(temp, "_MEI*")):
+        path = os.path.normcase(os.path.abspath(folder))
+        if not os.path.isdir(folder) or path == mine:
+            continue
+        if not os.path.isfile(os.path.join(folder, "play", "templates", "play",
+                                           "table.html")):
+            continue
+        doomed = folder + ".stale"
+        try:
+            os.rename(folder, doomed)
+        except OSError:
+            continue                     # something still has it open
+        shutil.rmtree(doomed, ignore_errors=True)
+        swept.append(folder)
+    return swept
+
+
+# Inside the shell's own kill window (electron/main.js: stdin closed, taskkill at 3 s,
+# app.exit at 4.5 s). Longer is not available: the 4.5 s floor exists because a
+# lingering backend held the single-instance lock and the next launch quit.
+LAST_TURN_WAIT = 2.0
+
+
+def _let_the_last_turn_land(timeout: float = LAST_TURN_WAIT) -> bool:
+    """Give a turn that is finishing the moment to finish, and let no new one start.
+
+    Measured 2026-09-25: the docstrings here said `server.shutdown()` "lets the request
+    in flight finish". It does not — the request threads are daemons
+    (`ThreadedWSGIServer.daemon_threads`), `serve_forever` returns, `main` returns, and
+    the turn dies with the process. A turn still waiting on the model cannot be saved in
+    the time the shell allows, and it is not: the save on disk is the last whole one,
+    because every save lands by rename (`pathfindergm/files.py`). What this buys is the
+    turn that has its answer and is writing it. The game lock is taken and kept, so
+    nothing queued behind it starts on the way out.
+
+    True if the lock was had — nothing was in flight, or it finished in time.
+    """
+    try:
+        from play import concurrency
+    except Exception:
+        return False
+    return concurrency._GAME.acquire(timeout=timeout)
+
+
 def _reap_when_the_last_window_closes(server) -> None:
     """Stop serving once no page has checked in for the grace period.
 
@@ -233,9 +327,10 @@ def _reap_when_the_last_window_closes(server) -> None:
     threads that call `liveness.touch()`. Daemon, so it can never be the thing holding
     the exit open — which is the failure mode this whole function is about.
 
-    `server.shutdown()` is the same graceful stop `--watch-stdin` uses: the request in
-    flight finishes, `serve_forever` returns, and `main`'s `finally` removes the
-    portfile, so an abandoned game still exits *cleanly* and leaves no stale handshake.
+    `server.shutdown()` is the same graceful stop `--watch-stdin` uses: `serve_forever`
+    returns, `main`'s `finally` gives a finishing turn its moment
+    (`_let_the_last_turn_land`) and removes the portfile, so an abandoned game still
+    exits *cleanly* and leaves no stale handshake.
     """
     from pathfindergm import liveness
 
@@ -337,9 +432,11 @@ def main(argv: list[str] | None = None) -> int:
     if "--watch-stdin" in argv:
         # Stdin closing is how the shell says stop — the graceful half of shutdown.
         # The taskkill fallback exists for shells that die without closing it, but a
-        # clean quit should not need the axe: `server.shutdown()` lets the request in
-        # flight finish, and the `finally` below removes the portfile, which is what
-        # marks the exit as clean. Daemon, so a broken stdin cannot hold the exit.
+        # clean quit should not need the axe: `server.shutdown()` stops the serving loop,
+        # the `finally` below gives a finishing turn two seconds and removes the
+        # portfile, which is what marks the exit as clean. A turn still waiting on the
+        # model is lost, and the save is the last whole one. Daemon, so a broken stdin
+        # cannot hold the exit.
         def _watch():
             try:
                 sys.stdin.read()
@@ -347,6 +444,12 @@ def main(argv: list[str] | None = None) -> int:
                 pass
             server.shutdown()
         threading.Thread(target=_watch, daemon=True).start()
+
+    # The unpack folders force-killed runs left in %TEMP%, swept in the background once
+    # the server is up — frozen only, since only a onefile build unpacks.
+    if getattr(sys, "frozen", False):
+        threading.Thread(target=_sweep_stale_unpacks, daemon=True,
+                         name="pathfindergm-sweep").start()
 
     # Always, shell or no shell. Inert until a page checks in, so nothing that drives the
     # exe without a browser — `tools/prove_build.py`, `--check`, a curl — can be reaped
@@ -376,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
         say("")
         say("  On this network, from a phone or tablet:")
         for address in lan_state["addresses"] or ["  (no network address found)"]:
-            say(f"    {address}")
+            _console_only(f"    {address}", redacted=f"    {_without_pass(address)}")
         say("  The pass is new every launch, and Windows may ask you to allow this")
         say("  app through the firewall the first time.")
         say("")
@@ -392,6 +495,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        _let_the_last_turn_land()
         server.server_close()
         # Best-effort: a portfile left by a crash still carries our (now dead) pid,
         # which is what lets a shell distinguish stale from current.

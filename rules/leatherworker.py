@@ -32,6 +32,7 @@ from pathlib import Path
 from . import effectspec
 from . import worldclass as wc
 from .tables import ARMOUR
+from pathfindergm import files
 
 TRACK_ID = "leatherworker"
 
@@ -261,7 +262,8 @@ def load_dir(path: str | Path, claimed_by: str = "") -> dict[str, Material]:
     for file in sorted(p.glob("*.json")):
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(file, exc)
             continue
         file_craft = str(data.get("craft") or "").strip().lower() \
             if isinstance(data, dict) else ""

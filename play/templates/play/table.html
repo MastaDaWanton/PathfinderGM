@@ -143,6 +143,11 @@
   /* Out of character: the engine answering a question about itself, never the
      narrator. Deliberately unlike the prose — monospace, no drop cap, no ink bleed —
      because the one thing this must never be mistaken for is the fiction. */
+  /* While a turn resolves, nothing that takes an action can be pressed (see busy()). */
+  body.resolving #combatbar button, body.resolving .castbtn,
+  body.resolving [data-use], body.resolving #talk button {
+    pointer-events: none; opacity: .55;
+  }
   .beat.aside {
     white-space: pre-wrap;
     font: 12.5px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -1740,7 +1745,7 @@ function csrf() {
 // where you left them rather than at the start of a new game.
 async function openRoster() {
   let d;
-  try { d = await (await fetch("/api/characters")).json(); }
+  try { d = await readJSON(await fetch("/api/characters")); }
   catch (e) { $("#err").textContent = e.message; return; }
 
   $("#deathtitle").textContent = "Who is playing";
@@ -1815,7 +1820,7 @@ document.addEventListener("click", async e => {
     const r = await fetch("/api/level-up", {
       method: "POST", headers: {"X-CSRFToken":
         document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""}});
-    const d = await r.json();
+    const d = await readJSON(r);
     if (!r.ok) { $("#levelerr").textContent = d.error || "could not level"; return; }
     // Shown before the sheet redraws, so the number arrives as a die landing rather than
     // as a figure that was already on the sheet by the time anybody looked.
@@ -1834,7 +1839,7 @@ document.addEventListener("click", async e => {
       });
     }
     render(d);
-    SHEET = await (await fetch("/api/sheet")).json();
+    SHEET = await readJSON(await fetch("/api/sheet"));
     $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
   } catch (err) { $("#levelerr").textContent = String(err); }
 });
@@ -1937,7 +1942,7 @@ function noteRevision(r) {
 async function getState() {
   const r = await fetch("/api/state", { cache: "no-store" });
   noteRevision(r);
-  return r.json();
+  return readJSON(r);
 }
 
 async function resync() { render(await getState()); }
@@ -1952,7 +1957,7 @@ async function checkTheOtherDevice() {
   try {
     const r = await fetch("/api/revision", { cache: "no-store" });
     if (!r.ok) return;
-    const theirs = (await r.json()).revision;
+    const theirs = (await readJSON(r)).revision;
     if (typeof theirs === "number" && theirs !== REVISION) await resync();
   } catch {
     // The server is gone, or saturated by a turn. Neither is this loop's business and a
@@ -1967,6 +1972,23 @@ setInterval(checkTheOtherDevice, RESYNC_MS);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) checkTheOtherDevice();
 });
+
+// Every response the page reads goes through here. A reply that is not JSON is a server
+// error page, and `r.json()` on it throws "JSON.parse: unexpected character at line 1
+// column 1" — which is what the player sees instead of the actual failure. Measured in
+// play: that string appeared in the transcript with no way to tell what had gone wrong.
+// `post` had this; eight direct `r.json()` calls did not (2026-09-25). Read the body once
+// as text and decide, so a 500 reports itself as a 500 — and the 500 the server now
+// answers in JSON ("it was not saved") is shown in its own words.
+async function readJSON(r) {
+  const raw = await r.text();
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const first = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(`The server failed (HTTP ${r.status}). ${first || "No detail."}`);
+  }
+}
 
 async function post(url, body) {
   const headers = {"Content-Type": "application/json", "X-CSRFToken": csrf()};
@@ -1986,14 +2008,7 @@ async function post(url, body) {
   // sees instead of the actual failure. Measured in play: that string appeared in the
   // transcript with no way to tell what had gone wrong. Read the body once as text and
   // decide, so a 500 reports itself as a 500.
-  const raw = await r.text();
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    const first = raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
-    throw new Error(`The server failed (HTTP ${r.status}). ${first || "No detail."}`);
-  }
+  const data = await readJSON(r);
   // 422 is the table pushing a turn back across the table rather than an error: the
   // player said what the world does, which is the GM's half. The text they typed is
   // deliberately left in the box so they can rewrite it.
@@ -2578,7 +2593,7 @@ function showPopup(p) {
 // rest share the plain excursion path.
 async function loadCraftActions() {
   try {
-    const d = await (await fetch("/api/craft/actions", { cache: "reload" })).json();
+    const d = await readJSON(await fetch("/api/craft/actions", { cache: "reload" }));
     $("#cp-biome").textContent = d.biome || "nowhere in particular";
     $("#cp-desc").textContent = d.biome_describe || "";
     const busyWhy = d.blocked || "";
@@ -3321,7 +3336,7 @@ async function openSheet() {
   $("#sheetbody").innerHTML = `<div class="empty">Reading the sheet…</div>`;
   try {
     const r = await fetch("/api/sheet");
-    SHEET = await r.json();
+    SHEET = await readJSON(r);
     if (!r.ok) throw new Error(SHEET.error || "could not read the sheet");
   } catch (e) {
     $("#sheetbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
@@ -3770,7 +3785,7 @@ document.addEventListener("input", e => {
   featTimer = setTimeout(async () => {
     try {
       const r = await fetch(`/api/feats?q=${encodeURIComponent(FEAT_QUERY)}&limit=40`);
-      FEAT_RESULTS = (await r.json()).feats;
+      FEAT_RESULTS = (await readJSON(r)).feats;
     } catch (err) {
       FEAT_RESULTS = [];
     }
@@ -4282,6 +4297,11 @@ document.addEventListener("keydown", e => {
 function busy(on) {
   $("#busy").classList.toggle("on", on);
   $("#send").disabled = on;
+  // And every other control that takes an action. Only #send was disabled, so the
+  // combat bar, the Cast and Use buttons and the talk panel stayed live mid-turn and the
+  // server's lock had to refuse the second press with a 409 (2026-09-25). The lock is
+  // still the authority; this stops the page offering what it would refuse.
+  document.body.classList.toggle("resolving", on);
 }
 // Money, in this world's words. The names arrive with the state rather than being
 // written here, because what a coin is called is the world's business — see

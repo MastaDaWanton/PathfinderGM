@@ -18,7 +18,19 @@ sys.path.insert(0, str(ROOT))
 os.chdir(ROOT)
 
 # Campaign saves must never land in the real user data directory during a test run.
-os.environ.setdefault("PATHFINDER_GM_DATA", str(ROOT / ".test-data"))
+# Assigned, not `setdefault`: a shell that had exported PATHFINDER_GM_DATA for a live
+# probe (the scratchpad data dirs the live checks use) would otherwise have pointed the
+# whole suite — house-rule deletes and all — at that directory.
+os.environ["PATHFINDER_GM_DATA"] = str(ROOT / ".test-data")
+
+# Emptied at the start of every run, before Django reads anything from it. Measured
+# 2026-09-25: it held 456 files left by earlier runs — characters, campaigns and their
+# backups — and a test that reads the shelf or the house-rules file read whatever the
+# last run left (the `point_buy: 0` leak of 2026-09-08 was exactly that). Ignored by git;
+# nothing in it is anybody's.
+import shutil as _shutil  # noqa: E402
+
+_shutil.rmtree(ROOT / ".test-data", ignore_errors=True)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pathfindergm.settings")
 
 import django  # noqa: E402
@@ -111,6 +123,152 @@ def _the_model_gate_is_open_unless_a_test_shuts_it(monkeypatch):
         return gm_client.Probe(True, installed=tuple(n.model for n in preflight.needs()))
 
     monkeypatch.setattr(gm_client, "probe", answers_with_whatever_is_configured)
+
+
+# --- the three fixtures pytest-django used to lend -----------------------------------------
+#
+# requirements.txt says the tests configure Django themselves rather than pulling in
+# pytest-django, and the module docstring above says why. Measured 2026-09-25: 26 test
+# files asked for pytest-django's `client`, `settings` or `db` anyway, and passed only
+# because the plugin happened to be installed on this machine — on a checkout built from
+# requirements.txt all 26 would have errored with "fixture 'client' not found". pytest.ini
+# now carries `-p no:django`, so the plugin cannot be leaned on silently again, and these
+# are the three it was lending.
+
+
+@pytest.fixture
+def client():
+    """A Django test client. Files that need a campaign dir of their own define their
+    own `client` fixture, which overrides this one."""
+    from django.test import Client
+
+    return Client()
+
+
+class _Settings:
+    """`settings.X = y` inside a test, undone at teardown — pytest-django's contract.
+
+    Each assignment goes through `override_settings`, so Django announces it with
+    `setting_changed`, and `_cache_follows_the_directory` below drops the content caches
+    when CAMPAIGN_DIR moves, exactly as it does for the context manager.
+    """
+
+    def __init__(self):
+        object.__setattr__(self, "_undo", [])
+
+    def __getattr__(self, name):
+        return getattr(settings, name)
+
+    def __setattr__(self, name, value):
+        from django.test import override_settings
+
+        o = override_settings(**{name: value})
+        o.enable()
+        self._undo.append(o)
+
+    def __delattr__(self, name):
+        from django.test.utils import override_settings
+
+        o = override_settings()
+        o.enable()
+        delattr(settings, name)
+        self._undo.append(o)
+
+    def finalize(self):
+        while self._undo:
+            self._undo.pop().disable()
+
+
+# Registered under pytest-django's name, defined under another so it does not shadow the
+# module-level `settings` this file reads.
+@pytest.fixture(name="settings")
+def _settings_fixture():
+    wrapper = _Settings()
+    yield wrapper
+    wrapper.finalize()
+
+
+@pytest.fixture(name="db")
+def _no_database():
+    """The app has no models and no ORM; a test asking for `db` asked for nothing."""
+    return None
+
+
+@pytest.fixture(autouse=True)
+def _no_test_reaches_a_live_model(request, monkeypatch):
+    """No test talks to Ollama unless it says so with `@pytest.mark.live_model`.
+
+    Measured 2026-09-25 with a connection recorder over the 49 files that start a
+    campaign: three tests reached the live model synchronously —
+    `test_a_free_action_does_not_hand_the_round_to_the_enemy` (4 calls, the prose) and
+    two in `test_combat_panel.py` (the thug's `npc_turn`, 6 and 2 calls). With Ollama up
+    the model decided the outcome: the free-action test flaked on 2026-09-20 because the
+    real narrator invented a person whose initiative beat the player's. With Ollama down
+    each call still cost ~2 s, the time Windows takes to refuse a localhost connection —
+    they were the three slowest tests in the suite. And every GET of the shelf page
+    warmed two models in background threads (22 connections across 10 files), so a test
+    run loaded the narrator into VRAM.
+
+    `chat` raises `ModelUnavailable`, the app's own "no model" path, so a test that did
+    not stub the model exercises the fallback the player sees with Ollama down, every
+    run, instead of whichever answer the model felt like. Tests that stub `chat`
+    themselves (`monkeypatch.setattr(client, "chat", fake)`) replace this, because they
+    run after it.
+    """
+    if request.node.get_closest_marker("live_model"):
+        return
+    import urllib.error
+
+    from gm import client as gm_client
+
+    # The TRANSPORT is refused, not `chat`: the first cut replaced `chat` and seven tests
+    # of `chat` itself failed — the hosted-provider routing, the missing-key refusal, the
+    # dropped connection — because they fake `urlopen` and need the real function above
+    # it. Every one of them stubs `urlopen` after this runs, so theirs wins.
+    # Only the model's door and the outside world: a test that serves the app on a
+    # loopback port and fetches its own pages (test_packaging) is not talking to a model.
+    from urllib.parse import urlsplit
+
+    real_urlopen = gm_client.urllib.request.urlopen
+
+    def no_model(req, *a, **kw):
+        url = str(getattr(req, "full_url", req))
+        parts = urlsplit(url)
+        local = parts.hostname in ("127.0.0.1", "localhost", "::1")
+        if local and parts.port != 11434:
+            return real_urlopen(req, *a, **kw)
+        raise urllib.error.URLError(
+            f"tests do not reach a live model ({url}); mark the test live_model or "
+            f"stub gm.client.chat")
+
+    monkeypatch.setattr(gm_client.urllib.request, "urlopen", no_model)
+    monkeypatch.setattr(gm_client, "warm", lambda *_a, **_kw: False)
+
+
+@pytest.fixture(autouse=True)
+def _unseeded_dice_are_seeded_per_test(request, monkeypatch):
+    """A `Dice()` with no seed draws its seed from a stream fixed by the test's own id.
+
+    `begin_with()` takes no seed and `Engine` falls back to `Dice(None)`: 61 test calls
+    to `begin_with` and every Client-driven `/api/start` rolled from the clock, so a
+    test's initiative, hits and damage differed run to run and a d20 could decide
+    whether it passed — the 2026-09-20 flake was exactly that. Keyed on the node id
+    (crc32, not `hash`, which Python salts per process), so a test rolls the same dice
+    whatever ran before it, and each unseeded `Dice` inside one test still gets its own
+    seed, so a test that builds several is not handed the same rolls twice.
+    """
+    import random
+    import zlib
+
+    from rules import dice as dice_mod
+
+    stream = random.Random(zlib.crc32(request.node.nodeid.encode("utf-8")))
+    original = dice_mod.Dice.__init__
+
+    def seeded(self, seed=None):
+        original(self, stream.randrange(2 ** 32) if seed is None else seed)
+
+    monkeypatch.setattr(dice_mod.Dice, "__init__", seeded)
 
 
 @pytest.fixture(autouse=True)

@@ -720,7 +720,12 @@ def table(request):
     if not preflight.check().ok:
         return redirect("/?setup=1")
     try:
-        c = campaign_mod.current(reset=request.GET.get("new") == "1")
+        # No `?new=1`. It archived the campaign and started another from a GET, which
+        # CSRF does not cover and the server sits on a fixed port: measured 2026-09-25,
+        # `<img src="http://127.0.0.1:8917/play/?new=1">` on any page the player visited
+        # reset their game. Nothing in the app linked to it — new games begin on the
+        # shelf, by POST — so the door is gone rather than moved.
+        c = campaign_mod.current()
     except campaign_mod.UnreadableSave:
         # Back to the shelf, which now survives this and says why. The refusal itself
         # stands — `current()` still raises, nothing is repaired behind the player's
@@ -969,7 +974,8 @@ def feat_search(request):
         kind=request.GET.get("type", ""),
         source=request.GET.get("source", ""),
         tag=request.GET.get("tag", ""),
-        limit=int(request.GET.get("limit", 60) or 60),
+        # `read_int`, not `int()`: "?limit=many" was a 500 (2026-09-25).
+        limit=read_int(request.GET, "limit", 60, lo=1, hi=500),
     )
 
     out = []
@@ -1218,13 +1224,29 @@ def say(request):
         )
     except ModelUnavailable as exc:
         c.transcript.pop()
+        _put_back_free_actions(c, pending)
         return JsonResponse({"error": str(exc)}, status=503)
     except IntentError as exc:
         c.transcript.pop()
+        _put_back_free_actions(c, pending)
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
 
     return _advance(c, agent, plan.narration, plan, text)
+
+
+def _put_back_free_actions(c, pending: list) -> None:
+    """A turn the model could not plan takes nothing with it.
+
+    Measured 2026-09-25: the free actions were moved into `history` as a note and
+    `pending_free` emptied BEFORE the plan call, so a 503 left the note in the history
+    (the next turn's model read it as already said) and the free actions gone from the
+    list that would have carried them to the turn that did happen."""
+    if not pending:
+        return
+    if c.history and c.history[-1].get("content", "").startswith("(Since their last turn"):
+        c.history.pop()
+    c.pending_free = list(pending) + list(getattr(c, "pending_free", []) or [])
 
 
 # The combat panel's whitelist: what a button may emit, and nothing else. The free-text
@@ -1817,10 +1839,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             tail = re.search(r"\bfor\s+([^.!?]{3,80})", judgement.redact_speech(player_input), re.I)
             line = f"{m.group(1)} paid {m.group(2)} {m.group(3)} {m.group(4)}" \
                    + (f" for {tail.group(1).strip()}" if tail else "")
-            agreed = list(c.scene.said.get("agreements") or [])
+            agreed = list(c.scene.agreements or [])
             if line not in agreed:
                 agreed.append(line)
-            c.scene.said["agreements"] = agreed[-5:]
+            c.scene.agreements = agreed[-5:]
     # Bodies age out on their own: two turns' grace to loot and mourn, then the
     # scene lets them go whether or not the player ever says the word "leave".
     swept = agent.engine.tidy_the_fallen()
@@ -2307,7 +2329,11 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         tells = [o for o in resolution.outcomes if o.tell]
         if tells:
             try:
-                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts")
+                # No polish rewrite on an NPC's turn — the same call `npc_turn` makes for
+                # its own prose: "a ~10s polish call per NPC per round is a price a fight
+                # cannot pay". This door had it on, measured 2026-09-25.
+                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts",
+                                                rewrite=False)
             except ModelUnavailable:
                 text = ""
             c.transcript.append({

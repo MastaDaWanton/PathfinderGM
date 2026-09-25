@@ -17,6 +17,7 @@ from pathlib import Path
 
 from django.conf import settings
 
+from pathfindergm import files
 from rules import biomes
 from rules.bestiary import instantiate
 from rules.dice import Dice
@@ -30,6 +31,18 @@ from world.loader import load_cached
 # opening a `people` save would read `actors` as empty and hand the player a dead game
 # with no sentence naming the cause; with the version refused, the sentence is there.
 SAVE_VERSION = 2
+
+# The saves kept beside each campaign, newest first: `<id>.json.1` is the turn before.
+BACKUPS_KEPT = 3
+
+
+class NewerSave(ValueError):
+    """The save was written by a newer build. Not damage: refused, never restored.
+
+    Measured the day backups arrived (2026-09-25): `test_a_save_from_an_older_build_still
+    _opens` caught the first cut "restoring" a version-3 save from its version-2 backup —
+    rolling the player's newer game back a turn and setting it aside, when the only right
+    answer is "update the app"."""
 
 
 class UnreadableSave(RuntimeError):
@@ -173,7 +186,7 @@ class Campaign:
     def path(self) -> Path:
         d = Path(settings.CAMPAIGN_DIR)
         d.mkdir(parents=True, exist_ok=True)
-        return d / f"{self.id}.json"
+        return files.child(d, self.id)
 
     def save(self) -> Path:
         # Version-stamped because this file lives in the user data directory and outlives
@@ -227,6 +240,7 @@ class Campaign:
                 "acted": sorted(self.scene.acted),
                 "attacked": sorted(self.scene.attacked),
                 "turn": self.scene.turn,
+                "turn_is_next": self.scene.turn_is_next,
                 "sides": self.scene.sides,
                 "round": self.scene.round,
                 "clock_minutes": self.scene.clock_minutes,
@@ -246,6 +260,8 @@ class Campaign:
                 "guarded_finds": [dict(g) for g in self.scene.guarded_finds],
                 "cards": [dict(c) for c in self.scene.cards],
                 "said": dict(self.scene.said),
+                "routed_xp": [dict(r) for r in self.scene.routed_xp],
+                "agreements": list(self.scene.agreements),
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
                 # Which counters already have somebody behind them. Absent in saves
@@ -281,7 +297,13 @@ class Campaign:
             "ended": self.ended,
         }
         p = self.path()
-        p.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+        # Serialised BEFORE anything on disk moves, so a payload that cannot be written
+        # (a set where a list belongs) raises with the last save and its backups intact.
+        text = json.dumps(payload, indent=1)
+        # The save that was whole becomes `.json.1` (then .2, .3), and the new one lands
+        # by rename, never by truncating the only copy — see pathfindergm/files.py.
+        files.keep_backup(p, keep=BACKUPS_KEPT)
+        files.write_text(p, text)
 
         # Keep the roster's copy of the sheet level with the game. Nothing called
         # `roster.record`, so the roster showed every character at the hit points they
@@ -310,7 +332,7 @@ class Campaign:
         except (TypeError, ValueError):
             found_n = 0
         if found_n > SAVE_VERSION:
-            raise ValueError(
+            raise NewerSave(
                 f"{path.name}: save version {found}, and this build writes "
                 f"{SAVE_VERSION}. The campaign was saved by a newer version of "
                 f"Pathfinder GM — update the app to open it."
@@ -339,6 +361,7 @@ class Campaign:
             acted=set(s.get("acted", [])),
             attacked=set(s.get("attacked", [])),
             turn=s.get("turn", -1),
+            turn_is_next=bool(s.get("turn_is_next", False)),
             sides={k: list(v) for k, v in (s.get("sides") or {}).items()},
             round=s.get("round", 0),
             clock_minutes=s.get("clock_minutes", 0),
@@ -360,7 +383,14 @@ class Campaign:
             # Absent in saves written before the pools were walked: an empty record
             # means the first line of each pool is next, which is where a new campaign
             # starts too.
-            said=dict(s.get("said") or {}),
+            said={k: v for k, v in (s.get("said") or {}).items()
+                  if k not in ("routed_xp", "agreements")},
+            # Their own fields since 2026-09-25; a save written before carries them in
+            # `said`, and they are moved over here rather than lost.
+            routed_xp=list(s.get("routed_xp") or (s.get("said") or {}).get("routed_xp")
+                           or []),
+            agreements=list(s.get("agreements") or (s.get("said") or {}).get("agreements")
+                            or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
@@ -436,6 +466,10 @@ class Campaign:
             else:
                 engine.place_party(self.scene.at)
         except Exception:
+            import logging
+
+            logging.getLogger("pathfindergm").exception(
+                "placing the party on load failed; they stand 'here' until the world loads")
             # A world that will not load is reported by whoever asked for it; the
             # party is not left nowhere on the way to that sentence. Everyone the save
             # did not place is stood with the party by `place_party`, which is the
@@ -630,7 +664,7 @@ def active_id() -> str:
 
 
 def set_active(campaign_id: str) -> None:
-    _pointer().write_text(campaign_id, encoding="utf-8")
+    files.write_text(_pointer(), campaign_id)
 
 
 def switch_to(character_id: str) -> Campaign:
@@ -678,6 +712,14 @@ def switch_to(character_id: str) -> Campaign:
     return c
 
 
+def forget_live() -> None:
+    """Drop every campaign held in memory; the next request reads its save back.
+
+    The answer to a request that failed half-way (`concurrency.OneGameAtATime`): the save
+    on disk is always a consistent point, the memory copy after a crash is not."""
+    _LIVE.clear()
+
+
 def _save_path(campaign_id: str) -> Path:
     return Campaign(id=campaign_id, world_source="", scene=Scene()).path()
 
@@ -699,7 +741,20 @@ def current(campaign_id: str | None = None, reset: bool = False) -> Campaign:
             # An explicit new game archives the old one rather than deleting it. Saves
             # are cheap and losing a campaign to a stray ?new=1 is not recoverable.
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            path.rename(path.with_name(f"{campaign_id}-{stamp}.json"))
+            # A second reset inside the same second collided with the first archive's
+            # name, and `rename` onto an existing file raises on Windows — a 500.
+            archive = path.with_name(f"{campaign_id}-{stamp}.json")
+            n = 2
+            while archive.exists():
+                archive = path.with_name(f"{campaign_id}-{stamp}-{n}.json")
+                n += 1
+            # The backups go with the game they are backups OF. Left under the old
+            # name, the next campaign to take this id would inherit them, and a failed
+            # load would "restore" the archived game over the new one.
+            for kept in files.backups(path, keep=BACKUPS_KEPT):
+                suffix = kept.name[len(path.name):]
+                kept.replace(archive.with_name(archive.name + suffix))
+            path.rename(archive)
 
     if campaign_id not in _LIVE:
         # `_resume` returns None only when there is genuinely no save to read; a save
@@ -735,6 +790,40 @@ def _retire_outgoing(path: Path) -> None:
         roster.save(entry)
 
 
+def _restore_from_backup(path: Path, why: Exception) -> Campaign | None:
+    """Open the newest backup of `path` that reads, put it in place, and say so.
+
+    Measured 2026-09-25: the save was written by truncate-then-write and had no copy,
+    so a campaign cut off mid-write was an `UnreadableSave` with nothing behind it.
+    """
+    import logging
+    import shutil
+
+    for backup in files.backups(path, keep=BACKUPS_KEPT):
+        try:
+            c = Campaign.load(backup)
+        except Exception:
+            continue
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        aside = path.with_name(f"{path.name}.unreadable-{stamp}")
+        try:
+            path.replace(aside)
+            shutil.copy2(backup, path)
+        except OSError:
+            return None
+        logging.getLogger("pathfindergm").warning(
+            "%s could not be read (%s); restored from %s, the unreadable file kept as %s",
+            path.name, why, backup.name, aside.name)
+        c.transcript.append({
+            "who": "gm", "kind": "aside",
+            "text": ("Your last save could not be read, so the game has been restored "
+                     "from the one before it. The unreadable file was kept beside it as "
+                     f"{aside.name}."),
+        })
+        return c
+    return None
+
+
 def _resume(campaign_id: str) -> Campaign | None:
     path = Campaign(id=campaign_id, world_source="", scene=Scene()).path()
     if not path.exists():
@@ -742,6 +831,20 @@ def _resume(campaign_id: str) -> Campaign | None:
     try:
         return Campaign.load(path)
     except Exception as exc:
+        # The last save that was whole, when there is one. The unreadable file is moved
+        # aside, never deleted — the refusal below still stands for the case where no
+        # backup reads either, and nothing is repaired behind the player's back: the
+        # restored game opens with a line saying what happened and which turn it is.
+        # Only a DAMAGED file — one that no longer parses — is restored. A save that
+        # parses and fails the rules (a homebrew class edited under its character) is
+        # not damage: its backups hold the same character and would fail the same way,
+        # and rolling the game back a turn to find one that passed would be exactly the
+        # repair behind the player's back that test_the_shelf_survives_a_bad_save
+        # forbids. A newer build's save is not damage either.
+        damaged = isinstance(exc, (json.JSONDecodeError, UnicodeDecodeError))
+        restored = _restore_from_backup(path, exc) if damaged else None
+        if restored is not None:
+            return restored
         # The save is left exactly where it is, and the failure is raised rather than
         # swallowed. This used to rename the file and return None, and `current()`
         # answers None by calling `_begin`, which immediately saves — so ANY error on

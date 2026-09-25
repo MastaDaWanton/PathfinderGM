@@ -279,14 +279,23 @@ def test_pools_expire_on_their_own_clocks(pc):
     assert pc.temp_hp == 6
 
 
-def test_a_misspelled_override_is_caught_at_load():
+def test_a_misspelled_override_is_caught_at_load(caplog):
     """A feature that silently never happens, with nothing anywhere saying why, is the
-    failure mode this exists to prevent."""
-    with pytest.raises(IllegalSheet, match="no such rule"):
-        from_dict({"name": "x", "kind": "npc", "hp": 5, "hp_max": 5,
-                   "abilities": {a: 10 for a in
-                                 ("str", "dex", "con", "int", "wis", "cha")},
-                   "overrides": {"temp_hp.stack": True}})
+    failure mode this exists to prevent.
+
+    Said in the log and dropped since 2026-09-25, no longer raised: `from_dict` is the
+    load path, and a raise there made renaming a rule a way to make every save that had
+    overridden it unreadable."""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="pathfindergm"):
+        a = from_dict({"name": "x", "kind": "npc", "hp": 5, "hp_max": 5,
+                       "abilities": {a: 10 for a in
+                                     ("str", "dex", "con", "int", "wis", "cha")},
+                       "overrides": {"temp_hp.stack": True}})
+    assert "temp_hp.stack" not in a.overrides
+    assert any("no such rule" in r.message and "temp_hp.stack" in r.message
+               for r in caplog.records)
 
 
 def test_everything_new_survives_a_save(pc):

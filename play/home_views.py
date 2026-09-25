@@ -24,6 +24,7 @@ from . import campaign as campaign_mod
 from .apiutil import read_body, read_int
 from . import homebrew, library, roster
 from .craft_views import DISCIPLINES
+from pathfindergm import files
 
 
 @ensure_csrf_cookie
@@ -310,12 +311,12 @@ def save_consumable(request):
 
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "thing"
     path = homebrew.folder("consumables") / f"{slug}.json"
-    path.write_text(json.dumps({
+    files.write_text(path, json.dumps({
         "id": slug, "name": name,
         "kind": str(body.get("kind", "consumable")),
         "description": str(body.get("description", "")),
         "effects": specs,
-    }, indent=1), encoding="utf-8")
+    }, indent=1))
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(s) for s in specs]})
 
@@ -331,7 +332,10 @@ def open_thing(request, bench_id: str, thing_id: str):
     """
     from rules import registry
 
-    mine = homebrew.folder(homebrew.get(bench_id).dir) / f"{thing_id}.json"
+    try:
+        mine = files.child(homebrew.folder(homebrew.get(bench_id).dir), thing_id)
+    except files.BadName as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     if mine.exists():
         d = json.loads(mine.read_text(encoding="utf-8"))
         # Derived for yours as well as for shipped: a race's structured fields are
@@ -409,7 +413,10 @@ def save_thing(request, bench_id: str):
     # edit: an imported race carries the world and the people it came from, and a
     # save that rebuilt the file from the form alone dropped both — and with them the
     # `world_people_id` every character of that race is stamped with.
-    path = homebrew.folder(bench.dir) / f"{slug}.json"
+    try:
+        path = files.child(homebrew.folder(bench.dir), slug)
+    except files.BadName as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     entry = {}
     if path.exists():
         try:
@@ -441,7 +448,7 @@ def save_thing(request, bench_id: str):
             return JsonResponse({"error": " ".join(problems), "problems": problems},
                                 status=400)
 
-    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(sp) for sp in specs]})
 
@@ -461,7 +468,7 @@ def spell_search(request):
         subschool=g.get("subschool", ""), descriptor=g.get("descriptor", ""),
         tag=g.get("tag", ""), klass=g.get("class", ""),
         level=int(level) if level not in (None, "") and level.isdigit() else None,
-        limit=int(g.get("limit", 120)),
+        limit=read_int(g, "limit", 120, lo=1, hi=1000),   # "?limit=x" was a 500
     )
     return JsonResponse({
         "count": len(found),

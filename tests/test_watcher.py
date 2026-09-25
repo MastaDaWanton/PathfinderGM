@@ -101,8 +101,9 @@ def test_the_watcher_and_the_loot_op_mean_the_same_thing_by_down():
     for key in ("dead", "dying", "unconscious", "stable", "petrified", "helpless"):
         a = body(conditions=[key])
         assert watcher._down(a), f"{key} at full hit points was not down to the watcher"
-        # The loot op's actual test, quoted rather than trusted.
-        assert a.hp <= 0 or a.has_state("state.down")
+        # The loot op's actual test, quoted rather than trusted — `lootable` since
+        # helpless left the down family (2026-09-25) and had to be named.
+        assert a.lootable
 
     assert not watcher._down(body()), "an unhurt creature must not be lootable"
     assert watcher._down(body(hp=-2)), "hit points alone still answer"

@@ -160,3 +160,32 @@ class TestInteresting:
                "params": {"name": "the Great Cathedral", "kind": "cathedral"}}
         out = e.run(e.validate([raw], origin="author:test")).outcomes[-1]
         assert out.status == "refused" and "cathedral" in out.tell
+
+
+class TestNotFromAFight:
+    """A brawl's prose reaches for whatever is near, and measured 2026-09-25 the page
+    founded places from combat prose too — a fight in the lane could found a smithy the
+    town never had. The ruling was about places the narration ESTABLISHES."""
+
+    def test_combat_prose_founds_nothing(self):
+        from gm.agent import GMAgent
+
+        s, e, pc = _party()
+        foe = instantiate("thug", scene=s, name="thug")
+        s.add(foe)
+        e.run(e.validate([{"op": "begin_encounter", "because": "t",
+                           "params": {"sides": {"pc": [pc.ref], "them": [foe.ref]}}}]))
+        assert s.in_encounter
+        gm = GMAgent(WORLD, e)
+        before = _names(e)
+        gm._found_from_the_page("You sit in the tavern, the thug's club at your ribs.")
+        assert _names(e) == before
+
+    def test_out_of_a_fight_the_same_sentence_still_founds(self):
+        from gm.agent import GMAgent
+
+        s, e, pc = _party()
+        gm = GMAgent(WORLD, e)
+        before = _names(e)
+        gm._found_from_the_page("You sit in the tavern.")
+        assert _names(e) != before, "the ruling of 2026-09-23 still stands"

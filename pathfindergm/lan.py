@@ -42,11 +42,12 @@ has to read characters off a screen and type them.
 from __future__ import annotations
 
 import hmac
+import re
 import secrets
 import socket
 import threading
 
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect
 
 # No 0/O, no 1/l/I. Misread once on a phone screen is a player who thinks the app is
@@ -228,13 +229,60 @@ def _from_this_machine(request) -> bool:
     return request.META.get("REMOTE_ADDR") in ("127.0.0.1", "::1")
 
 
+# How long a pass lasts once a device has presented it. A long evening's play; the door
+# closing ends it sooner, because the cookie carries the token it was issued against.
+PASS_SECONDS = 12 * 60 * 60
+
+
 def _carries_the_pass(request) -> bool:
-    try:
-        return request.get_signed_cookie(COOKIE, salt=COOKIE_SALT, default=None) == "yes"
-    except Exception:
-        # A tampered or truncated cookie reads as no cookie. There is nothing to report
-        # and nobody to report it to.
+    """The cookie names the pass that is open NOW, and is not older than PASS_SECONDS.
+
+    Measured 2026-09-25: the cookie was the signed literal "yes", read with no max_age,
+    under a signing key that lasts as long as the install — so a phone that got in once
+    got back in after the door was closed and after a relaunch, though this file promised
+    that closing "makes the pass worthless". It carries the token now, and a new door
+    mints a new token.
+    """
+    if _token is None:
         return False
+    try:
+        held = request.get_signed_cookie(COOKIE, salt=COOKIE_SALT, default=None,
+                                         max_age=PASS_SECONDS)
+    except Exception:
+        # A tampered, truncated or expired cookie reads as no cookie. There is nothing to
+        # report and nobody to report it to.
+        return False
+    return bool(held) and hmac.compare_digest(str(held), token())
+
+
+# What a guest may CHANGE. Everything the play table, the craft page and the outfitter
+# post to, and nothing else: reads stay open, and every other write — the model settings
+# (whose hosted `host` a guest could point at their own server to be handed the API key),
+# deleting characters, importing worlds, the homebrew benches, installing Ollama, house
+# rules — belongs to the person at the machine. Measured 2026-09-25: the door was all or
+# nothing, so a pass was the host's full power. An allowlist rather than a list of what
+# is refused, so an endpoint added later is the host's until somebody decides otherwise;
+# `test_every_write_the_play_pages_make_is_open_to_a_guest` reads the three templates and
+# fails if one of them posts somewhere this set does not name.
+GUEST_WRITES = frozenset({
+    "/api/say", "/api/talk", "/api/cast", "/api/roll", "/api/roll/face",
+    "/api/combat/act", "/api/use", "/api/wear", "/api/trade", "/api/trade/do",
+    "/api/travel", "/api/craftaction", "/api/craft/actions", "/api/craft/excursion",
+    "/api/craft/do", "/api/craft/preview", "/api/craft/recipes", "/api/craft/ingredients",
+    "/api/forage", "/api/forage/table", "/api/level-up", "/api/slots",
+    "/api/spells/prepare", "/api/sheet", "/api/feats", "/api/state", "/api/revision",
+    "/api/characters", "/api/character/gender", "/api/character/new",
+    "/api/character/switch", "/api/resurrect", "/api/resume", "/api/start",
+    "/api/character/create", "/api/character/choices",
+})
+_GUEST_WRITE_PATTERNS = (re.compile(r"^/api/outfit/[^/]+/buy$"),)
+
+
+def guest_may(method: str, path: str) -> bool:
+    """Whether a device holding the pass may make this request."""
+    if method in ("GET", "HEAD", "OPTIONS"):
+        return True
+    return path in GUEST_WRITES or any(p.match(path) for p in _GUEST_WRITE_PATTERNS)
 
 
 class TheDoor:
@@ -244,18 +292,25 @@ class TheDoor:
         self.get_response = get_response
 
     def __call__(self, request):
-        if not enabled() or _from_this_machine(request) or _carries_the_pass(request):
+        if not enabled() or _from_this_machine(request):
             return self.get_response(request)
+        if _carries_the_pass(request):
+            if guest_may(request.method, request.path):
+                return self.get_response(request)
+            return JsonResponse(
+                {"error": "That can only be done on the machine the game is running on."},
+                status=403)
 
         given = str(request.GET.get(QUERY_KEY, "")).strip().upper()
         if given and hmac.compare_digest(given, token()):
             # Redirect to the same path *without* the token, so the address bar, the
             # history and any screenshot of this phone stop carrying the secret. Query
-            # string dropped deliberately and not preserved: the only thing the table
-            # reads from it is `?new=1`, which must never be replayed by a redirect.
+            # string dropped deliberately and not preserved: the table used to read
+            # `?new=1` from it (a reset, removed 2026-09-25), and a query that changes
+            # the game must never be replayed by a redirect.
             response = redirect(request.path)
             response.set_signed_cookie(
-                COOKIE, "yes", salt=COOKIE_SALT,
+                COOKIE, token(), salt=COOKIE_SALT, max_age=PASS_SECONDS,
                 httponly=True, samesite="Lax",
                 # No `secure`: this is plain HTTP on a LAN by necessity — a phone cannot
                 # be given a trusted certificate for 192.168.x.x. Marking it secure would

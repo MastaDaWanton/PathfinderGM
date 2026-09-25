@@ -28,6 +28,7 @@ from pathlib import Path
 
 from . import bestiary
 from . import registry
+from pathfindergm import files
 
 # --- source ranking ----------------------------------------------------------------------------
 
@@ -282,7 +283,10 @@ def _path(world_entity_id: str, make: bool = False) -> Path | None:
     wid = re.sub(r"[^a-z0-9_.-]+", "-", str(world_entity_id or "").strip().lower()).strip("-")
     if not wid:
         return None
-    return _dir(make=make) / f"{wid}.json"
+    try:
+        return files.child(_dir(make=make), wid)
+    except files.BadName:
+        return None
 
 
 def remember(world_entity_id: str, block_id: str, name: str, *, role: str = "",
@@ -294,7 +298,7 @@ def remember(world_entity_id: str, block_id: str, name: str, *, role: str = "",
     entry = {"id": path.stem, "name": str(name or ""), "description": str(description or ""),
              "creature": str(block_id or ""), "world_entity_id": str(world_entity_id),
              "role": str(role or "")}
-    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return path
 
 
@@ -325,7 +329,8 @@ def remembered() -> dict[str, dict]:
     for path in sorted(_dir().glob("*.json")) if _dir().is_dir() else []:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         if isinstance(data, dict):
             out[path.stem] = data

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from pathfindergm import files
 
 
 # Conditions the checker understands. A condition kind not in here is treated as unknown
@@ -100,7 +101,8 @@ def all_feats() -> dict[str, Feat]:
             for path in sorted(folder.glob("*.json")):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("feats") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

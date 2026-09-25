@@ -29,6 +29,7 @@ from importlib import import_module
 from pathlib import Path
 
 from . import biomes as _biomes
+from pathfindergm import files
 
 
 @dataclass
@@ -386,7 +387,8 @@ def read_folder(path: Path, key: str) -> dict[str, dict]:
     for file in sorted(path.glob("*.json")):
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(file, exc)
             continue
         entries = data.get(key) if isinstance(data, dict) else None
         if not isinstance(entries, list):
@@ -480,8 +482,8 @@ def save(kind_id: str, entry: dict) -> Path:
     thing_id = str(entry.get(kind.id_field) or "").strip().lower()
     if not thing_id:
         raise ValueError("it needs an id")
-    path = homebrew_dir(kind_id, make=True) / f"{thing_id}.json"
-    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
+    path = files.child(homebrew_dir(kind_id, make=True), thing_id)
+    files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return path
 
 

@@ -129,7 +129,8 @@ def test_the_content_setting_is_one_line_of_the_prose_briefing():
 def test_what_was_agreed_is_written_by_the_engine_and_read_back_until_the_party_moves(vormoor):
     from gm import prompts
 
-    vormoor.said["agreements"] = ["Kesst Vayr paid the woman 10 gp for the night"]
+    # Its own Scene field since 2026-09-25 (it lived in `said`, a dict with no schema).
+    vormoor.agreements = ["Kesst Vayr paid the woman 10 gp for the night"]
     now = prompts.scene_now(vormoor)
     assert "WHAT WAS AGREED here (fact, still standing): Kesst Vayr paid the woman 10 gp for the night" in now
     import inspect
@@ -137,11 +138,11 @@ def test_what_was_agreed_is_written_by_the_engine_and_read_back_until_the_party_
     from play import views
 
     src = inspect.getsource(views._finish)
-    assert 'c.scene.said["agreements"]' in src and "hands (.+?) (\\d+) × (gp|sp|cp|pp)" in src
+    assert "c.scene.agreements" in src and "hands (.+?) (\\d+) × (gp|sp|cp|pp)" in src
     # A move clears it: the next room starts clean.
     vormoor.move("pc", "somewhere-else") if hasattr(vormoor, "move") else None
     if hasattr(vormoor, "move"):
-        assert "agreements" not in vormoor.said
+        assert vormoor.agreements == []
 
 
 # --- 1/20: an xp op, and the cheat read in code -----------------------------------------------------

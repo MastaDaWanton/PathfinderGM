@@ -43,9 +43,11 @@ import copy
 import json
 import re
 import time
+import zlib
 from pathlib import Path
 
 from django.conf import settings
+from pathfindergm import files
 
 PHYSICAL = ("str", "dex", "con")
 MENTAL = ("int", "wis", "cha")
@@ -422,7 +424,8 @@ def _read_folder(folder: Path) -> dict[str, dict]:
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         if not isinstance(data, dict):
             continue
@@ -481,7 +484,17 @@ _SIGNATURES: dict[str, tuple[float, tuple]] = {}
 
 def _signature(folder: Path, ttl: float = 0.0) -> tuple:
     """(name, mtime, size) of every race file in the folder — what "has it changed"
-    means. Compared whole, so a file added, removed, or touched all count."""
+    means. Compared whole, so a file added, removed, or touched all count.
+
+    The folder read with no timer — the bench's, which it writes and reads back in one
+    breath — also carries a checksum of each file's bytes. Measured 2026-09-25:
+    `test_an_edit_on_the_bench_is_seen_on_the_next_read` failed one run in five, because
+    "speed": 30 and "speed": 40 are the same size and two writes inside one clock tick
+    have the same mtime, so the signature said nothing had changed and the old document
+    was served. CLAUDE.md: compare content, not just timestamps. The bench folder holds a
+    handful of files; the shipped folder, which is what made this cache worth having,
+    keeps the cheap stat and its timer.
+    """
     now = time.monotonic()
     seen = _SIGNATURES.get(str(folder))
     if ttl and seen is not None and now - seen[0] < ttl:
@@ -491,9 +504,10 @@ def _signature(folder: Path, ttl: float = 0.0) -> tuple:
         for path in sorted(folder.glob("*.json")):
             try:
                 st = path.stat()
+                crc = 0 if ttl else zlib.crc32(path.read_bytes())
             except OSError:
                 continue
-            out.append((path.name, st.st_mtime_ns, st.st_size))
+            out.append((path.name, st.st_mtime_ns, st.st_size, crc))
     sig = tuple(out)
     _SIGNATURES[str(folder)] = (now, sig)
     return sig
@@ -1380,10 +1394,10 @@ def import_from_world(world, overwrite: bool = False) -> list[str]:
     folder = homebrew_dir(make=True)
     covered = _covered(written_for(world))
     for d in from_world(world):
-        path = folder / f"{d['id']}.json"
+        path = files.child(folder, d["id"])
         if path.exists() and not overwrite or d.get("people_id") in covered:
             continue
-        path.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
+        files.write_text(path, json.dumps(d, indent=1, ensure_ascii=False))
         written.append(d["id"])
     return written
 

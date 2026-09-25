@@ -39,6 +39,7 @@ from pathlib import Path
 from . import consumables as con
 from . import effectspec
 from . import worldclass as wc
+from pathfindergm import files
 
 TRACK_ID = "alchemist"
 
@@ -226,7 +227,8 @@ def _load_dir(path: str | Path, key: str) -> dict[str, dict]:
     for p in sorted(Path(path).glob("*.json")):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(p, exc)
             continue
         entries = data.get(key) if isinstance(data, dict) else None
         if not isinstance(entries, list):

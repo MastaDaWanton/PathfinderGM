@@ -170,7 +170,15 @@ class GMAgent:
                           spare.get("api_key", ""))] * 2
         last = len(schedule) - 1
 
+        # A model that could not be reached is not asked again this turn. Measured
+        # 2026-09-25: a `ModelUnavailable` inside this loop — a timeout, Ollama restarting
+        # under a loaded model — left the loop and aborted the turn, so the fallback model
+        # this schedule exists to reach was never tried. Only when every model in it is
+        # down does the player get the "start Ollama" answer.
+        down: set[str] = set()
         for n, (model, host, provider, key) in enumerate(schedule):
+            if model in down:
+                continue
             if n == max_attempts:
                 rejections.append(f"— handing the turn to {model}")
             # The shape the reply is *allowed* to have, built from this turn's situation
@@ -178,7 +186,8 @@ class GMAgent:
             # `narrate_only` is not among the choices, so the failure that cost this
             # project its whole combat loop — narrating a punch and proposing nothing —
             # is not a reply the sampler can produce. See `prompts.turn_schema`.
-            reply = client.chat(messages, model, host, as_json=True, think=False,
+            try:
+                reply = client.chat(messages, model, host, as_json=True, think=False,
                                 temperature=0.8 if n == 0 else 0.5,
                                 provider=provider, api_key=key,
                                 schema=prompts.turn_schema(
@@ -197,6 +206,12 @@ class GMAgent:
                                     # gives the model first refusal, with the scene in
                                     # front of it, on choosing the item and the target.
                                     must_contain=tuple(declared)))
+            except client.ModelUnavailable as exc:
+                down.add(model)
+                rejections.append(f"attempt {n + 1}: {model} could not be reached: {exc}")
+                if all(m in down for m, *_ in schedule):
+                    raise
+                continue
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
 
             try:
@@ -704,7 +719,13 @@ class GMAgent:
             names |= {f["name"] for f in world.factions}
             names.add(world.name)
         except Exception:
-            pass
+            # Logged, not passed over: with the world's names missing, the un-namer
+            # strips REAL names from the prose as inventions, and nothing said why
+            # (2026-09-25).
+            import logging
+
+            logging.getLogger("pathfindergm").exception(
+                "the world's names could not be read; real names may be un-named")
         # And every capitalised word the world's own prose uses. Titles alone are not the
         # world's vocabulary: measured across two 60-turn runs, `invented-name` fired on
         # 31 tokens and only four were real inventions. The rest were the world's own —
@@ -875,7 +896,8 @@ class GMAgent:
                claim: str = "",
                blows: list[dict] | None = None,
                cast: list[str] | None = None,
-               fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
+               fire_context: str | None = None,
+               facts: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -925,6 +947,7 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
+                facts=facts,
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 # What could have lit anything: the place's brief and the recent
                 # beats. None when the caller had no brief (a consequence line),
@@ -1128,6 +1151,12 @@ class GMAgent:
         here = self._here_name()
         if not here or not text:
             return []
+        # Not in a fight. A brawl's prose reaches for whatever is near — "he slams you
+        # back against the forge" — and measured 2026-09-25 this ran on combat prose
+        # too, so a fight in the lane could found a smithy the town never had. The
+        # ruling was about places the narration ESTABLISHES, which a fight does not do.
+        if getattr(self.engine.scene, "in_encounter", False):
+            return []
         places = self._place_names()
         real = {narration_mod._bare(p).lower() for p in places}
         for where, sentence in narration_mod.stands_elsewhere(text, here=here,
@@ -1154,7 +1183,8 @@ class GMAgent:
                 pull: dict | None = None,
                 claim: str = "",
                 blows: list[dict] | None = None,
-                fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
+                fire_context: str | None = None,
+                facts: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -1210,7 +1240,7 @@ class GMAgent:
         def _rewrite(complaint: str, note: str):
             reply = client.chat(
                 prompts.narration_repair_messages(
-                    text, complaint, player_input, scene_brief),
+                    text, complaint, player_input, scene_brief, facts=facts),
                 self.model, self.host, as_json=True, think=False, provider=self.provider,
                 api_key=self.api_key, temperature=0.6, num_predict=900,
                 # Structural insurance, not a truncation cure: `as_json` already puts a
@@ -1512,7 +1542,7 @@ class GMAgent:
             player_input=player_input, brief=brief, hand_back=True, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
             claim=claim, blows=self._blows_from(outcomes),
-            cast=self._cast_from(outcomes))
+            cast=self._cast_from(outcomes), facts=tells)
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
@@ -1623,7 +1653,8 @@ class GMAgent:
             out.append({"attacker": attacker or "somebody", "pc": is_pc, "tell": line})
         return out
 
-    def narrate_outcome(self, narration: str, outcomes: list, player_input: str) -> tuple[str, Attempt]:
+    def narrate_outcome(self, narration: str, outcomes: list, player_input: str,
+                        rewrite: bool = True) -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
 
         Fed only `player_visible()` outcomes, so a hidden roll's number is not in the
@@ -1677,7 +1708,8 @@ class GMAgent:
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths,
-            blows=self._blows_from(outcomes), cast=self._cast_from(outcomes))
+            blows=self._blows_from(outcomes), cast=self._cast_from(outcomes),
+            rewrite=rewrite, facts=tells)
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)

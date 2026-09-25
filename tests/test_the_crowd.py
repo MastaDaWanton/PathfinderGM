@@ -188,7 +188,7 @@ def test_a_unit_whose_morale_breaks_leaves_the_board_and_scatters(table):
     assert ref not in scene.actors, "they ran; they are not a body lying here"
     assert not any(ref in refs for refs in (scene.sides or {}).values())
     assert all(r != ref for r, _ in scene.initiative)
-    assert scene.said.get("routed_xp"), "the debt outlives them"
+    assert scene.routed_xp, "the debt outlives them"
 
 
 # --- the experience ----------------------------------------------------------------------
@@ -224,9 +224,12 @@ def test_a_routed_units_debt_is_settled_once(table):
     total, _ = xp.award_for_fallen(scene, scene.pc())
     assert total == 600, "one raider fell and the other five ran"
     # And paid ONCE: a second fight in the same room must not pay for the first one's dead.
-    src = inspect.getsource(Engine._settle_xp) if hasattr(Engine, "_settle_xp") else ""
-    assert 'scene.said.pop("routed_xp"' in inspect.getsource(Engine) or \
-        'said.pop("routed_xp", None)' in inspect.getsource(Engine)
+    # Asserted on behaviour since 2026-09-25 — this was a source-text pin on
+    # `said.pop("routed_xp"`, and the record moved to its own field.
+    assert scene.routed_xp, "the debt waits for the fight to settle"
+    scene.routed_xp = []                         # what settling the fight does
+    again, _ = xp.award_for_fallen(scene, scene.pc())
+    assert again < total, "a second settlement paid for the routed dead again"
 
 
 # --- the troop rules that are not about hit points ---------------------------------------

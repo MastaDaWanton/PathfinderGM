@@ -191,9 +191,53 @@ class OneGameAtATime:
         try:
             with held(READ_WAIT):
                 response = self.get_response(request)
+                self._forget_on_failure(response)
         except Busy:
             return self._busy()
         return self._stamp(response)
+
+    def _forget_on_failure(self, response) -> None:
+        """A request that failed leaves no half-applied game in memory.
+
+        Measured 2026-09-25: the turn's rollback restored the scene only on
+        `IntentError`, `ValueError` and `KeyError`, and the campaign lives in
+        `campaign._LIVE` between requests — so any other exception after `engine.run`
+        (a TypeError in `_finish`, an IndexError in an NPC turn) left the mechanics and
+        the history applied in memory, and the next turn that succeeded SAVED them. The
+        2026-09-01 incident had exactly that shape.
+
+        Every save the app writes is at a consistent point (a turn's end, or a roll it is
+        waiting on), so the save file is the boundary of a turn: on a 500 the memory
+        copy is dropped and the next request reads the last one back. Held under the
+        game lock, so no other request can be reading the copy being dropped.
+        """
+        # 500 exactly: the unhandled failure. A 502 or 503 is a refusal the view wrote
+        # itself after putting the game back, and dropping memory then would throw away
+        # what lives only there — the free actions waiting for the next spoken turn.
+        if getattr(response, "status_code", 200) == 500:
+            from . import campaign as campaign_mod
+
+            campaign_mod.forget_live()
+
+    def process_exception(self, request, exception):
+        """A view that raised answers in JSON the page can show, not Django's HTML 500.
+
+        The memory copy is dropped by `_forget_on_failure` on the way out; this only
+        writes the answer, and logs the traceback where the player's log file has it.
+        """
+        import logging
+
+        logging.getLogger("pathfindergm").exception(
+            "%s %s failed; the game in memory is dropped and the last save stands",
+            request.method, request.path)
+        if not request.path.startswith("/api/"):
+            return None
+        return JsonResponse(
+            {"error": "Something went wrong resolving that, and it was not saved — the "
+                      "game is back where it was before it. The details are in the "
+                      "log.",
+             "detail": f"{type(exception).__name__}: {exception}"},
+            status=500)
 
     def _write(self, request):
         sent = _sent_revision(request)
@@ -211,6 +255,7 @@ class OneGameAtATime:
                 if late is not None:
                     return late
                 response = self.get_response(request)
+                self._forget_on_failure(response)
                 if 200 <= response.status_code < 300:
                     bump()
         except Busy:

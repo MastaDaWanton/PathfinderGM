@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .worldclass import TIERS, tier_rank
+from pathfindergm import files
 
 # Named in the Herbalist and Blood Bending documents as growing somewhere specific, or
 # invented for a setting. Whether Pangrella has them is a World Bible question; until the
@@ -189,7 +190,8 @@ def load_dir(path: str | Path) -> dict[str, dict]:
     for p in sorted(Path(path).glob("*.json")):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(p, exc)
             continue
         entries = data.get("ingredients") if isinstance(data, dict) else None
         if not isinstance(entries, list):

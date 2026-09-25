@@ -36,7 +36,7 @@ from __future__ import annotations
 import json
 import re
 
-from gm import client, narration
+from gm import client, narration, speech
 from gm.narration import build_echo_index, invented_names
 
 # Whether the model is asked at all. The test suite turns this off in `conftest.py`:
@@ -201,11 +201,8 @@ def hard_problems(found: list[str]) -> list[str]:
     return [p for p in found if not p.startswith(_SOFT)]
 
 
-# Somebody speaking, by the marks around it: the same test `gm.narration.texture` uses.
-# Single quotes need a run long enough that two contractions in one sentence do not
-# pair up as speech — a miss in the lenient direction, which for a soft check is the
-# right way to miss.
-_SPEECH = re.compile(r'["“][^"”]{4,}["”]|(?:^|\s)\'[^\']{8,}\'')
+# Somebody speaking is `speech.has_speech`, the same scanner every narration pass reads;
+# the copy that lived here could not cross "it's" (2026-09-25).
 _WORD = re.compile(r"[A-Za-z][A-Za-z'’-]*")
 
 
@@ -406,7 +403,7 @@ def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
         if keys and not any(re.search(r"\b" + re.escape(k), text.lower()) for k in keys):
             out.append("it never uses the character's own past here; somebody present "
                        f"may know them from it — work in: {past[0]}")
-    if text and not _SPEECH.search(text):
+    if text and not speech.has_speech(text, 4):
         out.append("nobody here has spoken to the player; give the person beside them "
                    "one line, in quotes, said to the player — a question or a remark "
                    "about what is happening")

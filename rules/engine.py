@@ -276,6 +276,16 @@ class Scene:
     # remembered it had been said. Kept on the scene so a reload does not reset the
     # walk and hand the player the first line again.
     said: dict = field(default_factory=dict)
+    # Two records that lived in `said` beside the narrator's line rotation until
+    # 2026-09-25, in a dict with no schema: what a routed crowd still owes in experience
+    # (paid when the fight settles, `_rout` → `_settle_xp`), and the payments agreed in
+    # this room (the last five, for the brief). Their own fields now, saved as such; a
+    # save written before carries them in `said` and is moved over on load.
+    routed_xp: list = field(default_factory=list)
+    agreements: list = field(default_factory=list)
+    # The resolution record, for tests and debugging. Nothing in the app reads it, and it
+    # is deep-copied by every snapshot, so it keeps only the last LOG_KEPT outcomes.
+    LOG_KEPT = 200
     # Places minted in play (`rules/places.py`, doors two and three): the stored
     # exception to "derived, never stored", since the player made them. Place dicts
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
@@ -320,8 +330,16 @@ class Scene:
     road: dict = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
 
-    # Whose turn it is: an index into `initiative`. -1 outside an encounter.
+    # Whose turn it is: an index into `initiative`. -1 outside an encounter. Written only
+    # by `advance_turn`, the encounter's opening, and the two order-changing doors below
+    # (`enrol`, `leave_order`) — because an index silently re-points at somebody else
+    # whenever the list it indexes changes.
     turn: int = -1
+    # Set when the creature holding the turn left the order: their successor now sits in
+    # the slot `turn` points at, so the next advance must land THERE rather than one past
+    # it. Saved, because a save between the removal and the advance would otherwise skip
+    # that creature on reload.
+    turn_is_next: bool = False
     # side name -> refs, as `begin_encounter` declared them. Kept so the engine can tell
     # when a fight is over without guessing who was fighting whom.
     sides: dict[str, list[str]] = field(default_factory=dict)
@@ -640,6 +658,69 @@ class Scene:
             return None
         return self.initiative[self.turn % len(self.initiative)][0]
 
+    def turn_holder(self) -> str | None:
+        """Whoever holds the turn, read BEFORE anything changes the order.
+
+        No modulo, unlike `current_ref`: an out-of-range `turn` answers None, which is how
+        `leave_order` tells "the holder left" from "the holder moved"."""
+        if not (0 <= self.turn < len(self.initiative)):
+            return None
+        return self.initiative[self.turn][0]
+
+    def _point_at(self, was: str | None) -> None:
+        if not self.initiative:
+            self.turn = -1
+            self.turn_is_next = False
+            return
+        at = next((i for i, (r, _) in enumerate(self.initiative) if r == was), None)
+        self.turn = at if at is not None else min(self.turn, len(self.initiative) - 1)
+
+    def enrol(self, ref: str, roll: int) -> None:
+        """Put a newcomer into the initiative order; the turn stays where it was.
+
+        Measured 2026-09-20 as a flake of `test_a_free_action_does_not_hand_the_round_to
+        _the_enemy`: the narrator introduced somebody, `join_fight` rolled them in, their
+        unseeded d20 beat the player's, they sorted in ABOVE the player — and the turn the
+        player still held went to them. Four sites wrote their own version of this; three
+        read `current_ref()` AFTER the append and the sort, so the creature they "kept"
+        was already whoever the sort had moved into the slot, and one (a troop arriving)
+        adjusted nothing at all. This is the one door now.
+        """
+        was = self.turn_holder()
+        self.initiative.append((ref, roll))
+        self.initiative.sort(key=lambda t: -t[1])
+        if self.turn >= 0:
+            self._point_at(was)
+
+    def leave_order(self, ref: str) -> None:
+        """Take `ref` out of the initiative order, and keep the turn honest.
+
+        Somebody else leaving: the turn stays with its holder. The HOLDER leaving (dead on
+        their own turn, routed, walked out): their successor slides into the slot and is
+        next — measured 2026-09-25, the next `advance_turn` stepped one past the slot and
+        skipped them. The last slot leaving wraps to the top, which is the round's end.
+        """
+        if not any(r == ref for r, _ in self.initiative):
+            return
+        was = self.turn_holder()
+        idx = next(i for i, (r, _) in enumerate(self.initiative) if r == ref)
+        self.initiative = [(r, roll) for r, roll in self.initiative if r != ref]
+        if not self.initiative:
+            self.turn = -1
+            self.turn_is_next = False
+            return
+        if self.turn < 0:
+            return
+        if was != ref:
+            self._point_at(was)
+            return
+        if idx < len(self.initiative):
+            self.turn = idx
+            self.turn_is_next = True
+        else:
+            self.turn = len(self.initiative) - 1
+            self.turn_is_next = False
+
     def conscious(self, ref: str) -> bool:
         """Still up, and still in the fight — which is not the same as able to act now.
 
@@ -697,7 +778,12 @@ class Scene:
 
     def _next_able(self) -> str | None:
         """One pass down the initiative order from wherever the turn is."""
-        for step in range(1, len(self.initiative) + 1):
+        # The holder left and their successor sits in this slot (`leave_order`): the pass
+        # starts ON it. Step 0 cannot roll the round over — `reached` is `turn` itself —
+        # which is right: the successor's turn belongs to the round already running.
+        first = 0 if self.turn_is_next else 1
+        self.turn_is_next = False
+        for step in range(first, len(self.initiative) + first):
             reached = self.turn + step
             nxt = reached % len(self.initiative)
             # Passing the top of the order is the top of a new round — but not the
@@ -798,7 +884,11 @@ class Scene:
         the thing still exists and still expires — it simply has nowhere to put squares,
         which is honest rather than a refusal: most scenes have no map.
         """
-        made.id = made.id or f"m{len(self.manifests) + 1}"
+        # One past the highest id anything still names — a live manifestation or a
+        # ward's `manifest_id`. It was `len + 1`, and measured 2026-09-25: two fogs, the
+        # first lifted, and the next placed was `m2` beside the `m2` still standing —
+        # wards find their area by that id, so a ward could fire on the wrong one.
+        made.id = made.id or f"m{self._next_manifest_number()}"
         if self.grid is not None and made.terrain in ("obscuring", "blocked", "difficult"):
             already = getattr(self.grid, made.terrain)
             # The GROUND it covers, not the cells it fills. An area knows its own height
@@ -816,6 +906,11 @@ class Scene:
             already.update(made.added)
         self.manifests.append(made)
         return made
+
+    def _next_manifest_number(self) -> int:
+        taken = [m.id for m in self.manifests] + [w.manifest_id for w in self.wards]
+        numbers = [int(i[1:]) for i in taken if re.fullmatch(r"m\d+", str(i or ""))]
+        return max(numbers, default=0) + 1
 
     def lift(self, made: "Manifestation") -> None:
         """Take one back off the map. Squares another live manifestation also claims stay."""
@@ -1127,10 +1222,13 @@ class Scene:
         # tactical layer above it — initiative, sides, and the things a fight conjured.
         # The grid is cleared where it is replaced instead, when the party arrives
         # somewhere else (`Engine.place_party`).
-        # The fog goes with the map it was drawn on. A manifestation kept past the grid
-        # that held its squares is a bank of fog with no location, and the next fight
-        # would lay a fresh grid without it — the squares would be gone and the thing
-        # claiming them would not.
+        # The things a fight conjured go with it, and each is LIFTED off the ground it
+        # was drawn on. This used to be `self.manifests = []`, written when the grid went
+        # with the fight too; since item 28 the grid stays, and measured 2026-09-25 the
+        # cleared list left its squares in `grid.obscuring` with nothing claiming them —
+        # the room stayed blind and walled until the party walked out.
+        for made in list(self.manifests):
+            self.lift(made)
         self.manifests = []
         self.wards = []
         self.hazards = []
@@ -1233,13 +1331,10 @@ class Scene:
         """
         # The initiative order shrinks, and `turn` must go on pointing at the same
         # creature — an index into a list that just changed length is how a removal
-        # hands somebody else's turn to the wrong side of the fight.
-        current = self.initiative[self.turn][0] if 0 <= self.turn < len(self.initiative) else None
-        self.initiative = [(r, roll) for r, roll in self.initiative if r != ref]
-        if current == ref or current is None:
-            self.turn = -1 if not self.initiative else min(self.turn, len(self.initiative) - 1)
-        else:
-            self.turn = next(i for i, (r, _) in enumerate(self.initiative) if r == current)
+        # hands somebody else's turn to the wrong side of the fight. `leave_order` is
+        # the one door, and it also keeps the holder's successor next when the holder
+        # is the one leaving.
+        self.leave_order(ref)
 
         self.zones.pop(ref, None)
         self.positions.pop(ref, None)
@@ -1293,7 +1388,7 @@ class Scene:
             self.at = place_id
             self.cast = []
             # What was agreed here is a fact of this room; the next room starts clean.
-            self.said.pop("agreements", None)
+            self.agreements = []
         return actor
 
     def settle_relations(self) -> list[str]:
@@ -2150,9 +2245,21 @@ class Engine:
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
         resolution.outcomes.extend(self._settle_talk())
+        # A scheme that fails half-way leaves nothing of itself behind. Measured
+        # 2026-09-25: the tick reads and CHANGES the scene (steps advance, people are
+        # brought in, bodies fall), and a failure part-way kept whatever it had already
+        # done — the turn went on, and the next save wrote the half-run step. Snapshot
+        # only when there is a scheme to tick: a deep copy per turn for nothing is a cost.
+        undo = self.scene.snapshot() if getattr(self.scene, "schemes", None) else None
         try:
             extra = schemes_mod.tick(self, resolution.outcomes)
         except Exception as exc:  # noqa: BLE001 — a scheme must never take the turn down
+            if undo is not None:
+                self.scene.restore(undo)
+            import logging
+
+            logging.getLogger("pathfindergm").exception(
+                "a scheme's tick failed and was undone")
             extra = [Outcome(intent_id="", op="scheme", effects=[{"kind": "scheme_error",
                                                                    "error": str(exc)}],
                              tell="", because="")]
@@ -2207,6 +2314,8 @@ class Engine:
             if intent.actor and intent.op in ("attack", "check", "move", "save"):
                 self.scene.acted.add(intent.actor)
             self.scene.log.append(outcome.as_dict())
+            if len(self.scene.log) > self.scene.LOG_KEPT:
+                del self.scene.log[:-self.scene.LOG_KEPT]
         return Resolution(outcomes=outcomes)
 
     # --- Reactions ---------------------------------------------------------------------
@@ -3373,12 +3482,9 @@ class Engine:
         a.remove_condition(states.BYSTANDER_KEY)
         init = self.dice.d20(a.initiative_modifiers(), label=f"{a.name} initiative",
                              visibility="hidden")
-        self.scene.initiative.append((ref, init.total))
-        self.scene.initiative.sort(key=lambda t: -t[1])
-        current = self.scene.current_ref()
-        self.scene.turn = next(
-            (i for i, (r, _) in enumerate(self.scene.initiative) if r == current),
-            self.scene.turn)
+        # `enrol`, not an append and a sort: a newcomer who rolls above the turn-holder
+        # sorts in ahead of them, and `turn` is an index (see `Scene.enrol`).
+        self.scene.enrol(ref, init.total)
         self.scene.sides.setdefault(side, []).append(ref)
         if ref not in self.scene.positions and self.scene.grid is not None:
             self.scene.place_by_zone([ref])
@@ -3408,6 +3514,18 @@ class Engine:
         a = self.scene.actors.get(ref)
         if (pc is None or a is None or a.is_pc or a.is_down
                 or self.scene.in_encounter or pc.is_down):
+            return []
+        # Somebody who likes the player, or travels with them, does not swing on the
+        # prose's word. Measured 2026-09-25: the detector read "The barmaid rushes over to
+        # you with a tankard" as a blow and this door opened the fight and rolled her
+        # attack. The detector is tighter now; this is the engine's own half, asked of
+        # the state it holds rather than of a sentence — a friend who means harm has to
+        # stop being a friend first, and that is a change the engine would have made.
+        from . import attitude as attitude_mod
+
+        if (a.has_state(states.TRAVELS_WITH_YOU)
+                or attitude_mod.step_of(attitude_mod.of(a))
+                >= attitude_mod.step_of(attitude_mod.COMES_ALONG)):
             return []
         raw = {"op": "attack", "actor": ref, "target": pc.ref,
                "because": f"{a.name} struck first"}
@@ -4091,10 +4209,11 @@ class Engine:
     def tidy_the_fallen(self, grace: int = 2) -> list[str]:
         """Bodies age out of the scene on their own after a short grace.
 
-        Two turns is time to loot and say a word over them; after that they
+        Two turns is time to loot and say a word over them; after that the dead
         depart quietly, whether or not the player ever walks away. The dying get
         the same treatment as `leave_behind`: their story resolves rather than
-        printing "bleeding out" beats forever. No-op mid-encounter.
+        printing "bleeding out" beats forever — and whoever comes out of it alive,
+        stable or merely unconscious, stays. No-op mid-encounter.
         """
         if self.scene.in_encounter:
             return []
@@ -4120,7 +4239,14 @@ class Engine:
             if age > grace:
                 if a.has_condition("dying"):
                     tells.extend(self._resolve_dying(a))
-                self.scene.depart(ref)
+                # Only a corpse leaves. Measured 2026-09-25: unconscious and stable carry
+                # `state.down.fallen` beside dead, so an NPC knocked out with non-lethal
+                # damage — at full hit points — departed the campaign after three calls
+                # with no tell at all, and so did a dying man who stabilised on the roll
+                # just above. A prisoner, a spared thug and a fallen companion are all
+                # still somebody; they stay where they lie until they wake or die.
+                if a.has_state("state.down.dead"):
+                    self.scene.depart(ref)
                 self.scene.fallen.pop(ref, None)
         return tells
 
@@ -5284,7 +5410,7 @@ class Engine:
         # `hp <= 0 or state.down`, which differs from `is_down` at exactly 0 hit
         # points — and there the creature is *disabled*: conscious, upright, and
         # being stripped of its belongings where it stood.
-        if not body.is_down:
+        if not body.lootable:
             return Outcome(
                 intent_id=intent.id, op="loot", effects=[],
                 tell=(f"{body.name} is on their feet and very much attached to their "
@@ -7964,7 +8090,7 @@ class Engine:
         # Paid once. The routed units' debt is remembered on the scene because they are gone
         # from it (`_rout`), and a second fight in the same room must not pay for the first
         # one's dead a second time.
-        self.scene.said.pop("routed_xp", None)
+        self.scene.routed_xp = []
         if not total:
             # A fight that killed something and paid nothing has to say so. Silence
             # reads as "this fight was not worth anything", and the real reason is
@@ -9168,8 +9294,9 @@ class Engine:
             if self.scene.in_encounter:
                 init = self.dice.d20(unit.initiative_modifiers(),
                                      label=f"{unit.name} initiative", visibility="hidden")
-                self.scene.initiative.append((unit.ref, init.total))
-                self.scene.initiative.sort(key=lambda t: -t[1])
+                # This branch adjusted `turn` not at all: a troop that rolled high took
+                # the turn straight out of whoever's hand it was in.
+                self.scene.enrol(unit.ref, init.total)
                 self.scene.sides.setdefault(
                     side or ("pc" if unit.is_pc else "them"), []).append(unit.ref)
             return made
@@ -9203,12 +9330,9 @@ class Engine:
             if self.scene.in_encounter:
                 init = self.dice.d20(actor.initiative_modifiers(),
                                      label=f"{actor.name} initiative", visibility="hidden")
-                self.scene.initiative.append((actor.ref, init.total))
-                self.scene.initiative.sort(key=lambda t: -t[1])
-                self.scene.turn = next(
-                    (i for i, (r, _) in enumerate(self.scene.initiative)
-                     if r == self.scene.current_ref()), self.scene.turn
-                )
+                # `enrol`: the index this re-pointed was read after the sort, so it
+                # "kept" whoever the sort had just moved into the slot.
+                self.scene.enrol(actor.ref, init.total)
                 # A summoned creature fights for whoever called it. Without the `side`
                 # argument every arrival joined "them", so a caster's own celestial dog
                 # counted against them and a fight could not end while it was standing.
@@ -9337,7 +9461,12 @@ class Engine:
         return guards_mod.intercept(self.scene, packet)
 
     def _land(self, pk: Packet) -> dict:
-        target = self.scene.actors[pk.target]
+        # The store, not the here-view: a body in another room is still somebody the one
+        # damage door can reach. Measured 2026-09-25: a scheme's off-stage death wrote
+        # `who.hp -= amount` around this door because `scene.actors[...]` raised
+        # KeyError for a victim at the lodging while the player stood in the wild — so
+        # resistances, damage reduction and guards never applied off-stage.
+        target = self.scene.actors.get(pk.target) or self.scene.people[pk.target]
         amount = pk.amount
         # "A troop takes half again as much damage (+50%) from spells or effects that affect
         # an area" — the rule that makes a fireball feel right against a crowd, and the
@@ -9402,18 +9531,19 @@ class Engine:
             for refs in (self.scene.sides or {}).values():
                 if target.ref in refs:
                     refs.remove(target.ref)
-            self.scene.initiative = [(r, v) for r, v in self.scene.initiative
-                                     if r != target.ref]
+            # Through the door, not a list comprehension: this ran BEFORE `scene.remove`,
+            # so `_unseat` then read an order that had already shifted and re-pointed the
+            # turn at somebody else (measured: the turn moved from the player to c3).
+            self.scene.leave_order(target.ref)
         self.scene.positions.pop(target.ref, None)
         # The debt outlives them. They are about to leave the scene, and the experience for
         # the ones who died has not been paid yet — a fight's XP settles on the way OUT of
         # an encounter — so the amount is remembered where the scene remembers things.
         owed = troops_mod.xp_owed(target.troop)
         if owed:
-            ledger = list(self.scene.said.get("routed_xp") or [])
-            ledger.append({"who": str(target.name), "fallen": int(target.troop.fallen),
-                           "xp": int(owed)})
-            self.scene.said["routed_xp"] = ledger
+            self.scene.routed_xp.append({"who": str(target.name),
+                                         "fallen": int(target.troop.fallen),
+                                         "xp": int(owed)})
         # Off the board through the one destroyer, which takes the relational state with
         # them (guards at either end, wards, compulsions). They ran; they are not a body
         # lying here, and leaving them in the scene at 1 hp would make them a target.

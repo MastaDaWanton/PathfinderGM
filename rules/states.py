@@ -153,22 +153,29 @@ TAGS: dict[str, tuple[str, ...]] = {
     "bystander":   ("role.bystander",),
     "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
     "dying":       ("state.down.dying", "state.down.fallen", "state.unable",
-                    "recovery.hit-points"),
+                    "state.helpless", "recovery.hit-points", "state.exposed"),
     "unconscious": ("state.down.unconscious", "state.down.fallen", "state.unable",
-                    "recovery.hit-points"),
+                    "state.helpless", "recovery.hit-points", "state.exposed"),
     "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
-    "petrified":   ("state.down.petrified", "state.unable"),
+    "petrified":   ("state.down.petrified", "state.unable", "state.helpless"),
     # Helpless has always carried `can_act: False` in the condition row and no
     # `state.unable` tag, so the flag and the vocabulary disagreed about it: the tag
     # layer said a bound prisoner could act and the row said they could not.
-    "helpless":    ("state.down.helpless", "state.unable"),
-    "paralyzed":   ("state.unable.paralyzed", "state.held"),
-    "pinned":      ("state.held.pinned", "recovery.rest"),
+    # And NOT under `state.down`, which it was until 2026-09-25: `is_down` read true
+    # for a bound prisoner, so attacks on him were held back as "already down" and
+    # `sides_standing` stopped counting his side — a foe made helpless by any of the ten
+    # spell specs that apply it ENDED THE FIGHT, paralysis wearing off or not. 1e keeps a
+    # helpless creature in the fight: it is the one a coup de grace is for.
+    # `state.helpless` is the family `is_helpless` asks — 1e's "immobilized, unconscious,
+    # or otherwise incapacitated" — granted by every row that is helpless.
+    "helpless":    ("state.unable.helpless", "state.helpless", "state.exposed"),
+    "paralyzed":   ("state.unable.paralyzed", "state.held", "state.helpless", "state.exposed"),
+    "pinned":      ("state.held.pinned", "recovery.rest", "state.exposed"),
     "grappled":    ("state.held.grappled", "recovery.rest"),
-    "stunned":     ("state.unable.stunned",),
+    "stunned":     ("state.unable.stunned", "state.exposed"),
     "dazed":       ("state.unable.dazed", "recovery.rest"),
-    "cowering":    ("state.unable.cowering", "recovery.rest"),
+    "cowering":    ("state.unable.cowering", "recovery.rest", "state.exposed"),
     # Nauseated is impaired, not unable: 1e allows it "a single move action per turn"
     # and stops the rest. The condition row carried `can_act: False`, which the engine's
     # guard read as a block on attack, move AND check — denying the one action the rules
@@ -177,21 +184,21 @@ TAGS: dict[str, tuple[str, ...]] = {
     "staggered":   ("state.impaired.staggered", "recovery.rest"),
     "disabled":    ("state.impaired.disabled", "recovery.hit-points"),
     "fatigued":    ("state.impaired.fatigued",),
-    "exhausted":   ("state.impaired.exhausted",),
+    "exhausted":   ("state.impaired.exhausted", "state.slowed"),
     "sickened":    ("state.impaired.sickened", "recovery.rest"),
     "shaken":      ("state.fear.shaken", "recovery.rest"),
     "frightened":  ("state.fear.frightened", "recovery.rest"),
     "panicked":    ("state.fear.panicked", "recovery.rest"),
     "fascinated":  ("state.unable.fascinated", "recovery.rest"),
     "confused":    ("state.impaired.confused",),
-    "blinded":     ("state.senses.blinded",),
+    "blinded":     ("state.senses.blinded", "state.exposed"),
     "deafened":    ("state.senses.deafened",),
     "dazzled":     ("state.senses.dazzled", "recovery.rest"),
     "invisible":   ("state.hidden.invisible",),
     "prone":       ("state.position.prone", "recovery.rest"),
-    "flat-footed": ("state.position.flat-footed", "recovery.rest"),
+    "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),
-    "entangled":   ("state.held.entangled", "recovery.rest"),
+    "entangled":   ("state.held.entangled", "recovery.rest", "state.slowed"),
     # The stances play has already minted. Buffs, not states: they are worn by choice.
     "blood armament": ("buff.stance.blood-armament",),
     "blood rage":     ("buff.stance.blood-rage",),
@@ -296,6 +303,22 @@ def standing_with_the_law(actor, location_id) -> str:
     if actor.has_state(suspected_tag(location_id)):
         return "suspected"
     return ""
+
+
+# Two families that are questions, not places in the tree, added 2026-09-25 so that no
+# reader has to name conditions: `state.exposed` — denied Dex (and dodge) to AC, on every
+# row that carried the `lose_dex_to_ac` flag; `state.slowed` — moves at half speed
+# (entangled, exhausted). `tests/test_the_questions_are_tags.py` pins each family to the
+# rows it replaced.
+#
+# Tags the vocabulary once granted a key and no longer does. A saved condition keeps the
+# tags it was written with (`activeeffect._tags_on_load` unions, so a document's own tags
+# survive a reload), which means a withdrawal has to be named or it never reaches a save
+# already on disk. Each entry is the key and exactly what left it, never a family.
+WITHDRAWN: dict[str, tuple[str, ...]] = {
+    # 2026-09-25: a helpless creature is in the fight, not down — see TAGS above.
+    "helpless": ("state.down.helpless",),
+}
 
 
 def tags_for(key: str) -> tuple[str, ...]:

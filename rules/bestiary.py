@@ -30,6 +30,7 @@ from pathlib import Path
 
 from . import creature_effects
 from .sheet import Actor, from_dict
+from pathfindergm import files
 
 TEMPLATES: dict[str, dict] = {
     "guildhand": {
@@ -423,6 +424,57 @@ _NOT_ON_THE_SHEET = (
 )
 
 
+# What a stat block's AC note calls a bonus, and the type this app's stacking knows it
+# by ("" is untyped). Dex and size carry no type: the ability and the body.
+_AC_TYPES = {
+    "armor": "armour", "armour": "armour", "shield": "shield",
+    "natural": "natural armour", "natural armor": "natural armour",
+    "natural armour": "natural armour", "dodge": "dodge", "deflection": "deflection",
+    "insight": "insight", "luck": "luck", "sacred": "sacred", "profane": "profane",
+    "morale": "morale", "competence": "competence", "enhancement": "enhancement",
+}
+_AC_PART = re.compile(r"([+-]\s*\d+)\s+([A-Za-z][A-Za-z ]*?)\s*(?=,|\)|$)")
+
+
+def ac_parts(note: str) -> list[tuple[int, str, str]]:
+    """A stat block's AC note as (value, source, type) parts.
+
+    "(+4 armor, +8 Dex, +1 dodge, +9 natural, -2 size)" is the printed breakdown of the
+    printed AC, on 6,363 of the 7,136 imported creatures. Measured 2026-09-25: the sheet
+    ignored it and made the whole AC one untyped number, so flat-footed, touch and every
+    lose-Dex condition did nothing against any monster — wolf 14/14/14, ogre 17/17/17 —
+    while the tell still said "(flat-footed)".
+
+    A conditional part ("+2 dodge vs traps", "+2 deflection vs evil") is left out: the
+    printed AC does not include it, and neither may this.
+    """
+    out: list[tuple[int, str, str]] = []
+    for m in _AC_PART.finditer(str(note or "")):
+        words = m.group(2).strip()
+        if re.search(r"\b(?:vs|versus|against)\b", words, re.I):
+            continue
+        value = int(m.group(1).replace(" ", ""))
+        low = words.lower()
+        if low == "dex":
+            out.append((value, "Dex", ""))
+        elif low == "size":
+            out.append((value, "size", ""))
+        else:
+            out.append((value, words, _AC_TYPES.get(low, "")))
+    return out
+
+
+def ac_numbers(note: str) -> tuple[int, int] | None:
+    """(touch, flat-footed) when a stat block states them outright — "touch 10,
+    flat-footed 15", the form 782 of the imported blocks use instead of a breakdown."""
+    text = str(note or "")
+    t = re.search(r"touch\s*(-?\d+)", text, re.I)
+    f = re.search(r"flat-?\s*footed\s*(-?\d+)", text, re.I)
+    if t and f:
+        return int(t.group(1)), int(f.group(1))
+    return None
+
+
 def imported() -> dict[str, dict]:
     """Every imported stat block, keyed by slug. Loaded once, on first use."""
     global _IMPORTED, _INDEX
@@ -441,7 +493,8 @@ def imported() -> dict[str, dict]:
                                key=lambda q: (q.stem == "core", q.stem)):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("creatures") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

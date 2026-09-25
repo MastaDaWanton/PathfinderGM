@@ -122,6 +122,16 @@ def _tags_on_load(d: dict) -> tuple[str, ...]:
     # reaches a condition already on disk, and is written back on the next save. Nothing
     # has needed to withdraw one yet. Doing it safely needs documents to record their
     # own tags separately from the vocabulary's, which is a save-shape change.
+    #
+    # The first withdrawal arrived 2026-09-25 (`helpless` left `state.down`), and is
+    # done by NAME rather than by rebuilding: `states.WITHDRAWN` lists the exact
+    # (key, tag) pairs the vocabulary once granted and no longer does, so a helpless
+    # prisoner saved last week loads as helpless-and-still-in-the-fight, and no tag a
+    # document declared can be caught by it.
+    from .states import WITHDRAWN
+
+    gone = WITHDRAWN.get(key.strip().lower(), ())
+    stored = tuple(t for t in stored if t not in gone)
     return stored + tuple(t for t in tags_for(key) if t not in stored)
 
 

@@ -1118,10 +1118,10 @@ class Actor:
         moved = [Modifier(m.value, m.source, m.type or "enhancement")
                  for m in self._buff_mods("speed", "land")]
         base = max(0, base + sum(m.value for m in stack(moved)))
-        for slowed in ("entangled", "exhausted"):
-            if self.has_condition(slowed):
-                base //= 2
-                break
+        # Asked of the vocabulary (`state.slowed`), not by naming two conditions in a
+        # tuple the three-laws ratchet could not see (2026-09-25).
+        if self.has_state("state.slowed"):
+            base //= 2
         # Rounded down to a whole square. A speed of 22 feet lets you cross four squares,
         # not four and a bit, and carrying the remainder makes the fifth square arrive one
         # move sooner than it should.
@@ -1189,8 +1189,22 @@ class Actor:
         A narrower question than `can_act`, and the distinction is load-bearing: a
         fascinated creature takes no actions and is emphatically NOT helpless, so
         reading this off `can_act` would let anyone grapple a distracted one for free.
+
+        Asked of the vocabulary (`state.helpless`), not of a flag on the condition rows:
+        the flag was a second authority beside the tags, the shape the three laws forbid
+        for `can_act`, and a homebrew state could not be helpless without a row.
         """
-        return any(c.data.get("helpless") for c in self.conditions)
+        return self.has_state("state.helpless")
+
+    @property
+    def lootable(self) -> bool:
+        """Whether this creature's belongings can be taken without a steal: the down, and
+        the helpless — bound, paralysed, petrified — who cannot resist it either.
+
+        One owner for the loot op and the watcher, which had drifted apart once already.
+        Helpless has to be named since 2026-09-25, when it stopped counting as down.
+        """
+        return self.is_down or self.is_helpless
 
     def has_condition(self, key: str) -> bool:
         return any(e.kind == "condition" and e.key == key for e in self.effects)
@@ -1638,9 +1652,10 @@ class Actor:
 
     def ac_modifiers(self, against: str = "melee", flat_footed: bool = False) -> list[Modifier]:
         mods = [Modifier(10, "base")]
+        loses_dex = flat_footed or self.loses_dex_to_ac
 
         if self.flat_ac is not None:
-            mods = [Modifier(self.flat_ac, "AC")]
+            mods = self._printed_ac_modifiers()
         else:
             armour = ARMOUR.get(self.armour, ARMOUR["none"])
             shield = SHIELDS.get(self.shield, SHIELDS["none"])
@@ -1655,13 +1670,9 @@ class Actor:
                 mods.append(Modifier(self.natural_armour, "natural armour",
                                      "natural armour"))
 
-            loses_dex = flat_footed or any(
-                c.data.get("lose_dex_to_ac") for c in self.conditions
-            )
-            if not loses_dex:
-                dex = min(self.ability_mod("dex"), armour["max_dex"])
-                if dex:
-                    mods.append(Modifier(dex, "Dex"))
+            dex = min(self.ability_mod("dex"), armour["max_dex"])
+            if dex:
+                mods.append(Modifier(dex, "Dex"))
 
             # As with attack: a printed AC already accounts for size.
             size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
@@ -1671,7 +1682,54 @@ class Actor:
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
+        if loses_dex:
+            # Denied Dex is denied dodge too — 1e: "any situation that denies you your
+            # Dexterity bonus also denies you dodge bonuses". A negative Dex stays: a
+            # clumsy creature caught flat-footed is no harder to hit for it. `_buff_mods`
+            # already drops dodge for a lose-Dex CONDITION; being caught flat-footed at
+            # attack time (`flat_footed=True`) never reached it, for any character.
+            mods = [m for m in mods
+                    if not (m.value > 0 and (m.source == "Dex" or m.type == "dodge"))]
         return stack(mods)
+
+    def _printed_ac_modifiers(self) -> list[Modifier]:
+        """A stat block's printed AC, as the typed terms it is made of.
+
+        Measured 2026-09-25: `flat_ac` became ONE untyped modifier, so flat-footed, touch
+        and every lose-Dex condition did nothing against any of the bestiary's creatures —
+        wolf 14/14/14, ogre 17/17/17 — while the attack tell still said "(flat-footed)".
+        The stat block's own note ("+4 armor, +1 Dex, +1 dodge, +9 natural, -2 size") is
+        read into typed terms, so the rules that ask about types can see them. Whatever
+        the note does not account for is one untyped remainder, which is what keeps the
+        total EXACTLY the printed number: a note with a conditional or a typo must never
+        change a creature's AC. A creature with no note (the hand-written townsfolk) has
+        its Dex modifier as the only term it can name.
+        """
+        from . import bestiary as bestiary_mod
+
+        doc = self._creature_doc() or {}
+        note = doc.get("ac_note", "")
+        parts = bestiary_mod.ac_parts(note)
+        stated = None if parts else bestiary_mod.ac_numbers(note)
+        if stated:
+            # "touch 10, flat-footed 15": no breakdown, but the two numbers the rules
+            # need. What flat-footed takes away is Dex and dodge; what touch ignores is
+            # armour, shield and natural armour — one term each, sized to land exactly on
+            # the printed numbers.
+            touch, flat = stated
+            lost = max(0, int(self.flat_ac) - flat)
+            worn = max(0, int(self.flat_ac) - touch)
+            parts = [(lost, "Dex", ""), (worn, "armour and natural armour",
+                                         "natural armour")]
+            parts = [p for p in parts if p[0]]
+        elif not parts:
+            dex = self.ability_mod("dex")
+            parts = [(dex, "Dex", "")] if dex else []
+        terms = [Modifier(10, "base")] + [Modifier(v, src, typ) for v, src, typ in parts]
+        rest = int(self.flat_ac) - sum(m.value for m in stack(terms))
+        if rest:
+            terms.append(Modifier(rest, "stat block"))
+        return terms
 
     # The three channels a touch attack ignores. Named as bonus TYPES rather than as
     # equipment fields, which is the whole point: a mage armor spell, a bracer, a
@@ -1745,9 +1803,7 @@ class Actor:
         else:
             mods = [Modifier(10, "base"), Modifier(self.bab, "BAB"),
                     Modifier(self.ability_mod("str"), "Str")]
-            loses_dex = flat_footed or any(
-                c.data.get("lose_dex_to_ac") for c in self.conditions
-            )
+            loses_dex = flat_footed or self.loses_dex_to_ac
             if not loses_dex:
                 mods.append(Modifier(self.ability_mod("dex"), "Dex"))
             size_mod = SIZES.get(self.size, SIZES["medium"])["cmb_cmd"]
@@ -2717,7 +2773,11 @@ class Actor:
 
     @property
     def loses_dex_to_ac(self) -> bool:
-        return any(c.data.get("lose_dex_to_ac") for c in self.conditions)
+        """Denied Dex to AC — asked of the vocabulary (`state.exposed`), not of the
+        `lose_dex_to_ac` flag on the condition rows: that was a second authority beside
+        the tags, read in three places (2026-09-25), and a homebrew state could not
+        expose anybody without a row."""
+        return self.has_state("state.exposed")
 
     def _buff_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
         """Everything timed or worn that moves this number.
@@ -3936,14 +3996,23 @@ def _temp_pools(data: dict) -> list[TempPool]:
 
 def _overrides(raw: dict) -> dict[str, bool]:
     """A misspelled rule is a feature that never happens with nothing saying why, so it
-    is caught at load rather than never noticed."""
+    is SAID at load rather than never noticed — in the log, and dropped.
+
+    It used to raise, and measured 2026-09-25 that made renaming any rule in
+    ACTOR_RULES a way to make every save that had overridden it unreadable: `from_dict`
+    is the load path, and a raise there is an `UnreadableSave`. The sheet editor offers
+    the rules as toggles, so an unknown key only arrives from a hand-edited file or a
+    rule renamed since the save — both are worth a line in the log, neither is worth
+    the campaign.
+    """
     unknown = [k for k in raw if k not in ACTOR_RULES]
     if unknown:
-        raise IllegalSheet(
-            f"no such rule to override: {', '.join(sorted(unknown))}. "
-            f"Known rules: {', '.join(sorted(ACTOR_RULES))}"
-        )
-    return {k: bool(v) for k, v in raw.items()}
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "no such rule to override: %s (dropped). Known rules: %s",
+            ", ".join(sorted(unknown)), ", ".join(sorted(ACTOR_RULES)))
+    return {k: bool(v) for k, v in raw.items() if k in ACTOR_RULES}
 
 
 # The four effect kinds that are defences. Named once so the migration, the save and

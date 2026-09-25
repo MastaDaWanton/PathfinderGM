@@ -27,6 +27,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from . import speech
+
 # --- Speech is not action ---------------------------------------------------------------
 #
 # Everything below this line reads the player's own words looking for a declaration —
@@ -77,6 +79,20 @@ _SAID = re.compile(
     r"|admit|admits|admitted|claim|claims|claimed|boast|boasts|boasted|brag|brags"
     r"|bragged|swear|swears|swore|vow|vows|vowed|explain|explains|explained)\b"
     r"(?:\s+to\s+(?:the\s+|a\s+|an\s+|my\s+|his\s+|her\s+|their\s+)?\w+)?[\s:,]*", re.I)
+
+# Reported speech: the complement is a clause, and an "and" inside it is what was said.
+_REPORTED = re.compile(r"\s*(?:that|if|whether|to)\b", re.I)
+# "... and buy it", "..., and then I draw" — the player's next action, which the speech
+# verb's complement must not swallow. The verbs are the ones a declaration detector acts
+# on; "and whether he'll sell it" or "and how much" are still the question.
+_AND_THEN_DOES = re.compile(
+    r",?\s+and\s+(?:then\s+)?(?:I\s+)?(?:attack|strike|hit|punch|kick|stab|slash|shoot|"
+    r"fire|draw|grab|take|pick|buy|sell|pay|give|hand|drop|throw|cast|drink|eat|walk|"
+    r"run|go|head|leave|climb|jump|open|close|search|sneak|hide|follow|lunge|swing|"
+    r"charge|grapple|shove|push|pull|cut|light|sit|stand|wait|rest|sleep|examine|"
+    r"inspect|look|put|wear|sheathe|flee|step|move|enter|approach|knock|use|tie|steal|"
+    r"pocket|leap|dodge|block|parry|seize|shoot|aim|load|mount|ride|dismount|kneel)\b",
+    re.I)
 
 # "I ask the woman if she wants to pay" — the question itself starts at the complementiser.
 _ASKED = re.compile(
@@ -142,7 +158,19 @@ def redact_speech(text: str) -> str:
     for rx in (_TOLD, _SAID, _ASKED):
         for m in rx.finditer(line):
             stop = _SENTENCE_END.search(line, m.end())
-            blank(m.end(), stop.start() if stop else len(line))
+            end = stop.start() if stop else len(line)
+            # A second action joined on with "and". Measured 2026-09-25: "I ask the
+            # smith about the axe and buy it" blanked "buy it", and "I say nothing and
+            # attack the guard" read as no violence at all — every injector and the
+            # `must_contain` schema read the redacted line. Not for reported speech,
+            # where the "and" is part of what was said ("I tell him to leave and go
+            # home", "I say that I'll pay and go"): `_TOLD` always carries a message,
+            # and a `_SAID`/`_ASKED` complement opening with that/if/whether/to is one.
+            if rx is not _TOLD and not _REPORTED.match(line, m.end()):
+                joined = _AND_THEN_DOES.search(line, m.end(), end)
+                if joined:
+                    end = joined.start()
+            blank(m.end(), end)
 
     return "".join(out)
 
@@ -159,19 +187,9 @@ def narration_quotes_blanked(text: str) -> str:
     Both quote conventions, because the narrator uses both. Apostrophes inside a word are
     not openers: "the guard's" must not blank the rest of the paragraph.
     """
-    line = str(text or "")
-    out = list(line)
-    # An apostrophe INSIDE a single-quoted line — "don't", "it's", "guild's" — is part
-    # of the line, not its close: a close is an apostrophe not followed by a letter.
-    # Without that, `'If it's the leaf you want …'` matched nothing at all, the whole
-    # line stood as narration, and "the elder-quarter" in it booked an elder who was
-    # then stood in the lane (2026-09-24).
-    for m in re.finditer(r'"[^"]*"|“[^”]*”|'
-                         r'(?<![A-Za-z])\'(?:[^\']|\'(?=[A-Za-z]))*\'(?![A-Za-z])', line):
-        for i in range(m.start(), m.end()):
-            if not out[i].isspace():
-                out[i] = " "
-    return "".join(out)
+    # One scanner for the whole app (`gm/speech.py`): the in-word apostrophe rule this
+    # function carried is the scanner's, and so is the curly single quote it lacked.
+    return speech.blanked(text)
 
 
 # --- What the player's words indicate -------------------------------------------------
@@ -735,7 +753,10 @@ def is_finishing_blow(player_text: str, scene) -> bool:
     # looked for here. See `redact_speech`.
     if not _FINISHING.search(redact_speech(player_text)):
         return False
-    return any(not getattr(a, "is_pc", False) and a.has_state("state.down")
+    # Or helpless: the coup de grace is 1e's blow for exactly the creature that is bound
+    # or paralysed, which stopped counting as down on 2026-09-25.
+    return any(not getattr(a, "is_pc", False)
+               and (a.has_state("state.down") or a.has_state("state.helpless"))
                for a in (getattr(scene, "actors", {}) or {}).values())
 
 
@@ -4605,10 +4626,9 @@ def hold_the_booked_word(scene, text: str) -> tuple[str, list[str]]:
     swapped: list[str] = []
     # Narration only, never a line of dialogue — the same split `creature_nouns_for_pc`
     # uses, and for the same reason: his words are his.
-    parts = re.split(r'("[^"]*"|“[^”]*”|\'[^\']*\')', text)
     out = []
-    for i, part in enumerate(parts):
-        if i % 2:
+    for said, part in speech.split(text):
+        if said:
             out.append(part)
             continue
         for word in sorted(_ARMED_FAMILY, key=len, reverse=True):
@@ -5319,7 +5339,7 @@ def hailed_by(scene, beat: str) -> list[str]:
     the carter tells the drover" is not. Attribution reuses the head-word and name-word
     matching the introductions use, in the same sentence or the one before.
     """
-    from .narration import _QUOTED, _sentences, unquoted
+    from .narration import _sentences, unquoted
 
     if scene is None or not beat:
         return []
@@ -5330,8 +5350,8 @@ def hailed_by(scene, beat: str) -> list[str]:
     out: list[str] = []
     sentences = _sentences(beat)
     for i, s in enumerate(sentences):
-        for m in _QUOTED.finditer(s):
-            if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", m.group(0), re.I):
+        for qa, qb in speech.spans(s):
+            if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", s[qa:qb], re.I):
                 continue
             outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
             words = _name_words(outside)
@@ -5697,16 +5717,74 @@ def check_the_target(raw_intents, player_text: str, scene, recent=()) -> list | 
 
 # A blow struck, in the present tense the beats are written in. Finite forms only: an
 # infinitive ("to strike") is an intention, and the guards below cut those.
-_STRIKES = (r"(?:lunges?|swings?|strikes?|stabs?|slashes?|thrusts?|hacks?|charges?|"
-            r"lashes? out|comes? at|drives?|smashes?|punches?|kicks?|shoves?|grabs?|"
-            r"seizes?|tackles?|swipes?|jabs?|clubs?|bashes?|slams?|cuts?|brings? "
-            r"(?:\w+\s+){0,3}down|throws? (?:\w+\s+){0,3}at|attacks?|rushes?)")
-# The whole sentence, not a window: measured live 2026-09-18 on the first replay, "He
-# lunges, his weight shifting forward as he brings the notched broadsword in a
-# desperate, overhead arc aimed at your shoulder" put 100 characters between the verb
-# and "your", and an 80-character window let the fight go unopened again.
-_STRIKES_AT_YOU = re.compile(
-    r"\b" + _STRIKES + r"\b(?:[^.!?]*?)\b(?:you|your)\b", re.I)
+#
+# Two kinds of verb, because most of the old list was not violent at all. Measured
+# 2026-09-25, six of six friendly sentences read as a blow at the player and
+# `struck_first` rolled the barmaid's attack: "rushes over to you with a tankard", "grabs
+# your hand and shakes it warmly", "throws a wink at you", "cuts you a slice of cheese",
+# "charges you two silver", "slams a mug down in front of you". Any of thirty verbs
+# followed ANYWHERE in the sentence by "you" or "your" was a blow.
+#
+# A verb that is a blow in itself — lunges, stabs, punches — still needs only the player
+# in its sentence (the 2026-09-18 replay put 100 characters between "lunges" and "your
+# shoulder", and that must still open the fight):
+_BLOWS = (r"(?:lunges?|stabs?|slashes?|lashes? out|comes? at|punches?|tackles?|bashes?|"
+          r"attacks?|strikes?)")
+# ... except for the idioms that borrow them: "strikes up a conversation with you",
+# "strikes a deal", "the offer strikes you as fair".
+_BLOW_IDIOM = re.compile(
+    r"\s*(?:up\b|a\s+(?:deal|bargain|match|pose|note|chord|balance|light|flint)\b|"
+    r"you\s+(?:as|that)\b|(?:his|her|their)\s+(?:meal|food|plate|bowl|stew|work)\b)",
+    re.I)
+# A verb that usually is NOT a blow — somebody rushes over, grabs a hand, cuts bread,
+# charges a price, throws a look — is one only with something that makes it one in the
+# same sentence: a weapon, or a blow aimed at the player's body or guard.
+_CONTACTS = (r"(?:swings?|thrusts?|hacks?|jabs?|kicks?|clubs?|swipes?|grabs?|seizes?|"
+             r"rushes?|charges?|cuts?|drives?|smashes?|shoves?|slams?|hurls?|throws?|"
+             r"brings? (?:\w+\s+){0,3}down)")
+_WEAPON_NOUN = (r"(?:blade|sword|sabre|saber|scimitar|knife|knives|dagger|dirk|stiletto|"
+                r"club|cudgel|axe|hatchet|mace|hammer|maul|spear|pike|halberd|glaive|"
+                r"flail|whip|sap|fists?|knuckles|claws?|teeth|fangs|crossbow|bolt|arrow)")
+_YOUR_BODY = (r"(?:throat|neck|face|jaw|head|skull|temple|chest|ribs|gut|belly|stomach|"
+              r"back|shoulder|knees?|legs?|guard|shield|eyes?|nose|mouth|collar|hair|"
+              r"windpipe|groin|spine)")
+_AIMED = re.compile(
+    r"\b(?:at|into|against)\s+(?:you|your)\b|\byour\s+" + _YOUR_BODY + r"\b|"
+    r"\byou\s+(?:in|across|on)\s+the\s+" + _YOUR_BODY + r"\b|\b" + _WEAPON_NOUN + r"\b",
+    re.I)
+# What is thrown, cut or swung that is never a blow, and ends the question: a wink, a
+# glance, a coin, a slice.
+_GESTURE = re.compile(
+    r"\b(?:wink|glance|look|smile|grin|nod|kiss|shrug|salute|greeting|word|question|"
+    r"coin|coins|purse|slice|piece|share|price|fee|bargain|door|gate|shutter)s?\b", re.I)
+
+_STRIKES_AT_YOU = re.compile(r"\b" + _BLOWS + r"\b(?:[^.!?]*?)\b(?:you|your)\b", re.I)
+_BLOW_VERB = re.compile(_BLOWS, re.I)
+_CONTACT_VERB = re.compile(r"\b" + _CONTACTS + r"\b", re.I)
+
+
+def _a_blow_in(sentence: str):
+    """Where the blow at the player starts in this sentence, or None.
+
+    The whole sentence, not a window: measured live 2026-09-18 on the first replay, "He
+    lunges, his weight shifting forward as he brings the notched broadsword in a
+    desperate, overhead arc aimed at your shoulder" put 100 characters between the verb
+    and "your", and an 80-character window let the fight go unopened again.
+    """
+    for m in _STRIKES_AT_YOU.finditer(sentence):
+        verb = _BLOW_VERB.match(sentence, m.start())
+        if not _BLOW_IDIOM.match(sentence, verb.end()):
+            return m
+    for m in _CONTACT_VERB.finditer(sentence):
+        rest = sentence[m.end():]
+        aimed = _AIMED.search(rest)
+        if aimed is None:
+            continue
+        # The thing thrown, cut or swung comes before the aim: "throws a wink at you".
+        if _GESTURE.search(rest[:aimed.start()]):
+            continue
+        return m
+    return None
 # What turns a blow into a threat, a feint, or somebody else's: these within four
 # words before the verb, and the sentence opens no fight. "coils his muscles, waiting
 # for you" (beat 31 of the ring fight) must not; "he lunges … as he tries to overwhelm
@@ -5758,7 +5836,7 @@ def attacked_by(scene, gm_beat: str) -> list[tuple[str, str]]:
         # Who this sentence names, for the pronoun that may follow in the next.
         named_here = [r for r, a in people
                       if any(re.search(rf"\b{re.escape(h)}s?\b", low) for h in heads(a.name))]
-        m = _STRIKES_AT_YOU.search(sentence)
+        m = _a_blow_in(sentence)
         if not m:
             if named_here:
                 last_named = named_here[-1]
