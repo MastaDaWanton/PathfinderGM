@@ -237,6 +237,47 @@ def _write_portfile(data_root: Path, port: int, url: str) -> Path | None:
         return None
 
 
+def _sweep_stale_unpacks(temp: str | None = None, mine: str | None = None) -> list[str]:
+    """Delete the unpack folders earlier runs of THIS app left behind. Returns them.
+
+    A onefile build unpacks to `%TEMP%\\_MEIxxxxx` and removes it only on a clean exit;
+    the shell's taskkill fallback is not one. Measured 2026-09-05: 154 of them, ~40 MB
+    each, and every launch took 60-160 s while Defender caught up — the shell's startup
+    timeout fired over a game that was running.
+
+    Careful, because the wrong deletion is far worse than the leak:
+      - ours only: a folder is swept only if it holds this app's own play table, never
+        another PyInstaller program's unpack;
+      - not the running one: `sys._MEIPASS` is skipped;
+      - not one in use: on Windows a directory with an open file inside cannot be
+        renamed, so the folder is renamed first and only what could be renamed is
+        deleted — a second copy of the game still running keeps its unpack.
+    Run on a daemon thread after the server is up, never on the path to READY.
+    """
+    import glob
+    import shutil
+    import tempfile
+
+    temp = temp or tempfile.gettempdir()
+    mine = os.path.normcase(os.path.abspath(mine or getattr(sys, "_MEIPASS", "") or ""))
+    swept: list[str] = []
+    for folder in glob.glob(os.path.join(temp, "_MEI*")):
+        path = os.path.normcase(os.path.abspath(folder))
+        if not os.path.isdir(folder) or path == mine:
+            continue
+        if not os.path.isfile(os.path.join(folder, "play", "templates", "play",
+                                           "table.html")):
+            continue
+        doomed = folder + ".stale"
+        try:
+            os.rename(folder, doomed)
+        except OSError:
+            continue                     # something still has it open
+        shutil.rmtree(doomed, ignore_errors=True)
+        swept.append(folder)
+    return swept
+
+
 # Inside the shell's own kill window (electron/main.js: stdin closed, taskkill at 3 s,
 # app.exit at 4.5 s). Longer is not available: the 4.5 s floor exists because a
 # lingering backend held the single-instance lock and the next launch quit.
@@ -403,6 +444,12 @@ def main(argv: list[str] | None = None) -> int:
                 pass
             server.shutdown()
         threading.Thread(target=_watch, daemon=True).start()
+
+    # The unpack folders force-killed runs left in %TEMP%, swept in the background once
+    # the server is up — frozen only, since only a onefile build unpacks.
+    if getattr(sys, "frozen", False):
+        threading.Thread(target=_sweep_stale_unpacks, daemon=True,
+                         name="pathfindergm-sweep").start()
 
     # Always, shell or no shell. Inert until a page checks in, so nothing that drives the
     # exe without a browser — `tools/prove_build.py`, `--check`, a curl — can be reaped
