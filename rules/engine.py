@@ -4103,10 +4103,11 @@ class Engine:
     def tidy_the_fallen(self, grace: int = 2) -> list[str]:
         """Bodies age out of the scene on their own after a short grace.
 
-        Two turns is time to loot and say a word over them; after that they
+        Two turns is time to loot and say a word over them; after that the dead
         depart quietly, whether or not the player ever walks away. The dying get
         the same treatment as `leave_behind`: their story resolves rather than
-        printing "bleeding out" beats forever. No-op mid-encounter.
+        printing "bleeding out" beats forever — and whoever comes out of it alive,
+        stable or merely unconscious, stays. No-op mid-encounter.
         """
         if self.scene.in_encounter:
             return []
@@ -4132,7 +4133,14 @@ class Engine:
             if age > grace:
                 if a.has_condition("dying"):
                     tells.extend(self._resolve_dying(a))
-                self.scene.depart(ref)
+                # Only a corpse leaves. Measured 2026-09-25: unconscious and stable carry
+                # `state.down.fallen` beside dead, so an NPC knocked out with non-lethal
+                # damage — at full hit points — departed the campaign after three calls
+                # with no tell at all, and so did a dying man who stabilised on the roll
+                # just above. A prisoner, a spared thug and a fallen companion are all
+                # still somebody; they stay where they lie until they wake or die.
+                if a.has_state("state.down.dead"):
+                    self.scene.depart(ref)
                 self.scene.fallen.pop(ref, None)
         return tells
 
