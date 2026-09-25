@@ -262,6 +262,7 @@ class Campaign:
                 "said": dict(self.scene.said),
                 "routed_xp": [dict(r) for r in self.scene.routed_xp],
                 "agreements": list(self.scene.agreements),
+                "population": self.scene.population,
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
                 # Which counters already have somebody behind them. Absent in saves
@@ -391,6 +392,7 @@ class Campaign:
                            or []),
             agreements=list(s.get("agreements") or (s.get("said") or {}).get("agreements")
                             or []),
+            population=dict(s.get("population") or {}),
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],

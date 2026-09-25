@@ -5496,8 +5496,16 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
             taken = [a.true_name for a in scene.actors.values() if getattr(a, "true_name", "")]
             taken += [a.name for a in scene.actors.values()]
             actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
-            actor.appearance = names_mod.appearance_for(world, scene.location_id,
-                                                        ref=actor.ref)
+            # The face their population record rolled, when they have one — chosen to
+            # agree with their work (rules/lives.py) — and the record keeps the ref.
+            from rules import population
+
+            rec = population.at_spot(scene, phrase)
+            if rec is not None:
+                rec["ref"] = actor.ref
+            actor.appearance = names_mod.appearance_for(
+                world, scene.location_id, ref=actor.ref,
+                own=(rec["life"]["face"] if rec else None))
         if getattr(scene, "grid", None) is not None:
             scene.place_by_zone([actor.ref])
         for e in scene.cast:

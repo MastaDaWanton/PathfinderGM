@@ -64,6 +64,7 @@ def _campaign(save: dict, tmp: Path):
 def measure(tmp_path) -> dict:
     from gm import judgement, narration, speech
     from gm.agent import GMAgent
+    from rules import population
 
     faults: collections.Counter = collections.Counter()
     firings: collections.Counter = collections.Counter()
@@ -95,7 +96,16 @@ def measure(tmp_path) -> dict:
                 # Each state-writing detector on a fresh copy of the scene, so one's
                 # booking cannot change what the next one sees.
                 scene = _campaign(rec["save_before"], tmp_path).scene
-                firings["note_cast booked"] += len(judgement.note_cast(scene, text, turn=n))
+                booked = judgement.note_cast(scene, text, turn=n)
+                firings["note_cast booked"] += len(booked)
+                # Everyone booked goes into the population with a life rolled
+                # (rules/population.py, 2026-09-25): how many, and how many rolls on a
+                # real phrase had to fall back because every row was excluded.
+                for phrase in booked:
+                    person = population.note(scene, phrase, turn=n)
+                    firings["population noted"] += 1
+                    firings["life rolls that fell back"] += int(bool(
+                        person["life"]["fallbacks"]))
                 firings["attacked_by named"] += sum(1 for r, _ in
                                                     judgement.attacked_by(c.scene, text) if r)
                 firings["hailed_by"] += len(judgement.hailed_by(c.scene, text))

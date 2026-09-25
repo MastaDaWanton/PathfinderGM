@@ -47,15 +47,19 @@ from pathlib import Path
 
 from . import faces as faces_mod
 
-_CONTENT = Path(__file__).resolve().parent.parent / "content" / "people"
 _TABLES: dict | None = None
 
 
 def tables() -> dict:
-    """The shipped charts, read once."""
+    """The shipped charts, read once. Found through `settings.BASE_DIR`, never `__file__`,
+    which points inside the bundle when frozen (CLAUDE.md; the packaging test caught the
+    first cut of this module doing exactly that)."""
     global _TABLES
     if _TABLES is None:
-        read = lambda n: json.loads((_CONTENT / n).read_text(encoding="utf-8"))  # noqa: E731
+        from django.conf import settings
+
+        folder = Path(settings.BASE_DIR) / "content" / "people"
+        read = lambda n: json.loads((folder / n).read_text(encoding="utf-8"))  # noqa: E731
         _TABLES = {
             "occupations": read("occupations.json")["occupations"],
             "personality": read("personality.json")["axes"],

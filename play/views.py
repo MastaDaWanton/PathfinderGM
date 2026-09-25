@@ -2023,6 +2023,16 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
+            # And every one of them into the population, located and with a life rolled,
+            # before promotion — so a person who is promoted wears the face their record
+            # rolled, and one who is not is still somebody the player can find later
+            # (the user's question of 2026-09-25: "there is nothing left of her?").
+            from rules import names as names_mod
+            from rules import population
+
+            people_body = names_mod.appearance_for(c.world, c.scene.location_id, own="")
+            for phrase in introduced:
+                population.note(c.scene, phrase, turn=len(c.transcript), body=people_body)
             judgement.promote_cast(c.scene, introduced, beat=text, world=c.world)
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself

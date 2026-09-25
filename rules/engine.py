@@ -283,6 +283,10 @@ class Scene:
     # save written before carries them in `said` and is moved over on load.
     routed_xp: list = field(default_factory=list)
     agreements: list = field(default_factory=list)
+    # Everybody the campaign has seen, as records (rules/population.py), keyed by a `pN`
+    # id; a person who enters play is ALSO an Actor in `people`, and the record keeps the
+    # ref. The user's ruling of 2026-09-25: the database may grow; it must be findable.
+    population: dict = field(default_factory=dict)
     # The resolution record, for tests and debugging. Nothing in the app reads it, and it
     # is deep-copied by every snapshot, so it keeps only the last LOG_KEPT outcomes.
     LOG_KEPT = 200
