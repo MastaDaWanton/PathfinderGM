@@ -153,6 +153,32 @@ class _Tee(io.TextIOBase):
             pass
 
 
+def _without_pass(address: str) -> str:
+    """An address with its `?k=` pass masked, for the log."""
+    import re
+
+    return re.sub(r"([?&]k=)[^&\s]+", r"\1(the pass)", address)
+
+
+def _console_only(line: str, redacted: str) -> None:
+    """`line` to the console window, `redacted` to the log file.
+
+    Measured 2026-09-25: the LAN addresses were printed with `?k=PASS` through the tee,
+    so the pass sat in `logs/pathfindergm.log` — the file a player attaches to a bug
+    report. The console is the player's own screen and keeps the whole address."""
+    out = sys.stdout
+    if isinstance(out, _Tee):
+        out._console.write(line + "\n")
+        out._console.flush()
+        try:
+            out._log.write(redacted + "\n")
+            out._log.flush()
+        except OSError:
+            pass
+    else:
+        print(line, flush=True)
+
+
 def _start_log(data_root: Path):
     """The log file the Electron shell needs to exist before it can hide the console.
 
@@ -376,7 +402,7 @@ def main(argv: list[str] | None = None) -> int:
         say("")
         say("  On this network, from a phone or tablet:")
         for address in lan_state["addresses"] or ["  (no network address found)"]:
-            say(f"    {address}")
+            _console_only(f"    {address}", redacted=f"    {_without_pass(address)}")
         say("  The pass is new every launch, and Windows may ask you to allow this")
         say("  app through the firewall the first time.")
         say("")
