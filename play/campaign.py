@@ -697,6 +697,14 @@ def switch_to(character_id: str) -> Campaign:
     return c
 
 
+def forget_live() -> None:
+    """Drop every campaign held in memory; the next request reads its save back.
+
+    The answer to a request that failed half-way (`concurrency.OneGameAtATime`): the save
+    on disk is always a consistent point, the memory copy after a crash is not."""
+    _LIVE.clear()
+
+
 def _save_path(campaign_id: str) -> Path:
     return Campaign(id=campaign_id, world_source="", scene=Scene()).path()
 

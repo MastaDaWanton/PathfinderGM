@@ -1218,13 +1218,29 @@ def say(request):
         )
     except ModelUnavailable as exc:
         c.transcript.pop()
+        _put_back_free_actions(c, pending)
         return JsonResponse({"error": str(exc)}, status=503)
     except IntentError as exc:
         c.transcript.pop()
+        _put_back_free_actions(c, pending)
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
 
     return _advance(c, agent, plan.narration, plan, text)
+
+
+def _put_back_free_actions(c, pending: list) -> None:
+    """A turn the model could not plan takes nothing with it.
+
+    Measured 2026-09-25: the free actions were moved into `history` as a note and
+    `pending_free` emptied BEFORE the plan call, so a 503 left the note in the history
+    (the next turn's model read it as already said) and the free actions gone from the
+    list that would have carried them to the turn that did happen."""
+    if not pending:
+        return
+    if c.history and c.history[-1].get("content", "").startswith("(Since their last turn"):
+        c.history.pop()
+    c.pending_free = list(pending) + list(getattr(c, "pending_free", []) or [])
 
 
 # The combat panel's whitelist: what a button may emit, and nothing else. The free-text
