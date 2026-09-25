@@ -12,10 +12,11 @@ import pathlib
 import re
 
 from django.test import Client
+from pagesource import table_source
 
 
 def _page():
-    return pathlib.Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    return table_source()
 
 
 def test_no_reply_is_parsed_around_readjson():

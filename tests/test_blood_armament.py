@@ -13,6 +13,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, IntentError, Scene
 from rules.sheet import from_dict, load_pc, to_dict
+from pagesource import table_source
 
 
 def _bender(level=1):
@@ -222,8 +223,7 @@ def test_a_toggle_never_names_a_bystander_as_its_target():
     """
     from pathlib import Path
 
-    tpl = (Path(__file__).resolve().parents[1]
-           / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    tpl = table_source()
     # A toggle is identifiable at the click, and the target is conditional on a fight.
     assert 'data-toggle="${a.toggle ? "1" : "0"}"' in tpl
     assert 'const fighting = !!(STATE.scene && STATE.scene.in_encounter);' in tpl

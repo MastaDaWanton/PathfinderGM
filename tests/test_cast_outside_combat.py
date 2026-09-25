@@ -16,6 +16,7 @@ from django.urls import reverse
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from test_casting_executes import cleric
+from pagesource import table_source
 
 
 class TestTheEngineNeverNeededAFight:
@@ -36,7 +37,7 @@ class TestTheDoor:
         assert reverse("cast_act") == "/api/cast"
 
     def test_the_spells_tab_offers_it(self):
-        html = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+        html = table_source()
         assert 'class="prepbtn castbtn"' in html
         assert 'class="casttarget"' in html
         assert 'post("/api/cast"' in html

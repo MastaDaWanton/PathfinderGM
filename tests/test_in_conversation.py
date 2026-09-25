@@ -21,6 +21,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from world import loader
+from pagesource import table_source
 
 WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
 TOWN = "5bbd0c40345f"
@@ -211,7 +212,7 @@ class TestThePanel:
     def test_the_page_carries_the_panel_and_its_button(self):
         from pathlib import Path
 
-        html = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+        html = table_source()
         assert 'id="talk"' in html and 'id="takeleave"' in html
         assert 'post("/api/talk"' in html
         assert "craft.disabled = !!busy" in html

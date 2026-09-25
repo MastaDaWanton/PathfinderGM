@@ -65,3 +65,55 @@ def test_the_served_page_is_valid_javascript(tmp_path, path):
 # flagged 29 lines of ordinary prose ("server's rule", "the target's CMD") and every
 # regex literal. A check that cries wolf on comments would be turned off within a week,
 # and the parser above is the honest version of the same question.
+
+
+# --- the script files the pages load ---------------------------------------------------
+#
+# The play table's script moved into six files under static/js/table/ on 2026-09-25, and a
+# test that parsed only INLINE scripts would have passed over a broken file silently. Every
+# local script a page loads is fetched through the client — the URL the browser uses, with
+# its content stamp — and parsed on its own. Classic scripts, so `node --check` on `.js` is
+# the right parser (it would wave through broken module syntax; these are not modules).
+
+_SRC = re.compile(r"<script[^>]*\bsrc=\"(/static/[^\"]+)\"")
+
+
+@pytest.mark.parametrize("path", PAGES)
+def test_every_script_file_a_page_loads_is_valid_javascript(tmp_path, path):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed; the parse check needs a JS parser")
+    client = Client()
+    html = client.get(path).content.decode("utf-8")
+    for src in _SRC.findall(html):
+        r = client.get(src)
+        assert r.status_code == 200, f"{path} loads {src}, which is not served"
+        body = b"".join(r.streaming_content) if getattr(r, "streaming", False) else r.content
+        f = tmp_path / "file.js"
+        f.write_bytes(body)
+        done = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
+        assert done.returncode == 0, f"{src} does not parse:\n{done.stderr[:800]}"
+
+
+def test_the_table_scripts_carry_a_content_stamp_and_are_not_trusted_from_cache():
+    """The Electron shell's disk cache outlives reinstalls on an origin that never changes —
+    World Bible's five-day-old stylesheet. Each script URL carries a hash of its bytes, and
+    the static route answers `Cache-Control: no-cache`."""
+    client = Client()
+    html = client.get("/play/").content.decode("utf-8")
+    srcs = [s for s in _SRC.findall(html) if "/js/table/" in s]
+    assert len(srcs) == 6 and all(re.search(r"\?v=[0-9a-f]{10}$", s) for s in srcs), srcs
+    r = client.get(srcs[0])
+    assert r["Cache-Control"] == "no-cache"
+    assert r["Content-Type"].startswith("text/javascript")
+
+
+def test_an_edit_is_a_new_stamp(tmp_path, monkeypatch):
+    from play.templatetags import assets
+
+    f = tmp_path / "x.js"
+    f.write_text("let a = 1;", encoding="utf-8")
+    monkeypatch.setattr(assets.finders, "find", lambda p: str(f))
+    before = assets.stamp("js/x.js")
+    f.write_text("let a = 22;", encoding="utf-8")
+    assert assets.stamp("js/x.js") != before

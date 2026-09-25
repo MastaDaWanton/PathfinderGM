@@ -88,35 +88,47 @@ _META: dict = {}
 
 
 def all_feats() -> dict[str, Feat]:
-    """Every feat, shipped plus homebrew, layered the way spells and ingredients are."""
-    global _ALL, _META
+    """Every feat, shipped plus homebrew, layered the way spells and ingredients are.
+
+    With no homebrew feats, built once per process (`rules.pristine`)."""
+    global _ALL
     if _ALL is None:
         from django.conf import settings
 
-        raw: dict[str, dict] = {}
-        for folder in (Path(settings.BASE_DIR) / "content" / "feats",
-                       Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "feats"):
-            if not folder.is_dir():
-                continue
-            for path in sorted(folder.glob("*.json")):
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception as exc:
-                    files.unreadable(path, exc)
-                    continue
-                entries = data.get("feats") if isinstance(data, dict) else None
-                if not isinstance(entries, list):
-                    entries = [data] if isinstance(data, dict) and data.get("id") else []
-                if isinstance(data, dict):
-                    _META.update({k: v for k, v in data.items() if k != "feats"})
-                for e in entries:
-                    if not e.get("id"):
-                        continue
-                    # Merged, not replaced: a homebrew edit changing one field must not
-                    # drop the fifteen it never mentioned.
-                    raw.setdefault(e["id"], {}).update(e)
-        _ALL = {k: from_dict(v) for k, v in raw.items()}
+        from . import pristine
+
+        _ALL = pristine.memo(
+            "feats", [Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "feats"],
+            _build_feats)
     return _ALL
+
+
+def _build_feats() -> dict[str, Feat]:
+    from django.conf import settings
+
+    raw: dict[str, dict] = {}
+    for folder in (Path(settings.BASE_DIR) / "content" / "feats",
+                   Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "feats"):
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            entries = data.get("feats") if isinstance(data, dict) else None
+            if not isinstance(entries, list):
+                entries = [data] if isinstance(data, dict) and data.get("id") else []
+            if isinstance(data, dict):
+                _META.update({k: v for k, v in data.items() if k != "feats"})
+            for e in entries:
+                if not e.get("id"):
+                    continue
+                # Merged, not replaced: a homebrew edit changing one field must not
+                # drop the fifteen it never mentioned.
+                raw.setdefault(e["id"], {}).update(e)
+    return {k: from_dict(v) for k, v in raw.items()}
 
 
 def meta() -> dict:

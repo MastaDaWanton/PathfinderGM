@@ -22,6 +22,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import load_pc
+from pagesource import table_source
 
 
 @pytest.fixture(scope="module")
@@ -171,7 +172,7 @@ def test_an_xp_op_exists_and_the_cheat_reads_the_amount_without_the_model(vormoo
 def test_the_card_does_not_print_one_term_twice_and_the_reason_wraps():
     from pathlib import Path
 
-    html = Path("play/templates/play/table.html").read_text(encoding="utf-8")
+    html = table_source()
     assert html.count('if (p.breakdown.length !== 1) terms.push({ label: "your modifier"') == 2
     assert "overflow-wrap: anywhere" in html
 

@@ -26,6 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from django.conf import settings
+from pagesource import table_source
 
 
 def _js() -> str:
@@ -34,8 +35,7 @@ def _js() -> str:
 
 
 def _page() -> str:
-    return Path(settings.BASE_DIR, "play", "templates", "play", "table.html").read_text(
-        encoding="utf-8")
+    return table_source()
 
 
 def test_the_viewport_ships_and_the_table_loads_it():

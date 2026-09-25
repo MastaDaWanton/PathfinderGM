@@ -28,6 +28,7 @@ See docs/dice-feel.md.
 from pathlib import Path
 
 import pytest
+from pagesource import table_source
 
 SRC = (Path(__file__).resolve().parents[1] / "play" / "static" / "js"
        / "dice3d.js").read_text(encoding="utf-8")
@@ -310,7 +311,7 @@ def test_the_main_roll_path_actually_lands_the_die():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    table = table_source()
     views = (root / "play" / "views.py").read_text(encoding="utf-8")
 
     # The WHOLE function, not a fixed slice of it. This read `[:1400]` and went stale on
@@ -343,7 +344,7 @@ def test_the_die_lands_before_the_narrator_has_finished():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    table = table_source()
     views = (root / "play" / "views.py").read_text(encoding="utf-8")
     urls = (root / "pathfindergm" / "urls.py").read_text(encoding="utf-8")
 
@@ -420,7 +421,7 @@ def test_the_foraging_survival_die_lands_and_can_be_closed():
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[1]
-    table = (root / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    table = table_source()
 
     at = table.index('post("/api/craftaction", { action: "forage"')
     block = table[at:table.index("render(await", at)]

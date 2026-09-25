@@ -35,6 +35,7 @@ import pytest
 from django.conf import settings
 
 from pathfindergm import paths
+from pagesource import table_source
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "pathfindergm.spec"
@@ -882,7 +883,7 @@ def test_the_map_paints_foes_red_and_bystanders_white():
     """"make the bystanders white and the enemies bright red." The page is told each
     actor's side and paints by it; a bystander is a non-player on no side while a
     fight is on."""
-    text = (ROOT / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    text = table_source()
     assert "#map .token.foe { fill: #e0261e" in text
     assert "#map .token.bystander { fill: #f2ecdd" in text
     assert "#map .token.ally { fill: #6fc276" in text          # on your side: green

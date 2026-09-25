@@ -49,4 +49,21 @@ def test_an_explicit_seed_is_left_alone():
 
 def test_the_data_directory_is_the_repos_own():
     root = Path(__file__).resolve().parent.parent
-    assert Path(os.environ["PATHFINDER_GM_DATA"]) == root / ".test-data"
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    assert Path(os.environ["PATHFINDER_GM_DATA"]) == root / ".test-data" / worker
+
+
+# How many tests read source text. They break on a rename that changes no behaviour and pass
+# when the pinned text survives only in a comment (Google's "change-detector tests"); 64 on
+# 2026-09-25. A ceiling that may only go down: lower it when one is converted to a behaviour
+# or AST check, never raise it.
+SOURCE_PINS_CEILING = 64
+
+
+def test_source_text_pins_only_go_down():
+    here = Path(__file__).resolve()
+    count = sum(p.read_text(encoding="utf-8").count("inspect." + "getsource")
+                for p in here.parent.glob("test_*.py") if p != here)
+    assert count <= SOURCE_PINS_CEILING, (
+        f"{count} inspect.getsource calls in tests (ceiling {SOURCE_PINS_CEILING}): "
+        f"assert behaviour, or walk the AST as test_three_laws does")

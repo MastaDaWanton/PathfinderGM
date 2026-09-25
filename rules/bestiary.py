@@ -476,37 +476,51 @@ def ac_numbers(note: str) -> tuple[int, int] | None:
 
 
 def imported() -> dict[str, dict]:
-    """Every imported stat block, keyed by slug. Loaded once, on first use."""
+    """Every imported stat block, keyed by slug. Loaded once, on first use.
+
+    With no homebrew creatures, built once per process (`rules.pristine`): 16 MB of JSON,
+    325 ms a build, and the same result every time (measured 2026-09-25)."""
     global _IMPORTED, _INDEX
     if _IMPORTED is None:
         from django.conf import settings
 
-        out: dict[str, dict] = {}
-        for folder in (Path(settings.BASE_DIR) / "content" / "bestiary",
-                       Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"):
-            if not folder.is_dir():
-                continue
-            # `core.json` is loaded last so it wins the 55 name collisions with the
-            # variant spreadsheet: a printed Bestiary stat block is the canonical one, and
-            # an adventure-path variant that happens to share a name must not replace it.
-            for path in sorted(folder.glob("*.json"),
-                               key=lambda q: (q.stem == "core", q.stem)):
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception as exc:
-                    files.unreadable(path, exc)
-                    continue
-                entries = data.get("creatures") if isinstance(data, dict) else None
-                if not isinstance(entries, list):
-                    entries = [data] if isinstance(data, dict) and data.get("id") else []
-                for e in entries:
-                    if e.get("id"):
-                        base = dict(out.get(e["id"], {}))
-                        base.update({k: v for k, v in e.items() if v not in (None, "")})
-                        out[e["id"]] = base
-        _IMPORTED = out
-        _INDEX = sorted(set(list(TEMPLATES) + list(out)))
+        from . import pristine
+
+        _IMPORTED = pristine.memo(
+            "bestiary", [Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"],
+            _build_imported)
+        _INDEX = sorted(set(list(TEMPLATES) + list(_IMPORTED)))
     return _IMPORTED
+
+
+def _build_imported() -> dict[str, dict]:
+    """The two content files and the homebrew creatures, read and merged."""
+    from django.conf import settings
+
+    out: dict[str, dict] = {}
+    for folder in (Path(settings.BASE_DIR) / "content" / "bestiary",
+                   Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "creatures"):
+        if not folder.is_dir():
+            continue
+        # `core.json` is loaded last so it wins the 55 name collisions with the
+        # variant spreadsheet: a printed Bestiary stat block is the canonical one, and
+        # an adventure-path variant that happens to share a name must not replace it.
+        for path in sorted(folder.glob("*.json"),
+                           key=lambda q: (q.stem == "core", q.stem)):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            entries = data.get("creatures") if isinstance(data, dict) else None
+            if not isinstance(entries, list):
+                entries = [data] if isinstance(data, dict) and data.get("id") else []
+            for e in entries:
+                if e.get("id"):
+                    base = dict(out.get(e["id"], {}))
+                    base.update({k: v for k, v in e.items() if v not in (None, "")})
+                    out[e["id"]] = base
+    return out
 
 
 def everything() -> dict[str, dict]:

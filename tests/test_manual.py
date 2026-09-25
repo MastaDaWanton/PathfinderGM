@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 from django.conf import settings
+from pagesource import served
 
 
 @pytest.fixture
@@ -51,7 +52,7 @@ def test_both_pages_a_player_sits_on_link_to_it(client):
     the header — the person who most needs it has just opened the app and does not yet
     know what the tabs are — and the table carries it in the character pane."""
     for path in ("/", "/play/"):
-        assert '/manual' in client.get(path).content.decode("utf-8"), (
+        assert '/manual' in served(client, path), (
             f"{path} does not link to the manual")
 
 
