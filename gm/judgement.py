@@ -27,6 +27,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from . import speech
+
 # --- Speech is not action ---------------------------------------------------------------
 #
 # Everything below this line reads the player's own words looking for a declaration —
@@ -185,19 +187,9 @@ def narration_quotes_blanked(text: str) -> str:
     Both quote conventions, because the narrator uses both. Apostrophes inside a word are
     not openers: "the guard's" must not blank the rest of the paragraph.
     """
-    line = str(text or "")
-    out = list(line)
-    # An apostrophe INSIDE a single-quoted line — "don't", "it's", "guild's" — is part
-    # of the line, not its close: a close is an apostrophe not followed by a letter.
-    # Without that, `'If it's the leaf you want …'` matched nothing at all, the whole
-    # line stood as narration, and "the elder-quarter" in it booked an elder who was
-    # then stood in the lane (2026-09-24).
-    for m in re.finditer(r'"[^"]*"|“[^”]*”|'
-                         r'(?<![A-Za-z])\'(?:[^\']|\'(?=[A-Za-z]))*\'(?![A-Za-z])', line):
-        for i in range(m.start(), m.end()):
-            if not out[i].isspace():
-                out[i] = " "
-    return "".join(out)
+    # One scanner for the whole app (`gm/speech.py`): the in-word apostrophe rule this
+    # function carried is the scanner's, and so is the curly single quote it lacked.
+    return speech.blanked(text)
 
 
 # --- What the player's words indicate -------------------------------------------------
@@ -4634,10 +4626,9 @@ def hold_the_booked_word(scene, text: str) -> tuple[str, list[str]]:
     swapped: list[str] = []
     # Narration only, never a line of dialogue — the same split `creature_nouns_for_pc`
     # uses, and for the same reason: his words are his.
-    parts = re.split(r'("[^"]*"|“[^”]*”|\'[^\']*\')', text)
     out = []
-    for i, part in enumerate(parts):
-        if i % 2:
+    for said, part in speech.split(text):
+        if said:
             out.append(part)
             continue
         for word in sorted(_ARMED_FAMILY, key=len, reverse=True):
@@ -5348,7 +5339,7 @@ def hailed_by(scene, beat: str) -> list[str]:
     the carter tells the drover" is not. Attribution reuses the head-word and name-word
     matching the introductions use, in the same sentence or the one before.
     """
-    from .narration import _QUOTED, _sentences, unquoted
+    from .narration import _sentences, unquoted
 
     if scene is None or not beat:
         return []
@@ -5359,8 +5350,8 @@ def hailed_by(scene, beat: str) -> list[str]:
     out: list[str] = []
     sentences = _sentences(beat)
     for i, s in enumerate(sentences):
-        for m in _QUOTED.finditer(s):
-            if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", m.group(0), re.I):
+        for qa, qb in speech.spans(s):
+            if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", s[qa:qb], re.I):
                 continue
             outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
             words = _name_words(outside)

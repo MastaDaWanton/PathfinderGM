@@ -25,25 +25,16 @@ import statistics
 from collections import Counter
 from dataclasses import dataclass, field
 
+from . import speech
+
 # Six words is long enough that sharing one is copying rather than coincidence, and short
 # enough to catch a lifted clause rather than only a whole sentence.
 ECHO_LENGTH = 6
 
 _WORD = re.compile(r"[a-z']+")
-# The single-quote alternative pairs on word boundaries, because an apostrophe inside a
-# word is never a closing quote. The old form (`'[^']{8,300}?'`) could not cross
-# "that's" or "I'll", so a boatman's speech riddled with contractions was carved at the
-# wrong boundaries and "between you and me" leaked into narration — where the
-# first-person detector read it as the narrator having a body. An opener must follow
-# whitespace (or start); a closer must precede whitespace, punctuation or the end.
-# Up to 1,200 characters a quotation. It was 300, and measured 2026-09-24 on a beat
-# whose third quoted line ran to 600: the stripper left it standing as narration, the
-# cast ledger booked an "elder" out of Korgath's "the elder-quarter", promotion stood
-# him in the lane, and the face backstop wrote his face into the middle of Korgath's
-# own sentence. A long speech is still speech.
-_QUOTED = re.compile(
-    r"[\"“”‘][^\"“”]{0,1200}?[\"“”]"
-    r"|(?:^|(?<=\s))'[^\n]{2,1200}?'(?=$|[\s.,!?;:)\]])")
+# Where the speech is: `gm/speech.py`, the one scanner every pass here reads. The
+# rule that lived here capped a quotation at 300 then 1,200 characters, opened on
+# a curly single quote and closed only on a double one — see that module.
 _SENTENCE = re.compile(r"[^.!?]+[.!?]?")
 
 # Capitalised words that are not names.
@@ -135,7 +126,7 @@ def unquoted(text: str) -> str:
     An NPC may perfectly well say the player's name out loud; the narrator may not use it
     to describe them.
     """
-    return _QUOTED.sub(" ", text or "")
+    return speech.unquoted(text or "")
 
 
 # A turn shorter than this is not a scene. Measured: with the old prompt the model
@@ -308,11 +299,6 @@ def destutter(text: str) -> str:
 
 # --- the model looping -------------------------------------------------------------------
 
-# A sentence that begins speech. Straight and curly doubles always; a single quote only
-# when it follows a word boundary, because an apostrophe is intra-word and almost every
-# sentence of prose has one.
-_OPENS_SPEECH = re.compile(r"(?:^|\s)[\'‘\"“]")
-
 
 # Above this share of a beat's sentences already read, the beat is the last one again.
 REGURGITATED_SHARE = 40
@@ -356,7 +342,7 @@ def drop_repeated_beats(text: str, earlier: list[str] | None) -> tuple[str, int]
     cut = 0
     prev_cut = False
     for s, again in zip(sentences, repeated):
-        if again and (regurgitated or not _OPENS_SPEECH.search(s)):
+        if again and (regurgitated or not speech.opens(s)):
             cut += 1
             prev_cut = True
             continue
@@ -399,6 +385,7 @@ _CAP_TOKEN_BEFORE = re.compile(r"([A-Z][a-zA-Z'’-]{2,})\s+$")
 # word or two right after the phrase.
 _INTRODUCES = re.compile(
     r"(?i:\bcall me|\bmy name is|\bmy name's|\bthe name's|\bthe name is|\bthey call me|"
+    r"\bname's|\bname’s|"
     r"\bI am called|\bI'm called|\bname is|\bI am|\bI'm|\byou can call me|\bfolk call me|"
     r"\bknown as)\s+((?:[A-Z][a-zA-Z'’-]+)(?:\s+[A-Z][a-zA-Z'’-]+)?)", re.U)
 _NOT_A_GIVEN_NAME = frozenset({
@@ -440,10 +427,12 @@ def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, st
             name = m.group(1).strip()
             if name.split()[0] in _NOT_A_GIVEN_NAME:
                 continue
-            # Inside speech, or it is the narrator's own sentence about somebody.
-            before = s[:m.start()]
-            if before.count('"') % 2 == 0 and before.count("'") % 2 == 0 \
-                    and "“" not in before and "‘" not in before:
+            # Inside speech, or it is the narrator's own sentence about somebody. Asked
+            # of the scanner's lenient sentence question — was a line OPENED before the
+            # phrase — and not by counting quote marks, which "it's" and "don't" threw
+            # off by one (2026-09-25).
+            opened = speech.first_opening(s)
+            if opened is None or opened > m.start():
                 continue
             # Who is speaking: the last capitalised-or-role word outside the quotes,
             # in this sentence then the one before.
@@ -613,10 +602,8 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool) -> t
         return pc_name
 
     # Narration only: a man who SAYS "you beast" is in character, and his line is his.
-    parts = re.split(r'("[^"]*"|“[^”]*”|\'[^\']*\')', text)
-    out = []
-    for i, part in enumerate(parts):
-        out.append(part if i % 2 else _CREATURE_NOUNS.sub(_swap, part))
+    out = [run if said else _CREATURE_NOUNS.sub(_swap, run)
+           for said, run in speech.split(text)]
     return "".join(out), swapped
 
 
@@ -660,6 +647,16 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     shouts" came out with a stray space inside the closing quote.
     """
     found = invented_names(text, known)
+    # A name somebody gives for THEMSELF is a name given in play, not one the narrator
+    # conjured. Measured 2026-09-25: `"Name's Vorn," he says, and Vorn grins` came back
+    # as `"the stranger," he says, and the onlooker grins` — his own introduction
+    # rewritten, and one man given two descriptors. This runs in `_groom`, BEFORE
+    # `apply_introductions` reads the beat, so a self-given name was struck before
+    # anything could record it (item 12 of 2026-09-18 had the same root). Every
+    # occurrence of such a name is left for the introductions to take. A name spoken
+    # ABOUT somebody else ("Stay back, Kaida!") is still the narrator's invention.
+    given = {w for _, name in introductions(text) for w in name.split()}
+    found = [n for n in found if not (set(n.split()) & given)]
     if not found:
         return text, []
     known_words = {w.lower() for name in known for w in _WORD.findall(name.lower())}
@@ -816,7 +813,7 @@ def second_person_narrator(text: str) -> tuple[str, list[str]]:
     sentence can come out half-turned.
 
     Speech keeps its first person by span, not by guesswork: any sentence overlapping a
-    `_QUOTED` match is left alone, which protects multi-sentence dialogue in single
+    `speech.spans` quotation is left alone, which protects multi-sentence dialogue in single
     quotes — the shape the old per-sentence quote-character checks could not see.
     Written artifacts (a note that reads "I will come at dusk") stay exempt, and "mine"
     stays unswapped: it is a hole in the ground far more often than a pronoun in this
@@ -824,7 +821,7 @@ def second_person_narrator(text: str) -> tuple[str, list[str]]:
     """
     if not text:
         return text or "", []
-    protected = [m.span() for m in _QUOTED.finditer(text)]
+    protected = speech.spans(text)
     out: list[str] = []
     swapped: list[str] = []
     changed = False
@@ -833,7 +830,7 @@ def second_person_narrator(text: str) -> tuple[str, list[str]]:
         touches_speech = any(qlo < hi and lo < qhi for qlo, qhi in protected)
         if (not touches_speech
                 and '"' not in s and "“" not in s and "”" not in s
-                and not _OPENS_SPEECH.search(s)
+                and not speech.opens(s)
                 and not _WRITTEN_ARTIFACT.search(s)):
             first_alpha = next((i for i, ch in enumerate(s) if ch.isalpha()), -1)
 
@@ -2186,8 +2183,8 @@ def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str
             # speaker outside the quotes is cut, speech and all.
             # A quote OPENER, not any apostrophe: "it's" must not shield a dead
             # man named after the contraction.
-            opener = re.search(r"[\"“]|(?<=[\s,:])['‘]", s)
-            if opener is None or hit.start() < opener.start():
+            opener = speech.first_opening(s)
+            if opener is None or hit.start() < opener:
                 cut.append(s.strip())
                 continue
         kept.append(s.strip())
@@ -2222,7 +2219,7 @@ def cut_phantom_opposition(text: str) -> tuple[str, list[str]]:
     kept, cut = [], []
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
-        if _PHANTOM_OPPOSITION.search(s) and not _OPENS_SPEECH.search(s) \
+        if _PHANTOM_OPPOSITION.search(s) and not speech.opens(s) \
                 and '"' not in s and "“" not in s:
             cut.append(s.strip())
             continue
@@ -2288,9 +2285,7 @@ def invented_names(text: str, known: set[str]) -> list[str]:
         # word *inside* speech sits mid-sentence and was read as a name: measured across
         # two 60-turn runs, "Enjoy", "Ask", "Meet", "Just" and "Very" were all reported as
         # invented people, every one of them the opening word of somebody's line.
-        opens_speech = {
-            m.group(1) for m in re.finditer(r"[\"“”'‘’]\s*([A-Z][a-zA-Z'’-]{2,})",
-                                            sentence)}
+        opens_speech = speech.line_openers(sentence)
         for tok in tokens:
             low = tok.lower().replace("’", "'")
             # The whole token first, so a name that owns its apostrophe survives: this
@@ -2521,7 +2516,7 @@ def texture(text: str, earlier: list[str] | None = None) -> dict:
         # `repeats-an-earlier-beat`, which only catches a whole sentence repeated exactly.
         "echoed_openings": sum(1 for o in openers if o and o in before),
         "second_person": sum(1 for o in openers if o.split()[:1] == ["you"]),
-        "has_speech": bool(re.search(r'["“][^"”]{4,}["”]|\'[^\']{8,}\'', text or "")),
+        "has_speech": speech.has_speech(text or "", 4),
     }
 
 
@@ -3297,7 +3292,7 @@ def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
     first = name.split()[0]
     pattern = re.compile(
         rf"\b(?:{re.escape(name)}|{re.escape(first)})('s)?\b")
-    protected = [m.span() for m in _QUOTED.finditer(text)]
+    protected = speech.spans(text)
     count = 0
     out = []
     last = 0
@@ -3395,7 +3390,7 @@ def reads_as_a_refusal(text: str) -> bool:
     if not head:
         return False
     first = head[0]
-    if _QUOTED.search(first):
+    if speech.spans(first):
         return False
     return bool(_DECLINED.search(first))
 
@@ -3487,7 +3482,6 @@ def reintroduces_the_present(text: str, names, thread: str = "") -> list[str]:
 
 # Somebody present doing something about what they saw, and the words for merely
 # watching it. A reaction is speech, or a person-subject with an acting verb.
-_ANY_SPEECH = re.compile(r'["“][^"”]{4,}["”]|(?:^|\s)\'[^\']{8,}\'')
 _SOMEBODY = (r"man|woman|stranger|guards?|merchants?|crowd|people|onlookers?|bystanders?|"
              r"folk|vendors?|smiths?|boys?|girls?|child|children|priests?|soldiers?|"
              r"watchm[ae]n|sailors?|porters?|traders?|elders?|he|she|they|someone|somebody")
@@ -3518,7 +3512,7 @@ def nobody_reacts(text: str, others=()) -> bool:
     """
     if not text:
         return False
-    if _ANY_SPEECH.search(text):
+    if speech.has_speech(text, 4):
         return False
     body = unquoted(text)
     stems = [s for n in (others or ()) for s in _name_stems(str(n))]
@@ -4003,4 +3997,4 @@ def place_the_face(text: str, name: str, line: str) -> str:
 def _blanked(text: str) -> str:
     """The narration with every quotation replaced by spaces of the same length, so a
     position in the result is the same position in the original."""
-    return _QUOTED.sub(lambda m: " " * len(m.group(0)), text or "")
+    return speech.blanked(text or "")

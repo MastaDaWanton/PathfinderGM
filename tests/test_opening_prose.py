@@ -436,5 +436,7 @@ def test_the_example_shows_the_person_beside_them_speaking_first():
     the model wrote was silent too."""
     ferry = json.loads(opening_prose.EXAMPLE["assistant"])["opening"]
     third = ferry.split("\n\n")[2]
-    assert opening_prose._SPEECH.search(third), third
+    from gm import speech
+
+    assert speech.has_speech(third, 4), third
     assert "porter beside you" in third
