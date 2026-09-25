@@ -890,7 +890,8 @@ class GMAgent:
                claim: str = "",
                blows: list[dict] | None = None,
                cast: list[str] | None = None,
-               fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
+               fire_context: str | None = None,
+               facts: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         There used to be four copies of this chain and they had drifted — the census over
@@ -940,6 +941,7 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
+                facts=facts,
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 # What could have lit anything: the place's brief and the recent
                 # beats. None when the caller had no brief (a consequence line),
@@ -1169,7 +1171,8 @@ class GMAgent:
                 pull: dict | None = None,
                 claim: str = "",
                 blows: list[dict] | None = None,
-                fire_context: str | None = None) -> tuple[str, list[str], list[Attempt]]:
+                fire_context: str | None = None,
+                facts: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
 
         Same shape as every fix that has held here: detect mechanically, then ask the
@@ -1225,7 +1228,7 @@ class GMAgent:
         def _rewrite(complaint: str, note: str):
             reply = client.chat(
                 prompts.narration_repair_messages(
-                    text, complaint, player_input, scene_brief),
+                    text, complaint, player_input, scene_brief, facts=facts),
                 self.model, self.host, as_json=True, think=False, provider=self.provider,
                 api_key=self.api_key, temperature=0.6, num_predict=900,
                 # Structural insurance, not a truncation cure: `as_json` already puts a
@@ -1527,7 +1530,7 @@ class GMAgent:
             player_input=player_input, brief=brief, hand_back=True, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
             claim=claim, blows=self._blows_from(outcomes),
-            cast=self._cast_from(outcomes))
+            cast=self._cast_from(outcomes), facts=tells)
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
@@ -1638,7 +1641,8 @@ class GMAgent:
             out.append({"attacker": attacker or "somebody", "pc": is_pc, "tell": line})
         return out
 
-    def narrate_outcome(self, narration: str, outcomes: list, player_input: str) -> tuple[str, Attempt]:
+    def narrate_outcome(self, narration: str, outcomes: list, player_input: str,
+                        rewrite: bool = True) -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
 
         Fed only `player_visible()` outcomes, so a hidden roll's number is not in the
@@ -1692,7 +1696,8 @@ class GMAgent:
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths,
-            blows=self._blows_from(outcomes), cast=self._cast_from(outcomes))
+            blows=self._blows_from(outcomes), cast=self._cast_from(outcomes),
+            rewrite=rewrite, facts=tells)
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)

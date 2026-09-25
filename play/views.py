@@ -2328,7 +2328,11 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         tells = [o for o in resolution.outcomes if o.tell]
         if tells:
             try:
-                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts")
+                # No polish rewrite on an NPC's turn — the same call `npc_turn` makes for
+                # its own prose: "a ~10s polish call per NPC per round is a price a fight
+                # cannot pay". This door had it on, measured 2026-09-25.
+                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts",
+                                                rewrite=False)
             except ModelUnavailable:
                 text = ""
             c.transcript.append({

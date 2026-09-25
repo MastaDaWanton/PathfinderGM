@@ -1946,7 +1946,8 @@ GRAMMAR_MAXLENGTH_CEILING = 1800
 
 
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",
-                              scene_brief: str = "") -> list[dict]:
+                              scene_brief: str = "",
+                              facts: list[str] | None = None) -> list[dict]:
     """The rewrite call, given something to write *about*.
 
     It used to be handed the passage and the complaint and nothing else. Asked to rewrite
@@ -1960,6 +1961,12 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
         body += f"\n\nThe player said: {player_input}"
     if scene_brief:
         body += f"\n\nWrite about this scene, and nothing else:\n{scene_brief}"
+    # The engine's decisions, which the rewrite was the one prose call never shown
+    # (2026-09-25): asked to fix a phrase with no tells in front of it, it could turn a
+    # miss into a hit, and the only guard was that 60% of the action sentences survived.
+    if facts:
+        body += ("\n\nWhat the engine decided. Every one of these stays true in your "
+                 "rewrite:\n" + "\n".join(f"- {f}" for f in facts))
     return [
         {"role": "system", "content": NARRATION_REPAIR_BRIEFING},
         {"role": "user", "content": NARRATION_REPAIR_EXAMPLE["user"]},
