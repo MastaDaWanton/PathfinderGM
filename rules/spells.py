@@ -1765,7 +1765,8 @@ def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         for sid, got in (data.get("spells") or {}).items():
             key = str(sid).strip().lower()
@@ -1824,7 +1825,8 @@ def all_spells() -> dict[str, Spell]:
             for path in sorted(folder.glob("*.json")):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("spells") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

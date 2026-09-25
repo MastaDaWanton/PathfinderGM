@@ -30,6 +30,7 @@ from pathlib import Path
 
 from . import creature_effects
 from .sheet import Actor, from_dict
+from pathfindergm import files
 
 TEMPLATES: dict[str, dict] = {
     "guildhand": {
@@ -492,7 +493,8 @@ def imported() -> dict[str, dict]:
                                key=lambda q: (q.stem == "core", q.stem)):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("creatures") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

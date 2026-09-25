@@ -18,6 +18,7 @@ import json
 from pathlib import Path
 
 from .tables import WEAPONS as SHIPPED
+from pathfindergm import files
 
 _ALL: dict[str, dict] | None = None
 _META: dict = {}
@@ -40,7 +41,8 @@ def all_weapons() -> dict[str, dict]:
             for path in sorted(folder.glob("*.json")):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("weapons") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

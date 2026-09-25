@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 from .tables import CLASSES as SHIPPED, save_for
+from pathfindergm import files
 
 # BAB progressions, by the name a class file uses.
 BAB = {"full": 1.0, "three_quarter": 0.75, "half": 0.5}
@@ -52,7 +53,8 @@ def all_classes() -> dict[str, dict]:
             for path in sorted(folder.glob("*.json")):
                 try:
                     data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception:
+                except Exception as exc:
+                    files.unreadable(path, exc)
                     continue
                 entries = data.get("classes") if isinstance(data, dict) else None
                 if not isinstance(entries, list):

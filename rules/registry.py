@@ -387,7 +387,8 @@ def read_folder(path: Path, key: str) -> dict[str, dict]:
     for file in sorted(path.glob("*.json")):
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(file, exc)
             continue
         entries = data.get(key) if isinstance(data, dict) else None
         if not isinstance(entries, list):

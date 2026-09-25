@@ -3996,14 +3996,23 @@ def _temp_pools(data: dict) -> list[TempPool]:
 
 def _overrides(raw: dict) -> dict[str, bool]:
     """A misspelled rule is a feature that never happens with nothing saying why, so it
-    is caught at load rather than never noticed."""
+    is SAID at load rather than never noticed — in the log, and dropped.
+
+    It used to raise, and measured 2026-09-25 that made renaming any rule in
+    ACTOR_RULES a way to make every save that had overridden it unreadable: `from_dict`
+    is the load path, and a raise there is an `UnreadableSave`. The sheet editor offers
+    the rules as toggles, so an unknown key only arrives from a hand-edited file or a
+    rule renamed since the save — both are worth a line in the log, neither is worth
+    the campaign.
+    """
     unknown = [k for k in raw if k not in ACTOR_RULES]
     if unknown:
-        raise IllegalSheet(
-            f"no such rule to override: {', '.join(sorted(unknown))}. "
-            f"Known rules: {', '.join(sorted(ACTOR_RULES))}"
-        )
-    return {k: bool(v) for k, v in raw.items()}
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "no such rule to override: %s (dropped). Known rules: %s",
+            ", ".join(sorted(unknown)), ", ".join(sorted(ACTOR_RULES)))
+    return {k: bool(v) for k, v in raw.items() if k in ACTOR_RULES}
 
 
 # The four effect kinds that are defences. Named once so the migration, the save and

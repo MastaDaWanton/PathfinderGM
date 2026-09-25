@@ -28,6 +28,7 @@ from django.conf import settings
 from . import cards as cards_mod
 from . import places as places_mod
 from .activeeffect import ActiveEffect
+from pathfindergm import files
 
 # --- the vocabulary -------------------------------------------------------------------------
 
@@ -133,7 +134,8 @@ def _read_folder(folder: Path) -> dict[str, dict]:
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         if not isinstance(data, dict):
             continue

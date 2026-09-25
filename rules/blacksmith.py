@@ -26,6 +26,7 @@ from pathlib import Path
 
 from . import effectspec
 from . import worldclass as wc
+from pathfindergm import files
 
 TRACK_ID = "blacksmith"
 
@@ -240,7 +241,8 @@ def load_dir(path: str | Path) -> dict[str, dict]:
     for file in sorted(p.glob("*.json")):
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(file, exc)
             continue
         entries = data.get("materials") if isinstance(data, dict) else None
         if not isinstance(entries, list):

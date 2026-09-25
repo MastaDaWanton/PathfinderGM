@@ -19,6 +19,7 @@ from pathlib import Path
 from django.conf import settings
 
 from world.loader import SUPPORTED_MAJOR, UnsupportedSchema, load_cached
+from pathfindergm import files
 
 
 def user_dir() -> Path:
@@ -200,7 +201,8 @@ def campaigns_in(world_id: str) -> list[dict]:
     for path in sorted(d.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         if Path(str(data.get("world_source", ""))).stem != world_id:
             continue

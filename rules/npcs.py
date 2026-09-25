@@ -329,7 +329,8 @@ def remembered() -> dict[str, dict]:
     for path in sorted(_dir().glob("*.json")) if _dir().is_dir() else []:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         if isinstance(data, dict):
             out[path.stem] = data

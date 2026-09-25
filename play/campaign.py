@@ -466,6 +466,10 @@ class Campaign:
             else:
                 engine.place_party(self.scene.at)
         except Exception:
+            import logging
+
+            logging.getLogger("pathfindergm").exception(
+                "placing the party on load failed; they stand 'here' until the world loads")
             # A world that will not load is reported by whoever asked for it; the
             # party is not left nowhere on the way to that sentence. Everyone the save
             # did not place is stood with the party by `place_party`, which is the

@@ -719,7 +719,13 @@ class GMAgent:
             names |= {f["name"] for f in world.factions}
             names.add(world.name)
         except Exception:
-            pass
+            # Logged, not passed over: with the world's names missing, the un-namer
+            # strips REAL names from the prose as inventions, and nothing said why
+            # (2026-09-25).
+            import logging
+
+            logging.getLogger("pathfindergm").exception(
+                "the world's names could not be read; real names may be un-named")
         # And every capitalised word the world's own prose uses. Titles alone are not the
         # world's vocabulary: measured across two 60-turn runs, `invented-name` fired on
         # 31 tokens and only four were real inventions. The rest were the world's own —

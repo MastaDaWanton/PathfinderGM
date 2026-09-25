@@ -26,6 +26,7 @@ from rules import schemes as schemes_mod
 from rules import bestiary
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, SHIELDS, WEAPONS
+from pathfindergm import files
 
 
 def _slug(name: str) -> str:
@@ -53,7 +54,8 @@ def _count(name: str, key: str) -> int:
     for path in folder(name).glob("*.json"):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception as exc:
+            files.unreadable(path, exc)
             continue
         if isinstance(data, dict) and isinstance(data.get(key), list):
             total += len(data[key])

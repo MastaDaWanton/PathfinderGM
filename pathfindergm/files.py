@@ -59,6 +59,36 @@ def write_text(path, text: str, encoding: str = "utf-8") -> Path:
     return path
 
 
+_UNREADABLE_SAID: set[tuple[str, int]] = set()
+
+
+def unreadable(path, exc: Exception) -> None:
+    """Say, once per version of the file, that a content file was skipped.
+
+    Measured 2026-09-25: seventeen loaders across rules/ and play/ read their JSON
+    with `except Exception: continue`. A homebrew class file with a stray comma simply
+    vanished — and every character built on that class then failed validation, so the
+    player met an unreadable CAMPAIGN with nothing in the log naming the file that
+    caused it. The file is still skipped (one bad file must not take the catalogue
+    down); now the log says which, and why. Keyed on the path and its mtime so a cache
+    rebuilt twenty times does not say it twenty times, and a fixed file that breaks
+    again is said again.
+    """
+    import logging
+
+    p = Path(path)
+    try:
+        stamp = p.stat().st_mtime_ns
+    except OSError:
+        stamp = 0
+    key = (str(p), stamp)
+    if key in _UNREADABLE_SAID:
+        return
+    _UNREADABLE_SAID.add(key)
+    logging.getLogger("pathfindergm").warning("skipped %s: it could not be read (%s)",
+                                              p, exc)
+
+
 class BadName(ValueError):
     """An id that would put a file somewhere other than the folder it was meant for."""
 
