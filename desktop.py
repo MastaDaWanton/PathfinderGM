@@ -237,6 +237,33 @@ def _write_portfile(data_root: Path, port: int, url: str) -> Path | None:
         return None
 
 
+# Inside the shell's own kill window (electron/main.js: stdin closed, taskkill at 3 s,
+# app.exit at 4.5 s). Longer is not available: the 4.5 s floor exists because a
+# lingering backend held the single-instance lock and the next launch quit.
+LAST_TURN_WAIT = 2.0
+
+
+def _let_the_last_turn_land(timeout: float = LAST_TURN_WAIT) -> bool:
+    """Give a turn that is finishing the moment to finish, and let no new one start.
+
+    Measured 2026-09-25: the docstrings here said `server.shutdown()` "lets the request
+    in flight finish". It does not — the request threads are daemons
+    (`ThreadedWSGIServer.daemon_threads`), `serve_forever` returns, `main` returns, and
+    the turn dies with the process. A turn still waiting on the model cannot be saved in
+    the time the shell allows, and it is not: the save on disk is the last whole one,
+    because every save lands by rename (`pathfindergm/files.py`). What this buys is the
+    turn that has its answer and is writing it. The game lock is taken and kept, so
+    nothing queued behind it starts on the way out.
+
+    True if the lock was had — nothing was in flight, or it finished in time.
+    """
+    try:
+        from play import concurrency
+    except Exception:
+        return False
+    return concurrency._GAME.acquire(timeout=timeout)
+
+
 def _reap_when_the_last_window_closes(server) -> None:
     """Stop serving once no page has checked in for the grace period.
 
@@ -259,9 +286,10 @@ def _reap_when_the_last_window_closes(server) -> None:
     threads that call `liveness.touch()`. Daemon, so it can never be the thing holding
     the exit open — which is the failure mode this whole function is about.
 
-    `server.shutdown()` is the same graceful stop `--watch-stdin` uses: the request in
-    flight finishes, `serve_forever` returns, and `main`'s `finally` removes the
-    portfile, so an abandoned game still exits *cleanly* and leaves no stale handshake.
+    `server.shutdown()` is the same graceful stop `--watch-stdin` uses: `serve_forever`
+    returns, `main`'s `finally` gives a finishing turn its moment
+    (`_let_the_last_turn_land`) and removes the portfile, so an abandoned game still
+    exits *cleanly* and leaves no stale handshake.
     """
     from pathfindergm import liveness
 
@@ -363,9 +391,11 @@ def main(argv: list[str] | None = None) -> int:
     if "--watch-stdin" in argv:
         # Stdin closing is how the shell says stop — the graceful half of shutdown.
         # The taskkill fallback exists for shells that die without closing it, but a
-        # clean quit should not need the axe: `server.shutdown()` lets the request in
-        # flight finish, and the `finally` below removes the portfile, which is what
-        # marks the exit as clean. Daemon, so a broken stdin cannot hold the exit.
+        # clean quit should not need the axe: `server.shutdown()` stops the serving loop,
+        # the `finally` below gives a finishing turn two seconds and removes the
+        # portfile, which is what marks the exit as clean. A turn still waiting on the
+        # model is lost, and the save is the last whole one. Daemon, so a broken stdin
+        # cannot hold the exit.
         def _watch():
             try:
                 sys.stdin.read()
@@ -418,6 +448,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        _let_the_last_turn_land()
         server.server_close()
         # Best-effort: a portfile left by a crash still carries our (now dead) pid,
         # which is what lets a shell distinguish stale from current.
