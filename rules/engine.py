@@ -874,7 +874,11 @@ class Scene:
         the thing still exists and still expires — it simply has nowhere to put squares,
         which is honest rather than a refusal: most scenes have no map.
         """
-        made.id = made.id or f"m{len(self.manifests) + 1}"
+        # One past the highest id anything still names — a live manifestation or a
+        # ward's `manifest_id`. It was `len + 1`, and measured 2026-09-25: two fogs, the
+        # first lifted, and the next placed was `m2` beside the `m2` still standing —
+        # wards find their area by that id, so a ward could fire on the wrong one.
+        made.id = made.id or f"m{self._next_manifest_number()}"
         if self.grid is not None and made.terrain in ("obscuring", "blocked", "difficult"):
             already = getattr(self.grid, made.terrain)
             # The GROUND it covers, not the cells it fills. An area knows its own height
@@ -892,6 +896,11 @@ class Scene:
             already.update(made.added)
         self.manifests.append(made)
         return made
+
+    def _next_manifest_number(self) -> int:
+        taken = [m.id for m in self.manifests] + [w.manifest_id for w in self.wards]
+        numbers = [int(i[1:]) for i in taken if re.fullmatch(r"m\d+", str(i or ""))]
+        return max(numbers, default=0) + 1
 
     def lift(self, made: "Manifestation") -> None:
         """Take one back off the map. Squares another live manifestation also claims stay."""
@@ -1203,10 +1212,13 @@ class Scene:
         # tactical layer above it — initiative, sides, and the things a fight conjured.
         # The grid is cleared where it is replaced instead, when the party arrives
         # somewhere else (`Engine.place_party`).
-        # The fog goes with the map it was drawn on. A manifestation kept past the grid
-        # that held its squares is a bank of fog with no location, and the next fight
-        # would lay a fresh grid without it — the squares would be gone and the thing
-        # claiming them would not.
+        # The things a fight conjured go with it, and each is LIFTED off the ground it
+        # was drawn on. This used to be `self.manifests = []`, written when the grid went
+        # with the fight too; since item 28 the grid stays, and measured 2026-09-25 the
+        # cleared list left its squares in `grid.obscuring` with nothing claiming them —
+        # the room stayed blind and walled until the party walked out.
+        for made in list(self.manifests):
+            self.lift(made)
         self.manifests = []
         self.wards = []
         self.hazards = []
