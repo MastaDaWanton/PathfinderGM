@@ -468,7 +468,7 @@ def spell_search(request):
         subschool=g.get("subschool", ""), descriptor=g.get("descriptor", ""),
         tag=g.get("tag", ""), klass=g.get("class", ""),
         level=int(level) if level not in (None, "") and level.isdigit() else None,
-        limit=int(g.get("limit", 120)),
+        limit=read_int(g, "limit", 120, lo=1, hi=1000),   # "?limit=x" was a 500
     )
     return JsonResponse({
         "count": len(found),

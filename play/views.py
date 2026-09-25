@@ -974,7 +974,8 @@ def feat_search(request):
         kind=request.GET.get("type", ""),
         source=request.GET.get("source", ""),
         tag=request.GET.get("tag", ""),
-        limit=int(request.GET.get("limit", 60) or 60),
+        # `read_int`, not `int()`: "?limit=many" was a 500 (2026-09-25).
+        limit=read_int(request.GET, "limit", 60, lo=1, hi=500),
     )
 
     out = []
