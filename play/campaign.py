@@ -37,7 +37,7 @@ BACKUPS_KEPT = 3
 
 
 class NewerSave(ValueError):
-    """The save was written by a newer build. Not damage: never restored from a backup.
+    """The save was written by a newer build. Not damage: refused, never restored.
 
     Measured the day backups arrived (2026-09-25): `test_a_save_from_an_older_build_still
     _opens` caught the first cut "restoring" a version-3 save from its version-2 backup —
@@ -186,7 +186,7 @@ class Campaign:
     def path(self) -> Path:
         d = Path(settings.CAMPAIGN_DIR)
         d.mkdir(parents=True, exist_ok=True)
-        return d / f"{self.id}.json"
+        return files.child(d, self.id)
 
     def save(self) -> Path:
         # Version-stamped because this file lives in the user data directory and outlives
@@ -820,7 +820,14 @@ def _resume(campaign_id: str) -> Campaign | None:
         # aside, never deleted — the refusal below still stands for the case where no
         # backup reads either, and nothing is repaired behind the player's back: the
         # restored game opens with a line saying what happened and which turn it is.
-        restored = None if isinstance(exc, NewerSave) else _restore_from_backup(path, exc)
+        # Only a DAMAGED file — one that no longer parses — is restored. A save that
+        # parses and fails the rules (a homebrew class edited under its character) is
+        # not damage: its backups hold the same character and would fail the same way,
+        # and rolling the game back a turn to find one that passed would be exactly the
+        # repair behind the player's back that test_the_shelf_survives_a_bad_save
+        # forbids. A newer build's save is not damage either.
+        damaged = isinstance(exc, (json.JSONDecodeError, UnicodeDecodeError))
+        restored = _restore_from_backup(path, exc) if damaged else None
         if restored is not None:
             return restored
         # The save is left exactly where it is, and the failure is raised rather than

@@ -481,7 +481,7 @@ def save(kind_id: str, entry: dict) -> Path:
     thing_id = str(entry.get(kind.id_field) or "").strip().lower()
     if not thing_id:
         raise ValueError("it needs an id")
-    path = homebrew_dir(kind_id, make=True) / f"{thing_id}.json"
+    path = files.child(homebrew_dir(kind_id, make=True), thing_id)
     files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return path
 

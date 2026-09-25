@@ -59,6 +59,37 @@ def write_text(path, text: str, encoding: str = "utf-8") -> Path:
     return path
 
 
+class BadName(ValueError):
+    """An id that would put a file somewhere other than the folder it was meant for."""
+
+
+_DEVICES = {"CON", "PRN", "AUX", "NUL", *(f"COM{n}" for n in range(1, 10)),
+            *(f"LPT{n}" for n in range(1, 10))}
+
+
+def child(folder, name: str, suffix: str = ".json") -> Path:
+    """`folder / (name + suffix)`, refused unless it stays inside `folder`.
+
+    Measured 2026-09-25: the homebrew benches, the spell and class builders and the
+    roster built filenames straight from an id the request supplied — `body["id"]`, a
+    URL segment — so an id of `..\\..\\campaigns\\slice` overwrote a campaign and
+    `..\\..\\models` the model settings, and the same shape read files back through the
+    open-on-the-bench URL. `library.safe_name` already did this properly for world
+    uploads; nothing else used it. One door, for every id that becomes a filename.
+    """
+    raw = str(name or "")
+    stem = raw.strip()
+    if (not stem or stem in (".", "..") or stem.startswith(".")
+            or any(c in stem for c in "/\\:\0") or stem != raw
+            or stem.split(".")[0].upper() in _DEVICES):
+        raise BadName(f"{raw!r} cannot be used as a name here")
+    base = Path(folder)
+    path = base / f"{stem}{suffix}"
+    if path.resolve().parent != base.resolve():
+        raise BadName(f"{raw!r} cannot be used as a name here")
+    return path
+
+
 def backups(path, keep: int = 3) -> list[Path]:
     """The kept copies of `path`, newest first: `name.1` is the save before this one."""
     path = Path(path)

@@ -1393,7 +1393,7 @@ def import_from_world(world, overwrite: bool = False) -> list[str]:
     folder = homebrew_dir(make=True)
     covered = _covered(written_for(world))
     for d in from_world(world):
-        path = folder / f"{d['id']}.json"
+        path = files.child(folder, d["id"])
         if path.exists() and not overwrite or d.get("people_id") in covered:
             continue
         files.write_text(path, json.dumps(d, indent=1, ensure_ascii=False))

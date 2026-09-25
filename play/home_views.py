@@ -332,7 +332,10 @@ def open_thing(request, bench_id: str, thing_id: str):
     """
     from rules import registry
 
-    mine = homebrew.folder(homebrew.get(bench_id).dir) / f"{thing_id}.json"
+    try:
+        mine = files.child(homebrew.folder(homebrew.get(bench_id).dir), thing_id)
+    except files.BadName as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     if mine.exists():
         d = json.loads(mine.read_text(encoding="utf-8"))
         # Derived for yours as well as for shipped: a race's structured fields are
@@ -410,7 +413,10 @@ def save_thing(request, bench_id: str):
     # edit: an imported race carries the world and the people it came from, and a
     # save that rebuilt the file from the form alone dropped both — and with them the
     # `world_people_id` every character of that race is stamped with.
-    path = homebrew.folder(bench.dir) / f"{slug}.json"
+    try:
+        path = files.child(homebrew.folder(bench.dir), slug)
+    except files.BadName as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
     entry = {}
     if path.exists():
         try:

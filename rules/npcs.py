@@ -283,7 +283,10 @@ def _path(world_entity_id: str, make: bool = False) -> Path | None:
     wid = re.sub(r"[^a-z0-9_.-]+", "-", str(world_entity_id or "").strip().lower()).strip("-")
     if not wid:
         return None
-    return _dir(make=make) / f"{wid}.json"
+    try:
+        return files.child(_dir(make=make), wid)
+    except files.BadName:
+        return None
 
 
 def remember(world_entity_id: str, block_id: str, name: str, *, role: str = "",

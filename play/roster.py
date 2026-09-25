@@ -127,7 +127,7 @@ class Entry:
 
 
 def path_for(character_id: str) -> Path:
-    return root() / f"{character_id}.json"
+    return files.child(root(), character_id)
 
 
 def save(entry: Entry) -> Path:
@@ -146,7 +146,10 @@ def save(entry: Entry) -> Path:
 
 
 def load(character_id: str) -> Entry | None:
-    p = path_for(character_id)
+    try:
+        p = path_for(character_id)
+    except files.BadName:
+        return None                 # an id that is no file of ours is nobody we know
     if not p.exists():
         return None
     try:
@@ -270,7 +273,12 @@ def retire_file(character_id: str) -> tuple[bool, str]:
     campaign_dir = Path(settings.CAMPAIGN_DIR)
     for save in (character_id, entry.campaign_id):
         if save:
-            (campaign_dir / f"{save}.json").unlink(missing_ok=True)
+            gone = files.child(campaign_dir, save)
+            # And its backups: a new character minted the same id would otherwise
+            # inherit them, and a failed load would restore the deleted game.
+            for kept in files.backups(gone, keep=campaign_mod.BACKUPS_KEPT):
+                kept.unlink(missing_ok=True)
+            gone.unlink(missing_ok=True)
             campaign_mod._LIVE.pop(save, None)
     return True, f"{entry.name} is deleted, and so is their game."
 
@@ -301,7 +309,7 @@ def pregens() -> list[dict]:
 
 
 def from_pregen(source: str) -> Actor:
-    p = Path(settings.BASE_DIR / "fixtures") / f"{source}.json"
+    p = files.child(Path(settings.BASE_DIR / "fixtures"), source)
     if not p.exists() or not p.name.startswith("pc-"):
         raise FileNotFoundError(f"no such character {source!r}")
     return from_dict(json.loads(p.read_text(encoding="utf-8")), ref="pc")
