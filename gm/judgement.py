@@ -5697,16 +5697,74 @@ def check_the_target(raw_intents, player_text: str, scene, recent=()) -> list | 
 
 # A blow struck, in the present tense the beats are written in. Finite forms only: an
 # infinitive ("to strike") is an intention, and the guards below cut those.
-_STRIKES = (r"(?:lunges?|swings?|strikes?|stabs?|slashes?|thrusts?|hacks?|charges?|"
-            r"lashes? out|comes? at|drives?|smashes?|punches?|kicks?|shoves?|grabs?|"
-            r"seizes?|tackles?|swipes?|jabs?|clubs?|bashes?|slams?|cuts?|brings? "
-            r"(?:\w+\s+){0,3}down|throws? (?:\w+\s+){0,3}at|attacks?|rushes?)")
-# The whole sentence, not a window: measured live 2026-09-18 on the first replay, "He
-# lunges, his weight shifting forward as he brings the notched broadsword in a
-# desperate, overhead arc aimed at your shoulder" put 100 characters between the verb
-# and "your", and an 80-character window let the fight go unopened again.
-_STRIKES_AT_YOU = re.compile(
-    r"\b" + _STRIKES + r"\b(?:[^.!?]*?)\b(?:you|your)\b", re.I)
+#
+# Two kinds of verb, because most of the old list was not violent at all. Measured
+# 2026-09-25, six of six friendly sentences read as a blow at the player and
+# `struck_first` rolled the barmaid's attack: "rushes over to you with a tankard", "grabs
+# your hand and shakes it warmly", "throws a wink at you", "cuts you a slice of cheese",
+# "charges you two silver", "slams a mug down in front of you". Any of thirty verbs
+# followed ANYWHERE in the sentence by "you" or "your" was a blow.
+#
+# A verb that is a blow in itself — lunges, stabs, punches — still needs only the player
+# in its sentence (the 2026-09-18 replay put 100 characters between "lunges" and "your
+# shoulder", and that must still open the fight):
+_BLOWS = (r"(?:lunges?|stabs?|slashes?|lashes? out|comes? at|punches?|tackles?|bashes?|"
+          r"attacks?|strikes?)")
+# ... except for the idioms that borrow them: "strikes up a conversation with you",
+# "strikes a deal", "the offer strikes you as fair".
+_BLOW_IDIOM = re.compile(
+    r"\s*(?:up\b|a\s+(?:deal|bargain|match|pose|note|chord|balance|light|flint)\b|"
+    r"you\s+(?:as|that)\b|(?:his|her|their)\s+(?:meal|food|plate|bowl|stew|work)\b)",
+    re.I)
+# A verb that usually is NOT a blow — somebody rushes over, grabs a hand, cuts bread,
+# charges a price, throws a look — is one only with something that makes it one in the
+# same sentence: a weapon, or a blow aimed at the player's body or guard.
+_CONTACTS = (r"(?:swings?|thrusts?|hacks?|jabs?|kicks?|clubs?|swipes?|grabs?|seizes?|"
+             r"rushes?|charges?|cuts?|drives?|smashes?|shoves?|slams?|hurls?|throws?|"
+             r"brings? (?:\w+\s+){0,3}down)")
+_WEAPON_NOUN = (r"(?:blade|sword|sabre|saber|scimitar|knife|knives|dagger|dirk|stiletto|"
+                r"club|cudgel|axe|hatchet|mace|hammer|maul|spear|pike|halberd|glaive|"
+                r"flail|whip|sap|fists?|knuckles|claws?|teeth|fangs|crossbow|bolt|arrow)")
+_YOUR_BODY = (r"(?:throat|neck|face|jaw|head|skull|temple|chest|ribs|gut|belly|stomach|"
+              r"back|shoulder|knees?|legs?|guard|shield|eyes?|nose|mouth|collar|hair|"
+              r"windpipe|groin|spine)")
+_AIMED = re.compile(
+    r"\b(?:at|into|against)\s+(?:you|your)\b|\byour\s+" + _YOUR_BODY + r"\b|"
+    r"\byou\s+(?:in|across|on)\s+the\s+" + _YOUR_BODY + r"\b|\b" + _WEAPON_NOUN + r"\b",
+    re.I)
+# What is thrown, cut or swung that is never a blow, and ends the question: a wink, a
+# glance, a coin, a slice.
+_GESTURE = re.compile(
+    r"\b(?:wink|glance|look|smile|grin|nod|kiss|shrug|salute|greeting|word|question|"
+    r"coin|coins|purse|slice|piece|share|price|fee|bargain|door|gate|shutter)s?\b", re.I)
+
+_STRIKES_AT_YOU = re.compile(r"\b" + _BLOWS + r"\b(?:[^.!?]*?)\b(?:you|your)\b", re.I)
+_BLOW_VERB = re.compile(_BLOWS, re.I)
+_CONTACT_VERB = re.compile(r"\b" + _CONTACTS + r"\b", re.I)
+
+
+def _a_blow_in(sentence: str):
+    """Where the blow at the player starts in this sentence, or None.
+
+    The whole sentence, not a window: measured live 2026-09-18 on the first replay, "He
+    lunges, his weight shifting forward as he brings the notched broadsword in a
+    desperate, overhead arc aimed at your shoulder" put 100 characters between the verb
+    and "your", and an 80-character window let the fight go unopened again.
+    """
+    for m in _STRIKES_AT_YOU.finditer(sentence):
+        verb = _BLOW_VERB.match(sentence, m.start())
+        if not _BLOW_IDIOM.match(sentence, verb.end()):
+            return m
+    for m in _CONTACT_VERB.finditer(sentence):
+        rest = sentence[m.end():]
+        aimed = _AIMED.search(rest)
+        if aimed is None:
+            continue
+        # The thing thrown, cut or swung comes before the aim: "throws a wink at you".
+        if _GESTURE.search(rest[:aimed.start()]):
+            continue
+        return m
+    return None
 # What turns a blow into a threat, a feint, or somebody else's: these within four
 # words before the verb, and the sentence opens no fight. "coils his muscles, waiting
 # for you" (beat 31 of the ring fight) must not; "he lunges … as he tries to overwhelm
@@ -5758,7 +5816,7 @@ def attacked_by(scene, gm_beat: str) -> list[tuple[str, str]]:
         # Who this sentence names, for the pronoun that may follow in the next.
         named_here = [r for r, a in people
                       if any(re.search(rf"\b{re.escape(h)}s?\b", low) for h in heads(a.name))]
-        m = _STRIKES_AT_YOU.search(sentence)
+        m = _a_blow_in(sentence)
         if not m:
             if named_here:
                 last_named = named_here[-1]

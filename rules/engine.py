@@ -3409,6 +3409,18 @@ class Engine:
         if (pc is None or a is None or a.is_pc or a.is_down
                 or self.scene.in_encounter or pc.is_down):
             return []
+        # Somebody who likes the player, or travels with them, does not swing on the
+        # prose's word. Measured 2026-09-25: the detector read "The barmaid rushes over to
+        # you with a tankard" as a blow and this door opened the fight and rolled her
+        # attack. The detector is tighter now; this is the engine's own half, asked of
+        # the state it holds rather than of a sentence — a friend who means harm has to
+        # stop being a friend first, and that is a change the engine would have made.
+        from . import attitude as attitude_mod
+
+        if (a.has_state(states.TRAVELS_WITH_YOU)
+                or attitude_mod.step_of(attitude_mod.of(a))
+                >= attitude_mod.step_of(attitude_mod.COMES_ALONG)):
+            return []
         raw = {"op": "attack", "actor": ref, "target": pc.ref,
                "because": f"{a.name} struck first"}
         outcomes: list[Outcome] = []
