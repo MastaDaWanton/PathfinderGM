@@ -22,6 +22,15 @@ os.chdir(ROOT)
 # probe (the scratchpad data dirs the live checks use) would otherwise have pointed the
 # whole suite — house-rule deletes and all — at that directory.
 os.environ["PATHFINDER_GM_DATA"] = str(ROOT / ".test-data")
+
+# Emptied at the start of every run, before Django reads anything from it. Measured
+# 2026-09-25: it held 456 files left by earlier runs — characters, campaigns and their
+# backups — and a test that reads the shelf or the house-rules file read whatever the
+# last run left (the `point_buy: 0` leak of 2026-09-08 was exactly that). Ignored by git;
+# nothing in it is anybody's.
+import shutil as _shutil  # noqa: E402
+
+_shutil.rmtree(ROOT / ".test-data", ignore_errors=True)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pathfindergm.settings")
 
 import django  # noqa: E402
