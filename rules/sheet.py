@@ -1189,8 +1189,22 @@ class Actor:
         A narrower question than `can_act`, and the distinction is load-bearing: a
         fascinated creature takes no actions and is emphatically NOT helpless, so
         reading this off `can_act` would let anyone grapple a distracted one for free.
+
+        Asked of the vocabulary (`state.helpless`), not of a flag on the condition rows:
+        the flag was a second authority beside the tags, the shape the three laws forbid
+        for `can_act`, and a homebrew state could not be helpless without a row.
         """
-        return any(c.data.get("helpless") for c in self.conditions)
+        return self.has_state("state.helpless")
+
+    @property
+    def lootable(self) -> bool:
+        """Whether this creature's belongings can be taken without a steal: the down, and
+        the helpless — bound, paralysed, petrified — who cannot resist it either.
+
+        One owner for the loot op and the watcher, which had drifted apart once already.
+        Helpless has to be named since 2026-09-25, when it stopped counting as down.
+        """
+        return self.is_down or self.is_helpless
 
     def has_condition(self, key: str) -> bool:
         return any(e.kind == "condition" and e.key == key for e in self.effects)

@@ -196,8 +196,11 @@ def _down(a) -> bool:
     Both ask `Actor.is_down` now. They previously spelled it `hp <= 0 or state.down`,
     which is the same question except at exactly 0 hit points — where the creature is
     *disabled*: conscious, upright and taking turns, and being offered for looting.
+
+    Both ask `Actor.lootable` since 2026-09-25, when helpless left the down family and
+    the loot op had to name it: one owner, so the two cannot drift again.
     """
-    return a.is_down
+    return a.lootable
 
 
 def _belongings(a) -> dict:

@@ -153,17 +153,24 @@ TAGS: dict[str, tuple[str, ...]] = {
     "bystander":   ("role.bystander",),
     "dead":        ("state.down.dead", "state.down.fallen", "state.unable"),
     "dying":       ("state.down.dying", "state.down.fallen", "state.unable",
-                    "recovery.hit-points"),
+                    "state.helpless", "recovery.hit-points"),
     "unconscious": ("state.down.unconscious", "state.down.fallen", "state.unable",
-                    "recovery.hit-points"),
+                    "state.helpless", "recovery.hit-points"),
     "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
-    "petrified":   ("state.down.petrified", "state.unable"),
+    "petrified":   ("state.down.petrified", "state.unable", "state.helpless"),
     # Helpless has always carried `can_act: False` in the condition row and no
     # `state.unable` tag, so the flag and the vocabulary disagreed about it: the tag
     # layer said a bound prisoner could act and the row said they could not.
-    "helpless":    ("state.down.helpless", "state.unable"),
-    "paralyzed":   ("state.unable.paralyzed", "state.held"),
+    # And NOT under `state.down`, which it was until 2026-09-25: `is_down` read true
+    # for a bound prisoner, so attacks on him were held back as "already down" and
+    # `sides_standing` stopped counting his side — a foe made helpless by any of the ten
+    # spell specs that apply it ENDED THE FIGHT, paralysis wearing off or not. 1e keeps a
+    # helpless creature in the fight: it is the one a coup de grace is for.
+    # `state.helpless` is the family `is_helpless` asks — 1e's "immobilized, unconscious,
+    # or otherwise incapacitated" — granted by every row that is helpless.
+    "helpless":    ("state.unable.helpless", "state.helpless"),
+    "paralyzed":   ("state.unable.paralyzed", "state.held", "state.helpless"),
     "pinned":      ("state.held.pinned", "recovery.rest"),
     "grappled":    ("state.held.grappled", "recovery.rest"),
     "stunned":     ("state.unable.stunned",),
@@ -296,6 +303,16 @@ def standing_with_the_law(actor, location_id) -> str:
     if actor.has_state(suspected_tag(location_id)):
         return "suspected"
     return ""
+
+
+# Tags the vocabulary once granted a key and no longer does. A saved condition keeps the
+# tags it was written with (`activeeffect._tags_on_load` unions, so a document's own tags
+# survive a reload), which means a withdrawal has to be named or it never reaches a save
+# already on disk. Each entry is the key and exactly what left it, never a family.
+WITHDRAWN: dict[str, tuple[str, ...]] = {
+    # 2026-09-25: a helpless creature is in the fight, not down — see TAGS above.
+    "helpless": ("state.down.helpless",),
+}
 
 
 def tags_for(key: str) -> tuple[str, ...]:

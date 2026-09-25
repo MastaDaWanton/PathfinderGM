@@ -735,7 +735,10 @@ def is_finishing_blow(player_text: str, scene) -> bool:
     # looked for here. See `redact_speech`.
     if not _FINISHING.search(redact_speech(player_text)):
         return False
-    return any(not getattr(a, "is_pc", False) and a.has_state("state.down")
+    # Or helpless: the coup de grace is 1e's blow for exactly the creature that is bound
+    # or paralysed, which stopped counting as down on 2026-09-25.
+    return any(not getattr(a, "is_pc", False)
+               and (a.has_state("state.down") or a.has_state("state.helpless"))
                for a in (getattr(scene, "actors", {}) or {}).values())
 
 

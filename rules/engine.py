@@ -5304,7 +5304,7 @@ class Engine:
         # `hp <= 0 or state.down`, which differs from `is_down` at exactly 0 hit
         # points — and there the creature is *disabled*: conscious, upright, and
         # being stripped of its belongings where it stood.
-        if not body.is_down:
+        if not body.lootable:
             return Outcome(
                 intent_id=intent.id, op="loot", effects=[],
                 tell=(f"{body.name} is on their feet and very much attached to their "
