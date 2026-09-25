@@ -715,7 +715,13 @@ class GMAgent:
             names |= {e.name for e in world.entities.values()}
             names |= {u["name"] for u in world.unwritten}
             names |= {f["name"] for c in world.chronology for f in c.figures}
-            names |= {c["name"] for c in world.chronology}
+            # `c.name`: chronology entries are `world.loader.Event` dataclasses. This read
+            # `c["name"]` from 2026-08-20, raised TypeError on every call, and the bare
+            # `except: pass` below hid it — so every name after this line, every FACTION
+            # and the world's own name, was never on the list, and the un-namer was free
+            # to strike them as invented. Found 2026-09-25 by the log line that replaced
+            # the `pass`, the first time a recording ran.
+            names |= {c.name for c in world.chronology}
             names |= {f["name"] for f in world.factions}
             names.add(world.name)
         except Exception:
