@@ -704,6 +704,11 @@ _READS_MECHANICS = {
         "past dead the blow went, and a tell is a sentence, not a number. Making the "
         "narrator parse that back out of English would be a second vocabulary built in "
         "the presentation layer.",
+    "gm/judgement.py:book_introduced":
+        "writes the people an `introduce` made onto scene.cast, the ledger note_cast's "
+        "definiteness test reads — engine bookkeeping, not prose. It needs their refs, "
+        "which the effect holds and a tell is a sentence about; nothing it reads reaches "
+        "the narrator.",
     "gm/judgement.py:note_heat":
         "sets scene.heat, which is world state and not prose — nothing the narrator "
         "reads passes through here.",

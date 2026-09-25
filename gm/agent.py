@@ -284,6 +284,9 @@ class GMAgent:
                 raw = judgement.repair_misaimed_attack(
                     raw, player_input, self.engine.scene) or raw
                 raw = judgement.fill_obvious_targets(raw, self.engine.scene)
+                # The stat block a person the plan introduces walks on with, read off
+                # their words the way the prose's people always were (`template_for`).
+                raw = judgement.fill_introduce_templates(raw, self.engine.scene)
                 # A blow at a thing somebody holds is a blow at that somebody, and
                 # a sunder asked for is a sunder: "I strike the weapon and sunder it"
                 # died five times on "a sunder needs a target" and then spawned a

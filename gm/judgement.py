@@ -5488,42 +5488,61 @@ def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]
     return out
 
 
+def fill_introduce_templates(raw_intents, scene) -> list:
+    """An `introduce` with no stat block gets the one its words call for.
+
+    The engine's floor is a guildhand; `template_for` is what the prose's people have
+    always walked on with — a watchman for the watch, a dog for a dog, a Raider for a
+    raider — and it lives here, beside the role words it reads, so the planner's people
+    and the prose's are made alike."""
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    out = []
+    for raw in raw_intents:
+        if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "introduce"
+                and not (raw.get("params") or {}).get("template")
+                and (raw.get("params") or {}).get("who")):
+            params = dict(raw["params"])
+            params["template"] = template_for(str(params["who"]), _pc_level(scene))
+            raw = dict(raw, params=params)
+        out.append(raw)
+    return out
+
+
+def book_introduced(scene, outcomes, turn: int = 0) -> list[str]:
+    """The people this turn's plan introduced go on the scene's ledger, with their refs.
+
+    The ledger (`scene.cast`) is what `note_cast`'s definiteness test reads to decide
+    that the prose's "the old woman" is somebody already here. Somebody the plan
+    introduced and the prose then describes must meet that test as a person already
+    booked, or the booking door makes them a second time. Returns the phrases booked."""
+    booked = []
+    have = {e.get("ref") for e in scene.cast}
+    for o in outcomes or []:
+        if getattr(o, "op", "") != "introduce":
+            continue
+        for eff in getattr(o, "effects", None) or []:
+            if eff.get("kind") != "introduce":
+                continue
+            for ref in (eff.get("bound") or {}).values():
+                if ref in have or ref not in scene.actors:
+                    continue
+                who = re.sub(r"^(?:the|a|an)\s+", "", str(eff.get("who") or ""), flags=re.I)
+                scene.cast.append({"who": who, "turn": int(turn), "ref": ref})
+                have.add(ref)
+                booked.append(who)
+    return booked
+
+
 def embody(scene, phrase: str, *, zone: str = "near", world=None, rec: dict | None = None):
-    """One described person becomes an actor in the room: the one door `promote_cast` and
-    the finder's repair both go through, so a person found again is made exactly as one
-    promoted the first time. `rec` is their population record, when they have one: the
-    actor wears the face it rolled and the record keeps the ref."""
-    from rules import states
-    from rules.bestiary import instantiate
+    """One described person becomes an actor in the room, with the stat block their words
+    call for (`template_for`). The body itself is made by `population.embody`, the one
+    door the prose's people, the finder's repair and the planner's `introduce` all go
+    through, so a person is made the same way whichever door they came in by."""
+    from rules import population
 
-    actor = instantiate(template_for(phrase, _pc_level(scene)), scene=scene, name=phrase)
-    # Through the door. The fallback that wrote `scene.actors` directly would now
-    # write into a derived view and vanish; `add` stamps the place and the zone —
-    # the zone the prose put them in, so the map lays them out where the words did.
-    scene.add(actor, zone=zone)
-    # In the room, not in the fight. Law two: the fact travels as an effect whose
-    # tag is `role.bystander`, lifted by the one door into a fight and by a blow
-    # given or taken — never by a flag beside it.
-    actor.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
-    if rec is not None:
-        rec["ref"] = actor.ref
-    # A name behind the descriptor and a face beside it, from the world's own
-    # pools and bodies (rules/names.py) — the panel keeps showing the descriptor
-    # until the name is given in play.
-    if world is not None:
-        from rules import names as names_mod
-
-        taken = [a.true_name for a in scene.actors.values() if getattr(a, "true_name", "")]
-        taken += [a.name for a in scene.actors.values()]
-        actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
-        # The face their population record rolled, when they have one — chosen to
-        # agree with their work (rules/lives.py).
-        actor.appearance = names_mod.appearance_for(
-            world, scene.location_id, ref=actor.ref,
-            own=(rec["life"]["face"] if rec else None))
-    if getattr(scene, "grid", None) is not None:
-        scene.place_by_zone([actor.ref])
-    return actor
+    return population.embody(scene, phrase, template_for(phrase, _pc_level(scene)),
+                             zone=zone, world=world, rec=rec)
 
 
 def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:

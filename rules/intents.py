@@ -428,6 +428,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "spawn": (("template",),
               ("from_entity_id", "count", "name", "zone", "distance_ft"),
               "hidden"),
+    # A person enters the scene because the plan says so, before the prose is written
+    # (docs/declared-not-guessed.md). `spawn` is the combatant's door — it rolls
+    # initiative mid-fight and takes a stat block by name; this is the townsperson's: a
+    # bystander with a population record, a life and a face, named by the words the
+    # prose will use (`who`). The same plan targets them as new1, new2, new3 in the
+    # order introduced (`INTRODUCED_REFS`); the engine swaps in the real refs.
+    # `already_here` binds to somebody the scene already holds before making anybody.
+    "introduce": (("who",), ("count", "how", "template", "zone"), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     # Something changes hands. One op rather than four, because picking a thing up,
     # being handed it, buying it and dropping it are the same event with different ends
@@ -1065,6 +1073,32 @@ def _check_params(intent: Intent, index: int) -> None:
         except (TypeError, ValueError):
             raise IntentError("spawn: count must be a number", "schema", index)
 
+    elif op == "introduce":
+        who = " ".join(str(p["who"] or "").split())
+        if not who or len(who) > 80:
+            raise IntentError(
+                "introduce: who is the few words the scene will call this person by — "
+                "'old woman mending nets', 'a porter with a split lip'", "schema", index)
+        p["who"] = who
+        try:
+            p["count"] = max(1, min(len(INTRODUCED_REFS), int(p.get("count", 1) or 1)))
+        except (TypeError, ValueError):
+            raise IntentError("introduce: count must be a number", "schema", index)
+        how = str(p.get("how") or "already_here").strip().lower().replace(" ", "_")
+        if how not in ("arrives", "already_here"):
+            raise IntentError("introduce: how is 'arrives' or 'already_here'",
+                              "schema", index)
+        p["how"] = how
+        if p.get("template"):
+            from . import bestiary
+
+            raw_t = str(p["template"]).strip().lower()
+            if bestiary.lookup(raw_t) is None:
+                raise IntentError(
+                    f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
+                    "schema", index)
+            p["template"] = raw_t
+
     elif op == "begin_encounter":
         if not isinstance(p["sides"], dict):
             raise IntentError(
@@ -1109,6 +1143,13 @@ def _check_params(intent: Intent, index: int) -> None:
 # stamped: a jar, a spell, an ability, a rule, a creature's stat block, or the author.
 # The model is not offered these ops at the sampler (gm.prompts.turn_schema); the check
 # in Engine._check_legality is the backstop for the engine's own doors.
+# The refs a plan uses for the people its own `introduce` ops bring in, in order: the
+# first person introduced is new1. Placeholders, not predictions — `spawn` asks the model
+# to guess the next minted ref (c5), which is the kind of opaque id the tool-use
+# literature finds models invent; a fixed name for "the person I just introduced" is not.
+INTRODUCED_REFS: tuple[str, ...] = ("new1", "new2", "new3")
+
+
 AMOUNT_OPS: frozenset[str] = frozenset(
     {"damage", "heal", "buff", "temp_hp", "defence", "ability_damage", "item_damage"})
 

@@ -403,7 +403,7 @@ def _chain(said, scene, world=None):
         fn = getattr(judgement, name)
         if name == "inject_travel":
             raw = fn(raw, said, scene, world)
-        elif name == "fill_obvious_targets":
+        elif name in ("fill_obvious_targets", "fill_introduce_templates"):
             raw = fn(raw, scene)
         elif name == "fill_bare_checks":
             raw = fn(raw)

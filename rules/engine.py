@@ -1520,11 +1520,14 @@ class Resolution:
 # `rules/roster.py` tells the brief who THIS place would hold, with the template beside
 # each, and the four are named here only as the floor for a scene with no place in it.
 _SPAWN_HINT = (
-    ' If a PERSON or creature new to the scene should be in it, create them first with '
-    '{"op": "spawn", "params": {"template": "thug", "count": 2}} and use the refs it '
-    "returns. Take the template from WHO THIS PLACE WOULD HOLD above where there is one; "
+    ' If a PERSON new to the scene should be in it, bring them in first with '
+    '{"op": "introduce", "params": {"who": "old ferryman mending a net"}} and call them '
+    'new1 after it. A creature or a foe arriving to fight is '
+    '{"op": "spawn", "params": {"template": "thug", "count": 2}}, using the refs it '
+    "returns; take the template from WHO THIS PLACE WOULD HOLD above where there is one — "
     "guildhand, watchman, thug and guard dog always exist. A thing (a weapon, a table, a "
-    "door) is never spawned: a blow at a weapon is an attack on the person holding it."
+    "door) is never introduced or spawned: a blow at a weapon is an attack on the person "
+    "holding it."
 )
 
 # A spawn named after an object. Measured 2026-09-18: a thug named "weapon", 13 hp,
@@ -1785,10 +1788,37 @@ class Engine:
         # spawn followed by an attack on what it spawned was always rejected, and the GM
         # burned every attempt guessing at refs that could not exist yet.
         pending = self._projected_refs(intents)
+        # And the placeholders `introduce` hands out (new1, new2, new3), in the order the
+        # people are introduced — legal only AFTER the intent that makes them, because the
+        # list resolves in order and the swap to a real ref happens as each one lands.
+        from .intents import INTRODUCED_REFS
+
+        introduced: set[str] = set()
         for i, intent in enumerate(intents):
-            self._check_refs(intent, i, extra=pending)
+            self._check_refs(intent, i, extra=pending | introduced)
             self._check_legality(intent, i)
             self._force_visibility(intent)
+            if intent.op == "introduce":
+                # One introduce per plan, with `count` for a group. An op that is always
+                # on offer gets over-used: Labyrinth's state-only planner "calls state
+                # functions too frequently" (arXiv 2409.06949), and When2Call measured
+                # Llama-3.1-8B calling a tool where none fitted 67% of the time (arXiv
+                # 2504.18851). Measured live before any looser rule is allowed.
+                if introduced:
+                    raise IntentError(
+                        "introduce: one introduce per turn — bring a group in together "
+                        "with count, and anybody else next turn.", "schema", i)
+                start = len(introduced)
+                n = int(intent.params.get("count", 1) or 1)
+                if start + n > len(INTRODUCED_REFS):
+                    raise IntentError(
+                        f"introduce: at most {len(INTRODUCED_REFS)} new people in one "
+                        f"turn ({', '.join(INTRODUCED_REFS)}).", "schema", i)
+                # Stamped here, after parse, so it survives a suspend (queued intents
+                # are not re-parsed) and the model cannot write it: parse refuses any
+                # param the op table does not list.
+                intent.params["placeholders"] = list(INTRODUCED_REFS[start:start + n])
+                introduced |= set(INTRODUCED_REFS[start:start + n])
         return intents
 
     def _projected_refs(self, intents: list[Intent]) -> set[str]:
@@ -1875,6 +1905,12 @@ class Engine:
 
     def _check_refs(self, intent: Intent, index: int,
                     extra: set[str] | None = None) -> None:
+        if intent.op == "introduce":
+            if _spawn_names_a_thing(intent.params.get("who")):
+                raise IntentError(
+                    f"introduce: {str(intent.params.get('who'))!r} is a thing, not a "
+                    f"person, and things are not introduced.", "legality", index)
+            return
         if intent.op in ("narrate_only", "advance_time", "spawn", "begin_encounter"):
             if intent.op == "spawn" and _spawn_names_a_thing(intent.params.get("name")):
                 raise IntentError(
@@ -2314,6 +2350,14 @@ class Engine:
             queue.pop(0)
             partial = {}
             outcomes.append(outcome)
+            # The plan's placeholders (new1…) become the refs just made, in everything
+            # still queued — rewritten in the queue itself, so a turn that suspends for
+            # the player's roll later on carries real refs into the save.
+            if intent.op == "introduce":
+                bound = next((e.get("bound") for e in (outcome.effects or [])
+                              if e.get("kind") == "introduce"), None) or {}
+                if bound:
+                    queue = [_rename_refs(r, bound) for r in queue]
             # Anyone who has done something is no longer flat-footed.
             if intent.actor and intent.op in ("attack", "check", "move", "save"):
                 self.scene.acted.add(intent.actor)
@@ -9272,6 +9316,77 @@ class Engine:
             because=intent.because,
         )
 
+    def _op_introduce(self, intent: Intent, partial: dict) -> Outcome:
+        """People enter the scene because the plan says so, before the prose is written.
+
+        docs/declared-not-guessed.md: until this, new people came into existence because
+        a regex read them out of the finished prose (`note_cast` → `promote_cast`), and
+        its misfires — the phantom elder out of "the elder-quarter" inside a quote, a
+        second old man booked beside the opening's own — were people nobody declared.
+        Labyrinth (arXiv 2409.06949) measured the same choice: letting the model rewrite
+        state from its dialogue was the worst approach it tried.
+
+        `already_here` asks the scene first: somebody standing here who answers to these
+        words — an actor, or a glimpse the population already holds (`population.find`)
+        — IS that person, and the placeholder binds to them. `arrives` is a newcomer by
+        definition. Either way nobody enters the initiative: a person introduced mid-scene
+        is a bystander until they act or are acted on (item 18's ruling).
+        """
+        from . import population
+
+        who = intent.params["who"]
+        n = int(intent.params.get("count", 1) or 1)
+        how = intent.params.get("how") or "already_here"
+        template = intent.params.get("template") or "guildhand"
+        zone = str(intent.params.get("zone") or "near").strip().lower()
+        zone = zone if zone in ("engaged", "near", "far") else "near"
+        placeholders = list(intent.params.get("placeholders") or [])
+        made, bound = [], {}
+        for k in range(n):
+            actor = None
+            if how == "already_here" and n == 1:
+                actor = self._already_here(who)
+            if actor is None:
+                # A glimpse here with no body yet is who "already here" means; a record
+                # that already has a body here is somebody else's, and a newcomer or the
+                # second of several is always somebody new.
+                rec = (population.here_as(self.scene, who)
+                       if how == "already_here" and n == 1 else None)
+                if rec is not None and rec.get("ref") in self.scene.actors:
+                    rec = None
+                if rec is None:
+                    rec = population.note(self.scene, who, fresh=True)
+                actor = population.embody(self.scene, who, template, zone=zone,
+                                          world=self.world, rec=rec)
+                made.append({"ref": actor.ref, "name": actor.name})
+            if k < len(placeholders):
+                bound[placeholders[k]] = actor.ref
+        here = [f"{self.scene.actors[r].name} ({r})" for r in bound.values()] or \
+               [f"{m['name']} ({m['ref']})" for m in made]
+        return Outcome(
+            intent_id=intent.id, op="introduce",
+            effects=[{"kind": "introduce", "actors": made, "bound": bound,
+                      "who": who, "how": how}],
+            tell="In the scene: " + ", ".join(here) + ".",
+            because=intent.because,
+        )
+
+    def _already_here(self, who: str):
+        """The one person standing here these words fit, or None: an actor whose name
+        or population record answers to every word (`population.find` does both)."""
+        from . import population
+
+        found = population.find(self.scene, who, rings=(population.HERE,), log_miss=False)
+        if found.scope == population.HERE:
+            ref = found.people[0].get("ref")
+            if ref and ref in self.scene.actors:
+                return self.scene.actors[ref]
+        words = population._tokens(who)
+        fits = [a for a in self.scene.actors.values()
+                if not a.is_pc and words
+                and population._fits(words, set(population._tokens(a.name)))]
+        return fits[0] if len(fits) == 1 else None
+
     def _bring_in(self, template: str, count: int = 1, name: str | None = None,
                   from_entity_id: str | None = None, side: str = "") -> list[dict]:
         """Put creatures on the board. The one path a creature arrives by.
@@ -9616,6 +9731,31 @@ def _and_then(names) -> str:
     if len(got) <= 1:
         return got[0] if got else ""
     return ", ".join(got[:-1]) + f" and {got[-1]}"
+
+
+def _rename_refs(raw: dict, names: dict) -> dict:
+    """A queued intent with refs renamed, wherever an intent can hold one: actor, target
+    (one or several), and the params that name people — `opposed_by.ref`, `to`, `from_`,
+    `who`, and a begin_encounter's sides."""
+    def swap(v):
+        return names.get(v, v) if isinstance(v, str) else v
+
+    raw = dict(raw)
+    raw["actor"] = swap(raw.get("actor"))
+    tgt = raw.get("target")
+    raw["target"] = [swap(t) for t in tgt] if isinstance(tgt, list) else swap(tgt)
+    params = dict(raw.get("params") or {})
+    for key in ("to", "from_", "who"):
+        if key in params:
+            params[key] = swap(params[key])
+    if isinstance(params.get("opposed_by"), dict):
+        params["opposed_by"] = dict(params["opposed_by"],
+                                    ref=swap(params["opposed_by"].get("ref")))
+    if isinstance(params.get("sides"), dict):
+        params["sides"] = {k: [swap(r) for r in v] if isinstance(v, list) else v
+                           for k, v in params["sides"].items()}
+    raw["params"] = params
+    return raw
 
 
 def _intent_from_dict(d: dict) -> Intent:

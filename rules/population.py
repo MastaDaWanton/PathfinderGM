@@ -81,6 +81,45 @@ def here_as(scene, phrase: str) -> dict | None:
     return rec
 
 
+def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
+           rec: dict | None = None):
+    """One person becomes an actor in the room: the one door the prose's people
+    (`judgement.promote_cast`), the finder's repair and the planner's `introduce` all go
+    through. `rec` is their population record, when they have one: the actor wears the
+    face it rolled and the record keeps the ref."""
+    from . import states
+    from .bestiary import instantiate
+
+    actor = instantiate(template, scene=scene, name=phrase)
+    # Through the door. The fallback that wrote `scene.actors` directly would now
+    # write into a derived view and vanish; `add` stamps the place and the zone —
+    # the zone the prose put them in, so the map lays them out where the words did.
+    scene.add(actor, zone=zone)
+    # In the room, not in the fight. Law two: the fact travels as an effect whose
+    # tag is `role.bystander`, lifted by the one door into a fight and by a blow
+    # given or taken — never by a flag beside it.
+    actor.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
+    if rec is not None:
+        rec["ref"] = actor.ref
+    # A name behind the descriptor and a face beside it, from the world's own
+    # pools and bodies (rules/names.py) — the panel keeps showing the descriptor
+    # until the name is given in play.
+    if world is not None:
+        from . import names as names_mod
+
+        taken = [a.true_name for a in scene.actors.values() if getattr(a, "true_name", "")]
+        taken += [a.name for a in scene.actors.values()]
+        actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
+        # The face their population record rolled, when they have one — chosen to
+        # agree with their work (rules/lives.py).
+        actor.appearance = names_mod.appearance_for(
+            world, scene.location_id, ref=actor.ref,
+            own=(rec["life"]["face"] if rec else None))
+    if getattr(scene, "grid", None) is not None:
+        scene.place_by_zone([actor.ref])
+    return actor
+
+
 def used_frames(scene, home) -> set[str]:
     """The quirk frames people of this settlement already carry, so the next is new."""
     return {rec["life"]["quirk_frame"]
@@ -88,17 +127,18 @@ def used_frames(scene, home) -> set[str]:
             if rec.get("home") == home and rec.get("life")}
 
 
-def note(scene, phrase: str, *, turn: int = 0, body: str = "") -> dict:
+def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = False) -> dict:
     """Record the person this phrase describes, where the party stands; return the record.
 
     The same phrase at the same place is the same person seen again — their `last_seen`
     moves and nothing is rolled twice. A new one is rolled once, seeded by their id, and
-    never re-rolled: the roll is stored, not the seed.
+    never re-rolled: the roll is stored, not the seed. `fresh`: somebody new whatever the
+    words — the planner's newcomer, or the second of two introduced together.
     """
     if not hasattr(scene, "population") or scene.population is None:
         scene.population = {}
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
-    have = here_as(scene, phrase)
+    have = None if fresh else here_as(scene, phrase)
     if have is not None:
         have["last_seen"] = clock
         return have

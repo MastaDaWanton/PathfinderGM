@@ -2023,6 +2023,17 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # The beat is final; whoever it introduced is on the books now —
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.
+            # Whoever the plan introduced is on the ledger first, so the prose describing
+            # them reads as somebody already here, not a newcomer to book again.
+            booked_in = judgement.book_introduced(c.scene, resolution.outcomes,
+                                                  turn=len(c.transcript))
+            # The over-use measurement (an op always on offer gets over-called — Labyrinth,
+            # When2Call): who the plan introduced, and whether the prose then used them.
+            if booked_in:
+                c.turn_log.append({"kind": "introduced", "who": booked_in,
+                                   "in_prose": [bool(judgement._role_head(w)) and
+                                                judgement._role_head(w) in text.lower()
+                                                for w in booked_in]})
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
             # And every one of them into the population, located and with a life rolled,
             # before promotion — so a person who is promoted wears the face their record

@@ -417,6 +417,38 @@ EXAMPLES = [
             "intents": [],
         },
     },
+    # Somebody new, declared before the prose (docs/declared-not-guessed.md): the plan
+    # brings the ferryman in with `introduce`, and the same plan speaks to him as new1.
+    # Before this op the only way anybody entered a scene was the prose describing them
+    # and a regex booking them afterwards.
+    {
+        "player": "I look along the quay for someone who knows the river past the weir, "
+                  "and ask them.",
+        "reply": {
+            "narration": (
+                "Most of the quay has the look of people who have been asked something "
+                "already today and did not care for it. The fish-sellers keep their eyes "
+                "on their scales. Only at the far end, where the boards give way to "
+                "shingle, does anybody look up: an old ferryman on an upturned hull with a "
+                "net across his knees, working a torn mesh closed with a wooden needle. He "
+                "watches you come the whole length of the quay without stopping the "
+                "needle, and when you are close enough he lifts his chin a fraction, which "
+                "on this quay is as good as an invitation. What do you ask him?"
+            ),
+            "suggestions": [
+                "I ask him what lies past the weir",
+                "I offer him a coin for the telling",
+                "I sit down on the hull beside him and wait",
+            ],
+            "intents": [
+                {"op": "introduce",
+                 "because": "a quay has somebody who has worked the river for years",
+                 "params": {"who": "old ferryman mending a net", "how": "already_here"}},
+                {"op": "say", "actor": "pc", "because": "the player asks him",
+                 "params": {"words": "Do you know the river past the weir?", "to": "new1"}},
+            ],
+        },
+    },
 ]
 
 # --- Combat ---------------------------------------------------------------------------
@@ -592,7 +624,8 @@ Reply with a JSON object:
 {"narration": "...", "suggestions": ["...", "..."], "intents": [...]}.
 
 People and creatures are named by ref, never by name. The refs that exist are listed
-below; there are no others. If you want someone new in the scene, use the spawn op.
+below; there are no others. To bring a person into the scene, introduce them first and
+call them new1 for the rest of the turn; a creature or a foe arriving to fight is a spawn.
 
 Difficulty is a word from this list, not a number: %s.
 A circumstance is "favorable" or "unfavorable", nothing else.
@@ -2046,7 +2079,15 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
     by asking the injectors themselves), the reply is required to contain that op, and the
     model then picks the item, the target and the reason with the scene in front of it. An
     injector bolting those on afterwards has to guess them.
+
+    The placeholders `introduce` hands out (new1…) join the refs wherever that op can be
+    written, so a plan can talk to the person it just brought in; the engine refuses one
+    used before the intent that makes it.
     """
+    from rules.intents import INTRODUCED_REFS
+
+    if refs and not fighting and (not ops or "introduce" in ops):
+        refs = tuple(refs) + tuple(r for r in INTRODUCED_REFS if r not in refs)
     intent = {
         "type": "object",
         "properties": {
