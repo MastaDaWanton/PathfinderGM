@@ -311,7 +311,9 @@ def test_an_unaware_defender_is_flat_footed_and_loses_dex_to_ac(engine, scene):
     dog = instantiate("guard dog", scene=scene)
     scene.add(dog)
     assert dog.ac() == 14
-    assert dog.ac(flat_footed=True) == 14   # flat_ac stat blocks carry one number
+    # Was pinned at 14 — "flat_ac stat blocks carry one number" — which was the defect
+    # itself (2026-09-25): a Dex 17 dog caught flat-footed loses its +3.
+    assert dog.ac(flat_footed=True) == 11
 
     kesst = scene.pc()
     assert kesst.ac() == 15

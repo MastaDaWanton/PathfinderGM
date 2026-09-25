@@ -1652,9 +1652,10 @@ class Actor:
 
     def ac_modifiers(self, against: str = "melee", flat_footed: bool = False) -> list[Modifier]:
         mods = [Modifier(10, "base")]
+        loses_dex = flat_footed or self.loses_dex_to_ac
 
         if self.flat_ac is not None:
-            mods = [Modifier(self.flat_ac, "AC")]
+            mods = self._printed_ac_modifiers()
         else:
             armour = ARMOUR.get(self.armour, ARMOUR["none"])
             shield = SHIELDS.get(self.shield, SHIELDS["none"])
@@ -1669,13 +1670,9 @@ class Actor:
                 mods.append(Modifier(self.natural_armour, "natural armour",
                                      "natural armour"))
 
-            loses_dex = flat_footed or any(
-                c.data.get("lose_dex_to_ac") for c in self.conditions
-            )
-            if not loses_dex:
-                dex = min(self.ability_mod("dex"), armour["max_dex"])
-                if dex:
-                    mods.append(Modifier(dex, "Dex"))
+            dex = min(self.ability_mod("dex"), armour["max_dex"])
+            if dex:
+                mods.append(Modifier(dex, "Dex"))
 
             # As with attack: a printed AC already accounts for size.
             size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
@@ -1685,7 +1682,54 @@ class Actor:
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
+        if loses_dex:
+            # Denied Dex is denied dodge too — 1e: "any situation that denies you your
+            # Dexterity bonus also denies you dodge bonuses". A negative Dex stays: a
+            # clumsy creature caught flat-footed is no harder to hit for it. `_buff_mods`
+            # already drops dodge for a lose-Dex CONDITION; being caught flat-footed at
+            # attack time (`flat_footed=True`) never reached it, for any character.
+            mods = [m for m in mods
+                    if not (m.value > 0 and (m.source == "Dex" or m.type == "dodge"))]
         return stack(mods)
+
+    def _printed_ac_modifiers(self) -> list[Modifier]:
+        """A stat block's printed AC, as the typed terms it is made of.
+
+        Measured 2026-09-25: `flat_ac` became ONE untyped modifier, so flat-footed, touch
+        and every lose-Dex condition did nothing against any of the bestiary's creatures —
+        wolf 14/14/14, ogre 17/17/17 — while the attack tell still said "(flat-footed)".
+        The stat block's own note ("+4 armor, +1 Dex, +1 dodge, +9 natural, -2 size") is
+        read into typed terms, so the rules that ask about types can see them. Whatever
+        the note does not account for is one untyped remainder, which is what keeps the
+        total EXACTLY the printed number: a note with a conditional or a typo must never
+        change a creature's AC. A creature with no note (the hand-written townsfolk) has
+        its Dex modifier as the only term it can name.
+        """
+        from . import bestiary as bestiary_mod
+
+        doc = self._creature_doc() or {}
+        note = doc.get("ac_note", "")
+        parts = bestiary_mod.ac_parts(note)
+        stated = None if parts else bestiary_mod.ac_numbers(note)
+        if stated:
+            # "touch 10, flat-footed 15": no breakdown, but the two numbers the rules
+            # need. What flat-footed takes away is Dex and dodge; what touch ignores is
+            # armour, shield and natural armour — one term each, sized to land exactly on
+            # the printed numbers.
+            touch, flat = stated
+            lost = max(0, int(self.flat_ac) - flat)
+            worn = max(0, int(self.flat_ac) - touch)
+            parts = [(lost, "Dex", ""), (worn, "armour and natural armour",
+                                         "natural armour")]
+            parts = [p for p in parts if p[0]]
+        elif not parts:
+            dex = self.ability_mod("dex")
+            parts = [(dex, "Dex", "")] if dex else []
+        terms = [Modifier(10, "base")] + [Modifier(v, src, typ) for v, src, typ in parts]
+        rest = int(self.flat_ac) - sum(m.value for m in stack(terms))
+        if rest:
+            terms.append(Modifier(rest, "stat block"))
+        return terms
 
     # The three channels a touch attack ignores. Named as bonus TYPES rather than as
     # equipment fields, which is the whole point: a mage armor spell, a bracer, a
