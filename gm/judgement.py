@@ -78,6 +78,20 @@ _SAID = re.compile(
     r"|bragged|swear|swears|swore|vow|vows|vowed|explain|explains|explained)\b"
     r"(?:\s+to\s+(?:the\s+|a\s+|an\s+|my\s+|his\s+|her\s+|their\s+)?\w+)?[\s:,]*", re.I)
 
+# Reported speech: the complement is a clause, and an "and" inside it is what was said.
+_REPORTED = re.compile(r"\s*(?:that|if|whether|to)\b", re.I)
+# "... and buy it", "..., and then I draw" — the player's next action, which the speech
+# verb's complement must not swallow. The verbs are the ones a declaration detector acts
+# on; "and whether he'll sell it" or "and how much" are still the question.
+_AND_THEN_DOES = re.compile(
+    r",?\s+and\s+(?:then\s+)?(?:I\s+)?(?:attack|strike|hit|punch|kick|stab|slash|shoot|"
+    r"fire|draw|grab|take|pick|buy|sell|pay|give|hand|drop|throw|cast|drink|eat|walk|"
+    r"run|go|head|leave|climb|jump|open|close|search|sneak|hide|follow|lunge|swing|"
+    r"charge|grapple|shove|push|pull|cut|light|sit|stand|wait|rest|sleep|examine|"
+    r"inspect|look|put|wear|sheathe|flee|step|move|enter|approach|knock|use|tie|steal|"
+    r"pocket|leap|dodge|block|parry|seize|shoot|aim|load|mount|ride|dismount|kneel)\b",
+    re.I)
+
 # "I ask the woman if she wants to pay" — the question itself starts at the complementiser.
 _ASKED = re.compile(
     r"\b(?:ask|asks|asking|asked|beg|begs|begged|plead|pleads|pleaded)\s+"
@@ -142,7 +156,19 @@ def redact_speech(text: str) -> str:
     for rx in (_TOLD, _SAID, _ASKED):
         for m in rx.finditer(line):
             stop = _SENTENCE_END.search(line, m.end())
-            blank(m.end(), stop.start() if stop else len(line))
+            end = stop.start() if stop else len(line)
+            # A second action joined on with "and". Measured 2026-09-25: "I ask the
+            # smith about the axe and buy it" blanked "buy it", and "I say nothing and
+            # attack the guard" read as no violence at all — every injector and the
+            # `must_contain` schema read the redacted line. Not for reported speech,
+            # where the "and" is part of what was said ("I tell him to leave and go
+            # home", "I say that I'll pay and go"): `_TOLD` always carries a message,
+            # and a `_SAID`/`_ASKED` complement opening with that/if/whether/to is one.
+            if rx is not _TOLD and not _REPORTED.match(line, m.end()):
+                joined = _AND_THEN_DOES.search(line, m.end(), end)
+                if joined:
+                    end = joined.start()
+            blank(m.end(), end)
 
     return "".join(out)
 
