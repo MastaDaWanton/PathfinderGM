@@ -251,8 +251,9 @@ class TheDoor:
         if given and hmac.compare_digest(given, token()):
             # Redirect to the same path *without* the token, so the address bar, the
             # history and any screenshot of this phone stop carrying the secret. Query
-            # string dropped deliberately and not preserved: the only thing the table
-            # reads from it is `?new=1`, which must never be replayed by a redirect.
+            # string dropped deliberately and not preserved: the table used to read
+            # `?new=1` from it (a reset, removed 2026-09-25), and a query that changes
+            # the game must never be replayed by a redirect.
             response = redirect(request.path)
             response.set_signed_cookie(
                 COOKIE, "yes", salt=COOKIE_SALT,

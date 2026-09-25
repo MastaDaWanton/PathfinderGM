@@ -720,7 +720,12 @@ def table(request):
     if not preflight.check().ok:
         return redirect("/?setup=1")
     try:
-        c = campaign_mod.current(reset=request.GET.get("new") == "1")
+        # No `?new=1`. It archived the campaign and started another from a GET, which
+        # CSRF does not cover and the server sits on a fixed port: measured 2026-09-25,
+        # `<img src="http://127.0.0.1:8917/play/?new=1">` on any page the player visited
+        # reset their game. Nothing in the app linked to it — new games begin on the
+        # shelf, by POST — so the door is gone rather than moved.
+        c = campaign_mod.current()
     except campaign_mod.UnreadableSave:
         # Back to the shelf, which now survives this and says why. The refusal itself
         # stands — `current()` still raises, nothing is repaired behind the player's
