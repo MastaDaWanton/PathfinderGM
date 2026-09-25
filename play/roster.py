@@ -156,7 +156,14 @@ def load(character_id: str) -> Entry | None:
         d = json.loads(p.read_text(encoding="utf-8"))
     except Exception:
         return None
-    if d.get("roster_version") != ROSTER_VERSION:
+    # Only NEWER is refused — the rule `Campaign.load` already learned. Written `!=`
+    # (measured 2026-09-25), bumping ROSTER_VERSION would have made every character on
+    # the shelf disappear at once; older entries are read, as a save of an older build is.
+    try:
+        found = int(d.get("roster_version") or 0)
+    except (TypeError, ValueError):
+        found = 0
+    if found > ROSTER_VERSION:
         return None
     return Entry(
         id=d["id"], name=d.get("name", ""), status=d.get("status", ALIVE),
