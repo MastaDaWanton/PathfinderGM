@@ -170,7 +170,15 @@ class GMAgent:
                           spare.get("api_key", ""))] * 2
         last = len(schedule) - 1
 
+        # A model that could not be reached is not asked again this turn. Measured
+        # 2026-09-25: a `ModelUnavailable` inside this loop — a timeout, Ollama restarting
+        # under a loaded model — left the loop and aborted the turn, so the fallback model
+        # this schedule exists to reach was never tried. Only when every model in it is
+        # down does the player get the "start Ollama" answer.
+        down: set[str] = set()
         for n, (model, host, provider, key) in enumerate(schedule):
+            if model in down:
+                continue
             if n == max_attempts:
                 rejections.append(f"— handing the turn to {model}")
             # The shape the reply is *allowed* to have, built from this turn's situation
@@ -178,7 +186,8 @@ class GMAgent:
             # `narrate_only` is not among the choices, so the failure that cost this
             # project its whole combat loop — narrating a punch and proposing nothing —
             # is not a reply the sampler can produce. See `prompts.turn_schema`.
-            reply = client.chat(messages, model, host, as_json=True, think=False,
+            try:
+                reply = client.chat(messages, model, host, as_json=True, think=False,
                                 temperature=0.8 if n == 0 else 0.5,
                                 provider=provider, api_key=key,
                                 schema=prompts.turn_schema(
@@ -197,6 +206,12 @@ class GMAgent:
                                     # gives the model first refusal, with the scene in
                                     # front of it, on choosing the item and the target.
                                     must_contain=tuple(declared)))
+            except client.ModelUnavailable as exc:
+                down.add(model)
+                rejections.append(f"attempt {n + 1}: {model} could not be reached: {exc}")
+                if all(m in down for m, *_ in schedule):
+                    raise
+                continue
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
 
             try:
