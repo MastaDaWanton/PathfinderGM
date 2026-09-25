@@ -320,8 +320,16 @@ class Scene:
     road: dict = field(default_factory=dict)
     log: list[dict] = field(default_factory=list)
 
-    # Whose turn it is: an index into `initiative`. -1 outside an encounter.
+    # Whose turn it is: an index into `initiative`. -1 outside an encounter. Written only
+    # by `advance_turn`, the encounter's opening, and the two order-changing doors below
+    # (`enrol`, `leave_order`) — because an index silently re-points at somebody else
+    # whenever the list it indexes changes.
     turn: int = -1
+    # Set when the creature holding the turn left the order: their successor now sits in
+    # the slot `turn` points at, so the next advance must land THERE rather than one past
+    # it. Saved, because a save between the removal and the advance would otherwise skip
+    # that creature on reload.
+    turn_is_next: bool = False
     # side name -> refs, as `begin_encounter` declared them. Kept so the engine can tell
     # when a fight is over without guessing who was fighting whom.
     sides: dict[str, list[str]] = field(default_factory=dict)
@@ -640,6 +648,69 @@ class Scene:
             return None
         return self.initiative[self.turn % len(self.initiative)][0]
 
+    def turn_holder(self) -> str | None:
+        """Whoever holds the turn, read BEFORE anything changes the order.
+
+        No modulo, unlike `current_ref`: an out-of-range `turn` answers None, which is how
+        `leave_order` tells "the holder left" from "the holder moved"."""
+        if not (0 <= self.turn < len(self.initiative)):
+            return None
+        return self.initiative[self.turn][0]
+
+    def _point_at(self, was: str | None) -> None:
+        if not self.initiative:
+            self.turn = -1
+            self.turn_is_next = False
+            return
+        at = next((i for i, (r, _) in enumerate(self.initiative) if r == was), None)
+        self.turn = at if at is not None else min(self.turn, len(self.initiative) - 1)
+
+    def enrol(self, ref: str, roll: int) -> None:
+        """Put a newcomer into the initiative order; the turn stays where it was.
+
+        Measured 2026-09-20 as a flake of `test_a_free_action_does_not_hand_the_round_to
+        _the_enemy`: the narrator introduced somebody, `join_fight` rolled them in, their
+        unseeded d20 beat the player's, they sorted in ABOVE the player — and the turn the
+        player still held went to them. Four sites wrote their own version of this; three
+        read `current_ref()` AFTER the append and the sort, so the creature they "kept"
+        was already whoever the sort had moved into the slot, and one (a troop arriving)
+        adjusted nothing at all. This is the one door now.
+        """
+        was = self.turn_holder()
+        self.initiative.append((ref, roll))
+        self.initiative.sort(key=lambda t: -t[1])
+        if self.turn >= 0:
+            self._point_at(was)
+
+    def leave_order(self, ref: str) -> None:
+        """Take `ref` out of the initiative order, and keep the turn honest.
+
+        Somebody else leaving: the turn stays with its holder. The HOLDER leaving (dead on
+        their own turn, routed, walked out): their successor slides into the slot and is
+        next — measured 2026-09-25, the next `advance_turn` stepped one past the slot and
+        skipped them. The last slot leaving wraps to the top, which is the round's end.
+        """
+        if not any(r == ref for r, _ in self.initiative):
+            return
+        was = self.turn_holder()
+        idx = next(i for i, (r, _) in enumerate(self.initiative) if r == ref)
+        self.initiative = [(r, roll) for r, roll in self.initiative if r != ref]
+        if not self.initiative:
+            self.turn = -1
+            self.turn_is_next = False
+            return
+        if self.turn < 0:
+            return
+        if was != ref:
+            self._point_at(was)
+            return
+        if idx < len(self.initiative):
+            self.turn = idx
+            self.turn_is_next = True
+        else:
+            self.turn = len(self.initiative) - 1
+            self.turn_is_next = False
+
     def conscious(self, ref: str) -> bool:
         """Still up, and still in the fight — which is not the same as able to act now.
 
@@ -697,7 +768,12 @@ class Scene:
 
     def _next_able(self) -> str | None:
         """One pass down the initiative order from wherever the turn is."""
-        for step in range(1, len(self.initiative) + 1):
+        # The holder left and their successor sits in this slot (`leave_order`): the pass
+        # starts ON it. Step 0 cannot roll the round over — `reached` is `turn` itself —
+        # which is right: the successor's turn belongs to the round already running.
+        first = 0 if self.turn_is_next else 1
+        self.turn_is_next = False
+        for step in range(first, len(self.initiative) + first):
             reached = self.turn + step
             nxt = reached % len(self.initiative)
             # Passing the top of the order is the top of a new round — but not the
@@ -1233,13 +1309,10 @@ class Scene:
         """
         # The initiative order shrinks, and `turn` must go on pointing at the same
         # creature — an index into a list that just changed length is how a removal
-        # hands somebody else's turn to the wrong side of the fight.
-        current = self.initiative[self.turn][0] if 0 <= self.turn < len(self.initiative) else None
-        self.initiative = [(r, roll) for r, roll in self.initiative if r != ref]
-        if current == ref or current is None:
-            self.turn = -1 if not self.initiative else min(self.turn, len(self.initiative) - 1)
-        else:
-            self.turn = next(i for i, (r, _) in enumerate(self.initiative) if r == current)
+        # hands somebody else's turn to the wrong side of the fight. `leave_order` is
+        # the one door, and it also keeps the holder's successor next when the holder
+        # is the one leaving.
+        self.leave_order(ref)
 
         self.zones.pop(ref, None)
         self.positions.pop(ref, None)
@@ -3373,12 +3446,9 @@ class Engine:
         a.remove_condition(states.BYSTANDER_KEY)
         init = self.dice.d20(a.initiative_modifiers(), label=f"{a.name} initiative",
                              visibility="hidden")
-        self.scene.initiative.append((ref, init.total))
-        self.scene.initiative.sort(key=lambda t: -t[1])
-        current = self.scene.current_ref()
-        self.scene.turn = next(
-            (i for i, (r, _) in enumerate(self.scene.initiative) if r == current),
-            self.scene.turn)
+        # `enrol`, not an append and a sort: a newcomer who rolls above the turn-holder
+        # sorts in ahead of them, and `turn` is an index (see `Scene.enrol`).
+        self.scene.enrol(ref, init.total)
         self.scene.sides.setdefault(side, []).append(ref)
         if ref not in self.scene.positions and self.scene.grid is not None:
             self.scene.place_by_zone([ref])
@@ -9188,8 +9258,9 @@ class Engine:
             if self.scene.in_encounter:
                 init = self.dice.d20(unit.initiative_modifiers(),
                                      label=f"{unit.name} initiative", visibility="hidden")
-                self.scene.initiative.append((unit.ref, init.total))
-                self.scene.initiative.sort(key=lambda t: -t[1])
+                # This branch adjusted `turn` not at all: a troop that rolled high took
+                # the turn straight out of whoever's hand it was in.
+                self.scene.enrol(unit.ref, init.total)
                 self.scene.sides.setdefault(
                     side or ("pc" if unit.is_pc else "them"), []).append(unit.ref)
             return made
@@ -9223,12 +9294,9 @@ class Engine:
             if self.scene.in_encounter:
                 init = self.dice.d20(actor.initiative_modifiers(),
                                      label=f"{actor.name} initiative", visibility="hidden")
-                self.scene.initiative.append((actor.ref, init.total))
-                self.scene.initiative.sort(key=lambda t: -t[1])
-                self.scene.turn = next(
-                    (i for i, (r, _) in enumerate(self.scene.initiative)
-                     if r == self.scene.current_ref()), self.scene.turn
-                )
+                # `enrol`: the index this re-pointed was read after the sort, so it
+                # "kept" whoever the sort had just moved into the slot.
+                self.scene.enrol(actor.ref, init.total)
                 # A summoned creature fights for whoever called it. Without the `side`
                 # argument every arrival joined "them", so a caster's own celestial dog
                 # counted against them and a fight could not end while it was standing.
@@ -9422,8 +9490,10 @@ class Engine:
             for refs in (self.scene.sides or {}).values():
                 if target.ref in refs:
                     refs.remove(target.ref)
-            self.scene.initiative = [(r, v) for r, v in self.scene.initiative
-                                     if r != target.ref]
+            # Through the door, not a list comprehension: this ran BEFORE `scene.remove`,
+            # so `_unseat` then read an order that had already shifted and re-pointed the
+            # turn at somebody else (measured: the turn moved from the player to c3).
+            self.scene.leave_order(target.ref)
         self.scene.positions.pop(target.ref, None)
         # The debt outlives them. They are about to leave the scene, and the experience for
         # the ones who died has not been paid yet — a fight's XP settles on the way OUT of
