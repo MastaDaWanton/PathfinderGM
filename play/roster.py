@@ -20,6 +20,7 @@ from pathlib import Path
 from django.conf import settings
 
 from rules.sheet import Actor, from_dict, to_dict
+from pathfindergm import files
 
 ROSTER_VERSION = 1
 
@@ -140,7 +141,7 @@ def save(entry: Entry) -> Path:
         "sheet": entry.sheet,
     }
     p = path_for(entry.id)
-    p.write_text(json.dumps(payload, indent=1), encoding="utf-8")
+    files.write_text(p, json.dumps(payload, indent=1))
     return p
 
 

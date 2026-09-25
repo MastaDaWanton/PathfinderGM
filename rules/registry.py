@@ -29,6 +29,7 @@ from importlib import import_module
 from pathlib import Path
 
 from . import biomes as _biomes
+from pathfindergm import files
 
 
 @dataclass
@@ -481,7 +482,7 @@ def save(kind_id: str, entry: dict) -> Path:
     if not thing_id:
         raise ValueError("it needs an id")
     path = homebrew_dir(kind_id, make=True) / f"{thing_id}.json"
-    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return path
 
 

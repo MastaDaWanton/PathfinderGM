@@ -47,6 +47,7 @@ import zlib
 from pathlib import Path
 
 from django.conf import settings
+from pathfindergm import files
 
 PHYSICAL = ("str", "dex", "con")
 MENTAL = ("int", "wis", "cha")
@@ -1395,7 +1396,7 @@ def import_from_world(world, overwrite: bool = False) -> list[str]:
         path = folder / f"{d['id']}.json"
         if path.exists() and not overwrite or d.get("people_id") in covered:
             continue
-        path.write_text(json.dumps(d, indent=1, ensure_ascii=False), encoding="utf-8")
+        files.write_text(path, json.dumps(d, indent=1, ensure_ascii=False))
         written.append(d["id"])
     return written
 

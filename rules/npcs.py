@@ -28,6 +28,7 @@ from pathlib import Path
 
 from . import bestiary
 from . import registry
+from pathfindergm import files
 
 # --- source ranking ----------------------------------------------------------------------------
 
@@ -294,7 +295,7 @@ def remember(world_entity_id: str, block_id: str, name: str, *, role: str = "",
     entry = {"id": path.stem, "name": str(name or ""), "description": str(description or ""),
              "creature": str(block_id or ""), "world_entity_id": str(world_entity_id),
              "role": str(role or "")}
-    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return path
 
 

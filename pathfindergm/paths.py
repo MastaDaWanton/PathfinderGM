@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from pathfindergm import files
 
 APP_NAME = "PathfinderGM"
 
@@ -103,7 +104,7 @@ def secret_key() -> str:
     made = secrets.token_urlsafe(64)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(made, encoding="utf-8")
+        files.write_text(path, made)
         if sys.platform != "win32":
             path.chmod(0o600)
     except OSError:

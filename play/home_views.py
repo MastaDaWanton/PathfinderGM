@@ -24,6 +24,7 @@ from . import campaign as campaign_mod
 from .apiutil import read_body, read_int
 from . import homebrew, library, roster
 from .craft_views import DISCIPLINES
+from pathfindergm import files
 
 
 @ensure_csrf_cookie
@@ -310,12 +311,12 @@ def save_consumable(request):
 
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "thing"
     path = homebrew.folder("consumables") / f"{slug}.json"
-    path.write_text(json.dumps({
+    files.write_text(path, json.dumps({
         "id": slug, "name": name,
         "kind": str(body.get("kind", "consumable")),
         "description": str(body.get("description", "")),
         "effects": specs,
-    }, indent=1), encoding="utf-8")
+    }, indent=1))
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(s) for s in specs]})
 
@@ -441,7 +442,7 @@ def save_thing(request, bench_id: str):
             return JsonResponse({"error": " ".join(problems), "problems": problems},
                                 status=400)
 
-    path.write_text(json.dumps(entry, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(sp) for sp in specs]})
 

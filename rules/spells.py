@@ -57,6 +57,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import effectspec
+from pathfindergm import files
 
 SCHOOLS = ("abjuration", "conjuration", "divination", "enchantment", "evocation",
            "illusion", "necromancy", "transmutation", "universal")
@@ -1654,7 +1655,7 @@ def write_mechanics() -> dict:
                 "from this file and remains prose in spells.json.",
         "spells": [entries[k] for k in sorted(entries)],
     }
-    path.write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")
+    files.write_text(path, json.dumps(payload, indent=1, ensure_ascii=False))
     return report
 
 

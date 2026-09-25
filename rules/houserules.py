@@ -27,6 +27,7 @@ import json
 from pathlib import Path
 
 from django.conf import settings
+from pathfindergm import files
 
 # The four named tiers are the Core Rulebook's own table. Everything past 25 is this
 # app's homebrew, and the names admit it rather than borrowing the book's authority.
@@ -237,7 +238,7 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
         else:
             current["ability_cap"] = cap
     if not problems:
-        _path().write_text(json.dumps(current, indent=2), encoding="utf-8")
+        files.write_text(_path(), json.dumps(current, indent=2))
     return active(), problems
 
 

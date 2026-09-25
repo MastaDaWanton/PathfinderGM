@@ -24,6 +24,7 @@ import json
 from pathlib import Path
 
 from django.conf import settings
+from pathfindergm import files
 
 # The jobs a model can hold. Order is the order the settings page draws them.
 ROLES = (
@@ -178,7 +179,7 @@ def save(roles_in: dict | None = None, keys_in: dict | None = None) -> list[str]
 
     if problems:
         return problems
-    _path().write_text(json.dumps(data, indent=2), encoding="utf-8")
+    files.write_text(_path(), json.dumps(data, indent=2))
     try:
         _path().chmod(0o600)     # keys: readable by this user and nobody else
     except OSError:
