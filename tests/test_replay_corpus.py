@@ -88,6 +88,25 @@ def measure(tmp_path) -> dict:
                 if not text.strip():
                     continue
                 drafts += 1
+                # Speaker tags come out first, through the game's own door, and what
+                # they claimed is counted: every quoted line, how many a tag attributed
+                # to somebody here, and tags naming nobody here (docs/declared-not-
+                # guessed.md; nobody has published tag compliance for 8-12B models, so
+                # this corpus is the measurement). Replayed against the scene BEFORE the
+                # turn, so a tag naming somebody the turn's own plan spawned, or a place
+                # the turn travelled to, counts as "nobody here" although the game —
+                # which lifts after the engine resolved — attributed it: on the retag run
+                # this counts 5 such misses where the game's own turn log counted 2. The
+                # game's `speech-tags` row is the true rate; this is a floor.
+                agent.last_said = []
+                text = agent._lift(text)
+                said = agent.last_said
+                lines = speech.lines(text)
+                firings["quoted lines"] += len(lines)
+                firings["lines tagged"] += sum(
+                    1 for ln in lines
+                    if (speech.speaker(said, ln) or {}).get("who"))
+                firings["tags naming nobody here"] += sum(1 for r in said if not r["who"])
                 alone = not [a for a in c.scene.actors.values() if not a.is_pc and a.hp > 0]
                 review = narration.review(text, pc_name=pc.name if pc else "",
                                           known_names=known, alone=alone)
@@ -107,7 +126,7 @@ def measure(tmp_path) -> dict:
                         person["life"]["fallbacks"]))
                 firings["attacked_by named"] += sum(1 for r, _ in
                                                     judgement.attacked_by(c.scene, text) if r)
-                firings["hailed_by"] += len(judgement.hailed_by(c.scene, text))
+                firings["hailed_by"] += len(judgement.hailed_by(c.scene, text, said=said))
                 firings["introductions"] += len(narration.introductions(text))
                 firings["unname_strangers struck"] += len(
                     narration.unname_strangers(text, known)[1])

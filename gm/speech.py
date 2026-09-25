@@ -183,6 +183,130 @@ _OPENING_MARK = re.compile(r"(?:^|(?<=[\s,:(\[—–-]))['‘](?=\S)|[\"“]")
 _LINE_OPENER = re.compile(r"[\"“”'‘’]\s*([A-Z][a-zA-Z'’-]{2,})")
 
 
+# --- who said it: speaker tags written by the prose call ----------------------------------
+#
+# docs/declared-not-guessed.md, the first door (2026-09-25). The prose call writes a line of
+# dialogue as `<say who=c3 to=you>'You're a long way from home.'</say>`; the tags are
+# lifted out here, the moment a reply arrives, before any check or rewrite reads the text,
+# and what they said is kept beside the beat as `Said` records. Guessing the speaker after
+# the fact from the words round the quote is what `hailed_by` and `introductions` did, and
+# it misread; the model knows who is talking while it writes.
+#
+# Keyed by the words of the line, never by offsets: every groomer after this point may
+# rewrite the beat, and a record whose line no longer appears simply stops matching, so a
+# rewrite costs a fallback to the old guess rather than a wrong speaker.
+
+_SAY_OPEN = re.compile(r"<\s*say\b([^<>]*)>", re.I)
+_SAY_CLOSE = re.compile(r"<\s*/\s*say\s*>", re.I)
+_ATTR = re.compile(r"\b(who|to)\s*=\s*(?:\"([^\"<>]*)\"|'([^'<>]*)'|([^\"'\s<>]+))", re.I)
+
+
+def _key(line: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9']+", str(line or "").lower().replace("’", "'")))
+
+
+def lift(text: str, refs=None, names=None) -> tuple[str, list[dict]]:
+    """(the beat with every speaker tag removed, the lines they attributed).
+
+    Each record is {"who": ref, "to": "you" | ref | "", "line": what was said}. `refs`
+    are the scene's refs: a tag naming anything else keeps its words and loses its
+    attribution — its record has an empty "who" and the claim in "was", so the miss can
+    be counted — and never books anybody. `names` maps a lowercase name or descriptor to its
+    ref, for the model that writes `who="the smith"` instead of the ref it was shown.
+    Unclosed and stray tags are removed; a tag with no quotation inside keeps its words
+    and is wrapped in quote marks, because the model tagged it as speech.
+    """
+    text = str(text or "")
+    if "<" not in text:
+        return text, []
+    known = set(refs or [])
+    by_name = {str(k).lower(): v for k, v in (names or {}).items()}
+    said: list[dict] = []
+    out: list[str] = []
+    at = 0
+    for m in _SAY_OPEN.finditer(text):
+        if m.start() < at:
+            continue
+        out.append(text[at:m.start()])
+        close = _SAY_CLOSE.search(text, m.end())
+        nxt = _SAY_OPEN.search(text, m.end())
+        if close is None or (nxt is not None and nxt.start() < close.start()):
+            # Unclosed: the words run on as they are, unattributed.
+            at = m.end()
+            continue
+        inner = text[m.end():close.start()]
+        attrs = {k.lower(): (a or b or c) for k, a, b, c in _ATTR.findall(m.group(1))}
+        claimed = who = attrs.get("who", "").strip()
+        if who not in known:
+            who = by_name.get(who.lower().replace("_", " "), "") if who else ""
+        to = attrs.get("to", "").strip().lower()
+        to = "you" if to in ("you", "pc", "player") else (to if to in known else "")
+        found = spans(inner)
+        if not found and inner.strip():
+            inner = f"“{inner.strip()}”"
+            found = spans(inner)
+        if who or claimed:
+            for a, b in found:
+                line = inner[a + 1:b - 1] if b - a >= 2 else ""
+                if line.strip():
+                    rec = {"who": who, "to": to, "line": line.strip()}
+                    if not who:
+                        # Kept, with what the model claimed, so the miss can be counted;
+                        # an empty `who` attributes nothing to anybody.
+                        rec["was"] = claimed
+                    said.append(rec)
+        out.append(inner)
+        at = close.end()
+    out.append(text[at:])
+    clean = _SAY_CLOSE.sub("", "".join(out))
+    clean = re.sub(r"[ \t]{2,}", " ", clean)
+    return clean, said
+
+
+def retag(text: str, said) -> str:
+    """The beat with its recorded speakers written back round their lines — `lift`
+    undone — for the one place the model is shown its own earlier prose.
+
+    Measured on the first live run with tags (2026-09-25, gemma-4-12B, 12 turns): tagging
+    was all or nothing per beat, 4 beats tagged and 4 not, and the untagged ones followed
+    a tagged beat that the prompt had shown back to the model with its tags lifted out —
+    two beats of its own untagged speech in front of it, against the examples' tagged
+    ones. Demonstration volume beats instruction volume (CLAUDE.md), and the nearest
+    demonstration was ours.
+    """
+    text = str(text or "")
+    if not said:
+        return text
+    out, at = [], 0
+    for a, b in spans(text):
+        rec = speaker(said, text[a + 1:b - 1] if b - a >= 2 else "")
+        if not rec or not rec.get("who"):
+            continue
+        to = f" to={rec['to']}" if rec.get("to") else ""
+        out.append(text[at:a])
+        out.append(f"<say who={rec['who']}{to}>{text[a:b]}</say>")
+        at = b
+    out.append(text[at:])
+    return "".join(out)
+
+
+def speaker(said, line: str) -> dict | None:
+    """The record whose line this is, if the prose tagged it. Equal words first; then one
+    containing the other, for a groomer that trimmed a line's tail — but only for lines of
+    four words or more, where containment is not an accident."""
+    want = _key(line)
+    if not want:
+        return None
+    for rec in said or []:
+        if _key(rec.get("line", "")) == want:
+            return rec
+    for rec in said or []:
+        have = _key(rec.get("line", ""))
+        if len(want.split()) >= 4 and len(have.split()) >= 4 and (want in have or have in want):
+            return rec
+    return None
+
+
 def opens(sentence: str) -> bool:
     """Whether a sentence has speech opening in it — a double quote anywhere, a single
     quote at a word boundary (never the apostrophe inside "it's")."""

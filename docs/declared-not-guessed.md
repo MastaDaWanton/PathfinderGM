@@ -107,3 +107,47 @@ blows, then places, then the booking door last (the biggest).
   is happening to allow for travel, questing and discovery." Founding stays on the prose
   path (outside fights) and gains the planner's `found`; the corpus measures that places
   still appear.
+
+## Built: speaker tags (2026-09-25)
+
+The first door. The prose call writes `<say who=c3 to=you>'…'</say>`. `speech.lift`
+takes the tags out the moment any reply's narration is read: `GMAgent._lift` sits at
+every reader, an AST test holds all of them to it, and the opening lifts its own.
+The tags are checked against the people standing where the party is, never against
+everyone in the save. An unknown ref attributes nothing and books nobody; its claim is
+kept as `was` so the miss can be counted. `hailed_by` and `introduced_by` read the tag
+first and fall back to the old guess for untagged lines. The beat keeps its
+attributions as `said`, and every turn logs `speech-tags`: lines, tagged, refs naming
+nobody here, and the hails the tags found beside the hails the guess would have found.
+
+Prior art: Intra (Bicking, 2025) writes `<dialog from= to=>` inline, choosing text
+markup over tools for narrative work. Nobody has published tag compliance for 8-12B
+models, so these runs are the measurement.
+
+**Live, gemma-4-12B, the town script, 12 turns each, from the game's own turn log:**
+
+| | tags taught by the examples | + the model's own earlier beats shown tagged |
+|---|---|---|
+| quoted lines attributed on the page | 9 of 20 (45%) | 16 of 20 (80%) |
+| tags naming somebody not present (refused, fell back) | 2 | 2 |
+| hails the tag found and the guess missed | 2 | 4 |
+| hails the guess found and the tag contradicted | 0 | 0 |
+| tags reaching the page | 0 | 0 |
+
+The first run tagged all or nothing per beat. The untagged beats followed tagged ones
+that the prompt had shown back to the model with the tags lifted, so two beats of the
+model's own untagged speech sat in front of it against the examples' tagged ones.
+`speech.retag` writes the recorded tags back for the prompt only; every check still
+reads the plain beat. Twelve turns is a small sample, and the direction is what it
+shows.
+
+The one tagged speaker who was wrong: the man tending a cart's crates in a field was
+tagged as the gate's watchman, who was elsewhere. The check refused the tag, and the
+fallback guess read "the merchant's cart" as the merchant who was standing there.
+
+Both runs are in the replay corpus. It replays each draft against the scene from before
+the turn, so its tag count is a floor: a person the turn's own plan spawned counts as
+"nobody here".
+
+Next door: names read from tagged speech are already live through `introduced_by`. The
+`introduce` op comes next.

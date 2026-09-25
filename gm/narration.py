@@ -419,7 +419,19 @@ _BARE_NAME_ANSWER = re.compile(
 
 
 def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, str]]:
-    """(speaker head word or "", name) for each name somebody gives in this beat.
+    """(speaker head word or "", name) for each name somebody gives in this beat —
+    `introduced_by` without the tagged speaker."""
+    return [(head, name) for head, name, _ in introduced_by(text, asked_for_name)]
+
+
+def introduced_by(text: str, asked_for_name: bool = False,
+                  said=None) -> list[tuple[str, str, str]]:
+    """(speaker head word or "", name, the speaker's ref when the prose tagged the line)
+    for each name somebody gives in this beat.
+
+    The ref is the prose call's own `<say who=…>` (`speech.lift`): the model knew who was
+    speaking, so the head-word guess below — which once read "low" out of "a low,
+    resonant grind" as the speaker (2026-09-19) — is only the fallback.
 
     The speaker is the person the sentence (or the one before, for a bare quotation)
     names outside the quotation: "The stranger shrugs. 'Call me Kael.'" → ("stranger",
@@ -427,9 +439,22 @@ def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, st
     the stranger" — our placeholder — and when a model DID give a name ("Kaelen") the
     un-namer struck it inside his own line.
     """
-    out: list[tuple[str, str]] = []
+    out: list[tuple[str, str, str]] = []
     if not text:
         return out
+
+    def _tagged(sentence: str, at: int) -> str:
+        for a, b in speech.spans(sentence):
+            if a <= at < b:
+                rec = speech.speaker(said, sentence[a + 1:b - 1])
+                return rec["who"] if rec else ""
+        # A line cut across sentences has lost its close: from its opening mark on.
+        opened = speech.first_opening(sentence)
+        if opened is not None and opened <= at:
+            rec = speech.speaker(said, sentence[opened + 1:])
+            return rec["who"] if rec else ""
+        return ""
+
     sentences = _sentences(text)
     for i, s in enumerate(sentences):
         for m in _INTRODUCES.finditer(s):
@@ -457,7 +482,7 @@ def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, st
             else:
                 after = re.search(r"\b(?:the|a|an)\s+([a-z]{3,})\b", outside.lower())
                 head = after.group(1) if after else ""
-            out.append((head, name))
+            out.append((head, name, _tagged(s, m.start())))
     if asked_for_name and not out:
         from .judgement import _ROLE_WORD
 
@@ -467,7 +492,8 @@ def introductions(text: str, asked_for_name: bool = False) -> list[tuple[str, st
                 continue
             outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
             role = _ROLE_WORD.search(outside)
-            out.append((role.group(0).lower() if role else "", m.group(1).strip()))
+            out.append((role.group(0).lower() if role else "", m.group(1).strip(),
+                        _tagged(s, m.start())))
     return out
 
 
@@ -3121,7 +3147,7 @@ def added_sentences(before: str, after: str) -> list[str]:
     return [s for s in _sentences(after) if s not in had]
 
 
-def own_prose(transcript, n: int = 12) -> list[str]:
+def own_prose(transcript, n: int = 12, tagged: bool = False) -> list[str]:
     """The narrator's own recent beats, as the model wrote them: the last `n` GM beats
     of kind "setup", each with the pipeline's appended sentences taken back out.
 
@@ -3134,12 +3160,17 @@ def own_prose(transcript, n: int = 12) -> list[str]:
     looking at four — it fired once in fifty turns while the phrase it exists for sat
     in eleven of them. Every consumer slices its own tail from this list, so widening it
     changes nothing for the ones that wanted six or two.
+
+    `tagged`: with the speaker tags the beat was written with put back (`speech.retag`),
+    for the prompt only — every check reads the plain text.
     """
     out = []
     for b in list(transcript or [])[-4 * n:]:
         if not isinstance(b, dict) or b.get("who") != "gm" or b.get("kind") != "setup":
             continue
         text = strip_added(str(b.get("text") or ""), b.get("added"))
+        if text and tagged:
+            text = speech.retag(text, b.get("said"))
         if text:
             out.append(text)
     return out[-n:]

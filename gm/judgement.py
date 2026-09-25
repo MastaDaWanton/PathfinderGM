@@ -5305,14 +5305,15 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
     return {a.ref: (a.true_name if attitude_mod.tells_their_name(a) else "") for a in asked}
 
 
-def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[str, str]]:
+def apply_introductions(scene, beat: str, player_text: str = "",
+                        said=None) -> list[tuple[str, str]]:
     """A name given in play becomes the panel's name for that person.
 
     From `narration.introductions`: the speaker's head word finds the unnamed actor
     here (a descriptor name — lowercase, or "the …"); their display name becomes the
     name given, their true name too if none was held. A named person "introducing"
     themselves again changes nothing. Returns [(ref, name)] for the log."""
-    from .narration import introductions
+    from .narration import introduced_by
 
     if scene is None or not beat:
         return []
@@ -5335,14 +5336,19 @@ def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[s
     # the partial, and both women here answered to "woman", so every remaining branch
     # declined. The ref was known all along; nothing asked for it.
     was_asked = [actors[r] for r in names_asked_for(scene, player_text) if r in actors]
-    for head, given in introductions(beat, asked_for_name=asked):
-        # Whose name it is, in order of certainty: the person the player asked; the one the world holds THIS
+    for head, given, tagged in introduced_by(beat, asked_for_name=asked, said=said):
+        # Whose name it is, in order of certainty: the speaker the prose tagged (the
+        # model wrote who was talking — `speech.lift`); the person the player asked; the
+        # one the world holds THIS
         # name for (the brief gave it to them); the unnamed person the speaker's
         # head word names; the unnamed person the player addressed; the only unnamed
         # person here. Measured on the second group-3 replay (2026-09-18): six
         # descriptor-named people in the room, "'Gorvothor Kragnir,' he says" with no
         # role word in the sentence, and the panel kept "stranger".
-        who = was_asked[0] if len(was_asked) == 1 else None
+        who = (actors[tagged] if tagged in actors and not actors[tagged].is_pc
+               else None)
+        if who is None:
+            who = was_asked[0] if len(was_asked) == 1 else None
         if who is None:
             who = next((a for a in actors.values() if not a.is_pc
                         and str(getattr(a, "true_name", "")).lower() == given.lower()), None)
@@ -5384,7 +5390,7 @@ def apply_introductions(scene, beat: str, player_text: str = "") -> list[tuple[s
     return out
 
 
-def hailed_by(scene, beat: str) -> list[str]:
+def hailed_by(scene, beat: str, said=None) -> list[str]:
     """Who, in this beat, spoke to the player: refs of the people whose quoted line
     addresses "you".
 
@@ -5407,6 +5413,19 @@ def hailed_by(scene, beat: str) -> list[str]:
     sentences = _sentences(beat)
     for i, s in enumerate(sentences):
         for qa, qb in speech.spans(s):
+            # Tagged by the prose call (`speech.lift`): the model said who spoke and to
+            # whom while writing, which is the whole of this function's question. `to`
+            # decides it when given — "you" is a hail, another ref is not, whatever
+            # pronouns the line holds; untagged, the guess below still answers.
+            tagged = speech.speaker(said, s[qa + 1:qb - 1])
+            if tagged is not None and tagged["who"] in actors \
+                    and not actors[tagged["who"]].is_pc:
+                aimed = tagged.get("to") or ""
+                hails = (aimed == "you" or (not aimed and re.search(
+                    r"\b(?:you|your|you're|you've|you'll)\b", s[qa:qb], re.I)))
+                if hails and tagged["who"] not in out:
+                    out.append(tagged["who"])
+                continue
             if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", s[qa:qb], re.I):
                 continue
             outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")

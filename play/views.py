@@ -16,7 +16,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from gm import (client, judgement, ledger as ledger_mod,
-                narration as narration_mod, prompts, watcher)
+                narration as narration_mod, prompts, speech as speech_mod, watcher)
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -1919,7 +1919,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
                               else "")),
                 pull=pull,
-                claim=str(getattr(agent, "false_claim", "") or ""))
+                claim=str(getattr(agent, "false_claim", "") or ""),
+                shown=narration_mod.own_prose(c.transcript, tagged=True))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first
@@ -2038,12 +2039,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).
-            for ref, given in judgement.apply_introductions(c.scene, text, player_input):
+            for ref, given in judgement.apply_introductions(c.scene, text, player_input,
+                                                             said=agent.last_said):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
             # Somebody who spoke to the player in this beat is in conversation with
             # them from here, until the player takes their leave (2026-09-24). Through
             # the engine's one door, so the panel and the refusals read the same state.
-            for ref in judgement.hailed_by(c.scene, text):
+            for ref in judgement.hailed_by(c.scene, text, said=agent.last_said):
                 who = c.scene.actors.get(ref)
                 opened = c.engine().join_talk(who, how="they spoke to you") if who else ""
                 if opened:
@@ -2144,8 +2146,31 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # `added`: the sentences that are ours, so the next turn's `earlier` can
             # leave them out of what the model is shown as its own.
             added = added + ours
+            # Who said which line, as the prose call tagged it — the lines still in the
+            # beat after every rewrite, so the record never names a line the page lacks.
+            # Once each: a rewrite that kept a tagged line lifts it a second time.
+            said = []
+            for r in getattr(agent, "last_said", None) or []:
+                if r["who"] and r not in said and any(speech_mod.speaker([r], ln)
+                                         for ln in speech_mod.lines(text)):
+                    said.append(r)
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
-                                 **({"added": added} if added else {})})
+                                 **({"added": added} if added else {}),
+                                 **({"said": said} if said else {})})
+            # The measurement the tags are judged by: a valid ref on the wrong line looks
+            # fine to the parser, so the tagged hails are logged beside what the old
+            # guess would have said, and a disagreement means one of them is wrong.
+            c.turn_log.append({"kind": "speech-tags",
+                               "tagged": len({(r["who"], r["to"], r["line"])
+                                              for r in agent.last_said if r["who"]}),
+                               # Tags naming nobody here: the model's own claim, kept.
+                               "unknown_refs": sorted({r.get("was", "")
+                                                       for r in agent.last_said
+                                                       if not r["who"]}),
+                               "on_the_page": len(said),
+                               "lines": len(speech_mod.lines(text)),
+                               "hails_tagged": judgement.hailed_by(c.scene, text, said=said),
+                               "hails_guessed": judgement.hailed_by(c.scene, text)})
             c.history.append({"role": "assistant", "content": text})
             for line in struck_lines:
                 c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})

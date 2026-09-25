@@ -158,7 +158,7 @@ def test_the_view_appends_the_face_when_the_beat_left_it_out():
 
     src = inspect.getsource(views._finish)
     assert "judgement.settle_descriptions(c.scene, text, player_input)" in src
-    assert "apply_introductions(c.scene, text, player_input)" in src
+    assert "apply_introductions(c.scene, text, player_input," in src
 
 
 # --- 13c: the player is never a beast; the homebrew body is a body -------------------------

@@ -118,8 +118,8 @@ EXAMPLES = [
                 "He does not answer straight away. He turns the cup in his hands instead, "
                 "twice around, and looks at the ring it has left on the counter. Somewhere "
                 "behind him a shutter is banging in the wind off the terraces and nobody "
-                "has got up to fix it. 'The guild pays,' he says at last, in the flat tone "
-                "of a man giving you a sentence he was handed. 'The guild has always paid.' "
+                "has got up to fix it. <say who=c1 to=you>'The guild pays,'</say> he says at last, in the flat tone "
+                "of a man giving you a sentence he was handed. <say who=c1 to=you>'The guild has always paid.'</say> "
                 "Then his eyes come up and hold yours a moment too long, and flick past "
                 "your shoulder to the door, and back. Whatever the true answer is, he has "
                 "just decided you are the kind of trouble that might make him say it. Do "
@@ -369,11 +369,11 @@ EXAMPLES = [
                 "She lets that sit. The fire has burned down to the point where it is more "
                 "sound than light, and she does not look at you while she thinks — she "
                 "looks at the shutter, which is closed, and at the door, which is not. "
-                "'A name,' she says. 'You understand that a name is the only thing in this "
-                "room that cannot be given back.' Her rings go round once on her finger. "
-                "'I will give you one. And if I hear it anywhere but from your mouth to "
+                "<say who=c1 to=you>'A name,'</say> she says. <say who=c1 to=you>'You understand that a name is the only thing in this "
+                "room that cannot be given back.'</say> Her rings go round once on her finger. "
+                "<say who=c1 to=you>'I will give you one. And if I hear it anywhere but from your mouth to "
                 "mine, I will not need to send anyone after you — I will simply say where "
-                "you were on the night of the fire, and let the guild do it.' She waits, "
+                "you were on the night of the fire, and let the guild do it.'</say> She waits, "
                 "and the offer is on the table between you, and it has a price on it. Do "
                 "you take it?"
             ),
@@ -399,14 +399,14 @@ EXAMPLES = [
             "narration": (
                 "He does not stop planing. The shaving curls off the strake and drops "
                 "onto the pile at his feet, and he watches the river over the top of the "
-                "work rather than you. 'Tide's wrong for it,' he says. 'That's the Harrow "
+                "work rather than you. <say who=c1 to=you>'Tide's wrong for it,'</say> he says. <say who=c1 to=you>'That's the Harrow "
                 "boys trying to bring a barge in on the ebb, and the lock-keeper telling "
-                "them what he thinks of that.' Out past the slipway two lanterns are "
+                "them what he thinks of that.'</say> Out past the slipway two lanterns are "
                 "moving on the black water, one of them going in circles. Somebody on the "
                 "far bank has started ringing a handbell, slowly, the way you would to be "
                 "heard rather than to raise an alarm. He runs his thumb along the edge he "
-                "has just made and looks at you properly for the first time. 'You're not "
-                "from the lock,' he says. 'So what do you want with it?' What do you tell "
+                "has just made and looks at you properly for the first time. <say who=c1 to=you>'You're not "
+                "from the lock,'</say> he says. <say who=c1 to=you>'So what do you want with it?'</say> What do you tell "
                 "him?"
             ),
             "suggestions": [
@@ -1461,13 +1461,13 @@ CARRY_ON_EXAMPLES: list[dict] = [
     {
         "player": CARRY_ON,
         "reply": {"narration": (
-            "He takes his time about it, but he does answer. 'Two days,' he says, still "
-            "working the strap. 'The cart comes on the third, and it comes with men on "
-            "it.' He tests the buckle, finds it holds, and sets the harness on the rail "
+            "He takes his time about it, but he does answer. <say who=c1 to=you>'Two days,'</say> he says, still "
+            "working the strap. <say who=c1 to=you>'The cart comes on the third, and it comes with men on "
+            "it.'</say> He tests the buckle, finds it holds, and sets the harness on the rail "
             "beside the other two. His girl comes out with the pail and stops when she "
             "sees you, then goes on to the trough as if she had not. The rain has got "
-            "into the ruts. 'If you are still here on the third,' he says, 'stand where "
-            "I can see you.' What do you do?")},
+            "into the ruts. <say who=c1 to=you>'If you are still here on the third,'</say> he says, <say who=c1 to=you>'stand where "
+            "I can see you.'</say> What do you do?")},
     },
     {
         "player": CARRY_ON,
@@ -1476,7 +1476,7 @@ CARRY_ON_EXAMPLES: list[dict] = [
             "whatever was holding it has been settled or given up on, and the carts go "
             "through one after another with the guard waving each on without looking. "
             "The woman beside you finishes her bread, brushes her hands, and stands. "
-            "'They will want the square cleared by noon,' she says, to you, and goes "
+            "<say who=c2 to=you>'They will want the square cleared by noon,'</say> she says, to you, and goes "
             "down the steps toward the market. Two of the guard come up the street the "
             "other way, and one of them is already looking at you. What do you do?")},
     },
@@ -1491,6 +1491,10 @@ turn as prose — the scene, the people in it, what just happened — and put no
 What the engine decided is what happened. Do not contradict it, do not add a roll, do not
 state a number, and do not invent an outcome it did not give you. If it decided nothing
 mechanical, this is a quiet beat: describe the place and the people and hand the turn back.
+
+When somebody from WHO IS HERE speaks, wrap their words in a tag with their ref, and
+to=you when they say it to the player: <say who=c2 to=you>'Two days,'</say> he says.
+The tags are taken out before anyone reads the page. The player's own words get no tag.
 """
 
 

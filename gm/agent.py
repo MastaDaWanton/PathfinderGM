@@ -18,6 +18,7 @@ from rules.intents import (Intent, IntentError, claims_the_engine_backs,
                           cut_outcome_claims, find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
+from . import speech as speech_mod
 
 
 @dataclass
@@ -92,6 +93,10 @@ class GMAgent:
         # line, a thread anchor) — ours, not the model's, and kept apart so they are
         # never shown back to it as its own prose.
         self.last_added: list[str] = []
+        # Who said which line this turn, from the prose call's own `<say who=…>` tags
+        # (`speech.lift`, docs/declared-not-guessed.md). Read by `views._finish` for the
+        # hails and the names; reset when a turn is planned.
+        self.last_said: list[dict] = []
         # The experiment. Off by default and read per agent, so a run can be flipped
         # between turns without a restart — see `prompts.INTENTS_ONLY_EXTRA` for what is
         # being tested and why it is measured rather than argued about.
@@ -102,6 +107,27 @@ class GMAgent:
         # actually on the board. GM_INTENTS_FIRST=0 restores the old order.
         self.intents_first = (os.environ.get("GM_INTENTS_FIRST", "1").lower()
                               not in ("", "0", "false", "no"))
+
+    def _lift(self, text: str) -> str:
+        """A reply's narration with its speaker tags taken out, and what they said kept.
+
+        Every reader of a model's narration goes through here, the moment the reply is
+        parsed: the tags must never reach a check, a rewrite or the page, and a tag the
+        model wrote on any call — the examples teach it to all of them — is lifted the
+        same way (`tests/test_speaker_tags.py` holds every reader to it).
+        """
+        scene = self.engine.scene
+        people = {r: a for r, a in scene.actors.items() if not a.is_pc}
+        names = {}
+        for ref, a in people.items():
+            for n in (getattr(a, "name", ""), getattr(a, "true_name", "")):
+                n = str(n or "").strip().lower()
+                if n:
+                    names.setdefault(n, ref)
+                    names.setdefault(re.sub(r"^(?:the|a|an)\s+", "", n), ref)
+        clean, said = speech_mod.lift(text, refs=people, names=names)
+        self.last_said.extend(said)
+        return clean
 
     # --- Call 1 ---------------------------------------------------------------------
 
@@ -124,6 +150,7 @@ class GMAgent:
         reason to have one — and it inherits the final rejection, so it starts warned
         rather than fresh.
         """
+        self.last_said = []
         # Continue is a directive, never an utterance. The ruling (2026-09-18): "my
         # character should keep doing whatever he is doing and the scene should move
         # forward without any addition from me." So no plan is asked of the model at
@@ -221,7 +248,7 @@ class GMAgent:
                 messages = _with_correction(base, reply.text, str(exc))
                 continue
 
-            narration = str(data.get("narration", "")).strip()
+            narration = self._lift(str(data.get("narration", "")).strip())
             try:
                 # Checks 1, 2 and 3. A malformed intent has no repairable content, so
                 # these are hard rejections that regenerate — but the rejection text
@@ -620,7 +647,7 @@ class GMAgent:
             # ~10s polish call per NPC per round is a price a fight cannot pay.
             # `hand_back=False`: an NPC beat mid-round hands nothing back.
             narration, repairs, groom_attempts = self._groom(
-                str(data.get("narration", "")).strip(),
+                self._lift(str(data.get("narration", "")).strip()),
                 earlier=None, min_chars=0,
                 max_chars=narration_mod.MAX_COMBAT_CHARS,
                 player_input="", brief=brief, hand_back=False, claims=True,
@@ -678,10 +705,12 @@ class GMAgent:
             # Filled with the fallback word, not the raw token: the index wants the
             # phrasing around the placeholder, and "{Current Enemy}" never appears in
             # a reply — only whatever it was filled with does.
+            # And with the speaker tags lifted, as every reply is before this reads it:
+            # a phrase running across `<say who=c1 to=you>` would match nothing.
             self._echoes = narration_mod.build_echo_index(
-                *[prompts.fill_enemy(e["reply"]["narration"], None)
+                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
                   for e in prompts.EXAMPLES],
-                *[prompts.fill_enemy(e["reply"]["narration"], None)
+                *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
                   for e in prompts.NPC_EXAMPLES],
                 prompts.CONSEQUENCE_EXAMPLE["assistant"],
             )
@@ -1256,7 +1285,7 @@ class GMAgent:
                 # key and a length ceiling the budget can actually afford.
                 schema=prompts.prose_schema(max_chars=1600),
             )
-            return (str(reply.json().get("narration", "")).strip(),
+            return (self._lift(str(reply.json().get("narration", "")).strip()),
                     Attempt("polish", reply.seconds, reply.model, reply.text, note=note))
 
         attempts: list[Attempt] = []
@@ -1376,7 +1405,8 @@ class GMAgent:
                      earlier: list[str] | None = None, *,
                      scene_now: str = "",
                      pull: dict | None = None,
-                     claim: str = "") -> tuple[str, list[str], list[Attempt]]:
+                     claim: str = "",
+                     shown: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
 
         The other half of `intents_first`. Here the prose call is the only one there is,
@@ -1400,7 +1430,9 @@ class GMAgent:
         # numberless, and the prose call is the one that actually writes the page.
         messages = prompts.call_prose_messages(
             brief, [], player_input, tells, in_combat=fighting,
-            enemy=self._current_enemy(), earlier=earlier,
+            # `shown`: the same beats with their speaker tags written back, for the
+            # model's eyes only (`speech.retag`); every check below reads `earlier`.
+            enemy=self._current_enemy(), earlier=shown if shown is not None else earlier,
             ledger=getattr(self, "ledger", None),
             # Last in the prompt, after the tells: the scene this moment and the one
             # open matter nearest to hand (docs/narrator-guards.md D6, D7), and the
@@ -1449,7 +1481,7 @@ class GMAgent:
                     timeout=(PRIMARY_TIMEOUT if model == self.prose_model
                              else FALLBACK_TIMEOUT))
                 data = reply.json()
-                text = str(data.get("narration", "")).strip()
+                text = self._lift(str(data.get("narration", "")).strip())
                 # The prose reply's own "you could". Under intents-first the plan
                 # call is told to write nothing, so its suggestions are empty, and
                 # this call's — admitted by the schema, and good — were parsed and
@@ -1504,7 +1536,7 @@ class GMAgent:
                         num_predict=1400, provider=provider, api_key=key,
                         schema=schema, timeout=FALLBACK_TIMEOUT)
                     data2 = again.json()
-                    text2 = str(data2.get("narration", "")).strip()
+                    text2 = self._lift(str(data2.get("narration", "")).strip())
                     lost2 = narration_mod.reintroduces_the_present(text2, present,
                                                                     thread=thread)
                     attempts.append(Attempt(
@@ -1689,7 +1721,7 @@ class GMAgent:
         # straight into the transcript, because nothing stood between this return and
         # `c.transcript.append`. An empty answer is safe: the caller renders the tells.
         cleaned = narration_mod.clean_consequence(
-            reply.text.strip(), prompts.CONSEQUENCE_EXAMPLE["assistant"],
+            self._lift(reply.text.strip()), prompts.CONSEQUENCE_EXAMPLE["assistant"],
             # So a turn genuinely about the example's scenery keeps its sentences: the
             # marker cut only fires on words absent from the turn itself. The scene's
             # cast counts as the turn — an actor genuinely called "old man" is not the

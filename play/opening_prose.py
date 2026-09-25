@@ -428,6 +428,11 @@ def _ask(messages: list[dict], cfg: dict) -> tuple[str, list[str]]:
     # A model that writes "\n" inside the JSON string hands back a literal backslash-n;
     # measured on the second live draft, "grain.\n\nThe room is still".
     text = str(text or "").replace("\\n", "\n").replace("\r", "")
+    # Speaker tags, should the model carry the habit over from the turn's examples: the
+    # opening has no roster to attribute them to, so they are only taken out.
+    from gm import speech
+
+    text, _ = speech.lift(text)
     offered = [" ".join(str(s).split()) for s in (offered or []) if str(s).strip()]
     return text.strip(), offered
 
