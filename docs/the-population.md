@@ -168,3 +168,65 @@ sentence of news is a template or one short call. Search: milliseconds.
 - **Crowd:** a combination of "while you're there" and "until something moves them"
   (options 1 and 3 of the session's question): everyone the prose describes is recorded
   and located; residents persist in their settlement, mobile kinds travel.
+
+## Built (2026-09-25)
+
+**Step 1 — the record, the roll, glimpses.** `rules/lives.py` rolls a life in coherence
+order; `rules/population.py` keeps the records in `Scene.population`, saved with the
+campaign; `views._finish` notes every person the beat introduced before promotion, and a
+promoted actor wears the face their record rolled. Measured:
+
+- 3,000 rolls, 0 fallbacks; the top goal is 7.9% of people.
+- Replay corpus (real model prose): 30 people noted, 0 rolls fell back.
+- The quirk chart was widened from 45 frames to 170. With 45, the 46th person met in a
+  town repeated somebody's habit, and 21 of the 45 (47%) were one sentence, "… whenever
+  {occasion}". Now a town of 150 repeats no habit, "whenever" appears in 13.5% of frames,
+  and no opening verb starts more than 10% of them. Distinct quirk texts over 3,000
+  people fell from 848 to 685, because most new frames have no slots. Per-town
+  uniqueness is what a player sees, and that went from 45 to 150.
+
+**Step 2 — finding someone.** `population.find` searches the scope rings, using a
+synonym table (`content/people/synonyms.json`) plus the occupations' own match words.
+Two rules shape a fit:
+
+- A gender the record never stated does not rule someone out; a different stated gender
+  does.
+- A vague word ("the woman") searches only the room, the people seen in the last hour,
+  and the people met.
+
+The finder is wired into `scope.look_for`, and through it into `absent_answer` and
+`answer_the_absent`, and into `repair_unknown_refs`. That last one now binds the GM's
+invented ref to the person the population already holds, through `judgement.embody`,
+the one door `promote_cast` also uses, instead of spawning a stranger in her place.
+
+The old code, measured with the woman recorded at the party's own spot: all three
+lookups answered "No woman in the doorway is here, and Vormoor has none the world
+names."
+
+A search that misses and scans every ring takes 66 ms over 5,000 records, so no index
+has been built yet. Misses reach the turn log as `population-miss`.
+
+**Live checks (2026-09-25, gemma-4-12B, the real HTTP loop).** Three runs. Each found
+something the unit tests had not:
+
+1. The opening's own company ("the woman at the bread stall") had no record and no face,
+   because only `views._finish` noted people. A plural ("neighboring merchants") was
+   rolled one life as if it were one person. Fixed: `begin` records its company, and
+   `judgement.record_people` is the one rule the turn and the replay corpus share,
+   keeping crowds out. The corpus went from 30 people noted to 27; the three dropped
+   were "guards", two "Nirkor porter" and four "laborer".
+2. A planted glimpse ("old woman mending fishing nets by the doorway") was spoken to. The
+   planner wrote `narrate_only`, so the finder was never asked. The prose wrote "the old
+   woman", and the booking door made a second person with a second face. Fixed:
+   `population.here_as`. The booking asks the finder first, and only reaches people the
+   visit's ledger does not already hold, so the ledger's definiteness test is never
+   overruled. Rerun: the prose's "woman" became her, wearing her rolled face, across
+   both turns.
+3. The same run showed an older duplicate: the prose's "old man" was booked beside the
+   opening's "the old man ahead of you", because the opening company was never on the
+   ledger. Fixed by booking it there with its ref.
+
+Still unexercised live: the repair path's binding (the planner has not yet reached for an
+invented ref to a glimpse), and "which do you mean". Both are covered by unit tests only.
+The booking door also clips phrases ("man in a stained leather", "woman with a sharp");
+that door is replaced in step 3, so it is recorded here and left alone.

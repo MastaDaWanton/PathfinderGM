@@ -1005,6 +1005,41 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
     if not invented or any(r.get("op") == "spawn" for r in raw_intents):
         return None
 
+    # Somebody the prose already described. The GM reaching for `woman_doorway` about the
+    # woman the last beat painted in the doorway is not inventing her: she is in the
+    # population, with a face and a life, and spawning a stranger in her place orphaned
+    # that record (2026-09-25). Looked for by the player's own words first, then by the
+    # ref's; found HERE she is given her body, found twice over the player is asked.
+    from rules import population
+
+    sought_here = person_sought(player_text)
+    bound: dict[str, str] = {}
+    for ref in invented:
+        ref_words = re.sub(r"[\d_-]+", " ", ref).strip()
+        tries = [ref_words]
+        if sought_here and _name_words(ref_words.lower()) & _name_words(sought_here):
+            tries.insert(0, sought_here)
+        for phrase in tries:
+            found = population.find(scene, phrase, rings=(population.HERE,))
+            if found.scope == population.HERE:
+                rec = found.people[0]
+                actor = (scene.people.get(rec.get("ref") or "")
+                         if getattr(scene, "people", None) else None)
+                if actor is None or actor.ref not in scene.actors:
+                    actor = embody(scene, rec["phrase"], world=world, rec=rec)
+                bound[ref] = actor.ref
+                break
+            if found.scope == population.AMBIGUOUS:
+                kept = [dict(r) for r in raw_intents if not _touches_ref(r, invented)]
+                if not any((r.get("params") or {}).get("not_here") for r in kept):
+                    kept.append({"op": "narrate_only",
+                                 "because": "the player's words fit more than one person here",
+                                 "params": {"not_here": population.question(found.people)}})
+                return kept
+    invented = [r for r in invented if r not in bound]
+    if not invented:
+        return [_swap_refs(dict(r), bound) for r in raw_intents]
+
     # Whose word were they created on? The narration describing people arriving is an
     # arrival, and this repair exists for it. The PLAYER naming somebody is a question, and
     # the world can answer it: "I turn to find the mayor" made a 13-hp Warrior-1 called
@@ -1054,23 +1089,28 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
             params["name"] = cleaned
     amended = [{"op": "spawn", "because": "they are already in the scene the GM described",
                 "params": params}]
+    swap.update(bound)
     for raw in raw_intents:
-        raw = dict(raw)
-        if isinstance(raw.get("actor"), str):
-            raw["actor"] = swap.get(raw["actor"], raw["actor"])
-        tgt = raw.get("target")
-        if isinstance(tgt, str):
-            raw["target"] = swap.get(tgt, tgt)
-        elif isinstance(tgt, list):
-            raw["target"] = [swap.get(t, t) for t in tgt]
-        params = dict(raw.get("params") or {})
-        if isinstance(params.get("opposed_by"), dict):
-            ob = dict(params["opposed_by"])
-            ob["ref"] = swap.get(ob.get("ref"), ob.get("ref"))
-            params["opposed_by"] = ob
-            raw["params"] = params
-        amended.append(raw)
+        amended.append(_swap_refs(dict(raw), swap))
     return amended
+
+
+def _swap_refs(raw: dict, swap: dict) -> dict:
+    """An intent with its invented refs replaced — actor, target and `opposed_by`."""
+    if isinstance(raw.get("actor"), str):
+        raw["actor"] = swap.get(raw["actor"], raw["actor"])
+    tgt = raw.get("target")
+    if isinstance(tgt, str):
+        raw["target"] = swap.get(tgt, tgt)
+    elif isinstance(tgt, list):
+        raw["target"] = [swap.get(t, t) for t in tgt]
+    params = dict(raw.get("params") or {})
+    if isinstance(params.get("opposed_by"), dict):
+        ob = dict(params["opposed_by"])
+        ob["ref"] = swap.get(ob.get("ref"), ob.get("ref"))
+        params["opposed_by"] = ob
+        raw["params"] = params
+    return raw
 
 
 _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iteration",
@@ -5031,12 +5071,22 @@ def absent_answer(scene, world, player_text: str, location_id: str | None = None
     """
     from rules import scope as scope_mod
 
+    found = _sought(scene, world, player_text, location_id)
+    # A "which do you mean" is not an absence, and the brief's header for this line says
+    # NOT HERE: the question reaches the page as the engine's refusal instead.
+    if found.get("scope") not in (scope_mod.ELSEWHERE, scope_mod.NOWHERE):
+        return ""
+    return str(found.get("line") or "")
+
+
+def _sought(scene, world, player_text: str, location_id: str | None = None) -> dict:
+    from rules import scope as scope_mod
+
     phrase = person_sought(player_text)
     if not phrase:
-        return ""
+        return {}
     where = location_id if location_id is not None else getattr(scene, "location_id", None)
-    found = scope_mod.look_for(world, phrase, scene, where)
-    return str(found.get("line") or "")
+    return scope_mod.look_for(world, phrase, scene, where)
 
 
 def answer_the_absent(raw_intents, player_text: str, scene, world=None):
@@ -5058,7 +5108,13 @@ def answer_the_absent(raw_intents, player_text: str, scene, world=None):
     if any(isinstance(r, dict) and (r.get("params") or {}).get("not_here")
            for r in raw_intents):
         return raw_intents
-    said = absent_answer(scene, world, player_text)
+    from rules import scope as scope_mod
+
+    found = _sought(scene, world, player_text)
+    if found.get("scope") not in (scope_mod.ELSEWHERE, scope_mod.NOWHERE,
+                                  scope_mod.AMBIGUOUS):
+        return raw_intents
+    said = str(found.get("line") or "")
     if not said:
         return raw_intents
     out = [dict(r) if isinstance(r, dict) else r for r in raw_intents]
@@ -5388,6 +5444,69 @@ def _take_the_name(scene, who, given: str) -> None:
             e["who"] = given
 
 
+def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]:
+    """Everyone a beat introduced goes into the population, located, with a life rolled —
+    before promotion, so a promoted person wears the face their record rolled and one who
+    is not is still somebody the player can find later (the user's question of
+    2026-09-25: "there is nothing left of her?"). Returns the records.
+
+    A plural or a counted group is not one person with one life. Measured live
+    2026-09-25: "neighboring merchants" was rolled a work, a face and a quirk of its own.
+    `promote_cast` already treats a bare plural as scenery; a group's members are recorded
+    when the prose singles one of them out.
+    """
+    from rules import names as names_mod
+    from rules import population
+
+    body = (names_mod.appearance_for(world, scene.location_id, own="")
+            if world is not None else "")
+    counts = {str(e.get("who")): int(e.get("count", 1) or 1) for e in scene.cast}
+    out = []
+    for phrase in introduced or []:
+        if _plural_role(phrase) or counts.get(phrase, 1) > 1:
+            continue
+        out.append(population.note(scene, phrase, turn=turn, body=body))
+    return out
+
+
+def embody(scene, phrase: str, *, zone: str = "near", world=None, rec: dict | None = None):
+    """One described person becomes an actor in the room: the one door `promote_cast` and
+    the finder's repair both go through, so a person found again is made exactly as one
+    promoted the first time. `rec` is their population record, when they have one: the
+    actor wears the face it rolled and the record keeps the ref."""
+    from rules import states
+    from rules.bestiary import instantiate
+
+    actor = instantiate(template_for(phrase, _pc_level(scene)), scene=scene, name=phrase)
+    # Through the door. The fallback that wrote `scene.actors` directly would now
+    # write into a derived view and vanish; `add` stamps the place and the zone —
+    # the zone the prose put them in, so the map lays them out where the words did.
+    scene.add(actor, zone=zone)
+    # In the room, not in the fight. Law two: the fact travels as an effect whose
+    # tag is `role.bystander`, lifted by the one door into a fight and by a blow
+    # given or taken — never by a flag beside it.
+    actor.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
+    if rec is not None:
+        rec["ref"] = actor.ref
+    # A name behind the descriptor and a face beside it, from the world's own
+    # pools and bodies (rules/names.py) — the panel keeps showing the descriptor
+    # until the name is given in play.
+    if world is not None:
+        from rules import names as names_mod
+
+        taken = [a.true_name for a in scene.actors.values() if getattr(a, "true_name", "")]
+        taken += [a.name for a in scene.actors.values()]
+        actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
+        # The face their population record rolled, when they have one — chosen to
+        # agree with their work (rules/lives.py).
+        actor.appearance = names_mod.appearance_for(
+            world, scene.location_id, ref=actor.ref,
+            own=(rec["life"]["face"] if rec else None))
+    if getattr(scene, "grid", None) is not None:
+        scene.place_by_zone([actor.ref])
+    return actor
+
+
 def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     """A person the ledger notes becomes a person the engine holds.
 
@@ -5400,7 +5519,6 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     remembers its ref, so clearing the ledger walks its people off with it.
     """
     from rules import troops as troops_mod
-    from rules.bestiary import instantiate
 
     if scene is None or not added:
         return []
@@ -5476,38 +5594,10 @@ def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     for phrase in wanted:
         if len(standing) + len(made) >= _PROMOTED_CAP and phrase not in fronted:
             break
-        actor = instantiate(template_for(phrase, _pc_level(scene)), scene=scene, name=phrase)
-        # Through the door. The fallback that wrote `scene.actors` directly would now
-        # write into a derived view and vanish; `add` stamps the place and the zone —
-        # the zone the prose put them in, so the map lays them out where the words did.
-        scene.add(actor, zone=zones.get(phrase, "near"))
-        # In the room, not in the fight. Law two: the fact travels as an effect whose
-        # tag is `role.bystander`, lifted by the one door into a fight and by a blow
-        # given or taken — never by a flag beside it.
-        from rules import states
+        from rules import population
 
-        actor.add_condition(states.BYSTANDER_KEY, source="introduced by the scene")
-        # A name behind the descriptor and a face beside it, from the world's own
-        # pools and bodies (rules/names.py) — the panel keeps showing the descriptor
-        # until the name is given in play.
-        if world is not None:
-            from rules import names as names_mod
-
-            taken = [a.true_name for a in scene.actors.values() if getattr(a, "true_name", "")]
-            taken += [a.name for a in scene.actors.values()]
-            actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
-            # The face their population record rolled, when they have one — chosen to
-            # agree with their work (rules/lives.py) — and the record keeps the ref.
-            from rules import population
-
-            rec = population.at_spot(scene, phrase)
-            if rec is not None:
-                rec["ref"] = actor.ref
-            actor.appearance = names_mod.appearance_for(
-                world, scene.location_id, ref=actor.ref,
-                own=(rec["life"]["face"] if rec else None))
-        if getattr(scene, "grid", None) is not None:
-            scene.place_by_zone([actor.ref])
+        actor = embody(scene, phrase, zone=zones.get(phrase, "near"), world=world,
+                       rec=population.here_as(scene, phrase))
         for e in scene.cast:
             if e.get("who") == phrase and not e.get("ref"):
                 e["ref"] = actor.ref

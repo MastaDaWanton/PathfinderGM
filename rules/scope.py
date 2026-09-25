@@ -34,6 +34,9 @@ import re
 HERE = "here"
 ELSEWHERE = "elsewhere"
 NOWHERE = "nowhere"
+# Several people fit and the words cannot choose: Inform's "Which do you mean", asked
+# rather than guessed (docs/the-population.md §6).
+AMBIGUOUS = "ambiguous"
 
 # Words that are never the person being looked for. "the man" and "somebody" name no
 # office and no name, so the world cannot answer and the question is not this module's:
@@ -115,8 +118,36 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
     if ref:
         who = scene.actors[ref]
         return {**out, "scope": HERE, "who": str(who.name), "ref": ref, "line": ""}
+
+    # Then everybody the prose has described (rules/population.py). Before 2026-09-25 a
+    # woman the prose painted and the player did not engage at once could not be found by
+    # anything: this function knew the actors and the world's named characters, and she
+    # was neither, so "I talk to the woman in the doorway" was either told there was no
+    # such woman or answered with a stranger spawned in her place.
+    from . import population
+
     head = (_WORDS.findall(phrase.lower()) or [""])[-1]
-    if head in VAGUE and not any(w[:1].isupper() for w in phrase.split()):
+    vague = head in VAGUE and not any(w[:1].isupper() for w in phrase.split())
+    # "the woman" names half the town. Asked vaguely, only the room and the people just
+    # seen are searched; the rest of the town's women are not a list worth reading out.
+    pop = (population.find(scene, phrase, rings=(population.HERE, "recent", "met")
+                           if vague else None)
+           if scene is not None else population.Found(scope=population.NONE, ring="",
+                                                      people=[]))
+    if pop.scope == population.HERE:
+        rec = pop.people[0]
+        if rec.get("ref") and rec["ref"] in (getattr(scene, "actors", {}) or {}):
+            return {**out, "scope": HERE, "who": rec["phrase"], "ref": rec["ref"], "line": ""}
+        return {**out, "scope": HERE, "who": rec["phrase"], "record": rec["id"], "ref": "",
+                "line": ""}
+    if pop.scope == population.AMBIGUOUS and pop.ring == population.HERE:
+        return {**out, "scope": AMBIGUOUS, "records": [r["id"] for r in pop.people],
+                "line": population.question(pop.people)}
+    if vague:
+        if pop.scope == population.ELSEWHERE:
+            return {**out, "scope": ELSEWHERE, "who": pop.people[0]["phrase"],
+                    "record": pop.people[0]["id"],
+                    "line": population.seen_line(pop.people[0], scene, world)}
         # Not a question the world can answer. Left alone on purpose.
         return {**out, "scope": "", "line": ""}
     if world is None:
@@ -153,6 +184,16 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
             line = f"{named}, is not here."
         return {**out, "scope": ELSEWHERE, "who": str(who.name), "where": where,
                 "line": line}
+
+    # Nobody the world names — but somebody the party SAW, elsewhere, is still an answer,
+    # and a better one than "no such person": it says where to go.
+    if pop.scope == population.ELSEWHERE:
+        return {**out, "scope": ELSEWHERE, "who": pop.people[0]["phrase"],
+                "record": pop.people[0]["id"],
+                "line": population.seen_line(pop.people[0], scene, world)}
+    if pop.scope == population.AMBIGUOUS:
+        return {**out, "scope": AMBIGUOUS, "records": [r["id"] for r in pop.people],
+                "line": population.question(pop.people)}
 
     # Nobody of that name or office exists. For an OFFICE the settlement's own record says
     # what it has instead, which turns a refusal into information: "there is no mayor in

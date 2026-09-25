@@ -2027,13 +2027,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # before promotion — so a person who is promoted wears the face their record
             # rolled, and one who is not is still somebody the player can find later
             # (the user's question of 2026-09-25: "there is nothing left of her?").
-            from rules import names as names_mod
             from rules import population
 
-            people_body = names_mod.appearance_for(c.world, c.scene.location_id, own="")
-            for phrase in introduced:
-                population.note(c.scene, phrase, turn=len(c.transcript), body=people_body)
+            judgement.record_people(c.scene, introduced, turn=len(c.transcript),
+                                    world=c.world)
             judgement.promote_cast(c.scene, introduced, beat=text, world=c.world)
+            # Every search for somebody that found nobody this turn, so the synonym table
+            # (content/people/synonyms.json) grows from what real play missed.
+            c.turn_log.extend(population.drain_misses())
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).

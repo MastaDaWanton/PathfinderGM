@@ -51,6 +51,36 @@ def at_spot(scene, phrase: str, spot: str | None = None) -> dict | None:
     return None
 
 
+def here_as(scene, phrase: str) -> dict | None:
+    """The person at this spot this phrase means, if the population already holds them.
+
+    The exact phrase first; then the finder, in the here ring, for somebody the prose now
+    calls by other words — but only one who fits alone and whom no actor in the room
+    already embodies (somebody standing here in a body was the ledger's to match, and is
+    not who a fresh booking means). Measured live 2026-09-25: an old woman "mending fishing
+    nets by the doorway" was a glimpse at the party's spot; the player spoke to her, the
+    prose wrote "the old woman", and the booking door made a second person with a second
+    face while her record stayed without a body.
+    """
+    exact = at_spot(scene, phrase)
+    if exact is not None:
+        return exact
+    found = find(scene, phrase, rings=(HERE,), log_miss=False)
+    if found.scope != HERE:
+        return None
+    rec = found.people[0]
+    if rec.get("ref") and rec["ref"] in (getattr(scene, "actors", {}) or {}):
+        return None
+    # Somebody booked on this visit's ledger was already ruled a different person by the
+    # ledger's own definiteness test (`judgement._refers_back`): "a young guard" booked,
+    # then "a guard" arriving, are two. The finder only reaches people the ledger does
+    # not hold — an earlier visit's, or a glimpse it never booked.
+    ledger = {_norm(e.get("who", "")) for e in (getattr(scene, "cast", None) or [])}
+    if _norm(rec.get("phrase", "")) in ledger:
+        return None
+    return rec
+
+
 def used_frames(scene, home) -> set[str]:
     """The quirk frames people of this settlement already carry, so the next is new."""
     return {rec["life"]["quirk_frame"]
@@ -68,7 +98,7 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "") -> dict:
     if not hasattr(scene, "population") or scene.population is None:
         scene.population = {}
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
-    have = at_spot(scene, phrase)
+    have = here_as(scene, phrase)
     if have is not None:
         have["last_seen"] = clock
         return have
@@ -92,3 +122,238 @@ def of_ref(scene, ref: str) -> dict | None:
         if rec.get("ref") == ref:
             return rec
     return None
+
+
+# --- finding somebody the player describes ------------------------------------------------
+#
+# Scope, not semantic search (docs/the-population.md §6). On a 2,000-person set, word match
+# with a synonym table picked the right person 70% of the time inside the scene and 4.6%
+# across everybody, because 97% of references fit more than one person globally — which no
+# retriever fixes. Inform and TADS resolve by scope first and then ask "which do you
+# mean"; so does this. Rings, first clean answer wins:
+#
+#     here → seen in the last hour → met → this settlement → everyone
+#
+# Within a ring a person FITS only if every word the player used matches something the
+# record says (its phrase, its work, its face, the name its actor carries) after the
+# synonym table. One fit is them; several is a question; none moves out a ring. Nothing is
+# ranked by word statistics: BM25 committed to wrong answers more often than plain matching
+# in the same measurement.
+#
+# Measured before an index was reached for (2026-09-25): a search that misses, and so
+# scans every ring, took 66 ms over 5,000 records — against a turn of seconds. SQLite FTS5
+# waits for a population that needs it (tests/test_finding_someone.py holds the line).
+
+HERE = "here"
+ELSEWHERE = "elsewhere"
+AMBIGUOUS = "ambiguous"
+NONE = "none"
+
+# Words that say whether somebody is a man, a woman, a boy or a girl. A record that says
+# none of them is not ruled out by the player's — the prose's "someone mending nets" is
+# who "the woman mending nets" means — but a record that says another one is.
+_GENDERED = frozenset({"woman", "man", "boy", "girl"})
+
+# Searches that found nobody, for the turn log (`drain_misses`): the synonym table grows
+# from what real play missed, not from guesses.
+_MISSES: list[dict] = []
+
+
+def _stem(w: str) -> str:
+    w = w.lower().strip("'-")
+    if w.endswith("'s"):
+        w = w[:-2]
+    if len(w) > 5 and w.endswith("ing"):
+        w = w[:-3]
+    elif len(w) > 4 and w.endswith("ed"):
+        w = w[:-2]
+    elif len(w) > 4 and w.endswith("es") and not w.endswith(("ees", "oes")):
+        w = w[:-2]
+    elif len(w) > 3 and w.endswith("s") and not w.endswith("ss"):
+        w = w[:-1]
+    # "sitting" and "sits", "scarred" and "scar": a doubled consonant left by the cut.
+    if len(w) > 3 and w[-1] == w[-2] and w[-1] not in "lsaeiou":
+        w = w[:-1]
+    return w
+
+
+_CANON: dict | None = None
+
+
+def _canon() -> dict:
+    """{stem: canonical token} from the synonym groups and the occupations' own words."""
+    global _CANON
+    if _CANON is None:
+        t = lives.tables()
+        syn = t["synonyms"]
+        canon: dict = {}
+        for group in syn["groups"]:
+            for w in group:
+                canon[_stem(w)] = _stem(group[0])
+        # A trade is found by any word the occupation table already reads it from — the
+        # player's "blacksmith" is the prose's "smith". One-word matches only: "leather
+        # apron" is how the prose MAKES a tanner, not how a player names one.
+        for occ in t["occupations"]:
+            for w in [occ["id"], *str(occ["name"]).split(), *(occ.get("match") or [])]:
+                if " " not in w:
+                    canon.setdefault(_stem(w), f"work:{occ['id']}")
+        implies = {_stem(k): {_stem(x) for x in v} for k, v in syn["implies"].items()}
+        still = {_stem(w) for w in syn["still"]}
+        _CANON = {"canon": canon, "implies": implies, "still": still}
+    return _CANON
+
+
+def _tokens(text: str) -> list[str]:
+    c = _canon()
+    out = []
+    for w in re.findall(r"[a-z][a-z'-]*", str(text or "").lower()):
+        s = _stem(w)
+        if s in c["still"] or len(s) < 2:
+            continue
+        out.append(c["canon"].get(s, s))
+    return out
+
+
+def _bag(rec: dict, scene) -> set[str]:
+    """Everything a record answers to."""
+    c = _canon()
+    life = rec.get("life") or {}
+    said = [rec.get("phrase", ""), life.get("face", ""), life.get("work_name", "")]
+    actor = (getattr(scene, "people", {}) or {}).get(rec.get("ref") or "")
+    if actor is not None:
+        said += [str(getattr(actor, "name", "") or "")]
+    bag = set()
+    for text in said:
+        bag.update(_tokens(text))
+    if life.get("work"):
+        bag.add(f"work:{life['work']}")
+    for tok in list(bag):
+        bag |= c["implies"].get(tok, set())
+    return bag
+
+
+def _fits(words: list[str], bag: set[str]) -> bool:
+    gendered = bool(bag & _GENDERED)
+    for w in words:
+        if w in bag:
+            continue
+        if w in _GENDERED and not gendered:
+            continue
+        return False
+    return True
+
+
+def _where(rec: dict, scene) -> str:
+    """The place id a person is at: their actor's, once they have one."""
+    actor = (getattr(scene, "people", {}) or {}).get(rec.get("ref") or "")
+    if actor is not None and getattr(actor, "at", None):
+        return str(actor.at)
+    return str(rec.get("spot") or "")
+
+
+def _rings(scene):
+    pop = list((getattr(scene, "population", {}) or {}).values())
+    home = getattr(scene, "location_id", None)
+    at = getattr(scene, "at", None)
+    clock = int(getattr(scene, "clock_minutes", 0) or 0)
+    taken: set[str] = set()
+
+    def ring(name, keep):
+        members = [r for r in pop if r["id"] not in taken and keep(r)]
+        taken.update(r["id"] for r in members)
+        return name, members
+
+    yield ring(HERE, lambda r: r.get("home") == home and _where(r, scene) == at)
+    yield ring("recent", lambda r: int(r.get("last_seen") or 0) >= clock - 60)
+    yield ring("met", lambda r: r.get("last_met") is not None)
+    yield ring("settlement", lambda r: r.get("home") == home)
+    yield ring("everyone", lambda r: True)
+
+
+class Found(dict):
+    """{"scope", "ring", "people"}: one of HERE / ELSEWHERE / AMBIGUOUS / NONE."""
+
+    @property
+    def scope(self) -> str:
+        return self["scope"]
+
+    @property
+    def people(self) -> list[dict]:
+        return self["people"]
+
+    @property
+    def ring(self) -> str:
+        return self["ring"]
+
+
+def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
+         log_miss: bool = True) -> Found:
+    """The person that phrase means, by scope. `rings` limits the search to those rings."""
+    words = _tokens(phrase)
+    if not words or scene is None:
+        return Found(scope=NONE, ring="", people=[])
+    for name, members in _rings(scene):
+        if rings is not None and name not in rings:
+            continue
+        fits = [r for r in members if _fits(words, _bag(r, scene))]
+        if len(fits) == 1:
+            return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=fits)
+        if fits:
+            return Found(scope=AMBIGUOUS, ring=name, people=fits)
+    if log_miss and getattr(scene, "population", None):
+        _MISSES.append({"kind": "population-miss", "phrase": " ".join(str(phrase).split()),
+                        "words": words})
+    return Found(scope=NONE, ring="", people=[])
+
+
+def drain_misses() -> list[dict]:
+    """The searches that found nobody since last asked, for the turn log."""
+    out = list(_MISSES)
+    _MISSES.clear()
+    return out
+
+
+def _the(phrase: str) -> str:
+    p = " ".join(str(phrase or "").split())
+    p = re.sub(r"^(?:a|an|the|some)\s+", "", p, flags=re.I)
+    return f"the {p}" if p else "that person"
+
+
+def question(people: list[dict]) -> str:
+    """ "Which do you mean — the woman at the well, or the woman mending nets?" """
+    named = []
+    for rec in people:
+        n = _the(rec.get("phrase", ""))
+        if n not in named:
+            named.append(n)
+    if len(named) > 4:
+        named = named[:3] + ["somebody else"]
+    if len(named) == 1:
+        # Two people the prose described in the same words: said so, not "the X or the X".
+        return f"There is more than one — which {named[0][4:]} do you mean?"
+    return f"Which do you mean — {', '.join(named[:-1])}, or {named[-1]}?"
+
+
+def seen_line(rec: dict, scene, world=None) -> str:
+    """ "The woman watching from a doorway was at the market square when you saw them;
+    they are not here." Where they were SEEN, not where they are: until residency is built
+    (phase 2 step 4) that is all the campaign knows, and it says only that."""
+    where = ""
+    spot = _where(rec, scene)
+    try:
+        from . import places as places_mod
+
+        loc = world.get(rec.get("home")) if world is not None else None
+        known = places_mod.for_scene(loc or rec.get("home"), spot,
+                                     founded=getattr(scene, "founded", None))
+        place = places_mod.find(known, spot)
+        where = str(getattr(place, "name", "") or "")
+        if where and loc is not None and rec.get("home") != getattr(scene, "location_id", None):
+            where = f"{where} in {loc.name}"
+    except Exception:
+        where = ""
+    who = _the(rec.get("phrase", ""))
+    who = who[0].upper() + who[1:]
+    if where:
+        return f"{who} was at {where} when you saw them, and is not here."
+    return f"{who} is not here."

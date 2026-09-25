@@ -65,6 +65,7 @@ def tables() -> dict:
             "personality": read("personality.json")["axes"],
             **{k: v for k, v in read("life.json").items() if k != "note"},
             **{k: v for k, v in read("quirks.json").items() if k != "note"},
+            "synonyms": read("synonyms.json"),
         }
     return _TABLES
 

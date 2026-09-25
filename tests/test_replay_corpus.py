@@ -64,7 +64,6 @@ def _campaign(save: dict, tmp: Path):
 def measure(tmp_path) -> dict:
     from gm import judgement, narration, speech
     from gm.agent import GMAgent
-    from rules import population
 
     faults: collections.Counter = collections.Counter()
     firings: collections.Counter = collections.Counter()
@@ -100,9 +99,9 @@ def measure(tmp_path) -> dict:
                 firings["note_cast booked"] += len(booked)
                 # Everyone booked goes into the population with a life rolled
                 # (rules/population.py, 2026-09-25): how many, and how many rolls on a
-                # real phrase had to fall back because every row was excluded.
-                for phrase in booked:
-                    person = population.note(scene, phrase, turn=n)
+                # real phrase had to fall back because every row was excluded. Through
+                # the turn's own rule, which keeps crowds out.
+                for person in judgement.record_people(scene, booked, turn=n):
                     firings["population noted"] += 1
                     firings["life rolls that fell back"] += int(bool(
                         person["life"]["fallbacks"]))

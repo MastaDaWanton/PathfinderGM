@@ -514,6 +514,24 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     Engine(scene, Dice(seed), world=world).place_party()
     here = opening.roll(campaign_id, seed)
     watcher = scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
+    # The opening's own company is somebody the population keeps, like everyone the prose
+    # introduces later. Measured live 2026-09-25: "the woman at the bread stall" stood on
+    # the board with no record and no face, because only `views._finish` noted people and
+    # the opening never passes through it.
+    from rules import names as names_mod
+    from rules import population
+
+    rec = population.note(scene, here.who,
+                          body=names_mod.appearance_for(world, scene.location_id, own=""))
+    rec["ref"] = watcher.ref
+    watcher.appearance = names_mod.appearance_for(world, scene.location_id, ref=watcher.ref,
+                                                  own=rec["life"]["face"])
+    # And on the scene's ledger, as everybody the prose introduces is. Measured live the
+    # same day: the prose's "old man" was booked and stood beside the opening's own "the
+    # old man ahead of you", because the ledger — whose definiteness test decides that a
+    # later "the old man" is somebody already here — had never been told he was.
+    scene.cast.append({"who": re.sub(r"^(?:the|a|an)\s+", "", here.who, flags=re.I),
+                       "turn": 0, "ref": watcher.ref})
     c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
