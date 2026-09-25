@@ -11,6 +11,7 @@ three people in six. Each is a property checked here over thousands of rolls.
 from __future__ import annotations
 
 import collections
+import re
 
 import pytest
 
@@ -87,7 +88,7 @@ def test_a_priest_never_mocks_the_gods(rolled):
 
 def test_hair_is_only_smoothed_where_there_is_hair(rolled):
     for phrase, life in rolled:
-        if "hair" in life.quirk:
+        if re.search(r"\bhair\b", life.quirk):     # not "chair": the floor-sitter tripped it
             assert "shaved head" not in life.face and "under a cap" not in life.face
 
 
@@ -124,10 +125,48 @@ def test_no_two_neighbours_share_a_quirk_until_the_bag_is_empty():
     assert len(set(frames)) == len(frames)
 
 
+def test_a_town_of_a_hundred_and_fifty_shares_no_quirk():
+    """The chart first shipped with 45 frames, so the 46th person a party met in one town
+    wore a habit somebody there already had — thin for the "massive chart" the user asked
+    for. Widened to 170 (2026-09-25); 150 people drawn without replacement repeat none."""
+    phrases = ["", "woman watching from a doorway", "the smith", "old fisherman", "a boy",
+               "a girl", "the priest", "a young guard", "a baker"]
+    used: set[str] = set()
+    for i in range(150):
+        life = lives.roll(f"big-town|{i}", phrase=phrases[i % len(phrases)], used_frames=used)
+        assert life.quirk_frame not in used, (i, life.quirk_frame)
+        used.add(life.quirk_frame)
+
+
+def test_no_one_sentence_shape_carries_the_chart():
+    """21 of the first 45 frames (47%) ended "whenever {occasion}", so half of everybody
+    in town had the same sentence with a different noun in it — the template tic the
+    narrator guards measured in our own backstops (docs/narrator-guards.md). No clause
+    may carry more than a fifth of the frames, and no opening verb more than a tenth."""
+    frames = lives.tables()["frames"]
+    whenever = sum("whenever" in f["text"] for f in frames)
+    assert whenever / len(frames) <= 0.20, whenever
+    verb, n = collections.Counter(f["text"].split()[0] for f in frames).most_common(1)[0]
+    assert n / len(frames) <= 0.10, (verb, n)
+
+
+def test_a_traveller_does_not_know_the_towns_old_marriages(rolled):
+    """A pilgrim "can recite who married whom in this town going back five generations"
+    came out of the first sample of the widened chart: town memory is a resident's."""
+    local = {"who-married-whom", "gone-landmarks", "accent-reader", "sweeps-steps",
+             "friendly-feud", "up-first", "night-walk", "tells-the-graves"}
+    for phrase, life in rolled:
+        if life.mobility == "transient":
+            assert life.quirk_frame not in local, (life.work, life.quirk)
+
+
 def test_the_quirk_pool_holds_no_impairment():
     """The user's ruling of 2026-09-25: habits and fascinations only."""
-    banned = ("stutter", "tic", "phobia", "afraid", "addict", "drunk", "mad", "insane",
-              "blind", "deaf", "lame", "cripple", "fit", "seizure", "compuls")
+    # Whole words for the short ones: a prefix " fit" matched "when one fits" (2026-09-25),
+    # and "fit" left the list — too many innocent senses; "seizure" says what it meant.
+    words = ("tic", "tics", "mad", "lame", "deaf", "blind", "drunk", "insane")
+    stems = ("stutter", "phobi", "afraid", "addict", "cripple", "seizure", "compuls")
     for f in lives.tables()["frames"]:
-        text = f" {f['text'].lower()} "
-        assert not any(f" {b}" in text for b in banned), f["text"]
+        said = re.findall(r"[a-z]+", f["text"].lower())
+        assert not set(said) & set(words), f["text"]
+        assert not any(w.startswith(stems) for w in said), f["text"]

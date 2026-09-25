@@ -1,96 +1,1532 @@
 {
  "note": "The one thing that makes a person theirs. Original writing for Pathfinder GM (2026-09-25). A quirk is a FRAME with slots: {small} a pocketable thing, {tool} a thing of their own trade (their occupation's objects), {food}, {animal}, {occasion}. A frame may declare: needs (body tags that must be true: hands, hair, gap_tooth, limp, burned_hand, scar_brow), requires (at least one of these tags already rolled), forbids (none of these). Frames are drawn WITHOUT REPLACEMENT within a settlement, so no two people in a town share one until the bag empties. Habits and fascinations only, by the user's ruling of 2026-09-25: no disability, illness, tic, phobia or addiction is a quirk; bodies keep their own marks.",
  "frames": [
-  {"id": "turns-over", "text": "turns {small} over and over in their fingers whenever {occasion}", "needs": ["hands"]},
-  {"id": "counts-breath", "text": "counts quietly under their breath whenever {occasion}"},
-  {"id": "straightens-tool", "text": "straightens {tool} whenever {occasion}", "forbids": ["untidy"]},
-  {"id": "talks-to-animals", "text": "talks to {animal} as though they might answer", "forbids": ["hard"]},
-  {"id": "hums", "text": "hums the same four notes whenever {occasion}"},
-  {"id": "names-animals", "text": "has a name for every one of {animal} and uses it", "requires": ["kind", "gregarious", "untidy", "animals"]},
-  {"id": "pocket-token", "text": "keeps {small} in a pocket and touches it whenever {occasion}", "needs": ["hands"]},
-  {"id": "salutes", "text": "salutes out of old habit whenever {occasion}", "requires": ["arms", "law"]},
-  {"id": "gap-whistle", "text": "whistles through the gap in their teeth whenever {occasion}", "needs": ["gap_tooth"]},
-  {"id": "proverbs", "text": "quotes an old proverb, slightly wrong, whenever {occasion}", "forbids": ["reserved"]},
-  {"id": "offers-food", "text": "offers {food} to anybody they talk to for long", "forbids": ["tight_fisted", "hard"]},
-  {"id": "polishes-tool", "text": "polishes {tool} whenever {occasion}", "needs": ["hands"]},
-  {"id": "taps-nose", "text": "taps the side of their nose knowingly whenever {occasion}", "forbids": ["blunt"], "needs": ["hands"]},
-  {"id": "late-laugh", "text": "laughs a beat too late at every joke, but always laughs"},
-  {"id": "trade-names", "text": "calls everybody by their trade instead of their name — \"morning, cooper\""},
-  {"id": "favour-tally", "text": "keeps a running tally of favours owed, out loud", "requires": ["tight_fisted", "orderly", "coin"], "forbids": ["generous"]},
-  {"id": "back-to-wall", "text": "will not sit anywhere with their back to a door", "requires": ["suspicious", "timid", "arms"], "forbids": ["trusting"]},
-  {"id": "smooths-hair", "text": "smooths their hair flat whenever {occasion}", "needs": ["hair", "hands"]},
-  {"id": "rubs-scar", "text": "runs a thumb along the scar through their eyebrow whenever {occasion}", "needs": ["scar_brow"]},
-  {"id": "rubs-burn", "text": "rubs the old burn on the back of their hand whenever {occasion}", "needs": ["burned_hand"]},
-  {"id": "weather-leg", "text": "swears their bad leg knows the weather a day before the sky does", "needs": ["limp"]},
-  {"id": "exact-coin", "text": "pays in exact coin, always, and will not take change", "forbids": ["untidy"]},
-  {"id": "sniffs-food", "text": "sniffs {food} carefully before eating anything at all"},
-  {"id": "luck-token", "text": "carries {small} for luck and will not say who gave it to them"},
-  {"id": "table-circles", "text": "draws small circles with a fingertip on any table they sit at", "needs": ["hands"]},
-  {"id": "gods-mutter", "text": "says a word to the gods under their breath whenever {occasion}", "requires": ["devout"]},
-  {"id": "spits", "text": "spits over their left shoulder whenever {occasion}", "forbids": ["gentry", "orderly"]},
-  {"id": "paper-birds", "text": "folds any loose scrap of paper into a little bird and leaves it behind", "needs": ["hands"]},
-  {"id": "tiptoes", "text": "goes up on their toes to see over people whenever {occasion}", "forbids": ["limp"]},
-  {"id": "home-village", "text": "compares everything to the way it was done in their home village", "forbids": ["gentry"]},
-  {"id": "nicknames", "text": "gives everybody a nickname within a minute of meeting them", "requires": ["gregarious", "blunt"], "forbids": ["reserved"]},
-  {"id": "no-goodbye", "text": "never says goodbye — simply turns and leaves when they are done", "requires": ["reserved", "hard", "blunt"], "forbids": ["gregarious"]},
-  {"id": "checks-sky", "text": "glances at the sky whenever {occasion}", "requires": ["sea", "farm", "travel", "animals", "night"]},
-  {"id": "knuckles", "text": "cracks their knuckles one at a time whenever {occasion}", "needs": ["hands"], "forbids": ["gentry"]},
-  {"id": "smell-hours", "text": "can tell the hour by what the street smells of, and is never wrong"},
-  {"id": "keeps-gifts", "text": "keeps every small thing anybody has ever given them, down to {small}"},
-  {"id": "yellow", "text": "wears something yellow every single day and will not say why"},
-  {"id": "double-shake", "text": "shakes hands twice, as if the first did not count", "needs": ["hands"], "forbids": ["reserved"]},
-  {"id": "sketches", "text": "sketches faces on scraps of anything whenever {occasion}", "needs": ["hands"]},
-  {"id": "thumb-measure", "text": "measures things against their thumb whenever {occasion}", "needs": ["hands"], "requires": ["craft", "orderly", "labour"]},
-  {"id": "pocket-food", "text": "tucks {food} into a pocket for later, every time it is offered", "forbids": ["gentry"]},
-  {"id": "echo", "text": "repeats the last word anybody says to them, thoughtfully, before answering"},
-  {"id": "bows-low", "text": "bows far too low to everyone, children included", "requires": ["humble", "devout", "service"], "forbids": ["proud"]},
-  {"id": "sighs", "text": "sighs as if the world were a trial whenever {occasion}", "requires": ["proud", "gregarious", "hot_tempered"]},
-  {"id": "tool-name", "text": "has given {tool} a name and talks about it as a colleague"}
+  {
+   "id": "turns-over",
+   "text": "turns {small} over and over in their fingers whenever {occasion}",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "counts-breath",
+   "text": "counts quietly under their breath whenever {occasion}"
+  },
+  {
+   "id": "straightens-tool",
+   "text": "straightens {tool} whenever {occasion}",
+   "forbids": [
+    "untidy"
+   ]
+  },
+  {
+   "id": "talks-to-animals",
+   "text": "talks to {animal} as though they might answer",
+   "forbids": [
+    "hard"
+   ]
+  },
+  {
+   "id": "hums",
+   "text": "hums the same four notes whenever {occasion}"
+  },
+  {
+   "id": "names-animals",
+   "text": "has a name for every one of {animal} and uses it",
+   "requires": [
+    "kind",
+    "gregarious",
+    "untidy",
+    "animals"
+   ]
+  },
+  {
+   "id": "pocket-token",
+   "text": "keeps {small} in a pocket and touches it whenever {occasion}",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "salutes",
+   "text": "salutes out of old habit whenever {occasion}",
+   "requires": [
+    "arms",
+    "law"
+   ]
+  },
+  {
+   "id": "gap-whistle",
+   "text": "whistles through the gap in their teeth whenever {occasion}",
+   "needs": [
+    "gap_tooth"
+   ]
+  },
+  {
+   "id": "proverbs",
+   "text": "quotes an old proverb, slightly wrong, whenever {occasion}",
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "offers-food",
+   "text": "offers {food} to anybody they talk to for long",
+   "forbids": [
+    "tight_fisted",
+    "hard"
+   ]
+  },
+  {
+   "id": "polishes-tool",
+   "text": "polishes {tool} whenever {occasion}",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "taps-nose",
+   "text": "taps the side of their nose knowingly whenever {occasion}",
+   "forbids": [
+    "blunt"
+   ],
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "late-laugh",
+   "text": "laughs a beat too late at every joke, but always laughs"
+  },
+  {
+   "id": "trade-names",
+   "text": "calls everybody by their trade instead of their name — \"morning, cooper\""
+  },
+  {
+   "id": "favour-tally",
+   "text": "keeps a running tally of favours owed, out loud",
+   "requires": [
+    "tight_fisted",
+    "orderly",
+    "coin"
+   ],
+   "forbids": [
+    "generous"
+   ]
+  },
+  {
+   "id": "back-to-wall",
+   "text": "will not sit anywhere with their back to a door",
+   "requires": [
+    "suspicious",
+    "timid",
+    "arms"
+   ],
+   "forbids": [
+    "trusting"
+   ]
+  },
+  {
+   "id": "smooths-hair",
+   "text": "smooths their hair flat whenever {occasion}",
+   "needs": [
+    "hair",
+    "hands"
+   ]
+  },
+  {
+   "id": "rubs-scar",
+   "text": "runs a thumb along the scar through their eyebrow whenever {occasion}",
+   "needs": [
+    "scar_brow"
+   ]
+  },
+  {
+   "id": "rubs-burn",
+   "text": "rubs the old burn on the back of their hand whenever {occasion}",
+   "needs": [
+    "burned_hand"
+   ]
+  },
+  {
+   "id": "weather-leg",
+   "text": "swears their bad leg knows the weather a day before the sky does",
+   "needs": [
+    "limp"
+   ]
+  },
+  {
+   "id": "exact-coin",
+   "text": "pays in exact coin, always, and will not take change",
+   "forbids": [
+    "untidy"
+   ]
+  },
+  {
+   "id": "sniffs-food",
+   "text": "sniffs every mouthful before eating it, even {food}"
+  },
+  {
+   "id": "luck-token",
+   "text": "carries {small} for luck and will not say who gave it to them"
+  },
+  {
+   "id": "table-circles",
+   "text": "draws small circles with a fingertip on any table they sit at",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "gods-mutter",
+   "text": "says a word to the gods under their breath whenever {occasion}",
+   "requires": [
+    "devout"
+   ]
+  },
+  {
+   "id": "spits",
+   "text": "spits over their left shoulder whenever {occasion}",
+   "forbids": [
+    "gentry",
+    "orderly"
+   ]
+  },
+  {
+   "id": "paper-birds",
+   "text": "folds any loose scrap of paper into a little bird and leaves it behind",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "tiptoes",
+   "text": "goes up on their toes to see over people whenever {occasion}",
+   "forbids": [
+    "limp"
+   ]
+  },
+  {
+   "id": "home-village",
+   "text": "compares everything to the way it was done in their home village",
+   "forbids": [
+    "gentry"
+   ]
+  },
+  {
+   "id": "nicknames",
+   "text": "gives everybody a nickname within a minute of meeting them",
+   "requires": [
+    "gregarious",
+    "blunt"
+   ],
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "no-goodbye",
+   "text": "never says goodbye — simply turns and leaves when they are done",
+   "requires": [
+    "reserved",
+    "hard",
+    "blunt"
+   ],
+   "forbids": [
+    "gregarious"
+   ]
+  },
+  {
+   "id": "checks-sky",
+   "text": "glances at the sky whenever {occasion}",
+   "requires": [
+    "sea",
+    "farm",
+    "travel",
+    "animals",
+    "night"
+   ]
+  },
+  {
+   "id": "knuckles",
+   "text": "cracks their knuckles one at a time whenever {occasion}",
+   "needs": [
+    "hands"
+   ],
+   "forbids": [
+    "gentry"
+   ]
+  },
+  {
+   "id": "smell-hours",
+   "text": "can tell the hour by what the street smells of, and is never wrong"
+  },
+  {
+   "id": "keeps-gifts",
+   "text": "keeps every small thing anybody has ever given them, down to {small}"
+  },
+  {
+   "id": "yellow",
+   "text": "wears something yellow every single day and will not say why"
+  },
+  {
+   "id": "double-shake",
+   "text": "shakes hands twice, as if the first did not count",
+   "needs": [
+    "hands"
+   ],
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "sketches",
+   "text": "sketches faces on scraps of anything whenever {occasion}",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "thumb-measure",
+   "text": "measures things against their thumb whenever {occasion}",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "craft",
+    "orderly",
+    "labour"
+   ]
+  },
+  {
+   "id": "pocket-food",
+   "text": "tucks {food} into a pocket for later, every time it is offered",
+   "forbids": [
+    "gentry"
+   ]
+  },
+  {
+   "id": "echo",
+   "text": "repeats the last word anybody says to them, thoughtfully, before answering"
+  },
+  {
+   "id": "bows-low",
+   "text": "bows far too low to everyone, children included",
+   "requires": [
+    "humble",
+    "devout",
+    "service"
+   ],
+   "forbids": [
+    "proud"
+   ]
+  },
+  {
+   "id": "sighs",
+   "text": "sighs as if the world were a trial whenever {occasion}",
+   "requires": [
+    "proud",
+    "gregarious",
+    "hot_tempered"
+   ]
+  },
+  {
+   "id": "tool-name",
+   "text": "has given {tool} a name and talks about it as a colleague"
+  },
+  {
+   "id": "or-am-i-wrong",
+   "text": "ends half of what they say with “or am I wrong?” and waits for an answer"
+  },
+  {
+   "id": "weather-first",
+   "text": "opens every conversation with the weather, however urgent the matter"
+  },
+  {
+   "id": "long-word",
+   "text": "works one long word into every conversation, not always correctly"
+  },
+  {
+   "id": "mother-said",
+   "text": "prefaces all advice with “my mother used to say”, and their mother said a great deal"
+  },
+  {
+   "id": "counts-points",
+   "text": "counts off every point they make on their fingers, even when there is only one",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "whisper-ordinary",
+   "text": "lowers their voice for the ordinary parts of a story and raises it for the secrets"
+  },
+  {
+   "id": "uses-your-name",
+   "text": "uses your name in every other sentence once they have it",
+   "requires": [
+    "gregarious",
+    "trade",
+    "service"
+   ],
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "rhymes",
+   "text": "slips into rhyme without noticing when they are pleased with themselves"
+  },
+  {
+   "id": "song-answer",
+   "text": "answers questions with a line from an old song when one fits",
+   "requires": [
+    "music",
+    "gregarious",
+    "untidy"
+   ]
+  },
+  {
+   "id": "old-coinage",
+   "text": "gives prices in a coinage nobody has minted in forty years",
+   "requires": [
+    "old"
+   ],
+   "forbids": [
+    "minor"
+   ]
+  },
+  {
+   "id": "never-a-number",
+   "text": "never gives a plain number — it is always “a good dozen” or “a fair few”",
+   "forbids": [
+    "orderly"
+   ]
+  },
+  {
+   "id": "exact-number",
+   "text": "gives every number to the unit, down to “three hundred and eleven paces”",
+   "requires": [
+    "orderly",
+    "letters",
+    "coin"
+   ]
+  },
+  {
+   "id": "sorry-furniture",
+   "text": "apologises to furniture they bump into"
+  },
+  {
+   "id": "cousin-wedding",
+   "text": "cannot tell a story without a detour through a cousin’s wedding",
+   "requires": [
+    "gregarious"
+   ],
+   "forbids": [
+    "minor"
+   ]
+  },
+  {
+   "id": "foreign-tune",
+   "text": "whistles the one tune from a place nobody else here has heard of"
+  },
+  {
+   "id": "full-introduction",
+   "text": "introduces themselves with full name, trade and street, every single time",
+   "forbids": [
+    "reserved",
+    "minor"
+   ]
+  },
+  {
+   "id": "finishes-sentences",
+   "text": "finishes other people’s sentences for them, usually wrongly",
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "fewest-words",
+   "text": "answers in as few words as will do, and sometimes fewer",
+   "requires": [
+    "reserved",
+    "guarded"
+   ]
+  },
+  {
+   "id": "half-language",
+   "text": "sprinkles in words of a language they only half speak",
+   "requires": [
+    "trade",
+    "travel",
+    "sea"
+   ]
+  },
+  {
+   "id": "calls-everyone-duck",
+   "text": "calls everybody “duck”, whatever their station",
+   "forbids": [
+    "gentry",
+    "proud"
+   ]
+  },
+  {
+   "id": "sir-to-children",
+   "text": "addresses children as “sir” and “madam” with complete seriousness",
+   "requires": [
+    "orderly",
+    "humble",
+    "gentry"
+   ],
+   "forbids": [
+    "minor"
+   ]
+  },
+  {
+   "id": "nods-early",
+   "text": "nods along before they have heard what they are agreeing to",
+   "requires": [
+    "trusting",
+    "humble"
+   ]
+  },
+  {
+   "id": "we-shall-see",
+   "text": "never commits to anything without adding “we shall see”",
+   "requires": [
+    "guarded",
+    "timid"
+   ]
+  },
+  {
+   "id": "laughs-first",
+   "text": "laughs at their own jokes before the end, which ruins most of them",
+   "requires": [
+    "gregarious"
+   ]
+  },
+  {
+   "id": "straight-face",
+   "text": "tells every joke with a perfectly straight face and never explains one",
+   "requires": [
+    "reserved",
+    "guarded"
+   ]
+  },
+  {
+   "id": "riddles",
+   "text": "asks a riddle of anybody they take a liking to, and likes them better if they answer it"
+  },
+  {
+   "id": "dreams-aloud",
+   "text": "tells anybody who will listen what they dreamed last night",
+   "requires": [
+    "gregarious"
+   ]
+  },
+  {
+   "id": "reads-aloud",
+   "text": "reads every written thing aloud under their breath — signs, labels, notices",
+   "requires": [
+    "letters",
+    "learned",
+    "minor"
+   ]
+  },
+  {
+   "id": "word-origins",
+   "text": "explains where words come from, whether or not anybody asked",
+   "requires": [
+    "letters",
+    "learned"
+   ]
+  },
+  {
+   "id": "wolf-story",
+   "text": "tells the story of the time they faced down a wolf, and the wolf grows every telling",
+   "requires": [
+    "bold",
+    "proud"
+   ]
+  },
+  {
+   "id": "loose-thread",
+   "text": "picks at a loose thread on their sleeve that they refuse to cut",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "writes-in-air",
+   "text": "traces letters in the air when they are trying to remember something",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "letters",
+    "learned"
+   ]
+  },
+  {
+   "id": "hat-to-shrines",
+   "text": "doffs their hat to every shrine they pass, and to some that are only doorways",
+   "requires": [
+    "devout"
+   ]
+  },
+  {
+   "id": "floor-sitter",
+   "text": "prefers the floor to a chair and will say so",
+   "forbids": [
+    "gentry",
+    "old"
+   ]
+  },
+  {
+   "id": "will-not-sit",
+   "text": "will not sit down in anybody else’s house, however long the visit"
+  },
+  {
+   "id": "leans",
+   "text": "leans on the nearest wall as though it were holding them up",
+   "forbids": [
+    "orderly"
+   ]
+  },
+  {
+   "id": "sleeves-rolled",
+   "text": "keeps their sleeves rolled to the elbow in any weather",
+   "requires": [
+    "craft",
+    "labour",
+    "forge"
+   ]
+  },
+  {
+   "id": "taps-thinking",
+   "text": "taps out the rhythm of whatever they are thinking on the nearest surface",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "chews-straw",
+   "text": "keeps a stalk of straw in the corner of their mouth",
+   "requires": [
+    "farm",
+    "animals"
+   ]
+  },
+  {
+   "id": "paces-circle",
+   "text": "walks a small circle, round and round, whenever they are made to wait"
+  },
+  {
+   "id": "eyes-shut-listening",
+   "text": "shuts their eyes to listen and opens them only to reply"
+  },
+  {
+   "id": "bites-coins",
+   "text": "bites every coin they are paid, even coins from friends",
+   "requires": [
+    "suspicious",
+    "tight_fisted",
+    "coin"
+   ],
+   "forbids": [
+    "trusting",
+    "gentry"
+   ]
+  },
+  {
+   "id": "sniffs-rooms",
+   "text": "sniffs the air on entering any room, like a hound deciding whether to stay"
+  },
+  {
+   "id": "straightens-others",
+   "text": "quietly straightens anything left crooked on somebody else’s table",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "orderly"
+   ]
+  },
+  {
+   "id": "hat-moods",
+   "text": "wears their hat at a different tilt for every mood, and expects people to notice",
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "rubs-hands",
+   "text": "rubs their hands together before any task, however small",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "pats-pockets",
+   "text": "pats every pocket in turn before leaving anywhere",
+   "needs": [
+    "hands"
+   ]
+  },
+  {
+   "id": "mirror-check",
+   "text": "checks their reflection in every window, puddle and polished pot",
+   "requires": [
+    "proud"
+   ]
+  },
+  {
+   "id": "straighter-uniform",
+   "text": "stands a little straighter when anybody in uniform goes by",
+   "requires": [
+    "arms",
+    "law"
+   ],
+   "forbids": [
+    "minor"
+   ]
+  },
+  {
+   "id": "fast-walker",
+   "text": "walks everywhere at a pace just short of a run"
+  },
+  {
+   "id": "naps-anywhere",
+   "text": "can fall asleep anywhere, at any hour, for exactly as long as they mean to"
+  },
+  {
+   "id": "buttons",
+   "text": "collects buttons and can tell you where every one of them came from"
+  },
+  {
+   "id": "sorted-tin",
+   "text": "keeps anything like {small} in a tin, sorted by a system only they understand",
+   "requires": [
+    "orderly",
+    "untidy"
+   ]
+  },
+  {
+   "id": "fresh-flower",
+   "text": "wears a fresh flower every day and knows the name of each one",
+   "requires": [
+    "plants",
+    "kind",
+    "gentry"
+   ]
+  },
+  {
+   "id": "cheats-book",
+   "text": "keeps a little book of everybody who has ever cheated them",
+   "requires": [
+    "letters",
+    "coin",
+    "trade"
+   ],
+   "forbids": [
+    "trusting"
+   ]
+  },
+  {
+   "id": "own-knife",
+   "text": "eats only with their own small knife, which nobody else may touch",
+   "requires": [
+    "travel",
+    "suspicious",
+    "orderly"
+   ]
+  },
+  {
+   "id": "unvisited-map",
+   "text": "carries a map of a place they have never been and studies it on quiet evenings",
+   "requires": [
+    "travel",
+    "letters",
+    "young"
+   ]
+  },
+  {
+   "id": "all-rings",
+   "text": "wears every ring they own at once",
+   "forbids": [
+    "poor",
+    "minor"
+   ]
+  },
+  {
+   "id": "odd-stockings",
+   "text": "wears odd stockings on purpose and says it keeps bad luck off"
+  },
+  {
+   "id": "shined-boots",
+   "text": "keeps their boots polished to a shine the street has no use for",
+   "requires": [
+    "orderly",
+    "proud",
+    "arms"
+   ]
+  },
+  {
+   "id": "road-stones",
+   "text": "picks up one stone from every road they travel and keeps it",
+   "requires": [
+    "travel",
+    "road"
+   ]
+  },
+  {
+   "id": "carries-food",
+   "text": "never goes anywhere without {food}, just in case"
+  },
+  {
+   "id": "spare-everything",
+   "text": "carries a spare of everything — a spare string, a spare nail, a spare candle-end",
+   "requires": [
+    "orderly",
+    "timid"
+   ]
+  },
+  {
+   "id": "town-patches",
+   "text": "sews a patch onto their coat for every town they have stopped in",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "travel",
+    "cloth"
+   ]
+  },
+  {
+   "id": "hidden-sweet",
+   "text": "keeps {food} somewhere about their person and pretends not to"
+  },
+  {
+   "id": "small-gifts",
+   "text": "gives little presents at the slightest excuse — {small}, usually",
+   "requires": [
+    "generous",
+    "kind"
+   ],
+   "forbids": [
+    "tight_fisted"
+   ]
+  },
+  {
+   "id": "whittles",
+   "text": "whittles whenever their hands are empty, and gives away whatever comes of it",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "wood",
+    "untidy",
+    "placid"
+   ]
+  },
+  {
+   "id": "one-kind-at-a-time",
+   "text": "eats everything on the plate one kind at a time, never mixing"
+  },
+  {
+   "id": "salts-twice",
+   "text": "salts food before tasting it, and then salts it again"
+  },
+  {
+   "id": "food-opinion",
+   "text": "holds strong opinions on the right way to eat {food}"
+  },
+  {
+   "id": "feeds-the-thin",
+   "text": "feeds anybody who looks thin, whether they asked or not",
+   "requires": [
+    "kind",
+    "generous",
+    "food"
+   ],
+   "forbids": [
+    "tight_fisted",
+    "minor"
+   ]
+  },
+  {
+   "id": "drinks-hot",
+   "text": "drinks everything hot, even in high summer, and pities people who do not"
+  },
+  {
+   "id": "left-foot-first",
+   "text": "crosses every threshold left foot first, and notices who does not"
+  },
+  {
+   "id": "salt-shoulder",
+   "text": "throws a pinch of salt over their shoulder after any bad news"
+  },
+  {
+   "id": "by-the-moon",
+   "text": "plans anything that matters by the phase of the moon",
+   "requires": [
+    "farm",
+    "sea",
+    "devout",
+    "night"
+   ]
+  },
+  {
+   "id": "reads-animals",
+   "text": "reads omens in which way {animal} go"
+  },
+  {
+   "id": "knocks-wood",
+   "text": "knocks on wood the moment anybody says something hopeful"
+  },
+  {
+   "id": "lucky-number",
+   "text": "has a lucky number and arranges things, quietly, to land on it"
+  },
+  {
+   "id": "no-night-whistling",
+   "text": "will not whistle after dark and hushes anybody who does",
+   "requires": [
+    "sea",
+    "night"
+   ]
+  },
+  {
+   "id": "place-for-the-dead",
+   "text": "sets a place at table for a relative long dead",
+   "requires": [
+    "devout",
+    "kind"
+   ],
+   "forbids": [
+    "minor",
+    "irreverent"
+   ]
+  },
+  {
+   "id": "named-winds",
+   "text": "calls the winds by name and speaks of them like difficult neighbours",
+   "requires": [
+    "sea",
+    "farm",
+    "travel"
+   ]
+  },
+  {
+   "id": "tells-the-graves",
+   "text": "tells the graves the day’s news on the way past",
+   "requires": [
+    "dead",
+    "devout",
+    "old"
+   ],
+   "forbids": [
+    "transient"
+   ]
+  },
+  {
+   "id": "window-candle",
+   "text": "keeps a candle in the window all night and will not say for whom",
+   "forbids": [
+    "minor"
+   ]
+  },
+  {
+   "id": "unknown-feast",
+   "text": "keeps a feast day nobody else in town has heard of"
+  },
+  {
+   "id": "any-knot",
+   "text": "can tie any knot you name, and several you cannot",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "sea",
+    "travel",
+    "labour"
+   ]
+  },
+  {
+   "id": "bird-calls",
+   "text": "can do the call of any bird in the district, and will prove it"
+  },
+  {
+   "id": "star-names",
+   "text": "knows the names of the stars and hands them out freely",
+   "requires": [
+    "night",
+    "sea",
+    "travel",
+    "learned"
+   ]
+  },
+  {
+   "id": "who-married-whom",
+   "text": "can recite who married whom in this town going back five generations",
+   "requires": [
+    "old",
+    "gentry",
+    "faith"
+   ],
+   "forbids": [
+    "minor",
+    "transient"
+   ]
+  },
+  {
+   "id": "one-battle",
+   "text": "knows everything about one battle fought a century ago and nothing about any other"
+  },
+  {
+   "id": "gone-landmarks",
+   "text": "gives directions by landmarks that were pulled down years ago",
+   "requires": [
+    "old"
+   ],
+   "forbids": [
+    "transient"
+   ]
+  },
+  {
+   "id": "coin-trick",
+   "text": "does a small coin trick for children, and keeps the coin",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "gregarious",
+    "rogue",
+    "trade"
+   ]
+  },
+  {
+   "id": "beetle-watcher",
+   "text": "stops to watch ants and beetles at their work, sometimes for a long while"
+  },
+  {
+   "id": "cloud-shapes",
+   "text": "sees shapes in the clouds and points them out to strangers",
+   "forbids": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "weight-by-hand",
+   "text": "can tell the weight of anything by hefting it, to the ounce, and will bet on it",
+   "needs": [
+    "hands"
+   ],
+   "requires": [
+    "trade",
+    "labour",
+    "food"
+   ]
+  },
+  {
+   "id": "accent-reader",
+   "text": "can tell which quarter of town you grew up in from the way you say three words",
+   "forbids": [
+    "transient"
+   ]
+  },
+  {
+   "id": "never-forgets-a-face",
+   "text": "never forgets a face, and says so the moment they see one again"
+  },
+  {
+   "id": "almanac-tally",
+   "text": "keeps a tally of every time the almanac has been wrong",
+   "requires": [
+    "farm",
+    "letters"
+   ]
+  },
+  {
+   "id": "weed-uses",
+   "text": "knows a use for every weed between the cobbles",
+   "requires": [
+    "plants",
+    "healing"
+   ]
+  },
+  {
+   "id": "followed-by-animal",
+   "text": "is followed everywhere by one of {animal}, which they insist is not theirs"
+  },
+  {
+   "id": "shoes-first",
+   "text": "looks at people’s shoes before their faces, and always has an opinion",
+   "requires": [
+    "leather",
+    "cloth",
+    "trade"
+   ]
+  },
+  {
+   "id": "up-first",
+   "text": "is up before anybody else in the street, and makes sure the street knows it",
+   "forbids": [
+    "minor",
+    "transient",
+    "untidy"
+   ]
+  },
+  {
+   "id": "always-late",
+   "text": "arrives late to everything, with a new excuse each time",
+   "requires": [
+    "untidy"
+   ]
+  },
+  {
+   "id": "same-seat",
+   "text": "sits in exactly the same seat anywhere they go often, and will wait for it"
+  },
+  {
+   "id": "sings-at-work",
+   "text": "sings at their work, louder as the work gets harder",
+   "requires": [
+    "labour",
+    "craft",
+    "sea"
+   ]
+  },
+  {
+   "id": "unanswered-letters",
+   "text": "writes long letters to a sibling who never writes back",
+   "requires": [
+    "letters",
+    "learned"
+   ],
+   "forbids": [
+    "minor"
+   ]
+  },
+  {
+   "id": "night-walk",
+   "text": "takes a long walk every night, the same way round the town",
+   "forbids": [
+    "transient"
+   ]
+  },
+  {
+   "id": "sweeps-steps",
+   "text": "sweeps the step outside their door three times a day, and other people’s too",
+   "requires": [
+    "orderly"
+   ],
+   "forbids": [
+    "transient"
+   ]
+  },
+  {
+   "id": "knows-the-hour",
+   "text": "knows the hour without a bell and looks pained when the bell is late"
+  },
+  {
+   "id": "haggles-gifts",
+   "text": "haggles over everything, gifts included",
+   "requires": [
+    "tight_fisted",
+    "trade",
+    "coin"
+   ],
+   "forbids": [
+    "generous"
+   ]
+  },
+  {
+   "id": "first-price",
+   "text": "pays the first price asked and thinks haggling beneath everybody",
+   "requires": [
+    "proud",
+    "generous",
+    "gentry"
+   ],
+   "forbids": [
+    "tight_fisted",
+    "poor"
+   ]
+  },
+  {
+   "id": "thanks-twice",
+   "text": "thanks people twice — once on the spot and once as they leave",
+   "requires": [
+    "humble",
+    "kind"
+   ]
+  },
+  {
+   "id": "writes-promises",
+   "text": "writes down every promise anybody makes them, and reads it back later",
+   "requires": [
+    "letters",
+    "suspicious"
+   ]
+  },
+  {
+   "id": "smell-of-trade",
+   "text": "wears the smell of their trade like a coat, and is proud of it",
+   "requires": [
+    "forge",
+    "leather",
+    "animals",
+    "food"
+   ]
+  },
+  {
+   "id": "washes-first",
+   "text": "washes their hands before every meeting, even at a trough in the street",
+   "requires": [
+    "healing",
+    "food",
+    "orderly"
+   ]
+  },
+  {
+   "id": "borrows-returns",
+   "text": "borrows things without asking and always, always brings them back",
+   "requires": [
+    "trusting",
+    "untidy"
+   ]
+  },
+  {
+   "id": "people-count",
+   "text": "keeps count of how many people they have spoken to today, and will tell you the number",
+   "requires": [
+    "orderly",
+    "gregarious"
+   ]
+  },
+  {
+   "id": "friendly-feud",
+   "text": "has a friendly feud with a neighbour over a matter nobody can now remember",
+   "forbids": [
+    "minor",
+    "transient"
+   ]
+  },
+  {
+   "id": "volunteers",
+   "text": "volunteers for everything, and only then asks what it is",
+   "requires": [
+    "bold",
+    "gregarious"
+   ]
+  },
+  {
+   "id": "long-bath",
+   "text": "bathes more often than anybody thinks is healthy"
+  },
+  {
+   "id": "pocket-treasures",
+   "text": "keeps a pocket full of treasures and shows them off one at a time",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "narrates-self",
+   "text": "narrates whatever they are doing as though telling a story about somebody else",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "races-everyone",
+   "text": "races anybody walking beside them, whether or not they know it is a race",
+   "requires": [
+    "minor"
+   ],
+   "forbids": [
+    "timid"
+   ]
+  },
+  {
+   "id": "worst-thing-eaten",
+   "text": "asks every grown-up the worst thing they ever ate",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "trading-up",
+   "text": "has traded their way up from a button to {small} and means to keep going",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "secret-name",
+   "text": "has a secret name for themselves and will tell it only to friends",
+   "requires": [
+    "minor",
+    "young"
+   ]
+  }
  ],
  "small": [
-  "a smooth grey pebble", "a copper coin worn blank", "a knucklebone", "a length of knotted string",
-  "a wooden bead", "a pressed flower", "a brass button", "a folded letter gone soft at the creases",
-  "a lucky acorn", "a chip of blue glass", "a key that opens nothing they own", "a tooth on a cord",
-  "a faded ribbon", "a small carved bird", "a spiral shell", "a grey feather", "a single bone die",
-  "a ring too small to wear", "a clay marble", "a twist of red thread"
+  "a smooth grey pebble",
+  "a copper coin worn blank",
+  "a knucklebone",
+  "a length of knotted string",
+  "a wooden bead",
+  "a pressed flower",
+  "a brass button",
+  "a folded letter gone soft at the creases",
+  "a lucky acorn",
+  "a chip of blue glass",
+  "a key that opens nothing they own",
+  "a tooth on a cord",
+  "a faded ribbon",
+  "a small carved bird",
+  "a spiral shell",
+  "a grey feather",
+  "a single bone die",
+  "a ring too small to wear",
+  "a clay marble",
+  "a twist of red thread",
+  "a thimble",
+  "a bent nail",
+  "a broken wax seal",
+  "a snail shell",
+  "a whistle carved from bone",
+  "a pebble with a hole worn through it",
+  "a painted wooden soldier",
+  "a bead of amber",
+  "a sliver of mirror",
+  "a horseshoe nail",
+  "a dried seed pod",
+  "a scrap of lace",
+  "a clipped silver coin",
+  "a pine cone",
+  "a carved fish no bigger than a thumb",
+  "a wooden spoon too small to use",
+  "an arrowhead turned up in a field",
+  "a lead token from a fair",
+  "a hazelnut shell with a secret in it",
+  "a tiny brass bell"
  ],
  "food": [
-  "a heel of bread", "a handful of dried figs", "a twist of salted nuts", "a honey cake",
-  "a strip of smoked meat", "a wrinkled apple", "a lump of hard cheese", "a sugared plum",
-  "a crust of pie", "a boiled sweet"
+  "a heel of bread",
+  "a handful of dried figs",
+  "a twist of salted nuts",
+  "a honey cake",
+  "a strip of smoked meat",
+  "a wrinkled apple",
+  "a lump of hard cheese",
+  "a sugared plum",
+  "a crust of pie",
+  "a boiled sweet",
+  "a pickled egg",
+  "a bag of roast chestnuts",
+  "a slice of cold pudding",
+  "a raw onion",
+  "a sprig of mint",
+  "a handful of cherries",
+  "a spiced biscuit",
+  "a salted fish",
+  "a round of oatcake",
+  "a paper of candied peel"
  ],
  "animal": [
-  "the street dogs", "the market pigeons", "the cats of the lane", "the horses at the trough",
-  "the gulls", "the crows on the rooftops", "the goats in the square"
+  "the street dogs",
+  "the market pigeons",
+  "the cats of the lane",
+  "the horses at the trough",
+  "the gulls",
+  "the crows on the rooftops",
+  "the goats in the square",
+  "the donkeys at the well",
+  "the ducks on the pond",
+  "the sparrows under the eaves",
+  "the pigs in the back lanes",
+  "the mules at the stable",
+  "the geese on the green"
  ],
  "occasions": [
-  {"id": "lie", "text": "somebody lies to them"},
-  {"id": "weather", "text": "the weather turns"},
-  {"id": "name-asked", "text": "a stranger asks their name"},
-  {"id": "paid", "text": "they are paid"},
-  {"id": "bell", "text": "a bell rings anywhere in earshot"},
-  {"id": "money-talk", "text": "the talk turns to money"},
-  {"id": "eating", "text": "they sit down to eat"},
-  {"id": "thanked", "text": "somebody thanks them"},
-  {"id": "child-cries", "text": "a child cries nearby"},
-  {"id": "gods-mentioned", "text": "somebody mentions the gods"},
-  {"id": "argument-won", "text": "they win an argument"},
-  {"id": "sundown", "text": "the sun goes down"},
-  {"id": "music", "text": "they hear music"},
-  {"id": "raised-voice", "text": "someone raises their voice"},
-  {"id": "job-done", "text": "they finish a job"},
-  {"id": "new-face", "text": "they meet somebody new"},
-  {"id": "rain", "text": "it starts to rain"},
-  {"id": "door", "text": "a door bangs"},
-  {"id": "misnamed", "text": "somebody gets their name wrong"},
-  {"id": "waiting", "text": "they are kept waiting"},
-  {"id": "praised", "text": "somebody praises them"},
-  {"id": "cart", "text": "a cart rattles past"},
-  {"id": "directions", "text": "they are asked the way"},
-  {"id": "thinking", "text": "they are thinking hard"},
-  {"id": "cough", "text": "somebody coughs"},
-  {"id": "alone", "text": "they think nobody is looking"},
-  {"id": "dog", "text": "a dog barks"},
-  {"id": "outsider", "text": "somebody from out of town speaks to them"}
+  {
+   "id": "lie",
+   "text": "somebody lies to them"
+  },
+  {
+   "id": "weather",
+   "text": "the weather turns"
+  },
+  {
+   "id": "name-asked",
+   "text": "a stranger asks their name"
+  },
+  {
+   "id": "paid",
+   "text": "they are paid"
+  },
+  {
+   "id": "bell",
+   "text": "a bell rings anywhere in earshot"
+  },
+  {
+   "id": "money-talk",
+   "text": "the talk turns to money"
+  },
+  {
+   "id": "eating",
+   "text": "they sit down to eat"
+  },
+  {
+   "id": "thanked",
+   "text": "somebody thanks them"
+  },
+  {
+   "id": "child-cries",
+   "text": "a child cries nearby"
+  },
+  {
+   "id": "gods-mentioned",
+   "text": "somebody mentions the gods"
+  },
+  {
+   "id": "argument-won",
+   "text": "they win an argument"
+  },
+  {
+   "id": "sundown",
+   "text": "the sun goes down"
+  },
+  {
+   "id": "music",
+   "text": "they hear music"
+  },
+  {
+   "id": "raised-voice",
+   "text": "someone raises their voice"
+  },
+  {
+   "id": "job-done",
+   "text": "they finish a job"
+  },
+  {
+   "id": "new-face",
+   "text": "they meet somebody new"
+  },
+  {
+   "id": "rain",
+   "text": "it starts to rain"
+  },
+  {
+   "id": "door",
+   "text": "a door bangs"
+  },
+  {
+   "id": "misnamed",
+   "text": "somebody gets their name wrong"
+  },
+  {
+   "id": "waiting",
+   "text": "they are kept waiting"
+  },
+  {
+   "id": "praised",
+   "text": "somebody praises them"
+  },
+  {
+   "id": "cart",
+   "text": "a cart rattles past"
+  },
+  {
+   "id": "directions",
+   "text": "they are asked the way"
+  },
+  {
+   "id": "thinking",
+   "text": "they are thinking hard"
+  },
+  {
+   "id": "cough",
+   "text": "somebody coughs"
+  },
+  {
+   "id": "alone",
+   "text": "they think nobody is looking"
+  },
+  {
+   "id": "dog",
+   "text": "a dog barks"
+  },
+  {
+   "id": "outsider",
+   "text": "somebody from out of town speaks to them"
+  },
+  {
+   "id": "sneeze",
+   "text": "somebody sneezes"
+  },
+  {
+   "id": "sign-name",
+   "text": "they have to put their name to something"
+  },
+  {
+   "id": "stared-at",
+   "text": "a stranger stares at them"
+  },
+  {
+   "id": "soldier",
+   "text": "a soldier walks by"
+  },
+  {
+   "id": "fire-low",
+   "text": "the fire burns low"
+  },
+  {
+   "id": "wind-up",
+   "text": "the wind gets up"
+  },
+  {
+   "id": "coin-dropped",
+   "text": "a coin drops somewhere nearby"
+  },
+  {
+   "id": "favour",
+   "text": "they are asked for a favour"
+  },
+  {
+   "id": "bad-news",
+   "text": "they hear bad news"
+  },
+  {
+   "id": "age-asked",
+   "text": "somebody asks their age"
+  },
+  {
+   "id": "laughed-at",
+   "text": "somebody laughs at them"
+  },
+  {
+   "id": "market-opens",
+   "text": "the market opens"
+  },
+  {
+   "id": "whistle",
+   "text": "somebody whistles"
+  },
+  {
+   "id": "lamps-lit",
+   "text": "the lamps are lit"
+  },
+  {
+   "id": "decision",
+   "text": "they have to decide something"
+  },
+  {
+   "id": "old-days",
+   "text": "somebody mentions the old days"
+  }
  ]
 }
