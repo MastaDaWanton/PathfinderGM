@@ -135,7 +135,12 @@ installer.
 closed against the built artifact rather than against the source. The short version:
 **the app has never been installed on a clean Windows machine with no Python**, and the
 executable and installer are **unsigned**, so SmartScreen will warn on any machine that
-did not build them. Both need a machine or a certificate rather than a commit.
+did not build them ("Windows protected your PC" → **More info** → **Run anyway**; Windows
+11's Smart App Control, where it is on, blocks unsigned programs with no override). Both
+need a machine or a certificate rather than a commit. Signing was weighed on 2026-09-25 and
+deferred: Azure Artifact Signing (~$120/yr, US/Canada individuals only), Certum's
+open-source certificate (needs an OSI licence on the repo), or an OV certificate; EV no
+longer buys instant SmartScreen trust.
 
 What the exe is already proved to do, every run of the prover: a per-install
 `SECRET_KEY`, `DEBUG` off with no debug page, the first-run model check answering from
