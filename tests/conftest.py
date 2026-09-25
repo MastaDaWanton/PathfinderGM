@@ -21,16 +21,22 @@ os.chdir(ROOT)
 # Assigned, not `setdefault`: a shell that had exported PATHFINDER_GM_DATA for a live
 # probe (the scratchpad data dirs the live checks use) would otherwise have pointed the
 # whole suite — house-rule deletes and all — at that directory.
-os.environ["PATHFINDER_GM_DATA"] = str(ROOT / ".test-data")
+#
+# One directory per pytest-xdist worker (`PYTEST_XDIST_WORKER` is gw0, gw1, ...; "main"
+# without xdist), because every worker imports this file: with one shared directory,
+# each worker's start-of-run wipe below would delete the others' data mid-run, and the
+# house-rules file every test resets would be one file raced by all of them.
+DATA = ROOT / ".test-data" / os.environ.get("PYTEST_XDIST_WORKER", "main")
+os.environ["PATHFINDER_GM_DATA"] = str(DATA)
 
 # Emptied at the start of every run, before Django reads anything from it. Measured
 # 2026-09-25: it held 456 files left by earlier runs — characters, campaigns and their
 # backups — and a test that reads the shelf or the house-rules file read whatever the
 # last run left (the `point_buy: 0` leak of 2026-09-08 was exactly that). Ignored by git;
-# nothing in it is anybody's.
+# nothing in it is anybody's. Only this worker's own directory.
 import shutil as _shutil  # noqa: E402
 
-_shutil.rmtree(ROOT / ".test-data", ignore_errors=True)
+_shutil.rmtree(DATA, ignore_errors=True)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pathfindergm.settings")
 
 import django  # noqa: E402
@@ -335,3 +341,24 @@ def _cache_follows_the_directory(sender, setting, **kwargs):
 
 
 setting_changed.connect(_cache_follows_the_directory)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """The shared catalogues came through the run untouched.
+
+    `rules.pristine` keeps the no-homebrew bestiary, spells, feats and classes for the
+    whole process (2026-09-25), so a test that mutated an entry would leak into every
+    test after it — the one cost of not rebuilding. Each is rebuilt fresh here and
+    compared; a difference fails the run and names the catalogue.
+    """
+    from rules import pristine
+
+    changed = [name for name, build in pristine._BUILDERS.items()
+               if build() != pristine._MEMO.get(name)]
+    if changed:
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is not None:
+            reporter.write_line(
+                f"A test mutated a shared catalogue ({', '.join(changed)}): "
+                f"rules.pristine hands the same object to every test.", red=True)
+        session.exitstatus = 1

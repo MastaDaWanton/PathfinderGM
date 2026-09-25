@@ -44,56 +44,63 @@ _ALL: dict[str, dict] | None = None
 
 
 def all_classes() -> dict[str, dict]:
+    """With no homebrew classes, built once per process (`rules.pristine`)."""
     global _ALL
     if _ALL is None:
-        out = {k: dict(v) for k, v in SHIPPED.items()}
-        for folder in (_dir("classes"), _homebrew("classes")):
-            if not folder.is_dir():
-                continue
-            for path in sorted(folder.glob("*.json")):
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception as exc:
-                    files.unreadable(path, exc)
-                    continue
-                entries = data.get("classes") if isinstance(data, dict) else None
-                if not isinstance(entries, list):
-                    entries = [data] if isinstance(data, dict) and data.get("id") else []
-                for e in entries:
-                    key = str(e.get("id") or e.get("name", "")).strip().lower()
-                    if not key:
-                        continue
-                    base = dict(out.get(key, {}))
-                    for k, v in e.items():
-                        if v in (None, ""):
-                            continue
-                        # `paths` layers per path and per field, never wholesale. A
-                        # homebrew copy saved by the in-app editor before `grants` and
-                        # `toggles` existed silently erased every ability document the
-                        # shipped file had gained since — Blood Rage fell back to the
-                        # old effectspec branch and nothing on screen said why.
-                        if k == "paths" and isinstance(v, dict) \
-                                and isinstance(base.get(k), dict):
-                            merged = {pk: dict(pv) for pk, pv in base[k].items()}
-                            for pk, pv in v.items():
-                                if isinstance(pv, dict) and isinstance(
-                                        merged.get(pk), dict):
-                                    merged[pk].update(
-                                        {fk: fv for fk, fv in pv.items()
-                                         if fv not in (None, "")})
-                                else:
-                                    merged[pk] = pv
-                            base[k] = merged
-                        else:
-                            base[k] = v
-                    # The engine reads these two off the class, so they have to be the
-                    # shapes it expects rather than the shapes a file happens to use.
-                    base["good_saves"] = tuple(base.get("good_saves") or ())
-                    base["class_skills"] = tuple(base.get("class_skills") or ())
-                    base["proficiencies"] = tuple(base.get("proficiencies") or ())
-                    out[key] = base
-        _ALL = out
+        from . import pristine
+
+        _ALL = pristine.memo("classes", [_homebrew("classes")], _build_classes)
     return _ALL
+
+
+def _build_classes() -> dict[str, dict]:
+    out = {k: dict(v) for k, v in SHIPPED.items()}
+    for folder in (_dir("classes"), _homebrew("classes")):
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            entries = data.get("classes") if isinstance(data, dict) else None
+            if not isinstance(entries, list):
+                entries = [data] if isinstance(data, dict) and data.get("id") else []
+            for e in entries:
+                key = str(e.get("id") or e.get("name", "")).strip().lower()
+                if not key:
+                    continue
+                base = dict(out.get(key, {}))
+                for k, v in e.items():
+                    if v in (None, ""):
+                        continue
+                    # `paths` layers per path and per field, never wholesale. A
+                    # homebrew copy saved by the in-app editor before `grants` and
+                    # `toggles` existed silently erased every ability document the
+                    # shipped file had gained since — Blood Rage fell back to the
+                    # old effectspec branch and nothing on screen said why.
+                    if k == "paths" and isinstance(v, dict) \
+                            and isinstance(base.get(k), dict):
+                        merged = {pk: dict(pv) for pk, pv in base[k].items()}
+                        for pk, pv in v.items():
+                            if isinstance(pv, dict) and isinstance(
+                                    merged.get(pk), dict):
+                                merged[pk].update(
+                                    {fk: fv for fk, fv in pv.items()
+                                     if fv not in (None, "")})
+                            else:
+                                merged[pk] = pv
+                        base[k] = merged
+                    else:
+                        base[k] = v
+                # The engine reads these two off the class, so they have to be the
+                # shapes it expects rather than the shapes a file happens to use.
+                base["good_saves"] = tuple(base.get("good_saves") or ())
+                base["class_skills"] = tuple(base.get("class_skills") or ())
+                base["proficiencies"] = tuple(base.get("proficiencies") or ())
+                out[key] = base
+    return out
 
 
 def get(class_id: str) -> dict:

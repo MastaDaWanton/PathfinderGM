@@ -49,4 +49,5 @@ def test_an_explicit_seed_is_left_alone():
 
 def test_the_data_directory_is_the_repos_own():
     root = Path(__file__).resolve().parent.parent
-    assert Path(os.environ["PATHFINDER_GM_DATA"]) == root / ".test-data"
+    worker = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    assert Path(os.environ["PATHFINDER_GM_DATA"]) == root / ".test-data" / worker

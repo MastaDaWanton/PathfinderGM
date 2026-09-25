@@ -45,10 +45,12 @@ Then open http://localhost:8000. There is no database and nothing to migrate —
 campaign is a JSON file under your user data directory, and the world export is read-only.
 
 ```bash
-python -m pytest
+python -m pytest -n 12
 ```
 
-3,729 tests, about seven minutes. Run the whole suite, not the file you touched.
+About 5,000 tests, about a minute on twelve workers (`pytest-xdist`; each worker gets its
+own `.test-data/gw<n>`). Serial `python -m pytest` still works and takes several minutes.
+Run the whole suite, not the file you touched.
 
 To build the packaged app:
 

@@ -4,3 +4,5 @@
 # than pulling in pytest-django.
 Django>=5.0
 pytest>=8.0
+# Test-only: the suite in parallel (`python -m pytest -n 12`). Never bundled.
+pytest-xdist>=3.5

@@ -1812,49 +1812,67 @@ def read_mechanics_problems() -> dict[str, list[str]]:
 
 
 def all_spells() -> dict[str, Spell]:
-    """Every spell, shipped plus homebrew, layered the same way ingredients are."""
+    """Every spell, shipped plus homebrew, layered the same way ingredients are.
+
+    With no homebrew spells, built once per process (`rules.pristine`): 526 ms a
+    build, and the same result every time (measured 2026-09-25)."""
     global _ALL, _META
     if _ALL is None:
         from django.conf import settings
 
-        raw: dict[str, dict] = {}
-        for folder in (Path(settings.BASE_DIR) / "content" / "spells",
-                       Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spells"):
-            if not folder.is_dir():
-                continue
-            for path in sorted(folder.glob("*.json")):
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception as exc:
-                    files.unreadable(path, exc)
-                    continue
-                entries = data.get("spells") if isinstance(data, dict) else None
-                if not isinstance(entries, list):
-                    entries = [data] if isinstance(data, dict) and data.get("id") else []
-                for e in entries:
-                    if e.get("id"):
-                        # Merged, not replaced: an edit that changes one field must not
-                        # drop the twenty it never asked about.
-                        base = dict(raw.get(e["id"], {}))
-                        base.update({k: v for k, v in e.items() if v not in (None, "")})
-                        raw[e["id"]] = base
-                if isinstance(data, dict) and data.get("descriptors"):
-                    _META = {"descriptors": data["descriptors"],
-                             "classes": data.get("classes", []),
-                             "note": data.get("note", "")}
-        # The read-by-hand layer, last, because it wins. `spells-mechanics.json` is what
-        # a regex made of the prose; `mechanics/*.json` is what somebody got by reading
-        # it. Where they disagree the reading is right — that is the whole reason the
-        # second layer exists, and the machine pass has already been wrong 31 times in a
-        # way only reading caught.
-        for folder in (Path(settings.BASE_DIR) / "content" / "spells" / "mechanics",
-                       Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spell-mechanics"):
-            raw = _layer_read_mechanics(folder, raw)
-        # Normalised after the merge rather than per file, because the mechanics file and
-        # the Codex file each hold half of what a derivation needs — an element read from
-        # a scaling formula in one and from descriptors in the other.
-        _ALL = {k: from_dict(normalise(v)) for k, v in raw.items()}
+        from . import pristine
+
+        home = Path(settings.CAMPAIGN_DIR).parent / "homebrew"
+        built, found = pristine.memo("spells", [home / "spells", home / "spell-mechanics"],
+                                    _build_spells)
+        _ALL = built
+        if found:
+            _META = found
     return _ALL
+
+
+def _build_spells() -> tuple[dict[str, Spell], dict]:
+    """The shipped spells, the homebrew spells, then both mechanics layers."""
+    from django.conf import settings
+
+    raw: dict[str, dict] = {}
+    meta: dict = {}
+    for folder in (Path(settings.BASE_DIR) / "content" / "spells",
+                   Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spells"):
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                files.unreadable(path, exc)
+                continue
+            entries = data.get("spells") if isinstance(data, dict) else None
+            if not isinstance(entries, list):
+                entries = [data] if isinstance(data, dict) and data.get("id") else []
+            for e in entries:
+                if e.get("id"):
+                    # Merged, not replaced: an edit that changes one field must not
+                    # drop the twenty it never asked about.
+                    base = dict(raw.get(e["id"], {}))
+                    base.update({k: v for k, v in e.items() if v not in (None, "")})
+                    raw[e["id"]] = base
+            if isinstance(data, dict) and data.get("descriptors"):
+                meta = {"descriptors": data["descriptors"],
+                         "classes": data.get("classes", []),
+                         "note": data.get("note", "")}
+    # The read-by-hand layer, last, because it wins. `spells-mechanics.json` is what
+    # a regex made of the prose; `mechanics/*.json` is what somebody got by reading
+    # it. Where they disagree the reading is right — that is the whole reason the
+    # second layer exists, and the machine pass has already been wrong 31 times in a
+    # way only reading caught.
+    for folder in (Path(settings.BASE_DIR) / "content" / "spells" / "mechanics",
+                   Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spell-mechanics"):
+        raw = _layer_read_mechanics(folder, raw)
+    # Normalised after the merge rather than per file, because the mechanics file and
+    # the Codex file each hold half of what a derivation needs — an element read from
+    # a scaling formula in one and from descriptors in the other.
+    return {k: from_dict(normalise(v)) for k, v in raw.items()}, meta
 
 
 def meta() -> dict:
