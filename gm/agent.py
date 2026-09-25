@@ -1151,6 +1151,12 @@ class GMAgent:
         here = self._here_name()
         if not here or not text:
             return []
+        # Not in a fight. A brawl's prose reaches for whatever is near — "he slams you
+        # back against the forge" — and measured 2026-09-25 this ran on combat prose
+        # too, so a fight in the lane could found a smithy the town never had. The
+        # ruling was about places the narration ESTABLISHES, which a fight does not do.
+        if getattr(self.engine.scene, "in_encounter", False):
+            return []
         places = self._place_names()
         real = {narration_mod._bare(p).lower() for p in places}
         for where, sentence in narration_mod.stands_elsewhere(text, here=here,
