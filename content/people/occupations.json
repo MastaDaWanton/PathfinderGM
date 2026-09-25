@@ -1,0 +1,1105 @@
+{
+ "note": "What a person does for work. Original writing for Pathfinder GM (2026-09-25). class: the kind of work the other tables key on. mobility: resident (stays in their settlement), mobile (travels the roads between settlements), transient (passing through, gone when the scene closes). tags: what the rest of the roll is checked against. objects: things of the trade a quirk may be about. match: words in a described phrase that mean this work. excludes: temperament poles this work rules out (a priest who mocks the gods is not a priest); the axis is left silent instead.",
+ "occupations": [
+  {
+   "id": "fisher",
+   "name": "fisher",
+   "class": "sea",
+   "mobility": "resident",
+   "tags": [
+    "sea",
+    "water",
+    "food"
+   ],
+   "objects": [
+    "net floats",
+    "fish hooks",
+    "a gutting knife"
+   ],
+   "match": [
+    "fisher",
+    "fisherman",
+    "fisherwoman",
+    "fishwife",
+    "angler"
+   ]
+  },
+  {
+   "id": "sailor",
+   "name": "sailor",
+   "class": "sea",
+   "mobility": "mobile",
+   "tags": [
+    "sea",
+    "water",
+    "travel"
+   ],
+   "objects": [
+    "a coil of tarred line",
+    "a brass bosun's whistle",
+    "a knotted cord"
+   ],
+   "match": [
+    "sailor",
+    "deckhand",
+    "mariner",
+    "seaman"
+   ]
+  },
+  {
+   "id": "dockhand",
+   "name": "dockhand",
+   "class": "labour",
+   "mobility": "resident",
+   "tags": [
+    "sea",
+    "water",
+    "labour"
+   ],
+   "objects": [
+    "a cargo hook",
+    "tally sticks",
+    "a coil of rope"
+   ],
+   "match": [
+    "dockhand",
+    "docker",
+    "stevedore",
+    "porter"
+   ]
+  },
+  {
+   "id": "boatwright",
+   "name": "boatwright",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "water",
+    "wood"
+   ],
+   "objects": [
+    "a caulking iron",
+    "wood shavings",
+    "a pot of pitch"
+   ],
+   "match": [
+    "boatwright",
+    "shipwright"
+   ]
+  },
+  {
+   "id": "smith",
+   "name": "smith",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "forge",
+    "fire"
+   ],
+   "objects": [
+    "horseshoe nails",
+    "a pair of tongs",
+    "a scrap of iron"
+   ],
+   "match": [
+    "smith",
+    "blacksmith",
+    "farrier"
+   ]
+  },
+  {
+   "id": "smith-apprentice",
+   "name": "smith's apprentice",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "forge",
+    "fire",
+    "young"
+   ],
+   "objects": [
+    "a bellows strap",
+    "a bent nail",
+    "a sooty rag"
+   ],
+   "match": [
+    "apprentice"
+   ]
+  },
+  {
+   "id": "carpenter",
+   "name": "carpenter",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "wood"
+   ],
+   "objects": [
+    "a folding rule",
+    "a carpenter's pencil",
+    "wooden pegs"
+   ],
+   "match": [
+    "carpenter",
+    "joiner",
+    "woodworker"
+   ]
+  },
+  {
+   "id": "mason",
+   "name": "stonemason",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "stone",
+    "labour"
+   ],
+   "objects": [
+    "a mason's chisel",
+    "a chalk line",
+    "a chip of granite"
+   ],
+   "match": [
+    "mason",
+    "stonemason",
+    "stonecutter"
+   ]
+  },
+  {
+   "id": "weaver",
+   "name": "weaver",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "cloth"
+   ],
+   "objects": [
+    "a wooden shuttle",
+    "hanks of yarn",
+    "a bone needle"
+   ],
+   "match": [
+    "weaver",
+    "spinner"
+   ]
+  },
+  {
+   "id": "dyer",
+   "name": "dyer",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "cloth",
+    "water"
+   ],
+   "objects": [
+    "dyed thread ends",
+    "a stirring paddle",
+    "a pouch of madder root"
+   ],
+   "match": [
+    "dyer"
+   ]
+  },
+  {
+   "id": "tailor",
+   "name": "tailor",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "cloth"
+   ],
+   "objects": [
+    "a thimble",
+    "pins",
+    "a tape of knotted string"
+   ],
+   "match": [
+    "tailor",
+    "seamstress",
+    "clothier"
+   ]
+  },
+  {
+   "id": "tanner",
+   "name": "tanner",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "leather",
+    "animals"
+   ],
+   "objects": [
+    "a scraping blade",
+    "offcuts of hide",
+    "an awl"
+   ],
+   "match": [
+    "tanner",
+    "leatherworker",
+    "cobbler",
+    "saddler",
+    "leather apron"
+   ]
+  },
+  {
+   "id": "potter",
+   "name": "potter",
+   "class": "craft",
+   "mobility": "resident",
+   "tags": [
+    "earth",
+    "fire"
+   ],
+   "objects": [
+    "a wire for cutting clay",
+    "a shard of glazed pot",
+    "a wooden rib"
+   ],
+   "match": [
+    "potter"
+   ]
+  },
+  {
+   "id": "baker",
+   "name": "baker",
+   "class": "trade",
+   "mobility": "resident",
+   "tags": [
+    "food",
+    "fire"
+   ],
+   "objects": [
+    "a heel of bread",
+    "a dough scraper",
+    "a twist of flour paper"
+   ],
+   "match": [
+    "baker"
+   ]
+  },
+  {
+   "id": "butcher",
+   "name": "butcher",
+   "class": "trade",
+   "mobility": "resident",
+   "tags": [
+    "food",
+    "animals"
+   ],
+   "objects": [
+    "a cleaver",
+    "a whetstone",
+    "a string of sausage"
+   ],
+   "match": [
+    "butcher"
+   ]
+  },
+  {
+   "id": "brewer",
+   "name": "brewer",
+   "class": "trade",
+   "mobility": "resident",
+   "tags": [
+    "drink"
+   ],
+   "objects": [
+    "a wooden bung",
+    "a dipper",
+    "a bag of malt"
+   ],
+   "match": [
+    "brewer",
+    "vintner",
+    "distiller"
+   ]
+  },
+  {
+   "id": "innkeeper",
+   "name": "innkeeper",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "drink",
+    "food",
+    "crowd",
+    "coin"
+   ],
+   "objects": [
+    "a ring of keys",
+    "a tally slate",
+    "a bar rag"
+   ],
+   "match": [
+    "innkeeper",
+    "landlord",
+    "landlady",
+    "barkeep",
+    "publican",
+    "tavernkeeper"
+   ]
+  },
+  {
+   "id": "barmaid",
+   "name": "tavern server",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "drink",
+    "crowd"
+   ],
+   "objects": [
+    "a tray",
+    "a bar rag",
+    "copper tips"
+   ],
+   "match": [
+    "barmaid",
+    "server",
+    "tapster",
+    "potboy"
+   ]
+  },
+  {
+   "id": "cook",
+   "name": "cook",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "food",
+    "fire"
+   ],
+   "objects": [
+    "a wooden spoon",
+    "a pinch of salt in a twist of paper",
+    "a paring knife"
+   ],
+   "match": [
+    "cook",
+    "scullion"
+   ]
+  },
+  {
+   "id": "stallholder",
+   "name": "market stallholder",
+   "class": "trade",
+   "mobility": "resident",
+   "tags": [
+    "trade",
+    "coin",
+    "crowd"
+   ],
+   "objects": [
+    "a money pouch",
+    "a set of brass weights",
+    "a tally stick"
+   ],
+   "match": [
+    "stallholder",
+    "vendor",
+    "hawker",
+    "seller",
+    "grocer",
+    "costermonger"
+   ]
+  },
+  {
+   "id": "merchant",
+   "name": "travelling merchant",
+   "class": "trade",
+   "mobility": "mobile",
+   "tags": [
+    "trade",
+    "coin",
+    "travel",
+    "letters"
+   ],
+   "objects": [
+    "a ledger",
+    "a seal ring",
+    "sample swatches"
+   ],
+   "match": [
+    "merchant",
+    "trader",
+    "dealer"
+   ]
+  },
+  {
+   "id": "peddler",
+   "name": "peddler",
+   "class": "trade",
+   "mobility": "mobile",
+   "tags": [
+    "trade",
+    "travel",
+    "coin"
+   ],
+   "objects": [
+    "a tray of ribbons",
+    "cheap tin charms",
+    "a pack strap"
+   ],
+   "match": [
+    "peddler",
+    "pedlar",
+    "tinker"
+   ]
+  },
+  {
+   "id": "carter",
+   "name": "carter",
+   "class": "road",
+   "mobility": "mobile",
+   "tags": [
+    "travel",
+    "animals",
+    "labour"
+   ],
+   "objects": [
+    "a whip",
+    "a spare harness buckle",
+    "a bag of oats"
+   ],
+   "match": [
+    "carter",
+    "drover",
+    "teamster",
+    "wagoner",
+    "driver"
+   ]
+  },
+  {
+   "id": "caravan-guard",
+   "name": "caravan guard",
+   "class": "road",
+   "mobility": "mobile",
+   "tags": [
+    "travel",
+    "arms"
+   ],
+   "objects": [
+    "a whetstone",
+    "a dented tin cup",
+    "a lucky arrowhead"
+   ],
+   "match": [
+    "caravan guard",
+    "outrider",
+    "sellsword",
+    "mercenary"
+   ]
+  },
+  {
+   "id": "pilgrim",
+   "name": "pilgrim",
+   "class": "faith",
+   "mobility": "transient",
+   "tags": [
+    "faith",
+    "travel"
+   ],
+   "objects": [
+    "a string of prayer beads",
+    "a pilgrim's token",
+    "a worn staff"
+   ],
+   "match": [
+    "pilgrim"
+   ],
+   "excludes": [
+    "irreverent"
+   ]
+  },
+  {
+   "id": "minstrel",
+   "name": "minstrel",
+   "class": "road",
+   "mobility": "mobile",
+   "tags": [
+    "music",
+    "crowd",
+    "travel"
+   ],
+   "objects": [
+    "a spare lute string",
+    "a tin whistle",
+    "a scrap of song lyrics"
+   ],
+   "match": [
+    "minstrel",
+    "bard",
+    "singer",
+    "musician",
+    "piper",
+    "fiddler"
+   ]
+  },
+  {
+   "id": "messenger",
+   "name": "courier",
+   "class": "road",
+   "mobility": "mobile",
+   "tags": [
+    "travel",
+    "letters"
+   ],
+   "objects": [
+    "a sealed satchel",
+    "a waxed map",
+    "a runner's token"
+   ],
+   "match": [
+    "courier",
+    "messenger",
+    "runner"
+   ]
+  },
+  {
+   "id": "farmer",
+   "name": "farmer",
+   "class": "farm",
+   "mobility": "resident",
+   "tags": [
+    "earth",
+    "plants",
+    "animals",
+    "labour"
+   ],
+   "objects": [
+    "a seed pouch",
+    "a hoe blade",
+    "a sprig of barley"
+   ],
+   "match": [
+    "farmer",
+    "farmhand",
+    "crofter",
+    "peasant",
+    "farmwife"
+   ]
+  },
+  {
+   "id": "shepherd",
+   "name": "herder",
+   "class": "farm",
+   "mobility": "resident",
+   "tags": [
+    "animals",
+    "alone"
+   ],
+   "objects": [
+    "a crook",
+    "a tuft of wool",
+    "a bone whistle"
+   ],
+   "match": [
+    "shepherd",
+    "herder",
+    "goatherd",
+    "swineherd"
+   ]
+  },
+  {
+   "id": "woodcutter",
+   "name": "woodcutter",
+   "class": "labour",
+   "mobility": "resident",
+   "tags": [
+    "wood",
+    "labour",
+    "alone"
+   ],
+   "objects": [
+    "a hatchet",
+    "wood chips",
+    "a wedge"
+   ],
+   "match": [
+    "woodcutter",
+    "woodsman",
+    "forester",
+    "logger"
+   ]
+  },
+  {
+   "id": "miner",
+   "name": "miner",
+   "class": "labour",
+   "mobility": "resident",
+   "tags": [
+    "earth",
+    "stone",
+    "labour",
+    "dark"
+   ],
+   "objects": [
+    "a stub of candle",
+    "a chip of ore",
+    "a pick handle"
+   ],
+   "match": [
+    "miner",
+    "quarryman"
+   ]
+  },
+  {
+   "id": "labourer",
+   "name": "day labourer",
+   "class": "labour",
+   "mobility": "resident",
+   "tags": [
+    "labour"
+   ],
+   "objects": [
+    "a shovel handle",
+    "a sack",
+    "a day's wage in coppers"
+   ],
+   "match": [
+    "labourer",
+    "laborer",
+    "workman",
+    "worker",
+    "hauler"
+   ]
+  },
+  {
+   "id": "healer",
+   "name": "herbal healer",
+   "class": "learned",
+   "mobility": "resident",
+   "tags": [
+    "healing",
+    "plants"
+   ],
+   "objects": [
+    "a pouch of dried herbs",
+    "a mortar and pestle",
+    "rolled bandages"
+   ],
+   "match": [
+    "healer",
+    "herbalist",
+    "midwife",
+    "physician",
+    "surgeon",
+    "apothecary"
+   ]
+  },
+  {
+   "id": "priest",
+   "name": "priest",
+   "class": "faith",
+   "mobility": "resident",
+   "tags": [
+    "faith",
+    "letters",
+    "crowd"
+   ],
+   "objects": [
+    "a holy symbol",
+    "a stub of altar candle",
+    "a prayer book"
+   ],
+   "match": [
+    "priest",
+    "priestess",
+    "cleric",
+    "acolyte",
+    "monk",
+    "nun",
+    "friar"
+   ],
+   "excludes": [
+    "irreverent"
+   ]
+  },
+  {
+   "id": "scribe",
+   "name": "scribe",
+   "class": "learned",
+   "mobility": "resident",
+   "tags": [
+    "letters"
+   ],
+   "objects": [
+    "a quill",
+    "a pot of ink",
+    "sand for blotting"
+   ],
+   "match": [
+    "scribe",
+    "clerk",
+    "copyist",
+    "notary",
+    "bookkeeper"
+   ]
+  },
+  {
+   "id": "teacher",
+   "name": "tutor",
+   "class": "learned",
+   "mobility": "resident",
+   "tags": [
+    "letters",
+    "children"
+   ],
+   "objects": [
+    "a slate",
+    "a stick of chalk",
+    "a dog-eared primer"
+   ],
+   "match": [
+    "teacher",
+    "tutor",
+    "schoolmaster",
+    "schoolmistress"
+   ]
+  },
+  {
+   "id": "guard",
+   "name": "town guard",
+   "class": "law",
+   "mobility": "resident",
+   "tags": [
+    "arms",
+    "law",
+    "crowd"
+   ],
+   "objects": [
+    "a whistle",
+    "a ring of cell keys",
+    "a rolled notice"
+   ],
+   "match": [
+    "guard",
+    "watchman",
+    "constable",
+    "sentry",
+    "warden"
+   ]
+  },
+  {
+   "id": "reeve",
+   "name": "reeve's officer",
+   "class": "law",
+   "mobility": "resident",
+   "tags": [
+    "law",
+    "letters",
+    "coin"
+   ],
+   "objects": [
+    "a wax seal",
+    "a roll of tax receipts",
+    "a ledger"
+   ],
+   "match": [
+    "reeve",
+    "official",
+    "magistrate",
+    "bailiff",
+    "tax collector",
+    "tithe"
+   ]
+  },
+  {
+   "id": "soldier",
+   "name": "soldier",
+   "class": "law",
+   "mobility": "mobile",
+   "tags": [
+    "arms",
+    "travel"
+   ],
+   "objects": [
+    "a regimental badge",
+    "a whetstone",
+    "dice carved from bone"
+   ],
+   "match": [
+    "soldier",
+    "trooper",
+    "veteran",
+    "man-at-arms"
+   ]
+  },
+  {
+   "id": "hunter",
+   "name": "hunter",
+   "class": "farm",
+   "mobility": "resident",
+   "tags": [
+    "animals",
+    "arms",
+    "alone"
+   ],
+   "objects": [
+    "a skinning knife",
+    "fletching feathers",
+    "a snare wire"
+   ],
+   "match": [
+    "hunter",
+    "trapper",
+    "poacher"
+   ]
+  },
+  {
+   "id": "stablehand",
+   "name": "stablehand",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "animals",
+    "labour"
+   ],
+   "objects": [
+    "a curry comb",
+    "a hoof pick",
+    "a carrot end"
+   ],
+   "match": [
+    "stablehand",
+    "groom",
+    "ostler",
+    "stableboy"
+   ]
+  },
+  {
+   "id": "servant",
+   "name": "household servant",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "crowd"
+   ],
+   "objects": [
+    "a feather duster",
+    "a ring of pantry keys",
+    "a folded apron"
+   ],
+   "match": [
+    "servant",
+    "maid",
+    "valet",
+    "footman",
+    "housekeeper"
+   ]
+  },
+  {
+   "id": "washer",
+   "name": "launderer",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "water",
+    "cloth",
+    "labour"
+   ],
+   "objects": [
+    "a washing paddle",
+    "a cake of lye soap",
+    "clothes pegs"
+   ],
+   "match": [
+    "washerwoman",
+    "laundress",
+    "launderer",
+    "washer"
+   ]
+  },
+  {
+   "id": "gravedigger",
+   "name": "gravedigger",
+   "class": "labour",
+   "mobility": "resident",
+   "tags": [
+    "earth",
+    "dead",
+    "alone"
+   ],
+   "objects": [
+    "a spade",
+    "a lantern",
+    "a coffin nail"
+   ],
+   "match": [
+    "gravedigger",
+    "sexton",
+    "undertaker"
+   ]
+  },
+  {
+   "id": "lamplighter",
+   "name": "lamplighter",
+   "class": "service",
+   "mobility": "resident",
+   "tags": [
+    "fire",
+    "night"
+   ],
+   "objects": [
+    "a lighting pole",
+    "a tin of wicks",
+    "a flint"
+   ],
+   "match": [
+    "lamplighter"
+   ]
+  },
+  {
+   "id": "ratcatcher",
+   "name": "ratcatcher",
+   "class": "labour",
+   "mobility": "resident",
+   "tags": [
+    "animals",
+    "dark"
+   ],
+   "objects": [
+    "a wire cage",
+    "a terrier's leash",
+    "rat tails on a string"
+   ],
+   "match": [
+    "ratcatcher"
+   ]
+  },
+  {
+   "id": "beggar",
+   "name": "beggar",
+   "class": "rogue",
+   "mobility": "resident",
+   "tags": [
+    "crowd",
+    "poor"
+   ],
+   "objects": [
+    "a chipped bowl",
+    "a lucky copper",
+    "a scrap of blanket"
+   ],
+   "match": [
+    "beggar",
+    "vagrant",
+    "urchin"
+   ]
+  },
+  {
+   "id": "pickpocket",
+   "name": "pickpocket",
+   "class": "rogue",
+   "mobility": "resident",
+   "tags": [
+    "crowd",
+    "coin",
+    "night"
+   ],
+   "objects": [
+    "a thin blade",
+    "someone else's handkerchief",
+    "a lucky copper"
+   ],
+   "match": [
+    "pickpocket",
+    "cutpurse",
+    "thief"
+   ]
+  },
+  {
+   "id": "gambler",
+   "name": "gambler",
+   "class": "rogue",
+   "mobility": "resident",
+   "tags": [
+    "coin",
+    "crowd",
+    "night"
+   ],
+   "objects": [
+    "loaded dice",
+    "a deck of greasy cards",
+    "a lucky copper"
+   ],
+   "match": [
+    "gambler",
+    "cardsharp",
+    "dicer"
+   ]
+  },
+  {
+   "id": "noble",
+   "name": "minor noble",
+   "class": "gentry",
+   "mobility": "resident",
+   "tags": [
+    "coin",
+    "letters",
+    "gentry"
+   ],
+   "objects": [
+    "a signet ring",
+    "a scented handkerchief",
+    "a silver toothpick"
+   ],
+   "match": [
+    "noble",
+    "noblewoman",
+    "nobleman",
+    "lord",
+    "lady",
+    "gentleman",
+    "gentlewoman"
+   ]
+  },
+  {
+   "id": "retired",
+   "name": "retired",
+   "class": "gentry",
+   "mobility": "resident",
+   "tags": [
+    "old"
+   ],
+   "objects": [
+    "a walking stick",
+    "a pipe",
+    "an old medal"
+   ],
+   "match": [
+    "old man",
+    "old woman",
+    "elder",
+    "crone",
+    "greybeard",
+    "retiree"
+   ]
+  },
+  {
+   "id": "child",
+   "name": "child",
+   "class": "young",
+   "mobility": "resident",
+   "tags": [
+    "young",
+    "minor"
+   ],
+   "objects": [
+    "a wooden top",
+    "a pocketful of pebbles",
+    "a string with a button on it"
+   ],
+   "match": [
+    "child",
+    "boy",
+    "girl",
+    "kid",
+    "lad",
+    "lass",
+    "youngster"
+   ]
+  }
+ ]
+}
