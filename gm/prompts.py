@@ -1125,8 +1125,16 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 bond += (f" {actor.name} TRAVELS WITH the player: they came here "
                          f"together and they go on together. They have their own eyes "
                          f"and their own opinions about what is around them.")
+            # How they carry themselves, from the life the population rolled for them:
+            # behaviour, two traits at most, the quirk only when it is due — and never
+            # their wants, goal or hobby, which are learned in play and which a 12B model
+            # told them leaks (rules/population.py, "what the narrator is told").
+            from rules import population as _population
+
+            manner = _population.manner_for(_population.of_ref(scene, ref), turn)
+            manner = f" {manner}" if manner else ""
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
-                         f"{_states_of(actor)}")
+                         f"{manner}{_states_of(actor)}")
         # Who the player is talking to, as a fact with a rule attached. The step is
         # the vocabulary's word and the number stays on the panel: the narrator hears
         # how somebody feels, never what they score (the third law).

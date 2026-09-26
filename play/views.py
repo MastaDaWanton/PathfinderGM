@@ -2047,6 +2047,18 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # Every search for somebody that found nobody this turn, so the synonym table
             # (content/people/synonyms.json) grows from what real play missed.
             c.turn_log.extend(population.drain_misses())
+            # The quirk rests once the page has shown it (engine-held cadence, like a
+            # `respeakdelay`: a small model cannot count "now and then"), and a trait the
+            # page names outright instead of showing is counted — measured before any
+            # repair is written for it.
+            shown = population.note_quirks_shown(c.scene, text, len(c.transcript))
+            named = {r: population.traits_named(population.of_ref(c.scene, r), text,
+                                                c.scene.actors[r].name)
+                     for r in c.scene.actors if population.of_ref(c.scene, r)}
+            named = {r: w for r, w in named.items() if w}
+            if shown or named:
+                c.turn_log.append({"kind": "manner", "quirks_shown": shown,
+                                   "traits_named": named})
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).

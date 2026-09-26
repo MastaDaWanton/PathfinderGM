@@ -120,6 +120,93 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
     return actor
 
 
+# --- what the narrator is told about a person ------------------------------------------
+#
+# docs/the-population.md §7, built 2026-09-25 after a research pass (citations in
+# docs/the-population.md "Built: manner in the brief"):
+#   * two traits at most, the loudest — salient attributes crowd out the rest (The
+#     Chameleon's Limit, 2026), and Dwarf Fortress reports only facets past its neutral band;
+#   * as behaviour, never a label: the `shows` line is something they do, and CoMPosT
+#     (EMNLP 2023) found generic framing is what breeds caricature;
+#   * the quirk on first meeting and then only after QUIRK_EVERY turns, held here as
+#     state like Valve's `respeakdelay` — a small model cannot count "now and then";
+#   * wants, goal and hobby never: at 12B a secret the model is told leaks thematically
+#     about 83% of the time, and "don't reveal" helped only frontier models (Holtzman &
+#     West 2026). What it is not told it cannot tell.
+
+QUIRK_EVERY = 5
+
+
+def manner_for(rec: dict | None, turn: int) -> str:
+    """The line the brief carries for a person with a record, or ""."""
+    life = (rec or {}).get("life") or {}
+    shows = [s for s in (life.get("shows") or []) if s][:2]
+    parts = []
+    if shows:
+        parts.append("In how they act (show it; never name it): " + "; ".join(shows) + ".")
+    quirk = str(life.get("quirk") or "").strip()
+    if quirk and quirk_due(rec, turn):
+        parts.append(f"A habit of theirs, shown once in what they do this beat: {quirk}.")
+    return " ".join(parts)
+
+
+def quirk_due(rec: dict | None, turn: int) -> bool:
+    last = (rec or {}).get("quirk_turn")
+    return last is None or int(turn) - int(last) >= QUIRK_EVERY
+
+
+_QUIRK_FILLER = frozenset({
+    "their", "they", "them", "whenever", "every", "anybody", "somebody", "something",
+    "about", "before", "after", "while", "would", "could", "never", "always", "again",
+    "other", "people", "thing", "things", "where", "which", "there", "those", "these",
+})
+
+
+def quirk_shown(rec: dict | None, beat: str) -> bool:
+    """Whether the beat showed this person's quirk: two of its distinctive words (five
+    letters or more, not grammar) appear in it. Mechanical and deliberately loose — it
+    decides only when the brief next offers the habit, never what the page says."""
+    quirk = str(((rec or {}).get("life") or {}).get("quirk") or "").lower()
+    words = {_stem(w) for w in re.findall(r"[a-z]{5,}", quirk)} - {_stem(w) for w in _QUIRK_FILLER}
+    if len(words) < 2:
+        return False
+    said = {_stem(w) for w in re.findall(r"[a-z]{5,}", str(beat or "").lower())}
+    return len(words & said) >= 2
+
+
+def note_quirks_shown(scene, beat: str, turn: int) -> list[str]:
+    """After the prose: every person here whose quirk the beat showed gets `quirk_turn`,
+    so the brief rests it for QUIRK_EVERY turns. Returns their refs."""
+    out = []
+    for ref, actor in (getattr(scene, "actors", {}) or {}).items():
+        if getattr(actor, "is_pc", False):
+            continue
+        rec = of_ref(scene, ref)
+        if rec is not None and quirk_shown(rec, beat):
+            rec["quirk_turn"] = int(turn)
+            out.append(ref)
+    return out
+
+
+def traits_named(rec: dict | None, beat: str, name: str = "") -> list[str]:
+    """The trait words the beat says outright about this person — "suspicious",
+    "tight-fisted" — within the sentences that name them. Behaviour was asked for; a
+    label is the caricature CoMPosT describes. Logged, to be measured before any repair
+    is written for it."""
+    life = (rec or {}).get("life") or {}
+    words = [w.lower() for w in (life.get("traits") or []) if w]
+    if not words or not beat:
+        return []
+    head = (str(name or rec.get("phrase") or "").lower().split() or [""])[-1]
+    out = []
+    for sentence in re.split(r"(?<=[.!?])\s+", str(beat)):
+        low = sentence.lower()
+        if head and head not in low and not re.search(r"\b(?:he|she|they)\b", low):
+            continue
+        out += [w for w in words if re.search(rf"\b{re.escape(w)}\b", low)]
+    return sorted(set(out))
+
+
 def used_frames(scene, home) -> set[str]:
     """The quirk frames people of this settlement already carry, so the next is new."""
     return {rec["life"]["quirk_frame"]
