@@ -3147,6 +3147,27 @@ def added_sentences(before: str, after: str) -> list[str]:
     return [s for s in _sentences(after) if s not in had]
 
 
+# Sexual content, read mechanically, for ONE use: the adults-only rule in `views._finish`,
+# which discards a beat that reads as sexual while a child is in the scene. Unambiguous
+# words count alone; the softer ones only in pairs, so a parent's kiss on a forehead is not
+# read as a scene. A false positive costs one beat replaced by the holding line — the
+# right direction to be wrong in.
+_SEXUAL = re.compile(
+    r"\b(?:naked|nude|nudity|genitals?|breasts?|nipples?|penis|cock|vagina|cunt|"
+    r"erection|aroused|arousal|orgasm\w*|climax(?:es|ed|ing)?|intercourse|sex|sexual\w*|"
+    r"make love|making love|made love|fuck\w*|thrust(?:s|ing)? into|straddl\w*)\b", re.I)
+_SENSUAL = re.compile(
+    r"\b(?:undress\w*|unlac\w* (?:her|his|their) \w+|bare skin|moan\w*|caress\w*|"
+    r"kiss(?:es|ed|ing)? (?:her|his|their) (?:neck|throat|mouth|lips|body)|"
+    r"hips? against|between (?:her|his|their) (?:thighs|legs)|writh\w*)\b", re.I)
+
+
+def intimate(text: str) -> bool:
+    """Whether a beat reads as sexual content: one unambiguous word, or two softer ones."""
+    text = str(text or "")
+    return bool(_SEXUAL.search(text)) or len(_SENSUAL.findall(text)) >= 2
+
+
 def own_prose(transcript, n: int = 12, tagged: bool = False) -> list[str]:
     """The narrator's own recent beats, as the model wrote them: the last `n` GM beats
     of kind "setup", each with the pipeline's appended sentences taken back out.

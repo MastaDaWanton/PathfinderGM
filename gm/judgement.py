@@ -5602,6 +5602,23 @@ def _take_the_name(scene, who, given: str) -> None:
             e["who"] = given
 
 
+_CHILD_WORDS = re.compile(r"\b(?:child|children|boy|boys|girl|girls|kid|kids|urchin\w*|"
+                          r"youngster\w*|toddler\w*|infant\w*|baby|babies|lad|lass)\b", re.I)
+
+
+def a_child_in(scene, beat: str) -> bool:
+    """Whether a child is in this scene or in this beat: somebody here whose population
+    record is a minor, or a child the beat itself names. For the adults-only rule
+    (`narration.intimate`, `views._finish`), so it errs wide."""
+    from rules import population
+
+    for ref in (getattr(scene, "actors", {}) or {}):
+        rec = population.of_ref(scene, ref)
+        if rec and "minor" in ((rec.get("life") or {}).get("tags") or []):
+            return True
+    return bool(_CHILD_WORDS.search(str(beat or "")))
+
+
 def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]:
     """Everyone a beat introduced goes into the population, located, with a life rolled —
     before promotion, so a promoted person wears the face their record rolled and one who

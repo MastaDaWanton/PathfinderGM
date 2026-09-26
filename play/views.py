@@ -1990,6 +1990,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # were no tells, no degraded sentence, and the empty string skipped
             # every floor below because they all lived inside `if text`.
             text = _floor("empty turn")
+        # Adults only, without exception, whatever the table's content setting: a beat
+        # that reads as sexual while a child is in the scene or in the beat is discarded
+        # whole — never trimmed, never repaired — and the turn gets the holding line.
+        if text and narration_mod.intimate(text) and judgement.a_child_in(c.scene, text):
+            c.turn_log.append({"kind": "refused-beat",
+                               "why": "sexual content with a child in the scene"})
+            ours.clear()
+            text = _floor("discarded: sexual content with a child in the scene")
         added = list(getattr(agent, "last_added", []) or [])
         if text:
             before = text

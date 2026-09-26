@@ -463,7 +463,8 @@ EXAMPLES = [
 COMBAT_FORMULA = """A fight is fast and the writing is fast with it. One formula, every
 round:
 
-  LANDED   what the last beat did — a clause, not a sentence
+  LANDED   what the last blow did to the body — where it hit, what it opened or broke, the
+           blood — in plain physical words, a clause, not a sentence
   THREAT   what is coming at them right now, and from where
   OPENING  one concrete thing they could use: ground, a rail, a lamp, somebody's blind
            side, the fact that he has to step over a body to reach you
@@ -532,11 +533,19 @@ COMBAT_EXAMPLES = [
     {
         "player": "I stay on him and keep hitting.",
         "reply": {
-            "narration": "He is not blocking any more, just covering, and the arm he is "
-                         "covering with is the one that is bleeding. Behind you the door "
-                         "you came in by bangs once against its frame — somebody has come "
-                         "through it. He sees them before you do, and it puts something "
-                         "back into his face. Do you finish him or turn round?",
+            # Written out in the body, 2026-09-25. The fight examples were bloodless — this
+            # one's "the arm that is bleeding" was the only wound in five — and the prose
+            # copied them: in the recorded fights, "the violence" and "the chaos" turned up
+            # in about one beat in three. The player asked for the gore, plainly. These are
+            # the wounds of the blows before this one, so the example still never says how
+            # this turn's roll went.
+            "narration": "He is not blocking any more, just covering: your last punch "
+                         "opened his eyebrow to the bone, and the blood has run into the eye "
+                         "so he is fighting half blind, spitting red through a split lip. "
+                         "The forearm he holds up is the one you cut, laid open from the "
+                         "wrist, and it shakes. Behind you the door bangs against its frame — "
+                         "somebody has come through it, and he sees them before you do. Do "
+                         "you finish him or turn round?",
             "suggestions": ["I finish him now", "I turn to see who came in",
                             "I get where I can see both"],
             "intents": [{"op": "attack", "actor": "pc", "target": "c1",
@@ -1131,8 +1140,13 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # told them leaks (rules/population.py, "what the narrator is told").
             from rules import population as _population
 
-            manner = _population.manner_for(_population.of_ref(scene, ref), turn)
+            rec = _population.of_ref(scene, ref)
+            manner = _population.manner_for(rec, turn)
             manner = f" {manner}" if manner else ""
+            # Said as a fact every turn: the table's content rule is adults only, and
+            # the narrator cannot keep a rule about a child it was never told is one.
+            if rec and "minor" in ((rec.get("life") or {}).get("tags") or []):
+                manner += f" {actor.name} IS A CHILD (fact)."
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
                          f"{manner}{_states_of(actor)}")
         # Who the player is talking to, as a fact with a rule attached. The step is
@@ -1533,6 +1547,11 @@ What the engine decided is what happened. Do not contradict it, do not add a rol
 state a number, and do not invent an outcome it did not give you. If it decided nothing
 mechanical, this is a quiet beat: describe the place and the people and hand the turn back.
 
+Write bodies, not summaries. Say what moves, where it goes and what it does: the hand, the
+blade, the step, the fall. When a blow lands, show the wound in plain physical words —
+where it opened, what broke, the blood and where it runs — never "the violence", "the
+chaos" or "the struggle". A comparison only where nothing plain will do.
+
 When somebody from WHO IS HERE speaks, wrap their words in a tag with their ref, and
 to=you when they say it to the player: <say who=c2 to=you>'Two days,'</say> he says.
 The tags are taken out before anyone reads the page. The player's own words get no tag.
@@ -1738,8 +1757,15 @@ def content_line() -> str:
     from rules import houserules
 
     if houserules.content() == "explicit":
-        return ("\nThis table permits adult content: when a scene turns to intimacy, "
-                "write it plainly and go on with the scene.\n")
+        # Asked for 2026-09-25: the narrator "shies away ... by being metaphorical"; the
+        # table wants intimate scenes written as vividly as the fights, in the body.
+        # Adults only, without exception — the population holds children now
+        # (rules/lives.py), so the rule is stated here and checked in code after the
+        # prose (`narration.intimate` with the scene's minors, in `views._finish`).
+        return ("\nThis table permits adult content. When a scene between adults turns "
+                "to intimacy, write it vividly and in the body — the physical actions, "
+                "touch, breath and bodies described plainly, not in metaphor — and go on "
+                "with the scene. Never anyone who is a child, in any way.\n")
     return ("\nWhen a scene turns to intimacy, fade to black: say in one sentence that "
             "time passes, then pick the scene up afterwards — never stall it, never "
             "replace what the people were doing with the room's weather.\n")
