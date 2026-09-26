@@ -203,3 +203,38 @@ Not done: a trade the population rolled but the prose never showed still answers
 finder. In run 4, "a scribe" in the tavern found the man in the corner whom the
 population had rolled as a scribe. That reads as the world being consistent; flagged to
 the user.
+
+## Built: blows as plan ops (2026-09-25)
+
+The fourth door.
+
+- **A blow the plan declares is rolled before the prose.** It is an `attack` with an NPC
+  as actor. When somebody other than the player opens a fight, `Engine.run` rolls the
+  initiator's blow in the same batch (`_their_first_blow`), so the prose describes what
+  landed. `struck_first` is one run of that rule now; the opening effect carries the
+  declared params.
+- **The prose never opens a fight.** `attacked_by` is a check, run in `narrate_turn`. A
+  blow the engine never rolled gets one targeted rewrite naming the fix. If it still
+  strikes, the sentence is cut. This holds whether or not the striker is somebody the
+  scene holds yet. `_finish` logs anything still read and opens nothing.
+- A worked example shows the planner declaring an NPC's blow.
+  `narrator_audit.py --script provoke` escalates verbally against one man; nothing the
+  player does is itself an attack.
+
+**Live, gemma-4-12B, the provoke script:**
+
+| | run A | run B |
+|---|---|---|
+| turns where the plan declared his blow | 2 (turns 8, 9) | 0 |
+| fights the prose door opened | 1, on "he slams a heavy, calloused fist onto the bar" | 0 |
+| blows the new check had to rewrite | — | 0 |
+
+A first version of the script knocked a drink from his hand. The planner read that as
+the player attacking, so every turn after it was already a fight. The same line produced
+"Kesst Vayr drinks." (the noun "drink" read as the verb), which is now fixed.
+
+**What this leaves open, measured:** the man was insulted nine times in run B and never
+struck. The prose built the tension correctly and waited ("He doesn't lunge, but his
+knuckles turn white"). Nothing in the world moved: no insult changed anyone's attitude,
+so the world has no route from provocation to violence, and the planner rarely takes the
+step unprompted. This is a question of world logic, put to the user rather than guessed.
