@@ -79,3 +79,22 @@ on the first insult in half of twenty runs.
 - **A cooldown after an outburst**, following RimWorld's post-break reset.
 - **Insults in the middle of a fight** cost regard but roll nothing, since the blows are
   already the dice's.
+
+## Live (2026-09-25, gemma-4-12B, the provoke script)
+
+- "I laugh in his face and tell him to do something about it" declared `provoke` on
+  Borin Lyraxys, a world character with no rolled life, so temper 50. He was unfriendly
+  and the chance was 0.12; the roll was 4. He swung with his fists before the prose
+  ("Borin Lyraxys hits Kesst Vayr for 2 bludgeoning"), and the plan declared his later
+  blows in the fight that followed.
+- The first insult, "I tell the biggest man at the bar that I have seen better fighters
+  in a nursery", provoked nobody. Several men were present, nobody was in conversation
+  yet, and the words it was spoken at were never looked for. Fixed: they are found
+  through the population's finder, without where he stands ("the biggest man" is the
+  "large man").
+- Writing that fix reused the name `_AIMED_AT`, which already existed 3,800 lines
+  earlier, and broke four misaimed-attack repairs. `tests/test_no_silent_shadowing.py`
+  now refuses a module-level name rebound without reading its old value.
+
+One run, one seeded roll: this shows the path works end to end in real play, not that
+the tuning is right. The simulation table above is the tuning's evidence.
