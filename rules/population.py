@@ -175,17 +175,33 @@ def quirk_shown(rec: dict | None, beat: str) -> bool:
 
 
 def note_quirks_shown(scene, beat: str, turn: int) -> list[str]:
-    """After the prose: every person here whose quirk the beat showed gets `quirk_turn`,
-    so the brief rests it for QUIRK_EVERY turns. Returns their refs."""
-    out = []
+    """After the prose: the quirk rests for QUIRK_EVERY turns from the beat it was OFFERED
+    in, whether or not the page used it — Valve's `respeakdelay` counts from the speaking,
+    not from somebody confirming it was heard. Measured live 2026-09-25: the model plays
+    quirks in paraphrase ("can tell which quarter of town you grew up in from the way you
+    say three words" came back as "focuses on the way you speak, as if trying to pin down
+    where you grew up"), the word detector missed every one of them in twelve turns, and a
+    cadence waiting on the detector would have offered each quirk every turn — the
+    caricature the cadence exists to prevent. Returns the refs whose quirk the detector
+    DID see, for the turn log."""
+    seen = []
     for ref, actor in (getattr(scene, "actors", {}) or {}).items():
         if getattr(actor, "is_pc", False):
             continue
         rec = of_ref(scene, ref)
-        if rec is not None and quirk_shown(rec, beat):
+        if rec is None or not ((rec.get("life") or {}).get("quirk")):
+            continue
+        if quirk_shown(rec, beat):
+            seen.append(ref)
+        if quirk_due(rec, turn):
             rec["quirk_turn"] = int(turn)
-            out.append(ref)
-    return out
+    return seen
+
+
+_TOO_COMMON_TO_BE_A_LABEL = frozenset({
+    "open", "warm", "hard", "cold", "soft", "quiet", "loud", "plain", "close", "free",
+    "sharp", "still", "light", "dark", "tight", "loose", "straight", "fair", "short",
+})
 
 
 def traits_named(rec: dict | None, beat: str, name: str = "") -> list[str]:
@@ -194,7 +210,10 @@ def traits_named(rec: dict | None, beat: str, name: str = "") -> list[str]:
     label is the caricature CoMPosT describes. Logged, to be measured before any repair
     is written for it."""
     life = (rec or {}).get("life") or {}
-    words = [w.lower() for w in (life.get("traits") or []) if w]
+    # Words too common to be a label: "the gate stood open" named nobody "open" (live,
+    # 2026-09-25, the only hit in twelve turns).
+    words = [w.lower() for w in (life.get("traits") or [])
+             if w and w.lower() not in _TOO_COMMON_TO_BE_A_LABEL]
     if not words or not beat:
         return []
     head = (str(name or rec.get("phrase") or "").lower().split() or [""])[-1]

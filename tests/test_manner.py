@@ -72,11 +72,22 @@ def test_the_quirk_rests_once_the_page_has_shown_it(scene):
     assert rec["life"]["quirk"] in _brief(scene, 3 + population.QUIRK_EVERY)
 
 
-def test_a_beat_that_did_not_show_it_leaves_it_offered(scene):
+def test_an_offered_quirk_rests_even_when_the_page_paraphrased_it(scene):
+    """Measured live 2026-09-25: the model plays quirks in paraphrase — "can tell which
+    quarter of town you grew up in from the way you say three words" came back as
+    "focuses on the way you speak, as if trying to pin down where you grew up" — and the
+    word detector missed all of them in twelve turns. Resting only on a detected showing
+    would have offered every quirk every turn. It rests from the offer, as Valve's
+    `respeakdelay` counts from the speaking."""
     rec, actor = _person(scene)
-    rec["life"]["quirk"] = "folds any loose scrap of paper into a little bird"
-    assert population.note_quirks_shown(scene, "He nods and says nothing.", 3) == []
-    assert rec["life"]["quirk"] in _brief(scene, 4)
+    rec["life"]["quirk"] = ("can tell which quarter of town you grew up in from the way "
+                            "you say three words")
+    beat = ("She focuses on the way you speak, as if trying to pin down where you grew up "
+            "from the cadence of your voice.")
+    assert rec["life"]["quirk"] in _brief(scene, 3)
+    assert population.note_quirks_shown(scene, beat, 3) == [], "the detector misses it"
+    assert rec["quirk_turn"] == 3
+    assert rec["life"]["quirk"] not in _brief(scene, 4)
 
 
 def test_a_trait_named_outright_is_caught(scene):
