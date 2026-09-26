@@ -230,3 +230,64 @@ Still unexercised live: the repair path's binding (the planner has not yet reach
 invented ref to a glimpse), and "which do you mean". Both are covered by unit tests only.
 The booking door also clips phrases ("man in a stained leather", "woman with a sharp");
 that door is replaced in step 3, so it is recorded here and left alone.
+
+## Decided (2026-09-25, later): a world roster across playthroughs
+
+The user's words: "they need to exist here separately from the ones in an individual
+campaign because the campaign ones have history with a PC that doesn't exist".
+
+- **Who goes into the world's shared roster:** residents and travellers when they are
+  created, and anyone the player engages with, whatever they started as. "If I decide
+  I want to interact with a passing homeless nomadic man then when he is created he goes
+  into the shared roster as a person that can be used again."
+- **Found again on purpose:** "what if i like that person and want to find them in
+  another playthrough." That is a feature, not a side effect: the player can go looking
+  for a roster person from another playthrough.
+- Built on a global id per person. The campaign record points at the roster person and
+  keeps only what happened in that playthrough.
+- "Another playthrough" means a new character rolled in the same world, not a character
+  moving between worlds. The roster belongs to the world; each character's save keeps
+  only that character's history with its people.
+- **What carries over:** the life as first rolled. Nothing from another character's game.
+- **Reuse, in the user's words:** "When B's scene needs 'a baker in the market', it could
+  use the town's roster baker first making sure to use people in the destinations that
+  make sense for them but also dont always do that or the campaigns will feel to
+  similar. in the case of shops or stalls or social/political office the person who owned
+  that place or title before is perfect but if the game wants an NPC that isnt tied to a
+  location or title it should not always grab already created people. if it just needs a
+  shady merchant or a fisherman at the docks it should make new people at first and as
+  that kind needs rolled again bring up the old character." So there are two rules:
+  - **Tied to a place or a title** (the keeper of a shop or stall, a social or political
+    office): the roster's holder of that place or title is used.
+  - **Untied** (a shady merchant, a fisherman at the docks): new people first. As more of
+    that kind are needed in this character's game, roster people of that kind start to
+    come back.
+  - Either way, only in places that make sense for them: a resident near home, a
+    traveller on their roads.
+- Not built yet. Research first: RimWorld's world pawns (generation reusing existing
+  pawns) and Dwarf Fortress's historical figures are the prior art to read.
+- **No keep mark and no kept-people list.** The user's reasoning: "no character starts
+  knowing very many people and unless a person gives their name or has their name given
+  the character shouldn't know it. And if the PC metagames they should be able to find
+  the people by name and description." So a roster person is found the ordinary way, by
+  asking around by description or by name. This needs two changes: a name rolled when the
+  person is created (today `true_name` is rolled only when they get a body), so it is the
+  same in every character's game; and the finder matching that name. Townsfolk know
+  Maren's name even when the character does not, so asking after her by name is fair in
+  the fiction too.
+
+## Decided (2026-09-25): hidden facts may direct, never tell
+
+After "I look for a scribe" in a tavern found the man in the corner, whom the population
+had rolled as a scribe though the prose never said so, the user's words: "it would be fine
+if the prose had you ask if anyone was a scribe and the man walked up and asked but
+ultimately you are correct that the information should be hidden from the player. also
+its still fine as long as the player isnt told the man is a scribe and is just directed
+to him."
+
+So a rolled life (work, wants, goal, hobby, quirk) may decide who the finder points the
+player at, and the fiction may reveal it through play: he steps up when asked. No line
+the finder writes, and nothing the brief states, names the hidden fact.
+`tests/test_finding_someone.py::test_a_hidden_fact_may_find_them_but_is_never_said`
+holds the finder's side. A world character's authored role, such as Bregan Duskwatch
+the temple scribe, is public canon and is not a hidden fact.

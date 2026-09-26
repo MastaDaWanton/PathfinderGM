@@ -168,3 +168,28 @@ def test_a_big_town_is_searched_in_milliseconds(scene):
     start = time.perf_counter()
     population.find(scene, "the tinker with the cart")
     assert time.perf_counter() - start < 0.5
+
+
+def test_a_hidden_fact_may_find_them_but_is_never_said(scene):
+    """The user's ruling (2026-09-25), after "I look for a scribe" in a tavern found the
+    man in the corner whom the population had rolled as a scribe (a baker here: this
+    world authors its own scribe, whose role is public canon and answers first): "it's still fine as long
+    as the player isn't told the man is a scribe and is just directed to him." A rolled
+    life may decide who the player is pointed at; no answer the finder writes may state
+    it — the work, the wants, the goal and the quirk are learned in play."""
+    rec = population.note(scene, "man in a shadowed corner")
+    rec["life"]["work"], rec["life"]["work_name"] = "baker", "baker"
+    found = scope.look_for(WORLD, "baker", scene, VORMOOR)
+    assert found["scope"] == scope.HERE and found.get("record") == rec["id"]
+    assert "baker" not in found["line"] and "baker" not in found.get("who", "")
+    scene.at = "somewhere-else"
+    away = scope.look_for(WORLD, "the baker", scene, VORMOOR)
+    assert away["scope"] == scope.ELSEWHERE
+    hidden = [rec["life"][k] for k in ("work_name", "wants", "goal", "hobby", "quirk")
+              if rec["life"].get(k)]
+    assert not any(h.lower() in away["line"].lower() for h in hidden), away["line"]
+    population.note(scene, "man in a leather cap")["life"].update(work="baker",
+                                                                  work_name="baker")
+    rec["spot"] = "somewhere-else"
+    asked = scope.look_for(WORLD, "the baker", scene, VORMOOR)
+    assert asked["scope"] == scope.AMBIGUOUS and "baker" not in asked["line"]
