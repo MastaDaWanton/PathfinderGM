@@ -121,7 +121,8 @@ def in_the_room(scene, phrase: str) -> str:
     return best
 
 
-def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> dict:
+def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
+             indefinite: bool = False) -> dict:
     """The three answers of scope for a person the player named.
 
     Returns `{"scope": …, "who": name, "where": place, "line": sentence}`. `line` is what
@@ -148,8 +149,11 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
     vague = head in VAGUE and not any(w[:1].isupper() for w in phrase.split())
     # "the woman" names half the town. Asked vaguely, only the room and the people just
     # seen are searched; the rest of the town's women are not a list worth reading out.
-    pop = (population.find(scene, phrase, rings=(population.HERE, "recent", "met")
-                           if vague else None)
+    # And "a child" (indefinite) wants any child: somebody here will do, but a particular
+    # girl seen at the crossing an hour ago is not who was asked for (live, 2026-09-25) —
+    # the plan introduces one instead (`judgement.sought_indefinitely`).
+    pop = (population.find(scene, phrase, rings=(population.HERE,) if indefinite
+                           else (population.HERE, "recent", "met") if vague else None)
            if scene is not None else population.Found(scope=population.NONE, ring="",
                                                       people=[]))
     if pop.scope == population.HERE:

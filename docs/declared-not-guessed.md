@@ -151,3 +151,55 @@ the turn, so its tag count is a floor: a person the turn's own plan spawned coun
 
 Next door: names read from tagged speech are already live through `introduced_by`. The
 `introduce` op comes next.
+
+## Built: `introduce` (2026-09-25)
+
+The second door. `introduce{who; count <= 3, how: arrives|already_here, template, zone}`
+makes a bystander with a population record, a rolled life and a face, through
+`population.embody`: the one door the prose's people, the finder's repair and the plan
+now share. The same plan targets them as new1–new3, placeholders in the style of
+JSON:API's `lid` and ReWOO's `#E1`. Each is legal only after the intent that makes it,
+and is stamped at validation so the model cannot write it. The engine swaps real refs
+into the queue as each person lands, so a turn suspended for a roll saves real refs.
+`already_here` binds to the glimpse or actor the scene already holds before it makes
+anybody. There is one `introduce` per plan: Labyrinth and When2Call both measure
+over-use of an op that is always available.
+
+**Live, gemma-4-12B, a ten-turn script where every line asks for somebody new
+(`narrator_audit.py --script strangers`):**
+
+| | run 1 | run 2 | run 3 | run 4 |
+|---|---|---|---|---|
+| turns where introduce ran | 2 | 9 | 9 | 8 |
+| false "not here" refusals | 5 | 1 | 0 | 1 → fixed |
+| turns lost | 0 | 0 | 1 | 0 |
+| plan attempts for 10 turns | — | — | ~25 | 11 |
+
+The planner under-used the op rather than over-using it: in the first run it wrote
+`introduce` only where a turn was worded like the worked example. The fixes, each found
+in one of these runs:
+
+- **Trades were refused as absent.** "No scribe is here, and Zhilvarnia has none the
+  world names", said of a city: the item-29 rule against conjuring the mayor had reached
+  every trade. A trade or a description is now UNMET, and offices and unknown names keep
+  the world's answer.
+- **`person_sought`** read "ask around for a healer" as "a" + "round".
+- **Scope matched on "the"**, so "the oldest person on the street" matched a guild leader
+  in another city.
+- **`inject_introduce`** declares the op when the player looks for somebody who isn't
+  here, in a settlement, out of a fight. The schema's `must_contain` did not hold on half
+  the turns, so the injector is also the net.
+- **Leniency:** `how` and `who` are read, not refused. A blank `who` is filled from the
+  player's words, and a long one is clipped.
+- **The repeat check** read two introductions as "the same thing as last turn", because
+  the net writes one `because` for all of them. It lost a turn.
+- **Definiteness.** "a child" is any child: the population's here ring, then a new
+  person. "the girl" is that girl, in every ring. This is the same Heim distinction the
+  cast ledger uses, and the user's ruling that untied kinds should not always reuse.
+- **The three invented-name faults of run 2** were our own face line ("is a Korvu:
+  Somewhere in the middle of life"); the age clause is now lower-cased.
+
+Not done: a trade the population rolled but the prose never showed still answers the
+finder. In run 4, "a scribe" in the tavern found the man in the corner whom the
+population had rolled as a scribe. That reads as the world being consistent; flagged to
+the user.

@@ -1059,7 +1059,8 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
             if not word or not (_name_words(word) & _name_words(sought)):
                 continue
             found = scope_mod.look_for(world, sought, scene,
-                                       getattr(scene, "location_id", None))
+                                       getattr(scene, "location_id", None),
+                                       indefinite=sought_indefinitely(player_text))
             if found.get("scope") in (scope_mod.ELSEWHERE, scope_mod.NOWHERE):
                 kept = [dict(r) for r in raw_intents
                         if not _touches_ref(r, invented)]
@@ -5062,6 +5063,34 @@ _ASKS_AROUND = re.compile(
     re.I)
 
 
+def _sought_match(player_text: str):
+    # "I ask around for a healer" is looking, not speaking — but `redact_speech` reads
+    # "ask … for" as a request and blanks the healer. The asking-around forms are read
+    # from the sentence with only its quotations blanked (2026-09-25).
+    return (_ASKS_AROUND.search(speech.blanked(player_text or ""))
+            or _LOOKS_FOR.search(redact_speech(player_text or "")))
+
+
+def sought_indefinitely(player_text: str) -> bool:
+    """Whether the player asked for SOMEBODY of a kind ("a child", "some porter",
+    "someone who…") rather than for a particular person ("the girl", "my contact").
+
+    Heim's familiarity condition, which the cast ledger already reads (`_refers_back`):
+    an indefinite makes a new file card, a definite finds one. Measured live 2026-09-25:
+    "I look for a child who might run a message" was answered "The girl was at the north
+    crossing when you saw them, and is not here" — a particular girl from earlier, for a
+    request that wanted any child. The user's ruling on reuse is the same line: a kind
+    that is not tied to a place or a title should not always grab somebody already made.
+    """
+    m = _sought_match(player_text)
+    if not m:
+        return False
+    before = m.string[:m.start(1)].split()
+    head = m.group(1).split()[0].lower() if m.group(1).split() else ""
+    return bool((before and before[-1].lower() in ("a", "an", "some", "any", "another"))
+                or head in ("someone", "somebody", "anyone", "anybody", "whoever"))
+
+
 def person_sought(player_text: str) -> str:
     """The person the player's own sentence goes looking for, or "".
 
@@ -5069,11 +5098,7 @@ def person_sought(player_text: str) -> str:
     exists on. The narration describing people arriving is an arrival and legitimate; the
     player naming somebody is a question, and a question may be answered "no".
     """
-    # "I ask around for a healer" is looking, not speaking — but `redact_speech` reads
-    # "ask … for" as a request and blanks the healer. The asking-around forms are read
-    # from the sentence with only its quotations blanked (2026-09-25).
-    m = _ASKS_AROUND.search(speech.blanked(player_text or "")) \
-        or _LOOKS_FOR.search(redact_speech(player_text or ""))
+    m = _sought_match(player_text)
     if not m:
         return ""
     phrase = " ".join(m.group(1).split())
@@ -5159,7 +5184,8 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     phrase = person_sought(player_text)
     if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
         return raw_intents
-    found = scope_mod.look_for(world, phrase, scene, getattr(scene, "location_id", None))
+    found = scope_mod.look_for(world, phrase, scene, getattr(scene, "location_id", None),
+                               indefinite=sought_indefinitely(player_text))
     if found.get("scope") not in ("", scope_mod.UNMET):
         return raw_intents
     # "someone" describes nobody, and booked as a person's words it matched every later
@@ -5198,7 +5224,8 @@ def _sought(scene, world, player_text: str, location_id: str | None = None) -> d
     if not phrase:
         return {}
     where = location_id if location_id is not None else getattr(scene, "location_id", None)
-    return scope_mod.look_for(world, phrase, scene, where)
+    return scope_mod.look_for(world, phrase, scene, where,
+                              indefinite=sought_indefinitely(player_text))
 
 
 def answer_the_absent(raw_intents, player_text: str, scene, world=None):

@@ -266,3 +266,20 @@ def test_a_sentence_where_a_few_words_belong_is_clipped_not_refused():
             "and go for forty years and remembers them all")
     who = parse_all([_intro(long)])[0].params["who"]
     assert len(who) <= 80 and long.startswith(who)
+
+
+def test_a_child_is_any_child_and_the_girl_is_that_girl(engine):
+    """Measured live 2026-09-25: "I look for a child who might run a message" was
+    answered "The girl was at the north crossing when you saw them, and is not here" — a
+    particular girl for a request that wanted any child. The user's ruling on reuse draws
+    the same line: an untied kind should not always grab somebody already made."""
+    s = engine.scene
+    here = s.at
+    s.at = "elsewhere-spot"
+    population.note(s, "a girl selling ribbons")
+    s.at = here
+    said = "I look for a child who might run a message for a coin."
+    assert judgement.absent_answer(s, WORLD, said) == ""
+    assert judgement.inject_introduce([], said, s, WORLD)[0]["params"]["who"] == "child"
+    # The definite one is the particular girl, found where she was seen.
+    assert "girl selling ribbons" in judgement.absent_answer(s, WORLD, "I look for the girl.")
