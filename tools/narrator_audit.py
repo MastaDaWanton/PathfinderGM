@@ -79,20 +79,23 @@ SCRIPTS = {
         "I look for a scribe who can read a letter for me.",
         "I find the oldest person on the street and ask what this quarter was like once.",
     ],
-    # Every line gives somebody a reason to strike first. The blows door
-    # (docs/declared-not-guessed.md): does the PLAN declare the NPC's attack, or does the
-    # blow only appear in the prose — where `attacked_by` has had to read it out?
+    # Every line gives one man a reason to strike first, in words only — nothing the
+    # player does is itself an attack, so the first blow has to be his. The blows door
+    # (docs/declared-not-guessed.md): does the PLAN declare it, or does it only appear in
+    # the prose, where `attacked_by` has had to read it out? The first version knocked a
+    # drink from his hand, which the planner read as the player attacking, and every turn
+    # after was already a fight (2026-09-25).
     "provoke": [
         "I walk into the worst tavern on the street and sit at the bar.",
-        "I knock the drink out of the biggest man's hand and laugh at him.",
-        "I tell him he fights like his mother.",
-        "I shove past the men at the door on my way out.",
-        "I walk up to the gate guard and spit on his boots.",
-        "I try to lift the purse of the merchant beside me, clumsily.",
-        "I tell the merchant his scales are rigged, loudly, so the whole market hears.",
-        "I kick over the dice game in the alley.",
-        "I call the guard captain a bought man to his face.",
-        "I walk away without paying for the meal.",
+        "I tell the biggest man at the bar that I have seen better fighters in a nursery.",
+        "I laugh in his face and tell him to do something about it.",
+        "I call him a coward in front of his friends.",
+        "I tell his friends he cried when the last man stood up to him.",
+        "I lean in and tell him his wife is a better fighter than he is.",
+        "I turn my back on him and tell the barkeep he smells.",
+        "I tell the whole room he is all talk.",
+        "I stay where I am and smile at him.",
+        "I tell him I am still waiting.",
     ],
     "fight": [
         "I walk into the worst tavern on the street.",

@@ -2139,41 +2139,19 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                     repairs.append(f"{c.scene.actors[ref].name} joined the fight "
                                    f"on {'your' if side == 'pc' else 'their'} side")
                     agent.engine.rally(ref)
-            # And whoever the beat says struck at the player, outside a fight: the
-            # fight opens from THEIR side and their blow is rolled now, not after the
-            # player's next line. "I should be put into combat when I am attacked, it
-            # shouldn't wait for me" (2026-09-18). The NPC loop below then carries
-            # the order on to the player.
-            struck = judgement.attacked_by(c.scene, text)
+            # A blow at the player is declared in the plan now, and rolled before the
+            # prose (`Engine._their_first_blow`); the prose never opens a fight. Measured
+            # 2026-09-25 on the provoke script: the plan declared the real blows, and the
+            # one blow this door read out of the prose was a man slamming his fist on
+            # the bar — a fight opened on furniture. The prose call rewrites or cuts an
+            # undeclared blow (`GMAgent._undeclared_blows`); anything still read here is
+            # logged, never opened.
             struck_lines: list[str] = []
-            for sentence in [s for r, s in struck if r is None]:
-                c.turn_log.append({"kind": "npc-opener", "ref": None,
+            for ref, sentence in judgement.attacked_by(c.scene, text):
+                c.turn_log.append({"kind": "npc-opener", "ref": ref,
                                    "sentence": sentence[:300], "opened": False,
-                                   "note": "a blow at the player with no striker the "
-                                           "code could name"})
-            struck = [(r, s) for r, s in struck if r is not None]
-            for n, (ref, sentence) in enumerate(struck):
-                if n == 0:
-                    outs = agent.engine.struck_first(ref)
-                    c.turn_log.append({"kind": "npc-opener", "ref": ref,
-                                       "sentence": sentence[:300],
-                                       "opened": bool(c.scene.in_encounter),
-                                       "outcomes": [o.as_dict() for o in outs]})
-                    if not outs:
-                        continue
-                    repairs.append(f"{c.scene.actors[ref].name} struck first: the fight "
-                                   f"opened from their side")
-                    pc = c.scene.pc()
-                    for o in outs:
-                        if not o.tell:
-                            continue
-                        line = plain_tell(o.tell)
-                        if pc is not None:
-                            line, _ = narration_mod.pc_to_second_person(line, pc.name)
-                        # After the beat that described the swing, not before it.
-                        struck_lines.append(line)
-                elif c.scene.in_encounter and agent.engine.join_fight(ref, "them"):
-                    repairs.append(f"{c.scene.actors[ref].name} came in with them")
+                                   "note": "a blow read in the prose and not declared "
+                                           "in the plan: logged, not opened"})
             # `added`: the sentences that are ours, so the next turn's `earlier` can
             # leave them out of what the model is shown as its own.
             added = added + ours

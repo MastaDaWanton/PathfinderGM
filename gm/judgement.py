@@ -1410,6 +1410,26 @@ _WONT_SLEEP = re.compile(r"\b(?:can't|cannot|won't|will not|don't|do not|no|neve
 _EATS = re.compile(r"\b(?:eat|eats|eating|have (?:a|some) (?:meal|food|breakfast|supper"
                    r"|dinner)|chew|rations?)\b", re.I)
 _DRINKS = re.compile(r"\b(?:drink|drinks|drinking|waterskin)\b", re.I)
+# "the drink" is a thing, not the player drinking. Measured live 2026-09-25: "I knock the
+# drink out of the biggest man's hand" came back with "Kesst Vayr drinks." — and "I buy
+# him a drink" would have too. A drink after an article or a possessive is the noun,
+# unless the player has, takes or downs it.
+_A_DRINK_NOUN = frozenset({"the", "a", "an", "his", "her", "their", "my", "your", "our",
+                           "some", "another", "that", "this", "its", "whose"})
+_HAS_A_DRINK = re.compile(r"\b(?:have|has|take|takes|grab|grabs|down|downs|nurse|nurses)"
+                          r"\s+(?:a|another|my|some|the)\s+drink\b", re.I)
+
+
+def _drinks_declared(text: str) -> bool:
+    """Whether the player's sentence has them drink — the verb, not the noun."""
+    if _HAS_A_DRINK.search(text) or re.search(r"\bwaterskin\b", text, re.I):
+        return True
+    for m in re.finditer(r"\b(?:drink|drinks|drinking)\b", text, re.I):
+        before = text[:m.start()].split()
+        if before and before[-1].lower().strip(",") in _A_DRINK_NOUN:
+            continue
+        return True
+    return False
 
 
 def inject_survival(raw_intents, player_text: str, scene) -> list:
@@ -1442,7 +1462,7 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
         out.append({"op": "eat", "because": "the player said they eat"})
     # A drunk potion is `use_item`, declared before this runs; the waterskin sip is
     # for the sentence that names no jar.
-    if (_DRINKS.search(player_text) and "drink" not in present
+    if (_drinks_declared(player_text) and "drink" not in present
             and "use_item" not in present):
         out.append({"op": "drink", "because": "the player said they drink"})
     # Sleep last: you eat before you bed down, and the rest op's own legality check

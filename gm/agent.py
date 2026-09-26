@@ -108,6 +108,66 @@ class GMAgent:
         self.intents_first = (os.environ.get("GM_INTENTS_FIRST", "1").lower()
                               not in ("", "0", "false", "no"))
 
+    def _undeclared_blows(self, text: str, messages: list, schema: dict):
+        """The prose has somebody strike at the player that the engine never rolled.
+
+        Until 2026-09-25 this was a door: `attacked_by` read the blow out of the finished
+        prose and `struck_first` opened a fight on it. Measured live on the provoke
+        script the same day: the plan declared the real blows itself (the engine rolls a
+        declared first blow before the prose now), and the one blow the door read was
+        "He doesn't reach for a weapon, but he slams a heavy, calloused fist onto the
+        bar" — a fight opened on a man hitting furniture. So what the regex finds is a
+        claim the dice never made, and it gets the project's standing repair: one
+        targeted rewrite naming the fix, and if that still strikes, the sentence goes.
+        A misread now costs a rewrite, never a phantom fight.
+
+        Returns (text, repair note or "", attempts).
+        """
+        from .narration import unquoted
+
+        scene = self.engine.scene
+        # With or without a striker the code can name: a blow thrown by somebody the
+        # prose is only now describing — nobody the scene holds yet — is as undeclared
+        # as one thrown by the man at the bar (found writing the test, 2026-09-25).
+        struck = judgement.attacked_by(scene, text)
+        if not struck:
+            return text, "", []
+        names = ", ".join(dict.fromkeys(
+            scene.actors[r].name if r in scene.actors else "somebody"
+            for r, _ in struck)) or "somebody"
+        correction = (
+            f"In this beat {names} strikes at the player, and nothing the engine decided "
+            f"has anybody strike: no blow was rolled, so none was thrown and none landed. "
+            f"Write the same beat again with {names} threatening, squaring up or "
+            f"reaching — as close to violence as you like — but with no blow thrown at "
+            f"the player. The same events otherwise.")
+        attempts = []
+        try:
+            again = client.chat(
+                messages + [{"role": "assistant", "content": text},
+                            {"role": "user", "content": correction}],
+                self.prose_model, self.prose_host, as_json=True, think=False,
+                temperature=0.7, num_predict=1400, provider=self.prose_provider,
+                api_key=self.prose_key, schema=schema, timeout=FALLBACK_TIMEOUT)
+            text2 = self._lift(str(again.json().get("narration", "")).strip())
+            still = judgement.attacked_by(scene, text2)
+            attempts.append(Attempt("prose", again.seconds, again.model, again.text,
+                                    note="retry, undeclared blow named"
+                                         + (" — still strikes" if still else "")))
+            if text2 and not still and not narration_mod.reads_as_a_refusal(text2):
+                return text2, f"an undeclared blow by {names}: rewritten without it", attempts
+        except Exception as exc:
+            attempts.append(Attempt("prose", 0.0, self.prose_model,
+                                    note=f"blow retry failed: {str(exc)[:100]}"))
+        # The backstop: the sentences that throw the blow are cut.
+        gone = {" ".join(s.split()) for _, s in struck}
+        kept = [p for p in re.split(r"(?<=[.!?])\s+", text)
+                if " ".join(unquoted(p).split()) not in gone]
+        cut = " ".join(kept).strip()
+        if cut and cut != text:
+            return cut, f"an undeclared blow by {names}: the sentence was cut", attempts
+        return text, f"an undeclared blow by {names}: could not be removed", attempts
+
     def _lift(self, text: str) -> str:
         """A reply's narration with its speaker tags taken out, and what they said kept.
 
@@ -1573,6 +1633,12 @@ class GMAgent:
                          f"{', '.join(made or lost)} the one already here")
         if not text:
             return "", ["prose failed on every model"], attempts
+        # A blow at the player that nobody declared (docs/declared-not-guessed.md, the
+        # blows door): a check now, not a door into a fight.
+        text, note, struck_attempts = self._undeclared_blows(text, messages, schema)
+        attempts.extend(struck_attempts)
+        if note:
+            early.append(note)
         # No claim repair here on purpose: the engine has already resolved the turn, so
         # "the blow lands" is a fact being reported, not an outcome being invented.
         # Who died, before grooming: the review needs it to ask for the death, the
