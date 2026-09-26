@@ -291,3 +291,40 @@ the finder writes, and nothing the brief states, names the hidden fact.
 `tests/test_finding_someone.py::test_a_hidden_fact_may_find_them_but_is_never_said`
 holds the finder's side. A world character's authored role, such as Bregan Duskwatch
 the temple scribe, is public canon and is not a hidden fact.
+
+## Built: manner in the brief (2026-09-25)
+
+§7, which the build order had left without a slot. Before it, every rolled life was
+stored and nothing read it. Each person with a record now carries, in WHO IS HERE, on
+every turn:
+
+- **their two loudest traits, as behaviour**: the `shows` lines ("watches hands before
+  faces and asks why before how"), never the trait words;
+- **their quirk**, on first meeting and then only after `QUIRK_EVERY` (5) turns, held as
+  engine state;
+- **"IS A CHILD (fact)"** for a minor, because the table's adults-only rule depends on
+  the narrator knowing.
+
+Wants, goal, hobby and work never reach the brief.
+
+The research that set the shape:
+
+- **Two traits, as behaviour.** Salient attributes crowd out the rest (The Chameleon's
+  Limit, arXiv 2604.24698, preprint). Generic framing breeds caricature (CoMPosT, EMNLP
+  2023). Dwarf Fortress reports only facets outside its neutral band.
+- **The quirk cadence is engine state.** Valve's Response System keeps `respeakdelay`
+  as state, and a small model cannot count "now and then".
+- **Secrets stay out of the brief entirely.** A secret a 12B model is told leaks
+  thematically about 83% of the time, and "don't reveal" helped only frontier models
+  (Holtzman & West, arXiv 2605.10794, preprint).
+
+**Live, the town script, 12 turns, 13 people with records:**
+
+- No want, goal or hobby leaked (literal check).
+- Manner shows: a stallholder rolled to "watch the way people speak" was written as
+  "doesn't look at your hands or your weapon, but focuses on the way you speak".
+- Quirks are played in paraphrase, and the word detector missed every one. So the quirk
+  now rests from the beat it was offered in, not from a detected showing; otherwise it
+  would have been offered every turn.
+- The one "trait named outright" was "open" (a gate). Common words are not read as
+  labels.
