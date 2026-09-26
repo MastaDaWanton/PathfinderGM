@@ -239,3 +239,30 @@ def test_our_own_face_line_is_not_read_as_an_invented_name():
                 if f.kind == "invented-name"]
     assert narration.a_face_for("smith", "Korvu: Korvu have four limbs.").endswith(
         "Korvu: Korvu have four limbs.")
+
+
+def test_two_different_people_are_not_the_same_turn_twice(engine):
+    """The net writes one `because` for every introduction, so a baker after a guide read
+    as "the same thing as last turn": refused five times live, and the turn was lost
+    (2026-09-25). Who is introduced is part of what a turn is."""
+    guide = engine.validate(judgement.inject_introduce(
+        [{"op": "narrate_only"}], "I ask around for a guide.", engine.scene, WORLD))
+    baker = engine.validate(judgement.inject_introduce(
+        [{"op": "narrate_only"}], "I look for a baker.", engine.scene, WORLD))
+    previous = judgement._signature(guide)
+    assert judgement.review("I look for a baker.", baker, engine.scene,
+                            previous=previous).ok
+
+
+def test_the_models_introduce_with_nobody_in_it_is_filled_from_the_player(engine):
+    raw = judgement.inject_introduce([{"op": "introduce", "params": {}}],
+                                     "I ask around for a guide who knows the grass.",
+                                     engine.scene, WORLD)
+    assert raw == [{"op": "introduce", "params": {"who": "guide"}}]
+
+
+def test_a_sentence_where_a_few_words_belong_is_clipped_not_refused():
+    long = ("a weathered and very talkative old dock worker who has seen every ship come "
+            "and go for forty years and remembers them all")
+    who = parse_all([_intro(long)])[0].params["who"]
+    assert len(who) <= 80 and long.startswith(who)

@@ -268,7 +268,10 @@ class Review:
 # The params that say what a turn *is*. `dc` is deliberately excluded: the GM re-rolls a
 # difficulty band every turn, so comparing full params never matched and the repeat went
 # undetected even when the reason clause was word for word identical.
-_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone")
+# `who`: two people introduced are two turns. Measured live 2026-09-25: the introduce net
+# writes the same `because` every time, so a baker introduced after a guide read as "the
+# same thing as last turn", was refused five times, and the turn was lost.
+_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone", "who")
 
 
 def _signature(intents) -> list[tuple]:
@@ -5087,6 +5090,33 @@ _NOBODY_TO_INTRODUCE = frozenset({
 })
 
 
+def _describes(params: dict) -> bool:
+    """Whether an introduce says who, in any of the fields `parse` folds into `who`."""
+    return any(str(params.get(k) or "").strip() for k in
+               ("who", "description", "name", "role", "kind", "person", "npc", "character"))
+
+
+def _introducible(player_text: str, phrase: str | None = None) -> str:
+    """The words to introduce the person the player looked for by, or "".
+
+    "someone" describes nobody, and booked as a person's words it matched every later
+    "someone" (live, 2026-09-25). The player's own relative clause says who they mean —
+    "someone who knows the roads north"; with none, nothing is introduced from here.
+    """
+    from rules import population
+
+    phrase = phrase if phrase is not None else person_sought(player_text)
+    if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
+        return ""
+    if not population._tokens(phrase):
+        m = re.search(re.escape(phrase) + r"\s+(who\s+[^,.;!?]+?)(?=\s+and\b|[,.;!?]|$)",
+                      redact_speech(player_text or ""), re.I)
+        if not m:
+            return ""
+        phrase = f"{phrase} {' '.join(m.group(1).split())}"
+    return phrase
+
+
 def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     """The player went looking for somebody the scene does not hold yet: the plan
     introduces them (docs/declared-not-guessed.md).
@@ -5109,7 +5139,19 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
 
     if scene is None or not isinstance(raw_intents, list) or scene.in_encounter:
         return raw_intents
-    if any(isinstance(r, dict) and str(r.get("op", "")).lower() in ("introduce", "spawn")
+    # The model's own introduce, with nobody in it. Measured live 2026-09-25: `introduce`
+    # with no `who` (and nothing `parse` could fold into one) cost an attempt on two turns
+    # of ten. The player's words say who was looked for; they fill it.
+    theirs = [r for r in raw_intents if isinstance(r, dict)
+              and str(r.get("op", "")).lower() == "introduce"]
+    if theirs:
+        blank = [r for r in theirs if not _describes(r.get("params") or {})]
+        phrase = _introducible(player_text) if blank else ""
+        if not phrase:
+            return raw_intents
+        return [dict(r, params=dict(r.get("params") or {}, who=phrase))
+                if any(r is b for b in blank) else r for r in raw_intents]
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "spawn"
            for r in raw_intents):
         return raw_intents
     if places_mod.terrain_of(getattr(scene, "at", "")) != places_mod.URBAN:
@@ -5123,14 +5165,9 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     # "someone" describes nobody, and booked as a person's words it matched every later
     # "someone" (live, 2026-09-25). The player's own relative clause says who they mean —
     # "someone who knows the roads north"; with none, the model is left to choose.
-    from rules import population
-
-    if not population._tokens(phrase):
-        m = re.search(re.escape(phrase) + r"\s+(who\s+[^,.;!?]+?)(?=\s+and\b|[,.;!?]|$)",
-                      redact_speech(player_text or ""), re.I)
-        if not m:
-            return raw_intents
-        phrase = f"{phrase} {' '.join(m.group(1).split())}"
+    phrase = _introducible(player_text, phrase)
+    if not phrase:
+        return raw_intents
     return [{"op": "introduce",
              "because": "the player went looking for somebody the scene does not hold yet",
              "params": {"who": phrase}}] + list(raw_intents)

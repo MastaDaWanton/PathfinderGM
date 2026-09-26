@@ -1090,7 +1090,11 @@ def _check_params(intent: Intent, index: int) -> None:
     elif op == "introduce":
         # "merchant_with_herbs" is a ref-shaped description (live, 2026-09-25): words.
         who = " ".join(str(p["who"] or "").replace("_", " ").split())
-        if not who or len(who) > 80:
+        # Clipped, not refused: a sentence where a few words belong cost an attempt live
+        # (2026-09-25), and its first words are the description anyway.
+        if len(who) > 80:
+            who = who[:80].rsplit(" ", 1)[0].rstrip(",;:—- ")
+        if not who:
             raise IntentError(
                 "introduce: who is the few words the scene will call this person by — "
                 "'old woman mending nets', 'a porter with a split lip'", "schema", index)
