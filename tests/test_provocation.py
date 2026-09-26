@@ -128,3 +128,25 @@ def test_the_players_insult_declares_the_op_aimed_at_him():
                                      "params": {"words": "coward", "to": ref}}], said, s)
     assert raw[0] == {"op": "provoke", "target": ref, "params": {"how": "insult"},
                       "because": raw[0]["because"]}
+
+
+def test_the_insult_finds_the_man_it_is_spoken_at():
+    """Measured live 2026-09-25: "I tell the biggest man at the bar that I have seen
+    better fighters in a nursery" provoked nobody — three men were here and nobody was
+    in conversation yet. The words it is spoken at are looked for, through the finder,
+    without where he stands: "the biggest man" is the "large man"."""
+    s = Scene(location_id=VORMOOR)
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    e = Engine(s, Dice(seed=1), world=WORLD)
+    e.place_party()
+    for who in ("man with a thick beard", "large man", "man with the ledger"):
+        e.run(e.validate([{"op": "introduce", "params": {"who": who, "how": "arrives"}}],
+                         origin="author:test"))
+    refs = {a.name: r for r, a in s.actors.items() if not a.is_pc}
+    for said, who in [
+        ("I tell the biggest man at the bar that I have seen better fighters in a nursery.",
+         "large man"),
+        ("I call the man with the ledger a cheat.", "man with the ledger"),
+        ("I laugh at the bearded man.", "man with a thick beard"),
+    ]:
+        assert judgement.provoked_one([], said, s) == refs[who], said

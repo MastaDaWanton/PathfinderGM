@@ -5158,6 +5158,16 @@ _SLIGHTS = re.compile(r"\b(?:shove|shoves|shoving)\s+past\b|\bturn(?:s)?\s+my\s+
                       r"|\bignore\w*\s+(?:him|her|them)\b|\bsnub\w*\b", re.I)
 
 
+# Named apart from `_AIMED_AT` (an attack's victim): the first cut of this reused that
+# name, silently replaced it for the whole module, and broke four misaimed-attack repairs.
+_INSULT_AIMED_AT = re.compile(
+    r"\b(?:tell|tells|call|calls|mock|mocks|taunt|taunts|insult|insults|"
+    r"laugh(?:s)?\s+at|spit(?:s)?\s+(?:on|at))\s+(?:the\s+)?"
+    r"([a-z][a-z' -]{2,40}?)"
+    r"(?=\s+(?:that|he|she|they|a|an|to|his|her|their|what|about|in front)\b|[,.!?;]|$)",
+    re.I)
+
+
 def provocation_in(player_text: str) -> str:
     """"insult", "slight" or "" — what the player's sentence does to somebody."""
     text = str(player_text or "")
@@ -5185,9 +5195,24 @@ def provoked_one(raw_intents, player_text: str, scene) -> str:
             to = (r.get("params") or {}).get("to")
             if isinstance(to, str) and to in actors and not actors[to].is_pc:
                 return to
-    sought = person_sought(player_text)
-    if sought:
-        ref = scope_mod.in_the_room(scene, sought)
+    # Whom the insult is spoken AT: "I tell the biggest man at the bar that…". Measured
+    # live 2026-09-25: that sentence provoked nobody — several men were here, nobody was
+    # in conversation yet, and the words were never looked for. Found through the
+    # population's finder, in the room only, so "the biggest man" can be the "large man".
+    from rules import population
+
+    # Quotations blanked, not reported speech: `redact_speech` reads "tell the biggest
+    # man … that …" as reported speech and blanks the man himself.
+    aimed = _INSULT_AIMED_AT.search(speech.blanked(player_text or ""))
+    aimed = aimed.group(1) if aimed else ""
+    # "the biggest man at the bar": the finder asks every word to fit, and where he
+    # stands is not who he is — so the phrase is also tried without it.
+    bare = re.split(r"\s+(?:at|by|in|near|on|behind|beside|from|over)\s+", aimed)[0]
+    for phrase in [p for p in dict.fromkeys((bare, aimed, person_sought(player_text))) if p]:
+        found = population.find(scene, phrase, rings=(population.HERE,), log_miss=False)
+        if found.scope == population.HERE and found.people[0].get("ref") in actors:
+            return found.people[0]["ref"]
+        ref = scope_mod.in_the_room(scene, phrase)
         if ref:
             return ref
     talking = [r for r, a in actors.items() if not a.is_pc and a.has_state(states.TALKING)]
