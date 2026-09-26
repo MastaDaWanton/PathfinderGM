@@ -160,3 +160,82 @@ def test_the_worked_example_demonstrates_it():
     shown = [i for e in prompts.EXAMPLES for i in (e["reply"].get("intents") or [])]
     assert any(i["op"] == "introduce" for i in shown)
     assert any((i.get("params") or {}).get("to") == "new1" for i in shown)
+
+
+# --- the player looking for somebody new is an introduction the schema requires -------
+
+def test_looking_for_somebody_new_in_a_town_declares_an_introduction(engine):
+    """Measured live 2026-09-25 on ten turns that each asked for somebody new: the planner
+    wrote `introduce` twice and `narrate_only` eight times, and five of the ten were
+    refused "No scribe is here, and Zhilvarnia has none the world names" — of a city.
+    Detected in code now, and the schema requires the op."""
+    from rules import places
+
+    assert places.terrain_of(engine.scene.at) == places.URBAN
+    for said, who in [("I ask around for a guide.", "guide"),
+                      ("I look for a baker who might sell me a loaf.", "baker"),
+                      ("I wave down a passing carter and ask where he is headed.",
+                       "passing carter")]:
+        assert "introduce" in judgement.declared_ops(said, engine.scene, WORLD), said
+        raw = judgement.inject_introduce([{"op": "narrate_only"}], said, engine.scene, WORLD)
+        assert raw[0] == {"op": "introduce", "because": raw[0]["because"],
+                          "params": {"who": who}}
+
+
+def test_the_mayor_is_still_the_worlds_to_refuse(engine):
+    """Item 29 stands: an office the settlement answers for is not conjured."""
+    said = "I turn to find the mayor"
+    assert "introduce" not in judgement.declared_ops(said, engine.scene, WORLD)
+    assert "no mayor in Vormoor" in judgement.absent_answer(engine.scene, WORLD, said)
+
+
+def test_somebody_the_world_places_elsewhere_is_not_introduced_here(engine):
+    """By name, or by the trade the world wrote them up with: Vormoor's healer is Drenn
+    Ironvale, so "a healer" is answered with where he is, not a stranger conjured."""
+    for said in ("I look for Drenn Ironvale.", "I ask around for a healer."):
+        assert "introduce" not in judgement.declared_ops(said, engine.scene, WORLD), said
+    assert "Drenn Ironvale" in judgement.absent_answer(engine.scene, WORLD,
+                                                       "I ask around for a healer.")
+
+
+def test_nobody_is_introduced_in_open_country_or_in_a_fight(engine):
+    engine.scene.at = engine.scene.at.replace("urban", "grassland")
+    assert judgement.inject_introduce([], "I ask around for a healer.", engine.scene,
+                                      WORLD) == []
+
+
+def test_asking_around_for_somebody_is_looking_for_them():
+    """An optional article with no space of its own read "ask around for a healer" as the article "a" and the
+    person "round" — twice in ten live turns, each answered "No round is here"."""
+    assert judgement.person_sought("I ask around for a healer.") == "healer"
+    assert judgement.person_sought("I ask around for a guide who knows the grass.") == "guide"
+    assert judgement.person_sought("I say 'where is the mayor?'") == ""
+
+
+def test_the_word_the_is_not_a_name():
+    """"the oldest person on the street" matched Gorthok Ironfist, "Leader of the
+    Kaldrimian guilds", on "the" — and the player was sent to another city."""
+    from django.conf import settings
+
+    from rules import scope
+
+    world = load_cached(settings.WORLD_EXPORT)
+    town = next(e for e in world.entities.values() if getattr(e, "kind", "") == "CITY")
+    found = scope.look_for(world, "oldest person on the street", None, town.id)
+    assert "Gorthok" not in found.get("who", "")
+
+
+def test_our_own_face_line_is_not_read_as_an_invented_name():
+    """All three invented-name faults of a live ten-turn run (2026-09-25) were
+    "Somewhere", out of our own backstop's "is a Korvu: Somewhere in the middle of life".
+    Our age lines are lower-cased after the colon; the world's own body lines are not."""
+    from gm import narration
+
+    line = narration.a_face_for("seasoned traveler",
+                                "Korvu: Somewhere in the middle of life; a limp.")
+    assert "Korvu: somewhere in the middle of life" in line
+    assert not [f for f in narration.review(line, pc_name="Kesst Vayr",
+                                            known_names={"Korvu"}).findings
+                if f.kind == "invented-name"]
+    assert narration.a_face_for("smith", "Korvu: Korvu have four limbs.").endswith(
+        "Korvu: Korvu have four limbs.")

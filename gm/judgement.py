@@ -3705,6 +3705,9 @@ _DECLARERS = (
     # them. "I tell the smith I want to buy the axe" is a sale AND a line of dialogue,
     # and both belong in the turn — unlike the sale-or-handover pair above, where one
     # sentence must not be read twice.
+    # Before speech: "I find someone who knows the roads, and ask them" is an
+    # introduction AND a line, and the line is addressed to the person introduced.
+    ("introduce", lambda raw, text, scene, world: inject_introduce(raw, text, scene, world)),
     ("say", lambda raw, text, scene, world: inject_say(raw, text, scene)),
     ("travel", lambda raw, text, scene, world: inject_travel(raw, text, scene, world)),
     # After travel, and the ordering is load-bearing: "I go out to the forest to forage"
@@ -5034,12 +5037,24 @@ def challengers(beat: str, phrases) -> list[str]:
 # assume the person is there: "I turn to find the mayor" and "I ask the mayor for a reward"
 # were the same turn on 2026-09-19, and the second is the one that produced a 13-hp Warrior
 # called *mayor*.
+# The article takes its own whitespace. `(?:the|a|an)?\s*` read "I ask around for a
+# healer" as the article "a" and the person "round" — measured live 2026-09-25, twice in
+# ten turns, each answered "No round is here". "ask around for", and looking "along the
+# street for", are looking for somebody.
 _LOOKS_FOR = re.compile(
     r"\bI\s+(?:turn\s+to\s+find|turn\s+to|look\s+for|looks\s+for|search\s+for|seek\s+out|"
+    r"(?:look|ask|asks|search|go)\s+(?:around|about|along\s+the\s+\w+)\s+for|"
     r"seek|find|approach|approaches|go\s+to|walk\s+up\s+to|speak\s+to|speaks\s+to|"
     r"talk\s+to|talks\s+to|ask|asks|address|addresses|call\s+for|calls\s+for|summon|"
-    r"summons|look\s+around\s+for)\s+"
-    r"(?:the|a|an|my|to\s+the)?\s*([A-Za-z][A-Za-z' -]{2,40}?)"
+    r"summons|look\s+around\s+for|wave\s+down|flag\s+down)\s+"
+    r"(?:(?:the|a|an|my|to\s+the)\s+)?([A-Za-z][A-Za-z' -]{2,40}?)"
+    r"(?=[,.!?;]|\s+(?:and|about|for|to|if|that|what|where|who|whether|why|how)\b|$)",
+    re.I)
+
+
+_ASKS_AROUND = re.compile(
+    r"\bI\s+(?:look|looks|ask|asks|search|go)\s+(?:around|about|along\s+the\s+\w+)\s+for\s+"
+    r"(?:(?:the|a|an|my|some)\s+)?([A-Za-z][A-Za-z' -]{2,40}?)"
     r"(?=[,.!?;]|\s+(?:and|about|for|to|if|that|what|where|who|whether|why|how)\b|$)",
     re.I)
 
@@ -5051,7 +5066,11 @@ def person_sought(player_text: str) -> str:
     exists on. The narration describing people arriving is an arrival and legitimate; the
     player naming somebody is a question, and a question may be answered "no".
     """
-    m = _LOOKS_FOR.search(redact_speech(player_text or ""))
+    # "I ask around for a healer" is looking, not speaking — but `redact_speech` reads
+    # "ask … for" as a request and blanks the healer. The asking-around forms are read
+    # from the sentence with only its quotations blanked (2026-09-25).
+    m = _ASKS_AROUND.search(speech.blanked(player_text or "")) \
+        or _LOOKS_FOR.search(redact_speech(player_text or ""))
     if not m:
         return ""
     phrase = " ".join(m.group(1).split())
@@ -5059,6 +5078,62 @@ def person_sought(player_text: str) -> str:
     # capture runs to the next clause word, and neither tail is part of who they are.
     phrase = re.split(r"\s+(?:of|his|her|their|its|my|your)\s+", phrase, maxsplit=1)[0]
     return phrase.strip(" -'")
+
+
+# Words that point at somebody without describing anybody to introduce.
+_NOBODY_TO_INTRODUCE = frozenset({
+    "him", "her", "them", "it", "you", "me", "us", "everyone", "everybody", "nobody",
+    "anyone", "anybody", "people", "crowd", "others",
+})
+
+
+def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
+    """The player went looking for somebody the scene does not hold yet: the plan
+    introduces them (docs/declared-not-guessed.md).
+
+    Measured live 2026-09-25 on ten turns that each asked for somebody new ("I ask around
+    for a healer", "I look for a scribe who can read a letter"): the planner wrote
+    `introduce` twice and `narrate_only` eight times, and the people came in through the
+    prose-booking door this op exists to replace. Detected here in code, so
+    `declared_ops` can make the schema require the op and the model writes who they are
+    — the project's rule: detect mechanically, let the model fill in the content.
+
+    Only in a settlement, where a scribe or a healer is a fair thing to find; only for a
+    kind scope cannot place (UNMET) or a vague "someone" with nobody here — never for a
+    person the world names elsewhere or an office it answers for (item 29, the mayor);
+    never mid-fight, where arrivals are `spawn`'s. First in the list, so a `say` in the
+    same turn can address them as new1.
+    """
+    from rules import places as places_mod
+    from rules import scope as scope_mod
+
+    if scene is None or not isinstance(raw_intents, list) or scene.in_encounter:
+        return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() in ("introduce", "spawn")
+           for r in raw_intents):
+        return raw_intents
+    if places_mod.terrain_of(getattr(scene, "at", "")) != places_mod.URBAN:
+        return raw_intents
+    phrase = person_sought(player_text)
+    if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
+        return raw_intents
+    found = scope_mod.look_for(world, phrase, scene, getattr(scene, "location_id", None))
+    if found.get("scope") not in ("", scope_mod.UNMET):
+        return raw_intents
+    # "someone" describes nobody, and booked as a person's words it matched every later
+    # "someone" (live, 2026-09-25). The player's own relative clause says who they mean —
+    # "someone who knows the roads north"; with none, the model is left to choose.
+    from rules import population
+
+    if not population._tokens(phrase):
+        m = re.search(re.escape(phrase) + r"\s+(who\s+[^,.;!?]+?)(?=\s+and\b|[,.;!?]|$)",
+                      redact_speech(player_text or ""), re.I)
+        if not m:
+            return raw_intents
+        phrase = f"{phrase} {' '.join(m.group(1).split())}"
+    return [{"op": "introduce",
+             "because": "the player went looking for somebody the scene does not hold yet",
+             "params": {"who": phrase}}] + list(raw_intents)
 
 
 def absent_answer(scene, world, player_text: str, location_id: str | None = None) -> str:

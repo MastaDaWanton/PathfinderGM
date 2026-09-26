@@ -63,6 +63,22 @@ SCRIPTS = {
         "I look for tracks in the grass.",
         "I make camp and sleep until dawn.",
     ],
+    # Every line asks for somebody who is not in the scene yet. The first live run with
+    # the planner's `introduce` op (2026-09-25, the town script, 12 turns) used it zero
+    # times — but the town script mostly addresses people already standing there, so it
+    # could not tell under-use of the op from a script that never needed it.
+    "strangers": [
+        "I look along the street for someone who knows the roads north, and ask them.",
+        "I find somebody selling bread and ask what a loaf costs.",
+        "I ask around for a healer.",
+        "I look for whoever keeps the inn and ask for a room.",
+        "I wave down a passing carter and ask where he is headed.",
+        "I look for a child who might run a message for a coin.",
+        "I find someone who looks like they know the city's gossip and buy them a drink.",
+        "I ask around for a guide who knows the grassland.",
+        "I look for a scribe who can read a letter for me.",
+        "I find the oldest person on the street and ask what this quarter was like once.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",

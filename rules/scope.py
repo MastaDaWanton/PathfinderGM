@@ -37,6 +37,13 @@ NOWHERE = "nowhere"
 # Several people fit and the words cannot choose: Inform's "Which do you mean", asked
 # rather than guessed (docs/the-population.md §6).
 AMBIGUOUS = "ambiguous"
+# Somebody of a KIND the place could hold — a scribe, a healer, somebody selling bread —
+# whom nobody has described yet and the world has no record of. Not a refusal: the world
+# cannot rule on whether a city has a scribe, and the plan introduces one
+# (`judgement.declare_introduce`). Measured live 2026-09-25 before this existed: five of
+# ten turns that asked for somebody new were answered "No scribe is here, and Zhilvarnia
+# has none the world names" — of a city.
+UNMET = "unmet"
 
 # Words that are never the person being looked for. "the man" and "somebody" name no
 # office and no name, so the world cannot answer and the question is not this module's:
@@ -63,8 +70,19 @@ OFFICES = frozenset({
 _WORDS = re.compile(r"[a-z']+")
 
 
+# Words no person is named by. "the oldest person on the street" matched Gorthok Ironfist,
+# "Leader of the Kaldrimian guilds", on the word "the" — measured live 2026-09-25, and the
+# player was told a guild leader in another city was who they meant.
+_NOT_A_NAME = frozenset({
+    "the", "and", "for", "who", "with", "from", "that", "this", "has", "have", "was",
+    "are", "his", "her", "their", "its", "our", "your", "one", "any", "all", "out",
+    "into", "onto", "near", "over", "under", "than", "then", "some", "whoever",
+})
+
+
 def _words(text: str) -> set[str]:
-    return {w for w in _WORDS.findall(str(text or "").lower()) if len(w) > 2}
+    return {w for w in _WORDS.findall(str(text or "").lower())
+            if len(w) > 2 and w not in _NOT_A_NAME}
 
 
 def _role_of(entity) -> str:
@@ -204,6 +222,11 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
     # a place holds a trade is the place table's question (`rules/places.STAFFED`), not
     # this one's.
     where = town_name or "this place"
+    # A trade or a description is not the world's to refuse. The mayor is (an office the
+    # settlement's own record answers), and so is a name nobody in the world carries.
+    named = any(w[:1].isupper() for w in phrase.split())
+    if not (_words(phrase) & OFFICES) and not named:
+        return {**out, "scope": UNMET, "where": town_name, "line": ""}
     line = f"There is no {phrase} in {where}."
     if _words(phrase) & OFFICES:
         facts = dict(getattr(town, "facts", {}) or {}) if town is not None else {}

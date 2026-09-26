@@ -376,6 +376,10 @@ class GMAgent:
                 # the schema asked for one, the model wrote prose instead, and the turn
                 # resolved with no `say` at all, which is the whole failure the op
                 # exists to end. Detect mechanically, repair with a targeted call.
+                # Somebody looked for and not here yet is introduced, before the line
+                # addressed to them (the schema already required it; this is the net).
+                raw = judgement.inject_introduce(raw, player_input, self.engine.scene,
+                                                 self.world)
                 raw = judgement.inject_say(raw, player_input, self.engine.scene)
                 # And the world's answer when the player looked for somebody who is not
                 # here, stated whether or not the plan reached for them (item 29). Last,

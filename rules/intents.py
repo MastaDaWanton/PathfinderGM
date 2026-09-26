@@ -735,6 +735,20 @@ def parse(raw: dict, index: int = 0) -> Intent:
     # alias took it away and then refused the intent for missing it. An alias fires
     # only when the op actually wants the target and does not itself declare the word.
     declared = set(required) | set(optional)
+    # Who somebody is, however the model spelled the field. Measured live 2026-09-25:
+    # `introduce` came back with `description` and `kind` and no `who` on three attempts
+    # across two turns, each refused and retried. For this op alone — `move` declares
+    # `who` as a ref, and `rest` and `guard` declare `kind` — the first descriptive field
+    # is the person, and the rest are that description said again.
+    if op == "introduce":
+        described = ("description", "name", "role", "kind", "person", "npc", "character")
+        if params.get("who") in (None, ""):
+            for key in described:
+                if params.get(key):
+                    params["who"] = params[key]
+                    break
+        for key in described:
+            params.pop(key, None)
     for said, means in PARAM_ALIASES.items():
         if said in params and means not in params                 and means in declared and said not in declared:
             params[means] = params.pop(said)
@@ -1074,7 +1088,8 @@ def _check_params(intent: Intent, index: int) -> None:
             raise IntentError("spawn: count must be a number", "schema", index)
 
     elif op == "introduce":
-        who = " ".join(str(p["who"] or "").split())
+        # "merchant_with_herbs" is a ref-shaped description (live, 2026-09-25): words.
+        who = " ".join(str(p["who"] or "").replace("_", " ").split())
         if not who or len(who) > 80:
             raise IntentError(
                 "introduce: who is the few words the scene will call this person by — "
@@ -1084,11 +1099,12 @@ def _check_params(intent: Intent, index: int) -> None:
             p["count"] = max(1, min(len(INTRODUCED_REFS), int(p.get("count", 1) or 1)))
         except (TypeError, ValueError):
             raise IntentError("introduce: count must be a number", "schema", index)
+        # Read, not refused. Measured live 2026-09-25: `"how": "already_there"` cost a whole
+        # attempt on a param whose only choice is "new, or somebody standing here". A word
+        # of arriving means arrives; anything else is the safe reading, already here.
         how = str(p.get("how") or "already_here").strip().lower().replace(" ", "_")
-        if how not in ("arrives", "already_here"):
-            raise IntentError("introduce: how is 'arrives' or 'already_here'",
-                              "schema", index)
-        p["how"] = how
+        p["how"] = ("arrives" if re.match(r"(?:arriv|enter|come|comes|coming|walk|new)", how)
+                    else "already_here")
         if p.get("template"):
             from . import bestiary
 

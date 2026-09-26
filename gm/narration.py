@@ -3989,6 +3989,17 @@ def a_face_for(name: str, appearance: str) -> str:
     name = name[:1].upper() + name[1:]
     people, sep, body = said.partition(": ")
     if sep and body and 1 <= len(people.split()) <= 3:
+        # Except where the body opens with one of OUR lines, whose case is ours to set.
+        # Measured live 2026-09-25: all three invented-name faults of a ten-turn run were
+        # "Somewhere", out of "is a Korvu: Somewhere in the middle of life" — a rolled
+        # face (rules/lives.py) opening with an age line from `faces.YEARS`, capitalised,
+        # after a colon, and read as a name. The world's own body lines keep theirs.
+        from rules import faces as faces_mod
+        from rules import lives as lives_mod
+
+        ours = tuple(y.lower() for y in (*faces_mod.YEARS, *lives_mod._CHILD_YEARS))
+        if body[:1].isupper() and body.lower().startswith(ours):
+            body = body[:1].lower() + body[1:]
         return f"{name} is {_an(people)} {people}: {body}"
     return f"{name}: {said}"
 
