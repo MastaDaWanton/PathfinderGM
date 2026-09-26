@@ -1550,7 +1550,7 @@ mechanical, this is a quiet beat: describe the place and the people and hand the
 Write bodies, not summaries. Say what moves, where it goes and what it does: the hand, the
 blade, the step, the fall. When a blow lands, show the wound in plain physical words —
 where it opened, what broke, the blood and where it runs — never "the violence", "the
-chaos" or "the struggle". A comparison only where nothing plain will do.
+chaos" or "the struggle".
 
 When somebody from WHO IS HERE speaks, wrap their words in a tag with their ref, and
 to=you when they say it to the player: <say who=c2 to=you>'Two days,'</say> he says.
