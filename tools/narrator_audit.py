@@ -79,6 +79,21 @@ SCRIPTS = {
         "I look for a scribe who can read a letter for me.",
         "I find the oldest person on the street and ask what this quarter was like once.",
     ],
+    # Every line gives somebody a reason to strike first. The blows door
+    # (docs/declared-not-guessed.md): does the PLAN declare the NPC's attack, or does the
+    # blow only appear in the prose — where `attacked_by` has had to read it out?
+    "provoke": [
+        "I walk into the worst tavern on the street and sit at the bar.",
+        "I knock the drink out of the biggest man's hand and laugh at him.",
+        "I tell him he fights like his mother.",
+        "I shove past the men at the door on my way out.",
+        "I walk up to the gate guard and spit on his boots.",
+        "I try to lift the purse of the merchant beside me, clumsily.",
+        "I tell the merchant his scales are rigged, loudly, so the whole market hears.",
+        "I kick over the dice game in the alley.",
+        "I call the guard captain a bought man to his face.",
+        "I walk away without paying for the meal.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",

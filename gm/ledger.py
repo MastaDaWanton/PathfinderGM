@@ -177,12 +177,20 @@ def block(entries, *, before_hist: int, budget: int = BUDGET_CHARS) -> str:
     older = [e for e in entries or [] if int(e.get("hist", 0)) <= int(before_hist)]
     if not older:
         return ""
-    lines, spent = [], 0
+    # The budget is the whole block — header and line breaks included. Only the entry
+    # lines were counted, so the block ran over the room `prompts.pack` had reserved
+    # for it by the header's length and a newline per entry, and the prompt-budget test
+    # went 13 characters over the day the worked examples grew (2026-09-25).
+    header = ("EARLIER, WHICH YOU NO LONGER HAVE THE WORDS FOR (facts, kept by the "
+              "engine; do not contradict them):\n")
+    lines, spent = [], len(header)
     for e in reversed(older):
         line = f"  * {e.get('text', '')}" + (f" (at {e['at']})" if e.get("at") else "")
-        if lines and spent + len(line) > budget:
+        cost = len(line) + (1 if lines else 0)
+        if spent + cost > budget:
             break
         lines.append(line)
-        spent += len(line)
-    return ("EARLIER, WHICH YOU NO LONGER HAVE THE WORDS FOR (facts, kept by the "
-            "engine; do not contradict them):\n" + "\n".join(reversed(lines)))
+        spent += cost
+    if not lines:
+        return ""
+    return header + "\n".join(reversed(lines))

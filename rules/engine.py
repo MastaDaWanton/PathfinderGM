@@ -2269,7 +2269,46 @@ class Engine:
         # walked before a die was handed over is still this turn's one journey.
         self._battle_joined = False
         self._journeyed = ""
-        return self._tick_schemes(self._drive([i.as_dict() for i in intents], [], {}))
+        return self._tick_schemes(self._their_first_blow(
+            self._drive([i.as_dict() for i in intents], [], {})))
+
+    def _their_first_blow(self, resolution: "Resolution") -> "Resolution":
+        """Somebody else opened the fight: their blow is rolled now, in this batch.
+
+        The first-swing gate defers the swing that opens a fight, and for the PLAYER that
+        is right — the dice are theirs, on their own first combat turn. For anybody else
+        it is the wait the user refused: "I should be put into combat when I am attacked,
+        it shouldn't wait for me" (2026-09-18). `struck_first` answered it by running the
+        attack twice; this is that rule in the one place every door comes through, so a
+        blow the PLAN declares (docs/declared-not-guessed.md, the blows door) is rolled
+        before the prose is written, and the prose describes what actually landed.
+        Only the initiator, holding the turn: anybody who came in on the same batch
+        takes their swing in the order, as ever.
+        """
+        if resolution.awaiting or not self.scene.in_encounter:
+            return resolution
+        opened = next((e for o in resolution.outcomes if o.op == "attack"
+                       for e in (o.effects or []) if e.get("kind") == "battle_joined"), None)
+        if opened is None:
+            return resolution
+        ref, target = opened.get("ref"), opened.get("target")
+        a = self.scene.actors.get(ref)
+        if a is None or a.is_pc or target not in self.scene.actors:
+            return resolution
+        holding = (self.scene.initiative[self.scene.turn][0]
+                   if self.scene.initiative and 0 <= self.scene.turn < len(self.scene.initiative)
+                   else None)
+        if holding != ref:
+            return resolution
+        try:
+            blow = self.validate([{"op": "attack", "actor": ref, "target": target,
+                                   "because": f"{a.name} struck first",
+                                   "params": dict(opened.get("params") or {})}])
+        except (IntentError, ValueError, KeyError):
+            return resolution
+        self._battle_joined = False
+        return self._drive([i.as_dict() for i in blow],
+                           [o.as_dict() for o in resolution.outcomes], {})
 
     def _tick_schemes(self, resolution: "Resolution") -> "Resolution":
         """After a batch resolves, the world's schemes get their tick (rules/schemes.py):
@@ -2902,8 +2941,13 @@ class Engine:
                         and not self.scene.actors[r].is_down]
                 return Outcome(
                     intent_id=intent.id, op="attack",
+                    # The declared params ride along, so the initiator's blow that
+                    # `_their_first_blow` rolls is the one declared — the bow, not
+                    # whatever is in hand (a shortbow shot was re-rolled as a melee
+                    # swing and spiked by Thorn Body when this was missing).
                     effects=[{"ref": actor.ref, "kind": "battle_joined",
-                              "target": defender.ref}],
+                              "target": defender.ref,
+                              "params": dict(intent.params or {})}],
                     tell=(f"Battle is joined: {actor.name} squares off against "
                           f"{', '.join(foes) or defender.name}. Nothing has landed "
                           f"yet — the first blow is still to be struck."),
@@ -3577,20 +3621,13 @@ class Engine:
             return []
         raw = {"op": "attack", "actor": ref, "target": pc.ref,
                "because": f"{a.name} struck first"}
-        outcomes: list[Outcome] = []
+        # One run: the fight opens and, because the initiator is not the player, `run`
+        # rolls their blow in the same batch (`_their_first_blow`). This used to run the
+        # attack twice by hand, which is the rule `run` now keeps for every door.
         try:
-            first = self.run(self.validate([raw]))
+            return list(self.run(self.validate([raw])).outcomes)
         except (IntentError, ValueError, KeyError):
             return []
-        outcomes.extend(first.outcomes)
-        if not self.scene.in_encounter:
-            return outcomes
-        try:
-            second = self.run(self.validate([raw]))
-            outcomes.extend(second.outcomes)
-        except (IntentError, ValueError, KeyError):
-            pass                        # the fight is open; his swing is the loop's
-        return outcomes
 
     def rally(self, ref: str) -> list[str]:
         """The bystanders who come in on a foe's side when they are struck: the ones

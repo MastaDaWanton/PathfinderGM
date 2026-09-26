@@ -449,6 +449,33 @@ EXAMPLES = [
             ],
         },
     },
+    # Somebody else strikes first, declared in the plan (docs/declared-not-guessed.md,
+    # the blows door). Before this the only way an NPC's blow reached the dice was a
+    # regex reading it out of the finished prose (`attacked_by`), which read "the
+    # barmaid rushes over to you with a tankard" as a blow. The actor is the NPC; the
+    # engine opens the fight from his side and rolls his blow before the prose is written.
+    {
+        "player": "I knock the cup out of his hand and laugh in his face.",
+        "reply": {
+            "narration": (
+                "The cup goes spinning off the end of the bar and the laugh is still in "
+                "your mouth when he comes off the stool. He is bigger standing than he "
+                "looked sitting, and he does not say anything at all: his right hand is "
+                "already a fist and already coming round at the side of your head, and "
+                "the men at the next table push their chairs back to give him the room. "
+                "What do you do?"
+            ),
+            "suggestions": [
+                "I duck under it and hit him back",
+                "I step back out of his reach",
+                "I grab the stool and put it between us",
+            ],
+            "intents": [
+                {"op": "attack", "actor": "c1", "target": "pc",
+                 "because": "he will not be laughed at in front of his friends"},
+            ],
+        },
+    },
 ]
 
 # --- Combat ---------------------------------------------------------------------------
@@ -540,12 +567,10 @@ COMBAT_EXAMPLES = [
             # the wounds of the blows before this one, so the example still never says how
             # this turn's roll went.
             "narration": "He is not blocking any more, just covering: your last punch "
-                         "opened his eyebrow to the bone, and the blood has run into the eye "
-                         "so he is fighting half blind, spitting red through a split lip. "
-                         "The forearm he holds up is the one you cut, laid open from the "
-                         "wrist, and it shakes. Behind you the door bangs against its frame — "
-                         "somebody has come through it, and he sees them before you do. Do "
-                         "you finish him or turn round?",
+                         "opened his eyebrow to the bone, and blood has run into the eye so "
+                         "he fights half blind, spitting red through a split lip. The "
+                         "forearm he holds up is laid open from the wrist. Behind you the "
+                         "door bangs — somebody has come in. Do you finish him or turn round?",
             "suggestions": ["I finish him now", "I turn to see who came in",
                             "I get where I can see both"],
             "intents": [{"op": "attack", "actor": "pc", "target": "c1",
@@ -1351,7 +1376,9 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     # which is every prose call, handed `[]` by design — the whole ledger is outside
     # the window and all of it is fair game.
     edge = dropped if kept_history else 10 ** 9
-    remembered = ledger_mod.block(ledger, before_hist=edge, budget=reserve) if ledger else ""
+    # Less the two characters of the "\n\n" it is joined on with below.
+    remembered = (ledger_mod.block(ledger, before_hist=edge, budget=reserve - 2)
+                  if ledger else "")
     if remembered and head:
         # Onto the system message, which is never cut: these are facts the engine
         # kept, and they rank with the brief rather than with the conversation.
