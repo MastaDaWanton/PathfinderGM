@@ -2269,6 +2269,7 @@ class Engine:
         # walked before a die was handed over is still this turn's one journey.
         self._battle_joined = False
         self._journeyed = ""
+        self._provoked = set()
         return self._tick_schemes(self._their_first_blow(
             self._drive([i.as_dict() for i in intents], [], {})))
 
@@ -2397,6 +2398,17 @@ class Engine:
                               if e.get("kind") == "introduce"), None) or {}
                 if bound:
                     queue = [_rename_refs(r, bound) for r in queue]
+            # Provoked past bearing: their own blow, with their fists — a provoked brawl
+            # is fists, as a Skyrim brawl is (rules/provocation.py) — next in the queue.
+            # It opens the fight from their side and `run` rolls it before the prose.
+            if intent.op == "provoke":
+                hit = next((e for e in (outcome.effects or [])
+                            if e.get("kind") == "provoked" and e.get("strikes")), None)
+                pc = self.scene.pc()
+                if hit is not None and pc is not None:
+                    queue.insert(0, {"op": "attack", "actor": hit["ref"], "target": pc.ref,
+                                     "params": {"weapon": "unarmed"},
+                                     "because": "provoked past bearing"})
             # Anyone who has done something is no longer flat-footed.
             if intent.actor and intent.op in ("attack", "check", "move", "save"):
                 self.scene.acted.add(intent.actor)
@@ -2485,6 +2497,62 @@ class Engine:
         return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
                        tell="", because=intent.because)
 
+    # provoke -----------------------------------------------------------------------------
+
+    def _op_provoke(self, intent: Intent, partial: dict) -> Outcome:
+        """The player insults or slights somebody: their regard falls, and a seeded roll on
+        their temper decides whether it comes to blows (rules/provocation.py).
+
+        Measured before this existed (2026-09-25, the provoke script): a man insulted nine
+        times never struck and no attitude moved — worse, every exchange still earned the
+        +2 of a friendly word, so the insults made him like the player more. A blow is
+        queued as his own `attack` with his fists, and `run` rolls it before the prose
+        (`_their_first_blow`). Somebody who will not come to blows and is hostile turns
+        their back: out of the conversation, which is state the engine holds.
+        """
+        from . import attitude as attitude_mod
+        from . import provocation as prov
+
+        target = self.scene.actors.get(intent.target or "")
+        pc = self.scene.pc()
+        if target is None or target.is_pc or target.is_down or pc is None:
+            return Outcome(intent_id=intent.id, op="provoke", status="resolved",
+                           tell="", because=intent.because)
+        how = intent.params.get("how") or "insult"
+        day = int(self.scene.clock_minutes) // (24 * 60)
+        eff = attitude_mod._regard_effect(target)
+        payload = dict(getattr(eff, "payload", None) or {}) if eff is not None else {}
+        times = int(payload.get("provoked", 0)) if payload.get("provoked_day") == day else 0
+        before, after = attitude_mod.nudge_regard(target, -prov.cost(how, times),
+                                                  f"provoked: {how}")
+        attitude_mod.set_regard(target, after, f"provoked: {how}",
+                                payload={"provoked": times + 1, "provoked_day": day})
+        self._provoked = getattr(self, "_provoked", set()) | {target.ref}
+        step = attitude_mod.of(target)
+        effects = [{"kind": "regard", "ref": target.ref, "from": before, "to": after},
+                   {"kind": "provoked", "ref": target.ref, "how": how}]
+        if self.scene.in_encounter:
+            return Outcome(intent_id=intent.id, op="provoke", status="resolved",
+                           effects=effects, tell=f"{target.name} takes it badly.",
+                           because=intent.because)
+        chance = prov.strike_chance(self.scene, target, step)
+        roll = self.dice.roll("1d100", label=f"{target.name} keeps their temper",
+                              visibility="hidden")
+        strikes = chance > 0 and roll.total <= round(chance * 100)
+        effects[-1].update({"strikes": strikes, "chance": round(chance, 2),
+                            "roll": roll.total})
+        if strikes:
+            tell = f"{target.name} has had enough."
+        elif step == attitude_mod.HOSTILE and chance < prov.WILL_NOT_FIGHT:
+            ended = self.end_talk(who=target)
+            tell = (f"{target.name} turns their back on you and will have nothing more "
+                    f"to do with you." + (f" {ended}" if ended else ""))
+        else:
+            tell = attitude_mod.regard_said(target.name, before, after) \
+                or f"{target.name} takes it badly."
+        return Outcome(intent_id=intent.id, op="provoke", status="resolved",
+                       effects=effects, tell=tell, because=intent.because)
+
     # say ---------------------------------------------------------------------------------
 
     # A free action in 1e, so nothing is rolled and no time passes. What it produces is a
@@ -2537,7 +2605,11 @@ class Engine:
             if opened:
                 bits.append(opened)
             day = int(self.scene.clock_minutes) // (24 * 60)
+            # Not for an exchange that was an insult: the provocation already moved
+            # their regard, and the friendly word's +2 made nine insults warm a man up
+            # (measured 2026-09-25).
             if (not self.scene.in_encounter
+                    and heard.ref not in getattr(self, "_provoked", set())
                     and attitude_mod.step_of(attitude_mod.of(heard))
                     > attitude_mod.step_of(attitude_mod.HOSTILE)
                     and attitude_mod.talked_today(heard, day)):

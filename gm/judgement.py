@@ -3732,6 +3732,9 @@ _DECLARERS = (
     # Before speech: "I find someone who knows the roads, and ask them" is an
     # introduction AND a line, and the line is addressed to the person introduced.
     ("introduce", lambda raw, text, scene, world: inject_introduce(raw, text, scene, world)),
+    # Before speech too: the insult is carried by the `say`, and the provocation must
+    # land first so that exchange earns no friendly word's regard.
+    ("provoke", lambda raw, text, scene, world: inject_provoke(raw, text, scene)),
     ("say", lambda raw, text, scene, world: inject_say(raw, text, scene)),
     ("travel", lambda raw, text, scene, world: inject_travel(raw, text, scene, world)),
     # After travel, and the ordering is load-bearing: "I go out to the forest to forage"
@@ -5126,6 +5129,95 @@ def person_sought(player_text: str) -> str:
     # capture runs to the next clause word, and neither tail is part of who they are.
     phrase = re.split(r"\s+(?:of|his|her|their|its|my|your)\s+", phrase, maxsplit=1)[0]
     return phrase.strip(" -'")
+
+
+# --- provocation ----------------------------------------------------------------------
+#
+# An insult is read in code so the schema can require the `provoke` op (rules/
+# provocation.py). Measured on the provoke script (2026-09-25): nine insults to one man,
+# the planner wrote `say` and `narrate_only` every time, and no attitude moved.
+# Calling somebody a name is almost always an insult; so is laughing in a face or
+# spitting at somebody. An insult WORD counts only inside what the player says — "I ask
+# the thief where the gate is" names a thief and insults nobody.
+_CALLS_A_NAME = re.compile(
+    r"\b(?:call|calls|calling|called)\s+(?:him|her|them|the\s+\w+(?:\s+\w+){0,2})\s+"
+    r"(?:a|an)\s+\w+", re.I)
+_PROVOKES = re.compile(
+    r"\b(?:insult\w*|mock\w*|taunt\w*|jeer\w*|sneer\w*|belittl\w*|humiliat\w*|"
+    r"laugh(?:s|ing)?\s+(?:in|at)\s+(?:his|her|their|him|them|the)|"
+    r"spit(?:s|ting)?\s+(?:on|at))\b", re.I)
+_INSULTING = re.compile(
+    r"\b(?:coward\w*|liar|cheat|cheats|fool|idiot|oaf|lout|cur|craven|weakling|"
+    r"bastard|whoreson|pig|rat|dog|worm|drunkard|crook|thief|"
+    r"fights?\s+like|all\s+talk|smells?|stinks?|ugly|worthless|useless|"
+    r"(?:your|his|her|their)\s+(?:mother|wife|father)|bought\s+man|rigged|"
+    r"better\s+fighters?|nursery|cried|crying)\b", re.I)
+_SPEAKS = re.compile(r"\b(?:tell|tells|telling|told|say|says|said|shout|shouts|yell|"
+                     r"yells|call|calls|announce|announces|remark|remarks|sneer)\b", re.I)
+_SLIGHTS = re.compile(r"\b(?:shove|shoves|shoving)\s+past\b|\bturn(?:s)?\s+my\s+back\s+on\b"
+                      r"|\bignore\w*\s+(?:him|her|them)\b|\bsnub\w*\b", re.I)
+
+
+def provocation_in(player_text: str) -> str:
+    """"insult", "slight" or "" — what the player's sentence does to somebody."""
+    text = str(player_text or "")
+    if _CALLS_A_NAME.search(text) or _PROVOKES.search(text):
+        return "insult"
+    # An insulting word counts inside speech: quoted, or after a verb of saying.
+    quoted = " ".join(speech.lines(text))
+    said = _SPEAKS.search(text)
+    if _INSULTING.search(quoted) or (said and _INSULTING.search(text[said.end():])):
+        return "insult"
+    if _SLIGHTS.search(text):
+        return "slight"
+    return ""
+
+
+def provoked_one(raw_intents, player_text: str, scene) -> str:
+    """Who the provocation is aimed at: the person spoken to, the person named, the one
+    in conversation, or the only person here — else ""."""
+    from rules import scope as scope_mod
+    from rules import states
+
+    actors = getattr(scene, "actors", {}) or {}
+    for r in raw_intents or []:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "say":
+            to = (r.get("params") or {}).get("to")
+            if isinstance(to, str) and to in actors and not actors[to].is_pc:
+                return to
+    sought = person_sought(player_text)
+    if sought:
+        ref = scope_mod.in_the_room(scene, sought)
+        if ref:
+            return ref
+    talking = [r for r, a in actors.items() if not a.is_pc and a.has_state(states.TALKING)]
+    if len(talking) == 1:
+        return talking[0]
+    here = [r for r, a in actors.items() if not a.is_pc and not a.is_down]
+    return here[0] if len(here) == 1 else ""
+
+
+def inject_provoke(raw_intents, player_text: str, scene) -> list:
+    """The player's words insult or slight somebody here: the plan provokes them, first
+    in the list — before the `say` that carries the words, so that exchange earns no
+    friendly word's regard. Not mid-fight (a fight's insults are flavour; the blows are
+    already the dice's), and not when the player is already swinging at them."""
+    if scene is None or not isinstance(raw_intents, list) or scene.in_encounter:
+        return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "provoke"
+           for r in raw_intents):
+        return raw_intents
+    how = provocation_in(player_text)
+    if not how:
+        return raw_intents
+    ref = provoked_one(raw_intents, player_text, scene)
+    if not ref:
+        return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
+           and r.get("target") == ref for r in raw_intents):
+        return raw_intents
+    return [{"op": "provoke", "target": ref, "params": {"how": how},
+             "because": "the player's words were aimed to hurt"}] + list(raw_intents)
 
 
 # Words that point at somebody without describing anybody to introduce.

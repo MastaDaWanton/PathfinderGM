@@ -436,6 +436,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # order introduced (`INTRODUCED_REFS`); the engine swaps in the real refs.
     # `already_here` binds to somebody the scene already holds before making anybody.
     "introduce": (("who",), ("count", "how", "template", "zone"), "hidden"),
+    # The player provokes the person in `target`: an insult or a slight. Their regard
+    # falls and a roll on their temper decides whether they come to blows
+    # (rules/provocation.py). Nobody rolls to land an insult; the roll is the response.
+    "provoke": ((), ("how",), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     # Something changes hands. One op rather than four, because picking a thing up,
     # being handed it, buying it and dropping it are the same event with different ends
@@ -1118,6 +1122,11 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                     "schema", index)
             p["template"] = raw_t
+
+    elif op == "provoke":
+        # Read, not refused: anything that is not a slight is an insult.
+        p["how"] = "slight" if str(p.get("how") or "").strip().lower() == "slight" \
+            else "insult"
 
     elif op == "begin_encounter":
         if not isinstance(p["sides"], dict):

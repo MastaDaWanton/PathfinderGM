@@ -440,6 +440,8 @@ class GMAgent:
                 # addressed to them (the schema already required it; this is the net).
                 raw = judgement.inject_introduce(raw, player_input, self.engine.scene,
                                                  self.world)
+                # An insult aimed at somebody provokes them (rules/provocation.py).
+                raw = judgement.inject_provoke(raw, player_input, self.engine.scene)
                 raw = judgement.inject_say(raw, player_input, self.engine.scene)
                 # And the world's answer when the player looked for somebody who is not
                 # here, stated whether or not the plan reached for them (item 29). Last,
