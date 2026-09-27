@@ -5331,6 +5331,22 @@ def person_sought(player_text: str) -> str:
     exists on. The narration describing people arriving is an arrival and legitimate; the
     player naming somebody is a question, and a question may be answered "no".
     """
+    # The turn's reading first (gm/interpret.py), when it names somebody sought, called
+    # on or spoken to; the regex below is the fallback. Measured on the labelled set, the
+    # reading takes "go to the market AND look for the bread seller" and "the woman WHO
+    # SOLD me bread" whole, where this regex needed a patch for each.
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    if reading and not reading.get("error"):
+        target = _interpret.target_of(reading, acts=("seek", "call_on", "talk"))
+        if target:
+            # An indefinite description asks for any such person, and its clause is no
+            # part of who the newcomer is (`sought_indefinitely`).
+            if sought_indefinitely(player_text) or re.match(
+                    r"(?:someone|somebody|anyone|a|an|some|any)\b", target, re.I):
+                target = re.split(r"\s+(?:who|that|which)\s+", target, maxsplit=1)[0]
+            return target.strip(" -'")
     m = _sought_match(player_text)
     if not m:
         return ""
@@ -6750,6 +6766,13 @@ _ASKS_WHERE_THEY_LIVE = re.compile(
 
 def called_on(player_text: str) -> tuple[str, bool]:
     """(whom the player is going to call on, whether they go) — ("", False) for none."""
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    if reading and not reading.get("error"):
+        who, goes = _interpret.called(reading)
+        if who:
+            return who, goes
     text = speech.blanked(str(player_text or ""))
     m = _ASKS_WHERE_THEY_LIVE.search(text)
     if m:
@@ -6831,6 +6854,15 @@ def purchase_sought(player_text: str) -> str:
     purchase — so nothing is blanked. Buying somebody a drink, buying time, buying
     silence and taking a room are not purchases off a shelf."""
     text = str(player_text or "")
+    # The turn's reading first (gm/interpret.py): its `buy` names the goods, and "I buy
+    # the man a drink" reads as a gift, never a purchase. The regex is the fallback.
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(text)
+    if reading and not reading.get("error"):
+        got = _interpret.bought(reading)
+        if got:
+            return got
     if re.search(r"\bsell(?:s|ing)?\b", text, re.I) and not re.search(r"\bbuy", text, re.I):
         return ""
     m = _BUYS.search(text)
@@ -6885,6 +6917,13 @@ _BREAKS_IN = (
 def breaks_in(player_text: str) -> tuple[str, str]:
     """(whose house, "force" or "pick") the player is breaking into — ("", "") for none.
     `who` is "" for the house off the street the party stands in ("I kick the door in")."""
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    if reading and not reading.get("error"):
+        who, how = _interpret.broken_into(reading)
+        if how:
+            return who, how
     text = speech.blanked(str(player_text or ""))
     for pattern, how in _BREAKS_IN:
         m = pattern.search(text)

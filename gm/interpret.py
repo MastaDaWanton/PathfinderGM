@@ -32,6 +32,11 @@ import json
 import re
 import time
 
+# On in the app. Off in the test suite (tests/conftest.py), as the written opening and
+# the schemes are: most turn tests script the model's replies in order, and a reading
+# would spend one of them. The interpreter's own tests turn it back on.
+ENABLED = True
+
 ACTS = (
     "go", "journey", "leave", "look", "search", "seek", "talk", "insult", "buy", "sell",
     "give", "take", "steal", "attack", "cast", "use", "consume", "wait", "rest",
@@ -286,3 +291,129 @@ def interpret(sentence: str, *, model: str | None = None, host: str | None = Non
     frame.update(dropped=dropped, seconds=round(time.monotonic() - started, 2),
                  raw=reply.text)
     return frame
+
+
+# --- in the turn ---------------------------------------------------------------------
+#
+# First integration (2026-09-27), additive by design: the research's advice was to keep
+# the fast word-detectors as a second opinion (Rasa's pattern) and to retire each one
+# only on a measured comparison. So the reading is (1) shown to the planner as fact, (2)
+# joined to the ops the schema requires, (3) handed to the readers that need a slot
+# (who is sought, what is bought, whose house), with the regex as the fallback, and (4)
+# logged beside the detectors' opinion so each disagreement is on the record.
+_READINGS: dict[str, dict] = {}
+
+
+def _key(text: str) -> str:
+    return " ".join(str(text or "").split()).lower()
+
+
+def remember(text: str, frame: dict | None) -> None:
+    """This turn's reading of this sentence, for the readers that ask later in the turn."""
+    if len(_READINGS) > 64:
+        _READINGS.clear()
+    if frame is not None:
+        _READINGS[_key(text)] = frame
+
+
+def reading_of(text: str) -> dict | None:
+    return _READINGS.get(_key(text))
+
+
+def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
+    """The ops the reading commits the turn to, where the reading grounds.
+
+    Only the acts whose op cannot go wrong for want of a guess: a `go` to a place this
+    town really has (the model still names it, from the brief's list); the house calls
+    and break-ins; sleep; a wait with a time; an insult; words said. Buying opens the
+    counter and is not an op; a fight's attacks are the fight schema's already."""
+    from rules import places as places_mod
+
+    ops: list[str] = []
+    here = str(getattr(scene, "at", "") or "")
+
+    def add(op):
+        if op not in ops:
+            ops.append(op)
+
+    for a in (frame or {}).get("actions") or []:
+        act = a.get("act")
+        if act == "go" and a.get("place"):
+            p = places_mod.find(places, a["place"]) if places else None
+            if p is not None and p.id != here:
+                add("travel")
+        elif act == "journey":
+            add("journey")
+        elif act in ("call_on", "break_in", "rest"):
+            add(act)
+        elif act == "wait" and a.get("time"):
+            add("advance_time")
+        elif act == "insult":
+            add("provoke")
+        elif act == "talk" and a.get("says"):
+            add("say")
+    return ops
+
+
+def brief_lines(frame: dict | None) -> str:
+    """What the planner is told the player's words say, in order, as fact."""
+    if not frame:
+        return ""
+    if frame.get("question") and not frame.get("actions"):
+        return ("THE PLAYER'S WORDS, READ (fact): a question asked of the game, not "
+                "something the character does. Answer it; the character does nothing.")
+    rows = []
+    for n, a in enumerate(frame.get("actions") or [], 1):
+        slots = ", ".join(f"{s}: {a[s]}" for s in SLOTS if a.get(s))
+        rows.append(f"{n}. {a['act']}" + (f" — {slots}" if slots else ""))
+    out = ""
+    if rows:
+        out = ("THE PLAYER'S WORDS, READ (fact, in the order they are done; the plan "
+               "carries each): " + " ".join(rows))
+    if frame.get("claims"):
+        out += (" THE PLAYER CLAIMS, and it is not so unless the engine makes it so: "
+                + "; ".join(frame["claims"]) + ".")
+    return out
+
+
+_BARE_PRONOUN = {"him", "her", "them", "he", "she", "they", "it", "his", "their", "its",
+                 "me", "you", "us"}
+
+
+def target_of(frame: dict | None, acts=("seek", "call_on", "talk", "give", "buy",
+                                         "follow")) -> str:
+    """The person the sentence goes looking for or addresses, without its article —
+    the reading's answer to `judgement.person_sought`. "" when it names nobody."""
+    for a in (frame or {}).get("actions") or []:
+        t = str(a.get("target") or "").strip()
+        if a.get("act") in acts and t and t.lower() not in _BARE_PRONOUN:
+            return re.sub(r"^(?:the|a|an|my|some)\s+", "", t, flags=re.I)
+    return ""
+
+
+def bought(frame: dict | None) -> str:
+    for a in (frame or {}).get("actions") or []:
+        if a.get("act") == "buy" and a.get("object"):
+            return str(a["object"])
+    return ""
+
+
+def called(frame: dict | None) -> tuple[str, bool]:
+    for a in (frame or {}).get("actions") or []:
+        if a.get("act") == "call_on":
+            return str(a.get("target") or "her"), True
+    return "", False
+
+
+def broken_into(frame: dict | None) -> tuple[str, str]:
+    for a in (frame or {}).get("actions") or []:
+        if a.get("act") == "break_in":
+            who = str(a.get("target") or "")
+            who = re.sub(r"(?:'s|s')?\s*(?:front\s+)?(?:door|house|home|lock)\b.*$", "", who,
+                         flags=re.I).strip()
+            if who.lower() in ("the", "a", "an", ""):
+                who = ""
+            how = "pick" if re.search(r"\block|pick", str(a.get("object") or ""), re.I) \
+                else "force"
+            return who, how
+    return "", ""

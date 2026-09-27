@@ -104,6 +104,13 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from rules import schemes as schemes_mod
 
     monkeypatch.setattr(schemes_mod, "ENABLED", False)
+    # And the interpreter's reading of the player's sentence (gm/interpret.py): a turn
+    # test that scripts the model's replies in order would have one spent on it.
+    # tests/test_interpreter_in_the_turn.py turns it back on.
+    from gm import interpret as interpret_mod
+
+    monkeypatch.setattr(interpret_mod, "ENABLED", False)
+    interpret_mod._READINGS.clear()
 
 
 @pytest.fixture(autouse=True)

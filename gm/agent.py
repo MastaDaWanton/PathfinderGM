@@ -277,6 +277,19 @@ class GMAgent:
         # Somebody the prose described and the player now turns to walks on with a body
         # first, so the plan can address them by ref (ruled 2026-09-27: the prose
         # records people; engagement or the plan makes them actors).
+        # The player's sentence, read once into a checked frame (gm/interpret.py,
+        # docs/the-interpreter.md): the readers below consult it before their regex, and
+        # the planner is shown it. A reading that fails costs nothing but the reading —
+        # the turn goes on exactly as it did before the interpreter existed.
+        from . import interpret
+
+        self.reading = None
+        if interpret.ENABLED:
+            try:
+                self.reading = interpret.interpret(player_input)
+                interpret.remember(player_input, self.reading)
+            except Exception as exc:  # noqa: BLE001 — never a reason to lose the turn
+                self.reading = {"error": str(exc)[:200]}
         judgement.embody_sought(self.engine.scene, player_input, self.world)
         # The plan sees the situation cards — the GM's secret ones included — keyed
         # off the last few beats the view hands over (`self.recent`).
@@ -284,6 +297,10 @@ class GMAgent:
                                     here=self.engine.here(), known=self.engine.places(),
                                     recent=getattr(self, "recent", None), secret=True,
                                     turn=getattr(self, "turn", 0))
+        read = interpret.brief_lines(self.reading if isinstance(self.reading, dict)
+                                     and "error" not in self.reading else None)
+        if read:
+            brief += "\n\n" + read
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first
@@ -303,6 +320,14 @@ class GMAgent:
         # injectors what they would add. Computed once: it depends on the player's text
         # and the scene, and neither moves between attempts.
         declared = judgement.declared_ops(player_input, self.engine.scene, self.world)
+        # And what the reading grounds, joined — the detectors stay a second opinion
+        # until each is retired on a measured comparison (docs/the-interpreter.md).
+        if isinstance(self.reading, dict) and "error" not in self.reading:
+            by_reading = interpret.ops_for(self.reading, self.engine.scene,
+                                           self.engine.places())
+            self.reading["ops"] = by_reading
+            self.reading["detectors"] = list(declared)
+            declared = list(dict.fromkeys([*declared, *by_reading]))
 
         from play import modelcfg
 

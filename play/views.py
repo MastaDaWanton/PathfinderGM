@@ -1232,6 +1232,10 @@ def say(request):
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
 
+    # The interpreter's reading of the sentence rides with the plan into the turn log,
+    # beside the detectors' opinion, so every disagreement is on the record
+    # (docs/the-interpreter.md).
+    plan.reading = getattr(agent, "reading", None)
     resp = _advance(c, agent, plan.narration, plan, text)
     # A purchase opens the counter with the thing picked (`_trade_offer`): the turn's
     # prose brings the keeper to the counter, and the player pays on the screen.
@@ -2476,6 +2480,9 @@ def _log_turn(c, plan, resolution, replace: bool = False):
         "intents": [i.as_dict() for i in plan.intents],
         "outcomes": [o.as_dict() for o in resolution.outcomes],
     }
+    reading = getattr(plan, "reading", None)
+    if isinstance(reading, dict):
+        entry["reading"] = {k: v for k, v in reading.items() if k != "raw"}
     # The turn entry `_advance` wrote before the prose call, wherever it now sits.
     # `replace` used to look only at the LAST entry, and under intents-first the
     # prose entry is appended between the two — so every single turn was logged
