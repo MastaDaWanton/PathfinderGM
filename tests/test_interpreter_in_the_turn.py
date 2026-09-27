@@ -75,3 +75,47 @@ def test_a_reading_that_fails_leaves_the_regex_in_charge():
     text = "I kick in her door."
     interpret.remember(text, {"error": "timed out"})
     assert judgement.breaks_in(text) == ("her", "force")
+
+
+# --- found live, 2026-09-27 (strangers and calling, with the reading in the turn) ----------
+
+def test_a_reading_of_her_means_nobody_new():
+    """Live: "I buy a loaf from her and ask her name" read as talking to her; falling back
+    to the regex brought back "her name" as a person to introduce."""
+    text = "I buy a loaf from her and ask her name."
+    _read(text, [{"act": "buy", "object": "a loaf", "target": "her"},
+                 {"act": "talk", "target": "her", "says": "name"}])
+    assert judgement.person_sought(text) == ""
+
+
+def test_the_counter_takes_the_payment_not_a_give():
+    raw = judgement.strip_counter_buys(
+        [{"op": "give", "params": {"item": "gp"}}, {"op": "say", "params": {"words": "hi"}}],
+        "I buy a loaf from her.")
+    assert [r["op"] for r in raw] == ["say"]
+
+
+def test_a_placeholder_is_not_who_somebody_is():
+    """Live: `introduce who="new1"` put a person called "new1" in the scene."""
+    assert not judgement._describes({"who": "new1"})
+    assert judgement._describes({"who": "a carter"})
+
+
+def test_the_schema_asks_for_a_declared_op_as_a_required_key():
+    """Measured: Ollama enforced `contains` in 0 of 6 replies and a required property in
+    6 of 6. The declared op is a required key, and a travel's place is one of the real
+    places by name."""
+    from gm import prompts
+    from gm.agent import GMAgent
+
+    schema = prompts.turn_schema(must_contain=("travel",), places=("the market", "the well"))
+    decl = schema["properties"]["declared"]
+    assert decl["required"] == ["travel"] and "declared" in schema["required"]
+    assert decl["properties"]["travel"]["properties"]["params"]["properties"]["place"][
+        "enum"] == ["the market", "the well"]
+    merged = GMAgent._merge_declared([{"op": "narrate_only"}],
+                                     {"travel": {"params": {"place": "the market"}}})
+    assert merged[0]["op"] == "travel" and merged[0]["params"]["place"] == "the market"
+    kept = GMAgent._merge_declared([{"op": "travel", "params": {"place": "the well"}}],
+                                   {"travel": {"params": {"place": "the market"}}})
+    assert len(kept) == 1 and kept[0]["params"]["place"] == "the well"

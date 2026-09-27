@@ -374,7 +374,11 @@ class GMAgent:
                                     # The injectors still run below as the backstop; this
                                     # gives the model first refusal, with the scene in
                                     # front of it, on choosing the item and the target.
-                                    must_contain=tuple(declared)))
+                                    must_contain=tuple(declared),
+                                    # A declared travel chooses among the places that
+                                    # exist here, by name, and invents none.
+                                    places=tuple(p.name for p in self.engine.places()
+                                                 if p.id != self.engine.scene.at)))
             except client.ModelUnavailable as exc:
                 down.add(model)
                 rejections.append(f"attempt {n + 1}: {model} could not be reached: {exc}")
@@ -411,6 +415,10 @@ class GMAgent:
                 # `eat` and `drink` for the sleep and meals both models narrate and
                 # neither ever proposes, worked example notwithstanding.
                 raw = data.get("intents")
+                # The ops the player's words committed the turn to, which the schema asks
+                # for as required keys because Ollama does not enforce `contains`
+                # (`prompts.turn_schema`): merged in where the list left them out.
+                raw = self._merge_declared(raw, data.get("declared"))
                 # First, because everything downstream reads the shapes this
                 # straightens: a target pocketed in params is invisible to the misaim
                 # check, and an invented param is a schema refusal five lines later.
@@ -1806,6 +1814,32 @@ class GMAgent:
             if m:
                 out.append(" ".join(m.group(1).split()))
         return out
+
+    @staticmethod
+    def _merge_declared(raw, declared) -> list:
+        """The `declared` ops of the reply, added to its intents where missing.
+
+        A declared op the intents already carry is left to the intents' own version: the
+        model wrote it twice and the full intent is the richer. A travel is put first,
+        because everything else in the turn happens where the party ends up (Inform's
+        and TADS's one-command-at-a-time: the meaning of what follows depends on where
+        the player is by then)."""
+        raw = list(raw) if isinstance(raw, list) else []
+        if not isinstance(declared, dict):
+            return raw
+        have = {str(r.get("op", "")).lower() for r in raw if isinstance(r, dict)}
+        for op, body in declared.items():
+            if op in have or not isinstance(body, dict):
+                continue
+            entry = {"op": op, "params": dict(body.get("params") or {}),
+                     "because": "the player's words commit the turn to it"}
+            if body.get("target"):
+                entry["target"] = body["target"]
+            if op in ("travel", "journey"):
+                raw.insert(0, entry)
+            else:
+                raw.append(entry)
+        return raw
 
     def _doors_from(self, outcomes: list) -> list[dict]:
         """The doors this turn forced or picked, and whether each gave — for the review's

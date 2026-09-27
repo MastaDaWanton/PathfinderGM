@@ -5340,6 +5340,11 @@ def person_sought(player_text: str) -> str:
     reading = _interpret.reading_of(player_text)
     if reading and not reading.get("error"):
         target = _interpret.target_of(reading, acts=("seek", "call_on", "talk"))
+        # The reading is the answer when there is one, including "nobody new": live
+        # 2026-09-27, "I buy a loaf from her and ask her name" read as talking to HER,
+        # and falling back to the regex here brought back "her name" as a person.
+        if not target:
+            return ""
         if target:
             # An indefinite description asks for any such person, and its clause is no
             # part of who the newcomer is (`sought_indefinitely`).
@@ -5535,9 +5540,16 @@ _NOBODY_TO_INTRODUCE = frozenset({
 
 
 def _describes(params: dict) -> bool:
-    """Whether an introduce says who, in any of the fields `parse` folds into `who`."""
-    return any(str(params.get(k) or "").strip() for k in
-               ("who", "description", "name", "role", "kind", "person", "npc", "character"))
+    """Whether an introduce says who, in any of the fields `parse` folds into `who`.
+
+    A placeholder is not a description: live 2026-09-27, the plan wrote `introduce
+    who="new1"` and a person called "new1" entered the scene."""
+    from rules.intents import INTRODUCED_REFS
+
+    return any(str(params.get(k) or "").strip()
+               and str(params.get(k)).strip().lower() not in INTRODUCED_REFS
+               for k in ("who", "description", "name", "role", "kind", "person", "npc",
+                         "character"))
 
 
 def _introducible(player_text: str, phrase: str | None = None) -> str:
@@ -6888,7 +6900,12 @@ def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
             return False
         op = str(r.get("op", "")).lower()
         to = str((r.get("params") or {}).get("to") or "").lower()
-        return op == "buy" or (op == "give" and to in ("pc", "you", "player"))
+        item = str((r.get("params") or {}).get("item") or "").lower()
+        # And coin handed over for it: the counter takes the payment. Live 2026-09-27,
+        # the plan wrote `give item="gp"` beside the purchase.
+        coin = item in ("gp", "sp", "cp", "pp", "gold", "silver", "copper", "coin",
+                        "coins") or item.endswith((" gp", " sp", " cp", " coins"))
+        return op == "buy" or (op == "give" and (to in ("pc", "you", "player") or coin))
     return [r for r in raw_intents if not settles_it(r)]
 
 

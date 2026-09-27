@@ -2144,9 +2144,35 @@ _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools"
 _CREATURE_OPS = _FIGHT_OPS + ("damage", "ability_damage")
 
 
+_NUMERIC_PARAMS = {"amount": "number", "count": "integer", "hours": "integer"}
+
+
+def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...]) -> dict:
+    """One required op's shape in the reply's `declared` object: its target and params,
+    the params the op requires marked required — and a travel's place held to the names
+    of the places this town really has (generation under a list of valid names; GENRE,
+    arXiv 2010.00904), so the model chooses among them and invents none."""
+    from rules.intents import OPS as _OP_TABLE
+
+    required, optional, _vis = _OP_TABLE.get(op, ((), (), ""))
+    props: dict = {}
+    for name in (*required, *optional):
+        props[name] = {"type": _NUMERIC_PARAMS.get(name, "string")}
+    need = list(required)
+    if op == "travel" and places:
+        props["place"] = {"type": "string", "enum": list(places)}
+        need = ["place"]
+    shape: dict = {"type": "object", "properties": {
+        "params": {"type": "object", "properties": props, "required": need}},
+        "required": ["params"]}
+    if refs:
+        shape["properties"]["target"] = {"type": "string", "enum": list(refs)}
+    return shape
+
+
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                 min_chars: int = 0, must_contain: tuple[str, ...] = (),
-                ops: tuple[str, ...] = ()) -> dict:
+                ops: tuple[str, ...] = (), places: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
 
     `refs` pins the cast: the enum makes it impossible to aim at somebody who is not in
@@ -2209,7 +2235,7 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
     # to write the intents after it. Clamped to what Ollama's grammar compiler can
     # actually build — see GRAMMAR_MAXLENGTH_CEILING.
     narration["maxLength"] = min(800 if fighting else 2000, GRAMMAR_MAXLENGTH_CEILING)
-    return {
+    schema = {
         "type": "object",
         "properties": {
             "narration": narration,
@@ -2218,6 +2244,22 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         },
         "required": ["narration", "intents"],
     }
+    if wanted:
+        # The requirement the sampler actually keeps. Measured 2026-09-27 against the
+        # local model: Ollama's grammar does NOT enforce `contains` (0 of 6 replies held
+        # the required op) nor `prefixItems` (0 of 6), so every declarer's "the reply is
+        # unsamplable without one" was a hint the model could ignore — and did: "I go to
+        # the market and buy a coil of rope" planned no walk, twice. A REQUIRED property
+        # it keeps (6 of 6). So the ops the player's words commit the turn to are also
+        # asked for as required keys of `declared`, one per op, which the agent merges
+        # into the intents when the list left them out (`GMAgent._merge_declared`). The
+        # `allOf` above stays for providers that do enforce it.
+        schema["properties"]["declared"] = {
+            "type": "object",
+            "properties": {op: _declared_op(op, refs, places) for op in wanted},
+            "required": list(wanted)}
+        schema["required"] = ["narration", "declared", "intents"]
+    return schema
 
 
 # --- The author's own hand -------------------------------------------------------------

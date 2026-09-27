@@ -128,3 +128,27 @@ its second half as `go`, not `call_on`.
 **Left as misses rather than bent to fit:** several misses are readings as defensible as
 the label ("seek … place=the market", taunting somebody's friends read as talk rather
 than insult). The labels were not changed to match the model.
+
+## First integration (2026-09-27)
+
+Additive, as the research advised: keep the fast word-detectors as a second opinion
+(Rasa's pattern) and retire each only on a measured comparison.
+
+- **When:** `GMAgent.plan_turn` reads the sentence first. A failed reading is logged
+  and changes nothing.
+- **What the planner sees:** a fact line of the actions in order ("THE PLAYER'S WORDS,
+  READ"), what is only claimed, and whether it was a question.
+- **What the schema requires:** the ops the reading grounds (`interpret.ops_for`)
+  join `declared_ops`:
+  - a `go` to a place this town really has (the model still names it from the brief's
+    list);
+  - `journey`, `call_on`, `break_in`, `rest`;
+  - a `wait` with a time;
+  - an `insult` (`provoke`);
+  - `talk` with words said.
+- **What the readers take from it:** `person_sought` (seeking, calling on, or talking to
+  somebody), `purchase_sought`, `called_on` and `breaks_in` consult the reading first,
+  and the regex is the fallback.
+- **What is logged:** the reading, the ops it grounded, and the detectors' ops, per turn
+  (`turn_log` "turn" entries, `reading`).
+- **Off in the test suite,** as the written opening is (`interpret.ENABLED`).
