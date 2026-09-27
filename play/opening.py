@@ -76,6 +76,22 @@ class Situation:
     errand: str = ""
 
 
+# The hour each opening's `when` names, for the world clock. Until 2026-09-27 every game
+# began at clock 0, which the app reads as midnight (the crafting bench's night is dusk to
+# dawn), under an opening that said "Mid-morning, in the market row" — harmless while
+# nothing read the hour, and wrong once the market's counter kept hours and townsfolk kept
+# a day (rules/keepers.py, rules/residency.py).
+_HOUR_OF = {"morning": 8, "mid-morning": 10, "late morning": 11, "just past noon": 13,
+            "midday": 12, "afternoon": 14, "late afternoon": 16, "early evening": 18,
+            "evening": 19, "dusk": 19}
+OPENING_HOUR = 10
+
+
+def hour_of(when: str) -> int:
+    """The clock hour an opening's `when` means; mid-morning for one the table lacks."""
+    return _HOUR_OF.get(" ".join(str(when or "").lower().split()), OPENING_HOUR)
+
+
 # Deliberately ordinary. The player can go looking for trouble — the point is that
 # trouble is not the only thing on offer in the first sentence.
 SITUATIONS: tuple[Situation, ...] = (

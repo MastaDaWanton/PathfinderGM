@@ -535,3 +535,29 @@ def line(who: str, where: Where, *, here_loc: str, clock: int, world=None,
         by_day = f" By day they are at {day_place}." if day_place else ""
         return f"At this hour {who} would be indoors, at home.{by_day}"
     return ""
+
+
+_PARTS = ("deep in the night", "the small hours", "early morning", "morning", "midday",
+          "afternoon", "evening", "late evening")
+
+
+def time_words(clock: int) -> str:
+    """The hour as the narrator is told it: "day 2, evening (about 7 in the evening)".
+
+    Until 2026-09-27 the brief never said what time it was, which was harmless while
+    nothing read the hour. Now the hour decides who is where and which counters are open,
+    and a narrator who has not been told writes the market bustling at a shut stall.
+    """
+    clock = int(clock or 0)
+    hour = (clock % DAY) // 60
+    twelve = hour % 12 or 12
+    half = "in the morning" if hour < 12 else ("in the afternoon" if hour < 18
+                                                else "at night" if hour >= 21
+                                                else "in the evening")
+    if hour == 12:
+        about = "about noon"
+    elif hour == 0:
+        about = "about midnight"
+    else:
+        about = f"about {twelve} {half}"
+    return f"day {clock // DAY + 1}, {_PARTS[slot_of(clock)]} ({about})"

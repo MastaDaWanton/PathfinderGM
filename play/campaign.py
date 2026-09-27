@@ -520,6 +520,9 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     Engine(scene, Dice(seed), world=world).place_party()
     here = opening.roll(campaign_id, seed)
+    # The clock starts at the hour the opening names ("Mid-morning, in the market row"),
+    # not at midnight: the hour now decides who is where and which counters are open.
+    scene.clock_minutes = opening.hour_of(here.when) * 60
     watcher = scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
     # The opening's own company is somebody the population keeps, like everyone the prose
     # introduces later. Measured live 2026-09-25: "the woman at the bread stall" stood on

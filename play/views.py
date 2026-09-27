@@ -2775,6 +2775,11 @@ def trade(request):
     if pc is None:
         return JsonResponse({"error": "nobody is being played"}, status=409)
 
+    from rules import keepers as _keepers
+
+    shut = _keepers.shut_here(c.scene)
+    if shut:
+        return JsonResponse({"error": shut}, status=409)
     if _merchant_here(c.scene) is None:
         return JsonResponse({"error": (
             "There is nobody here to trade with. Find a stall and speak to whoever "
@@ -2830,6 +2835,11 @@ def trade_do(request):
     refusal = _cannot_act(pc, "trade")
     if refusal:
         return refusal
+    from rules import keepers as _keepers
+
+    shut = _keepers.shut_here(c.scene)
+    if shut:
+        return JsonResponse({"error": shut}, status=409)
     if _merchant_here(c.scene) is None:
         return JsonResponse({"error": "There is nobody here to trade with."},
                             status=409)

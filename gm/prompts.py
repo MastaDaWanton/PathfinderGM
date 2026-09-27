@@ -845,6 +845,13 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     if world.premise:
         lines.append("Premise: " + "; ".join(f"{k} — {v}" for k, v in world.premise.items()))
 
+    # What time it is, as fact (rules/residency.py, `time_words`): who is where and which
+    # counters are open follow the hour, and a narrator not told it writes a busy market
+    # at a stall the engine has shut.
+    from rules import residency as _residency
+
+    lines.append(f"WHEN (fact): {_residency.time_words(getattr(scene, 'clock_minutes', 0))}.")
+
     if location:
         # The scale AND what it means. "a village" was all this said, and a model shown
         # a bare word writes whatever size of place it happens to imagine — which is how
@@ -963,6 +970,13 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     seen = _judgement.heat_brief(scene)
     if seen:
         lines.append("\n" + seen)
+    # The counter here keeps hours, and they are over (rules/keepers.py): said as fact, so
+    # the beat does not write a bustling stall at midnight that the engine will not sell at.
+    from rules import keepers as _keepers
+
+    shut = _keepers.shut_here(scene)
+    if shut:
+        lines.append(f"\nCOUNTER SHUT (fact): {shut}")
 
     # The player went looking for somebody who is not here, and the world has an answer.
     # Stated before the cast, as fact, because the failure was a model answering a question

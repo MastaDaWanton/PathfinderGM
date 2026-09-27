@@ -4623,6 +4623,24 @@ class Engine:
                     or getattr(actor, "world_entity_id", None)
                     or attitude_mod._regard_effect(actor) is not None)
 
+    def _keeper_goes(self, a, here_loc: str) -> bool:
+        """Move a stall's keeper home when the counter shuts and back when it opens."""
+        from . import keepers
+        from . import places as places_mod
+        from . import residency
+
+        place = keepers.place_of(getattr(a, "world_entity_id", "") or "")
+        if not place or places_mod.location_of(place) != here_loc or keepers.lives_in(place):
+            return False
+        if a.at not in (place, residency.offstage(here_loc, f"home-{a.ref}")):
+            return False     # somewhere the plan took them; theirs to come back from
+        target = (place if keepers.open_now(place, self.scene.clock_minutes, self.scene.founded)
+                  else residency.offstage(here_loc, f"home-{a.ref}"))
+        if target == a.at or a.is_down or a.has_state(states.TALKING):
+            return False
+        self.scene.move(a.ref, target)
+        return True
+
     def settle_people(self) -> list[str]:
         """The party has arrived somewhere: everybody with a life goes where it puts them.
 
@@ -4656,7 +4674,14 @@ class Engine:
         here_loc = scene.location_id
         for ref, a in list(scene.people.items()):
             rec = by_ref.get(ref)
-            if a.is_pc or rec is None or ref in came or ref in fighting:
+            if a.is_pc or ref in came or ref in fighting:
+                continue
+            if rec is None:
+                # A keeper keeps their counter's hours (rules/keepers.py): a stall in the
+                # open is packed up and its keeper goes home; a keeper under a roof lives
+                # on the premises and stays to be talked to, with the counter shut.
+                if self._keeper_goes(a, here_loc):
+                    moved.append(ref)
                 continue
             if (a.at == scene.at
                     and int(rec.get("last_seen") or 0) >= int(scene.arrived or 0)):
@@ -7213,6 +7238,11 @@ class Engine:
         buyer = intent.params.get("to")
         if buyer and buyer not in self.scene.actors:
             return self._refuse(intent, self._elsewhere(buyer) or f"There is no {buyer} here to sell to.")
+        from . import keepers as keepers_mod
+
+        shut = keepers_mod.shut_here(self.scene, self.scene.actors[buyer] if buyer else None)
+        if shut:
+            return self._refuse(intent, shut)
         who = self.scene.actors[buyer].name if buyer else "the stallholder"
 
         # The same three coordinates the shelf is drawn on, read the same way
@@ -7294,6 +7324,12 @@ class Engine:
         seller = intent.params.get("from_")
         if seller and seller not in self.scene.actors:
             return self._refuse(intent, self._elsewhere(seller) or f"There is no {seller} here to buy from.")
+        # A counter keeps hours (rules/keepers.py): the keeper says when to come back.
+        from . import keepers as keepers_mod
+
+        shut = keepers_mod.shut_here(self.scene, self.scene.actors[seller] if seller else None)
+        if shut:
+            return self._refuse(intent, shut)
         who = self.scene.actors[seller].name if seller else "the stallholder"
 
         place = str(self.scene.location_id or "nowhere")
