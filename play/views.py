@@ -2043,15 +2043,19 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                                 judgement._role_head(w) in text.lower()
                                                 for w in booked_in]})
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
-            # And every one of them into the population, located and with a life rolled,
-            # before promotion — so a person who is promoted wears the face their record
-            # rolled, and one who is not is still somebody the player can find later
-            # (the user's question of 2026-09-25: "there is nothing left of her?").
+            # And every one of them into the population, located and with a life rolled —
+            # a RECORD, which the player can find later (the user's question of
+            # 2026-09-25: "there is nothing left of her?"). Never a body any more: ruled
+            # 2026-09-27, option (a) of the declared-not-guessed review. A hand check of
+            # the prose door found 11 of 30 booked people wrong (the "elder" out of "the
+            # elder-quarter" in a quote, a second old man, "man in a stained leather", a
+            # thug named "weapon"), and a body is what a misread turned into a phantom in
+            # a fight. Bodies come from the plan (`introduce`) or from the player engaging
+            # somebody (`judgement.embody_sought`); a misread now leaves a stray record.
             from rules import population
 
             judgement.record_people(c.scene, introduced, turn=len(c.transcript),
                                     world=c.world)
-            judgement.promote_cast(c.scene, introduced, beat=text, world=c.world)
             # Every search for somebody that found nobody this turn, so the synonym table
             # (content/people/synonyms.json) grows from what real play missed.
             c.turn_log.extend(population.drain_misses())

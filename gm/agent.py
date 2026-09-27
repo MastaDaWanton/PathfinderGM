@@ -168,6 +168,59 @@ class GMAgent:
             return cut, f"an undeclared blow by {names}: the sentence was cut", attempts
         return text, f"an undeclared blow by {names}: could not be removed", attempts
 
+    def _undeclared_arrivals(self, text: str, messages: list, schema: dict):
+        """Mid-fight, the prose brings in people the engine never put on the board.
+
+        Item 30 (2026-09-19): "a band of twelve raiders" arrived in the prose mid-battle
+        and zero bodies went on the board; the fix then was to promote the prose's
+        people into bodies. Ruled 2026-09-27, the prose makes no bodies — so a newcomer
+        in a fight's prose is a claim nothing backs, and gets the standing repair: one
+        rewrite naming the fix. Arrivals are the plan's or an NPC turn's `spawn`. Out of
+        a fight the prose's people are records, and stay (the user's ruling).
+
+        Returns (text, repair note or "", attempts).
+        """
+        scene = self.engine.scene
+        if not getattr(scene, "in_encounter", False):
+            return text, "", []
+        cast = list(scene.cast)
+        try:
+            newcomers = judgement.note_cast(scene, text, turn=0)
+        finally:
+            scene.cast = cast
+        if not newcomers:
+            return text, "", []
+        who = ", ".join(newcomers)
+        correction = (
+            f"In this beat {who} {'arrives' if len(newcomers) == 1 else 'arrive'} in the "
+            f"fight, and nothing the engine decided brought anybody new in: the people in "
+            f"this fight are the ones already on the board. Write the same beat again "
+            f"with only them — the same blows and events otherwise.")
+        attempts = []
+        try:
+            again = client.chat(
+                messages + [{"role": "assistant", "content": text},
+                            {"role": "user", "content": correction}],
+                self.prose_model, self.prose_host, as_json=True, think=False,
+                temperature=0.7, num_predict=1400, provider=self.prose_provider,
+                api_key=self.prose_key, schema=schema, timeout=FALLBACK_TIMEOUT)
+            text2 = self._lift(str(again.json().get("narration", "")).strip())
+            cast = list(scene.cast)
+            try:
+                still = judgement.note_cast(scene, text2, turn=0)
+            finally:
+                scene.cast = cast
+            attempts.append(Attempt("prose", again.seconds, again.model, again.text,
+                                    note="retry, undeclared arrival named"
+                                         + (f" — still brings in {', '.join(still)}"
+                                            if still else "")))
+            if text2 and not still and not narration_mod.reads_as_a_refusal(text2):
+                return text2, f"undeclared arrivals in a fight ({who}): rewritten", attempts
+        except Exception as exc:
+            attempts.append(Attempt("prose", 0.0, self.prose_model,
+                                    note=f"arrival retry failed: {str(exc)[:100]}"))
+        return text, f"undeclared arrivals in a fight ({who}): could not be removed", attempts
+
     def _lift(self, text: str) -> str:
         """A reply's narration with its speaker tags taken out, and what they said kept.
 
@@ -221,6 +274,10 @@ class GMAgent:
         # of "scene on" three times, and `use_item potion_of_rest_01`.
         if player_input == prompts.CARRY_ON:
             return self._continue_plan()
+        # Somebody the prose described and the player now turns to walks on with a body
+        # first, so the plan can address them by ref (ruled 2026-09-27: the prose
+        # records people; engagement or the plan makes them actors).
+        judgement.embody_sought(self.engine.scene, player_input, self.world)
         # The plan sees the situation cards — the GM's secret ones included — keyed
         # off the last few beats the view hands over (`self.recent`).
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
@@ -1244,44 +1301,6 @@ class GMAgent:
         "nobody-reacts",
     })
 
-    def _found_from_the_page(self, text: str) -> list[str]:
-        """A place the page made, before the reviewer reads the draft.
-
-        Ruled 2026-09-23: a place the narration establishes that the settlement does
-        not list is FOUNDED, not rewritten away — "what matters is the places being
-        remembered, interesting, and at least make sense to be where they are". Every
-        such place the engine can make sense of is made (`Engine.found_from_prose`),
-        and the review that follows sees it on the list. One a beat: a paragraph that
-        names three new buildings is still a paragraph that has wandered. Returns the
-        repair-log notes.
-        """
-        here = self._here_name()
-        if not here or not text:
-            return []
-        # Not in a fight. A brawl's prose reaches for whatever is near — "he slams you
-        # back against the forge" — and measured 2026-09-25 this ran on combat prose
-        # too, so a fight in the lane could found a smithy the town never had. The
-        # ruling was about places the narration ESTABLISHES, which a fight does not do.
-        if getattr(self.engine.scene, "in_encounter", False):
-            return []
-        places = self._place_names()
-        real = {narration_mod._bare(p).lower() for p in places}
-        for where, sentence in narration_mod.stands_elsewhere(text, here=here,
-                                                              places=places):
-            if narration_mod._bare(where).lower() in real:
-                continue        # a real place walked to without moving: still item 38
-            try:
-                note, why = self.engine.found_from_prose(
-                    where, sentence,
-                    standing=narration_mod.claims_standing(sentence, where))
-            except Exception as exc:      # noqa: BLE001 — a founding is never worth a turn
-                return [f"a place the page made could not be kept: {exc}"]
-            if note:
-                return [note]
-            if why:
-                return [f"a place the page made was refused: {why}"]
-        return []
-
     def polish(self, text: str, earlier: list[str] | None = None,
                 min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                 scene_brief: str = "",
@@ -1306,8 +1325,11 @@ class GMAgent:
         backstop (a backstop repairs for free what the retry would chase) and the scene
         is not a fight (a second ~10s call mid-combat costs more than the finding).
         """
-        # The page may have made a place; the review below must see it on the list.
-        made = self._found_from_the_page(text)
+        # The page founds no places (ruled 2026-09-27, option (a) of the declared-not-
+        # guessed review): places come from the plan's `found`, the player and venturing
+        # out. A beat set somewhere the party is not is `stands-elsewhere` below, and is
+        # rewritten to where they are — never kept as a new place.
+        made: list[str] = []
         known = self._known_names() | (extra_known or set())
 
         def _review(t: str):
@@ -1642,6 +1664,11 @@ class GMAgent:
         # blows door): a check now, not a door into a fight.
         text, note, struck_attempts = self._undeclared_blows(text, messages, schema)
         attempts.extend(struck_attempts)
+        if note:
+            early.append(note)
+        # And, in a fight, anybody the prose brings in that nobody declared.
+        text, note, arrival_attempts = self._undeclared_arrivals(text, messages, schema)
+        attempts.extend(arrival_attempts)
         if note:
             early.append(note)
         # No claim repair here on purpose: the engine has already resolved the turn, so

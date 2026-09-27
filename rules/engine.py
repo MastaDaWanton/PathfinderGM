@@ -6158,9 +6158,10 @@ class Engine:
                     origin: str = "found", kind: str = ""):
         """Mint a place off `parent` and remember it: the one door a place is made by.
 
-        Pulled out of `_op_found` when the page was given leave to make places too
-        (`found_from_prose`), so the plan's door and the page's door mint the same
-        thing — the record in `scene.founded`, the holder's effect, the place's card.
+        Pulled out of `_op_found` when the page was given leave to make places too, so
+        both doors minted the same thing — the record in `scene.founded`, the holder's
+        effect, the place's card. The page's door is gone (ruled 2026-09-27); the plan's
+        `found` and `venture` remain.
         """
         from . import cards as cards_mod
         from . import places as places_mod
@@ -6186,64 +6187,6 @@ class Engine:
             people=[owner.ref] if owner is not None else [], place=place.id,
             clock_max=6, origin=origin), turn=0)
         return place
-
-    def found_from_prose(self, where: str, sentence: str, *,
-                         standing: bool = False) -> tuple[str, str]:
-        """A place the narration established, made real — or the reason it cannot be.
-
-        Ruled 2026-09-23, reversing item 45's answer: *"i dont mind it creating a dock so
-        long as it remembers that it has a dock and remembers the tavern it put there."*
-        Until then a beat that walked the party into a tavern Vormoor did not list was
-        sent back to be rewritten; now the tavern is founded off the place the party is
-        standing in, described as the page described it, and the party is moved into it
-        when the sentence put them there. Next turn it is on the list, next door, on the
-        map, and somebody is behind its bar.
-
-        Returns `(note, why)`: a note for the repair log when a place was made, or the
-        reason none was — which is what the reviewer's rewrite then says. Only a kind
-        the settlement table knows is made, and only where it makes sense
-        (`places.fits_here`); "the counting house of the Vardic league" stays a
-        rewrite, because a place the app cannot shape or staff is not one it can
-        remember properly.
-        """
-        from . import places as places_mod
-
-        kind = " ".join(str(where or "").split()).lower().removeprefix("the ")
-        if kind not in places_mod.KINDS:
-            return "", ""
-        known = self.places()
-        if places_mod.find(known, f"the {kind}") is not None:
-            return "", ""
-        here = self.here()
-        location = self.world.get(self.scene.location_id) if self.world else None
-        why = places_mod.fits_here(kind, location)
-        if why:
-            return "", why
-        if len(places_mod.children_of(self.scene.founded, here.id)) >= places_mod.MOST_CHILDREN:
-            return "", (f"{here.name} already has as many places hanging off it as one "
-                        f"place can hold.")
-        about = " ".join(str(sentence or "").split())
-        place = self.found_place(f"the {kind}", here, about=about, origin="narrated",
-                                 kind=kind)
-        note = f"a place the page made: {place.name}, off {here.name}"
-        pc = self.scene.pc()
-        if standing and pc is not None and not self.scene.in_encounter:
-            # The sentence stood them in it, so they are in it: the map and the panel
-            # follow the page for once, because the page has just been made true.
-            # Whoever travels with them comes; it is one step through a door.
-            self.scene.move(pc.ref, place.id)
-            for ref, a in list(self.scene.people.items()):
-                if not a.is_pc and a.has_state(states.TRAVELS_WITH_YOU):
-                    self.scene.move(ref, place.id)
-            self.scene.grid = None
-            self.scene.positions.clear()
-            self.lay_the_ground()
-            self.scene.settle_relations()
-            self.staff_the_place()
-            note += ", and the party is in it"
-        return note, ""
-
-    # --- the sea ------------------------------------------------------------------------
 
     def vessel(self, vessel_id: str):
         """One ship the campaign holds, as a live record. None if it holds no such ship."""

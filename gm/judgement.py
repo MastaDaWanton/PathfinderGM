@@ -5906,6 +5906,37 @@ def book_introduced(scene, outcomes, turn: int = 0) -> list[str]:
     return booked
 
 
+def embody_sought(scene, player_text: str, world=None) -> str:
+    """The person the player's words go to, when the population holds them here with no
+    body yet, is given one — before the plan, so the planner sees them in WHO IS HERE.
+
+    Ruled 2026-09-27: the prose no longer makes bodies; it records people. A person
+    becomes an actor when the plan introduces them or when the player engages them, and
+    this is the second: "I talk to the woman in the doorway" finds her record (the
+    finder, `scope.look_for`) and she walks on wearing the face she was rolled. Returns
+    the ref, or "". Only somebody found HERE — a glimpse elsewhere is answered, not
+    fetched — and only when the words picked out one person."""
+    from rules import population
+    from rules import scope as scope_mod
+
+    phrase = person_sought(player_text)
+    if not phrase or scene is None:
+        return ""
+    found = scope_mod.look_for(world, phrase, scene, getattr(scene, "location_id", None),
+                               indefinite=sought_indefinitely(player_text))
+    rid = found.get("record") if found.get("scope") == scope_mod.HERE else None
+    if not rid or found.get("ref"):
+        return ""
+    rec = (getattr(scene, "population", {}) or {}).get(rid)
+    if rec is None:
+        return ""
+    actor = embody(scene, rec["phrase"], world=world, rec=rec)
+    if not any(e.get("ref") == actor.ref for e in scene.cast):
+        scene.cast.append({"who": rec["phrase"], "turn": int(rec.get("turn", 0)),
+                           "ref": actor.ref})
+    return actor.ref
+
+
 def embody(scene, phrase: str, *, zone: str = "near", world=None, rec: dict | None = None):
     """One described person becomes an actor in the room, with the stat block their words
     call for (`template_for`). The body itself is made by `population.embody`, the one
@@ -5919,6 +5950,14 @@ def embody(scene, phrase: str, *, zone: str = "near", world=None, rec: dict | No
 
 def promote_cast(scene, added, beat: str = "", world=None) -> list[str]:
     """A person the ledger notes becomes a person the engine holds.
+
+    NOT CALLED FROM THE PROSE PATH since 2026-09-27 (option (a) of the declared-not-
+    guessed review): the prose records people (`record_people`) and makes no bodies. The
+    live doors to a body are the plan's `introduce` and the player turning to somebody
+    (`embody_sought`); mid-fight arrivals are the plan's `spawn`, and a newcomer only the
+    prose brings is rewritten out (`GMAgent._undeclared_arrivals`). Kept as the batch
+    form of `embody` — the tests stand people up with it — and everything below about
+    how it places, caps and groups them is still true of it. What follows is its history.
 
     The ruling, after the library beat: the place held but "there should have
     been a stranger" — the ledger knew about him and the scene did not, so he
