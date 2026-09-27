@@ -1232,7 +1232,11 @@ def say(request):
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
 
-    return _advance(c, agent, plan.narration, plan, text)
+    resp = _advance(c, agent, plan.narration, plan, text)
+    # A purchase opens the counter with the thing picked (`_trade_offer`): the turn's
+    # prose brings the keeper to the counter, and the player pays on the screen.
+    offer = _trade_offer(c, text) if getattr(resp, "status_code", 200) == 200 else None
+    return _with(resp, {"trade": offer}) if offer else resp
 
 
 def _put_back_free_actions(c, pending: list) -> None:
@@ -1890,7 +1894,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     # And the world's answer when the player went looking
                                     # for somebody who is not here (item 29).
                                     absent=judgement.absent_answer(c.scene, c.world,
-                                                                   player_input))
+                                                                   player_input),
+                                    # And the counter the turn opens, when the player
+                                    # set out to buy something (`_trade_offer`).
+                                    buying=_buying_note(c, player_input))
         # The model's own recent prose — the narrator's beats only, with the sentences
         # WE appended to them (a death line, a thread anchor) taken back out. Shown its
         # own backstop or the engine's award line as "what you narrated", the model
@@ -2697,6 +2704,41 @@ def _merchant_here(scene):
     return None
 
 
+def _trade_offer(c, player_text: str) -> dict | None:
+    """{"open": True, "want": ...} when the player set out to buy something and there is
+    an open counter here to buy it at; else None.
+
+    The user's ruling (2026-09-27): "I try to buy a coil of rope." should "open the trade
+    tab [potentially with Rope in the basket]". Not opened at a shut counter (the keeper
+    has said when to come back, `keepers.shut_here`), with nobody keeping one, or for a
+    customer the keeper will not serve (`_counter_refusal`) — each of those is the
+    beat's to say, and an empty panel would contradict it."""
+    from rules import keepers
+
+    want = judgement.purchase_sought(player_text)
+    if not want or c.scene.in_encounter:
+        return None
+    pc = c.scene.pc()
+    if pc is None or keepers.shut_here(c.scene) or _merchant_here(c.scene) is None:
+        return None
+    if _counter_refusal(c, pc) is not None:
+        return None
+    return {"open": True, "want": want}
+
+
+def _buying_note(c, player_text: str) -> str:
+    """The brief's line when the turn opens the counter: the prose brings the keeper to
+    it and settles nothing — the screen is where the coin moves."""
+    offer = _trade_offer(c, player_text)
+    if not offer:
+        return ""
+    who = getattr(_merchant_here(c.scene), "name", "") or "the keeper"
+    return (f"The player is buying {offer['want']}: the counter's own screen opens for it "
+            f"after this beat. {who} comes to the counter and may show the goods and name "
+            f"a price; nothing is handed over and no coin changes hands in the prose — "
+            f"the player pays on the screen.")
+
+
 def _counter_refusal(c, pc):
     """The merchant's answer to a wanted character: no, with the reason named. Else
     None (docs/wanted.md, reader two).
@@ -2757,7 +2799,8 @@ def _stall_of(c) -> tuple[str, str, int]:
 def _row(item, price: float, count: int = 1) -> dict:
     from rules import pricing
 
-    return {"id": str(getattr(item, "id", "")), "name": str(getattr(item, "name", "")),
+    return {"id": str(getattr(item, "id", "")),
+            "name": str(getattr(item, "label", "") or getattr(item, "name", "")),
             "tier": str(getattr(item, "tier", "") or "common"), "count": count,
             "gp": round(price, 2), "price": pricing.as_text(price),
             # What the engine can actually run with it, which is a quarter of the price
@@ -2796,10 +2839,24 @@ def trade(request):
 
     till = market.purse(place, stall, day, tier)
     left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
-    counter = market.on_sale(place, stall, day, c.scene.market_taken, tier)
+    counter = market.on_sale(place, stall, day, c.scene.market_taken, tier,
+                             counter_kind=market.counter_kind_here(c.scene))
+    # What the player's words asked for, picked on the counter if it is there — and if
+    # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
+    # and nothing is guessed in its place.
+    want = " ".join(str(body.get("want") or "").split())[:80]
+    pick, want_line = "", ""
+    if want:
+        found, _fits = goods.match_want(want, counter)
+        if found is not None:
+            pick = str(getattr(found, "id", ""))
+        else:
+            who = getattr(_merchant_here(c.scene), "name", "") or "The keeper"
+            thing = re.sub(r"^(?:a|an|some|the)\s+", "", want)
+            want_line = f"{who} has no {thing} on the counter. This is what there is."
 
     return JsonResponse({
-        "stall": stall, "place": place, "day": day,
+        "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
         "till": {"gp": left, "text": pricing.as_text(max(0.0, left))},
         "purse": goods.purse_line(pc.purse, goods.coinage()),
         "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),

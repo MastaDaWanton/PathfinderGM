@@ -491,6 +491,9 @@ class GMAgent:
                 # Somebody's house: the engine's knock, in place of a walk into a
                 # place that is not one yet (docs/the-population.md, calling on people).
                 raw = judgement.inject_call_on(raw, player_input, self.engine.scene)
+                # A declared purchase is made on the counter's screen, which the turn
+                # opens with the thing picked (play/views.py, `_trade_offer`).
+                raw = judgement.strip_counter_buys(raw, player_input)
                 raw = judgement.inject_company(raw, player_input,
                                                self.engine.scene, self.world)
                 # Speech last, because it competes with nothing: "I tell the smith I

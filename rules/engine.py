@@ -7576,15 +7576,26 @@ class Engine:
         shut = keepers_mod.shut_here(self.scene, self.scene.actors[seller] if seller else None)
         if shut:
             return self._refuse(intent, shut)
-        who = self.scene.actors[seller].name if seller else "the stallholder"
+        # Whoever keeps this counter, by name, when the plan named no seller: the panel
+        # never does, and "pays the stallholder" read wrong with Azhil Vex standing
+        # behind it (live, 2026-09-27).
+        here_keeper = keepers_mod.keeper_in(self.scene, str(self.scene.at or ""))
+        who = (self.scene.actors[seller].name if seller
+               else here_keeper.name if here_keeper is not None
+               and here_keeper.ref in self.scene.actors else "the stallholder")
 
         place = str(self.scene.location_id or "nowhere")
         stall = str(intent.params.get("stall") or seller or "market")
         day = market_mod.day_of(self.scene.clock_minutes)
 
-        counter = market_mod.on_sale(place, stall, day, self.scene.market_taken)
+        counter = market_mod.on_sale(place, stall, day, self.scene.market_taken,
+                                     counter_kind=market_mod.counter_kind_here(self.scene))
         found = next((m for m in counter if str(getattr(m, "id", "")).lower() == item_id),
                      None)
+        if found is None:
+            # Named the way a person names it ("rope", "a coil of rope") rather than by
+            # id: the shelf's own matcher, which guesses nothing (`goods.match_want`).
+            found, _ = goods.match_want(item_id, counter)
         if found is None:
             # Named, not blank, and printed: what is on a counter TODAY is a fact only
             # the engine holds — the shelf is drawn from a seeded table and the day is
@@ -7610,19 +7621,27 @@ class Engine:
 
         actor.purse = purse
         # Onto the shelf as a crafted-shape entry, which is the one container the
-        # inventory panels and the benches both already read.
+        # inventory panels and the benches both already read. A good measured out comes
+        # in its measure: one purchase of rope is fifty feet, as the outfitting screen
+        # has always sold it.
+        per = int(getattr(found, "per", 1) or 1)
         actor.add_stock(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
                               potency=1.0, craft=str(getattr(found, "track", "") or "")),
-                        count)
-        for _ in range(count):
-            market_mod.mark_sold(self.scene.market_taken, item_id, place, stall, day)
+                        count * per)
+        # A staple is never sold out; a thing drawn onto today's shelf is, once sold.
+        if not getattr(found, "staple", False):
+            for _ in range(count):
+                market_mod.mark_sold(self.scene.market_taken, str(found.id), place, stall,
+                                     day)
 
         return Outcome(
             intent_id=intent.id, op="buy",
             effects=[{"ref": actor.ref, "kind": "bought", "item": found.name,
                       "count": count, "paid_cp": cp}],
-            tell=f"{actor.name} pays {who} {pricing.as_text(price)} for {count}x "
-                 f"{found.name}. ({goods.purse_line(actor.purse, coins)} left.)",
+            tell=f"{actor.name} pays {who} {pricing.as_text(price)} for "
+                 + (f"{count * per} {found.unit} of {found.name}"
+                    if getattr(found, "unit", "") else f"{count}x {found.name}")
+                 + f". ({goods.purse_line(actor.purse, coins)} left.)",
             because=intent.because,
         )
 

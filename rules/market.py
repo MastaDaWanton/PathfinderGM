@@ -196,8 +196,23 @@ def everything_priced() -> list:
     return _POOL
 
 
+_GOODS_ONLY = frozenset({"tavern", "inn", "alehouse", "taproom"})
+
+
+def counter_kind_here(scene) -> str:
+    """What kind of counter the party is standing at, for what it stocks: the kind of
+    the place whose keeper is here (`keepers.kind_of`), else a market — a peddler in
+    the street sells what a market does."""
+    from . import keepers
+
+    at = str(getattr(scene, "at", "") or "")
+    if at and keepers.keeper_in(scene, at) is not None:
+        return keepers.kind_of(at, getattr(scene, "founded", None) or ())
+    return "market"
+
+
 def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
-            tier: str = DEFAULT_STALL_TIER) -> list:
+            tier: str = DEFAULT_STALL_TIER, counter_kind: str = "") -> list:
     """What this stall has on the counter right now — today's shelf minus what has gone.
 
     **A stall does not stock what it could not buy.** The rarity quota alone put a
@@ -214,9 +229,19 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
     till = purse(place, stall, day, tier)
     from . import pricing
 
+    # The goods this counter always carries (`goods.goods_at`): staples, first on the
+    # shelf and never sold out. A counter named by no kind (the old callers, the tests of
+    # the material draw) keeps the draw alone.
+    staples = []
+    if counter_kind:
+        from . import goods as goods_mod
+
+        staples = [g for g in goods_mod.goods_at(counter_kind) if pricing.worth(g) <= till]
+        if str(counter_kind).lower().removeprefix("the ") in _GOODS_ONLY:
+            return staples
     affordable = [m for m in everything_priced() if pricing.worth(m) <= till]
     shelf = stock(affordable, place=place, stall=stall, day=day)
-    return remaining(shelf, taken or {}, place, stall, day)
+    return staples + remaining(shelf, taken or {}, place, stall, day)
 
 
 def summary(shelf) -> dict[str, int]:

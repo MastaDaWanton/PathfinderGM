@@ -835,7 +835,7 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
 
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=(), recent=None, secret=False, turn=0, names_for=None,
-                absent: str = "") -> str:
+                absent: str = "", buying: str = "") -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
@@ -977,6 +977,10 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     shut = _keepers.shut_here(scene)
     if shut:
         lines.append(f"\nCOUNTER SHUT (fact): {shut}")
+    # The player set out to buy something and the counter's screen opens for it after
+    # this beat (play/views.py, `_trade_offer`): the prose settles nothing.
+    if buying:
+        lines.append(f"\nAT THE COUNTER (fact): {buying}")
 
     # The player went looking for somebody who is not here, and the world has an answer.
     # Stated before the cast, as fact, because the failure was a model answering a question

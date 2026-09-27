@@ -6747,3 +6747,52 @@ def inject_call_on(raw_intents, player_text: str, scene) -> list:
         goes and isinstance(r, dict) and str(r.get("op", "")).lower() == "travel")]
     return kept + [{"op": "call_on", "because": "the player went to their home",
                     "params": {"who": who, "visit": goes}}]
+
+
+# --- a purchase opens the counter ---------------------------------------------------------
+#
+# "I try to buy a coil of rope." was `narrate_only` in every live run (2026-09-27): the
+# narrator invented a rope seller, handed rope over at one in the morning, and no coin
+# moved. The user's ruling: a purchase "should open the trade tab [potentially with Rope
+# in the basket]". Every tradition researched hands words to a trade screen and never
+# settles a sale in them — Fallout's `ShowBarterMenu`, Neverwinter Nights' `OpenStore`,
+# Baldur's Gate 3's Trade button — and matches the thing named against the keeper's real
+# stock, refusing rather than guessing when it is not there (tbaMUD's "Sorry, I haven't
+# got exactly that item."). So the player's words open the panel with the thing picked;
+# paying is a click on it, through the engine's own `buy`.
+_BUYS = re.compile(
+    r"\b(?:buy|buys|purchase|purchases|pay\s+for|shop\s+for|order)\s+"
+    r"(?P<what>[a-z][a-z' -]{1,60}?)"
+    r"(?=\s+(?:from|at|off|for|with|and|if|to|so|before|then)\b|[,.!?;]|$)", re.I)
+_NOT_A_PURCHASE = re.compile(
+    r"^(?:him|her|them|me|us|you|everyone|everybody|the\s+(?:man|woman|room|house|"
+    r"table|bar)|a\s+round|time|some\s+time|a\s+moment|their\s+silence|a\s+favour|"
+    r"a\s+favor|passage|a\s+room|rooms?|the\s+story|it|that|this)\b", re.I)
+
+
+def purchase_sought(player_text: str) -> str:
+    """What the player is setting out to buy, in their words ("a coil of rope"), or "".
+
+    The character's own speech counts — "I'd like to buy a loaf" said to a baker is a
+    purchase — so nothing is blanked. Buying somebody a drink, buying time, buying
+    silence and taking a room are not purchases off a shelf."""
+    text = str(player_text or "")
+    if re.search(r"\bsell(?:s|ing)?\b", text, re.I) and not re.search(r"\bbuy", text, re.I):
+        return ""
+    m = _BUYS.search(text)
+    if not m:
+        return ""
+    what = " ".join(m.group("what").split()).strip(" -'")
+    if not what or _NOT_A_PURCHASE.match(what):
+        return ""
+    return what
+
+
+def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
+    """A purchase the player declared is made on the counter's screen, not in the plan:
+    a `buy` the model wrote for it would settle the sale before the player saw the price
+    (the failure every tradition above avoids)."""
+    if not isinstance(raw_intents, list) or not purchase_sought(player_text):
+        return raw_intents
+    return [r for r in raw_intents
+            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "buy")]

@@ -330,4 +330,139 @@ GEAR: dict[str, dict] = {
     "caltrops": {"name": "caltrops", "cost_gp": 1.0},
     "sunrod": {"name": "sunrod", "cost_gp": 2.0},
     "alchemist's fire": {"name": "alchemist's fire", "cost_gp": 20.0},
+    # Food and drink, Core Rulebook Table 6-9 ("Food, Drink, and Lodging"), read from the
+    # PRD's own table 2026-09-27 (legacy.aonprd.com/coreRulebook/equipment.html). Open
+    # Game Content; the book is in OGL-NOTICE.md's section 15. Provisions a market sells
+    # too; drink and meals are a tavern's. Lodging and banquets are services, not goods.
+    "bread": {"name": "loaf of bread", "cost_gp": 0.02, "category": "provisions"},
+    "cheese": {"name": "hunk of cheese", "cost_gp": 0.1, "category": "provisions"},
+    "meat": {"name": "chunk of meat", "cost_gp": 0.3, "category": "provisions"},
+    "ale": {"name": "mug of ale", "cost_gp": 0.04, "category": "food"},
+    "ale gallon": {"name": "gallon of ale", "cost_gp": 0.2, "category": "food"},
+    "wine": {"name": "pitcher of common wine", "cost_gp": 0.2, "category": "food"},
+    "fine wine": {"name": "bottle of fine wine", "cost_gp": 10.0, "category": "food"},
+    "good meal": {"name": "good meal", "cost_gp": 0.5, "category": "food"},
+    "common meal": {"name": "common meal", "cost_gp": 0.3, "category": "food"},
+    "poor meal": {"name": "poor meal", "cost_gp": 0.1, "category": "food"},
 }
+
+
+# --- goods on a counter ---------------------------------------------------------------------
+#
+# A shop's shelf was drawn only from the crafting benches' materials, so a market stall
+# sold alum, bismuth and quicklime and no rope, no torch and no bread. Measured live
+# 2026-09-27: "I try to buy a coil of rope." — the narrator invented a rope seller and
+# handed rope over at one in the morning with no coin moving, and even had the purchase
+# reached the engine there was no rope on any shelf to buy. The goods are the Core
+# Rulebook's (`GEAR` above, the same list the outfitting screen sells from), and a counter
+# stocks the ones its trade would: staples, always there, never sold out — a general
+# store does not run out of rope by noon.
+_SMITH_GOODS = frozenset({"crowbar", "grappling hook", "hammer", "pitons", "manacles",
+                          "shovel", "caltrops", "whetstone", "lantern", "mirror"})
+def _category(key: str) -> str:
+    return str((GEAR.get(key) or {}).get("category") or "gear")
+
+
+def stocked_at(counter_kind: str) -> list[str]:
+    """The GEAR keys a counter of this kind always has on it.
+
+    A tavern or inn sells food and drink; a smithy, what a smith makes; everything else
+    that keeps a counter — the market above all — sells the general goods."""
+    kind = str(counter_kind or "").lower().removeprefix("the ")
+    if kind in ("tavern", "inn", "alehouse", "taproom"):
+        return [k for k in GEAR if _category(k) in ("food", "provisions")] + ["rations"]
+    if kind in ("smithy", "workshops"):
+        return [k for k in GEAR if k in _SMITH_GOODS]
+    return [k for k in GEAR if _category(k) != "food"]
+
+
+@dataclass(frozen=True)
+class Good:
+    """One of the Core Rulebook's goods on a shelf, in the shape the counter reads:
+    `id`, `name`, `tier`, `price_gp`. `per` is how much one purchase is — fifty feet of
+    rope — and `unit` what it is measured in."""
+    id: str
+    name: str
+    price_gp: float
+    tier: str = "common"
+    per: int = 1
+    unit: str = ""
+    specs: tuple = ()
+    staple: bool = True
+
+    @property
+    def label(self) -> str:
+        return f"{self.name} ({self.per} {self.unit})" if self.unit else self.name
+
+
+GOOD_PREFIX = "gear:"
+
+
+def good(key: str) -> Good | None:
+    entry = GEAR.get(key)
+    if not entry:
+        return None
+    return Good(id=GOOD_PREFIX + key, name=str(entry["name"]),
+                price_gp=float(entry["cost_gp"]), per=int(entry.get("per", 1) or 1),
+                unit=str(entry.get("unit", "") or ""))
+
+
+def goods_at(counter_kind: str) -> list[Good]:
+    return [g for g in (good(k) for k in stocked_at(counter_kind)) if g is not None]
+
+
+# The words a purchase is measured in and nothing else: "a coil of rope" is rope, "a loaf
+# of bread" is bread, "some torches" is torches.
+_MEASURE_WORDS = frozenset({
+    "a", "an", "the", "some", "any", "of", "coil", "coils", "length", "lengths", "loaf",
+    "loaves", "flask", "flasks", "mug", "mugs", "pitcher", "bottle", "bottles", "bag",
+    "bags", "pair", "pairs", "set", "sets", "piece", "pieces", "few", "couple", "bit",
+    "stick", "sticks", "roll", "rolls", "bundle", "one", "two", "three", "four", "five",
+    "fifty", "feet", "foot", "ft", "day's", "days", "day", "worth", "new", "good",
+    "decent", "cheap", "sturdy", "fresh", "hot", "cold", "more", "extra", "spare",
+})
+
+
+def _want_words(text: str) -> list[str]:
+    from .population import _stem
+
+    return [_stem(w) for w in re.findall(r"[a-z][a-z'-]*", str(text or "").lower())
+            if w not in _MEASURE_WORDS]
+
+
+def match_want(want: str, rows) -> tuple[object | None, list]:
+    """The shelf row the player asked for, or None and what is nearest.
+
+    Every word of the want must be in the row's name or id (after the measure words go):
+    "a coil of rope" is hemp rope and silk rope both, and the cheaper, plainer one wins,
+    as a shopkeeper asked for "rope" reaches for the ordinary coil. None fits: nothing
+    is guessed (CircleMUD's keeper: "I don't have that") and the caller says so."""
+    words = _want_words(want)
+    if not words:
+        # All measure: "a loaf" is the loaf of bread. The words themselves, then.
+        from .population import _stem
+
+        words = [_stem(w) for w in re.findall(r"[a-z][a-z'-]*", str(want or "").lower())
+                 if w not in ("a", "an", "the", "some", "any", "of")]
+    if not words:
+        return None, []
+    fits = []
+    for r in rows:
+        name = str(getattr(r, "name", "") or (r.get("name") if isinstance(r, dict) else ""))
+        rid = str(getattr(r, "id", "") or (r.get("id") if isinstance(r, dict) else ""))
+        from .population import _stem
+
+        have = {_stem(w) for w in re.findall(
+            r"[a-z][a-z'-]*", f"{name} {rid.replace(GOOD_PREFIX, '').replace('-', ' ')}".lower())}
+        if all(w in have for w in words):
+            fits.append(r)
+    if not fits:
+        return None, []
+
+    def price(r):
+        v = getattr(r, "price_gp", None)
+        if v is None and isinstance(r, dict):
+            v = r.get("gp")
+        return float(v or 0)
+    fits.sort(key=price)
+    return fits[0], fits
