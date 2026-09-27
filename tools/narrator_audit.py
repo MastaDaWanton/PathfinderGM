@@ -526,7 +526,13 @@ def audit(turns: int, script: str, world: str, character: str,
                          # answer it.
                          "narration": text,
                          "prose": prose_this_turn,
-                         "pull": pull})
+                         "pull": pull,
+                         # What the grooming did to each creature's turn this turn: a
+                         # `wrong-actor` rewrite or backstop is a creature's turn the
+                         # model told the wrong way round, which the page — mended —
+                         # no longer shows (docs/wrong-actor.md).
+                         "npc_repairs": [r for t in new_log if t.get("kind") == "npc-turn"
+                                         for r in (t.get("repairs") or [])]})
             print(f"  turn {n + 1:3d}  {seconds:5.1f}s  "
                   f"{', '.join(faults) if faults else 'clean'}")
             if recorder:
@@ -540,8 +546,13 @@ def audit(turns: int, script: str, world: str, character: str,
 
     clean = sum(1 for r in rows if not r["faults"])
     pulls = [r["pull"] for r in rows if r.get("pull")]
+    npc_repairs = collections.Counter(
+        ("wrong actor: rewritten" if "rewritten" in r else "wrong actor: backstop")
+        if r.startswith("wrong actor") else r.split(":")[0]
+        for row in rows for r in row.get("npc_repairs") or [])
     return {"turns": len(rows), "clean": clean, "tally": dict(tally), "rows": rows,
             "texture": _texture_report(rows), "drift": _drift_report(rows),
+            "npc_repairs": dict(npc_repairs),
             "pulls": {"sent": len(pulls), "distinct": len(set(pulls)),
                       "commonest": collections.Counter(pulls).most_common(3)},
             "stopped_early": stopped_early}
@@ -683,6 +694,10 @@ def main() -> None:
             if kind == "rolls-answered":
                 continue
             print(f"  {kind:28s} {n:4d}   {100 * n / turns:6.1f}")
+    if result.get("npc_repairs"):
+        print("\nwhat grooming did to the creatures' turns:")
+        for kind, n in sorted(result["npc_repairs"].items(), key=lambda kv: -kv[1]):
+            print(f"  {kind[:60]:60s} {n:4d}")
     if result.get("stopped_early"):
         print(f"\nSTOPPED EARLY: {result['stopped_early']}")
     pulls = result.get("pulls") or {}

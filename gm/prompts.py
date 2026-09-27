@@ -1852,22 +1852,110 @@ CONSEQUENCE_EXAMPLE = {
 }
 
 
+# A creature's turn, demonstrated. The example above is the player's turn — the tell
+# names the player and the answer calls them "you" — and it was the ONLY example this
+# call had, so on a creature's turn it taught the wrong lesson exactly: the tell's
+# subject is "you". Measured 2026-09-27 on the gemma-4-12B fight audit, with the call
+# opening "The player said: Borin Lyraxys acts": "You weave through the panicked crowd …
+# close the distance to the heavy door" for "Borin Lyraxys moves", and 8 of the 100
+# enemy-turn beats in the recorded corpus turned round the same way. Demonstration, not
+# instruction: this example has a creature acting and the player on the receiving end,
+# the tells already in the player's person, and the creature named in the answer.
+# The same ferry as the example above, and nowhere near the shipped world, for the same
+# reason: a copied answer must be catchable.
+CONSEQUENCE_NPC_EXAMPLE = {
+    "user": (
+        "It is the ferryman's turn, not the player's. The ferryman acted; the player's "
+        "character is \"you\".\n\n"
+        "You had already narrated: The ferryman lets go of the rail and comes at you "
+        "along the deck with the boathook.\n\n"
+        "What the engine decided:\n"
+        "- The ferryman's attack misses you.\n"
+    ),
+    "assistant": (
+        "The ferryman swings the boathook flat and hard, and you duck under it; the iron "
+        "cracks against the mast behind your head. He drags it back for another try, "
+        "breathing hard."
+    ),
+}
+
+
 def call_two_messages(narration: str, tells: list[str], because: list[str],
-                      player_input: str) -> list[dict]:
+                      player_input: str, *, acting: str = "",
+                      pc_name: str = "") -> list[dict]:
+    """The consequence call. `acting` is set on a creature's own turn: then the call
+    says whose turn it is instead of "The player said: <creature> acts", shows the
+    tells with the player already as "you" (Inform's adaptive text does the same — one
+    report, rendered "you" for the player and by name for anyone else, the story's
+    viewpoint applied by the system rather than guessed by the writer), and
+    demonstrates a creature's turn rather than the player's."""
+    if acting and pc_name:
+        from .narration import pc_to_second_person
+
+        tells = [pc_to_second_person(t, pc_name)[0] if t else t for t in tells]
     facts = "\n".join(f"- {t}" for t in tells if t)
     why = "\n".join(f"- {b}" for b in because if b)
+    if acting:
+        opening = (f"It is {acting}'s turn, not the player's. {acting} acted; the "
+                   f"player's character is \"you\".\n\n")
+        example = CONSEQUENCE_NPC_EXAMPLE
+    else:
+        opening = f"The player said: {player_input}\n\n"
+        example = CONSEQUENCE_EXAMPLE
     content = (
-        f"The player said: {player_input}\n\n"
-        f"You had already narrated: {narration}\n\n"
-        f"What the engine decided:\n{facts}\n"
+        opening
+        + f"You had already narrated: {narration}\n\n"
+        + f"What the engine decided:\n{facts}\n"
     )
     if why:
         content += f"\nWhy it was rolled:\n{why}\n"
     return [
         {"role": "system", "content": CONSEQUENCE_BRIEFING},
-        {"role": "user", "content": CONSEQUENCE_EXAMPLE["user"]},
-        {"role": "assistant", "content": CONSEQUENCE_EXAMPLE["assistant"]},
+        {"role": "user", "content": example["user"]},
+        {"role": "assistant", "content": example["assistant"]},
         {"role": "user", "content": content},
+    ]
+
+
+# The targeted repair under `wrong-actor`: a creature's turn told the wrong way round.
+# One call per beat, and only when the check fired — never a standing cost of a round.
+ACTOR_REPAIR_BRIEFING = """You narrated a creature's turn in a fight, and wrote it the
+wrong way round: the creature's act was given to the player, or the player's name to the
+creature. Rewrite the passage so the creature named is the one who acts, called by its
+name, and the player's character is "you" — the one it is done to — and never named.
+
+Keep what happened exactly as the tells say, the voice, and about the same length. Do not
+say how any roll turned out beyond what the tells say.
+
+Reply with a JSON object: {"narration": "..."}."""
+
+ACTOR_REPAIR_EXAMPLE = {
+    "user": (
+        "It was the ferryman's turn, not the player's.\n\n"
+        "What the engine decided:\n- The ferryman's attack misses you.\n\n"
+        "The passage:\nYou swing the boathook at the stranger on the deck, but it cracks "
+        "against the mast.\n\n"
+        "The problem: it was the ferryman's turn, and the passage never names the "
+        "ferryman — the act is given to \"you\"."
+    ),
+    "assistant": json.dumps({"narration": (
+        "The ferryman swings the boathook at you and it cracks against the mast, a "
+        "hand's width from your head.")}),
+}
+
+
+def actor_repair_messages(passage: str, acting: str, tells: list[str],
+                          problem: str) -> list[dict]:
+    facts = "\n".join(f"- {t}" for t in tells if t) or "- (nothing landed)"
+    return [
+        {"role": "system", "content": ACTOR_REPAIR_BRIEFING},
+        {"role": "user", "content": ACTOR_REPAIR_EXAMPLE["user"]},
+        {"role": "assistant", "content": ACTOR_REPAIR_EXAMPLE["assistant"]},
+        {"role": "user", "content":
+            f"It was {acting}'s turn, not the player's.\n\n"
+            f"What the engine decided:\n{facts}\n\n"
+            f"The passage:\n{passage}\n\n"
+            f"The problem: {problem}"},
     ]
 
 

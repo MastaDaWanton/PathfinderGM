@@ -843,7 +843,7 @@ class GMAgent:
                 earlier=None, min_chars=0,
                 max_chars=narration_mod.MAX_COMBAT_CHARS,
                 player_input="", brief=brief, hand_back=False, claims=True,
-                rewrite=False)
+                rewrite=False, acting=actor.name)
             attempts.extend(groom_attempts)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
                             repairs=repairs, rejections=rejections)
@@ -1124,8 +1124,12 @@ class GMAgent:
                blows: list[dict] | None = None,
                cast: list[str] | None = None,
                fire_context: str | None = None,
-               facts: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               facts: list[str] | None = None,
+               acting: str = "") -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
+
+        `acting` names the creature whose turn this prose is, on an NPC's turn; empty on
+        the player's. It arms the `wrong-actor` check and its repair.
 
         There used to be four copies of this chain and they had drifted — the census over
         all seven saved campaigns found that `npc_turn` prose reached the transcript with
@@ -1269,6 +1273,13 @@ class GMAgent:
             text, fp = narration_mod.second_person_narrator(text)
             if fp:
                 repairs.append(f"narrator in the scene: swapped {', '.join(fp)}")
+        # A creature's turn told as somebody else's — before the swap below, which would
+        # otherwise turn "swinging your blade toward Kesst Vayr" into "toward you" and
+        # hide the inversion inside a sentence that reads as sound.
+        if acting:
+            text, turned, turn_attempts = self._repair_wrong_actor(text, acting, facts)
+            repairs += turned
+            attempts += turn_attempts
         pc = self.engine.scene.pc()
         if pc is not None:
             text, named = narration_mod.pc_to_second_person(text, pc.name)
@@ -1323,8 +1334,13 @@ class GMAgent:
                  or (a._race_doc() or {}).get("type", "humanoid") in ("humanoid", "outsider", ""))
                 and int((a.abilities or {}).get("int", 10) or 10) > 2
                 for a in self.engine.scene.actors.values() if not a.is_pc)
-            text, beasts = narration_mod.creature_nouns_for_pc(text, pc.name, people_only)
+            text, beasts = narration_mod.creature_nouns_for_pc(text, pc.name, people_only,
+                                                               acting=acting)
             if beasts:
+                # Into the player's own person, like every other mention of them: this
+                # ran after the name swap above, so the name it wrote stayed a name on
+                # the page and `third-person-pc` fired on our own repair.
+                text, _ = narration_mod.pc_to_second_person(text, pc.name)
                 repairs.append(f"the player called a creature: replaced {', '.join(beasts)}")
         # Nobody left standing means nobody "presses forward". Measured: the engine
         # printed "The fight is over" under prose that had officials regaining their
@@ -1568,6 +1584,53 @@ class GMAgent:
             repairs.append(f"still claiming an outcome after repair: cut {gone!r}")
 
         return " ".join(narration.split()), repairs, attempts
+
+    def _repair_wrong_actor(self, text: str, acting: str,
+                            tells: list[str] | None) -> tuple[str, list[str], list[Attempt]]:
+        """A creature's turn told as somebody else's: detect, one targeted rewrite, and
+        the tells under it (`narration.wrong_actor`, `narration.right_actor`).
+
+        The rewrite is the one model call an NPC turn now makes after its prose, and
+        only when the check fired — the standing ~10s polish is still off here, for the
+        reason `npc_turn` gives. Run BEFORE the player's name is swapped to "you":
+        after the swap, "You lunge forward, swinging your blade toward Kesst Vayr" reads
+        "…toward you" and the inversion can no longer be told from a sound beat.
+        """
+        pc = self.engine.scene.pc()
+        pc_name = pc.name if pc is not None else ""
+        others = tuple(self._other_names())
+        wrong = narration_mod.wrong_actor(text, acting, pc_name, others)
+        if not wrong:
+            return text, [], []
+        from play.views import plain_tell
+
+        plain = [narration_mod.pc_to_second_person(plain_tell(t), pc_name)[0]
+                 if pc_name else plain_tell(t) for t in (tells or []) if t]
+        shown = [narration_mod.pc_to_second_person(t, pc_name)[0] if pc_name else t
+                 for t in (tells or []) if t]
+        sentence, why = wrong[0]
+        attempts: list[Attempt] = []
+        try:
+            reply = client.chat(
+                prompts.actor_repair_messages(text, acting, shown, f"{why}: {sentence!r}"),
+                self.prose_model, self.prose_host, as_json=True, think=False,
+                temperature=0.4, num_predict=400, provider=self.prose_provider,
+                api_key=self.prose_key,
+                schema={"type": "object",
+                        "properties": {"narration": {"type": "string"}},
+                        "required": ["narration"]})
+            attempts.append(Attempt("repair", reply.seconds, reply.model, reply.text,
+                                    note=f"wrong actor: {why}"))
+            fixed = self._lift(str(reply.json().get("narration", "")).strip())
+        except Exception as exc:  # a failed repair must not lose the turn
+            attempts.append(Attempt("repair", 0.0, self.prose_model,
+                                    note=f"wrong actor: failed: {exc}"))
+            fixed = ""
+        if fixed and not narration_mod.wrong_actor(fixed, acting, pc_name, others):
+            return fixed, [f"wrong actor: {why} — rewritten"], attempts
+        kept, cut = narration_mod.right_actor(text, acting, pc_name, plain, others)
+        return kept, [f"wrong actor: {why} — the rewrite failed; cut {len(cut)} "
+                      f"sentence(s), the tells stand"], attempts
 
     # --- Call 2 -------------------------------------------------------------------------
 
@@ -1917,11 +1980,13 @@ class GMAgent:
         return out
 
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str,
-                        rewrite: bool = True) -> tuple[str, Attempt]:
+                        rewrite: bool = True, acting: str = "") -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
 
         Fed only `player_visible()` outcomes, so a hidden roll's number is not in the
-        context and cannot be leaked.
+        context and cannot be leaked. `acting` is the creature whose turn this was, on
+        an NPC's turn: the call is framed as its turn and the prose checked for being
+        told the wrong way round (`narration.wrong_actor`).
         """
         tells = [o.tell for o in outcomes if o.tell]
         because = [o.because for o in outcomes if o.because]
@@ -1929,8 +1994,10 @@ class GMAgent:
             return "", Attempt("consequence", 0.0, self.prose_model,
                               note="nothing to narrate")
 
+        pc = self.engine.scene.pc()
         reply = client.chat(
-            prompts.call_two_messages(narration, tells, because, player_input),
+            prompts.call_two_messages(narration, tells, because, player_input,
+                                      acting=acting, pc_name=pc.name if pc else ""),
             # 700 rather than 250, and it is free. `num_predict` is a ceiling, not a
             # target: llama3.1 writes its two sentences and stops either way. A reasoning
             # model does not — measured on R4C3R/qwen3-8b-heretic, every consequence call
@@ -1945,8 +2012,10 @@ class GMAgent:
         # answer word for word, looped four times — and 2,897 characters of it went
         # straight into the transcript, because nothing stood between this return and
         # `c.transcript.append`. An empty answer is safe: the caller renders the tells.
+        example = (prompts.CONSEQUENCE_NPC_EXAMPLE if acting
+                   else prompts.CONSEQUENCE_EXAMPLE)
         cleaned = narration_mod.clean_consequence(
-            self._lift(reply.text.strip()), prompts.CONSEQUENCE_EXAMPLE["assistant"],
+            self._lift(reply.text.strip()), example["assistant"],
             # So a turn genuinely about the example's scenery keeps its sentences: the
             # marker cut only fires on words absent from the turn itself. The scene's
             # cast counts as the turn — an actor genuinely called "old man" is not the
@@ -1974,7 +2043,7 @@ class GMAgent:
             player_input=player_input, brief="", hand_back=False, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths,
             blows=self._blows_from(outcomes), cast=self._cast_from(outcomes),
-            rewrite=rewrite, facts=tells)
+            rewrite=rewrite, facts=tells, acting=acting)
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)

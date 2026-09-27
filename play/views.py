@@ -2360,7 +2360,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             for o in resolution.outcomes:
                 if o.tell:
                     c.transcript.append({"who": "gm", "kind": "consequence",
-                                     "text": plain_tell(o.tell)})
+                                         "text": _plain_tells(c, [o])})
             continue
 
         undo = scene.snapshot()
@@ -2385,9 +2385,15 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         # the log only when it failed, so the one door where a model still writes a
         # number (a bestiary creature's `damage`, stamped creature:<template>) could
         # not be audited off a saved campaign at all.
-        c.turn_log.append({"kind": "npc-turn", "ref": ref,
-                           "intents": [i.as_dict() for i in plan.intents],
-                           "outcomes": [o.as_dict() for o in resolution.outcomes]})
+        entry = {"kind": "npc-turn", "ref": ref,
+                 "intents": [i.as_dict() for i in plan.intents],
+                 "outcomes": [o.as_dict() for o in resolution.outcomes],
+                 # What the grooming did to this creature's prose. Written nowhere
+                 # before 2026-09-27, so a `wrong-actor` rewrite, a name swapped to
+                 # "you" or a creature noun turned into the player's name could only
+                 # be found by replaying the recording through `_groom` by hand.
+                 "repairs": list(plan.repairs or [])}
+        c.turn_log.append(entry)
         if plan.narration:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 
@@ -2397,13 +2403,18 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # No polish rewrite on an NPC's turn — the same call `npc_turn` makes for
                 # its own prose: "a ~10s polish call per NPC per round is a price a fight
                 # cannot pay". This door had it on, measured 2026-09-25.
-                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts",
-                                                rewrite=False)
+                # `acting`: the call is told whose turn it was, and the prose is checked
+                # for being told the wrong way round (narration.wrong_actor).
+                text, attempt = agent.narrate_outcome(plan.narration, tells,
+                                                      f"{actor.name} acts",
+                                                      rewrite=False, acting=actor.name)
+                if attempt is not None and attempt.note:
+                    entry["repairs"] += [r for r in attempt.note.split("; ") if r]
             except ModelUnavailable:
                 text = ""
             c.transcript.append({
                 "who": "gm", "kind": "consequence",
-                "text": text or " ".join(plain_tell(o.tell) for o in tells),
+                "text": text or _plain_tells(c, tells),
             })
         # An NPC's turn is not the player speaking, so the ledger gets no speech
         # from it — only whatever the engine decided on their behalf.
@@ -2417,6 +2428,18 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     # skipped creatures lose their turn, which is a mercy to the player, not a
     # round of free time for anyone.
     _hand_the_turn_back(c, "The scuffle blurs; the moment comes back to you.")
+
+
+def _plain_tells(c, outcomes) -> str:
+    """Tells for the page when no prose was written for them: numbers off, and the
+    player as "you". The player-turn fallback got the person treatment after the gemma4
+    fight audit; the two creature-turn fallbacks here did not, and "Borin Lyraxys hits
+    Kesst Vayr for 1 bludgeoning" reached the page as the enemy's beat."""
+    text = " ".join(plain_tell(o.tell) for o in outcomes if o.tell)
+    pc = c.scene.pc()
+    if pc is not None and text:
+        text, _ = narration_mod.pc_to_second_person(text, pc.name)
+    return text
 
 
 def _hand_the_turn_back(c, why: str) -> None:

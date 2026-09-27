@@ -221,7 +221,10 @@ not yet measured.
   ("Kesst Vayr with the marked knuckles lets out a low, guttural growl", reading off),
   which is written after the plan and never sees the reading. The plans of the two runs
   were near identical. The ON run grappled, and every enemy turn after it repeated the
-  confusion. Flagged as its own task.
+  confusion. Flagged as its own task — and settled in `docs/wrong-actor.md`: rerun the
+  same day, reading on 2 of 12, off 3 of 12, and every flagged sentence in both was put
+  there by our own grooming (`creature_nouns_for_pc` swapping "the beast" — the enemy —
+  for the player's name, and a name swap that ignored the first name alone).
 - **Conjured gifts:** both fight runs, with and without the reading, had the model's own
   `give` conjure things ("Kesst Vayr takes fight", "takes table"). With a reading, a give
   to the player that no act asked for is now dropped (`interpret.drop_unread_gifts`).

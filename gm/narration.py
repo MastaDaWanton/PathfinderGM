@@ -619,25 +619,56 @@ _CREATURE_NOUNS = re.compile(
     r"fiend|demon|devil|animal|horror)\b", re.I)
 
 
-def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool) -> tuple[str, list[str]]:
+# What opens a clause: a creature noun right after one of these is the clause's subject.
+_CLAUSE_OPENS = re.compile(
+    r"(?:^|[,;:—–]|\b(?:and|but|as|while|then|when|until|before|after|so))\s*$", re.I)
+
+
+def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
+                          acting: str = "") -> tuple[str, list[str]]:
     """"The beast" for the player's character becomes their name.
 
     Measured 2026-09-18 (a homebrew asura at 70 hp with a blank body line): the NPC
     plan's motive and the miss beat both called the player "the beast", from nothing in
     any document. When everybody else in the scene is a person — no animal, no summoned
-    thing — a creature noun can only mean the player, and the player is referred to by
+    thing — a creature noun usually means the player, and the player is referred to by
     name or as "you", never by a creature noun the race document does not use. Left
-    alone when a creature is present: then the noun may well be its own."""
+    alone when a creature is present: then the noun may well be its own.
+
+    "Usually", not "only" — and the difference put the player's name on the enemy.
+    Measured 2026-09-27 on the gemma-4-12B fight audit: "the biggest man in the room"
+    is a brute and a beast to the narrator, and on his own turn "The strike misses, and
+    the beast's momentum carries it past you" shipped as "…and Kesst Vayr's momentum
+    carries it past you"; "the brute with the marked knuckles" became "Kesst Vayr with
+    the marked knuckles". Two guards, each the measured case:
+
+      * a sentence that already says "you" has the player in it, so its creature is
+        somebody else;
+      * on a creature's turn (`acting`), a creature noun opening a clause is the one
+        acting, and that is the creature. "The thug's swing misses the beast" — the
+        asura case, the player on the receiving end — is still swapped.
+    """
     if not text or not pc_name or not others_are_people:
         return text, []
     swapped: list[str] = []
 
-    def _swap(m):
-        swapped.append(m.group(2).lower())
-        return pc_name
+    def _swapper(run: str):
+        def _swap(m):
+            lo = max(run.rfind(".", 0, m.start()), run.rfind("!", 0, m.start()),
+                     run.rfind("?", 0, m.start())) + 1
+            ends = [i for i in (run.find(".", m.end()), run.find("!", m.end()),
+                                run.find("?", m.end())) if i >= 0]
+            sentence = run[lo:(min(ends) + 1) if ends else len(run)]
+            if _SECOND_PERSON.search(sentence):
+                return m.group(0)
+            if acting and _CLAUSE_OPENS.search(run[lo:m.start()]):
+                return m.group(0)
+            swapped.append(m.group(2).lower())
+            return pc_name
+        return _swap
 
     # Narration only: a man who SAYS "you beast" is in character, and his line is his.
-    out = [run if said else _CREATURE_NOUNS.sub(_swap, run)
+    out = [run if said else _CREATURE_NOUNS.sub(_swapper(run), run)
            for said, run in speech.split(text)]
     return "".join(out), swapped
 
@@ -1091,6 +1122,135 @@ def right_hands(text: str, blows: list[dict] | None) -> tuple[str, list[str]]:
     return " ".join(kept).strip(), wrong
 
 
+# --- A creature's turn, told as somebody else's -------------------------------------------
+
+_SECOND_PERSON = re.compile(r"\b(?:you|your|yours|yourself)\b", re.I)
+# The glue words of a descriptor name ("man with the marked knuckles"): never the word
+# that says who somebody is.
+_NAME_GLUE = {"with", "in", "of", "and", "the", "a", "an", "wearing", "from", "at", "on"}
+_DESCRIPTOR_JOIN = re.compile(r"^\s*(?:,\s*)?(?:with|in|wearing|in a|in the)\b", re.I)
+
+
+def actor_words(name: str) -> set[str]:
+    """The words that say a beat is about this actor: every word of a proper name, or a
+    descriptor's head noun and its telling words.
+
+    "Borin Lyraxys" is named by "Borin" or "Lyraxys"; "man with the marked knuckles" by
+    "man" (the head, the word before the first glue word) or "knuckles"; "Commoner" by
+    "commoner". Lower-cased, three letters or more."""
+    words = re.findall(r"[A-Za-z][A-Za-z'’-]*", str(name or ""))
+    out = {w.lower().rstrip("'’s") if w.lower().endswith(("'s", "’s")) else w.lower()
+           for w in words if w.lower() not in _NAME_GLUE and len(w) > 2}
+    return {w for w in out if w}
+
+
+def _names(text: str, words: set[str]) -> bool:
+    return any(re.search(rf"\b{re.escape(w)}(?:s|es|['’]s)?\b", text, re.I) for w in words)
+
+
+def wrong_actor(text: str, acting: str, pc_name: str,
+                others: tuple = ()) -> list[tuple[str, str]]:
+    """On a creature's turn, the sentences that give its act — or the player's name — to
+    the wrong person. Returns (sentence, why) pairs; empty when the beat is sound.
+
+    Measured 2026-09-27 on the gemma-4-12B fight audit: with the reading on, 8 of 12
+    turns flagged `third-person-pc`, all in the beat written for the ENEMY's turn;
+    with it off, 2 of 12. The reading never reaches that beat (it feeds only the
+    planner), and a rerun with it on gave 2 of 12. What the enemy-turn beats held,
+    read back from the recordings, was three shapes, none of them the reading's:
+
+      * the actor made "you". The consequence prompt opened "The player said: Borin
+        acts", and its one worked example taught that the tell's subject is "you";
+        on a creature's turn the subject is the creature. "You weave through the
+        panicked crowd … close the distance to the heavy door" for "Borin Lyraxys
+        moves"; "you wrench your body sideways … to break the hold" for the grappled
+        man's own turn. 8 of the 100 enemy-turn beats in the recorded corpus, and the
+        audit could see one only when the player's name happened to survive in it;
+      * the name and "you" in one sentence — two people, only one of whom can be the
+        player: "The strike misses, and Kesst Vayr's momentum carries it past you";
+      * the player's name wearing somebody else's descriptor: "Kesst Vayr with the
+        marked knuckles lets out a low, guttural growl".
+
+    The second and third were written by OUR backstop, not the model: the model said
+    "the beast's momentum" and "the brute with the marked knuckles", and
+    `creature_nouns_for_pc` swapped the noun for the player's name. It no longer can
+    (see there); this check is what would have caught it.
+
+    The first rule fires only when the beat never names the actor at all — measured on
+    the recorded corpus, every inverted beat left the actor out and every sound one
+    named it, bar one ("He shifts his weight…"), which costs a repair and no more.
+    """
+    acting = str(acting or "").strip()
+    name = str(pc_name or "").strip()
+    if not text or not acting or (name and acting == name):
+        return []
+    body = unquoted(text)
+    sentences = _sentences(body)
+    found: list[tuple[str, str]] = []
+    pc_tokens = {name, name.split()[0]} if name else set()
+    pc_re = (re.compile(r"\b(?:" + "|".join(re.escape(t) for t in
+                                             sorted(pc_tokens, key=len, reverse=True))
+                        + r")(?:['’]s)?\b") if pc_tokens else None)
+    descriptors = set()
+    for other in (acting, *others):
+        if str(other).strip() and str(other).strip() != name:
+            descriptors |= actor_words(other)
+
+    for s in sentences:
+        m = pc_re.search(s) if pc_re else None
+        if not m:
+            continue
+        if _SECOND_PERSON.search(s):
+            found.append((s, f"names the player {m.group(0)!r} and says \"you\" in one "
+                             f"sentence — two people, and only one is the player"))
+            continue
+        after = s[m.end():]
+        if _DESCRIPTOR_JOIN.search(after) and _names(" ".join(after.split()[:6]),
+                                                     descriptors):
+            found.append((s, f"gives the player's name to somebody described as "
+                             f"{' '.join(after.split()[:5])!r}"))
+
+    if not _names(body, actor_words(acting)) and not _creature_opens_a_clause(sentences):
+        yours = [s for s in sentences if _SECOND_PERSON.search(s)
+                 and s not in {f for f, _ in found}]
+        found += [(s, f"it was {acting}'s turn, and the beat never names {acting} — "
+                      f"the act is given to \"you\"") for s in yours]
+    return found
+
+
+def _creature_opens_a_clause(sentences: list[str]) -> bool:
+    """Whether "the beast", "the creature" stands as some clause's subject — on a
+    creature's own turn, that is the creature named (the same reading
+    `creature_nouns_for_pc` makes). Measured on the 2026-09-27 control run: "The creature
+    lunges with a desperate, frantic energy … It misses your position entirely" is Borin's
+    turn told the right way up, and would otherwise cost a repair for want of his name."""
+    return any(_CLAUSE_OPENS.search(s[:m.start()])
+               for s in sentences for m in _CREATURE_NOUNS.finditer(s))
+
+
+def right_actor(text: str, acting: str, pc_name: str, plain_tells: list[str] | None = None,
+                others: tuple = ()) -> tuple[str, list[str]]:
+    """The deterministic backstop under `wrong-actor`. Returns (text, what was cut).
+
+    A beat whose actor was never named is the whole beat turned round — no sentence of it
+    can be trusted to be the right way up — so it is replaced by the tells. Otherwise only
+    the flagged sentences go, and the tells stand in for them when nothing is left. The
+    same shape as `right_hands`: agency is a fact of the tell, and the tell is always
+    true. `plain_tells` come already rendered for the page, numbers off and the player as
+    "you" (`views.plain_tell` then `pc_to_second_person`, the caller's job — one copy of
+    that rule, not two)."""
+    wrong = wrong_actor(text, acting, pc_name, others)
+    if not wrong:
+        return text, []
+    plain = " ".join(t for t in (plain_tells or []) if t).strip()
+    body = unquoted(text)
+    if not _names(body, actor_words(acting)) and not _creature_opens_a_clause(
+            _sentences(body)):
+        return plain, [s for s, _ in wrong]
+    kept = _cut_sentences(text, [s for s, _ in wrong]).strip()
+    return (kept or plain), [s for s, _ in wrong]
+
+
 ID = r"[A-Za-z][A-Za-z' -]{2,40}"
 # A spell being CAST in the prose — not mentioned, not asked about, not remembered. The
 # verb has to be finite and the caster has to be the player or the subject of the sentence:
@@ -1345,7 +1505,7 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            claim: str = "", blows: list[dict] | None = None,
            fire_context: str | None = None,
            here: str = "", places: tuple = (), doors: list[dict] | None = None,
-           buying: str = "") -> Review:
+           buying: str = "", acting: str = "") -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -1507,6 +1667,21 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             f"Rewrite {handed[0]!r} so that {striker} is the one swinging and the "
             f"player is the one the blow is aimed at; the outcome stays exactly what "
             f"the tells say. Keep the rest.",
+            weight=3,
+        ))
+
+    # 0d'. A creature's turn told as somebody else's: its act given to "you", or the
+    #      player's name given to it (`wrong_actor`). Weight 3 with `wrong-hands`: who
+    #      did what is whether the turn was true.
+    turned = wrong_actor(text, acting, pc_name, others) if acting else []
+    if turned:
+        sentence, why = turned[0]
+        out.findings.append(Finding(
+            "wrong-actor", f"{why}: {sentence[:90]!r}",
+            f"This was {acting}'s turn, not the player's. {acting} is the one who acts — "
+            f"name them and give them what they did. The player's character is \"you\", "
+            f"the one it is done to, and is never called by name. {sentence!r} has it the "
+            f"wrong way round. Keep what happened exactly as the tells say.",
             weight=3,
         ))
 
@@ -2634,7 +2809,8 @@ def formulaic(turns: list[str]) -> tuple[float, str]:
 # and an anchored pattern left exactly that fragment in front of the player.
 _SCAFFOLD = re.compile(
     r"(?:the player said|you had already narrated|what the engine decided"
-    r"|why it was rolled)\b[:\s]*[^\n]*|^\s*-\s.*$", re.I | re.M)
+    r"|why it was rolled|it is [^\n.]{1,60}'s turn, not the player's)\b[:\s]*[^\n]*"
+    r"|^\s*-\s.*$", re.I | re.M)
 
 # Two or three sentences is the brief; this is far past any honest answer and exists so a
 # looping model cannot write a page. Same reasoning as MAX_COMBAT_CHARS: a cap set above
@@ -2649,7 +2825,8 @@ MAX_CONSEQUENCE_CHARS = 700
 # check can touch, but the nouns give it away. A sentence naming one of these is the
 # example bleeding through, unless the turn itself is genuinely about a ferry — which is
 # what the `context` parameter decides.
-_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel", "old man", "ferryman")
+_EXAMPLE_MARKS = ("ferry", "mooring", "piling", "ashka", "verel", "old man", "ferryman",
+                  "boathook")
 
 # The NPC-turn examples have a cast of their own, and it bleeds the same way: in a real
 # bear fight the bear's turn was narrated as "The thug, grinning..., swinging the sap" and
@@ -3360,7 +3537,7 @@ _YOU_VERBS = {
     "throws": "throw", "lands": "land", "feels": "feel", "sees": "see",
     "hears": "hear", "stands": "stand", "drops": "drop", "pulls": "pull",
     "pushes": "push", "grips": "grip", "draws": "draw", "breathes": "breathe",
-    "ducks": "duck", "dodges": "dodge", "staggers": "stagger",
+    "ducks": "duck", "dodges": "dodge", "staggers": "stagger", "reels": "reel",
     "strikes": "strike", "watches": "watch", "reaches": "reach",
     "keeps": "keep", "holds": "hold", "looks": "look", "leans": "lean",
     "knows": "know", "finds": "find", "twists": "twist", "readies": "ready",
@@ -3401,11 +3578,15 @@ def pc_to_second_person(text: str, pc_name: str) -> tuple[str, int]:
     alone — somebody may shout her name.
     """
     name = str(pc_name or "").strip()
-    if not name or not text or name.lower() not in text.lower():
+    first = name.split()[0] if name else ""
+    # The first name alone is enough to look. Measured 2026-09-27: "against Kesst’s
+    # temple" reached the page untouched, because this guard asked for the WHOLE name
+    # and a beat that says only "Kesst" returned before the pattern below ever ran. The
+    # curly apostrophe is taken with the straight one for the same beat.
+    if not name or not text or first.lower() not in text.lower():
         return text or "", 0
-    first = name.split()[0]
     pattern = re.compile(
-        rf"\b(?:{re.escape(name)}|{re.escape(first)})('s)?\b")
+        rf"\b(?:{re.escape(name)}|{re.escape(first)})(['’]s)?\b")
     protected = speech.spans(text)
     count = 0
     out = []
