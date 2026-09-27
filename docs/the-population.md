@@ -665,3 +665,25 @@ hearts cannot express.
 - **Witnesses:** anybody in the street sees it. Seen, the character is suspected; seen
   again, wanted. That is Skyrim's warning before the fine, in this app's own law tags.
 - **A forced door stays broken.**
+
+**Live, the `homes` script (2026-09-27, three runs, gemma-4-12B).**
+
+- **The knock:** at three in the morning the bread seller "is woken by the knocking and
+  shouts through the door to come back in daylight". At six she was already at work:
+  "Nobody answers … A neighbour says: The one selling bread is at the north crossing at
+  this hour."
+- **Breaking in:** a lock pick failed and a kick broke a door in. Seen by two
+  bystanders, the character was suspected; unseen, not.
+- **Two defects found and fixed:**
+  1. **The model wrote extra ops beside the break-in,** a `give` of "lock on her door"
+     and a thug spawned as "new" who then "witnessed" the break-in. A break-in turn now
+     keeps nothing beside the door.
+  2. **The prose opened a door the dice held,** in two runs out of three. The review
+     check caught it every time, and the model's rewrite never fixed it. The backstop now
+     cuts the beat from the first sentence that opens the door and ends it shut. Live, it
+     left "The lock does not give, and the door stays shut. What do you do?", thin
+     because the false opening was the beat's first sentence, but true.
+- **Not changed:** "I go to the market and buy a coil of rope" planned no walk twice,
+  and the party stayed where it was. Room-to-room travel is deliberately the model's to
+  name (`inject_travel`'s documented refusal to guess a place), so this is the model's
+  miss and was left.
