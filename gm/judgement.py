@@ -5162,7 +5162,18 @@ def person_sought(player_text: str) -> str:
     # "the mayor of the town" is the mayor; "the stranger his name" is the stranger. The
     # capture runs to the next clause word, and neither tail is part of who they are.
     phrase = re.split(r"\s+(?:of|his|her|their|its|my|your)\s+", phrase, maxsplit=1)[0]
-    return phrase.strip(" -'")
+    phrase = phrase.strip(" -'")
+    # "the woman WHO SOLD ME BREAD": the clause is what picks her out. Measured live
+    # 2026-09-27, the capture stopped at "who", the finder was asked for "woman", and the
+    # plan spawned a stranger. Kept, a few words at most; the finder falls back to the
+    # head alone when nobody fits the whole of it (`population.find`). Only for a
+    # DEFINITE description: "the woman who sold me bread" identifies somebody, "a guide
+    # who knows the grass" asks for any guide, and the clause is no part of who the
+    # newcomer is (`sought_indefinitely`, Heim's familiarity condition).
+    rel = None if sought_indefinitely(player_text) else re.match(r"\s+who\s+([a-z][a-z' ]{2,60}?)(?=[,.!?;]|$)", m.string[m.end(1):], re.I)
+    if rel and len(rel.group(1).split()) <= 8:
+        phrase = f"{phrase} who {rel.group(1).strip()}"
+    return phrase
 
 
 # --- provocation ----------------------------------------------------------------------

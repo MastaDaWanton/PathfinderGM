@@ -21,7 +21,8 @@
     "fisherman",
     "fisherwoman",
     "fishwife",
-    "angler"
+    "angler",
+    "fish"
    ]
   },
   {
@@ -275,7 +276,11 @@
     "a twist of flour paper"
    ],
    "match": [
-    "baker"
+    "baker",
+    "bread",
+    "loaf",
+    "loaves",
+    "bakery"
    ]
   },
   {
@@ -293,7 +298,8 @@
     "a string of sausage"
    ],
    "match": [
-    "butcher"
+    "butcher",
+    "meat"
    ]
   },
   {
@@ -312,7 +318,9 @@
    "match": [
     "brewer",
     "vintner",
-    "distiller"
+    "distiller",
+    "ale",
+    "beer"
    ]
   },
   {
@@ -662,7 +670,9 @@
     "laborer",
     "workman",
     "worker",
-    "hauler"
+    "hauler",
+    "foreman",
+    "overseer"
    ]
   },
   {

@@ -42,6 +42,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -187,6 +188,20 @@ def occupation_for(phrase: str) -> dict | None:
     for occ in tables()["occupations"]:
         for m in occ.get("match") or ():
             if f" {m} " in words or f" {m}s " in words or f" {m}'s " in words:
+                if best is None or len(m) > best[0]:
+                    best = (len(m), occ)
+    if best is not None:
+        return best[1]
+    # Then word by word, stemmed as the finder stems them (`population._stem`). Measured
+    # live 2026-09-27: "somebody selling bread in the market" was rolled a gravedigger,
+    # while the finder read "selling" as a stallholder's word; the two disagreed about
+    # what a person was, and now the trade decides where they are.
+    from .population import _stem
+
+    stems = {_stem(w) for w in re.findall(r"[a-z][a-z'-]*", words)}
+    for occ in tables()["occupations"]:
+        for m in occ.get("match") or ():
+            if " " not in m and _stem(m) in stems:
                 if best is None or len(m) > best[0]:
                     best = (len(m), occ)
     return best[1] if best else None

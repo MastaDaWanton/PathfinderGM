@@ -152,7 +152,7 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
     # And "a child" (indefinite) wants any child: somebody here will do, but a particular
     # girl seen at the crossing an hour ago is not who was asked for (live, 2026-09-25) —
     # the plan introduces one instead (`judgement.sought_indefinitely`).
-    pop = (population.find(scene, phrase, rings=(population.HERE,) if indefinite
+    pop = (population.find(scene, phrase, world=world, rings=(population.HERE,) if indefinite
                            else (population.HERE, "recent", "met") if vague else None)
            if scene is not None else population.Found(scope=population.NONE, ring="",
                                                       people=[]))

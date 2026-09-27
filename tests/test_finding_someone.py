@@ -88,15 +88,20 @@ def test_the_nearer_ring_wins_before_anybody_is_asked(scene):
 
 
 def test_somebody_seen_elsewhere_is_said_to_be_elsewhere(scene):
+    """Where they ARE, reckoned, not where they were seen. Before residency (2026-09-27)
+    the line could only say "was at the well when you saw them", because that was all
+    the campaign knew. At nine in the morning a fisherman is at his work, and his work is
+    where he was seen (rules/residency.py)."""
     places = Engine(scene, Dice(seed=1), world=WORLD).places()
     first, second = places[0], places[1]
     scene.at = first.id
-    population.note(scene, "an old fisherman mending nets")
+    population.note(scene, "an old fisherman mending nets")["life"].update(
+        work="fisher", work_name="fisher")
     scene.at = second.id
     found = scope.look_for(WORLD, "the old fisherman", scene, VORMOOR)
     assert found["scope"] == scope.ELSEWHERE
-    assert found["line"] == (f"The old fisherman mending nets was at {first.name} when "
-                             f"you saw them, and is not here.")
+    assert found["line"] == (f"The old fisherman mending nets is at {first.name} at this "
+                             f"hour, and is not here.")
 
 
 def test_a_vague_word_does_not_read_out_the_town(scene):
@@ -190,6 +195,6 @@ def test_a_hidden_fact_may_find_them_but_is_never_said(scene):
     assert not any(h.lower() in away["line"].lower() for h in hidden), away["line"]
     population.note(scene, "man in a leather cap")["life"].update(work="baker",
                                                                   work_name="baker")
-    rec["spot"] = "somewhere-else"
+    rec["spot"] = rec["seen_at"] = "somewhere-else"
     asked = scope.look_for(WORLD, "the baker", scene, VORMOOR)
     assert asked["scope"] == scope.AMBIGUOUS and "baker" not in asked["line"]

@@ -328,3 +328,154 @@ The research that set the shape:
   would have been offered every turn.
 - The one "trait named outright" was "open" (a gate). Common words are not read as
   labels.
+
+## Built: residency and movement (2026-09-27)
+
+Step 4, first half. The user's words were "go ahead with residency and movement";
+"since last we met" is the second half and is not built yet.
+
+**What was wrong, measured before building:**
+
+- **The road out of town destroyed everybody left behind** (`Scene.depart` in the
+  journey). A woman met at the gate, Soren Kragnirath at regard 70, came back two days
+  later as Korvin Korvath at regard 35. Her record kept her face and life, but her
+  name and standing lived on the body the road threw away.
+- **Nobody in a town ever moved.** A stallholder seen at noon stood at her stall all
+  night.
+- **Travellers never travelled.** Merchants, carters and minstrels stayed put, although
+  the occupation table already marked them mobile.
+- **Nothing wrote `last_met`,** so the finder's `met` ring was always empty.
+
+**What the research found** (two passes and a critic, 2026-09-27; URLs in the session
+record):
+
+- **Ultima VII keeps eight three-hour slots per person.** Off screen, Exult does not
+  walk anybody to their slot; it teleports them there (`teleport_offscreen_to_schedule`
+  in actors.cc, read directly). It disabled walking in from off screen because it
+  "causes NPCs to teleport to on-screen far too often (e.g., Blue Boar bartenders)".
+- **Shadows of Doubt abandoned precomputed daily routines** (DevBlog 15), because
+  spontaneous reactions broke them. Stardew Valley overrides its schedule keys by date,
+  weather and marriage.
+- **Placing a traveller by arithmetic from a departure time has no confirmed game
+  precedent.** The Oblivion claim that low-process actors are teleported by elapsed
+  travel time is a blogger's inference, and the critic found no primary source for it.
+  Kerbal Space Program's "on rails" orbits are the nearest precedent. Its failure mode,
+  an unloaded object that cannot feel its environment, is why nothing here resolves
+  "what the road did to them" yet: the catch-up step will, seeded, when they are next
+  met.
+- **Players lose scheduled NPCs:** Majora's Mask needed its notebook, and Stardew has
+  wiki schedules and a map-locations mod. PF1e already has the answer in Diplomacy's
+  gather information: at least 1d4 hours canvassing, DC 10 for what is commonly known.
+  The finder says where somebody is.
+- **Nobody dies of being away.** Skyrim's `Protected` flag means only the player may
+  kill that actor, and players resent off-screen deaths (Bannerlord). The catch-up step
+  must honour this.
+
+**What was built:**
+
+- **`rules/residency.py`: where somebody is, as a function of their record and the
+  clock.** Asked only when needed, and never on a tick.
+  - **Residents keep a class routine over eight slots.** Home, work, gather, temple and
+    market resolve against the places the settlement actually has. Work is where they
+    were first seen. Trades with their own hours override their class (the innkeeper,
+    the lamplighter), and a guard keeps a day or night watch, rolled once. The slot they
+    were first seen in is theirs at that place, because an observation beats the key.
+  - **Travellers walk the world's real roads from where and when they were last seen.**
+    Each stay lasts a seeded number of days, and traders prefer the trade roads. The
+    walk is stored on the record ("store what was rolled") and re-anchored whenever they
+    are seen again. Only `random.random()` is drawn, the one method Python promises
+    stable across versions.
+  - **Transients (pilgrims) take one road out once the party leaves them,** spend a day
+    where it leads, and are then gone.
+- **Where nobody can walk in is an `offstage` place id** under the town: at home,
+  lodging, on a road, gone. `travel` only reaches places `places()` lists, so no door
+  leads there. Somebody at home is found by asking.
+- **`population.where_now`** answers the finder in three steps, the first that holds:
+  1. their body's place;
+  2. where the party saw them, if the party has not left that place since (the
+     ruling: "should stay there until i leave or something moves them");
+  3. the key or the road.
+  The HERE and settlement rings read it.
+- **`Engine.settle_people`** runs once per arrival (`Scene.moves`), after the batch:
+  everyone with a record goes where the answer puts them. Some people stay put:
+  - whoever came along with the party;
+  - whoever was seen here since arriving;
+  - anybody down, held, travelling with the party, in conversation or in a fight;
+  - residents of other towns, reckoned when the party is there.
+  - anybody without a record (a keeper at the counter, a world character, a spawned
+    thug).
+
+  A reload where the party already stands is not an arrival. A resident settled has
+  eaten and slept, so their hunger counters reset (NetHack's catch-up shape).
+- **A journey keeps anybody the world has a reason to keep:** a record, a world
+  character, or a standing with the player. These are RimWorld's keep reasons. A
+  spawned creature with none of these still goes, and so do the dead.
+- **`join_talk` writes `last_met`** and makes a glimpse an acquaintance.
+- **The finder's line says where they are, never what they are:**
+  - "is at the market at this hour"
+  - "would be indoors, at home. By day they are at the market"
+  - "left Vormoor for Dustgate 2 days ago, and is on the road"
+  - "is in Ledgerwarren now"
+  - "has moved on"
+
+**Measured on the way:**
+
+- **An hour's `advance` over 300 bodies took 0.515 s.** `tick_effects` computed
+  `hp_max` for every body, and that asks the race registry, whose homebrew freshness
+  check reads the folder from disk on every call (about 1 ms per `has_state`,
+  pre-existing, flagged as its own task). With no timed effect, nothing can end: now
+  0.007 s.
+- **Settling 300 bodies went from 1.3 s to 0.03 s** once the cheap questions went
+  first.
+- **Walking 2,500 travellers' roads 30 days on went from 25 s to 1.0 s** once roads
+  were cached per world. After that the walk is stored, and a miss over 5,000 records
+  takes 0.3 s.
+- **In Aurvantis every road is a trade road** (64 of 64 settlements), so the trader's
+  preference only matters for a world with other roads. The test proves the weighting
+  on a subset.
+
+**Not built yet:**
+
+- visiting somebody at home (the planner's `found` needs the owner in the room);
+- shop hours for keepers;
+- "since last we met";
+- the world roster.
+
+**Live, the `return` script (2026-09-27, gemma-4-12B, the real HTTP loop).** Two runs,
+each 12 turns and 11 of 12 clean.
+
+- **The finder's answer reaches the plan and the prose.** The morning search got
+  `not_here`: "The one selling bread in the market is at the north crossing at this
+  hour". The narrator wrote it as a notice pinned to her empty stall. Asked after dark,
+  the answer was "would be indoors, at home. By day they are at the north crossing".
+- **Her body went where her day put it:** home at 18:00, back at her work place at 11:00
+  the next day. A stranger the roller made a merchant was on the road to Xylorvotha by
+  the end.
+
+Defects the runs found, each fixed with a test in `tests/test_residency.py`:
+
+1. **The roller and the finder disagreed about trades.** "Somebody selling bread" was
+   rolled a gravedigger, and "the foreman with the tally board" a merchant, who then
+   left town. `lives.occupation_for` now falls back to the finder's stemmer, and the
+   goods name the trade (bread → baker, foreman → labourer).
+2. **"I ask her name." came back as `introduce who="her name"`,** and the prose check made
+   the narrator write her in. A possessive naming no person is refused
+   (`population.names_a_person`).
+3. **`introduce` then `travel` then `say` made her at the place being left,** and the
+   question went to the one other person in the market. Now `introduce` of somebody
+   already here moves after the plan's walk, and `say` with a named listener who is not
+   here falls back to nobody.
+4. **The answer read "At this hour The somebody selling bread…".** It now reads "the one
+   selling bread", capitalised as a sentence.
+5. **"I ask around for the woman who sold me bread" was read as "woman".** The capture
+   stopped at "who", and "sold" never stemmed to "sell". A definite description now
+   keeps its "who" clause, and the finder falls back to the head when nobody answers to
+   the clause. An indefinite one ("a guide who knows the grass") introduces a guide, and
+   the clause is no part of who they are. The stemmer knows the irregular past.
+
+Not yet seen live: the round trip between towns. Both runs were stopped on the road
+before they reached the next town, so name and standing surviving a journey rests on
+the unit test.
+
+Noticed and left: "I go to the market and look for the bread seller" is read as looking
+for "market", because the first verb phrase wins. The plan answered correctly anyway.

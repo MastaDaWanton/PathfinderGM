@@ -246,7 +246,7 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
     have = None if fresh else here_as(scene, phrase)
     if have is not None:
-        have["last_seen"] = clock
+        seen(scene, have)
         return have
     pid = _next_id(scene)
     home = getattr(scene, "location_id", None)
@@ -254,12 +254,39 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
                       used_frames=used_frames(scene, home))
     rec = {
         "id": pid, "phrase": " ".join(str(phrase).split()), "home": home,
-        "spot": getattr(scene, "at", None), "first_seen": clock, "last_seen": clock,
+        "spot": getattr(scene, "at", None), "seen_at": getattr(scene, "at", None),
+        "first_seen": clock, "last_seen": clock,
         "last_met": None, "turn": int(turn), "ref": "", "tier": "glimpse",
         "life": life.as_dict(),
     }
+    if rec["life"].get("mobility", "resident") != "resident":
+        # A traveller's roads are walked from where and when they were last seen.
+        rec["anchor"] = {"loc": home, "place": rec["spot"], "t": clock}
     scene.population[pid] = rec
     return rec
+
+
+def seen(scene, rec: dict) -> None:
+    """The party has seen this person, here, now: the fact everything about where they
+    are next is reckoned from (`rules/residency.py`)."""
+    from . import residency
+
+    at = getattr(scene, "at", None)
+    rec["seen_at"] = at
+    residency.observe(rec, getattr(scene, "location_id", None) or "", at or "",
+                      int(getattr(scene, "clock_minutes", 0) or 0))
+
+
+def met(scene, rec: dict | None) -> None:
+    """The player has engaged this person: spoken with them. `last_met` is what the
+    "since last we met" catch-up will compare the clock with, and the finder's `met` ring
+    reads it; before 2026-09-27 nothing wrote it, and that ring was always empty."""
+    if rec is None:
+        return
+    rec["last_met"] = int(getattr(scene, "clock_minutes", 0) or 0)
+    if rec.get("tier", "glimpse") == "glimpse":
+        rec["tier"] = "acquaintance"
+    seen(scene, rec)
 
 
 def of_ref(scene, ref: str) -> dict | None:
@@ -300,13 +327,62 @@ NONE = "none"
 # who "the woman mending nets" means — but a record that says another one is.
 _GENDERED = frozenset({"woman", "man", "boy", "girl"})
 
+# Words that are somebody, for `names_a_person`: kin and the generic nouns a description
+# is built on. Only asked of a phrase that opens with a possessive, where "her husband" is
+# a person and "her name" is not.
+_PERSON_WORDS = frozenset({
+    "woman", "man", "boy", "girl", "child", "person", "figure", "stranger", "friend",
+    "brother", "sister", "mother", "father", "son", "daughter", "wife", "husband", "kin",
+    "cousin", "uncle", "aunt", "nephew", "niece", "grandmother", "grandfather", "master",
+    "mistress", "servant", "companion", "partner", "lover", "rival", "guard", "man-at-arms",
+    "apprentice", "boss", "employer", "captain", "lord", "lady", "sir", "folk", "people",
+    "family", "neighbour", "neighbor", "helper", "assistant", "mate", "crew", "retainer",
+})
+_POSSESSIVE = re.compile(r"^\s*(?:her|his|their|its|my|your|our)\s+", re.I)
+
+
+def names_a_person(phrase: str) -> bool:
+    """Whether a phrase the plan declared as somebody is a person at all.
+
+    Measured live 2026-09-27: "I ask her name." came back as `introduce who="her name"`,
+    a person the population then rolled a life for and the prose check made the narrator
+    write in ("lost the scene, re-introduced her name"). Narrow on purpose: only a phrase
+    that opens with a possessive is asked, and it passes when any word is a person —
+    kin, a trade, or a generic noun ("her husband", "his apprentice"). Everything else
+    ("a hooded figure", "a Korvu porter") is the plan's to declare.
+    """
+    if not _POSSESSIVE.match(str(phrase or "")):
+        return True
+    rest = _POSSESSIVE.sub("", str(phrase))
+    words = {_stem(w) for w in re.findall(r"[a-z][a-z'-]*", rest.lower())}
+    if words & {_stem(w) for w in _PERSON_WORDS}:
+        return True
+    return any(t.startswith("work:") for t in _tokens(rest))
+
 # Searches that found nobody, for the turn log (`drain_misses`): the synonym table grows
 # from what real play missed, not from guesses.
 _MISSES: list[dict] = []
 
 
+# The past of the verbs people are described by. Measured live 2026-09-27: "the woman who
+# sold me bread" missed the record "somebody selling bread in the market", because the
+# suffix rules make "selling" into "sell" and leave "sold" as "sold".
+_IRREGULAR = {
+    "sold": "sell", "bought": "buy", "told": "tell", "sang": "sing", "sung": "sing",
+    "caught": "catch", "fought": "fight", "wore": "wear", "worn": "wear", "held": "hold",
+    "brought": "bring", "taught": "teach", "made": "make", "gave": "give", "given": "give",
+    "spoke": "speak", "spoken": "speak", "drove": "drive", "driven": "drive", "rode": "ride",
+    "ridden": "ride", "led": "lead", "kept": "keep", "swept": "sweep", "wept": "weep",
+    "slept": "sleep", "dug": "dig", "hung": "hang", "sewn": "sew", "fed": "feed",
+    "met": "meet", "ran": "run", "threw": "throw", "thrown": "throw", "carried": "carry",
+    "sweeping": "sweep",
+}
+
+
 def _stem(w: str) -> str:
     w = w.lower().strip("'-")
+    if w in _IRREGULAR:
+        return _IRREGULAR[w]
     if w.endswith("'s"):
         w = w[:-2]
     if len(w) > 5 and w.endswith("ing"):
@@ -389,30 +465,73 @@ def _fits(words: list[str], bag: set[str]) -> bool:
     return True
 
 
-def _where(rec: dict, scene) -> str:
-    """The place id a person is at: their actor's, once they have one."""
+def where_now(rec: dict, scene, world=None):
+    """Where this person is, as a `residency.Where`. Three answers, the first that holds:
+
+    1. their body, if they have one: the engine moves bodies (`Engine.settle_people`);
+    2. where the party saw them, if the party has not left that place since. The
+       ruling: she "should stay there until i leave or something moves them";
+    3. the schedule key or the road (`residency.whereabouts`).
+    """
+    from . import places as places_mod
+    from . import residency
+
+    clock = int(getattr(scene, "clock_minutes", 0) or 0)
     actor = (getattr(scene, "people", {}) or {}).get(rec.get("ref") or "")
     if actor is not None and getattr(actor, "at", None):
-        return str(actor.at)
-    return str(rec.get("spot") or "")
+        return residency.where_of_place(str(actor.at), int(rec.get("last_seen") or 0))
+    here = getattr(scene, "at", None)
+    seen_at = rec.get("seen_at", rec.get("spot"))
+    # Unplaced (a scene nobody has stood anywhere yet) is still one room.
+    if ((seen_at or "") == (here or "")
+            and int(rec.get("last_seen") or 0) >= int(getattr(scene, "arrived", 0) or 0)):
+        return residency.Where("place", places_mod.location_of(here or "") or
+                               str(getattr(scene, "location_id", "") or ""), here or "")
+    return residency.whereabouts(rec, clock, world, getattr(scene, "founded", None))
 
 
-def _rings(scene):
+def _where(rec: dict, scene, world=None) -> str:
+    """The place id a person is at now (see `where_now`)."""
+    return where_now(rec, scene, world).place
+
+
+def _rings(scene, world=None):
+    from . import residency
+
     pop = list((getattr(scene, "population", {}) or {}).values())
     home = getattr(scene, "location_id", None)
     at = getattr(scene, "at", None)
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
     taken: set[str] = set()
+    where: dict[str, object] = {}
+
+    def now(r):
+        # A resident of another settlement with no body is in neither of the first
+        # rings; asking their schedule would cost the whole population for nothing.
+        if (r.get("home") != home and residency.mobility_of(r) == "resident"
+                and not r.get("ref")):
+            return None
+        if r["id"] not in where:
+            where[r["id"]] = where_now(r, scene, world)
+        return where[r["id"]]
 
     def ring(name, keep):
         members = [r for r in pop if r["id"] not in taken and keep(r)]
         taken.update(r["id"] for r in members)
         return name, members
 
-    yield ring(HERE, lambda r: r.get("home") == home and _where(r, scene) == at)
+    def is_here(r):
+        w = now(r)
+        return w is not None and w.kind == "place" and w.place == at
+
+    def in_town(r):
+        w = now(r)
+        return w is not None and w.kind in ("place", "home") and w.location == home
+
+    yield ring(HERE, is_here)
     yield ring("recent", lambda r: int(r.get("last_seen") or 0) >= clock - 60)
     yield ring("met", lambda r: r.get("last_met") is not None)
-    yield ring("settlement", lambda r: r.get("home") == home)
+    yield ring("settlement", in_town)
     yield ring("everyone", lambda r: True)
 
 
@@ -433,12 +552,14 @@ class Found(dict):
 
 
 def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
-         log_miss: bool = True) -> Found:
-    """The person that phrase means, by scope. `rings` limits the search to those rings."""
+         log_miss: bool = True, world=None) -> Found:
+    """The person that phrase means, by scope. `rings` limits the search to those rings.
+    `world` lets a traveller's roads be walked (`rules/residency.py`); without it they are
+    reckoned to stay where they were seen, and nothing reckoned so is stored."""
     words = _tokens(phrase)
     if not words or scene is None:
         return Found(scope=NONE, ring="", people=[])
-    for name, members in _rings(scene):
+    for name, members in _rings(scene, world):
         if rings is not None and name not in rings:
             continue
         fits = [r for r in members if _fits(words, _bag(r, scene))]
@@ -446,6 +567,11 @@ def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=fits)
         if fits:
             return Found(scope=AMBIGUOUS, ring=name, people=fits)
+    # A description with a relative clause the record cannot answer to ("the woman who
+    # waved at me" of a woman nobody saw wave) is still asking for the woman.
+    head = re.split(r"\s+who\s+", str(phrase), maxsplit=1, flags=re.I)
+    if len(head) == 2 and head[0].strip():
+        return find(scene, head[0], rings=rings, log_miss=log_miss, world=world)
     if log_miss and getattr(scene, "population", None):
         _MISSES.append({"kind": "population-miss", "phrase": " ".join(str(phrase).split()),
                         "words": words})
@@ -461,6 +587,11 @@ def drain_misses() -> list[dict]:
 
 def _the(phrase: str) -> str:
     p = " ".join(str(phrase or "").split())
+    # "somebody selling bread" is "the one selling bread": measured live 2026-09-27, the
+    # finder said "The somebody selling bread in the market is at the north crossing".
+    if re.match(r"^(?:somebody|someone|a person)\b", p, re.I):
+        rest = re.sub(r"^(?:somebody|someone|a person)\s*", "", p, flags=re.I)
+        return f"the one {rest}".strip() if rest else "that person"
     p = re.sub(r"^(?:a|an|the|some)\s+", "", p, flags=re.I)
     return f"the {p}" if p else "that person"
 
@@ -480,26 +611,43 @@ def question(people: list[dict]) -> str:
     return f"Which do you mean — {', '.join(named[:-1])}, or {named[-1]}?"
 
 
-def seen_line(rec: dict, scene, world=None) -> str:
-    """ "The woman watching from a doorway was at the market square when you saw them;
-    they are not here." Where they were SEEN, not where they are: until residency is built
-    (phase 2 step 4) that is all the campaign knows, and it says only that."""
-    where = ""
-    spot = _where(rec, scene)
-    try:
-        from . import places as places_mod
+def _place_name(place_id: str, scene, world=None) -> str:
+    from . import places as places_mod
 
-        loc = world.get(rec.get("home")) if world is not None else None
-        known = places_mod.for_scene(loc or rec.get("home"), spot,
+    try:
+        loc_id = places_mod.location_of(place_id)
+        loc = world.get(loc_id) if world is not None else None
+        known = places_mod.for_scene(loc or loc_id, place_id,
                                      founded=getattr(scene, "founded", None))
-        place = places_mod.find(known, spot)
-        where = str(getattr(place, "name", "") or "")
-        if where and loc is not None and rec.get("home") != getattr(scene, "location_id", None):
-            where = f"{where} in {loc.name}"
+        place = places_mod.find(known, place_id)
+        return str(getattr(place, "name", "") or "")
     except Exception:
-        where = ""
+        return ""
+
+
+def seen_line(rec: dict, scene, world=None) -> str:
+    """What asking around turns up about somebody who is not here: where they ARE.
+
+    Until residency (2026-09-27) this could only say where they were SEEN, "was at the
+    market square when you saw them", because that was all the campaign knew. Now it is
+    reckoned (`where_now`): at another place in town at this hour, at home, in another
+    town, on the road, or gone. Where a person is found is what any neighbour would say,
+    so it is said; what they ARE (work, wants, temper) is never in this line.
+    """
+    from . import residency
+
     who = _the(rec.get("phrase", ""))
-    who = who[0].upper() + who[1:]
-    if where:
-        return f"{who} was at {where} when you saw them, and is not here."
-    return f"{who} is not here."
+    here_loc = getattr(scene, "location_id", None) or ""
+    clock = int(getattr(scene, "clock_minutes", 0) or 0)
+    w = where_now(rec, scene, world)
+    if w.kind == "place" and w.location == here_loc:
+        name = _place_name(w.place, scene, world)
+        return residency.sentence(f"{who} is at {name} at this hour, and is not here."
+                                  if name else f"{who} is not here.")
+    day = ""
+    if w.kind == "home" and residency.mobility_of(rec) == "resident":
+        day = _place_name(residency.resolve(residency.WORK, rec, w.location, world,
+                                            getattr(scene, "founded", None)), scene, world)
+    said = residency.line(who, w, here_loc=here_loc, clock=clock, world=world,
+                          day_place=day)
+    return said or residency.sentence(f"{who} is not here.")

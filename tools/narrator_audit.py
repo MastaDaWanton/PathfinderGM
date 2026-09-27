@@ -116,6 +116,24 @@ SCRIPTS = {
         "I find a back alley where nobody will see me count my coin.",
         "I head out of town to wherever the charcoal burners work.",
     ],
+    # Residency (docs/the-population.md §4): somebody met, walked away from, come back to
+    # at night (gone home), asked after, found again in the morning, and then the road out
+    # of town and back. Before 2026-09-27 the road destroyed everybody left behind, so
+    # the bread seller of the last lines would have been a stranger with a new name.
+    "return": [
+        "I find somebody selling bread in the market and ask what a loaf costs.",
+        "I ask her name.",
+        "I walk over to the well.",
+        "I sit by the well until well after dark.",
+        "I go back to the market.",
+        "I ask around for the woman who sold me bread.",
+        "I find somewhere to sleep until morning.",
+        "I go to the market and look for the bread seller.",
+        "I take the road to the nearest town.",
+        "I take the road back to the town I just left.",
+        "I go to the market and look for the bread seller.",
+        "I greet her by name.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",

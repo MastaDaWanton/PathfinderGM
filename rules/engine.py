@@ -287,6 +287,17 @@ class Scene:
     # id; a person who enters play is ALSO an Actor in `people`, and the record keeps the
     # ref. The user's ruling of 2026-09-25: the database may grow; it must be findable.
     population: dict = field(default_factory=dict)
+    # When the party last arrived somewhere, and how many times it has: residency
+    # (rules/residency.py) moves people to where their day or their road puts them only
+    # when the party arrives, never while it stands with them — the ruling that the woman
+    # in the doorway "should stay there until i leave or something moves them".
+    # `settled` is the arrival `Engine.settle_people` last answered; `came_along` the
+    # people moved WITH the party since, whom the plan moved and who stay moved until
+    # the party leaves them.
+    arrived: int = 0
+    moves: int = 0
+    settled: int = 0
+    came_along: list = field(default_factory=list)
     # The resolution record, for tests and debugging. Nothing in the app reads it, and it
     # is deep-copied by every snapshot, so it keeps only the last LOG_KEPT outcomes.
     LOG_KEPT = 200
@@ -1400,8 +1411,14 @@ class Scene:
             raise ValueError("move: the player does not leave an initiative order; "
                              "end the encounter first")
         self._unseat(ref)
+        was = actor.at
         actor.at = place_id
         self.zones[ref] = "near"
+        if actor.is_pc and was != place_id:
+            self.arrived = self.clock_minutes
+            self.moves += 1
+        elif not actor.is_pc and ref not in self.came_along:
+            self.came_along.append(ref)
         if actor.is_pc:
             self.at = place_id
             self.cast = []
@@ -1757,6 +1774,12 @@ class Engine:
         # world, and an engine built without one falls back to the Core Rulebook's own
         # names rather than refusing to do arithmetic.
         self.world = world
+        # Where people are is reckoned against the world's own places and roads
+        # (rules/residency.py), and half the finder's callers hold a scene and no world.
+        if world is not None:
+            from . import residency as _residency
+
+            _residency.use_world(world)
         # Whether a fight began inside the current batch of intents. Read by the
         # attack op: a swing riding the same GM turn that opened the battle is
         # deferred to the player's own first combat turn, never resolved in prose.
@@ -1801,6 +1824,12 @@ class Engine:
         # it — the list resolves in order, so the walk went looking for a place that did
         # not exist yet. Put right mechanically rather than refused: the plan said both.
         intents = _found_before_travel(intents)
+        # And somebody the plan introduces as ALREADY HERE is here where the party ends
+        # up. Measured live 2026-09-27: "I find somebody selling bread in the market" was
+        # planned `introduce`, `travel` to the market, `say` to her — so she was made at
+        # the crossing the party was leaving, and the question went to whoever stood in
+        # the market instead.
+        intents = _introduce_after_travel(intents)
         # Refs an earlier intent in this same list will have created by the time a later
         # one runs. Without this, "two bravos step out of the dark and I fight them" is
         # impossible to express: the whole list is validated before any of it runs, so a
@@ -2359,6 +2388,11 @@ class Engine:
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
         resolution.outcomes.extend(self._settle_talk())
+        # The party arrived somewhere this batch: people go where their day or their road
+        # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
+        # of who is in the room, and it simply has them or does not.
+        if not self.scene.in_encounter:
+            self.settle_people()
         # A scheme that fails half-way leaves nothing of itself behind. Measured
         # 2026-09-25: the tick reads and CHANGES the scene (steps advance, people are
         # brought in, bodies fall), and a failure part-way kept whatever it had already
@@ -2654,7 +2688,10 @@ class Engine:
         # Speaking in a room with one other person in it is speaking to them. Decided
         # here, once, rather than asked of the model: the injector that makes this op
         # names a `to` only when the player's words name somebody.
-        if heard is None and speaker is not None and speaker.is_pc:
+        # Not when the plan named somebody who is not here: measured live 2026-09-27, a
+        # question put to the bread seller went to the one other person in the room.
+        if (heard is None and speaker is not None and speaker.is_pc
+                and not str(intent.params.get("to") or "").strip()):
             others = [a for r, a in self.scene.actors.items()
                       if not a.is_pc and self.scene.conscious(r)]
             if len(others) == 1:
@@ -4564,6 +4601,98 @@ class Engine:
                    if a.has_condition("stable")
                    else "has bled out where they fell.")]
 
+    def _stays_in_the_world(self, actor) -> bool:
+        """Whether somebody left behind by a journey goes on existing where they are.
+
+        Until 2026-09-27 the road out destroyed everybody who did not come along, and
+        coming back met strangers: measured, a woman met at the gate (Soren Kragnirath,
+        regard 70) was Korvin Korvath at regard 35 two days later — the record kept her
+        face and life, and the name and the standing lived on the body the road had
+        destroyed. Kept now: anybody with a population record, a world character, anybody
+        holding a standing with the player. RimWorld's world pawns are the precedent — kept
+        for a reason, the rest let go — and so are its reasons: kin, memory, relationship.
+        A spawned creature with none of those (the wolves, a hired thug) still goes, and the
+        dead go as they always did.
+        """
+        from . import attitude as attitude_mod
+        from . import population
+
+        if actor.has_state("state.down.dead"):
+            return False
+        return bool(population.of_ref(self.scene, actor.ref)
+                    or getattr(actor, "world_entity_id", None)
+                    or attitude_mod._regard_effect(actor) is not None)
+
+    def settle_people(self) -> list[str]:
+        """The party has arrived somewhere: everybody with a life goes where it puts them.
+
+        Ultima VII's off-screen rule, confirmed in the Exult source
+        (`teleport_offscreen_to_schedule`): nobody is walked to their slot, they are
+        simply there. Asked once per arrival, never per turn and never on a clock — the
+        same answer `population.where_now` gives the finder for people with no body, so a
+        body and a record cannot disagree about where somebody is.
+
+        Stays where they are: the party itself; whoever came along with it (`came_along`
+        — the plan moved them, and they stay moved until the party leaves them); whoever
+        the party has seen HERE since it arrived (the opening's own company, somebody
+        introduced a minute ago); anybody down, helpless, held, travelling with the party,
+        in conversation or in a fight; and anybody with no population record — a keeper
+        at their counter, a world character, a thug the plan spawned. Returns the refs
+        moved.
+        """
+        from . import places as places_mod
+        from . import population
+        from . import residency
+
+        scene = self.scene
+        if scene.settled == scene.moves:
+            return []
+        scene.settled = scene.moves
+        came = set(scene.came_along)
+        scene.came_along = []
+        by_ref = {r.get("ref"): r for r in (scene.population or {}).values() if r.get("ref")}
+        fighting = {ref for ref, _ in scene.initiative}
+        moved: list[str] = []
+        here_loc = scene.location_id
+        for ref, a in list(scene.people.items()):
+            rec = by_ref.get(ref)
+            if a.is_pc or rec is None or ref in came or ref in fighting:
+                continue
+            if (a.at == scene.at
+                    and int(rec.get("last_seen") or 0) >= int(scene.arrived or 0)):
+                continue
+            # A resident of another town lives their day where nobody is looking, and is
+            # reckoned when the party is there; asking now would be the whole world's
+            # bodies' cost on every arrival for an answer nobody reads — the finder asks
+            # a body where it is only to the town.
+            if (residency.mobility_of(rec) == "resident"
+                    and places_mod.location_of(a.at) != here_loc):
+                continue
+            where = residency.whereabouts(rec, scene.clock_minutes, self.world,
+                                          scene.founded)
+            target = residency.place_for(where, rec)
+            if not target or target == a.at:
+                continue
+            # The questions that cost (a state is asked of the whole sheet, race and
+            # feats included: about a millisecond each, measured 2026-09-27) only of
+            # somebody who would otherwise move.
+            if (a.is_down or a.is_helpless or a.has_state("state.held")
+                    or a.has_state(states.TRAVELS_WITH_YOU)
+                    or a.has_state(states.TALKING)):
+                continue
+            # Living their day, they ate, drank and slept. The clock's one door charges
+            # every body it holds (`Scene.advance`), and a baker the party left for a
+            # month would otherwise come back into the room a month hungry. NetHack's
+            # catch-up is the shape: settled once, when they are next reckoned.
+            a.awake_minutes = a.fed_minutes = a.watered_minutes = 0
+            scene.move(ref, target)
+            moved.append(ref)
+            if a.at == scene.at:
+                population.seen(scene, rec)
+        # The moves above are residency's own, not the plan's.
+        scene.came_along = []
+        return moved
+
     def leave_behind(self) -> list[str]:
         """The player says they are leaving: the dying here run their course.
 
@@ -4676,6 +4805,11 @@ class Engine:
         # `Actor.at`, and it only ever writes the party's own place.
         pc = self.scene.pc()
         was_at = self.scene.at
+        if was_at != target.id:
+            # An arrival, for residency: a load that stands the party where it already
+            # was is not one, or a reload would send the baker home mid-conversation.
+            self.scene.arrived = self.scene.clock_minutes
+            self.scene.moves += 1
         self.scene.at = target.id
         if pc is not None:
             pc.at = target.id
@@ -4892,7 +5026,8 @@ class Engine:
         left = [a.name for ref, a in list(self.scene.actors.items())
                 if ref not in keeping and not a.is_pc]
         for ref in list(self.scene.actors):
-            if ref not in keeping and not self.scene.actors[ref].is_pc:
+            if (ref not in keeping and not self.scene.actors[ref].is_pc
+                    and not self._stays_in_the_world(self.scene.actors[ref])):
                 self.scene.depart(ref)
 
         # The road, charged to the body first and the world's clock second — the order
@@ -6425,6 +6560,11 @@ class Engine:
         """Bring somebody into the conversation; the tell, or "" if they were in it."""
         if who is None or who.is_pc or who.has_state(states.TALKING):
             return ""
+        # Spoken with: the record's `last_met`, which the finder's `met` ring and the
+        # coming "since last we met" catch-up read (rules/population.py, `met`).
+        from . import population as _population
+
+        _population.met(self.scene, _population.of_ref(self.scene, who.ref))
         who.apply_effect(ActiveEffect(
             name="in conversation", kind="bond", key="talk", source="talk",
             origin=str(how or "talk"), duration="until-dismissed",
@@ -9484,6 +9624,12 @@ class Engine:
         from . import population
 
         who = intent.params["who"]
+        # "I ask her name." came back as `introduce who="her name"` (live, 2026-09-27).
+        if not population.names_a_person(who):
+            return self._refuse(
+                intent, f"introduce brings in a PERSON, and {who!r} is not somebody. "
+                        f"Asking a name, a price or a question of somebody here is `say` "
+                        f"to them, or narrate_only.")
         n = int(intent.params.get("count", 1) or 1)
         how = intent.params.get("how") or "already_here"
         template = intent.params.get("template") or "guildhand"
@@ -9898,6 +10044,28 @@ def _found_before_travel(intents: list) -> list:
         if walk is not None and walk < out.index(found):
             out.remove(found)
             out.insert(walk, found)
+    return out
+
+
+def _introduce_after_travel(intents: list) -> list:
+    """Every `introduce` of somebody already here moved after the plan's last walk,
+    unless that walk takes them along (`with` names their placeholder). An `arrives`
+    newcomer is left where it is: arriving is an event where the party stands."""
+    out = list(intents)
+    walks = [k for k, i in enumerate(out) if i.op in ("travel", "journey")]
+    if not walks:
+        return out
+    for intro in [i for i in out if i.op == "introduce"
+                  and (i.params.get("how") or "already_here") == "already_here"]:
+        last = max(k for k, i in enumerate(out) if i.op in ("travel", "journey"))
+        if out.index(intro) > last:
+            continue
+        walk = out[last]
+        takes = {str(w) for w in (walk.params.get("with") or [])}
+        if takes & {str(p) for p in intro.params.get("placeholders") or ["new1"]}:
+            continue
+        out.remove(intro)
+        out.insert(last, intro)
     return out
 
 

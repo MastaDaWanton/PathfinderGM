@@ -263,6 +263,10 @@ class Campaign:
                 "routed_xp": [dict(r) for r in self.scene.routed_xp],
                 "agreements": list(self.scene.agreements),
                 "population": self.scene.population,
+                # Residency's arrival mark (rules/residency.py): lost, a reload would read
+                # every arrival as unanswered and send the baker home mid-conversation.
+                "arrived": self.scene.arrived, "moves": self.scene.moves,
+                "settled": self.scene.settled, "came_along": list(self.scene.came_along),
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
                 # Which counters already have somebody behind them. Absent in saves
@@ -393,6 +397,9 @@ class Campaign:
             agreements=list(s.get("agreements") or (s.get("said") or {}).get("agreements")
                             or []),
             population=dict(s.get("population") or {}),
+            arrived=int(s.get("arrived") or 0), moves=int(s.get("moves") or 0),
+            settled=int(s.get("settled") or 0),
+            came_along=list(s.get("came_along") or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
