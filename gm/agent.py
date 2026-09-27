@@ -411,6 +411,9 @@ class GMAgent:
                 raw = judgement.fill_bare_checks(raw)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)
+                # A travel the model wrote with nowhere in it takes the place the
+                # player named, so validation can find it or name "found it first".
+                raw = judgement.fill_empty_travel(raw, player_input, self.engine.scene)
                 # A departure that names the room the party is in is asked again with
                 # the rooms that would have worked; raises into the correction path.
                 raw = judgement.refuse_leaving_in_place(raw, player_input,

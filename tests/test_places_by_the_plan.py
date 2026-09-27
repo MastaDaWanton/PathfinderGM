@@ -68,3 +68,20 @@ def test_a_building_hangs_off_the_street_not_off_the_room_you_stand_in(engine):
 
     parent = places.find(engine.places(), stables.parent)
     assert parent is None or not places.is_indoors(parent.id)
+
+
+def test_a_travel_with_nowhere_in_it_takes_the_place_the_player_named(engine):
+    """Measured live 2026-09-26, twice in two runs: "I go looking for the bathhouse" came
+    back as a travel with no place, and the engine answered "Nobody moves: where to?".
+    Filled from the player's words, validation then names the fix: found it first."""
+    from gm import judgement
+
+    raw = judgement.fill_empty_travel([{"op": "travel", "params": {}}],
+                                      "I go looking for the bathhouse.", engine.scene)
+    assert raw[0]["params"]["place"] == "the bathhouse"
+    with pytest.raises(IntentError, match="found it first"):
+        engine.validate(raw)
+    # Two kinds named, or none: left alone.
+    for said in ("I look for a bookseller.", "I go from the market to the tavern."):
+        assert judgement.fill_empty_travel([{"op": "travel", "params": {}}], said,
+                                           engine.scene) == [{"op": "travel", "params": {}}]

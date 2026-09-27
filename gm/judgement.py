@@ -3247,6 +3247,40 @@ def _named_settlement(text: str, world) -> str:
     return ""
 
 
+def fill_empty_travel(raw_intents, player_text: str, scene) -> list:
+    """A `travel` the model wrote with nowhere in it gets the place the player named.
+
+    Measured live 2026-09-26, twice in two runs of the discover script: "I go looking for
+    the bathhouse" came back as a `travel` with no `place` and no `biome`, and the engine
+    answered "Nobody moves: where to?" — while a travel that DID name an unlisted place
+    was refused with the fix named ("found it first"), and the plan's retry founded it
+    and walked in. So the empty travel is given the player's own place word, when the
+    sentence names exactly one kind of place the settlement table knows
+    (`places.KINDS`), and validation takes it from there. Not a guess at a journey: the
+    model already declared the travel; this names where to. `inject_travel` still never
+    invents one."""
+    from rules import places as places_mod
+
+    if not isinstance(raw_intents, list) or not player_text:
+        return raw_intents
+    empty = [r for r in raw_intents if isinstance(r, dict)
+             and str(r.get("op", "")).lower() == "travel"
+             and not (r.get("params") or {}).get("place")
+             and not (r.get("params") or {}).get("biome")]
+    if not empty:
+        return raw_intents
+    low = redact_speech(player_text).lower()
+    named = [k for k in places_mod.KINDS if re.search(rf"\b{re.escape(k)}\b", low)]
+    if len(named) != 1:
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        if r in empty:
+            r = dict(r, params=dict(r.get("params") or {}, place=f"the {named[0]}"))
+        out.append(r)
+    return out
+
+
 def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
     """Make a declared journey move the engine's ground.
 
