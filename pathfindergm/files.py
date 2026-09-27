@@ -38,6 +38,48 @@ def _replace(src: str, dst: Path) -> None:
             time.sleep(_REPLACE_WAIT)
 
 
+# --- what has been written, folder by folder -------------------------------------------
+#
+# Every writer in the app comes through `write_text` (and `remove`), so this is the one
+# place that knows a folder has just changed. A reader that caches a folder's contents
+# asks `written(folder)` and rebuilds when the count has moved: a write followed by a
+# read in the same breath is seen without stat-ing a single file.
+#
+# The shape is CPython's: `FileFinder` caches a directory's listing and checks it by
+# stat, and because "cache staleness relies upon the granularity of the operating
+# system's state information", a module created and imported inside one tick is missed —
+# so the writer calls `importlib.invalidate_caches()`. The docs say so in as many words.
+# Our bench met the same race (docs on `rules.races._signature`), and this is the same
+# answer: the writer, which knows, says so; the reader does not guess from the clock.
+#
+# In the process only, and a count rather than a time: nothing here outlives a restart,
+# and a count cannot be fooled by a clock that did not move.
+_WRITTEN: dict[str, int] = {}
+_KEYS: dict[str, str] = {}
+
+
+def _folder_key(folder) -> str:
+    raw = os.fspath(folder)
+    key = _KEYS.get(raw)
+    if key is None:
+        # Remembered: `written` is asked under every `has_state`. A relative path is
+        # not remembered, since its answer moves with the working directory.
+        key = os.path.normcase(os.path.abspath(raw))
+        if os.path.isabs(raw) and len(_KEYS) < 256:
+            _KEYS[raw] = key
+    return key
+
+
+def written(folder) -> int:
+    """How many times the app has written or removed a file in `folder` since start."""
+    return _WRITTEN.get(_folder_key(folder), 0)
+
+
+def _wrote(path: Path) -> None:
+    key = _folder_key(path.parent)
+    _WRITTEN[key] = _WRITTEN.get(key, 0) + 1
+
+
 def write_text(path, text: str, encoding: str = "utf-8") -> Path:
     """`Path.write_text`, atomically. Same newline handling, so the bytes on disk are
     the ones `write_text` would have written."""
@@ -56,7 +98,20 @@ def write_text(path, text: str, encoding: str = "utf-8") -> Path:
         except OSError:
             pass
         raise
+    finally:
+        # Counted even on failure: a half-finished write that did land is still a
+        # change, and a rebuild that finds nothing new costs one read.
+        _wrote(path)
     return path
+
+
+def remove(path) -> None:
+    """`Path.unlink(missing_ok=True)`, counted, so a cache of the folder sees it go."""
+    path = Path(path)
+    try:
+        path.unlink(missing_ok=True)
+    finally:
+        _wrote(path)
 
 
 _UNREADABLE_SAID: set[tuple[str, int]] = set()

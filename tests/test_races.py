@@ -16,6 +16,7 @@ import json
 
 import pytest
 
+from pathfindergm import files
 from rules import houserules, races
 from rules.creation import build, options
 from rules.dice import Dice
@@ -122,13 +123,12 @@ def test_a_race_over_the_tables_tier_is_refused_with_the_fix_named(tmp_path, mon
     # The table's tier, pinned: this read the shared test data's rules file once, and
     # a probe that had set the tier to 20 made the refusal vanish.
     monkeypatch.setattr(houserules, "race_rp", lambda: races.STANDARD_RP)
-    races.homebrew_dir(make=True).joinpath("dragonkin.json").write_text(
-        json.dumps(doc), encoding="utf-8")
+    files.write_text(races.homebrew_dir(make=True) / "dragonkin.json", json.dumps(doc))
     try:
         _, problems = build(_payload(race="dragonkin", choices=["str", "cha", "wis"]))
         assert any("RP race" in p and "Rulesets bench" in p for p in problems)
     finally:
-        races.homebrew_dir().joinpath("dragonkin.json").unlink()
+        files.remove(races.homebrew_dir() / "dragonkin.json")
 
 
 # --- from the world ---------------------------------------------------------------------
@@ -211,18 +211,18 @@ def test_importing_writes_drafts_the_bench_can_correct_and_keeps_an_edited_copy(
     folder = races.homebrew_dir(make=True)
     path = folder / "korvu.json"
     if path.exists():
-        path.unlink()
+        files.remove(path)
     try:
         assert races.import_from_world(WORLD) == ["korvu"]
         assert races.import_from_world(WORLD) == []          # kept, not clobbered
         edited = json.loads(path.read_text(encoding="utf-8"))
         edited["speed"] = 20
-        path.write_text(json.dumps(edited), encoding="utf-8")
+        files.write_text(path, json.dumps(edited))
         offered = {d["id"]: d for d in races.for_world(WORLD)}
         assert offered["korvu"]["speed"] == 20                # the bench's copy wins
     finally:
         if path.exists():
-            path.unlink()
+            files.remove(path)
 
 
 def test_saving_an_imported_race_on_the_bench_keeps_where_it_came_from(client, monkeypatch):
@@ -233,7 +233,7 @@ def test_saving_an_imported_race_on_the_bench_keeps_where_it_came_from(client, m
     folder = races.homebrew_dir(make=True)
     path = folder / "korvu.json"
     if path.exists():
-        path.unlink()
+        files.remove(path)
     try:
         assert races.import_from_world(WORLD) == ["korvu"]
         opened = client.get("/api/bench/races/open/korvu").json()
@@ -254,7 +254,7 @@ def test_saving_an_imported_race_on_the_bench_keeps_where_it_came_from(client, m
         assert r.status_code == 400 and "skill_mod perception +2 racial" in r.json()["error"]
     finally:
         if path.exists():
-            path.unlink()
+            files.remove(path)
 
 
 # --- the anatomy: eidolon evolutions, free of cost ----------------------------------------------
@@ -285,8 +285,7 @@ def _built(tmp_id="built-one", **evs):
     doc = races.normalise({"id": tmp_id, "name": "Built One", "size": "small",
                            "choose": list(races.STANDARD_CHOOSE),
                            "evolutions": evs.get("evolutions", [])})
-    races.homebrew_dir(make=True).joinpath(f"{tmp_id}.json").write_text(
-        json.dumps(doc), encoding="utf-8")
+    files.write_text(races.homebrew_dir(make=True) / f"{tmp_id}.json", json.dumps(doc))
     return races.homebrew_dir().joinpath(f"{tmp_id}.json")
 
 
@@ -304,7 +303,7 @@ def test_a_natural_weapon_is_in_the_hand_by_the_bodys_size_and_is_proficient():
         pc.size = "medium"
         assert pc.weapon("bite")["damage"] == "1d6"
     finally:
-        path.unlink()
+        files.remove(path)
 
 
 def test_immunity_resistance_and_ferocity_are_read_off_the_tags():
@@ -325,7 +324,7 @@ def test_immunity_resistance_and_ferocity_are_read_off_the_tags():
         pc.apply_hp_state()
         assert pc.has_condition("unconscious")
     finally:
-        path.unlink()
+        files.remove(path)
 
 
 def test_the_brief_tells_the_narrator_what_the_body_can_do():
@@ -342,7 +341,7 @@ def test_the_brief_tells_the_narrator_what_the_body_can_do():
         brief = prompts.scene_brief(WORLD, s, WORLD.get("5bbd0c40345f"), here=e.here(), known=e.places())
         assert "A Built One: moves by fly 30 ft as well as on foot; senses: darkvision 60 ft; natural weapons: claws." in brief
     finally:
-        path.unlink()
+        files.remove(path)
 
 
 def test_the_race_editor_page_carries_the_catalogue_and_opens_a_race(client):
@@ -365,7 +364,7 @@ def test_the_race_editor_page_carries_the_catalogue_and_opens_a_race(client):
                                        {"id": "skilled", "choice": "perception", "times": 1}]
         assert "natural.bite" in races.document("editor-built")["tags"]
     finally:
-        races.homebrew_dir().joinpath("editor-built.json").unlink()
+        files.remove(races.homebrew_dir() / "editor-built.json")
 
 
 # --- the two worlds' own races -------------------------------------------------------------------
