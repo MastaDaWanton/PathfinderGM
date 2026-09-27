@@ -118,3 +118,30 @@ player suspected, which the gate and the counter read; nobody walks in to make a
 
 One run, one seeded roll: this shows the path works end to end in real play, not that
 the tuning is right. The simulation table above is the tuning's evidence.
+
+## Live, after the targeting fixes (2026-09-26, the journey-free provoke script)
+
+Every insult outside a fight reached the same man, the laborer: a prose person with no
+rolled life, so temper 50. He escalated through the track exactly as the simulation
+predicts for an average temper:
+
+| turn | insult | engine |
+|---|---|---|
+| 1 | "…better fighters in a nursery" | "laborer cools: has no time for you" |
+| 2 | "I laugh in his face…" | "laborer takes it badly" |
+| 3 | "I call him a coward…" | "laborer cools: wants you gone, and is past talking" (hostile) |
+| 4 | "I tell his friends he cried…" | "laborer has had enough", then his fists (missed) |
+
+Turn 4 is an insult about him said to others, aimed at the man being baited. The run
+before it had shown the merchant (temper 80) swing on the first insult, the fight end,
+and "glares at you, but will not be drawn again so soon" on the next two insults.
+
+Before these fixes a spy on the injector found four insult turns of six provoking
+nobody. The model wrote a `say`'s listener in `target`, and only `params.to` was read;
+"him" had no reading at all. The first targeting fix had also reused the name
+`_AIMED_AT`, which already existed, and broke four unrelated repairs; see
+tests/test_no_silent_shadowing.py.
+
+Not yet seen live: turning the room and going to the watch. Both need somebody with a
+rolled life who is hostile and too even-tempered to swing, and no script has produced
+one yet. Both are covered by `tests/test_provocation.py`.
