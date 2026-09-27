@@ -69,6 +69,15 @@ from here:
   (`parent_id`) and trade (`play.travel`), not geometry. If the game needs travel time, it
   has to invent it.
 - **Years can be `null`** for undated events; the timeline sorts those last.
+- **Names carry no gender, and neither do characters.** `play.names[]` gives each people
+  one `given` list, and the characters are written as "them" throughout (Bregan Sootspar,
+  measured 2026-09-27: 256 characters, not one "he" or "she"). So a townswoman the prose
+  calls "a woman mending nets" can be named Soren Kragnirath, which reads as a man's name
+  to an English reader and says nothing either way in the world's own language. This app
+  does not guess a made-up name's gender from its shape; that would put English over the
+  world's language, the trap the races ruling names. **Requested of the next export:** a
+  gender (or none) on each given name, or given lists split the way the people split
+  them. `rules/names.py:true_name` is where it would be read.
 
 ## Things worth stealing
 

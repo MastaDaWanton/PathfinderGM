@@ -387,3 +387,27 @@ def test_asking_around_for_her_by_what_she_did_finds_her():
     assert found.get("record") == rec["id"] and found["scope"] == scope.ELSEWHERE
     # And a clause nobody answers to still asks for the head.
     assert population.find(s, "the woman who waved at me", world=WORLD).people
+
+
+def test_going_somewhere_and_looking_for_somebody_looks_for_the_somebody():
+    """Live: "I go to the market and look for the bread seller" was read as looking for
+    "market". The subject of "look for" is carried by "and", and a place is not a
+    person."""
+    assert judgement.person_sought(
+        "I go to the market and look for the bread seller.") == "bread seller"
+    assert judgement.person_sought("I go to the market.") == ""
+    assert judgement.person_sought("I draw my sword and approach the guard.") == "guard"
+    assert judgement.person_sought("I walk up to the gate guard.") == "gate guard"
+
+
+def test_asking_after_somebody_known_spawns_nobody_new():
+    """Live: "I ask around for the woman who sold me bread" spawned a body called
+    "woman" beside the plan's own answer that she was at the north crossing — the older
+    `inject_company` door read "ask" as addressing somebody."""
+    s, e = _engine(clock=10 * HOUR)
+    population.note(s, "somebody selling bread in the market")
+    s.at = next(p.id for p in e.places() if p.id != s.at)
+    for said in ("I ask around for the woman who sold me bread.",
+                 "I talk to the woman selling bread."):
+        out = judgement.inject_company([{"op": "narrate_only"}], said, s, WORLD)
+        assert not any(i.get("op") == "spawn" for i in out), (said, out)

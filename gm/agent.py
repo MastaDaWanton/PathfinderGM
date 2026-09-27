@@ -489,7 +489,7 @@ class GMAgent:
                 # cannot steal a turn from `fill_obvious_targets`.
                 raw = judgement.inject_fight(raw, player_input, self.engine.scene)
                 raw = judgement.inject_company(raw, player_input,
-                                               self.engine.scene)
+                                               self.engine.scene, self.world)
                 # Speech last, because it competes with nothing: "I tell the smith I
                 # want the axe" is a sale AND a line of dialogue, and both belong in
                 # the turn. Measured on the first live turn after the `say` op landed —

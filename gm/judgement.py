@@ -5009,7 +5009,7 @@ _CIVILIANS = re.compile(
     r"woman|man|stranger|elder|girl|boy)\b", re.I)
 
 
-def inject_company(raw_intents, player_text: str, scene):
+def inject_company(raw_intents, player_text: str, scene, world=None):
     """The person the player turns to becomes a real actor, not a phantom.
 
     This deliberately reverses an older refusal ("spawning a merchant because the
@@ -5019,8 +5019,32 @@ def inject_company(raw_intents, player_text: str, scene):
     living merchant actor), and evaporated on the next beat. The GM's narration
     already invented these people; making the addressed one real is bookkeeping,
     not invention. Civilians only, spawned peacefully, no encounter."""
+    from rules import places as places_mod
+
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
+    # The older door, and it steps aside for the two newer ones. Measured live
+    # 2026-09-27: "I ask around for the woman who sold me bread" matched "ask" here, and
+    # a body called "woman" was spawned beside the plan's own answer that the bread
+    # seller was at the north crossing. Asking around is looking, not addressing; and
+    # somebody the finder knows (here, elsewhere, or which-do-you-mean) is the finder's,
+    # while a kind of person nobody holds yet is `introduce`'s (`inject_introduce`).
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "introduce"
+           for r in raw_intents):
+        return raw_intents
+    if _ASKS_AROUND.search(speech.blanked(str(player_text or ""))):
+        return raw_intents
+    sought = person_sought(player_text)
+    if sought:
+        from rules import scope as scope_mod
+
+        found = scope_mod.look_for(world, sought, scene,
+                                   getattr(scene, "location_id", None))
+        if found.get("scope") in (scope_mod.HERE, scope_mod.ELSEWHERE,
+                                  scope_mod.AMBIGUOUS):
+            return raw_intents
+        if places_mod.terrain_of(getattr(scene, "at", "")) == places_mod.URBAN:
+            return raw_intents
     m = _ADDRESSES.search(str(player_text or ""))
     if not m:
         return raw_intents
@@ -5103,7 +5127,7 @@ def challengers(beat: str, phrases) -> list[str]:
 # ten turns, each answered "No round is here". "ask around for", and looking "along the
 # street for", are looking for somebody.
 _LOOKS_FOR = re.compile(
-    r"\bI\s+(?:turn\s+to\s+find|turn\s+to|look\s+for|looks\s+for|search\s+for|seek\s+out|"
+    r"(?:\bI|\band|\bthen)\s+(?:turn\s+to\s+find|turn\s+to|look\s+for|looks\s+for|search\s+for|seek\s+out|"
     r"(?:look|ask|asks|search|go)\s+(?:around|about|along\s+the\s+\w+)\s+for|"
     r"seek|find|approach|approaches|go\s+to|walk\s+up\s+to|speak\s+to|speaks\s+to|"
     r"talk\s+to|talks\s+to|ask|asks|address|addresses|call\s+for|calls\s+for|summon|"
@@ -5114,7 +5138,7 @@ _LOOKS_FOR = re.compile(
 
 
 _ASKS_AROUND = re.compile(
-    r"\bI\s+(?:look|looks|ask|asks|search|go)\s+(?:around|about|along\s+the\s+\w+)\s+for\s+"
+    r"(?:\bI|\band|\bthen)\s+(?:look|looks|ask|asks|search|go)\s+(?:around|about|along\s+the\s+\w+)\s+for\s+"
     r"(?:(?:the|a|an|my|some)\s+)?([A-Za-z][A-Za-z' -]{2,40}?)"
     r"(?=[,.!?;]|\s+(?:and|about|for|to|if|that|what|where|who|whether|why|how)\b|$)",
     re.I)
@@ -5124,8 +5148,27 @@ def _sought_match(player_text: str):
     # "I ask around for a healer" is looking, not speaking — but `redact_speech` reads
     # "ask … for" as a request and blanks the healer. The asking-around forms are read
     # from the sentence with only its quotations blanked (2026-09-25).
-    return (_ASKS_AROUND.search(speech.blanked(player_text or ""))
-            or _LOOKS_FOR.search(redact_speech(player_text or "")))
+    #
+    # The first match that is not a PLACE. Measured live 2026-09-27: "I go to the market
+    # and look for the bread seller" was read as looking for "market" — "go to" is a
+    # seeking verb ("I go to the mayor"), the subject of "look for" was carried by "and",
+    # and the first phrase won.
+    for pattern, text in ((_ASKS_AROUND, speech.blanked(player_text or "")),
+                          (_LOOKS_FOR, redact_speech(player_text or ""))):
+        for m in pattern.finditer(text):
+            if not _a_place_word(m.group(1)):
+                return m
+    return None
+
+
+def _a_place_word(phrase: str) -> bool:
+    """Whether a sought phrase is a kind of place a settlement has ("market", "the way
+    in", "the old well") rather than somebody."""
+    from rules import places as places_mod
+
+    words = " ".join(str(phrase or "").lower().split())
+    words = re.sub(r"^(?:the|a|an)\s+", "", words)
+    return any(words == k or words.endswith(" " + k) for k in places_mod.KINDS)
 
 
 def sought_indefinitely(player_text: str) -> bool:
