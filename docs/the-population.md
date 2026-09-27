@@ -568,3 +568,32 @@ Built:
 Not built: forced entry, knocking at a house the world wrote (keepers and world
 characters keep no home yet), and a door that stays open to a friend once earned
 (Stardew's "permanently unlocked").
+
+**Live, the `calling` script (2026-09-27, three runs).** Run 3, 10 of 11 turns clean:
+"I ask around where the bread seller lives" became "2 hours of asking around finds out
+where they live. They live at Bram's house, off the warrens." Asked after midnight, "I
+go to her house" became "Bram is woken by the knocking and shouts through the door to
+come back in daylight. It does not open." She was indifferent to the character, so the
+door stayed shut, and the party stood in the street.
+
+Runs 1 and 2 found five defects, each fixed with a test in
+`tests/test_calling_on_people.py`:
+
+1. **"The bread seller" missed "somebody selling bread".** "Seller" was read as a
+   stallholder's word. Generic trade words now mean selling, and the goods beat them in
+   the roll.
+2. **A `travel` to "the baker's row" rode beside the `call_on`.** The call now decides
+   the walk.
+3. **"Sleep until morning" was a fixed eight hours,** from five in the afternoon to one
+   in the morning under a "morning sun". A night begun in the evening now runs to the
+   next dawn.
+4. **"Wait until ten at night" was planned as 140 minutes.** The engine's clock now does
+   the arithmetic.
+5. **"Her" went to somebody met in the same minute.** It now means the person whose home
+   was last asked after.
+
+**Still open, and flagged as its own task:** buying in narration never becomes a `buy`.
+"I try to buy a coil of rope" was `narrate_only` in all three runs, and the narrator
+sold rope at one in the morning with no coin moving. There is a `sell` injector and no
+`buy` one. Shop hours are enforced on the trade panel and on any `buy` or `sell` that
+reaches the engine.
