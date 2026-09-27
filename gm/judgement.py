@@ -5451,6 +5451,10 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
         return raw_intents
     if places_mod.terrain_of(getattr(scene, "at", "")) != places_mod.URBAN:
         return raw_intents
+    # Going to somebody's house is calling on somebody already met (`inject_call_on`),
+    # never a stranger to introduce.
+    if called_on(player_text)[0]:
+        return raw_intents
     phrase = person_sought(player_text)
     if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
         return raw_intents
@@ -6584,3 +6588,80 @@ def aim_at_the_holder(raw_intents, player_text: str, scene) -> list | None:
             changed = True
         out.append(raw)
     return out if changed else raw_intents
+
+
+# --- calling on somebody at home ----------------------------------------------------------
+#
+# The player's words for going to somebody's house, read in code so the plan cannot miss
+# them (docs/the-population.md, "calling on people"): the engine's `call_on` decides
+# whether the way is known, whether anybody is in and whether the door opens.
+_HOUSE = r"(?:house|home|door|cottage|hovel|lodgings|rooms)"
+_CALLS_ON = (
+    re.compile(r"\b(?:go|goes|walk|head|make\s+my\s+way|return|come|run)\s+(?:back\s+)?"
+               r"(?:over\s+|round\s+)?(?:to|towards?)\s+(?:the\s+)?"
+               r"(?P<who>[a-z][a-z' -]{1,50}?)(?:'s|s')\s+" + _HOUSE + r"\b", re.I),
+    re.compile(r"\b(?:go|goes|walk|head|make\s+my\s+way|return|come|run)\s+(?:back\s+)?"
+               r"(?:over\s+|round\s+)?(?:to|towards?)\s+(?P<who>her|his|their)\s+"
+               + _HOUSE + r"\b", re.I),
+    re.compile(r"\bknock\s+(?:on|at)\s+(?:the\s+)?(?P<who>[a-z][a-z' -]{1,50}?)(?:'s|s')\s+"
+               r"door\b", re.I),
+    re.compile(r"\bknock\s+(?:on|at)\s+(?P<who>her|his|their)\s+door\b", re.I),
+    re.compile(r"\b(?:call\s+on|visit|drop\s+in\s+on|look\s+in\s+on)\s+(?:the\s+)?"
+               r"(?P<who>[a-z][a-z' -]{1,50}?)(?=\s+at\s+(?:her|his|their)\s+home|\s+at\s+home"
+               r"|[,.!?;]|\s+and\b|$)", re.I),
+)
+_ASKS_WHERE_THEY_LIVE = re.compile(
+    r"\b(?:ask|find\s+out|learn|ask\s+around)\s+where\s+(?:the\s+)?"
+    r"(?P<who>[a-z][a-z' -]{1,50}?)\s+(?:lives|live|stays|sleeps)\b", re.I)
+
+
+def called_on(player_text: str) -> tuple[str, bool]:
+    """(whom the player is going to call on, whether they go) — ("", False) for none."""
+    text = speech.blanked(str(player_text or ""))
+    m = _ASKS_WHERE_THEY_LIVE.search(text)
+    if m:
+        who = m.group("who").strip()
+        goes = bool(re.search(r"\band\s+(?:go|head|walk)\b", text[m.end():], re.I))
+        return (who if who.lower() not in ("she", "he", "they") else "her"), goes
+    for pattern in _CALLS_ON:
+        m = pattern.search(text)
+        if m:
+            who = m.group("who").strip()
+            if who.lower() in ("my", "our", "your"):
+                continue
+            return who, True
+    return "", False
+
+
+def inject_call_on(raw_intents, player_text: str, scene) -> list:
+    """The player went to somebody's house: `call_on`, in place of whatever the plan
+    tried — a `travel` to a house that is not a place yet, or a `found` of one."""
+    if not isinstance(raw_intents, list) or scene is None or scene.in_encounter:
+        return raw_intents
+    theirs = [r for r in raw_intents if isinstance(r, dict)
+              and str(r.get("op", "")).lower() == "call_on"]
+    if theirs:
+        # The call decides where the party walks: to the door, or in through it.
+        # Measured live 2026-09-27, "I go to her house" came back as `call_on` AND a
+        # `travel` to "the baker's row", and the travel walked the party off first.
+        if any((r.get("params") or {}).get("visit", True) not in (False, "false")
+               for r in theirs):
+            return [r for r in raw_intents if not (
+                isinstance(r, dict) and str(r.get("op", "")).lower() in ("travel", "found"))]
+        return raw_intents
+    who, goes = called_on(player_text)
+    if not who:
+        return raw_intents
+
+    def aimed_at_the_house(r) -> bool:
+        if not isinstance(r, dict) or str(r.get("op", "")).lower() not in (
+                "travel", "found", "venture"):
+            return False
+        p = r.get("params") or {}
+        said = " ".join(str(p.get(k) or "") for k in ("place", "name", "to")).lower()
+        return bool(re.search(_HOUSE, said)) or (who.lower() in said)
+
+    kept = [r for r in raw_intents if not aimed_at_the_house(r) and not (
+        goes and isinstance(r, dict) and str(r.get("op", "")).lower() == "travel")]
+    return kept + [{"op": "call_on", "because": "the player went to their home",
+                    "params": {"who": who, "visit": goes}}]

@@ -1780,6 +1780,7 @@ class Engine:
             from . import residency as _residency
 
             _residency.use_world(world)
+        self._let_in: set = set()
         # Whether a fight began inside the current batch of intents. Read by the
         # attack op: a swing riding the same GM turn that opened the battle is
         # deferred to the player's own first combat turn, never resolved in prose.
@@ -2333,6 +2334,8 @@ class Engine:
         self._battle_joined = False
         self._journeyed = ""
         self._provoked = set()
+        # Homes whose door opened to the party this batch (`_op_call_on`, `_knock`).
+        self._let_in = set()
         return self._tick_schemes(self._their_first_blow(
             self._drive([i.as_dict() for i in intents], [], {})))
 
@@ -2469,6 +2472,13 @@ class Engine:
             # Provoked past bearing: their own blow, with their fists — a provoked brawl
             # is fists, as a Skyrim brawl is (rules/provocation.py) — next in the queue.
             # It opens the fight from their side and `run` rolls it before the prose.
+            # Called on: the party walks to the door, or in through it.
+            if intent.op == "call_on":
+                went = next((e for e in (outcome.effects or [])
+                             if e.get("kind") == "call_on" and e.get("go")), None)
+                if went is not None and went["go"] != self.scene.at:
+                    queue.insert(0, {"op": "travel", "params": {"place": went["go"]},
+                                     "because": "calling on them"})
             if intent.op == "provoke":
                 hit = next((e for e in (outcome.effects or [])
                             if e.get("kind") == "provoked" and e.get("strikes")), None)
@@ -2566,6 +2576,223 @@ class Engine:
                        tell="", because=intent.because)
 
     # provoke -----------------------------------------------------------------------------
+
+    # --- calling on somebody at home ----------------------------------------------------
+    #
+    # docs/the-population.md "Built: shop hours and calling on people" (2026-09-27). The
+    # research that set the shape:
+    #   * WHERE SOMEBODY LIVES IS KNOWLEDGE, not a map object: PF1e's gather information
+    #     (Diplomacy, at least 1d4 hours canvassing, DC 10 for what is commonly known), and
+    #     The Alexandrian's targeted investigation. Held as a `knows.home.<id>` tag on the
+    #     character through the one applicator, like `knows.way-past-gate`.
+    #   * A VISIT IS A KNOCK with two gates, as Stardew Valley's homes have: the hour
+    #     (its doors keep times) and the relationship (two hearts for a bedroom). Out, and
+    #     nobody answers; at home by day, the door opens to anybody not ill-disposed; in the
+    #     night, they are woken — which costs regard, as U7's innkeeper "must be awoken" —
+    #     and only a friend lets you in.
+    #   * NO FORCED ENTRY HERE: Skyrim warns and then fines a trespasser, and a break-in
+    #     is a crime this app has doors for elsewhere; this door only knocks.
+    # A house is a place founded once, owned by them (`found_place`, origin "home"), off a
+    # street of their town; from then on the home their day sends them to IS that house
+    # (`residency.resolve` reads what they hold).
+    HOME_DC = 10
+    _NIGHT_SLOTS = frozenset({0, 1})
+    _STREET_WORDS = ("lane", "back streets", "warrens", "streets", "green", "row", "well")
+
+    def _person_called_on(self, who: str):
+        """(record, body) for the person `who` means in this town, or (None, reason)."""
+        from . import population
+
+        scene = self.scene
+        body = scene.people.get(who)
+        if body is not None and not body.is_pc:
+            return population.of_ref(scene, body.ref), body
+        words = who.lower().split()
+        if words and words[0] in ("her", "him", "them", "his", "their", "she", "he", "they"):
+            # The pronoun is whoever the character last spoke with in this town.
+            met = [r for r in (scene.population or {}).values()
+                   if r.get("last_met") is not None and r.get("home") == scene.location_id]
+            if met:
+                rec = max(met, key=lambda r: int(r["last_met"]))
+                return rec, scene.people.get(rec.get("ref") or "")
+            return None, "Nobody the party has spoken with lives in this town."
+        found = population.find(scene, who, world=self.world, log_miss=False)
+        if found.scope == population.AMBIGUOUS:
+            return None, population.question(found.people)
+        if not found.people:
+            return None, f"Nobody the party has met answers to {who!r}."
+        rec = found.people[0]
+        return rec, scene.people.get(rec.get("ref") or "")
+
+    def _knows_home(self, pc, rec, body) -> tuple[bool, str]:
+        """Whether the character knows where this person lives, learning it if they can.
+
+        Known already (the tag); told, when the person is friendly with them; else asked
+        around for, taking 10 on Diplomacy against DC 10 — at least 1d4 hours, and the
+        hours are the world's roll. A character who could not find out that way is told
+        so, and who might tell them."""
+        from . import attitude as attitude_mod
+        from .activeeffect import ActiveEffect
+        from .dice import stack
+
+        tag = f"knows.home.{rec['id']}"
+        if pc.has_state(tag):
+            return True, ""
+
+        def learn(how: str) -> None:
+            pc.apply_effect(ActiveEffect(
+                name=f"knows where {rec['phrase']} lives", kind="knowledge",
+                key=f"knows-home:{rec['id']}", source=f"home:{rec['id']}", origin=how,
+                duration="until-dismissed", tags=(tag,)))
+
+        if body is not None and attitude_mod.step_of(attitude_mod.of(body)) >= \
+                attitude_mod.step_of("friendly"):
+            learn("told")
+            return True, "They had told you where they live."
+        try:
+            bonus = sum(m.value for m in stack(pc.skill_modifiers("diplomacy")))
+        except Exception:
+            bonus = 0
+        if 10 + bonus < self.HOME_DC:
+            return False, ("Nobody you ask around will say where they live. Somebody "
+                           "who knows them might, or they might tell you themselves.")
+        hours = self.dice.roll("1d4", label="asking around", visibility="hidden").total
+        self.scene.advance(hours * 60)
+        learn("asked around")
+        return True, f"{hours} hour{'s' if hours != 1 else ''} of asking around finds out where they live."
+
+    def _street_for_a_house(self):
+        from . import places as places_mod
+
+        outdoor = [p for p in self.places()
+                   if not places_mod.is_indoors(p.id) and not p.id.startswith(
+                       f"{self.scene.location_id}~offstage")
+                   and places_mod.terrain_of(p.id) == places_mod.URBAN]
+        roomy = [p for p in outdoor if len(places_mod.children_of(
+            self.scene.founded, p.id)) < places_mod.MOST_CHILDREN]
+        for words in self._STREET_WORDS:
+            for p in roomy:
+                if words in p.name.lower():
+                    return p
+        return roomy[0] if roomy else None
+
+    def _home_of(self, rec, body, handle: str):
+        """Their house, founded the first time anybody calls: (place, body)."""
+        from . import places as places_mod
+        from . import population
+        from . import residency
+
+        for p in self.scene.founded:
+            if body is not None and p.get("owner") == body.ref and p.get("origin") == "home":
+                return places_mod.find(self.places(), p["id"]), body
+        if body is None:
+            # Somebody the party has only seen: they are given their body now, the one
+            # door everybody is made by, and sent where their day puts them.
+            body = population.embody(self.scene, rec["phrase"], "guildhand",
+                                     world=self.world, rec=rec)
+        street = self._street_for_a_house()
+        if street is None:
+            return None, body
+        name = (f"{body.name}'s house" if body.name == getattr(body, "true_name", None)
+                else f"the house of {handle}")[:60]
+        place = self.found_place(name, street, owner=body, origin="home")
+        where = residency.whereabouts(rec, self.scene.clock_minutes, self.world,
+                                      self.scene.founded)
+        target = residency.place_for(where, rec)
+        if target and target != body.at:
+            self.scene.move(body.ref, target)
+        return places_mod.find(self.places(), place.id), body
+
+    def _op_call_on(self, intent: Intent, partial: dict) -> Outcome:
+        from . import attitude as attitude_mod
+        from . import population
+        from . import residency
+
+        pc = self.scene.pc()
+        if pc is None:
+            return self._refuse(intent, "There is nobody to go calling.")
+        rec, body = self._person_called_on(str(intent.params["who"]))
+        if rec is None:
+            return self._refuse(intent, str(body))
+        if residency.mobility_of(rec) != "resident" or rec.get("home") != self.scene.location_id:
+            return self._refuse(intent, population.seen_line(rec, self.scene, self.world)
+                                + " They keep no house in this town.")
+        if intent.params.get("visit", True) and body is not None and body.ref in self.scene.actors:
+            return self._refuse(intent, residency.sentence(
+                f"{body.name} is here, with you; there is no need to go to their door."))
+        knows, how = self._knows_home(pc, rec, body)
+        if not knows:
+            return self._refuse(intent, how)
+        handle = population._the(rec["phrase"])
+        house, body = self._home_of(rec, body, handle)
+        if house is None:
+            return self._refuse(intent, "There is no street here with room for a house.")
+        bits = [how] if how else []
+        effects = [{"kind": "call_on", "record": rec["id"], "house": house.id,
+                    "street": house.parent}]
+        if not intent.params.get("visit", True):
+            bits.append(f"They live at {house.name}, off "
+                        f"{self._place_name(house.parent)}.")
+            return Outcome(intent_id=intent.id, op="call_on", effects=effects,
+                           tell=" ".join(bits), because=intent.because)
+        let_in, said = self._knock(rec, body, house)
+        bits.append(said)
+        effects[0].update(let_in=let_in, go=house.id if let_in else house.parent)
+        if let_in:
+            self._let_in.add(house.id)
+        return Outcome(intent_id=intent.id, op="call_on", effects=effects,
+                       tell=" ".join(b for b in bits if b), because=intent.because)
+
+    def _at_their_door(self, intent, place: str):
+        """None when the party may walk in; a refusal carrying the knock when not."""
+        from . import places as places_mod
+        from . import population
+
+        target = places_mod.find(self.places(), place)
+        if target is None or target.id in self._let_in:
+            return None
+        home = next((p for p in self.scene.founded if p.get("id") == target.id
+                     and p.get("origin") == "home"), None)
+        pc = self.scene.pc()
+        if home is None or (pc is not None and home.get("owner") == pc.ref):
+            return None
+        body = self.scene.people.get(str(home.get("owner") or ""))
+        rec = population.of_ref(self.scene, body.ref) if body is not None else None
+        if body is None or rec is None or body.has_state(states.TRAVELS_WITH_YOU):
+            return None
+        let_in, said = self._knock(rec, body, target)
+        if let_in:
+            self._let_in.add(target.id)
+            return None
+        return self._refuse(intent, said)
+
+    def _place_name(self, place_id: str) -> str:
+        from . import places as places_mod
+
+        p = places_mod.find(self.places(), place_id)
+        return p.name if p is not None else "the street"
+
+    def _knock(self, rec, body, house) -> tuple[bool, str]:
+        """Who answers the door, and whether it opens. (let in, what happened)."""
+        from . import attitude as attitude_mod
+        from . import population
+        from . import residency
+
+        who = body.name if body is not None else population._the(rec["phrase"])
+        if body is None or body.at != house.id:
+            elsewhere = population.seen_line(rec, self.scene, self.world)
+            return False, f"Nobody answers at {house.name}. A neighbour says: {elsewhere}"
+        step = attitude_mod.step_of(attitude_mod.of(body))
+        if residency.slot_of(self.scene.clock_minutes) in self._NIGHT_SLOTS:
+            before, after = attitude_mod.nudge_regard(body, -3, "woken")
+            if step >= attitude_mod.step_of("friendly"):
+                return True, (f"{who} is woken by the knocking, comes to the door half "
+                              f"dressed, and lets you in.")
+            return False, (f"{who} is woken by the knocking and shouts through the door "
+                           f"to come back in daylight. It does not open.")
+        if step >= attitude_mod.step_of("indifferent"):
+            return True, f"{who} opens the door and lets you in."
+        return False, f"{who} opens the door a crack, sees who it is, and will not let you in."
 
     def _op_provoke(self, intent: Intent, partial: dict) -> Outcome:
         """The player insults or slights somebody: their regard falls, and a seeded roll on
@@ -5286,6 +5513,12 @@ class Engine:
                 intent, "Nobody moves: where to? From here you can reach "
                         f"{', '.join(p.name for p in self.places())}, or the open ground "
                         f"outside — {', '.join(sorted(biomes.BIOMES))}.")
+        # Somebody's house is knocked at, not walked into (`_knock`): the door opens
+        # from their day and their regard, and a shut door leaves the party outside.
+        if place:
+            refused = self._at_their_door(intent, place)
+            if refused is not None:
+                return refused
         biome = biomes.canonical(want) if want else None
         if biome is not None and place:
             from . import places as places_mod
@@ -9537,7 +9770,23 @@ class Engine:
         # survival.sleep, and a night deliberately costs no food or water.
         # `charge_body=False`: `Actor.rest` has already called survival.sleep, and a
         # night deliberately costs no food or water — pinned by tests/test_survival.py.
-        ended = self.scene.advance(hours * 60, charge_body=False)["ended"]
+        # A night's sleep begun in the evening runs to the morning, not to a fixed eight
+        # hours. Measured live 2026-09-27: "I find somewhere to sleep until morning" at
+        # five in the afternoon woke the party at one in the morning, the prose wrote "the
+        # morning sun has just begun to bleed through", and the market it walked into
+        # next — shut until first light (rules/keepers.py) — was written trading. The
+        # rules' eight hours are the least a night is; the next dawn ends it when it is
+        # later than that and within sixteen.
+        minutes = hours * 60
+        if kind == "night":
+            now = self.scene.clock_minutes
+            dawn = (now // (24 * 60)) * 24 * 60 + 6 * 60
+            if dawn <= now:
+                dawn += 24 * 60
+            if now + minutes < dawn <= now + 16 * 60:
+                minutes = dawn - now
+                hours = round(minutes / 60)
+        ended = self.scene.advance(minutes, charge_body=False)["ended"]
 
         bits = [f"{actor.name} rests for {hours} hours."]
         if result["healed"]:

@@ -479,3 +479,92 @@ the unit test.
 
 Noticed and left: "I go to the market and look for the bread seller" is read as looking
 for "market", because the first verb phrase wins. The plan answered correctly anyway.
+
+## Built: the open list (2026-09-27)
+
+The user's words: "finish the still open list first". Five items came out of the
+residency report.
+
+**1. A woman named Soren.** The world gives names no gender, and it gives none to its
+characters either: 256 characters, every one written "them", with one `given` list per
+people. "Soren" reads as a man's name only to an English reader. Guessing gender from
+the shape of a made-up name would put English over the world's own language, the same
+trap as the races ruling. This is recorded in `docs/from-world-bible.md` ("Known gaps")
+as a request of the next export: a gender, or none, on each given name.
+
+**2. "I go to the market and look for the bread seller" was read as looking for
+"market".** The subject of a second seeking verb is carried by "and" or "then", and a
+place kind is not a person (`judgement._a_place_word`).
+
+**3. The planner added a stranger.** The older door, `inject_company`, read "I **ask**
+around for the woman…" as addressing a woman, and spawned a body called "woman" beside
+the finder's answer. It now steps aside for asking around, for anybody the finder
+knows, and for a kind of person `introduce` will bring in within a settlement.
+
+**4. Shop hours.** Research (sources in the session record):
+
+- **Open is where the keeper stands.** Stardew Valley opens a shop only while its owner
+  is in the counter's tile area, and Skyrim's vendor faction asks an hour window and a
+  place.
+- **A shut shop is not a shut building.** Pierre's Wednesday closure cut players off
+  from the people inside, and complaints ran until the game added three overrides.
+- **The keeper says when to come back.** CircleMUD's keeper speaks "Come back later!",
+  "Sorry, we have closed, but come back later." or "Sorry, come back tomorrow."
+- **Somebody is always open:** Skyrim's innkeepers.
+- **Period hours:** the market bell at first light, most counters shut by mid-afternoon
+  or evening, smiths and taverners working to the curfew bell (the 1345 Spurriers'
+  ordinance forbade work after it).
+
+Built in `rules/keepers.py`:
+
+- **Hours by what the place is:**
+  - taverns and inns always;
+  - smithies, workshops, tannery, brewery, stables and the carters' yard until 21:00;
+  - the market and everything else 06:00 to 18:00.
+- **One door, `keepers.shut_here`,** asked by the trade panel, `buy`, `sell` and the
+  brief ("COUNTER SHUT (fact)").
+- **A stall's keeper goes home** when it shuts and comes back when it opens. A keeper
+  under a roof lives there and can be talked to.
+
+Two defects the shop hours exposed, both fixed:
+
+- **Every game began at clock 0, which the app reads as midnight,** under an opening
+  that said "Mid-morning, in the market row". The clock now starts at the hour the
+  opening names.
+- **The brief never told the narrator the time.** Harmless while nothing read the hour;
+  it now says "WHEN (fact): day 1, morning (about 10 in the morning)".
+
+**5. Calling on somebody at home.** Research:
+
+- **Where somebody lives is knowledge.** PF1e's gather information is Diplomacy: at
+  least 1d4 hours canvassing, DC 10 for what is commonly known. The Alexandrian's
+  targeted investigation says the same.
+- **A visit is a knock with two gates,** the hour and the relationship. Stardew's houses
+  keep door times, and a bedroom needs two hearts. U7's innkeeper "must be awoken".
+- **Skyrim warns, then fines, a trespasser.** This door only knocks.
+
+Built:
+
+- **The `call_on` op,** detected in code from the player's words: "I go to the bread
+  seller's house", "I go to her house", "I knock at her door", "I call on the old
+  fisherman", "I ask around where the baker lives" (which only asks). "Her" or "him"
+  means whoever the character spoke with last in this town.
+- **Knowing the way is a `knows.home.<id>` tag on the character.** The person tells you
+  if they are friendly. Otherwise you ask around, taking 10 on Diplomacy against DC 10
+  for 1d4 hours of the world's clock. A character who cannot manage that is told who
+  might say.
+- **The house is founded once, owned by them, off a street:** "the house of the woman
+  selling bread", or "Maren's house" once her name is known. From then on their day's
+  "home" is that house (`residency.resolve` reads what they hold).
+- **The knock:**
+  - out: "Nobody answers", and a neighbour says where they are;
+  - home by day or evening: the door opens to anybody indifferent or better;
+  - between midnight and six: they are woken, which costs 3 regard, and only a friend
+    opens.
+
+  The party walks in, or stands in the street. `travel` straight to their house knocks
+  first.
+
+Not built: forced entry, knocking at a house the world wrote (keepers and world
+characters keep no home yet), and a door that stays open to a friend once earned
+(Stardew's "permanently unlocked").

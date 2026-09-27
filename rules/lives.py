@@ -185,11 +185,14 @@ def occupation_for(phrase: str) -> dict | None:
     """The work a described phrase names outright — "the smith", "a fishwife" — or None."""
     words = f" {str(phrase or '').lower()} "
     best = None
+    # A word for WHAT they sell beats a word for selling: "bread seller" is a baker, and
+    # "seller" alone is a stallholder (live, 2026-09-27).
     for occ in tables()["occupations"]:
         for m in occ.get("match") or ():
             if f" {m} " in words or f" {m}s " in words or f" {m}'s " in words:
-                if best is None or len(m) > best[0]:
-                    best = (len(m), occ)
+                rank = (m not in _GENERIC_TRADE, len(m))
+                if best is None or rank > best[0]:
+                    best = (rank, occ)
     if best is not None:
         return best[1]
     # Then word by word, stemmed as the finder stems them (`population._stem`). Measured
@@ -202,9 +205,14 @@ def occupation_for(phrase: str) -> dict | None:
     for occ in tables()["occupations"]:
         for m in occ.get("match") or ():
             if " " not in m and _stem(m) in stems:
-                if best is None or len(m) > best[0]:
-                    best = (len(m), occ)
+                rank = (m not in _GENERIC_TRADE, len(m))
+                if best is None or rank > best[0]:
+                    best = (rank, occ)
     return best[1] if best else None
+
+
+_GENERIC_TRADE = frozenset({"seller", "vendor", "hawker", "trader", "dealer", "worker",
+                            "workman"})
 
 
 def roll(seed: str, *, phrase: str = "", body: str = "", used_frames=()) -> Life:

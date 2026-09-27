@@ -488,6 +488,9 @@ class GMAgent:
                 # GM only described. Runs once there is certainly nobody to fight, so it
                 # cannot steal a turn from `fill_obvious_targets`.
                 raw = judgement.inject_fight(raw, player_input, self.engine.scene)
+                # Somebody's house: the engine's knock, in place of a walk into a
+                # place that is not one yet (docs/the-population.md, calling on people).
+                raw = judgement.inject_call_on(raw, player_input, self.engine.scene)
                 raw = judgement.inject_company(raw, player_input,
                                                self.engine.scene, self.world)
                 # Speech last, because it competes with nothing: "I tell the smith I

@@ -440,6 +440,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # falls and a roll on their temper decides whether they come to blows
     # (rules/provocation.py). Nobody rolls to land an insult; the roll is the response.
     "provoke": ((), ("how",), "hidden"),
+    # The player goes to somebody's home and knocks (docs/the-population.md, "calling on
+    # people"). `who` is a ref or the words the player used; `visit` false only asks where
+    # they live. The engine decides whether the party knows the way, whether anybody is
+    # in, and whether the door opens — from the person's day and their regard.
+    "call_on": (("who",), ("visit",), "hidden"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     # Something changes hands. One op rather than four, because picking a thing up,
     # being handed it, buying it and dropping it are the same event with different ends
@@ -1122,6 +1127,13 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                     "schema", index)
             p["template"] = raw_t
+
+    elif op == "call_on":
+        p["who"] = " ".join(str(p["who"] or "").replace("_", " ").split())[:80]
+        if not p["who"]:
+            raise IntentError("call_on: who is the person whose home the party goes to",
+                              "schema", index)
+        p["visit"] = str(p.get("visit", True)).strip().lower() not in ("false", "0", "no")
 
     elif op == "provoke":
         # Read, not refused: anything that is not a slight is an insult.

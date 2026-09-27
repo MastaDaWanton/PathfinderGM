@@ -134,6 +134,21 @@ SCRIPTS = {
         "I go to the market and look for the bread seller.",
         "I greet her by name.",
     ],
+    # Shop hours and calling on people (docs/the-population.md): a counter shut at night,
+    # a person gone home, asked after, and knocked on.
+    "calling": [
+        "I find somebody selling bread and ask what a loaf costs.",
+        "I buy a loaf from her and ask her name.",
+        "I walk over to the well.",
+        "I wait at the well until late in the evening.",
+        "I ask around where the bread seller lives.",
+        "I go to her house.",
+        "I thank her, say goodnight and leave.",
+        "I go to the market.",
+        "I try to buy a coil of rope.",
+        "I find somewhere to sleep until morning.",
+        "I go to the market and buy a coil of rope.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",

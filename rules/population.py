@@ -326,6 +326,7 @@ NONE = "none"
 # none of them is not ruled out by the player's — the prose's "someone mending nets" is
 # who "the woman mending nets" means — but a record that says another one is.
 _GENDERED = frozenset({"woman", "man", "boy", "girl"})
+_SELLS = frozenset({"baker", "butcher", "brewer", "stallholder", "merchant", "peddler"})
 
 # Words that are somebody, for `names_a_person`: kin and the generic nouns a description
 # is built on. Only asked of a phrase that opens with a possessive, where "her husband" is
@@ -447,6 +448,11 @@ def _bag(rec: dict, scene) -> set[str]:
     bag = set()
     for text in said:
         bag.update(_tokens(text))
+    # Anybody whose trade is selling answers to "seller": measured live 2026-09-27, "the
+    # bread seller" read "seller" as a stallholder's word and missed the baker the prose
+    # had written as "somebody selling bread".
+    if life.get("work") in _SELLS:
+        bag.add("sell")
     if life.get("work"):
         bag.add(f"work:{life['work']}")
     for tok in list(bag):
