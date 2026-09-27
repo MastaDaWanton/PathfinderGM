@@ -149,6 +149,22 @@ SCRIPTS = {
         "I find somewhere to sleep until morning.",
         "I go to the market and buy a coil of rope.",
     ],
+    # The still-not-built list (docs/the-population.md): a knock in the small hours, a
+    # lock picked, a door forced, a shut counter, and a purchase opening the counter.
+    "homes": [
+        "I find somebody selling bread and ask what a loaf costs.",
+        "I ask her name.",
+        "I walk over to the well.",
+        "I wait at the well until two in the morning.",
+        "I ask around where the bread seller lives.",
+        "I go to her house.",
+        "I pick the lock on her door.",
+        "I kick in her door.",
+        "I go to the market.",
+        "I try to buy a coil of rope.",
+        "I find somewhere to sleep until morning.",
+        "I go to the market and buy a coil of rope.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",

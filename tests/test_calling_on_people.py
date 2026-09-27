@@ -167,8 +167,8 @@ def test_her_is_the_one_whose_home_was_just_asked_after():
     other["last_met"] = rec["last_met"]
     other["last_seen"] = s.clock_minutes + 5
     _call(e, who="woman selling bread", visit=False)
-    got, _ = e._person_called_on("her")
-    assert got["id"] == rec["id"]
+    got = e._callee("her")
+    assert got["key"] == rec["id"]
 
 
 def test_waiting_until_a_named_hour_waits_until_it():

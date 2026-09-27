@@ -6720,6 +6720,9 @@ def inject_call_on(raw_intents, player_text: str, scene) -> list:
     tried — a `travel` to a house that is not a place yet, or a `found` of one."""
     if not isinstance(raw_intents, list) or scene is None or scene.in_encounter:
         return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "break_in"
+           for r in raw_intents):
+        return raw_intents
     theirs = [r for r in raw_intents if isinstance(r, dict)
               and str(r.get("op", "")).lower() == "call_on"]
     if theirs:
@@ -6796,3 +6799,63 @@ def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
         return raw_intents
     return [r for r in raw_intents
             if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "buy")]
+
+
+# --- breaking in ------------------------------------------------------------------------------
+#
+# The player's words for forcing a way into a house, read in code as `call_on` is: the
+# engine's `break_in` rolls the player's own Strength or Disable Device and decides who
+# heard (docs/the-population.md, "Built: the still-not-built list").
+_WHOSE = r"(?:(?:the\s+)?(?P<who>[a-z][a-z' -]{1,50}?)(?:'s|s')\s+|(?P<pron>her|his|their)\s+|the\s+)"
+_BREAKS_IN = (
+    # The specific first: "the lock on her door" says whose before "the lock" says none.
+    (re.compile(r"\b(?:pick|picks)\s+(?:the\s+)?lock\s+(?:on|of)\s+" + _WHOSE
+                + r"(?:door|house|home)\b", re.I), "pick"),
+    (re.compile(r"\b(?:pick|picks|jimmy|jimmies)\s+" + _WHOSE + r"(?:door\s+)?lock\b", re.I),
+     "pick"),
+    (re.compile(r"\b(?:sneak|slip|creep)\s+into\s+" + _WHOSE + r"(?:house|home)\b", re.I),
+     "pick"),
+    (re.compile(r"\b(?:break|breaks|kick|kicks|force|forces|smash|smashes|batter|shoulder)"
+                r"\s+(?:down\s+|in\s+|open\s+)?" + _WHOSE + r"(?:front\s+)?door\b", re.I),
+     "force"),
+    (re.compile(r"\b(?:break|breaks)\s+into\s+" + _WHOSE + r"(?:house|home|cottage)\b", re.I),
+     "force"),
+)
+
+
+def breaks_in(player_text: str) -> tuple[str, str]:
+    """(whose house, "force" or "pick") the player is breaking into — ("", "") for none.
+    `who` is "" for the house off the street the party stands in ("I kick the door in")."""
+    text = speech.blanked(str(player_text or ""))
+    for pattern, how in _BREAKS_IN:
+        m = pattern.search(text)
+        if m:
+            who = (m.group("who") or m.group("pron") or "").strip()
+            if who.lower() in ("my", "our", "your", "the"):
+                who = ""
+            if re.search(r"\b(?:lockpick|pick\s+the\s+lock|pick\s+its\s+lock)\b", text, re.I):
+                how = "pick"
+            return who, how
+    return "", ""
+
+
+def inject_break_in(raw_intents, player_text: str, scene) -> list:
+    """The player forces a way into somebody's house: `break_in`, in place of a walk
+    into it or a knock at it."""
+    if not isinstance(raw_intents, list) or scene is None or scene.in_encounter:
+        return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "break_in"
+           for r in raw_intents):
+        return raw_intents
+    m = None
+    for pattern, _how in _BREAKS_IN:
+        m = m or pattern.search(speech.blanked(str(player_text or "")))
+    if m is None:
+        return raw_intents
+    who, how = breaks_in(player_text)
+    kept = [r for r in raw_intents if not (isinstance(r, dict) and str(
+        r.get("op", "")).lower() in ("travel", "call_on", "found", "check"))]
+    pc = scene.pc()
+    return kept + [{"op": "break_in", "actor": pc.ref if pc is not None else "pc",
+                    "because": "the player forced a way in",
+                    "params": {"who": who, "how": how}}]

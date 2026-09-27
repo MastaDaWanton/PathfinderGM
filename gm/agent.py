@@ -490,6 +490,8 @@ class GMAgent:
                 raw = judgement.inject_fight(raw, player_input, self.engine.scene)
                 # Somebody's house: the engine's knock, in place of a walk into a
                 # place that is not one yet (docs/the-population.md, calling on people).
+                # Breaking in first: "I break into her house" is not a knock.
+                raw = judgement.inject_break_in(raw, player_input, self.engine.scene)
                 raw = judgement.inject_call_on(raw, player_input, self.engine.scene)
                 # A declared purchase is made on the counter's screen, which the turn
                 # opens with the thing picked (play/views.py, `_trade_offer`).

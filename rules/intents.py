@@ -445,6 +445,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # they live. The engine decides whether the party knows the way, whether anybody is
     # in, and whether the door opens — from the person's day and their regard.
     "call_on": (("who",), ("visit",), "hidden"),
+    # Forcing a house door or picking its lock (PF1e: Strength against the door's break
+    # DC, Disable Device against the lock). `who` is whose house, or empty for the one
+    # house off the street the party stands in; `how` is "force" or "pick". The player
+    # rolls; the engine decides who heard.
+    "break_in": ((), ("who", "how"), "player"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     # Something changes hands. One op rather than four, because picking a thing up,
     # being handed it, buying it and dropping it are the same event with different ends
@@ -1134,6 +1139,11 @@ def _check_params(intent: Intent, index: int) -> None:
             raise IntentError("call_on: who is the person whose home the party goes to",
                               "schema", index)
         p["visit"] = str(p.get("visit", True)).strip().lower() not in ("false", "0", "no")
+
+    elif op == "break_in":
+        p["who"] = " ".join(str(p.get("who") or "").replace("_", " ").split())[:80]
+        p["how"] = "pick" if str(p.get("how") or "").strip().lower().startswith(
+            ("pick", "lock")) else "force"
 
     elif op == "provoke":
         # Read, not refused: anything that is not a slight is an insult.
