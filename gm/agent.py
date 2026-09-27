@@ -1157,6 +1157,10 @@ class GMAgent:
                                f"and wrote the world's answer")
         if risen:
             repairs.append(f"the dead stayed dead: cut {len(risen)} sentence(s)")
+        # A door the dice held, opened anyway after the rewrite: cut from the opening on.
+        text, forced = narration_mod.hold_the_door(text, getattr(self, "doors", None))
+        if forced:
+            repairs.append("the door stayed shut: cut the beat from where the prose opened it")
         text, leaked = narration_mod.strip_leaked_options(text)
         if leaked:
             repairs.append(f"option menu leaked into prose: cut {len(leaked)} "

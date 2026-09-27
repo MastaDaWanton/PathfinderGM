@@ -274,3 +274,19 @@ def test_the_outcome_written_into_a_break_in_is_ignored_not_refused():
 
     got = parse_all([{"op": "break_in", "params": {"how": "force", "success": True}}])
     assert got[0].params.get("how") == "force" and "success" not in got[0].params
+
+
+def test_when_the_rewrite_fails_the_door_still_stays_shut():
+    """Live: the held-door rewrite was asked for and the model kept "the metal yields to
+    your touch with a satisfying, hollow click" — the beat shipped unrepaired. The cut is
+    the backstop, as it is for the dead and for false claims."""
+    from gm import narration
+
+    beat = ("You kneel at the door in the grey light. The lock is a simple, rusted thing, "
+            "and the metal yields to your touch with a hollow click. Inside, the air is "
+            "heavy and sweet.")
+    text, cut = narration.hold_the_door(beat, [{"opened": False, "how": "pick"}])
+    assert cut and "Inside" not in text and "yields" not in text
+    assert text.startswith("You kneel at the door") and "door stays shut" in text
+    same, none = narration.hold_the_door(beat, [{"opened": True, "how": "pick"}])
+    assert same == beat and not none

@@ -4125,3 +4125,24 @@ def opens_a_held_door(text: str) -> list[str]:
                 and not _DOOR_HELD.search(sentence)):
             out.append(sentence.strip())
     return out
+
+
+def hold_the_door(text: str, doors) -> tuple[str, list[str]]:
+    """The backstop under the held-door rewrite: when the engine held a door shut and
+    the prose still opens it, the beat is cut from the first sentence that opens it —
+    everything after is the house the party never entered — and ends on the door
+    staying shut. Measured live 2026-09-27: the rewrite was asked for and the 12B model
+    kept "the metal yields to your touch" three times over."""
+    held = [d for d in (doors or []) if not d.get("opened")]
+    if not held or any(d.get("opened") for d in (doors or [])):
+        return text, []
+    gave = opens_a_held_door(text)
+    if not gave:
+        return text, []
+    at = (text or "").find(gave[0])
+    if at < 0:
+        return text, []
+    ending = ("The lock does not give, and the door stays shut." if held[0].get("how") == "pick"
+              else "The door shudders in its frame and stays shut.")
+    kept = text[:at].rstrip()
+    return (f"{kept} {ending} What do you do?".strip(), gave)
