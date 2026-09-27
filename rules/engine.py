@@ -1796,6 +1796,11 @@ class Engine:
         for intent in intents:
             intent.origin = str(origin or "")
             intent.origin_name = str(origin_name or "")
+        # A place the plan founds, then goes to: the founding first. Measured live
+        # 2026-09-26, a plan wrote `travel` to "the tavern" BEFORE the `found` that made
+        # it — the list resolves in order, so the walk went looking for a place that did
+        # not exist yet. Put right mechanically rather than refused: the plan said both.
+        intents = _found_before_travel(intents)
         # Refs an earlier intent in this same list will have created by the time a later
         # one runs. Without this, "two bravos step out of the dark and I fight them" is
         # impossible to express: the whole list is validated before any of it runs, so a
@@ -1808,6 +1813,11 @@ class Engine:
         from .intents import INTRODUCED_REFS
 
         introduced: set[str] = set()
+        # The places a `found` earlier in this list will have made by the time a later
+        # `travel` runs — the `spawn` projection, for places. Without it "I look for a
+        # tavern where the dockhands drink" could not become "found it, and walk in" in
+        # one plan: validation refused the travel to a place that did not exist yet.
+        self._planned_places: set[str] = set()
         for i, intent in enumerate(intents):
             self._check_refs(intent, i, extra=pending | introduced)
             self._check_legality(intent, i)
@@ -1833,6 +1843,9 @@ class Engine:
                 # param the op table does not list.
                 intent.params["placeholders"] = list(INTRODUCED_REFS[start:start + n])
                 introduced |= set(INTRODUCED_REFS[start:start + n])
+            if intent.op == "found" and intent.params.get("name"):
+                self._planned_places.add(_place_key(intent.params["name"]))
+        self._planned_places = set()
         return intents
 
     def _projected_refs(self, intents: list[Intent]) -> set[str]:
@@ -2104,10 +2117,17 @@ class Engine:
                 terrain = self._terrain_hint(self.world.get(self.scene.location_id)) or ""
                 if terrain:
                     outside = places_mod.region_set(self.scene.location_id, terrain)
-            if known and places_mod.find(known, str(intent.params["place"])) is None                     and places_mod.find(outside, str(intent.params["place"])) is None:
+            planned = _place_key(intent.params["place"]) in getattr(self, "_planned_places", ())
+            if known and not planned \
+                    and places_mod.find(known, str(intent.params["place"])) is None \
+                    and places_mod.find(outside, str(intent.params["place"])) is None:
                 raise IntentError(
                     f"travel: there is no {intent.params['place']!r} here. Name one of: "
-                    f"{', '.join(p.name for p in known)}.", "schema")
+                    f"{', '.join(p.name for p in known)} — or, if the scene goes somewhere "
+                    f"new that a place like this would have, found it first in the same "
+                    f"plan: {{\"op\": \"found\", \"params\": {{\"name\": "
+                    f"{intent.params['place']!r}, \"kind\": \"tavern\"}}}} (kind: what it "
+                    f"is), then travel to it.", "schema")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
             if trouble:
@@ -9898,6 +9918,25 @@ def _and_then(names) -> str:
     if len(got) <= 1:
         return got[0] if got else ""
     return ", ".join(got[:-1]) + f" and {got[-1]}"
+
+
+def _place_key(name) -> str:
+    """A place's name as a plan's two ops compare it: "The Tarred Rope" is "tarred rope"."""
+    text = " ".join(str(name or "").lower().split())
+    return text[4:] if text.startswith("the ") else text
+
+
+def _found_before_travel(intents: list) -> list:
+    """Every `found` moved ahead of the first `travel` to the place it makes."""
+    out = list(intents)
+    for found in [i for i in out if i.op == "found" and i.params.get("name")]:
+        key = _place_key(found.params["name"])
+        walk = next((k for k, i in enumerate(out) if i.op == "travel"
+                     and _place_key(i.params.get("place")) == key), None)
+        if walk is not None and walk < out.index(found):
+            out.remove(found)
+            out.insert(walk, found)
+    return out
 
 
 def _rename_refs(raw: dict, names: dict) -> dict:

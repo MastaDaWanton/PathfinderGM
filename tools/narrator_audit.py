@@ -99,6 +99,23 @@ SCRIPTS = {
         "I stay where I am and smile at him.",
         "I tell him I am still waiting.",
     ],
+    # Every line goes looking for a place the settlement may not list yet: the places
+    # door (docs/declared-not-guessed.md). Does the PLAN found it and go there, does the
+    # prose door found it afterwards, or does nothing get made? The user's ruling: the
+    # mechanism is free, but places must keep being created for travel, questing and
+    # discovery (2026-09-25).
+    "discover": [
+        "I ask where the dockhands drink, and go there.",
+        "I look for somewhere that sells rope and lamp oil.",
+        "I find a quiet shrine and sit a while.",
+        "I head for the stables to ask about a horse.",
+        "I look for a pawnbroker who asks no questions.",
+        "I ask around for the best cook in town and go to where they work.",
+        "I go looking for the bathhouse.",
+        "I look for a bookseller.",
+        "I find a back alley where nobody will see me count my coin.",
+        "I head out of town to wherever the charcoal burners work.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",
