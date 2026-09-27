@@ -119,3 +119,15 @@ def test_the_schema_asks_for_a_declared_op_as_a_required_key():
     kept = GMAgent._merge_declared([{"op": "travel", "params": {"place": "the well"}}],
                                    {"travel": {"params": {"place": "the market"}}})
     assert len(kept) == 1 and kept[0]["params"]["place"] == "the well"
+
+
+def test_a_declared_introduce_comes_before_whatever_addresses_them():
+    """Live: appended last, the model's own `say` to new1 came before the introduce that
+    makes new1; every attempt was refused and the turn fell back to narrate_only."""
+    from gm.agent import GMAgent
+
+    merged = GMAgent._merge_declared(
+        [{"op": "narrate_only"}, {"op": "say", "params": {"words": "hi", "to": "new1"}}],
+        {"introduce": {"params": {"who": "a baker", "how": "already_here"}},
+         "travel": {"params": {"place": "the market"}}})
+    assert [r["op"] for r in merged] == ["travel", "introduce", "narrate_only", "say"]

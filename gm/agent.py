@@ -328,6 +328,19 @@ class GMAgent:
             self.reading["ops"] = by_reading
             self.reading["detectors"] = list(declared)
             declared = list(dict.fromkeys([*declared, *by_reading]))
+            # Where the reading says the named place is the one the party stands in, no
+            # walk is owed. Measured live 2026-09-27: at the market already, "I go to the
+            # market and buy a coil of rope" had a detector require `travel`, and with a
+            # travel's place held to the OTHER places here the model had to leave — it
+            # walked to the merchants row.
+            from rules import places as places_mod
+
+            here_named = [a for a in self.reading.get("actions") or []
+                          if a.get("act") in ("go", "leave") and a.get("place")
+                          and getattr(places_mod.find(self.engine.places(), a["place"]),
+                                      "id", None) == self.engine.scene.at]
+            if here_named and "travel" not in by_reading:
+                declared = [op for op in declared if op != "travel"]
 
         from play import modelcfg
 
@@ -1837,6 +1850,14 @@ class GMAgent:
                 entry["target"] = body["target"]
             if op in ("travel", "journey"):
                 raw.insert(0, entry)
+            elif op == "introduce":
+                # Before anything that addresses the person it brings in (new1…), and
+                # after the walk. Measured live 2026-09-27: appended last, the model's
+                # own `say` to new1 came before the introduce that makes new1, every
+                # attempt was refused, and the turn fell back to narrate_only.
+                at = next((k for k, r in enumerate(raw) if isinstance(r, dict) and str(
+                    r.get("op", "")).lower() not in ("travel", "journey")), len(raw))
+                raw.insert(at, entry)
             else:
                 raw.append(entry)
         return raw
