@@ -238,3 +238,39 @@ struck. The prose built the tension correctly and waited ("He doesn't lunge, but
 knuckles turn white"). Nothing in the world moved: no insult changed anyone's attitude,
 so the world has no route from provocation to violence, and the planner rarely takes the
 step unprompted. This is a question of world logic, put to the user rather than guessed.
+
+## Built: places by the plan (2026-09-26)
+
+The fifth door, under the user's ruling that the mechanism is free and the outcome is
+not: places must keep being created for travel, questing and discovery, and the prose
+door stays alongside the planner's `found`.
+
+- **A plan can found a place and walk into it in the same turn.** Validation checked
+  the whole list before any of it ran, so "found The Tarred Rope, travel there" was
+  refused because the place did not exist yet. It now projects the places earlier
+  `found` intents will make, as `spawn` projects refs. A `travel` written before its own
+  `found` has the `found` moved ahead of it.
+- **A travel to an unknown place is refused with the fix named**: "found it first in
+  the same plan", with the op spelled out. In the live runs this refusal taught the
+  planner every place it founded: the first attempt was refused, and the retry founded
+  and walked in.
+- **A building hangs off the street.** A settlement kind founded from inside a building
+  goes off the nearest place under the sky, up the chain or out through the interior's
+  first exit. Live, before this: "the stables is a place now, off the shrine".
+- **An empty travel takes the place the player named**, when the sentence names exactly
+  one settlement kind. Live, twice: "I go looking for the bathhouse" became a travel to
+  nowhere and "Nobody moves: where to?".
+
+**Live, gemma-4-12B, `narrator_audit.py --script discover` (ten places to look for):**
+
+| | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| places the plan founded | 4 | 3 | 3 |
+| places the prose door founded | 0 | 0 | 0 |
+| a building founded inside another | 1 (stables off the shrine) | 0 | 0 |
+| travels to nowhere | 2 | 2 | 0 |
+
+The replay corpus now counts `plans founding a place`.
+
+Seen and not fixed: a plan that introduced a bookseller and then walked the party to the
+guildhall, leaving him behind. That is the planner's coherence, not a door.

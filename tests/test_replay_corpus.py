@@ -78,9 +78,16 @@ def measure(tmp_path) -> dict:
                 if call["role"] == "plan_turn":
                     plans += 1
                     try:
-                        json.loads(call["raw"])
+                        plan = json.loads(call["raw"])
                     except ValueError:
                         bad_plan_json += 1
+                        continue
+                    # The user's ruling on places (2026-09-25): the mechanism is free, but
+                    # places must keep being created — so the corpus counts the plans
+                    # that found one (docs/declared-not-guessed.md, the places door).
+                    firings["plans founding a place"] += int(any(
+                        isinstance(i, dict) and i.get("op") == "found"
+                        for i in (plan.get("intents") or []) if isinstance(plan, dict)))
                     continue
                 if call["role"] not in PROSE_ROLES:
                     continue

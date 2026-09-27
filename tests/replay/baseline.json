@@ -1,6 +1,6 @@
 {
- "drafts": 131,
- "plans": 129,
+ "drafts": 142,
+ "plans": 143,
  "bad_plan_json": 0,
  "faults": {
   "invented-name": 5,
@@ -8,16 +8,17 @@
  },
  "firings": {
   "attacked_by named": 0,
-  "drafts with speech": 43,
-  "hailed_by": 13,
+  "drafts with speech": 48,
+  "hailed_by": 14,
   "introductions": 0,
   "life rolls that fell back": 0,
-  "lines tagged": 38,
-  "note_cast booked": 61,
-  "population noted": 52,
-  "quoted lines": 128,
-  "stands_elsewhere": 5,
-  "tags naming nobody here": 25,
+  "lines tagged": 40,
+  "note_cast booked": 76,
+  "plans founding a place": 3,
+  "population noted": 62,
+  "quoted lines": 139,
+  "stands_elsewhere": 12,
+  "tags naming nobody here": 31,
   "unname_strangers struck": 7
  }
 }
