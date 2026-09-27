@@ -382,6 +382,30 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     return kept, dropped
 
 
+def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
+    """(the plan's intents, the gives dropped). A `give` to the player that no act of the
+    reading asked for is the model conjuring: goods are open (rules/goods.py), so a give
+    makes whatever it names. Measured live 2026-09-27 on the fight script, both with and
+    without the interpreter: "Kesst Vayr takes fight", "takes table", "takes c3" — for
+    "I pick a fight", "I throw him over a table". Only with a reading to judge by, and
+    only gives to the player; a give the player makes to somebody else is left alone."""
+    if not isinstance(raw, list) or not frame or frame.get("error"):
+        return (raw if isinstance(raw, list) else []), []
+    acts = {a.get("act") for a in frame.get("actions") or []}
+    if acts & {"give", "take", "buy", "steal", "gather", "sell"}:
+        return raw, []
+    kept, dropped = [], []
+    for r in raw:
+        p = (r.get("params") or {}) if isinstance(r, dict) else {}
+        to = str(p.get("to") or "").lower()
+        if (isinstance(r, dict) and str(r.get("op", "")).lower() == "give"
+                and (to in ("pc", "you", "player") or not p.get("from_") and not to)):
+            dropped.append(str(p.get("item") or ""))
+            continue
+        kept.append(r)
+    return kept, dropped
+
+
 def brief_lines(frame: dict | None) -> str:
     """What the planner is told the player's words say, in order, as fact."""
     if not frame:

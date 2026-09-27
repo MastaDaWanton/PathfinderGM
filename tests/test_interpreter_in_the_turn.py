@@ -141,3 +141,17 @@ def test_the_reading_overrules_a_detector_it_contradicts():
         {"actions": [{"act": "go", "place": "the market"},
                      {"act": "buy", "object": "a dragon's egg"}]})
     assert kept == ["travel", "check"] and dropped == ["give"]
+
+
+def test_a_give_nobody_asked_for_is_not_made():
+    """Live, the fight script with and without the interpreter: "Kesst Vayr takes fight",
+    "takes table", "takes c3". Goods are open, so a give conjures what it names."""
+    raw, dropped = interpret.drop_unread_gifts(
+        [{"op": "attack"}, {"op": "give", "params": {"item": "fight", "to": "pc"}},
+         {"op": "give", "params": {"item": "c3"}}],
+        {"actions": [{"act": "insult", "target": "the biggest man"}]})
+    assert [r["op"] for r in raw] == ["attack"] and dropped == ["fight", "c3"]
+    kept, none = interpret.drop_unread_gifts(
+        [{"op": "give", "params": {"item": "a copper", "to": "c2", "from_": "pc"}}],
+        {"actions": [{"act": "give", "target": "the beggar", "object": "a copper"}]})
+    assert len(kept) == 1 and not none

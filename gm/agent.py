@@ -436,6 +436,11 @@ class GMAgent:
                 # for as required keys because Ollama does not enforce `contains`
                 # (`prompts.turn_schema`): merged in where the list left them out.
                 raw = self._merge_declared(raw, data.get("declared"))
+                # A give to the player that the reading never asked for is conjuring.
+                raw, conjured = interpret.drop_unread_gifts(
+                    raw, self.reading if isinstance(self.reading, dict) else None)
+                if conjured:
+                    self.reading.setdefault("dropped_gifts", []).extend(conjured)
                 # First, because everything downstream reads the shapes this
                 # straightens: a target pocketed in params is invisible to the misaim
                 # check, and an invented param is a schema refusal five lines later.

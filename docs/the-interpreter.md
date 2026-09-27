@@ -152,3 +152,76 @@ Additive, as the research advised: keep the fast word-detectors as a second opin
 - **What is logged:** the reading, the ops it grounded, and the detectors' ops, per turn
   (`turn_log` "turn" entries, `reading`).
 - **Off in the test suite,** as the written opening is (`interpret.ENABLED`).
+
+## Found on the way: Ollama does not enforce `contains`
+
+Measured 2026-09-27 against the local model, with a prompt that invited the wrong op:
+
+| Construct | Replies holding the required op |
+|---|---|
+| `allOf` of `contains` (what `turn_schema` used for `must_contain`) | 0 of 6 |
+| `prefixItems` | 0 of 6 |
+| a required object property | 6 of 6 |
+
+So every declarer's "the reply is unsamplable without one" had only ever been a hint the
+model could ignore, and it did: "I go to the market and buy a coil of rope" planned no
+walk twice, with the requirement in place.
+
+The ops the player's words commit the turn to are now also required keys of a
+`declared` object in the reply (`prompts._declared_op`), merged into the intents where
+missing (`GMAgent._merge_declared`):
+
+- a travel goes first, its place held by an enum to the names of this town's real
+  places;
+- an introduce goes next, before anything that addresses the person it brings in;
+- everything else goes after.
+
+**Two defects the first live run of it found, both fixed:**
+
+- **Wrong order:** appended last, a declared introduce followed the model's own `say` to
+  new1, every attempt was refused, and the turn fell back to `narrate_only`.
+- **A walk owed to where the party stands:** at the market already, a detector's
+  `travel` forced the model to walk elsewhere, because the place was held to the other
+  places. Where the reading says the named place is the party's own, that `travel` is
+  dropped.
+
+**Where the two disagree:** a detector's op stands only when an act of the reading
+supports it (`interpret.supported`). The overruled op is logged. Live, a detector
+required `give` for "I buy a dragon's egg".
+
+**Latency:** readings took 2 to 3 s on most turns and 16 to 20 s on a few. The model is
+the same for every role and `num_ctx` is fixed, so this is not a reload. The likeliest
+cause is queueing behind the app's background calls between turns (the watcher); it is
+not yet measured.
+
+## The live battery (2026-09-27, gemma-4-12B, 60 turns across five scripts, the reading on)
+
+| Script | Turns clean |
+|---|---|
+| calling | 12 of 12 |
+| homes | 12 of 12 |
+| buying | 11 of 12 |
+| provoke | 10 of 12 |
+| fight | 4 of 12 |
+
+- **No reading failed.** Median time 3.1 s, p90 19.7 s: the spikes are the queueing
+  noted above.
+- **The reading overruled 7 detector ops, all wrong.** The goods detector reads "pick"
+  as picking something up, and required a `give` for "I pick the lock on her door" and
+  "I pick a fight with the biggest man in the room". It also required one for "I buy a
+  dragon's egg".
+- **The reading added ops no detector found:**
+  - `provoke` on four insults ("call him a coward", "tell his friends he cried", "tell
+    the barkeep he smells", "tell the room he is all talk");
+  - `break_in` on both break-ins, and `call_on`;
+  - `say` on the questions asked.
+- **The fight script's 8 "third-person-pc" turns are not the reading's doing,** as far
+  as two runs can show. The control with the reading off had 2 of 12. Every flagged
+  sentence in both is the enemy-turn narration giving the character's name to the enemy
+  ("Kesst Vayr with the marked knuckles lets out a low, guttural growl", reading off),
+  which is written after the plan and never sees the reading. The plans of the two runs
+  were near identical. The ON run grappled, and every enemy turn after it repeated the
+  confusion. Flagged as its own task.
+- **Conjured gifts:** both fight runs, with and without the reading, had the model's own
+  `give` conjure things ("Kesst Vayr takes fight", "takes table"). With a reading, a give
+  to the player that no act asked for is now dropped (`interpret.drop_unread_gifts`).
