@@ -46,7 +46,8 @@ from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import Actor
 from .tables import (
     CONDITIONS,
-    ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, normalise_damage_type,
+    ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, maneuver_text,
+    normalise_damage_type,
 )
 
 
@@ -4147,10 +4148,22 @@ class Engine:
         extra_rolls: list[Roll] = []
 
         if verdict == "success":
+            # Every sentence of the table is rendered by name, never spliced: the table
+            # was written "you drag the target 5 feet", and on a creature's turn that
+            # "you" was the creature while the narrator is told "you" is the player
+            # (see `maneuver_text`). The player's own become "you" downstream, through
+            # `narration.pc_to_second_person`, like every other tell. The lead was
+            # `name + "s"` too, which wrote "bull rushs" and, once that rule ran, "you
+            # trips"; each manoeuvre now says its own verb.
+            def say(template: str, capital: bool = True, **values) -> str:
+                return maneuver_text(template, actor.name, defender.name,
+                                     capital=capital, **values)
+
             bits.append(
-                f"{actor.name} {m['name']}s {defender.name}"
-                + (" automatically — it cannot resist" if automatic else f" by {margin}")
-                + ("." if m.get("damages_item") else f": {m['effect']}.")
+                say(m["lead"])
+                + (f" automatically, as {defender.name} cannot resist" if automatic
+                   else f" by {margin}")
+                + ("." if m.get("damages_item") else f": {say(m['effect'], False)}.")
             )
             if m.get("damages_item"):
                 # Sunder, Core Rulebook (aonprd.com, Rules: Sunder): "If your attack is
@@ -4224,21 +4237,21 @@ class Engine:
                                 "condition": "grappled", "from": m["name"]})
             for over, extra in sorted((m.get("degrees") or {}).items()):
                 if margin >= over:
-                    bits.append(extra.capitalize().rstrip(".") + ".")
+                    bits.append(say(extra).rstrip(".") + ".")
                     dc_cond = (m.get("degree_condition") or {}).get(over)
                     if dc_cond:
                         defender.add_condition(dc_cond, source=m["name"])
                         effects.append({"ref": defender.ref, "kind": "condition",
                                         "condition": dc_cond, "from": m["name"]})
             if m.get("per_5_over") and margin >= 5:
-                bits.append(f"{margin // 5} x {m['per_5_over']}.")
+                bits.append(say(m["per_5_over"], feet=margin // 5 * 5) + ".")
         else:
             bits.append(
                 f"{actor.name}'s {m['name']} fails against {defender.name} by {-margin}."
             )
             # Failing by 10 or more can turn the manoeuvre back on you.
             if m.get("backfire") and margin <= -10:
-                bits.append(m["backfire"].capitalize() + ".")
+                bits.append(maneuver_text(m["backfire"], actor.name, defender.name) + ".")
                 back = m.get("backfire_condition")
                 if back:
                     actor.add_condition(back, source=f"failed {m['name']}")

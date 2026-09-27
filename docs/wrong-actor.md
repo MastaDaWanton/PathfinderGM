@@ -124,10 +124,7 @@ tell's subject is "you"* — and on a creature's turn the subject is the creatur
 
 ## Not done, on purpose
 
-- **The maneuver tells** in `rules/tables.py` write their effect with "you" meaning the
-  *attacker* — "you drag the target 5 feet", "you are knocked prone instead". On a
-  creature's maneuver that "you" is the creature. No recorded run had a creature use a
-  maneuver, so it is flagged as its own task rather than changed blind.
+- ~~**The maneuver tells**~~ — done, 2026-09-27; see "The maneuver tells" below.
 - **The player's own consequence call** still shows tells naming the player in the third
   person. The same Inform move would likely help there too; it is unmeasured, so it is
   left alone.

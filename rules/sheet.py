@@ -28,7 +28,8 @@ from .tables import (
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
-    is_physical, iterative_attacks, material_for, normalise_damage_type, save_for,
+    is_physical, iterative_attacks, maneuver_text, material_for, normalise_damage_type,
+    save_for,
 )
 
 
@@ -3343,7 +3344,9 @@ def full_sheet(actor: Actor) -> dict:
         maneuvers.append({
             "name": m["name"],
             "cmb": _terms(actor.cmb_modifiers(key)),
-            "effect": m["effect"],
+            # The player's own sheet, so the player is "you" and the other is "the
+            # target"; the same template names both people in a tell.
+            "effect": maneuver_text(m["effect"], "you", "the target", you="actor"),
             "size_limit": m.get("size_limit"),
         })
 

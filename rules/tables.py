@@ -10,6 +10,8 @@ and that import brings its own attribution obligations with it.
 """
 from __future__ import annotations
 
+import re
+
 # --- Abilities ------------------------------------------------------------------
 
 ABILITIES = ("str", "dex", "con", "int", "wis", "cha")
@@ -589,29 +591,47 @@ SHIELDS: dict[str, dict] = {
 # against the target's CMD. Only the consequences differ.
 #
 # `size_limit` — the manoeuvre only works on a target at most one size category larger.
+# `lead`       — the success sentence's opening, before the margin.
 # `degrees`    — extra effects keyed on how far the roll exceeded CMD.
+# `per_5_over` — the extra distance per full 5 over, with `{feet}` the total extra.
 # `backfire`   — what happens to the attacker on failing by 10 or more.
+#
+# Every sentence here is a TEMPLATE, rendered by `maneuver_text`, never spliced raw. They
+# were written in the attacker's second person — "you drag the target 5 feet", "you are
+# knocked prone instead" — and the engine pasted them into the tell after the attacker's
+# name. On a creature's turn that "you" was the creature, while the narrator is told, and
+# every tell is rendered so, that "you" is the player: "the thug drags you by 3: you drag
+# the target 5 feet" (docs/wrong-actor.md, which found creature turns told the wrong way
+# round in 8 of 100 beats and left this as its own task). The shape is Inform 7's adaptive
+# text (Writing with Inform §14.3): "[The actor] [put] [the noun]" prints "You put…" or
+# "General Lee puts…" by who acted, so one sentence serves every viewpoint. Here
+# `{actor}` / `{target}` are the two people, `{actor's}` / `{target's}` their possessives,
+# and a `[verb]` is written in its "you" form and agrees with the nearest person before it.
+# A plain verb (grapple's "both gain") does not change.
 MANEUVERS: dict[str, dict] = {
     "bull rush": {
         "name": "bull rush",
         "size_limit": 1,
         "provokes": True,
-        "effect": "pushes the target back 5 feet",
-        "per_5_over": "another 5 feet",
+        "lead": "{actor} [charge] {target} in a bull rush",
+        "effect": "{actor} [push] {target} back 5 feet",
+        "per_5_over": "{target} [are] pushed another {feet} feet",
     },
     "disarm": {
         "name": "disarm",
         "provokes": True,
-        "effect": "the target drops one carried item",
-        "degrees": {10: "the target drops what it holds in both hands"},
-        "backfire": "you drop the weapon you were using",
+        "lead": "{actor} [disarm] {target}",
+        "effect": "{target} [drop] one carried item",
+        "degrees": {10: "{target} [drop] everything held in both hands"},
+        "backfire": "{actor} [drop] the weapon used for the disarm",
         "unarmed_penalty": -4,
     },
     "grapple": {
         "name": "grapple",
         "size_limit": None,
         "provokes": True,
-        "effect": "both of you gain the grappled condition",
+        "lead": "{actor} [grapple] {target}",
+        "effect": "{actor} and {target} both gain the grappled condition",
         "condition": "grappled",
         "also_grapples_attacker": True,
         "needs_two_hands": True,
@@ -620,24 +640,27 @@ MANEUVERS: dict[str, dict] = {
         "name": "overrun",
         "size_limit": 1,
         "provokes": True,
-        "effect": "you move through the target's space",
-        "degrees": {5: "and the target is knocked prone"},
+        "lead": "{actor} [overrun] {target}",
+        "effect": "{actor} [move] through {target's} space",
+        "degrees": {5: "{target} [are] knocked prone"},
         "degree_condition": {5: "prone"},
         "extra_legs_penalty": True,
     },
     "sunder": {
         "name": "sunder",
         "provokes": True,
-        "effect": "you damage an item the target is holding or wearing",
+        "lead": "{actor} [land] a sunder on {target's} gear",
+        "effect": "{actor} [damage] an item {target} [are] holding or wearing",
         "damages_item": True,
     },
     "trip": {
         "name": "trip",
         "size_limit": 1,
         "provokes": True,
-        "effect": "the target is knocked prone",
+        "lead": "{actor} [trip] {target}",
+        "effect": "{target} [are] knocked prone",
         "condition": "prone",
-        "backfire": "you are knocked prone instead",
+        "backfire": "{actor} [are] knocked prone instead",
         "backfire_condition": "prone",
         "extra_legs_penalty": True,
     },
@@ -645,27 +668,86 @@ MANEUVERS: dict[str, dict] = {
         "name": "reposition",
         "size_limit": 1,
         "provokes": True,
-        "effect": "you move the target to another square within your reach",
+        "lead": "{actor} [reposition] {target}",
+        "effect": "{actor} [move] {target} to another square within reach",
     },
     "dirty trick": {
         "name": "dirty trick",
         "provokes": True,
-        "effect": "the target is blinded, dazzled, deafened, entangled, shaken or sickened for 1 round",
+        "lead": "{actor} [play] a dirty trick on {target}",
+        "effect": "{target} [are] blinded, dazzled, deafened, entangled, shaken or sickened for 1 round",
         "condition": "dazzled",
     },
     "steal": {
         "name": "steal",
         "provokes": True,
-        "effect": "you take an object the target is carrying",
+        "lead": "{actor} [steal] from {target}",
+        "effect": "{actor} [take] an object {target} [are] carrying",
     },
     "drag": {
         "name": "drag",
         "size_limit": 1,
         "provokes": True,
-        "effect": "you drag the target 5 feet",
-        "per_5_over": "another 5 feet",
+        "lead": "{actor} [drag] {target}",
+        "effect": "{target} [are] dragged 5 feet",
+        "per_5_over": "{target} [are] dragged another {feet} feet",
     },
 }
+
+# The "he/she/it" forms of the few verbs whose third person is not a plain +s/+es.
+_THIRD_PERSON = {"are": "is", "have": "has", "do": "does", "go": "goes"}
+
+
+def third_person(verb: str) -> str:
+    """"drag" -> "drags", "push" -> "pushes", "are" -> "is", "carry" -> "carries"."""
+    if verb in _THIRD_PERSON:
+        return _THIRD_PERSON[verb]
+    if re.search(r"(?:s|sh|ch|x|z|o)$", verb):
+        return verb + "es"
+    if re.search(r"[^aeiou]y$", verb):
+        return verb[:-1] + "ies"
+    return verb + "s"
+
+
+_MANEUVER_TOKEN = re.compile(r"\{(actor|target)('s)?\}|\[([a-z]+)\]")
+
+
+def maneuver_verbs(template: str) -> list[str]:
+    """Every `[verb]` a template conjugates — so a test can hold the second-person map
+    in `gm/narration.py` to all of them."""
+    return [m.group(3) for m in _MANEUVER_TOKEN.finditer(template) if m.group(3)]
+
+
+def maneuver_text(template: str, actor: str, target: str, you: str = "",
+                  capital: bool = True, **values) -> str:
+    """One `MANEUVERS` sentence, with its two people named and its verbs agreeing.
+
+    `you` names which of the two ("actor" or "target") is the reader — the character
+    sheet reads "you drag the target 5 feet". A tell passes nothing: tells name everyone
+    in the third person, and the player's own become "you" later, in one place, through
+    `narration.pc_to_second_person` — so there is one copy of that rule, not two. The
+    first letter is capitalised, because "the thug" opens sentences here — unless
+    `capital` is off, for a clause after a colon.
+    """
+    names = {"actor": actor, "target": target}
+    subject = ""
+
+    def fill(m: re.Match) -> str:
+        nonlocal subject
+        who, possessive, verb = m.group(1), m.group(2), m.group(3)
+        if verb:
+            return verb if you and subject == you else third_person(verb)
+        if possessive:
+            return "your" if who == you else names[who] + "'s"
+        subject = who
+        return "you" if who == you else names[who]
+
+    # Plain values ("{feet}") go in first, so a name is never read as a placeholder.
+    for key, value in values.items():
+        template = template.replace("{" + key + "}", str(value))
+    text = _MANEUVER_TOKEN.sub(fill, template)
+    return text[:1].upper() + text[1:] if capital else text
+
 
 MANEUVER_ALIASES = {
     "bullrush": "bull rush", "bull-rush": "bull rush", "push": "bull rush",
