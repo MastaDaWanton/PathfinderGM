@@ -1161,6 +1161,11 @@ class GMAgent:
         text, forced = narration_mod.hold_the_door(text, getattr(self, "doors", None))
         if forced:
             repairs.append("the door stayed shut: cut the beat from where the prose opened it")
+        # A purchase settled in the prose, after the rewrite: the handing-over is cut and
+        # the keeper showing the goods is kept (the screen is where the coin moves).
+        text, handed = narration_mod.keep_the_goods(text, getattr(self, "buying", ""))
+        if handed:
+            repairs.append(f"the sale waits for the screen: cut {len(handed)} sentence(s)")
         text, leaked = narration_mod.strip_leaked_options(text)
         if leaked:
             repairs.append(f"option menu leaked into prose: cut {len(leaked)} "
@@ -1355,6 +1360,8 @@ class GMAgent:
                 fire_context=fire_context,
                 # The doors this turn forced or picked, and whether they gave.
                 doors=getattr(self, "doors", None),
+                # The purchase the counter's screen opens for after this beat.
+                buying=getattr(self, "buying", ""),
                 # Where the party actually is, and what places exist here, so a beat
                 # set in a gate this town does not have is caught (items 45 and 38).
                 here=self._here_name(), places=self._place_names(),

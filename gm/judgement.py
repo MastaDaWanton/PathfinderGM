@@ -3808,6 +3808,10 @@ def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
         return raw_intents
     if not _WALKS_AWAY.search(str(player_text or "")):
         return raw_intents
+    # A question is not a departure: "Should I go to the market?" required a `travel`
+    # and would have walked the party there (found 2026-09-27 beside its sibling below).
+    if "?" in str(player_text or ""):
+        return raw_intents
     from rules import places as places_mod
 
     location = None
@@ -3824,6 +3828,51 @@ def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
                                  "because": "the player is leaving; say to where"}]
 
 
+def declare_going_to_a_place(raw_intents, player_text: str, scene, world=None) -> list:
+    """The player goes to a place this town has, by its name: the turn must carry a
+    `travel`, and the model says to where.
+
+    `declare_leaving`'s sibling, and a DECLARER for the same reason: nothing guesses the
+    place. Measured live 2026-09-27 (the `homes` and `calling` scripts): "I go to the
+    market and buy a coil of rope." was planned as one `narrate_only`, twice, and the
+    party stayed in the tavern — the counter the purchase then opened was the tavern's.
+    A movement verb with a real place's own name after it, and not the place the party
+    is standing in, is a declaration; the schema then insists on the op
+    (`turn_schema(must_contain=("travel",))`) and the model picks the destination from
+    the brief's list of places, which is the only thing it can choose.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if any(str((r or {}).get("op", "")).lower() == "travel" for r in raw_intents
+           if isinstance(r, dict)):
+        return raw_intents
+    text = redact_speech(str(player_text or ""))
+    m = _DEPARTS.search(text)
+    if not m or "?" in text:
+        return raw_intents
+    from rules import places as places_mod
+
+    location = None
+    if world is not None and getattr(scene, "location_id", None):
+        try:
+            location = world.get(scene.location_id)
+        except Exception:
+            location = None
+    known = places_mod.for_scene(location or getattr(scene, "location_id", None),
+                                 getattr(scene, "at", ""),
+                                 founded=getattr(scene, "founded", None))
+    after = text[m.end():].lower()
+    here = getattr(scene, "at", "")
+    for p in known:
+        if p.id == here:
+            continue
+        name = p.name.lower().removeprefix("the ").strip()
+        if len(name) >= 3 and re.search(r"\b" + re.escape(name) + r"\b", after):
+            return list(raw_intents) + [{"op": "travel",
+                                         "because": f"the player goes to {p.name}"}]
+    return raw_intents
+
+
 _DECLARERS = (
     # Before survival: "I drink my healing potion" is a jar, not a waterskin, and
     # the survival injector stands down when a `use_item` is already in the list.
@@ -3833,6 +3882,8 @@ _DECLARERS = (
     # present, so a leaving sentence that also names new ground still gets its one
     # travel from whichever declarer spoke first.
     ("leaving", lambda raw, text, scene, world: declare_leaving(raw, text, scene, world)),
+    ("going", lambda raw, text, scene, world: declare_going_to_a_place(raw, text, scene,
+                                                                        world)),
     # Sale before goods, the same order the live chain runs them in — and asking them in
     # the wrong order here is what surfaced the bug: "I sell the Yarow Elixir" came back
     # as both `give` and `sell`, which is one item leaving twice.
@@ -6797,8 +6848,16 @@ def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
     (the failure every tradition above avoids)."""
     if not isinstance(raw_intents, list) or not purchase_sought(player_text):
         return raw_intents
-    return [r for r in raw_intents
-            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "buy")]
+    # And a `give` to the player of what they set out to buy: live 2026-09-27, at a
+    # market shut for the night, "I buy a dragon's egg." came back with `give
+    # item="dragon's egg" to=pc` and the egg was in the pack for nothing.
+    def settles_it(r) -> bool:
+        if not isinstance(r, dict):
+            return False
+        op = str(r.get("op", "")).lower()
+        to = str((r.get("params") or {}).get("to") or "").lower()
+        return op == "buy" or (op == "give" and to in ("pc", "you", "player"))
+    return [r for r in raw_intents if not settles_it(r)]
 
 
 # --- breaking in ------------------------------------------------------------------------------

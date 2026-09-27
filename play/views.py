@@ -1916,6 +1916,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                 c.scene, recent=[b["text"] for b in c.transcript[-4:]],
                 player_text=player_input, tells=[o.tell for o in outcomes],
                 turn=len(c.transcript))
+        # The purchase the counter's screen opens for after this beat, if any: the review
+        # holds the prose to leaving it unsettled (narration.hands_over_goods).
+        # Every declared purchase, whether or not a counter opens: nothing is bought in
+        # the prose either way.
+        agent.buying = judgement.purchase_sought(player_input)
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
                 resolution.outcomes, player_input, brief, earlier,
@@ -2731,7 +2736,19 @@ def _buying_note(c, player_text: str) -> str:
     it and settles nothing — the screen is where the coin moves."""
     offer = _trade_offer(c, player_text)
     if not offer:
-        return ""
+        # A purchase that opens nothing sells nothing, and the beat says why. Live
+        # 2026-09-27, the market shut for the night: the prose invented a vendor, sold
+        # bread and torches, and finished "The transaction for the egg is complete".
+        want = judgement.purchase_sought(player_text)
+        if not want or c.scene.in_encounter:
+            return ""
+        from rules import keepers
+
+        why = (keepers.shut_here(c.scene)
+               or ("Nobody here keeps a counter." if _merchant_here(c.scene) is None
+                   else "The keeper here will not serve the player."))
+        return (f"The player tries to buy {want}, and nothing is sold: {why} Nobody "
+                f"hands anything over and no coin changes hands in the prose.")
     who = getattr(_merchant_here(c.scene), "name", "") or "the keeper"
     return (f"The player is buying {offer['want']}: the counter's own screen opens for it "
             f"after this beat. {who} comes to the counter and may show the goods and name "

@@ -184,3 +184,56 @@ def test_a_shut_counter_opens_nothing(at_the_market, monkeypatch):
     c.scene.clock_minutes = 23 * HOUR
     assert keepers.shut_here(c.scene) or views._merchant_here(c.scene) is None
     assert views._trade_offer(c, "I try to buy a coil of rope.") is None
+
+
+# --- found live, 2026-09-27 ---------------------------------------------------------------------
+
+def test_the_prose_does_not_settle_the_sale_the_screen_is_for():
+    """Live, on the turn that opened the counter: "The metal of the coil feels heavy and
+    cool in your hands" — the rope was the player's before a coin had moved."""
+    from gm import narration
+
+    beat = ("The metal of the coil feels heavy and cool in your hands, a simple weight of "
+            "hemp. Azhil Vex stands behind the counter. 'Fifty feet, a gold piece,' he "
+            "says. It is yours once you have paid. What do you do?")
+    assert "contradicts-the-engine" in [
+        f.kind for f in narration.review(beat, buying="a coil of rope").findings]
+    kept, cut = narration.keep_the_goods(beat, "a coil of rope")
+    assert cut and "in your hands" not in kept
+    assert "a gold piece" in kept and "once you have paid" in kept
+    # Not a buying turn: nothing is read.
+    assert narration.keep_the_goods(beat, "") == (beat, [])
+
+
+def test_going_to_a_named_place_requires_the_walk():
+    """Live, twice: "I go to the market and buy a coil of rope." was one `narrate_only`,
+    and the party stayed in the tavern. The schema now requires a `travel`; the model
+    still names the place from the brief's list."""
+    s = Scene(location_id=TOWN)
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    e = Engine(s, Dice(seed=1))
+    e.place_party(f"{TOWN}~urban:the-gate")
+    assert "travel" in judgement.declared_ops("I go to the market and buy a coil of rope.", s)
+    assert "travel" not in judgement.declared_ops("I look at the market prices.", s)
+    assert "travel" not in judgement.declared_ops("Should I go to the market?", s)
+
+
+def test_a_shut_market_sells_nothing_in_the_prose_either(at_the_market):
+    """Live: the market shut for the night, "I buy a dragon's egg." — the prose invented a
+    vendor and wrote "The transaction for the egg is complete, and the heavy weight of it
+    now rests in your pack", and the plan's `give` conjured the egg for nothing."""
+    from gm import narration
+    from play import campaign as cm
+    from play import views
+
+    c = cm.current()
+    c.scene.clock_minutes = 23 * HOUR
+    note = views._buying_note(c, "I buy a dragon's egg.")
+    assert "nothing is sold" in note
+    beat = ("The transaction for the egg is complete, and the heavy weight of it now rests "
+            "in your pack. What do you do?")
+    assert len(narration.hands_over_goods(beat)) == 1
+    raw = judgement.strip_counter_buys(
+        [{"op": "give", "params": {"item": "dragon's egg", "to": "pc"}},
+         {"op": "narrate_only"}], "I buy a dragon's egg.")
+    assert raw == [{"op": "narrate_only"}]

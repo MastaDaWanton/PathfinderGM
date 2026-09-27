@@ -165,6 +165,16 @@ SCRIPTS = {
         "I find somewhere to sleep until morning.",
         "I go to the market and buy a coil of rope.",
     ],
+    # Buying: the counter opens for a purchase, a walk to a named place is planned, and
+    # the prose settles nothing the screen is for.
+    "buying": [
+        "I find somewhere to sleep until morning.",
+        "I walk over to the well.",
+        "I go to the market and buy a coil of rope.",
+        "I try to buy a loaf of bread.",
+        "I want to buy some torches.",
+        "I buy a dragon's egg.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",
@@ -509,6 +519,8 @@ def audit(turns: int, script: str, world: str, character: str,
                 tally[f] += 1
             rows.append({"n": n, "said": said, "faults": faults,
                          "seconds": round(seconds, 1),
+                         # The counter the turn opened, if a purchase opened one.
+                         "trade": body.get("trade"),
                          # Whole, not truncated to 120 — the length of the prose is the
                          # thing being asked about now, and a clipped sample cannot
                          # answer it.

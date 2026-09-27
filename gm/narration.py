@@ -1344,10 +1344,25 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            pull: dict | None = None, heat: dict | None = None,
            claim: str = "", blows: list[dict] | None = None,
            fire_context: str | None = None,
-           here: str = "", places: tuple = (), doors: list[dict] | None = None) -> Review:
+           here: str = "", places: tuple = (), doors: list[dict] | None = None,
+           buying: str = "") -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 0e. The counter's screen is where this purchase happens, and the prose settled it.
+    if buying:
+        handed = hands_over_goods(text)
+        if handed:
+            out.findings.append(Finding(
+                "contradicts-the-engine", f"the sale was settled in the prose: {handed[0][:80]!r}",
+                f"You have written the purchase as done — {handed[0]!r}. Nothing has been "
+                f"bought: a sale happens only on the counter's own screen, when a counter "
+                f"is open, and the player pays there. Rewrite those sentences so nothing "
+                f"is handed over and no coin moves — a keeper may show the goods and name "
+                f"a price, or there is nobody to sell. Keep the rest.",
+                weight=3,
+            ))
 
     # 0d. A door the engine held shut, opened in the prose (`opens_a_held_door`).
     held = [d for d in (doors or []) if not d.get("opened")]
@@ -4146,3 +4161,48 @@ def hold_the_door(text: str, doors) -> tuple[str, list[str]]:
               else "The door shudders in its frame and stays shut.")
     kept = text[:at].rstrip()
     return (f"{kept} {ending} What do you do?".strip(), gave)
+
+
+# --- goods handed over before the counter's screen --------------------------------------
+#
+# A purchase opens the trade panel, and the coin moves there (play/views.py,
+# `_trade_offer`). Measured live 2026-09-27 on that very turn: "The metal of the coil
+# feels heavy and cool in your hands" — the rope was in the player's hands before a coin
+# had moved. Showing the goods and naming a price is the beat's to write; handing them
+# over, and taking the money, is the screen's.
+_HANDED_OVER = re.compile(
+    r"\b(?:hands? (?:it|them|you|the|over)|handed (?:it|them|you|over)|"
+    r"pass(?:es|ed)? (?:it|them|the \w+) (?:to you|over|across)|"
+    r"press(?:es|ed)? [^.!?]{0,40}into your (?:hand|hands|palm)|"
+    r"in(?:to)? your (?:hands?|palm|grip|arms|pack|satchel)|"
+    r"you (?:take|took|pocket|tuck|sling|accept|shoulder) (?:it|them|the)\b|"
+    r"you (?:pay|paid|count out|hand over (?:the )?coins?)|"
+    r"coins? (?:change hands|changes hands|clink into|slide across)|money changes hands|"
+    r"the (?:deal|sale|bargain) is (?:done|struck|made)|it'?s yours now|"
+    r"the (?:transaction|purchase|sale)\b[^.!?]{0,30}\b(?:is|was) (?:complete|done|made))",
+    re.I)
+_ONLY_OFFERED = re.compile(
+    r"\b(?:until|before|once you|if you|when you|after you|for (?:a|one|two|\d)|"
+    r"would|could|might|offers?|offered|asks?|asking)\b", re.I)
+
+
+def hands_over_goods(text: str) -> list[str]:
+    """Sentences that complete the sale in prose: the goods in the player's hands, or
+    the coin changing hands — never an offer ("yours once you've paid")."""
+    out = []
+    for sentence in re.split(r"(?<=[.!?])\s+", unquoted(text or "")):
+        if _HANDED_OVER.search(sentence) and not _ONLY_OFFERED.search(sentence):
+            out.append(sentence.strip())
+    return out
+
+
+def keep_the_goods(text: str, buying: str) -> tuple[str, list[str]]:
+    """The backstop under the rewrite: the sentences that complete the sale are cut, and
+    the keeper showing the goods and naming a price is left standing."""
+    if not buying:
+        return text, []
+    gave = hands_over_goods(text)
+    out = text or ""
+    for sentence in gave:
+        out = out.replace(sentence, "").replace("  ", " ")
+    return (out.strip(), gave) if gave else (text, [])
