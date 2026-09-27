@@ -82,12 +82,14 @@ SCRIPTS = {
     # Every line gives one man a reason to strike first, in words only — nothing the
     # player does is itself an attack, so the first blow has to be his. The blows door
     # (docs/declared-not-guessed.md): does the PLAN declare it, or does it only appear in
-    # the prose, where `attacked_by` has had to read it out? The first version knocked a
+    # the prose, where `attacked_by` has had to read it out? No journey: a walk to a
+    # tavern was ambushed on the way once (2026-09-26) and every insult after it landed
+    # mid-fight, where provocation is off by design. The first version knocked a
     # drink from his hand, which the planner read as the player attacking, and every turn
     # after was already a fight (2026-09-25).
     "provoke": [
-        "I walk into the worst tavern on the street and sit at the bar.",
-        "I tell the biggest man at the bar that I have seen better fighters in a nursery.",
+        "I look around at the people standing nearest me.",
+        "I tell the biggest man here that I have seen better fighters in a nursery.",
         "I laugh in his face and tell him to do something about it.",
         "I call him a coward in front of his friends.",
         "I tell his friends he cried when the last man stood up to him.",

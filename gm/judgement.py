@@ -5168,6 +5168,28 @@ _INSULT_AIMED_AT = re.compile(
     re.I)
 
 
+_ABOUT_HIM = re.compile(
+    r"\b(?:tell|tells|telling|say|says|announce|announces|shout|shouts)\s+"
+    r"(?:(?:his|her|their)\s+\w+|the\s+(?:whole\s+)?(?:room|crowd|tavern|bar|market|square)|"
+    r"every(?:one|body)|them|the\s+\w+)\s+(?:that\s+)?(?:he|she)\b", re.I)
+
+
+def _last_provoked(scene, within: int = 60) -> str:
+    """The person here provoked most recently, within `within` minutes, or ""."""
+    from rules import attitude as attitude_mod
+
+    now = int(getattr(scene, "clock_minutes", 0) or 0)
+    best, when = "", -1
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if a.is_pc or a.is_down:
+            continue
+        eff = attitude_mod._regard_effect(a)
+        at = (getattr(eff, "payload", None) or {}).get("grudge_at") if eff else None
+        if at is not None and now - int(at) <= within and int(at) > when:
+            best, when = ref, int(at)
+    return best
+
+
 def provocation_in(player_text: str) -> str:
     """"insult", "slight" or "" — what the player's sentence does to somebody."""
     text = str(player_text or "")
@@ -5190,11 +5212,23 @@ def provoked_one(raw_intents, player_text: str, scene) -> str:
     from rules import states
 
     actors = getattr(scene, "actors", {}) or {}
+    # An insult ABOUT him, said to somebody else — "I tell his friends he cried", "I
+    # tell the whole room he is all talk", "I tell the barkeep he smells". Measured live
+    # 2026-09-26: the first two provoked nobody and the third provoked the barkeep. The
+    # "he" is the man the player has been baiting, as any table would read it: the one
+    # provoked most recently here, within the hour.
+    if _ABOUT_HIM.search(speech.blanked(player_text or "")):
+        baited = _last_provoked(scene)
+        if baited:
+            return baited
     for r in raw_intents or []:
         if isinstance(r, dict) and str(r.get("op", "")).lower() == "say":
-            to = (r.get("params") or {}).get("to")
-            if isinstance(to, str) and to in actors and not actors[to].is_pc:
-                return to
+            # Either field: the model writes the listener as `target` as often as in
+            # `params.to` — measured live 2026-09-26, "I call him a coward" came with
+            # `say target=c2`, and reading only `to` provoked nobody on four turns of six.
+            for to in ((r.get("params") or {}).get("to"), r.get("target")):
+                if isinstance(to, str) and to in actors and not actors[to].is_pc:
+                    return to
     # Whom the insult is spoken AT: "I tell the biggest man at the bar that…". Measured
     # live 2026-09-25: that sentence provoked nobody — several men were here, nobody was
     # in conversation yet, and the words were never looked for. Found through the
@@ -5219,7 +5253,18 @@ def provoked_one(raw_intents, player_text: str, scene) -> str:
     if len(talking) == 1:
         return talking[0]
     here = [r for r, a in actors.items() if not a.is_pc and not a.is_down]
-    return here[0] if len(here) == 1 else ""
+    if len(here) == 1:
+        return here[0]
+    # "him", "his face": the person the player last spoke to, from the engine's own
+    # record of what was said (the `said` effect's `to`) — or the one last provoked.
+    if re.search(r"\b(?:him|her|his|them)\b", speech.blanked(player_text or ""), re.I):
+        for entry in reversed(list(getattr(scene, "log", None) or [])[-40:]):
+            for eff in (entry.get("effects") or []) if isinstance(entry, dict) else []:
+                to = eff.get("to") if isinstance(eff, dict) and eff.get("kind") == "said" else ""
+                if to in actors and not actors[to].is_pc and not actors[to].is_down:
+                    return to
+        return _last_provoked(scene)
+    return ""
 
 
 def inject_provoke(raw_intents, player_text: str, scene) -> list:

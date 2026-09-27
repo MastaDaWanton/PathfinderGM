@@ -220,3 +220,39 @@ def test_a_cooled_man_is_not_drawn_again_so_soon():
     assert not s.in_encounter
     s.advance(provocation.COOL_MINUTES)
     assert not provocation.cooled(s.actors[ref], s.clock_minutes)
+
+
+def test_an_insult_about_him_said_to_others_is_aimed_at_the_man_being_baited():
+    """Measured live 2026-09-26: "I tell his friends he cried when the last man stood
+    up to him" and "I tell the whole room he is all talk" provoked nobody, and "I tell
+    the barkeep he smells" provoked the barkeep. The "he" is the man the player has been
+    baiting — the one provoked most recently here — as any table would read it."""
+    s, e, ref = _bar(temper=5)
+    s.add(instantiate("guildhand", scene=s, name="barkeep"))
+    barkeep = next(r for r, a in s.actors.items() if a.name == "barkeep")
+    e.run(e.validate([{"op": "provoke", "target": ref}]))
+    for said in ("I tell his friends he cried when the last man stood up to him.",
+                 "I tell the whole room he is all talk.",
+                 "I tell the barkeep he smells."):
+        assert judgement.provoked_one([], said, s) == ref, said
+    # With nobody baited yet, the man spoken to is the one insulted.
+    s2, e2, ref2 = _bar(temper=5)
+    s2.add(instantiate("guildhand", scene=s2, name="barkeep"))
+    barkeep2 = next(r for r, a in s2.actors.items() if a.name == "barkeep")
+    assert judgement.provoked_one([], "I tell the barkeep he smells.", s2) == barkeep2
+
+
+def test_the_listener_counts_whichever_field_the_model_wrote_it_in():
+    """Measured live 2026-09-26: "I call him a coward" came with `say target=c2`, not
+    `params.to`, and provoked nobody on four turns of six."""
+    s, e, ref = _bar()
+    s.add(instantiate("guildhand", scene=s, name="woman with a basket"))
+    raw = [{"op": "say", "actor": "pc", "target": ref, "params": {"words": "coward"}}]
+    assert judgement.inject_provoke(raw, "I call him a coward.", s)[0]["target"] == ref
+
+
+def test_him_is_the_man_last_spoken_to():
+    s, e, ref = _bar()
+    s.add(instantiate("guildhand", scene=s, name="woman with a basket"))
+    e.run(e.validate([{"op": "say", "actor": "pc", "params": {"words": "evening", "to": ref}}]))
+    assert judgement.provoked_one([], "I laugh in his face.", s) == ref
