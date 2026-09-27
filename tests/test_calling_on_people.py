@@ -157,3 +157,39 @@ def test_a_night_begun_in_the_evening_ends_in_the_morning():
     e.run(e.validate([{"op": "rest", "actor": "pc", "params": {"kind": "night"}}],
                      origin="author:test"))
     assert s.clock_minutes == 10 * HOUR
+
+
+def test_her_is_the_one_whose_home_was_just_asked_after():
+    """Live: two people met in the same minute, and "I go to her house" knocked for the
+    opening's companion rather than the bread seller asked after the turn before."""
+    s, e, rec, body = _met(10 * HOUR, regard=80)
+    other = population.note(s, "a neighbour who knows the words", fresh=True)
+    other["last_met"] = rec["last_met"]
+    other["last_seen"] = s.clock_minutes + 5
+    _call(e, who="woman selling bread", visit=False)
+    got, _ = e._person_called_on("her")
+    assert got["id"] == rec["id"]
+
+
+def test_waiting_until_a_named_hour_waits_until_it():
+    """Live: "I wait at the well until ten at night" at mid-morning was planned as 140
+    minutes."""
+    s = Scene(location_id=VORMOOR)
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.clock_minutes = 10 * HOUR
+    raw = judgement.inject_wait(
+        [{"op": "advance_time", "params": {"amount": 140, "unit": "minute"}}],
+        "I wait at the well until ten at night.", s)
+    assert raw[0]["params"] == {"amount": 12 * HOUR, "unit": "minutes"}
+    assert judgement.minutes_until("I wait until dawn.", 22 * HOUR) == 8 * HOUR
+
+
+def test_sleeping_until_morning_is_a_night_not_a_day_in_bed():
+    """Live: "I find somewhere to sleep until morning" came back as bed rest, a full day
+    and night, and the party woke at noon."""
+    got = judgement.repair_rest_kind([{"op": "rest", "params": {"kind": "bed rest"}}],
+                                     "I find somewhere to sleep until morning.")
+    assert got[0]["params"]["kind"] == "night"
+    kept = judgement.repair_rest_kind([{"op": "rest", "params": {"kind": "bed rest"}}],
+                                      "I take a full day of bed rest.")
+    assert kept[0]["params"]["kind"] == "bed rest"

@@ -2609,11 +2609,24 @@ class Engine:
             return population.of_ref(scene, body.ref), body
         words = who.lower().split()
         if words and words[0] in ("her", "him", "them", "his", "their", "she", "he", "they"):
-            # The pronoun is whoever the character last spoke with in this town.
+            # The pronoun is the person whose home the character last learned — "I ask
+            # where the bread seller lives", then "I go to her house" — and failing that
+            # whoever they last spoke with in this town. Measured live 2026-09-27: two
+            # people met in the same minute, and "her" went to the opening's companion
+            # instead of the bread seller whose house had just been asked after.
+            pc = scene.pc()
+            learned = [e.key.split(":", 1)[1] for e in (getattr(pc, "effects", None) or [])
+                       if str(getattr(e, "key", "")).startswith("knows-home:")]
+            for pid in reversed(learned):
+                rec = (scene.population or {}).get(pid)
+                if rec is not None and rec.get("home") == scene.location_id:
+                    return rec, scene.people.get(rec.get("ref") or "")
             met = [r for r in (scene.population or {}).values()
                    if r.get("last_met") is not None and r.get("home") == scene.location_id]
             if met:
-                rec = max(met, key=lambda r: int(r["last_met"]))
+                rec = max(met, key=lambda r: (int(r["last_met"]),
+                                              int(r.get("last_seen") or 0),
+                                              int(str(r["id"])[1:] or 0)))
                 return rec, scene.people.get(rec.get("ref") or "")
             return None, "Nobody the party has spoken with lives in this town."
         found = population.find(scene, who, world=self.world, log_miss=False)

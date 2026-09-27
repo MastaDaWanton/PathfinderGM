@@ -140,7 +140,7 @@ SCRIPTS = {
         "I find somebody selling bread and ask what a loaf costs.",
         "I buy a loaf from her and ask her name.",
         "I walk over to the well.",
-        "I wait at the well until late in the evening.",
+        "I wait at the well until ten at night.",
         "I ask around where the bread seller lives.",
         "I go to her house.",
         "I thank her, say goodnight and leave.",

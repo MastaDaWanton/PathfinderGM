@@ -3539,6 +3539,67 @@ _UNIT_HOURS = {"hour": 1, "hours": 1, "day": 10, "days": 10, "morning": 4, "afte
                "evening": 3, "night": 8, "watch": 4}
 
 
+_UNTIL_WORD = {"dark": 19, "nightfall": 19, "dusk": 19, "sunset": 19, "evening": 19,
+               "dawn": 6, "first light": 6, "sunrise": 6, "daybreak": 6, "morning": 8,
+               "noon": 12, "midday": 12, "midnight": 0}
+_UNTIL = re.compile(
+    r"\buntil\s+(?:it\s+is\s+)?(?:fully\s+|well\s+after\s+|after\s+)?(?:the\s+)?"
+    r"(?:(?P<word>first light|nightfall|daybreak|sunrise|sunset|midnight|midday|morning|"
+    r"evening|dark|dusk|dawn|noon)"
+    r"|(?P<n>\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+    r"(?:\s*o'clock)?\s*(?P<half>am|pm|a\.m\.|p\.m\.|in the morning|in the afternoon|"
+    r"in the evening|at night|tonight)?)\b", re.I)
+
+
+def minutes_until(player_text: str, clock: int) -> int | None:
+    """Minutes from `clock` to the time the player named ("until ten at night", "until
+    dawn"), or None. Measured live 2026-09-27: "I wait at the well until ten at night"
+    at mid-morning was planned as 140 minutes — the model's arithmetic, and the hour now
+    decides who is home and which counters are open."""
+    m = _UNTIL.search(str(player_text or ""))
+    if not m:
+        return None
+    if m.group("word"):
+        hour = _UNTIL_WORD[m.group("word").lower()]
+    else:
+        n = m.group("n").lower()
+        hour = int(n) if n.isdigit() else _WORDS_TO_N.get(n, 0)
+        half = (m.group("half") or "").lower().replace(".", "")
+        if hour > 24:
+            return None
+        if half in ("pm", "in the afternoon", "in the evening", "at night", "tonight")                 and hour < 12:
+            hour += 12
+        elif half in ("am", "in the morning") and hour == 12:
+            hour = 0
+        elif not half and hour < 12:
+            # A bare "until ten": the next ten o'clock to come.
+            now_h = (int(clock) % 1440) / 60
+            if hour <= now_h and hour + 12 > now_h:
+                hour += 12
+        hour %= 24
+    day = 24 * 60
+    now = int(clock) % day
+    return ((hour * 60 - now) % day) or day
+
+
+def repair_rest_kind(raw_intents, player_text: str) -> list:
+    """A night's sleep the plan wrote as bed rest, when the player asked for no such
+    thing. Live 2026-09-27: "I find somewhere to sleep until morning" came back as
+    `rest kind=bed rest` — a full day and night — and the party woke at noon."""
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    if re.search(r"\bbed\s*rest\b|\ball\s+day\b|\bfull\s+day\b|\bday\s+and\s+(?:a\s+)?night\b|"
+                 r"\brecuperat|\bconvalesc", str(player_text or ""), re.I):
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        p = (r.get("params") or {}) if isinstance(r, dict) else {}
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "rest"                 and str(p.get("kind") or "").lower().replace("_", " ") == "bed rest":
+            r = dict(r, params=dict(p, kind="night"))
+        out.append(r)
+    return out
+
+
 def inject_wait(raw_intents, player_text: str, scene) -> list:
     """Time the player says they pass becomes `advance_time`, in minutes."""
     # Speech is not action: the character's own words are blanked before any
@@ -3548,6 +3609,27 @@ def inject_wait(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     if "?" in player_text:
         return raw_intents
+    raw_intents = repair_rest_kind(raw_intents, player_text)
+    # "until ten at night": the engine's clock does the arithmetic, and a model's
+    # `advance_time` for it is corrected rather than bowed to.
+    until = minutes_until(player_text, getattr(scene, "clock_minutes", 0))
+    if until is not None and re.search(r"\b(?:wait|sit|stay|linger|rest|remain|keep|"
+                                       r"watch|stand|loiter|pass the time)\w*\b",
+                                       player_text, re.I):
+        timed = [r for r in raw_intents if isinstance(r, dict)
+                 and str(r.get("op", "")).lower() == "advance_time"]
+        if timed:
+            return [dict(r, params={"amount": until, "unit": "minutes"})
+                    if any(r is x for x in timed) else r for r in raw_intents]
+        present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+        pc = scene.pc()
+        if pc is not None and not present & {"rest", "travel", "venture", "forage",
+                                             "prospect"}:
+            return [r for r in raw_intents if not (isinstance(r, dict) and str(
+                r.get("op", "")).lower() == "narrate_only")] + [{
+                "op": "advance_time", "actor": pc.ref,
+                "params": {"amount": until, "unit": "minutes"},
+                "because": "the player waited until a time they named"}]
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if present & {"advance_time", "rest", "forage", "prospect", "travel", "venture"}:
         return raw_intents
