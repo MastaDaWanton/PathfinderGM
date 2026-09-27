@@ -6322,10 +6322,15 @@ def _a_blow_in(sentence: str):
         verb = _BLOW_VERB.match(sentence, m.start())
         if not _BLOW_IDIOM.match(sentence, verb.end()):
             return m
+    # A weapon in the sentence makes a contact verb a blow only when the player is in the
+    # sentence at all. Measured live 2026-09-27: "He stops mid-swing, the hammer hanging
+    # heavy in his grip, and the glowing rod he was shaping rests on the anvil" — a smith
+    # at his forge — read as a blow at the player, and the check cut the sentence.
+    at_all = re.search(r"\b(?:you|your)\b", sentence, re.I)
     for m in _CONTACT_VERB.finditer(sentence):
         rest = sentence[m.end():]
         aimed = _AIMED.search(rest)
-        if aimed is None:
+        if aimed is None or not at_all:
             continue
         # The thing thrown, cut or swung comes before the aim: "throws a wink at you".
         if _GESTURE.search(rest[:aimed.start()]):

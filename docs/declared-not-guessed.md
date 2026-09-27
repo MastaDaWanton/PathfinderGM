@@ -274,3 +274,34 @@ The replay corpus now counts `plans founding a place`.
 
 Seen and not fixed: a plan that introduced a bookseller and then walked the party to the
 guildhall, leaving him behind. That is the planner's coherence, not a door.
+
+## Decided and built (2026-09-27): the prose records people, and makes no bodies or places
+
+The user asked whether, now that the planner makes people and places, the prose needed
+to make them at all. After the trade-offs were measured, they chose option (a):
+
+- **Places: the page founds none.** A beat set somewhere the party is not is
+  `stands-elsewhere` and is rewritten to where they are. Places come from the plan's
+  `found` (founded and walked into in one turn), from the player, and from venturing
+  out. This replaces the 2026-09-23 ruling that let the page found places ("i dont mind
+  it creating a dock so long as it remembers…"). What that ruling wanted, a remembered,
+  sensible, staffed dock, still holds through the plan's door. Measured before the
+  choice: in three discover runs the page founded none and the plan all ten. The page's
+  one measured misfire was a smithy founded from a brawl's prose.
+- **People: the prose records, and never embodies.** Everyone it describes becomes a
+  population record: located, searchable, with a life (the "there is nothing left of
+  her?" ruling). `promote_cast` is no longer called from the prose path. A hand check of
+  that door had found 11 of 30 booked people wrong, and a body is what turned a misread
+  into a phantom in a fight. A person gets a body when the plan introduces them or when
+  the player turns to them (`judgement.embody_sought`, before the plan).
+- **In a fight, the prose brings nobody new in.** A newcomer only the prose describes
+  gets a targeted rewrite (`GMAgent._undeclared_arrivals`). Item 30's raiders are the
+  plan's `spawn`.
+
+**Live, the town script, 12 turns, after:** the planner introduced three people itself
+(the stallholder, the smith, the gate guard; none in the earlier town run) and founded
+the smithy and walked in. Ten people were recorded and four have bodies, the ones engaged
+or introduced. One beat set in "the lane" was rewritten, since "there is no lane in this
+place at all". No place came from the page. The blows check cut one sentence wrongly: a
+smith "mid-swing" with his hammer at the anvil. A weapon now makes a swing a blow at the
+player only when the player is in the sentence.

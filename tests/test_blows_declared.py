@@ -187,3 +187,17 @@ def test_a_blow_by_somebody_the_prose_only_now_describes_is_checked_too(live, mo
     shown = next(b for b in reversed(out["transcript"]) if b.get("who") == "gm")
     assert "lunges at you" not in shown["text"]
     assert not cm.current().scene.in_encounter
+
+
+def test_a_smith_at_his_forge_is_not_swinging_at_the_player():
+    """Measured live 2026-09-27: "He stops mid-swing, the hammer hanging heavy in his
+    grip…" — a contact verb and a weapon, and no player in the sentence — was read as a
+    blow at the player and the check cut it. A weapon makes a swing a blow AT YOU only
+    when you are in the sentence."""
+    s = Scene(location_id=VORMOOR)
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.add(instantiate("guildhand", scene=s, name="smith"))
+    forge = ("He stops mid-swing, the hammer hanging heavy in his grip, and the glowing rod "
+             "he was shaping rests on the anvil with a dull hiss.")
+    assert judgement.attacked_by(s, forge) == []
+    assert judgement.attacked_by(s, "The smith swings the hammer at your head.")
