@@ -699,6 +699,11 @@ def test_an_ability_that_deals_damage_can_kill():
 # afterwards, may know engine facts.** A repair is the engine correcting the model, not
 # the model being taught a mechanic.
 _READS_MECHANICS = {
+    "gm/agent.py:_doors_from":
+        "feeds the review's held-door check, a repair that runs AFTER the prose: whether "
+        "a forced door gave is a yes or no on the effect, and the tell that says so is a "
+        "sentence. Measured live 2026-09-27, the engine held a door and the prose wrote "
+        "it flying inward; nothing read here reaches the narrator.",
     "gm/agent.py:_deaths_from":
         "feeds press_the_death, a repair that runs AFTER the prose — it needs how far "
         "past dead the blow went, and a tell is a sentence, not a number. Making the "

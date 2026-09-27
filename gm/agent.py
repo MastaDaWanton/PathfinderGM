@@ -1349,6 +1349,8 @@ class GMAgent:
                 gender=self._pc_gender(), state=self._body_count(),
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 fire_context=fire_context,
+                # The doors this turn forced or picked, and whether they gave.
+                doors=getattr(self, "doors", None),
                 # Where the party actually is, and what places exist here, so a beat
                 # set in a gate this town does not have is caught (items 45 and 38).
                 here=self._here_name(), places=self._place_names(),
@@ -1685,6 +1687,8 @@ class GMAgent:
         # dead-men cut needs it to spare the killing sentence, and the backstop below
         # needs it last.
         deaths = self._deaths_from(outcomes)
+        # The doors this turn forced or picked, for the review's held-door check.
+        self.doors = self._doors_from(outcomes)
         text, repairs, groom_attempts = self._groom(
             text, earlier=earlier or [],
             min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
@@ -1766,6 +1770,14 @@ class GMAgent:
             if m:
                 out.append(" ".join(m.group(1).split()))
         return out
+
+    def _doors_from(self, outcomes: list) -> list[dict]:
+        """The doors this turn forced or picked, and whether each gave — for the review's
+        held-door check (`narration.opens_a_held_door`), a repair that runs after the
+        prose. Measured live 2026-09-27: the engine rolled "The door ... holds." and the
+        prose wrote it flying inward."""
+        return [e for o in outcomes if getattr(o, "op", "") == "break_in"
+                for e in (getattr(o, "effects", None) or []) if e.get("kind") == "break_in"]
 
     def _blows_from(self, outcomes: list) -> list[dict]:
         """Who struck this turn, from the attack outcomes that rolled — the reviewer's
@@ -1855,6 +1867,8 @@ class GMAgent:
         # to turn it off. `hand_back=False`: two or three sentences about what the dice
         # did hand nothing back. `min_chars` stays 0 for the same reason.
         deaths = self._deaths_from(outcomes)
+        # The doors this turn forced or picked, for the review's held-door check.
+        self.doors = self._doors_from(outcomes)
         text, repairs, _more = self._groom(
             cleaned, earlier=None, min_chars=0, max_chars=0,
             player_input=player_input, brief="", hand_back=False, claims=True,

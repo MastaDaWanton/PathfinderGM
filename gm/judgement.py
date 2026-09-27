@@ -6844,17 +6844,33 @@ def inject_break_in(raw_intents, player_text: str, scene) -> list:
     into it or a knock at it."""
     if not isinstance(raw_intents, list) or scene is None or scene.in_encounter:
         return raw_intents
-    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "break_in"
-           for r in raw_intents):
-        return raw_intents
     m = None
     for pattern, _how in _BREAKS_IN:
         m = m or pattern.search(speech.blanked(str(player_text or "")))
-    if m is None:
+    theirs = [r for r in raw_intents if isinstance(r, dict)
+              and str(r.get("op", "")).lower() == "break_in"]
+    if m is None and not theirs:
         return raw_intents
+
+    # The door decides the turn: no walk, no knock, no check beside it, nobody spawned
+    # (who is home is the engine's to know), and nothing "taken" that is the door itself.
+    # Measured live 2026-09-27: "I pick the lock on her door" came back with `give
+    # item="lock on her door"`, and "I kick in her door" with a thug spawned as "new".
+    import json
+
+    def beside_it(r) -> bool:
+        if not isinstance(r, dict):
+            return False
+        op = str(r.get("op", "")).lower()
+        if op in ("travel", "call_on", "found", "check", "spawn", "introduce"):
+            return True
+        said = json.dumps(r.get("params") or {}).lower()
+        return op in ("give", "loot") and bool(re.search(r"door|lock", said))
+
+    kept = [r for r in raw_intents if not beside_it(r)]
+    if theirs:
+        return kept
     who, how = breaks_in(player_text)
-    kept = [r for r in raw_intents if not (isinstance(r, dict) and str(
-        r.get("op", "")).lower() in ("travel", "call_on", "found", "check"))]
     pc = scene.pc()
     return kept + [{"op": "break_in", "actor": pc.ref if pc is not None else "pc",
                     "because": "the player forced a way in",

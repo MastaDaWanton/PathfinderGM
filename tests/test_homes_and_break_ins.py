@@ -234,3 +234,43 @@ def test_the_players_words_are_read_as_breaking_in():
     raw = judgement.inject_break_in([{"op": "travel", "params": {"place": "her house"}}],
                                     "I break into her house.", Scene(location_id=VORMOOR))
     assert [r["op"] for r in raw] == ["break_in"]
+
+
+# --- found live, 2026-09-27 (the `homes` script, gemma-4-12B) --------------------------------
+
+def test_prose_may_not_open_a_door_the_engine_held():
+    """Live: the engine rolled "The door ... holds." and the prose wrote "The wood groans
+    and splinters under the force of your boot ... The door flies inward"."""
+    from gm import narration
+
+    beat = ("The wood groans and splinters under the force of your boot, and finally gives "
+            "way. The door flies inward. What do you do?")
+    kinds = [f.kind for f in narration.review(
+        beat, doors=[{"opened": False, "how": "force"}]).findings]
+    assert "contradicts-the-engine" in kinds
+    held = "The door shudders under your boot but holds. What do you do?"
+    assert not narration.opens_a_held_door(held)
+    # And a door that did give may be written giving.
+    assert "contradicts-the-engine" not in [f.kind for f in narration.review(
+        beat, doors=[{"opened": True, "how": "force"}]).findings]
+
+
+def test_a_break_in_turn_spawns_nobody_and_takes_no_lock():
+    """Live: "I pick the lock on her door" came back with `give item="lock on her door"`
+    ("Kesst Vayr takes lock on her door"), and "I kick in her door" with a thug spawned
+    as "new" — who then witnessed the break-in and made the character suspected."""
+    raw = judgement.inject_break_in(
+        [{"op": "give", "params": {"item": "lock on her door", "to": "pc"}},
+         {"op": "spawn", "params": {"template": "thug", "name": "new"}},
+         {"op": "break_in", "params": {"who": "her", "how": "pick"}}],
+        "I pick the lock on her door.", Scene(location_id=VORMOOR))
+    assert [r["op"] for r in raw] == ["break_in"]
+
+
+def test_the_outcome_written_into_a_break_in_is_ignored_not_refused():
+    """Live: `break_in` with `success` cost an attempt, and the repair after it invented a
+    thug."""
+    from rules.intents import parse_all
+
+    got = parse_all([{"op": "break_in", "params": {"how": "force", "success": True}}])
+    assert got[0].params.get("how") == "force" and "success" not in got[0].params

@@ -1344,10 +1344,25 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            pull: dict | None = None, heat: dict | None = None,
            claim: str = "", blows: list[dict] | None = None,
            fire_context: str | None = None,
-           here: str = "", places: tuple = ()) -> Review:
+           here: str = "", places: tuple = (), doors: list[dict] | None = None) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
+
+    # 0d. A door the engine held shut, opened in the prose (`opens_a_held_door`).
+    held = [d for d in (doors or []) if not d.get("opened")]
+    if held and not any(d.get("opened") for d in (doors or [])):
+        gave = opens_a_held_door(text)
+        if gave:
+            how = "the lock held" if held[0].get("how") == "pick" else "the door held"
+            out.findings.append(Finding(
+                "contradicts-the-engine", f"{how}, and the prose opened it: {gave[0][:80]!r}",
+                f"You have written a door opening that did not open — {gave[0]!r}. The "
+                f"dice said {how}. Rewrite those sentences so the attempt is made and "
+                f"fails: the door shudders and stays shut, the pick slips; the player is "
+                f"still outside. Keep the rest.",
+                weight=3,
+            ))
 
     # 0c. The player claimed to be what the sheet says they are not, and the prose made
     #     it true. Weight 3, with `contradicts-the-engine`: this is the turn being
@@ -4079,3 +4094,34 @@ def _blanked(text: str) -> str:
     """The narration with every quotation replaced by spaces of the same length, so a
     position in the result is the same position in the original."""
     return speech.blanked(text or "")
+
+
+# --- a door the engine held shut --------------------------------------------------------
+#
+# Measured live 2026-09-27 (the `homes` script): the engine rolled "The door of the house
+# of somebody selling bread holds." and the prose wrote "The wood groans and splinters
+# under the force of your boot ... The door flies inward". A door is an outcome like a
+# blow, and the prose does not get to open one the dice kept shut.
+# Wood, planks and timber too: only read in a turn whose break-in the engine held, and
+# the live prose's first sentence was "The wood groans and splinters ... gives way".
+_DOOR_WORD = re.compile(r"\b(?:door|lock|latch|bolt|frame|hinges?|wood|planks?|timbers?)\b",
+                        re.I)
+_DOOR_GAVE = re.compile(
+    r"\b(?:gives? way|gave way|gives|gave|giving way|splinter\w*|bursts? (?:open|inward)|"
+    r"swings? (?:open|inward)|swung (?:open|inward)|fl(?:y|ies|ew) (?:open|inward|in)|"
+    r"crash\w* (?:open|inward|in)|clicks? open|clicked open|springs? open|sprang open|"
+    r"yields?|yielded|opens? (?:before|under|for) you|comes? open|came open|"
+    r"you (?:step|stride|push|slip|walk|shoulder your way) (?:inside|in|through))\b", re.I)
+_DOOR_HELD = re.compile(
+    r"\b(?:not|n't|never|holds?|held|resists?|resisted|refuses?|refused|fails?|failed|"
+    r"stubborn|won't|will not|stays? shut|stayed shut|in vain)\b", re.I)
+
+
+def opens_a_held_door(text: str) -> list[str]:
+    """Sentences that open a door or turn a lock, with nothing in them saying it held."""
+    out = []
+    for sentence in re.split(r"(?<=[.!?])\s+", unquoted(text or "")):
+        if (_DOOR_WORD.search(sentence) and _DOOR_GAVE.search(sentence)
+                and not _DOOR_HELD.search(sentence)):
+            out.append(sentence.strip())
+    return out

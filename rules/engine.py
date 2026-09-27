@@ -2909,7 +2909,7 @@ class Engine:
             return Outcome(intent_id=intent.id, op="call_on", effects=effects,
                            tell=" ".join(bits), because=intent.because)
         let_in, said = self._knock(callee, house)
-        bits.append(said)
+        bits.append(residency.sentence(said))
         effects[0].update(let_in=let_in, go=house.id if let_in else (house.parent or ""))
         if let_in:
             self._let_in.add(house.id)
@@ -2956,7 +2956,7 @@ class Engine:
         if let_in:
             self._let_in.add(target.id)
             return None
-        return self._refuse(intent, said)
+        return self._refuse(intent, residency.sentence(said))
 
     def _place_name(self, place_id: str) -> str:
         from . import places as places_mod

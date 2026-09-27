@@ -782,7 +782,17 @@ def parse(raw: dict, index: int = 0) -> Intent:
             f"use_ability ability=<name> for a power.", "schema", index)
 
     unknown = set(params) - set(required) - set(optional)
-    ignored = sorted(unknown & ENGINE_OWNED_PARAMS)
+    # The door and the knock are the engine's to decide, and a model that writes the
+    # outcome in ("success": true) is ignored, not refused. Measured live 2026-09-27:
+    # `break_in` with `success` cost an attempt, and the repair after it invented a thug
+    # called "new" out of the ref the second attempt reached for.
+    if op in ("break_in", "call_on"):
+        ignored = sorted(unknown)
+        for key in ignored:
+            params.pop(key, None)
+        unknown = set()
+    else:
+        ignored = sorted(unknown & ENGINE_OWNED_PARAMS)
     for key in ignored:
         params.pop(key, None)
     unknown -= set(ignored)

@@ -597,3 +597,71 @@ Runs 1 and 2 found five defects, each fixed with a test in
 sold rope at one in the morning with no coin moving. There is a `sell` injector and no
 `buy` one. Shop hours are enforced on the trade panel and on any `buy` or `sell` that
 reaches the engine.
+
+## Built: buying, and the still-not-built list (2026-09-27)
+
+The user's words: "Close the buying gap and have prompts like 'I try to buy a coil of
+rope.' should open the trade tab [potentially with Rope in the basket.]. Then build the
+still not built section".
+
+**Buying.** Before this, a purchase in words was `narrate_only` in every live run, and
+had it reached the engine there was nothing to buy: every shelf was drawn from the
+crafting benches' materials (alum, bismuth, quicklime). Research:
+
+- **Talk hands off to a trade screen and never settles a sale:** Fallout's
+  `ShowBarterMenu`, Neverwinter Nights' `OpenStore`, Baldur's Gate 3's Trade button.
+- **The thing named is matched against real stock,** and refused rather than guessed
+  when it is not there (tbaMUD: "Sorry, I haven't got exactly that item.").
+
+Built:
+
+- **Counters stock goods as staples,** never sold out, from the Core Rulebook's Goods
+  and Services (the same `GEAR` list the outfitting screen sells from, plus Table 6-9's
+  food and drink):
+  - the market: the outfitting list plus bread, cheese and meat;
+  - a tavern: food and drink only;
+  - a smithy: its ironmongery.
+- **Your earlier ruling holds:** "a single store should not have every possible item",
+  so the other 70-odd rows of the table are not on every counter.
+- **`judgement.purchase_sought` reads "buy / try to buy / want to buy X"** and skips
+  buying a man a drink, time or a room.
+- **The turn returns `trade: {open, want}`,** and the page opens the panel.
+  `/api/trade` matches the want against the shelf (`goods.match_want`: every word, the
+  plainer item winning, "a loaf" is bread). It picks the row, or the keeper says they
+  have none.
+- **The prose is told the screen opens and settles nothing,** and a `buy` the model
+  wrote for it is dropped.
+- **Nothing opens at a shut counter,** with nobody keeping one, or for a customer the
+  keeper will not serve.
+
+Verified in the running app, on a scratch data folder: "I try to buy a coil of rope."
+opened the panel with "hemp rope (50 ft)" picked at 1 gp, and paying left 11 gp and 50
+ft of rope.
+
+**Homes for keepers and the world's people.** Pierre lives in his shop and Belethor
+sleeps upstairs in his, so a keeper under a roof lives on the premises. A stall's keeper
+has a house of their own, founded on the first call, and goes there when the stall
+shuts. A character the world wrote is found by name in their own town and given a body
+as a `spawn` would. Their house is founded on the first call, and they keep the plainest
+day: home by night, by day where they were first found. A trade shop under a roof is
+knocked at in the small hours. A guardhouse or a guildhall is not; the first cut
+refused the guardhouse at midnight and the storeys suite caught it.
+
+**A door that stays open to a friend.** Stardew Valley's bedroom, once opened at two
+hearts, "is permanently unlocked even if the heart meter goes below 2 hearts". So a
+character let in as a friend holds `bond.welcome.<key>`, and the door opens at any hour
+from then on. The exception is somebody who has come to hate them, which Stardew's
+hearts cannot express.
+
+**Breaking in.** PF1e Core Rulebook numbers:
+
+- **The door:** a good wooden door, locked, breaks at Strength DC 18. Table 13-2 and the
+  Breaking Items table disagree for most doors and agree for this one.
+- **The lock:** an average lock is Disable Device DC 25, +10 without thieves' tools,
+  trained only, and the player rolls.
+- **Noise:** Perception's own DCs judge it. The sound of battle is -10 and a whisper 15,
+  so a door forced is heard at 0 and a lock picked at 15, +10 for a sleeping
+  householder. One who hears it loses 20 regard.
+- **Witnesses:** anybody in the street sees it. Seen, the character is suspected; seen
+  again, wanted. That is Skyrim's warning before the fine, in this app's own law tags.
+- **A forced door stays broken.**
