@@ -52,3 +52,19 @@ def test_the_projection_does_not_outlive_the_plan(engine):
     engine.validate([dict(FOUND), dict(WALK)])
     with pytest.raises(IntentError):
         engine.validate([{"op": "travel", "params": {"place": "The Tarred Rope"}}])
+
+
+def test_a_building_hangs_off_the_street_not_off_the_room_you_stand_in(engine):
+    """Measured live 2026-09-26: "I head for the stables" from inside a shrine made "the
+    stables … off the shrine". A settlement kind goes off the nearest place under the
+    sky; the guildhall here is indoors and hangs off the town."""
+    engine.run(engine.validate([{"op": "travel", "params": {"place": "the guildhall"}}]))
+    assert engine.here().name == "the guildhall"
+    res = engine.run(engine.validate([
+        {"op": "found", "params": {"name": "the stables", "kind": "stables"}}]))
+    assert "off the guildhall" not in res.outcomes[0].tell, res.outcomes[0].tell
+    stables = next(p for p in engine.places() if p.name == "the stables")
+    from rules import places
+
+    parent = places.find(engine.places(), stables.parent)
+    assert parent is None or not places.is_indoors(parent.id)

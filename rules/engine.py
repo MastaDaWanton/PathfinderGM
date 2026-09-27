@@ -6116,6 +6116,25 @@ class Engine:
         kind = str(intent.params.get("kind") or "").strip().lower().removeprefix("the ")
         if not kind and name.lower().removeprefix("the ") in places_mod.KINDS:
             kind = name.lower().removeprefix("the ")
+        # A building hangs off the street, not off the room the party is standing in.
+        # Measured live 2026-09-26: "I head for the stables" from inside a shrine made
+        # "the stables … off the shrine". A settlement kind (`places.KINDS` — the smithy,
+        # the stables, the tavern) founded with no parent named goes off the nearest place
+        # up the chain that is under the sky; a room (a cellar, a back room) still goes
+        # off the room.
+        if kind in places_mod.KINDS and not str(intent.params.get("parent") or "").strip():
+            seen = set()
+            while places_mod.is_indoors(parent.id) and parent.id not in seen:
+                seen.add(parent.id)
+                up = places_mod.find(known, parent.parent) if parent.parent else None
+                if up is None:
+                    # A building whose parent is the settlement itself (the guildhall):
+                    # the street it opens onto — its first exit under the sky.
+                    up = next((p for p in (places_mod.find(known, x) for x in parent.exits)
+                               if p is not None and not places_mod.is_indoors(p.id)), None)
+                if up is None:
+                    break
+                parent = up
         if kind:
             location = self.world.get(self.scene.location_id) if self.world else None
             why = places_mod.fits_here(kind, location)
