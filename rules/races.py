@@ -40,7 +40,9 @@ plays.
 from __future__ import annotations
 
 import copy
+import functools
 import json
+import os
 import re
 import time
 import zlib
@@ -406,12 +408,22 @@ def body_line(doc: dict) -> str:
 
 # --- loading ---------------------------------------------------------------------------
 
+# Built once per settings value rather than once per call: both are asked under every
+# `has_state`, and three `Path` joins were a third of what that cost once the folder
+# check stopped touching the disk (measured 2026-09-27). Keyed on the setting, so a test
+# that moves CAMPAIGN_DIR gets its own folder.
+@functools.lru_cache(maxsize=16)
+def _under(root: str, up: bool, *parts: str) -> Path:
+    base = Path(root).parent if up else Path(root)
+    return base.joinpath(*parts)
+
+
 def _content_dir() -> Path:
-    return Path(settings.BASE_DIR) / "content" / "races"
+    return _under(str(settings.BASE_DIR), False, "content", "races")
 
 
 def homebrew_dir(make: bool = False) -> Path:
-    p = Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "races"
+    p = _under(str(settings.CAMPAIGN_DIR), True, "homebrew", "races")
     if make:
         p.mkdir(parents=True, exist_ok=True)
     return p
@@ -455,66 +467,105 @@ def _read_folder(folder: Path) -> dict[str, dict]:
 #
 # The refusal to cache was deliberate and half right. The trap CLAUDE.md records is a
 # DERIVED cache in the user's data directory that outlives the install and answers
-# "fresh" from a timestamp. This is neither: it lives in the process, it is keyed on every
-# file's name, size and modification time, and the key is recomputed on every read — so a
-# race edited on the bench is seen on the next call, and nothing survives a restart.
-# What it costs is one directory listing and a stat per file, which is what a change
-# check has to cost.
+# "fresh" from a timestamp. This is neither: it lives in the process, nothing survives a
+# restart, and it is keyed on what `_signature` says about each folder — the app's own
+# writes announced at the write door, and every file's name, size and modification time
+# for anything written from outside — so a race edited on the bench is seen on the next
+# call.
 #
 # Callers get COPIES. The registry is shared between every actor in the process, and a
 # caller that pokes at the dict it was handed — the bench does — must not be editing
-# everybody's race.
+# everybody's race. The one exception is `shared`, for the sheet's own readers, which
+# only read and are asked under every `has_state`.
 _CACHE: dict[str, tuple[tuple, object]] = {}
 
 
-# How long one look at the SHIPPED folder is trusted for. Measured after the cache
-# landed: the stat calls behind the signature were 1.6 ms of a 2.1 ms `has_state` on
-# Windows, nearly all of them the seven shipped files, so a check made on every call
-# would have kept most of the cost it was there to remove. The shipped folder is inside
-# the install and does not change under a running app; half a second is shorter than
-# any gap a developer editing it would notice, and unlike the trap CLAUDE.md records,
-# the answer expires on its own.
+# How long one look at a folder's files is trusted for, when nothing in the app has
+# written there since. Measured after the cache landed: the stat calls behind the
+# signature were 1.6 ms of a 2.1 ms `has_state` on Windows, so a check made on every
+# call would have kept most of the cost it was there to remove. Half a second is shorter
+# than any gap a person editing a file by hand would notice, and unlike the trap
+# CLAUDE.md records, the answer expires on its own.
 #
-# The homebrew folder is NOT under this. The bench writes it and reads it back in the
-# same breath — `import_from_world` drafts a race and the next line offers it — and so do
-# eight tests. It is a handful of files at most, and a scandir of it is cheap.
+# The timer is for writers OUTSIDE the app — a race file edited in Notepad, a folder
+# dropped in from Explorer. The app's own writes do not wait on it: see `_signature`.
 _SIGNATURE_TTL = 0.5
-_SIGNATURES: dict[str, tuple[float, tuple]] = {}
+# (monotonic time of the look, the folder's write count then, what the look saw)
+_SIGNATURES: dict[str, tuple[float, int, tuple]] = {}
+
+# How close to "now" a file's mtime has to be before its stat is not trusted alone and
+# its bytes are read too — git's racy-clean rule (Documentation/technical/racy-git.txt):
+# a file modified inside the same clock tick as the look can change again without its
+# stat changing. Two seconds covers FAT's two-second mtime, which a data directory on a
+# USB stick would have; NTFS is finer. Almost always no file is this young, so almost
+# always nothing is read.
+_RACY_NS = 2_000_000_000
 
 
-def _signature(folder: Path, ttl: float = 0.0) -> tuple:
-    """(name, mtime, size) of every race file in the folder — what "has it changed"
-    means. Compared whole, so a file added, removed, or touched all count.
-
-    The folder read with no timer — the bench's, which it writes and reads back in one
-    breath — also carries a checksum of each file's bytes. Measured 2026-09-25:
-    `test_an_edit_on_the_bench_is_seen_on_the_next_read` failed one run in five, because
-    "speed": 30 and "speed": 40 are the same size and two writes inside one clock tick
-    have the same mtime, so the signature said nothing had changed and the old document
-    was served. CLAUDE.md: compare content, not just timestamps. The bench folder holds a
-    handful of files; the shipped folder, which is what made this cache worth having,
-    keeps the cheap stat and its timer.
-    """
-    now = time.monotonic()
-    seen = _SIGNATURES.get(str(folder))
-    if ttl and seen is not None and now - seen[0] < ttl:
-        return seen[1]
+def _look(folder: Path) -> tuple:
+    """(name, mtime, size, crc) of every race file in the folder. `crc` is 0 unless the
+    file is racily young (above). One `scandir`: on Windows a DirEntry carries its stat
+    from the directory listing, so this is one system call however many files there are,
+    where `glob` + `stat` was two per file."""
     out = []
-    if folder.exists():
-        for path in sorted(folder.glob("*.json")):
-            try:
-                st = path.stat()
-                crc = 0 if ttl else zlib.crc32(path.read_bytes())
-            except OSError:
-                continue
-            out.append((path.name, st.st_mtime_ns, st.st_size, crc))
-    sig = tuple(out)
-    _SIGNATURES[str(folder)] = (now, sig)
-    return sig
+    now = time.time_ns()
+    try:
+        entries = sorted((e for e in os.scandir(folder)
+                          if e.name.lower().endswith(".json") and e.is_file()),
+                         key=lambda e: e.name)
+    except OSError:
+        return ()
+    for e in entries:
+        try:
+            st = e.stat()
+            crc = (zlib.crc32(Path(e.path).read_bytes())
+                   if now - st.st_mtime_ns < _RACY_NS else 0)
+        except OSError:
+            continue
+        out.append((e.name, st.st_mtime_ns, st.st_size, crc))
+    return tuple(out)
 
 
-def _normalised(folder: Path, ttl: float = 0.0) -> dict[str, dict]:
-    sig = _signature(folder, ttl)
+def _signature(folder: Path) -> tuple:
+    """What "has this folder changed" means: how many times the app has written there
+    (`files.written`), and what the last look at its files saw. Compared whole, so a
+    file added, removed, or touched all count.
+
+    Two writers, two answers:
+
+    - **The app** writes through `files.write_text` — the bench save, `import_from_world`
+      — and that bumps the folder's count, so a write followed by a read in the same
+      breath is seen at once, with no stat and no clock. Measured 2026-09-25, before the
+      count existed: `test_an_edit_on_the_bench_is_seen_on_the_next_read` failed one run
+      in five, because "speed": 30 and "speed": 40 are the same size and two writes
+      inside one clock tick have the same mtime. The fix then was a CRC of every file's
+      bytes on every call — correct, and measured 2026-09-27 at 1,500 `has_state` calls
+      in 1.3 s, 1.28 s of it this function: `scandir`, two `stat`s and an `open` per
+      call. The count answers the same question for the price of a dict lookup.
+    - **Anything else** — a hand edit, a file dropped in — has no door to announce it,
+      so it is found by looking, at most every `_SIGNATURE_TTL`. A count that moved
+      forces a fresh look too, so the stored look is never older than the last write.
+
+    This is CPython's arrangement for the same problem: `FileFinder` caches a directory
+    listing checked by stat, and a writer inside the process calls
+    `importlib.invalidate_caches()` because the stat cannot be trusted within one tick.
+    Directory mtime alone was measured and refused: on NTFS it moves when a file is
+    created or deleted but NOT when one is rewritten in place, which is what an editor
+    does.
+    """
+    ttl = _SIGNATURE_TTL
+    key = str(folder)
+    count = files.written(folder)
+    now = time.monotonic()
+    seen = _SIGNATURES.get(key)
+    if seen is None or seen[1] != count or not ttl or now - seen[0] >= ttl:
+        seen = (now, count, _look(folder))
+        _SIGNATURES[key] = seen
+    return (count, seen[2])
+
+
+def _normalised(folder: Path) -> dict[str, dict]:
+    sig = _signature(folder)
     hit = _CACHE.get(str(folder))
     if hit is not None and hit[0] == sig:
         return hit[1]
@@ -525,7 +576,7 @@ def _normalised(folder: Path, ttl: float = 0.0) -> dict[str, dict]:
 
 def shipped() -> dict[str, dict]:
     """The seven, from content/races."""
-    return copy.deepcopy(_normalised(_content_dir(), _SIGNATURE_TTL))
+    return copy.deepcopy(_normalised(_content_dir()))
 
 
 def authored() -> dict[str, dict]:
@@ -540,11 +591,11 @@ def all_races() -> dict[str, dict]:
     read through it, so a test that stands a race in front of the sheet by replacing
     this function is honoured (`test_natural_attacks` does). Read-only by contract —
     take `get`, which copies, to have something to edit."""
-    key = (_signature(_content_dir(), _SIGNATURE_TTL), _signature(homebrew_dir()))
+    key = (_signature(_content_dir()), _signature(homebrew_dir()))
     hit = _CACHE.get("registry")
     if hit is not None and hit[0] == key:
         return hit[1]
-    out = dict(_normalised(_content_dir(), _SIGNATURE_TTL))
+    out = dict(_normalised(_content_dir()))
     for k, v in _normalised(homebrew_dir()).items():
         out[k] = normalise({**out.get(k, {}), **v})
     _CACHE["registry"] = (key, out)
@@ -556,13 +607,22 @@ def get(race_id: str) -> dict | None:
     return copy.deepcopy(doc) if doc else None
 
 
-def document(race_id: str) -> dict | None:
-    """The document as the sheet reads it: normalised, with what it computes filled in.
+def shared(race_id: str) -> dict | None:
+    """The document as the sheet reads it: normalised, with what it computes filled in —
+    the SAME dict on every call until a file changes. Read-only by contract; take
+    `document` to have something to edit.
 
     Derived once per race per registry: `derive` is the other half of the cost the
     header measures, and it answers the same until the registry is rebuilt. Keyed on
     the registry dict's identity, which is stable until a file changes and fresh on
-    every call when a test has replaced `all_races`."""
+    every call when a test has replaced `all_races`.
+
+    Why a second door and not a copy: `Actor._race_doc` asks this under every
+    `has_state`, and every reader behind it — `standing_tags`, `natural_weapon`,
+    `movement_modes`, `_race_mods`, the brief's body line — only reads. Measured
+    2026-09-27: the deepcopy was 0.26 s of 1,500 `has_state` calls, a fifth of the
+    whole, spent protecting a dict nobody wrote to.
+    `test_the_shared_document_survives_the_sheet_reading_it` holds the contract."""
     registry = all_races()
     rid = slug(race_id)
     derived = _CACHE.get("derived")
@@ -572,7 +632,12 @@ def document(race_id: str) -> dict | None:
     if rid not in derived[1]:
         doc = registry.get(rid)
         derived[1][rid] = derive(doc) if doc else None
-    got = derived[1][rid]
+    return derived[1][rid] or None
+
+
+def document(race_id: str) -> dict | None:
+    """`shared`, as a copy the caller may edit — the bench's open adds `source` to it."""
+    got = shared(race_id)
     return copy.deepcopy(got) if got else None
 
 

@@ -2543,12 +2543,15 @@ class Actor:
     def _race_doc(self) -> dict | None:
         """The race as a document, read live — the race id on the sheet is the store,
         the way the feat list is; nothing of the document is ever saved onto the
-        character, so correcting a race on the bench corrects every character of it."""
+        character, so correcting a race on the bench corrects every character of it.
+
+        The registry's own dict, not a copy (`races.shared`): read it, never write to
+        it — every character of the race is holding the same one."""
         from . import races as races_mod
 
         if not str(self.race or "").strip():
             return None
-        return races_mod.document(self.race)
+        return races_mod.shared(self.race)
 
     def _creature_doc(self) -> dict | None:
         """The stat block this creature was instantiated from, read live.

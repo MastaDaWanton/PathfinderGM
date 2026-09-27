@@ -12,6 +12,7 @@ import json
 import pytest
 from django.test import Client, override_settings
 
+from pathfindergm import files
 from rules import creation, houserules
 
 
@@ -302,12 +303,12 @@ def test_unlimited_race_tier_accepts_any_race_on_the_bench(isolated):
                            "choose": list(races.STANDARD_CHOOSE)})
     assert races.rp(doc) > races.STANDARD_RP
     path = races.homebrew_dir(make=True) / "dragonkin-u.json"
-    path.write_text(json.dumps(doc), encoding="utf-8")
+    files.write_text(path, json.dumps(doc))
     try:
         _, problems = creation.build(spec(race="dragonkin-u", choices=["str", "cha", "wis"]))
         assert not any("RP race" in p for p in problems), problems
     finally:
-        path.unlink()
+        files.remove(path)
 
 
 # --- every rule survives the round trip ---------------------------------------------------

@@ -319,7 +319,7 @@ def forget(world_entity_id: str) -> bool:
     path = _path(world_entity_id)
     if path is None or not path.is_file():
         return False
-    path.unlink()
+    files.remove(path)
     return True
 
 
