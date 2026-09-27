@@ -340,6 +340,9 @@ def test_her_name_is_not_a_person():
     assert not any("name" in r["phrase"] for r in s.population.values())
     assert population.names_a_person("her husband")
     assert population.names_a_person("a hooded figure")
+    # Live, the buying run: "I find somewhere to sleep until morning" introduced a
+    # person called "somewhere".
+    assert not population.names_a_person("somewhere")
 
 
 def test_somebody_found_in_the_market_is_made_in_the_market():

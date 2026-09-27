@@ -352,6 +352,11 @@ def names_a_person(phrase: str) -> bool:
     kin, a trade, or a generic noun ("her husband", "his apprentice"). Everything else
     ("a hooded figure", "a Korvu porter") is the plan's to declare.
     """
+    # "somewhere" is a place: live 2026-09-27, "I find somewhere to sleep until morning"
+    # came back as `introduce who="somewhere"`, a person the scene then held.
+    if " ".join(str(phrase or "").lower().split()) in ("somewhere", "anywhere", "nowhere",
+                                                        "everywhere", "someplace"):
+        return False
     if not _POSSESSIVE.match(str(phrase or "")):
         return True
     rest = _POSSESSIVE.sub("", str(phrase))
