@@ -995,6 +995,12 @@ class Scene:
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
+            # A grudge the player earned by provoking them comes back with time, faster
+            # the longer nothing new happens (rules/provocation.py, `recover`).
+            if minutes and not a.is_pc:
+                from . import provocation as _provocation
+
+                _provocation.recover(a, self.clock_minutes)
             # The breath they are holding, for anybody under the surface who does not
             # breathe water. A counter, like hunger above it and for the same reason:
             # the Constitution check that follows it rolls dice and belongs to the
@@ -1214,6 +1220,14 @@ class Scene:
         )
 
     def end_encounter(self) -> None:
+        # Whoever swung because they were provoked settles it now — cathartic or
+        # embittered, and cooled either way (rules/provocation.py). Here because a fight
+        # ends through eight different callers and this is the one door they all use.
+        from . import provocation as _provocation
+
+        for note in _provocation.settle_outbursts(
+                [a for a in self.people.values() if not a.is_pc], self.clock_minutes):
+            self.log.append({"op": "outburst-settled", "tell": "", "note": note})
         self.initiative = []
         self.turn = -1
         self.round = 0
@@ -2523,10 +2537,13 @@ class Engine:
         eff = attitude_mod._regard_effect(target)
         payload = dict(getattr(eff, "payload", None) or {}) if eff is not None else {}
         times = int(payload.get("provoked", 0)) if payload.get("provoked_day") == day else 0
+        now = int(self.scene.clock_minutes)
         before, after = attitude_mod.nudge_regard(target, -prov.cost(how, times),
                                                   f"provoked: {how}")
         attitude_mod.set_regard(target, after, f"provoked: {how}",
                                 payload={"provoked": times + 1, "provoked_day": day})
+        # What provocation took is a grudge, and it comes back with time (`recover`).
+        prov.note_grudge(target, before - after, now)
         self._provoked = getattr(self, "_provoked", set()) | {target.ref}
         step = attitude_mod.of(target)
         effects = [{"kind": "regard", "ref": target.ref, "from": before, "to": after},
@@ -2535,6 +2552,14 @@ class Engine:
             return Outcome(intent_id=intent.id, op="provoke", status="resolved",
                            effects=effects, tell=f"{target.name} takes it badly.",
                            because=intent.because)
+        # Cooled after an outburst: it still stings, but they will not rise to it again
+        # so soon (RimWorld's post-break reset; `settle_outbursts`).
+        if prov.cooled(target, now):
+            effects[-1]["cooled"] = True
+            return Outcome(intent_id=intent.id, op="provoke", status="resolved",
+                           effects=effects,
+                           tell=f"{target.name} glares at you, but will not be drawn "
+                                f"again so soon.", because=intent.because)
         chance = prov.strike_chance(self.scene, target, step)
         roll = self.dice.roll("1d100", label=f"{target.name} keeps their temper",
                               visibility="hidden")
@@ -2542,16 +2567,49 @@ class Engine:
         effects[-1].update({"strikes": strikes, "chance": round(chance, 2),
                             "roll": roll.total})
         if strikes:
+            prov.mark_outburst(target)
             tell = f"{target.name} has had enough."
         elif step == attitude_mod.HOSTILE and chance < prov.WILL_NOT_FIGHT:
             ended = self.end_talk(who=target)
             tell = (f"{target.name} turns their back on you and will have nothing more "
                     f"to do with you." + (f" {ended}" if ended else ""))
+            tell += self._what_they_do_instead(target, effects)
         else:
             tell = attitude_mod.regard_said(target.name, before, after) \
                 or f"{target.name} takes it badly."
         return Outcome(intent_id=intent.id, op="provoke", status="resolved",
                        effects=effects, tell=tell, because=intent.because)
+
+    def _what_they_do_instead(self, target, effects: list) -> str:
+        """A hostile person who will not swing does something the engine holds, chosen
+        by their rolled life (rules/provocation.py): the gregarious turn the room, the
+        orderly report the player to the watch, anyone else only turns away. Returns the
+        tell's extra sentence."""
+        from . import attitude as attitude_mod
+        from . import places as places_mod
+        from . import provocation as prov
+
+        pc = self.scene.pc()
+        if prov.axis_of(self.scene, target, "sociability") >= prov.TURNS_THE_ROOM_FROM:
+            others = [a for r, a in self.scene.actors.items()
+                      if not a.is_pc and a is not target and self.scene.conscious(r)]
+            for a in others:
+                b, n = attitude_mod.nudge_regard(a, -prov.SLIGHT, f"turned by {target.ref}")
+                effects.append({"kind": "regard", "ref": a.ref, "from": b, "to": n})
+            if others:
+                return f" {target.name} makes sure everybody here hears what you said."
+        if (pc is not None and prov.axis_of(self.scene, target, "order") >= prov.REPORTS_FROM
+                and places_mod.terrain_of(self.scene.at) == places_mod.URBAN):
+            town = places_mod.location_of(self.scene.at) or self.scene.location_id
+            if not states.standing_with_the_law(pc, town):
+                pc.apply_effect(ActiveEffect(
+                    name="a name on the watch's lips", kind="situation",
+                    key=states.suspected_tag(town), source=f"rule:provocation/{target.ref}",
+                    origin=f"rule:provocation/{target.ref}", duration="until-dismissed",
+                    tags=(states.suspected_tag(town),)))
+                effects.append({"kind": "reported", "ref": target.ref, "town": town})
+                return f" {target.name} goes to find the watch."
+        return ""
 
     # say ---------------------------------------------------------------------------------
 

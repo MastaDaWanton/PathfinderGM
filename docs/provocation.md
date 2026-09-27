@@ -71,14 +71,34 @@ of what a hostile NPC does (the 3.5 SRD table was found only through search snip
 The first cut (0.45 / 0.20 / 0.06 with a linear multiplier) had an average temper swing
 on the first insult in half of twenty runs.
 
-## Not built yet
+## Built second (2026-09-26): what they do instead, recovery, cooling
 
-- **Calling the watch** or turning the room against the player. Needs the watch system.
-- **Decay.** Regard lost to insults does not recover by itself. DF's lesson is to let
-  it fall off faster when nothing new happens.
-- **A cooldown after an outburst**, following RimWorld's post-break reset.
-- **Insults in the middle of a fight** cost regard but roll nothing, since the blows are
-  already the dice's.
+The user asked for the "not built yet" list before moving on.
+
+- **What a hostile person who will not swing does.** Their rolled life chooses; nothing
+  is rolled.
+  - Sociability 65 or more: they **turn the room**. Everybody else here loses a slight's
+    worth of regard for the player.
+  - Order 60 or more, in a settlement: they **go to the watch**. The player gains the
+    town's existing `state.suspected` through the one applicator, with source
+    `rule:provocation/<ref>` (docs/wanted.md): prices up 25%, a warning at the gate.
+    This is PF1e's lapsed Intimidate, where they "may report you to local authorities".
+  - Anyone else only turns their back.
+- **Recovery.** What provocation took is held as a *grudge* on the regard effect. It
+  comes back through `Scene.advance`, the one clock door, as `(elapsed / 3 days)²` of
+  the grudge. That is slow at first and faster the longer nothing new happens (Dwarf
+  Fortress 0.40.17), and it is gone in three days. A fresh insult starts the curve over.
+  Regard lost to a failed Diplomacy check is the book's and does not return this way.
+- **After an outburst.** When a fight ends (`Scene.end_encounter`, the door all eight
+  callers use), each person who swung because they were provoked has their coin tossed,
+  seeded on who and when: **cathartic** (the grudge cleared, and a step warmer) or
+  **embittered** (a step colder). This is RimWorld's +38 or −22. Either way they are
+  **cooled** for 8 hours: an insult still costs regard, but they will not rise to it
+  again yet (RimWorld's post-break reset; the Dwarf Fortress tantrum spiral is the
+  failure it prevents).
+
+Still open: the watch coming *to* the player after a report. Today a report marks the
+player suspected, which the gate and the counter read; nobody walks in to make an arrest.
 
 ## Live (2026-09-25, gemma-4-12B, the provoke script)
 

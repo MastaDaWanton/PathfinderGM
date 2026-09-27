@@ -150,3 +150,73 @@ def test_the_insult_finds_the_man_it_is_spoken_at():
         ("I laugh at the bearded man.", "man with a thick beard"),
     ]:
         assert judgement.provoked_one([], said, s) == refs[who], said
+
+
+# --- what they do instead, the grudge coming back, and the cooling after -------------
+
+def _hostile_now(temper=5, **axes):
+    s, e, ref = _bar(temper=temper)
+    life = population.of_ref(s, ref)["life"]
+    life["axes"].update(axes)
+    for _ in range(6):
+        res = e.run(e.validate([{"op": "provoke", "target": ref}]))
+        if "turns their back" in res.outcomes[0].tell:
+            return s, e, ref, res
+    raise AssertionError("never turned away")
+
+
+def test_a_gregarious_man_turns_the_room():
+    s, e, ref = _bar(temper=5)
+    s.add(instantiate("guildhand", scene=s, name="woman with a basket"))
+    other = next(r for r, a in s.actors.items() if a.name == "woman with a basket")
+    before = attitude.regard_of(s.actors[other])
+    population.of_ref(s, ref)["life"]["axes"].update(sociability=90, order=10)
+    for _ in range(6):
+        res = e.run(e.validate([{"op": "provoke", "target": ref}]))
+        if "turns their back" in res.outcomes[0].tell:
+            break
+    assert "everybody here hears" in res.outcomes[0].tell
+    assert attitude.regard_of(s.actors[other]) == before - provocation.SLIGHT
+
+
+def test_an_orderly_man_goes_to_the_watch():
+    """PF1e's lapsed Intimidate: they "may report you to local authorities". The town's
+    existing `state.suspected` (docs/wanted.md): prices up, a warning at the gate."""
+    from rules import places
+
+    s, e, ref, res = _hostile_now(sociability=10, order=90)
+    assert "goes to find the watch" in res.outcomes[0].tell
+    town = places.location_of(s.at) or s.location_id
+    assert states.standing_with_the_law(s.pc(), town) == "suspected"
+
+
+def test_the_grudge_comes_back_with_time_and_faster_the_longer_nothing_happens():
+    """Dwarf Fortress 0.40.17: "Made stress levels drop faster the longer no stressors
+    are applied". Only what provocation took comes back."""
+    s, e, ref = _bar(temper=5)
+    start = attitude.regard_of(s.actors[ref])
+    e.run(e.validate([{"op": "provoke", "target": ref}]))
+    low = attitude.regard_of(s.actors[ref])
+    s.advance(12 * 60)
+    first_half_day = attitude.regard_of(s.actors[ref]) - low
+    s.advance(provocation.GRUDGE_DAYS * 24 * 60)
+    assert attitude.regard_of(s.actors[ref]) == start
+    assert 0 <= first_half_day < (start - low) / 4, "slow at first"
+
+
+def test_a_cooled_man_is_not_drawn_again_so_soon():
+    s, e, ref = _bar(temper=95)
+    for _ in range(8):
+        e.run(e.validate([{"op": "provoke", "target": ref}]))
+        if s.in_encounter:
+            break
+    assert s.in_encounter
+    before = attitude.regard_of(s.actors[ref])
+    s.end_encounter()
+    after = attitude.regard_of(s.actors[ref])
+    assert abs(after - before) == provocation.AFTERMATH, "cathartic or embittered, a step"
+    res = e.run(e.validate([{"op": "provoke", "target": ref}]))
+    assert "will not be drawn again so soon" in res.outcomes[0].tell
+    assert not s.in_encounter
+    s.advance(provocation.COOL_MINUTES)
+    assert not provocation.cooled(s.actors[ref], s.clock_minutes)

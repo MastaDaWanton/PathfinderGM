@@ -102,3 +102,120 @@ def strike_chance(scene, actor, step: str) -> float:
 def cost(how: str, times_today: int) -> int:
     base = INSULT if how == "insult" else SLIGHT
     return max(1, round(base * (REPEAT ** max(0, int(times_today)))))
+
+
+# --- what a hostile person who will not swing does instead ------------------------------
+#
+# Chosen by their rolled life, never rolled: the gregarious turn the room, the orderly go
+# to the watch (PF1e's lapsed Intimidate: they "may report you to local authorities"),
+# anyone else turns their back. A report writes the town's existing `state.suspected`
+# through the one applicator (docs/wanted.md): prices up, a warning at the gate.
+
+TURNS_THE_ROOM_FROM = 65     # sociability at or above: they make sure everybody hears
+REPORTS_FROM = 60            # order at or above: they go to the watch
+
+
+def axis_of(scene, actor, axis: str) -> int:
+    from . import population
+
+    rec = population.of_ref(scene, getattr(actor, "ref", ""))
+    axes = ((rec or {}).get("life") or {}).get("axes") or {}
+    try:
+        return int(axes.get(axis, 50))
+    except (TypeError, ValueError):
+        return 50
+
+
+# --- the grudge: regard lost to provocation, and how it comes back ------------------------
+#
+# Only what provocation took is held as a grudge (a failed Diplomacy's loss is the book's
+# and stays). It comes back with time, slowly at first and faster the longer nothing new
+# happens — Dwarf Fortress 0.40.17: "Made stress levels drop faster the longer no
+# stressors are applied" — gone in GRUDGE_DAYS. A fresh provocation starts it over.
+
+GRUDGE_DAYS = 3
+
+
+def note_grudge(actor, lost: int, now: int) -> None:
+    from . import attitude as attitude_mod
+
+    eff = attitude_mod._regard_effect(actor)
+    pay = dict(getattr(eff, "payload", None) or {}) if eff is not None else {}
+    grudge = int(pay.get("grudge", 0)) + int(lost)
+    attitude_mod.set_regard(actor, attitude_mod.regard_of(actor), "grudge",
+                            payload={"grudge": grudge, "grudge_start": grudge,
+                                     "grudge_at": int(now)})
+
+
+def recover(actor, now: int) -> int:
+    """Give back what time has earned of the grudge; returns the regard returned."""
+    from . import attitude as attitude_mod
+
+    eff = attitude_mod._regard_effect(actor)
+    pay = dict(getattr(eff, "payload", None) or {}) if eff is not None else {}
+    grudge, start = int(pay.get("grudge", 0)), int(pay.get("grudge_start", 0))
+    if grudge <= 0 or start <= 0:
+        return 0
+    elapsed = max(0, int(now) - int(pay.get("grudge_at", now)))
+    healed = min(1.0, (elapsed / (GRUDGE_DAYS * 24 * 60)) ** 2)
+    remaining = round(start * (1 - healed))
+    back = grudge - remaining
+    if back <= 0:
+        return 0
+    before, after = attitude_mod.nudge_regard(actor, back, "time")
+    attitude_mod.set_regard(actor, after, "time", payload={"grudge": remaining})
+    return after - before
+
+
+# --- after an outburst ----------------------------------------------------------------
+#
+# RimWorld settles a social fight with a coin: "cathartic" (+38 opinion) or "angering"
+# (−22), and resets the break clock after any outburst (doubled in Beta 19). Dwarf
+# Fortress's tantrum spiral is the failure it prevents: injury and punishment feeding
+# fresh anger. Here: cathartic clears the grudge and warms them a step; embittered costs a
+# step; either way they are COOLED for COOL_MINUTES — an insult still costs regard, but
+# they will not rise to it again yet.
+
+COOL_MINUTES = 8 * 60
+AFTERMATH = 8
+
+
+def cooled(actor, now: int) -> bool:
+    from . import attitude as attitude_mod
+
+    eff = attitude_mod._regard_effect(actor)
+    pay = dict(getattr(eff, "payload", None) or {}) if eff is not None else {}
+    return int(now) < int(pay.get("cooled_until", -1))
+
+
+def mark_outburst(actor) -> None:
+    from . import attitude as attitude_mod
+
+    attitude_mod.set_regard(actor, attitude_mod.regard_of(actor), "outburst",
+                            payload={"outburst": True})
+
+
+def settle_outbursts(people, now: int) -> list[str]:
+    """When a fight ends: each person who swung because they were provoked has their
+    coin tossed (seeded on who and when, so a replay settles the same way) and is
+    cooled. Returns (name, "cathartic"|"embittered") strings for the log."""
+    import hashlib
+
+    from . import attitude as attitude_mod
+
+    out = []
+    for actor in people:
+        eff = attitude_mod._regard_effect(actor)
+        pay = dict(getattr(eff, "payload", None) or {}) if eff is not None else {}
+        if not pay.get("outburst"):
+            continue
+        coin = int(hashlib.sha256(f"{actor.ref}|{now}".encode()).hexdigest()[:2], 16) % 2
+        before = attitude_mod.regard_of(actor)
+        after = max(0, min(attitude_mod.REGARD_MAX,
+                           before + (AFTERMATH if coin else -AFTERMATH)))
+        attitude_mod.set_regard(actor, after, "outburst",
+                                payload={"outburst": False,
+                                         "cooled_until": int(now) + COOL_MINUTES,
+                                         **({"grudge": 0, "grudge_start": 0} if coin else {})})
+        out.append(f"{actor.name}: {'cathartic' if coin else 'embittered'}")
+    return out
