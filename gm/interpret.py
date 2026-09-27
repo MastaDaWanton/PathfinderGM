@@ -355,6 +355,33 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
     return ops
 
 
+# Which acts of the reading can stand behind an op a word-detector requires. An op with
+# no row here is not judged (the reading has no view on it).
+_OP_NEEDS = {
+    "travel": {"go", "leave", "journey", "search", "seek", "call_on"},
+    "journey": {"journey"}, "introduce": {"seek", "talk", "call_on"},
+    "say": {"talk", "insult"}, "provoke": {"insult"}, "give": {"give"}, "sell": {"sell"},
+    "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
+    "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
+    "loot": {"take", "steal"}, "cast": {"cast"},
+    "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},
+}
+
+
+def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]:
+    """(the detectors' ops the reading supports, the ones it does not). Measured live
+    2026-09-27: a detector required `give` for "I buy a dragon's egg", which the reading
+    read — rightly — as a purchase. On the labelled set the reading's acts score F1 0.91
+    against the detectors' 0.47, so where the two disagree the reading decides, and the
+    overruled op is logged."""
+    acts = {a.get("act") for a in (frame or {}).get("actions") or []}
+    kept, dropped = [], []
+    for op in ops:
+        need = _OP_NEEDS.get(op)
+        (kept if need is None or acts & need else dropped).append(op)
+    return kept, dropped
+
+
 def brief_lines(frame: dict | None) -> str:
     """What the planner is told the player's words say, in order, as fact."""
     if not frame:

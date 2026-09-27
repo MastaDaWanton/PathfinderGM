@@ -131,3 +131,13 @@ def test_a_declared_introduce_comes_before_whatever_addresses_them():
         {"introduce": {"params": {"who": "a baker", "how": "already_here"}},
          "travel": {"params": {"place": "the market"}}})
     assert [r["op"] for r in merged] == ["travel", "introduce", "narrate_only", "say"]
+
+
+def test_the_reading_overrules_a_detector_it_contradicts():
+    """Live: a detector required `give` for "I buy a dragon's egg"; the reading read a
+    purchase. The reading's acts score F1 0.91 on the labelled set, the detectors' 0.47."""
+    kept, dropped = interpret.supported(
+        ["give", "travel", "check"],
+        {"actions": [{"act": "go", "place": "the market"},
+                     {"act": "buy", "object": "a dragon's egg"}]})
+    assert kept == ["travel", "check"] and dropped == ["give"]

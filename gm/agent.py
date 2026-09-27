@@ -327,6 +327,10 @@ class GMAgent:
                                            self.engine.places())
             self.reading["ops"] = by_reading
             self.reading["detectors"] = list(declared)
+            # The reading decides where the two disagree (`interpret.supported`); the
+            # overruled op is kept on the record.
+            declared, overruled = interpret.supported(declared, self.reading)
+            self.reading["overruled"] = overruled
             declared = list(dict.fromkeys([*declared, *by_reading]))
             # Where the reading says the named place is the one the party stands in, no
             # walk is owed. Measured live 2026-09-27: at the market already, "I go to the
