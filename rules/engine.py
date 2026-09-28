@@ -2154,7 +2154,7 @@ class Engine:
                     "legality", index,
                 )
         if intent.op == "attack" and actor:
-            key = intent.params.get("weapon") or actor.equipped or "unarmed"
+            key = intent.params.get("weapon") or actor.wielded_key()
             # A granted weapon is worn, not carried: it exists while its toggle holds
             # and nowhere else, so both the weapons-table check and the carried-list
             # check would refuse it for the wrong reason. Which grants exist — and
@@ -2167,6 +2167,24 @@ class Engine:
                     raise IntentError(
                         f"attack: the {granted['key']} is not formed. Use "
                         f"{granted['ability']} to form it first.", "legality", index)
+            elif actor.stat_block_weapon(key) is not None:
+                # A printed attack: the ogre's greatclub, the owlbear's claws, a
+                # dragon's tail slap. The stat block is the creature's inventory.
+                pass
+            elif (actor.stat_block_attacks()
+                  and str(key).strip().lower() not in ("unarmed", "improvised")
+                  and str(key).strip().lower() not in (actor.weapons or ())):
+                # A monster reaching for a weapon its block does not print. It used to
+                # be let through (a stat-block creature carries no `weapons` list, so
+                # the carried check below never fired) and then swung at its printed
+                # +7 with the named weapon's dice and its Strength on top — a number
+                # that is neither the book's nor a derivation.
+                printed = [a["key"] for cat in ("melee", "ranged")
+                           for opt in actor.stat_block_attacks().get(cat) or ()
+                           for a in opt]
+                raise IntentError(
+                    f"attack: {actor.name} has no {key}. Its attacks are "
+                    f"{', '.join(dict.fromkeys(printed))}.", "legality", index)
             elif actor.natural_weapon(key) is not None:
                 # The body's own weapon. Checked before the table, because the table
                 # holds none of them: `weapons_mod.has("bite")` is False for every
@@ -2861,7 +2879,7 @@ class Engine:
                           f"yet — the first blow is still to be struck."),
                     because=intent.because)
         self._ensure_encounter(intent.actor, intent.target)
-        weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
+        weapon_key = (intent.params.get("weapon") or actor.wielded_key()).lower()
         weapon = actor.weapon(weapon_key)
         # An improvised weapon IS the object: the tell names the chunk of wood, not
         # "improvised weapon", and the object leaves the hand for the ground below
@@ -2896,6 +2914,7 @@ class Engine:
         flounders = wet_defender and water.loses_dex_to_ac(wet_defender)
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders))
+        worn_ac = target_ac
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
         if wet_defender:
             against = water.bonus_against(wet_defender)
@@ -2918,10 +2937,16 @@ class Engine:
         if cover_mods:
             target_ac += sum(m.value for m in cover_mods)
             ac_note += " with " + ", ".join(m.source for m in cover_mods)
+        # What the water and the board added, kept apart so a touch attack below can
+        # stand them on the touch AC instead: floundering and cover are about where the
+        # defender is, not about what they wear.
+        footing = target_ac - worn_ac
 
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
-        sequence = actor.attack_sequence(weapon_key, full)
+        # (weapon, iteration) per swing. One weapon for a character; for a monster, the
+        # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
+        sequence = actor.attack_plan(weapon_key, full)
         # One swing at a stated iterative. The combat panel lets a Blood Bender replace
         # any attack in a full attack with an ability, so the remaining weapon swings
         # arrive one op each, still carrying their own -5/-10 — a mixed full attack
@@ -2929,7 +2954,7 @@ class Engine:
         # class it was built for.
         it = intent.params.get("iteration")
         if it is not None and not full:
-            whole = actor.attack_sequence(weapon_key, True)
+            whole = actor.attack_plan(weapon_key, True)
             sequence = [whole[min(int(it), len(whole) - 1)]]
 
         # Swift Strikes: an always-active passive, never an ability to spend. On any
@@ -2950,6 +2975,7 @@ class Engine:
                     f"Swift Strikes: {actor.name} strikes "
                     f"{'twice more' if extra == 2 else 'again'} at {defender.name}.")
 
+        named_key, named = weapon_key, weapon
         while state["i"] < len(sequence):
             # Stop swinging at somebody who has already gone down. Measured in the
             # tavern: the thug dropped to -5 on the first swing of a Swift Strikes pair,
@@ -2965,7 +2991,22 @@ class Engine:
                     state["tells"].append(
                         f"{defender.name} is already down; {actor.name} holds the blow.")
                 break
-            iteration = sequence[state["i"]]
+            swing_key, iteration = sequence[state["i"]]
+            # Each swing its own weapon: the bite of a claw-claw-bite full attack rolls
+            # the bite's printed bonus and dice, not the claw's. The named weapon keeps
+            # the dict built for it above (an improvised weapon carries its object's name).
+            if swing_key == named_key:
+                weapon_key, weapon = named_key, named
+            else:
+                weapon_key, weapon = swing_key, actor.weapon(swing_key)
+            printed = weapon.get("stat_block") or {}
+            swing_ac, swing_note = target_ac, ac_note
+            if printed.get("touch"):
+                # "tongue +7 touch", "incorporeal touch +5": armour, shield and natural
+                # armour do not count. 243 printed attacks say so.
+                swing_ac = defender.touch_ac(flat_footed or bool(flounders)) + footing
+                swing_note = (f"touch AC {swing_ac}"
+                              + (" (flat-footed)" if flat_footed else ""))
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
             # Compulsions are charged here rather than in `attack_modifiers` because the
             # penalty depends on *who is being attacked*, which the sheet does not know.
@@ -2982,7 +3023,12 @@ class Engine:
             # occupy at the end of their move, with no attack roll needed." It also solves a
             # real engine problem the player would have met immediately — twelve raiders
             # would otherwise be twelve NPC turns and twelve rolls a round.
-            if state["stage"] == "attack" and getattr(actor, "troop", None) is not None:
+            #
+            # A swarm is the same rule by another subtype ("creatures with the swarm
+            # subtype don't make standard melee attacks"), and its block says so by
+            # printing no bonus: "swarm (2d6 plus distraction)".
+            if state["stage"] == "attack" and (getattr(actor, "troop", None) is not None
+                                              or printed.get("automatic")):
                 state["tells"].append(
                     f"{actor.name} are all around {defender.name} — no single blow to "
                     f"parry, and no roll to make.")
@@ -2993,7 +3039,7 @@ class Engine:
             if state["stage"] == "attack":
                 atk = self._roll_or_suspend_stage(
                     intent, actor, atk_mods, f"Attack with {weapon['name']}",
-                    target_ac, partial, state, "1d20",
+                    swing_ac, partial, state, "1d20",
                 )
                 state["rolls"].append(atk.as_dict())
                 natural = atk.natural
@@ -3002,10 +3048,10 @@ class Engine:
                         f"{actor.name}'s attack goes badly wide (natural 1).")
                     state["i"] += 1
                     continue
-                if not (natural == 20 or atk.total >= target_ac):
+                if not (natural == 20 or atk.total >= swing_ac):
                     state["tells"].append(
                         f"{actor.name}'s attack misses {defender.name} "
-                        f"({atk.total} against {ac_note}).")
+                        f"({atk.total} against {swing_note}).")
                     state["i"] += 1
                     continue
                 # Concealment: displacement, blur, entropic shield and invisibility all
@@ -3040,11 +3086,34 @@ class Engine:
             if state["stage"] == "confirm":
                 confirm = self._roll_or_suspend_stage(
                     intent, actor, atk_mods, f"Confirm critical ({weapon['name']})",
-                    target_ac, partial, state, "1d20",
+                    swing_ac, partial, state, "1d20",
                 )
                 state["rolls"].append(confirm.as_dict())
-                state["crit"] = confirm.total >= target_ac
+                state["crit"] = confirm.total >= swing_ac
                 state["stage"] = "damage"
+
+            if state["stage"] == "damage" and printed.get("ability"):
+                # A shadow's touch: its dice are Strength, not hit points. Landed
+                # through the `ability_damage` op with the stat block's provenance, the
+                # way `_natural_riders` lands a race's rider — the one applicator, so
+                # Constitution's hit points and a score at 0 follow by the op's rules.
+                res = self.run(self.validate([{
+                    "op": "ability_damage", "actor": actor.ref, "target": defender.ref,
+                    "visibility": "hidden",
+                    "because": f"{actor.name}'s {weapon['name']}",
+                    "params": {"ability": printed["ability"], "amount": weapon["damage"],
+                               "drain": bool(printed.get("drain"))},
+                }], origin=printed.get("origin", ""), origin_name=actor.name))
+                state["tells"].append(f"{actor.name}'s {weapon['name']} finds "
+                                      f"{defender.name}.")
+                for o in res.outcomes:
+                    state["effects"].extend(o.effects or [])
+                    state["rolls"].extend(r.as_dict() for r in (o.rolls or []))
+                    if o.tell:
+                        state["tells"].append(o.tell)
+                state["i"] += 1
+                state["stage"] = "attack"
+                continue
 
             if state["stage"] == "damage":
                 mult = weapon["crit_mult"] if state.get("crit") else 1
@@ -3108,6 +3177,20 @@ class Engine:
                         # letter is raised: `capitalize()` lowercases the rest, and it
                         # turned "Troop, Goblin" into "Troop, goblin".
                         else sneak_why[:1].upper() + sneak_why[1:] + ".")
+                # "plus 1d6 fire", "plus 2d6 cold": a second packet of a second type,
+                # rolled here BEFORE the main die for the reason the rider and sneak
+                # dice are — a suspension after damage had landed would land it twice
+                # on resume. Never multiplied on a critical (1e: extra dice are not),
+                # and applied on its own so fire resistance meets only the fire.
+                # Measured 2026-09-27: 551 printed attacks carry one.
+                for n, extra in enumerate(printed.get("extra") or ()):
+                    if f"extra_{n}" not in state:
+                        extra_roll = self._roll_or_suspend_stage(
+                            intent, actor, [],
+                            f"{extra['type'].title()} ({extra['dice']})",
+                            None, partial, state, extra["dice"])
+                        state[f"extra_{n}"] = extra_roll.total
+                        state["rolls"].append(extra_roll.as_dict())
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # A granted weapon's damage is several named things — Blood DMG +
@@ -3134,6 +3217,10 @@ class Engine:
                     amount = max(1, amount // 2)
                     state["tells"].append("The water takes half the force out of it.")
                 hit = self._apply_damage(defender, amount, weapon["type"])
+                if printed:
+                    # Whose numbers these were: the stat block's, by the provenance
+                    # vocabulary stage 8 gave every other amount.
+                    hit["origin"] = printed.get("origin", "")
                 # What struck, and how heavy it was: the death line's third axis.
                 # Measured 2026-09-18: a thrown pebble took a man's head clean off
                 # in the authored backstop, because the pool knew the damage type
@@ -3152,6 +3239,15 @@ class Engine:
                     f"{actor.name} {'critically ' if state.get('crit') else ''}hits "
                     f"{defender.name} for {hit['amount']} {weapon['type']}"
                     + (f" ({hit['note']})." if hit["note"] else "."))
+                for n, extra in enumerate(printed.get("extra") or ()):
+                    more = self._apply_damage(
+                        defender, max(0, int(state.pop(f"extra_{n}"))), extra["type"])
+                    more["weapon"] = hit["weapon"]
+                    more["origin"] = printed.get("origin", "")
+                    state["effects"].append(more)
+                    state["tells"].append(
+                        f"The {weapon['name']} adds {more['amount']} {more['type']}"
+                        + (f" ({more['note']})." if more.get("note") else "."))
                 # A coated blade delivers its dose on the first thing it cuts, and then it
                 # is gone. Spent on the hit rather than on the swing: a poison wiped off
                 # by a miss is a dose nobody got.
@@ -9783,6 +9879,11 @@ def _multiply_dice(notation: str, mult: int) -> str:
     if mult <= 1:
         return notation
     count, faces, flat = Dice().parse(notation)
+    if count == 0:
+        # A constant: "1" is what a stat block's "(1)" or "(1d1)" becomes, and
+        # "0d1+2" — what the line below would build — is refused by the roller. The
+        # constant is the damage, and a critical multiplies it.
+        return str(flat * mult)
     out = f"{count * mult}d{faces}"
     if flat:
         out += f"{flat:+d}"

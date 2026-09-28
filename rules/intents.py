@@ -182,7 +182,13 @@ def _known_weapon(name) -> bool:
     # weapon, did you mean bardiche".
     if str(name).strip().lower() in natural_weapon_names():
         return True
-    return has(str(name))
+    if has(str(name)):
+        return True
+    # A monster's printed attack — the same courtesy, for the same reason, and last so
+    # the corpus is read only when a name has missed both tables above.
+    from .statblock_attacks import printed_names
+
+    return str(name).strip().lower() in printed_names()
 
 
 @functools.lru_cache(maxsize=1)
