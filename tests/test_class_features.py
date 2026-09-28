@@ -254,7 +254,16 @@ class TestEvasion:
         monk.char_class = "monk"
         monk.armour = "none"
         assert monk.has_state(classfeatures.IMPROVED_EVASION)
-        # A DC a 9th-level monk's Reflex save cannot make on a 1.
+        # A DC a 9th-level monk's Reflex save cannot make on a 1 — and a 1 it is. The
+        # monk is not the player, so `face` never reaches the popup and the engine
+        # rolls; with this seed that roll was a natural 20, which "failed" DC 40 only
+        # while saves ignored naturals (fixed 2026-09-28, tests/test_save_naturals.py).
+        # So the engine's d20 is loaded to the 1 this test always meant.
+        class _Ones:
+            def randint(self, a, b):
+                return a
+
+        e.dice._rng = _Ones()
         tell = " ".join(o.tell for o in self._save(e, monk, 1, dc=40).outcomes)
         assert "halved" in tell and "part of the way clear" in tell
 

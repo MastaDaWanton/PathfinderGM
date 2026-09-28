@@ -88,7 +88,12 @@ doors places come in by** — a settlement's own words imply spots (`places.IMPL
 the player founds a place with an owner (`found`; the owner holds `holds.place.<slug>`
 as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its parent
 (`venture`); all of it in `Scene.founded`, read back through the one derivation
-`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`).
+`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`); **the d20's
+face** — `dice.d20_succeeds` is the one reader for a natural 20 always succeeding and
+a natural 1 always failing (CRB p.180), asked by every save (`_op_save`, the cast save,
+both ward saves, survival's saves), the attack roll and the manoeuvre; never by a skill
+or ability check, which 1e excludes; `dice.natural_said` names the face in a tell when
+it overruled the total (`tests/test_save_naturals.py`).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
@@ -207,5 +212,7 @@ rules/engine.py:Engine._ability_refusal
 rules/engine.py:_damage_note
 rules/intents.py:cut_outcome_claims
 gm/judgement.py:is_finishing_blow
+rules/dice.py:d20_succeeds
+tests/test_save_naturals.py
 content/classes/blood-bending.json
 -->

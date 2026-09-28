@@ -169,8 +169,12 @@ def _check(actor, kind: str, dc: int, dice, save: str = "") -> dict:
         mod = actor.ability_mod("con")
         roll = dice.d20([Modifier(mod, "Constitution")], label=f"{kind} check",
                         visibility="player")
-    return {"kind": kind, "dc": dc, "total": roll.total,
-            "passed": roll.total >= dc, "save": save}
+    # A save's face decides before its total (CRB p.180, `dice.d20_succeeds`); the
+    # Constitution check beside it is a check, and 1e gives checks no such rule.
+    from .dice import d20_succeeds
+
+    passed = d20_succeeds(roll, dc) if save else roll.total >= dc
+    return {"kind": kind, "dc": dc, "total": roll.total, "passed": passed, "save": save}
 
 
 def pass_hours(actor, hours: int, dice, biome: str = "") -> Toll:
