@@ -1202,8 +1202,13 @@ class GMAgent:
         # Whoever died THIS turn keeps their killing sentence (see the function): the
         # cut used to delete "the sailor crumples to the deck" as a dead man acting,
         # which is how every one-punch kill ended in the same appended template.
+        # And the living beside them: a name the dead share with somebody standing is not
+        # a corpse acting (two "thug"s, one dead — the 2026-09-27 fight audit).
+        living = [a.name for a in self.engine.scene.actors.values()
+                  if not a.is_pc and not (a.hp < 0 or a.has_state("state.down.dead"))]
         text, risen = narration_mod.cut_dead_men_walking(
-            text, dead, fresh=[str(d.get("name") or "") for d in (deaths or [])])
+            text, dead, fresh=[str(d.get("name") or "") for d in (deaths or [])],
+            living=living)
         # A claim the engine holds false, written as true anyway: the sentences that
         # make the player a god are cut and the world's answer is written in their
         # place, from a pool that never repeats twice running. The rewrite above had

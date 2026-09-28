@@ -158,7 +158,7 @@ running `wrong_actor` over the `--record` file.
   outcome-claim repair cut "The thug lunges forward, his fist connecting squarely with
   your ribs", and `cut_dead_men_walking` cut "The thug lets out a desperate, rattling
   groan…" because a *second* actor named "thug" was dead (a name collision, flagged as its
-  own task). The remainder said "you" with no thug in it; the rewrite gave "The thug
+  own task — fixed in docs/two-of-a-name.md). The remainder said "you" with no thug in it; the rewrite gave "The thug
   strikes you with a heavy blow…" and "The thug, despite its broken state, crawls toward
   you…". About one second each.
 - **The backstop never fired live.** It is exercised by the tests only.

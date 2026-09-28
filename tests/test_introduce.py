@@ -98,7 +98,10 @@ def test_already_here_is_the_person_already_standing_here(engine):
 def test_a_newcomer_is_always_somebody_new(engine):
     _run(engine, [_intro("watchman", how="arrives")])
     _run(engine, [_intro("watchman", how="arrives")])
-    assert sum(1 for a in engine.scene.actors.values() if a.name == "watchman") == 2
+    # Twins are named apart at the mint since 2026-09-27 (`bestiary.name_apart`): two
+    # actors both called "thug", one dead, cost the living one his own turn's sentence.
+    assert sorted(a.name for a in engine.scene.actors.values() if not a.is_pc) == \
+        ["second watchman", "watchman"]
     refs = {r["ref"] for r in engine.scene.population.values()}
     assert len(refs) == 2, "two records, one per person"
 
@@ -107,7 +110,10 @@ def test_a_group_is_that_many_people(engine):
     res = _run(engine, [_intro("porter", count=2, how="arrives"),
                         {"op": "say", "actor": "pc", "because": "t",
                          "params": {"words": "You two.", "to": "new2"}}])
-    porters = [r for r, a in engine.scene.actors.items() if a.name == "porter"]
+    # Twins are named apart at the mint since 2026-09-27 (`bestiary.name_apart`): two
+    # actors both called "thug", one dead, cost the living one his own turn's sentence.
+    porters = [r for r, a in engine.scene.actors.items()
+               if a.name in ("porter", "second porter")]
     assert len(porters) == 2
     bound = res.outcomes[0].effects[0]["bound"]
     assert set(bound) == {"new1", "new2"} and set(bound.values()) == set(porters)
@@ -124,7 +130,9 @@ def test_a_turn_that_waits_on_the_player_keeps_real_refs(engine):
     ])
     assert res.awaiting
     s = engine.scene
-    first, second = [r for r, a in s.actors.items() if a.name == "ferryman"]
+    first, second = [r for r, a in s.actors.items()
+                     if a.name in ("ferryman", "second ferryman")]
+    assert s.actors[second].name == "second ferryman"
     assert s.pending_intents[0]["params"]["opposed_by"]["ref"] == first
     assert s.pending_intents[1]["params"]["to"] == second
     done = Engine(s, Dice(seed=4), world=WORLD).resume(11)

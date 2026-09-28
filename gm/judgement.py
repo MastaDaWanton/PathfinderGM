@@ -4478,6 +4478,57 @@ _CAST_INTRO = re.compile(
 _ROLE_WORD = re.compile(r"\b(?:" + _CAST_ROLES + r")\b", re.I)
 
 
+# The noun the tail's slot missed. The slot is one word after the article (plus an
+# adjective it can recognise), so an adjective it cannot recognise TAKES the noun's place
+# and the noun is left behind. Measured 2026-09-27 over the 239 beats in tests/replay/:
+# 13 tails ended one word short — "a man with a thick | neck" (the actor the fight audit
+# showed as **man with a thick**: "man with a thick's attack misses Kesst Vayr"), "the
+# thick | accent" three times, "a stained leather | apron / harness / jerkin", "a missing
+# front | tooth" twice, "the wild | mane", "a wide | wingspan", "the silk | robes" — and 8
+# beats then wrote our stump back as prose: "The man with a thick grunts."
+#
+# A third fix of the same shape: "heavy" was added to a word list (2026-09-19), then the
+# endings (2026-09-20, "distinctive"), and "thick" is on neither. So not another word,
+# the other side: in the same 239 beats every word that followed a WHOLE description was
+# a verb in -s ("watches", "lies", "steps", "leans", "grunts"), a function word ("is",
+# "and", "of") or a preposition ("across") — and every word that followed a cut-short one
+# was a plain noun. One more word is taken when it is none of those. A word in -s is a
+# plural noun only with an auxiliary after it: "the silk robes is now visible", never
+# "the bread watches you".
+#
+# Not reached, stated: "a woman with a sharp, intelligent face" (1 of the 13) — a noun
+# with a comma after it is also how a clause starts ("a man with a sword, who …"), so the
+# comma is left to the rule above that only drops a known adjective. And an irregular past
+# tense after a whole description ("a man with a club swung") would be taken; the
+# recorded prose is present tense throughout and held none.
+_NOT_A_NOUN_AFTER = frozenset({
+    "across", "into", "onto", "toward", "towards", "near", "beside", "behind", "over",
+    "under", "against", "through", "without", "about", "around", "up", "down", "out",
+    "off", "along", "beneath", "between", "upon", "nearby", "now", "again", "too",
+    "that", "who", "while", "nor", "yet", "like", "back", "forward", "away",
+})
+_AUXILIARY = frozenset({"is", "are", "was", "were", "has", "have", "had"})
+
+
+def _verb_shaped(word: str) -> bool:
+    w = word.lower()
+    return (w.endswith("s") and not w.endswith(("ss", "us", "is"))) \
+        or w.endswith(("ed", "ing"))
+
+
+def _rest_of_the_description(beat: str, end: int) -> str:
+    """The noun a description tail left behind at `end`, with its space — or ""."""
+    m = re.match(r" ([a-z]+)(?![\w'’-])(?: ([a-z]+))?", beat[end:end + 60])
+    if not m:
+        return ""
+    word, after = m.group(1), (m.group(2) or "")
+    if word in _NOT_AN_ADJECTIVE or word in _NOT_A_NOUN_AFTER:
+        return ""
+    if _verb_shaped(word) and not (word.endswith("s") and after in _AUXILIARY):
+        return ""
+    return " " + word
+
+
 def _role_head(phrase: str) -> str:
     """The role word of a cast phrase — "man" for "man in the leather apron", the last
     word when no role word is in it ("Drenn Ironvale" → "ironvale")."""
@@ -4772,6 +4823,7 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
                 and gm_beat[m.end():m.end() + 1] in (",", "-"):
             tail = ""
         if tail:
+            tail += _rest_of_the_description(gm_beat, m.end())
             who = f"{who} {tail}"
         # Dedup on the head word ONLY for a bare repeat. "the man" after "desperate
         # man" is the same man mentioned again; "the man in the leather apron" is a
@@ -4779,6 +4831,17 @@ def note_cast(scene, gm_beat: str, turn: int = 0) -> list[str]:
         # player was never on the board (2026-09-18). An exact repeat of a phrase is
         # always the same person, whatever the description.
         if who.lower() in phrases or who.lower() in real_names:
+            continue
+        # A stump a save booked before `_rest_of_the_description` is the same person
+        # once the missing noun is read: the replay corpus's saves hold "sturdy woman
+        # with a missing front", and "a sturdy woman with a missing front tooth" booked
+        # her a second card on two turns of the 142 (2026-09-27). Only a phrase that
+        # has a description in it, and only one word short — a bare "man" is not a stump
+        # of every man described after him.
+        if tail and any(len(p.split()) == len(who.split()) - 1
+                        and re.search(r"\s(?:in|with)\s", p)
+                        and who.lower().startswith(p + " ")
+                        for p in phrases | real_names):
             continue
         if (head in heads or head in real) and len(who.split()) == 1:
             continue

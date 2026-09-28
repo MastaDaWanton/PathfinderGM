@@ -2412,7 +2412,16 @@ _DEAD_MAY = re.compile(
 _PLAYER_ACTS = re.compile(r"[\"“'‘]?\s*Your?\b", re.I)
 
 
-def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str]]:
+def _shared_with_the_living(said: str, living_words: list[list[str]]) -> bool:
+    """Whether the words that named a dead actor would name a living one just as well:
+    "thug" when a living "thug" or "second thug" stands here."""
+    words = said.lower().split()
+    n = len(words)
+    return any(words == lw[i:i + n] for lw in living_words for i in range(len(lw) - n + 1))
+
+
+def cut_dead_men_walking(text: str, dead_names, fresh=(),
+                         living=()) -> tuple[str, list[str]]:
     """Drop sentences where a dead actor gets up and acts.
 
     Measured across a live session: the stranger died in the opening turns, the panel
@@ -2430,19 +2439,37 @@ def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str
     `spooter.json`: four kills, four identical appended lines. Long-dead actors keep
     the strict rule, because "the stranger collapses" two turns after he died is the
     resurrection this cut exists for.
+
+    `living` names everybody here who is not dead. A dead name the sentence used that
+    fits one of them word for word is not evidence of a corpse acting, and the sentence
+    is left alone. Measured in the 2026-09-27 fight audit (gemma-4-12B): the scene held
+    two actors both named "thug", one dead, and this cut deleted "The thug lets out a
+    desperate, rattling groan and shuffles forward…" on the LIVING thug's own turn — the
+    one sentence that said who was acting. Inform's parser, given words that fit two
+    objects, asks "which do you mean?" rather than guess; with nobody to ask, the cut
+    declines. The mint now names the newcomer apart ("second thug",
+    `bestiary.name_apart`), and the model still writes "the thug" for him, which is why
+    a living name CONTAINING the words counts too. The cost, stated: a dead "thug" who
+    really does rise beside a living "second thug" is no longer cut.
     """
     if not text or not dead_names:
         return text or "", []
     names = [n for n in dead_names if n and len(n) >= 3]
     if not names:
         return text, []
-    pattern = re.compile("|".join(re.escape(n) for n in names), re.I)
+    # Longest first and whole words: "second thug" must be read as itself before "thug"
+    # is read inside it, and "thug" is not the start of "thuggish".
+    names = sorted(set(names), key=len, reverse=True)
+    pattern = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(n) for n in names)
+                         + r")(?!\w)", re.I)
+    living_words = [str(n).lower().split() for n in living or () if n and str(n).strip()]
     just_died = re.compile("|".join(re.escape(n) for n in fresh if n and len(n) >= 3),
                            re.I) if any(n and len(n) >= 3 for n in fresh) else None
     cut, spans = [], []
     for m in _SENTENCE.finditer(text):
         s = m.group(0)
-        hit = pattern.search(s)
+        hit = next((h for h in pattern.finditer(s)
+                    if not _shared_with_the_living(h.group(0), living_words)), None)
         dying_now = bool(just_died and just_died.search(s)
                          and (_FELLED.search(s) or _DEATH_LANGUAGE.search(s)))
         if hit and not dying_now and not _DEAD_MAY.search(s) \
