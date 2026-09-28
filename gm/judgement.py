@@ -4577,8 +4577,11 @@ def inject_say(raw_intents, player_text: str, scene) -> list:
                                  "params": params}]
 
 
-def declared_ops(player_text: str, scene, world=None) -> list[str]:
+def declared_ops(player_text: str, scene, world=None, *, attached=None) -> list[str]:
     """The ops the player's own words already commit the turn to.
+
+    `attached` is the turn's attachments (a spell chosen from the Spells button,
+    docs/fix-interfaces.md §2.10): accepted and not read yet — Lane E reads it in Phase 2.
 
     Each injector is asked what it would add to an empty turn. Whatever it names is
     something the player has plainly declared, so the schema can insist on it up front
@@ -4627,8 +4630,10 @@ _ABOUT_A_SPELL = re.compile(
     r"learn|scribe|read)\b", re.I)
 
 
-def inject_cast(raw_intents, player_text: str, scene) -> list:
-    """Make a declared spell reach the engine."""
+def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
+    """Make a declared spell reach the engine.
+
+    `attached`: the turn's attachments, accepted and not read yet (Lane E, Phase 2)."""
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text or _ABOUT_A_SPELL.search(player_text):

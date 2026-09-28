@@ -93,12 +93,30 @@ datas += [(str(_stamp_dir / "build-stamp.txt"), ".")]
 
 # --- code ------------------------------------------------------------------------------
 
+# The packages whose members are found by FILENAME at runtime (`pkgutil.iter_modules`
+# over the package's `__path__`, docs/fix-interfaces.md §2.0): narrator checks, brief
+# sections, after-the-beat steps. Nothing imports a member by name — that is the point of
+# them — so static analysis never sees one, and a member missing from the bundle is not
+# an error: the frozen app simply discovers nothing and checks nothing. The blanket
+# `collect_submodules("gm")`/`("play")` below already reach them; they are named here as
+# well so the claim is written down and `tests/test_s1_check_registry.py` can hold the
+# spec to it. A package that does not exist yet (each lands on its own branch) is
+# skipped rather than breaking the build: its `__init__.py` is looked for on disk, not
+# imported, so the spec never has to import Django to decide.
+DISCOVERED_PACKAGES = ("gm.checks", "gm.brief", "play.aftermath")
+
+discovered = []
+for _package in DISCOVERED_PACKAGES:
+    if Path(*_package.split("."), "__init__.py").is_file():
+        discovered += [_package] + collect_submodules(_package)
+
 hiddenimports = (
     collect_submodules("rules")
     + collect_submodules("play")
     + collect_submodules("gm")
     + collect_submodules("world")
     + collect_submodules("pathfindergm")
+    + discovered
     # Django resolves these from settings strings too. The staticfiles app is the one that
     # actually bit: it is in INSTALLED_APPS, but its *finders* and the signed-cookie
     # session backend are named in settings as dotted paths and nothing imports them.
