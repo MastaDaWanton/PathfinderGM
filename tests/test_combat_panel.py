@@ -51,8 +51,9 @@ def fight(tmp_path):
 
 
 def _at_arms_length(cm):
-    """The fight lays the thug fifteen feet off, and a strike from there is refused with
-    the square to step to (test_maneuver_reach.py). The swing tests stand him close."""
+    """The thug came in `near` and stands fifteen feet off, and a strike from there is
+    refused with the square to step to (test_maneuver_reach.py). The swing tests stand
+    him close."""
     face_to_face(cm.current().scene)
     cm.current().save()
 

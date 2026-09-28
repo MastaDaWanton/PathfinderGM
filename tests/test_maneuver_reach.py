@@ -228,9 +228,9 @@ def test_the_attack_and_the_attack_of_opportunity_read_one_rule():
 # --- what it does not refuse ----------------------------------------------------------------
 
 def test_the_swing_that_opens_a_fight_is_not_measured():
-    """The map is down from arrival, but where people idle before a fight is no claim
-    about it: `_lay_battlefield` re-lays everybody as the fight forms, and the opening
-    swing is deferred ("Battle is joined") rather than rolled."""
+    """The opening swing rolls nothing: it joins battle ("Battle is joined") and the blow
+    is the attacker's to declare — and have measured — on their first combat turn. And
+    the fight moves nobody (the ruling of 2026-09-28): both stand where they stood."""
     scene = Scene(location_id="5bbd0c40345f")
     scene.add(load_pc("fixtures/pc-kesst.json"), at=(1, 1))
     scene.add(instantiate("thug", scene=scene, name="the thug"), at=(12, 12))
@@ -239,6 +239,7 @@ def test_the_swing_that_opens_a_fight_is_not_measured():
     assert scene.distance_between("pc", "c1") > 5
     res = engine.run(engine.validate([_attack()]))
     assert "Battle is joined" in res.outcomes[0].tell
+    assert scene.positions["pc"] == (1, 1) and scene.positions["c1"] == (12, 12)
 
 
 def test_a_mapless_scene_is_not_refused():

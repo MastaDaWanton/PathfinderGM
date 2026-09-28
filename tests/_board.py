@@ -3,8 +3,10 @@
 Since 2026-09-27 a melee blow is refused from further than the attacker reaches (Core
 Rulebook p.182; `position.out_of_reach`). Forty-six tests swung across the fifteen feet
 `_ensure_encounter` lays a foe with no zone at, because nothing had ever asked — every one
-of them was about the blow (its dice, its rider, its tell), none about the distance. This
-is their premise said once: the two are at arm's length. The distance itself has its own
+of them was about the blow (its dice, its rider, its tell), none about the distance. Since
+2026-09-28 a newcomer also stands at their zone from the moment they arrive, and the fight
+moves nobody, so `near` is fifteen feet before the fight as well as during it. This is
+their premise said once: the two are at arm's length. The distance itself has its own
 tests in tests/test_maneuver_reach.py.
 """
 from __future__ import annotations

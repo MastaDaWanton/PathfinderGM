@@ -511,7 +511,14 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     Engine(scene, Dice(seed), world=world).place_party()
     here = opening.roll(campaign_id, seed)
-    watcher = scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
+    # Where they stand is what their own description says, read by the same cues the
+    # prose is read by: "the stranger sharing the step" and "the neighbour beside you"
+    # were added `near` and laid fifteen feet off (measured 2026-09-28), which the map
+    # has shown ever since arrivals got a square the moment they come in.
+    from gm.judgement import zone_of_mention
+
+    watcher = scene.add(instantiate(here.template, scene=scene, name=here.who),
+                        zone=zone_of_mention(here.who, 0, len(here.who)))
     c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )

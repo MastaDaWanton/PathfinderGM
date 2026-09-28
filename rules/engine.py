@@ -449,6 +449,16 @@ class Scene:
             self.positions[actor.ref] = (
                 (int(at[0]), int(at[1])) if len(at) < 3
                 else (int(at[0]), int(at[1]), int(at[2])))
+        elif self.grid is not None and not actor.is_pc:
+            # Somebody who comes into a room with a map stands somewhere on it, from the
+            # moment they come in. The user's ruling, 2026-09-28: "people should already
+            # be in the scene which means they should already have a place on the board
+            # that shouldn't change unless they move." Measured the same day: in a fresh
+            # campaign the foreman the scene introduced had no square at all — the ground
+            # was laid before he arrived and nothing placed arrivals — so the first swing
+            # at him had the fight invent one, fifteen feet off. `place_by_zone` measures
+            # from the player's real square, and does nothing while they have none.
+            self.place_by_zone([actor.ref])
         # The mark only ever rises. Loading a save, spawning, promoting a cast entry all
         # come through here, so a save from before the mark existed heals itself to the
         # highest ref it holds on the first load.
@@ -2231,9 +2241,9 @@ class Engine:
             # Reach, asked here so the model gets its retry with the square to step
             # to in hand. Unless this list moves one of them first — then only the
             # board after the move can answer, and the floor in `_op_attack` does.
-            # Only inside a running fight: the map is down from arrival, but where
-            # people idle before a fight is no claim about it — the swing that opens
-            # one is deferred, and `_lay_battlefield` re-lays everybody as it forms.
+            # Only inside a running fight: the swing that opens one rolls nothing —
+            # it joins battle and defers — so the blow itself is declared, and
+            # measured, on the attacker's first combat turn.
             # Nor while the target is still a question: with `undecided` parked, the
             # ref is a placeholder and `_op_attack` asks "which of them?" — the
             # distance to somebody nobody chose is not the refusal to print.
@@ -2843,7 +2853,7 @@ class Engine:
         # Printed, not raised — by now nobody is listening for a retry. Asked before
         # anybody is drawn in: a blow that cannot land does not make a bystander a
         # combatant. And only inside a running fight — a swing that opens one is
-        # deferred below, and the fight re-lays everybody's squares as it forms.
+        # deferred below and rolls nothing, so there is no blow yet to measure.
         if (partial.get("attack_state") is None and self.scene.in_encounter
                 and not self._battle_joined):
             out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
@@ -4610,7 +4620,19 @@ class Engine:
         # been put anywhere yet — the map tray says so rather than drawing a blank field —
         # but a brawl still has to happen on ground, and `floorplan.for_place("")` falls
         # through to open ground the way every fight used to get.
-        if self.scene.grid is not None or not (self.scene.at or even_nowhere):
+        if self.scene.grid is not None:
+            # The ground is down already; anybody still standing nowhere on it is put
+            # at their zone now — a save from before arrivals were placed, a door that
+            # added somebody before the player had a square. Nobody who HAS a square is
+            # touched: it is theirs until they move (the ruling of 2026-09-28).
+            pc = self.scene.pc()
+            if place and pc is not None and pc.ref in self.scene.positions:
+                stragglers = [r for r in self.scene.actors
+                              if r != pc.ref and r not in self.scene.positions]
+                if stragglers:
+                    self.scene.place_by_zone(stragglers)
+            return False
+        if not (self.scene.at or even_nowhere):
             return False
         from . import floorplan, places as places_mod
 
@@ -8458,17 +8480,28 @@ class Engine:
         # alley is gone" — their narrow-room rule had been made unreachable by this app's
         # own floor — and this is the half of that fix which is not the floor.
         pc_side, foe_row = max(1, min(4, self.scene.grid.width // 4)), 0
-        # The fight lays out its own combatants, even where they were already standing.
+        # Everybody already standing somewhere keeps that square: a fight is a layer of
+        # initiative over the room, not a new room. The user's ruling, 2026-09-28:
+        # "people should already be in the scene which means they should already have a
+        # place on the board that shouldn't change unless they move." Foundry's combat
+        # tracker is the same shape — combatants are the tokens already on the canvas.
         #
-        # This is the one place the geometry is load-bearing: a zone word and a stated
-        # distance are claims about the fight ("I loose an arrow at him from 200 feet"),
-        # and an idle position from standing about in the room is not. Measured by the
-        # suite the hour the map became permanent: with everyone pre-placed on arrival the
-        # bowshot opened at forty feet, because the loop below skips anybody who already
-        # has a square. Bystanders keep where they were standing — they are the half of
-        # the room that is not the fight.
-        for ref in [r for refs in sides.values() for r in refs]:
-            self.scene.positions.pop(ref, None)
+        # This loop used to pop every combatant's square and lay them out afresh by
+        # zone, on the theory that a zone word is a claim about the fight and an idle
+        # position is not; the case behind it was a bowshot that opened at forty feet.
+        # That is answered where the claim is made instead — a spawn with a stated
+        # distance is placed AT that distance as it arrives (`_op_spawn`,
+        # `place_by_zone(feet=...)`), so nothing here has to re-lay anybody. And the
+        # re-lay did harm the other way: the man the player was standing beside was
+        # moved fifteen feet off by the act of swinging at him.
+        #
+        # Only the unplaced are laid. With the player already on the map, from the
+        # player's real square; on fresh ground, in the columns below.
+        pc = self.scene.pc()
+        if pc is not None and pc.ref in self.scene.positions:
+            for ref in [r for refs in sides.values() for r in refs
+                        if r in self.scene.actors and r not in self.scene.positions]:
+                self.scene.place_by_zone([ref], feet=self.scene.spawn_feet.get(ref))
         for side, refs in sides.items():
             has_pc = any(self.scene.actors[r].is_pc for r in refs
                          if r in self.scene.actors)

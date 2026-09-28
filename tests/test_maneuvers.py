@@ -298,6 +298,11 @@ def test_a_manoeuvre_with_no_size_limit_is_allowed_against_anything(engine, scen
                    "hp": 90, "flat_ac": 20, "flat_attack": 12, "flat_cmd": 30},
                   ref="c2")
     scene.add(giant)
+    # Beside the player: a newcomer now stands at his zone from the moment he arrives,
+    # and a disarm from fifteen feet is refused for reach (test_maneuver_reach.py).
+    # A 3x3 body anchored here touches (4,10) diagonally and misses the thug at (5,10).
+    scene.positions["c2"] = (5, 11)
+    assert scene.distance_between("pc", "c2") == 5
     engine.validate([{"op": "attack", "actor": "pc", "target": "c2",
                       "params": {"manoeuvre": "disarm"}}])
 
