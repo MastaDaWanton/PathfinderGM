@@ -91,6 +91,32 @@ def has(key: str) -> bool:
     return (key or "").strip().lower() in all_weapons()
 
 
+def described(key: str) -> str:
+    """What the thing in the hand IS, in the table's own words, for a prompt:
+    "a light one-handed bludgeoning weapon: weighted head, wrapped grip".
+
+    Built from the row, never hand-written per weapon. Measured live 2026-09-27: told
+    "In hand: the sap", the local model wrote "the heavy vial of sap" and "the sticky
+    liquid splashes wide" — a sap is a leather cosh, and the bare word reads as tree
+    sap. Every weapon whose name is also an ordinary word (sap, flail, pick, star) is
+    the same trap; the row already knows it has a weighted head. "" for anything the
+    table does not hold.
+    """
+    if not has(key):
+        return ""
+    row = get(key)
+    ranged = row.get("category") == "ranged"
+    hands = int(row.get("hands") or 1)
+    # The hand count only for melee: the table lists a longbow as one hand, which is
+    # what it takes to carry, not to draw.
+    grip = "" if ranged else ("two-handed" if hands >= 2 else "one-handed")
+    words = " ".join(w for w in ("light" if row.get("light") else "", grip,
+                                 str(row.get("type") or ""), "ranged" if ranged else "")
+                     if w)
+    parts = [str(v).lower() for v in (row.get("components") or {}).values() if v]
+    return f"a {words} weapon" + (f": {', '.join(parts)}" if parts else "")
+
+
 def has_trait(key: str, trait: str) -> bool:
     """Does this weapon carry that special quality — `reach`, `trip`, `brace`?
 

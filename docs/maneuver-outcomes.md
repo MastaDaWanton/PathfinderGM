@@ -64,7 +64,7 @@ dirty trick, reposition and steal).
 - **ROM 2.4** `fight.c:disarm()` puts the weapon on the room's floor (`obj_to_room`), never
   into the attacker's hands, and an NPC that can see it picks it straight back up;
   `do_steal` takes only an item with no wear location into the thief's inventory. The
-  drop and the steal follow ROM. The NPC's pick-up does not exist here yet (open, below).
+  drop and the steal follow ROM. The NPC's pick-up is docs/creature-rearms.md, priced by 1e.
 - **NetHack's** bullwhip puts a snatched weapon under the monster, at your feet or in
   your pack by skill; a branch where the snatched weapon hit you is still in the source
   under `#if 0`, which is to say tried and abandoned.
@@ -122,9 +122,10 @@ And the doors the outcomes needed:
 
 ## Still open
 
-- **NPCs never pick their weapon back up.** ROM's NPC does at once; 1e makes it a move
-  action that provokes. The creature-turn ops (`_CREATURE_OPS`) have no `give`, so a
-  disarmed thug fights on with his dagger or his fists.
+- ~~**NPCs never pick their weapon back up.**~~ Closed 2026-09-27 on branch
+  `creature-recovers-weapon`: the engine re-arms a disarmed creature first (pick it up
+  within reach, which provokes; else draw a carried weapon; else fists). See
+  docs/creature-rearms.md.
 - ~~Manoeuvres have no reach check.~~ Closed 2026-09-28 by the maneuver-reach work
   (`position.out_of_reach`, tests/test_maneuver_reach.py): a blow or a manoeuvre from
   further than the attacker reaches is refused, and the square is named.

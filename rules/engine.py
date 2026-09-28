@@ -1294,10 +1294,16 @@ class Scene:
     # --- the props ledger: one applicator for where a thing is -----------------------
 
     def place_prop(self, name: str, *, owner: str = "", from_: str = "",
-                   state: str = "intact", at: str | None = None, turn: int = 0) -> dict:
+                   state: str = "intact", at: str | None = None, turn: int = 0,
+                   square=None) -> dict:
         """A thing comes to lie somewhere: dropped, thrown, left in fragments. The
         record already held for it (by name, in the hands of somebody here or lying
-        here) moves; otherwise one is made. Returns the record."""
+        here) moves; otherwise one is made. Returns the record.
+
+        `square` is the map square it lies in, when a map is laid and the caller knows
+        it — a disarmed weapon lands "at the feet of the disarmed creature" (Greater
+        Disarm's Normal line), so in its square. Without one the thing is at this spot
+        and nowhere more exact, and a reach question about it is unmeasurable."""
         rec = self.prop_named(name)
         if rec is None:
             rec = {"name": " ".join(str(name).split()), "owner": owner, "from_": from_,
@@ -1305,6 +1311,11 @@ class Scene:
             self.props.append(rec)
         rec.pop("held_by", None)
         rec["at"] = str(at if at is not None else self.at)
+        # Replaced, never kept: a square from where it lay LAST time would put a thrown
+        # sap back at the feet it was knocked from.
+        rec.pop("square", None)
+        if square is not None and self.has_grid:
+            rec["square"] = [int(v) for v in tuple(square)[:2]]
         if owner:
             rec["owner"] = owner
         if from_:
@@ -1324,6 +1335,7 @@ class Scene:
                    "from_": from_, "state": state or "intact", "turn": int(turn)}
             self.props.append(rec)
         rec.pop("at", None)
+        rec.pop("square", None)
         rec["held_by"] = ref
         if owner:
             rec["owner"] = owner
@@ -1356,6 +1368,23 @@ class Scene:
                     and rec.get("held_by") != ref):
                 return rec
         return None
+
+    def within_reach(self, ref: str, rec: dict) -> int | None:
+        """How far past `ref`'s reach a lying thing is, in feet: 0 when it can be
+        taken from where they stand, None when it cannot be measured (no map, nobody
+        placed on it, or a record with no square).
+
+        Natural reach, not the weapon's: a glaive lets you strike ten feet off and does
+        not let you pick a sap up there. Measured from the edge of the creature's space,
+        as every reach in `grid` is, so a Large ogre's own squares count."""
+        square = rec.get("square")
+        anchor = self.positions.get(ref)
+        actor = self.actors.get(ref)
+        if not self.has_grid or square is None or anchor is None or actor is None:
+            return None
+        gap = gridmod.distance_between(tuple(anchor), actor.size,
+                                       tuple(square), "medium")
+        return max(0, gap - gridmod.natural_reach(actor.size))
 
     def props_here(self) -> list[dict]:
         """What lies at the party's spot, unheld."""
@@ -2650,11 +2679,16 @@ class Engine:
         else — which is what makes a player-taken attack of opportunity suspend for a dice
         roll without a single line of special handling.
 
-        Only movement provokes today. The shape is a dispatch rather than an `if` because
-        the next triggers (casting in a threatened square, standing up from prone) are the
-        same machinery with a different question.
+        Movement provokes, and so does picking a thing up off the ground (1e Table 7-2,
+        "Pick up an item": a move action, attack of opportunity yes). The shape is a
+        dispatch rather than an `if` because the next triggers (casting in a threatened
+        square, standing up from prone) are the same machinery with a different question.
         """
-        if raw.get("op") != "move" or not self.scene.in_encounter:
+        if not self.scene.in_encounter:
+            return []
+        if raw.get("op") == "give":
+            return self._provoked_by_pick_up(raw)
+        if raw.get("op") != "move":
             return []
 
         ref = (raw.get("params") or {}).get("who") or raw.get("actor")
@@ -2676,6 +2710,39 @@ class Engine:
                 # Never a full attack: an attack of opportunity is a single swing, and
                 # letting it inherit the attacker's iteratives would turn a fighter's
                 # threatened square into four free attacks a round.
+                "params": {"full_attack": False, "reaction": reaction.id},
+                "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+            })
+        return out
+
+    def _provoked_by_pick_up(self, raw: dict) -> list[dict]:
+        """The attacks of opportunity a pick-up from the ground is owed.
+
+        Only a thing that IS lying here with a record: a `give` from a giver's hands, a
+        purchase, or a thing the world supplies with no record is not somebody stooping
+        in a fight. And only when it is in reach — out of reach the give is refused, and
+        a swing at a creature for a pick-up that never happened would be the engine
+        inventing an opening. Found 2026-09-27: until this, the player's own pick-up of
+        a disarmed thug's sap was a free action with a thug standing over it.
+        """
+        params = raw.get("params") or {}
+        if params.get("from_") or params.get("price"):
+            return []
+        taker = params.get("to") or raw.get("target") or raw.get("actor")
+        rec = self.scene.prop_on_the_ground(str(params.get("item", "")))
+        if not taker or taker not in self.scene.actors or rec is None:
+            return []
+        if self.scene.within_reach(taker, rec):
+            return []
+        mover = self.scene.actors[taker]
+        thing = str(rec.get("from_") or rec.get("name"))
+        out: list[dict] = []
+        for watcher, reaction in reactions.provoked_by_action(self.scene, taker):
+            if not self._spend_reaction(watcher, reaction.budget):
+                continue
+            out.append({
+                "op": reaction.op, "actor": watcher, "target": taker,
+                "because": f"{mover.name} stooped for the {thing} within reach",
                 "params": {"full_attack": False, "reaction": reaction.id},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
@@ -3812,6 +3879,20 @@ class Engine:
                 "refs",
             )
         defender = self.scene.actors[targets[0]]
+        # The move's rule, for a swing. `validate` asked whether they could attack
+        # before the list began; an attack of opportunity spliced in front of an
+        # earlier intent in the same list can drop them since. Measured 2026-09-27:
+        # the player's AoO put a thug stooping for his sap unconscious, the give said
+        # "never picks up the sap", and the swing queued behind it still rolled.
+        if (partial.get("attack_state") is None and self.scene.in_encounter
+                and not intent.params.get("reaction")
+                and (actor.is_down or actor.blocking_key("attack"))):
+            why = (actor.blocking_condition() or "down").lower()
+            return Outcome(
+                intent_id=intent.id, op="attack", status="prevented",
+                effects=[{"ref": actor.ref, "kind": "attack_stopped", "why": why}],
+                tell=f"{actor.name} is {why} and never swings.",
+                because=intent.because)
         # Two live people and no word from the player about which: nobody chooses for
         # them. `judgement.check_the_target` parks the candidates here, and the refusal
         # is prose on the page (Inform's check rulebook), never a lost turn.
@@ -4095,13 +4176,14 @@ class Engine:
                 natural = atk.natural
                 if natural == 1:
                     state["tells"].append(
-                        f"{actor.name}'s attack goes badly wide (natural 1).")
+                        f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
+                        f"badly wide (natural 1).")
                     state["i"] += 1
                     continue
                 if not d20_succeeds(atk, target_ac):
                     state["tells"].append(
-                        f"{actor.name}'s attack misses {defender.name} "
-                        f"({atk.total} against {ac_note}).")
+                        f"{actor.name}'s attack{_instrument(weapon, weapon_key)} misses "
+                        f"{defender.name} ({atk.total} against {ac_note}).")
                     state["i"] += 1
                     continue
                 # Concealment: displacement, blur, entropic shield and invisibility all
@@ -4256,7 +4338,8 @@ class Engine:
                 # will narrate a wound nobody took.
                 state["tells"].append(
                     f"{actor.name} {'critically ' if state.get('crit') else ''}hits "
-                    f"{defender.name} for {hit['amount']} "
+                    f"{defender.name}{_instrument(weapon, weapon_key)} for "
+                    f"{hit['amount']} "
                     # The one word that keeps a knockout from being narrated as a
                     # wound: the narrator is fed tells and nothing else, and the
                     # effect's `lethality` never reaches it.
@@ -4763,7 +4846,10 @@ class Engine:
         return self.scene.place_prop(
             f"{owner.name}'s {key}", owner=owner.ref, from_=key,
             state="broken" if worn is not None and worn.broken else "intact",
-            turn=int(self.scene.clock_minutes))
+            turn=int(self.scene.clock_minutes),
+            # At their feet: in their own square, so a bull rush that follows the
+            # disarm leaves the weapon behind, where a pick-up has to reach it.
+            square=self.scene.positions.get(owner.ref))
 
     def _into_hands(self, taker: Actor, item: str, equip: bool = False) -> None:
         """A thing goes into this creature's carry, routed the way `_op_give` routes a
@@ -10469,6 +10555,29 @@ class Engine:
             if taker is not None and not denom:
                 rec = self.scene.prop_on_the_ground(item)
                 if rec is not None:
+                    # Picking a thing up is done with a hand, from where you stand
+                    # (natural reach; 1e Table 7-2: a move action). A thing lying
+                    # further off is walked to first — a `move`, which the refusal
+                    # names — rather than taken across the room.
+                    past = self.scene.within_reach(taker.ref, rec)
+                    if past:
+                        return self._refuse(
+                            intent, f"{rec['name']} lies {past} ft beyond "
+                                    f"{taker.name}'s reach. Move next to it first, then "
+                                    f"pick it up.")
+                    # Stooping for it provokes, and the attack of opportunity was
+                    # spliced in front of this intent (`_reactions_before`): if it
+                    # dropped them, the hand never closes on it — the move's rule.
+                    if self.scene.in_encounter and not taker.can_act():
+                        why = (taker.blocking_condition() or "down").lower()
+                        return Outcome(
+                            intent_id=intent.id, op="give", status="prevented",
+                            effects=[{"ref": taker.ref, "kind": "pick_up_stopped",
+                                      "prop": rec["name"], "why": why}],
+                            tell=f"{taker.name} is {why} and never picks up "
+                                 f"{self._the(str(rec.get('from_') or rec['name']))}.",
+                            because=intent.because)
+                    whose_rec = str(rec.get("owner") or "")
                     self.scene.hold_prop(rec["name"], taker.ref,
                                          turn=int(self.scene.clock_minutes))
                     item = rec["name"]
@@ -10480,9 +10589,14 @@ class Engine:
                         item = str(rec["from_"])
                         from_ground = True
                         moved = 1           # that one thing, not `count` of them
-                    whose = self.scene.actors.get(str(rec.get("owner") or ""))
+                    whose = self.scene.actors.get(whose_rec)
                     if whose is not None and whose.ref != taker.ref:
                         note = f" — {whose.name}'s, not {taker.name}'s"
+                    elif whose_rec == taker.ref and from_ground:
+                        # Their own weapon, back from the ground. "The thug takes
+                        # sap." was the whole tell, which says neither that it was
+                        # lying there nor that it is in the hand again.
+                        note = "back up off the ground; it is in hand again"
 
         if taker is not None and moved:
             if denom:
@@ -10524,6 +10638,8 @@ class Engine:
         what = f"{moved} × {item}" if moved != 1 else item
         if giver is not None and taker is not None:
             tell = f"{giver.name} hands {taker.name} {what}{paid}."
+        elif taker is not None and note.startswith("back up"):
+            tell = f"{taker.name} takes {self._the(what)} {note}."
         elif taker is not None:
             tell = f"{taker.name} takes {what}{paid}{note}."
         elif giver is not None:
@@ -11819,6 +11935,26 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
     return ""
+
+
+def _instrument(weapon: dict, weapon_key: str) -> str:
+    """" with the sap" — what the blow was struck with, for the tell — or "" for a
+    bare hand or an improvised thing (whose own tell names it).
+
+    The narrator is fed tells and nothing else about mechanics, and "the thug hits
+    Kesst Vayr for 5 bludgeoning" named no weapon at all. Measured live 2026-09-27: a
+    disarmed thug took his sap back up, swung it three rounds running, and the prose
+    had him clamping her forearm, driving his fist into her ribs and raking with "its
+    taloned limbs" — the body the brief describes, since nothing said what was in his
+    hand. The weapon rides as the instrument, after the defender, never as the subject:
+    a tell that opened with an object ("weapon's attack misses Masta", 2026-09-18) had
+    the model hand the blow to the player (`narration.wrong_hands`).
+    """
+    key = str(weapon_key or "").lower()
+    if key in ("unarmed", "improvised"):
+        return ""
+    name = " ".join(str(weapon.get("name") or key).split())
+    return f" with the {name}" if name else ""
 
 
 def _damage_note(d: dict) -> str:

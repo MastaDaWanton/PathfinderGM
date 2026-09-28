@@ -36,6 +36,15 @@ TRIGGERS = {
         "A creature moves out of a square this one threatens, without withdrawing. The "
         "classic attack of opportunity."
     ),
+    # 1e Table 7-2 marks some actions as provoking wherever they are taken: "Pick up an
+    # item — move action — attack of opportunity: yes". The first of them wired here is
+    # the pick-up, because the disarm puts a weapon on the ground and a creature stooping
+    # for it is the one moment in a fight its guard is down on purpose (TemplePlus's
+    # "Retrieve Disarmed Weapon ... will provoke an AoO if done within combat").
+    "provoking_action": (
+        "A creature in a square this one threatens takes an action the rules say "
+        "provokes — picking an item up off the ground."
+    ),
 }
 
 
@@ -54,12 +63,20 @@ class Reaction:
     budget: str = "attack_of_opportunity"
     source: str = ""
     because: str = ""
+    # Further triggers the same reaction answers. An attack of opportunity is ONE
+    # reaction with one allowance whether the goblin fled or stooped, so it is one
+    # record that fires on both rather than two records a budget could count twice.
+    also: tuple[str, ...] = ()
+
+    def fires_on(self, trigger: str) -> bool:
+        return trigger == self.trigger or trigger in self.also
 
 
 def attack_of_opportunity(actor) -> Reaction:
     return Reaction(
         id="attack_of_opportunity",
         trigger="leaves_threatened_square",
+        also=("provoking_action",),
         op="attack",
         source="attack of opportunity",
         because="they moved out of reach",
@@ -122,6 +139,8 @@ def threatens(scene, watcher_ref: str, square) -> bool:
     # Threatening a square is about being able to swing into it.
     if anchor is None or watcher is None or watcher.blocking_key("attack"):
         return False
+    if disarmed_and_empty_handed(scene, watcher):
+        return False
     reach = _reach_of(watcher)
     if reach <= 0:
         return False
@@ -132,6 +151,37 @@ def threatens(scene, watcher_ref: str, square) -> bool:
         threatened -= gridmod.threatened_squares(anchor, watcher.size,
                                                  reach=gridmod.SQUARE_FT)
     return tuple(square) in threatened
+
+
+def disarmed_and_empty_handed(scene, actor) -> bool:
+    """Knocked out of its weapon and holding nothing: 1e's "an unarmed character can't
+    take attacks of opportunity", in the one case this engine can say it safely.
+
+    `_reach_of` below explains why the general rule is not applied — every bestiary
+    creature fights with an empty `weapons` list, so "unarmed threatens nothing" would
+    stop the whole bestiary threatening. A creature whose own weapon lies on the ground
+    (the props ledger says so) is not that case: it HAD a weapon and lost it. Without
+    this, a pick-up provoking (Table 7-2) handed the disarmed thug a punch at the player
+    stooping for his sap, which the rule gives him no hand to throw. A body that is
+    its own weapon — claws, a bite — or Improved Unarmed Strike still threatens
+    (the Paizo forum's disarmed orc "doesn't threaten" unless it has natural attacks).
+    """
+    if str(getattr(actor, "equipped", "") or "unarmed").lower() != "unarmed":
+        return False
+    out = getattr(scene, "out_of_hand", None)
+    if out is None or not any(out(actor.ref, w) for w in _own_weapons_off(scene, actor)):
+        return False
+    doc = actor._race_doc() if hasattr(actor, "_race_doc") else None
+    if (doc or {}).get("weapons"):
+        return False
+    feats = [actor._feat_name(str(f)) for f in (getattr(actor, "feats", ()) or ())]
+    return "improved unarmed strike" not in feats
+
+
+def _own_weapons_off(scene, actor) -> list[str]:
+    """What this creature owns that the props ledger has somewhere other than its hand."""
+    return [str(r.get("from_")) for r in getattr(scene, "props", ()) or ()
+            if r.get("owner") == actor.ref and r.get("from_")]
 
 
 def _reach_of(actor) -> int:
@@ -231,7 +281,35 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
         if not vacated:
             continue
         for reaction in reactions_for(watcher):
-            if reaction.trigger == "leaves_threatened_square":
+            if reaction.fires_on("leaves_threatened_square"):
+                out.append((ref, reaction))
+    return out
+
+
+def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
+    """Who gets an attack of opportunity because this creature, where it stands, took an
+    action that provokes.
+
+    Every creature not on its side that threatens any square it fills — the same
+    `threatens` a move asks, so reach weapons, the hole beside a glaive and a watcher who
+    cannot swing all answer the same way here. Nothing on a scene with no map, for the
+    reason `threatens` gives.
+    """
+    if not scene.has_grid:
+        return []
+    actor = scene.actors.get(actor_ref)
+    anchor = scene.positions.get(actor_ref)
+    if actor is None or anchor is None:
+        return []
+    filled = set(gridmod.footprint(tuple(anchor), actor.size))
+    out: list[tuple[str, Reaction]] = []
+    for ref, watcher in scene.actors.items():
+        if ref == actor_ref or _allied(scene, ref, actor_ref):
+            continue
+        if not any(threatens(scene, ref, sq) for sq in filled):
+            continue
+        for reaction in reactions_for(watcher):
+            if reaction.fires_on("provoking_action"):
                 out.append((ref, reaction))
     return out
 
@@ -243,5 +321,6 @@ def _allied(scene, a: str, b: str) -> bool:
     return False
 
 
-__all__ = ["Reaction", "TRIGGERS", "budget_for", "provoked_by_move", "reach_with",
-           "reactions_for", "threatens"]
+__all__ = ["Reaction", "TRIGGERS", "budget_for", "disarmed_and_empty_handed",
+           "provoked_by_action", "provoked_by_move", "reach_with", "reactions_for",
+           "threatens"]
