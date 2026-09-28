@@ -2090,9 +2090,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).
+            refused_names: list = []
             for ref, given in judgement.apply_introductions(c.scene, text, player_input,
-                                                             said=agent.last_said):
+                                                             said=agent.last_said,
+                                                             refused=refused_names):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
+            for ref, given, whose in refused_names:
+                repairs.append(f"{ref} was not renamed {given}: {whose} answers to it")
             # Somebody who spoke to the player in this beat is in conversation with
             # them from here, until the player takes their leave (2026-09-24). Through
             # the engine's one door, so the panel and the refusals read the same state.
