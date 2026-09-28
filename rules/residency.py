@@ -541,6 +541,16 @@ _PARTS = ("deep in the night", "the small hours", "early morning", "morning", "m
           "afternoon", "evening", "late evening")
 
 
+def day_part(clock: int) -> str:
+    """The part of the day in words — "early morning", "late evening" — and nothing else.
+
+    The same eight parts `time_words` names, split out so the panel (`/api/state`'s
+    `scene.day_part`, docs/fix-interfaces.md §2.9) and the brief cannot name the hour two
+    ways. No count and no clock face: the page shows words where the narrator reads them.
+    """
+    return _PARTS[slot_of(int(clock or 0))]
+
+
 def time_words(clock: int) -> str:
     """The hour as the narrator is told it: "day 2, evening (about 7 in the evening)".
 
