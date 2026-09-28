@@ -8,6 +8,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import IntentError
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 @pytest.fixture
@@ -27,8 +28,10 @@ def engine(scene):
 def fight(engine):
     """An encounter already running, initiator's turn kept — the old auto-start
     semantics, done in setup. Since the battle gate landed, a first swing out of
-    combat opens the fight and defers; these fixtures test the swing itself."""
+    combat opens the fight and defers; these fixtures test the swing itself, so the
+    two stand at arm's length (a swing from across the room is refused)."""
     engine._ensure_encounter("pc")
+    face_to_face(engine.scene)
     return engine
 
 

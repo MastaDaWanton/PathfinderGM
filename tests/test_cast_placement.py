@@ -12,6 +12,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import SQUARES_BY_ZONE, Engine, Scene
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 def _mentions(beat: str) -> dict[str, str]:
@@ -119,6 +120,7 @@ def test_swinging_at_a_bystander_brings_them_in():
     engine = Engine(s, Dice(seed=4))
     assert engine._ensure_encounter(pc.ref, target=thug.ref)
     assert merchant.ref not in s.sides["them"]
+    face_to_face(s, pc.ref, merchant.ref)   # within reach: a swing from 15 ft is refused
     intents = engine.validate([{"op": "attack", "actor": "pc", "target": merchant.ref,
                                 "because": "test"}], origin="author:test")
     engine.run(intents)

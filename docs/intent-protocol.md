@@ -159,7 +159,7 @@ and gets a real id.
 |---|---|---|
 | `check` | `skill`, `dc`, `opposed_by?`, `circumstance?`, `aid?` | Skill and ability checks. `opposed_by` makes it a contest; the engine rolls both sides. |
 | `save` | `save`, `dc`, `on_success?`, `on_failure?` | Fort / Ref / Will. |
-| `attack` | `weapon?`, `full_attack`, `power_attack?`, `manoeuvre?` | Engine owns BAB, iteratives, size, proficiency, crit range and every modifier. **Defaults to `player` visibility** — the PC rolls their own to-hit *and* their own damage. `power_attack` is the GM declaring a tactical choice; the −1/+2 and its scaling are the engine's. `manoeuvre` resolves as CMB against the target's CMD — see below. |
+| `attack` | `weapon?`, `full_attack`, `power_attack?`, `manoeuvre?` | Engine owns BAB, iteratives, size, proficiency, crit range and every modifier. **Defaults to `player` visibility** — the PC rolls their own to-hit *and* their own damage. `power_attack` is the GM declaring a tactical choice; the −1/+2 and its scaling are the engine's. `manoeuvre` resolves as CMB against the target's CMD — see below. **A melee blow, manoeuvre or not, needs its target within reach** inside a running fight (CRB p.182: a normal weapon strikes "any opponent within 5 feet"; a reach weapon doubles it and loses the adjacent squares; disarm, sunder and trip reach with the weapon, every other manoeuvre with the body). Out of reach is refused at validation with the square to step to written out as a `move` — never "move first" alone, because a zone-only move on a mapped fight leaves the body where it stood — and an attack after a `move` of either party in the same list is left to a printed refusal at resolution. The engine never moves the attacker to make a declared blow fit (2026-09-27, tests/test_maneuver_reach.py). |
 | `cast` | `spell`, `at?`, `level?`, `defensively?` | Engine owns the slot, the caster level and the save DC, and refuses a spell the caster cannot reach. It does **not** derive what the spell does — see §11, which corrects what this row used to promise. |
 | `damage` | `amount`, `type`, `to` | Environmental and untyped sources only; weapon damage rides on `attack`. |
 | `condition` | `condition`, `to`, `duration` | Applied conditions and buffs, with duration in rounds/minutes so the engine can expire them. |
@@ -425,7 +425,7 @@ the triggering intent looks identical in every case except that one.
 
 | Trigger | Fires when |
 |---|---|
-| `leaves_threatened_square` | A creature moves out of a square another one threatens. Entering does not provoke; a five-foot step does not provoke, and that is measured from the distance rather than declared by the GM. |
+| `leaves_threatened_square` | A creature moves out of a square another one threatens. Entering does not provoke; a five-foot step does not provoke, and that is measured from the distance rather than declared by the GM. A bystander (`role.bystander`) takes no attack of opportunity: they join a fight by joining it. |
 
 **The allowance** is not a pool on the sheet. 1e gives everyone one attack of opportunity
 per round, and Combat Reflexes raises it to 1 + Dexterity modifier. It refills at the top

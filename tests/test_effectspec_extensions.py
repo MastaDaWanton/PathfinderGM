@@ -42,6 +42,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Manifestation, Scene, Ward
 from rules.grid import Grid
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._board import face_to_face
 
 
 # --- fixtures a spell needs to actually be cast ----------------------------------------------
@@ -155,6 +156,7 @@ def test_thorn_body_burns_the_attacker_and_not_the_druid_who_cast_it():
 
     druid_hp, thug_hp = scene.actors["pc"].hp, scene.actors["c1"].hp
     engine._ensure_encounter("c1")         # the gate defers a swing that opens a fight
+    face_to_face(scene, "c1", "pc")        # and the fight re-lays them fifteen feet apart
     hit = engine.run(engine.validate([
         {"op": "attack", "actor": "c1", "target": "pc", "params": {"weapon": "sap"}}
     ])).outcomes[0]
@@ -534,6 +536,10 @@ def test_displacement_is_a_miss_chance_and_not_an_armour_bonus():
 
     # And it is actually rolled: over twenty swings from twenty seeds, some are lost to
     # the miss chance and say so.
+    # The fight opened first and the two at arm's length: the gate defers a swing that
+    # opens one, and the fight lays its combatants fifteen feet apart.
+    engine._ensure_encounter("c1")
+    face_to_face(scene, "c1", "pc")
     lost = 0
     for seed in range(20):
         e = Engine(scene, Dice(seed=seed))

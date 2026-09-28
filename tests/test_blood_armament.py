@@ -13,6 +13,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, IntentError, Scene
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._board import face_to_face
 from pagesource import table_source
 
 
@@ -32,6 +33,7 @@ def _fight():
     e = Engine(scene, dice=Dice(seed=11))
     e.run(e.validate([{"op": "begin_encounter",
                        "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+    face_to_face(scene)
     return scene, e
 
 
@@ -259,6 +261,7 @@ def test_swift_strikes_does_not_swing_at_a_body_on_the_floor():
         # Not `c1`: refs are never reused, and the opening companion wore that one.
         e.run(e.validate([{"op": "begin_encounter",
                            "params": {"sides": {"pc": ["pc"], "them": [thug.ref]}}}]))
+        face_to_face(c.scene, "pc", thug.ref)
         while c.scene.current_ref() != "pc":
             c.scene.advance_turn()
         c.save()

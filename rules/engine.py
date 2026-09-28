@@ -1781,10 +1781,18 @@ class Engine:
         # spawn followed by an attack on what it spawned was always rejected, and the GM
         # burned every attempt guessing at refs that could not exist yet.
         pending = self._projected_refs(intents)
+        # Who an earlier intent in this list moves. The same problem as `pending`, for
+        # squares instead of refs: the combat panel posts "move to (6,10), strike the
+        # thug" as one list, and a reach check asked of the board as it stands would
+        # refuse the strike for the fifteen feet the move is about to close. Those
+        # swings are left to the floor in `_op_attack`, which asks after the move.
+        moved: set[str] = set()
         for i, intent in enumerate(intents):
             self._check_refs(intent, i, extra=pending)
-            self._check_legality(intent, i)
+            self._check_legality(intent, i, moved=moved)
             self._force_visibility(intent)
+            if intent.op == "move":
+                moved.add(str(intent.params.get("who") or intent.actor or ""))
         return intents
 
     def _projected_refs(self, intents: list[Intent]) -> set[str]:
@@ -1941,7 +1949,8 @@ class Engine:
                 f"{intent.op}: unknown ref {frm!r} in params.from", "refs", index
             )
 
-    def _check_legality(self, intent: Intent, index: int) -> None:
+    def _check_legality(self, intent: Intent, index: int,
+                        moved: set[str] | frozenset[str] = frozenset()) -> None:
         # The cheap facts, asked HERE so the model gets its retry with the list in
         # hand. Stage 7 measured that a refusal raised at resolution reaches nobody who
         # can act on it — `_advance` catches it once, answers 502, and pops the
@@ -2219,6 +2228,23 @@ class Engine:
                         f"attack: {defender.name} is already "
                         f"{m['condition']}", "legality", index,
                     )
+            # Reach, asked here so the model gets its retry with the square to step
+            # to in hand. Unless this list moves one of them first — then only the
+            # board after the move can answer, and the floor in `_op_attack` does.
+            # Only inside a running fight: the map is down from arrival, but where
+            # people idle before a fight is no claim about it — the swing that opens
+            # one is deferred, and `_lay_battlefield` re-lays everybody as it forms.
+            # Nor while the target is still a question: with `undecided` parked, the
+            # ref is a placeholder and `_op_attack` asks "which of them?" — the
+            # distance to somebody nobody chose is not the refusal to print.
+            targets = intent.targets()
+            defender = self.scene.get(targets[0]) if targets else None
+            if defender is not None and self.scene.in_encounter \
+                    and not intent.params.get("undecided") \
+                    and not ({intent.actor, defender.ref} & set(moved)):
+                why = self._reach_refusal(intent, actor, defender, key)
+                if why:
+                    raise IntentError(f"attack: {why}", "legality", index)
 
     # --- Running --------------------------------------------------------------------
 
@@ -2807,6 +2833,20 @@ class Engine:
             asked = ", ".join(names[:-1]) + f" or {names[-1]}"
             return self._refuse(
                 intent, f"Which of them — {asked}? Say who, and the blow follows.")
+        weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
+        # The floor under validate's reach check, for the lists it could not answer: a
+        # move earlier in the list that fell short, a push that put the target out of
+        # reach, an attack of opportunity that dropped the mover before they arrived.
+        # Printed, not raised — by now nobody is listening for a retry. Asked before
+        # anybody is drawn in: a blow that cannot land does not make a bystander a
+        # combatant. And only inside a running fight — a swing that opens one is
+        # deferred below, and the fight re-lays everybody's squares as it forms.
+        if (partial.get("attack_state") is None and self.scene.in_encounter
+                and not self._battle_joined):
+            out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
+                                               for_the_model=False)
+            if out_of_reach:
+                return self._refuse(intent, out_of_reach)
         # A blow given or taken ends being a bystander. The one place besides
         # `join_fight` that lifts the tag, and it lifts it BEFORE the encounter forms so
         # the sides are drawn with both of them in.
@@ -2861,7 +2901,6 @@ class Engine:
                           f"yet — the first blow is still to be struck."),
                     because=intent.because)
         self._ensure_encounter(intent.actor, intent.target)
-        weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
         # An improvised weapon IS the object: the tell names the chunk of wood, not
         # "improvised weapon", and the object leaves the hand for the ground below
@@ -3209,6 +3248,69 @@ class Engine:
             because=intent.because,
         )
 
+    def _reach_refusal(self, intent: Intent, actor: Actor, defender: Actor,
+                       weapon_key: str, *, for_the_model: bool = True) -> str:
+        """Why this melee blow cannot land from where the two of them stand, or "".
+
+        The measurement and its source are `position.out_of_reach`'s; this is the
+        sentence. Measured 2026-09-27: a disarm, a trip, a grapple and a plain rapier
+        thrust all resolved from fifteen feet.
+
+        What the refusal names is a SQUARE. The model plans in zones, and a
+        `move zone=engaged` on a mapped fight relabels the zone and leaves the body
+        where it stood — so "move first" alone is an instruction nobody can carry out.
+        The attacker is never moved here: closing the distance is their move action to
+        spend, or not.
+
+        `for_the_model=False` is the printed floor's sentence: the fault alone. A tell
+        is fed to the narrator, and a JSON move and a grid square in it are two things
+        the prose has no business repeating.
+        """
+        from . import position as position_mod
+
+        man = str(intent.params.get("manoeuvre") or "")
+        miss = position_mod.out_of_reach(self.scene, actor, defender, weapon_key,
+                                         manoeuvre=man,
+                                         thrown=bool(intent.params.get("thrown")))
+        if miss is None:
+            return ""
+        blow = (f"an {man}" if man[:1] in "aeiou" else f"a {man}") if man \
+            else "a melee attack"
+        # The table's own key ("glaive"), not its display name ("Glaive"), mid-sentence;
+        # a granted or natural weapon has no key there and is called what it is called.
+        if weapons_mod.has(weapon_key):
+            held = weapon_key
+        else:
+            try:
+                held = str(actor.weapon(weapon_key).get("name") or weapon_key)
+            except KeyError:
+                held = weapon_key
+        if miss.too_close:
+            fault = (f"{defender.name} is {miss.feet} ft from {actor.name}, inside the "
+                     f"{held}'s reach — a reach weapon cannot strike a foe beside you, "
+                     f"and {blow} with it needs them {miss.reach} ft off.")
+        else:
+            by = f" with the {held}" if miss.with_weapon and weapon_key != "unarmed" else ""
+            fault = (f"{actor.name} reaches {miss.reach} ft{by} and {defender.name} is "
+                     f"{miss.feet} ft away; {blow} needs them within reach.")
+        if not for_the_model:
+            return f"{_sentence(fault)} Nothing is rolled."
+        found = position_mod.square_in_reach(self.scene, actor, defender, miss.reach,
+                                             miss.gap)
+        if found is None:
+            return (f"{fault} There is no open square in reach of {defender.name} that "
+                    f"{actor.name} can get to. Take another action.")
+        (x, y), cost = found
+        step = (f'{{"op": "move", "actor": "{actor.ref}", "params": {{"square": '
+                f'[{x}, {y}]}}}}')
+        speed = int(getattr(actor, "speed_feet", 0) or 0)
+        if self.scene.in_encounter and speed and cost > speed:
+            return (f"{fault} The nearest square in reach, [{x}, {y}], is {cost} ft away "
+                    f"by the open route and {actor.name} has {speed} ft of movement: "
+                    f"move toward them this turn and strike on the next.")
+        return (f"{fault} Move first — to square [{x}, {y}], {cost} ft — with {step} "
+                f"before the attack in the same list.")
+
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
         """A combat manoeuvre: the same attack roll, with CMB instead of the attack
@@ -3537,8 +3639,18 @@ class Engine:
         outcomes.extend(first.outcomes)
         if not self.scene.in_encounter:
             return outcomes
+        # He lunged: if the fight laid him out of reach, the lunge is the move that
+        # closes it, then the blow. A declared move — told, and provoking as it goes —
+        # never a silent shift of where he stands. Too far for one move, the blow is
+        # the loop's to decide, and he is not rolled a swing he could not have landed.
+        from . import position as position_mod
+
+        closing = position_mod.closing_move(self.scene, a, pc, a.equipped or "unarmed")
+        if closing is not None and not closing[1]:
+            return outcomes
         try:
-            second = self.run(self.validate([raw]))
+            second = self.run(self.validate(
+                ([closing[0]] if closing is not None else []) + [raw]))
             outcomes.extend(second.outcomes)
         except (IntentError, ValueError, KeyError):
             pass                        # the fight is open; his swing is the loop's

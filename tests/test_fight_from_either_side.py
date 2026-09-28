@@ -24,6 +24,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, IntentError, Scene
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 @pytest.fixture
@@ -240,6 +241,7 @@ def test_a_sunder_damages_the_item_through_hardness_and_says_what_became_of_it(m
     engine = Engine(market, Dice(seed=11))
     engine.run(engine.validate([{"op": "begin_encounter",
                                  "params": {"sides": {"pc": ["pc"], "them": [thug.ref]}}}]))
+    face_to_face(market, "pc", thug.ref)     # the fight lays him fifteen feet off
     # The NPC sunders the player's rapier: hidden dice, so the whole thing resolves.
     landed = None
     for seed in range(1, 40):
@@ -267,6 +269,7 @@ def test_the_player_rolls_the_cmb_and_then_the_damage_and_neither_twice(market):
     engine = Engine(market, Dice(seed=5))
     engine.run(engine.validate([{"op": "begin_encounter",
                                  "params": {"sides": {"pc": ["pc"], "them": [thug.ref]}}}]))
+    face_to_face(market, "pc", thug.ref)     # the fight lays him fifteen feet off
     engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": thug.ref,
                                  "params": {"manoeuvre": "sunder"}}]))
     assert market.awaiting and "Sunder (CMB)" in market.awaiting["label"]

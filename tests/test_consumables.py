@@ -22,6 +22,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import IntentError
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._board import face_to_face
 
 
 class Named:
@@ -45,8 +46,9 @@ def board(poison_specs):
                                    potency=1.25, count=3, specs=list(poison_specs))
     e = Engine(s, Dice(seed=9))
     # The battle gate defers a first swing out of combat; the coating tests are
-    # about the blade, so the fight is already open.
+    # about the blade, so the fight is already open, at arm's length.
     e._ensure_encounter("pc")
+    face_to_face(s)
     return s, e
 
 

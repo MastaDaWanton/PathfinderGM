@@ -15,6 +15,7 @@ from rules import bestiary
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 # --- what was imported ------------------------------------------------------------------
@@ -87,6 +88,7 @@ def test_an_imported_creature_can_actually_hit_the_player():
 
     engine = Engine(scene, Dice(seed=11))
     engine._ensure_encounter(wolf.ref)     # the gate defers a swing that opens a fight
+    face_to_face(scene, wolf.ref, "pc")     # and lays them fifteen feet apart
     res = engine.run(engine.validate([
         {"op": "attack", "actor": wolf.ref, "target": "pc",
          "because": "it comes out of the dark"},
