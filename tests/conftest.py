@@ -111,6 +111,12 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
 
     monkeypatch.setattr(interpret_mod, "ENABLED", False)
     interpret_mod._READINGS.clear()
+    # And the mention labeller (gm/mentions.py), for the same reason: one label call per
+    # groomed beat. The code-settled names still attribute with it off.
+    # tests/test_who_the_prose_means.py scripts its replies.
+    from gm import mentions as mentions_mod
+
+    monkeypatch.setattr(mentions_mod, "ENABLED", False)
 
 
 @pytest.fixture(autouse=True)

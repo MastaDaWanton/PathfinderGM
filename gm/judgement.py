@@ -6555,13 +6555,16 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
 
 
 def apply_introductions(scene, beat: str, player_text: str = "",
-                        said=None) -> list[tuple[str, str]]:
+                        said=None, refused: list | None = None,
+                        whose=None) -> list[tuple[str, str]]:
     """A name given in play becomes the panel's name for that person.
 
     From `narration.introductions`: the speaker's head word finds the unnamed actor
     here (a descriptor name — lowercase, or "the …"); their display name becomes the
     name given, their true name too if none was held. A named person "introducing"
-    themselves again changes nothing. Returns [(ref, name)] for the log."""
+    themselves again changes nothing. Returns [(ref, name)] for the log; a name refused
+    because somebody else here already answers to it goes into `refused` as
+    (ref, name, whose) when a list is passed."""
     from .narration import introduced_by
 
     if scene is None or not beat:
@@ -6615,6 +6618,11 @@ def apply_introductions(scene, beat: str, player_text: str = "",
                 who = unnamed[0]
         if who is None or not _unnamed(who):
             continue
+        taken_by = _answers_to(actors, who, given)
+        if taken_by:
+            if refused is not None:
+                refused.append((who.ref, given, taken_by))
+            continue
         _take_the_name(scene, who, given)
         out.append((who.ref, given))
     # And the narrator's own naming in passing — "The man—Korgath Varn—takes a slow
@@ -6626,17 +6634,63 @@ def apply_introductions(scene, beat: str, player_text: str = "",
     for head, given in named_in_apposition(beat):
         if any(str(a.name).lower() == given.lower() for a in actors.values()):
             continue
-        who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
-                    and head in _name_words(a.name)), None)
+        # Who the head noun means, from the attribution when it has an answer
+        # (gm/mentions.py): the head word alone picked whichever unnamed person owned
+        # the word, and the one-unnamed-person fallback picked whoever was left.
+        who = None
+        if whose is not None:
+            from .narration import _sentences
+
+            for sentence in _sentences(speech.unquoted(beat)):
+                if given in sentence:
+                    ref = whose(sentence, head)
+                    cand = actors.get(ref) if ref else None
+                    if cand is not None and not cand.is_pc and _unnamed(cand):
+                        who = cand
+                    break
+        if who is None:
+            who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
+                        and head in _name_words(a.name)), None)
         if who is None:
             unnamed = [a for a in actors.values() if not a.is_pc and _unnamed(a)]
             if len(unnamed) == 1:
                 who = unnamed[0]
         if who is None:
             continue
+        taken_by = _answers_to(actors, who, given)
+        if taken_by:
+            if refused is not None:
+                refused.append((who.ref, given, taken_by))
+            continue
         _take_the_name(scene, who, given)
         out.append((who.ref, given))
     return out
+
+
+def _answers_to(actors, who, given: str) -> str:
+    """The name of somebody else here who already answers to `given`, or "".
+
+    Measured live 2026-09-27 (docs/who-the-prose-means.md): a thug spawned under the
+    plan's placeholder "new" was renamed "Borin" from the prose and fought beside Borin
+    Lyraxys, the one man in the tavern — two people answering to one name, and every
+    check after it that read names read the wrong man. The appositive branch refused only
+    an exact duplicate of a whole name; the speech branch refused nothing.
+
+    A name is taken when EVERY word of it is a word of one other person's name, shown or
+    true, living or dead: "Borin" beside "Borin Lyraxys" is his; "Bren Varn" beside
+    "Aldo Varn" is a brother, and passes. The dead count — a corpse still answers to its
+    name on the page, and cut_dead_men_walking has already cut a living man's line for
+    sharing one with the dead."""
+    words = _name_words(given)
+    if not words:
+        return ""
+    for other in actors.values():
+        if other is who:
+            continue
+        for held in (other.name, getattr(other, "true_name", "")):
+            if held and words <= _name_words(str(held)):
+                return str(other.name)
+    return ""
 
 
 def hailed_by(scene, beat: str, said=None) -> list[str]:

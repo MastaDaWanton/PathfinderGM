@@ -18,6 +18,7 @@ from rules.intents import (Intent, IntentError, claims_the_engine_backs,
                           cut_outcome_claims, find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
+from . import mentions as mentions_mod
 from . import speech as speech_mod
 
 
@@ -97,6 +98,11 @@ class GMAgent:
         # (`speech.lift`, docs/declared-not-guessed.md). Read by `views._finish` for the
         # hails and the names; reset when a turn is planned.
         self.last_said: list[dict] = []
+        # Who each person-mention in the last groomed beat means (gm/mentions.py,
+        # docs/who-the-prose-means.md), and one log row per groomed beat, drained into
+        # the turn log by the view.
+        self.attribution = None
+        self.mention_rows: list[dict] = []
         # The experiment. Off by default and read per agent, so a run can be flipped
         # between turns without a restart — see `prompts.INTENTS_ONLY_EXTRA` for what is
         # being tested and why it is measured rather than argued about.
@@ -1214,6 +1220,30 @@ class GMAgent:
             repairs += p_repairs
             attempts += p_attempts
 
+        # Who every person the beat mentions is, declared once for the checks below to
+        # read instead of guessing from names (gm/mentions.py). After the rewrite, which
+        # is the last thing to change most of the text; a sentence cut or rewritten
+        # after this is not in the attribution, and the checks fall back to their guess.
+        self.attribution = mentions_mod.attribute(
+            text, self.engine.scene, acting=acting, facts=facts,
+            model=self.prose_model, host=self.prose_host,
+            provider=self.prose_provider, api_key=self.prose_key)
+        if self.attribution.mentions:
+            self.mention_rows.append(self.attribution.as_log())
+        # A name on the wrong person — the words name one man, the sentence is about
+        # another: one targeted rewrite (stage 3 of the note).
+        if self.attribution.misnamed():
+            text, fixed, fix_attempts = self._repair_misnamed(text, self.attribution)
+            repairs += fixed
+            attempts += fix_attempts
+        attribution = self.attribution
+        dead_refs = {r for r, a in self.engine.scene.actors.items()
+                     if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead"))}
+
+        def _alive(sentence: str, words: str) -> bool:
+            ref = attribution.who(sentence, words)
+            return ref is not None and ref not in dead_refs
+
         # Before the stranger-renamer, which once half-mangled a leaked option list
         # into "the stranger: * the onlooker off your opponent * ..." — cutting the
         # leak first means there is nothing garbled left to rename.
@@ -1234,7 +1264,7 @@ class GMAgent:
                   if not a.is_pc and not (a.hp < 0 or a.has_state("state.down.dead"))]
         text, risen = narration_mod.cut_dead_men_walking(
             text, dead, fresh=[str(d.get("name") or "") for d in (deaths or [])],
-            living=living)
+            living=living, spare=_alive)
         # A claim the engine holds false, written as true anyway: the sentences that
         # make the player a god are cut and the world's answer is written in their
         # place, from a pool that never repeats twice running. The rewrite above had
@@ -1371,8 +1401,9 @@ class GMAgent:
                  or (a._race_doc() or {}).get("type", "humanoid") in ("humanoid", "outsider", ""))
                 and int((a.abilities or {}).get("int", 10) or 10) > 2
                 for a in self.engine.scene.actors.values() if not a.is_pc)
-            text, beasts = narration_mod.creature_nouns_for_pc(text, pc.name, people_only,
-                                                               acting=acting)
+            text, beasts = narration_mod.creature_nouns_for_pc(
+                text, pc.name, people_only, acting=acting,
+                whose=attribution.who, pc_ref=pc.ref)
             if beasts:
                 # Into the player's own person, like every other mention of them: this
                 # ran after the name swap above, so the name it wrote stayed a name on
@@ -1689,7 +1720,13 @@ class GMAgent:
         pc = self.engine.scene.pc()
         pc_name = pc.name if pc is not None else ""
         others = tuple(self._other_names())
-        wrong = narration_mod.wrong_actor(text, acting, pc_name, others)
+        # Whether the beat mentions the actor at all, from the attribution rather than
+        # the word lists (gm/mentions.py) — only ever able to clear the check.
+        acting_ref = next((r for r, a in self.engine.scene.actors.items()
+                           if str(a.name) == acting), None)
+        named = (self.attribution.mentioned_in(text, acting_ref)
+                 if self.attribution is not None and acting_ref else None)
+        wrong = narration_mod.wrong_actor(text, acting, pc_name, others, named=named)
         if not wrong:
             return text, [], []
         from play.views import plain_tell
@@ -1718,9 +1755,51 @@ class GMAgent:
             fixed = ""
         if fixed and not narration_mod.wrong_actor(fixed, acting, pc_name, others):
             return fixed, [f"wrong actor: {why} — rewritten"], attempts
-        kept, cut = narration_mod.right_actor(text, acting, pc_name, plain, others)
+        kept, cut = narration_mod.right_actor(text, acting, pc_name, plain, others,
+                                              named=named)
         return kept, [f"wrong actor: {why} — the rewrite failed; cut {len(cut)} "
                       f"sentence(s), the tells stand"], attempts
+
+    def _repair_misnamed(self, text: str, attribution) -> tuple[str, list[str], list[Attempt]]:
+        """A name written on the wrong person: the words name one person here and the
+        sentence is about another (gm/mentions.py `Mention.misnamed`). One targeted
+        rewrite of the flagged sentences, kept only if the wrong name is gone from each.
+
+        No mechanical backstop, on purpose: the flag is the labeller's word against the
+        name's, and a swap on a wrong flag would write the wrong name — which is exactly
+        what `creature_nouns_for_pc` did when it guessed. A failed rewrite leaves the
+        sentence and says so in the repairs."""
+        from . import mentions as mentions_mod
+
+        names = {r: str(a.name) for r, a in self.engine.scene.actors.items()}
+        flagged = attribution.misnamed()
+        try:
+            reply = client.chat(
+                mentions_mod.repair_messages(text, flagged, names),
+                self.prose_model, self.prose_host, as_json=True, think=False,
+                temperature=0.3, num_predict=120 + 80 * len(flagged),
+                provider=self.prose_provider, api_key=self.prose_key,
+                schema=mentions_mod.repair_schema(len(flagged)))
+            attempt = Attempt("repair", reply.seconds, reply.model, reply.text,
+                              note=f"misnamed: {len(flagged)} sentence(s)")
+            got = reply.json() or {}
+        except Exception as exc:  # a failed repair must not lose the turn
+            return text, [f"misnamed: the rewrite failed ({type(exc).__name__}); "
+                          f"{len(flagged)} sentence(s) left as written"], []
+        fixed, notes = text, []
+        for i, m in enumerate(flagged, 1):
+            new = str(got.get(f"s{i}") or "").strip()
+            wrong = mentions_mod.name_words_of(names.get(m.code, ""))
+            if (new and m.sentence in fixed
+                    and not wrong & mentions_mod.name_words_of(new)
+                    and 0.5 <= len(new) / max(1, len(m.sentence)) <= 2.0):
+                fixed = fixed.replace(m.sentence, new, 1)
+                notes.append(f"misnamed: {m.phrase!r} was {names.get(m.model, m.model)} "
+                             f"— rewritten")
+            else:
+                notes.append(f"misnamed: {m.phrase!r} may be {names.get(m.model, m.model)}"
+                             f" — the rewrite did not hold; left as written")
+        return fixed, notes, [attempt]
 
     # --- Call 2 -------------------------------------------------------------------------
 
