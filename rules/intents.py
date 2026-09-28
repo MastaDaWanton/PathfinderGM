@@ -562,10 +562,15 @@ class IntentError(ValueError):
     """A malformed or illegal intent. Carries which check rejected it, so the caller can
     decide between a regenerate and a targeted repair."""
 
-    def __init__(self, message: str, check: str = "schema", index: int | None = None):
+    def __init__(self, message: str, check: str = "schema", index: int | None = None,
+                 for_a_person: str = ""):
         super().__init__(message)
         self.check = check
         self.index = index
+        # The same refusal in a sentence a player reads, when the message itself is
+        # written for the model's repair loop (a JSON intent to copy). The combat panel
+        # shows errors to a person directly; "" means the message already reads fine.
+        self.for_a_person = for_a_person
 
 
 @dataclass

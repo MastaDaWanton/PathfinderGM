@@ -2244,7 +2244,10 @@ class Engine:
                     and not ({intent.actor, defender.ref} & set(moved)):
                 why = self._reach_refusal(intent, actor, defender, key)
                 if why:
-                    raise IntentError(f"attack: {why}", "legality", index)
+                    raise IntentError(
+                        f"attack: {why}", "legality", index,
+                        for_a_person=self._reach_refusal(intent, actor, defender, key,
+                                                         voice="person"))
 
     # --- Running --------------------------------------------------------------------
 
@@ -2844,7 +2847,7 @@ class Engine:
         if (partial.get("attack_state") is None and self.scene.in_encounter
                 and not self._battle_joined):
             out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
-                                               for_the_model=False)
+                                               voice="tell")
             if out_of_reach:
                 return self._refuse(intent, out_of_reach)
         # A blow given or taken ends being a bystander. The one place besides
@@ -3249,7 +3252,7 @@ class Engine:
         )
 
     def _reach_refusal(self, intent: Intent, actor: Actor, defender: Actor,
-                       weapon_key: str, *, for_the_model: bool = True) -> str:
+                       weapon_key: str, *, voice: str = "model") -> str:
         """Why this melee blow cannot land from where the two of them stand, or "".
 
         The measurement and its source are `position.out_of_reach`'s; this is the
@@ -3262,9 +3265,12 @@ class Engine:
         The attacker is never moved here: closing the distance is their move action to
         spend, or not.
 
-        `for_the_model=False` is the printed floor's sentence: the fault alone. A tell
-        is fed to the narrator, and a JSON move and a grid square in it are two things
-        the prose has no business repeating.
+        Three readers, three sentences (`voice`). "model": the fix as a JSON move to
+        copy, for the repair loop. "tell": the printed floor's, the fault alone — a
+        tell is fed to the narrator, and a JSON move and a grid square in it are two
+        things the prose has no business repeating. "person": the combat panel shows
+        a refusal to the player directly, and the first live run put the JSON on the
+        page (2026-09-28); the square is named the way the map names it.
         """
         from . import position as position_mod
 
@@ -3293,18 +3299,27 @@ class Engine:
             by = f" with the {held}" if miss.with_weapon and weapon_key != "unarmed" else ""
             fault = (f"{actor.name} reaches {miss.reach} ft{by} and {defender.name} is "
                      f"{miss.feet} ft away; {blow} needs them within reach.")
-        if not for_the_model:
+        if voice == "tell":
             return f"{_sentence(fault)} Nothing is rolled."
         found = position_mod.square_in_reach(self.scene, actor, defender, miss.reach,
                                              miss.gap)
         if found is None:
-            return (f"{fault} There is no open square in reach of {defender.name} that "
-                    f"{actor.name} can get to. Take another action.")
+            return (f"{_sentence(fault) if voice == 'person' else fault} There is no "
+                    f"open square in reach of {defender.name} that {actor.name} can get "
+                    f"to. Take another action.")
         (x, y), cost = found
         step = (f'{{"op": "move", "actor": "{actor.ref}", "params": {{"square": '
                 f'[{x}, {y}]}}}}')
         speed = int(getattr(actor, "speed_feet", 0) or 0)
-        if self.scene.in_encounter and speed and cost > speed:
+        far = self.scene.in_encounter and speed and cost > speed
+        if voice == "person":
+            if far:
+                return (f"{_sentence(fault)} The nearest square in reach, {x},{y}, is "
+                        f"{cost} ft away and {actor.name} moves {speed} ft: close in "
+                        f"this turn and strike on the next.")
+            return (f"{_sentence(fault)} Click square {x},{y} on the map to move there "
+                    f"({cost} ft), then strike.")
+        if far:
             return (f"{fault} The nearest square in reach, [{x}, {y}], is {cost} ft away "
                     f"by the open route and {actor.name} has {speed} ft of movement: "
                     f"move toward them this turn and strike on the next.")

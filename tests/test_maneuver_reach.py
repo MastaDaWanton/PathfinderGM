@@ -310,3 +310,57 @@ def test_the_prompt_the_model_reads_is_the_refusal_it_repairs_from():
         engine.validate([_attack({"manoeuvre": "disarm"})])
     move = json.loads(re.search(r'(\{"op": "move".*?\}\})', str(err.value)).group(1))
     engine.validate([move])
+
+
+# --- the combat panel, where a person reads the refusal ------------------------------------
+
+@pytest.fixture
+def panel(tmp_path):
+    from django.test import Client, override_settings
+
+    from play import campaign as cm
+
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
+        cm._LIVE.clear()
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        c.seed = 20260928
+        for ref in [r for r in c.scene.actors if r != "pc"]:
+            c.scene.depart(ref)
+        thug = instantiate("thug", scene=c.scene, name="the thug")
+        thug.ref = "c1"
+        c.scene.add(thug)
+        e = c.engine()
+        e.run(e.validate([{"op": "begin_encounter",
+                           "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+        while c.scene.current_ref() != "pc":
+            c.scene.advance_turn()
+        c.save()
+        yield Client(), cm
+        cm._LIVE.clear()
+
+
+def _post(client, actions):
+    return client.post("/api/combat/act", content_type="application/json",
+                       data=json.dumps({"actions": actions, "label": "strike",
+                                        "end_turn": False}))
+
+
+def test_the_panel_says_which_square_to_click_and_shows_no_json(panel):
+    """The first live run (2026-09-28) put the model's repair sentence on the page:
+    `{"op": "move", "actor": "pc", "params": {"square": [6, 8]}}` in red under the
+    prose. The panel is read by a person; the square is named the way the map names it."""
+    client, cm = panel
+    scene = cm.current().scene
+    assert scene.distance_between("pc", "c1") == 15
+    r = _post(client, [{"op": "attack", "target": "c1", "params": {}}])
+    assert r.status_code == 400
+    said = r.json()["error"]
+    assert "15 ft away" in said and "Click square" in said
+    assert "{" not in said and '"op"' not in said
+    got = re.search(r"Click square (\d+),(\d+)", said)
+    square = [int(got.group(1)), int(got.group(2))]
+    # And doing what it says works: the panel's own move-and-strike list.
+    r = _post(client, [{"op": "move", "params": {"zone": "near", "square": square}},
+                       {"op": "attack", "target": "c1", "params": {}}])
+    assert r.status_code == 200, r.json()
+    assert r.json()["awaiting"], "the strike is waiting on the player's own d20"

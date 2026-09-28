@@ -1351,7 +1351,7 @@ def combat_act(request):
         # A stale panel can name somebody who has since left the room, and the
         # validator's sentence for that is written for the model — a ref and an op.
         # The person reads a sentence written for a person.
-        said = str(exc)
+        said = getattr(exc, "for_a_person", "") or str(exc)
         if getattr(exc, "check", "") == "refs" and "not here" in said:
             said = "That person is no longer here."
         return JsonResponse({"error": said}, status=400)
@@ -2320,7 +2320,11 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         # the log only when it failed, so the one door where a model still writes a
         # number (a bestiary creature's `damage`, stamped creature:<template>) could
         # not be audited off a saved campaign at all.
+        # With the rejections, as the player's turn has them: a creature's plan refused
+        # for reach and repaired from the square the refusal named looked, in the log,
+        # exactly like one that never needed a retry (live run, 2026-09-28).
         c.turn_log.append({"kind": "npc-turn", "ref": ref,
+                           "rejections": list(plan.rejections),
                            "intents": [i.as_dict() for i in plan.intents],
                            "outcomes": [o.as_dict() for o in resolution.outcomes]})
         if plan.narration:
