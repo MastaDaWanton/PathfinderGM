@@ -2087,13 +2087,17 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             if shown or named:
                 c.turn_log.append({"kind": "manner", "quirks_shown": shown,
                                    "traits_named": named})
+            _log_mentions(c, agent)
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).
             refused_names: list = []
+            attribution = getattr(agent, "attribution", None)
+            whose = attribution.who if attribution is not None else None
             for ref, given in judgement.apply_introductions(c.scene, text, player_input,
                                                              said=agent.last_said,
-                                                             refused=refused_names):
+                                                             refused=refused_names,
+                                                             whose=whose):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
             for ref, given, whose in refused_names:
                 repairs.append(f"{ref} was not renamed {given}: {whose} answers to it")
@@ -2420,6 +2424,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 "who": "gm", "kind": "consequence",
                 "text": text or _plain_tells(c, tells),
             })
+        _log_mentions(c, agent)
         # An NPC's turn is not the player speaking, so the ledger gets no speech
         # from it — only whatever the engine decided on their behalf.
         _remember(c, resolution, "")
@@ -2432,6 +2437,15 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     # skipped creatures lose their turn, which is a mercy to the player, not a
     # round of free time for anyone.
     _hand_the_turn_back(c, "The scuffle blurs; the moment comes back to you.")
+
+
+def _log_mentions(c, agent) -> None:
+    """Who the groomed beats' mentions meant, one row per beat (gm/mentions.py), into the
+    turn log — the record stage 1 of docs/who-the-prose-means.md is measured from."""
+    rows = getattr(agent, "mention_rows", None) or []
+    c.turn_log.extend(rows)
+    if rows:
+        agent.mention_rows = []
 
 
 def _plain_tells(c, outcomes) -> str:

@@ -5880,7 +5880,8 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
 
 
 def apply_introductions(scene, beat: str, player_text: str = "",
-                        said=None, refused: list | None = None) -> list[tuple[str, str]]:
+                        said=None, refused: list | None = None,
+                        whose=None) -> list[tuple[str, str]]:
     """A name given in play becomes the panel's name for that person.
 
     From `narration.introductions`: the speaker's head word finds the unnamed actor
@@ -5942,10 +5943,10 @@ def apply_introductions(scene, beat: str, player_text: str = "",
                 who = unnamed[0]
         if who is None or not _unnamed(who):
             continue
-        whose = _answers_to(actors, who, given)
-        if whose:
+        taken_by = _answers_to(actors, who, given)
+        if taken_by:
             if refused is not None:
-                refused.append((who.ref, given, whose))
+                refused.append((who.ref, given, taken_by))
             continue
         _take_the_name(scene, who, given)
         out.append((who.ref, given))
@@ -5958,18 +5959,33 @@ def apply_introductions(scene, beat: str, player_text: str = "",
     for head, given in named_in_apposition(beat):
         if any(str(a.name).lower() == given.lower() for a in actors.values()):
             continue
-        who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
-                    and head in _name_words(a.name)), None)
+        # Who the head noun means, from the attribution when it has an answer
+        # (gm/mentions.py): the head word alone picked whichever unnamed person owned
+        # the word, and the one-unnamed-person fallback picked whoever was left.
+        who = None
+        if whose is not None:
+            from .narration import _sentences
+
+            for sentence in _sentences(speech.unquoted(beat)):
+                if given in sentence:
+                    ref = whose(sentence, head)
+                    cand = actors.get(ref) if ref else None
+                    if cand is not None and not cand.is_pc and _unnamed(cand):
+                        who = cand
+                    break
+        if who is None:
+            who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
+                        and head in _name_words(a.name)), None)
         if who is None:
             unnamed = [a for a in actors.values() if not a.is_pc and _unnamed(a)]
             if len(unnamed) == 1:
                 who = unnamed[0]
         if who is None:
             continue
-        whose = _answers_to(actors, who, given)
-        if whose:
+        taken_by = _answers_to(actors, who, given)
+        if taken_by:
             if refused is not None:
-                refused.append((who.ref, given, whose))
+                refused.append((who.ref, given, taken_by))
             continue
         _take_the_name(scene, who, given)
         out.append((who.ref, given))

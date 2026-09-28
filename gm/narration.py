@@ -625,7 +625,8 @@ _CLAUSE_OPENS = re.compile(
 
 
 def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
-                          acting: str = "") -> tuple[str, list[str]]:
+                          acting: str = "", whose=None, pc_ref: str = "pc"
+                          ) -> tuple[str, list[str]]:
     """"The beast" for the player's character becomes their name.
 
     Measured 2026-09-18 (a homebrew asura at 70 hp with a blank body line): the NPC
@@ -647,6 +648,10 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
       * on a creature's turn (`acting`), a creature noun opening a clause is the one
         acting, and that is the creature. "The thug's swing misses the beast" — the
         asura case, the player on the receiving end — is still swapped.
+
+    `whose(sentence, words)` is gm/mentions.py's answer to who the noun means. When it
+    has one it decides: the noun is swapped only when it means the player — the two
+    guards above were guesses at exactly that question.
     """
     if not text or not pc_name or not others_are_people:
         return text, []
@@ -659,9 +664,13 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
             ends = [i for i in (run.find(".", m.end()), run.find("!", m.end()),
                                 run.find("?", m.end())) if i >= 0]
             sentence = run[lo:(min(ends) + 1) if ends else len(run)]
-            if _SECOND_PERSON.search(sentence):
+            meant = whose(sentence, m.group(0)) if whose else None
+            if meant is not None:
+                if meant != pc_ref:
+                    return m.group(0)
+            elif _SECOND_PERSON.search(sentence):
                 return m.group(0)
-            if acting and _CLAUSE_OPENS.search(run[lo:m.start()]):
+            elif acting and _CLAUSE_OPENS.search(run[lo:m.start()]):
                 return m.group(0)
             swapped.append(m.group(2).lower())
             return pc_name
@@ -1149,7 +1158,7 @@ def _names(text: str, words: set[str]) -> bool:
 
 
 def wrong_actor(text: str, acting: str, pc_name: str,
-                others: tuple = ()) -> list[tuple[str, str]]:
+                others: tuple = (), named: bool | None = None) -> list[tuple[str, str]]:
     """On a creature's turn, the sentences that give its act — or the player's name — to
     the wrong person. Returns (sentence, why) pairs; empty when the beat is sound.
 
@@ -1179,6 +1188,12 @@ def wrong_actor(text: str, acting: str, pc_name: str,
     The first rule fires only when the beat never names the actor at all — measured on
     the recorded corpus, every inverted beat left the actor out and every sound one
     named it, bar one ("He shifts his weight…"), which costs a repair and no more.
+
+    `named` is gm/mentions.py's answer to "does the beat mention the actor at all",
+    when it has one. True settles it: measured live 2026-09-27, all three of this rule's
+    flags on sound beats were the actor called by a description the word lists did not
+    hold ("the warrior", "the Korvu"). Only True is taken — the attribution can clear
+    this rule, never arm it; a False or an unknown falls back to the words.
     """
     acting = str(acting or "").strip()
     name = str(pc_name or "").strip()
@@ -1210,8 +1225,9 @@ def wrong_actor(text: str, acting: str, pc_name: str,
             found.append((s, f"gives the player's name to somebody described as "
                              f"{' '.join(after.split()[:5])!r}"))
 
-    if not _names(body, actor_words(acting)) and not _creature_opens_a_clause(sentences):
-        yours = [s for s in sentences if _SECOND_PERSON.search(s)
+    if named is not True and not _names(body, actor_words(acting)) \
+            and not _creature_opens_a_clause(sentences):
+        yours =[s for s in sentences if _SECOND_PERSON.search(s)
                  and s not in {f for f, _ in found}]
         found += [(s, f"it was {acting}'s turn, and the beat never names {acting} — "
                       f"the act is given to \"you\"") for s in yours]
@@ -1229,7 +1245,7 @@ def _creature_opens_a_clause(sentences: list[str]) -> bool:
 
 
 def right_actor(text: str, acting: str, pc_name: str, plain_tells: list[str] | None = None,
-                others: tuple = ()) -> tuple[str, list[str]]:
+                others: tuple = (), named: bool | None = None) -> tuple[str, list[str]]:
     """The deterministic backstop under `wrong-actor`. Returns (text, what was cut).
 
     A beat whose actor was never named is the whole beat turned round — no sentence of it
@@ -1239,13 +1255,13 @@ def right_actor(text: str, acting: str, pc_name: str, plain_tells: list[str] | N
     true. `plain_tells` come already rendered for the page, numbers off and the player as
     "you" (`views.plain_tell` then `pc_to_second_person`, the caller's job — one copy of
     that rule, not two)."""
-    wrong = wrong_actor(text, acting, pc_name, others)
+    wrong = wrong_actor(text, acting, pc_name, others, named=named)
     if not wrong:
         return text, []
     plain = " ".join(t for t in (plain_tells or []) if t).strip()
     body = unquoted(text)
-    if not _names(body, actor_words(acting)) and not _creature_opens_a_clause(
-            _sentences(body)):
+    if named is not True and not _names(body, actor_words(acting)) \
+            and not _creature_opens_a_clause(_sentences(body)):
         return plain, [s for s, _ in wrong]
     kept = _cut_sentences(text, [s for s, _ in wrong]).strip()
     return (kept or plain), [s for s, _ in wrong]
@@ -2412,7 +2428,7 @@ _DEAD_MAY = re.compile(
 _PLAYER_ACTS = re.compile(r"[\"“'‘]?\s*Your?\b", re.I)
 
 
-def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str]]:
+def cut_dead_men_walking(text: str, dead_names, fresh=(), spare=None) -> tuple[str, list[str]]:
     """Drop sentences where a dead actor gets up and acts.
 
     Measured across a live session: the stranger died in the opening turns, the panel
@@ -2430,6 +2446,11 @@ def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str
     `spooter.json`: four kills, four identical appended lines. Long-dead actors keep
     the strict rule, because "the stranger collapses" two turns after he died is the
     resurrection this cut exists for.
+
+    `spare(sentence, words)` is gm/mentions.py's answer to "is the person these words
+    name in this sentence alive" — True keeps the sentence. Measured 2026-09-27
+    (docs/wrong-actor.md): two thugs, one dead, and the LIVING thug's groan on his own
+    turn was cut because the words "the thug" also named a corpse.
     """
     if not text or not dead_names:
         return text or "", []
@@ -2446,7 +2467,8 @@ def cut_dead_men_walking(text: str, dead_names, fresh=()) -> tuple[str, list[str
         dying_now = bool(just_died and just_died.search(s)
                          and (_FELLED.search(s) or _DEATH_LANGUAGE.search(s)))
         if hit and not dying_now and not _DEAD_MAY.search(s) \
-                and not _PLAYER_ACTS.match(s.strip()):
+                and not _PLAYER_ACTS.match(s.strip()) \
+                and not (spare and spare(s, hit.group(0))):
             # The quote exemption exists so a living speaker may *mention* the
             # dead — and it let the dead keep talking, measured live: a merchant
             # at -19 spat "You'll pay for this!" and nodded through two beats,
