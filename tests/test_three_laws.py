@@ -704,6 +704,14 @@ _READS_MECHANICS = {
         "a forced door gave is a yes or no on the effect, and the tell that says so is a "
         "sentence. Measured live 2026-09-27, the engine held a door and the prose wrote "
         "it flying inward; nothing read here reaches the narrator.",
+    "gm/agent.py:_changes_from":
+        "feeds the state-claims repair (gm/state_claims.py), which runs AFTER the prose: "
+        "whether anything left a hand or a condition landed this turn is a field on the "
+        "effect, and the backing is read off the outcome record the way "
+        "`claims_the_engine_backs` is. Measured live 2026-09-27, a failed steal was "
+        "written as the purse tumbling to the floor. What reaches the repair model is a "
+        "numberless sentence naming a fact the tells and the brief's props line already "
+        "state ('your rapier is lying on the floor').",
     "gm/agent.py:_deaths_from":
         "feeds press_the_death, a repair that runs AFTER the prose — it needs how far "
         "past dead the blow went, and a tell is a sentence, not a number. Making the "
