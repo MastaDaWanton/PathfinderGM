@@ -1690,6 +1690,17 @@ class Actor:
             # attack time (`flat_footed=True`) never reached it, for any character.
             mods = [m for m in mods
                     if not (m.value > 0 and (m.source == "Dex" or m.type == "dodge"))]
+        if self.is_helpless:
+            # Core Rulebook p.197, "Helpless Defenders": Dexterity treated as 0, a -5
+            # modifier, and -4 AC against melee. The helpless row's note had said "treated
+            # as Dex 0; melee attackers gain +4 to hit" since the table was written, and
+            # nothing read it — so a sleeping guard was as hard to hit as a flat-footed
+            # one (found 2026-09-27 building the coup de grâce). Asked of the vocabulary
+            # once, not written into the five helpless rows, where an unconscious AND
+            # dying body would have taken the -4 twice.
+            mods = [m for m in mods if m.source != "Dex"] + [Modifier(-5, "Dex 0 (helpless)")]
+            if against == "melee":
+                mods.append(Modifier(-4, "helpless, against melee"))
         return stack(mods)
 
     def _printed_ac_modifiers(self) -> list[Modifier]:
@@ -2847,6 +2858,31 @@ class Actor:
         fourth loop was a mechanism that never wore off."""
         return self.tick_effects(rounds)
 
+    @property
+    def is_dead(self) -> bool:
+        return self.has_condition("dead")
+
+    def die(self, source: str) -> bool:
+        """Write `dead`, clearing the rungs above it. False when already dead.
+
+        The one sentence that writes death off the hit-point ladder, and since 2026-09-27
+        the door a failed coup-de-grâce save walks through too — a death at positive hit
+        points that `apply_hp_state` would never notice. A second copy of these three
+        lines in the engine is exactly what the three laws' literal-key ratchet exists to
+        stop.
+        """
+        if self.is_dead:
+            return False
+        # `disabled` belongs on the list and was missing from it. Most deaths never stop
+        # at exactly 0 hit points, so nobody had ever been disabled and then killed —
+        # until drowning, which walks a body down the ladder one rung a round (0, then
+        # -1, then dead) and left a corpse that was still "conscious, and a standard
+        # action costs a hit point".
+        for gone in _DOWN_THE_LADDER:
+            self.remove_condition(gone)
+        self.add_condition("dead", source=source)
+        return True
+
     def apply_hp_state(self) -> list[str]:
         """1e's death and unconsciousness thresholds, applied by code so nobody has to
         remember them mid-scene.
@@ -2869,15 +2905,8 @@ class Actor:
         # ratchet caught it: two copies of a ladder is how one of them goes stale.
         con = self.ability_score("con")
         floor = 0 if self.troop is not None else -con
-        if self.hp <= floor and not self.has_condition("dead"):
-            # `disabled` belongs on the list and was missing from it. Most deaths never
-            # stop at exactly 0 hit points, so nobody had ever been disabled and then
-            # killed — until drowning, which walks a body down the ladder one rung a
-            # round (0, then -1, then dead) and left a corpse that was still "conscious,
-            # and a standard action costs a hit point".
-            for gone in _DOWN_THE_LADDER:
-                self.remove_condition(gone)
-            self.add_condition("dead", source="hit points")
+        if self.hp <= floor and not self.is_dead:
+            self.die("hit points")
             changed.append("dead")
         elif (self.hp < 0 or (self.hp == 0 and self.drown_failures)) \
                 and not self.has_condition("dead"):

@@ -88,7 +88,21 @@ doors places come in by** — a settlement's own words imply spots (`places.IMPL
 the player founds a place with an owner (`found`; the owner holds `holds.place.<slug>`
 as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its parent
 (`venture`); all of it in `Scene.founded`, read back through the one derivation
-`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`).
+`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`); **the coup
+de grâce** (CRB p.197) — the `coup_de_grace` attack param: no attack roll, an
+automatic critical the PC still rolls, sneak attack added, then Fortitude DC 10 +
+damage dealt or `Actor.die` (the one door `dead` is written through, shared with
+`apply_hp_state`); refused, with the reason printed, at anybody not helpless, at a
+creature immune to critical hits (ooze, elemental, swarm, incorporeal, or the
+printed immunity — NOT undead or constructs, that was 3.5), and with any ranged
+weapon but a point-blank bow or crossbow; undead and constructs take the blow and
+have no save; declared from finishing words by `judgement.declare_coup_de_grace`
+and from the combat bar; never opens a battle (`rules/coup_de_grace.py`,
+`tests/test_coup_de_grace.py`). An ordinary first swing at a body on the floor
+lands too, at helpless AC (Dex 0, −4 against melee, in `Actor.ac_modifiers`) —
+until 2026-09-27 the attack loop broke on `is_down` before the FIRST swing and
+the blow resolved as nothing. Sneak attack now reads "denied Dex" (`loses_dex_to_ac`),
+not only flat-footed.
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
@@ -98,8 +112,14 @@ as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its p
 - `grants` documents for blood spike, coagulator and blood commander paths.
 - Blood Burst's computed save DC; Rupture Self's blood-pool targeting (see the
   path's `needs` map).
-- A proper 1e coup de grâce (full-round, auto-crit, Fortitude save) — today a
-  mercy stroke resolves as an ordinary attack on the body.
+- The coup de grâce's remaining clauses: the attack of opportunity it provokes
+  (only movement provokes anything today — `rules/reactions.py`), the full-round
+  cost as an enforced budget (no op has one), the two-round version against total
+  concealment, and ghost touch against the incorporeal.
+- Critical-hit immunity on ORDINARY attacks: an ooze is critted by a normal swing
+  today. `coup_de_grace.crit_immunity` is the reader to reuse.
+- Natural 1 / natural 20 on saving throws: only the coup de grâce's save honours
+  them; `_op_save` and the spell-save path decide on the total alone.
 
 **Refused** (asked and answered — do not reopen without the user): the three GAS
 items above; models authoring numbers anywhere (validators refuse documents with
@@ -207,5 +227,10 @@ rules/engine.py:Engine._ability_refusal
 rules/engine.py:_damage_note
 rules/intents.py:cut_outcome_claims
 gm/judgement.py:is_finishing_blow
+gm/judgement.py:declare_coup_de_grace
+rules/coup_de_grace.py:refusal
+rules/coup_de_grace.py:crit_immunity
+rules/sheet.py:Actor.die
+tests/test_coup_de_grace.py
 content/classes/blood-bending.json
 -->

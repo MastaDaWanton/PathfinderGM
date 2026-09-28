@@ -26,9 +26,13 @@ function renderCombat(s) {
   $("#cb-turn").textContent = up ? "your turn" :
     `waiting on ${(s.scene.initiative.find(i => i.up) || {}).name || "…"}`;
 
-  const foes = (s.scene.actors || []).filter(a => !a.is_pc && a.hp > 0);
+  // The helpless stay targets below 0 hp: a dying foe is exactly who a coup de grâce
+  // is for, and the engine lands an ordinary blow on one too (2026-09-27).
+  const foes = (s.scene.actors || []).filter(a => !a.is_pc && (a.hp > 0 || a.helpless));
   if (COMBAT.target && !foes.some(f => f.ref === COMBAT.target)) COMBAT.target = null;
   if (!COMBAT.target && foes.length === 1) COMBAT.target = foes[0].ref;
+  const aimed = foes.find(f => f.ref === COMBAT.target);
+  $("#cb-coup").hidden = !(aimed && aimed.helpless);
   $("#cb-targets").innerHTML = foes.map(f =>
     `<span class="cb-target ${COMBAT.target === f.ref ? "on" : ""}" data-target="${
       esc(f.ref)}">${esc(f.name)}<small>${
@@ -145,6 +149,14 @@ document.addEventListener("click", async e => {
     combatMenu(""); renderPlan(); return;
   }
 
+  if (t.closest("#cb-coup")) {
+    if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
+    // Filed in the standard slot, as a full attack is: the panel budgets no full round
+    // for either, and the engine enforces no action economy for any op.
+    COMBAT.standard = { label: `Coup de grâce on ${targetName()}`,
+      actions: [{ op: "attack", target: COMBAT.target, params: { coup_de_grace: true } }] };
+    combatMenu(""); renderPlan(); return;
+  }
   if (t.closest("#cb-fullatk")) {
     if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
     const seq = (STATE.attacks || {}).sequence || [0];
