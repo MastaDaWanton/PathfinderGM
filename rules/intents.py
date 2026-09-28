@@ -635,6 +635,76 @@ class Intent:
 NOT_A_MANOEUVRE = {"draw", "swing", "lunge", "strike", "slash", "stab", "thrust",
                    "attack", "charge", "melee"}
 
+# What a model writes in an optional slot it has nothing for. The plan's `declared`
+# block lists every attack param as a string property (`prompts._declared_op`), and the
+# model fills the ones it has no use for: "none" is the commonest manoeuvre in the
+# recordings, 53 of 157 values across 32 of them (2026-09-28). Filed as a weapon, it
+# lost turn 1 of two fight audits running, five attempts each on "attack: no such weapon
+# 'none'" and then ten minutes waiting on the fallback model. Read as absent, the way a
+# structured-output validator maps sentinel strings to None for an optional field.
+NULL_WORDS = frozenset({"", "none", "null", "nil", "n/a", "na", "no", "nothing",
+                        "false", "-", "—"})
+
+# The body as the weapon, by the name of the blow. "punch" was the manoeuvre in six
+# recorded plans, and filed as a weapon it was refused like "none".
+UNARMED_WORDS = frozenset({"punch", "punches", "kick", "kicks", "fist", "fists", "jab",
+                           "hook", "uppercut", "headbutt", "elbow", "knee", "slap",
+                           "unarmed strike", "unarmed attack", "bare hands", "hands"})
+
+
+def is_null(value) -> bool:
+    """Whether a slot's value is the model saying it has nothing to put there."""
+    return value is None or (isinstance(value, str)
+                             and value.strip().lower() in NULL_WORDS)
+
+
+# The params that are a yes or a no, wherever they appear.
+FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
+                         "thrown", "quoted"})
+
+
+def _flag(value) -> bool:
+    """A yes/no param, whether the model wrote it as a boolean or as a word."""
+    if isinstance(value, str):
+        return not (is_null(value) or value.strip().lower() in ("0", "off"))
+    return bool(value)
+
+
+def attack_slots(manoeuvre, weapon) -> tuple[str | None, str | None]:
+    """(manoeuvre, weapon) as the model meant them, before either is checked.
+
+    The one reading of the two slots, shared by `judgement.normalize_attacks` (before
+    validation) and `parse` (every intent, the NPC turn's included). Before 2026-09-28
+    they disagreed: the judgement moved anything not a manoeuvre into `weapon` — its own
+    comment promised "anything a weapon lookup knows goes to `weapon`, anything neither
+    knows is dropped", and the code never asked the lookup — so "strike", which the
+    parser drops as part of attacking, and "intimidate", which the parser turns into a
+    check, reached the parser as weapons and were refused. In the recordings: "none" 53,
+    "punch" 6, "strike" 4, "throw" 3, "bull_rush" and "dirty_trick" 1 each, every one a
+    refusal the correction loop could not teach past.
+    """
+    w = None if is_null(weapon) else weapon
+    if isinstance(w, str) and w.strip().lower() in UNARMED_WORDS:
+        w = "unarmed"
+    if is_null(manoeuvre):
+        return None, w
+    m = str(manoeuvre).strip().lower()
+    key = MANEUVER_ALIASES.get(m) or MANEUVER_ALIASES.get(m.replace("_", " ")) \
+        or m.replace("_", " ")
+    key = MANEUVER_ALIASES.get(key, key)
+    if key in MANEUVERS:
+        return key, w
+    if key in NOT_A_MANOEUVRE:
+        return None, w
+    if key in UNARMED_WORDS:
+        return None, w or "unarmed"
+    # A skill is the parser's to rewrite into a check (`normalise_raw`), untouched here.
+    if normalise_skill(key):
+        return m, w
+    if _known_weapon(key):
+        return None, w or key
+    return None, w
+
 # The one word a model reaches for when it means "no circumstance applies", which is
 # exactly the case the enum has no room for.
 NO_CIRCUMSTANCE = {"neutral", "none", "normal", "average", "standard", "no"}
@@ -837,6 +907,13 @@ def _check_params(intent: Intent, index: int) -> None:
     """Per-op value checks. Closed vocabularies are checked here rather than trusted,
     because a closed vocabulary the code does not enforce is just a suggestion."""
     p, op = intent.params, intent.op
+    # A yes/no param the model wrote as a word is read as one. `bool("false")` is True,
+    # and the engine reads every one of these with `bool()` — `drain: "false"` would have
+    # made ability damage permanent. The plan's `declared` block typed them all as
+    # strings (`prompts._declared_op`, now booleans); the intents list types no params
+    # at all. Not yet seen in a recording: the null words in `manoeuvre` were.
+    for key in FLAG_PARAMS & set(p):
+        p[key] = _flag(p[key])
 
     if op == "check":
         raw_skill = str(p["skill"]).strip().lower()
@@ -914,6 +991,18 @@ def _check_params(intent: Intent, index: int) -> None:
         p["save"] = save
 
     elif op == "attack":
+        # "none" in either slot is nothing in it (`NULL_WORDS`), and "punch" as a weapon
+        # is the unarmed strike (`UNARMED_WORDS`) — the same reading `attack_slots` gives
+        # the plan before validation, here for every intent the NPC turn's included.
+        if is_null(p.get("weapon")):
+            p.pop("weapon", None)
+        elif str(p["weapon"]).strip().lower() in UNARMED_WORDS:
+            p["weapon"] = "unarmed"
+        if is_null(p.get("manoeuvre")):
+            p.pop("manoeuvre", None)
+        elif str(p["manoeuvre"]).strip().lower() in UNARMED_WORDS:
+            p.pop("manoeuvre")
+            p.setdefault("weapon", "unarmed")
         w = p.get("weapon")
         if w and not _known_weapon(w):
             # The list used to be printed in full, which was reasonable at eleven weapons
@@ -933,6 +1022,9 @@ def _check_params(intent: Intent, index: int) -> None:
         man = p.get("manoeuvre")
         if man:
             key = str(man).strip().lower()
+            # "bull_rush" and "dirty_trick": the model's snake_case, once each in the
+            # recordings, refused as not being manoeuvres.
+            key = MANEUVER_ALIASES.get(key) or key.replace("_", " ")
             key = MANEUVER_ALIASES.get(key, key)
             # "draw", "swing", "lunge" — things that are simply part of making an attack
             # rather than manoeuvres. Measured live: `"manoeuvre": "draw"` was the first

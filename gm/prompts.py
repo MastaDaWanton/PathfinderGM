@@ -2242,10 +2242,15 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...]) -> dic
     arXiv 2010.00904), so the model chooses among them and invents none."""
     from rules.intents import OPS as _OP_TABLE
 
+    from rules.intents import FLAG_PARAMS
+
     required, optional, _vis = _OP_TABLE.get(op, ((), (), ""))
     props: dict = {}
     for name in (*required, *optional):
-        props[name] = {"type": _NUMERIC_PARAMS.get(name, "string")}
+        # A flag is a boolean at the sampler: typed "string", `full_attack` could only
+        # ever be sampled as a word, and `bool("false")` is True (rules.intents._flag).
+        props[name] = {"type": "boolean" if name in FLAG_PARAMS
+                       else _NUMERIC_PARAMS.get(name, "string")}
     need = list(required)
     if op == "travel" and places:
         props["place"] = {"type": "string", "enum": list(places)}

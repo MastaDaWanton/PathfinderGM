@@ -1328,7 +1328,7 @@ def normalize_attacks(raw_intents, scene):
 
     Returns amended raw intents, or None when nothing needed straightening.
     """
-    from rules import tables
+    from rules import intents as intents_mod
 
     changed = False
     out: list[dict] = []
@@ -1344,14 +1344,21 @@ def normalize_attacks(raw_intents, scene):
             changed = True
         # A weapon filed as a manoeuvre: legal manoeuvres are a closed set with an
         # alias table; anything a weapon lookup knows goes to `weapon`, anything
-        # neither knows is dropped — a plain attack is what the player described.
-        man = str(params.get("manoeuvre", "") or "").strip().lower()
-        if man and man not in tables.MANEUVERS and \
-                man not in tables.MANEUVER_ALIASES:
-            params.pop("manoeuvre")
-            if not params.get("weapon"):
-                params["weapon"] = man
-            changed = True
+        # neither knows is dropped — a plain attack is what the player described. And
+        # "none" is nothing at all. One reading of the two slots, the parser's too
+        # (`intents.attack_slots`): this used to move every unknown word into `weapon`
+        # unasked, and "none" lost turn 1 of two fight audits running (2026-09-27/28).
+        if "manoeuvre" in params or "weapon" in params:
+            man, weapon = intents_mod.attack_slots(params.get("manoeuvre"),
+                                                   params.get("weapon"))
+            fixed = {k: v for k, v in params.items() if k not in ("manoeuvre", "weapon")}
+            if man is not None:
+                fixed["manoeuvre"] = man
+            if weapon is not None:
+                fixed["weapon"] = weapon
+            if fixed != params:
+                params = fixed
+                changed = True
         # Unknown params ('action', 'target' now that it has moved) are refusals
         # waiting to happen; the schema names the legal five.
         for key in [k for k in params if k not in _ATTACK_PARAMS]:
