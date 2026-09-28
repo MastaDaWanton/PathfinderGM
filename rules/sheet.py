@@ -1401,7 +1401,7 @@ class Actor:
 
         from . import leveling
 
-        wanted = (key or self.equipped or "unarmed").strip().lower()
+        wanted = (key or self.wielded_key()).strip().lower()
         # A granted weapon rides every unarmed strike while its toggle holds, and
         # answers to its own aliases whether or not it is formed — the engine's gate
         # refuses the unformed swing with the forming ability's name, which it cannot
@@ -1446,10 +1446,141 @@ class Actor:
             base["granted_by"] = g["key"]
             base["formed_with"] = g["ability"]
             return base
+        printed = self.stat_block_weapon(wanted)
+        if printed is not None:
+            return printed
         natural = self.natural_weapon(wanted)
         if natural is not None:
             return natural
         return weapons_mod.get(wanted)
+
+    def wielded_key(self) -> str:
+        """What this body swings when nobody names a weapon.
+
+        `equipped`, then the first attack its stat block prints, then the fist. The middle
+        step is the fix for 2026-09-27: an imported ogre has no `equipped` — its greatclub
+        is a line of print, not an item — so every caller that wrote `equipped or
+        "unarmed"` swung its fists, 1d3 plus Strength where the book says 2d8+7.
+        """
+        return (self.equipped or self.primary_attack_key() or "unarmed").strip().lower()
+
+    def stat_block_attacks(self) -> dict[str, list[list[dict]]]:
+        """The creature's printed attacks, read live off its stat block.
+
+        Only for a body whose numbers ARE a stat block (`flat_attack` set, no class): a
+        printed "+7" is a total, and it is only honest on the sheet that printed it. Read
+        live like `movement_modes` reads a climb speed, so correcting a creature on the
+        bench corrects every one already standing in a scene, and nothing is copied onto
+        the actor to go stale in a save.
+        """
+        if self.flat_attack is None or self.class_data:
+            return {}
+        doc = self._creature_doc()
+        if not doc or not (doc.get("melee") or doc.get("ranged")):
+            return {}
+        from . import statblock_attacks
+
+        return statblock_attacks.of_block(doc)
+
+    def primary_attack_key(self) -> str:
+        """The first attack of the first melee option, else of the first ranged one, or "".
+
+        The first printed is the primary one — the Bestiary prints a creature's best
+        attack first, and 1e's single attack action uses exactly that one."""
+        blocks = self.stat_block_attacks()
+        for category in ("melee", "ranged"):
+            for option in blocks.get(category) or ():
+                if option:
+                    return str(option[0]["key"])
+        return ""
+
+    def _find_stat_block_attack(self, key: str) -> tuple[dict, list[dict]] | None:
+        """(attack, the option it sits in) for a name, or None.
+
+        Exact printed name first, then the singular, then the family a model's word
+        belongs to ("fangs" is the bite, "talons" the claws), then the weapon the name
+        stands on ("+1 frost katana" answers to "katana"). Exact first so the skeleton's
+        "2 claws" option is found by "claws" rather than the lone "claw" in the option
+        before it.
+        """
+        from . import statblock_attacks as sa
+
+        blocks = self.stat_block_attacks()
+        if not blocks:
+            return None
+        want = " ".join(str(key or "").split()).lower()
+        if not want:
+            return None
+        rows = [(a, opt) for cat in ("melee", "ranged")
+                for opt in blocks.get(cat) or () for a in opt]
+        one = sa.singular(want)
+        tests = (
+            lambda a: a["key"] == want or a["name"].lower() == want,
+            lambda a: sa.singular(a["key"]) == one,
+            lambda a: bool(a["kind"]) and a["kind"] == sa.natural_kind(want),
+            lambda a: bool(a["base"]) and a["base"] in (want, want.replace(" ", "-"),
+                                                        sa.base_weapon(want)),
+        )
+        for test in tests:
+            for a, opt in rows:
+                if test(a):
+                    return a, opt
+        return None
+
+    def stat_block_weapon(self, key: str) -> dict | None:
+        """A printed attack as a weapon the engine can swing, or None.
+
+        The weapons table supplies what the print leaves out — a greatclub is two-handed
+        and bludgeoning — and the print overrides everything it states: the dice ("2d8",
+        a Large greatclub, not the table's Medium 1d10), the crit, and under `stat_block`
+        the printed totals for every swing and the printed flat damage. Those two numbers
+        reach a roll only through `attack_modifiers` and `damage_modifiers`, named as the
+        stat block's, so the dice popup still itemises every term.
+        """
+        from . import statblock_attacks as sa
+        from . import weapons as weapons_mod
+
+        found = self._find_stat_block_attack(key)
+        if found is None:
+            return None
+        a, option = found
+        base = dict(weapons_mod.get(a["base"])) if a["base"] else {
+            "name": a["name"], "category": a["category"], "light": False, "hands": 1,
+            "finessable": False, "prof": "", "traits": []}
+        typ = (a["type"] or (base.get("type") if a["base"] else "")
+               or sa.NATURAL.get(a["kind"], "")
+               # A printed name the tables do not know — "tendrils", "chains", "vines" —
+               # with no damage word inside its parenthesis. Bludgeoning is what the
+               # engine's unarmed fallback already called every one of these.
+               or "bludgeoning")
+        base.update({
+            "name": re.sub(r"^\d+\s+", "", a["name"]),
+            "damage": a["dice"],
+            "type": typ,
+            "crit_range": int(a["crit_range"] or (base.get("crit_range") if a["base"]
+                                                  else 20) or 20),
+            "crit_mult": int(a["crit_mult"] or (base.get("crit_mult") if a["base"]
+                                                else 2) or 2),
+            "category": a["category"],
+            "nonlethal": bool(a["nonlethal"]),
+            "natural": bool(a["natural"]),
+            "stat_block": {
+                "key": a["key"],
+                "bonuses": list(a["bonuses"]),
+                "damage_bonus": int(a["bonus"]),
+                "extra": [dict(x) for x in a["extra"]],
+                "riders": list(a["riders"]),
+                "touch": bool(a["touch"]),
+                "automatic": bool(a.get("automatic")),
+                "ability": str(a.get("ability") or ""),
+                "drain": bool(a.get("drain")),
+                "option": [x["key"] for x in option],
+                "origin": f"creature:{self.from_template}",
+            },
+        })
+        if a["natural"]:
+            base.update({"hands": 0, "prof": "natural", "light": False})
+        return base
 
     def _attack_ability(self, weapon: dict, weapon_key: str | None = None) -> str | None:
         """A feat document's `attack_ability` substitution, when its clause holds.
@@ -1526,7 +1657,7 @@ class Actor:
         feat, or from the weapon being named specifically."""
         from . import weapons as weapons_mod
 
-        key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        key = (weapon_key or self.wielded_key()).strip().lower()
         if self.natural_weapon(key) is not None:
             return True                      # a body is proficient with itself
         # A granted weapon is your own fists with something over them, so proficiency
@@ -1612,10 +1743,22 @@ class Actor:
         power_attack: bool = False, lethality: str | None = None,
     ) -> list[Modifier]:
         w = self.weapon(weapon_key)
-        key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
+        printed = w.get("stat_block")
 
-        if self.flat_attack is not None:
+        if printed:
+            # The stat block's own total for THIS swing — "+11/+6" is two numbers, and
+            # the second is the book's, not the first minus five. It already holds base
+            # attack, Strength, size, masterwork, enhancement, Weapon Focus and a
+            # secondary attack's -5, so none of those is added again below; what follows
+            # it in this list is only what print cannot know (conditions, spells, water).
+            # Past the printed list — Swift Strikes asking for one more — the last
+            # printed swing is the one repeated.
+            bonuses = printed["bonuses"] or [self.flat_attack or 0]
+            mods.append(Modifier(int(bonuses[min(iteration, len(bonuses) - 1)]),
+                                 f"{w['name']} (stat block)"))
+        elif self.flat_attack is not None:
             mods.append(Modifier(self.flat_attack, "attack bonus"))
         else:
             mods.append(Modifier(self.bab, "BAB"))
@@ -1642,7 +1785,7 @@ class Actor:
             if size_mod:
                 mods.append(Modifier(size_mod, f"{self.size} size"))
 
-        if iteration:
+        if iteration and not printed:
             mods.append(Modifier(-5 * iteration, f"iterative #{iteration + 1}"))
         # Declared with the swing, like Power Attack, and charged whether the numbers
         # are derived or printed: a thug's stat-block bonus assumes the sap does what
@@ -1676,17 +1819,60 @@ class Actor:
         bookkeeping this app exists to carry."""
         if not full_attack:
             return [0]
+        printed = self.weapon(weapon_key).get("stat_block")
+        if printed:
+            from . import statblock_attacks
+
+            return statblock_attacks.swings({"bonuses": printed["bonuses"], "count": 1})
         if self.flat_attack is not None:
             return [0]
         return list(range(len(iterative_attacks(self.bab))))
+
+    def attack_plan(self, weapon_key: str | None = None,
+                    full_attack: bool = False) -> list[tuple[str, int]]:
+        """Every swing of this attack, as (weapon key, iteration) in the order thrown.
+
+        A character's full attack is one weapon at falling bonuses, which is what
+        `attack_sequence` has always answered. A monster's is not: an owlbear's full
+        attack is claw, claw, bite, and a troll's bite, claw, claw — several weapons in
+        one action, which a list of iteration numbers for one weapon cannot say. Measured
+        2026-09-27: `full_attack` gave every stat-block creature exactly one swing.
+
+        So a stat-block full attack is the whole printed option the named attack sits in
+        (the book's "or" separates options; its commas are one full attack), each entry
+        swung as often as `statblock_attacks.swings` reads off the print. A single attack
+        is the named entry's first, best swing.
+        """
+        key = (weapon_key or self.wielded_key()).strip().lower()
+        w = self.weapon(key)
+        printed = w.get("stat_block")
+        if not printed:
+            return [(key, i) for i in self.attack_sequence(key, full_attack)]
+        if not full_attack:
+            return [(printed["key"], 0)]
+        from . import statblock_attacks
+
+        found = self._find_stat_block_attack(key)
+        option = found[1] if found else []
+        return [(a["key"], i) for a in option for i in statblock_attacks.swings(a)]
 
     def damage_modifiers(
         self, weapon_key: str | None = None, power_attack: bool = False,
     ) -> list[Modifier]:
         w = self.weapon(weapon_key)
-        key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
-        if w["category"] == "melee":
+        printed = w.get("stat_block")
+        if printed:
+            # The printed "+7" of "2d8+7": Strength at whatever multiple this attack
+            # takes it (1.5 on a two-hander or a lone natural attack, half on a
+            # secondary one), enhancement and Weapon Specialization, already summed by
+            # the book. Never Strength again on top — that double count is what an
+            # importer that re-derives from the ability scores gets wrong.
+            if printed["damage_bonus"]:
+                mods.append(Modifier(int(printed["damage_bonus"]),
+                                     f"{w['name']} (stat block)"))
+        elif w["category"] == "melee":
             # Str applies to melee damage even when Finesse supplied the attack roll —
             # Weapon Finesse changes the attack, never the damage. This is a standard
             # place to get 1e wrong.
@@ -2779,7 +2965,7 @@ class Actor:
     def _roll_context(self, weapon_key: str | None = None, **extra) -> dict:
         """What a scoped or conditional feat term is evaluated against."""
         w = self.weapon(weapon_key)
-        key = (weapon_key or self.equipped or "unarmed").strip().lower()
+        key = (weapon_key or self.wielded_key()).strip().lower()
         return {"weapon": {"key": key, "hands": w.get("hands", 1),
                            "category": w.get("category", "melee"),
                            "light": bool(w.get("light", False)),

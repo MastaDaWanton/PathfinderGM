@@ -169,7 +169,11 @@ the `hands` slot through the sheet editor lends its enhancement to EVERY weapon
 (`_standing_mods` has no weapon scope: a live door, measured by the verifiers);
 bestiary special attacks have no locator, so a creature's fight turn keeps
 `damage`/`ability_damage` stamped `creature:<template>` (three live thug turns chose
-`attack`; the door is open, unused, and logged as `kind: npc-turn` now); feat actions
+`attack`; the door is open, unused, and logged as `kind: npc-turn` now) — though a
+monster's printed ATTACKS are read now (2026-09-27, docs/printed-attacks.md: printed
+bonus and damage as the base term through the funnel, full attack = the printed option,
+hits stamped `creature:<template>`; before it every monster swung its fists), while its
+riders — grab, poison, trip — are parsed and still not fired; feat actions
 (Cleave, Vital Strike) have no `find_ability` branch; no level-up feat writer exists;
 the claims scrubber let prose describe a struck target after a `cast` that never
 resolved (measured once, before the actor fill); "I set off the trap" came back as

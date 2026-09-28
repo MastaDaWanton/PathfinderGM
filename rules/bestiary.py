@@ -103,8 +103,11 @@ TEMPLATES: dict[str, dict] = {
         "flat_initiative": 3,
         "flat_cmd": 13,
         "flat_damage": "1d4",
-        "equipped": "unarmed",
-        "weapons": ["unarmed"],
+        # The Bestiary dog's own line. This template used to say `equipped: unarmed`
+        # beside `flat_damage: 1d4`, and nothing read the second: the dog punched, 1d3+1.
+        # A printed line is what `statblock_attacks` reads for every imported creature,
+        # so the hand-written one says its bite the same way.
+        "melee": "bite +2 (1d4+1)",
         "notes": "Scent. Barks first.",
     },
 }
@@ -477,6 +480,9 @@ _INDEX: list[str] = []
 # does not recognise and a stat block is a great deal more than a combatant.
 _NOT_ON_THE_SHEET = (
     "cr", "cr_value", "xp", "creature_type", "subtype", "alignment", "hit_dice",
+    # `melee` and `ranged` stay off the sheet but are NOT unread: `Actor.stat_block_attacks`
+    # reads them live off the block through `rules/statblock_attacks.py`. Until
+    # 2026-09-27 nothing did, and every imported creature fought with its fists.
     "ac_note", "melee", "ranged", "ranged_attack", "ranged_damage", "cmb",
     # `speed` came off this list on 2026-09-14. It had been stripped beside `speed_note`,
     # which is prose the sheet has no field for — but `speed` is a plain integer and
