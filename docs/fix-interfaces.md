@@ -661,6 +661,7 @@ has one lane.
 | No Heal DC 15 stabilise (`_op_check`) | C | **C, Phase 2** (`rules/firstaid.py` plus the `_op_check` branch) | Confirm at G0 (Q8). The bonesetter and ferryman starts depend on it |
 | The scheme's open-grant leak | D | **D, Phase 2** (`the-lost-thing.json`) | The grant moves to a step with `present($giver)`; the `event:talk` criterion is I4's |
 | `IntentError.for_a_person` already exists | this pass | register | Reused, not duplicated |
+| The brief's IN CONVERSATION WITH block sits inside the WHO IS HERE loop, so it prints once per visible actor | S2 (Phase 1) | **A, Phase 2** (`gm/prompts.py`, that block only, beside its line-1167 grant) | Left byte-identical in Phase 1 on purpose; a test records the per-actor repeat before the fix |
 | Scene fields must never be named `said` | this pass | register | `Scene.said` is the backstop rotation |
 
 **Out of scope, recorded:** `biomes.detect`'s default matching (its herb and forage
