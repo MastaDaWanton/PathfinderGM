@@ -1125,11 +1125,17 @@ class GMAgent:
                cast: list[str] | None = None,
                fire_context: str | None = None,
                facts: list[str] | None = None,
-               acting: str = "") -> tuple[str, list[str], list[Attempt]]:
+               acting: str = "",
+               changes: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         `acting` names the creature whose turn this prose is, on an NPC's turn; empty on
         the player's. It arms the `wrong-actor` check and its repair.
+
+        `changes` is this turn's effect records (`_changes_from`): what left a hand and
+        what condition landed, so the state-claims check can tell reporting from
+        invention. None before the dice — setup prose and an NPC's opener — where
+        nothing has changed yet and every drop or stun the prose writes is its own.
 
         There used to be four copies of this chain and they had drifted — the census over
         all seven saved campaigns found that `npc_turn` prose reached the transcript with
@@ -1286,6 +1292,12 @@ class GMAgent:
             if named:
                 repairs.append(f"the player narrated by name: {named} swap(s) "
                                f"to second person")
+        # What a hand holds and a body suffers, set against the state and this turn's
+        # effect records (gm/state_claims.py). After the name swap, so "your" is the
+        # player's; after the rewrite, so the prose it judges is the prose that ships.
+        text, held, held_attempts = self._repair_state_claims(text, changes)
+        repairs += held
+        attempts += held_attempts
         # Agency is a fact of the tell. When every blow this turn was somebody else's
         # and the prose still swings the player's blade, the sentences go and the
         # plain tell stands — the free backstop under `wrong-hands`, the one that
@@ -1585,6 +1597,59 @@ class GMAgent:
 
         return " ".join(narration.split()), repairs, attempts
 
+    def _repair_state_claims(self, text: str,
+                             changes: list[dict] | None) -> tuple[str, list[str], list[Attempt]]:
+        """Prose that says a hand holds or loses something, or a body suffers something,
+        the state does not carry: one targeted rewrite of the sentence with the fact
+        named, checked again, and cut when it still says it.
+
+        The shape of `_repair_outcome_claims`, and for the reason the literature gives
+        as well as this project's: edit only the span that disagrees (RARR kept the
+        passage's intent in over 90% of cases where whole-passage revisers kept it in
+        6-40%), and re-run the detector on the repair, because a repair fixes only some
+        of what it is asked to (57.6% in Varshney et al. 2023) — a failed one is cut.
+        Two calls a beat at most; a third finding is cut straight away, because a local
+        model's minute is the player's minute.
+        """
+        from .state_claims import state_claims
+
+        scene = self.engine.scene
+        found = state_claims(text, scene, changes)
+        if not found:
+            return text, [], []
+        pc = scene.pc()
+        repairs: list[str] = []
+        attempts: list[Attempt] = []
+        for n, (sentence, why) in enumerate(found):
+            fixed = ""
+            if n < 2:
+                try:
+                    reply = client.chat(
+                        prompts.repair_messages(sentence, why),
+                        self.prose_model, self.prose_host, as_json=True, think=False,
+                        temperature=0.3, num_predict=200, provider=self.prose_provider,
+                        api_key=self.prose_key,
+                        schema={"type": "object",
+                                "properties": {"sentence": {"type": "string",
+                                                            "maxLength": 400}},
+                                "required": ["sentence"]})
+                    attempts.append(Attempt("repair", reply.seconds, reply.model,
+                                            reply.text, note=f"state claim: {why}"))
+                    fixed = str(reply.json().get("sentence", "")).strip()
+                    if fixed and pc is not None:
+                        fixed, _ = narration_mod.pc_to_second_person(fixed, pc.name)
+                except Exception as exc:  # a failed repair must not lose the turn
+                    attempts.append(Attempt("repair", 0.0, self.prose_model,
+                                            note=f"state claim: failed: {exc}"))
+                    fixed = ""
+            if fixed and not state_claims(fixed, scene, changes):
+                text = text.replace(sentence, fixed, 1)
+                repairs.append(f"state claim: {why}: {sentence!r} -> {fixed!r}")
+            else:
+                text = text.replace(sentence, "", 1)
+                repairs.append(f"state claim: {why}: cut {sentence!r}")
+        return " ".join(text.split()), repairs, attempts
+
     def _repair_wrong_actor(self, text: str, acting: str,
                             tells: list[str] | None) -> tuple[str, list[str], list[Attempt]]:
         """A creature's turn told as somebody else's: detect, one targeted rewrite, and
@@ -1826,7 +1891,8 @@ class GMAgent:
             player_input=player_input, brief=brief, hand_back=True, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
             claim=claim, blows=self._blows_from(outcomes),
-            cast=self._cast_from(outcomes), facts=tells)
+            cast=self._cast_from(outcomes), facts=tells,
+            changes=self._changes_from(outcomes))
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
@@ -1942,6 +2008,17 @@ class GMAgent:
         return [e for o in outcomes if getattr(o, "op", "") == "break_in"
                 for e in (getattr(o, "effects", None) or []) if e.get("kind") == "break_in"]
 
+    @staticmethod
+    def _changes_from(outcomes: list) -> list[dict]:
+        """This turn's effect records, flat — what left a hand, what landed on a body.
+        Read off the outcome RECORD, never the tells' text, the way
+        `claims_the_engine_backs` is (tests/test_three_laws.py holds it there)."""
+        out: list[dict] = []
+        for o in outcomes or []:
+            effects = o.get("effects") if isinstance(o, dict) else getattr(o, "effects", None)
+            out.extend(e for e in (effects or []) if isinstance(e, dict))
+        return out
+
     def _blows_from(self, outcomes: list) -> list[dict]:
         """Who struck this turn, from the attack outcomes that rolled — the reviewer's
         feed for `wrong-hands`. `{"attacker", "pc", "tell"}` per blow; the tell is the
@@ -2043,7 +2120,8 @@ class GMAgent:
             player_input=player_input, brief="", hand_back=False, claims=True,
             backed=claims_the_engine_backs(outcomes), deaths=deaths,
             blows=self._blows_from(outcomes), cast=self._cast_from(outcomes),
-            rewrite=rewrite, facts=tells, acting=acting)
+            rewrite=rewrite, facts=tells, acting=acting,
+            changes=self._changes_from(outcomes))
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)
