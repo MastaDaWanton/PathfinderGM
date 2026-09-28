@@ -120,7 +120,7 @@ def people_name(world, people_id: str | None) -> str:
 
 
 def appearance_for(world, location_id: str | None, people_id: str | None = None,
-                   ref: str = "") -> str:
+                   ref: str = "", own: str | None = None) -> str:
     """What a stranger would see of a person of this people: the export's own body
     sentences for the people, one or two of them, in the people's name."""
     if world is None:
@@ -147,7 +147,10 @@ def appearance_for(world, location_id: str | None, people_id: str | None = None,
         lines.append(body[1])
     from . import faces as faces_mod
 
-    own = faces_mod.details_for(" ".join(lines), ref, location_id)
+    # `own` is given when the person was rolled by `rules.lives`, whose face was chosen to
+    # agree with their work (2026-09-25); otherwise the seeded pick from `faces`.
+    if own is None:
+        own = faces_mod.details_for(" ".join(lines), ref, location_id)
     if own:
         lines.append(own)
     named = str(race.get("name") or people_name(world, pid) or "").strip()

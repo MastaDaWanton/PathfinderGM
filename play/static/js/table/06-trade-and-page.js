@@ -13,7 +13,11 @@
    decide, so it goes straight to the engine the way the combat panel does. */
 let TRADE = null, PICK = null;
 
-async function openTrade() {
+// `want` is what the player's own words set out to buy ("a coil of rope"): the turn
+// that said it opens this panel with the thing already picked, and the server matches
+// it against the real shelf — or says the keeper has none, and picks nothing
+// (2026-09-27, the user's ruling: a purchase "should open the trade tab").
+async function openTrade(want) {
   $("#tradepanel").classList.add("on");
   $("#tradepanel").setAttribute("aria-hidden", "false");
   $("#trademsg").textContent = "";
@@ -22,12 +26,17 @@ async function openTrade() {
     // `post` already reads the body, throws on a bad status and hands back the parsed
     // object. Calling `.json()` on its return is how this screen first shipped, and the
     // panel opened completely empty with "r.json is not a function" in the corner.
-    TRADE = await post("/api/trade", {});
+    TRADE = await post("/api/trade", typeof want === "string" && want ? {want} : {});
   } catch (e) {
     $("#trademsg").textContent = e.message;
     return;
   }
+  if (TRADE.pick) PICK = { side: "buy", id: TRADE.pick };
+  if (TRADE.want_line) $("#trademsg").textContent = TRADE.want_line;
   drawTrade();
+  const picked = PICK && document.querySelector(
+    `#tradtheirs [data-id="${CSS.escape(PICK.id)}"]`);
+  if (picked) picked.scrollIntoView({ block: "nearest" });
 }
 
 async function closeTrade() {

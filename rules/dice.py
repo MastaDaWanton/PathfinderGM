@@ -121,6 +121,44 @@ class Roll:
         }
 
 
+def d20_succeeds(roll: Roll, dc: int) -> bool:
+    """Whether a d20 roll whose natural face decides meets its DC: an attack roll, a
+    combat manoeuvre, or a saving throw.
+
+    Core Rulebook p.180: a natural 1 on a saving throw is always a failure and a natural
+    20 always a success — the same rule attack rolls and manoeuvres already honoured,
+    each in its own copy. Saves had none: `_op_save`, the cast save, both ward saves and
+    the survival saves decided on the total alone, so a natural 20 that missed the DC
+    failed (measured 2026-09-28 building the coup de grâce, whose save was the first to
+    ask). One reader now, and every save site calls it.
+
+    NOT for skill or ability checks: 1e says in as many words that a 20 on a skill check
+    is not an automatic success, and stabilising, holding one's breath and a caster
+    level check are checks. `Roll.natural` is the one d20 face — a player-rolled d20
+    through `Dice.given` or `Dice.given_total` keeps it too — and None for anything
+    else, which then falls through to the total.
+    """
+    if roll.natural == 20:
+        return True
+    if roll.natural == 1:
+        return False
+    return roll.total >= dc
+
+
+def natural_said(roll: Roll, dc: int) -> str:
+    """"on a natural 20" / "on a natural 1" when the face overruled the total, else "".
+
+    For a tell that would otherwise read as bad arithmetic: "makes the save (23 against
+    DC 27)" is how the coup de grâce's first live natural 20 came out.
+    """
+    made = d20_succeeds(roll, dc)
+    if made and roll.total < dc:
+        return "on a natural 20"
+    if not made and roll.total >= dc:
+        return "on a natural 1"
+    return ""
+
+
 class Dice:
     def __init__(self, seed: int | None = None):
         self._rng = random.Random(seed)

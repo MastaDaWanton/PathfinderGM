@@ -37,6 +37,7 @@ CONTENT_DIRS = [
     "backgrounds", # where a character was before turn one (rules/backgrounds.py)
     "races",       # the Core seven as documents (content/races/core.json, rules/races.py)
     "schemes",     # authored quest schemes (content/schemes, rules/schemes.py)
+    "people",      # the charts a life is rolled from (content/people, rules/lives.py)
     "ingredients",
     "materials",
     "spells",

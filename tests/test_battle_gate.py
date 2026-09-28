@@ -95,10 +95,13 @@ def test_a_mercy_stroke_on_the_dying_opens_nothing_and_lands(scene):
         {"op": "attack", "actor": "pc", "target": "c1",
          "because": "out of his misery"}]))
     assert not scene.in_encounter, "a corpse cannot be an opponent"
-    # The swing itself proceeds (suspending on the player's own d20) rather than
-    # being announced as a battle.
-    assert scene.awaiting or all(
-        e.get("kind") != "battle_joined" for o in res.outcomes for e in o.effects)
+    # The swing itself proceeds, suspending on the player's own d20, rather than being
+    # announced as a battle. This used to read `awaiting or <no battle_joined>`, and it
+    # passed through the second half for as long as the swing resolved as NOTHING — the
+    # attack loop broke on `is_down` before the first swing (probed 2026-09-27; see
+    # tests/test_coup_de_grace.py). Both halves are required now.
+    assert scene.awaiting and scene.awaiting["die"] == "1d20", "no die was offered"
+    assert all(e.get("kind") != "battle_joined" for o in res.outcomes for e in o.effects)
 
 
 def test_inject_fight_stands_aside_for_a_finishing_blow(scene):

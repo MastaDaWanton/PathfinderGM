@@ -1132,7 +1132,9 @@ def test_a_pair_of_guards_is_two_guards():
                                         "name": "pair of guards"}}], origin="author:test")).outcomes[0]
     made = out.effects[0]["actors"]
     assert len(made) == 2
-    assert all(m["name"] == "guard" for m in made)
+    # Twins are named apart at the mint since 2026-09-27 (`bestiary.name_apart`): two
+    # actors both called "thug", one dead, cost the living one his own turn's sentence.
+    assert [m["name"] for m in made] == ["guard", "second guard"]
 
 
 def test_a_spawn_the_model_could_not_shape_is_shaped_here():
@@ -1563,8 +1565,10 @@ def test_a_crowd_is_people():
         s2, "A pair of guards blocks the door, and a merchant watches.", turn=1)
     assert added == ["guard", "merchant"]
     judgement.promote_cast(s2, added)
+    # Twins are named apart at the mint since 2026-09-27 (`bestiary.name_apart`): two
+    # actors both called "thug", one dead, cost the living one his own turn's sentence.
     assert sorted(a.name for a in s2.actors.values()) == [
-        "guard", "guard", "merchant"]
+        "guard", "merchant", "second guard"]
 
 
 def test_the_ledger_books_people_not_turns_of_phrase():

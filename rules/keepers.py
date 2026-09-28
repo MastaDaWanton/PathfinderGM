@@ -306,3 +306,107 @@ def staff(engine):
                                                    ref=actor.ref or wid)
     scene.add(actor)
     return actor
+
+
+# --- hours ----------------------------------------------------------------------------------
+#
+# A counter keeps hours (2026-09-27). Researched before building, sources in
+# docs/the-population.md "Built: shop hours and calling on people":
+#   * OPEN IS WHERE THE KEEPER STANDS, never a second clock: Stardew Valley's shop opens
+#     only while its owner is inside the counter's tile area, and Skyrim's vendor faction
+#     asks both an hour window and a place. Here a keeper's hours say where they stand,
+#     and the counter is open exactly when they stand at it in an open slot.
+#   * A SHUT SHOP IS NOT A SHUT BUILDING: Pierre's Wednesday closure shut the building and
+#     cut players off from the people inside, and the complaints ran for years. A keeper
+#     of a place under a roof lives on the premises (Pierre, Belethor) and can still be
+#     talked to; only the counter is shut. A stall in the open is packed up, and its
+#     keeper goes home.
+#   * THE KEEPER SAYS WHEN TO COME BACK: CircleMUD's keeper speaks one of "Come back
+#     later!", "Sorry, we have closed, but come back later." and "Sorry, come back
+#     tomorrow."; Stardew's closed shop "does nothing" unless a message is written.
+#   * SOMEBODY IS ALWAYS OPEN: Skyrim's innkeepers are; so are these.
+# The hours themselves are the town's own: trade from the market bell at first light, most
+# counters shut by evening, smiths and taverners working to the curfew bell (the 1345
+# Spurriers' ordinance forbade work after it). In residency's three-hour slots, starting
+# at midnight: 0, 3, 6, 9, 12, 15, 18, 21.
+ALWAYS = frozenset(range(8))
+_HOURS: tuple[tuple[tuple[str, ...], frozenset], ...] = (
+    (("tavern", "inn", "alehouse", "taproom"), ALWAYS),
+    (("smithy", "workshops", "tannery", "brewery", "stables", "carters yard", "mill"),
+     frozenset({2, 3, 4, 5, 6})),
+)
+DAY_TRADE = frozenset({2, 3, 4, 5})
+_SLOT_WORDS = {0: "midnight", 1: "the small hours", 2: "first light", 3: "mid-morning",
+               4: "noon", 5: "mid-afternoon", 6: "evening", 7: "the curfew bell"}
+
+
+def kind_of(place_id: str, founded=()) -> str:
+    """What a place is, for its hours: a founded place's own `kind`, else its label."""
+    for p in founded or ():
+        if p.get("id") == place_id and p.get("kind"):
+            return str(p["kind"]).lower().removeprefix("the ")
+    return label_of(place_id).removeprefix("the ")
+
+
+def hours_of(place_id: str, founded=()) -> frozenset:
+    kind = kind_of(place_id, founded)
+    for words, slots in _HOURS:
+        if any(kind == w or kind.endswith(" " + w) for w in words):
+            return slots
+    return DAY_TRADE
+
+
+def open_now(place_id: str, clock: int, founded=()) -> bool:
+    from .residency import slot_of
+
+    return slot_of(clock) in hours_of(place_id, founded)
+
+
+def shut_line(place_id: str, clock: int, founded=(), who: str = "") -> str:
+    """The keeper's answer at a shut counter, or "" when it is open: when to come back.
+
+    Before the first open slot of the day: "opens at first light". Between two open
+    slots (none today, but the table allows it): back later. After the last: tomorrow.
+    """
+    from .residency import slot_of
+
+    if open_now(place_id, clock, founded):
+        return ""
+    hours = sorted(hours_of(place_id, founded))
+    now = slot_of(clock)
+    later = [s for s in hours if s > now]
+    what = label_of(place_id) or "the counter"
+    whose = f"{who}'s counter" if who else f"the counter at {what}"
+    if later and any(s < now for s in hours):
+        return f"{whose[:1].upper()}{whose[1:]} is shut for now; it opens again at {_SLOT_WORDS[later[0]]}."
+    if later:
+        return f"{whose[:1].upper()}{whose[1:]} is not open yet; it opens at {_SLOT_WORDS[later[0]]}."
+    return (f"{whose[:1].upper()}{whose[1:]} is shut for the day; come back tomorrow, "
+            f"from {_SLOT_WORDS[hours[0]]}.")
+
+
+def lives_in(place_id: str) -> bool:
+    """A keeper of a place under a roof lives on the premises; a stall's goes home."""
+    return places_mod.is_indoors(place_id)
+
+
+def shut_here(scene, seller=None) -> str:
+    """Why nobody will sell to the party at this counter right now, or "".
+
+    Asked of the seller when the plan named one, else of the keeper of the place the
+    party is standing in — whether they are at their counter or have gone home for the
+    night. A person who keeps no counter (a peddler, a passer-by) keeps no hours. The one
+    door the trade panel, `buy`, `sell` and the brief all ask, so a counter is never shut
+    to one of them and open to another.
+    """
+    keeper = seller if seller is not None and is_keeper(
+        getattr(seller, "world_entity_id", "") or "") else None
+    if keeper is None and seller is None:
+        keeper = keeper_in(scene, str(getattr(scene, "at", "") or ""))
+    if keeper is None:
+        return ""
+    place = place_of(keeper.world_entity_id)
+    if place != getattr(scene, "at", None):
+        return ""
+    return shut_line(place, int(getattr(scene, "clock_minutes", 0) or 0),
+                     getattr(scene, "founded", None) or (), who=str(keeper.name or ""))

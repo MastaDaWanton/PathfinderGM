@@ -418,9 +418,11 @@ def test_the_challenger_is_promoted_over_the_cap_and_is_who_the_thread_binds_to(
         a.add_condition("bystander")
     judgement.update_thread(market, "I wait for a challenger")
     added = judgement.note_cast(market, INSULT_BEAT, turn=3)
-    assert "woman in the shadows" in added and "man in the scarred leather" in added
+    # "vest" and all since 2026-09-27: the tail stopped a word short of the noun here
+    # too, one of the stumps tests/test_a_description_is_whole.py records.
+    assert "woman in the shadows" in added and "man in the scarred leather vest" in added
     made = judgement.promote_cast(market, added, beat=INSULT_BEAT)
-    assert "man in the scarred leather" in made, "the challenger goes in over the cap"
+    assert "man in the scarred leather vest" in made, "the challenger goes in over the cap"
     man = next(a for a in market.actors.values() if "scarred" in a.name)
     assert market.thread.get("ref") == man.ref
     # With the beat in hand, a lone promoted person who did NOT square off binds nothing.
