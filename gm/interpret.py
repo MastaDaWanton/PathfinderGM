@@ -355,6 +355,19 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
     return ops
 
 
+def travel_choices(frame: dict | None, scene, places, location) -> tuple[str, ...]:
+    """The place names a declared travel may choose among — the `places` enum of
+    `prompts.turn_schema`, so the planner walks to a place that exists and invents none.
+
+    Today's answer, moved here unchanged from `GMAgent.plan_turn` (docs/fix-interfaces.md
+    §2.9): every place here but the one the party stands in. The frame and the settlement
+    are taken so Lane B can offer the ground outside the walls (the ring of places,
+    docs/design-b-space.md) without another signature change; in Phase 1 neither is read.
+    """
+    here = getattr(scene, "at", None)
+    return tuple(p.name for p in places if p.id != here)
+
+
 # Which acts of the reading can stand behind an op a word-detector requires. An op with
 # no row here is not judged (the reading has no view on it).
 _OP_NEEDS = {

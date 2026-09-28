@@ -270,6 +270,11 @@ class GMAgent:
         rather than fresh.
         """
         self.last_said = []
+        # Where the party stood when the turn began, and the settlement, for the narrator
+        # checks (gm/checks, `BeatContext.was_at`): a refused move is judged against the
+        # place the turn started from, whatever the engine did afterwards.
+        self._was_at = str(getattr(self.engine.scene, "at", "") or "")
+        self._location = location
         # Continue is a directive, never an utterance. The ruling (2026-09-18): "my
         # character should keep doing whatever he is doing and the scene should move
         # forward without any addition from me." So no plan is asked of the model at
@@ -325,7 +330,8 @@ class GMAgent:
         # What the player's own words already commit this turn to, read by asking the
         # injectors what they would add. Computed once: it depends on the player's text
         # and the scene, and neither moves between attempts.
-        declared = judgement.declared_ops(player_input, self.engine.scene, self.world)
+        declared = judgement.declared_ops(player_input, self.engine.scene, self.world,
+                                          attached=getattr(self, "attachments", ()))
         # And what the reading grounds, joined — the detectors stay a second opinion
         # until each is retired on a measured comparison (docs/the-interpreter.md).
         if isinstance(self.reading, dict) and "error" not in self.reading:
@@ -399,9 +405,14 @@ class GMAgent:
                                     # front of it, on choosing the item and the target.
                                     must_contain=tuple(declared),
                                     # A declared travel chooses among the places that
-                                    # exist here, by name, and invents none.
-                                    places=tuple(p.name for p in self.engine.places()
-                                                 if p.id != self.engine.scene.at)))
+                                    # exist here, by name, and invents none — the list
+                                    # is the interpreter's to widen (the ground outside
+                                    # the walls, Lane B), so it is asked for there.
+                                    places=interpret.travel_choices(
+                                        self.reading if isinstance(self.reading, dict)
+                                        and "error" not in self.reading else None,
+                                        self.engine.scene, self.engine.places(),
+                                        location)))
             except client.ModelUnavailable as exc:
                 down.add(model)
                 rejections.append(f"attempt {n + 1}: {model} could not be reached: {exc}")
@@ -527,7 +538,8 @@ class GMAgent:
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.
-                raw = judgement.inject_cast(raw, player_input, self.engine.scene)
+                raw = judgement.inject_cast(raw, player_input, self.engine.scene,
+                                            attached=getattr(self, "attachments", ()))
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 # After inject_checks so its product is covered too: a check with
                 # neither dc nor opposed_by is refused by validation, and the "engine
@@ -678,7 +690,9 @@ class GMAgent:
                 min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
                            else narration_mod.MIN_SCENE_CHARS),
                 max_chars=narration_mod.MAX_COMBAT_CHARS if fighting else 0,
-                player_input=player_input, brief=brief, hand_back=True, claims=True)
+                player_input=player_input, brief=brief, hand_back=True, claims=True,
+                ctx=self._beat_context("plan", player_input=player_input, brief=brief,
+                                       location=location))
             attempts.extend(prose_attempts)
 
             return TurnPlan(narration=narration, intents=intents,
@@ -864,12 +878,15 @@ class GMAgent:
             # `rewrite=False`: the deterministic backstops close the hole for free, and a
             # ~10s polish call per NPC per round is a price a fight cannot pay.
             # `hand_back=False`: an NPC beat mid-round hands nothing back.
+            self._location = location
             narration, repairs, groom_attempts = self._groom(
                 self._lift(str(data.get("narration", "")).strip()),
                 earlier=None, min_chars=0,
                 max_chars=narration_mod.MAX_COMBAT_CHARS,
                 player_input="", brief=brief, hand_back=False, claims=True,
-                rewrite=False, acting=actor.name)
+                rewrite=False, acting=actor.name,
+                ctx=self._beat_context("npc", player_input="", brief=brief,
+                                       location=location, acting=ref))
             attempts.extend(groom_attempts)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
                             repairs=[*rearmed, *repairs], rejections=rejections)
@@ -1152,11 +1169,17 @@ class GMAgent:
                fire_context: str | None = None,
                facts: list[str] | None = None,
                acting: str = "",
-               changes: list[dict] | None = None) -> tuple[str, list[str], list[Attempt]]:
+               changes: list[dict] | None = None,
+               ctx: "BeatContext | None" = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         `acting` names the creature whose turn this prose is, on an NPC's turn; empty on
         the player's. It arms the `wrong-actor` check and its repair.
+
+        `ctx` is the beat as the narrator checks read it (gm/checks, `BeatContext`), built
+        by each of the four callers. With it, the registered checks run once the
+        attribution exists (`_truth_pass`); without it — a test, a tool — they do not run
+        and nothing else changes.
 
         `changes` is this turn's effect records (`_changes_from`): what left a hand and
         what condition landed, so the state-claims check can tell reporting from
@@ -1230,6 +1253,18 @@ class GMAgent:
             provider=self.prose_provider, api_key=self.prose_key)
         if self.attribution.mentions:
             self.mention_rows.append(self.attribution.as_log())
+        # The narrator checks (gm/checks): here and not inside `review()`, because
+        # `review()` runs only in `polish`, only when there is a rewrite, and before this
+        # attribution exists (docs/fix-interfaces.md §1.1 P2). The context is brought up
+        # to the draft as it now stands, with what the rewrite's tags said.
+        if ctx is not None:
+            from dataclasses import replace
+
+            ctx = replace(ctx, text=text, attribution=self.attribution,
+                          said=tuple(dict(r) for r in self.last_said))
+            text, truth, truth_attempts = self._truth_pass(ctx)
+            repairs += truth
+            attempts += truth_attempts
         # A name on the wrong person — the words name one man, the sentence is about
         # another: one targeted rewrite (stage 3 of the note).
         if self.attribution.misnamed():
@@ -1377,9 +1412,9 @@ class GMAgent:
                            f"landed a blow before any die was rolled")
         # Fire with nothing to light it, when the rewrite left it standing: cut. Judged
         # only with a brief in hand, the same gate the finding has.
-        ctx = (" ".join([brief] + list(earlier or [])) if brief else fire_context)
-        if ctx is not None:
-            text, lit = narration_mod.cut_fire_from_nowhere(text, ctx)
+        lit_by = (" ".join([brief] + list(earlier or [])) if brief else fire_context)
+        if lit_by is not None:
+            text, lit = narration_mod.cut_fire_from_nowhere(text, lit_by)
             if lit:
                 repairs.append(f"fire from nowhere: cut {len(lit)} sentence(s)")
         text, outsourced = narration_mod.fix_hand_back(text)
@@ -1424,6 +1459,80 @@ class GMAgent:
                     f"phantom opposition: cut {len(ghosts)} sentence(s) of enemies "
                     f"who are not in the scene")
         return text, repairs, attempts
+
+    # --- The narrator checks (gm/checks) ------------------------------------------------
+
+    def _beat_context(self, door: str, *, player_input: str, brief: str,
+                      outcomes=(), tells=None, pull=None, location=None,
+                      acting: str = "") -> "BeatContext":
+        """The beat as the narrator checks read it, built at one of `_groom`'s four
+        callers. `text` and `attribution` are filled in by `_groom` itself, once the
+        draft has been rewritten and attributed.
+
+        What the view hands the agent between turns is read with `getattr`, the way
+        `buying` is: `brief_facts` (what each brief section printed) and `attachments`
+        arrive from the view in Phase 1 (S3) without any signature here changing."""
+        from .checks import BeatContext
+
+        scene = self.engine.scene
+        reading = getattr(self, "reading", None)
+        if not isinstance(reading, dict) or "error" in reading:
+            reading = None
+        if location is None:
+            location = getattr(self, "_location", None)
+        return BeatContext(
+            door=door, text="", player_text=str(player_input or ""),
+            engine=self.engine, scene=scene, world=self.world, location=location,
+            reading=reading, outcomes=tuple(outcomes or ()),
+            tells=tuple(str(t) for t in (tells or ())),
+            said=tuple(dict(r) for r in self.last_said), attribution=None,
+            brief=str(brief or ""),
+            brief_facts=dict(getattr(self, "brief_facts", None) or {}),
+            pull=pull,
+            was_at=str(getattr(self, "_was_at", None) or getattr(scene, "at", "") or ""),
+            acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0))
+
+    def _ref_named(self, name: str) -> str:
+        """The ref of the one person here called `name`; "" when none or several are."""
+        if not name:
+            return ""
+        refs = [r for r, a in self.engine.scene.actors.items() if a.name == name]
+        return refs[0] if len(refs) == 1 else ""
+
+    def _truth_pass(self, ctx) -> tuple[str, list[str], list[Attempt]]:
+        """Run the registered checks over the beat and hand what they find to the repair.
+
+        Returns (text, repair notes, attempts) — the shape of every other repair `_groom`
+        calls, so the notes reach the turn log and the model calls reach the ledger. A
+        check that raises costs only its own findings: it is logged as a `check-error`
+        row and the turn goes on. The findings themselves are logged as one
+        `truth-checks` row per beat, drained into the turn log with the mention rows.
+        With no member registered this returns the text untouched and logs nothing.
+        """
+        from . import checks
+
+        errors: list[dict] = []
+        findings = checks.run(ctx, errors=errors)
+        self.mention_rows.extend(dict(e, door=ctx.door) for e in errors)
+        if not findings:
+            return ctx.text, [], []
+        text, notes, attempts = self._repair_sentences(ctx.text, findings, ctx)
+        self.mention_rows.append({
+            "kind": "truth-checks", "door": ctx.door,
+            "findings": [{"kind": f.kind, "detail": f.detail,
+                          "sentences": list(f.sentences)} for f in findings],
+            "repairs": list(notes)})
+        return text, list(notes), list(attempts)
+
+    def _repair_sentences(self, text: str, findings: list, ctx
+                          ) -> tuple[str, list[str], list[Attempt]]:
+        """Repair what the narrator checks found, sentence by sentence.
+
+        A STUB in Phase 1 (S1): the text comes back unchanged. Lane A fills it in, in the
+        shape of `_repair_state_claims` — one rewrite of the flagged `sentences` with the
+        fact named, re-checked; cut on failure; then the member's `backstop`
+        (`checks.owner_of(kind)`)."""
+        return text, [], []
 
     # The finding kinds with no deterministic backstop below them — the only ones worth
     # a second model call, because for everything else the backstop repairs for free
@@ -1996,7 +2105,9 @@ class GMAgent:
             backed=claims_the_engine_backs(outcomes), deaths=deaths, pull=pull,
             claim=claim, blows=self._blows_from(outcomes),
             cast=self._cast_from(outcomes), facts=tells,
-            changes=self._changes_from(outcomes))
+            changes=self._changes_from(outcomes),
+            ctx=self._beat_context("turn", player_input=player_input, brief=brief,
+                                   outcomes=outcomes, tells=tells, pull=pull))
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen
@@ -2225,7 +2336,12 @@ class GMAgent:
             backed=claims_the_engine_backs(outcomes), deaths=deaths,
             blows=self._blows_from(outcomes), cast=self._cast_from(outcomes),
             rewrite=rewrite, facts=tells, acting=acting,
-            changes=self._changes_from(outcomes))
+            changes=self._changes_from(outcomes),
+            # `acting` arrives as a name here; the context carries the ref, when exactly
+            # one person here answers to it.
+            ctx=self._beat_context("outcome", player_input=player_input, brief="",
+                                   outcomes=outcomes, tells=tells,
+                                   acting=self._ref_named(acting)))
         before = text
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)

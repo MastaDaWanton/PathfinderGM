@@ -86,6 +86,10 @@ class Finding:
     # echo finding after is not "fewer findings" — measured on a model that reproduces
     # whole example paragraphs, where every repair was discarded and the plagiarism kept.
     weight: int = 1
+    # The sentences the finding flags, as they stand on the page, so a repair edits only
+    # them and the registry can drop a finding a heavier one already covers
+    # (gm/checks, docs/fix-interfaces.md §2.1). Empty for the review's whole-beat kinds.
+    sentences: tuple[str, ...] = ()
 
 
 @dataclass
