@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import re
+import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -178,6 +179,19 @@ class Campaign:
         """
         return self.scene.biome
 
+    @property
+    def story_seed(self) -> int:
+        """The number the story draws from — never the dice. Read-only, and read off the
+        scene rather than stored here: a second copy is a second store to drift. `seed`
+        below is left alone on purpose; see `Scene.story_seed`."""
+        return self.scene.story_seed
+
+    @property
+    def start_id(self) -> str:
+        """Which start document opened this campaign, "" for the legacy opening. Derived
+        from `scene.start`, not a stored mirror (docs/fix-interfaces.md §2.4)."""
+        return str((self.scene.start or {}).get("id", "") or "")
+
     def engine(self) -> Engine:
         return Engine(self.scene, Dice(self.seed), world=self.world)
 
@@ -301,6 +315,24 @@ class Campaign:
             "suggestions": self.suggestions,
             "ended": self.ended,
         }
+        # The fix pass's scene fields (docs/fix-interfaces.md §2.4), each written only
+        # when it differs from what `load` reads a save without it as — so every save
+        # written before them comes back out byte for byte (the G1 proof), and they sit
+        # after every older key rather than among them. The story seed's "default" is
+        # the one `load` derives from the campaign id, not zero: written whenever it
+        # differed from zero, the first save after the update would have rewritten
+        # every campaign on disk.
+        from . import opening
+
+        kept = {
+            "story_seed": (self.scene.story_seed, opening._seed_from(self.id)),
+            "start": (dict(self.scene.start), {}),
+            "spoken_for": (list(self.scene.spoken_for), []),
+            "acquainted": (list(self.scene.acquainted), []),
+            "conversation_log": ([dict(e) for e in self.scene.conversation_log], []),
+            "conversation_seq": (int(self.scene.conversation_seq), 0),
+        }
+        payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
         # Serialised BEFORE anything on disk moves, so a payload that cannot be written
         # (a set where a list belongs) raises with the last save and its backups intact.
@@ -413,6 +445,16 @@ class Campaign:
             pending_outcomes=s.get("pending_outcomes", []),
             pending_partial=s.get("pending_partial", {}),
             awaiting=s.get("awaiting"),
+            # The fix pass's fields, each absent from every save written before it and
+            # read here at the default `save` leaves out. `story_seed` is filled below,
+            # once the campaign id is in hand.
+            start=dict(s.get("start") or {}),
+            spoken_for=[str(x) for x in (s.get("spoken_for") or [])],
+            acquainted=[str(x) for x in (s.get("acquainted") or [])],
+            # Whole entries, unknown keys and all: a later build's entry must survive a
+            # load and save by this one.
+            conversation_log=[dict(e) for e in (s.get("conversation_log") or [])],
+            conversation_seq=int(s.get("conversation_seq", 0) or 0),
         )
         # `people` from a version-2 save, `actors` from a version-1 one. Straight into
         # the store rather than through `add`, because `add` stamps the party's place
@@ -446,6 +488,14 @@ class Campaign:
             suggestions=list(data.get("suggestions") or []),
             ended=data.get("ended", ""),
         )
+        # A save from before the story seed: derived from the id, the same number
+        # `opening.roll` has always fallen back to, so the campaign's story keeps one
+        # seed across every load — and `save` leaves it out again while it still equals
+        # this, which is what keeps an old save byte-identical.
+        from . import opening
+
+        scene.story_seed = (int(s["story_seed"]) if s.get("story_seed") is not None
+                            else opening._seed_from(campaign.id))
         campaign._heal_places(str(s.get("biome") or ""), unplaced)
         return campaign
 
@@ -513,6 +563,7 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     world = load_cached(world_source)
     town = opening.starting_place(world)
     scene = Scene(location_id=town.id if town else None)
+    scene.story_seed = seed if seed is not None else secrets.randbits(31)
     # Placed, not biomed: the ground is inside the place id and a new campaign stands
     # at its town's first place. The PC first, then the party is placed, THEN the
     # company — `Scene.add` stamps whoever arrives with the party's place, and the

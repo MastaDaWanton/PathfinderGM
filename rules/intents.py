@@ -604,12 +604,25 @@ from .guards import KINDS as GUARD_KINDS  # noqa: E402
 TIME_UNITS = ("round", "minute", "hour", "day")
 
 
+# The refusal codes only the PLAYER can fix (docs/fix-interfaces.md §2.6). The rule for
+# adding one: the refusing fact is the character's own state or the player's own words —
+# an unprepared spell, a target out of reach, ground the land does not have — never the
+# plan's choice of ref or param. Those ("no_such_target", "wrong_aim", and every refusal
+# that carries no code) are the plan's to fix, and the plan loop retries them. Measured
+# in the 2026-09-28 playtest: "I cast burning hands" with nothing prepared went round the
+# five-attempt schedule as though a different plan could prepare the spell.
+PLAYER_FIXABLE = frozenset({
+    "unprepared", "no_slots", "not_known", "not_on_list", "too_high", "ability_too_low",
+    "not_your_turn", "no_aim", "out_of_range", "no_line_of_effect", "no_such_object",
+    "no_such_weapon", "out_of_reach", "absent_ground"})
+
+
 class IntentError(ValueError):
     """A malformed or illegal intent. Carries which check rejected it, so the caller can
     decide between a regenerate and a targeted repair."""
 
     def __init__(self, message: str, check: str = "schema", index: int | None = None,
-                 for_a_person: str = ""):
+                 for_a_person: str = "", code: str = "", fix: dict | None = None):
         super().__init__(message)
         self.check = check
         self.index = index
@@ -617,6 +630,19 @@ class IntentError(ValueError):
         # written for the model's repair loop (a JSON intent to copy). The combat panel
         # shows errors to a person directly; "" means the message already reads fine.
         self.for_a_person = for_a_person
+        # Which refusal this is, as a word a caller can branch on without reading the
+        # sentence ("" = uncoded, which is the plan's to fix), and what would fix it —
+        # {"kind": "prepare", "spell": id}, {"kind": "go", "place": name}. One stored
+        # field and one derived (`fixable_by`), which is how Lane A's "who can fix it"
+        # and Lane E's code were unified rather than stored twice.
+        self.code = code
+        self.fix = fix
+
+    @property
+    def fixable_by(self) -> str:
+        """"player" when the refusing fact is the character's or the player's words,
+        else "plan". Derived from `code`, never stored beside it."""
+        return "player" if self.code in PLAYER_FIXABLE else "plan"
 
 
 @dataclass

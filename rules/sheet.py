@@ -463,6 +463,16 @@ class Actor:
     # for as long as that is true, and the first beat in which they act, speak or are
     # addressed owes the description.
     described: bool = False
+    # What the page has said this person looks like, at most two sentences, once they
+    # have been described — so the description a later beat owes is the one already
+    # given, not a fresh one (docs/design-a-truth.md; Lane A writes it). Empty until
+    # then, and absent from every sheet saved before it.
+    described_as: list[str] = field(default_factory=list)
+    # A prepared caster's last chosen spells, spell id -> copies, kept so the next
+    # morning's preparation can offer the same day again (docs/design-e-magic.md; Lane E
+    # writes it). Not `prepared`: that is what is in the slots now, and it empties as
+    # spells are cast.
+    loadout: dict[str, int] = field(default_factory=dict)
     # Where this character was before the first turn. The id alone; the
     # modifiers, tags and ties are read live off the document.
     background: str = ""
@@ -4017,7 +4027,7 @@ def _when_holds(when, ctx: dict | None) -> bool:
 def to_dict(actor: Actor) -> dict:
     """Round-trips through `from_dict`. The campaign save is a file a person can read,
     which is the same choice World Bible made and for the same reason."""
-    return {
+    d = {
         "ref": actor.ref, "name": actor.name, "kind": actor.kind, "level": actor.level,
         "class": actor.char_class, "size": actor.size, "abilities": actor.abilities,
         "ranks": actor.ranks, "feats": actor.feats, "armour": actor.armour,
@@ -4106,6 +4116,15 @@ def to_dict(actor: Actor) -> dict:
         # and a name with no record here is exactly the inert string it always was.
         "worn": {k: dict(v) for k, v in actor.worn.items()},
     }
+    # Written only when set (docs/fix-interfaces.md §2.0): every save and roster file
+    # written before these fields reads back byte for byte. Unlike `immunities` above,
+    # empty and absent mean the same thing here — nothing derives either one from a
+    # stat block, so there is no second source for an absent key to fall back to.
+    if actor.described_as:
+        d["described_as"] = [str(s) for s in actor.described_as]
+    if actor.loadout:
+        d["loadout"] = {str(k): int(v) for k, v in actor.loadout.items()}
+    return d
 
 
 def _progression(actor: Actor) -> dict:
@@ -4457,6 +4476,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         true_name=str(data.get("true_name", "") or ""),
         appearance=str(data.get("appearance", "") or ""),
         described=bool(data.get("described", False)),
+        described_as=[str(s) for s in (data.get("described_as") or [])],
+        loadout={str(k): int(v) for k, v in (data.get("loadout") or {}).items()
+                 if int(v) > 0},
         domains=list(data.get("domains") or []),
         troop=_troops.Troop.from_dict(data.get("troop")),
         background=data.get("background", ""),

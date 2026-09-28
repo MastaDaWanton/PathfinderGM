@@ -318,3 +318,38 @@ def acquaint(engine, actor, bound: list[dict]) -> str:
     # introduced `COMES_ALONG` so that no reader spells an attitude spelled one here.
     engine.settle_attitude(who, attitude_mod.COMES_ALONG, None, source)
     return str(who.name or "")
+
+
+def recognise(scene, actor) -> str:
+    """Somebody a background tie names knows the character when they meet.
+
+    Called by the arrival door — `Scene.arrive` and `Scene.move` — for every non-PC who
+    comes in (docs/fix-interfaces.md §2.5). The people a tie names are recorded in
+    `scene.acquainted` by entity id (docs/design-c-starts.md §4.8 step 4); `acquaint`
+    above covers only the one person standing beside the character at the opening, so
+    a tied teacher who walks in on day three was a stranger to them. This is the same
+    `bond.knows-you` tag through the same applicator, with the same source, so a reader
+    asking `has_state("bond.knows-you")` cannot tell which door it came by and does not
+    need to.
+
+    The bond only: moving the attitude track needs the engine (`settle_attitude`), and
+    the arrival door is on the scene. Inert until Lane C writes `acquainted`. Returns
+    their name when the bond is new — the caller's to turn into a tell — else "".
+    """
+    from .activeeffect import ActiveEffect
+
+    entity = str(getattr(actor, "world_entity_id", "") or "")
+    if (not entity or getattr(actor, "is_pc", False)
+            or entity not in (getattr(scene, "acquainted", None) or ())):
+        return ""
+    pc = scene.pc()
+    background = str(getattr(pc, "background", "") or "") if pc is not None else ""
+    doc = get(background) if background else None
+    source = f"background:{(doc or {}).get('id') or background or 'background'}"
+    key = f"{source}:knows-you"
+    if any(e.kind == "bond" and e.key == key for e in actor.effects):
+        return ""
+    actor.apply_effect(ActiveEffect(
+        name="knows you", kind="bond", key=key, source=source,
+        origin=source, duration="until-dismissed", tags=(states.KNOWS_YOU,)))
+    return str(actor.name or "")

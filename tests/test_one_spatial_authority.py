@@ -18,7 +18,11 @@ PRODUCTION = ("rules", "gm", "play")
 # allowlist rather than a count, because a count cannot tell a removal from a relocation
 # — the shape `_CLOCK_SITES` established for the world clock.
 _PLACE_WRITERS = {
-    ("rules/engine.py", "add"): "a creature arrives HERE; the first writer",
+    # `Scene.add` is a thin alias of `arrive` since the 2026-09-28 fix pass
+    # (docs/fix-interfaces.md §2.5): the one entrance, which also records somebody
+    # arriving at another place, so the first writer moved with it.
+    ("rules/engine.py", "arrive"): "a creature arrives, HERE or at a named place; the "
+                                   "first writer",
     ("rules/engine.py", "move"): "the one mover; the second writer",
     ("rules/engine.py", "place_party"): "placement, not movement: a loaded or new scene "
                                         "stood somewhere real without unseating anybody",
@@ -68,7 +72,8 @@ def test_an_actors_place_has_three_writers_and_they_are_named():
     unexpected = {k: v for k, v in found.items() if k not in _PLACE_WRITERS}
     assert not unexpected, (
         f"new writer(s) of an actor's place: {unexpected}. A place is written by "
-        f"Scene.add, Scene.move and Engine.place_party, and nothing else.")
+        f"Scene.arrive (and `add`, its alias), Scene.move and Engine.place_party, and "
+        f"nothing else.")
 
 
 def test_the_party_record_has_three_writers_and_they_are_named():
