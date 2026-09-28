@@ -39,7 +39,7 @@ from . import spells as spells_mod
 from . import weapons as weapons_mod
 from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
-from .dice import Dice, Modifier, Roll
+from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from .grid import Grid
 from . import hazards
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
@@ -1116,13 +1116,14 @@ class Scene:
                 roll = self._dice.d20(
                     victim.save_modifiers(gate_save),
                     label=f"{gate_save} save against {ward.source}", visibility="hidden")
-                saved = roll.total >= ward.dc
+                saved = d20_succeeds(roll, ward.dc)
                 if saved:
                     branch = spec.get("on_success") or []
                     if not branch:
                         return [{"kind": "ward_saved", "ref": victim.ref,
                                  "source": ward.source, "roll": roll.total,
-                                 "dc": ward.dc}]
+                                 "dc": ward.dc,
+                                 "natural": natural_said(roll, ward.dc)}]
             for inner in branch:
                 out.extend(self._resolve_on(victim, ward, inner, "", ""))
             return out
@@ -1132,10 +1133,11 @@ class Scene:
             roll = self._dice.d20(victim.save_modifiers(save),
                                   label=f"{save} save against {ward.source}",
                                   visibility="hidden")
-            saved = roll.total >= ward.dc
+            saved = d20_succeeds(roll, ward.dc)
             if saved and save_effect in ("negates", ""):
                 return [{"kind": "ward_saved", "ref": victim.ref, "source": ward.source,
-                         "roll": roll.total, "dc": ward.dc}]
+                         "roll": roll.total, "dc": ward.dc,
+                         "natural": natural_said(roll, ward.dc)}]
 
         out = []
         if kind in ("damage", "heal"):
@@ -2684,12 +2686,22 @@ class Engine:
             dc=resolved_dc.final, partial=partial,
         )
 
+        # The face decides before the total (CRB p.180; `dice.d20_succeeds`). Until
+        # 2026-09-28 this read `margin >= 0` alone, so a natural 20 short of the DC failed
+        # and a natural 1 over it passed. The margin is clamped to agree with the verdict,
+        # as the manoeuvre path does, so nothing downstream reads "succeeded by -3".
         margin = roll.total - resolved_dc.final
-        verdict = "success" if margin >= 0 else "failure"
+        natural = natural_said(roll, resolved_dc.final)
+        if d20_succeeds(roll, resolved_dc.final):
+            verdict, margin = "success", max(margin, 0)
+        else:
+            verdict, margin = "failure", min(margin, -1)
         branch = intent.params.get("on_success" if verdict == "success" else "on_failure") or {}
 
         effects: list[dict] = []
+        made = "makes" if verdict == "success" else "fails"
         tell_bits = [
+            f"{actor.name} {made} the {SAVES[save]} save {natural}." if natural else
             f"{actor.name} makes the {SAVES[save]} save by {margin}."
             if verdict == "success" else
             f"{actor.name} fails the {SAVES[save]} save by {-margin}."
@@ -3045,7 +3057,7 @@ class Engine:
                         f"{actor.name}'s attack goes badly wide (natural 1).")
                     state["i"] += 1
                     continue
-                if not (natural == 20 or atk.total >= target_ac):
+                if not d20_succeeds(atk, target_ac):
                     state["tells"].append(
                         f"{actor.name}'s attack misses {defender.name} "
                         f"({atk.total} against {ac_note}).")
@@ -3247,12 +3259,13 @@ class Engine:
                                      visibility=intent.visibility)
                 state["rolls"].append(save.as_dict())
                 # CRB p.180: a natural 20 on a save always succeeds and a natural 1
-                # always fails. Against DC 10 + damage the first is most of the reason
-                # anybody lives through this.
-                # The natural is said when it decided, because "makes the save (23
-                # against DC 27)" read as bad arithmetic in the first live run.
-                why = {20: "a natural 20, ", 1: "a natural 1, "}.get(save.natural, "")
-                if save.natural == 20 or (save.natural != 1 and save.total >= coup_dc):
+                # always fails — `dice.d20_succeeds`, the reader every save asks.
+                # Against DC 10 + damage the first is most of the reason anybody lives
+                # through this. The natural is said when it decided, because "makes
+                # the save (23 against DC 27)" read as bad arithmetic in the first run.
+                nat = natural_said(save, coup_dc)
+                why = f"{nat}, " if nat else ""
+                if d20_succeeds(save, coup_dc):
                     state["tells"].append(
                         f"{defender.name} makes the Fortitude save ({why}{save.total} "
                         f"against DC {coup_dc}) and clings to life.")
@@ -3366,16 +3379,15 @@ class Engine:
                     state, "1d20",
                 )
                 state["cmb"] = roll.as_dict()
-            natural = roll.natural
-            margin = roll.total - cmd
             # A natural 20 always succeeds and a natural 1 always fails, whatever the
-            # arithmetic says.
-            if natural == 20:
+            # arithmetic says — `dice.d20_succeeds`, the one reader saves use too. The
+            # margin is clamped to agree with the verdict, because the overrun's "by 5
+            # or more" reads it.
+            margin = roll.total - cmd
+            if d20_succeeds(roll, cmd):
                 verdict, margin = "success", max(margin, 0)
-            elif natural == 1:
-                verdict, margin = "failure", min(margin, -1)
             else:
-                verdict = "success" if margin >= 0 else "failure"
+                verdict, margin = "failure", min(margin, -1)
 
         effects: list[dict] = []
         bits: list[str] = []
@@ -7256,7 +7268,7 @@ class Engine:
                     partial, state, "1d20", state_key="cast_state",
                 )
                 state["rolls"].append(save_roll.as_dict())
-                saved = save_roll.total >= dc
+                saved = d20_succeeds(save_roll, dc)
                 effect = plan["save_effect"]
                 if saved and effect == "negates":
                     amount = 0
@@ -7275,7 +7287,10 @@ class Engine:
                     amount = 0
                 state["tells"].append(
                     f"{target.name} {'makes' if saved else 'fails'} the "
-                    f"{SAVES[plan['save']]} save ({save_roll.total} against DC {dc})"
+                    f"{SAVES[plan['save']]} save ("
+                    + (f"{natural_said(save_roll, dc)}, " if natural_said(save_roll, dc)
+                       else "")
+                    + f"{save_roll.total} against DC {dc})"
                     + (f"; what a partial save leaves is in {spell.name}'s text."
                        if saved and plan["save_effect"] == "partial" else "."))
 
@@ -9844,7 +9859,8 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "heal":
         return f"{source} restores {e['amount']} hit points to {name}."
     if kind == "ward_saved":
-        return f"{name} rides out {source} ({e.get('roll')} against DC {e.get('dc')})."
+        nat = f"{e['natural']}, " if e.get("natural") else ""
+        return f"{name} rides out {source} ({nat}{e.get('roll')} against DC {e.get('dc')})."
     if kind == "condition":
         key = str(e.get("condition") or "")
         said = _STATE_SAID.get(key, "{name} is " + key)

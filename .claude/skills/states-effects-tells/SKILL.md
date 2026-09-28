@@ -102,7 +102,12 @@ and from the combat bar; never opens a battle (`rules/coup_de_grace.py`,
 lands too, at helpless AC (Dex 0, −4 against melee, in `Actor.ac_modifiers`) —
 until 2026-09-27 the attack loop broke on `is_down` before the FIRST swing and
 the blow resolved as nothing. Sneak attack now reads "denied Dex" (`loses_dex_to_ac`),
-not only flat-footed.
+not only flat-footed. **The d20's face** — `dice.d20_succeeds` is the one reader for
+a natural 20 always succeeding and a natural 1 always failing (CRB p.180), asked by
+every save (`_op_save`, the cast save, both ward saves, survival's saves, the coup de
+grâce's save), the attack roll and the manoeuvre; never by a skill or ability check,
+which 1e excludes; `dice.natural_said` names the face in a tell when it overruled the
+total (`tests/test_save_naturals.py`).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —
@@ -118,8 +123,6 @@ not only flat-footed.
   concealment, and ghost touch against the incorporeal.
 - Critical-hit immunity on ORDINARY attacks: an ooze is critted by a normal swing
   today. `coup_de_grace.crit_immunity` is the reader to reuse.
-- Natural 1 / natural 20 on saving throws: only the coup de grâce's save honours
-  them; `_op_save` and the spell-save path decide on the total alone.
 
 **Refused** (asked and answered — do not reopen without the user): the three GAS
 items above; models authoring numbers anywhere (validators refuse documents with
@@ -232,5 +235,7 @@ rules/coup_de_grace.py:refusal
 rules/coup_de_grace.py:crit_immunity
 rules/sheet.py:Actor.die
 tests/test_coup_de_grace.py
+rules/dice.py:d20_succeeds
+tests/test_save_naturals.py
 content/classes/blood-bending.json
 -->
