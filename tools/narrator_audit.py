@@ -63,6 +63,118 @@ SCRIPTS = {
         "I look for tracks in the grass.",
         "I make camp and sleep until dawn.",
     ],
+    # Every line asks for somebody who is not in the scene yet. The first live run with
+    # the planner's `introduce` op (2026-09-25, the town script, 12 turns) used it zero
+    # times — but the town script mostly addresses people already standing there, so it
+    # could not tell under-use of the op from a script that never needed it.
+    "strangers": [
+        "I look along the street for someone who knows the roads north, and ask them.",
+        "I find somebody selling bread and ask what a loaf costs.",
+        "I ask around for a healer.",
+        "I look for whoever keeps the inn and ask for a room.",
+        "I wave down a passing carter and ask where he is headed.",
+        "I look for a child who might run a message for a coin.",
+        "I find someone who looks like they know the city's gossip and buy them a drink.",
+        "I ask around for a guide who knows the grassland.",
+        "I look for a scribe who can read a letter for me.",
+        "I find the oldest person on the street and ask what this quarter was like once.",
+    ],
+    # Every line gives one man a reason to strike first, in words only — nothing the
+    # player does is itself an attack, so the first blow has to be his. The blows door
+    # (docs/declared-not-guessed.md): does the PLAN declare it, or does it only appear in
+    # the prose, where `attacked_by` has had to read it out? No journey: a walk to a
+    # tavern was ambushed on the way once (2026-09-26) and every insult after it landed
+    # mid-fight, where provocation is off by design. The first version knocked a
+    # drink from his hand, which the planner read as the player attacking, and every turn
+    # after was already a fight (2026-09-25).
+    "provoke": [
+        "I look around at the people standing nearest me.",
+        "I tell the biggest man here that I have seen better fighters in a nursery.",
+        "I laugh in his face and tell him to do something about it.",
+        "I call him a coward in front of his friends.",
+        "I tell his friends he cried when the last man stood up to him.",
+        "I lean in and tell him his wife is a better fighter than he is.",
+        "I turn my back on him and tell the barkeep he smells.",
+        "I tell the whole room he is all talk.",
+        "I stay where I am and smile at him.",
+        "I tell him I am still waiting.",
+    ],
+    # Every line goes looking for a place the settlement may not list yet: the places
+    # door (docs/declared-not-guessed.md). Does the PLAN found it and go there, does the
+    # prose door found it afterwards, or does nothing get made? The user's ruling: the
+    # mechanism is free, but places must keep being created for travel, questing and
+    # discovery (2026-09-25).
+    "discover": [
+        "I ask where the dockhands drink, and go there.",
+        "I look for somewhere that sells rope and lamp oil.",
+        "I find a quiet shrine and sit a while.",
+        "I head for the stables to ask about a horse.",
+        "I look for a pawnbroker who asks no questions.",
+        "I ask around for the best cook in town and go to where they work.",
+        "I go looking for the bathhouse.",
+        "I look for a bookseller.",
+        "I find a back alley where nobody will see me count my coin.",
+        "I head out of town to wherever the charcoal burners work.",
+    ],
+    # Residency (docs/the-population.md §4): somebody met, walked away from, come back to
+    # at night (gone home), asked after, found again in the morning, and then the road out
+    # of town and back. Before 2026-09-27 the road destroyed everybody left behind, so
+    # the bread seller of the last lines would have been a stranger with a new name.
+    "return": [
+        "I find somebody selling bread in the market and ask what a loaf costs.",
+        "I ask her name.",
+        "I walk over to the well.",
+        "I sit by the well until well after dark.",
+        "I go back to the market.",
+        "I ask around for the woman who sold me bread.",
+        "I find somewhere to sleep until morning.",
+        "I go to the market and look for the bread seller.",
+        "I take the road to the nearest town.",
+        "I take the road back to the town I just left.",
+        "I go to the market and look for the bread seller.",
+        "I greet her by name.",
+    ],
+    # Shop hours and calling on people (docs/the-population.md): a counter shut at night,
+    # a person gone home, asked after, and knocked on.
+    "calling": [
+        "I find somebody selling bread and ask what a loaf costs.",
+        "I buy a loaf from her and ask her name.",
+        "I walk over to the well.",
+        "I wait at the well until ten at night.",
+        "I ask around where the bread seller lives.",
+        "I go to her house.",
+        "I thank her, say goodnight and leave.",
+        "I go to the market.",
+        "I try to buy a coil of rope.",
+        "I find somewhere to sleep until morning.",
+        "I go to the market and buy a coil of rope.",
+    ],
+    # The still-not-built list (docs/the-population.md): a knock in the small hours, a
+    # lock picked, a door forced, a shut counter, and a purchase opening the counter.
+    "homes": [
+        "I find somebody selling bread and ask what a loaf costs.",
+        "I ask her name.",
+        "I walk over to the well.",
+        "I wait at the well until two in the morning.",
+        "I ask around where the bread seller lives.",
+        "I go to her house.",
+        "I pick the lock on her door.",
+        "I kick in her door.",
+        "I go to the market.",
+        "I try to buy a coil of rope.",
+        "I find somewhere to sleep until morning.",
+        "I go to the market and buy a coil of rope.",
+    ],
+    # Buying: the counter opens for a purchase, a walk to a named place is planned, and
+    # the prose settles nothing the screen is for.
+    "buying": [
+        "I find somewhere to sleep until morning.",
+        "I walk over to the well.",
+        "I go to the market and buy a coil of rope.",
+        "I try to buy a loaf of bread.",
+        "I want to buy some torches.",
+        "I buy a dragon's egg.",
+    ],
     "fight": [
         "I walk into the worst tavern on the street.",
         "I pick a fight with the biggest man in the room.",
@@ -407,12 +519,20 @@ def audit(turns: int, script: str, world: str, character: str,
                 tally[f] += 1
             rows.append({"n": n, "said": said, "faults": faults,
                          "seconds": round(seconds, 1),
+                         # The counter the turn opened, if a purchase opened one.
+                         "trade": body.get("trade"),
                          # Whole, not truncated to 120 — the length of the prose is the
                          # thing being asked about now, and a clipped sample cannot
                          # answer it.
                          "narration": text,
                          "prose": prose_this_turn,
-                         "pull": pull})
+                         "pull": pull,
+                         # What the grooming did to each creature's turn this turn: a
+                         # `wrong-actor` rewrite or backstop is a creature's turn the
+                         # model told the wrong way round, which the page — mended —
+                         # no longer shows (docs/wrong-actor.md).
+                         "npc_repairs": [r for t in new_log if t.get("kind") == "npc-turn"
+                                         for r in (t.get("repairs") or [])]})
             print(f"  turn {n + 1:3d}  {seconds:5.1f}s  "
                   f"{', '.join(faults) if faults else 'clean'}")
             if recorder:
@@ -426,8 +546,13 @@ def audit(turns: int, script: str, world: str, character: str,
 
     clean = sum(1 for r in rows if not r["faults"])
     pulls = [r["pull"] for r in rows if r.get("pull")]
+    npc_repairs = collections.Counter(
+        ("wrong actor: rewritten" if "rewritten" in r else "wrong actor: backstop")
+        if r.startswith("wrong actor") else r.split(":")[0]
+        for row in rows for r in row.get("npc_repairs") or [])
     return {"turns": len(rows), "clean": clean, "tally": dict(tally), "rows": rows,
             "texture": _texture_report(rows), "drift": _drift_report(rows),
+            "npc_repairs": dict(npc_repairs),
             "pulls": {"sent": len(pulls), "distinct": len(set(pulls)),
                       "commonest": collections.Counter(pulls).most_common(3)},
             "stopped_early": stopped_early}
@@ -569,6 +694,10 @@ def main() -> None:
             if kind == "rolls-answered":
                 continue
             print(f"  {kind:28s} {n:4d}   {100 * n / turns:6.1f}")
+    if result.get("npc_repairs"):
+        print("\nwhat grooming did to the creatures' turns:")
+        for kind, n in sorted(result["npc_repairs"].items(), key=lambda kv: -kv[1]):
+            print(f"  {kind[:60]:60s} {n:4d}")
     if result.get("stopped_early"):
         print(f"\nSTOPPED EARLY: {result['stopped_early']}")
     pulls = result.get("pulls") or {}

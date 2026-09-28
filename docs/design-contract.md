@@ -113,7 +113,10 @@ name; GAS is where the working gets checked, not where it came from. Translate:
   the swing defers to the player's own first combat turn; a whole fight must
   never resolve inside one narrated paragraph.
 - *Mercy stroke on the dying* → not a fight being started; finishing words plus a
-  downed body silence the fight-making repairs.
+  downed body silence the fight-making repairs, and `declare_coup_de_grace` turns
+  them into 1e's coup de grâce (`rules/coup_de_grace.py`). Until 2026-09-27 the blow
+  itself resolved as nothing: the attack loop broke on `is_down` before the first
+  swing. Only swings queued behind the one that dropped somebody are held.
 
 ## In the repo, before finishing
 

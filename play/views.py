@@ -16,7 +16,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
 from gm import (client, judgement, ledger as ledger_mod,
-                narration as narration_mod, prompts, watcher)
+                narration as narration_mod, prompts, speech as speech_mod, watcher)
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
 from rules import biomes, grid, ingredients as ing_mod
@@ -369,6 +369,11 @@ def _state(c) -> dict:
                      "members_max": int(a.troop.members_max)}
                     if getattr(a, "troop", None) is not None else {}),
                  "at": list(c.scene.positions[r]) if r in c.scene.positions else None,
+                 # Whether the combat bar may offer a coup de grâce. Asked here of the
+                 # vocabulary so the browser never matches condition names; the dead
+                 # are past finishing.
+                 "helpless": bool(a.is_helpless
+                                  and not a.has_state("state.down.dead")),
                  "conditions": [x.name for x in a.conditions]}
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
@@ -1232,7 +1237,15 @@ def say(request):
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
 
-    return _advance(c, agent, plan.narration, plan, text)
+    # The interpreter's reading of the sentence rides with the plan into the turn log,
+    # beside the detectors' opinion, so every disagreement is on the record
+    # (docs/the-interpreter.md).
+    plan.reading = getattr(agent, "reading", None)
+    resp = _advance(c, agent, plan.narration, plan, text)
+    # A purchase opens the counter with the thing picked (`_trade_offer`): the turn's
+    # prose brings the keeper to the counter, and the player pays on the screen.
+    offer = _trade_offer(c, text) if getattr(resp, "status_code", 200) == 200 else None
+    return _with(resp, {"trade": offer}) if offer else resp
 
 
 def _put_back_free_actions(c, pending: list) -> None:
@@ -1890,7 +1903,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                     # And the world's answer when the player went looking
                                     # for somebody who is not here (item 29).
                                     absent=judgement.absent_answer(c.scene, c.world,
-                                                                   player_input))
+                                                                   player_input),
+                                    # And the counter the turn opens, when the player
+                                    # set out to buy something (`_trade_offer`).
+                                    buying=_buying_note(c, player_input))
         # The model's own recent prose — the narrator's beats only, with the sentences
         # WE appended to them (a death line, a thread anchor) taken back out. Shown its
         # own backstop or the engine's award line as "what you narrated", the model
@@ -1909,6 +1925,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                 c.scene, recent=[b["text"] for b in c.transcript[-4:]],
                 player_text=player_input, tells=[o.tell for o in outcomes],
                 turn=len(c.transcript))
+        # The purchase the counter's screen opens for after this beat, if any: the review
+        # holds the prose to leaving it unsettled (narration.hands_over_goods).
+        # Every declared purchase, whether or not a counter opens: nothing is bought in
+        # the prose either way.
+        agent.buying = judgement.purchase_sought(player_input)
         try:
             text, repairs, prose_attempts = agent.narrate_turn(
                 resolution.outcomes, player_input, brief, earlier,
@@ -1919,7 +1940,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
                               else "")),
                 pull=pull,
-                claim=str(getattr(agent, "false_claim", "") or ""))
+                claim=str(getattr(agent, "false_claim", "") or ""),
+                shown=narration_mod.own_prose(c.transcript, tagged=True))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first
@@ -1989,6 +2011,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # were no tells, no degraded sentence, and the empty string skipped
             # every floor below because they all lived inside `if text`.
             text = _floor("empty turn")
+        # Adults only, without exception, whatever the table's content setting: a beat
+        # that reads as sexual while a child is in the scene or in the beat is discarded
+        # whole — never trimmed, never repaired — and the turn gets the holding line.
+        if text and narration_mod.intimate(text) and judgement.a_child_in(c.scene, text):
+            c.turn_log.append({"kind": "refused-beat",
+                               "why": "sexual content with a child in the scene"})
+            ours.clear()
+            text = _floor("discarded: sexual content with a child in the scene")
         added = list(getattr(agent, "last_added", []) or [])
         if text:
             before = text
@@ -2022,17 +2052,56 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # The beat is final; whoever it introduced is on the books now —
             # and on the board: a noted person the engine does not hold cannot
             # be attacked, addressed or found again.
+            # Whoever the plan introduced is on the ledger first, so the prose describing
+            # them reads as somebody already here, not a newcomer to book again.
+            booked_in = judgement.book_introduced(c.scene, resolution.outcomes,
+                                                  turn=len(c.transcript))
+            # The over-use measurement (an op always on offer gets over-called — Labyrinth,
+            # When2Call): who the plan introduced, and whether the prose then used them.
+            if booked_in:
+                c.turn_log.append({"kind": "introduced", "who": booked_in,
+                                   "in_prose": [bool(judgement._role_head(w)) and
+                                                judgement._role_head(w) in text.lower()
+                                                for w in booked_in]})
             introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
-            judgement.promote_cast(c.scene, introduced, beat=text, world=c.world)
+            # And every one of them into the population, located and with a life rolled —
+            # a RECORD, which the player can find later (the user's question of
+            # 2026-09-25: "there is nothing left of her?"). Never a body any more: ruled
+            # 2026-09-27, option (a) of the declared-not-guessed review. A hand check of
+            # the prose door found 11 of 30 booked people wrong (the "elder" out of "the
+            # elder-quarter" in a quote, a second old man, "man in a stained leather", a
+            # thug named "weapon"), and a body is what a misread turned into a phantom in
+            # a fight. Bodies come from the plan (`introduce`) or from the player engaging
+            # somebody (`judgement.embody_sought`); a misread now leaves a stray record.
+            from rules import population
+
+            judgement.record_people(c.scene, introduced, turn=len(c.transcript),
+                                    world=c.world)
+            # Every search for somebody that found nobody this turn, so the synonym table
+            # (content/people/synonyms.json) grows from what real play missed.
+            c.turn_log.extend(population.drain_misses())
+            # The quirk rests once the page has shown it (engine-held cadence, like a
+            # `respeakdelay`: a small model cannot count "now and then"), and a trait the
+            # page names outright instead of showing is counted — measured before any
+            # repair is written for it.
+            shown = population.note_quirks_shown(c.scene, text, len(c.transcript))
+            named = {r: population.traits_named(population.of_ref(c.scene, r), text,
+                                                c.scene.actors[r].name)
+                     for r in c.scene.actors if population.of_ref(c.scene, r)}
+            named = {r: w for r, w in named.items() if w}
+            if shown or named:
+                c.turn_log.append({"kind": "manner", "quirks_shown": shown,
+                                   "traits_named": named})
             # A name given in play renames the panel: "call me Kael" from an unnamed
             # person here makes him Kael from now on (2026-09-18: he called himself
             # "the stranger", our placeholder, because nothing held a name).
-            for ref, given in judgement.apply_introductions(c.scene, text, player_input):
+            for ref, given in judgement.apply_introductions(c.scene, text, player_input,
+                                                             said=agent.last_said):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
             # Somebody who spoke to the player in this beat is in conversation with
             # them from here, until the player takes their leave (2026-09-24). Through
             # the engine's one door, so the panel and the refusals read the same state.
-            for ref in judgement.hailed_by(c.scene, text):
+            for ref in judgement.hailed_by(c.scene, text, said=agent.last_said):
                 who = c.scene.actors.get(ref)
                 opened = c.engine().join_talk(who, how="they spoke to you") if who else ""
                 if opened:
@@ -2095,46 +2164,47 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                     repairs.append(f"{c.scene.actors[ref].name} joined the fight "
                                    f"on {'your' if side == 'pc' else 'their'} side")
                     agent.engine.rally(ref)
-            # And whoever the beat says struck at the player, outside a fight: the
-            # fight opens from THEIR side and their blow is rolled now, not after the
-            # player's next line. "I should be put into combat when I am attacked, it
-            # shouldn't wait for me" (2026-09-18). The NPC loop below then carries
-            # the order on to the player.
-            struck = judgement.attacked_by(c.scene, text)
+            # A blow at the player is declared in the plan now, and rolled before the
+            # prose (`Engine._their_first_blow`); the prose never opens a fight. Measured
+            # 2026-09-25 on the provoke script: the plan declared the real blows, and the
+            # one blow this door read out of the prose was a man slamming his fist on
+            # the bar — a fight opened on furniture. The prose call rewrites or cuts an
+            # undeclared blow (`GMAgent._undeclared_blows`); anything still read here is
+            # logged, never opened.
             struck_lines: list[str] = []
-            for sentence in [s for r, s in struck if r is None]:
-                c.turn_log.append({"kind": "npc-opener", "ref": None,
+            for ref, sentence in judgement.attacked_by(c.scene, text):
+                c.turn_log.append({"kind": "npc-opener", "ref": ref,
                                    "sentence": sentence[:300], "opened": False,
-                                   "note": "a blow at the player with no striker the "
-                                           "code could name"})
-            struck = [(r, s) for r, s in struck if r is not None]
-            for n, (ref, sentence) in enumerate(struck):
-                if n == 0:
-                    outs = agent.engine.struck_first(ref)
-                    c.turn_log.append({"kind": "npc-opener", "ref": ref,
-                                       "sentence": sentence[:300],
-                                       "opened": bool(c.scene.in_encounter),
-                                       "outcomes": [o.as_dict() for o in outs]})
-                    if not outs:
-                        continue
-                    repairs.append(f"{c.scene.actors[ref].name} struck first: the fight "
-                                   f"opened from their side")
-                    pc = c.scene.pc()
-                    for o in outs:
-                        if not o.tell:
-                            continue
-                        line = plain_tell(o.tell)
-                        if pc is not None:
-                            line, _ = narration_mod.pc_to_second_person(line, pc.name)
-                        # After the beat that described the swing, not before it.
-                        struck_lines.append(line)
-                elif c.scene.in_encounter and agent.engine.join_fight(ref, "them"):
-                    repairs.append(f"{c.scene.actors[ref].name} came in with them")
+                                   "note": "a blow read in the prose and not declared "
+                                           "in the plan: logged, not opened"})
             # `added`: the sentences that are ours, so the next turn's `earlier` can
             # leave them out of what the model is shown as its own.
             added = added + ours
+            # Who said which line, as the prose call tagged it — the lines still in the
+            # beat after every rewrite, so the record never names a line the page lacks.
+            # Once each: a rewrite that kept a tagged line lifts it a second time.
+            said = []
+            for r in getattr(agent, "last_said", None) or []:
+                if r["who"] and r not in said and any(speech_mod.speaker([r], ln)
+                                         for ln in speech_mod.lines(text)):
+                    said.append(r)
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
-                                 **({"added": added} if added else {})})
+                                 **({"added": added} if added else {}),
+                                 **({"said": said} if said else {})})
+            # The measurement the tags are judged by: a valid ref on the wrong line looks
+            # fine to the parser, so the tagged hails are logged beside what the old
+            # guess would have said, and a disagreement means one of them is wrong.
+            c.turn_log.append({"kind": "speech-tags",
+                               "tagged": len({(r["who"], r["to"], r["line"])
+                                              for r in agent.last_said if r["who"]}),
+                               # Tags naming nobody here: the model's own claim, kept.
+                               "unknown_refs": sorted({r.get("was", "")
+                                                       for r in agent.last_said
+                                                       if not r["who"]}),
+                               "on_the_page": len(said),
+                               "lines": len(speech_mod.lines(text)),
+                               "hails_tagged": judgement.hailed_by(c.scene, text, said=said),
+                               "hails_guessed": judgement.hailed_by(c.scene, text)})
             c.history.append({"role": "assistant", "content": text})
             for line in struck_lines:
                 c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
@@ -2295,7 +2365,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             for o in resolution.outcomes:
                 if o.tell:
                     c.transcript.append({"who": "gm", "kind": "consequence",
-                                     "text": plain_tell(o.tell)})
+                                         "text": _plain_tells(c, [o])})
             continue
 
         undo = scene.snapshot()
@@ -2320,9 +2390,15 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         # the log only when it failed, so the one door where a model still writes a
         # number (a bestiary creature's `damage`, stamped creature:<template>) could
         # not be audited off a saved campaign at all.
-        c.turn_log.append({"kind": "npc-turn", "ref": ref,
-                           "intents": [i.as_dict() for i in plan.intents],
-                           "outcomes": [o.as_dict() for o in resolution.outcomes]})
+        entry = {"kind": "npc-turn", "ref": ref,
+                 "intents": [i.as_dict() for i in plan.intents],
+                 "outcomes": [o.as_dict() for o in resolution.outcomes],
+                 # What the grooming did to this creature's prose. Written nowhere
+                 # before 2026-09-27, so a `wrong-actor` rewrite, a name swapped to
+                 # "you" or a creature noun turned into the player's name could only
+                 # be found by replaying the recording through `_groom` by hand.
+                 "repairs": list(plan.repairs or [])}
+        c.turn_log.append(entry)
         if plan.narration:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 
@@ -2332,13 +2408,18 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # No polish rewrite on an NPC's turn — the same call `npc_turn` makes for
                 # its own prose: "a ~10s polish call per NPC per round is a price a fight
                 # cannot pay". This door had it on, measured 2026-09-25.
-                text, _ = agent.narrate_outcome(plan.narration, tells, f"{actor.name} acts",
-                                                rewrite=False)
+                # `acting`: the call is told whose turn it was, and the prose is checked
+                # for being told the wrong way round (narration.wrong_actor).
+                text, attempt = agent.narrate_outcome(plan.narration, tells,
+                                                      f"{actor.name} acts",
+                                                      rewrite=False, acting=actor.name)
+                if attempt is not None and attempt.note:
+                    entry["repairs"] += [r for r in attempt.note.split("; ") if r]
             except ModelUnavailable:
                 text = ""
             c.transcript.append({
                 "who": "gm", "kind": "consequence",
-                "text": text or " ".join(plain_tell(o.tell) for o in tells),
+                "text": text or _plain_tells(c, tells),
             })
         # An NPC's turn is not the player speaking, so the ledger gets no speech
         # from it — only whatever the engine decided on their behalf.
@@ -2352,6 +2433,18 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
     # skipped creatures lose their turn, which is a mercy to the player, not a
     # round of free time for anyone.
     _hand_the_turn_back(c, "The scuffle blurs; the moment comes back to you.")
+
+
+def _plain_tells(c, outcomes) -> str:
+    """Tells for the page when no prose was written for them: numbers off, and the
+    player as "you". The player-turn fallback got the person treatment after the gemma4
+    fight audit; the two creature-turn fallbacks here did not, and "Borin Lyraxys hits
+    Kesst Vayr for 1 bludgeoning" reached the page as the enemy's beat."""
+    text = " ".join(plain_tell(o.tell) for o in outcomes if o.tell)
+    pc = c.scene.pc()
+    if pc is not None and text:
+        text, _ = narration_mod.pc_to_second_person(text, pc.name)
+    return text
 
 
 def _hand_the_turn_back(c, why: str) -> None:
@@ -2415,6 +2508,9 @@ def _log_turn(c, plan, resolution, replace: bool = False):
         "intents": [i.as_dict() for i in plan.intents],
         "outcomes": [o.as_dict() for o in resolution.outcomes],
     }
+    reading = getattr(plan, "reading", None)
+    if isinstance(reading, dict):
+        entry["reading"] = {k: v for k, v in reading.items() if k != "raw"}
     # The turn entry `_advance` wrote before the prose call, wherever it now sits.
     # `replace` used to look only at the LAST entry, and under intents-first the
     # prose entry is appended between the two — so every single turn was logged
@@ -2648,6 +2744,53 @@ def _merchant_here(scene):
     return None
 
 
+def _trade_offer(c, player_text: str) -> dict | None:
+    """{"open": True, "want": ...} when the player set out to buy something and there is
+    an open counter here to buy it at; else None.
+
+    The user's ruling (2026-09-27): "I try to buy a coil of rope." should "open the trade
+    tab [potentially with Rope in the basket]". Not opened at a shut counter (the keeper
+    has said when to come back, `keepers.shut_here`), with nobody keeping one, or for a
+    customer the keeper will not serve (`_counter_refusal`) — each of those is the
+    beat's to say, and an empty panel would contradict it."""
+    from rules import keepers
+
+    want = judgement.purchase_sought(player_text)
+    if not want or c.scene.in_encounter:
+        return None
+    pc = c.scene.pc()
+    if pc is None or keepers.shut_here(c.scene) or _merchant_here(c.scene) is None:
+        return None
+    if _counter_refusal(c, pc) is not None:
+        return None
+    return {"open": True, "want": want}
+
+
+def _buying_note(c, player_text: str) -> str:
+    """The brief's line when the turn opens the counter: the prose brings the keeper to
+    it and settles nothing — the screen is where the coin moves."""
+    offer = _trade_offer(c, player_text)
+    if not offer:
+        # A purchase that opens nothing sells nothing, and the beat says why. Live
+        # 2026-09-27, the market shut for the night: the prose invented a vendor, sold
+        # bread and torches, and finished "The transaction for the egg is complete".
+        want = judgement.purchase_sought(player_text)
+        if not want or c.scene.in_encounter:
+            return ""
+        from rules import keepers
+
+        why = (keepers.shut_here(c.scene)
+               or ("Nobody here keeps a counter." if _merchant_here(c.scene) is None
+                   else "The keeper here will not serve the player."))
+        return (f"The player tries to buy {want}, and nothing is sold: {why} Nobody "
+                f"hands anything over and no coin changes hands in the prose.")
+    who = getattr(_merchant_here(c.scene), "name", "") or "the keeper"
+    return (f"The player is buying {offer['want']}: the counter's own screen opens for it "
+            f"after this beat. {who} comes to the counter and may show the goods and name "
+            f"a price; nothing is handed over and no coin changes hands in the prose — "
+            f"the player pays on the screen.")
+
+
 def _counter_refusal(c, pc):
     """The merchant's answer to a wanted character: no, with the reason named. Else
     None (docs/wanted.md, reader two).
@@ -2708,7 +2851,8 @@ def _stall_of(c) -> tuple[str, str, int]:
 def _row(item, price: float, count: int = 1) -> dict:
     from rules import pricing
 
-    return {"id": str(getattr(item, "id", "")), "name": str(getattr(item, "name", "")),
+    return {"id": str(getattr(item, "id", "")),
+            "name": str(getattr(item, "label", "") or getattr(item, "name", "")),
             "tier": str(getattr(item, "tier", "") or "common"), "count": count,
             "gp": round(price, 2), "price": pricing.as_text(price),
             # What the engine can actually run with it, which is a quarter of the price
@@ -2726,6 +2870,11 @@ def trade(request):
     if pc is None:
         return JsonResponse({"error": "nobody is being played"}, status=409)
 
+    from rules import keepers as _keepers
+
+    shut = _keepers.shut_here(c.scene)
+    if shut:
+        return JsonResponse({"error": shut}, status=409)
     if _merchant_here(c.scene) is None:
         return JsonResponse({"error": (
             "There is nobody here to trade with. Find a stall and speak to whoever "
@@ -2742,10 +2891,24 @@ def trade(request):
 
     till = market.purse(place, stall, day, tier)
     left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
-    counter = market.on_sale(place, stall, day, c.scene.market_taken, tier)
+    counter = market.on_sale(place, stall, day, c.scene.market_taken, tier,
+                             counter_kind=market.counter_kind_here(c.scene))
+    # What the player's words asked for, picked on the counter if it is there — and if
+    # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
+    # and nothing is guessed in its place.
+    want = " ".join(str(body.get("want") or "").split())[:80]
+    pick, want_line = "", ""
+    if want:
+        found, _fits = goods.match_want(want, counter)
+        if found is not None:
+            pick = str(getattr(found, "id", ""))
+        else:
+            who = getattr(_merchant_here(c.scene), "name", "") or "The keeper"
+            thing = re.sub(r"^(?:a|an|some|the)\s+", "", want)
+            want_line = f"{who} has no {thing} on the counter. This is what there is."
 
     return JsonResponse({
-        "stall": stall, "place": place, "day": day,
+        "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
         "till": {"gp": left, "text": pricing.as_text(max(0.0, left))},
         "purse": goods.purse_line(pc.purse, goods.coinage()),
         "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
@@ -2781,6 +2944,11 @@ def trade_do(request):
     refusal = _cannot_act(pc, "trade")
     if refusal:
         return refusal
+    from rules import keepers as _keepers
+
+    shut = _keepers.shut_here(c.scene)
+    if shut:
+        return JsonResponse({"error": shut}, status=409)
     if _merchant_here(c.scene) is None:
         return JsonResponse({"error": "There is nobody here to trade with."},
                             status=409)

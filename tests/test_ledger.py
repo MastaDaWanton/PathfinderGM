@@ -98,7 +98,11 @@ def test_the_block_keeps_the_most_recent_of_the_forgotten_turns():
     """Newest first while the budget lasts, then back into reading order."""
     entries = [_entry(f"you went to place {n}".replace(str(n), "abcdefgh"[n]), hist=n)
                for n in range(8)]
-    out = ledger.block(entries, before_hist=100, budget=90)
+    # The budget covers the whole block, header included (it once counted only the entry
+    # lines, and the block overran the room `pack` reserved for it): the header's ~110
+    # characters, then room for a few entries.
+    out = ledger.block(entries, before_hist=100, budget=200)
+    assert len(out) <= 200, "the budget was not enforced"
     assert out.count("  * ") < 8, "the budget was not enforced"
     assert "place h" in out, "the newest forgotten turn was the first to be dropped"
 

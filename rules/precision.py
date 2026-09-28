@@ -21,10 +21,12 @@ THE RULE (d20pfsrd, rogue, read 2026-09-20):
   feet." "A rogue cannot sneak attack while striking a creature with concealment." The
   extra damage "is not multiplied" on a critical hit.
 
-WHAT IS IMMUNE, AND THE THING THAT IS EASY TO GET WRONG. Immunity to critical hits is NOT
-immunity to sneak attack in Pathfinder 1e — that was 3.5. Undead and constructs are "not
-subject to critical hits" and can still be sneak attacked; only traits that say so in as
-many words stop precision damage:
+WHAT IS IMMUNE, AND THE THING THAT IS EASY TO GET WRONG. Pathfinder 1e dropped 3.5's
+blanket immunity for undead and constructs: neither type's trait list mentions critical
+hits or precision damage any more (re-read on the legacy PRD's creatureTypes page
+2026-09-27, when `rules/coup_de_grace.py` needed the answer — this paragraph used to say
+they were "not subject to critical hits", which was the 3.5 wording). So both can be
+sneak attacked; only traits that say so in as many words stop precision damage:
 
   ooze traits      "Not subject to critical hits or flanking. Does not take additional
                    damage from precision-based attacks, such as sneak attack."

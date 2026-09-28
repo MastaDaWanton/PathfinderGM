@@ -262,6 +262,11 @@ class Campaign:
                 "said": dict(self.scene.said),
                 "routed_xp": [dict(r) for r in self.scene.routed_xp],
                 "agreements": list(self.scene.agreements),
+                "population": self.scene.population,
+                # Residency's arrival mark (rules/residency.py): lost, a reload would read
+                # every arrival as unanswered and send the baker home mid-conversation.
+                "arrived": self.scene.arrived, "moves": self.scene.moves,
+                "settled": self.scene.settled, "came_along": list(self.scene.came_along),
                 "founded": [dict(f) for f in self.scene.founded],
                 "schemes": [dict(s) for s in self.scene.schemes],
                 # Which counters already have somebody behind them. Absent in saves
@@ -391,6 +396,10 @@ class Campaign:
                            or []),
             agreements=list(s.get("agreements") or (s.get("said") or {}).get("agreements")
                             or []),
+            population=dict(s.get("population") or {}),
+            arrived=int(s.get("arrived") or 0), moves=int(s.get("moves") or 0),
+            settled=int(s.get("settled") or 0),
+            came_along=list(s.get("came_along") or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
@@ -511,7 +520,28 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
     Engine(scene, Dice(seed), world=world).place_party()
     here = opening.roll(campaign_id, seed)
+    # The clock starts at the hour the opening names ("Mid-morning, in the market row"),
+    # not at midnight: the hour now decides who is where and which counters are open.
+    scene.clock_minutes = opening.hour_of(here.when) * 60
     watcher = scene.add(instantiate(here.template, scene=scene, name=here.who), zone="near")
+    # The opening's own company is somebody the population keeps, like everyone the prose
+    # introduces later. Measured live 2026-09-25: "the woman at the bread stall" stood on
+    # the board with no record and no face, because only `views._finish` noted people and
+    # the opening never passes through it.
+    from rules import names as names_mod
+    from rules import population
+
+    rec = population.note(scene, here.who,
+                          body=names_mod.appearance_for(world, scene.location_id, own=""))
+    rec["ref"] = watcher.ref
+    watcher.appearance = names_mod.appearance_for(world, scene.location_id, ref=watcher.ref,
+                                                  own=rec["life"]["face"])
+    # And on the scene's ledger, as everybody the prose introduces is. Measured live the
+    # same day: the prose's "old man" was booked and stood beside the opening's own "the
+    # old man ahead of you", because the ledger — whose definiteness test decides that a
+    # later "the old man" is somebody already here — had never been told he was.
+    scene.cast.append({"who": re.sub(r"^(?:the|a|an)\s+", "", here.who, flags=re.I),
+                       "turn": 0, "ref": watcher.ref})
     c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )

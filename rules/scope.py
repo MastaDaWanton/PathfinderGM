@@ -34,6 +34,16 @@ import re
 HERE = "here"
 ELSEWHERE = "elsewhere"
 NOWHERE = "nowhere"
+# Several people fit and the words cannot choose: Inform's "Which do you mean", asked
+# rather than guessed (docs/the-population.md §6).
+AMBIGUOUS = "ambiguous"
+# Somebody of a KIND the place could hold — a scribe, a healer, somebody selling bread —
+# whom nobody has described yet and the world has no record of. Not a refusal: the world
+# cannot rule on whether a city has a scribe, and the plan introduces one
+# (`judgement.declare_introduce`). Measured live 2026-09-25 before this existed: five of
+# ten turns that asked for somebody new were answered "No scribe is here, and Zhilvarnia
+# has none the world names" — of a city.
+UNMET = "unmet"
 
 # Words that are never the person being looked for. "the man" and "somebody" name no
 # office and no name, so the world cannot answer and the question is not this module's:
@@ -60,8 +70,19 @@ OFFICES = frozenset({
 _WORDS = re.compile(r"[a-z']+")
 
 
+# Words no person is named by. "the oldest person on the street" matched Gorthok Ironfist,
+# "Leader of the Kaldrimian guilds", on the word "the" — measured live 2026-09-25, and the
+# player was told a guild leader in another city was who they meant.
+_NOT_A_NAME = frozenset({
+    "the", "and", "for", "who", "with", "from", "that", "this", "has", "have", "was",
+    "are", "his", "her", "their", "its", "our", "your", "one", "any", "all", "out",
+    "into", "onto", "near", "over", "under", "than", "then", "some", "whoever",
+})
+
+
 def _words(text: str) -> set[str]:
-    return {w for w in _WORDS.findall(str(text or "").lower()) if len(w) > 2}
+    return {w for w in _WORDS.findall(str(text or "").lower())
+            if len(w) > 2 and w not in _NOT_A_NAME}
 
 
 def _role_of(entity) -> str:
@@ -100,7 +121,8 @@ def in_the_room(scene, phrase: str) -> str:
     return best
 
 
-def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> dict:
+def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
+             indefinite: bool = False) -> dict:
     """The three answers of scope for a person the player named.
 
     Returns `{"scope": …, "who": name, "where": place, "line": sentence}`. `line` is what
@@ -115,8 +137,39 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
     if ref:
         who = scene.actors[ref]
         return {**out, "scope": HERE, "who": str(who.name), "ref": ref, "line": ""}
+
+    # Then everybody the prose has described (rules/population.py). Before 2026-09-25 a
+    # woman the prose painted and the player did not engage at once could not be found by
+    # anything: this function knew the actors and the world's named characters, and she
+    # was neither, so "I talk to the woman in the doorway" was either told there was no
+    # such woman or answered with a stranger spawned in her place.
+    from . import population
+
     head = (_WORDS.findall(phrase.lower()) or [""])[-1]
-    if head in VAGUE and not any(w[:1].isupper() for w in phrase.split()):
+    vague = head in VAGUE and not any(w[:1].isupper() for w in phrase.split())
+    # "the woman" names half the town. Asked vaguely, only the room and the people just
+    # seen are searched; the rest of the town's women are not a list worth reading out.
+    # And "a child" (indefinite) wants any child: somebody here will do, but a particular
+    # girl seen at the crossing an hour ago is not who was asked for (live, 2026-09-25) —
+    # the plan introduces one instead (`judgement.sought_indefinitely`).
+    pop = (population.find(scene, phrase, world=world, rings=(population.HERE,) if indefinite
+                           else (population.HERE, "recent", "met") if vague else None)
+           if scene is not None else population.Found(scope=population.NONE, ring="",
+                                                      people=[]))
+    if pop.scope == population.HERE:
+        rec = pop.people[0]
+        if rec.get("ref") and rec["ref"] in (getattr(scene, "actors", {}) or {}):
+            return {**out, "scope": HERE, "who": rec["phrase"], "ref": rec["ref"], "line": ""}
+        return {**out, "scope": HERE, "who": rec["phrase"], "record": rec["id"], "ref": "",
+                "line": ""}
+    if pop.scope == population.AMBIGUOUS and pop.ring == population.HERE:
+        return {**out, "scope": AMBIGUOUS, "records": [r["id"] for r in pop.people],
+                "line": population.question(pop.people)}
+    if vague:
+        if pop.scope == population.ELSEWHERE:
+            return {**out, "scope": ELSEWHERE, "who": pop.people[0]["phrase"],
+                    "record": pop.people[0]["id"],
+                    "line": population.seen_line(pop.people[0], scene, world)}
         # Not a question the world can answer. Left alone on purpose.
         return {**out, "scope": "", "line": ""}
     if world is None:
@@ -154,6 +207,16 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
         return {**out, "scope": ELSEWHERE, "who": str(who.name), "where": where,
                 "line": line}
 
+    # Nobody the world names — but somebody the party SAW, elsewhere, is still an answer,
+    # and a better one than "no such person": it says where to go.
+    if pop.scope == population.ELSEWHERE:
+        return {**out, "scope": ELSEWHERE, "who": pop.people[0]["phrase"],
+                "record": pop.people[0]["id"],
+                "line": population.seen_line(pop.people[0], scene, world)}
+    if pop.scope == population.AMBIGUOUS:
+        return {**out, "scope": AMBIGUOUS, "records": [r["id"] for r in pop.people],
+                "line": population.question(pop.people)}
+
     # Nobody of that name or office exists. For an OFFICE the settlement's own record says
     # what it has instead, which turns a refusal into information: "there is no mayor in
     # Vormoor; its authority is a local reeve confirmed by Kragmoor Horde's central
@@ -163,6 +226,11 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None) -> 
     # a place holds a trade is the place table's question (`rules/places.STAFFED`), not
     # this one's.
     where = town_name or "this place"
+    # A trade or a description is not the world's to refuse. The mayor is (an office the
+    # settlement's own record answers), and so is a name nobody in the world carries.
+    named = any(w[:1].isupper() for w in phrase.split())
+    if not (_words(phrase) & OFFICES) and not named:
+        return {**out, "scope": UNMET, "where": town_name, "line": ""}
     line = f"There is no {phrase} in {where}."
     if _words(phrase) & OFFICES:
         facts = dict(getattr(town, "facts", {}) or {}) if town is not None else {}

@@ -78,9 +78,16 @@ def measure(tmp_path) -> dict:
                 if call["role"] == "plan_turn":
                     plans += 1
                     try:
-                        json.loads(call["raw"])
+                        plan = json.loads(call["raw"])
                     except ValueError:
                         bad_plan_json += 1
+                        continue
+                    # The user's ruling on places (2026-09-25): the mechanism is free, but
+                    # places must keep being created — so the corpus counts the plans
+                    # that found one (docs/declared-not-guessed.md, the places door).
+                    firings["plans founding a place"] += int(any(
+                        isinstance(i, dict) and i.get("op") == "found"
+                        for i in (plan.get("intents") or []) if isinstance(plan, dict)))
                     continue
                 if call["role"] not in PROSE_ROLES:
                     continue
@@ -88,6 +95,25 @@ def measure(tmp_path) -> dict:
                 if not text.strip():
                     continue
                 drafts += 1
+                # Speaker tags come out first, through the game's own door, and what
+                # they claimed is counted: every quoted line, how many a tag attributed
+                # to somebody here, and tags naming nobody here (docs/declared-not-
+                # guessed.md; nobody has published tag compliance for 8-12B models, so
+                # this corpus is the measurement). Replayed against the scene BEFORE the
+                # turn, so a tag naming somebody the turn's own plan spawned, or a place
+                # the turn travelled to, counts as "nobody here" although the game —
+                # which lifts after the engine resolved — attributed it: on the retag run
+                # this counts 5 such misses where the game's own turn log counted 2. The
+                # game's `speech-tags` row is the true rate; this is a floor.
+                agent.last_said = []
+                text = agent._lift(text)
+                said = agent.last_said
+                lines = speech.lines(text)
+                firings["quoted lines"] += len(lines)
+                firings["lines tagged"] += sum(
+                    1 for ln in lines
+                    if (speech.speaker(said, ln) or {}).get("who"))
+                firings["tags naming nobody here"] += sum(1 for r in said if not r["who"])
                 alone = not [a for a in c.scene.actors.values() if not a.is_pc and a.hp > 0]
                 review = narration.review(text, pc_name=pc.name if pc else "",
                                           known_names=known, alone=alone)
@@ -95,10 +121,19 @@ def measure(tmp_path) -> dict:
                 # Each state-writing detector on a fresh copy of the scene, so one's
                 # booking cannot change what the next one sees.
                 scene = _campaign(rec["save_before"], tmp_path).scene
-                firings["note_cast booked"] += len(judgement.note_cast(scene, text, turn=n))
+                booked = judgement.note_cast(scene, text, turn=n)
+                firings["note_cast booked"] += len(booked)
+                # Everyone booked goes into the population with a life rolled
+                # (rules/population.py, 2026-09-25): how many, and how many rolls on a
+                # real phrase had to fall back because every row was excluded. Through
+                # the turn's own rule, which keeps crowds out.
+                for person in judgement.record_people(scene, booked, turn=n):
+                    firings["population noted"] += 1
+                    firings["life rolls that fell back"] += int(bool(
+                        person["life"]["fallbacks"]))
                 firings["attacked_by named"] += sum(1 for r, _ in
                                                     judgement.attacked_by(c.scene, text) if r)
-                firings["hailed_by"] += len(judgement.hailed_by(c.scene, text))
+                firings["hailed_by"] += len(judgement.hailed_by(c.scene, text, said=said))
                 firings["introductions"] += len(narration.introductions(text))
                 firings["unname_strangers struck"] += len(
                     narration.unname_strangers(text, known)[1])

@@ -1,0 +1,937 @@
+{
+ "note": "What a person wants now, the goal they carry for the future, and what they do for pleasure. Original writing for Pathfinder GM (2026-09-25); the goals follow the shape of Dwarf Fortress's life goals, not its words. Each row may declare: classes (the work classes it fits; absent = any), requires (at least one of these tags must already be rolled), excludes (none of these tags may be rolled). Tags are the occupation tags, the occupation class, and the personality pole ids. minor: the tag a child's work carries; adult-only rows exclude it.",
+ "wants": [
+  {
+   "id": "debt",
+   "text": "to pay off what they owe a moneylender before the next quarter-day",
+   "excludes": [
+    "generous",
+    "gentry",
+    "minor"
+   ]
+  },
+  {
+   "id": "master",
+   "text": "to be made a master of their trade at last",
+   "classes": [
+    "craft"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "better-pitch",
+   "text": "a better pitch on the market square than the one they have",
+   "classes": [
+    "trade"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "see-sea",
+   "text": "to see the sea once before they die",
+   "excludes": [
+    "sea",
+    "water",
+    "travel"
+   ]
+  },
+  {
+   "id": "court",
+   "text": "to find the nerve to speak plainly to the one they are sweet on",
+   "requires": [
+    "timid",
+    "reserved",
+    "guarded"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "brother-news",
+   "text": "news of a brother who went off soldiering and stopped writing"
+  },
+  {
+   "id": "leave-town",
+   "text": "enough coin to leave this place and not come back",
+   "excludes": [
+    "devout",
+    "minor",
+    "mobile",
+    "travel"
+   ]
+  },
+  {
+   "id": "left-alone",
+   "text": "to be left alone by everyone for one whole day",
+   "requires": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "council",
+   "text": "a seat among those who run the town",
+   "requires": [
+    "proud",
+    "bold"
+   ],
+   "excludes": [
+    "minor",
+    "poor"
+   ]
+  },
+  {
+   "id": "roof",
+   "text": "to fix the roof before the rains come back",
+   "excludes": [
+    "gentry",
+    "minor",
+    "mobile"
+   ]
+  },
+  {
+   "id": "apprentice",
+   "text": "an apprentice worth teaching, which they have never had",
+   "classes": [
+    "craft",
+    "learned"
+   ],
+   "excludes": [
+    "minor",
+    "young"
+   ]
+  },
+  {
+   "id": "rival-shamed",
+   "text": "to see a rival in the same trade brought low",
+   "excludes": [
+    "humble",
+    "kind",
+    "minor"
+   ]
+  },
+  {
+   "id": "cure",
+   "text": "a cure for a sick parent that the local healer cannot manage",
+   "excludes": [
+    "healing",
+    "minor"
+   ]
+  },
+  {
+   "id": "pilgrimage",
+   "text": "the coin and the leave to make a pilgrimage",
+   "requires": [
+    "devout"
+   ],
+   "excludes": [
+    "minor",
+    "pilgrim"
+   ]
+  },
+  {
+   "id": "respect",
+   "text": "to be taken seriously by the people who give them orders",
+   "excludes": [
+    "gentry",
+    "minor"
+   ]
+  },
+  {
+   "id": "lost-thing",
+   "text": "to get back something of their mother's that was stolen last winter"
+  },
+  {
+   "id": "quiet-drink",
+   "text": "a quiet drink at the end of the day without anybody's troubles in it",
+   "requires": [
+    "crowd",
+    "service"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "promotion",
+   "text": "a promotion they believe they were passed over for",
+   "classes": [
+    "law",
+    "service"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "cargo",
+   "text": "a cargo that will finally make the journey pay",
+   "classes": [
+    "trade",
+    "road",
+    "sea"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "new-boat",
+   "text": "a boat of their own instead of shares in someone else's",
+   "classes": [
+    "sea"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "good-harvest",
+   "text": "one good harvest after two bad ones",
+   "classes": [
+    "farm"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "letter-read",
+   "text": "someone they trust to read them a letter they have kept for a month",
+   "excludes": [
+    "letters"
+   ]
+  },
+  {
+   "id": "forgiveness",
+   "text": "to be forgiven by someone they wronged years ago",
+   "requires": [
+    "kind",
+    "devout",
+    "humble"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "stranger-story",
+   "text": "a traveller with a story they have not heard before",
+   "requires": [
+    "gregarious",
+    "trusting"
+   ],
+   "excludes": [
+    "travel"
+   ]
+  },
+  {
+   "id": "prove-wrong",
+   "text": "to prove a doubter wrong in front of the whole street",
+   "requires": [
+    "proud",
+    "hot_tempered"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "safe-road",
+   "text": "a road home that the bandits do not know about",
+   "classes": [
+    "road",
+    "trade"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "sell-out",
+   "text": "to sell the business for a fair price and rest",
+   "classes": [
+    "trade",
+    "craft",
+    "service"
+   ],
+   "requires": [
+    "old"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "fit-in",
+   "text": "to be counted as one of the town's own, not an outsider",
+   "excludes": [
+    "gentry"
+   ]
+  },
+  {
+   "id": "coat",
+   "text": "a coat that will actually keep the cold out this year",
+   "requires": [
+    "poor",
+    "labour",
+    "farm"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "recipe",
+   "text": "the secret of a rival's recipe",
+   "classes": [
+    "trade",
+    "service"
+   ],
+   "requires": [
+    "food",
+    "drink"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "dog",
+   "text": "a dog of their own, which they have asked for every day this year",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "festival",
+   "text": "to be allowed to stay up for the whole of the next festival",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "race",
+   "text": "to beat the older children in the race to the well",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "grown-up",
+   "text": "to be trusted with a real errand, alone",
+   "requires": [
+    "minor"
+   ]
+  }
+ ],
+ "goals": [
+  {
+   "id": "family",
+   "text": "to raise a family and see them settled",
+   "excludes": [
+    "minor",
+    "young"
+   ]
+  },
+  {
+   "id": "mastery",
+   "text": "to become the best at their work anyone in the region has seen",
+   "requires": [
+    "proud",
+    "orderly",
+    "bold"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "masterwork",
+   "text": "to make one thing so fine it outlasts them",
+   "classes": [
+    "craft"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "love",
+   "text": "to fall properly in love, once",
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "rank",
+   "text": "to rise to command the ones who command them now",
+   "classes": [
+    "law",
+    "service"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "wide-world",
+   "text": "to see the far side of the world with their own eyes",
+   "excludes": [
+    "mobile",
+    "travel",
+    "timid"
+   ]
+  },
+  {
+   "id": "fame",
+   "text": "to have their name sung in taverns they have never visited",
+   "requires": [
+    "proud",
+    "gregarious",
+    "bold"
+   ]
+  },
+  {
+   "id": "wealth",
+   "text": "to be rich enough never to count coin again",
+   "requires": [
+    "tight_fisted",
+    "proud",
+    "coin",
+    "trade"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "own-shop",
+   "text": "a shop of their own with their name over the door",
+   "classes": [
+    "craft",
+    "trade",
+    "service"
+   ],
+   "excludes": [
+    "gentry",
+    "minor"
+   ]
+  },
+  {
+   "id": "build",
+   "text": "to build something the town will still use in a hundred years",
+   "classes": [
+    "craft",
+    "labour",
+    "gentry"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "revenge",
+   "text": "to pay back the one who ruined their family",
+   "excludes": [
+    "humble",
+    "kind",
+    "minor",
+    "placid"
+   ]
+  },
+  {
+   "id": "reconcile",
+   "text": "to make peace with a parent or child they stopped speaking to",
+   "requires": [
+    "kind",
+    "humble",
+    "devout"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "holy-life",
+   "text": "to be counted among the faithful when their god calls them",
+   "requires": [
+    "devout"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "quiet-end",
+   "text": "a small house somewhere quiet to grow old in",
+   "excludes": [
+    "bold",
+    "minor",
+    "young"
+   ]
+  },
+  {
+   "id": "letters",
+   "text": "to learn to read and write properly",
+   "excludes": [
+    "letters",
+    "gentry"
+   ]
+  },
+  {
+   "id": "treasure",
+   "text": "to find what their grandfather swore he buried and never came back for",
+   "requires": [
+    "bold",
+    "trusting"
+   ]
+  },
+  {
+   "id": "freedom",
+   "text": "to owe nobody anything, ever again",
+   "requires": [
+    "poor",
+    "suspicious",
+    "labour"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "teach",
+   "text": "to pass on everything they know before it is lost",
+   "requires": [
+    "old",
+    "kind"
+   ],
+   "classes": [
+    "craft",
+    "learned",
+    "faith"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "belong",
+   "text": "to be somewhere they are wanted",
+   "requires": [
+    "reserved",
+    "timid",
+    "poor"
+   ]
+  },
+  {
+   "id": "justice",
+   "text": "to see one particular crime answered for",
+   "requires": [
+    "law",
+    "blunt",
+    "hard"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "adventure",
+   "text": "to live one story worth telling before settling down",
+   "requires": [
+    "young",
+    "bold"
+   ]
+  },
+  {
+   "id": "restore-name",
+   "text": "to restore a family name that was disgraced",
+   "requires": [
+    "proud",
+    "gentry"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "cure-self",
+   "text": "to be rid of an old hurt that aches every winter",
+   "requires": [
+    "old",
+    "limp",
+    "stoop"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "home",
+   "text": "to go back to the village they left as a child",
+   "requires": [
+    "mobile",
+    "travel",
+    "reserved"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "knight",
+   "text": "to be a knight — or at least a guard — when they grow up",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "ship",
+   "text": "to sail away on a real ship one day",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "parent-trade",
+   "text": "to be as good at their parent's trade as their parent is",
+   "requires": [
+    "minor"
+   ]
+  }
+ ],
+ "hobbies": [
+  {
+   "id": "whittling",
+   "text": "whittles small animals out of scrap wood"
+  },
+  {
+   "id": "dice",
+   "text": "plays dice in the back of the tavern",
+   "excludes": [
+    "devout",
+    "minor",
+    "tight_fisted"
+   ]
+  },
+  {
+   "id": "singing",
+   "text": "sings in the tavern when the evening gets loud",
+   "excludes": [
+    "reserved"
+   ]
+  },
+  {
+   "id": "birds",
+   "text": "watches the birds and knows every one by its call",
+   "requires": [
+    "reserved",
+    "placid",
+    "alone"
+   ]
+  },
+  {
+   "id": "garden",
+   "text": "keeps a small garden that is better tended than it needs to be",
+   "excludes": [
+    "minor",
+    "mobile"
+   ]
+  },
+  {
+   "id": "shells",
+   "text": "collects odd stones and keeps the best on a windowsill"
+  },
+  {
+   "id": "cards",
+   "text": "plays cards for small stakes and remembers every hand",
+   "excludes": [
+    "devout",
+    "minor"
+   ]
+  },
+  {
+   "id": "stories",
+   "text": "tells long stories to anybody who stays still",
+   "requires": [
+    "gregarious"
+   ]
+  },
+  {
+   "id": "pigeons",
+   "text": "keeps pigeons on the roof and races them",
+   "excludes": [
+    "minor",
+    "mobile"
+   ]
+  },
+  {
+   "id": "brewing",
+   "text": "brews a private batch of something strong",
+   "excludes": [
+    "devout",
+    "drink",
+    "minor"
+   ]
+  },
+  {
+   "id": "embroidery",
+   "text": "embroiders flowers onto whatever will hold still",
+   "excludes": [
+    "minor",
+    "untidy"
+   ]
+  },
+  {
+   "id": "chess",
+   "text": "carves game pieces and plays anyone who will sit down",
+   "requires": [
+    "orderly",
+    "proud",
+    "letters"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "walls",
+   "text": "walks the edge of town at dusk, the same way every night",
+   "requires": [
+    "orderly",
+    "reserved"
+   ]
+  },
+  {
+   "id": "histories",
+   "text": "reads old histories and argues about them",
+   "requires": [
+    "letters"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "knives",
+   "text": "throws knives at a target behind the house",
+   "excludes": [
+    "minor",
+    "timid"
+   ]
+  },
+  {
+   "id": "wrestling",
+   "text": "arm-wrestles for drinks and loses gracefully",
+   "excludes": [
+    "minor",
+    "old",
+    "timid"
+   ]
+  },
+  {
+   "id": "gossip",
+   "text": "collects gossip the way other people collect coins",
+   "requires": [
+    "gregarious",
+    "suspicious"
+   ]
+  },
+  {
+   "id": "songs",
+   "text": "learns songs from travellers and writes the words down wrong",
+   "excludes": [
+    "music"
+   ]
+  },
+  {
+   "id": "painting",
+   "text": "paints small pictures on broken pottery",
+   "excludes": [
+    "hard"
+   ]
+  },
+  {
+   "id": "bees",
+   "text": "keeps bees and talks to them",
+   "excludes": [
+    "minor",
+    "mobile",
+    "timid"
+   ]
+  },
+  {
+   "id": "stars",
+   "text": "knows the stars and names them by their old names",
+   "requires": [
+    "night",
+    "reserved",
+    "devout",
+    "sea"
+   ]
+  },
+  {
+   "id": "shrine",
+   "text": "keeps a small household shrine spotless",
+   "requires": [
+    "devout"
+   ]
+  },
+  {
+   "id": "mending",
+   "text": "mends other people's broken things for nothing",
+   "requires": [
+    "kind",
+    "generous"
+   ]
+  },
+  {
+   "id": "cooking",
+   "text": "cooks elaborate meals for friends on rest days",
+   "requires": [
+    "generous",
+    "gregarious"
+   ],
+   "excludes": [
+    "food",
+    "minor"
+   ]
+  },
+  {
+   "id": "horses",
+   "text": "goes to watch the horse fair every season",
+   "excludes": [
+    "timid"
+   ]
+  },
+  {
+   "id": "fishing",
+   "text": "fishes off the bridge on rest days and catches nothing",
+   "excludes": [
+    "sea"
+   ]
+  },
+  {
+   "id": "dancing",
+   "text": "dances at every festival, badly and happily",
+   "excludes": [
+    "reserved",
+    "old"
+   ]
+  },
+  {
+   "id": "maps",
+   "text": "draws maps of places they have only heard about",
+   "requires": [
+    "letters",
+    "reserved"
+   ],
+   "excludes": [
+    "travel"
+   ]
+  },
+  {
+   "id": "cats",
+   "text": "feeds every stray cat on the street",
+   "requires": [
+    "kind",
+    "generous"
+   ]
+  },
+  {
+   "id": "riddles",
+   "text": "trades riddles and keeps the good ones in their head",
+   "excludes": [
+    "hot_tempered"
+   ]
+  },
+  {
+   "id": "carving-names",
+   "text": "carves their mark into things they have built or mended",
+   "requires": [
+    "proud",
+    "craft"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "betting",
+   "text": "bets on anything that can be bet on",
+   "requires": [
+    "bold",
+    "coin"
+   ],
+   "excludes": [
+    "devout",
+    "minor",
+    "tight_fisted"
+   ]
+  },
+  {
+   "id": "weather",
+   "text": "keeps a tally of the weather and is proud of it",
+   "requires": [
+    "orderly"
+   ]
+  },
+  {
+   "id": "music-lessons",
+   "text": "is teaching themself the fiddle, slowly",
+   "excludes": [
+    "minor",
+    "music"
+   ]
+  },
+  {
+   "id": "sparring",
+   "text": "spars with a friend behind the stables",
+   "requires": [
+    "arms",
+    "bold"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "collecting-coins",
+   "text": "collects foreign coins and never spends them",
+   "requires": [
+    "tight_fisted",
+    "orderly",
+    "coin"
+   ],
+   "excludes": [
+    "minor"
+   ]
+  },
+  {
+   "id": "skim-stones",
+   "text": "skims stones and counts every bounce out loud",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "stick-sword",
+   "text": "plays at being a guard with a stick for a sword",
+   "requires": [
+    "minor"
+   ]
+  },
+  {
+   "id": "follows-strangers",
+   "text": "follows interesting strangers at a distance, badly",
+   "requires": [
+    "minor"
+   ]
+  }
+ ]
+}
