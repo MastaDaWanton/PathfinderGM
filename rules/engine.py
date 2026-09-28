@@ -344,6 +344,35 @@ class Scene:
     # road again, which makes being interrupted a punishment for the dice rather
     # than an event (`rules/ontheway.py`).
     road: dict = field(default_factory=dict)
+    # --- the 2026-09-28 fix pass (docs/fix-interfaces.md §2.4) ---------------------------
+    # Every one of these is saved only when it differs from what a save without it reads
+    # back as, so a campaign written before them round-trips byte for byte. Nothing in
+    # Phase 1 writes them; the lanes named beside each do.
+    #
+    # The number the STORY draws from — which start, which lead, which keeper — and not
+    # the dice. `Campaign.engine()` builds `Dice(campaign.seed)` on every one of its call
+    # sites, so a fixed dice seed would replay the same rolls every turn
+    # (docs/design-c-starts.md §5). On the scene because `rules/` has to reach it.
+    # Random at creation; for a campaign made before it, derived from the campaign id
+    # on load (`opening._seed_from`), which is stable across processes where `hash()`
+    # is not. Lane C.
+    story_seed: int = 0
+    # Which start document the campaign opened with, and what it bound:
+    # {"id", "kind", "where", "slots": {name: ref}, "hand_off": {...}, "tells": [str]}.
+    # Empty is the legacy opening, byte-identical. Lane C.
+    start: dict = field(default_factory=dict)
+    # World entity ids already given a part — by a background tie, a scheme slot, the
+    # start's lead — so two stories do not cast one person twice. One set shared by
+    # every binder instead of a local `set()` in each. Lane C.
+    spoken_for: list[str] = field(default_factory=list)
+    # World entity ids a background tie names: people who knew the character before the
+    # first turn. The arrival door (`arrive`/`move`) gives each of them `bond.knows-you`
+    # when they come in (`backgrounds.recognise`). Lane C writes it; Lane D reads it.
+    acquainted: list[str] = field(default_factory=list)
+    # Who said what to whom, in order: the conversation panel's store (§2.10's Entry).
+    # Entry keys this build does not know are kept, not dropped. Lane F.
+    conversation_log: list[dict] = field(default_factory=list)
+    conversation_seq: int = 0
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter. Written only
@@ -444,7 +473,15 @@ class Scene:
         return places_mod.terrain_of(self.at)
 
     def add(self, actor: Actor, zone: str = "near", at: tuple[int, int] | None = None) -> Actor:
-        """Put a creature into the scene, HERE. One of the writers of `Actor.at`.
+        """Put a creature into the scene, HERE. A thin alias of `arrive`, kept because
+        every door written before it (spawn, keepers, schemes, the opening, the
+        population, the loader's tests) calls it by this name and positionally."""
+        return self.arrive(actor, zone=zone, at=at)
+
+    def arrive(self, actor: Actor, *, zone: str = "near", at: tuple | None = None,
+               place_id: str | None = None, source: str = "") -> Actor:
+        """Put a creature into the campaign — HERE by default. One of the two writers of
+        `Actor.at`, and the one entrance for every arrival (docs/fix-interfaces.md §2.5).
 
         Stamped unconditionally: a roster sheet carries the place the character last
         stood in, in a campaign that may be in another world, and `if not actor.at`
@@ -453,7 +490,23 @@ class Scene:
         The keyword `at` is a GRID SQUARE and predates the place field of the same
         name on the actor; forty test sites pass it. The two are never confused in
         code because one is a tuple and the other a string, and the name stays.
+
+        `place_id` puts them somewhere other than the party's place: recorded there,
+        with a zone and no square, because a square is a fact of the room the party is
+        standing in. Absent, or equal to `scene.at`, this is exactly what `add` always
+        did. `source` says which door brought them (a scheme, a spawn, the opening) for
+        the lanes that record it; nothing reads it yet.
+
+        Every arrival is asked whether the character knew them before the first turn
+        (`backgrounds.recognise`), which does nothing until somebody is `acquainted`.
         """
+        if place_id and str(place_id).strip() and str(place_id).strip() != self.at:
+            actor.at = str(place_id).strip()
+            self.people[actor.ref] = actor
+            self.zones[actor.ref] = zone
+            self._mark_minted(actor.ref)
+            self._recognise(actor)
+            return actor
         actor.at = self.at
         self.people[actor.ref] = actor
         self.zones[actor.ref] = zone
@@ -475,13 +528,27 @@ class Scene:
             # at him had the fight invent one, fifteen feet off. `place_by_zone` measures
             # from the player's real square, and does nothing while they have none.
             self.place_by_zone([actor.ref])
+        self._mark_minted(actor.ref)
+        self._recognise(actor)
+        return actor
+
+    def _mark_minted(self, ref: str) -> None:
         # The mark only ever rises. Loading a save, spawning, promoting a cast entry all
-        # come through here, so a save from before the mark existed heals itself to the
-        # highest ref it holds on the first load.
-        m = re.fullmatch(r"c(\d+)", str(actor.ref))
+        # come through the arrival door, so a save from before the mark existed heals
+        # itself to the highest ref it holds on the first load.
+        m = re.fullmatch(r"c(\d+)", str(ref))
         if m:
             self.minted = max(self.minted, int(m.group(1)))
-        return actor
+
+    def _recognise(self, actor: Actor) -> str:
+        """Somebody a background tie names knows the character on sight. Asked on every
+        arrival and every move, answered by `backgrounds.recognise`; inert while
+        `acquainted` is empty, which it is until Lane C's `bind` writes it."""
+        if actor.is_pc or not getattr(self, "acquainted", None):
+            return ""
+        from . import backgrounds
+
+        return backgrounds.recognise(self, actor)
 
     # --- the map, when there is one ------------------------------------------------------
 
@@ -1470,6 +1537,9 @@ class Scene:
         Mid-encounter the PC is refused: travel ends the fight first (`_op_travel`
         settles the XP, then `end_encounter`, then moves), and every other caller has
         no business moving the party out of an initiative order.
+
+        Somebody moved into the party's place on a mapped scene is given a square, at
+        their zone — the arrival door's rule, which `move` used to undo (item 14).
         """
         actor = self.people.get(ref)
         if actor is None:
@@ -1494,6 +1564,17 @@ class Scene:
             self.cast = []
             # What was agreed here is a fact of this room; the next room starts clean.
             self.agreements = []
+        elif place_id == self.at and self.grid is not None:
+            # Moved INTO the party's room: they stand somewhere on its map from the
+            # moment they come in, as an arrival through `arrive` does. Item 14 of the
+            # 2026-09-28 playtest: a scheme brought Drenn in with `add` (which placed
+            # him) and then `move`d him to the market the party was standing in, and
+            # `_unseat` above had taken the square away with nothing to give one back —
+            # he was on the WHO IS HERE list and not on the board. The ruling of the
+            # same day: everyone in a scene has a square from arrival. The PC is not
+            # placed here: moving the party is a new room, and `place_party` lays it.
+            self.place_by_zone([ref])
+        self._recognise(actor)
         return actor
 
     def settle_relations(self) -> list[str]:
@@ -1566,9 +1647,16 @@ class Outcome:
     effects: list[dict] = field(default_factory=list)
     tell: str = ""
     because: str = ""
+    # A refusal's code, the sentence a player reads, and what would fix it — the same
+    # three an `IntentError` carries (rules/intents.py, `PLAYER_FIXABLE`), so a refusal
+    # at resolution time and one at validation render into one shape
+    # (docs/fix-interfaces.md §2.6). Empty on everything that is not a coded refusal.
+    code: str = ""
+    for_a_person: str = ""
+    fix: dict | None = None
 
     def as_dict(self) -> dict:
-        return {
+        d = {
             "intent_id": self.intent_id,
             "op": self.op,
             "status": self.status,
@@ -1580,6 +1668,16 @@ class Outcome:
             "tell": self.tell,
             "because": self.because,
         }
+        # Emitted only when set: every turn log, pending outcome and replay written
+        # before these existed reads back as the same ten keys, and an outcome that is
+        # not a coded refusal still is those ten keys.
+        if self.code:
+            d["code"] = self.code
+        if self.for_a_person:
+            d["for_a_person"] = self.for_a_person
+        if self.fix is not None:
+            d["fix"] = self.fix
+        return d
 
     def player_visible(self) -> dict:
         """The same outcome with hidden rolls stripped of their numbers.
@@ -10965,7 +11063,8 @@ class Engine:
             because=intent.because,
         )
 
-    def _refuse(self, intent: Intent, why: str) -> Outcome:
+    def _refuse(self, intent: Intent, why: str, *, code: str = "", for_a_person: str = "",
+                fix: dict | None = None) -> Outcome:
         """A refusal the player could not have foreseen, as a printable Outcome.
 
         The design contract's rule, made into one door: a refusal whose reason the
@@ -10987,13 +11086,19 @@ class Engine:
         `effects=[]` and a tell, which is what fifteen refusals already looked like;
         this only gives the shape a name. The tell is a fact the narrator dresses, and
         the claims scrubber will not let prose claim the thing that did not happen.
+
+        `code`, `for_a_person` and `fix` are the refusal's one payload
+        (docs/fix-interfaces.md §2.6), the same three an `IntentError` carries. No
+        caller passes them yet — the lanes place the codes — and an uncoded refusal is
+        the same ten keys it always was.
         """
         # `status="refused"`, so a reader can tell a refusal from an outcome that
         # happened and simply changed nothing. `cards.touch_from_outcomes` needs to:
         # "X is already a quest on the table" landed on the quest's card as its first
         # FACT (2026-09-23), and a test double with no effects is not a refusal.
         return Outcome(intent_id=intent.id, op=intent.op, status="refused", effects=[],
-                       tell=" ".join(str(why).split()), because=intent.because)
+                       tell=" ".join(str(why).split()), because=intent.because,
+                       code=code, for_a_person=for_a_person, fix=fix)
 
     def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:
         """Why this ability cannot be used right now, as a printable sentence — or "".
@@ -11920,6 +12025,8 @@ def _rehydrate(d: dict) -> Outcome:
         rolls=[_roll_from_dict(r) for r in d.get("rolls", [])],
         dc=d.get("dc"), verdict=d.get("verdict"), margin=d.get("margin"),
         effects=d.get("effects", []), tell=d.get("tell", ""), because=d.get("because", ""),
+        code=str(d.get("code", "") or ""), for_a_person=str(d.get("for_a_person", "") or ""),
+        fix=d.get("fix"),
     )
 
 
