@@ -3346,7 +3346,8 @@ def full_sheet(actor: Actor) -> dict:
             "cmb": _terms(actor.cmb_modifiers(key)),
             # The player's own sheet, so the player is "you" and the other is "the
             # target"; the same template names both people in a tell.
-            "effect": maneuver_text(m["effect"], "you", "the target", you="actor"),
+            "effect": maneuver_text(m["effect"], "you", "the target", you="actor",
+                                    **m.get("sheet", {})),
             "size_limit": m.get("size_limit"),
         })
 
@@ -4088,13 +4089,19 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         level=data.get("level", 1),
         char_class=data.get("class"),
         size=data.get("size", "medium"),
-        abilities=data.get("abilities", {}),
+        # Copies, never the dict or list handed in. A bestiary template is shallow-
+        # copied into `data`, so these were the TEMPLATE's own objects, shared by every
+        # creature made from it: measured 2026-09-27, one thug's sap knocked out of
+        # his hand left every thug in the run holding only a dagger, and setting one
+        # thug's Strength set them all. `_op_give` has appended to `weapons` in place
+        # since it was written, so a sword handed to one thug armed the whole bestiary.
+        abilities=dict(data.get("abilities") or {}),
         ranks={k.lower(): v for k, v in (data.get("ranks") or {}).items()},
-        feats=data.get("feats", []),
+        feats=list(data.get("feats") or []),
         armour=data.get("armour", "none"),
         shield=data.get("shield", "none"),
         natural_armour=data.get("natural_armour", 0),
-        weapons=data.get("weapons", []),
+        weapons=list(data.get("weapons") or []),
         equipped=data.get("equipped"),
         hp=data.get("hp", 1),
         nonlethal=int(data.get("nonlethal", 0) or 0),

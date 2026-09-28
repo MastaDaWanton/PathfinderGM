@@ -1122,8 +1122,11 @@ _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iterati
                   # attack back as a question through it.
                   "undecided",
                   # The object an improvised weapon is, and whether it left the hand
-                  # (`inject_improvised`).
-                  "item", "thrown"}
+                  # (`inject_improvised`). `item` is also what a disarm, a steal or a
+                  # sunder is aimed at.
+                  "item", "thrown",
+                  # A dirty trick's condition and a reposition's destination.
+                  "trick", "square"}
 
 
 def normalize_attacks(raw_intents, scene):

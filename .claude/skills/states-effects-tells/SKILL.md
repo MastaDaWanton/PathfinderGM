@@ -88,7 +88,14 @@ doors places come in by** — a settlement's own words imply spots (`places.IMPL
 the player founds a place with an owner (`found`; the owner holds `holds.place.<slug>`
 as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its parent
 (`venture`); all of it in `Scene.founded`, read back through the one derivation
-`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`).
+`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`); **manoeuvres
+do what they tell** — every `MANEUVERS` row carries a `condition`, `damages_item` or an
+`outcome` applicator (`Engine._MANEUVER_OUTCOMES`): a disarm puts the item on the props
+ledger and empties the hand, a steal moves it with `owner` kept, a dirty trick applies
+its one `trick` for 1 + margin/5 rounds, the moving four walk `Scene.positions` through
+`_push_line` and tell the feet actually moved; an attack naming a weapon that lies
+elsewhere is refused (`Scene.out_of_hand`) (docs/maneuver-outcomes.md;
+`tests/test_maneuver_outcomes.py`, whose ratchet refuses a row with no applicator).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —

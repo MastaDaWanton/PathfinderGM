@@ -593,8 +593,20 @@ SHIELDS: dict[str, dict] = {
 # `size_limit` — the manoeuvre only works on a target at most one size category larger.
 # `lead`       — the success sentence's opening, before the margin.
 # `degrees`    — extra effects keyed on how far the roll exceeded CMD.
-# `per_5_over` — the extra distance per full 5 over, with `{feet}` the total extra.
 # `backfire`   — what happens to the attacker on failing by 10 or more.
+# `outcome`    — the engine applicator that makes the effect TRUE (`Engine._MANEUVER_
+#                OUTCOMES`): "drop", "take", "trick", "push", "drag", "shift", "pass".
+#                A row whose `effect` claims something must carry a `condition`, the
+#                sunder's `damages_item`, or one of these. Measured 2026-09-27: the
+#                tell said the thug dropped his club, took the player's purse, was
+#                pushed ten feet, or was "blinded, dazzled, deafened, entangled, shaken
+#                or sickened" — and nothing in state carried any of it but a dazzle.
+#                The narrator is fed tells and nothing else (the third law), so each of
+#                those was prose asserting a fact the next beat could not find.
+# `sheet`      — plain values for the character sheet, which reads a template with no
+#                fight behind it ("the target drops one item it holds").
+# `short` / `blocked` — the moving manoeuvres' sentences when the ground stops them
+#                part way, or before the first square.
 #
 # Every sentence here is a TEMPLATE, rendered by `maneuver_text`, never spliced raw. They
 # were written in the attacker's second person — "you drag the target 5 feet", "you are
@@ -609,22 +621,42 @@ SHIELDS: dict[str, dict] = {
 # and a `[verb]` is written in its "you" form and agrees with the nearest person before it.
 # A plain verb (grapple's "both gain") does not change.
 MANEUVERS: dict[str, dict] = {
+    # The moving four run through `Engine._shove` on the map: square by square, stopped
+    # by walls and bodies ("it cannot push into a square with a solid object"; a
+    # creature in the way ends it, which is the drag's own rule and the bull rush's
+    # simplified — the book's second check against the obstacle is not rolled). Their
+    # `{feet}` is the distance actually moved, the book's 5 plus 5 per full 5 over, so
+    # the old `per_5_over` sentence ("pushed another 10 feet") is folded into it.
     "bull rush": {
         "name": "bull rush",
         "size_limit": 1,
         "provokes": True,
         "lead": "{actor} [charge] {target} in a bull rush",
-        "effect": "{actor} [push] {target} back 5 feet",
-        "per_5_over": "{target} [are] pushed another {feet} feet",
+        "effect": "{target} [are] pushed back {feet} feet",
+        "short": "{target} [are] pushed back only {feet} feet before the way is blocked",
+        "blocked": "{target} [are] driven against something solid and [go] nowhere",
+        "outcome": "push",
+        "sheet": {"feet": "5 (+5 per 5 over)"},
     },
+    # Disarm, Core Rulebook p.199: "the target drops one item it is carrying of your
+    # choice (even if the item is wielded with two hands)"; by 10 or more, "the items in
+    # both hands"; failing by 10, "you drop the weapon that you were using"; unarmed,
+    # "you may automatically pick up the item dropped". Where it lands the book never
+    # says; Greater Disarm's "15 feet away" implies the plain one stays at the wielder's
+    # feet, and ROM's `disarm()` puts it on the room's floor (`obj_to_room`). So: the
+    # props ledger, at this spot, still its owner's.
     "disarm": {
         "name": "disarm",
         "provokes": True,
         "lead": "{actor} [disarm] {target}",
-        "effect": "{target} [drop] one carried item",
-        "degrees": {10: "{target} [drop] everything held in both hands"},
-        "backfire": "{actor} [drop] the weapon used for the disarm",
+        "effect": "{target} [drop] {item}",
+        "nothing": "{target} [hold] nothing that can be knocked loose",
+        "picked_up": "{actor} [pick] up {item}",
+        "backfire": "{actor} [drop] {item}",
+        "both_hands_at": 10,
         "unarmed_penalty": -4,
+        "outcome": "drop",
+        "sheet": {"item": "one item it holds (both hands, by 10 or more)"},
     },
     "grapple": {
         "name": "grapple",
@@ -636,15 +668,19 @@ MANEUVERS: dict[str, dict] = {
         "also_grapples_attacker": True,
         "needs_two_hands": True,
     },
+    # "You move through the target's space"; the far side is where the mover ends, and
+    # with no room there the tell says so rather than put two bodies in one square.
     "overrun": {
         "name": "overrun",
         "size_limit": 1,
         "provokes": True,
         "lead": "{actor} [overrun] {target}",
         "effect": "{actor} [move] through {target's} space",
+        "blocked": "{actor} [find] no room past {target}",
         "degrees": {5: "{target} [are] knocked prone"},
         "degree_condition": {5: "prone"},
         "extra_legs_penalty": True,
+        "outcome": "pass",
     },
     "sunder": {
         "name": "sunder",
@@ -664,33 +700,60 @@ MANEUVERS: dict[str, dict] = {
         "backfire_condition": "prone",
         "extra_legs_penalty": True,
     },
+    # Reposition, APG: the target moves 5 feet (+5 per 5 over) and "must remain within
+    # your reach" but for the last 5 feet. The attacker stays put. Where to is the
+    # attacker's choice — the intent's `square` — and without one the nearest open
+    # square that keeps the rule is taken.
     "reposition": {
         "name": "reposition",
         "size_limit": 1,
         "provokes": True,
         "lead": "{actor} [reposition] {target}",
-        "effect": "{actor} [move] {target} to another square within reach",
+        "effect": "{actor} [move] {target} {feet} feet",
+        "blocked": "{actor} [find] no open ground to move {target} to",
+        "outcome": "shift",
+        "sheet": {"feet": "5 (+5 per 5 over)"},
     },
+    # Dirty trick, APG: ONE of six conditions, the attacker's choice, for 1 round plus 1
+    # per 5 over. The tell listed all six while the engine applied dazzled, until-
+    # dismissed — so the narrator could write a blinding that no roll would ever feel,
+    # and the dazzle outlasted the fight. The choice is the intent's `trick`.
     "dirty trick": {
         "name": "dirty trick",
         "provokes": True,
         "lead": "{actor} [play] a dirty trick on {target}",
-        "effect": "{target} [are] blinded, dazzled, deafened, entangled, shaken or sickened for 1 round",
-        "condition": "dazzled",
+        "effect": "{target} [are] {trick} for {rounds}",
+        "tricks": ("blinded", "dazzled", "deafened", "entangled", "shaken", "sickened"),
+        "default_trick": "dazzled",
+        "outcome": "trick",
+        "sheet": {"trick": "blinded, dazzled, deafened, entangled, shaken or sickened",
+                  "rounds": "1 round (+1 per 5 over)"},
     },
+    # Steal, APG: one item "neither held nor hidden in a bag or pack"; fastened things
+    # (sheathed weapons, pouches, cloaks) give +5 CMD; armour, backpacks, boots,
+    # clothing and rings cannot be taken, and a held item is the disarm's. The target
+    # knows at once (without Greater Steal). ROM's `do_steal` is the same shape: only an
+    # item with no wear location, into the thief's inventory.
     "steal": {
         "name": "steal",
         "provokes": True,
         "lead": "{actor} [steal] from {target}",
-        "effect": "{actor} [take] an object {target} [are] carrying",
+        "effect": "{actor} [take] {item} from {target}",
+        "nothing": "{target} [carry] nothing loose enough to take",
+        "fastened_cmd": 5,
+        "outcome": "take",
+        "sheet": {"item": "one item the target is not holding"},
     },
     "drag": {
         "name": "drag",
         "size_limit": 1,
         "provokes": True,
         "lead": "{actor} [drag] {target}",
-        "effect": "{target} [are] dragged 5 feet",
-        "per_5_over": "{target} [are] dragged another {feet} feet",
+        "effect": "{target} [are] dragged {feet} feet",
+        "short": "{target} [are] dragged only {feet} feet before the way is blocked",
+        "blocked": "{actor} [have] no room to back into and [drag] {target} nowhere",
+        "outcome": "drag",
+        "sheet": {"feet": "5 (+5 per 5 over)"},
     },
 }
 
