@@ -77,7 +77,77 @@ from here:
   does not guess a made-up name's gender from its shape; that would put English over the
   world's language, the trap the races ruling names. **Requested of the next export:** a
   gender (or none) on each given name, or given lists split the way the people split
-  them. `rules/names.py:true_name` is where it would be read.
+  them. `rules/names.py:true_name` is where it would be read. The shape is in *Asks of
+  the next export* below, with everything else this app would like.
+
+## Asks of the next export
+
+Collected 2026-09-28 from the playtest of that day (`docs/playtest-2026-09-28.md`, "What
+World Bible should export") and the six fix-pass designs (`docs/design-a-truth.md` …
+`docs/design-f-ui.md`, each design's §7). Written here once, so that no lane of the fix
+pass has to edit this file again.
+
+**Every one is optional.** The app builds a fallback for each from what the export already
+ships, and a world without the field stays playable; the field makes it sharper. That is
+the same promise `journey.py` made about `miles` before any export carried it. The rules
+for the shapes, all learned the hard way:
+
+- **Words, not numbers,** for anything a narrator will read. A number in the brief is one
+  the model starts doing arithmetic with.
+- **The world's own sentences,** unedited. The app puts labels around them and never
+  rewrites them.
+- **Structured fields over prose the app must parse.** Every fallback below is a parse of
+  prose, and every parse has been wrong somewhere ("ash-fields" read as grassland).
+- **Ids, never names,** for anything that points at another entity. Renaming rewrites
+  names.
+- **Nothing rules-shaped.** No levels, DCs or dice: the `play` layer still carries no rules.
+
+Where the app already reads a field the moment it appears, the reader is named. The two
+designs E (magic) and F (the table's furniture) asked for nothing.
+
+### Where things are
+
+The export has no maps, coordinates or distances beyond `play.travel`. On 2026-09-28 the
+narrator invented "north to Dustgate, west to Grotburrow" and three of Vormoor's five routes
+were never mentioned (playtest items 17 and 19).
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.travel[].bearing` | Absent everywhere; the world records no direction at all | One of eight compass words (`north`, `north-east`, … `north-west`), from `from` toward `to`, and **only when the author knows it**. Never derived from `world_map.py`'s rings, which encode containment depth, not latitude. Read by `geography.roads_out` (reversed for a row walked the other way); anything else is dropped rather than guessed. Coordinates per settlement would answer the same need, and bearings are the smaller ask |
+| `play.travel[].road` | 0 of 132 Aurvantis rows carry it, so every road is priced as trackless ground (Vormoor→Dustgate 38 hours, about 27 on the road column) | When `by` is `road`: `highway`, `road` or `trail`, the three columns of PF1e's overland table. Read by `journey.legs_from` today |
+| `play.travel[].leaves_by` | Absent; the app says every road leaves from the outskirts | The **id** of the settlement place the route leaves from (its gate, its docks). Read by `geography.roads_out` |
+| `play.travel[].miles` | Shipped on every Aurvantis row; missing on some synthetic rows, which the brief then states as "how far, nobody has written down" | A whole number on every row. It is the one number the app turns into words itself ("about five days on foot") |
+| `play.settlements[].near` | Absent; derived from the first ground of every road out plus the continent's prose | One to three terrain words in the `crosses` vocabulary, nearest first: the land at the gate. Replaces the derivation outright (`geography.land_around`) |
+| `play.settlements[].water` | Absent; inferred from being a port or from words like "stilt" and "tide" in the settlement's facts. Vormoor, a stilt village, is not a port | `"coast"`, `"river"`, `"lake"` or `""`. Design B asked for `coast: true/false`; this is the same fact with more in it, and `land_around` reads either |
+| Outside places in `play.places` | None; the app will generate a small ring (the outskirts, the roads, a crossroads, the fields, the shore) | Rows with `parent` = the settlement's id, a non-urban `terrain`, and `"setting": "outside"`. They replace the generated ring, as authored rooms already replace the generated set |
+
+### People
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.cast[].role` | `"Person"` on every row: 256 of 256 in Aurvantis, 47 of 47 in Pangrella, while each entity's own `Role` fact says "healer" or "border scout". Every background tie matched nobody and every campaign met Drenn Ironvale first (item 8) | The entity's short role noun, three words at most ("healer"); add `role_long` for the phrase ("Innovative developer and expert in magnetic shift adaptation"). `geography.role_of` reads the entity's `Role`, `Occupation`, `Profession`, `Position` or `Title` until then |
+| `play.cast[].gender`, `play.names[].given` | No gender anywhere; the characters are written as "them" throughout (see *Known gaps*) | `given` as `[{"name": "Kael", "gender": "male" \| "female" \| ""}]`, or split lists as the people split them; and `gender` on each cast row. `""` is an answer, not a gap |
+| `play.cast[].standing` | Absent | `"notable"` or `"common"`, so the app can take a market's master from the cast instead of minting one when the world already wrote one |
+| `play.cast[].appearance` | `Appearance` is free prose ("carries an old scar earned young…", "Tall, dark-haired, with Zhilakai facial markings") | Fields beside the prose, which stays the world's own: `{"text": str, "age": "young" \| "middle" \| "old" \| "ageless", "hair": str \| null, "marks": [str]}` |
+| `play.races[].body_slots` | Absent; a Pangrella Korvu has talons and wings, so "hands" and "hair" cannot be assumed | `{"hair": bool, "hands": "hands" \| "talons" \| "paws", …}`: which of a face's slots this people has at all |
+| `play.settlements[].peoples` | Absent; inferred from each resident's Identity prose | `[people_id, …]`, majority first |
+| `play.names[]` per settlement | Aurvantis ships 64 per-town pools (`home_id`; Vormoor's holds 16 families) that nothing reads yet; Pangrella ships none | A `play.names` row for every settlement, with `home_id`, and a gender on each given name as above |
+
+### How a settlement talks about itself
+
+| Field | Now | Best shape |
+|---|---|---|
+| Stock sentences | Scale-blind: all 64 Aurvantis settlements say "drawn… from the city's own leading families", and 48 of them are villages or towns. The opening called Vormoor, a village, "a sprawling settlement… the city's bustling thoroughfares" (item 1) | Stock sentences keyed on `scale`. `geography.in_its_own_words` rewrites "the city('s)" to the scale word until then, and never "the city of X" |
+| Fact key `Urban Life` | On every settlement, village or not | A scale-free key (`Daily Life`, as the synthetic world writes). `geography.display_key` shows it that way until then |
+| `kind` | `CITY` on every settlement (World Bible's word for "settlement"; the path is `…/cities/…`) | Documented in `campaign-format.md` as meaning "settlement", or a real kind per scale. The app reads `scale`, never `kind == "CITY"` |
+
+### Trade and hooks
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.settlements[].trade` | One `sells` and one `buys` line per settlement (Vormoor "iron"; Pangrella "Fine ironwork and crafted windcatchers"), and one keeper per market | `{"stalls": [{"line": "cord and canvas", "about": "<one sentence>"}], "authority": {"title": "clerk of the market", "answers_to": "<office>"}, "market_days": "<words>"}`. Lines as the world's own trades; words, not prices |
+| `play.cards[]` | Absent; hooks come only from this app's schemes | `{"giver", "want", "offer", "motive", "withholds"}`, so a world's own hooks arrive in the same shape a scheme's do. `giver` is an id |
+| `unwritten[].where_id` | `unwritten` names things with no location | The id of the settlement or place the unwritten thing belongs to, so it can be offered where it would be found |
 
 ## Things worth stealing
 

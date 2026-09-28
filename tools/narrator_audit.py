@@ -437,7 +437,12 @@ def audit(turns: int, script: str, world: str, character: str,
     with override_settings(CAMPAIGN_DIR=Path(os.environ.get("TEMP", "/tmp"))
                            / f"narrator-audit-{int(time.time())}"):
         cm._LIVE.clear()
-        c = cm.begin_with(load_pc(character))
+        # `--world` was parsed and handed here since the flag existed, and then dropped:
+        # every run started in the shipped default whatever was asked for, so a
+        # "Pangrella" audit measured Aurvantis (docs/fix-interfaces.md, R0-5). The fix
+        # pass's three-world queue needs the flag to mean what it says. "" keeps the old
+        # behaviour — `new_campaign` fills a missing source with the shipped default.
+        c = cm.begin_with(load_pc(character), world_source=world or None)
         c.save()
         client = Client()
 
