@@ -46,7 +46,8 @@ from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import Actor
 from .tables import (
     CONDITIONS,
-    ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, normalise_damage_type,
+    ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, maneuver_text,
+    normalise_damage_type,
 )
 
 
@@ -1344,6 +1345,18 @@ class Scene:
                 return rec
         return None
 
+    def out_of_hand(self, ref: str, item: str) -> dict | None:
+        """The record of `ref`'s own `item` when it is somewhere other than their
+        hands — knocked to the ground, or in a thief's — or None. Whole things only:
+        fragments are not the weapon any more."""
+        key = " ".join(str(item or "").split()).lower()
+        for rec in self.props:
+            if (rec.get("owner") == ref and str(rec.get("from_", "")).lower() == key
+                    and rec.get("state") not in ("fragments", "destroyed")
+                    and rec.get("held_by") != ref):
+                return rec
+        return None
+
     def props_here(self) -> list[dict]:
         """What lies at the party's spot, unheld."""
         return [r for r in self.props if r.get("at") == self.at and not r.get("held_by")]
@@ -2349,6 +2362,20 @@ class Engine:
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index
                 )
+            elif (key.lower() not in [w.lower() for w in actor.weapons]
+                  and self.scene.out_of_hand(actor.ref, key)):
+                # Checked before the carried-list test, because that one is skipped
+                # when the list is EMPTY (a bestiary creature with no list may swing
+                # anything it is statted for) — and a thug disarmed of his last weapon
+                # has an empty list, so his sap lying on the ground was swingable by
+                # name. The ledger says where it is, and the refusal says so.
+                rec = self.scene.out_of_hand(actor.ref, key)
+                holder = self.scene.actors.get(str(rec.get("held_by") or ""))
+                where = (f"is in {holder.name}'s hands" if holder is not None
+                         else "lies on the ground")
+                raise IntentError(
+                    f"attack: {actor.name}'s {key} {where}. Picking it up is a give "
+                    f"to {actor.ref} of '{rec['name']}'.", "legality", index)
             elif (actor.weapons and key not in actor.weapons
                   and key not in ("unarmed", "improvised")):
                 raise IntentError(
@@ -2356,6 +2383,13 @@ class Engine:
                     f"(has {', '.join(actor.weapons) or 'nothing'})",
                     "legality", index,
                 )
+            elif (actor.gear.get(key.lower()) is not None
+                  and actor.gear[key.lower()].destroyed):
+                # The sunder's "destroyed — in pieces" left the club on the weapons
+                # list, so the pieces could be swung by name at full damage.
+                raise IntentError(
+                    f"attack: {actor.name}'s {key} is destroyed — in pieces.",
+                    "legality", index)
             if intent.params.get("power_attack"):
                 why = actor.can_power_attack()
                 if why:
@@ -4432,9 +4466,22 @@ class Engine:
         if defender.has_condition("stunned"):
             mods.append(Modifier(4, "target is stunned"))
 
+        # A steal chooses its item before the roll, because the item sets the defence:
+        # a sheathed weapon, a pouch or a cloak is fastened and worth +5 CMD. What is
+        # held or worn close is not a steal at all, and is refused here with the
+        # manoeuvre that would do it.
+        loot = None
+        if m.get("outcome") == "take":
+            loot = self._steal_choice(defender, str(intent.params.get("item") or ""))
+            if isinstance(loot, str):
+                return self._refuse(intent, loot)
+
         flat_footed = self._flat_footed(defender)
         cmd_mods = defender.cmd_modifiers(
             flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None)
+        if loot and loot["fastened"]:
+            cmd_mods = list(cmd_mods) + [Modifier(m["fastened_cmd"],
+                                                  f"{loot['label']} is fastened")]
         cmd = sum(x.value for x in cmd_mods)
         cmd_note = f"CMD {cmd}" + (" (flat-footed)" if flat_footed else "")
 
@@ -4483,11 +4530,36 @@ class Engine:
         extra_rolls: list[Roll] = []
 
         if verdict == "success":
+            # Every sentence of the table is rendered by name, never spliced: the table
+            # was written "you drag the target 5 feet", and on a creature's turn that
+            # "you" was the creature while the narrator is told "you" is the player
+            # (see `maneuver_text`). The player's own become "you" downstream, through
+            # `narration.pc_to_second_person`, like every other tell. The lead was
+            # `name + "s"` too, which wrote "bull rushs" and, once that rule ran, "you
+            # trips"; each manoeuvre now says its own verb.
+            def say(template: str, capital: bool = True, **values) -> str:
+                return maneuver_text(template, actor.name, defender.name,
+                                     capital=capital, **values)
+
+            # The effect clause is written by whatever makes it true. A row with an
+            # `outcome` hands the sentence to its applicator, which says what it did —
+            # the item by name, the feet actually moved, the one condition put on — and
+            # nothing else; the table's plain `effect` is only spliced for the rows whose
+            # claim a `condition` below carries (trip, grapple).
+            outcome = m.get("outcome")
+            if outcome:
+                clause, extra, done = self._MANEUVER_OUTCOMES[outcome](
+                    self, m, intent, actor, defender, margin, weapon_key, loot, say)
+                effects.extend(done)
+            else:
+                clause, extra = say(m["effect"], False), []
             bits.append(
-                f"{actor.name} {m['name']}s {defender.name}"
-                + (" automatically — it cannot resist" if automatic else f" by {margin}")
-                + ("." if m.get("damages_item") else f": {m['effect']}.")
+                say(m["lead"])
+                + (f" automatically, as {defender.name} cannot resist" if automatic
+                   else f" by {margin}")
+                + ("." if m.get("damages_item") else f": {clause}.")
             )
+            bits.extend(extra)
             if m.get("damages_item"):
                 # Sunder, Core Rulebook (aonprd.com, Rules: Sunder): "If your attack is
                 # successful, you deal damage to the item normally. Damage that exceeds
@@ -4560,21 +4632,31 @@ class Engine:
                                 "condition": "grappled", "from": m["name"]})
             for over, extra in sorted((m.get("degrees") or {}).items()):
                 if margin >= over:
-                    bits.append(extra.capitalize().rstrip(".") + ".")
+                    bits.append(say(extra).rstrip(".") + ".")
                     dc_cond = (m.get("degree_condition") or {}).get(over)
                     if dc_cond:
                         defender.add_condition(dc_cond, source=m["name"])
                         effects.append({"ref": defender.ref, "kind": "condition",
                                         "condition": dc_cond, "from": m["name"]})
-            if m.get("per_5_over") and margin >= 5:
-                bits.append(f"{margin // 5} x {m['per_5_over']}.")
         else:
             bits.append(
                 f"{actor.name}'s {m['name']} fails against {defender.name} by {-margin}."
             )
             # Failing by 10 or more can turn the manoeuvre back on you.
-            if m.get("backfire") and margin <= -10:
-                bits.append(m["backfire"].capitalize() + ".")
+            if m.get("backfire") and margin <= -10 and m.get("outcome") == "drop":
+                # "You drop the weapon that you were using." Said only when there was
+                # one: a fist has nothing to let go of, and the tell used to drop "the
+                # weapon used for the disarm" whether or not there was a weapon, and
+                # then leave it in the hand.
+                if self._drops_in_hand(actor, weapon_key):
+                    rec = self._let_go(actor, weapon_key)
+                    bits.append(maneuver_text(m["backfire"], actor.name, defender.name,
+                                              item=self._the(weapon_key)) + ".")
+                    effects.append({"ref": actor.ref, "kind": "dropped",
+                                    "item": weapon_key, "prop": rec["name"],
+                                    "from": f"failed {m['name']}"})
+            elif m.get("backfire") and margin <= -10:
+                bits.append(maneuver_text(m["backfire"], actor.name, defender.name) + ".")
                 back = m.get("backfire_condition")
                 if back:
                     actor.add_condition(back, source=f"failed {m['name']}")
@@ -4592,6 +4674,433 @@ class Engine:
             tell=" ".join(bits) + self._hp_state_tell(crossed),
             because=intent.because,
         )
+
+    # --- what a manoeuvre does, through the doors that already exist -------------------
+    #
+    # Measured 2026-09-27 on the tells-by-name branch: disarm, steal, bull rush, drag,
+    # reposition, overrun and dirty trick each told the narrator an outcome nothing in
+    # state carried — the club "dropped" and still `equipped`, the purse "taken" and
+    # still in the purse, the thug "pushed back 10 feet" on the square he started on,
+    # and "blinded, dazzled, deafened, entangled, shaken or sickened" over a dazzle.
+    # Each applicator below changes the state through a door the engine already has —
+    # the props ledger for where a thing is, the carry for who has it, `Scene.positions`
+    # for where a body stands, `add_condition` for what it suffers — and returns the
+    # sentence for what it did, so the tell is written from the change and not before it.
+    #
+    # Prior art. Foundry's pf1 system resolves a manoeuvre as a roll against CMD and
+    # leaves every consequence to the GM (no issue proposes more); that is the shape this
+    # engine had, and it only works with a human at the table to do the rest. Owlcat's
+    # Pathfinder CRPGs made disarm a timed "cannot use weapons" condition instead of a
+    # drop — refused here, because it changes the rule (the weapon comes back on its
+    # own) and the props ledger already carries a thing lying on the ground. ROM puts a
+    # disarmed weapon on the room's floor (`obj_to_room`) and a stolen thing in the
+    # thief's inventory; so does this.
+
+    def _drops_in_hand(self, actor: Actor, key: str) -> bool:
+        """Is `key` a thing in this creature's hand that can leave it? A fist cannot,
+        a bite cannot, and a weapon a class power forms exists only while it is formed."""
+        from . import leveling
+
+        key = (key or "").strip().lower()
+        if not key or key in ("unarmed", "improvised"):
+            return False
+        if actor.natural_weapon(key) is not None:
+            return False
+        if leveling.granted_weapon_named(actor, key) is not None:
+            return False
+        return key == (actor.equipped or "").strip().lower()
+
+    def _held_items(self, actor: Actor) -> list[str]:
+        """What is in this creature's hands: the weapon it wields and a shield it holds.
+        A buckler is strapped to the forearm and stays."""
+        held = []
+        if self._drops_in_hand(actor, actor.equipped or ""):
+            held.append(str(actor.equipped))
+        shield = str(actor.shield or "none")
+        if shield != "none" and "buckler" not in shield.lower():
+            held.append(shield)
+        return held
+
+    def _let_go(self, owner: Actor, item: str) -> dict:
+        """A held thing leaves the hand and lies here, still its owner's. Returns the
+        props record.
+
+        The hand is empty afterwards — "unarmed", not the next weapon on the list. The
+        sunder's destroyed branch draws the next one for free; a drop does not, because
+        a draw is an action the tell would have to claim, and a creature that wants its
+        dagger names it in its next attack the way it always could.
+        """
+        key = item.strip().lower()
+        if str(owner.shield or "").lower() == key:
+            owner.shield = "none"
+        else:
+            for i, w in enumerate(owner.weapons):
+                if w.lower() == key:
+                    del owner.weapons[i]
+                    break
+            for name in list(owner.goods):
+                if name.lower() == key:
+                    owner.goods[name] -= 1
+                    if owner.goods[name] <= 0:
+                        del owner.goods[name]
+                    break
+            if (owner.equipped or "").lower() == key:
+                owner.equipped = "unarmed"
+        worn = owner.gear.get(key)
+        # Named for its owner, because the ledger finds a record by name: two thugs'
+        # saps both called "sap" would be ONE record, and the second drop would pick the
+        # first one up and move it.
+        return self.scene.place_prop(
+            f"{owner.name}'s {key}", owner=owner.ref, from_=key,
+            state="broken" if worn is not None and worn.broken else "intact",
+            turn=int(self.scene.clock_minutes))
+
+    def _into_hands(self, taker: Actor, item: str, equip: bool = False) -> None:
+        """A thing goes into this creature's carry, routed the way `_op_give` routes a
+        bought one: a weapon onto the weapons list, so it can be swung."""
+        from . import weapons as weapons_mod
+
+        key = item.strip().lower()
+        taker.goods[key] = taker.goods.get(key, 0) + 1
+        if goods.kind_of(key) == "weapon" or weapons_mod.has(key):
+            if key not in [w.lower() for w in taker.weapons]:
+                taker.weapons.append(key)
+            if equip:
+                taker.equipped = key
+
+    @staticmethod
+    def _the(item: str) -> str:
+        return item if re.match(r"(?i)(the|a|an|some)\b", item) else f"the {item}"
+
+    def _outcome_drop(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        held = self._held_items(defender)
+        if not held:
+            return say(m["nothing"], False), [], []
+        named = str(intent.params.get("item") or "").strip().lower()
+        if margin >= m["both_hands_at"]:
+            chosen = held
+        else:
+            chosen = [next((h for h in held if h.lower() == named), None)
+                      or next((h for h in held if named and (named in h.lower()
+                                                             or h.lower() in named)), None)
+                      or held[0]]
+        effects, recs = [], []
+        for h in chosen:
+            rec = self._let_go(defender, h)
+            recs.append(rec)
+            effects.append({"ref": defender.ref, "kind": "dropped", "item": h.lower(),
+                            "prop": rec["name"], "from": m["name"]})
+        extra = []
+        # "If you successfully disarm your opponent without using a weapon, you may
+        # automatically pick up the item dropped." A formed class weapon is a weapon.
+        if weapon_key == "unarmed" and not actor.weapon(weapon_key).get("granted_by"):
+            first = recs[0]
+            self.scene.hold_prop(first["name"], actor.ref,
+                                 turn=int(self.scene.clock_minutes))
+            self._into_hands(actor, first["from_"], equip=True)
+            extra.append(say(m["picked_up"], item=self._the(first["from_"])) + ".")
+            effects.append({"ref": actor.ref, "kind": "picked_up",
+                            "item": first["from_"], "prop": first["name"]})
+        return (say(m["effect"], False,
+                    item=" and ".join(self._the(h.lower()) for h in chosen)),
+                extra, effects)
+
+    # Slots a steal may reach: "tucked into a belt or loosely attached — brooches and
+    # necklaces" are easy, a cloak is fastened (+5). Everything else a slot holds is
+    # "closely worn" (armour, boots, clothing, rings) and is not a steal at all.
+    _STEAL_SLOTS = {"neck": False, "shoulders": True}
+    _PURSE_WORDS = re.compile(r"(?i)\b(purse|pouch|coins?|money|silver|gold|copper)\b")
+
+    def _steal_choice(self, defender: Actor, named: str):
+        """What a steal would take: a dict, a refusal (str), or None for nothing loose.
+
+        The kit a creature was generated with collapses into contents here, because a
+        hand in its pockets is the first observation of them (`bestiary.collapse_kit`)."""
+        from .bestiary import collapse_kit
+
+        collapse_kit(defender)
+        held = {h.lower() for h in self._held_items(defender)}
+        options: list[dict] = []
+        seen: set[str] = set()
+
+        def offer(label, where, key, fastened):
+            if label.lower() in seen or label.lower() in held:
+                return
+            seen.add(label.lower())
+            options.append({"label": label, "where": where, "key": key,
+                            "fastened": fastened})
+
+        for name, n in defender.goods.items():
+            if n > 0:
+                offer(name, "goods", name, False)
+        for iid, n in defender.inventory.items():
+            if n > 0:
+                offer(iid.replace("-", " "), "inventory", iid, False)
+        for slot, fastened in self._STEAL_SLOTS.items():
+            for it in defender.slots.get(slot) or []:
+                if it:
+                    offer(str(it), f"slot:{slot}", str(it), fastened)
+        for w in defender.weapons:
+            if w.lower() not in ("unarmed", "improvised"):
+                offer(w, "weapons", w, True)          # sheathed
+        if any(int(v) > 0 for v in defender.purse.values()):
+            offer("coin purse", "purse", "", True)
+
+        named = " ".join(named.lower().split())
+        if not named:
+            loose = [o for o in options if not o["fastened"]]
+            return (loose or options or [None])[0]
+        if named in held or any(named in h or h in named for h in held):
+            return (f"{defender.name} is holding the {named}. A steal takes what is not "
+                    f"in the hand; knocking it out of the hand is a disarm.")
+        close = [str(defender.armour or "")] + [
+            str(it) for slot, items in defender.slots.items()
+            if slot not in self._STEAL_SLOTS for it in (items or []) if it]
+        if any(c and c.lower() == named for c in close):
+            return (f"The {named} is worn close — armour, rings, boots and clothing "
+                    f"cannot be stolen in a fight.")
+        exact = next((o for o in options if o["label"].lower() == named), None)
+        if exact:
+            return exact
+        if self._PURSE_WORDS.search(named):
+            purse = next((o for o in options if o["where"] == "purse"), None)
+            if purse:
+                return purse
+        words = {w for w in re.findall(r"[a-z]+", named) if len(w) >= 3}
+        near = next((o for o in options
+                     if words & set(re.findall(r"[a-z]+", o["label"].lower()))), None)
+        return near or f"{defender.name} has no {named} that can be taken."
+
+    def _outcome_take(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        if not loot:
+            return say(m["nothing"], False), [], []
+        where, key, label = loot["where"], loot["key"], loot["label"]
+        if where == "purse":
+            coins = goods.coinage(getattr(self, "world", None), None)
+            label = f"coin purse ({goods.purse_line(defender.purse, coins)})"
+            for coin, n in defender.purse.items():
+                actor.purse[coin] = actor.purse.get(coin, 0) + int(n)
+            defender.purse = {}
+        elif where == "inventory":
+            defender.inventory[key] -= 1
+            if defender.inventory[key] <= 0:
+                del defender.inventory[key]
+            actor.carry(key, 1, at_minute=self.scene.clock_minutes)
+        elif where.startswith("slot:"):
+            items = defender.slots.get(where[5:]) or []
+            items.remove(key)
+            self._into_hands(actor, key)
+        else:
+            # Goods or a sheathed weapon: out of both lists, since a bought sword sits
+            # on both and a stolen one must leave both.
+            self._let_go_quietly(defender, key)
+            self._into_hands(actor, key)
+        # Whose it was travels with it (Creation Kit's owner beside the stolen flag):
+        # the thing is in the thief's hands and still the victim's, so the victim's own
+        # dagger is refused to them by name, and the ledger can say whose purse it is.
+        plain = loot["label"].lower()       # "dice of bone", not its id "dice-of-bone"
+        rec = self.scene.hold_prop(f"{defender.name}'s {plain}", actor.ref,
+                                   owner=defender.ref, from_=plain, state="intact",
+                                   turn=int(self.scene.clock_minutes))
+        return (say(m["effect"], False, item=self._the(label)), [],
+                [{"ref": actor.ref, "kind": "stolen", "from": defender.ref,
+                  "item": label, "prop": rec["name"]}])
+
+    def _let_go_quietly(self, owner: Actor, key: str) -> None:
+        """A sheathed weapon leaves the carry without touching the ground."""
+        k = key.lower()
+        for i, w in enumerate(owner.weapons):
+            if w.lower() == k:
+                del owner.weapons[i]
+                break
+        for name in list(owner.goods):
+            if name.lower() == k:
+                owner.goods[name] -= 1
+                if owner.goods[name] <= 0:
+                    del owner.goods[name]
+                break
+
+    def _outcome_trick(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        # The attacker's choice, subject to the GM — here the intent's `trick`, checked
+        # against the six at parse; the gentlest when none was named.
+        trick = str(intent.params.get("trick") or m["default_trick"]).strip().lower()
+        if trick not in m["tricks"]:
+            trick = m["default_trick"]
+        rounds = 1 + max(0, margin) // 5
+        defender.add_condition(trick, rounds=rounds,
+                               source=f"{m['name']} by {actor.name}")
+        return (say(m["effect"], False, trick=trick,
+                    rounds=f"{rounds} round{'' if rounds == 1 else 's'}"), [],
+                [{"ref": defender.ref, "kind": "condition", "condition": trick,
+                  "rounds": rounds, "from": m["name"]}])
+
+    # --- the moving four --------------------------------------------------------------
+
+    def _both_on_the_map(self, a: Actor, b: Actor) -> bool:
+        return (self.scene.has_grid and a.ref in self.scene.positions
+                and b.ref in self.scene.positions)
+
+    def _heading(self, from_ref: str, to_ref: str) -> tuple[int, int]:
+        """One square's step from one creature toward the other."""
+        a, b = self.scene.positions[from_ref], self.scene.positions[to_ref]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        step = ((dx > 0) - (dx < 0), (dy > 0) - (dy < 0))
+        return step if step != (0, 0) else (1, 0)
+
+    def _open_for(self, ref: str, square) -> bool:
+        from .grid import footprint
+
+        grid = self.scene.grid
+        taken = self.scene.occupied(ignore=ref)
+        return all(grid.passable(q) and q not in taken
+                   for q in footprint(square, self.scene.actors[ref].size))
+
+    def _put(self, ref: str, square) -> None:
+        """Stand a creature on a square, keeping a flier's height (`settle_levels`
+        puts everything else back on the floor)."""
+        was = self.scene.positions[ref]
+        self.scene.positions[ref] = tuple(square[:2]) + tuple(was[2:])
+
+    def _push_line(self, ref: str, step: tuple[int, int], squares: int) -> int:
+        """Move a creature square by square in a straight line until it has gone
+        `squares` or the next square is wall or somebody. Returns squares moved.
+
+        Forced movement provokes nothing — it does not go through `_op_move` and so
+        not through `_reactions_before`, which is the book's rule without Greater Bull
+        Rush."""
+        moved = 0
+        for _ in range(max(0, squares)):
+            here = self.scene.positions[ref]
+            nxt = (here[0] + step[0], here[1] + step[1])
+            if not self._open_for(ref, nxt):
+                break
+            self._put(ref, nxt)
+            moved += 1
+        return moved
+
+    def _moved(self, ref: str, before, m: dict) -> dict:
+        from .grid import distance
+
+        self.scene.settle_levels()
+        self.scene.resync_zones()
+        after = self.scene.positions[ref]
+        return {"ref": ref, "kind": "position", "from": before, "to": after,
+                "feet": distance(before[:2], after[:2]), "forced": m["name"],
+                "zone": self.scene.zones.get(ref, "")}
+
+    def _moved_clause(self, m, say, moved: int, want: int, feet: int) -> str:
+        if moved == 0:
+            return say(m["blocked"], False)
+        return say(m["effect" if moved >= want else "short"], False, feet=feet)
+
+    def _unmapped(self, m, actor, defender, want, say, breaks_reach: bool):
+        """No map: the zones are the only record, and they are measured from the
+        player. A push breaks melee reach (13th Age's "popping free"; no tradition
+        found turns five feet into a whole zone), so a bull rush with the player on
+        either end puts the other one `near`. Everything else keeps its zone."""
+        effects = []
+        pc = self.scene.pc()
+        other = (defender if pc is actor else actor if pc is defender else None)
+        if breaks_reach and other is not None and \
+                self.scene.zones.get(other.ref) == "engaged":
+            self.scene.zones[other.ref] = "near"
+            effects.append({"ref": other.ref, "kind": "zone", "from": "engaged",
+                            "to": "near", "forced": m["name"]})
+        return say(m["effect"], False, feet=want * FEET_PER_SQUARE), [], effects
+
+    def _outcome_push(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        want = 1 + max(0, margin) // 5
+        if not self._both_on_the_map(actor, defender):
+            return self._unmapped(m, actor, defender, want, say, breaks_reach=True)
+        before = self.scene.positions[defender.ref]
+        moved = self._push_line(defender.ref, self._heading(actor.ref, defender.ref),
+                                want)
+        done = [self._moved(defender.ref, before, m)] if moved else []
+        return (self._moved_clause(m, say, moved, want,
+                                   done[0]["feet"] if done else 0), [], done)
+
+    def _outcome_drag(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        want = 1 + max(0, margin) // 5
+        if not self._both_on_the_map(actor, defender):
+            return self._unmapped(m, actor, defender, want, say, breaks_reach=False)
+        # "You and the target move 5 feet directly away": the dragger backs off first,
+        # and the dragged follows into the ground it leaves, no further than it went.
+        step = self._heading(defender.ref, actor.ref)
+        a_before, d_before = (self.scene.positions[actor.ref],
+                              self.scene.positions[defender.ref])
+        went = self._push_line(actor.ref, step, want)
+        followed = self._push_line(defender.ref, step, went)
+        done = []
+        if went:
+            done.append(self._moved(actor.ref, a_before, m))
+        if followed:
+            done.append(self._moved(defender.ref, d_before, m))
+        return (self._moved_clause(m, say, followed, want,
+                                   done[-1]["feet"] if followed else 0), [], done)
+
+    def _outcome_shift(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        from . import reactions
+        from .grid import distance, distance_between
+
+        want = 1 + max(0, margin) // 5
+        if not self._both_on_the_map(actor, defender):
+            return self._unmapped(m, actor, defender, want, say, breaks_reach=False)
+        grid = self.scene.grid
+        here = self.scene.positions[defender.ref]
+        mine = self.scene.positions[actor.ref]
+        # Within reach, but for the last five feet, which may end just past it.
+        reach = reactions._reach_of(actor) + FEET_PER_SQUARE
+        budget = want * FEET_PER_SQUARE
+
+        def allowed(q) -> bool:
+            q = tuple(q[:2])
+            return (q != tuple(here[:2]) and grid.inside(q)
+                    and distance(here[:2], q) <= budget
+                    and distance_between(mine, actor.size, q, defender.size) <= reach
+                    and self._open_for(defender.ref, q))
+
+        asked = intent.params.get("square")
+        if asked is not None and allowed(tuple(asked)):
+            dest = tuple(asked[:2])
+        else:
+            options = [(distance(here[:2], (x, y)), y, x)
+                       for x in range(here[0] - want, here[0] + want + 1)
+                       for y in range(here[1] - want, here[1] + want + 1)
+                       if allowed((x, y))]
+            if not options:
+                return say(m["blocked"], False), [], []
+            _, y, x = min(options)
+            dest = (x, y)
+        self._put(defender.ref, dest)
+        done = self._moved(defender.ref, here, m)
+        return say(m["effect"], False, feet=done["feet"]), [], [done]
+
+    def _outcome_pass(self, m, intent, actor, defender, margin, weapon_key, loot, say):
+        from .grid import footprint
+
+        if not self._both_on_the_map(actor, defender):
+            return say(m["effect"], False), [], []
+        # "You move through the target's space": to the first open square on the far
+        # side of it, along the line of the charge. Never INTO its space — two bodies do
+        # not share a square at the end of a move.
+        step = self._heading(actor.ref, defender.ref)
+        start = self.scene.positions[actor.ref]
+        theirs = set(footprint(self.scene.positions[defender.ref], defender.size))
+        for k in range(1, 8):
+            q = (start[0] + step[0] * k, start[1] + step[1] * k)
+            if set(footprint(q, actor.size)) & theirs:
+                continue
+            if self._open_for(actor.ref, q):
+                self._put(actor.ref, q)
+                return say(m["effect"], False), [], [self._moved(actor.ref, start, m)]
+            break
+        return say(m["blocked"], False), [], []
+
+    _MANEUVER_OUTCOMES = {
+        "drop": _outcome_drop, "take": _outcome_take, "trick": _outcome_trick,
+        "push": _outcome_push, "drag": _outcome_drag, "shift": _outcome_shift,
+        "pass": _outcome_pass,
+    }
 
     def _ensure_encounter(self, initiator: str, target: str | None = None) -> bool:
         """Start a fight the moment someone swings, if one is not already running.
@@ -8001,21 +8510,20 @@ class Engine:
 
     def _shove(self, actor: Actor, defender: Actor, toward: bool) -> bool:
         """One five-foot step of the defender, towards the attacker or away. False when
-        there is no grid, no room, or the square is taken."""
-        grid = getattr(self.scene, "grid", None)
-        pos = getattr(self.scene, "positions", None)
-        if not grid or not pos:
+        there is no grid, no room, or the square is taken.
+
+        One copy of forced movement, not two: this used to step the anchor itself and
+        test only other anchors, so a Large body's second square and the level axis
+        were both ignored, while the manoeuvres' `_push_line` checks footprints.
+        """
+        if not self._both_on_the_map(actor, defender):
             return False
-        here, there = pos.get(defender.ref), pos.get(actor.ref)
-        if not here or not there:
+        step = self._heading(actor.ref, defender.ref)
+        if toward:
+            step = (-step[0], -step[1])
+        if not self._push_line(defender.ref, step, 1):
             return False
-        step = []
-        for a, b in zip(here, there):
-            step.append(a + (1 if b > a else -1 if b < a else 0) * (1 if toward else -1))
-        target = tuple(step)
-        if target in pos.values() or not grid.passable(target) or not grid.inside(target):
-            return False
-        pos[defender.ref] = target
+        self.scene.settle_levels()
         self.scene.resync_zones()
         return True
 
@@ -9934,6 +10442,7 @@ class Engine:
 
         moved = 0
         note = ""
+        from_ground = False
         if giver is not None:
             held = (giver.purse if denom else giver.goods)
             moved = min(count, int(held.get(denom or item, 0)))
@@ -9953,6 +10462,14 @@ class Engine:
                     self.scene.hold_prop(rec["name"], taker.ref,
                                          turn=int(self.scene.clock_minutes))
                     item = rec["name"]
+                    # A whole thing that was somebody's (a disarmed sap is recorded
+                    # as "the thug's sap", so two thugs' saps are two records) is
+                    # carried as what it IS, so it can be swung; fragments stay
+                    # fragments. Picked up is in the hand: a weapon is wielded.
+                    if rec.get("from_") and rec.get("state") in ("intact", "broken"):
+                        item = str(rec["from_"])
+                        from_ground = True
+                        moved = 1           # that one thing, not `count` of them
                     whose = self.scene.actors.get(str(rec.get("owner") or ""))
                     if whose is not None and whose.ref != taker.ref:
                         note = f" — {whose.name}'s, not {taker.name}'s"
@@ -9987,6 +10504,8 @@ class Engine:
                 key = item.lower()
                 if kind == "weapon" and key not in [w.lower() for w in taker.weapons]:
                     taker.weapons.append(key)
+                if kind == "weapon" and from_ground:
+                    taker.equipped = key
                 elif kind == "consumable":
                     from .crafting import Stock
 

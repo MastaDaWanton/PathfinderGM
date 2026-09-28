@@ -10,6 +10,8 @@ and that import brings its own attribution obligations with it.
 """
 from __future__ import annotations
 
+import re
+
 # --- Abilities ------------------------------------------------------------------
 
 ABILITIES = ("str", "dex", "con", "int", "wis", "cha")
@@ -597,83 +599,226 @@ SHIELDS: dict[str, dict] = {
 # against the target's CMD. Only the consequences differ.
 #
 # `size_limit` — the manoeuvre only works on a target at most one size category larger.
+# `lead`       — the success sentence's opening, before the margin.
 # `degrees`    — extra effects keyed on how far the roll exceeded CMD.
 # `backfire`   — what happens to the attacker on failing by 10 or more.
+# `outcome`    — the engine applicator that makes the effect TRUE (`Engine._MANEUVER_
+#                OUTCOMES`): "drop", "take", "trick", "push", "drag", "shift", "pass".
+#                A row whose `effect` claims something must carry a `condition`, the
+#                sunder's `damages_item`, or one of these. Measured 2026-09-27: the
+#                tell said the thug dropped his club, took the player's purse, was
+#                pushed ten feet, or was "blinded, dazzled, deafened, entangled, shaken
+#                or sickened" — and nothing in state carried any of it but a dazzle.
+#                The narrator is fed tells and nothing else (the third law), so each of
+#                those was prose asserting a fact the next beat could not find.
+# `sheet`      — plain values for the character sheet, which reads a template with no
+#                fight behind it ("the target drops one item it holds").
+# `short` / `blocked` — the moving manoeuvres' sentences when the ground stops them
+#                part way, or before the first square.
+#
+# Every sentence here is a TEMPLATE, rendered by `maneuver_text`, never spliced raw. They
+# were written in the attacker's second person — "you drag the target 5 feet", "you are
+# knocked prone instead" — and the engine pasted them into the tell after the attacker's
+# name. On a creature's turn that "you" was the creature, while the narrator is told, and
+# every tell is rendered so, that "you" is the player: "the thug drags you by 3: you drag
+# the target 5 feet" (docs/wrong-actor.md, which found creature turns told the wrong way
+# round in 8 of 100 beats and left this as its own task). The shape is Inform 7's adaptive
+# text (Writing with Inform §14.3): "[The actor] [put] [the noun]" prints "You put…" or
+# "General Lee puts…" by who acted, so one sentence serves every viewpoint. Here
+# `{actor}` / `{target}` are the two people, `{actor's}` / `{target's}` their possessives,
+# and a `[verb]` is written in its "you" form and agrees with the nearest person before it.
+# A plain verb (grapple's "both gain") does not change.
 MANEUVERS: dict[str, dict] = {
+    # The moving four run through `Engine._shove` on the map: square by square, stopped
+    # by walls and bodies ("it cannot push into a square with a solid object"; a
+    # creature in the way ends it, which is the drag's own rule and the bull rush's
+    # simplified — the book's second check against the obstacle is not rolled). Their
+    # `{feet}` is the distance actually moved, the book's 5 plus 5 per full 5 over, so
+    # the old `per_5_over` sentence ("pushed another 10 feet") is folded into it.
     "bull rush": {
         "name": "bull rush",
         "size_limit": 1,
         "provokes": True,
-        "effect": "pushes the target back 5 feet",
-        "per_5_over": "another 5 feet",
+        "lead": "{actor} [charge] {target} in a bull rush",
+        "effect": "{target} [are] pushed back {feet} feet",
+        "short": "{target} [are] pushed back only {feet} feet before the way is blocked",
+        "blocked": "{target} [are] driven against something solid and [go] nowhere",
+        "outcome": "push",
+        "sheet": {"feet": "5 (+5 per 5 over)"},
     },
+    # Disarm, Core Rulebook p.199: "the target drops one item it is carrying of your
+    # choice (even if the item is wielded with two hands)"; by 10 or more, "the items in
+    # both hands"; failing by 10, "you drop the weapon that you were using"; unarmed,
+    # "you may automatically pick up the item dropped". Where it lands the book never
+    # says; Greater Disarm's "15 feet away" implies the plain one stays at the wielder's
+    # feet, and ROM's `disarm()` puts it on the room's floor (`obj_to_room`). So: the
+    # props ledger, at this spot, still its owner's.
     "disarm": {
         "name": "disarm",
         "provokes": True,
-        "effect": "the target drops one carried item",
-        "degrees": {10: "the target drops what it holds in both hands"},
-        "backfire": "you drop the weapon you were using",
+        "lead": "{actor} [disarm] {target}",
+        "effect": "{target} [drop] {item}",
+        "nothing": "{target} [hold] nothing that can be knocked loose",
+        "picked_up": "{actor} [pick] up {item}",
+        "backfire": "{actor} [drop] {item}",
+        "both_hands_at": 10,
         "unarmed_penalty": -4,
+        "outcome": "drop",
+        "sheet": {"item": "one item it holds (both hands, by 10 or more)"},
     },
     "grapple": {
         "name": "grapple",
         "size_limit": None,
         "provokes": True,
-        "effect": "both of you gain the grappled condition",
+        "lead": "{actor} [grapple] {target}",
+        "effect": "{actor} and {target} both gain the grappled condition",
         "condition": "grappled",
         "also_grapples_attacker": True,
         "needs_two_hands": True,
     },
+    # "You move through the target's space"; the far side is where the mover ends, and
+    # with no room there the tell says so rather than put two bodies in one square.
     "overrun": {
         "name": "overrun",
         "size_limit": 1,
         "provokes": True,
-        "effect": "you move through the target's space",
-        "degrees": {5: "and the target is knocked prone"},
+        "lead": "{actor} [overrun] {target}",
+        "effect": "{actor} [move] through {target's} space",
+        "blocked": "{actor} [find] no room past {target}",
+        "degrees": {5: "{target} [are] knocked prone"},
         "degree_condition": {5: "prone"},
         "extra_legs_penalty": True,
+        "outcome": "pass",
     },
     "sunder": {
         "name": "sunder",
         "provokes": True,
-        "effect": "you damage an item the target is holding or wearing",
+        "lead": "{actor} [land] a sunder on {target's} gear",
+        "effect": "{actor} [damage] an item {target} [are] holding or wearing",
         "damages_item": True,
     },
     "trip": {
         "name": "trip",
         "size_limit": 1,
         "provokes": True,
-        "effect": "the target is knocked prone",
+        "lead": "{actor} [trip] {target}",
+        "effect": "{target} [are] knocked prone",
         "condition": "prone",
-        "backfire": "you are knocked prone instead",
+        "backfire": "{actor} [are] knocked prone instead",
         "backfire_condition": "prone",
         "extra_legs_penalty": True,
     },
+    # Reposition, APG: the target moves 5 feet (+5 per 5 over) and "must remain within
+    # your reach" but for the last 5 feet. The attacker stays put. Where to is the
+    # attacker's choice — the intent's `square` — and without one the nearest open
+    # square that keeps the rule is taken.
     "reposition": {
         "name": "reposition",
         "size_limit": 1,
         "provokes": True,
-        "effect": "you move the target to another square within your reach",
+        "lead": "{actor} [reposition] {target}",
+        "effect": "{actor} [move] {target} {feet} feet",
+        "blocked": "{actor} [find] no open ground to move {target} to",
+        "outcome": "shift",
+        "sheet": {"feet": "5 (+5 per 5 over)"},
     },
+    # Dirty trick, APG: ONE of six conditions, the attacker's choice, for 1 round plus 1
+    # per 5 over. The tell listed all six while the engine applied dazzled, until-
+    # dismissed — so the narrator could write a blinding that no roll would ever feel,
+    # and the dazzle outlasted the fight. The choice is the intent's `trick`.
     "dirty trick": {
         "name": "dirty trick",
         "provokes": True,
-        "effect": "the target is blinded, dazzled, deafened, entangled, shaken or sickened for 1 round",
-        "condition": "dazzled",
+        "lead": "{actor} [play] a dirty trick on {target}",
+        "effect": "{target} [are] {trick} for {rounds}",
+        "tricks": ("blinded", "dazzled", "deafened", "entangled", "shaken", "sickened"),
+        "default_trick": "dazzled",
+        "outcome": "trick",
+        "sheet": {"trick": "blinded, dazzled, deafened, entangled, shaken or sickened",
+                  "rounds": "1 round (+1 per 5 over)"},
     },
+    # Steal, APG: one item "neither held nor hidden in a bag or pack"; fastened things
+    # (sheathed weapons, pouches, cloaks) give +5 CMD; armour, backpacks, boots,
+    # clothing and rings cannot be taken, and a held item is the disarm's. The target
+    # knows at once (without Greater Steal). ROM's `do_steal` is the same shape: only an
+    # item with no wear location, into the thief's inventory.
     "steal": {
         "name": "steal",
         "provokes": True,
-        "effect": "you take an object the target is carrying",
+        "lead": "{actor} [steal] from {target}",
+        "effect": "{actor} [take] {item} from {target}",
+        "nothing": "{target} [carry] nothing loose enough to take",
+        "fastened_cmd": 5,
+        "outcome": "take",
+        "sheet": {"item": "one item the target is not holding"},
     },
     "drag": {
         "name": "drag",
         "size_limit": 1,
         "provokes": True,
-        "effect": "you drag the target 5 feet",
-        "per_5_over": "another 5 feet",
+        "lead": "{actor} [drag] {target}",
+        "effect": "{target} [are] dragged {feet} feet",
+        "short": "{target} [are] dragged only {feet} feet before the way is blocked",
+        "blocked": "{actor} [have] no room to back into and [drag] {target} nowhere",
+        "outcome": "drag",
+        "sheet": {"feet": "5 (+5 per 5 over)"},
     },
 }
+
+# The "he/she/it" forms of the few verbs whose third person is not a plain +s/+es.
+_THIRD_PERSON = {"are": "is", "have": "has", "do": "does", "go": "goes"}
+
+
+def third_person(verb: str) -> str:
+    """"drag" -> "drags", "push" -> "pushes", "are" -> "is", "carry" -> "carries"."""
+    if verb in _THIRD_PERSON:
+        return _THIRD_PERSON[verb]
+    if re.search(r"(?:s|sh|ch|x|z|o)$", verb):
+        return verb + "es"
+    if re.search(r"[^aeiou]y$", verb):
+        return verb[:-1] + "ies"
+    return verb + "s"
+
+
+_MANEUVER_TOKEN = re.compile(r"\{(actor|target)('s)?\}|\[([a-z]+)\]")
+
+
+def maneuver_verbs(template: str) -> list[str]:
+    """Every `[verb]` a template conjugates — so a test can hold the second-person map
+    in `gm/narration.py` to all of them."""
+    return [m.group(3) for m in _MANEUVER_TOKEN.finditer(template) if m.group(3)]
+
+
+def maneuver_text(template: str, actor: str, target: str, you: str = "",
+                  capital: bool = True, **values) -> str:
+    """One `MANEUVERS` sentence, with its two people named and its verbs agreeing.
+
+    `you` names which of the two ("actor" or "target") is the reader — the character
+    sheet reads "you drag the target 5 feet". A tell passes nothing: tells name everyone
+    in the third person, and the player's own become "you" later, in one place, through
+    `narration.pc_to_second_person` — so there is one copy of that rule, not two. The
+    first letter is capitalised, because "the thug" opens sentences here — unless
+    `capital` is off, for a clause after a colon.
+    """
+    names = {"actor": actor, "target": target}
+    subject = ""
+
+    def fill(m: re.Match) -> str:
+        nonlocal subject
+        who, possessive, verb = m.group(1), m.group(2), m.group(3)
+        if verb:
+            return verb if you and subject == you else third_person(verb)
+        if possessive:
+            return "your" if who == you else names[who] + "'s"
+        subject = who
+        return "you" if who == you else names[who]
+
+    # Plain values ("{feet}") go in first, so a name is never read as a placeholder.
+    for key, value in values.items():
+        template = template.replace("{" + key + "}", str(value))
+    text = _MANEUVER_TOKEN.sub(fill, template)
+    return text[:1].upper() + text[1:] if capital else text
+
 
 MANEUVER_ALIASES = {
     "bullrush": "bull rush", "bull-rush": "bull rush", "push": "bull rush",

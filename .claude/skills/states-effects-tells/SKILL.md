@@ -107,7 +107,14 @@ a natural 20 always succeeding and a natural 1 always failing (CRB p.180), asked
 every save (`_op_save`, the cast save, both ward saves, survival's saves, the coup de
 grâce's save), the attack roll and the manoeuvre; never by a skill or ability check,
 which 1e excludes; `dice.natural_said` names the face in a tell when it overruled the
-total (`tests/test_save_naturals.py`). **Lethality of a blow** — a
+total (`tests/test_save_naturals.py`). **Manoeuvres
+do what they tell** — every `MANEUVERS` row carries a `condition`, `damages_item` or an
+`outcome` applicator (`Engine._MANEUVER_OUTCOMES`): a disarm puts the item on the props
+ledger and empties the hand, a steal moves it with `owner` kept, a dirty trick applies
+its one `trick` for 1 + margin/5 rounds, the moving four walk `Scene.positions` through
+`_push_line` and tell the feet actually moved; an attack naming a weapon that lies
+elsewhere is refused (`Scene.out_of_hand`) (docs/maneuver-outcomes.md;
+`tests/test_maneuver_outcomes.py`, whose ratchet refuses a row with no applicator). **Lethality of a blow** — a
 weapon deals its own (`weapons.lethality_of`: an explicit `nonlethal` flag, else the
 content file's `nonlethal` trait — sap, whip, bolas, the unarmed strike) unless the attack
 declares `lethality`; the −4 arrives through `attack_modifiers` from

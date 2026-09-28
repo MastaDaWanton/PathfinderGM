@@ -142,6 +142,20 @@ def measure(tmp_path) -> dict:
                     firings["stands_elsewhere"] += len(narration.stands_elsewhere(
                         text, here=here, places=agent._place_names()))
                 firings["drafts with speech"] += int(speech.has_speech(text, 4))
+                # What a hand holds and a body suffers, against the scene and the turn's
+                # own effect records (gm/state_claims.py). 0 on this corpus when it
+                # landed (2026-09-27): four false firings on the first draft — a smith's
+                # quoted "when the hammer falls", "a stunned, heavy silence", a city's
+                # "sprawl" twice — each narrowed out; any firing here is a sentence the
+                # game would now rewrite or cut, so it is read before it is accepted.
+                from gm.state_claims import state_claims
+
+                changes = [e for t in (rec.get("added_turn_log") or [])
+                           for o in (t.get("outcomes") or [])
+                           for e in (o.get("effects") or []) if isinstance(e, dict)]
+                second = narration.pc_to_second_person(text, pc.name)[0] if pc else text
+                firings["state claims flagged"] += len(state_claims(second, c.scene,
+                                                                    changes))
     return {"drafts": drafts, "plans": plans, "bad_plan_json": bad_plan_json,
             "faults": dict(sorted(faults.items())), "firings": dict(sorted(firings.items()))}
 

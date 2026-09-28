@@ -664,7 +664,9 @@ call them new1 for the rest of the turn; a creature or a foe arriving to fight i
 Difficulty is a word from this list, not a number: %s.
 A circumstance is "favorable" or "unfavorable", nothing else.
 To grab, shove, trip, disarm or break something rather than wound it, use an attack with
-a manoeuvre: %s.
+a manoeuvre: %s. A disarm, steal or sunder names the thing it is after in "item"; a dirty
+trick names its one effect in "trick" (blinded, dazzled, deafened, entangled, shaken or
+sickened).
 When the fighting stops — they run, they yield, the player gets clear — end it with
 {"op": "end_encounter"}. Nobody can rest while a fight is still running.
 When the player sleeps or makes camp, use {"op": "rest", "params": {"kind": "night"}}
@@ -1667,7 +1669,11 @@ def scene_now(scene) -> str:
         said = []
         for rec in lying[:6]:
             owner = actors.get(str(rec.get("owner") or ""))
-            whose = f" ({owner.name}'s)" if owner is not None else ""
+            # A dropped or stolen thing's record is already named for its owner ("the
+            # thug's sap", so two thugs' saps are two records); saying it twice is noise.
+            whose = (f" ({owner.name}'s)" if owner is not None and not
+                     str(rec.get("name", "")).lower().startswith(owner.name.lower())
+                     else "")
             said.append(f"{rec.get('name')}{whose}")
         facts.append("lying on the ground here, and nothing else is: " + "; ".join(said))
     # What was agreed in this room, as the engine wrote it when the coin moved: the
