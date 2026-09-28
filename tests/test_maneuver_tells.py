@@ -30,6 +30,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import full_sheet, load_pc
 from rules.tables import MANEUVERS, maneuver_text, maneuver_verbs, third_person
+from tests._board import face_to_face
 
 PC = "Kesst Vayr"
 THUG = "the thug"
@@ -57,6 +58,7 @@ def _tell(key: str, by: str, face: int, strength: int) -> str:
     scene.add(instantiate("thug", scene=scene, name=THUG))
     engine = Engine(scene, _AimedCMB(face))
     engine._ensure_encounter("pc")
+    face_to_face(scene)                 # at arm's length: a manoeuvre needs reach
     attacker = scene.get(by)
     attacker.abilities["str"] = strength
     target = "c1" if by == "pc" else "pc"

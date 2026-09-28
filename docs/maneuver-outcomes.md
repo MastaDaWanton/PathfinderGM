@@ -125,8 +125,9 @@ And the doors the outcomes needed:
 - **NPCs never pick their weapon back up.** ROM's NPC does at once; 1e makes it a move
   action that provokes. The creature-turn ops (`_CREATURE_OPS`) have no `give`, so a
   disarmed thug fights on with his dagger or his fists.
-- **Manoeuvres have no reach check.** A fight lays the thug 15 ft off, and a disarm from
-  there resolves. Not introduced here; the tests stand the two adjacent.
+- ~~Manoeuvres have no reach check.~~ Closed 2026-09-28 by the maneuver-reach work
+  (`position.out_of_reach`, tests/test_maneuver_reach.py): a blow or a manoeuvre from
+  further than the attacker reaches is refused, and the square is named.
 - Steal's "at least one free hand" and Greater Steal's unnoticed theft are not modelled;
   nor is removing a dirty trick early as a move action.
 - A 1-round condition ticks at the top of the round (the one ticker), so a target earlier
