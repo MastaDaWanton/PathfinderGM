@@ -345,6 +345,10 @@ def test_every_armed_punch_of_a_full_attack_rolls_its_own_fist_die():
     e = Engine(scene, dice=Dice(seed=11))
     e.run(e.validate([{"op": "begin_encounter",
                        "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+    # Side by side: a punch needs its reach (the melee-reach rule merged to master while
+    # this test was written — laid out at the default range the thug stood 15 ft off).
+    scene.positions["pc"] = (4, 5)
+    scene.positions["c1"] = (5, 5)
     _use(e)
     while scene.current_ref() != "pc":
         scene.advance_turn()
