@@ -1681,6 +1681,13 @@ _HANDS_OVER = re.compile(
 _THING = re.compile(
     r"\b(?:a|an|the|some|my|two|three|four|five|\d+)\s+([a-z][a-z' -]{2,28}?)"
     r"(?=\s*(?:[.,;!?]|\band\b|\bfrom\b|\bto\b|\bfor\b|\bwith\b|$))", re.I)
+# ... and it is the verb's own object: it starts where the verb ends, after at most a
+# particle ("take back the ring"). Searched for anywhere, "I grab him and throw him over
+# a table" found the table after "over" and put it in the satchel — on every one of the
+# six recorded turns that sentence resolved (2026-09-25 and 2026-09-27 fight audits). The
+# object token sits right after the verb in Inform's grammar lines too ("take
+# [something]", Writing with Inform 17.1); a pronoun there is a person, not goods.
+_OBJECT = re.compile(r"\s*(?:(?:back|up|out|down|away|along)\s+)?" + _THING.pattern, re.I)
 
 
 # Nouns that are never objects, however much they read like them after "I take". Found in
@@ -1698,8 +1705,12 @@ walk stairs road path route way route trail direction watch guard vigil pause br
 initiative action reaction move measure account stance grip liberty leave offence
 umbrage pride solace revenge vengeance revenge stock example lesson point issue matter
 scene action satisfaction job patience services service pleasure attention silence
+fight fistfight brawl quarrel argument feud duel dispute grudge
 on off up in out over under away back down
 """.split())
+# "fight" and its kin: "I pick a fight with the biggest man in the room" put a "fight" in
+# the goods on every recorded turn that sentence resolved — four in the committed fight
+# recordings (2026-09-25), one in the 2026-09-27 audit ("Kesst Vayr takes fight.").
 # Measured in the masta save (2026-09-18): `goods` held "scene on" ×3 and
 # "satisfaction" ×1 — the Continue directive ("I take no action. Carry the scene on…")
 # read by `_ACQUIRES` as "I take … the scene on", and "pay for satisfaction" read as a
@@ -1718,6 +1729,16 @@ _IDIOM = re.compile(
     r"aim|revenge|vengeance|bearings|pick|seat|stand|due|share)|"
     r"a\s+(?:look|glance|peek|seat|moment|breath|break|rest|turn|step|walk|stroll|chance|"
     r"stand|hint|guess|dislike|liking|shine|swing|bow|knee))\b", re.I)
+
+
+# Bare "pick" (not "pick up") before these is a skill or a choice, not a pick-up: "I pick
+# the lock on her door" made the goods detector require a `give` in the 2026-09-27
+# battery (docs/the-interpreter.md), and "I pick his pocket" is a theft of whatever is IN
+# it. "I pick an apple" still picks an apple.
+_PICK_IS_NOT_TAKING = re.compile(
+    r"^\s*(?:(?:the|a|an|his|her|their|its|that|this|my|your|another)\s+)?"
+    r"(?:\w+\s+)?(?:locks?|pockets?|fights?|quarrels?|sides?|spots?|targets?|moments?)\b",
+    re.I)
 
 
 def _is_a_thing(item: str) -> bool:
@@ -1769,8 +1790,19 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     pc = scene.pc()
     if pc is None:
         return raw_intents
+    # The reading's rule, at this door too. `interpret.drop_unread_gifts` takes the
+    # plan's own give out when no act of the reading can leave the player holding
+    # anything — and this ran after it and put one straight back: 2026-09-27, "I pick a
+    # fight" was read as an insult, the reading overruled the required `give`, and the
+    # turn still ended "Kesst Vayr takes fight." The detector stays the judge only when
+    # there is no reading.
+    from . import interpret as _interpret
+
+    reads_no_gain = _interpret.gets_nothing(_interpret.reading_of(player_text))
 
     for pattern, gains in ((_ACQUIRES, True), (_HANDS_OVER, False)):
+        if gains and reads_no_gain:
+            continue
         found = pattern.search(player_text)
         if not found:
             continue
@@ -1780,7 +1812,10 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
         # afternoon's reflection became a line in the inventory.
         if _IDIOM.match(rest):
             continue
-        thing = _THING.search(rest)
+        if gains and found.group(0).split()[-1].lower() == "pick" \
+                and _PICK_IS_NOT_TAKING.match(rest):
+            continue
+        thing = _OBJECT.match(rest)
         if not thing:
             continue
         item = " ".join(thing.group(1).split()).strip(" -'")
@@ -1948,7 +1983,7 @@ def inject_improvised(raw_intents, player_text: str, scene) -> list:
             # "I pick up a chunk of wood and throw it": the thing is what the same
             # sentence picked up; failing that, the one thing in the hands.
             taken = _ACQUIRES.search(text)
-            named = _THING.search(text[taken.end():]) if taken else None
+            named = _OBJECT.match(text[taken.end():]) if taken else None
             if named and _is_a_thing(" ".join(named.group(1).split())):
                 thing = " ".join(named.group(1).split()).strip(" -'")
             else:

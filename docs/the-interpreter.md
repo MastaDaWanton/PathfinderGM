@@ -228,3 +228,31 @@ not yet measured.
 - **Conjured gifts:** both fight runs, with and without the reading, had the model's own
   `give` conjure things ("Kesst Vayr takes fight", "takes table"). With a reading, a give
   to the player that no act asked for is now dropped (`interpret.drop_unread_gifts`).
+
+## The second door (2026-09-27): "Kesst Vayr takes fight", after the drop
+
+`drop_unread_gifts` took the plan's own give out, but the fight audit on
+placeholders-are-ours still ended turn 1 with "Kesst Vayr takes fight." and
+`goods: {"fight": 1}`. The give came from `judgement.inject_goods`. That detector runs
+after the drop and never asked the reading, which had read "I pick a fight" as an insult
+and overruled the give. The rule had two doors and was written at one. Both now ask the
+same question, `interpret.gets_nothing`, with one act set (`GETTING_ACTS`), and only
+for gains to the player.
+
+The reading alone would not have closed it. Every committed fight recording has the
+detector's give on every turn the sentence resolved:
+
+| sentence | recordings | give |
+|---|---|---|
+| "I pick a fight with the biggest man in the room" | 4 in the corpus, 1 on 2026-09-27 | "fight" |
+| "I grab him and throw him over a table" | 4 in the corpus, 2 on 2026-09-27 | "table" |
+
+The reading read "grab him" as `take`, so it supports the table. That fault is in the
+regex. `_THING` searched for a noun phrase anywhere after the verb and found the table
+after "over". The object now has to start where the verb ends (`_OBJECT`, the way
+Inform's grammar lines place the noun token after the verb). A pronoun there is a
+person. "Fight" and its kin joined the stop-list. Bare "pick" before a lock, a pocket
+or a fight is not a pick-up, which also covers "I pick the lock on her door" from the
+battery above. Of the 40 distinct player sentences in the recordings, the detector gave
+something for 2 before (both wrong) and for none after. `tests/test_pick_a_fight.py`
+holds the measurement.

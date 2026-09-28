@@ -382,6 +382,20 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     return kept, dropped
 
 
+# The acts under which the player can come away holding something. One set for both
+# doors that make a give to the player: the plan's (`drop_unread_gifts`) and the
+# detector's (`judgement.inject_goods`).
+GETTING_ACTS = frozenset({"give", "take", "buy", "steal", "gather", "sell"})
+
+
+def gets_nothing(frame: dict | None) -> bool:
+    """Whether a reading exists and none of its acts can leave the player holding
+    anything. False when there is no reading to judge by — the regex decides then."""
+    if not frame or frame.get("error"):
+        return False
+    return not ({a.get("act") for a in frame.get("actions") or []} & GETTING_ACTS)
+
+
 def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
     """(the plan's intents, the gives dropped). A `give` to the player that no act of the
     reading asked for is the model conjuring: goods are open (rules/goods.py), so a give
@@ -391,8 +405,7 @@ def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
     only gives to the player; a give the player makes to somebody else is left alone."""
     if not isinstance(raw, list) or not frame or frame.get("error"):
         return (raw if isinstance(raw, list) else []), []
-    acts = {a.get("act") for a in frame.get("actions") or []}
-    if acts & {"give", "take", "buy", "steal", "gather", "sell"}:
+    if not gets_nothing(frame):
         return raw, []
     kept, dropped = [], []
     for r in raw:
