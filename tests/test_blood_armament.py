@@ -323,3 +323,45 @@ def test_the_unarmed_strike_wears_the_armament_automatically():
     assert w["name"] == "unarmed strike (blood armament)"
     pc.remove_condition("blood armament")
     assert pc.weapon(None).get("granted_by") is None
+
+
+def test_every_armed_punch_of_a_full_attack_rolls_its_own_fist_die():
+    """The rider die lived on the same shelf as sneak attack and leaked the same way:
+    parked in the attack state to survive the popups, never cleared when the swing
+    ended, so the second punch of a full attack reused the first one's fist die and the
+    player was asked for it once. Measured 2026-09-27 on the sneak dice (one "Sneak
+    attack (4d6)" roll, "+13" on both hits); this is the rider half of the same fix.
+
+    An 8th-level bender has two swings. The fist popups are answered 3, then 9, so a
+    reused total cannot pass for a fresh one."""
+    scene = Scene()
+    scene.add(_bender(level=8))
+    thug = instantiate("thug", scene=scene, name="the thug")
+    thug.hp = thug.hp_base = 400          # it must outlast both punches
+    scene.add(thug)
+    e = Engine(scene, dice=Dice(seed=11))
+    e.run(e.validate([{"op": "begin_encounter",
+                       "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+    _use(e)
+    while scene.current_ref() != "pc":
+        scene.advance_turn()
+    assert scene.actors["pc"].attack_sequence("armed punch", True) == [0, 1]
+
+    res = e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                             "params": {"weapon": "armed punch", "full_attack": True},
+                             "because": "test"}]))
+    fist_faces = iter([3, 9])
+    asked = []
+    for _ in range(12):
+        if res.awaiting is None:
+            break
+        label = res.awaiting["label"]
+        asked.append(label)
+        count, faces, _flat = e.dice.parse(str(res.awaiting.get("die") or "1d20"))
+        res = e.resume(next(fist_faces) if label.startswith("Fist die")
+                       else 19 if (count, faces) == (1, 20) else count)
+    assert res.awaiting is None, asked
+    assert sum(l.startswith("Fist die") for l in asked) == 2, asked
+    rolls = [r for o in res.outcomes for r in o.rolls]
+    added = [m.value for r in rolls for m in r.modifiers if "fist die" in m.source]
+    assert added == [3, 9], added
