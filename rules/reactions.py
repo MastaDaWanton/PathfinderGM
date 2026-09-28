@@ -151,12 +151,7 @@ def _reach_of(actor) -> int:
     threaten at all. Left out because it would silently disarm every monster in the
     bestiary, none of which carry the feat.
     """
-    from . import weapons as weapons_mod
-
-    natural = gridmod.natural_reach(actor.size)
-    if weapons_mod.has_trait(actor.equipped or "", "reach"):
-        return natural * 2
-    return natural
+    return reach_with(actor, actor.equipped)[0]
 
 
 def reach_gap(actor) -> bool:
@@ -165,9 +160,26 @@ def reach_gap(actor) -> bool:
     True only for a reach weapon. A creature with natural reach — an ogre — threatens
     everything out to ten feet including what is under its nose.
     """
+    return reach_with(actor, actor.equipped)[1]
+
+
+def reach_with(actor, weapon_key: str | None) -> tuple[int, bool]:
+    """(reach in feet, whether the adjacent squares are out of it) for a swing made with
+    this weapon — `None` for the body alone.
+
+    The one rule behind both questions the board asks of a melee blow: what a creature
+    threatens on somebody else's turn (`_reach_of`, with the weapon in hand) and whether
+    the blow it declares on its own turn can land at all (`Engine._reach_refusal`, with
+    the weapon it named — a glaive-wielder who punches has a fist's reach, not the
+    glaive's). Written once so the attack of opportunity and the attack cannot disagree
+    about how far a glaive goes.
+    """
     from . import weapons as weapons_mod
 
-    return weapons_mod.has_trait(actor.equipped or "", "reach")
+    natural = gridmod.natural_reach(actor.size)
+    if weapon_key and weapons_mod.has_trait(weapon_key, "reach"):
+        return natural * 2, True
+    return natural, False
 
 
 def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, Reaction]]:
@@ -198,9 +210,18 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
     left = set(gridmod.footprint(tuple(start), mover.size))
     arrived = set(gridmod.footprint(tuple(end), mover.size))
 
+    from . import states
+
     out: list[tuple[str, Reaction]] = []
     for ref, watcher in scene.actors.items():
         if ref == mover_ref or _allied(scene, ref, mover_ref):
+            continue
+        # A bystander is watching, not fighting, and joins a fight only by joining it
+        # (`Engine.join_fight`, or a blow of their own). Measured 2026-09-27, the day
+        # creatures began closing to reach before they swing: the merchant beside the
+        # man in the apron took an attack of opportunity as he stepped in, knocked him
+        # unconscious, and was drawn into a fight the scene had kept him out of.
+        if watcher.has_state(states.BYSTANDER):
             continue
         # Squares this watcher threatened that the mover has now vacated. Comparing
         # against the squares it *left* rather than the ones it crossed is deliberate: the
@@ -222,5 +243,5 @@ def _allied(scene, a: str, b: str) -> bool:
     return False
 
 
-__all__ = ["Reaction", "TRIGGERS", "budget_for", "provoked_by_move", "reactions_for",
-           "threatens"]
+__all__ = ["Reaction", "TRIGGERS", "budget_for", "provoked_by_move", "reach_with",
+           "reactions_for", "threatens"]

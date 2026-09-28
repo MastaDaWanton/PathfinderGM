@@ -1540,10 +1540,23 @@ def default_npc_action(scene, ref: str) -> list[dict] | None:
     # The most hurt enemy still standing: a creature that has been fighting knows who is
     # nearly down.
     target = min(enemies, key=lambda r: scene.actors[r].hp)
-    return [{
+    swing = {
         "op": "attack", "actor": ref, "target": target,
         "because": "it is in a fight and there is someone in front of it",
-    }]
+    }
+    # Out of reach, it closes first. Since 2026-09-27 the engine refuses a melee blow
+    # from further than the attacker reaches, and this bare swing from a foe laid at
+    # `near` — fifteen feet, the default — was refused every round: the creature "held
+    # back" for the whole fight, which is the bug this fallback exists to end. The move
+    # is a declared intent like any other, validated, told, and provoking as it goes.
+    from rules import position as position_mod
+
+    closing = position_mod.closing_move(scene, actor, scene.actors[target],
+                                        actor.equipped or "unarmed")
+    if closing is not None:
+        move, arrives = closing
+        return [move, swing] if arrives else [move]
+    return [swing]
 
 
 def _quote(text: str, limit: int = 120) -> str:

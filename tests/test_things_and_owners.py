@@ -24,6 +24,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 @pytest.fixture
@@ -59,6 +60,7 @@ def test_a_destroyed_weapon_leaves_fragments_at_the_spot_owned_by_its_wielder(ri
     engine.run(engine.validate([{"op": "begin_encounter",
                                  "params": {"sides": {"pc": ["pc", thug.ref],
                                                       "them": [challenger.ref]}}}]))
+    face_to_face(ring, thug.ref, challenger.ref)   # the fight lays them fifteen feet apart
     out, _ = _sunder_until_destroyed(engine, ring, thug.ref, challenger.ref)
     lying = ring.props_here()
     assert len(lying) == 1

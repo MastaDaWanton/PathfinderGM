@@ -151,9 +151,28 @@ def test_a_creature_the_GM_cannot_speak_for_still_swings(scene):
         {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
     ], origin="author:test"))
     fallback = judgement.default_npc_action(scene, "c1")
-    assert fallback and fallback[0]["op"] == "attack"
-    assert fallback[0]["target"] == "pc"
+    assert fallback and fallback[-1]["op"] == "attack"
+    assert fallback[-1]["target"] == "pc"
     engine.validate(fallback, origin="author:test")              # the fallback is not exempt from validation
+
+
+def test_a_fallback_out_of_reach_closes_before_it_swings(scene):
+    """Measured 2026-09-27, the day a melee blow began to need reach: the fight lays the
+    thug fifteen feet off, the bare fallback swing was refused at validate every round,
+    and the creature "held back" for the whole fight — the bug this fallback was written
+    to end. It declares the move that closes the distance, and the move is a real one:
+    validated, resolved, and the swing that follows lands from within reach."""
+    engine = Engine(scene, Dice(seed=8))
+    engine.run(engine.validate([
+        {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
+    ], origin="author:test"))
+    assert scene.distance_between("c1", "pc") == 15
+    fallback = judgement.default_npc_action(scene, "c1")
+    assert [r["op"] for r in fallback] == ["move", "attack"]
+    res = engine.run(engine.validate(fallback, origin="author:test"))
+    assert scene.distance_between("c1", "pc") == 5
+    swing = res.outcomes[-1]
+    assert swing.op == "attack" and swing.status != "refused" and swing.rolls
 
 
 def test_the_fallback_picks_the_most_hurt_enemy(scene):
@@ -165,7 +184,7 @@ def test_the_fallback_picks_the_most_hurt_enemy(scene):
         "params": {"sides": {"them": ["c1"], "pc": ["pc", other.ref]}},
     }], origin="author:test"))
     scene.get("pc").hp = 2
-    assert judgement.default_npc_action(scene, "c1")[0]["target"] == "pc"
+    assert judgement.default_npc_action(scene, "c1")[-1]["target"] == "pc"
 
 
 def test_there_is_no_fallback_for_a_creature_that_cannot_act(scene):

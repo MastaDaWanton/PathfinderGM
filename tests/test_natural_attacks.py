@@ -29,6 +29,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 BITE = {"key": "bite", "name": "bite", "type": "piercing", "count": 1,
         "damage": {"tiny": "1d3", "small": "1d4", "medium": "1d6", "large": "1d8"}}
@@ -78,6 +79,7 @@ def _bite_until_it_lands(e, s, foe, tries=25):
     pending roll back on the outcome.
     """
     _run(e, "begin_encounter", {"sides": {"us": ["pc"], "them": [foe.ref]}})
+    face_to_face(s, "pc", foe.ref)
     for _ in range(tries):
         res = _run(e, "attack", {"weapon": "bite"}, target=foe.ref)
         for _ in range(6):
