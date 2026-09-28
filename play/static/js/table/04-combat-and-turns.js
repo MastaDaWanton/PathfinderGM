@@ -87,6 +87,11 @@ async function commitTurn(endOnly) {
     actions.push({ op: "use_ability", params: { ability: f }, target: COMBAT.target });
     said.push(`free: ${f}`);
   }
+  // Cleared as the spoken turn clears it. A refusal ("…15 ft away… Click square 6,8…")
+  // is a normal step since strikes need reach, and it stayed on the page under the
+  // turn that had just followed its advice (live run, 2026-09-28).
+  $("#err").textContent = "";
+  $("#err").className = "";
   busy(true);
   try {
     const d = await post("/api/combat/act", {

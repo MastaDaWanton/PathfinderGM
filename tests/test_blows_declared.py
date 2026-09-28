@@ -39,9 +39,13 @@ def test_a_blow_the_plan_declares_is_rolled_before_the_prose(table):
     res = e.run(e.validate([{"op": "attack", "actor": thug.ref, "target": "pc",
                              "because": "he will not be laughed at"}]))
     assert s.in_encounter
-    assert [o.op for o in res.outcomes] == ["attack", "attack"]
+    # He came in `near` and stands fifteen feet off (people keep their square, the
+    # ruling of 2026-09-28), so the blow comes after the move that closes it — a
+    # declared move, not a blow from across the room (tests/test_maneuver_reach.py).
+    assert [o.op for o in res.outcomes] == ["attack", "move", "attack"]
     assert "Battle is joined" in res.outcomes[0].tell
-    assert thug.name in res.outcomes[1].tell and "Battle is joined" not in res.outcomes[1].tell
+    assert thug.name in res.outcomes[2].tell and "Battle is joined" not in res.outcomes[2].tell
+    assert res.outcomes[2].rolls and s.distance_between(thug.ref, "pc") == 5
 
 
 def test_the_players_own_first_swing_still_waits_for_their_dice(table):
@@ -57,8 +61,9 @@ def test_struck_first_is_one_blow_not_two(table):
     two runs would have been two blows."""
     s, e, thug = table
     outs = e.struck_first(thug.ref)
-    assert [o.op for o in outs] == ["attack", "attack"]
-    assert sum("Battle is joined" not in o.tell for o in outs) == 1
+    # The move between is his lunge closing the fifteen feet he stood off.
+    assert [o.op for o in outs] == ["attack", "move", "attack"]
+    assert sum("Battle is joined" not in o.tell for o in outs if o.op == "attack") == 1
 
 
 def test_the_declared_weapon_is_the_one_rolled(table):

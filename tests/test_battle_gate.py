@@ -23,6 +23,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 @pytest.fixture
@@ -73,6 +74,9 @@ def test_a_swing_inside_a_running_fight_resolves(scene):
     engine = Engine(scene, Dice(seed=5))
     engine.run(engine.validate([
         {"op": "attack", "actor": "pc", "target": "c1", "because": "she swings"}]))
+    # The fight lays the thug fifteen feet off; a swing from there is refused and the
+    # square to step to named (test_maneuver_reach.py). This test is about the gate.
+    face_to_face(scene)
     res = engine.run(engine.validate([
         {"op": "attack", "actor": "pc", "target": "c1", "because": "round one"}]))
     assert scene.awaiting and scene.awaiting["die"] == "1d20"

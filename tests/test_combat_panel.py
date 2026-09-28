@@ -12,6 +12,7 @@ import pytest
 from django.test import Client, override_settings
 
 from rules.sheet import load_pc
+from tests._board import face_to_face
 
 
 @pytest.fixture
@@ -49,6 +50,14 @@ def fight(tmp_path):
         cm._LIVE.clear()
 
 
+def _at_arms_length(cm):
+    """The thug came in `near` and stands fifteen feet off, and a strike from there is
+    refused with the square to step to (test_maneuver_reach.py). The swing tests stand
+    him close."""
+    face_to_face(cm.current().scene)
+    cm.current().save()
+
+
 def _act(client, actions, label="", end_turn=True):
     return client.post("/api/combat/act",
                        data=json.dumps({"actions": actions, "label": label,
@@ -78,6 +87,7 @@ def test_a_strike_suspends_into_the_players_own_roll(fight):
     """The PC rolls their own to-hit: the attack suspends, the panel's response carries
     `awaiting`, and the existing dice popup answers it — one roll pipeline, not two."""
     client, cm = fight
+    _at_arms_length(cm)
     r = _act(client, [{"op": "attack", "target": "c1", "params": {}}],
              label="Strike the thug")
     assert r.status_code == 200
@@ -89,6 +99,7 @@ def test_a_strike_suspends_into_the_players_own_roll(fight):
 
 def test_answering_the_roll_finishes_the_turn_and_the_thug_answers_back(fight):
     client, cm = fight
+    _at_arms_length(cm)
     _act(client, [{"op": "attack", "target": "c1", "params": {}}], label="Strike")
     guard = 0
     while cm.current().scene.awaiting and guard < 8:
@@ -111,6 +122,7 @@ def test_a_stated_iteration_swings_at_its_own_penalty(fight):
     arrive one op each and must keep their -5: a mixed full attack whose swings all
     rolled at full BAB would be the panel quietly buffing the class it was built for."""
     client, cm = fight
+    _at_arms_length(cm)
     pc = cm.current().scene.pc()
     pc.flat_attack = None
     pc.level = 8                              # BAB +8/+3 as a monk-BAB stand-in
@@ -150,6 +162,7 @@ def test_not_your_turn_runs_the_turns_it_is_waiting_on(fight):
     a request ending with the turn parked on an NPC.
     """
     client, cm = fight
+    _at_arms_length(cm)
     scene = cm.current().scene
     while scene.current_ref() == "pc":
         scene.advance_turn()

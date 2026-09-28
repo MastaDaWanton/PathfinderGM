@@ -683,6 +683,15 @@ MANEUVER_ALIASES = {
     "run over": "overrun", "trip attack": "trip", "disarm attack": "disarm",
 }
 
+# The manoeuvres made WITH the weapon, and so at the weapon's reach: "in place of a melee
+# attack" (Core Rulebook p.198-201), and the whip and the guisarme carry the trip and
+# disarm qualities precisely so they can be tripped and disarmed with at ten feet. Every
+# other manoeuvre is the body's — a shove, a grab, a pocket picked, sand in the eyes — and
+# reaches as far as the body does. Every one of them needs its target within that reach:
+# the engine has no charge, and an overrun's "during your move" is the move op before it.
+# Kept beside the table rather than as a key in each row so the rows stay the book's.
+MANEUVERS_WITH_THE_WEAPON = frozenset({"disarm", "sunder", "trip"})
+
 # Order of size categories, for the "no more than one size category larger" limit.
 SIZE_ORDER = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
               "gargantuan", "colossal")

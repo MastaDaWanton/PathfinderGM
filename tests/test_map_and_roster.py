@@ -85,30 +85,82 @@ def test_the_ground_stays_when_the_fight_ends(table):
     assert "self.grid = None" not in src
 
 
-def test_a_fight_still_lays_out_its_own_combatants(table):
-    """The geometry that is load-bearing. A zone word and a stated distance are claims
-    about the FIGHT — "I loose an arrow at him from 200 feet" — and an idle position from
-    standing about in the room is not. Measured the hour the map became permanent: with
-    everyone pre-placed on arrival the bowshot opened at forty feet, because the layout
-    skips anybody who already has a square."""
+def test_a_fight_moves_nobody_who_is_already_standing_somewhere(table):
+    """The user's ruling, 2026-09-28: "people should already be in the scene which means
+    they should already have a place on the board that shouldn't change unless they
+    move." This test used to pin the opposite — the fight popped every combatant's square
+    and laid them out afresh by zone — and measured live the same day, the man the player
+    was standing beside was moved fifteen feet off by the act of swinging at him.
+
+    What the old rule protected still holds, from the other end: a stated distance is
+    placed where it is stated, on arrival, so a bowshot opens at forty feet ("far")
+    because the archer arrived at forty feet, not because the fight put him there."""
     scene, engine = table
     engine.place_party(MARKET)
     foe = instantiate("watchman", scene=scene, name="the watchman")
     scene.add(foe, zone="far")
-    # As the real arrivals do: `promote_cast` and `Engine._bring_in` place a newcomer by
-    # their zone when there is ground, which there now always is.
-    scene.place_by_zone([foe.ref])
-    assert scene.positions.get(foe.ref) is not None, "standing somewhere before the fight"
+    stood = scene.positions.get(foe.ref)
+    assert stood is not None, "standing somewhere from the moment he came in"
+    assert scene.distance_between("pc", foe.ref) == 40
+    mine = scene.positions["pc"]
     engine.run(engine.validate([{"op": "begin_encounter", "because": "the arrow",
                                  "params": {"sides": {"pc": ["pc"], "them": [foe.ref]}}}]))
+    assert scene.positions[foe.ref] == stood and scene.positions["pc"] == mine
     assert scene.distance_between("pc", foe.ref) == 40, "far is far, and the fight says so"
     src = inspect.getsource(Engine._lay_battlefield)
-    assert "self.scene.positions.pop(ref, None)" in src
+    assert "positions.pop" not in src, "the fight re-lays nobody who has a square"
+
+
+def _opening(who: str):
+    """A fresh campaign whose opening person is `who` — the table is rolled per seed."""
+    from play import campaign as cm
+
+    for seed in range(1, 200):
+        c = cm.new_campaign(seed=seed)
+        if any(a.name == who for a in c.scene.actors.values()):
+            return c
+    raise AssertionError(f"no seed opens on {who!r}")
+
+
+def test_the_person_the_scene_introduces_stands_somewhere_from_the_start():
+    """Measured 2026-09-28 on a fresh campaign: the map was laid and the player stood at
+    (4,8), and the foreman the scene introduced had no square at all — the ground went
+    down before he arrived and nothing placed arrivals. The first swing at him had the
+    fight invent a square fifteen feet off. People in the scene have a place on the
+    board; the fight does not make one up."""
+    c = _opening("the foreman with the tally board")
+    ref = next(r for r, a in c.scene.actors.items() if not a.is_pc)
+    stood = c.scene.positions.get(ref)
+    assert stood is not None, "introduced by the scene and standing nowhere"
+    e = c.engine()
+    e.run(e.validate([{"op": "attack", "actor": "pc", "target": ref, "because": "t"}]))
+    assert c.scene.in_encounter
+    assert c.scene.positions[ref] == stood, "the swing moved him"
+
+
+@pytest.mark.parametrize("who", ["the stranger sharing the step",
+                                 "the neighbour beside you who knows the words"])
+def test_the_opening_person_beside_you_is_beside_you(who):
+    """Both were added `near` whatever their description said, and stood fifteen feet off
+    — "sharing the step" is one of the engine's own `engaged` cues. Their zone is read
+    from their description now, by the cues the prose is read by."""
+    c = _opening(who)
+    ref = next(r for r, a in c.scene.actors.items() if a.name == who)
+    assert c.scene.zones[ref] == "engaged"
+    assert c.scene.distance_between("pc", ref) == 5
+
+
+def test_somebody_added_to_a_mapped_room_gets_a_square_as_they_arrive(table):
+    scene, engine = table
+    engine.place_party(MARKET)
+    late = scene.add(instantiate("guildhand", scene=scene, name="the latecomer"),
+                     zone="engaged")
+    assert scene.distance_between("pc", late.ref) == 5
 
 
 def test_a_bystander_keeps_where_they_were_standing(table):
-    """The other half of the same rule: the fight lays out the fight, and the room keeps
-    the rest of the room."""
+    """The same rule for the rest of the room: the fight moves nobody, and the people
+    who are not in it keep where they were standing."""
     scene, engine = table
     engine.place_party(MARKET)
     watcher = instantiate("guildhand", scene=scene, name="the merchant")

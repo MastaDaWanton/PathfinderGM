@@ -46,13 +46,25 @@ Making the map permanent broke fourteen tests. Three were real:
    is the fight's door.
 3. **The fight stopped laying out its own combatants**, because the layout skips anybody
    who already has a square — so a stated "I loose an arrow at him from 200 feet" opened at
-   forty. A fight now clears and re-lays its combatants' positions.
+   forty. A fight then cleared and re-laid its combatants' positions.
 
-The third is a real trade, taken deliberately: a zone word and a stated distance are claims
-about the **fight**, and an idle position from standing about in the room is not. Bystanders
-keep where they were standing; the fight lays out the fight. The nicety of "the man at the
-counter is still at the counter when the brawl starts" is lost for combatants and kept for
-everybody else.
+**Reversed 2026-09-28, by the user's ruling:** *"people should already be in the scene which
+means they should already have a place on the board that shouldn't change unless they
+move."* The re-lay traded away more than the note above admitted: measured live, the man
+the player was standing beside was moved fifteen feet off by the act of swinging at him, and
+once melee needed reach that cost the player's first turn of every fight. Worse, in a fresh
+campaign the person the scene introduced had **no square at all** — the ground was laid
+before they arrived and nothing placed arrivals — so the fight was inventing positions, not
+re-laying them.
+
+So now: `Scene.add` gives anybody who comes into a mapped scene their square at once, by
+their zone, measured from the player; `lay_the_ground` places any straggler on a map that
+already exists; and `_lay_battlefield` keeps every square it finds and lays only the
+unplaced (from the player's real square, or on fresh ground in columns). The bowshot is
+answered where the claim is made: a spawn with a stated distance is placed *at* that
+distance as it arrives. The opening person's zone is read from their own description by the
+prose cues (`judgement.zone_of_mention`) — "the stranger sharing the step" is beside you.
+Pinned by `test_a_fight_moves_nobody_who_is_already_standing_somewhere`.
 
 ## Who this place would hold
 

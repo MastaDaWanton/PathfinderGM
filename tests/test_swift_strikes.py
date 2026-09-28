@@ -13,6 +13,7 @@ from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, IntentError, Scene
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._board import face_to_face
 
 
 def _bender(level=1):
@@ -31,6 +32,7 @@ def _fight():
     e = Engine(scene, dice=Dice(seed=7))
     e.run(e.validate([{"op": "begin_encounter",
                        "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+    face_to_face(scene)
     return scene, e
 
 
@@ -109,5 +111,6 @@ def test_a_character_without_the_passive_never_doubles():
     e = Engine(scene, dice=Dice(seed=7))
     e.run(e.validate([{"op": "begin_encounter",
                        "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}]))
+    face_to_face(scene)
     _attack(e)
     assert _swings(_attack(e)) == 1

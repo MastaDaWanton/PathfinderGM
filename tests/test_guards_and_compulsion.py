@@ -300,7 +300,7 @@ def test_damage_is_untouched_when_nobody_is_guarding():
 def test_a_compulsion_penalises_and_never_prohibits():
     """The design decision this half of the file exists for. A compelled creature may
     always swing at whoever it likes; doing so is just worse."""
-    s, e = board()
+    s, e = board(foe_at=(7, 5))          # the raider beside the one he swings at
     e.run(e.validate([{"op": "compel", "actor": "pc", "because": "a taunt",
                        "params": {"to": "c2"}}], origin="author:test"))
     # Not an error, not a refusal — the attack validates and resolves.
@@ -329,7 +329,7 @@ def test_defying_one_costs_its_penalty():
 def test_the_penalty_reaches_the_attack_roll():
     """Charged in the engine rather than in `attack_modifiers`, because the penalty
     depends on who is being attacked and the sheet does not know that."""
-    s, e = board()
+    s, e = board(foe_at=(7, 5))          # the raider beside the one he swings at
     compulsion.add(s.actors["c2"], by="pc", penalty=4, source="a taunt")
     res = e.run(e.validate([{"op": "attack", "actor": "c2", "target": "c1",
                              "because": "defying it", "params": {"full_attack": False}}], origin="author:test"))

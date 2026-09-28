@@ -534,6 +534,9 @@ def test_displacement_is_a_miss_chance_and_not_an_armour_bonus():
 
     # And it is actually rolled: over twenty swings from twenty seeds, some are lost to
     # the miss chance and say so.
+    # The fight opened first: the gate defers a swing that opens one. `table` stood the
+    # two side by side, and the fight leaves them there.
+    engine._ensure_encounter("c1")
     lost = 0
     for seed in range(20):
         e = Engine(scene, Dice(seed=seed))

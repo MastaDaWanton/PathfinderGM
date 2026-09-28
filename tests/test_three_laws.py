@@ -575,6 +575,7 @@ def test_the_scrubber_knows_what_the_dice_already_decided():
     from rules.engine import Engine, Scene
     from rules.intents import claims_the_engine_backs, find_outcome_claims
     from rules.sheet import load_pc
+    from tests._board import face_to_face
 
     def swing(seed):
         scene = Scene(location_id="5bbd0c40345f")
@@ -584,6 +585,7 @@ def test_the_scrubber_knows_what_the_dice_already_decided():
         intent = [{"op": "attack", "actor": "pc", "target": "c1",
                    "visibility": "hidden", "because": "she swings", "params": {}}]
         engine.run(engine.validate(intent, origin="author:test"))        # the battle gate opens the fight
+        face_to_face(scene)                    # and lays him fifteen feet off; stand close
         return engine.run(engine.validate(intent, origin="author:test"))
 
     found = {}

@@ -27,6 +27,7 @@ from rules.dice import Dice
 from rules.engine import Engine, IntentError, Scene
 from rules.intents import parse
 from rules.sheet import from_dict, load_pc, to_dict
+from tests._board import face_to_face
 
 
 def _fight(pc=None, seed=5):
@@ -36,6 +37,9 @@ def _fight(pc=None, seed=5):
     engine = Engine(scene, Dice(seed=seed))
     engine.run(engine.validate([{"op": "begin_encounter",
                                  "params": {"sides": {"you": ["pc"], "them": ["c1"]}}}]))
+    # Within reach: a melee blow at somebody across the room is refused since the
+    # reach rule (tests/test_maneuver_reach.py), and these tests are about the blow.
+    face_to_face(scene)
     return scene, engine
 
 

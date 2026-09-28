@@ -464,6 +464,16 @@ class Scene:
             self.positions[actor.ref] = (
                 (int(at[0]), int(at[1])) if len(at) < 3
                 else (int(at[0]), int(at[1]), int(at[2])))
+        elif self.grid is not None and not actor.is_pc:
+            # Somebody who comes into a room with a map stands somewhere on it, from the
+            # moment they come in. The user's ruling, 2026-09-28: "people should already
+            # be in the scene which means they should already have a place on the board
+            # that shouldn't change unless they move." Measured the same day: in a fresh
+            # campaign the foreman the scene introduced had no square at all — the ground
+            # was laid before he arrived and nothing placed arrivals — so the first swing
+            # at him had the fight invent one, fifteen feet off. `place_by_zone` measures
+            # from the player's real square, and does nothing while they have none.
+            self.place_by_zone([actor.ref])
         # The mark only ever rises. Loading a save, spawning, promoting a cast entry all
         # come through here, so a save from before the mark existed heals itself to the
         # highest ref it holds on the first load.
@@ -1866,10 +1876,18 @@ class Engine:
         # tavern where the dockhands drink" could not become "found it, and walk in" in
         # one plan: validation refused the travel to a place that did not exist yet.
         self._planned_places: set[str] = set()
+        # Who an earlier intent in this list moves. The same problem as `pending`, for
+        # squares instead of refs: the combat panel posts "move to (6,10), strike the
+        # thug" as one list, and a reach check asked of the board as it stands would
+        # refuse the strike for the fifteen feet the move is about to close. Those
+        # swings are left to the floor in `_op_attack`, which asks after the move.
+        moved: set[str] = set()
         for i, intent in enumerate(intents):
             self._check_refs(intent, i, extra=pending | introduced)
-            self._check_legality(intent, i)
+            self._check_legality(intent, i, moved=moved)
             self._force_visibility(intent)
+            if intent.op == "move":
+                moved.add(str(intent.params.get("who") or intent.actor or ""))
             if intent.op == "introduce":
                 # One introduce per plan, with `count` for a group. An op that is always
                 # on offer gets over-used: Labyrinth's state-only planner "calls state
@@ -2085,7 +2103,8 @@ class Engine:
                 f"{intent.op}: unknown ref {frm!r} in params.from", "refs", index
             )
 
-    def _check_legality(self, intent: Intent, index: int) -> None:
+    def _check_legality(self, intent: Intent, index: int,
+                        moved: set[str] | frozenset[str] = frozenset()) -> None:
         # The cheap facts, asked HERE so the model gets its retry with the list in
         # hand. Stage 7 measured that a refusal raised at resolution reaches nobody who
         # can act on it — `_advance` catches it once, answers 502, and pops the
@@ -2382,6 +2401,28 @@ class Engine:
                         f"attack: {defender.name} is already "
                         f"{m['condition']}", "legality", index,
                     )
+            # Reach, asked here so the model gets its retry with the square to step
+            # to in hand. Unless this list moves one of them first — then only the
+            # board after the move can answer, and the floor in `_op_attack` does.
+            # Only where a blow will actually land: inside a running fight, or a coup
+            # de grace, which resolves on the spot with no fight (a sleeping guard). A
+            # swing that opens a fight rolls nothing — it joins battle and defers — so
+            # that blow is declared, and measured, on the attacker's first turn.
+            # Nor while the target is still a question: with `undecided` parked, the
+            # ref is a placeholder and `_op_attack` asks "which of them?" — the
+            # distance to somebody nobody chose is not the refusal to print.
+            targets = intent.targets()
+            defender = self.scene.get(targets[0]) if targets else None
+            if defender is not None \
+                    and (self.scene.in_encounter or intent.params.get("coup_de_grace")) \
+                    and not intent.params.get("undecided") \
+                    and not ({intent.actor, defender.ref} & set(moved)):
+                why = self._reach_refusal(intent, actor, defender, key)
+                if why:
+                    raise IntentError(
+                        f"attack: {why}", "legality", index,
+                        for_a_person=self._reach_refusal(intent, actor, defender, key,
+                                                         voice="person"))
 
     # --- Running --------------------------------------------------------------------
 
@@ -2426,10 +2467,22 @@ class Engine:
                    else None)
         if holding != ref:
             return resolution
+        # He lunged: if he stands out of reach, the lunge is the move that closes it,
+        # then the blow — declared, told, provoking as it goes, never a silent shift of
+        # where he stands. Too far for one move, the blow is the loop's to decide, and
+        # he is not rolled a swing he could not have landed.
+        from . import position as position_mod
+
+        params = dict(opened.get("params") or {})
+        closing = position_mod.closing_move(
+            self.scene, a, self.scene.actors[target],
+            params.get("weapon") or a.equipped or "unarmed")
+        if closing is not None and not closing[1]:
+            return resolution
         try:
-            blow = self.validate([{"op": "attack", "actor": ref, "target": target,
-                                   "because": f"{a.name} struck first",
-                                   "params": dict(opened.get("params") or {})}])
+            blow = self.validate(([closing[0]] if closing is not None else []) + [
+                {"op": "attack", "actor": ref, "target": target,
+                 "because": f"{a.name} struck first", "params": params}])
         except (IntentError, ValueError, KeyError):
             return resolution
         self._battle_joined = False
@@ -3735,6 +3788,21 @@ class Engine:
             asked = ", ".join(names[:-1]) + f" or {names[-1]}"
             return self._refuse(
                 intent, f"Which of them — {asked}? Say who, and the blow follows.")
+        weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
+        # The floor under validate's reach check, for the lists it could not answer: a
+        # move earlier in the list that fell short, a push that put the target out of
+        # reach, an attack of opportunity that dropped the mover before they arrived.
+        # Printed, not raised — by now nobody is listening for a retry. Asked before
+        # anybody is drawn in: a blow that cannot land does not make a bystander a
+        # combatant. And only where a blow will land now: inside a running fight, or a
+        # coup de grace (resolved on the spot, fight or none). A swing that opens a
+        # fight is deferred below and rolls nothing, so there is no blow to measure.
+        if (partial.get("attack_state") is None and not self._battle_joined
+                and (self.scene.in_encounter or intent.params.get("coup_de_grace"))):
+            out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
+                                               voice="tell")
+            if out_of_reach:
+                return self._refuse(intent, out_of_reach)
         # A blow given or taken ends being a bystander. The one place besides
         # `join_fight` that lifts the tag, and it lifts it BEFORE the encounter forms so
         # the sides are drawn with both of them in.
@@ -3809,7 +3877,6 @@ class Engine:
                     because=intent.because)
         if not coup:
             self._ensure_encounter(intent.actor, intent.target)
-        weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
         # An improvised weapon IS the object: the tell names the chunk of wood, not
         # "improvised weapon", and the object leaves the hand for the ground below
@@ -4267,6 +4334,81 @@ class Engine:
             tell=" ".join(state["tells"]) + self._hp_state_tell(crossed),
             because=intent.because,
         )
+
+    def _reach_refusal(self, intent: Intent, actor: Actor, defender: Actor,
+                       weapon_key: str, *, voice: str = "model") -> str:
+        """Why this melee blow cannot land from where the two of them stand, or "".
+
+        The measurement and its source are `position.out_of_reach`'s; this is the
+        sentence. Measured 2026-09-27: a disarm, a trip, a grapple and a plain rapier
+        thrust all resolved from fifteen feet.
+
+        What the refusal names is a SQUARE. The model plans in zones, and a
+        `move zone=engaged` on a mapped fight relabels the zone and leaves the body
+        where it stood — so "move first" alone is an instruction nobody can carry out.
+        The attacker is never moved here: closing the distance is their move action to
+        spend, or not.
+
+        Three readers, three sentences (`voice`). "model": the fix as a JSON move to
+        copy, for the repair loop. "tell": the printed floor's, the fault alone — a
+        tell is fed to the narrator, and a JSON move and a grid square in it are two
+        things the prose has no business repeating. "person": the combat panel shows
+        a refusal to the player directly, and the first live run put the JSON on the
+        page (2026-09-28); the square is named the way the map names it.
+        """
+        from . import position as position_mod
+
+        man = str(intent.params.get("manoeuvre") or "")
+        miss = position_mod.out_of_reach(self.scene, actor, defender, weapon_key,
+                                         manoeuvre=man,
+                                         thrown=bool(intent.params.get("thrown")))
+        if miss is None:
+            return ""
+        blow = (f"an {man}" if man[:1] in "aeiou" else f"a {man}") if man \
+            else "a melee attack"
+        # The table's own key ("glaive"), not its display name ("Glaive"), mid-sentence;
+        # a granted or natural weapon has no key there and is called what it is called.
+        if weapons_mod.has(weapon_key):
+            held = weapon_key
+        else:
+            try:
+                held = str(actor.weapon(weapon_key).get("name") or weapon_key)
+            except KeyError:
+                held = weapon_key
+        if miss.too_close:
+            fault = (f"{defender.name} is {miss.feet} ft from {actor.name}, inside the "
+                     f"{held}'s reach — a reach weapon cannot strike a foe beside you, "
+                     f"and {blow} with it needs them {miss.reach} ft off.")
+        else:
+            by = f" with the {held}" if miss.with_weapon and weapon_key != "unarmed" else ""
+            fault = (f"{actor.name} reaches {miss.reach} ft{by} and {defender.name} is "
+                     f"{miss.feet} ft away; {blow} needs them within reach.")
+        if voice == "tell":
+            return f"{_sentence(fault)} Nothing is rolled."
+        found = position_mod.square_in_reach(self.scene, actor, defender, miss.reach,
+                                             miss.gap)
+        if found is None:
+            return (f"{_sentence(fault) if voice == 'person' else fault} There is no "
+                    f"open square in reach of {defender.name} that {actor.name} can get "
+                    f"to. Take another action.")
+        (x, y), cost = found
+        step = (f'{{"op": "move", "actor": "{actor.ref}", "params": {{"square": '
+                f'[{x}, {y}]}}}}')
+        speed = int(getattr(actor, "speed_feet", 0) or 0)
+        far = self.scene.in_encounter and speed and cost > speed
+        if voice == "person":
+            if far:
+                return (f"{_sentence(fault)} The nearest square in reach, {x},{y}, is "
+                        f"{cost} ft away and {actor.name} moves {speed} ft: close in "
+                        f"this turn and strike on the next.")
+            return (f"{_sentence(fault)} Click square {x},{y} on the map to move there "
+                    f"({cost} ft), then strike.")
+        if far:
+            return (f"{fault} The nearest square in reach, [{x}, {y}], is {cost} ft away "
+                    f"by the open route and {actor.name} has {speed} ft of movement: "
+                    f"move toward them this turn and strike on the next.")
+        return (f"{fault} Move first — to square [{x}, {y}], {cost} ft — with {step} "
+                f"before the attack in the same list.")
 
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
@@ -5669,7 +5811,19 @@ class Engine:
         # been put anywhere yet — the map tray says so rather than drawing a blank field —
         # but a brawl still has to happen on ground, and `floorplan.for_place("")` falls
         # through to open ground the way every fight used to get.
-        if self.scene.grid is not None or not (self.scene.at or even_nowhere):
+        if self.scene.grid is not None:
+            # The ground is down already; anybody still standing nowhere on it is put
+            # at their zone now — a save from before arrivals were placed, a door that
+            # added somebody before the player had a square. Nobody who HAS a square is
+            # touched: it is theirs until they move (the ruling of 2026-09-28).
+            pc = self.scene.pc()
+            if place and pc is not None and pc.ref in self.scene.positions:
+                stragglers = [r for r in self.scene.actors
+                              if r != pc.ref and r not in self.scene.positions]
+                if stragglers:
+                    self.scene.place_by_zone(stragglers)
+            return False
+        if not (self.scene.at or even_nowhere):
             return False
         from . import floorplan, places as places_mod
 
@@ -9533,17 +9687,28 @@ class Engine:
         # alley is gone" — their narrow-room rule had been made unreachable by this app's
         # own floor — and this is the half of that fix which is not the floor.
         pc_side, foe_row = max(1, min(4, self.scene.grid.width // 4)), 0
-        # The fight lays out its own combatants, even where they were already standing.
+        # Everybody already standing somewhere keeps that square: a fight is a layer of
+        # initiative over the room, not a new room. The user's ruling, 2026-09-28:
+        # "people should already be in the scene which means they should already have a
+        # place on the board that shouldn't change unless they move." Foundry's combat
+        # tracker is the same shape — combatants are the tokens already on the canvas.
         #
-        # This is the one place the geometry is load-bearing: a zone word and a stated
-        # distance are claims about the fight ("I loose an arrow at him from 200 feet"),
-        # and an idle position from standing about in the room is not. Measured by the
-        # suite the hour the map became permanent: with everyone pre-placed on arrival the
-        # bowshot opened at forty feet, because the loop below skips anybody who already
-        # has a square. Bystanders keep where they were standing — they are the half of
-        # the room that is not the fight.
-        for ref in [r for refs in sides.values() for r in refs]:
-            self.scene.positions.pop(ref, None)
+        # This loop used to pop every combatant's square and lay them out afresh by
+        # zone, on the theory that a zone word is a claim about the fight and an idle
+        # position is not; the case behind it was a bowshot that opened at forty feet.
+        # That is answered where the claim is made instead — a spawn with a stated
+        # distance is placed AT that distance as it arrives (`_op_spawn`,
+        # `place_by_zone(feet=...)`), so nothing here has to re-lay anybody. And the
+        # re-lay did harm the other way: the man the player was standing beside was
+        # moved fifteen feet off by the act of swinging at him.
+        #
+        # Only the unplaced are laid. With the player already on the map, from the
+        # player's real square; on fresh ground, in the columns below.
+        pc = self.scene.pc()
+        if pc is not None and pc.ref in self.scene.positions:
+            for ref in [r for refs in sides.values() for r in refs
+                        if r in self.scene.actors and r not in self.scene.positions]:
+                self.scene.place_by_zone([ref], feet=self.scene.spawn_feet.get(ref))
         for side, refs in sides.items():
             has_pc = any(self.scene.actors[r].is_pc for r in refs
                          if r in self.scene.actors)

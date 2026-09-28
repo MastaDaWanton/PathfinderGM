@@ -12,6 +12,7 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 from rules.intents import IntentError, parse
 from rules.sheet import from_dict, load_pc
+from tests._board import face_to_face
 
 
 @pytest.fixture
@@ -26,8 +27,10 @@ def scene():
 def engine(scene):
     e = Engine(scene, Dice(seed=20260820))
     # The battle gate defers a swing that finds no fight running; every test here
-    # is about the manoeuvre itself, so the fight is already open.
+    # is about the manoeuvre itself, so the fight is already open — and at arm's
+    # length, since a manoeuvre from across the room is refused (test_maneuver_reach.py).
     e._ensure_encounter("pc")
+    face_to_face(scene)
     return e
 
 
@@ -151,6 +154,7 @@ def test_a_natural_one_always_fails_and_a_natural_twenty_always_succeeds(scene):
     """CRB p.199, and the reason verdict is not simply `total >= cmd`."""
     engine = Engine(scene, Dice(seed=3))
     engine._ensure_encounter("pc")
+    face_to_face(scene)
     res, _ = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"manoeuvre": "trip"}}], faces=[20])
     assert res.outcomes[0].verdict == "success"
@@ -237,6 +241,7 @@ def test_overrun_by_five_or_more_also_knocks_the_target_prone(scene):
     scene.pc().abilities["str"] = 20        # +5, enough to clear CMD 14 by 5 on a 14
     engine = Engine(scene, Dice(seed=5))
     engine._ensure_encounter("pc")
+    face_to_face(scene)
     res, _ = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"manoeuvre": "overrun"}}], faces=[20])
     assert res.outcomes[0].margin >= 5
@@ -249,6 +254,7 @@ def test_bull_rush_reports_the_extra_distance(scene):
     scene.pc().abilities["str"] = 20
     engine = Engine(scene, Dice(seed=5))
     engine._ensure_encounter("pc")
+    face_to_face(scene)
     res, _ = play(engine, [{"op": "attack", "actor": "pc", "target": "c1",
                             "params": {"manoeuvre": "bull rush"}}], faces=[20])
     assert "5 feet" in res.outcomes[0].tell
@@ -292,6 +298,11 @@ def test_a_manoeuvre_with_no_size_limit_is_allowed_against_anything(engine, scen
                    "hp": 90, "flat_ac": 20, "flat_attack": 12, "flat_cmd": 30},
                   ref="c2")
     scene.add(giant)
+    # Beside the player: a newcomer now stands at his zone from the moment he arrives,
+    # and a disarm from fifteen feet is refused for reach (test_maneuver_reach.py).
+    # A 3x3 body anchored here touches (4,10) diagonally and misses the thug at (5,10).
+    scene.positions["c2"] = (5, 11)
+    assert scene.distance_between("pc", "c2") == 5
     engine.validate([{"op": "attack", "actor": "pc", "target": "c2",
                       "params": {"manoeuvre": "disarm"}}])
 

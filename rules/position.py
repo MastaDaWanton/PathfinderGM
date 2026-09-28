@@ -36,8 +36,10 @@ The rules, with their sources, because two of the four are easy to misremember:
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from .dice import Modifier
-from .grid import distance_between, flanking
+from .grid import SQUARE_FT, distance_between, flanking
 
 # How far above a defender an attacker has to be before the ground counts as higher.
 # One square — five feet — because that is the smallest difference this engine can
@@ -244,6 +246,148 @@ def explain(scene, actor, defender, weapon: dict | None = None) -> str:
     return ", ".join(words)
 
 
+# --- Reach: whether the blow lands at all ------------------------------------------------
+#
+# The board's one question that is not a modifier. Measured 2026-09-27: `_ensure_encounter`
+# lays a foe with no zone at `near`, fifteen feet off, and from there a disarm, a trip, a
+# grapple and a plain rapier thrust all resolved, because nothing between the intent and
+# the dice asked how far away the target stood. "With a normal melee weapon, you can strike
+# any opponent within 5 feet" (Core Rulebook p.182, aonprd.com/Rules.aspx?ID=131), and a
+# manoeuvre made in place of a melee attack reaches no further (p.198).
+#
+# Asked here rather than in the engine because two doors need the same answer: the engine
+# refusing a declared blow (`Engine._reach_refusal`), and a creature's own turn composed
+# without a model (`judgement.default_npc_action`, `Engine.struck_first`) closing the
+# distance before it swings. Two copies of "how far does a glaive reach" would disagree
+# with each other the first time either was edited. Still nothing mutates.
+
+
+@dataclass(frozen=True)
+class OutOfReach:
+    """How a melee blow falls short: the gap, the reach, and why the reach is what it is."""
+    feet: int
+    reach: int
+    gap: bool             # a reach weapon, which cannot strike what is beside it
+    with_weapon: bool     # the reach is the weapon's, not the body's
+
+    @property
+    def too_close(self) -> bool:
+        return self.gap and self.feet <= SQUARE_FT
+
+
+def out_of_reach(scene, actor, defender, weapon_key: str | None,
+                 manoeuvre: str = "", thrown: bool = False) -> OutOfReach | None:
+    """None when this blow can land from where the two of them stand — or when the board
+    cannot say (no map, either of them off it: a distance nobody measured is not a
+    refusal), or when it is not a melee blow at all (a bow, a thrown knife).
+
+    A manoeuvre made with the weapon (`MANEUVERS_WITH_THE_WEAPON`: disarm, sunder,
+    trip) reaches as far as the weapon does, which is what a whip is for; every other
+    one is the body's and reaches as far as the body.
+    """
+    from . import reactions
+    from .tables import MANEUVERS_WITH_THE_WEAPON
+
+    if defender is None or actor is None or defender.ref == actor.ref:
+        return None
+    try:
+        weapon = actor.weapon(weapon_key) if weapon_key else {}
+    except KeyError:
+        weapon = {}
+    if not manoeuvre and (not _melee(weapon) or (
+            thrown and (weapon.get("range_ft") or weapon_key == "improvised"))):
+        return None
+    feet = scene.distance_between(actor.ref, defender.ref)
+    if feet is None:
+        return None
+    with_weapon = not manoeuvre or manoeuvre in MANEUVERS_WITH_THE_WEAPON
+    reach, gap = reactions.reach_with(actor, weapon_key if with_weapon else None)
+    miss = OutOfReach(feet, reach, gap, with_weapon)
+    if feet <= reach and not miss.too_close:
+        return None
+    return miss
+
+
+def square_in_reach(scene, actor, defender, reach: int,
+                    gap: bool = False) -> tuple[tuple[int, int], int] | None:
+    """The cheapest open square from which `actor` reaches `defender`, and what the walk
+    there costs in feet; None when there is none.
+
+    Walked with `Grid.reachable` over the same occupancy `Engine._check_move` refuses by,
+    so a square named here is one the move op will accept. Ties go to the square
+    squarest-on to the target — the first cut named the diagonal [6, 9] for a thug
+    straight ahead at [7, 10] — then the lower row and column, so the same board always
+    names the same square.
+    """
+    grid = getattr(scene, "grid", None)
+    start = scene.positions.get(actor.ref)
+    there = scene.positions.get(defender.ref)
+    if grid is None or start is None or there is None:
+        return None
+    level = tuple(start[2:3])
+    routes = grid.reachable(tuple(start[:2]), 10_000, size=actor.size,
+                            occupied=scene.occupied(ignore=actor.ref))
+    best = None
+    for square, cost in routes.items():
+        flat = tuple(square[:2])
+        feet = distance_between(flat + level, actor.size, there, defender.size)
+        if feet > reach or (gap and feet <= SQUARE_FT):
+            continue
+        rank = (cost, (flat[0] - there[0]) ** 2 + (flat[1] - there[1]) ** 2,
+                flat[1], flat[0])
+        if best is None or rank < best[0]:
+            best = (rank, flat, cost)
+    return None if best is None else (best[1], best[2])
+
+
+def closing_move(scene, actor, defender,
+                 weapon_key: str | None) -> tuple[dict, bool] | None:
+    """The move a creature makes toward `defender`, as a raw intent, and whether it ends
+    in reach — so a blow can follow it this turn. None when it is in reach already,
+    when the board cannot say, or when there is no open ground to cover.
+
+    Too far for one move, it goes as far as one move takes it toward them: a thug forty
+    feet off spends his turn crossing the room, which is what 1e has him do, rather than
+    standing still because the square he wanted was out of range.
+
+    For the turns the engine composes on a creature's behalf, never for a turn a model
+    or the player declared: those are refused with the square named, and closing the
+    distance stays theirs to choose. A fallback that swung from where it stood would
+    now be refused every round, and "holds back" at fifteen feet, for ever, is the bug
+    the fallback was written to end.
+    """
+    miss = out_of_reach(scene, actor, defender, weapon_key)
+    if miss is None:
+        return None
+    found = square_in_reach(scene, actor, defender, miss.reach, miss.gap)
+    speed = int(getattr(actor, "speed_feet", 0) or 0)
+    arrives = found is not None and not (speed and found[1] > speed)
+    if arrives:
+        square = found[0]
+    else:
+        start = scene.positions.get(actor.ref)
+        there = scene.positions.get(defender.ref)
+        grid = getattr(scene, "grid", None)
+        if grid is None or start is None or there is None or not speed:
+            return None
+        level = tuple(start[2:3])
+        routes = grid.reachable(tuple(start[:2]), speed, size=actor.size,
+                                occupied=scene.occupied(ignore=actor.ref))
+        here = distance_between(tuple(start), actor.size, there, defender.size)
+        nearer = [(distance_between(tuple(q[:2]) + level, actor.size, there,
+                                    defender.size), cost, q[1], q[0])
+                  for q, cost in routes.items()]
+        nearer = [n for n in nearer if n[0] < here]
+        if not nearer:
+            return None
+        _, _, y, x = min(nearer)
+        square = (x, y)
+    return ({"op": "move", "actor": actor.ref,
+             "params": {"square": [square[0], square[1]]},
+             "because": f"closing on {defender.name}"}, arrives)
+
+
 __all__ = ["attack_mods", "ac_mods", "cover_of", "reflex_mods", "explain",
+           "OutOfReach", "out_of_reach", "square_in_reach", "closing_move",
            "FLANKING_BONUS", "HIGHER_GROUND_BONUS", "HIGHER_GROUND_SQUARES",
            "COVER_AC", "COVER_REFLEX", "SOFT_COVER_AC"]
