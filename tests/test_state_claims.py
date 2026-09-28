@@ -98,6 +98,24 @@ def test_an_unarmed_barkeep_does_not_swing_a_weapon():
     assert "nobody facing you here is armed" in why
 
 
+def test_the_live_verification_run_caught_a_weapon_and_a_stun_nobody_had():
+    """The live run with the repair in (2026-09-28): a disarm by 5 against Borin, whose
+    tell was "holds nothing that can be knocked loose", and the draft still tossed his
+    weapon aside and left him stunned — with a second creature in the room, so the stun
+    is said of "they"."""
+    scene, _ = _tavern()
+    borin = scene.get("c1")
+    borin.equipped, borin.weapons = "unarmed", []
+    scene.add(instantiate("guildhand", scene=scene, name="the old man"))
+    [(_, why)] = state_claims(
+        "His hands fly wide, empty and grasping for the air as the weapon he held is "
+        "tossed aside, clattering onto the floor.", scene, [])
+    assert "weapon leaves a hand" in why
+    [(_, why)] = state_claims("He is momentarily stunned by the loss of his reach, his "
+                              "stance wide and unbalanced.", scene, [])
+    assert why.startswith("says they are stunned, and they are not")
+
+
 # --- what the recorded corpus taught ---------------------------------------------------
 
 @pytest.mark.parametrize("text", [

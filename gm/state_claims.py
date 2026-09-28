@@ -307,8 +307,8 @@ def state_claims(text: str, scene, changes=None) -> list[tuple[str, str]]:
                 break
         for who, keys in said_of.items():
             what = " and ".join(keys)
-            flag(said, f"says {who} {'are' if who in ('you', 'they') else 'is'} {what}, "
-                    f"and {'you are' if who == 'you' else who + ' is'} not: nothing put "
+            be = "are" if who in ("you", "they") else "is"
+            flag(said, f"says {who} {be} {what}, and {who} {be} not: nothing put "
                     f"{'that' if len(keys) == 1 else 'either'} on "
                     f"{'you' if who == 'you' else 'them'}")
 
