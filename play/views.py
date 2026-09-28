@@ -91,6 +91,137 @@ def _busy_state(c) -> str:
         return ""
 
 
+def _where_state(c) -> dict:
+    """`scene.where_label`, `where_detail` and `setting`: the panel's "where", read from
+    `geography.where` so the panel and (from Lane B) the brief say it one way. Phase 1's
+    `where` reproduces today's "{location} · {scale}" and biome exactly."""
+    from rules import geography
+
+    try:
+        here = c.engine().here()
+    except Exception:      # noqa: BLE001 — the label falls back to the settlement alone
+        here = None
+    try:
+        w = geography.where(c.world, c.scene, here)
+        return {"where_label": w.label, "where_detail": w.detail, "setting": w.setting}
+    except Exception:      # noqa: BLE001 — a panel line is never worth failing a turn
+        return {"where_label": "", "where_detail": "", "setting": ""}
+
+
+def _spellcasting_state(pc) -> dict:
+    """How the PC casts, for the Spells button (design F §4.4): shown on `kind`, not on
+    `pc.castable`, which offers a prepared caster's whole book when nothing is prepared
+    (fix-interfaces §1.7 F1). `empty_slots` is Lane E's to fill (§2.10)."""
+    from rules import casting
+
+    kind = ""
+    if pc is not None and casting.is_caster(pc):
+        kind = str(casting.caster_data(pc).get("kind", "") or "")
+        if kind not in ("prepared", "spontaneous"):
+            kind = ""
+    nothing = kind == "prepared" and not any(
+        int(n or 0) > 0 for n in (getattr(pc, "prepared", None) or {}).values())
+    return {"kind": kind, "nothing_prepared": bool(nothing), "empty_slots": {}}
+
+
+def _start_state(scene) -> dict:
+    """The start this campaign opened with (`Scene.start`, Lane C), or {} before one."""
+    start = dict(getattr(scene, "start", None) or {})
+    if not start:
+        return {}
+    return {"id": start.get("id", ""), "kind": start.get("kind", ""),
+            "hand_off": start.get("hand_off", {})}
+
+
+# The conversation panel's budget (§2.10): the people strip and the entries sent with
+# every state. Anything older is a `GET /api/conversation` away.
+_CONVO_PEOPLE = 30
+_CONVO_RECENT = 80
+
+
+def _involves(entry: dict, ref: str) -> bool:
+    """Whether an Entry is in `ref`'s log (design F §4.2): they said it, it was said to
+    them, or the player said it while they were in the conversation."""
+    return (entry.get("who") == ref or entry.get("to") == ref
+            or (entry.get("who") == "you" and ref in (entry.get("among") or [])))
+
+
+def _conversation_state(c) -> dict:
+    """`scene.conversation` from `Scene.conversation_log` (F writes it from Phase 2).
+
+    People are everyone the log names — so the strip is empty until F writes the log,
+    whoever is talking — ordered talking, then present, then by their latest entry,
+    newest first; `recent` is the last entries involving anybody present or talking."""
+    scene = c.scene
+    log = [e for e in (getattr(scene, "conversation_log", None) or []) if isinstance(e, dict)]
+    seq = int(getattr(scene, "conversation_seq", 0) or 0)
+    if not log:
+        return {"people": [], "recent": [], "seq": seq}
+    try:
+        talking = {a.ref for a in c.engine().talking_to()}
+    except Exception:      # noqa: BLE001
+        talking = set()
+    at = str(getattr(scene, "at", "") or "")
+
+    def present(ref: str) -> bool:
+        a = scene.actors.get(ref)
+        if a is None or a.is_pc or a.has_state("state.hidden"):
+            return False
+        return not getattr(a, "at", "") or a.at == at
+
+    refs: list[str] = []
+    for e in log:
+        for r in [e.get("who"), e.get("to")] + list(e.get("among") or []):
+            if r and r != "you" and r not in refs:
+                refs.append(str(r))
+    people = []
+    for ref in refs:
+        mine = [e for e in log if _involves(e, ref)]
+        spoken = [e for e in log if e.get("who") == ref]
+        actor = scene.actors.get(ref)
+        name = (actor.name if actor is not None
+                else next((str(e.get("name") or "") for e in reversed(spoken)), ref))
+        people.append({"ref": ref, "name": name, "present": present(ref),
+                       "talking": ref in talking, "lines": len(spoken),
+                       "last": max((int(e.get("n", 0) or 0) for e in mine), default=0)})
+    people.sort(key=lambda p: (not p["talking"], not p["present"], -p["last"]))
+    near = {p["ref"] for p in people if p["talking"] or p["present"]}
+    recent = [e for e in log if any(_involves(e, r) for r in near)][-_CONVO_RECENT:]
+    return {"people": people[:_CONVO_PEOPLE], "recent": recent, "seq": seq}
+
+
+def _after_the_beat(c, agent, stage: str, door: str, **fields) -> None:
+    """One stage of the after-the-beat steps (play/aftermath, §2.3) over this beat, its
+    rows into the turn log — only when there are any, so a turn with no step to run
+    writes exactly what it wrote before the registry existed."""
+    from .aftermath import context, run as steps
+
+    rows = steps(stage, context(stage, door, c, engine=agent.engine,
+                                reading=getattr(agent, "reading", None), **fields))
+    if rows:
+        c.turn_log.extend(rows)
+
+
+def _attached_this_turn(c) -> tuple:
+    """The attachments on the player's line this turn answers — the last player beat —
+    or (). Read off the beat, so a turn resumed by a die roll still carries them."""
+    beat = next((b for b in reversed(c.transcript) if b.get("who") == "player"), None)
+    return tuple(dict(a) for a in ((beat or {}).get("attachments") or ()))
+
+
+def _refusal(refusal: dict, status: int = 422):
+    """A refusal on the wire (fix-interfaces §2.6, Q4 (a)): HTTP 422 with the player's
+    sentence as `error`, beside `{"text", "code", "fix"}`. No beat, no clock, no NPC turn —
+    the caller pops the player's line the way the 502 path does. Unused until Lanes A
+    and E refuse through it; one shape for both, so the client reads one."""
+    text = str((refusal or {}).get("text") or "")
+    return JsonResponse({"error": text,
+                         "refusal": {"text": text,
+                                     "code": str((refusal or {}).get("code") or ""),
+                                     "fix": (refusal or {}).get("fix")}},
+                        status=status)
+
+
 @require_POST
 def talk_act(request):
     """The conversation's own button: take your leave, or refuse somebody.
@@ -299,9 +430,17 @@ def _state(c) -> dict:
     from rules import cards as cards_mod
     from rules import goods as goods_mod
     from rules import houserules as houserules_mod
+    from rules import residency
     from rules import schemes as schemes_mod
 
     coins = goods_mod.coinage(c.world, c.location)
+
+    def with_areas(grid):
+        # The latest turn's spell areas, for the map's overlay: Lane E fills it (§2.10).
+        if grid is not None:
+            grid["areas"] = []
+        return grid
+
     return {
         "transcript": c.transcript,
         # The world's own name, for the title bar. Reported 2026-09-18 with a screenshot:
@@ -378,11 +517,18 @@ def _state(c) -> dict:
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
             ],
-            "grid": _grid_state(c.scene),
+            "grid": with_areas(_grid_state(c.scene)),
             # Blood on the ground. Sent whether or not there is a grid: without one
             # they are still a count the player needs, because half the class spends
             # them.
             "pools": [b.as_dict() for b in c.scene.pools if b.here(c.scene)],
+            # The keys of the 2026-09-28 fix pass (docs/fix-interfaces.md §2.10), every
+            # one at its default until the lane that owns its value lands: the panel's
+            # "where" in words, the conversation log (F), the part of the day (the clock
+            # pop-up's caption and the log's dividers).
+            **_where_state(c),
+            "conversation": _conversation_state(c),
+            "day_part": residency.day_part(c.scene.clock_minutes),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -395,6 +541,10 @@ def _state(c) -> dict:
         # here, at the edge, rather than in the template — a number that never reaches
         # the browser cannot be read out of the page source either.
         "log": [_player_visible_entry(e) for e in c.turn_log[-30:]],
+        # How the PC casts, for the Spells button (F), and the slots a rest left empty (E).
+        "spellcasting": _spellcasting_state(pc),
+        # The start this campaign opened with (C): its id, kind and hand-off.
+        "start": _start_state(c.scene),
     }
 
 
@@ -772,6 +922,31 @@ def state(request):
 
 
 @require_GET
+def conversation(request):
+    """One person's conversation log, or everybody's, a page at a time (§2.10).
+
+    `with` is a ref or "all"; `before` an entry number to page back from; `limit` at most
+    200. Answers `{"entries": [...], "more": bool}`, oldest first, `more` when older
+    entries remain. A ref the log never names answers an empty page, not an error: the
+    panel's "Earlier…" list may hold somebody the log has since let go. Reads only —
+    unlike `state`, it drains nothing, so paging back through history never moves the game.
+    """
+    c = campaign_mod.current()
+    who = str(request.GET.get("with") or "all").strip() or "all"
+    q = request.GET
+    before = read_int(q, "before", 0)
+    limit = read_int(q, "limit", 50, lo=1, hi=200)
+    log = sorted((e for e in (getattr(c.scene, "conversation_log", None) or [])
+                  if isinstance(e, dict)), key=lambda e: int(e.get("n", 0) or 0))
+    if who != "all":
+        log = [e for e in log if _involves(e, who)]
+    if before > 0:
+        log = [e for e in log if int(e.get("n", 0) or 0) < before]
+    page = log[-limit:]
+    return JsonResponse({"entries": page, "more": len(log) > len(page)})
+
+
+@require_GET
 def sheet(request):
     """The full character sheet, every number with its provenance.
 
@@ -1129,6 +1304,16 @@ def say(request):
     # The line is written here rather than typed into the box, so it cannot be mistaken
     # for a declaration and cannot be refused by the check below.
     carry_on = bool(body.get("carry_on"))
+    # A spell chosen from the Spells button rides as an attachment beside the words
+    # (design F §4.4, item 21.1): validated here, stored on the player's beat and the
+    # turn log, and not acted on in Phase 1 — Lane E makes the engine read it.
+    attached, bad = _read_attachments(c, body, text, carry_on)
+    if bad:
+        return JsonResponse({"error": bad}, status=400)
+    typed = bool(text)
+    if not text and attached:
+        # A chip and nothing else is a turn: the player means the spell.
+        text = f"I cast {attached[0]['name']}."
     if carry_on:
         text = CARRY_ON
     if not text:
@@ -1160,10 +1345,12 @@ def say(request):
     # consuming the turn, because the player has not done anything wrong so much as
     # reached across the table.
     if not carry_on:
-        said = player_input.check(text)
-        if not said.ok:
-            return JsonResponse({"hint": said.hint, "offending": said.offending},
-                                status=422)
+        # Only on words the player typed: the line written for a bare chip is ours.
+        if typed:
+            said = player_input.check(text)
+            if not said.ok:
+                return JsonResponse({"hint": said.hint, "offending": said.offending},
+                                    status=422)
     # And what the character claims to BE. Not a door: the player's own design,
     # 2026-09-18, is that "I reveal my true form as a divine being" should PLAY — the
     # character does it, nothing happens, and the people here react to somebody
@@ -1182,9 +1369,13 @@ def say(request):
     if c.ended:
         return JsonResponse(_ended_payload(c), status=410)
 
+    # The player's line, with the chip drawn before it when there is one (design F §4.4);
+    # the key only when sent, so every beat before attachments reads as it did.
+    beat = {"who": "player", "text": shown,
+            **({"attachments": [dict(a) for a in attached]} if attached else {})}
     pc = c.scene.pc()
     if downed.state_of(pc) not in ("fine", "disabled"):
-        c.transcript.append({"who": "player", "text": shown})
+        c.transcript.append(beat)
         outcome = downed.resolve(c)
         for line in outcome.lines:
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
@@ -1202,11 +1393,15 @@ def say(request):
         c.save()
         return JsonResponse(_state(c))
 
-    c.transcript.append({"who": "player", "text": shown})
+    c.transcript.append(beat)
     world = c.world
     agent = GMAgent(world, c.engine())
     _arm_cards(agent, c)
     agent.false_claim = claim
+    # Read by the planner's `declared_ops(attached=…)` and the narrator checks — accepted
+    # and not yet acted on (Lane E). Set every turn on a fresh agent, so it never outlives
+    # the turn, as `claim` does not.
+    agent.attachments = attached
 
     # Free actions taken since the last spoken turn ride along as context rather than
     # having cost turns of their own. Into `history`, not `player_input`: the injectors
@@ -1241,6 +1436,9 @@ def say(request):
     # beside the detectors' opinion, so every disagreement is on the record
     # (docs/the-interpreter.md).
     plan.reading = getattr(agent, "reading", None)
+    # And the attachments, into the turn log's `turn` row beside it (`_log_turn`).
+    if attached:
+        plan.attachments = [dict(a) for a in attached]
     resp = _advance(c, agent, plan.narration, plan, text)
     # A purchase opens the counter with the thing picked (`_trade_offer`): the turn's
     # prose brings the keeper to the counter, and the player pays on the screen.
@@ -1501,6 +1699,58 @@ _CHEAT = re.compile(r"^\s*/cheat\b[:\s]*", re.I)
 # slash reasoning as the cheat above: no ordinary turn starts with one.
 _GM = re.compile(r"^\s*/gm\b[:\s]*", re.I)
 
+# The aim a spell attachment may carry (fix-interfaces §2.7). A copy for validation at the
+# door, as the register allows; Lane E owns the canonical `areas.AIM_PATTERN`, and a test
+# holds this one to it once it exists.
+_AIM = re.compile(r"^(ref:[A-Za-z0-9_-]+|self|dir:(n|ne|e|se|s|sw|w|nw|up|down)"
+                  r"|point:\d+,\d+(,\d+)?|object:[^\n]{1,60})$")
+
+
+def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
+    """The turn's attachments, checked at the door: `(attachments, "")`, or `((), why)`
+    with a sentence for the player when one breaks a rule of §2.10.
+
+    Checked here, before anything else reads the turn, because a chip the engine cannot
+    honour is the player's to fix, not a plan for the model to guess around. Phase 1
+    stores what passes and acts on none of it (Lane E does). Each one stored carries the
+    spell's `name`, so the transcript can draw the chip without a second lookup.
+    """
+    from rules import casting, spells as spells_mod
+
+    raw = body.get("attachments")
+    if raw is None or raw == []:
+        return (), ""
+    if not isinstance(raw, list):
+        return (), "Attachments must be a list."
+    if len(raw) > 1:
+        return (), "Only one spell can be attached to a turn."
+    if carry_on:
+        return (), "A spell cannot be attached to Continue — say what you do with it."
+    if _CHEAT.match(text) or _GM.match(text):
+        return (), "A spell cannot be attached to /gm or /cheat."
+    item = raw[0]
+    if not isinstance(item, dict) or item.get("kind") != "spell":
+        return (), "Only a spell can be attached to a turn."
+    spell_id = str(item.get("id") or "").strip()
+    try:
+        spell = spells_mod.get(spell_id)
+    except KeyError:
+        return (), f"There is no spell called {spell_id or 'that'}."
+    pc = c.scene.pc()
+    if pc is None:
+        return (), "There is nobody here to cast it."
+    if not (casting.knows(pc, spell) or spell.id in (getattr(pc, "prepared", None) or {})):
+        return (), f"{pc.name} does not know {spell.name}."
+    out = {"kind": "spell", "id": spell.id, "name": spell.name}
+    if "aim" in item:
+        aim = item.get("aim")
+        if not isinstance(aim, str) or not _AIM.match(aim):
+            return (), (f"{aim!r} is not an aim a spell can take: a person (ref:c1), "
+                        f"yourself (self), a direction (dir:n), a square (point:3,4) or "
+                        f"a thing (object:the cart).")
+        out["aim"] = aim
+    return (out,), ""
+
 
 def _gm_answer(c, question: str, shown: str):
     """Answer a question about the game from the engine, and change nothing.
@@ -1588,9 +1838,14 @@ def _ask_the_gm(c, engine, question: str) -> str:
     from . import gm_search
 
     agent = GMAgent(c.world, engine)
+    # The sections' facts ride on the agent the way the prose door's do (§2.2); nothing
+    # out of character reads them yet, and the brief's text does not change.
+    report: dict = {}
     brief = prompts.scene_brief(
         c.world, c.scene, c.location, _recent_events(c.world, c.location),
-        here=engine.here(), known=engine.places())
+        here=engine.here(), known=engine.places(), reading=None, player_text=question,
+        report=report)
+    agent.brief_facts = dict(report.get("facts") or {})
     found = "\n".join(gm_answers.look_up(c, engine, question))
     # What the character would know (2026-09-18, item 9). Public facts are answered.
     # Rumour-grade facts ride ONE secret Knowledge (local) roll per place — DC 15, the
@@ -1838,6 +2093,12 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         c.save()
         return JsonResponse(_state(c))
 
+    # Which door this turn came through, for the after-the-beat steps (play/aftermath):
+    # Continue carries no words of the player's, so a step that logs them logs nothing.
+    door = "carry_on" if player_input == CARRY_ON else "turn"
+    player_text = "" if door == "carry_on" else (player_input or "")
+    attached = _attached_this_turn(c)
+
     # The thread first, so the brief below states the engagement this very turn
     # declared — "I follow the guards" must constrain the beat that answers it.
     judgement.update_thread(c.scene, player_input,
@@ -1888,6 +2149,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
         # brief is written — including the people a save holds from before the
         # fields existed (c11 'woman', c16 'woman' on the 2026-09-18 save).
         judgement.name_the_nameless(c.scene, c.world)
+        # What each brief section printed, for the narrator checks to read what the model
+        # was shown (`BeatContext.brief_facts`, §2.1), and what the player attached to the
+        # turn. Handed over as attributes, the way `buying` is, so no agent signature moves.
+        report: dict = {}
         brief = prompts.scene_brief(c.world, c.scene, c.location,
                                     _recent_events(c.world, c.location),
                                     here=agent.engine.here(),
@@ -1906,7 +2171,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                                                    player_input),
                                     # And the counter the turn opens, when the player
                                     # set out to buy something (`_trade_offer`).
-                                    buying=_buying_note(c, player_input))
+                                    buying=_buying_note(c, player_input),
+                                    reading=getattr(agent, "reading", None),
+                                    player_text=player_text, report=report)
+        agent.brief_facts = dict(report.get("facts") or {})
+        agent.attachments = attached
         # The model's own recent prose — the narrator's beats only, with the sentences
         # WE appended to them (a death line, a thread anchor) taken back out. Shown its
         # own backstop or the engine's award line as "what you narrated", the model
@@ -1958,6 +2227,9 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # Which open matter was put in front of the model, if any, so an audit
             # can say how often the beat carried it.
             "pull": str((pull or {}).get("title") or ""),
+            # How the pull meant the thread to reach the player, and whether the beat gave
+            # it up (design D). Only when the pull says: every row before D reads the same.
+            **{k: (pull or {})[k] for k in ("approach", "yielded") if k in (pull or {})},
             "repairs": list(repairs or []),
             "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1),
                           "model": a.model, "note": (a.note or "")[:300],
@@ -2106,6 +2378,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
             for ref, given, whose in refused_names:
                 repairs.append(f"{ref} was not renamed {given}: {whose} answers to it")
+            # The after-the-beat steps' "people" stage (play/aftermath, §2.3): here, and
+            # not with the "beat" stage below, because a speaker the page made real has to
+            # exist before `hailed_by` reads who spoke to the player. `said` is the live
+            # list `hailed_by` reads next.
+            _after_the_beat(c, agent, "people", door, text=text, said=agent.last_said,
+                            player_text=player_text, attachments=attached,
+                            attribution=attribution, outcomes=resolution.outcomes,
+                            turn=len(c.transcript))
             # Somebody who spoke to the player in this beat is in conversation with
             # them from here, until the player takes their leave (2026-09-24). Through
             # the engine's one door, so the panel and the refusals read the same state.
@@ -2213,6 +2493,16 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
                                "lines": len(speech_mod.lines(text)),
                                "hails_tagged": judgement.hailed_by(c.scene, text, said=said),
                                "hails_guessed": judgement.hailed_by(c.scene, text)})
+            # The "beat" stage: the beat is on the transcript now, with the lines kept on
+            # it, so a step can index it (the conversation log, F) and `c.suggestions` is
+            # already this turn's (D).
+            _after_the_beat(c, agent, "beat", door, text=text, said=said,
+                            player_text=player_text, attachments=attached,
+                            attribution=attribution, outcomes=resolution.outcomes,
+                            beat_index=len(c.transcript) - 1,
+                            # The number the rest of this beat's bookkeeping used: the
+                            # transcript's length before the beat went onto it.
+                            turn=len(c.transcript) - 1)
             c.history.append({"role": "assistant", "content": text})
             for line in struck_lines:
                 c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
@@ -2533,6 +2823,10 @@ def _log_turn(c, plan, resolution, replace: bool = False):
     reading = getattr(plan, "reading", None)
     if isinstance(reading, dict):
         entry["reading"] = {k: v for k, v in reading.items() if k != "raw"}
+    # What the player attached to the turn (§2.4), only when they did.
+    attachments = getattr(plan, "attachments", None)
+    if attachments:
+        entry["attachments"] = [dict(a) for a in attachments]
     # The turn entry `_advance` wrote before the prose call, wherever it now sits.
     # `replace` used to look only at the LAST entry, and under intents-first the
     # prose entry is appended between the two — so every single turn was logged
