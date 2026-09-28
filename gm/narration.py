@@ -3591,6 +3591,12 @@ _YOU_VERBS = {
     "wears": "wear", "puts": "put", "lights": "light", "cuts": "cut", "cooks": "cook",
     "brews": "brew", "grinds": "grind", "gathers": "gather", "crafts": "craft",
     "founds": "found", "ventures": "venture", "journeys": "journey", "loses": "lose",
+    # The manoeuvre table's verbs (`rules/tables.py` MANEUVERS, its `[verb]`s). Its lead
+    # was `name + "s"`, so the player's trip reached the page as "You trips the thug";
+    # `test_every_maneuver_verb_turns_to_the_second_person` holds this list to the table.
+    "trips": "trip", "grapples": "grapple", "disarms": "disarm", "overruns": "overrun",
+    "repositions": "reposition", "steals": "steal", "drags": "drag", "plays": "play",
+    "damages": "damage",
 }
 
 

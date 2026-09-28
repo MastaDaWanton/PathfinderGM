@@ -51,8 +51,10 @@ def played():
      "the guildhand on the gate's attack misses Kesst Vayr."),
     ("Kesst Vayr beats the guildhand on the gate's perception by 6.",
      "Kesst Vayr beats the guildhand on the gate's perception."),
-    ("Kesst Vayr trips the thug by 7: the target is knocked prone.",
-     "Kesst Vayr trips the thug: the target is knocked prone."),
+    # The manoeuvre tell names both people since 2026-09-27; it read "the target is
+    # knocked prone" when the table's text was spliced raw (tests/test_maneuver_tells.py).
+    ("Kesst Vayr trips the thug by 7: the thug is knocked prone.",
+     "Kesst Vayr trips the thug: the thug is knocked prone."),
     ("Kesst Vayr fails the Reflex save by 6.", "Kesst Vayr fails the Reflex save."),
 ])
 def test_a_raw_tell_shown_to_the_player_loses_its_arithmetic(tell, expected):
