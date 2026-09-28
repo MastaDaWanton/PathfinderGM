@@ -2031,13 +2031,25 @@ NPC_EXAMPLES = [
 
 
 def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
-                      actor, round_no: int) -> list[dict]:
+                      actor, round_no: int, first: str = "") -> list[dict]:
     hp_note = "unhurt"
     if actor.hp < actor.hp_max:
         share = actor.hp / max(1, actor.hp_max)
         hp_note = ("badly hurt" if share <= .34 else
                    "bloodied" if share <= .67 else "lightly hurt")
     conditions = ", ".join(c.name.lower() for c in actor.conditions) or "none"
+    # What is in the hand, as a fact beside the hit points. Measured live 2026-09-27: a
+    # thug swung his sap three rounds running and every wind-up had him grabbing,
+    # pinning and seizing — nothing in this prompt said he held anything. A bare hand
+    # says nothing: a wolf's "unarmed" is its jaws, not empty hands.
+    # And what the thing IS (`weapons.described`): told only "the sap", the model wrote
+    # a vial of tree sap splashing on the floor.
+    from rules import weapons as _weapons
+
+    held = str(getattr(actor, "equipped", "") or "").strip()
+    gloss = _weapons.described(held) if held else ""
+    holding = (f"In hand: the {held}" + (f" ({gloss})" if gloss else "") + ".\n"
+               if held and held.lower() not in ("unarmed", "none") else "")
     messages = [{"role": "system", "content": NPC_TURN_BRIEFING + "\n\n" + briefing_scene}]
     # The acting creature is its own {Current Enemy}: an example the model copies now
     # describes the animal whose turn it is, not a thug it was once shown.
@@ -2048,7 +2060,8 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
     messages.append({"role": "user", "content":
         f"Round {round_no}. It is {ref} ({actor.name}) turn.\n"
         f"They are {hp_note} and their conditions are: {conditions}.\n"
-        f"What does {ref} do?"})
+        + (f"{first}\n" if first else holding)
+        + f"What does {ref} do?"})
     return messages
 
 

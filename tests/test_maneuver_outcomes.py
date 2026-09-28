@@ -158,7 +158,11 @@ def test_picking_your_weapon_back_up_puts_it_in_your_hand():
     assert pc.equipped == "unarmed" and "rapier" not in pc.weapons
     res = engine.run(engine.validate([{"op": "give", "actor": "pc", "target": "pc",
                                        "params": {"item": "rapier"}}]))
-    assert "takes rapier" in res.outcomes[0].tell, res.outcomes[0].tell
+    # Stooping for it beside the armed thug provokes (Table 7-2; tests/
+    # test_creature_rearms.py) — his swing lands first, then the hand closes on it.
+    assert [o.op for o in res.outcomes] == ["attack", "give"]
+    assert res.outcomes[-1].tell == ("Kesst Vayr takes the rapier back up off the "
+                                     "ground; it is in hand again."), res.outcomes[-1].tell
     assert pc.equipped == "rapier" and "rapier" in pc.weapons
     assert scene.prop_named("Kesst Vayr's rapier")["held_by"] == "pc"
     engine.validate([{"op": "attack", "actor": "pc", "target": "c1",

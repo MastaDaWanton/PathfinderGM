@@ -1302,10 +1302,184 @@ def default_npc_action(scene, ref: str) -> list[dict] | None:
     # The most hurt enemy still standing: a creature that has been fighting knows who is
     # nearly down.
     target = min(enemies, key=lambda r: scene.actors[r].hp)
-    return [{
+    # And a disarmed one re-arms first, on this path as on the model's: with Ollama
+    # down this was the only path, and it swung `equipped` — "unarmed" — every round.
+    intents, _ = rearm(scene, ref, [{
         "op": "attack", "actor": ref, "target": target,
         "because": "it is in a fight and there is someone in front of it",
-    }]
+    }])
+    return intents
+
+
+# --- a disarmed creature re-arms --------------------------------------------------------
+#
+# docs/maneuver-outcomes.md "Still open", closed 2026-09-27. A successful disarm puts the
+# thug's sap on the ground and the legality check refuses him swinging it there, but the
+# creature turn's op list has no `give`, and the fallback swings whatever is `equipped` —
+# "unarmed" — so a disarmed thug punched round after round with his sap at his feet and a
+# dagger in his belt. The shape is TemplePlus's (ToEE, `ai.cpp` StrategyParse): before any
+# tactic, "check if disarmed, if so, try to pick up weapon" — only with nothing already in
+# hand, only within reach, never walking to it. The order is the user's ruling
+# (2026-09-27): pick the weapon up; else draw a carried one; else fists. The engine
+# decides it, not the model — both creature paths run it, so it holds with Ollama down.
+#
+# Refused: adding `give` to the creature's op enum. With no giver and no record a give
+# comes "from the world, which never runs out", and a creature could mint a greatsword
+# mid-fight. ROM's free instant pick-up (`fight.c:disarm`, `get_obj` with no WAIT_STATE)
+# is refused too: 1e prices it (Table 7-2, "Pick up an item": move action, provokes).
+
+def rearm_step(scene, ref: str) -> tuple[str, object] | None:
+    """What a disarmed creature does first this turn to have a weapon in hand again:
+    ("pick_up", props record) for its own weapon lying within reach, ("draw", weapon
+    key) for one it still carries, or None — not disarmed, already holding something,
+    or nothing to re-arm with."""
+    actor = scene.actors.get(ref)
+    if (actor is None or actor.is_pc or not scene.in_encounter or actor.is_down
+            or not actor.can_act()):
+        return None
+    if str(actor.equipped or "unarmed").lower() != "unarmed":
+        return None                      # something is in the hand already
+    from rules import goods, weapons as weapons_mod
+
+    mine = [r for r in getattr(scene, "props", ()) or ()
+            if r.get("owner") == ref and r.get("from_")
+            and r.get("state") in ("intact", "broken")
+            and r.get("held_by") != ref]
+    if not mine:
+        return None                      # never disarmed: its fists are its choice
+    for rec in mine:
+        if (rec.get("at") == scene.at and not rec.get("held_by")
+                and not scene.within_reach(ref, rec)
+                and goods.kind_of(str(rec["from_"])) == "weapon"):
+            return ("pick_up", rec)
+    for key in actor.weapons:
+        gear = actor.gear.get(str(key).lower())
+        if gear is not None and gear.destroyed:
+            continue
+        if weapons_mod.has(key) and str(key).lower() not in ("unarmed", "improvised"):
+            return ("draw", str(key))
+    return None
+
+
+def rearm_note(scene, ref: str) -> str:
+    """The re-arming as a fact for the creature's turn prompt, so the wind-up prose
+    does not raise the fists the engine is about to put a sap in."""
+    step = rearm_step(scene, ref)
+    if step is None:
+        return ""
+    from rules import weapons as weapons_mod
+
+    key = str(step[1]["from_"] if step[0] == "pick_up" else step[1])
+    gloss = weapons_mod.described(key)
+    what = f"{key} ({gloss})" if gloss else key
+    if step[0] == "pick_up":
+        return (f"Its {what} lies at its feet. It takes it back up off the ground "
+                f"first — its move action, and stooping for it can draw a blow — so "
+                f"this turn it swings once, with the {key}.")
+    return (f"Its own weapon is out of reach, so it draws the {what} it still "
+            f"carries — its move action — and swings once with it.")
+
+
+def rearm(scene, ref: str, raw_intents) -> tuple[list, list[str]]:
+    """Put the re-arming at the front of a disarmed creature's turn and cut the rest to
+    what a move action leaves: one swing. Returns (intents, what was changed).
+
+    The pick-up and the draw are each a move action (Table 7-2). So after one:
+    no full attack and no second swing (a standard action is one attack); a move of
+    more than a five-foot step is dropped when the plan also swings — or, when the
+    target is out of reach from where it stands, the swing is dropped and the move
+    kept (pick up, then close: two move actions). A draw with BAB +1 or better rides
+    along with a move (footnote 3), so there the move stays.
+    """
+    step = rearm_step(scene, ref)
+    if step is None or not isinstance(raw_intents, list):
+        return raw_intents, []
+    kind, what = step
+    if kind == "pick_up":
+        first = {"op": "give", "actor": ref,
+                 "params": {"item": what["name"], "to": ref},
+                 "because": "its own weapon lies at its feet"}
+        weapon = str(what["from_"])
+    else:
+        first = {"op": "wear", "actor": ref, "params": {"item": what, "actor": ref},
+                 "because": "its own weapon is out of reach; it draws another"}
+        weapon = what
+    repairs = [f"rearm: {ref} {'picks up' if kind == 'pick_up' else 'draws'} the {weapon} "
+               f"first (a move action)"]
+
+    def mine(r):
+        return isinstance(r, dict) and (r.get("actor") or ref) == ref
+
+    # Reactions are not the creature's turn: an attack of opportunity already in the
+    # list (none is, today — they are spliced at resolution) would be left alone.
+    attacks = [r for r in raw_intents if mine(r) and str(r.get("op", "")).lower() == "attack"
+               and not (r.get("params") or {}).get("reaction")]
+    moves = [r for r in raw_intents if mine(r) and str(r.get("op", "")).lower() == "move"
+             and not _a_step(scene, ref, r)]
+    draw_rides_a_move = kind == "draw" and scene.actors[ref].bab >= 1
+    keep_attack = attacks[0] if attacks else None
+    # A move and no swing is two move actions — the pick-up, then the move — and
+    # legal: a creature that stoops for its sap and runs keeps its run.
+    drop_moves = False
+    if keep_attack is not None and moves and not draw_rides_a_move:
+        if _target_in_reach(scene, ref, keep_attack.get("target")):
+            drop_moves = True
+            repairs.append("rearm: the move after the pick-up is dropped; the swing stays")
+        else:
+            keep_attack = None
+            repairs.append("rearm: the target is out of reach; it closes instead of swinging")
+    out = [first]
+    for r in raw_intents:
+        if any(r is a for a in attacks) and r is not keep_attack:
+            if keep_attack is not None:
+                repairs.append("rearm: one swing after a move action; a further attack "
+                               "dropped")
+            continue
+        if drop_moves and any(r is m for m in moves):
+            continue
+        if r is keep_attack:
+            r = dict(r)
+            params = dict(r.get("params") or {})
+            if params.get("full_attack"):
+                repairs.append("rearm: full attack cut to one swing")
+            params["full_attack"] = False
+            params.pop("iteration", None)
+            # "unarmed" means the empty hand the model saw; by the time the swing
+            # resolves the hand holds the weapon. So the weapon is UNnamed and the
+            # attack swings what is in hand then — naming it here is refused, because
+            # `validate` checks the whole list against the state before the pick-up
+            # resolves, and the sap is still lying on the ground (measured: the
+            # fallback "held back" every round). A manoeuvre's own hand is its own.
+            if not params.get("manoeuvre") and str(params.get("weapon") or "unarmed"
+                                                   ).lower() == "unarmed":
+                params.pop("weapon", None)
+            r["params"] = params
+        out.append(r)
+    return out, repairs
+
+
+def _a_step(scene, ref: str, raw: dict) -> bool:
+    """A five-foot step — the one movement a pick-up leaves room for."""
+    from rules import grid as gridmod
+
+    square = (raw.get("params") or {}).get("square")
+    start = scene.positions.get(ref) if scene.has_grid else None
+    if square is None or start is None:
+        return False
+    return gridmod.distance(tuple(start), tuple(square)) <= gridmod.SQUARE_FT
+
+
+def _target_in_reach(scene, ref: str, target) -> bool:
+    """Can `ref` swing at `target` without moving? True when it cannot be measured —
+    with no map the zones decide, and a swing the engine refuses says why."""
+    from rules import grid as gridmod, reactions
+
+    actor, foe = scene.actors.get(ref), scene.actors.get(str(target or ""))
+    a, b = scene.positions.get(ref), scene.positions.get(str(target or ""))
+    if not scene.has_grid or actor is None or foe is None or a is None or b is None:
+        return True
+    gap = gridmod.distance_between(tuple(a), actor.size, tuple(b), foe.size)
+    return gap <= max(gridmod.natural_reach(actor.size), reactions._reach_of(actor))
 
 
 def _quote(text: str, limit: int = 120) -> str:

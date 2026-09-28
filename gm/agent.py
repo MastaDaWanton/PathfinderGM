@@ -791,7 +791,11 @@ class GMAgent:
         actor = self.engine.scene.actors[ref]
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places())
-        base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round)
+        # A disarmed creature re-arms first, by the engine's hand (`judgement.rearm`);
+        # the prompt is told so as a fact, or the wind-up raises the fists the tells
+        # are about to put a sap in.
+        base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round,
+                                         first=judgement.rearm_note(self.engine.scene, ref))
         # Stage 8's one named exception. A bestiary creature has no path, spellbook
         # or satchel, and its bite's poison lives in a stat block no locator reads
         # yet, so on its turn `damage` and `ability_damage` stay and the origin is
@@ -822,7 +826,8 @@ class GMAgent:
             attempts.append(Attempt("npc", reply.seconds, reply.model, reply.text))
             try:
                 data = reply.json()
-                intents = self.engine.validate(data.get("intents"), origin=origin,
+                raw, rearmed = judgement.rearm(self.engine.scene, ref, data.get("intents"))
+                intents = self.engine.validate(raw, origin=origin,
                                                origin_name=actor.name if origin else "")
             except (ValueError, IntentError) as exc:
                 rejections.append(f"attempt {n + 1}: {exc}")
@@ -846,7 +851,7 @@ class GMAgent:
                 rewrite=False, acting=actor.name)
             attempts.extend(groom_attempts)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
-                            repairs=repairs, rejections=rejections)
+                            repairs=[*rearmed, *repairs], rejections=rejections)
 
         raise IntentError(
             f"the GM could not act for {ref} in {max_attempts} attempts:\n"
