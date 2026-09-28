@@ -256,3 +256,12 @@ or a fight is not a pick-up, which also covers "I pick the lock on her door" fro
 battery above. Of the 40 distinct player sentences in the recordings, the detector gave
 something for 2 before (both wrong) and for none after. `tests/test_pick_a_fight.py`
 holds the measurement.
+
+**Live, the fight script, 12 turns, gemma-4-12B, after:** no `give` in any turn, and the
+player's goods were empty at the end. On both "pick a fight" turns the detectors declared
+`['attack']`, where the run before declared `['give', 'attack']`. The table turn came out
+as one `attack`, with the reading again reading `take`. Four turns fell back to narration,
+none of them over goods: turn 1 lost to a declared `manoeuvre: "none"` read as a weapon
+(flagged as its own task), and turns 6, 9 and 11 lost to `save`/`move` param shapes and a
+repeat refusal. Two other sessions' suites were running, so the timings are not
+comparable.
