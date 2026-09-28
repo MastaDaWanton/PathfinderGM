@@ -756,8 +756,20 @@ hand, Thessaly bonesetter). The owner's own rulings, which OVERRIDE the recommen
   Conversation panel is removed from the sidebar panel set (S6's `#panel-conversation` and its
   bar button go; `#talk`'s controls move into the tray). Phone: the badged edge tab opens it.
 
-Still open for the owner: whether the outfit page should be reachable mid-campaign (§3.4,
-the stale prove_build row).
+- **The outfit page, and where gear is bought (answered 2026-09-28).** "outfit page should
+  not be reachable but there should be stores that carry all of those items in town split
+  between a general goods store and armorer and a weaponsmith. add an alchemist and have the
+  rest split up between random market stalls."
+  - **Lane C, Phase 2:** the outfit page is for character creation only. Once a character's
+    campaign has begun, nothing links to it and `/api/outfit/<id>/buy` refuses with the
+    reason named (409), so the roster and the running sheet cannot drift apart again.
+    `outfit_views.py` and the outfit link join Lane C's files.
+  - **I2, Phase 3 (widened):** every item the outfit catalogue sells is buyable in play, from
+    a real counter: a **general goods store**, an **armorer**, a **weaponsmith**, an
+    **alchemist**, and the rest spread across **market stalls** chosen by lot (seeded, so a
+    town keeps its stalls). Each is a place with a keeper through the existing staffing and
+    trade machinery (`places.STAFFED`, `goods`, `market`, the trade panel). Which of the four
+    shops a village has versus a town or city is I2's design, put to the owner at P3.
 
 49 questions, deduplicated. **G0** means it must be answered before Phase 1 starts. **P2**
 means before the named lane starts. **P3** means before the integration task starts.
