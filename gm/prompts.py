@@ -837,11 +837,16 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
 
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=(), recent=None, secret=False, turn=0, names_for=None,
-                absent: str = "", buying: str = "") -> str:
+                absent: str = "", buying: str = "", reading=None, player_text: str = "",
+                report: dict | None = None) -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
     seconds or in a minute, and whether long campaigns stay coherent.
+
+    `reading` (the interpreter's frame) and `player_text` are for the brief's sections
+    (gm/brief/) and print nothing by themselves. `report`, when given, is filled with
+    `report["facts"][section module] = the facts that section printed`.
     """
     lines = [f"WORLD: {world.name}."]
     if world.premise:
@@ -854,85 +859,44 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
 
     lines.append(f"WHEN (fact): {_residency.time_words(getattr(scene, 'clock_minutes', 0))}.")
 
+    # Which part of the settlement the party is in, handed down by the caller that has
+    # an engine, never derived here: this used to be a second copy of `Engine.places()`,
+    # keyed on the `location` argument where the engine keys on `scene.location_id`, and
+    # two derivations of one fact is the trap CLAUDE.md names. The fallback is the same
+    # one function the engine calls, for the callers (tests, mostly) that have no
+    # engine. Resolved here, before the place slot, because the thread line below
+    # needs `here` too.
+    if location and not known:
+        from rules import places as _places
+
+        known = _places.for_scene(location, getattr(scene, "at", ""))
+        here = _places.find(known, getattr(scene, "at", "")) or (known[0] if known else None)
+
+    # The brief's sections (gm/brief/, docs/fix-interfaces.md §2.2). The "place" slot is
+    # HERE / THE PLACES HERE / NEXT DOOR / UNDERFOOT, ROADS OUT and the settlement's fact
+    # keys, which were written inline here until the 2026-09-28 fix pass moved them out
+    # byte for byte, so the lanes that change them do not all edit this one function.
+    # Each section's facts go into `report`, the `pack` pattern: the returned text is
+    # unchanged, and a narrator check can read what the model was actually shown.
+    from . import brief as _brief
+
+    # A failed reading (`{"error": ...}`, gm/agent.py) is no reading, for every section.
+    from collections.abc import Mapping
+
+    if not isinstance(reading, Mapping) or "error" in reading:
+        reading = None
+    ctx = _brief.BriefContext(
+        world=world, scene=scene, location=location, here=here, known=tuple(known or ()),
+        recent_events=recent_events, recent=recent, secret=secret, turn=turn,
+        names_for=names_for, absent=absent, buying=buying, reading=reading,
+        player_text=player_text or "")
+    shown: dict = {}
+    placed, facts = _brief.run("place", ctx)
+    shown.update(facts)
+    if placed:
+        lines.append(placed)
+
     if location:
-        # The scale AND what it means. "a village" was all this said, and a model shown
-        # a bare word writes whatever size of place it happens to imagine — which is how
-        # a settlement of a few hundred acquires crowds to be lost in. `places.what_it_is`
-        # is the one composer; the opening and the panel print the same sentence.
-        from rules import places as _places_for_scale
-
-        lines.append(f"\nHERE: {location.name}, "
-                     f"{_places_for_scale.what_it_is(_places_for_scale.scale_of(location))
-                        or 'a place'}.")
-        # Which part of it, and what leads out — stated the same way the cast is, because
-        # it is the same rule. "WHO IS HERE (these refs are the only ones that exist)"
-        # has grounded people since it was written; this file's own docstring has asked
-        # for the same courtesy for PLACES since it was written too ("a model invents
-        # places and people, then treats them as settled fact") and never got it. Without
-        # it the model reconstructs the room from earlier beats, and put a player back
-        # inside a building they had walked out of two turns before.
-        # Handed down by the caller that has an engine, never derived here: this used
-        # to be a second copy of `Engine.places()`, keyed on the `location` argument
-        # where the engine keys on `scene.location_id`, and two derivations of one
-        # fact is the trap CLAUDE.md names. The fallback is the same one function the
-        # engine calls, for the callers (tests, mostly) that have no engine.
-        if not known:
-            from rules import places as _places
-
-            known = _places.for_scene(location, getattr(scene, "at", ""))
-            here = _places.find(known, getattr(scene, "at", "")) or (known[0] if known else None)
-        if here is not None and len(known) > 1:
-            others = [p.name for p in known if p.id != here.id]
-            lines.append(f"  The party is at {here.name}. Not anywhere else in "
-                         f"{location.name}; they are there now.")
-            lines.append(f"  THE PLACES HERE (the only ones that exist): "
-                         f"{', '.join(p.name for p in known)}. To move between them use "
-                         f'{{"op": "travel", "params": {{"place": "{others[0]}"}}}}. '
-                         f"Anything else is refused, and so is a SECOND travel in the "
-                         f"same plan — one journey a turn.")
-            # What is NEXT DOOR, which is a different question from what exists, and
-            # became answerable on 2026-09-22 when `places.route` started walking the
-            # exits graph. The engine finds the way itself now, so the plan must name
-            # the destination and never the route — said here because the block above
-            # reads as a flat list of equally-near rooms, which is what produced plans
-            # of five travels in the first place (item 35).
-            near = [p.name for p in known if p.id in (here.exits or ())]
-            if near:
-                lines.append(
-                    f"  NEXT DOOR to {here.name}, and reached in one step: "
-                    f"{', '.join(near)}. Everywhere else here is further off and is "
-                    f"reached by walking through these — name the DESTINATION in the "
-                    f"travel and the engine walks the way, through every place between, "
-                    f"in one turn. Never plan the route yourself.")
-            # And what this ground looks like underfoot. The shape is what the tactical
-            # map is drawn from, so a narrator describing the market's stalls and the
-            # cart is describing the same market the player can climb on — which is the
-            # positional half of the 2026-09-22 request ("describes positionally where i
-            # am in the market what's around me").
-            from rules import floorplan as _floorplan
-
-            underfoot = _floorplan.describe(here.id, here.terrain, here.shape)
-            if underfoot:
-                lines.append(f"  UNDERFOOT at {here.name} (what is physically here, and "
-                             f"what the map is drawn from): {underfoot}.")
-        # And the roads out. Named for the same reason the places are: a model told only
-        # about the room it is in reconstructs the rest of the world from earlier beats,
-        # and "we set out for Zhilgoroth" is refused if Zhilgoroth has no road. The
-        # engine is the one that says how long it takes; this only says where is
-        # reachable at all.
-        if world is not None:
-            from rules import journey as _journey
-
-            out = _journey.legs_from(world, getattr(location, "id", "") or "")
-            if out:
-                lines.append(
-                    f"  ROADS OUT OF {location.name.upper()} (the only settlements that "
-                    f"can be reached, and only by journey, which takes days): "
-                    f"{', '.join(leg.to_name for leg in out)}.")
-        for key in ("Urban Life", "Social Classes", "Architecture", "Governance",
-                    "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
-            if location.fact(key):
-                lines.append(f"  {key}: {location.fact(key)}")
         # The place in its author's own words, not only its fields. Asked for as "more
         # text and more description per generation", and the fields cannot supply it:
         # "wooden buildings, thatched roofs" is all the brief ever said of Vyrakon,
@@ -1214,6 +1178,15 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                   "who looks up, what they see coming, what the newcomer looks like — "
                   "and let the conversation react to it; nobody appears mid-sentence "
                   "as if they had always been there.")
+
+    # The "people" slot: sections about who is here, after the list that says who is
+    # (gm/brief/, docs/fix-interfaces.md §2.2). Empty when the fix pass began.
+    peopled, facts = _brief.run("people", ctx)
+    shown.update(facts)
+    if peopled:
+        lines.append(peopled)
+    if report is not None:
+        report.setdefault("facts", {}).update(shown)
 
     # What the player's class can actually do, by name. Without this the GM narrates a
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,

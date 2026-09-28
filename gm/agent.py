@@ -302,7 +302,9 @@ class GMAgent:
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places(),
                                     recent=getattr(self, "recent", None), secret=True,
-                                    turn=getattr(self, "turn", 0))
+                                    turn=getattr(self, "turn", 0),
+                                    reading=getattr(self, "reading", None),
+                                    player_text=player_input)
         read = interpret.brief_lines(self.reading if isinstance(self.reading, dict)
                                      and "error" not in self.reading else None)
         if read:
@@ -735,7 +737,8 @@ class GMAgent:
         run through `inject_fight` would spawn somebody to fight.
         """
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
-                                    here=self.engine.here(), known=self.engine.places())
+                                    here=self.engine.here(), known=self.engine.places(),
+                                    reading=None, player_text=wish)
         base = prompts.cheat_messages(brief, wish)
         messages = base
         attempts: list[Attempt] = []
@@ -811,7 +814,8 @@ class GMAgent:
         """
         actor = self.engine.scene.actors[ref]
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
-                                    here=self.engine.here(), known=self.engine.places())
+                                    here=self.engine.here(), known=self.engine.places(),
+                                    reading=getattr(self, "reading", None), player_text="")
         # A disarmed creature re-arms first, by the engine's hand (`judgement.rearm`);
         # the prompt is told so as a fact, or the wind-up raises the fists the tells
         # are about to put a sap in.
