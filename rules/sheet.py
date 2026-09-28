@@ -848,6 +848,13 @@ class Actor:
         one call site somebody remembered, because 25 shipped spells carry a timed
         Constitution bonus and every one of them ends somewhere.
         """
+        # Nothing timed, nothing can end, and there is no maximum to follow. Measured
+        # 2026-09-27: `hp_max` reads the race document, whose freshness check stats the
+        # race folders, and the clock's one door ticks EVERY body the campaign holds —
+        # an hour's advance over 300 townsfolk with no timed effect among them took 0.5 s,
+        # all of it computing a maximum nothing then compared.
+        if not any(e.rounds_left is not None for e in self.effects):
+            return []
         before_max = self.hp_max
         ended = []
         for e in list(self.effects):

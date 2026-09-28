@@ -82,14 +82,21 @@ def test_a_vague_phrase_is_not_a_question_the_world_can_answer():
         assert scope.look_for(WORLD, phrase, None, VORMOOR)["scope"] == ""
 
 
-def test_the_trade_gets_no_lecture_about_who_governs():
+def test_the_trade_is_not_the_worlds_to_refuse():
     """The first version answered "there is no blacksmith in Vormoor, its authority is a
-    local reeve", which is a non sequitur: a town plainly has a smith and the world simply
-    never wrote one up. The authority clause belongs to offices."""
+    local reeve"; the second dropped the reeve and still answered "No blacksmith is here,
+    and Vormoor has none the world names" — though, as this test's own first docstring
+    said, "a town plainly has a smith and the world simply never wrote one up". Measured
+    live 2026-09-25: five of ten turns that asked for somebody new were refused this way,
+    "No scribe is here" of a city among them. A trade or a description is UNMET: no line,
+    and the plan introduces one (`judgement.inject_introduce`). Offices and names keep
+    the world's answer — the mayor stays refused."""
     smith = scope.look_for(WORLD, "blacksmith", None, VORMOOR)
-    assert smith["scope"] == scope.NOWHERE
-    assert "authority" not in smith["line"]
-    assert "reeve" not in smith["line"]
+    assert smith["scope"] == scope.UNMET and smith["line"] == ""
+    bread = scope.look_for(WORLD, "somebody selling bread", None, VORMOOR)
+    assert bread["scope"] == scope.UNMET
+    assert scope.look_for(WORLD, "mayor", None, VORMOOR)["scope"] == scope.NOWHERE
+    assert scope.look_for(WORLD, "Harwick Stolmere", None, VORMOOR)["scope"] == scope.NOWHERE
 
 
 def test_somebody_standing_here_is_here(scene):

@@ -401,9 +401,9 @@ def _chain(said, scene, world=None):
     raw = [{"op": "narrate_only", "params": {}}]
     for name in names:
         fn = getattr(judgement, name)
-        if name == "inject_travel":
+        if name in ("inject_travel", "inject_introduce"):
             raw = fn(raw, said, scene, world)
-        elif name == "fill_obvious_targets":
+        elif name in ("fill_obvious_targets", "fill_introduce_templates"):
             raw = fn(raw, scene)
         elif name == "fill_bare_checks":
             raw = fn(raw)

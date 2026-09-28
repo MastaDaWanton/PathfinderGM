@@ -1,0 +1,215 @@
+{
+ "note": "Ten bipolar axes. Structure after the public-domain IPIP item pool (ipip.ori.org); every word here is original to Pathfinder GM (2026-09-25). A score is rolled on a bell curve (3d6 scaled to 0-100): 40-60 is the silent middle and says nothing. Below 40 speaks the low pole, above 60 the high pole; the three words are for 25-39 / 61-75, 10-24 / 76-90, and the extremes. A person is voiced by their two most extreme axes (three when a third is past 85 or under 15). Each pole's id is the tag other tables are checked against. shows: one line of how it comes out in a scene, for the model. No cross-axis exclusions: opposites share one axis, so they cannot both be rolled, and every pairing across axes reads as a person (a timid gossip, a kind miser) — contradiction is what the other tables are checked against these tags for.",
+ "axes": [
+  {
+   "id": "trust",
+   "low": {
+    "id": "suspicious",
+    "words": [
+     "wary",
+     "suspicious",
+     "trusts nobody"
+    ],
+    "shows": "watches hands before faces and asks why before how"
+   },
+   "high": {
+    "id": "trusting",
+    "words": [
+     "open",
+     "trusting",
+     "believes anyone"
+    ],
+    "shows": "takes people at their word and is hurt when that fails"
+   }
+  },
+  {
+   "id": "temper",
+   "low": {
+    "id": "placid",
+    "words": [
+     "even-tempered",
+     "placid",
+     "unshakeable"
+    ],
+    "shows": "lets insults slide past as if they were weather"
+   },
+   "high": {
+    "id": "hot_tempered",
+    "words": [
+     "short-fused",
+     "hot-tempered",
+     "volcanic"
+    ],
+    "shows": "flares fast, cools fast, and says the worst of it in between"
+   }
+  },
+  {
+   "id": "candour",
+   "low": {
+    "id": "guarded",
+    "words": [
+     "discreet",
+     "guarded",
+     "a closed book"
+    ],
+    "shows": "answers questions with questions and gives away little"
+   },
+   "high": {
+    "id": "blunt",
+    "words": [
+     "plain-spoken",
+     "blunt",
+     "tactless"
+    ],
+    "shows": "says the true thing first and the kind thing never"
+   }
+  },
+  {
+   "id": "thrift",
+   "low": {
+    "id": "generous",
+    "words": [
+     "open-handed",
+     "generous",
+     "gives it all away"
+    ],
+    "shows": "pays for others without being asked and forgets it at once"
+   },
+   "high": {
+    "id": "tight_fisted",
+    "words": [
+     "careful with coin",
+     "tight-fisted",
+     "miserly"
+    ],
+    "shows": "knows the price of everything and haggles over the last copper"
+   }
+  },
+  {
+   "id": "piety",
+   "low": {
+    "id": "irreverent",
+    "words": [
+     "worldly",
+     "irreverent",
+     "mocks the gods"
+    ],
+    "shows": "treats omens as jokes and temples as buildings"
+   },
+   "high": {
+    "id": "devout",
+    "words": [
+     "observant",
+     "devout",
+     "zealous"
+    ],
+    "shows": "marks the day's small rites and sees the gods' hand in chance"
+   }
+  },
+  {
+   "id": "courage",
+   "low": {
+    "id": "timid",
+    "words": [
+     "cautious",
+     "timid",
+     "easily frightened"
+    ],
+    "shows": "keeps a door at their back and a reason to leave ready"
+   },
+   "high": {
+    "id": "bold",
+    "words": [
+     "game for anything",
+     "bold",
+     "reckless"
+    ],
+    "shows": "steps forward before anyone else has decided to"
+   }
+  },
+  {
+   "id": "sociability",
+   "low": {
+    "id": "reserved",
+    "words": [
+     "quiet",
+     "reserved",
+     "solitary"
+    ],
+    "shows": "speaks when there is something to say and not otherwise"
+   },
+   "high": {
+    "id": "gregarious",
+    "words": [
+     "friendly",
+     "gregarious",
+     "never stops talking"
+    ],
+    "shows": "knows everybody's news and shares it freely"
+   }
+  },
+  {
+   "id": "order",
+   "low": {
+    "id": "untidy",
+    "words": [
+     "easygoing",
+     "untidy",
+     "chaotic"
+    ],
+    "shows": "loses things, finds others, and does not mind either way"
+   },
+   "high": {
+    "id": "orderly",
+    "words": [
+     "tidy",
+     "orderly",
+     "fastidious"
+    ],
+    "shows": "keeps everything in its place and notices when it is not"
+   }
+  },
+  {
+   "id": "pride",
+   "low": {
+    "id": "humble",
+    "words": [
+     "modest",
+     "humble",
+     "self-effacing"
+    ],
+    "shows": "turns praise aside and credits somebody else"
+   },
+   "high": {
+    "id": "proud",
+    "words": [
+     "self-assured",
+     "proud",
+     "vain"
+    ],
+    "shows": "wants their work and name noticed, and says so if they are not"
+   }
+  },
+  {
+   "id": "mercy",
+   "low": {
+    "id": "hard",
+    "words": [
+     "unsentimental",
+     "hard",
+     "cold"
+    ],
+    "shows": "judges by results and does not soften a refusal"
+   },
+   "high": {
+    "id": "kind",
+    "words": [
+     "warm",
+     "kind",
+     "soft-hearted"
+    ],
+    "shows": "cannot pass somebody in trouble without stopping"
+   }
+  }
+ ]
+}

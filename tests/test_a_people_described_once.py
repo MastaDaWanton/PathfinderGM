@@ -62,7 +62,9 @@ class TestOnceIsRead_OffWhoHasBeenDescribed:
         assert faces.people_seen_before(b, s.people.values()) is True
         said = narration.a_face_for(b.name, faces.for_the_page(
             b.appearance, faces.people_seen_before(b, s.people.values())))
-        assert said == ("Ashla is an Orc: Old enough to have stopped counting; a fringe "
+        # Lower-cased after the colon: the age line is ours, and its capital was read as
+        # an invented name ("Somewhere", three faults in one live run, 2026-09-25).
+        assert said == ("Ashla is an Orc: old enough to have stopped counting; a fringe "
                         "cut straight across, badly.")
         assert "Powerfully built" not in said
 

@@ -118,8 +118,8 @@ EXAMPLES = [
                 "He does not answer straight away. He turns the cup in his hands instead, "
                 "twice around, and looks at the ring it has left on the counter. Somewhere "
                 "behind him a shutter is banging in the wind off the terraces and nobody "
-                "has got up to fix it. 'The guild pays,' he says at last, in the flat tone "
-                "of a man giving you a sentence he was handed. 'The guild has always paid.' "
+                "has got up to fix it. <say who=c1 to=you>'The guild pays,'</say> he says at last, in the flat tone "
+                "of a man giving you a sentence he was handed. <say who=c1 to=you>'The guild has always paid.'</say> "
                 "Then his eyes come up and hold yours a moment too long, and flick past "
                 "your shoulder to the door, and back. Whatever the true answer is, he has "
                 "just decided you are the kind of trouble that might make him say it. Do "
@@ -369,11 +369,11 @@ EXAMPLES = [
                 "She lets that sit. The fire has burned down to the point where it is more "
                 "sound than light, and she does not look at you while she thinks — she "
                 "looks at the shutter, which is closed, and at the door, which is not. "
-                "'A name,' she says. 'You understand that a name is the only thing in this "
-                "room that cannot be given back.' Her rings go round once on her finger. "
-                "'I will give you one. And if I hear it anywhere but from your mouth to "
+                "<say who=c1 to=you>'A name,'</say> she says. <say who=c1 to=you>'You understand that a name is the only thing in this "
+                "room that cannot be given back.'</say> Her rings go round once on her finger. "
+                "<say who=c1 to=you>'I will give you one. And if I hear it anywhere but from your mouth to "
                 "mine, I will not need to send anyone after you — I will simply say where "
-                "you were on the night of the fire, and let the guild do it.' She waits, "
+                "you were on the night of the fire, and let the guild do it.'</say> She waits, "
                 "and the offer is on the table between you, and it has a price on it. Do "
                 "you take it?"
             ),
@@ -399,14 +399,14 @@ EXAMPLES = [
             "narration": (
                 "He does not stop planing. The shaving curls off the strake and drops "
                 "onto the pile at his feet, and he watches the river over the top of the "
-                "work rather than you. 'Tide's wrong for it,' he says. 'That's the Harrow "
+                "work rather than you. <say who=c1 to=you>'Tide's wrong for it,'</say> he says. <say who=c1 to=you>'That's the Harrow "
                 "boys trying to bring a barge in on the ebb, and the lock-keeper telling "
-                "them what he thinks of that.' Out past the slipway two lanterns are "
+                "them what he thinks of that.'</say> Out past the slipway two lanterns are "
                 "moving on the black water, one of them going in circles. Somebody on the "
                 "far bank has started ringing a handbell, slowly, the way you would to be "
                 "heard rather than to raise an alarm. He runs his thumb along the edge he "
-                "has just made and looks at you properly for the first time. 'You're not "
-                "from the lock,' he says. 'So what do you want with it?' What do you tell "
+                "has just made and looks at you properly for the first time. <say who=c1 to=you>'You're not "
+                "from the lock,'</say> he says. <say who=c1 to=you>'So what do you want with it?'</say> What do you tell "
                 "him?"
             ),
             "suggestions": [
@@ -415,6 +415,65 @@ EXAMPLES = [
                 "I watch the lanterns and say nothing yet",
             ],
             "intents": [],
+        },
+    },
+    # Somebody new, declared before the prose (docs/declared-not-guessed.md): the plan
+    # brings the ferryman in with `introduce`, and the same plan speaks to him as new1.
+    # Before this op the only way anybody entered a scene was the prose describing them
+    # and a regex booking them afterwards.
+    {
+        "player": "I look along the quay for someone who knows the river past the weir, "
+                  "and ask them.",
+        "reply": {
+            "narration": (
+                "Most of the quay has the look of people who have been asked something "
+                "already today and did not care for it. The fish-sellers keep their eyes "
+                "on their scales. Only at the far end, where the boards give way to "
+                "shingle, does anybody look up: an old ferryman on an upturned hull with a "
+                "net across his knees, working a torn mesh closed with a wooden needle. He "
+                "watches you come the whole length of the quay without stopping the "
+                "needle, and when you are close enough he lifts his chin a fraction, which "
+                "on this quay is as good as an invitation. What do you ask him?"
+            ),
+            "suggestions": [
+                "I ask him what lies past the weir",
+                "I offer him a coin for the telling",
+                "I sit down on the hull beside him and wait",
+            ],
+            "intents": [
+                {"op": "introduce",
+                 "because": "a quay has somebody who has worked the river for years",
+                 "params": {"who": "old ferryman mending a net", "how": "already_here"}},
+                {"op": "say", "actor": "pc", "because": "the player asks him",
+                 "params": {"words": "Do you know the river past the weir?", "to": "new1"}},
+            ],
+        },
+    },
+    # Somebody else strikes first, declared in the plan (docs/declared-not-guessed.md,
+    # the blows door). Before this the only way an NPC's blow reached the dice was a
+    # regex reading it out of the finished prose (`attacked_by`), which read "the
+    # barmaid rushes over to you with a tankard" as a blow. The actor is the NPC; the
+    # engine opens the fight from his side and rolls his blow before the prose is written.
+    {
+        "player": "I knock the cup out of his hand and laugh in his face.",
+        "reply": {
+            "narration": (
+                "The cup goes spinning off the end of the bar and the laugh is still in "
+                "your mouth when he comes off the stool. He is bigger standing than he "
+                "looked sitting, and he does not say anything at all: his right hand is "
+                "already a fist and already coming round at the side of your head, and "
+                "the men at the next table push their chairs back to give him the room. "
+                "What do you do?"
+            ),
+            "suggestions": [
+                "I duck under it and hit him back",
+                "I step back out of his reach",
+                "I grab the stool and put it between us",
+            ],
+            "intents": [
+                {"op": "attack", "actor": "c1", "target": "pc",
+                 "because": "he will not be laughed at in front of his friends"},
+            ],
         },
     },
 ]
@@ -431,7 +490,8 @@ EXAMPLES = [
 COMBAT_FORMULA = """A fight is fast and the writing is fast with it. One formula, every
 round:
 
-  LANDED   what the last beat did — a clause, not a sentence
+  LANDED   what the last blow did to the body — where it hit, what it opened or broke, the
+           blood — in plain physical words, a clause, not a sentence
   THREAT   what is coming at them right now, and from where
   OPENING  one concrete thing they could use: ground, a rail, a lamp, somebody's blind
            side, the fact that he has to step over a body to reach you
@@ -500,11 +560,17 @@ COMBAT_EXAMPLES = [
     {
         "player": "I stay on him and keep hitting.",
         "reply": {
-            "narration": "He is not blocking any more, just covering, and the arm he is "
-                         "covering with is the one that is bleeding. Behind you the door "
-                         "you came in by bangs once against its frame — somebody has come "
-                         "through it. He sees them before you do, and it puts something "
-                         "back into his face. Do you finish him or turn round?",
+            # Written out in the body, 2026-09-25. The fight examples were bloodless — this
+            # one's "the arm that is bleeding" was the only wound in five — and the prose
+            # copied them: in the recorded fights, "the violence" and "the chaos" turned up
+            # in about one beat in three. The player asked for the gore, plainly. These are
+            # the wounds of the blows before this one, so the example still never says how
+            # this turn's roll went.
+            "narration": "He is not blocking any more, just covering: your last punch "
+                         "opened his eyebrow to the bone, and blood has run into the eye so "
+                         "he fights half blind, spitting red through a split lip. The "
+                         "forearm he holds up is laid open from the wrist. Behind you the "
+                         "door bangs — somebody has come in. Do you finish him or turn round?",
             "suggestions": ["I finish him now", "I turn to see who came in",
                             "I get where I can see both"],
             "intents": [{"op": "attack", "actor": "pc", "target": "c1",
@@ -592,7 +658,8 @@ Reply with a JSON object:
 {"narration": "...", "suggestions": ["...", "..."], "intents": [...]}.
 
 People and creatures are named by ref, never by name. The refs that exist are listed
-below; there are no others. If you want someone new in the scene, use the spawn op.
+below; there are no others. To bring a person into the scene, introduce them first and
+call them new1 for the rest of the turn; a creature or a foe arriving to fight is a spawn.
 
 Difficulty is a word from this list, not a number: %s.
 A circumstance is "favorable" or "unfavorable", nothing else.
@@ -768,7 +835,7 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
 
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=(), recent=None, secret=False, turn=0, names_for=None,
-                absent: str = "") -> str:
+                absent: str = "", buying: str = "") -> str:
     """The world facts the GM may draw on this turn.
 
     A budget, not a dump. This is the thing that decides whether a local model answers in
@@ -777,6 +844,13 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     lines = [f"WORLD: {world.name}."]
     if world.premise:
         lines.append("Premise: " + "; ".join(f"{k} — {v}" for k, v in world.premise.items()))
+
+    # What time it is, as fact (rules/residency.py, `time_words`): who is where and which
+    # counters are open follow the hour, and a narrator not told it writes a busy market
+    # at a stall the engine has shut.
+    from rules import residency as _residency
+
+    lines.append(f"WHEN (fact): {_residency.time_words(getattr(scene, 'clock_minutes', 0))}.")
 
     if location:
         # The scale AND what it means. "a village" was all this said, and a model shown
@@ -896,6 +970,17 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     seen = _judgement.heat_brief(scene)
     if seen:
         lines.append("\n" + seen)
+    # The counter here keeps hours, and they are over (rules/keepers.py): said as fact, so
+    # the beat does not write a bustling stall at midnight that the engine will not sell at.
+    from rules import keepers as _keepers
+
+    shut = _keepers.shut_here(scene)
+    if shut:
+        lines.append(f"\nCOUNTER SHUT (fact): {shut}")
+    # The player set out to buy something and the counter's screen opens for it after
+    # this beat (play/views.py, `_trade_offer`): the prose settles nothing.
+    if buying:
+        lines.append(f"\nAT THE COUNTER (fact): {buying}")
 
     # The player went looking for somebody who is not here, and the world has an answer.
     # Stated before the cast, as fact, because the failure was a model answering a question
@@ -1092,8 +1177,21 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 bond += (f" {actor.name} TRAVELS WITH the player: they came here "
                          f"together and they go on together. They have their own eyes "
                          f"and their own opinions about what is around them.")
+            # How they carry themselves, from the life the population rolled for them:
+            # behaviour, two traits at most, the quirk only when it is due — and never
+            # their wants, goal or hobby, which are learned in play and which a 12B model
+            # told them leaks (rules/population.py, "what the narrator is told").
+            from rules import population as _population
+
+            rec = _population.of_ref(scene, ref)
+            manner = _population.manner_for(rec, turn)
+            manner = f" {manner}" if manner else ""
+            # Said as a fact every turn: the table's content rule is adults only, and
+            # the narrator cannot keep a rule about a child it was never told is one.
+            if rec and "minor" in ((rec.get("life") or {}).get("tags") or []):
+                manner += f" {actor.name} IS A CHILD (fact)."
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
-                         f"{_states_of(actor)}")
+                         f"{manner}{_states_of(actor)}")
         # Who the player is talking to, as a fact with a rule attached. The step is
         # the vocabulary's word and the number stays on the panel: the narrator hears
         # how somebody feels, never what they score (the third law).
@@ -1296,7 +1394,9 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     # which is every prose call, handed `[]` by design — the whole ledger is outside
     # the window and all of it is fair game.
     edge = dropped if kept_history else 10 ** 9
-    remembered = ledger_mod.block(ledger, before_hist=edge, budget=reserve) if ledger else ""
+    # Less the two characters of the "\n\n" it is joined on with below.
+    remembered = (ledger_mod.block(ledger, before_hist=edge, budget=reserve - 2)
+                  if ledger else "")
     if remembered and head:
         # Onto the system message, which is never cut: these are facts the engine
         # kept, and they rank with the brief rather than with the conversation.
@@ -1461,13 +1561,13 @@ CARRY_ON_EXAMPLES: list[dict] = [
     {
         "player": CARRY_ON,
         "reply": {"narration": (
-            "He takes his time about it, but he does answer. 'Two days,' he says, still "
-            "working the strap. 'The cart comes on the third, and it comes with men on "
-            "it.' He tests the buckle, finds it holds, and sets the harness on the rail "
+            "He takes his time about it, but he does answer. <say who=c1 to=you>'Two days,'</say> he says, still "
+            "working the strap. <say who=c1 to=you>'The cart comes on the third, and it comes with men on "
+            "it.'</say> He tests the buckle, finds it holds, and sets the harness on the rail "
             "beside the other two. His girl comes out with the pail and stops when she "
             "sees you, then goes on to the trough as if she had not. The rain has got "
-            "into the ruts. 'If you are still here on the third,' he says, 'stand where "
-            "I can see you.' What do you do?")},
+            "into the ruts. <say who=c1 to=you>'If you are still here on the third,'</say> he says, <say who=c1 to=you>'stand where "
+            "I can see you.'</say> What do you do?")},
     },
     {
         "player": CARRY_ON,
@@ -1476,7 +1576,7 @@ CARRY_ON_EXAMPLES: list[dict] = [
             "whatever was holding it has been settled or given up on, and the carts go "
             "through one after another with the guard waving each on without looking. "
             "The woman beside you finishes her bread, brushes her hands, and stands. "
-            "'They will want the square cleared by noon,' she says, to you, and goes "
+            "<say who=c2 to=you>'They will want the square cleared by noon,'</say> she says, to you, and goes "
             "down the steps toward the market. Two of the guard come up the street the "
             "other way, and one of them is already looking at you. What do you do?")},
     },
@@ -1491,6 +1591,15 @@ turn as prose — the scene, the people in it, what just happened — and put no
 What the engine decided is what happened. Do not contradict it, do not add a roll, do not
 state a number, and do not invent an outcome it did not give you. If it decided nothing
 mechanical, this is a quiet beat: describe the place and the people and hand the turn back.
+
+Write bodies, not summaries. Say what moves, where it goes and what it does: the hand, the
+blade, the step, the fall. When a blow lands, show the wound in plain physical words —
+where it opened, what broke, the blood and where it runs — never "the violence", "the
+chaos" or "the struggle".
+
+When somebody from WHO IS HERE speaks, wrap their words in a tag with their ref, and
+to=you when they say it to the player: <say who=c2 to=you>'Two days,'</say> he says.
+The tags are taken out before anyone reads the page. The player's own words get no tag.
 """
 
 
@@ -1693,8 +1802,15 @@ def content_line() -> str:
     from rules import houserules
 
     if houserules.content() == "explicit":
-        return ("\nThis table permits adult content: when a scene turns to intimacy, "
-                "write it plainly and go on with the scene.\n")
+        # Asked for 2026-09-25: the narrator "shies away ... by being metaphorical"; the
+        # table wants intimate scenes written as vividly as the fights, in the body.
+        # Adults only, without exception — the population holds children now
+        # (rules/lives.py), so the rule is stated here and checked in code after the
+        # prose (`narration.intimate` with the scene's minors, in `views._finish`).
+        return ("\nThis table permits adult content. When a scene between adults turns "
+                "to intimacy, write it vividly and in the body — the physical actions, "
+                "touch, breath and bodies described plainly, not in metaphor — and go on "
+                "with the scene. Never anyone who is a child, in any way.\n")
     return ("\nWhen a scene turns to intimacy, fade to black: say in one sentence that "
             "time passes, then pick the scene up afterwards — never stall it, never "
             "replace what the people were doing with the room's weather.\n")
@@ -1736,22 +1852,110 @@ CONSEQUENCE_EXAMPLE = {
 }
 
 
+# A creature's turn, demonstrated. The example above is the player's turn — the tell
+# names the player and the answer calls them "you" — and it was the ONLY example this
+# call had, so on a creature's turn it taught the wrong lesson exactly: the tell's
+# subject is "you". Measured 2026-09-27 on the gemma-4-12B fight audit, with the call
+# opening "The player said: Borin Lyraxys acts": "You weave through the panicked crowd …
+# close the distance to the heavy door" for "Borin Lyraxys moves", and 8 of the 100
+# enemy-turn beats in the recorded corpus turned round the same way. Demonstration, not
+# instruction: this example has a creature acting and the player on the receiving end,
+# the tells already in the player's person, and the creature named in the answer.
+# The same ferry as the example above, and nowhere near the shipped world, for the same
+# reason: a copied answer must be catchable.
+CONSEQUENCE_NPC_EXAMPLE = {
+    "user": (
+        "It is the ferryman's turn, not the player's. The ferryman acted; the player's "
+        "character is \"you\".\n\n"
+        "You had already narrated: The ferryman lets go of the rail and comes at you "
+        "along the deck with the boathook.\n\n"
+        "What the engine decided:\n"
+        "- The ferryman's attack misses you.\n"
+    ),
+    "assistant": (
+        "The ferryman swings the boathook flat and hard, and you duck under it; the iron "
+        "cracks against the mast behind your head. He drags it back for another try, "
+        "breathing hard."
+    ),
+}
+
+
 def call_two_messages(narration: str, tells: list[str], because: list[str],
-                      player_input: str) -> list[dict]:
+                      player_input: str, *, acting: str = "",
+                      pc_name: str = "") -> list[dict]:
+    """The consequence call. `acting` is set on a creature's own turn: then the call
+    says whose turn it is instead of "The player said: <creature> acts", shows the
+    tells with the player already as "you" (Inform's adaptive text does the same — one
+    report, rendered "you" for the player and by name for anyone else, the story's
+    viewpoint applied by the system rather than guessed by the writer), and
+    demonstrates a creature's turn rather than the player's."""
+    if acting and pc_name:
+        from .narration import pc_to_second_person
+
+        tells = [pc_to_second_person(t, pc_name)[0] if t else t for t in tells]
     facts = "\n".join(f"- {t}" for t in tells if t)
     why = "\n".join(f"- {b}" for b in because if b)
+    if acting:
+        opening = (f"It is {acting}'s turn, not the player's. {acting} acted; the "
+                   f"player's character is \"you\".\n\n")
+        example = CONSEQUENCE_NPC_EXAMPLE
+    else:
+        opening = f"The player said: {player_input}\n\n"
+        example = CONSEQUENCE_EXAMPLE
     content = (
-        f"The player said: {player_input}\n\n"
-        f"You had already narrated: {narration}\n\n"
-        f"What the engine decided:\n{facts}\n"
+        opening
+        + f"You had already narrated: {narration}\n\n"
+        + f"What the engine decided:\n{facts}\n"
     )
     if why:
         content += f"\nWhy it was rolled:\n{why}\n"
     return [
         {"role": "system", "content": CONSEQUENCE_BRIEFING},
-        {"role": "user", "content": CONSEQUENCE_EXAMPLE["user"]},
-        {"role": "assistant", "content": CONSEQUENCE_EXAMPLE["assistant"]},
+        {"role": "user", "content": example["user"]},
+        {"role": "assistant", "content": example["assistant"]},
         {"role": "user", "content": content},
+    ]
+
+
+# The targeted repair under `wrong-actor`: a creature's turn told the wrong way round.
+# One call per beat, and only when the check fired — never a standing cost of a round.
+ACTOR_REPAIR_BRIEFING = """You narrated a creature's turn in a fight, and wrote it the
+wrong way round: the creature's act was given to the player, or the player's name to the
+creature. Rewrite the passage so the creature named is the one who acts, called by its
+name, and the player's character is "you" — the one it is done to — and never named.
+
+Keep what happened exactly as the tells say, the voice, and about the same length. Do not
+say how any roll turned out beyond what the tells say.
+
+Reply with a JSON object: {"narration": "..."}."""
+
+ACTOR_REPAIR_EXAMPLE = {
+    "user": (
+        "It was the ferryman's turn, not the player's.\n\n"
+        "What the engine decided:\n- The ferryman's attack misses you.\n\n"
+        "The passage:\nYou swing the boathook at the stranger on the deck, but it cracks "
+        "against the mast.\n\n"
+        "The problem: it was the ferryman's turn, and the passage never names the "
+        "ferryman — the act is given to \"you\"."
+    ),
+    "assistant": json.dumps({"narration": (
+        "The ferryman swings the boathook at you and it cracks against the mast, a "
+        "hand's width from your head.")}),
+}
+
+
+def actor_repair_messages(passage: str, acting: str, tells: list[str],
+                          problem: str) -> list[dict]:
+    facts = "\n".join(f"- {t}" for t in tells if t) or "- (nothing landed)"
+    return [
+        {"role": "system", "content": ACTOR_REPAIR_BRIEFING},
+        {"role": "user", "content": ACTOR_REPAIR_EXAMPLE["user"]},
+        {"role": "assistant", "content": ACTOR_REPAIR_EXAMPLE["assistant"]},
+        {"role": "user", "content":
+            f"It was {acting}'s turn, not the player's.\n\n"
+            f"What the engine decided:\n{facts}\n\n"
+            f"The passage:\n{passage}\n\n"
+            f"The problem: {problem}"},
     ]
 
 
@@ -2028,9 +2232,40 @@ _FIGHT_OPS = ("attack", "cast", "use_ability", "use_item", "move", "spend_pools"
 _CREATURE_OPS = _FIGHT_OPS + ("damage", "ability_damage")
 
 
+_NUMERIC_PARAMS = {"amount": "number", "count": "integer", "hours": "integer"}
+
+
+def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...]) -> dict:
+    """One required op's shape in the reply's `declared` object: its target and params,
+    the params the op requires marked required — and a travel's place held to the names
+    of the places this town really has (generation under a list of valid names; GENRE,
+    arXiv 2010.00904), so the model chooses among them and invents none."""
+    from rules.intents import OPS as _OP_TABLE
+
+    from rules.intents import FLAG_PARAMS
+
+    required, optional, _vis = _OP_TABLE.get(op, ((), (), ""))
+    props: dict = {}
+    for name in (*required, *optional):
+        # A flag is a boolean at the sampler: typed "string", `full_attack` could only
+        # ever be sampled as a word, and `bool("false")` is True (rules.intents._flag).
+        props[name] = {"type": "boolean" if name in FLAG_PARAMS
+                       else _NUMERIC_PARAMS.get(name, "string")}
+    need = list(required)
+    if op == "travel" and places:
+        props["place"] = {"type": "string", "enum": list(places)}
+        need = ["place"]
+    shape: dict = {"type": "object", "properties": {
+        "params": {"type": "object", "properties": props, "required": need}},
+        "required": ["params"]}
+    if refs:
+        shape["properties"]["target"] = {"type": "string", "enum": list(refs)}
+    return shape
+
+
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                 min_chars: int = 0, must_contain: tuple[str, ...] = (),
-                ops: tuple[str, ...] = ()) -> dict:
+                ops: tuple[str, ...] = (), places: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
 
     `refs` pins the cast: the enum makes it impossible to aim at somebody who is not in
@@ -2042,7 +2277,15 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
     by asking the injectors themselves), the reply is required to contain that op, and the
     model then picks the item, the target and the reason with the scene in front of it. An
     injector bolting those on afterwards has to guess them.
+
+    The placeholders `introduce` hands out (new1…) join the refs wherever that op can be
+    written, so a plan can talk to the person it just brought in; the engine refuses one
+    used before the intent that makes it.
     """
+    from rules.intents import INTRODUCED_REFS
+
+    if refs and not fighting and (not ops or "introduce" in ops):
+        refs = tuple(refs) + tuple(r for r in INTRODUCED_REFS if r not in refs)
     intent = {
         "type": "object",
         "properties": {
@@ -2085,7 +2328,7 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
     # to write the intents after it. Clamped to what Ollama's grammar compiler can
     # actually build — see GRAMMAR_MAXLENGTH_CEILING.
     narration["maxLength"] = min(800 if fighting else 2000, GRAMMAR_MAXLENGTH_CEILING)
-    return {
+    schema = {
         "type": "object",
         "properties": {
             "narration": narration,
@@ -2094,6 +2337,22 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         },
         "required": ["narration", "intents"],
     }
+    if wanted:
+        # The requirement the sampler actually keeps. Measured 2026-09-27 against the
+        # local model: Ollama's grammar does NOT enforce `contains` (0 of 6 replies held
+        # the required op) nor `prefixItems` (0 of 6), so every declarer's "the reply is
+        # unsamplable without one" was a hint the model could ignore — and did: "I go to
+        # the market and buy a coil of rope" planned no walk, twice. A REQUIRED property
+        # it keeps (6 of 6). So the ops the player's words commit the turn to are also
+        # asked for as required keys of `declared`, one per op, which the agent merges
+        # into the intents when the list left them out (`GMAgent._merge_declared`). The
+        # `allOf` above stays for providers that do enforce it.
+        schema["properties"]["declared"] = {
+            "type": "object",
+            "properties": {op: _declared_op(op, refs, places) for op in wanted},
+            "required": list(wanted)}
+        schema["required"] = ["narration", "declared", "intents"]
+    return schema
 
 
 # --- The author's own hand -------------------------------------------------------------

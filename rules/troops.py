@@ -248,7 +248,9 @@ def form(template: str, members: int, scene=None, name: str = "",
     from .bestiary import instantiate
 
     n = max(1, int(members or 1))
-    one = instantiate(template, scene=scene)
+    # A pattern, never added: no scene, so it is not named apart from anybody here —
+    # the members of a unit of raiders are raiders, not "second Raider"s.
+    one = instantiate(template)
     member_hp = max(1, int(one.hp_max or one.hp or 1))
     actor = instantiate(template, scene=scene, name=name or _plural_name(one.name, n))
     actor.troop = Troop(member=str(getattr(one, "from_template", "") or template),

@@ -107,3 +107,261 @@ blows, then places, then the booking door last (the biggest).
   is happening to allow for travel, questing and discovery." Founding stays on the prose
   path (outside fights) and gains the planner's `found`; the corpus measures that places
   still appear.
+
+## Built: speaker tags (2026-09-25)
+
+The first door. The prose call writes `<say who=c3 to=you>'…'</say>`. `speech.lift`
+takes the tags out the moment any reply's narration is read: `GMAgent._lift` sits at
+every reader, an AST test holds all of them to it, and the opening lifts its own.
+The tags are checked against the people standing where the party is, never against
+everyone in the save. An unknown ref attributes nothing and books nobody; its claim is
+kept as `was` so the miss can be counted. `hailed_by` and `introduced_by` read the tag
+first and fall back to the old guess for untagged lines. The beat keeps its
+attributions as `said`, and every turn logs `speech-tags`: lines, tagged, refs naming
+nobody here, and the hails the tags found beside the hails the guess would have found.
+
+Prior art: Intra (Bicking, 2025) writes `<dialog from= to=>` inline, choosing text
+markup over tools for narrative work. Nobody has published tag compliance for 8-12B
+models, so these runs are the measurement.
+
+**Live, gemma-4-12B, the town script, 12 turns each, from the game's own turn log:**
+
+| | tags taught by the examples | + the model's own earlier beats shown tagged |
+|---|---|---|
+| quoted lines attributed on the page | 9 of 20 (45%) | 16 of 20 (80%) |
+| tags naming somebody not present (refused, fell back) | 2 | 2 |
+| hails the tag found and the guess missed | 2 | 4 |
+| hails the guess found and the tag contradicted | 0 | 0 |
+| tags reaching the page | 0 | 0 |
+
+The first run tagged all or nothing per beat. The untagged beats followed tagged ones
+that the prompt had shown back to the model with the tags lifted, so two beats of the
+model's own untagged speech sat in front of it against the examples' tagged ones.
+`speech.retag` writes the recorded tags back for the prompt only; every check still
+reads the plain beat. Twelve turns is a small sample, and the direction is what it
+shows.
+
+The one tagged speaker who was wrong: the man tending a cart's crates in a field was
+tagged as the gate's watchman, who was elsewhere. The check refused the tag, and the
+fallback guess read "the merchant's cart" as the merchant who was standing there.
+
+Both runs are in the replay corpus. It replays each draft against the scene from before
+the turn, so its tag count is a floor: a person the turn's own plan spawned counts as
+"nobody here".
+
+Next door: names read from tagged speech are already live through `introduced_by`. The
+`introduce` op comes next.
+
+## Built: `introduce` (2026-09-25)
+
+The second door. `introduce{who; count <= 3, how: arrives|already_here, template, zone}`
+makes a bystander with a population record, a rolled life and a face, through
+`population.embody`: the one door the prose's people, the finder's repair and the plan
+now share. The same plan targets them as new1–new3, placeholders in the style of
+JSON:API's `lid` and ReWOO's `#E1`. Each is legal only after the intent that makes it,
+and is stamped at validation so the model cannot write it. The engine swaps real refs
+into the queue as each person lands, so a turn suspended for a roll saves real refs.
+`already_here` binds to the glimpse or actor the scene already holds before it makes
+anybody. There is one `introduce` per plan: Labyrinth and When2Call both measure
+over-use of an op that is always available.
+
+**Live, gemma-4-12B, a ten-turn script where every line asks for somebody new
+(`narrator_audit.py --script strangers`):**
+
+| | run 1 | run 2 | run 3 | run 4 |
+|---|---|---|---|---|
+| turns where introduce ran | 2 | 9 | 9 | 8 |
+| false "not here" refusals | 5 | 1 | 0 | 1 → fixed |
+| turns lost | 0 | 0 | 1 | 0 |
+| plan attempts for 10 turns | — | — | ~25 | 11 |
+
+The planner under-used the op rather than over-using it: in the first run it wrote
+`introduce` only where a turn was worded like the worked example. The fixes, each found
+in one of these runs:
+
+- **Trades were refused as absent.** "No scribe is here, and Zhilvarnia has none the
+  world names", said of a city: the item-29 rule against conjuring the mayor had reached
+  every trade. A trade or a description is now UNMET, and offices and unknown names keep
+  the world's answer.
+- **`person_sought`** read "ask around for a healer" as "a" + "round".
+- **Scope matched on "the"**, so "the oldest person on the street" matched a guild leader
+  in another city.
+- **`inject_introduce`** declares the op when the player looks for somebody who isn't
+  here, in a settlement, out of a fight. The schema's `must_contain` did not hold on half
+  the turns, so the injector is also the net.
+- **Leniency:** `how` and `who` are read, not refused. A blank `who` is filled from the
+  player's words, and a long one is clipped.
+- **The repeat check** read two introductions as "the same thing as last turn", because
+  the net writes one `because` for all of them. It lost a turn.
+- **Definiteness.** "a child" is any child: the population's here ring, then a new
+  person. "the girl" is that girl, in every ring. This is the same Heim distinction the
+  cast ledger uses, and the user's ruling that untied kinds should not always reuse.
+- **The three invented-name faults of run 2** were our own face line ("is a Korvu:
+  Somewhere in the middle of life"); the age clause is now lower-cased.
+
+Not done: a trade the population rolled but the prose never showed still answers the
+finder. In run 4, "a scribe" in the tavern found the man in the corner whom the
+population had rolled as a scribe. That reads as the world being consistent; flagged to
+the user.
+
+## Built: blows as plan ops (2026-09-25)
+
+The fourth door.
+
+- **A blow the plan declares is rolled before the prose.** It is an `attack` with an NPC
+  as actor. When somebody other than the player opens a fight, `Engine.run` rolls the
+  initiator's blow in the same batch (`_their_first_blow`), so the prose describes what
+  landed. `struck_first` is one run of that rule now; the opening effect carries the
+  declared params.
+- **The prose never opens a fight.** `attacked_by` is a check, run in `narrate_turn`. A
+  blow the engine never rolled gets one targeted rewrite naming the fix. If it still
+  strikes, the sentence is cut. This holds whether or not the striker is somebody the
+  scene holds yet. `_finish` logs anything still read and opens nothing.
+- A worked example shows the planner declaring an NPC's blow.
+  `narrator_audit.py --script provoke` escalates verbally against one man; nothing the
+  player does is itself an attack.
+
+**Live, gemma-4-12B, the provoke script:**
+
+| | run A | run B |
+|---|---|---|
+| turns where the plan declared his blow | 2 (turns 8, 9) | 0 |
+| fights the prose door opened | 1, on "he slams a heavy, calloused fist onto the bar" | 0 |
+| blows the new check had to rewrite | — | 0 |
+
+A first version of the script knocked a drink from his hand. The planner read that as
+the player attacking, so every turn after it was already a fight. The same line produced
+"Kesst Vayr drinks." (the noun "drink" read as the verb), which is now fixed.
+
+**What this leaves open, measured:** the man was insulted nine times in run B and never
+struck. The prose built the tension correctly and waited ("He doesn't lunge, but his
+knuckles turn white"). Nothing in the world moved: no insult changed anyone's attitude,
+so the world has no route from provocation to violence, and the planner rarely takes the
+step unprompted. This is a question of world logic, put to the user rather than guessed.
+
+## Built: places by the plan (2026-09-26)
+
+The fifth door, under the user's ruling that the mechanism is free and the outcome is
+not: places must keep being created for travel, questing and discovery, and the prose
+door stays alongside the planner's `found`.
+
+- **A plan can found a place and walk into it in the same turn.** Validation checked
+  the whole list before any of it ran, so "found The Tarred Rope, travel there" was
+  refused because the place did not exist yet. It now projects the places earlier
+  `found` intents will make, as `spawn` projects refs. A `travel` written before its own
+  `found` has the `found` moved ahead of it.
+- **A travel to an unknown place is refused with the fix named**: "found it first in
+  the same plan", with the op spelled out. In the live runs this refusal taught the
+  planner every place it founded: the first attempt was refused, and the retry founded
+  and walked in.
+- **A building hangs off the street.** A settlement kind founded from inside a building
+  goes off the nearest place under the sky, up the chain or out through the interior's
+  first exit. Live, before this: "the stables is a place now, off the shrine".
+- **An empty travel takes the place the player named**, when the sentence names exactly
+  one settlement kind. Live, twice: "I go looking for the bathhouse" became a travel to
+  nowhere and "Nobody moves: where to?".
+
+**Live, gemma-4-12B, `narrator_audit.py --script discover` (ten places to look for):**
+
+| | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| places the plan founded | 4 | 3 | 3 |
+| places the prose door founded | 0 | 0 | 0 |
+| a building founded inside another | 1 (stables off the shrine) | 0 | 0 |
+| travels to nowhere | 2 | 2 | 0 |
+
+The replay corpus now counts `plans founding a place`.
+
+Seen and not fixed: a plan that introduced a bookseller and then walked the party to the
+guildhall, leaving him behind. That is the planner's coherence, not a door.
+
+## Decided and built (2026-09-27): the prose records people, and makes no bodies or places
+
+The user asked whether, now that the planner makes people and places, the prose needed
+to make them at all. After the trade-offs were measured, they chose option (a):
+
+- **Places: the page founds none.** A beat set somewhere the party is not is
+  `stands-elsewhere` and is rewritten to where they are. Places come from the plan's
+  `found` (founded and walked into in one turn), from the player, and from venturing
+  out. This replaces the 2026-09-23 ruling that let the page found places ("i dont mind
+  it creating a dock so long as it remembers…"). What that ruling wanted, a remembered,
+  sensible, staffed dock, still holds through the plan's door. Measured before the
+  choice: in three discover runs the page founded none and the plan all ten. The page's
+  one measured misfire was a smithy founded from a brawl's prose.
+- **People: the prose records, and never embodies.** Everyone it describes becomes a
+  population record: located, searchable, with a life (the "there is nothing left of
+  her?" ruling). `promote_cast` is no longer called from the prose path. A hand check of
+  that door had found 11 of 30 booked people wrong, and a body is what turned a misread
+  into a phantom in a fight. A person gets a body when the plan introduces them or when
+  the player turns to them (`judgement.embody_sought`, before the plan).
+- **In a fight, the prose brings nobody new in.** A newcomer only the prose describes
+  gets a targeted rewrite (`GMAgent._undeclared_arrivals`). Item 30's raiders are the
+  plan's `spawn`.
+
+**Live, the town script, 12 turns, after:** the planner introduced three people itself
+(the stallholder, the smith, the gate guard; none in the earlier town run) and founded
+the smithy and walked in. Ten people were recorded and four have bodies, the ones engaged
+or introduced. One beat set in "the lane" was rewritten, since "there is no lane in this
+place at all". No place came from the page. The blows check cut one sentence wrongly: a
+smith "mid-swing" with his hammer at the anvil. A weapon now makes a swing a blow at the
+player only when the player is in the sentence.
+
+## Built (2026-09-27): a placeholder is ours, and a dangling one makes nobody
+
+**What happened.** In the fight audit on twin-names (gemma-4-12B), turn 2 was "I punch him
+in the face". The plan came back as `attack pc -> new1` with no `introduce`. The ref check
+refused `new1`, the invented-ref repair stripped the digit, and it spawned a 13-hp thug
+called **new**. The tells read "Battle is joined: Kesst Vayr squares off against new",
+and the wrong-actor repair logged "it was new's turn, and the beat never names new". Turn
+1 had already written `say to new1`. Both times the placeholder meant Borin Lyraxys, the
+one man in the tavern, standing there as c2. `inject_fight` had even put a correct second
+attack on him, so the punch was rolled twice: once at a phantom, once at Borin.
+
+The same digit-stripping named `npc1` "npc", `enemy1` "enemy" and `target1` "target".
+
+**Prior art.** `new1` is the local id `introduce` hands out, in the style of JSON:API's
+`lid`. The specification (jsonapi.org/format/1.1) defines a `lid` only as the identity of
+a new resource created in the same document. I could not find an explicit rule for a
+dangling one. It is not a resource, so it falls under the atomic extension's 400 for a
+malformed operation, and it is never an implicit create.
+
+**The rulings, in code** (`judgement.bind_placeholders`, before any target fill):
+
+- **A label is never a name.** A ref made only of slot words (`new`, `npc`, `enemy`,
+  `target`, `foe`, `man`, ...: `_LABEL_WORDS`) gives no name to anybody it makes.
+  `winged_woman` and `kaldrimia` still name who they mean.
+- **A placeholder is never spawned.** `repair_unknown_refs` declines `newN`.
+- **Declared under the wrong op.** A plan that spawned and then wrote `new1` gets the
+  spawn's first ref.
+- **One dangling label is bound to the person the player's words can only mean.** First
+  the person the sentence names. Then the one the population finds here for a
+  description. Then, for a pronoun, the one person engaged, then the one person in the
+  room. It is never bound when the sentence has somebody arriving, and never when two
+  people fit.
+- **Otherwise it is refused with the fix named** (`Engine._refuse_placeholder`): "new1 is
+  the placeholder introduce hands out ... Somebody already here is aimed at by their own
+  ref — here: c2 (Borin Lyraxys). Somebody new comes in by an introduce written before
+  it." Before this, the refusal was the generic unknown-ref one plus the spawn hint, which
+  read as an invitation to spawn.
+
+**Weighed and refused: an `introduce` built from the beat.** The plan's draft did
+describe "two others at the nearest table stand up". But that is prose, and the ruling
+above is that prose makes no bodies. The player had punched the man already there. If
+the plan meant a newcomer, the refusal tells it to declare one.
+
+**Measured.** Turns 1 and 2 of that run are kept in `tests/replay/plans/`. Turn 2's
+recorded plan is replayed through the real `plan_turn`, with the recorded replies
+standing in for the model (`tests/test_placeholders_are_ours.py`). Before the fix it gave
+spawn "new" + attack c3 + attack c2. After it, one attack on c2.
+
+A fresh live fight audit on the branch (12 turns, gemma-4-12B) came back 12/12 clean.
+But the planner wrote no placeholder and no label ref in any call, and aimed at c2 by
+ref every time. So that run confirms nothing regressed. It does not exercise the new
+path; the replayed recording does.
+
+**Seen and not changed.** The plan schema puts `new1`–`new3` in the actor/target enum of
+every plan outside a fight where `introduce` can be written (`prompts.turn_schema`). So
+when the model wanted "him", the grammar offered `new1` as one of five legal strings.
+Taking the placeholders out of the enum would stop a plan attacking or checking against
+somebody it introduced (`say`'s `to` lives in params, outside the enum). That is a
+trade-off to measure with the strangers script before changing it.

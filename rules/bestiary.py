@@ -262,6 +262,10 @@ def instantiate(
     data["from_template"] = key
     if name:
         data["name"] = name
+    # A resident of the world is somebody in particular and keeps their own name; a
+    # descriptor is told apart from anybody here already wearing it (`name_apart`).
+    if scene is not None and not world_entity_id:
+        data["name"] = name_apart(scene, str(data.get("name") or ""))
     data["world_entity_id"] = world_entity_id
     actor = from_dict(data, ref=_next_ref(scene))
     _assemble_kit(actor, data)
@@ -397,6 +401,70 @@ def next_ref(scene, taken=()) -> str:
 
 # The name stage 8a and every older test knew it by.
 _next_ref = next_ref
+
+
+# Two actors called exactly "thug" in one room (the fight audit, gemma-4-12B,
+# 2026-09-27: scene names ['Kesst Vayr', 'Borin Lyraxys', 'thug', 'thug']). One died, and
+# from then on every door that finds people by name answered for both: the brief told the
+# model "dead on the ground here: thug" and "hostile towards the player: thug" in the same
+# breath, and `cut_dead_men_walking` cut the LIVING thug's own groan on his own turn.
+#
+# How the traditions tell identical creatures apart, looked up before this was written:
+#   * Foundry VTT's unlinked tokens: "Append Number" and "Prepend Adjective" — one Kobold
+#     actor placing "Angry Kobold (1)", "Eager Kobold (2)" (foundryvtt/foundryvtt#17).
+#   * Inform 7 lets duplicates of a kind stay indistinguishable and has the parser ask
+#     "which do you mean?" when the player's words fit more than one (Writing with Inform
+#     §4.14; Zarf, "Parser IF disambiguation hassles", 2024: solve it at the
+#     disambiguation stage, not the matching stage).
+#   * Diku-family MUDs target the second of a name as "2.guard". Known from play, not
+#     confirmed against a primary source in this pass.
+# Inform's answer does not transfer: our reader is a narrator writing prose, not a player
+# typing a command, and there is nobody to ask. Foundry's number reads as a label in
+# prose ("thug (2) groans"), and its adjective asserts something about a face the world
+# rolled separately (rules/faces.py) — an invented trait, refused. An ordinal is neutral,
+# reads as English, and is already this engine's own idiom: the boarding crew are "a
+# hand", "a second hand" (`Engine._defenders`, named apart for exactly this reason).
+#
+# Only the newcomer is named: the first thug has been "the thug" on the page for turns,
+# and renaming him would contradict every beat already written.
+_ORDINALS = ("second", "third", "fourth", "fifth", "sixth", "seventh", "eighth",
+             "ninth", "tenth", "eleventh", "twelfth")
+_ORDINAL_LEAD = re.compile(r"^(?:(a|an|the)\s+)?(?:(?:" + "|".join(_ORDINALS)
+                           + r"|first|other)\s+)?(.*?)(?:\s+\d+)?$", re.I)
+
+
+def _name_base(name: str) -> str:
+    """"a second hand" → "hand"; "thug 13" → "thug": what the name is apart from the
+    article and the ordinal that told it from its twins."""
+    m = _ORDINAL_LEAD.match(" ".join(str(name or "").split()))
+    return (m.group(2) if m else str(name or "")).lower()
+
+
+def name_apart(scene, name: str) -> str:
+    """`name`, unless somebody here already answers to it — then the first free ordinal
+    ("second thug", "a second hand"). Dead or alive: a body on the floor still wears its
+    name, and a dead thug is the one the living thug was mistaken for."""
+    name = " ".join(str(name or "").split())
+    if not name or scene is None:
+        return name
+    here = getattr(scene, "actors", None) or {}
+    base = _name_base(name)
+    worn = {" ".join(str(a.name or "").split()).lower() for a in here.values()
+            if not getattr(a, "is_pc", False) and _name_base(a.name) == base}
+    if name.lower() not in worn:
+        return name
+    m = re.match(r"^(a|an|the)\s+(.*)$", name, re.I)
+    article, rest = (m.group(1), m.group(2)) if m else ("", name)
+    for ordinal in _ORDINALS:
+        # "a" before a consonant ordinal whatever the noun took: "an elf" → "a second elf".
+        lead = ("a" if article.lower() in ("a", "an") else article)
+        candidate = f"{lead} {ordinal} {rest}" if article else f"{ordinal} {rest}"
+        if candidate.lower() not in worn:
+            return candidate
+    n = len(worn) + 1
+    while f"{name} {n}".lower() in worn:
+        n += 1
+    return f"{name} {n}"
 
 
 # --- the imported bestiary ------------------------------------------------------------------

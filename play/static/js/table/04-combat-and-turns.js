@@ -324,6 +324,9 @@ async function takeTurn(body, clearInput) {
     render(s);
     if (clearInput) $("#input").value = "";   // cleared only once the turn was taken
     if (s.ended) showDeath(s);
+    // The player set out to buy something at an open counter: the counter's screen,
+    // with the thing picked (play/views.py, `_trade_offer`).
+    else if (s.trade && s.trade.open) openTrade(s.trade.want);
   }
   catch (err) {
     if (!err.handled) $("#err").textContent = err.message;

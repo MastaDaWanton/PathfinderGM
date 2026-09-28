@@ -431,6 +431,28 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "spawn": (("template",),
               ("from_entity_id", "count", "name", "zone", "distance_ft"),
               "hidden"),
+    # A person enters the scene because the plan says so, before the prose is written
+    # (docs/declared-not-guessed.md). `spawn` is the combatant's door — it rolls
+    # initiative mid-fight and takes a stat block by name; this is the townsperson's: a
+    # bystander with a population record, a life and a face, named by the words the
+    # prose will use (`who`). The same plan targets them as new1, new2, new3 in the
+    # order introduced (`INTRODUCED_REFS`); the engine swaps in the real refs.
+    # `already_here` binds to somebody the scene already holds before making anybody.
+    "introduce": (("who",), ("count", "how", "template", "zone"), "hidden"),
+    # The player provokes the person in `target`: an insult or a slight. Their regard
+    # falls and a roll on their temper decides whether they come to blows
+    # (rules/provocation.py). Nobody rolls to land an insult; the roll is the response.
+    "provoke": ((), ("how",), "hidden"),
+    # The player goes to somebody's home and knocks (docs/the-population.md, "calling on
+    # people"). `who` is a ref or the words the player used; `visit` false only asks where
+    # they live. The engine decides whether the party knows the way, whether anybody is
+    # in, and whether the door opens — from the person's day and their regard.
+    "call_on": (("who",), ("visit",), "hidden"),
+    # Forcing a house door or picking its lock (PF1e: Strength against the door's break
+    # DC, Disable Device against the lock). `who` is whose house, or empty for the one
+    # house off the street the party stands in; `how` is "force" or "pick". The player
+    # rolls; the engine decides who heard.
+    "break_in": ((), ("who", "how"), "player"),
     "advance_time": (("amount", "unit"), (), "hidden"),
     # Something changes hands. One op rather than four, because picking a thing up,
     # being handed it, buying it and dropping it are the same event with different ends
@@ -616,6 +638,76 @@ class Intent:
 NOT_A_MANOEUVRE = {"draw", "swing", "lunge", "strike", "slash", "stab", "thrust",
                    "attack", "charge", "melee"}
 
+# What a model writes in an optional slot it has nothing for. The plan's `declared`
+# block lists every attack param as a string property (`prompts._declared_op`), and the
+# model fills the ones it has no use for: "none" is the commonest manoeuvre in the
+# recordings, 53 of 157 values across 32 of them (2026-09-28). Filed as a weapon, it
+# lost turn 1 of two fight audits running, five attempts each on "attack: no such weapon
+# 'none'" and then ten minutes waiting on the fallback model. Read as absent, the way a
+# structured-output validator maps sentinel strings to None for an optional field.
+NULL_WORDS = frozenset({"", "none", "null", "nil", "n/a", "na", "no", "nothing",
+                        "false", "-", "—"})
+
+# The body as the weapon, by the name of the blow. "punch" was the manoeuvre in six
+# recorded plans, and filed as a weapon it was refused like "none".
+UNARMED_WORDS = frozenset({"punch", "punches", "kick", "kicks", "fist", "fists", "jab",
+                           "hook", "uppercut", "headbutt", "elbow", "knee", "slap",
+                           "unarmed strike", "unarmed attack", "bare hands", "hands"})
+
+
+def is_null(value) -> bool:
+    """Whether a slot's value is the model saying it has nothing to put there."""
+    return value is None or (isinstance(value, str)
+                             and value.strip().lower() in NULL_WORDS)
+
+
+# The params that are a yes or a no, wherever they appear.
+FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
+                         "thrown", "quoted"})
+
+
+def _flag(value) -> bool:
+    """A yes/no param, whether the model wrote it as a boolean or as a word."""
+    if isinstance(value, str):
+        return not (is_null(value) or value.strip().lower() in ("0", "off"))
+    return bool(value)
+
+
+def attack_slots(manoeuvre, weapon) -> tuple[str | None, str | None]:
+    """(manoeuvre, weapon) as the model meant them, before either is checked.
+
+    The one reading of the two slots, shared by `judgement.normalize_attacks` (before
+    validation) and `parse` (every intent, the NPC turn's included). Before 2026-09-28
+    they disagreed: the judgement moved anything not a manoeuvre into `weapon` — its own
+    comment promised "anything a weapon lookup knows goes to `weapon`, anything neither
+    knows is dropped", and the code never asked the lookup — so "strike", which the
+    parser drops as part of attacking, and "intimidate", which the parser turns into a
+    check, reached the parser as weapons and were refused. In the recordings: "none" 53,
+    "punch" 6, "strike" 4, "throw" 3, "bull_rush" and "dirty_trick" 1 each, every one a
+    refusal the correction loop could not teach past.
+    """
+    w = None if is_null(weapon) else weapon
+    if isinstance(w, str) and w.strip().lower() in UNARMED_WORDS:
+        w = "unarmed"
+    if is_null(manoeuvre):
+        return None, w
+    m = str(manoeuvre).strip().lower()
+    key = MANEUVER_ALIASES.get(m) or MANEUVER_ALIASES.get(m.replace("_", " ")) \
+        or m.replace("_", " ")
+    key = MANEUVER_ALIASES.get(key, key)
+    if key in MANEUVERS:
+        return key, w
+    if key in NOT_A_MANOEUVRE:
+        return None, w
+    if key in UNARMED_WORDS:
+        return None, w or "unarmed"
+    # A skill is the parser's to rewrite into a check (`normalise_raw`), untouched here.
+    if normalise_skill(key):
+        return m, w
+    if _known_weapon(key):
+        return None, w or key
+    return None, w
+
 # The one word a model reaches for when it means "no circumstance applies", which is
 # exactly the case the enum has no room for.
 NO_CIRCUMSTANCE = {"neutral", "none", "normal", "average", "standard", "no"}
@@ -731,6 +823,20 @@ def parse(raw: dict, index: int = 0) -> Intent:
     # alias took it away and then refused the intent for missing it. An alias fires
     # only when the op actually wants the target and does not itself declare the word.
     declared = set(required) | set(optional)
+    # Who somebody is, however the model spelled the field. Measured live 2026-09-25:
+    # `introduce` came back with `description` and `kind` and no `who` on three attempts
+    # across two turns, each refused and retried. For this op alone — `move` declares
+    # `who` as a ref, and `rest` and `guard` declare `kind` — the first descriptive field
+    # is the person, and the rest are that description said again.
+    if op == "introduce":
+        described = ("description", "name", "role", "kind", "person", "npc", "character")
+        if params.get("who") in (None, ""):
+            for key in described:
+                if params.get(key):
+                    params["who"] = params[key]
+                    break
+        for key in described:
+            params.pop(key, None)
     for said, means in PARAM_ALIASES.items():
         if said in params and means not in params                 and means in declared and said not in declared:
             params[means] = params.pop(said)
@@ -750,7 +856,17 @@ def parse(raw: dict, index: int = 0) -> Intent:
             f"use_ability ability=<name> for a power.", "schema", index)
 
     unknown = set(params) - set(required) - set(optional)
-    ignored = sorted(unknown & ENGINE_OWNED_PARAMS)
+    # The door and the knock are the engine's to decide, and a model that writes the
+    # outcome in ("success": true) is ignored, not refused. Measured live 2026-09-27:
+    # `break_in` with `success` cost an attempt, and the repair after it invented a thug
+    # called "new" out of the ref the second attempt reached for.
+    if op in ("break_in", "call_on"):
+        ignored = sorted(unknown)
+        for key in ignored:
+            params.pop(key, None)
+        unknown = set()
+    else:
+        ignored = sorted(unknown & ENGINE_OWNED_PARAMS)
     for key in ignored:
         params.pop(key, None)
     unknown -= set(ignored)
@@ -795,6 +911,13 @@ def _check_params(intent: Intent, index: int) -> None:
     """Per-op value checks. Closed vocabularies are checked here rather than trusted,
     because a closed vocabulary the code does not enforce is just a suggestion."""
     p, op = intent.params, intent.op
+    # A yes/no param the model wrote as a word is read as one. `bool("false")` is True,
+    # and the engine reads every one of these with `bool()` — `drain: "false"` would have
+    # made ability damage permanent. The plan's `declared` block typed them all as
+    # strings (`prompts._declared_op`, now booleans); the intents list types no params
+    # at all. Not yet seen in a recording: the null words in `manoeuvre` were.
+    for key in FLAG_PARAMS & set(p):
+        p[key] = _flag(p[key])
 
     if op == "check":
         raw_skill = str(p["skill"]).strip().lower()
@@ -872,6 +995,18 @@ def _check_params(intent: Intent, index: int) -> None:
         p["save"] = save
 
     elif op == "attack":
+        # "none" in either slot is nothing in it (`NULL_WORDS`), and "punch" as a weapon
+        # is the unarmed strike (`UNARMED_WORDS`) — the same reading `attack_slots` gives
+        # the plan before validation, here for every intent the NPC turn's included.
+        if is_null(p.get("weapon")):
+            p.pop("weapon", None)
+        elif str(p["weapon"]).strip().lower() in UNARMED_WORDS:
+            p["weapon"] = "unarmed"
+        if is_null(p.get("manoeuvre")):
+            p.pop("manoeuvre", None)
+        elif str(p["manoeuvre"]).strip().lower() in UNARMED_WORDS:
+            p.pop("manoeuvre")
+            p.setdefault("weapon", "unarmed")
         w = p.get("weapon")
         if w and not _known_weapon(w):
             # The list used to be printed in full, which was reasonable at eleven weapons
@@ -893,6 +1028,9 @@ def _check_params(intent: Intent, index: int) -> None:
         man = p.get("manoeuvre")
         if man:
             key = str(man).strip().lower()
+            # "bull_rush" and "dirty_trick": the model's snake_case, once each in the
+            # recordings, refused as not being manoeuvres.
+            key = MANEUVER_ALIASES.get(key) or key.replace("_", " ")
             key = MANEUVER_ALIASES.get(key, key)
             # "draw", "swing", "lunge" — things that are simply part of making an attack
             # rather than manoeuvres. Measured live: `"manoeuvre": "draw"` was the first
@@ -1071,6 +1209,55 @@ def _check_params(intent: Intent, index: int) -> None:
         except (TypeError, ValueError):
             raise IntentError("spawn: count must be a number", "schema", index)
 
+    elif op == "introduce":
+        # "merchant_with_herbs" is a ref-shaped description (live, 2026-09-25): words.
+        who = " ".join(str(p["who"] or "").replace("_", " ").split())
+        # Clipped, not refused: a sentence where a few words belong cost an attempt live
+        # (2026-09-25), and its first words are the description anyway.
+        if len(who) > 80:
+            who = who[:80].rsplit(" ", 1)[0].rstrip(",;:—- ")
+        if not who:
+            raise IntentError(
+                "introduce: who is the few words the scene will call this person by — "
+                "'old woman mending nets', 'a porter with a split lip'", "schema", index)
+        p["who"] = who
+        try:
+            p["count"] = max(1, min(len(INTRODUCED_REFS), int(p.get("count", 1) or 1)))
+        except (TypeError, ValueError):
+            raise IntentError("introduce: count must be a number", "schema", index)
+        # Read, not refused. Measured live 2026-09-25: `"how": "already_there"` cost a whole
+        # attempt on a param whose only choice is "new, or somebody standing here". A word
+        # of arriving means arrives; anything else is the safe reading, already here.
+        how = str(p.get("how") or "already_here").strip().lower().replace(" ", "_")
+        p["how"] = ("arrives" if re.match(r"(?:arriv|enter|come|comes|coming|walk|new)", how)
+                    else "already_here")
+        if p.get("template"):
+            from . import bestiary
+
+            raw_t = str(p["template"]).strip().lower()
+            if bestiary.lookup(raw_t) is None:
+                raise IntentError(
+                    f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
+                    "schema", index)
+            p["template"] = raw_t
+
+    elif op == "call_on":
+        p["who"] = " ".join(str(p["who"] or "").replace("_", " ").split())[:80]
+        if not p["who"]:
+            raise IntentError("call_on: who is the person whose home the party goes to",
+                              "schema", index)
+        p["visit"] = str(p.get("visit", True)).strip().lower() not in ("false", "0", "no")
+
+    elif op == "break_in":
+        p["who"] = " ".join(str(p.get("who") or "").replace("_", " ").split())[:80]
+        p["how"] = "pick" if str(p.get("how") or "").strip().lower().startswith(
+            ("pick", "lock")) else "force"
+
+    elif op == "provoke":
+        # Read, not refused: anything that is not a slight is an insult.
+        p["how"] = "slight" if str(p.get("how") or "").strip().lower() == "slight" \
+            else "insult"
+
     elif op == "begin_encounter":
         if not isinstance(p["sides"], dict):
             raise IntentError(
@@ -1115,6 +1302,13 @@ def _check_params(intent: Intent, index: int) -> None:
 # stamped: a jar, a spell, an ability, a rule, a creature's stat block, or the author.
 # The model is not offered these ops at the sampler (gm.prompts.turn_schema); the check
 # in Engine._check_legality is the backstop for the engine's own doors.
+# The refs a plan uses for the people its own `introduce` ops bring in, in order: the
+# first person introduced is new1. Placeholders, not predictions — `spawn` asks the model
+# to guess the next minted ref (c5), which is the kind of opaque id the tool-use
+# literature finds models invent; a fixed name for "the person I just introduced" is not.
+INTRODUCED_REFS: tuple[str, ...] = ("new1", "new2", "new3")
+
+
 AMOUNT_OPS: frozenset[str] = frozenset(
     {"damage", "heal", "buff", "temp_hp", "defence", "ability_damage", "item_damage"})
 

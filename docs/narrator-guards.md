@@ -560,3 +560,32 @@ reporting self-repetition and compression ratio by third alongside the existing 
 and the kill-line pool walked in a unit harness, since a level-one fixture cannot be
 relied on to kill in one blow. The first after-run is the section above; the run with
 D9–D14 in follows it. Numbers go in `narrator-reliability.md` as they exist.
+
+## Bodies, not summaries (2026-09-25)
+
+Asked for by the user: the narrator "shies away from graphic description by being
+metaphorical". Measured first, on the recorded fights: similes were rare (0.4 per 1,000
+words). The shying away was summary: "the violence", "the chaos", "the struggle" in
+about one fight beat in three. The fight examples were bloodless too: one wound in five
+examples.
+
+The prose briefing now says "Write bodies, not summaries". The combat formula's LANDED
+line names the wound. One fight example carries the wounds of earlier blows, so it still
+never claims the current roll.
+
+| fight prose, per 1,000 words | before (39 beats) | with the line (16) | line removed (18) |
+|---|---|---|---|
+| body and wound words | 13.8 | 17.2 | 15.3 |
+| summary nouns | 5.4 | 2.8 | 1.6 |
+| similes | 0.4 | 5.5 | 0.0 |
+
+The middle run's simile rise followed a closing line that named comparisons ("A comparison
+only where nothing plain will do"). With that line removed, similes went to none,
+summaries fell by about 70% against the first measurement, and there were more body
+words: the shape of a prompt becomes the shape of the output, again. Small samples; the
+direction held across both runs.
+
+Intimacy, under the table's explicit setting, is written vividly and in the body, between
+adults only. The brief marks children. After the prose, a beat that reads as sexual while
+a child is in the scene or the beat is discarded whole for the holding line, in either
+setting (`narration.intimate`, `judgement.a_child_in`, `views._finish`).
