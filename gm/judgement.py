@@ -233,7 +233,22 @@ MANOEUVRE_CUES: dict[str, re.Pattern] = {
                          r"shatter)\b", re.I),
     "steal": re.compile(r"\b(steal|steals|lift (?:his|her|their) \w+|pick (?:his|her|their) pocket|"
                         r"snatch)\b", re.I),
-    "dirty trick": re.compile(r"\b(dirty trick|throw (?:sand|dirt|dust)|blind (?:him|her|them|it))\b", re.I),
+    # "grit in his eyes" and "salt in her face" as well as the textbook sand: the live
+    # fight of 2026-09-27 threw "a handful of grit in his eyes".
+    "dirty trick": re.compile(r"\b(dirty trick|throw (?:sand|dirt|dust|grit|ash|salt)|"
+                              r"(?:sand|dirt|dust|grit|ash|salt) in (?:his|her|their|its) "
+                              r"(?:eyes|face)|blind (?:him|her|them|it))\b", re.I),
+    # Drag and reposition had no cues at all, so a GM that chose either was always
+    # overruled — dropped as "nobody asked for it", or swapped to a grapple when the
+    # sentence also said "grab". Measured live 2026-09-27: "I grab him by the collar
+    # and drag him toward the door" came back as drag and was resolved as a grapple.
+    # Neither manoeuvre could reach the engine from a player's turn.
+    "drag": re.compile(r"\b(drag|drags|haul (?:him|her|them|it)|"
+                       r"pull (?:him|her|them|it) (?:along|toward|towards|after))\b", re.I),
+    "reposition": re.compile(r"\b(reposition|steer (?:him|her|them|it)|"
+                             r"spin (?:him|her|them|it) (?:round|around|into|toward)|"
+                             r"(?:force|walk|shove|put) (?:him|her|them|it) "
+                             r"(?:into|against|toward|towards|between|in front of))\b", re.I),
 }
 
 # The action is plainly meant to wound: a manoeuvre would be the wrong answer.
@@ -1158,6 +1173,21 @@ def normalize_attacks(raw_intents, scene):
         # A weapon filed as a manoeuvre: legal manoeuvres are a closed set with an
         # alias table; anything a weapon lookup knows goes to `weapon`, anything
         # neither knows is dropped — a plain attack is what the player described.
+        # The other way round: a manoeuvre filed as the weapon. Measured live
+        # 2026-09-27, "I shove him back hard" came back as `"weapon": "bull_rush"`, the
+        # schema refused "no such weapon", and the retry was a plain swing.
+        weapon = re.sub(r"[_-]+", " ", str(params.get("weapon", "") or "")).strip().lower()
+        weapon = tables.MANEUVER_ALIASES.get(weapon, weapon)
+        if weapon in tables.MANEUVERS and not params.get("manoeuvre"):
+            params.pop("weapon")
+            params["manoeuvre"] = weapon
+            changed = True
+        # A `trick` means one manoeuvre. Measured the same run: "I throw a handful of
+        # grit in his eyes to blind him" came back as `{"trick": "blinded"}` with no
+        # manoeuvre, and was rolled as a plain attack against AC.
+        if params.get("trick") and not params.get("manoeuvre"):
+            params["manoeuvre"] = "dirty trick"
+            changed = True
         man = str(params.get("manoeuvre", "") or "").strip().lower()
         if man and man not in tables.MANEUVERS and \
                 man not in tables.MANEUVER_ALIASES:

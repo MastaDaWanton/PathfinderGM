@@ -373,3 +373,51 @@ def test_one_thugs_disarm_no_longer_disarms_every_thug():
     fresh = instantiate("thug", scene=scene, name="another thug")
     assert fresh.weapons == ["sap", "dagger"]
     assert fresh.abilities["str"] != 1
+
+
+# --- reaching the applicators from a player's sentence ---------------------------------
+#
+# The scripted live fight of 2026-09-27 (gemma-4-12B, the real /api/say loop) typed seven
+# manoeuvre lines and reached the new applicators with none of them: the grit was a
+# `trick` with no manoeuvre and rolled against AC, the shove filed `bull_rush` as the
+# weapon and was refused, and the drag was overruled into a grapple — because drag and
+# reposition had no cue in `judgement.MANOEUVRE_CUES`, so a GM choosing either was always
+# "the manoeuvre nobody asked for".
+
+def _reviewed(text, raw):
+    from gm import judgement
+    from rules.intents import parse_all
+
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(load_pc("fixtures/pc-kesst.json"))
+    scene.add(instantiate("thug", scene=scene, name=THUG))
+    raw = judgement.normalize_attacks(raw, scene) or raw
+    intents = parse_all(raw)
+    judgement.review(text, intents, scene)
+    return intents[0].params
+
+
+def test_a_trick_with_no_manoeuvre_is_a_dirty_trick():
+    params = _reviewed("I throw a handful of grit in his eyes to blind him.",
+                       [{"op": "attack", "actor": "pc", "target": "c1",
+                         "params": {"trick": "blinded"}}])
+    assert params.get("manoeuvre") == "dirty trick" and params["trick"] == "blinded"
+
+
+def test_a_manoeuvre_filed_as_the_weapon_moves_to_the_manoeuvre():
+    params = _reviewed("I shove him back hard, away from me.",
+                       [{"op": "attack", "actor": "pc", "target": "c1",
+                         "params": {"weapon": "bull_rush"}}])
+    assert params.get("manoeuvre") == "bull rush" and "weapon" not in params
+
+
+@pytest.mark.parametrize("text,man", [
+    ("I grab him by the collar and drag him toward the door.", "drag"),
+    ("I haul him back towards the stairs.", "drag"),
+    ("I steer him into the corner.", "reposition"),
+    ("I force him against the bar.", "reposition"),
+])
+def test_a_drag_or_reposition_the_player_described_is_not_overruled(text, man):
+    params = _reviewed(text, [{"op": "attack", "actor": "pc", "target": "c1",
+                               "params": {"manoeuvre": man}}])
+    assert params.get("manoeuvre") == man
