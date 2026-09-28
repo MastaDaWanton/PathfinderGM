@@ -91,6 +91,11 @@ gap is recorded here rather than guessed at.
    `tools/ogl_sources.py` exists so this stays a mechanical check rather than a memory
    exercise: a source it lists that this file does not is an attribution the build owes
    and does not have. Re-run it after any content import.
+
+   **Attribution is not the whole problem for `creatures.json`.** Two thirds of its rows
+   are Paizo adventure characters whose *names* are Product Identity, which Section 15
+   does not license. Measurements, the declarations and the options are in
+   `docs/bestiary-licensing.md`, awaiting the owner's decision.
 3. **Add the required notices to the packaged app** — the licence must reach the user, not
    just the repository. `OGL.txt` is served at `/licence` and must also be added to the
    PyInstaller bundle's data files when the spec is written.
