@@ -715,6 +715,50 @@ tests skip, and each worktree copies it from the main checkout. Q3 yes, Q4 (a), 
 both with the stated limits, Q6 cap 300 and no backfill, Q7 agree, Q8 Lane C in Phase 2.
 Q9–49 are asked when their lane or integration task starts.
 
+**PHASE-2 ANSWERS 2026-09-28 by the owner.** Every P2 question not named below takes the
+register's recommendation (including the pregen backgrounds: Kesst thief-taker, Borin caravan
+hand, Thessaly bonesetter). The owner's own rulings, which OVERRIDE the recommendations:
+
+- **Q20 (Lane C) — build the path, label it.** "make the button/path for it and then label it
+  not built yet." Lane C adds the start/town picker's entry point on the new-campaign screen
+  and the backend path it will call (`begin_with(..., start_town=, start_id=)` already in
+  §2.9), with the control visibly labelled as not built yet; "Surprise me" stays the working
+  default. `home_views`/`home.html` join Lane C's files for this one control.
+- **Q11 (Lane B) — a crossroads is not in a town.** "crossroads are place[s] not in a town
+  where all the roads leave to different places." A crossroads is an OUTSIDE place on the road
+  network, out past the settlement, where the roads toward different destinations part; it is
+  not one of the settlement's own places and not a ring member beside the fields. Journeys
+  along those roads pass through it. Generated where two or more of a settlement's roads lead
+  to different destinations; one per such fork.
+- **Q13 (Lane B) — journeys take days, and a horse changes it.** "travel between settlement[s]
+  should take days without a horse, half the time with a horse and a third of the full time if
+  you gallop on the horse the whole way [horse fatigue should kick in if the journey is too
+  far]." Journey time: on foot = the world's distance at walking pace in days; riding = half;
+  galloping the whole way = a third, with the mount's fatigue applied by rule when the journey
+  is too long for that pace (Lane B researches PF1e mount/forced-march/hustle rules for the
+  fatigue and its thresholds, and how a party comes to have a mount — owned, bought at the
+  stables, hired). Ground beyond the near land follows the same pace rule rather than a flat
+  4-hour band.
+- **Q34 (Lane E) — unpleasant conditions count, but only when you are seen.** "conditions that
+  cause harm or unpleasantness should count but only if you are seen casting or causing the
+  condition … if i shoot a blowdart from concealment or [pass] a stealth check then nobody saw
+  that I did it so no one dislikes me for it or tries to fight me. The same would apply to
+  conditions like nauseated or sickened." Harm = damage OR a harmful/unpleasant condition
+  (nauseated, sickened, and the like). Attitude loss, witnesses' reactions and the battle gate
+  apply ONLY when the source is perceived: an attacker in concealment/hidden, or who beats the
+  observers' Perception with Stealth (PF1e sniping rules for the attack from hiding — Lane E
+  sources the exact penalty), is not identified; the victim knows they were hurt, not by whom.
+  This applies to swords and spells alike (Q37 stands).
+- **Q42 (Lane F) — a conversation tray, out of the panel.** "Yes but it should be openable and
+  closeable while the buttons to ignore or leave conversation should be there as well. It
+  should be removed from the panel." The conversation becomes its own openable/closeable tray
+  (the map tray's idiom), carrying the log AND the Ignore / Take your leave controls; the
+  Conversation panel is removed from the sidebar panel set (S6's `#panel-conversation` and its
+  bar button go; `#talk`'s controls move into the tray). Phone: the badged edge tab opens it.
+
+Still open for the owner: whether the outfit page should be reachable mid-campaign (§3.4,
+the stale prove_build row).
+
 49 questions, deduplicated. **G0** means it must be answered before Phase 1 starts. **P2**
 means before the named lane starts. **P3** means before the integration task starts.
 Resolved by this register, so not asked: A's attribution order (§2.1), B's `02-state.js`
