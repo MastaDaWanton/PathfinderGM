@@ -2812,6 +2812,20 @@ class Engine:
         # the sides are drawn with both of them in.
         actor.remove_condition(states.BYSTANDER_KEY)
         defender.remove_condition(states.BYSTANDER_KEY)
+        # A blow at the dead. `redirect_attacks_off_corpses` lets it stand on purpose —
+        # "kicking the fallen is a thing a player may genuinely mean" — so it happens,
+        # and there is nothing in it to roll: the player is not handed a d20 against a
+        # corpse, the insult the manoeuvre path was fixed for too. A manoeuvre is left to
+        # that path, which already answers a corpse with an automatic success.
+        if defender.has_state("state.down.dead") and not intent.params.get("manoeuvre"):
+            return Outcome(
+                intent_id=intent.id, op="attack",
+                tell=f"{defender.name} is already dead; the blow falls on a corpse.",
+                because=intent.because)
+        # A coup de grâce is not a fight being started (tests/test_battle_gate.py), so it
+        # never meets the gate below: finishing a bound prisoner opens no battle, and the
+        # blow is resolved on the spot, never deferred. `rules/coup_de_grace.py`.
+        coup = bool(intent.params.get("coup_de_grace"))
         # The moment of first violence opens the battle and stops there. Measured in
         # play (2026-08-27): a spoken turn spawned an opponent, began the encounter,
         # swung, confirmed a critical, killed, ended the fight and paid out XP — an
@@ -2822,7 +2836,7 @@ class Engine:
         # battle is joined, and the swing itself is the player's to declare on their
         # own first combat turn. A swing at somebody already down opens nothing — one
         # living combatant is no encounter — and resolves as the mercy stroke it is.
-        if partial.get("attack_state") is None:
+        if partial.get("attack_state") is None and not coup:
             opened = False
             if not self.scene.in_encounter:
                 opened = self._ensure_encounter(intent.actor, intent.target)
@@ -2860,7 +2874,8 @@ class Engine:
                           f"{', '.join(foes) or defender.name}. Nothing has landed "
                           f"yet — the first blow is still to be struck."),
                     because=intent.because)
-        self._ensure_encounter(intent.actor, intent.target)
+        if not coup:
+            self._ensure_encounter(intent.actor, intent.target)
         weapon_key = (intent.params.get("weapon") or actor.equipped or "unarmed").lower()
         weapon = actor.weapon(weapon_key)
         # An improvised weapon IS the object: the tell names the chunk of wood, not
@@ -2882,7 +2897,17 @@ class Engine:
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
 
-        if intent.params.get("manoeuvre"):
+        if coup:
+            from . import coup_de_grace as coup_mod
+
+            why = coup_mod.refusal(actor, defender, weapon,
+                                   self._gap_ft(actor, defender))
+            if why:
+                return self._refuse(intent, why)
+            # One blow is the whole full-round action: no iteratives, and no manoeuvre
+            # riding it — a trip is not a way to finish somebody.
+            full = False
+        elif intent.params.get("manoeuvre"):
             return self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
 
         flat_footed = self._flat_footed(defender)
@@ -2928,9 +2953,21 @@ class Engine:
         # whose swings all rolled at full BAB would be the panel quietly buffing the
         # class it was built for.
         it = intent.params.get("iteration")
-        if it is not None and not full:
+        if it is not None and not full and not coup:
             whole = actor.attack_sequence(weapon_key, True)
             sequence = [whole[min(int(it), len(whole) - 1)]]
+        if coup:
+            sequence = sequence[:1]
+            # No roll to hit and a critical by right. Set once, on first entry: the
+            # state rides every suspension, and a resume must not reset a damage stage
+            # the player is halfway through rolling.
+            if state["i"] == 0 and state["stage"] == "attack" and not state["rolls"]:
+                state["stage"] = "damage"
+                state["crit"] = True
+                state["hit_total"] = None
+                state["tells"].append(
+                    f"{actor.name} stands over {defender.name} and delivers a coup de "
+                    f"grâce: no roll to hit, and a critical hit by right.")
 
         # Swift Strikes: an always-active passive, never an ability to spend. On any
         # attack after the first against the same target this encounter, the swing
@@ -2941,7 +2978,7 @@ class Engine:
         # round-trips of the dice popup.
         from . import leveling as leveling_mod
 
-        if (leveling_mod.has_passive(actor, "swift strikes")
+        if (not coup and leveling_mod.has_passive(actor, "swift strikes")
                 and f"{actor.ref}>{defender.ref}" in self.scene.attacked):
             extra = 2 if full else 1
             sequence = list(sequence) + [sequence[0]] * extra
@@ -2960,10 +2997,16 @@ class Engine:
             # The reported "0 XP from the bear" has this shape underneath it too.
             # "Already down", not "cannot act": a stunned or fascinated defender is
             # still a target, and reading this off can-act made them unattackable.
-            if defender.is_down:
-                if state["i"]:
-                    state["tells"].append(
-                        f"{defender.name} is already down; {actor.name} holds the blow.")
+            #
+            # From the SECOND swing on. Until 2026-09-27 it broke on the first as well,
+            # so a blow at somebody already lying there — unconscious, dying — came
+            # back as 0 rolls, no effects, an empty tell and hit points unchanged, and
+            # "I finish him" never resolved at all. The first swing is the one the
+            # player declared at the body, and it lands (at helpless AC); what the
+            # guard is for is the swing QUEUED behind one that dropped them.
+            if defender.is_down and state["i"]:
+                state["tells"].append(
+                    f"{defender.name} is already down; {actor.name} holds the blow.")
                 break
             iteration = sequence[state["i"]]
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
@@ -3083,8 +3126,14 @@ class Engine:
                 # extra damage "is not multiplied" on a critical hit, so it is added
                 # here, past `mult`, and never folded into the weapon's notation.
                 # `rules/precision.py` decides whether it applies at all.
+                # "Any time her target would be denied a Dexterity bonus to AC": caught
+                # flat-footed, or held somewhere Dex does not reach — helpless, stunned,
+                # blinded. Only the first was asked until 2026-09-27, so once a fight's
+                # first round was over a rogue's blow at a sleeping guard found nothing,
+                # and the coup de grâce the book gives sneak attack explicitly got none.
                 sneak_dice, sneak_why = self._sneak_for(
-                    actor, defender, weapon, flat_footed=flat_footed)
+                    actor, defender, weapon,
+                    flat_footed=flat_footed or defender.loses_dex_to_ac)
                 if sneak_dice:
                     if "sneak_total" not in state:
                         sneak_roll = self._roll_or_suspend_stage(
@@ -3145,6 +3194,8 @@ class Engine:
                                else "heavy" if int(weapon.get("hands", 1) or 1) >= 2
                                else "one-handed")
                 state["effects"].append(hit)
+                # What the coup de grâce's save is set by: the damage DEALT, after DR.
+                state["dealt"] = int(hit.get("amount") or 0)
                 # What the *defender* lost, not what the die said. A hit for 12 against
                 # DR 5 is a hit for 7, and the GM must be told the second number or it
                 # will narrate a wound nobody took.
@@ -3175,8 +3226,51 @@ class Engine:
                 state["i"] += 1
                 state["stage"] = "attack"
 
-        rolls = [_roll_from_dict(r) for r in state["rolls"]]
         crossed = self._hp_state_effects(defender)
+        coup_dc = None
+        if coup and "dealt" in state and not defender.is_dead:
+            # "If the defender survives the damage": the ladder has run first, so a blow
+            # that killed outright asks nothing more of anybody.
+            exempt = coup_mod.fortitude_exempt(defender)
+            if exempt:
+                state["tells"].append(
+                    f"{defender.name} has {exempt}: there is no Fortitude save to fail, "
+                    f"and only the wound counts.")
+            else:
+                coup_dc = coup_mod.save_dc(state["dealt"])
+                # Rolled by the engine, never suspended: the defender is not the one who
+                # declared this, and every NPC's save is the engine's. (A PC on the
+                # receiving end only ever meets this from an NPC's intent, which
+                # `_force_visibility` has already made hidden.)
+                save = self.dice.d20(defender.save_modifiers("fort"),
+                                     label="Fortitude save against the coup de grâce",
+                                     visibility=intent.visibility)
+                state["rolls"].append(save.as_dict())
+                # CRB p.180: a natural 20 on a save always succeeds and a natural 1
+                # always fails. Against DC 10 + damage the first is most of the reason
+                # anybody lives through this.
+                # The natural is said when it decided, because "makes the save (23
+                # against DC 27)" read as bad arithmetic in the first live run.
+                why = {20: "a natural 20, ", 1: "a natural 1, "}.get(save.natural, "")
+                if save.natural == 20 or (save.natural != 1 and save.total >= coup_dc):
+                    state["tells"].append(
+                        f"{defender.name} makes the Fortitude save ({why}{save.total} "
+                        f"against DC {coup_dc}) and clings to life.")
+                else:
+                    state["tells"].append(
+                        f"{defender.name} fails the Fortitude save ({why}{save.total} "
+                        f"against DC {coup_dc}).")
+                    # The one door death is written through (`Actor.die`), and the same
+                    # effect shape the ladder writes, so the tell below says it.
+                    if defender.die("a coup de grâce"):
+                        # The rungs this same blow wrote (unconscious, dying) are gone
+                        # again, and saying them first read "the thug is dying. the
+                        # thug is dead." in the probe — only what still holds is said.
+                        crossed = [e for e in crossed if e.get("ref") != defender.ref
+                                   or defender.has_condition(str(e.get("condition")))]
+                        crossed.append({"ref": defender.ref, "kind": "condition",
+                                        "condition": "dead", "from": "coup de grâce"})
+        rolls = [_roll_from_dict(r) for r in state["rolls"]]
         effects = list(state["effects"]) + crossed
         any_hit = any(e.get("kind") == "damage" for e in effects)
         # A thrown thing is on the ground now, at this spot, with its record — the
@@ -3200,9 +3294,14 @@ class Engine:
         # First blood is remembered only once the attack completes, so the decision
         # "is this a subsequent attack?" cannot flip between a suspension and its resume.
         self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
+        if coup:
+            # No AC was rolled against; the only number set against anybody was the save.
+            dc = ({"value": coup_dc, "explain": "Fortitude, 10 + damage dealt"}
+                  if coup_dc is not None else None)
+        else:
+            dc = {"value": target_ac, "explain": ac_note, "flat_footed": flat_footed}
         return Outcome(
-            intent_id=intent.id, op="attack", rolls=rolls,
-            dc={"value": target_ac, "explain": ac_note, "flat_footed": flat_footed},
+            intent_id=intent.id, op="attack", rolls=rolls, dc=dc,
             verdict="hit" if any_hit else "miss",
             effects=effects,
             tell=" ".join(state["tells"]) + self._hp_state_tell(crossed),
@@ -8256,6 +8355,23 @@ class Engine:
             or not self._has_acted(defender.ref)
         )
 
+    def _gap_ft(self, actor, defender) -> float | None:
+        """Feet between two creatures on the grid, or None when either is off it.
+
+        Edge to edge, sizes included — the same measurement reach and range use, so a
+        shot that is 30 feet for one rule is 30 feet for the other. One reader for
+        sneak attack's 30 feet and the coup de grâce's point-blank bow.
+        """
+        here = self.scene.positions.get(getattr(actor, "ref", ""))
+        there = self.scene.positions.get(getattr(defender, "ref", ""))
+        if getattr(self.scene, "grid", None) is None or not here or not there:
+            return None
+        from .grid import distance_between
+
+        return distance_between(
+            tuple(here[:2]), str(getattr(actor, "size", "medium") or "medium"),
+            tuple(there[:2]), str(getattr(defender, "size", "medium") or "medium"))
+
     def _sneak_for(self, actor, defender, weapon, *, flat_footed: bool) -> tuple[str, str]:
         """The sneak attack dice for this swing and why, or ("", why not).
 
@@ -8266,17 +8382,7 @@ class Engine:
         """
         from . import position as position_mod, precision as precision_mod
 
-        distance_ft = None
-        here = self.scene.positions.get(getattr(actor, "ref", ""))
-        there = self.scene.positions.get(getattr(defender, "ref", ""))
-        if getattr(self.scene, "grid", None) is not None and here and there:
-            from .grid import distance_between
-
-            # Edge to edge, sizes included — the same measurement reach and range use, so
-            # a shot that is 30 feet for one rule is 30 feet for the other.
-            distance_ft = distance_between(
-                tuple(here[:2]), str(getattr(actor, "size", "medium") or "medium"),
-                tuple(there[:2]), str(getattr(defender, "size", "medium") or "medium"))
+        distance_ft = self._gap_ft(actor, defender)
         # Cover is not concealment in 1e — they are different rules with different
         # sources — but total cover means there is nothing to aim at. The rogue's bar is
         # concealment, so only what obscures counts.
@@ -9600,6 +9706,14 @@ class Engine:
             if key == "unconscious" and "dying" in keys:
                 line = "{name} is unconscious and dying."
             who = self.scene.actors.get(e.get("ref"))
+            # Disabled says "still standing", and a body already out cold from non-lethal
+            # damage is not: a blow that takes it to exactly 0 leaves it unconscious at
+            # nothing. Unreachable until 2026-09-27, when a blow at an unconscious body
+            # first landed at all; the first live coup de grâce the thug survived by a
+            # natural 20 would have told the narrator he was on his feet.
+            if key == "disabled" and who is not None \
+                    and who.has_state("state.down.unconscious"):
+                line = "{name} has no hit points left and lies unconscious."
             said.append(line.format(name=who.name if who else "they"))
         return (" " + " ".join(said)) if said else ""
 

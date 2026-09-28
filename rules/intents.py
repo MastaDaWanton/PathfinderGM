@@ -246,7 +246,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # `item`: the object an improvised weapon IS — "chunk of wood",
                     # "pebble" — so the tell can name it and the props ledger can
                     # move it.
-                    "iteration", "undecided", "item", "thrown"), "player"),
+                    "iteration", "undecided", "item", "thrown",
+                    # 1e's coup de grâce: a declared choice, like `power_attack`; the
+                    # engine refuses it at anybody who is not helpless.
+                    "coup_de_grace"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
@@ -700,7 +703,8 @@ def normalise_raw(raw: dict) -> dict:
             skill = normalise_skill(man)
             if skill:
                 kept = {k: v for k, v in params.items()
-                        if k not in ("manoeuvre", "full_attack", "weapon", "power_attack")}
+                        if k not in ("manoeuvre", "full_attack", "weapon", "power_attack",
+                                     "coup_de_grace")}
                 raw = dict(raw, op="check", params={**kept, "skill": skill})
     return raw
 
@@ -884,6 +888,8 @@ def _check_params(intent: Intent, index: int) -> None:
         if w:
             p["weapon"] = str(w).strip().lower()
         p["full_attack"] = bool(p.get("full_attack", False))
+        if "coup_de_grace" in p:
+            p["coup_de_grace"] = bool(p["coup_de_grace"])
         man = p.get("manoeuvre")
         if man:
             key = str(man).strip().lower()

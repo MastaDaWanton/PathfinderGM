@@ -271,6 +271,10 @@ class GMAgent:
                                                  recent=getattr(self, "recent", ())) or raw
                 raw = judgement.redirect_attacks_off_corpses(
                     raw, player_input, self.engine.scene) or raw
+                # Once the targets are settled: "I finish him" at a body on the floor is
+                # 1e's coup de grâce, declared from the words rather than hoped for.
+                raw = judgement.declare_coup_de_grace(raw, player_input,
+                                                      self.engine.scene)
                 # Before survival: a drunk potion is the jar door, not a waterskin
                 # sip, and never a number the model wrote.
                 raw = judgement.declare_use_item(raw, player_input, self.engine.scene)

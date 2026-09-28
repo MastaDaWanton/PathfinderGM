@@ -760,6 +760,53 @@ def is_finishing_blow(player_text: str, scene) -> bool:
                for a in (getattr(scene, "actors", {}) or {}).values())
 
 
+def _finishable(actor) -> bool:
+    """A non-player body a coup de grâce could be aimed at: helpless or down, not dead."""
+    return (not getattr(actor, "is_pc", False)
+            and not actor.has_state("state.down.dead")
+            and (actor.has_state("state.down") or actor.has_state("state.helpless")))
+
+
+def declare_coup_de_grace(raw_intents, player_text: str, scene):
+    """Finishing words make the blow a coup de grâce; the model does not have to.
+
+    Measured 2026-09-27: `is_finishing_blow` recognised "I finish him" and kept the
+    fight-making repairs off it, and the attack that got through then resolved as nothing
+    at all — so detecting the words was never the gap; nothing turned them into the rule
+    they name. The model is not asked to learn a param (instruction volume loses to
+    demonstration volume); the words are read here and the param written, the same shape
+    as every declaration repair that held.
+
+    Two moves, both mechanical. An attack already aimed at a finishable body gets
+    `coup_de_grace: true`. And when the words are there, no attack was proposed at all,
+    and exactly ONE body could be meant, the blow is added — two candidates is a question
+    for the player, not a guess. The engine still refuses what 1e refuses (a creature
+    immune to criticals, a sling), so this only ever declares; it never decides.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if not is_finishing_blow(player_text, scene):
+        return raw_intents
+    actors = getattr(scene, "actors", {}) or {}
+    bodies = [r for r, a in actors.items() if _finishable(a)]
+    out, aimed = [], False
+    for raw in raw_intents:
+        if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
+                and str(raw.get("target", "")) in bodies
+                and not (raw.get("params") or {}).get("manoeuvre")):
+            raw = dict(raw, params={**(raw.get("params") or {}), "coup_de_grace": True})
+            aimed = True
+        elif isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack":
+            aimed = True                  # aimed elsewhere on purpose: left alone
+        out.append(raw)
+    if not aimed and len(bodies) == 1:
+        pc = next((r for r, a in actors.items() if getattr(a, "is_pc", False)), "pc")
+        out.append({"op": "attack", "actor": pc, "target": bodies[0],
+                    "because": "the player finishes the fallen",
+                    "params": {"coup_de_grace": True}})
+    return out
+
+
 def inject_fight(raw_intents, player_text: str, scene):
     """The player started a fight and there was nobody there to have it with.
 
@@ -1079,7 +1126,9 @@ _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iterati
                   "undecided",
                   # The object an improvised weapon is, and whether it left the hand
                   # (`inject_improvised`).
-                  "item", "thrown"}
+                  "item", "thrown",
+                  # `declare_coup_de_grace`, or the model/panel declaring it.
+                  "coup_de_grace"}
 
 
 def normalize_attacks(raw_intents, scene):

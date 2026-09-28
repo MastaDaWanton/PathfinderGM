@@ -369,6 +369,11 @@ def _state(c) -> dict:
                      "members_max": int(a.troop.members_max)}
                     if getattr(a, "troop", None) is not None else {}),
                  "at": list(c.scene.positions[r]) if r in c.scene.positions else None,
+                 # Whether the combat bar may offer a coup de grâce. Asked here of the
+                 # vocabulary so the browser never matches condition names; the dead
+                 # are past finishing.
+                 "helpless": bool(a.is_helpless
+                                  and not a.has_state("state.down.dead")),
                  "conditions": [x.name for x in a.conditions]}
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
