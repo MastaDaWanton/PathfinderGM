@@ -96,14 +96,14 @@ def test_an_npc_drag_no_longer_reads_you_drag_the_target_5_feet():
     tell = _tell("drag", "c1", 20, 30)
     assert "you drag the target 5 feet" not in tell
     shown, _ = narration.pc_to_second_person(tell, PC)
-    assert re.match(r"The thug drags you by \d+: you are dragged 5 feet\.", shown), shown
+    assert re.match(r"The thug drags you by \d+: you are dragged \d+ feet\.", shown), shown
     assert "you drag" not in shown.lower()
     assert narration.wrong_actor(shown, THUG, PC) == []
 
 
 @pytest.mark.parametrize("key,backfire", [
     ("trip", "The thug is knocked prone instead."),
-    ("disarm", "The thug drops the weapon used for the disarm."),
+    ("disarm", "The thug drops the sap."),
 ])
 def test_a_creatures_backfire_lands_on_the_creature(key, backfire):
     """"you are knocked prone instead" on the thug's failed trip told the narrator the
@@ -128,9 +128,9 @@ def test_the_players_own_manoeuvre_reads_in_the_second_person_with_agreement():
     assert re.match(r"You trip the thug by \d+: the thug is knocked prone\.", shown), shown
     shown, _ = narration.pc_to_second_person(_tell("bull rush", "pc", 20, 30), PC)
     assert shown.startswith("You charge the thug in a bull rush by "), shown
-    assert "You push the thug back 5 feet." not in shown   # mid-sentence, not capital
-    assert "you push the thug back 5 feet" in shown
-    assert "The thug is pushed another" in shown
+    # The distance is the total moved (5, +5 per full 5 over), measured on the map;
+    # the separate "pushed another N feet" sentence folded into it.
+    assert re.search(r": the thug is pushed back \d+ feet\.", shown), shown
     assert "rushs" not in shown
 
 
@@ -140,7 +140,8 @@ def test_every_maneuver_verb_turns_to_the_second_person():
     manoeuvre reads "you drags". Grep-for-every-copy, held by a test."""
     missing = []
     for m in MANEUVERS.values():
-        texts = [m.get(f, "") for f in ("lead", "effect", "backfire", "per_5_over")]
+        texts = [m.get(f, "") for f in ("lead", "effect", "backfire", "nothing",
+                                         "picked_up", "short", "blocked")]
         texts += list((m.get("degrees") or {}).values())
         for verb in (v for t in texts for v in maneuver_verbs(t)):
             if narration._YOU_VERBS.get(third_person(verb)) != verb:
@@ -169,6 +170,11 @@ def test_the_sheet_reads_in_the_players_person():
     sheet = full_sheet(load_pc("fixtures/pc-kesst.json"))
     effects = {m["name"]: m["effect"] for m in sheet["offense"]["maneuvers"]}
     assert effects["overrun"] == "You move through the target's space"
+    assert effects["disarm"] == ("The target drops one item it holds (both hands, "
+                                 "by 10 or more)")
+    assert effects["dirty trick"] == ("The target is blinded, dazzled, deafened, "
+                                      "entangled, shaken or sickened for 1 round "
+                                      "(+1 per 5 over)")
     assert effects["trip"] == "The target is knocked prone"
     assert effects["grapple"] == "You and the target both gain the grappled condition"
     for name, text in effects.items():

@@ -233,7 +233,22 @@ MANOEUVRE_CUES: dict[str, re.Pattern] = {
                          r"shatter)\b", re.I),
     "steal": re.compile(r"\b(steal|steals|lift (?:his|her|their) \w+|pick (?:his|her|their) pocket|"
                         r"snatch)\b", re.I),
-    "dirty trick": re.compile(r"\b(dirty trick|throw (?:sand|dirt|dust)|blind (?:him|her|them|it))\b", re.I),
+    # "grit in his eyes" and "salt in her face" as well as the textbook sand: the live
+    # fight of 2026-09-27 threw "a handful of grit in his eyes".
+    "dirty trick": re.compile(r"\b(dirty trick|throw (?:sand|dirt|dust|grit|ash|salt)|"
+                              r"(?:sand|dirt|dust|grit|ash|salt) in (?:his|her|their|its) "
+                              r"(?:eyes|face)|blind (?:him|her|them|it))\b", re.I),
+    # Drag and reposition had no cues at all, so a GM that chose either was always
+    # overruled — dropped as "nobody asked for it", or swapped to a grapple when the
+    # sentence also said "grab". Measured live 2026-09-27: "I grab him by the collar
+    # and drag him toward the door" came back as drag and was resolved as a grapple.
+    # Neither manoeuvre could reach the engine from a player's turn.
+    "drag": re.compile(r"\b(drag|drags|haul (?:him|her|them|it)|"
+                       r"pull (?:him|her|them|it) (?:along|toward|towards|after))\b", re.I),
+    "reposition": re.compile(r"\b(reposition|steer (?:him|her|them|it)|"
+                             r"spin (?:him|her|them|it) (?:round|around|into|toward)|"
+                             r"(?:force|walk|shove|put) (?:him|her|them|it) "
+                             r"(?:into|against|toward|towards|between|in front of))\b", re.I),
 }
 
 # The action is plainly meant to wound: a manoeuvre would be the wrong answer.
@@ -1359,10 +1374,13 @@ _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iterati
                   # attack back as a question through it.
                   "undecided",
                   # The object an improvised weapon is, and whether it left the hand
-                  # (`inject_improvised`).
+                  # (`inject_improvised`). `item` is also what a disarm, a steal or a
+                  # sunder is aimed at.
                   "item", "thrown",
                   # `declare_coup_de_grace`, or the model/panel declaring it.
-                  "coup_de_grace"}
+                  "coup_de_grace",
+                  # A dirty trick's condition and a reposition's destination.
+                  "trick", "square"}
 
 
 def normalize_attacks(raw_intents, scene):
@@ -1397,6 +1415,7 @@ def normalize_attacks(raw_intents, scene):
         # "none" is nothing at all. One reading of the two slots, the parser's too
         # (`intents.attack_slots`): this used to move every unknown word into `weapon`
         # unasked, and "none" lost turn 1 of two fight audits running (2026-09-27/28).
+        # A manoeuvre filed as the WEAPON ("bull_rush") is read there too.
         if "manoeuvre" in params or "weapon" in params:
             man, weapon = intents_mod.attack_slots(params.get("manoeuvre"),
                                                    params.get("weapon"))
@@ -1408,6 +1427,12 @@ def normalize_attacks(raw_intents, scene):
             if fixed != params:
                 params = fixed
                 changed = True
+        # A `trick` means one manoeuvre. Measured live 2026-09-27: "I throw a handful
+        # of grit in his eyes to blind him" came back as `{"trick": "blinded"}` with no
+        # manoeuvre, and was rolled as a plain attack against AC.
+        if params.get("trick") and not params.get("manoeuvre"):
+            params["manoeuvre"] = "dirty trick"
+            changed = True
         # Unknown params ('action', 'target' now that it has moved) are refusals
         # waiting to happen; the schema names the legal five.
         for key in [k for k in params if k not in _ATTACK_PARAMS]:

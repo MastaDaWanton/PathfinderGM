@@ -249,7 +249,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "iteration", "undecided", "item", "thrown",
                     # 1e's coup de grâce: a declared choice, like `power_attack`; the
                     # engine refuses it at anybody who is not helpless.
-                    "coup_de_grace"), "player"),
+                    "coup_de_grace",
+                    # A dirty trick's one condition, and where a reposition puts its
+                    # target: the attacker's choices, which the rules leave to them.
+                    "trick", "square"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
@@ -690,6 +693,14 @@ def attack_slots(manoeuvre, weapon) -> tuple[str | None, str | None]:
     if isinstance(w, str) and w.strip().lower() in UNARMED_WORDS:
         w = "unarmed"
     if is_null(manoeuvre):
+        # A manoeuvre filed as the weapon. Measured live 2026-09-27: "I shove him back
+        # hard" came back as `"weapon": "bull_rush"`, was refused as "no such weapon",
+        # and the retry was a plain swing — the shove never reached the engine.
+        if isinstance(w, str):
+            said = re.sub(r"[_-]+", " ", w).strip().lower()
+            said = MANEUVER_ALIASES.get(said, said)
+            if said in MANEUVERS:
+                return said, None
         return None, w
     m = str(manoeuvre).strip().lower()
     key = MANEUVER_ALIASES.get(m) or MANEUVER_ALIASES.get(m.replace("_", " ")) \
@@ -1056,6 +1067,21 @@ def _check_params(intent: Intent, index: int) -> None:
                 p["iteration"], 0, 15, index,
                 "attack: iteration is which swing of a full attack this is, counting "
                 "from 0")
+        # A dirty trick's one condition, the attacker's choice among the six the APG
+        # allows. Refused here rather than defaulted in the engine, so "blind him" that
+        # arrives as "blindness" is repaired by the model instead of quietly dazzling.
+        if p.get("trick") not in (None, ""):
+            tricks = MANEUVERS["dirty trick"]["tricks"]
+            said = str(p["trick"]).strip().lower()
+            if said not in tricks:
+                raise IntentError(
+                    f"attack: a dirty trick's trick is one of {', '.join(tricks)}; "
+                    f"{p['trick']!r} is not." + _suggest(said, tricks),
+                    "schema", index)
+            p["trick"] = said
+        # Where a reposition puts its target — the attacker's choice.
+        if p.get("square") not in (None, ""):
+            p["square"] = _square(p["square"], op, index)
 
     elif op == "defence":
         kinds = ("damage_reduction", "immunity", "resistance", "vulnerability")
