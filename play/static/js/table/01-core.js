@@ -53,30 +53,32 @@ function showMap(on) {
   $("#maptab").style.display = on ? "none" : "";
   if (on && STATE) renderMap(STATE);
 }
-// The sheet drawer, which exists only under the phone breakpoint. Two panels that slide
-// over the same screen must not both be open: on a 375px phone the second one lands on
-// top of the first and the one underneath can only be found by closing the one above it.
-function showSheet(on) {
-  $("aside").classList.toggle("on", on);
-  $("#sheettab").style.display = on ? "none" : "";
-  if (on) showMap(false);
-}
+// The drawer. It was the sheet alone, under the phone breakpoint, through `showSheet`;
+// since the 2026-09-28 panel shell it is the whole column of panels, on a phone or on a
+// desktop after "Hide the column", and `Panels` (07-panels.js) owns it. `showSheet` was
+// removed rather than redefined there: a later classic script's function of the same
+// name silently wins, the JS form of what test_no_silent_shadowing guards in Python.
+// Two slide-overs on one screen must still never both be open: on a 375px phone the
+// second lands on top of the first, so the map closes the drawer and the drawer the map.
 document.addEventListener("click", e => {
   if (e.target.closest("#maptab") || e.target.closest("#mapopen")) {
-    showSheet(false);
+    Panels.close();
     showMap(true);
   }
   else if (e.target.closest("#mapclose")) showMap(false);
-  else if (e.target.closest("#sheettab")) showSheet(true);
+  else if (e.target.closest(".edgetab")) {
+    const tab = e.target.closest(".edgetab");
+    Panels.open(tab.dataset.panel, { from: tab });
+  }
   // Anywhere outside it, while it is open. A drawer with no way out but a tab it is
-  // currently covering is a trap, and the tab is hidden precisely while it is open.
+  // currently covering is a trap, and the tabs are hidden precisely while it is open.
   else if ($("aside").classList.contains("on") && !e.target.closest("aside")) {
-    showSheet(false);
+    Panels.close();
   }
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && $("#maptray").classList.contains("on")) showMap(false);
-  if (e.key === "Escape" && $("aside").classList.contains("on")) showSheet(false);
+  if (e.key === "Escape" && $("aside").classList.contains("on")) Panels.close();
   // A map is worth a shortcut in a game where the whole question is where you stand.
   if (e.key === "m" && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
     showMap(!$("#maptray").classList.contains("on"));

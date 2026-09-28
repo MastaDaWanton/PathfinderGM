@@ -122,6 +122,8 @@ async function readJSON(r) {
 }
 
 async function post(url, body) {
+  // The clock this screen showed when the player acted, for `table:posted` below.
+  const clockBefore = (STATE && STATE.scene) ? STATE.scene.clock_minutes : null;
   const headers = {"Content-Type": "application/json", "X-CSRFToken": csrf()};
   // What this screen was drawn from. The server refuses the write if it has moved on,
   // which is the only thing standing between a stale screen and a turn taken against a
@@ -164,6 +166,11 @@ async function post(url, body) {
     const e = new Error(data.error); e.hint = true; throw e;
   }
   if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+  // This page's own POST succeeded. Dispatched before the caller renders the answer, so
+  // a listener (the time-skip clock, 09-clock.js) can arm on it and fire from the render
+  // hook that follows. Never on load, a resync or the other device's turn: none of those
+  // pass through here. A listener that throws is reported, not raised into this turn.
+  document.dispatchEvent(new CustomEvent("table:posted", { detail: { url, clockBefore } }));
   return data;
 }
 
@@ -176,6 +183,8 @@ async function post(url, body) {
    caller that knows a mat is open passes `hold` and opens the next popup itself once
    the player has closed the last one. */
 function render(s, hold) {
+  // What was on screen before this draw, for the render hooks below.
+  const prev = STATE;
   STATE = s;
   // The shell's title bar follows the world the state is in, not the one the page was
   // opened on: the table page's picker can begin again in another campaign without a
@@ -190,9 +199,15 @@ function render(s, hold) {
   // ink-bleed entrance on every turn, which reads as the book flickering rather than
   // being written in.
   const seen = window._beatsSeen || 0;
+  // A player beat sent with an attachment (a spell chip, docs/fix-interfaces.md §2.10)
+  // shows the chip before the words, so "I cast Burning Hands." is never the only trace.
+  const chips = b => (b.attachments || []).map(a =>
+    `<span class="chip" data-kind="${esc(a.kind || "")}" data-id="${esc(a.id || "")}">${
+      a.kind === "spell" ? `<span class="vh">Spell: </span>` : ""}${
+      esc(a.name || a.id || "")}</span> `).join("");
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
-      i >= seen ? " fresh" : ""}">${said(b.text)}</p>`
+      i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}</p>`
   ).join("");
   window._beatsSeen = s.transcript.length;
   $("#story").scrollTop = $("#story").scrollHeight;
@@ -213,9 +228,15 @@ function render(s, hold) {
     $("#sheet").innerHTML = `
       <div class="name">${esc(pc.name)}</div>
       <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
-      ${s.scene.biome ? `<div class="biome" title="${esc(s.scene.what_it_is || s.scene.biome_describe)}">
-        ${esc(s.scene.location)}${s.scene.scale ? ` · ${esc(s.scene.scale)}` : ""} · ${
-          esc(s.scene.biome)} · ${fmtClock(s.scene.clock_minutes)}</div>` : ""}
+      ${(s.scene.where_label || s.scene.biome) ? `<div class="biome" title="${
+        esc(s.scene.what_it_is || s.scene.biome_describe || "")}">
+        ${s.scene.where_label
+          // Where you stand, in geography's words (docs/fix-interfaces.md §2.10), when the
+          // server sends them; the location, scale and biome line otherwise.
+          ? `${esc(s.scene.where_label)}${
+              s.scene.where_detail ? ` · ${esc(s.scene.where_detail)}` : ""}`
+          : `${esc(s.scene.location)}${s.scene.scale ? ` · ${esc(s.scene.scale)}` : ""} · ${
+              esc(s.scene.biome)}`} · ${fmtClock(s.scene.clock_minutes)}</div>` : ""}
       <div class="bar"><i style="width:${pct}%"></i>${
         temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
       <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${
@@ -320,6 +341,12 @@ function render(s, hold) {
   renderGmView(s);
 
   renderRolls(s.log);
+
+  // The lanes' hooks (07-panels.js `onRender`). Guarded because the page's first draw,
+  // at the bottom of 06, runs before 07 has defined them; 07 primes every hook with the
+  // state on screen once the document has loaded. Before `hold`, so a held dice mat
+  // never keeps a hook from seeing the turn.
+  if (typeof runRenderHooks === "function") runRenderHooks(s, prev);
 
   if (hold) return;
   if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");

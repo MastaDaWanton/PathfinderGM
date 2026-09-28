@@ -1006,8 +1006,50 @@
    * The sheet becomes a drawer rather than a column, reusing the map tray's idiom two
    * hundred lines up — an edge tab and a slide-over — so there is one way this page
    * shows a panel it has no room for rather than two.
+   *
+   * Since the 2026-09-28 panel shell the drawer is a MODE, `body.drawer`, not a
+   * breakpoint: the phone gets it from the pre-paint script under 760px, and a desktop
+   * gets it from "Hide the column". The rules are written once, below, for both.
    */
-  #sheettab { display: none; }
+  body.drawer { grid-template-columns: 1fr; }
+  body.drawer aside {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
+    width: min(400px, 88vw);
+    /* Off-screen rather than hidden, so it slides rather than appears — same
+       reasoning as `#maptray`. */
+    transform: translateX(102%);
+    transition: transform .32s cubic-bezier(.2,.7,.3,1);
+    border-width: 0 0 0 4px;
+    box-shadow: -14px 0 40px rgba(0,0,0,.6);
+  }
+  body.drawer aside.on { transform: translateX(0); }
+
+  /* The edge tabs: the old SHEET tab, now one of up to three, stacked on the right edge
+     where it always sat. Only in drawer mode; hidden while the drawer they open is out,
+     because they would be a button under the thing it opens. */
+  #edgetabs { display: none; }
+  body.drawer #edgetabs {
+    display: flex; flex-direction: column; gap: 8px;
+    position: fixed; right: 0; top: 46%; z-index: 60;
+  }
+  body.drawer aside.on ~ #edgetabs { visibility: hidden; }
+  .edgetab {
+    cursor: pointer; writing-mode: vertical-rl; text-orientation: mixed;
+    padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-right: 0;
+    border-radius: 3px 0 0 3px; background: linear-gradient(#241d15, #17120d);
+    color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
+    font-variant: normal; box-shadow: -3px 0 14px rgba(0,0,0,.6);
+  }
+  .edgetab:hover:not(:disabled) { color: #ffe7b4; border-color: var(--gold);
+                                  transform: none; }
+  .edgetab:focus-visible { outline: 1px solid var(--accent); outline-offset: -3px; }
+  /* The count of new lines, upright in the vertical tab. A number, not a dot: it says
+     how many, which is the thing worth knowing. */
+  .edgecount {
+    display: block; margin-top: 7px; padding: 3px 0; letter-spacing: 0;
+    text-combine-upright: all; color: #f4e6c0;
+    border-top: 1px solid var(--gold-dim);
+  }
 
   @media (max-width: 760px) {
     /* 100dvh, not 100vh. Mobile browsers count their own collapsing address bar in
@@ -1016,27 +1058,8 @@
        cannot be played without. */
     body { grid-template-columns: 1fr; height: 100dvh; }
 
-    aside {
-      position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
-      width: min(400px, 88vw);
-      /* Off-screen rather than hidden, so it slides rather than appears — same
-         reasoning as `#maptray`. */
-      transform: translateX(102%);
-      transition: transform .32s cubic-bezier(.2,.7,.3,1);
-      border-width: 0 0 0 4px;
-      box-shadow: -14px 0 40px rgba(0,0,0,.6);
-    }
-    aside.on { transform: translateX(0); }
-
-    #sheettab {
-      display: block;
-      position: fixed; right: 0; top: 46%; z-index: 60; cursor: pointer;
-      writing-mode: vertical-rl; text-orientation: mixed;
-      padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-right: 0;
-      border-radius: 3px 0 0 3px; background: linear-gradient(#241d15, #17120d);
-      color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
-      box-shadow: -3px 0 14px rgba(0,0,0,.6);
-    }
+    /* A phone has no room for a column to come back to. */
+    #panelmode { display: none; }
 
     /* 48px of horizontal padding is a quarter of a phone screen spent on margin. */
     #story { padding: 20px 16px 22px; }
@@ -1100,8 +1123,104 @@
     #maptray { width: 92vw; }
   }
 
-  @media (max-width: 760px) and (prefers-reduced-motion: reduce) {
-    aside { transition: none; }
+  @media (prefers-reduced-motion: reduce) {
+    body.drawer aside { transition: none; }
+  }
+
+  /* --- The panels -----------------------------------------------------------
+   * One component for the column and the drawer (07-panels.js). Quiet on purpose: the
+   * story is what the page is for, so the chrome is the aside's own heading style and
+   * its own iron-and-gold buttons, taken down a size, and nothing that moves unless the
+   * player moved it. Radii follow the page's scale: 2px for controls, 3px for panels.
+   */
+  #panelbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+    margin: 0 0 18px; padding-bottom: 12px; border-bottom: 1px solid #2b2319;
+  }
+  #panelbar button {
+    padding: 6px 9px; font-size: 12px; letter-spacing: .08em; border-radius: 2px;
+  }
+  /* Pressed: the ordinary iron button, lit. Unpressed: an empty slot, dashed like the
+     combat bar's planned steps, still gold so it reads as something to press. */
+  #panelbar .panelbtn[aria-pressed="false"] {
+    background: transparent; border-style: dashed; color: var(--gold);
+  }
+  #panelbar .panelbtn[aria-pressed="true"] {
+    border-color: var(--accent); color: #f4e6c0;
+  }
+  #panelmode {
+    margin-left: auto; background: transparent; border-color: transparent;
+    color: var(--gold);
+  }
+  #panelmode:hover:not(:disabled) { border-color: var(--gold-dim); }
+  /* No lift on hover inside the column: these sit in rows, and a row of buttons that
+     jump under the pointer is harder to aim along. */
+  #panelbar button:hover:not(:disabled), .panelhead button:hover:not(:disabled) {
+    transform: none; box-shadow: none;
+  }
+
+  .panel { margin: 0 0 22px; }
+  .panel:last-of-type { margin-bottom: 0; }
+  /* The heading is the old `aside h2` ("In the scene", "Rolls"), now a button that
+     folds its panel, with the close beside it. */
+  .panelhead {
+    display: flex; align-items: center; gap: 6px; margin: 0 0 10px;
+    border-bottom: 1px solid #2b2319;
+  }
+  .panel.collapsed .panelhead { margin-bottom: 0; }
+  .paneltoggle {
+    flex: 1; min-width: 0; text-align: left; padding: 3px 0 6px;
+    background: none; border: 0; border-radius: 2px; overflow: visible;
+    color: var(--gold); font: 400 16px/1 var(--display); letter-spacing: .13em;
+    font-variant: small-caps;
+  }
+  .paneltoggle::before {
+    content: "▸"; display: inline-block; width: 1em; margin-right: 4px;
+    font-size: 13px; color: var(--accent); transform: rotate(90deg);
+    transition: transform .12s ease-out;
+  }
+  .paneltoggle[aria-expanded="false"]::before { transform: none; }
+  .paneltoggle::after { display: none; }
+  .paneltoggle:hover:not(:disabled) { color: #f4e6c0; }
+  .paneltoggle:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px;
+                               box-shadow: none; }
+  .panelclose {
+    flex: none; width: 26px; height: 26px; padding: 0; margin-bottom: 4px;
+    background: transparent; border-color: transparent; color: var(--gold);
+    font: 13px/1 var(--body); letter-spacing: 0;
+  }
+  .panelclose:hover:not(:disabled) { border-color: var(--gold-dim); color: #f4e6c0; }
+  .panelbody.arrive { animation: panelarrive .14s ease-out both; }
+  @keyframes panelarrive { from { opacity: 0; } }
+
+  /* An empty panel says what will appear in it. Ink rather than the dim grey the
+     older `.sub` lines use, which falls under 4.5:1 on the leather. */
+  .panelempty { margin: 0; color: var(--ink); font: italic 13px/1.5 var(--body); }
+  #talk:not([hidden]) ~ .panelempty, #convo:not([hidden]) ~ .panelempty,
+  #mapwrap:not(:empty) ~ .panelempty { display: none; }
+  #panelsnone { display: none; }
+  #panels:not(:has(.panel:not([hidden]))) #panelsnone { display: block; }
+
+  /* Said to a screen reader, not shown: #clocksay and #saystatus. */
+  .vh {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+    border: 0;
+  }
+
+  /* Lane F's mount points, inert until Phase 2 fills them. The spell picker is shut
+     unless open, including in a browser that predates popovers, where the attribute
+     alone would leave it on the page. Two rules, because a selector a browser cannot
+     parse takes the whole rule with it. */
+  #spellpop { display: none; }
+  #spellpop.open { display: block; }
+  #spellpop:popover-open { display: block; }
+
+  /* A chip sent with a player beat, drawn before the words in the transcript. */
+  .beat .chip {
+    display: inline-block; padding: 0 9px; border: 1px solid var(--gold-dim);
+    border-radius: 12px; color: var(--gold); font-style: normal; font-size: 13px;
+    line-height: 1.6; vertical-align: 1px;
   }
 
   .opensheet {
@@ -1532,11 +1651,32 @@
 <script src="{% static 'js/scene3d.js' %}"></script>
 </head>
 <body>
+<script>
+// Drawer or column, decided before the first paint, so a phone never flashes the desktop
+// column and a desktop that hid the column never flashes it back. First in <body>
+// because <head> has no body to mark. No template variables in here: a variable Django
+// renders as "" is a syntax error that takes the page down silently (PATHFINDER_BOOT
+// below says why). The key is 07-panels.js's PANELS_KEY; change both together.
+(function () {
+  var docked = true;
+  try {
+    var saved = JSON.parse(window.localStorage.getItem("pgm.table.panels.v1") || "null");
+    if (saved && saved.docked === false) docked = false;
+  } catch (e) { /* unreadable storage: the column stays docked */ }
+  var narrow = !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  if (narrow || !docked) document.body.classList.add("drawer");
+})();
+</script>
 <div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div id="cursorshade" aria-hidden="true"></div>
 <div id="cursorlight" aria-hidden="true"></div>
 <main>
   <div id="story"></div>
+  <!-- The time-skip clock (Lane F, 09-clock.js): positioned inside main so it never
+       covers the column, and its one sentence for screen readers, in the DOM from load
+       because a live region added at the moment of speaking is not heard. -->
+  <div id="clockpop" aria-hidden="true" hidden></div>
+  <div id="clocksay" class="vh" role="status"></div>
   <div id="busy">the GM is thinking…</div>
   <div id="err"></div>
   <footer>
@@ -1572,6 +1712,10 @@
     </div>
   <div id="abilities"></div>
     <form id="sayform" autocomplete="off">
+      <!-- A spell chip rides beside the words, never inside them (Lane F, 10-spells.js):
+           a contenteditable composer would break the real input that the iOS 16px rule,
+           the sticky phone form and player_input all depend on. -->
+      <div id="attachments" role="group" aria-label="Attached to this turn" hidden></div>
       <!-- The out-of-character door is discoverable or it does not exist. `title` so
            the hint is there on hover without taking a line of the page. -->
       <input type="text" id="input" placeholder="What do you do?" autofocus
@@ -1593,7 +1737,14 @@
            raise. -->
       <button type="button" id="tradeaction" class="quiet"
               title="Buy and sell at the counter">Trade</button>
+      <!-- Shown by 10-spells.js when the character casts spells at all. -->
+      <button type="button" id="spellbtn" class="quiet" popovertarget="spellpop"
+              title="Choose a spell to cast this turn" hidden>Spells</button>
     </form>
+    <!-- The spell picker (Lane F). Popover, so Esc and a click outside close it. -->
+    <div id="spellpop" popover="auto" aria-label="Spells"></div>
+    <!-- What was attached or removed, said once for screen readers; present from load. -->
+    <div id="saystatus" class="vh" role="status"></div>
     <!-- The excursion panel. Foraging lived only on the bench page, where it was a
          button and a table: no narration, no time, no way back into the fiction. -->
     <div id="craftpanel" hidden>
@@ -1623,31 +1774,132 @@
   </footer>
 </main>
 
-<aside>
-  <div id="sheet"></div>
-  <div id="order"></div>
-  <div id="mapwrap"></div>
-  <h2>In the scene</h2>
-  <div id="board"></div>
-  <!-- The conversation, while there is one (2026-09-24): who is in it, how each of
-       them stands towards you, and the one button that ends it. Engine-held state;
-       the button posts straight to the engine with no model call, because an exit
-       that has to be noticed by a narrator is an exit that sometimes is not. -->
-  <div id="talk" hidden></div>
-  <!-- Filled only when the GM view house rule is on; the server decides, so the seams
-       cannot leak into an ordinary session through a front-end mistake. -->
-  <div id="gmview"></div>
-  <h2>Rolls</h2>
-  <div id="rolls"></div>
+<!-- The column, as five panels (docs/design-f-ui.md §4.1; 07-panels.js drives it).
+     Every id the renderers write into moved here unchanged, so none of them changed.
+     The order is fixed and never rearranged by the page: text that moves under a reader
+     is worse than text left where it was. Several panels show at once, so the bar is a
+     toolbar of toggles and each panel a disclosure, not a set of tabs. -->
+<aside id="panels" aria-label="Your character and the scene">
+  <div id="panelbar" role="toolbar" aria-label="Panels">
+    <button type="button" class="panelbtn" data-panel="sheet" aria-pressed="true"
+            aria-controls="panel-sheet">Sheet</button>
+    <button type="button" class="panelbtn" data-panel="scene" aria-pressed="true"
+            aria-controls="panel-scene">Scene</button>
+    <button type="button" class="panelbtn" data-panel="conversation" aria-pressed="true"
+            aria-controls="panel-conversation">Talk</button>
+    <button type="button" class="panelbtn" data-panel="map" aria-pressed="true"
+            aria-controls="panel-map">Map</button>
+    <button type="button" class="panelbtn" data-panel="rolls" aria-pressed="true"
+            aria-controls="panel-rolls">Rolls</button>
+    <!-- Desktop only: the story takes the full width and the panels open from the
+         right edge, as on a phone. 07 writes its label. -->
+    <button type="button" id="panelmode" aria-controls="panels">Hide the column</button>
+  </div>
+
+  <section class="panel" id="panel-sheet" data-panel="sheet" aria-labelledby="panel-sheet-title">
+    <div class="panelhead">
+      <button type="button" class="paneltoggle" id="panel-sheet-title" aria-expanded="true"
+              aria-controls="panel-sheet-body">Sheet</button>
+      <button type="button" class="panelclose" aria-label="Close the sheet panel"
+              title="Close the sheet panel">✕</button>
+    </div>
+    <div class="panelbody" id="panel-sheet-body">
+      <div id="sheet"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-scene" data-panel="scene" aria-labelledby="panel-scene-title">
+    <div class="panelhead">
+      <button type="button" class="paneltoggle" id="panel-scene-title" aria-expanded="true"
+              aria-controls="panel-scene-body">In the scene</button>
+      <button type="button" class="panelclose" aria-label="Close the scene panel"
+              title="Close the scene panel">✕</button>
+    </div>
+    <div class="panelbody" id="panel-scene-body">
+      <!-- Turn order, only while a fight is on. -->
+      <div id="order"></div>
+      <div id="board"></div>
+      <!-- Filled only when the GM view house rule is on; the server decides, so the seams
+           cannot leak into an ordinary session through a front-end mistake. -->
+      <div id="gmview"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-conversation" data-panel="conversation"
+           aria-labelledby="panel-conversation-title">
+    <div class="panelhead">
+      <button type="button" class="paneltoggle" id="panel-conversation-title"
+              aria-expanded="true" aria-controls="panel-conversation-body">Conversation</button>
+      <button type="button" class="panelclose" aria-label="Close the conversation panel"
+              title="Close the conversation panel">✕</button>
+    </div>
+    <div class="panelbody" id="panel-conversation-body">
+      <!-- What was said, per person (Lane F, 08-conversation.js). The controls in #talk
+           sit below the log's scroll region, never inside it: Disco Elysium's log held
+           its live choices, and scrolling back left players unable to reach them. -->
+      <div id="convo" hidden>
+        <div id="convo-people"></div>
+        <div id="convo-log" role="log" aria-live="off"></div>
+        <button type="button" id="convo-latest" hidden>Go to the latest line</button>
+      </div>
+      <!-- The conversation, while there is one (2026-09-24): who is in it, how each of
+           them stands towards you, and the one button that ends it. Engine-held state;
+           the button posts straight to the engine with no model call, because an exit
+           that has to be noticed by a narrator is an exit that sometimes is not. -->
+      <div id="talk" hidden></div>
+      <p class="panelempty">Nobody is talking with you. When someone is, they appear here
+        with how they regard you and a way to take your leave.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-map" data-panel="map" aria-labelledby="panel-map-title">
+    <div class="panelhead">
+      <button type="button" class="paneltoggle" id="panel-map-title" aria-expanded="true"
+              aria-controls="panel-map-body">Map</button>
+      <button type="button" class="panelclose" aria-label="Close the map panel"
+              title="Close the map panel">✕</button>
+    </div>
+    <div class="panelbody" id="panel-map-body">
+      <div id="mapwrap"></div>
+      <p class="panelempty">No ground is mapped yet. The map is drawn from wherever you
+        are standing, as soon as you are standing somewhere.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-rolls" data-panel="rolls" aria-labelledby="panel-rolls-title">
+    <div class="panelhead">
+      <button type="button" class="paneltoggle" id="panel-rolls-title" aria-expanded="true"
+              aria-controls="panel-rolls-body">Rolls</button>
+      <button type="button" class="panelclose" aria-label="Close the rolls panel"
+              title="Close the rolls panel">✕</button>
+    </div>
+    <div class="panelbody" id="panel-rolls-body">
+      <div id="rolls"></div>
+    </div>
+  </section>
+
+  <p class="panelempty" id="panelsnone">Every panel is closed. Choose one in the bar
+    above to bring it back.</p>
 </aside>
 
 <!-- The map, big enough to read. A tab on the left edge rather than a button in the
      panel, so it is reachable whether or not the ground is currently drawn there. -->
 <button id="maptab" title="The map">MAP</button>
-<!-- Only ever visible under the phone breakpoint, where the sheet is a drawer rather
-     than a column. On a desktop the panel is simply there and a tab for it would be a
-     button that scrolls you to something already on screen. -->
-<button id="sheettab" title="Your character">SHEET</button>
+<!-- The drawer's way in: shown only in drawer mode (a phone, or a desktop that hid the
+     column). In column mode the panels are simply there, and a tab would be a button
+     that scrolls you to something already on screen. Sheet always; Scene while a fight
+     is on; Conversation while somebody is talking with you, with a count of new lines.
+     Upper-case to match the map's tab on the other edge. -->
+<div id="edgetabs" role="group" aria-label="Open a panel">
+  <button type="button" class="edgetab" id="sheettab" data-panel="sheet" data-name="Sheet"
+          aria-controls="panels" aria-expanded="false" title="Your character">SHEET</button>
+  <button type="button" class="edgetab" data-panel="scene" data-name="Scene"
+          aria-controls="panels" aria-expanded="false" title="In the scene"
+          hidden>SCENE</button>
+  <button type="button" class="edgetab" data-panel="conversation" data-name="Talk"
+          aria-controls="panels" aria-expanded="false" title="Conversation"
+          hidden>TALK<span class="edgecount" hidden></span></button>
+</div>
 <div id="maptray">
   <div class="traybar"><b>The ground</b>
     <button id="mapclose" title="Close">✕</button></div>
@@ -1745,6 +1997,12 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/04-combat-and-turns.js' %}"></script>
 <script src="{% asset 'js/table/05-sheet.js' %}"></script>
 <script src="{% asset 'js/table/06-trade-and-page.js' %}"></script>
+<!-- The panel shell (S6, 2026-09-28) and Lane F's three components, which ship as stubs
+     until Phase 2 so the page names no script it cannot load. -->
+<script src="{% asset 'js/table/07-panels.js' %}"></script>
+<script src="{% asset 'js/table/08-conversation.js' %}"></script>
+<script src="{% asset 'js/table/09-clock.js' %}"></script>
+<script src="{% asset 'js/table/10-spells.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>
