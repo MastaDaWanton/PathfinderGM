@@ -261,3 +261,58 @@ def test_the_reason_is_given_once_a_swing_and_keeps_the_name_it_was_given():
     said = " ".join(o.tell for o in res.outcomes)
     assert said.count("no single guard to slip past") == 1, said
     assert "Troop, goblin" not in said, said
+
+
+def test_every_hit_of_a_full_attack_rolls_its_own_sneak_dice():
+    """Measured 2026-09-27 through `Engine.run`, seed 7: an 8th-level rogue (BAB +6, two
+    swings) full-attacked a flat-footed foe and hit twice. "Sneak attack (4d6)" was rolled
+    ONCE, both damage rolls carried the same "+13 sneak attack (4d6)", the player was never
+    asked for the second die, and "finds the opening" was said once. The swing's dice were
+    parked in the attack state to survive the popups and never cleared when the swing
+    ended, so the next swing's `not in state` guard read them as already rolled. In 1e
+    each hit that qualifies rolls its own.
+
+    Answered through the popups with a different face each time (6, then 12), so a reused
+    total cannot pass for a fresh one the way two honest 13s on the seeded dice could."""
+    s, e, rogue, _a, foe = _board(rogue_level=8)
+    rogue.flat_attack = None              # the stat block's one swing; the rogue's BAB
+    foe.hp = foe.hp_base = 400            # rules here, and the foe must outlast both hits
+    e.run(e.validate([{"op": "begin_encounter",
+                       "params": {"sides": {"us": [rogue.ref], "them": [foe.ref]}}}],
+                     origin="author:test"))
+    s.positions[rogue.ref] = (4, 5)
+    s.positions[foe.ref] = (5, 5)
+    e.run(e.validate([{"op": "condition", "target": foe.ref,
+                       "params": {"condition": "flat-footed", "duration": 5}}],
+                     origin="author:test"))
+    while s.current_ref() != rogue.ref:
+        s.advance_turn()
+    assert rogue.attack_sequence("unarmed", True) == [0, 1]
+
+    res = e.run(e.validate([{"op": "attack", "actor": rogue.ref, "target": foe.ref,
+                             "params": {"weapon": "unarmed", "full_attack": True},
+                             "because": "t"}], origin="author:test"))
+    sneak_faces = iter([6, 12])
+    asked = []
+    for _ in range(12):
+        if res.awaiting is None:
+            break
+        label = res.awaiting["label"]
+        asked.append(label)
+        count, faces, _flat = e.dice.parse(str(res.awaiting.get("die") or "1d20"))
+        res = e.resume(next(sneak_faces) if label.startswith("Sneak attack")
+                       else 19 if (count, faces) == (1, 20) else count)
+    assert res.awaiting is None, asked
+    assert [l for l in asked if l.startswith("Sneak attack")] == ["Sneak attack (4d6)"] * 2
+
+    # The dice come BEFORE each damage roll, so the damage popup's suspension resumes
+    # into a swing whose extra dice are already settled.
+    order = [l.split(" (")[0] for l in asked]
+    assert order == ["Attack with unarmed strike", "Sneak attack", "Damage"] * 2, asked
+
+    rolls = [r for o in res.outcomes for r in o.as_dict()["rolls"]]
+    added = [m["value"] for r in rolls if str(r.get("label", "")).startswith("Damage")
+             for m in r.get("modifiers") or [] if "sneak attack" in str(m.get("source"))]
+    assert added == [6, 12], added
+    said = " ".join(o.tell for o in res.outcomes)
+    assert said.count("finds the opening") == 2, said

@@ -4283,6 +4283,16 @@ class Engine:
                     for got in self._retaliate(defender, actor):
                         state["effects"].append(got)
                         state["tells"].append(_ward_tell(self.scene, got))
+                # The swing is over, so its own dice go with it. They are parked in
+                # `state` only to survive the popups between the extra dice and the
+                # main damage roll; left in place, the `not in state` guards above read
+                # the NEXT swing's as already rolled. Measured 2026-09-27: an 8th-level
+                # rogue's full attack on a flat-footed foe hit twice, rolled "Sneak
+                # attack (4d6)" once, and added the same +13 to both damage rolls; the
+                # player was never asked for the second sneak die, and the opening was
+                # found once. Each hit rolls its own in 1e.
+                for key in ("rider_total", "sneak_total", "sneak_said"):
+                    state.pop(key, None)
                 state["i"] += 1
                 state["stage"] = "attack"
 
