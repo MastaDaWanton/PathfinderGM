@@ -356,6 +356,35 @@ def _cache_follows_the_directory(sender, setting, **kwargs):
 setting_changed.connect(_cache_follows_the_directory)
 
 
+# --- three worlds, one fixture ------------------------------------------------------------
+#
+# docs/fix-plan-2026-09-28.md, fact 5: "Fixes must work for any world." Aurvantis is one
+# export with its own habits — all 64 settlements `kind: CITY`, all 256 `play.cast` roles
+# "Person", stock sentences that call 48 villages and towns "the city", every fact keyed
+# "Geography" / "Urban Life" — and a fix keyed on any of those is not a fix. Pangrella is a
+# second real export from the same generator family. `fixtures/synthetic-world.json` is a
+# hand-built third that differs on purpose (kinds that match their scale, real role words,
+# the alternate fact keys, travel rows with no miles, a port, a town with no cast).
+#
+# Every new test in the fix pass takes `worlds` and so runs once per export. The World is
+# `load_cached`'s shared object — read it, never mutate it (the lru cache hands the same
+# one to every test that asks).
+WORLD_EXPORTS = (
+    ("aurvantis", "fixtures/aurvantis-campaign.json"),
+    ("pangrella", "fixtures/pangrella-campaign.json"),
+    ("synthetic", "fixtures/synthetic-world.json"),
+)
+
+
+@pytest.fixture(params=[path for _, path in WORLD_EXPORTS],
+                ids=[name for name, _ in WORLD_EXPORTS])
+def worlds(request):
+    """Each of the three exports, loaded through the real loader; the test id names it."""
+    from world.loader import load_cached
+
+    return load_cached(request.param)
+
+
 def pytest_sessionfinish(session, exitstatus):
     """The shared catalogues came through the run untouched.
 

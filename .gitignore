@@ -5,6 +5,10 @@ __pycache__/
 db.sqlite3
 *.log
 
+# A player's own playtest extracts stay on their disk: the repository is public (owner's
+# ruling, 2026-09-28). The loader in tests/replays/ skips when they are absent.
+tests/replays/*/
+
 # Local editor and OS noise
 .vscode/
 .idea/

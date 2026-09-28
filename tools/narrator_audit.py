@@ -280,6 +280,56 @@ SCRIPTS = {
         "I go and find somewhere to sleep.",
         "I lie down and let the day go.",
     ],
+    # --- the 2026-09-28 fix pass (docs/fix-plan-2026-09-28.md, gate G2) ----------------
+    #
+    # Each line is the playtest's own sentence or the nearest thing to it, so the live run
+    # meets the defect the way the player did (docs/playtest-2026-09-28.md). A fourth,
+    # `starts`, needs thirty fresh campaigns rather than thirty turns of one, which this
+    # harness cannot express — its steps are in docs/fix-baseline-2026-09-28.md.
+    #
+    # Out of the gate and into the land (items 16, 17, 19, 20). The Bobby session: `leave`
+    # became a walk to the way in, the crossroads and the road away were refused and
+    # narrated as reached, the bearing was never answered, and the forest the model
+    # invented was accepted and filed under the village.
+    "leave-town": [
+        "I leave the town and stand outside it on the road.",
+        "I look around to get a bearing on where I am and where the nearest larger town lies.",
+        "I walk to the nearest crossroads and read the signposts.",
+        "I take the road away from town until I can no longer see the walls.",
+        "I take in the land around me: the ground, what grows here, the sky.",
+        "I head into the nearest trees.",
+        "I turn round and walk back to the gate.",
+        "I speak to the watchman at the gate again.",
+        "I walk across town to the market.",
+        "I leave by the road and keep walking until nightfall.",
+    ],
+    # Asking after somebody who is elsewhere, then going to find them (items 5, 9). The
+    # Bobby session: "I ask him about the girl in the market" spawned a girl at the gate,
+    # the market had nobody of the kind, and the quest's giver walked up instead.
+    "market-seek": [
+        "I ask the nearest person about the girl who sells herbs in the market.",
+        "I head to the market and look for the girl who sells herbs.",
+        "I ask her what she is selling today.",
+        "I ask her name.",
+        "I ask a stallholder about the old man who mends nets down by the water.",
+        "I go down to the water and look for the old man who mends nets.",
+        "I ask him how long he has worked here.",
+        "I go back to the market and look for whoever runs it.",
+    ],
+    # Area magic on people and on things (items 21, 22). Needs a caster whose book holds
+    # Burning Hands and Sleep: the shipped pregens have empty books, so pass `--character`
+    # a prepared wizard (docs/fix-baseline-2026-09-28.md). The Sleep line is the unprepared
+    # cast — one refusal shown to the player, not seven retries — when Sleep is in the
+    # book but not prepared.
+    "cast-area": [
+        "I look around at who is standing near me.",
+        "I cast burning hands into the empty air above my head.",
+        "I cast burning hands at the man standing nearest me.",
+        "I cast burning hands at the two of them together.",
+        "I cast burning hands into the dry brush at the roadside.",
+        "I cast sleep on the whole crowd.",
+        "I stand my ground and watch what they do.",
+    ],
 }
 
 

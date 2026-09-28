@@ -1,0 +1,1384 @@
+{
+ "schema_version": "1.5",
+ "generated_by": {
+  "application": "Pathfinder GM test harness",
+  "version": "synthetic-1"
+ },
+ "exported_at": "2026-09-28T00:00:00+00:00",
+ "_about": "A SYNTHETIC export, hand-built for the test harness (docs/fix-plan-2026-09-28.md, R0). Not written by World Bible. It differs from Aurvantis on purpose: settlement kinds VILLAGE/TOWN/CITY match their scale; stock sentences use the settlement's own scale word; play.cast roles are real words; fact keys are the alternates (Terrain, Landscape, Daily Life, Customs, Conflict) rather than Geography / Biomes / Urban Life / Tension; two travel rows carry no miles and no crosses; Marrowby is a port; Oakhollow has no cast; Brindle Ford, Oakhollow, Caddonbury and Pellow Green ship no play.places.",
+ "world": {
+  "name": "Calvessa",
+  "premise": {},
+  "secret": "The pale moon is drawing the sea further inland every year.",
+  "counts": {
+   "WORLD": 1,
+   "CONTINENT": 1,
+   "PEOPLE": 2,
+   "NATION": 2,
+   "VILLAGE": 3,
+   "TOWN": 2,
+   "CITY": 1,
+   "CHARACTER": 9
+  }
+ },
+ "entities": [
+  {
+   "id": "c0a1f5e20001",
+   "kind": "WORLD",
+   "name": "Calvessa",
+   "summary": "World",
+   "parent_id": null,
+   "path": "",
+   "facts": {
+    "Cosmology": "One sun, one pale moon, and a long grey sea around a single landmass",
+    "Magic": "Quiet hedge-craft and a few learned orders; nothing that moves mountains"
+   },
+   "sections": [
+    {
+     "title": "Cosmology",
+     "paragraphs": [
+      "Calvessa has one sun and one pale moon, and the sea that rings its only landmass is grey in every season.",
+      "Its people reckon years from the Drowning, when the southern shore was lost to the sea."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20002",
+   "kind": "CONTINENT",
+   "name": "Lathwe",
+   "summary": "Continent",
+   "parent_id": "c0a1f5e20001",
+   "path": "continents/lathwe",
+   "facts": {
+    "Terrain": "chalk downs, beech hangers, slow clay rivers",
+    "Landscape": "rolling downland cut by river valleys, with salt marsh along the southern shore",
+    "Climate": "mild and wet, with hard westerly gales in winter"
+   },
+   "sections": [
+    {
+     "title": "Landscape",
+     "paragraphs": [
+      "Lathwe is chalk downland folded into long valleys, each with a slow clay river at the bottom and beech woods hanging on the steep sides.",
+      "Along the southern shore the downs give way to salt marsh, creeks and mudflats that flood twice a day."
+     ]
+    },
+    {
+     "title": "Climate",
+     "paragraphs": [
+      "The weather is mild and wet for most of the year; in winter the westerly gales come off the sea hard enough to strip thatch."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20003",
+   "kind": "PEOPLE",
+   "name": "Fenwic",
+   "summary": "People",
+   "parent_id": "c0a1f5e20002",
+   "path": "continents/lathwe/peoples/fenwic",
+   "facts": {
+    "Body": "Stocky, broad-handed, weathered early by wind",
+    "Homeland": "the river valleys of the downs",
+    "Livelihood": "Ferrying, smithing, sheep and barley"
+   },
+   "sections": [
+    {
+     "title": "Body",
+     "paragraphs": [
+      "The Fenwic are stocky and broad-handed, and the wind weathers their faces early."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20004",
+   "kind": "PEOPLE",
+   "name": "Carrow",
+   "summary": "People",
+   "parent_id": "c0a1f5e20002",
+   "path": "continents/lathwe/peoples/carrow",
+   "facts": {
+    "Body": "Tall, long-limbed, dark-eyed",
+    "Homeland": "the marsh shore and the creeks behind it",
+    "Livelihood": "Fishing, salt-panning and the carrying trade"
+   },
+   "sections": [
+    {
+     "title": "Body",
+     "paragraphs": [
+      "The Carrow are tall and long-limbed, with dark eyes and a stooped way of walking learned in low boats."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20005",
+   "kind": "NATION",
+   "name": "The Wealdmark",
+   "summary": "Nation",
+   "parent_id": "c0a1f5e20002",
+   "path": "continents/lathwe/nations/the-wealdmark",
+   "facts": {
+    "Governance": "a council of valley reeves meeting at each quarter-day",
+    "Economy": "wool, barley and worked iron"
+   },
+   "sections": [
+    {
+     "title": "Governance",
+     "paragraphs": [
+      "The Wealdmark is governed by a council of valley reeves who meet at each quarter-day and agree on as little as they can."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20006",
+   "kind": "NATION",
+   "name": "The Saltholm Compact",
+   "summary": "Nation",
+   "parent_id": "c0a1f5e20002",
+   "path": "continents/lathwe/nations/the-saltholm-compact",
+   "facts": {
+    "Governance": "a compact of marsh towns under an elected warden",
+    "Economy": "salt, smoked fish and river carriage"
+   },
+   "sections": [
+    {
+     "title": "Governance",
+     "paragraphs": [
+      "The Saltholm Compact is a league of marsh towns that elect a warden every seven years and argue with every one of them."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20010",
+   "kind": "VILLAGE",
+   "name": "Brindle Ford",
+   "summary": "A ford village on the Brindle, a few hundred souls",
+   "parent_id": "c0a1f5e20005",
+   "path": "continents/lathwe/nations/the-wealdmark/villages/brindle-ford",
+   "facts": {
+    "Landscape": "water meadows either side of a gravel ford",
+    "Architecture": "flint cottages with reed thatch",
+    "Daily Life": "everyone turns out when the ford floods",
+    "Governance": "a village reeve answering to the valley council",
+    "Conflict": "who pays to keep the ford stones in place"
+   },
+   "sections": [
+    {
+     "title": "Daily Life",
+     "paragraphs": [
+      "Brindle Ford is a village of flint cottages strung along a gravel ford, with water meadows on both banks.",
+      "The village's reeve is chosen from the village's own oldest families and answers to the valley council.",
+      "When the river rises everyone in the village turns out to shift the stepping stones before the current takes them."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {
+    "sells": "wool",
+    "buys": "salt"
+   },
+   "scale": "village"
+  },
+  {
+   "id": "c0a1f5e20011",
+   "kind": "VILLAGE",
+   "name": "Oakhollow",
+   "summary": "A charcoal-burners' village in a wooded combe",
+   "parent_id": "c0a1f5e20005",
+   "path": "continents/lathwe/nations/the-wealdmark/villages/oakhollow",
+   "facts": {
+    "Landscape": "a steep wooded combe with a stream at the bottom",
+    "Architecture": "timber huts and turf-roofed sheds",
+    "Daily Life": "the clamps are watched day and night while they burn",
+    "Governance": "the oldest burner speaks for the village"
+   },
+   "sections": [
+    {
+     "title": "Daily Life",
+     "paragraphs": [
+      "Oakhollow is a village of timber huts in a steep wooded combe, and the smoke of the charcoal clamps hangs over it in every season.",
+      "Nobody in the village keeps written records; the oldest burner speaks for everyone."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {
+    "sells": "charcoal",
+    "buys": "barley"
+   },
+   "scale": "village"
+  },
+  {
+   "id": "c0a1f5e20012",
+   "kind": "TOWN",
+   "name": "Kestwick",
+   "summary": "A market town at the head of the valley",
+   "parent_id": "c0a1f5e20005",
+   "path": "continents/lathwe/nations/the-wealdmark/towns/kestwick",
+   "facts": {
+    "Landscape": "a chalk spur above the river crossing",
+    "Architecture": "timber-framed houses on flint footings",
+    "Daily Life": "market day is Thursday and the whole valley comes in",
+    "Customs": "a stranger buys the first round",
+    "Governance": "a town reeve and a bench of guild wardens",
+    "Conflict": "the smiths and the wool merchants both want the market hall"
+   },
+   "sections": [
+    {
+     "title": "Daily Life",
+     "paragraphs": [
+      "Kestwick is a market town of timber-framed houses on a chalk spur above the river crossing.",
+      "The town's reeve sits with a bench of guild wardens, and the town's smiths and wool merchants have quarrelled over the market hall for a generation.",
+      "On Thursdays the whole valley comes in to the town's market and the streets are impassable by noon."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {
+    "sells": "iron tools",
+    "buys": "salt fish"
+   },
+   "scale": "town"
+  },
+  {
+   "id": "c0a1f5e20013",
+   "kind": "TOWN",
+   "name": "Marrowby",
+   "summary": "A fishing town on a marsh creek, with a harbour",
+   "parent_id": "c0a1f5e20006",
+   "path": "continents/lathwe/nations/the-saltholm-compact/towns/marrowby",
+   "facts": {
+    "Landscape": "a shingle spit at the mouth of a marsh creek",
+    "Architecture": "tarred weatherboard on stilts above the high-water mark",
+    "Daily Life": "the tide sets the working day, not the clock",
+    "Governance": "a harbour court of boat-owners",
+    "Conflict": "the salt-pans are silting and nobody agrees whose dredging it is"
+   },
+   "sections": [
+    {
+     "title": "Daily Life",
+     "paragraphs": [
+      "Marrowby is a fishing town of tarred weatherboard houses raised on stilts along a shingle spit at the mouth of a marsh creek.",
+      "The town's harbour court is made up of boat-owners, and the town's quay is where every quarrel ends up.",
+      "In Marrowby the tide sets the working day: the boats go out on the ebb and the whole town is on the quay when they come back."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {
+    "sells": "smoked fish",
+    "buys": "timber"
+   },
+   "scale": "town"
+  },
+  {
+   "id": "c0a1f5e20014",
+   "kind": "CITY",
+   "name": "Caddonbury",
+   "summary": "The walled river city where the warden sits",
+   "parent_id": "c0a1f5e20006",
+   "path": "continents/lathwe/nations/the-saltholm-compact/cities/caddonbury",
+   "facts": {
+    "Landscape": "a broad river bend inside old earth ramparts",
+    "Architecture": "stone halls, brick warehouses, and a cathedral of grey limestone",
+    "Daily Life": "the bells of the cathedral ring the hours for the whole city",
+    "Customs": "debts are settled on the cathedral steps",
+    "Governance": "the warden of the Compact and a city assembly of guilds",
+    "Conflict": "the river guilds and the warden's customs men"
+   },
+   "sections": [
+    {
+     "title": "Daily Life",
+     "paragraphs": [
+      "Caddonbury is a walled city in a broad bend of the river, grown up inside old earth ramparts that no longer hold it.",
+      "The city's assembly of guilds sits beneath the warden of the Compact, and the city's river guilds fight the warden's customs men over every barge.",
+      "The cathedral bells ring the hours for the whole city, and debts in the city are settled on the cathedral steps."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {
+    "sells": "salt",
+    "buys": "iron tools"
+   },
+   "scale": "city"
+  },
+  {
+   "id": "c0a1f5e20015",
+   "kind": "VILLAGE",
+   "name": "Pellow Green",
+   "summary": "A shepherds' village on the edge of the marsh",
+   "parent_id": "c0a1f5e20006",
+   "path": "continents/lathwe/nations/the-saltholm-compact/villages/pellow-green",
+   "facts": {
+    "Landscape": "a green on the last dry ground before the marsh",
+    "Architecture": "cob cottages round a common",
+    "Daily Life": "the flocks come in off the marsh at dusk",
+    "Governance": "a village moot on the green"
+   },
+   "sections": [
+    {
+     "title": "Daily Life",
+     "paragraphs": [
+      "Pellow Green is a village of cob cottages round a common, on the last dry ground before the marsh begins.",
+      "The village moot meets on the green, and the village's flocks come in off the marsh at dusk."
+     ]
+    }
+   ],
+   "links": [],
+   "trade": {
+    "sells": "wool",
+    "buys": "smoked fish"
+   },
+   "scale": "village"
+  },
+  {
+   "id": "c0a1f5e20020",
+   "kind": "CHARACTER",
+   "name": "Wenna Cobbe",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20010",
+   "path": "continents/lathwe/nations/the-wealdmark/villages/brindle-ford/people/wenna-cobbe",
+   "facts": {
+    "Identity": "Fenwic healer of Brindle Ford",
+    "Role": "healer",
+    "Appearance": "a grey plait pinned up out of the way and herb-stained fingers",
+    "Personality": "patient, blunt"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Wenna Cobbe is a Fenwic healer in Brindle Ford, known to everyone who lives there.",
+      "Wenna Cobbe has a grey plait pinned up out of the way and herb-stained fingers."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20010"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20021",
+   "kind": "CHARACTER",
+   "name": "Idris Marl",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20010",
+   "path": "continents/lathwe/nations/the-wealdmark/villages/brindle-ford/people/idris-marl",
+   "facts": {
+    "Identity": "Fenwic ferryman of Brindle Ford",
+    "Role": "ferryman",
+    "Appearance": "a split lip that healed crooked and a coat of oiled wool",
+    "Personality": "cheerful, careless"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Idris Marl is a Fenwic ferryman in Brindle Ford, known to everyone who lives there.",
+      "Idris Marl has a split lip that healed crooked and a coat of oiled wool."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20010"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20022",
+   "kind": "CHARACTER",
+   "name": "Hob Tallow",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20012",
+   "path": "continents/lathwe/nations/the-wealdmark/towns/kestwick/people/hob-tallow",
+   "facts": {
+    "Identity": "Fenwic smith of Kestwick",
+    "Role": "smith",
+    "Appearance": "forearms marked with old burns and a leather cap",
+    "Personality": "slow to speak"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Hob Tallow is a Fenwic smith in Kestwick, known to everyone who lives there.",
+      "Hob Tallow has forearms marked with old burns and a leather cap."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20012"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20023",
+   "kind": "CHARACTER",
+   "name": "Sabine Rook",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20012",
+   "path": "continents/lathwe/nations/the-wealdmark/towns/kestwick/people/sabine-rook",
+   "facts": {
+    "Identity": "Carrow trader of Kestwick",
+    "Role": "trader",
+    "Appearance": "a long green coat and a ledger on a cord round her neck",
+    "Personality": "shrewd, generous to regulars"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Sabine Rook is a Carrow trader in Kestwick, known to everyone who lives there.",
+      "Sabine Rook has a long green coat and a ledger on a cord round her neck."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20012"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20024",
+   "kind": "CHARACTER",
+   "name": "Jory Penhale",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20013",
+   "path": "continents/lathwe/nations/the-saltholm-compact/towns/marrowby/people/jory-penhale",
+   "facts": {
+    "Identity": "Carrow fisher of Marrowby",
+    "Role": "fisher",
+    "Appearance": "salt-cracked hands and a knitted cap pulled low",
+    "Personality": "superstitious"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Jory Penhale is a Carrow fisher in Marrowby, known to everyone who lives there.",
+      "Jory Penhale has salt-cracked hands and a knitted cap pulled low."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20013"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20025",
+   "kind": "CHARACTER",
+   "name": "Ysolde Quill",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20013",
+   "path": "continents/lathwe/nations/the-saltholm-compact/towns/marrowby/people/ysolde-quill",
+   "facts": {
+    "Identity": "Carrow harbourmaster of Marrowby",
+    "Role": "harbourmaster",
+    "Appearance": "a brass whistle on a chain and a voice that carries",
+    "Personality": "exacting"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Ysolde Quill is a Carrow harbourmaster in Marrowby, known to everyone who lives there.",
+      "Ysolde Quill has a brass whistle on a chain and a voice that carries."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20013"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20026",
+   "kind": "CHARACTER",
+   "name": "Aldous Venn",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20014",
+   "path": "continents/lathwe/nations/the-saltholm-compact/cities/caddonbury/people/aldous-venn",
+   "facts": {
+    "Identity": "Carrow magistrate of Caddonbury",
+    "Role": "magistrate",
+    "Appearance": "black robes gone brown at the hem",
+    "Personality": "tired, fair"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Aldous Venn is a Carrow magistrate in Caddonbury, known to everyone who lives there.",
+      "Aldous Venn has black robes gone brown at the hem."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20014"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20027",
+   "kind": "CHARACTER",
+   "name": "Tamsin Hale",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20014",
+   "path": "continents/lathwe/nations/the-saltholm-compact/cities/caddonbury/people/tamsin-hale",
+   "facts": {
+    "Identity": "Carrow scribe of Caddonbury",
+    "Role": "scribe",
+    "Appearance": "ink to the wrist and spectacles on a ribbon",
+    "Personality": "curious"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Tamsin Hale is a Carrow scribe in Caddonbury, known to everyone who lives there.",
+      "Tamsin Hale has ink to the wrist and spectacles on a ribbon."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20014"
+   ],
+   "trade": {},
+   "scale": null
+  },
+  {
+   "id": "c0a1f5e20028",
+   "kind": "CHARACTER",
+   "name": "Garrow Tewk",
+   "summary": "Person",
+   "parent_id": "c0a1f5e20015",
+   "path": "continents/lathwe/nations/the-saltholm-compact/villages/pellow-green/people/garrow-tewk",
+   "facts": {
+    "Identity": "Carrow shepherd of Pellow Green",
+    "Role": "shepherd",
+    "Appearance": "a crook taller than he is and a dog at heel",
+    "Personality": "quiet"
+   },
+   "sections": [
+    {
+     "title": "Identity",
+     "paragraphs": [
+      "Garrow Tewk is a Carrow shepherd in Pellow Green, known to everyone who lives there.",
+      "Garrow Tewk has a crook taller than he is and a dog at heel."
+     ]
+    }
+   ],
+   "links": [
+    "c0a1f5e20015"
+   ],
+   "trade": {},
+   "scale": null
+  }
+ ],
+ "chronology": [
+  {
+   "name": "The Drowning",
+   "year": -300,
+   "summary": "The southern shore was lost to the sea in one winter.",
+   "scope": "Lathwe",
+   "background": "",
+   "moments": [],
+   "aftermath": "The marsh towns moved inland and founded the Compact.",
+   "figures": [],
+   "entity_ids": []
+  },
+  {
+   "name": "The Ford Stones Laid",
+   "year": -40,
+   "summary": "Brindle Ford's stepping stones were set by the valley council.",
+   "scope": "Brindle Ford",
+   "background": "",
+   "moments": [],
+   "aftermath": "",
+   "figures": [],
+   "entity_ids": [
+    "c0a1f5e20010"
+   ]
+  },
+  {
+   "name": "The Salt Quarrel",
+   "year": null,
+   "summary": "Marrowby and Caddonbury came to blows over landing fees.",
+   "scope": "The Saltholm Compact",
+   "background": "",
+   "moments": [],
+   "aftermath": "",
+   "figures": [
+    {
+     "name": "Ysolde Quill",
+     "role": "harbourmaster",
+     "entity_id": "c0a1f5e20025"
+    }
+   ],
+   "entity_ids": []
+  }
+ ],
+ "trade_routes": [
+  {
+   "origin": "Brindle Ford",
+   "destination": "Kestwick",
+   "origin_id": "c0a1f5e20010",
+   "destination_id": "c0a1f5e20012",
+   "commodity": "wool",
+   "sought_as": "wool",
+   "acquisition": "",
+   "demand": "",
+   "conduct": "",
+   "friction": "Kestwick's merchants set the price and Brindle Ford resents it."
+  },
+  {
+   "origin": "Oakhollow",
+   "destination": "Brindle Ford",
+   "origin_id": "c0a1f5e20011",
+   "destination_id": "c0a1f5e20010",
+   "commodity": "charcoal",
+   "sought_as": "charcoal",
+   "acquisition": "",
+   "demand": "",
+   "conduct": "",
+   "friction": "The burners want paying in coin; the village pays in barley."
+  },
+  {
+   "origin": "Pellow Green",
+   "destination": "Marrowby",
+   "origin_id": "c0a1f5e20015",
+   "destination_id": "c0a1f5e20013",
+   "commodity": "wool",
+   "sought_as": "wool",
+   "acquisition": "",
+   "demand": "",
+   "conduct": "",
+   "friction": "Marrowby buys fleeces cheap in a wet year."
+  },
+  {
+   "origin": "Kestwick",
+   "destination": "Caddonbury",
+   "origin_id": "c0a1f5e20012",
+   "destination_id": "c0a1f5e20014",
+   "commodity": "iron tools",
+   "sought_as": "iron tools",
+   "acquisition": "",
+   "demand": "",
+   "conduct": "",
+   "friction": "The warden's customs men tax every cart at the ramparts."
+  },
+  {
+   "origin": "Caddonbury",
+   "destination": "Marrowby",
+   "origin_id": "c0a1f5e20014",
+   "destination_id": "c0a1f5e20013",
+   "commodity": "salt",
+   "sought_as": "salt",
+   "acquisition": "",
+   "demand": "",
+   "conduct": "",
+   "friction": "The river guilds and the harbour court both claim the landing fees."
+  },
+  {
+   "origin": "Pellow Green",
+   "destination": "Caddonbury",
+   "origin_id": "c0a1f5e20015",
+   "destination_id": "c0a1f5e20014",
+   "commodity": "wool",
+   "sought_as": "wool",
+   "acquisition": "",
+   "demand": "",
+   "conduct": "",
+   "friction": "The city's drapers buy through one broker."
+  }
+ ],
+ "factions": [
+  {
+   "name": "The River Guilds",
+   "description": "Bargemen and landing-masters who hold the river between Caddonbury and the sea.",
+   "reach": "Every landing on the Caddon river.",
+   "aim": "Landing fees paid to them, not to the warden",
+   "method": "Slow cargoes and lost paperwork",
+   "foothold": "Caddonbury",
+   "weakness": "They cannot agree among themselves who speaks for them."
+  }
+ ],
+ "unwritten": [
+  {
+   "name": "The Grey Warden",
+   "kind": "person",
+   "why": "A former warden of the Compact, spoken of in Marrowby as if still alive."
+  }
+ ],
+ "play": {
+  "settlements": [
+   {
+    "id": "c0a1f5e20010",
+    "name": "Brindle Ford",
+    "scale": "village",
+    "sells": "wool",
+    "buys": "salt",
+    "tension": "who pays to keep the ford stones in place",
+    "governed_by": "a village reeve answering to the valley council",
+    "parent_id": "c0a1f5e20005"
+   },
+   {
+    "id": "c0a1f5e20011",
+    "name": "Oakhollow",
+    "scale": "village",
+    "sells": "charcoal",
+    "buys": "barley",
+    "tension": "",
+    "governed_by": "the oldest burner speaks for the village",
+    "parent_id": "c0a1f5e20005"
+   },
+   {
+    "id": "c0a1f5e20012",
+    "name": "Kestwick",
+    "scale": "town",
+    "sells": "iron tools",
+    "buys": "salt fish",
+    "tension": "the smiths and the wool merchants both want the market hall",
+    "governed_by": "a town reeve and a bench of guild wardens",
+    "parent_id": "c0a1f5e20005"
+   },
+   {
+    "id": "c0a1f5e20013",
+    "name": "Marrowby",
+    "scale": "town",
+    "sells": "smoked fish",
+    "buys": "timber",
+    "tension": "the salt-pans are silting and nobody agrees whose dredging it is",
+    "governed_by": "a harbour court of boat-owners",
+    "parent_id": "c0a1f5e20006"
+   },
+   {
+    "id": "c0a1f5e20014",
+    "name": "Caddonbury",
+    "scale": "city",
+    "sells": "salt",
+    "buys": "iron tools",
+    "tension": "the river guilds and the warden's customs men",
+    "governed_by": "the warden of the Compact and a city assembly of guilds",
+    "parent_id": "c0a1f5e20006"
+   },
+   {
+    "id": "c0a1f5e20015",
+    "name": "Pellow Green",
+    "scale": "village",
+    "sells": "wool",
+    "buys": "smoked fish",
+    "tension": "",
+    "governed_by": "a village moot on the green",
+    "parent_id": "c0a1f5e20006"
+   }
+  ],
+  "cast": [
+   {
+    "id": "c0a1f5e20020",
+    "name": "Wenna Cobbe",
+    "role": "healer",
+    "home_id": "c0a1f5e20010",
+    "home": "Brindle Ford"
+   },
+   {
+    "id": "c0a1f5e20021",
+    "name": "Idris Marl",
+    "role": "ferryman",
+    "home_id": "c0a1f5e20010",
+    "home": "Brindle Ford"
+   },
+   {
+    "id": "c0a1f5e20022",
+    "name": "Hob Tallow",
+    "role": "smith",
+    "home_id": "c0a1f5e20012",
+    "home": "Kestwick"
+   },
+   {
+    "id": "c0a1f5e20023",
+    "name": "Sabine Rook",
+    "role": "trader",
+    "home_id": "c0a1f5e20012",
+    "home": "Kestwick"
+   },
+   {
+    "id": "c0a1f5e20024",
+    "name": "Jory Penhale",
+    "role": "fisher",
+    "home_id": "c0a1f5e20013",
+    "home": "Marrowby"
+   },
+   {
+    "id": "c0a1f5e20025",
+    "name": "Ysolde Quill",
+    "role": "harbourmaster",
+    "home_id": "c0a1f5e20013",
+    "home": "Marrowby"
+   },
+   {
+    "id": "c0a1f5e20026",
+    "name": "Aldous Venn",
+    "role": "magistrate",
+    "home_id": "c0a1f5e20014",
+    "home": "Caddonbury"
+   },
+   {
+    "id": "c0a1f5e20027",
+    "name": "Tamsin Hale",
+    "role": "scribe",
+    "home_id": "c0a1f5e20014",
+    "home": "Caddonbury"
+   },
+   {
+    "id": "c0a1f5e20028",
+    "name": "Garrow Tewk",
+    "role": "shepherd",
+    "home_id": "c0a1f5e20015",
+    "home": "Pellow Green"
+   }
+  ],
+  "travel": [
+   {
+    "from_id": "c0a1f5e20010",
+    "to_id": "c0a1f5e20012",
+    "from": "Brindle Ford",
+    "to": "Kestwick",
+    "carrying": "wool",
+    "friction": "Kestwick's merchants set the price and Brindle Ford resents it.",
+    "miles": 18,
+    "by": "road",
+    "crosses": [
+     "farmland",
+     "hills"
+    ]
+   },
+   {
+    "from_id": "c0a1f5e20011",
+    "to_id": "c0a1f5e20010",
+    "from": "Oakhollow",
+    "to": "Brindle Ford",
+    "carrying": "charcoal",
+    "friction": "The burners want paying in coin; the village pays in barley."
+   },
+   {
+    "from_id": "c0a1f5e20015",
+    "to_id": "c0a1f5e20013",
+    "from": "Pellow Green",
+    "to": "Marrowby",
+    "carrying": "wool",
+    "friction": "Marrowby buys fleeces cheap in a wet year.",
+    "by": "road"
+   },
+   {
+    "from_id": "c0a1f5e20012",
+    "to_id": "c0a1f5e20014",
+    "from": "Kestwick",
+    "to": "Caddonbury",
+    "carrying": "iron tools",
+    "friction": "The warden's customs men tax every cart at the ramparts.",
+    "miles": 40,
+    "by": "road",
+    "crosses": [
+     "farmland",
+     "forest"
+    ]
+   },
+   {
+    "from_id": "c0a1f5e20014",
+    "to_id": "c0a1f5e20013",
+    "from": "Caddonbury",
+    "to": "Marrowby",
+    "carrying": "salt",
+    "friction": "The river guilds and the harbour court both claim the landing fees.",
+    "miles": 30,
+    "by": "river",
+    "crosses": [
+     "swamp"
+    ]
+   },
+   {
+    "from_id": "c0a1f5e20015",
+    "to_id": "c0a1f5e20014",
+    "from": "Pellow Green",
+    "to": "Caddonbury",
+    "carrying": "wool",
+    "friction": "The city's drapers buy through one broker.",
+    "miles": 12,
+    "by": "road",
+    "crosses": [
+     "farmland"
+    ]
+   }
+  ],
+  "conflicts": [
+   {
+    "faction": "The River Guilds",
+    "wants": "Landing fees paid to them, not to the warden",
+    "works_by": "Slow cargoes and lost paperwork",
+    "holds": "Caddonbury",
+    "undone_by": "They cannot agree among themselves who speaks for them."
+   }
+  ],
+  "races": [
+   {
+    "id": "fenwic",
+    "name": "Fenwic",
+    "people_id": "c0a1f5e20003",
+    "size": "medium",
+    "speed": "normal",
+    "body": [
+     "Stocky and broad-handed, weathered early by the wind."
+    ],
+    "senses": [],
+    "movement": [],
+    "about": "The Fenwic live in the river valleys of the downs, ferrying, smithing and keeping sheep.",
+    "strengths": [
+     "hardy",
+     "strong"
+    ],
+    "weakness": "nimble",
+    "grants": [
+     "versatile"
+    ]
+   },
+   {
+    "id": "carrow",
+    "name": "Carrow",
+    "people_id": "c0a1f5e20004",
+    "size": "medium",
+    "speed": "normal",
+    "body": [
+     "Tall and long-limbed, with dark eyes."
+    ],
+    "senses": [
+     "They see well by moonlight on the marsh."
+    ],
+    "movement": [],
+    "about": "The Carrow live along the marsh shore, fishing and panning salt.",
+    "strengths": [
+     "nimble",
+     "perceptive"
+    ],
+    "weakness": "strong",
+    "grants": [
+     "sense.low-light"
+    ]
+   }
+  ],
+  "places": [
+   {
+    "id": "c0a1f5e20012~urban:the-gate",
+    "name": "the gate",
+    "about": "A timber gate on the valley road, open from dawn to curfew.",
+    "parent": "c0a1f5e20012",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20012~urban:the-market"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 30,
+     "depth": 20,
+     "height": null
+    },
+    "clutter": "bare",
+    "footing": "firm",
+    "vertical": "scatter"
+   },
+   {
+    "id": "c0a1f5e20012~urban:the-market",
+    "name": "the market",
+    "about": "Hurdles and trestles on the slope, loud on a Thursday.",
+    "parent": "c0a1f5e20012",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20012~urban:the-gate",
+     "c0a1f5e20012~urban:the-well",
+     "c0a1f5e20012~urban:the-smithy",
+     "c0a1f5e20012~urban:the-tavern"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 90,
+     "depth": 70,
+     "height": null
+    },
+    "clutter": "dense",
+    "footing": "firm",
+    "vertical": "scatter"
+   },
+   {
+    "id": "c0a1f5e20012~urban:the-well",
+    "name": "the well",
+    "about": "A deep chalk well with a windlass and a queue.",
+    "parent": "c0a1f5e20012",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20012~urban:the-market"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 20,
+     "depth": 20,
+     "height": null
+    },
+    "clutter": "bare",
+    "footing": "firm",
+    "vertical": "none"
+   },
+   {
+    "id": "c0a1f5e20012~urban:the-smithy",
+    "name": "the smithy",
+    "about": "Two forges under one roof and a yard of cart-iron.",
+    "parent": "c0a1f5e20012",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20012~urban:the-market"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 40,
+     "depth": 30,
+     "height": 18
+    },
+    "clutter": "cluttered",
+    "footing": "firm",
+    "vertical": "ledge"
+   },
+   {
+    "id": "c0a1f5e20012~urban:the-tavern",
+    "name": "the tavern",
+    "about": "A low taproom with a settle by the fire.",
+    "parent": "c0a1f5e20012",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20012~urban:the-market"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 35,
+     "depth": 25,
+     "height": 10
+    },
+    "clutter": "cluttered",
+    "footing": "firm",
+    "vertical": "none"
+   },
+   {
+    "id": "c0a1f5e20013~urban:the-docks",
+    "name": "the docks",
+    "about": "A tarred quay on piles where the boats land their catch.",
+    "parent": "c0a1f5e20013",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20013~urban:the-market",
+     "c0a1f5e20013~urban:the-net-lofts"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 110,
+     "depth": 40,
+     "height": null
+    },
+    "clutter": "cluttered",
+    "footing": "broken",
+    "vertical": "scatter"
+   },
+   {
+    "id": "c0a1f5e20013~urban:the-market",
+    "name": "the market",
+    "about": "Fish on wet slabs and salt in sacks.",
+    "parent": "c0a1f5e20013",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20013~urban:the-docks",
+     "c0a1f5e20013~urban:the-well",
+     "c0a1f5e20013~urban:the-shrine"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 60,
+     "depth": 50,
+     "height": null
+    },
+    "clutter": "dense",
+    "footing": "firm",
+    "vertical": "scatter"
+   },
+   {
+    "id": "c0a1f5e20013~urban:the-well",
+    "name": "the well",
+    "about": "A brackish well nobody drinks from willingly.",
+    "parent": "c0a1f5e20013",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20013~urban:the-market"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 20,
+     "depth": 20,
+     "height": null
+    },
+    "clutter": "bare",
+    "footing": "firm",
+    "vertical": "none"
+   },
+   {
+    "id": "c0a1f5e20013~urban:the-shrine",
+    "name": "the shrine",
+    "about": "A tide-shrine hung with drowned men's names.",
+    "parent": "c0a1f5e20013",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20013~urban:the-market"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 25,
+     "depth": 20,
+     "height": 12
+    },
+    "clutter": "some",
+    "footing": "firm",
+    "vertical": "none"
+   },
+   {
+    "id": "c0a1f5e20013~urban:the-net-lofts",
+    "name": "the net lofts",
+    "about": "Long sheds where the nets are mended and hung.",
+    "parent": "c0a1f5e20013",
+    "within": "",
+    "terrain": "urban",
+    "exits": [
+     "c0a1f5e20013~urban:the-docks"
+    ],
+    "described_only": false,
+    "origin": "world",
+    "size_ft": {
+     "width": 70,
+     "depth": 20,
+     "height": 14
+    },
+    "clutter": "cluttered",
+    "footing": "firm",
+    "vertical": "ledge"
+   }
+  ],
+  "names": [
+   {
+    "people_id": "c0a1f5e20003",
+    "given": [
+     "Wenna",
+     "Idris",
+     "Hob",
+     "Merryn",
+     "Tobin",
+     "Elowen",
+     "Cador",
+     "Senara",
+     "Jago",
+     "Kerra",
+     "Bran",
+     "Loveday",
+     "Pascoe",
+     "Ruan",
+     "Tegen",
+     "Morwen"
+    ],
+    "family": [
+     "Cobbe",
+     "Marl",
+     "Tallow",
+     "Wedge",
+     "Brankstone",
+     "Furze",
+     "Hollis",
+     "Tredenny",
+     "Pellam",
+     "Ashby",
+     "Crane",
+     "Dunstable",
+     "Harrow",
+     "Linney",
+     "Oakes",
+     "Rundle"
+    ]
+   },
+   {
+    "people_id": "c0a1f5e20004",
+    "given": [
+     "Sabine",
+     "Jory",
+     "Ysolde",
+     "Aldous",
+     "Tamsin",
+     "Garrow",
+     "Odile",
+     "Piran",
+     "Mabyn",
+     "Corin",
+     "Wynn",
+     "Nessa",
+     "Talan",
+     "Ebrel",
+     "Madoc",
+     "Lowdy"
+    ],
+    "family": [
+     "Rook",
+     "Penhale",
+     "Quill",
+     "Venn",
+     "Hale",
+     "Tewk",
+     "Saltash",
+     "Brine",
+     "Keel",
+     "Trewin",
+     "Morrow",
+     "Scarle",
+     "Vosper",
+     "Gannet",
+     "Tresize",
+     "Wherry"
+    ]
+   }
+  ],
+  "cards": [
+   {
+    "id": "brindle-ford-strain",
+    "title": "Who pays to keep the ford stones in place",
+    "facts": [
+     "Who pays to keep the ford stones in place."
+    ],
+    "keys": [],
+    "tags": [
+     "situation.world.brindle-ford"
+    ],
+    "people": [],
+    "place": "c0a1f5e20010",
+    "clock": "",
+    "secret": false,
+    "always_on": false
+   },
+   {
+    "id": "kestwick-strain",
+    "title": "The smiths and the wool merchants both want the market hall",
+    "facts": [
+     "The smiths and the wool merchants both want the market hall."
+    ],
+    "keys": [],
+    "tags": [
+     "situation.world.kestwick"
+    ],
+    "people": [],
+    "place": "c0a1f5e20012",
+    "clock": "",
+    "secret": false,
+    "always_on": false
+   },
+   {
+    "id": "marrowby-strain",
+    "title": "The salt-pans are silting and nobody agrees whose dredging it is",
+    "facts": [
+     "The salt-pans are silting and nobody agrees whose dredging it is."
+    ],
+    "keys": [],
+    "tags": [
+     "situation.world.marrowby"
+    ],
+    "people": [],
+    "place": "c0a1f5e20013",
+    "clock": "",
+    "secret": false,
+    "always_on": false
+   },
+   {
+    "id": "caddonbury-strain",
+    "title": "The river guilds and the warden's customs men",
+    "facts": [
+     "The river guilds and the warden's customs men."
+    ],
+    "keys": [],
+    "tags": [
+     "situation.world.caddonbury"
+    ],
+    "people": [],
+    "place": "c0a1f5e20014",
+    "clock": "",
+    "secret": false,
+    "always_on": false
+   }
+  ],
+  "timeline": [
+   {
+    "year": -300,
+    "name": "The Drowning",
+    "summary": "The southern shore was lost to the sea in one winter."
+   },
+   {
+    "year": -40,
+    "name": "The Ford Stones Laid",
+    "summary": "Brindle Ford's stepping stones were set by the valley council."
+   },
+   {
+    "year": null,
+    "name": "The Salt Quarrel",
+    "summary": "Marrowby and Caddonbury came to blows over landing fees."
+   }
+  ]
+ }
+}
