@@ -265,3 +265,52 @@ none of them over goods: turn 1 lost to a declared `manoeuvre: "none"` read as a
 (flagged as its own task), and turns 6, 9 and 11 lost to `save`/`move` param shapes and a
 repeat refusal. Two other sessions' suites were running, so the timings are not
 comparable.
+
+## A third defect of the `declared` block (2026-09-28): `"manoeuvre": "none"`
+
+`_declared_op` lists every param of a required op as a string property. For an attack,
+the model fills the ones it has no use for, and "none" is the manoeuvre it writes most:
+53 of 157 values across the 32 recordings on this machine. `judgement.normalize_attacks`
+moved every word that is not a manoeuvre into `weapon`. Its own comment promised a
+weapon lookup that the code never made. The parser then refused "no such weapon 'none'"
+five times, the fallback model timed out after 600 s, and turn 1 of the fight script
+("I pick a fight with the biggest man in the room") was lost in two audits running. The
+same move refused recorded "punch" (6), "strike" (4, a word the parser itself drops),
+"throw" (3), "bull_rush" and "dirty_trick". It would also have refused "intimidate",
+which the parser turns into a check but only ever saw as a weapon.
+
+- **One reading of the two slots** (`intents.attack_slots`), used both before validation
+  and by the parser. `NULL_WORDS` means nothing is there. `UNARMED_WORDS` is the unarmed
+  strike. Snake_case manoeuvres are read as their names. A skill is left for the parser's
+  check rewrite, and a known weapon goes to `weapon`. Where the two still differ, it is
+  on purpose: a word neither table knows is dropped before validation and refused by the
+  parser (the NPC turn's path), because the refusal teaches.
+- **Flags are read as flags everywhere.** The engine reads `full_attack`,
+  `power_attack`, `drain`, `risky`, `failed`, `thrown` and `quoted` with `bool()`, and
+  `bool("false")` is True. The parser now reads them with `_flag` (`FLAG_PARAMS`), and
+  the declared schema samples them as booleans. No recording shows a flag written as a
+  word yet; the fix is here because the schema made it the only thing the model could
+  write.
+- Prior art is thin and secondary: the usual structured-output practice is a
+  field-level validator that maps sentinel strings ("None", "N/A") to null for an
+  optional field. I found no primary source.
+
+**Measured.** Both recorded turn 1s are kept in `tests/replay/plans/` and replayed through
+the real `plan_turn` (`tests/test_none_is_no_manoeuvre.py`). Before the fix, each was
+refused on the model's first reply. After it, each stands on that reply: words to Borin,
+an attack on him, the provocation.
+
+**Live, the fight script, 12 turns, after:** no turn fell back to narration (the run
+before lost 4 of 12), and no attempt was refused over a weapon or a manoeuvre. Turn 1
+and turn 11 (the same line again) both stood on the first attempt. A partial run
+before the flag change had declared "none" on turns 1 and 2 and gone through clean.
+
+**Seen, and not changed:** in this run the declared manoeuvre was never "none". It was
+"grapple", "punch", "parry" and "bull rush" on plain punches. On turns 2 to 4 the
+model's own attack intent carried the turn, so the declared one was never merged. On
+turns 1 and 11 it was merged, and the review's existing check caught it: "player did not
+describe a manoeuvre, GM chose grapple; resolved as a plain attack". With one run, I
+cannot tell whether typing the flags as booleans moved the model off "none". If it keeps
+reaching for real manoeuvres, the next step is to leave `manoeuvre` out of the declared
+attack unless the player's words name one (the review's `MANOEUVRE_CUES`). That is
+unmeasured, so it is not done.
