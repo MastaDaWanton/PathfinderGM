@@ -105,6 +105,24 @@ def has_trait(key: str, trait: str) -> bool:
     return trait.strip().lower() in [t.lower() for t in weapon.get("traits", [])]
 
 
+def lethality_of(weapon: dict) -> str:
+    """What this weapon deals when nobody says otherwise: "lethal" or "nonlethal".
+
+    Asked of the weapon record the sheet built, not of a key, because the record is
+    what knows: a natural bite and a granted blood gauntlet are both built on the
+    unarmed strike and say `nonlethal: False` for themselves, and a printed "(1d6+1
+    nonlethal)" says True. An explicit flag wins; otherwise the weapon's special
+    quality does — the content file writes the sap, whip, bolas and slaver's crossbow
+    as `traits: ["nonlethal"]` and the slice table wrote a bool, and until this one
+    reader existed neither was read by anything: a punch and a sap took hit points
+    (measured 2026-09-27: a punch 13 -> 4 hp, a sap 9 -> 1, nonlethal 0 both times).
+    """
+    if "nonlethal" in weapon:
+        return "nonlethal" if weapon.get("nonlethal") else "lethal"
+    traits = [str(t).strip().lower() for t in weapon.get("traits") or ()]
+    return "nonlethal" if "nonlethal" in traits else "lethal"
+
+
 def search(text: str = "", prof: str = "", category: str = "", trait: str = "",
            limit: int = 60) -> list[dict]:
     needle = text.strip().lower()

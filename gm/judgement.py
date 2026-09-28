@@ -1079,7 +1079,10 @@ _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iterati
                   "undecided",
                   # The object an improvised weapon is, and whether it left the hand
                   # (`inject_improvised`).
-                  "item", "thrown"}
+                  "item", "thrown",
+                  # Which kind of damage, when not the weapon's own. The PC's is
+                  # `declare_lethality`'s to set from the player's words.
+                  "lethality"}
 
 
 def normalize_attacks(raw_intents, scene):
@@ -1744,6 +1747,119 @@ def inject_improvised(raw_intents, player_text: str, scene) -> list:
             params["thrown"] = True
         raw["params"] = params
     return out
+
+
+# The player's word for sparing the one they hit. Checked BEFORE `_TO_KILL`, because the
+# commonest way to say it is to deny the other: "without killing him", "don't kill her".
+_TO_SPARE = re.compile(
+    r"\b(?:knock(?:s|ing)?\s+(?:\w+\s+){0,2}(?:out|unconscious|senseless|cold)"
+    r"|subdu(?:e|es|ing)"
+    r"|take\s+(?:him|her|them|it)\s+alive|alive\s+(?:if|for)\b"
+    r"|(?:don'?t|do\s+not|not\s+to|without|never)\s+(?:\w+\s+){0,3}kill(?:ing)?"
+    r"|flat\s+of\s+(?:my|the|his|her|their)\s+(?:blade|sword|axe)"
+    r"|pull(?:s|ing)?\s+(?:my|the|his|her|their)?\s*(?:punch(?:es)?|blows?|strikes?)"
+    r"|non-?\s?lethal(?:ly)?|spare\s+(?:his|her|their|its)\s+li(?:fe|ves)"
+    r"|beat\s+(?:\w+\s+){0,2}(?:unconscious|senseless))", re.I)
+
+# And for killing. "for good" is the kills script's own "I put him down for good".
+_TO_KILL = re.compile(
+    r"\b(?:kill(?:s|ing)?|murder(?:s|ing)?|to\s+death|for\s+good|lethal(?:ly)?"
+    r"|finish(?:es|ing)?\s+(?:him|her|them|it)(?:\s+off)?"
+    r"|snap\s+(?:his|her|their|its)\s+neck|slit\s+(?:his|her|their|its)\s+throat"
+    r"|crush\s+(?:his|her|their|its)\s+(?:skull|throat|windpipe))\b", re.I)
+
+
+# A blow the body itself delivers. "hit" and "strike" are not here: they say nothing
+# about what is doing the hitting, and a swordsman who "hits him" means the sword.
+_BODY_BLOW = re.compile(
+    r"\b(?:punch(?:es|ed|ing)?|kick(?:s|ed|ing)?|head-?butt(?:s|ed|ing)?"
+    r"|elbow(?:s|ed|ing)?|knee(?:s|d|ing)?|uppercut|haymaker|jab(?:s|bed|bing)?"
+    r"|fists?|bare[- ]?handed|bare[- ]knuckled?|with\s+my\s+hands)\b", re.I)
+# Any held weapon named in the same sentence, which then decides instead — "I punch him
+# with the hilt of my rapier", "I kick him and draw my dagger".
+_HELD_WEAPON = re.compile(
+    r"\b(?:sword|blade|dagger|knife|axe|spear|bow|club|mace|hammer|staff|sap|rapier|"
+    r"glaive|halberd|scimitar|flail|whip|crossbow|hilt|pommel|cudgel)s?\b", re.I)
+
+
+def declare_unarmed(raw_intents, player_text: str, scene) -> list:
+    """"I punch him in the face" is an unarmed strike, whatever is in the hand.
+
+    Measured 2026-09-27 on the `fight` audit with `--record`: "I punch him in the face",
+    "I punch him again" and "I keep hitting him" came back as `attack` with no weapon,
+    so the engine swung the equipped rapier and the tells read "hits ... for 3
+    piercing" — the script that is mostly punches had never thrown one. The weapon is
+    the player's word, like the lethality: a blow with the body in a sentence that names
+    no held weapon sets `weapon: unarmed` on the PC's attacks — which is also the door a
+    formed blood armament rides (`Actor.weapon`). An improvised weapon already set by
+    `inject_improvised` ("I kick the stool into him") is left alone, and so is a
+    manoeuvre, whose unarmed penalty is the manoeuvre's own business.
+    """
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    text = redact_speech(player_text)
+    if not _BODY_BLOW.search(text) or _HELD_WEAPON.search(text):
+        return raw_intents
+    for raw in raw_intents:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
+                and (raw.get("actor") or pc.ref) == pc.ref):
+            continue
+        params = dict(raw.get("params") or {})
+        if params.get("manoeuvre") or str(params.get("weapon") or "").lower() == "improvised":
+            continue
+        params["weapon"] = "unarmed"
+        raw["params"] = params
+    return raw_intents
+
+
+def declare_lethality(raw_intents, player_text: str, scene) -> list:
+    """The player's attack deals what the player said it would: to spare, or to kill.
+
+    1e lets any attacker deal the other kind of damage than the weapon deals, at -4
+    (Core Rulebook p.191, p.182), so an unarmed strike is a knockout unless the player
+    means to kill and a sword is a killing blow unless they turn it to the flat. The
+    choice is the player's; only their words may make it. So this is detection, never
+    instruction: the PC's attacks get `lethality` from `_TO_SPARE` / `_TO_KILL`, and a
+    `lethality` the model wrote for the PC on its own is removed — it would be a -4 on
+    the player's roll that the player never asked for. NPCs keep whatever the plan
+    gave them: a thug swinging his sap to kill is the GM's call about the thug.
+
+    Only set when it differs from the weapon's own, so "I knock him out with my fists"
+    costs nothing and adds nothing; and never "nonlethal" on a lethal ranged weapon,
+    which the book does not allow and the engine would refuse.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    from rules import weapons as weapons_mod
+
+    text = redact_speech(player_text or "")
+    spare = _TO_SPARE.search(text)
+    kill = None if spare else _TO_KILL.search(text)
+    if kill and _denied(text, kill.start()):
+        kill = None
+    wanted = "nonlethal" if spare else "lethal" if kill else ""
+    for raw in raw_intents:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "attack"
+                and (raw.get("actor") or pc.ref) == pc.ref):
+            continue
+        params = dict(raw.get("params") or {})
+        params.pop("lethality", None)
+        if wanted and not params.get("manoeuvre"):
+            try:
+                held = pc.weapon(params.get("weapon") or None)
+            except KeyError:
+                held = None                  # validation names the unknown weapon
+            if held is not None and wanted != weapons_mod.lethality_of(held) and not (
+                    wanted == "nonlethal" and held.get("category") != "melee"):
+                params["lethality"] = wanted
+        raw["params"] = params
+    return raw_intents
 
 
 _SELLS = re.compile(

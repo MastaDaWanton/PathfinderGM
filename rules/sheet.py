@@ -24,7 +24,7 @@ from .activeeffect import ActiveEffect
 from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
-    CLASSES, CONDITIONS, FEAT_TARGET_RE,
+    CLASSES, CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_VS_OBJECTS_HALVED, MATERIALS, ability_modifier, bab_for,
@@ -208,6 +208,11 @@ class Reduction:
 # The two sets that carry a body with them in ordinary English, and nothing else. A world
 # that turned on ze/hir gets an empty answer here rather than an invented one — the forge
 # asks in that case, which is the only honest way to find out.
+# The tag Improved Unarmed Strike's feat document grants: "your unarmed strikes can deal
+# lethal or nonlethal damage, at your choice." A permission is a tag (law 1), so the
+# attack roll asks `has_state` and never looks for the feat by name.
+STRIKES_EITHER_WAY = "lethality.either.unarmed"
+
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
 # The other direction, which is the one the forge uses. Keeping the two questions apart
@@ -1419,6 +1424,15 @@ class Actor:
             for carried in ("rider_column", "damage_label", "proficiency_as"):
                 if w.get(carried):
                     base[carried] = str(w[carried])
+            # Lethality is the document's to say and never the fist's. Every granted
+            # weapon is built on the unarmed strike, which 1e makes non-lethal, and the
+            # day a weapon's `nonlethal` flag was first read the blood armament's
+            # "piercing/bludgeoning (or non-lethal)" would have silently become a sap.
+            # `either` is that "(or non-lethal)": the wielder picks, with no -4.
+            lethality = str(w.get("lethality") or "lethal").strip().lower()
+            base["nonlethal"] = lethality == "nonlethal"
+            if lethality == "either":
+                base["lethality"] = "either"
             # The flags the engine keys on: which toggle must hold, and which ability
             # forms it — so a refusal can name the fix.
             base["granted_by"] = g["key"]
@@ -1553,9 +1567,41 @@ class Actor:
             return f"{self.name} cannot use {doc['name']}: needs {', '.join(verdict['unmet'])}"
         return None
 
+    def lethality_swap(self, weapon_key: str | None = None,
+                       lethality: str | None = None) -> str:
+        """Why this swing takes the -4 for its lethality, or "" when it takes none.
+
+        Core Rulebook p.191: a melee weapon that deals lethal damage may deal nonlethal
+        instead, and a weapon that deals nonlethal — the unarmed strike included — may
+        deal lethal instead, each at -4 on the attack roll. Two waivers, both the book's:
+        Improved Unarmed Strike ("your unarmed strikes can deal lethal or nonlethal
+        damage, at your choice"), which a monk has from 1st level; and a granted weapon
+        whose document says `lethality: either`.
+
+        Asked by the attack roll through `attack_modifiers`, like Power Attack's
+        penalty, so the -4 arrives through the one modifier funnel and shows in the
+        dice popup with its reason — never as a number the engine added beside it.
+        """
+        from . import classfeatures as classfeatures_mod
+        from . import weapons as weapons_mod
+
+        w = self.weapon(weapon_key)
+        usual = weapons_mod.lethality_of(w)
+        wanted = str(lethality or usual).strip().lower()
+        if wanted == usual or w.get("lethality") == "either":
+            return ""
+        plain_fist = (str(w.get("name", "")).lower().startswith("unarmed strike")
+                      and not w.get("natural") and not w.get("granted_by"))
+        if plain_fist and (self.has_state(STRIKES_EITHER_WAY)
+                           or self.has_state(classfeatures_mod.UNARMED_STRIKE)):
+            return ""
+        if wanted == "nonlethal":
+            return f"pulling the blow with a {w['name']} (non-lethal)"
+        return f"striking to kill with a {w['name']}"
+
     def attack_modifiers(
         self, weapon_key: str | None = None, iteration: int = 0,
-        power_attack: bool = False,
+        power_attack: bool = False, lethality: str | None = None,
     ) -> list[Modifier]:
         w = self.weapon(weapon_key)
         key = (weapon_key or self.equipped or "unarmed").strip().lower()
@@ -1590,6 +1636,12 @@ class Actor:
 
         if iteration:
             mods.append(Modifier(-5 * iteration, f"iterative #{iteration + 1}"))
+        # Declared with the swing, like Power Attack, and charged whether the numbers
+        # are derived or printed: a thug's stat-block bonus assumes the sap does what
+        # a sap does, so swinging it to kill is still the -4 the book asks.
+        swap = self.lethality_swap(key, lethality) if lethality else ""
+        if swap:
+            mods.append(Modifier(LETHALITY_SWAP_PENALTY, swap))
 
         mods.extend(self._condition_mods("attack"))
         if w["category"] == "melee":
@@ -1976,6 +2028,19 @@ class Actor:
         return (any(normalise_damage_type(t) == want for t in self.immunities)
                 or self.has_state(f"immune.{want}"))
 
+    def immune_to_nonlethal(self) -> bool:
+        """Whether nonlethal damage simply does not land on this creature.
+
+        The printed line through the same table every other immunity reads — "undead
+        traits" and "construct traits" carry it, and three stat blocks print "nonlethal
+        damage" bare — and a race document's `immune.nonlethal` tag, the same two
+        sources `immune_to` asks.
+        """
+        from . import states
+
+        return bool(states.immunity_blocks(self.immunities, "nonlethal")
+                    or self.has_state("immune.nonlethal"))
+
     def resistance(self, dtype: str) -> int:
         """Points of this energy shrugged off. 0 when none applies.
 
@@ -2135,6 +2200,11 @@ class Actor:
         # Immunity is the whole packet or none of it, and it is checked first so nothing
         # below has to consider a zero it cannot explain.
         immune = self.immune_to(dtype)
+        # Undead and constructs are "not subject to nonlethal damage" (Bestiary,
+        # creature types) — a lethality, not a damage type, so it is its own question.
+        immune_nonlethal = (lethality == "nonlethal" and not immune
+                            and self.immune_to_nonlethal())
+        immune = immune or immune_nonlethal
         # 1e: half again as much, rounded down.
         vulnerable = not immune and self.vulnerable_to(dtype)
         after_type = 0 if immune else (rolled * 3) // 2 if vulnerable else rolled
@@ -2159,8 +2229,16 @@ class Actor:
         taken = after_dr - absorbed
         # Non-lethal still spends temporary hit points first — they are hit points — but
         # what gets through goes to its own pool rather than off the character's total.
+        # Up to a ceiling: "If a creature's nonlethal damage is equal to his total
+        # maximum hit points, all further nonlethal damage is treated as lethal damage"
+        # (Core Rulebook p.191). Without it a fist is a pool with no bottom — a blow of
+        # 30 on a 13-hp thug would leave him at 13 hit points forever.
+        overflow = 0
         if lethality == "nonlethal":
-            self.nonlethal += taken
+            room = max(0, int(self.hp_max or 0) - self.nonlethal)
+            overflow = max(0, taken - room)
+            self.nonlethal += taken - overflow
+            self.hp -= overflow
         else:
             self.hp -= taken
         # A unit's pool is its members: every member's worth of damage takes one of them
@@ -2178,6 +2256,7 @@ class Actor:
             "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
             "factored": factored, "factored_by": factored_by if factored else "",
             "absorbed": absorbed, "taken": taken, "lethality": lethality,
+            "immune_nonlethal": immune_nonlethal, "overflow": overflow,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
             "nonlethal": self.nonlethal,
             "nonlethal_threshold": self.nonlethal_threshold,
@@ -2933,6 +3012,13 @@ class Actor:
             if not self.has_condition("staggered"):
                 self.add_condition("staggered", source="non-lethal damage")
                 changed.append("staggered")
+            # Healed back to the line from past it: staggered, and awake. Only the
+            # branch below used to lift the knockout, so a character recovering an hour
+            # at a time stopped at exactly equal and stayed unconscious — found by the
+            # first test that let nonlethal heal by the hour (2026-09-27).
+            c = next((x for x in self.conditions if x.key == "unconscious"), None)
+            if c is not None and c.source == "non-lethal damage":
+                self.remove_condition("unconscious")
         else:
             # Healed back below the line: whichever of the two this caused, it lifts.
             for gone in ("staggered", "unconscious"):

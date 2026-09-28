@@ -328,6 +328,14 @@
       "proficient.weapon.$target"
     ]
   },
+  "improved-unarmed-strike": {
+    "tags": [
+      "lethality.either.unarmed"
+    ],
+    "not_yet": [
+      "counts as armed: no attack of opportunity for attacking unarmed, and threatens with unarmed strikes (rules/reactions.py has no unarmed-provokes rule to waive)"
+    ]
+  },
   "improved-bull-rush": {
     "modifiers": [
       {

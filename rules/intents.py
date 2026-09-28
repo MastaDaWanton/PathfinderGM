@@ -21,8 +21,16 @@ import re
 from dataclasses import dataclass, field
 
 from .tables import (
-    CIRCUMSTANCE, DC_BANDS, MANEUVER_ALIASES, MANEUVERS, SAVES, SKILLS, WEAPONS,
+    CIRCUMSTANCE, DC_BANDS, LETHALITIES, MANEUVER_ALIASES, MANEUVERS, SAVES, SKILLS,
+    WEAPONS,
 )
+
+# Hyphens and spaces are already gone when this is read ("non-lethal" -> "nonlethal").
+# "subdual" is 3.0's word for the same damage and the one a model trained on it reaches
+# for; "kill" is how a sentence says lethal.
+_LETHALITY_SPELLINGS = {"subdual": "nonlethal", "subdue": "nonlethal",
+                        "nonlethaldamage": "nonlethal", "kill": "lethal",
+                        "lethaldamage": "lethal"}
 
 # Skill names from other editions, mapped to the 1e name they unambiguously mean.
 #
@@ -246,7 +254,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # `item`: the object an improvised weapon IS — "chunk of wood",
                     # "pebble" — so the tell can name it and the props ledger can
                     # move it.
-                    "iteration", "undecided", "item", "thrown"), "player"),
+                    "iteration", "undecided", "item", "thrown",
+                    # "lethal" or "nonlethal", when the swing deals the other kind
+                    # than its weapon does: a sap swung to kill, a sword turned to the
+                    # flat. Absent means the weapon's own; the -4 is the engine's.
+                    "lethality"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
@@ -700,7 +712,8 @@ def normalise_raw(raw: dict) -> dict:
             skill = normalise_skill(man)
             if skill:
                 kept = {k: v for k, v in params.items()
-                        if k not in ("manoeuvre", "full_attack", "weapon", "power_attack")}
+                        if k not in ("manoeuvre", "full_attack", "weapon", "power_attack",
+                                     "lethality")}
                 raw = dict(raw, op="check", params={**kept, "skill": skill})
     return raw
 
@@ -904,6 +917,21 @@ def _check_params(intent: Intent, index: int) -> None:
                 )
             else:
                 p["manoeuvre"] = key
+        # The two words 1e has, and the spellings that mean them. Anything else is
+        # refused with both named: a lethality the engine guessed at would be a -4 on
+        # the player's roll that nobody asked for.
+        leth = p.get("lethality")
+        if leth in (None, ""):
+            p.pop("lethality", None)
+        else:
+            said = str(leth).strip().lower().replace("-", "").replace(" ", "")
+            said = _LETHALITY_SPELLINGS.get(said, said)
+            if said not in LETHALITIES:
+                raise IntentError(
+                    f"attack: lethality is 'lethal' or 'nonlethal', not {leth!r} — "
+                    f"leave it out and the weapon deals what it deals.",
+                    "schema", index)
+            p["lethality"] = said
         # Which swing of a full attack this is. Unvalidated, it reached
         # `whole[min(int(it), len(whole) - 1)]` in the engine, where a non-numeric value
         # raised inside resolution — a 500 rather than a refusal the model could act on.

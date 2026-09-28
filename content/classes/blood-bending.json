@@ -1117,7 +1117,8 @@
             "damage_label": "Blood die",
             "rider_column": "fist",
             "type": "bludgeoning and piercing",
-            "proficiency_as": "unarmed"
+            "proficiency_as": "unarmed",
+            "lethality": "either"
           },
           "tell": "{name} forms the blood armament. The armed punch is ready as an attack."
         },

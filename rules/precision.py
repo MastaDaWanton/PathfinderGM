@@ -118,11 +118,17 @@ def immune(defender) -> str:
 
 
 def applies(scene, actor, defender, weapon, *, flat_footed: bool,
-            distance_ft: float | None = None, concealed: bool = False) -> tuple[str, str]:
+            distance_ft: float | None = None, concealed: bool = False,
+            pulled: bool = False) -> tuple[str, str]:
     """(dice, why) when this swing is a sneak attack; ("", why-not) when it is not.
 
     Every branch answers in words, because the "why not" is worth as much as the "why":
     a rogue who never sees their dice needs to be told it was the concealment.
+
+    `pulled` is a lethal weapon swung to deal nonlethal damage. Core Rulebook, Rogue:
+    with a sap or an unarmed strike a rogue may sneak attack for nonlethal damage, but
+    "she cannot use a weapon that deals lethal damage to deal nonlethal damage in a
+    sneak attack, not even with the usual -4 penalty."
     """
     dice = dice_for(actor)
     if not dice:
@@ -130,6 +136,8 @@ def applies(scene, actor, defender, weapon, *, flat_footed: bool,
     reason = immune(defender)
     if reason:
         return "", f"{defender.name} {reason}"
+    if pulled:
+        return "", "a blow pulled to spare them cannot also be aimed at the vitals"
     if concealed:
         # "A rogue cannot sneak attack while striking a creature with concealment."
         return "", f"{defender.name} is concealed — nothing to aim at precisely"

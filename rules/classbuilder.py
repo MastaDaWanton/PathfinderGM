@@ -983,6 +983,14 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                     problems.append(
                         f"{gat}.weapon: needs a name — what the dice popup and the "
                         f"attack panel call the strike.")
+                leth = weapon.get("lethality")
+                if leth is not None and str(leth).strip().lower() not in (
+                        "lethal", "nonlethal", "either"):
+                    problems.append(
+                        f"{gat}.weapon: lethality {leth!r} is not one of lethal, "
+                        f"nonlethal or either. Leave it out for lethal; \"either\" lets "
+                        f"the wielder choose with no -4, the way Improved Unarmed "
+                        f"Strike does.")
         standing = any(doc.get(k) for k in ("modifiers", "temp_hp", "weapon",
                                             "tags", "drain", "resist", "dr"))
         # A passive's standing parts never need removing — the ability is never on

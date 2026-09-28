@@ -88,7 +88,17 @@ doors places come in by** — a settlement's own words imply spots (`places.IMPL
 the player founds a place with an owner (`found`; the owner holds `holds.place.<slug>`
 as an `ActiveEffect`, source `place:<id>`), ground gone into is seeded off its parent
 (`venture`); all of it in `Scene.founded`, read back through the one derivation
-`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`).
+`places.for_scene` (docs/place-doors.md; `tests/test_place_doors.py`). **Lethality of a blow** — a
+weapon deals its own (`weapons.lethality_of`: an explicit `nonlethal` flag, else the
+content file's `nonlethal` trait — sap, whip, bolas, the unarmed strike) unless the attack
+declares `lethality`; the −4 arrives through `attack_modifiers` from
+`Actor.lethality_swap`, waived by the `lethality.either.unarmed` tag (Improved Unarmed
+Strike's feat document), `class.unarmed-strike` (the monk) or a grant's
+`lethality: either`; a lethal ranged weapon cannot be pulled; a pulled blow gets no sneak
+dice; the undead/construct bundles carry `nonlethal`; nonlethal past `hp_max` lands as
+lethal; `Scene.advance` heals nonlethal 1/hour/level by hour boundaries crossed. The PC's
+`lethality` comes only from the player's words (`judgement.declare_lethality`)
+(`tests/test_nonlethal_strikes.py`).
 
 **Promised, not built** (do not write code that assumes these exist):
 - Watcher-granted social tags (`attitude.*`, `knows.*`) through the applicator —

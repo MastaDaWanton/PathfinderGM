@@ -967,6 +967,9 @@ class Scene:
                   else minutes * self.ROUNDS_PER_MINUTE)
         if not minutes and not rounds:
             return {"minutes": 0, "rounds": 0, "ended": []}
+        # Hours crossed on the world clock, not minutes // 60: the clock mostly moves
+        # in ten-minute steps, and flooring each step would never heal anybody.
+        hours = (int(self.clock_minutes) + minutes) // 60 - int(self.clock_minutes) // 60
         self.clock_minutes += minutes
         ended: list[str] = []
         # Everyone the campaign holds: an eight-hour rest expires the buff on the
@@ -991,6 +994,19 @@ class Scene:
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
+            # "You heal nonlethal damage at the rate of 1 hit point per hour per
+            # character level" (Core Rulebook p.191). Only a night's `rest` healed it
+            # before, which was harmless while almost nothing dealt it; once punches
+            # and saps did (2026-09-27), a player knocked out cold woke an hour later
+            # still carrying more than their hit points, and the next blow's
+            # hit-point check put them straight back down. Deterministic, so it sits
+            # with the counters above rather than with the checks.
+            if hours and a.nonlethal:
+                out_cold = a.has_state("state.down.unconscious")
+                a.heal_nonlethal(hours * max(1, int(getattr(a, "level", 1) or 1)))
+                a.apply_nonlethal_state()
+                if out_cold and not a.has_state("state.down.unconscious"):
+                    ended.append(f"{a.name} comes round")
             # The breath they are holding, for anybody under the surface who does not
             # breathe water. A counter, like hunger above it and for the same reason:
             # the Constitution check that follows it rolls dice and belongs to the
@@ -2190,6 +2206,18 @@ class Engine:
                 why = actor.can_power_attack()
                 if why:
                     raise IntentError(f"attack: {why}", "legality", index)
+            # "You can use a MELEE weapon that deals lethal damage to deal nonlethal
+            # damage instead" (Core Rulebook p.191). An arrow cannot be pulled; a sling
+            # of softstones already deals nonlethal and needs no param at all.
+            if intent.params.get("lethality") == "nonlethal":
+                held = actor.weapon(key)
+                if (held.get("category") != "melee"
+                        and weapons_mod.lethality_of(held) == "lethal"):
+                    raise IntentError(
+                        f"attack: a {held['name']} cannot pull its blow — only a melee "
+                        f"weapon can deal non-lethal damage instead of lethal (at -4). "
+                        f"Drop `lethality`, or strike with a melee weapon or the fists.",
+                        "legality", index)
             man = intent.params.get("manoeuvre")
             if man:
                 m = MANEUVERS[man]
@@ -2881,6 +2909,15 @@ class Engine:
                         f"forms it, as a free action.")
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
+        # Which kind of damage this swing deals: the weapon's own, unless the swing was
+        # declared the other way (`lethality`), which costs the -4 `attack_modifiers`
+        # charges. Measured 2026-09-27 before this was read: a punch took a thug from 13
+        # to 4 hit points and a thug's sap took the player from 9 to 1, nonlethal 0 both
+        # times — `tables.WEAPONS` had marked both non-lethal since the slice and
+        # nothing had ever asked.
+        usual = weapons_mod.lethality_of(weapon)
+        lethality = str(intent.params.get("lethality") or usual)
+        pulled = usual == "lethal" and lethality == "nonlethal"
 
         if intent.params.get("manoeuvre"):
             return self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
@@ -2950,6 +2987,15 @@ class Engine:
                     f"Swift Strikes: {actor.name} strikes "
                     f"{'twice more' if extra == 2 else 'again'} at {defender.name}.")
 
+        # Said once, before the first die: a narrator told only "the attack misses" has
+        # no way to know the player was trying to take the man alive.
+        if lethality != usual and not state.get("lethality_said"):
+            state["lethality_said"] = True
+            state["tells"].append(
+                f"{actor.name} pulls the blow, meaning to leave {defender.name} alive."
+                if lethality == "nonlethal" else
+                f"{actor.name} strikes to kill.")
+
         while state["i"] < len(sequence):
             # Stop swinging at somebody who has already gone down. Measured in the
             # tavern: the thug dropped to -5 on the first swing of a Swift Strikes pair,
@@ -2966,7 +3012,8 @@ class Engine:
                         f"{defender.name} is already down; {actor.name} holds the blow.")
                 break
             iteration = sequence[state["i"]]
-            atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power)
+            atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
+                                              lethality=lethality)
             # Compulsions are charged here rather than in `attack_modifiers` because the
             # penalty depends on *who is being attacked*, which the sheet does not know.
             # It penalises and never prohibits: see the header of rules/compulsion.py.
@@ -3084,7 +3131,7 @@ class Engine:
                 # here, past `mult`, and never folded into the weapon's notation.
                 # `rules/precision.py` decides whether it applies at all.
                 sneak_dice, sneak_why = self._sneak_for(
-                    actor, defender, weapon, flat_footed=flat_footed)
+                    actor, defender, weapon, flat_footed=flat_footed, pulled=pulled)
                 if sneak_dice:
                     if "sneak_total" not in state:
                         sneak_roll = self._roll_or_suspend_stage(
@@ -3133,7 +3180,8 @@ class Engine:
                 if wet_row and water.damage_halved(wet_row, str(weapon["type"])):
                     amount = max(1, amount // 2)
                     state["tells"].append("The water takes half the force out of it.")
-                hit = self._apply_damage(defender, amount, weapon["type"])
+                hit = self._apply_damage(defender, amount, weapon["type"],
+                                         lethality=lethality)
                 # What struck, and how heavy it was: the death line's third axis.
                 # Measured 2026-09-18: a thrown pebble took a man's head clean off
                 # in the authored backstop, because the pool knew the damage type
@@ -3150,7 +3198,12 @@ class Engine:
                 # will narrate a wound nobody took.
                 state["tells"].append(
                     f"{actor.name} {'critically ' if state.get('crit') else ''}hits "
-                    f"{defender.name} for {hit['amount']} {weapon['type']}"
+                    f"{defender.name} for {hit['amount']} "
+                    # The one word that keeps a knockout from being narrated as a
+                    # wound: the narrator is fed tells and nothing else, and the
+                    # effect's `lethality` never reaches it.
+                    + ("non-lethal " if hit.get("lethality") == "nonlethal" else "")
+                    + f"{weapon['type']}"
                     + (f" ({hit['note']})." if hit["note"] else "."))
                 # A coated blade delivers its dose on the first thing it cuts, and then it
                 # is gone. Spent on the hit rather than on the swing: a poison wiped off
@@ -8256,7 +8309,8 @@ class Engine:
             or not self._has_acted(defender.ref)
         )
 
-    def _sneak_for(self, actor, defender, weapon, *, flat_footed: bool) -> tuple[str, str]:
+    def _sneak_for(self, actor, defender, weapon, *, flat_footed: bool,
+                   pulled: bool = False) -> tuple[str, str]:
         """The sneak attack dice for this swing and why, or ("", why not).
 
         The engine's half is only the two facts `precision` cannot see for itself: how far
@@ -8288,7 +8342,8 @@ class Engine:
                          or position_mod.cover_of(self.scene, actor, defender) == "total")
         return precision_mod.applies(
             self.scene, actor, defender, weapon,
-            flat_footed=flat_footed, distance_ft=distance_ft, concealed=concealed)
+            flat_footed=flat_footed, distance_ft=distance_ft, concealed=concealed,
+            pulled=pulled)
 
     def _lay_battlefield(self, sides: dict) -> None:
         """The ground. The map tray has promised "a grid is laid out when a fight
@@ -9773,8 +9828,14 @@ def _damage_note(d: dict) -> str:
         bits.append(f"{d['factored']} shrugged off by {d.get('factored_by') or 'resistance'}")
     if d["absorbed"]:
         bits.append(f"{d['absorbed']} off temporary")
+    if d.get("immune_nonlethal"):
+        # The fourth way damage vanishes: a fist on a skeleton. Said, for the reason
+        # this function exists.
+        bits.append("not subject to non-lethal damage")
     if d.get("lethality") == "nonlethal" and d.get("taken"):
         bits.append(f"non-lethal now {d.get('nonlethal')}")
+    if d.get("overflow"):
+        bits.append(f"{d['overflow']} past the non-lethal limit, taken as lethal")
     return f"{d['rolled']}, " + ", ".join(bits) if bits else ""
 
 

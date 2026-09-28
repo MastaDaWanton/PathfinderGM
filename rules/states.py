@@ -448,14 +448,22 @@ IMMUNITY_COVERS: dict[str, tuple[str, ...]] = {
     "deafness": ("deafened",),
     "death effects": ("death",),
     "energy drain": ("energy drain",),
+    # Not a condition but a lethality, asked by `Actor.take_damage` under the key
+    # "nonlethal": three shipped stat blocks print it bare, and the two bundles below
+    # carry it because the Bestiary says so ("not subject to nonlethal damage").
+    "nonlethal damage": ("nonlethal",),
     # The Bestiary's own bundle, expanded once here rather than in every consumer.
+    # "nonlethal" joined both 2026-09-27, the day punches first dealt it: until then
+    # every blow was lethal and a skeleton punched was a skeleton hurt, which was the
+    # right answer for the wrong reason.
     "undead traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                       "disease", "poison", "fatigued", "exhausted",
-                      *_MIND_AFFECTING, "bleed", "death", "nauseated", "sickened"),
+                      *_MIND_AFFECTING, "bleed", "death", "nauseated", "sickened",
+                      "nonlethal"),
     "construct traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                          "disease", "poison", "fatigued", "exhausted",
                          *_MIND_AFFECTING, "bleed", "death", "nauseated",
-                         "sickened"),
+                         "sickened", "nonlethal"),
     "elemental traits": (*_SLEEP, "paralyzed", "paralysis", "stunned", "stun",
                          "poison", "bleed"),
 }

@@ -120,6 +120,26 @@ def resolve(campaign) -> Outcome:
             lines.append(death_notice(pc))
             return Outcome(state="dead", playable=False, lines=lines)
 
+    # Beaten senseless rather than cut down: unconscious from nonlethal damage, hit
+    # points above zero, nothing bleeding. 1e wakes them when the nonlethal falls back
+    # to their hit points, at 1 point an hour per level (`Scene.advance` heals it), so
+    # the wait is however many hours that takes — and their hit points are left alone.
+    # The general branch below floors hp at 1 and clears the unconsciousness after one
+    # hour, which for a knockout of 20 on 9 hit points woke a player who was still out
+    # cold by the rules, to be knocked down again by the next hit-point check.
+    if (pc.hp > 0 and pc.nonlethal > pc.nonlethal_threshold
+            and not pc.has_state("state.down.dying")
+            and not pc.has_state("state.down.stable")):
+        if scene.in_encounter:
+            scene.end_encounter()
+        per_hour = max(1, int(getattr(pc, "level", 1) or 1))
+        hours = max(1, -(-(pc.nonlethal - pc.nonlethal_threshold) // per_hour))
+        scene.advance(hours * 60)
+        lines.append(
+            f"You come round {'about an hour' if hours == 1 else f'{hours} hours'} "
+            f"later, aching, where you were knocked down. Whoever did it has gone.")
+        return Outcome(state="stable", playable=True, lines=lines)
+
     # Stable, one way or the other: the fight is long over and the character wakes.
     if scene.in_encounter:
         scene.end_encounter()

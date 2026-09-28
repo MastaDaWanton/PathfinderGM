@@ -42,6 +42,7 @@ rows are still inert and why:
   improved uncanny dodge    READ by `position.flanking_with`
   evasion / improved        READ by `_op_save`'s damage branch
   sneak attack              READ by `rules/precision.py` (group 15)
+  unarmed strike            READ by `Actor.lethality_swap` (lethal fists, no -4)
 
   bravery, trap sense       no trigger exists. Both are bonuses on a save against a
                             DESCRIPTOR — fear, traps — and `save` carries no descriptor:
@@ -76,6 +77,10 @@ _NUMBER = re.compile(r"\s*(?:[+-]\s*\d+|\d+d\d+|\d+|\(.*?\))\s*$")
 UNCANNY_DODGE = f"{FAMILY}.uncanny-dodge"
 IMPROVED_UNCANNY_DODGE = f"{FAMILY}.improved-uncanny-dodge"
 EVASION = f"{FAMILY}.evasion"
+# The monk's "unarmed strike (1d6)" row. Core Rulebook, Monk: "At 1st level, a monk gains
+# Improved Unarmed Strike as a bonus feat", so this answers the feat's own question —
+# may the fist strike lethal without the -4 — for a monk who never picked the feat.
+UNARMED_STRIKE = f"{FAMILY}.unarmed-strike"
 IMPROVED_EVASION = f"{FAMILY}.improved-evasion"
 
 # Evasion is for people who can move: "can be used only if the rogue is wearing light

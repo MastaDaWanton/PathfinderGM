@@ -338,6 +338,13 @@ class GMAgent:
                 # GM only described. Runs once there is certainly nobody to fight, so it
                 # cannot steal a turn from `fill_obvious_targets`.
                 raw = judgement.inject_fight(raw, player_input, self.engine.scene)
+                # After every attack the turn will hold exists. What strikes is the
+                # player's word — "I punch him" is the fist, not the rapier in hand —
+                # and then, reading that weapon, to spare or to kill is theirs too; a
+                # lethality the model chose for the PC on its own is struck (a -4
+                # nobody asked for).
+                raw = judgement.declare_unarmed(raw, player_input, self.engine.scene)
+                raw = judgement.declare_lethality(raw, player_input, self.engine.scene)
                 raw = judgement.inject_company(raw, player_input,
                                                self.engine.scene)
                 # Speech last, because it competes with nothing: "I tell the smith I

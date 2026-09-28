@@ -396,6 +396,14 @@ WEAPONS: dict[str, dict] = {
 # Using a weapon you are not proficient with.
 NON_PROFICIENT_PENALTY = -4
 
+# Dealing the other kind of damage than the weapon deals. Core Rulebook p.191: "You can
+# use a melee weapon that deals lethal damage to deal nonlethal damage instead, but you
+# take a –4 penalty on your attack roll", and the same –4 the other way round for a sap
+# or an unarmed strike swung to kill. p.182: "If you have the Improved Unarmed Strike
+# feat, you can deal lethal damage with an unarmed strike without taking a penalty."
+LETHALITY_SWAP_PENALTY = -4
+LETHALITIES = ("lethal", "nonlethal")
+
 # --- damage types -----------------------------------------------------------------------
 #
 # The distinction earns its keep in exactly one place, and it is not cosmetic: **damage
