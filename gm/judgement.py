@@ -413,6 +413,180 @@ def name_refs(text: str, scene) -> str:
 # A ref the GM invented for someone it wanted to exist: "thug1", "bravo_2", "guard1".
 _INVENTED_REF = re.compile(r"^[a-z][a-z_]{2,}[ _-]?\d*$", re.I)
 
+# The refs `introduce` hands out — new1, new2, new3 (`rules.intents.INTRODUCED_REFS`),
+# and the new4 a model will count on to. Ours, never the fiction's.
+_PLACEHOLDER = re.compile(r"new[ _-]?\d+", re.I)
+
+# Words a ref is made of when it labels a slot in the plan rather than anybody in the
+# fiction: "npc1", "enemy_2", "target1", "new1". Such a ref says nothing about who, so it
+# can be neither a name nor a description to make somebody from. Measured live
+# 2026-09-27 (gemma-4-12B, the fight script, turn 2): "I punch him in the face" came back
+# as `attack new1` with no `introduce`, and the invented-ref repair stripped the digit and
+# spawned a 13-hp thug called "new" — "Battle is joined: Kesst Vayr squares off against
+# new" — beside the man the player had actually punched. `npc1` became "npc", `enemy1`
+# "enemy" and `target1` "target" by the same line. A ref like `winged_woman` or
+# `kaldrimia` has a word outside this set and still names who it means.
+_LABEL_WORDS = frozenset({
+    "new", "npc", "npcs", "enemy", "enemies", "foe", "foes", "target", "targets",
+    "opponent", "opponents", "adversary", "attacker", "attackers", "hostile", "hostiles",
+    "combatant", "person", "people", "someone", "somebody", "stranger", "creature",
+    "monster", "mob", "character", "char", "actor", "entity", "individual", "figure",
+    "unknown", "other", "others", "man", "woman", "guy", "him", "her", "them", "it",
+    "victim", "subject", "one", "ref", "placeholder", "id",
+})
+
+
+def _is_placeholder(ref) -> bool:
+    return isinstance(ref, str) and bool(_PLACEHOLDER.fullmatch(ref.strip()))
+
+
+def _is_label(ref) -> bool:
+    """Whether a ref is only a slot's label — `new1`, `npc1`, `enemy_2` — and no name."""
+    if not isinstance(ref, str):
+        return False
+    words = re.findall(r"[a-z]+", ref.lower())
+    return bool(words) and all(w in _LABEL_WORDS for w in words)
+
+
+def _refs_in(raw: dict) -> list:
+    """Every slot of an intent a person's ref can sit in: actor, target, `opposed_by`, `to`."""
+    targets = raw.get("target")
+    targets = targets if isinstance(targets, list) else [targets]
+    params = raw.get("params") or {}
+    opposed = params.get("opposed_by") if isinstance(params, dict) else None
+    to = params.get("to") if isinstance(params, dict) else None
+    return [raw.get("actor"), *targets,
+            opposed.get("ref") if isinstance(opposed, dict) else None,
+            *(to if isinstance(to, list) else [to])]
+
+
+# Somebody arriving, in the player's own sentence: "two bravos come round the corner".
+# The arrival is who a label then means, and `repair_unknown_refs` exists to make them.
+_ARRIVING = re.compile(
+    r"\b(?:comes?|coming|came|bursts?|bursting|arrives?|arriving|appears?|appearing|"
+    r"emerges?|emerging|enters?|entering|steps? (?:out|in|forward)|walks? in|"
+    r"shows? up|drops? (?:down|in|out)|round the corner|out of nowhere|jumps? out|"
+    r"charges? in|rushes? in|barges? in)\b", re.I)
+
+
+def _the_one_meant(scene, player_text: str) -> str:
+    """The ref of the one person present the player's words can only mean, or "".
+
+    In order: the one present person the sentence names; when it describes somebody
+    instead ("the biggest man in the room"), the one the population finds here with a
+    body; when it only points ("him"), the one person the player is engaged with, then
+    the one person in the room — unless the sentence has somebody arriving, who is then
+    the likelier "him" and not ours to guess. Two that fit is never a choice made for
+    the player.
+    """
+    from rules import population
+
+    text = redact_speech(player_text or "")
+    actors = getattr(scene, "actors", {}) or {}
+    conscious = getattr(scene, "conscious", None)
+    present = [a for r, a in actors.items() if not a.is_pc
+               and (conscious(r) if callable(conscious) else int(getattr(a, "hp", 1)) > 0)]
+    if not present:
+        return ""
+    words = _name_words(text)
+    named = [a for a in present if words & _name_words(a.name)]
+    if named:
+        return named[0].ref if len(named) == 1 else ""
+    sought = person_sought(player_text)
+    if sought and sought.lower() not in _NOBODY_TO_INTRODUCE:
+        found = population.find(scene, sought, rings=(population.HERE,))
+        if found.scope == population.HERE:
+            ref = found.people[0].get("ref") or ""
+            if ref in actors and not actors[ref].is_pc:
+                return ref
+        return ""
+    if _ARRIVING.search(text):
+        return ""
+    engaged = engaged_refs(scene)
+    if len(engaged) == 1:
+        return engaged[0]
+    return present[0].ref if len(present) == 1 else ""
+
+
+def bind_placeholders(raw_intents, player_text: str, scene):
+    """A placeholder nothing declared is bound to whoever the plan plainly meant, or left
+    for validation to refuse with the fix named. It never makes anybody.
+
+    Measured live 2026-09-27 (gemma-4-12B, the fight script): the plan wrote `say to new1`
+    on turn 1 ("I pick a fight with the biggest man in the room") and `attack new1` on
+    turn 2 ("I punch him in the face") with no `introduce` either time. Both meant Borin
+    Lyraxys, the one man in the tavern, already standing there as c2 — and on turn 2 the
+    invented-ref repair spawned a thug called "new" for the punch to land on instead.
+
+    `new1` is the local id `introduce` hands out, the shape of JSON:API's `lid`, which the
+    specification defines only as the identity of a resource created in the same document;
+    a dangling one is a malformed request, never an implicit create. So, in code:
+
+    * The plan made its people by `spawn` and wrote `new1` for them (the placeholder of
+      the wrong op): `newK` is the K-th body those spawns make. Declared, just misnamed.
+    * One dangling label (`new1`, `npc1`, `enemy1`) and the player's words can only mean
+      one person present (`_the_one_meant`): it is that person's ref.
+    * Otherwise nothing is changed. A placeholder is refused by validation with the fix
+      named (`Engine._refuse_ref`), and `repair_unknown_refs` will not spawn it.
+
+    Building an `introduce` out of the beat instead was weighed and refused: the beat is
+    prose, and docs/declared-not-guessed.md is the ruling that prose makes no bodies. Run
+    before the target fills, so an attack bound here is one `inject_fight` stands aside
+    for rather than a second swing at the same man.
+    """
+    if scene is None or not isinstance(raw_intents, list):
+        return raw_intents
+    from rules.intents import INTRODUCED_REFS
+
+    known = set(getattr(scene, "actors", {}) or {})
+    intro = next((r for r in raw_intents if isinstance(r, dict)
+                  and str(r.get("op", "")).lower() == "introduce"), None)
+    declared: set[str] = set()
+    if intro is not None:
+        try:
+            n = int((intro.get("params") or {}).get("count", 1) or 1)
+        except (TypeError, ValueError):
+            n = 1
+        declared = set(INTRODUCED_REFS[:max(1, n)])
+    dangling: list[str] = []
+    for raw in raw_intents:
+        if not isinstance(raw, dict):
+            return raw_intents
+        for ref in _refs_in(raw):
+            if (isinstance(ref, str) and ref not in known and ref not in declared
+                    and ref not in dangling and _is_label(ref)):
+                dangling.append(ref)
+    if not dangling:
+        return raw_intents
+
+    bound: dict[str, str] = {}
+    spawns = [r for r in raw_intents if str(r.get("op", "")).lower() == "spawn"]
+    if spawns:
+        if intro is not None:
+            return raw_intents
+        from rules.bestiary import next_ref
+
+        made: list[str] = []
+        for s in spawns:
+            try:
+                n = int((s.get("params") or {}).get("count", 1) or 1)
+            except (TypeError, ValueError):
+                n = 1
+            for _ in range(max(1, n)):
+                made.append(next_ref(scene, taken=made))
+        for ref in dangling:
+            if _is_placeholder(ref):
+                k = int(re.sub(r"\D", "", ref))
+                if 1 <= k <= len(made):
+                    bound[ref] = made[k - 1]
+    elif len(dangling) == 1:
+        who = _the_one_meant(scene, player_text)
+        if who:
+            bound[dangling[0]] = who
+    if not bound:
+        return raw_intents
+    return [_swap_refs(dict(r), bound) for r in raw_intents]
+
 # What the player's words suggest the newcomers are. The animal cue is first because it
 # is the more specific claim: "the guard dog" contains "guard", and with the human cue
 # first the dog came out a watchman.
@@ -1003,6 +1177,12 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
                 continue
             if not _INVENTED_REF.match(ref) or re.fullmatch(r"c\d+|pc", ref, re.I):
                 return None            # a real ref that is simply wrong: not our business
+            # `introduce`'s placeholder with no introduce: ours, not somebody the GM
+            # described, and `bind_placeholders` has already failed to find who it
+            # meant. Validation's refusal names the fix; nobody is made (2026-09-27, the
+            # thug called "new").
+            if _is_placeholder(ref):
+                return None
             invented.append(ref)
 
     if not invented or any(r.get("op") == "spawn" for r in raw_intents):
@@ -1088,8 +1268,9 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
         # narrate the wrong person: the live fight read "the thug steps forward" about a
         # guildmate the scene had introduced by name. Only for one: two invented refs
         # cannot share a name, and picking which ref names the pair is a guess.
+        # A label is not a name: `npc1` made somebody called "npc" (`_LABEL_WORDS`).
         cleaned = re.sub(r"\d+$", "", invented[0]).replace("_", " ").replace("-", " ").strip()
-        if cleaned and cleaned != template:
+        if cleaned and cleaned != template and not _is_label(invented[0]):
             params["name"] = cleaned
     amended = [{"op": "spawn", "because": "they are already in the scene the GM described",
                 "params": params}]
@@ -1100,7 +1281,7 @@ def repair_unknown_refs(raw_intents, player_text: str, scene, world=None):
 
 
 def _swap_refs(raw: dict, swap: dict) -> dict:
-    """An intent with its invented refs replaced — actor, target and `opposed_by`."""
+    """An intent with its invented refs replaced — actor, target, `opposed_by` and `to`."""
     if isinstance(raw.get("actor"), str):
         raw["actor"] = swap.get(raw["actor"], raw["actor"])
     tgt = raw.get("target")
@@ -1108,12 +1289,21 @@ def _swap_refs(raw: dict, swap: dict) -> dict:
         raw["target"] = swap.get(tgt, tgt)
     elif isinstance(tgt, list):
         raw["target"] = [swap.get(t, t) for t in tgt]
-    params = dict(raw.get("params") or {})
+    params = raw.get("params")
+    if not isinstance(params, dict):
+        return raw
+    params = dict(params)
     if isinstance(params.get("opposed_by"), dict):
         ob = dict(params["opposed_by"])
         ob["ref"] = swap.get(ob.get("ref"), ob.get("ref"))
         params["opposed_by"] = ob
-        raw["params"] = params
+    # `say to new1` is the same ref in another pocket (turn 1 of the 2026-09-27 fight).
+    to = params.get("to")
+    if isinstance(to, str) and to in swap:
+        params["to"] = swap[to]
+    elif isinstance(to, list):
+        params["to"] = [swap.get(t, t) if isinstance(t, str) else t for t in to]
+    raw["params"] = params
     return raw
 
 

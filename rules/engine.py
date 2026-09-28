@@ -1949,6 +1949,7 @@ class Engine:
     def _refuse_ref(self, intent: Intent, index: int, ref, role: str,
                     extra: set[str] | None) -> None:
         """One shape for every unknown-ref refusal, with the right branch chosen."""
+        self._refuse_placeholder(intent, index, ref)
         away = self._elsewhere(ref)
         if away:
             raise IntentError(f"{intent.op}: {away}", "refs", index)
@@ -1959,6 +1960,33 @@ class Engine:
             + _SPAWN_HINT,
             "refs", index,
         )
+
+    def _refuse_placeholder(self, intent: Intent, index: int, ref) -> None:
+        """`new1` with no `introduce` before it: refused with the two fixes named.
+
+        Measured live 2026-09-27 (gemma-4-12B, the fight script): `attack new1` with no
+        introduce, meaning the one man already in the room, fell through to the generic
+        unknown-ref refusal and from there to the invented-ref repair, which spawned a
+        thug called "new". A placeholder is the plan's own local id — JSON:API's `lid`
+        names only a resource created in the same document — so the refusal says what
+        the plan must do instead of what it may not.
+        """
+        from .intents import INTRODUCED_REFS
+
+        if not (isinstance(ref, str)
+                and re.fullmatch(r"new[ _-]?\d+", ref.strip(), re.I)):
+            return
+        here = ", ".join(f"{r} ({a.name})" for r, a in self.scene.actors.items()
+                         if not a.is_pc) or "nobody"
+        # The same split the prompt teaches: people arrive by `introduce`, a creature or
+        # a foe arriving to fight by `spawn` — and in a fight only the second.
+        arrive = ("a spawn written before it" if self.scene.in_encounter
+                  else "an introduce written before it (a foe arriving to fight: a spawn)")
+        raise IntentError(
+            f"{intent.op}: {ref!r} is the placeholder introduce hands out "
+            f"({', '.join(INTRODUCED_REFS)}), and nothing earlier in this plan introduces "
+            f"anybody. Somebody already here is aimed at by their own ref — here: {here}. "
+            f"Somebody new comes in by {arrive}.", "refs", index)
 
     def _check_refs(self, intent: Intent, index: int,
                     extra: set[str] | None = None) -> None:
@@ -2029,6 +2057,7 @@ class Engine:
         # road list and refuses an unknown one by naming the ones that exist, which is
         # the same courtesy `travel` extends to a place.
         if to and intent.op != "journey" and not self._known(to, extra):
+            self._refuse_placeholder(intent, index, to)
             raise IntentError(
                 f"{intent.op}: unknown ref {to!r} in params.to", "refs", index
             )

@@ -305,3 +305,63 @@ or introduced. One beat set in "the lane" was rewritten, since "there is no lane
 place at all". No place came from the page. The blows check cut one sentence wrongly: a
 smith "mid-swing" with his hammer at the anvil. A weapon now makes a swing a blow at the
 player only when the player is in the sentence.
+
+## Built (2026-09-27): a placeholder is ours, and a dangling one makes nobody
+
+**What happened.** In the fight audit on twin-names (gemma-4-12B), turn 2 was "I punch him
+in the face". The plan came back as `attack pc -> new1` with no `introduce`. The ref check
+refused `new1`, the invented-ref repair stripped the digit, and it spawned a 13-hp thug
+called **new**. The tells read "Battle is joined: Kesst Vayr squares off against new",
+and the wrong-actor repair logged "it was new's turn, and the beat never names new". Turn
+1 had already written `say to new1`. Both times the placeholder meant Borin Lyraxys, the
+one man in the tavern, standing there as c2. `inject_fight` had even put a correct second
+attack on him, so the punch was rolled twice: once at a phantom, once at Borin.
+
+The same digit-stripping named `npc1` "npc", `enemy1` "enemy" and `target1` "target".
+
+**Prior art.** `new1` is the local id `introduce` hands out, in the style of JSON:API's
+`lid`. The specification (jsonapi.org/format/1.1) defines a `lid` only as the identity of
+a new resource created in the same document. I could not find an explicit rule for a
+dangling one. It is not a resource, so it falls under the atomic extension's 400 for a
+malformed operation, and it is never an implicit create.
+
+**The rulings, in code** (`judgement.bind_placeholders`, before any target fill):
+
+- **A label is never a name.** A ref made only of slot words (`new`, `npc`, `enemy`,
+  `target`, `foe`, `man`, ...: `_LABEL_WORDS`) gives no name to anybody it makes.
+  `winged_woman` and `kaldrimia` still name who they mean.
+- **A placeholder is never spawned.** `repair_unknown_refs` declines `newN`.
+- **Declared under the wrong op.** A plan that spawned and then wrote `new1` gets the
+  spawn's first ref.
+- **One dangling label is bound to the person the player's words can only mean.** First
+  the person the sentence names. Then the one the population finds here for a
+  description. Then, for a pronoun, the one person engaged, then the one person in the
+  room. It is never bound when the sentence has somebody arriving, and never when two
+  people fit.
+- **Otherwise it is refused with the fix named** (`Engine._refuse_placeholder`): "new1 is
+  the placeholder introduce hands out ... Somebody already here is aimed at by their own
+  ref — here: c2 (Borin Lyraxys). Somebody new comes in by an introduce written before
+  it." Before this, the refusal was the generic unknown-ref one plus the spawn hint, which
+  read as an invitation to spawn.
+
+**Weighed and refused: an `introduce` built from the beat.** The plan's draft did
+describe "two others at the nearest table stand up". But that is prose, and the ruling
+above is that prose makes no bodies. The player had punched the man already there. If
+the plan meant a newcomer, the refusal tells it to declare one.
+
+**Measured.** Turns 1 and 2 of that run are kept in `tests/replay/plans/`. Turn 2's
+recorded plan is replayed through the real `plan_turn`, with the recorded replies
+standing in for the model (`tests/test_placeholders_are_ours.py`). Before the fix it gave
+spawn "new" + attack c3 + attack c2. After it, one attack on c2.
+
+A fresh live fight audit on the branch (12 turns, gemma-4-12B) came back 12/12 clean.
+But the planner wrote no placeholder and no label ref in any call, and aimed at c2 by
+ref every time. So that run confirms nothing regressed. It does not exercise the new
+path; the replayed recording does.
+
+**Seen and not changed.** The plan schema puts `new1`–`new3` in the actor/target enum of
+every plan outside a fight where `introduce` can be written (`prompts.turn_schema`). So
+when the model wanted "him", the grammar offered `new1` as one of five legal strings.
+Taking the placeholders out of the enum would stop a plan attacking or checking against
+somebody it introduced (`say`'s `to` lives in params, outside the enum). That is a
+trade-off to measure with the strangers script before changing it.

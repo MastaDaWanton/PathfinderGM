@@ -445,6 +445,10 @@ class GMAgent:
                 # straightens: a target pocketed in params is invisible to the misaim
                 # check, and an invented param is a schema refusal five lines later.
                 raw = judgement.split_plural_targets(raw)
+                # An introduce placeholder nothing introduced (`attack new1`) is the
+                # person the plan plainly meant, before anything fills a target or
+                # opens a fight around it — or left for validation to refuse.
+                raw = judgement.bind_placeholders(raw, player_input, self.engine.scene)
                 # The player's own cast, jar or power with no actor written is theirs.
                 raw = judgement.fill_missing_actor(raw, player_input, self.engine.scene)
                 raw = judgement.repair_bare_spawns(raw, player_input)

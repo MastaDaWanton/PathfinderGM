@@ -179,4 +179,5 @@ described after him. With that in place the corpus counts are back to the baseli
   invented-ref repair (`judgement.py`, `re.sub(r"\d+$", "", invented[0])`) then spawned a
   thug called **new**. It is flagged as its own task, because whether a stray
   placeholder should spawn anybody at all is a declared-not-guessed question, not a
-  naming one.
+  naming one. Fixed on the branch placeholders-are-ours. See docs/declared-not-guessed.md,
+  "a placeholder is ours".
