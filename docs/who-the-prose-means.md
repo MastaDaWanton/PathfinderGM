@@ -1,7 +1,11 @@
 # Who the prose means
 
-*Design note, 2026-09-28. The next step of `docs/declared-not-guessed.md`. Nothing here is
-built until the user has read it; the open questions are at the end.*
+*Design note and record, 2026-09-28. The next step of `docs/declared-not-guessed.md`.
+The user asked for stages 0-3 the same day; what was built, and why it is not the
+design first written here, is in "Built" below. The code is `gm/mentions.py`, the
+checks in `gm/narration.py` and `gm/judgement.py`, the wiring in `GMAgent._groom`; the
+tests are `tests/test_a_name_taken_twice.py` and `tests/test_who_the_prose_means.py`;
+the bench is `tools/mention_bench.py`.*
 
 ---
 
@@ -72,89 +76,119 @@ Research pass of 2026-09-28, checked by a critic pass and then spot-checked by h
   Door, Latitude or Inworld on their markup. No system was found that tagged entities
   inline and then abandoned it — which is absence of evidence, not evidence.
 
-## The design
+## The first design, and why it was not built
 
-**The narrator tags every person it mentions; code lifts the tags before anything reads the
-prose; the checks read the tags; the player never sees a ref.**
+The first version of this note had the narrator write `<p who=c3>the thug</p>` around every
+person it mentioned, as it already does `<say who=c3>` for speech. The user asked whether
+there was another way than demonstration to get a small model to comply. There was:
 
-1. **The tag.** The same attribute grammar the model already writes for speech:
-   `<p who=c3>the thug</p>`. It wraps a name or a noun phrase for a person present —
-   "Borin Lyraxys", "the brute with the marked knuckles". Pronouns are not tagged. "You"
-   is never tagged: it is always the player.
-2. **The words stay the model's.** Lifting keeps the text inside the tag exactly as
-   written and throws the tag away. Nothing is substituted for a ref — substituting names
-   is what `creature_nouns_for_pc` did, and it wrote the player's name onto the enemy.
-3. **One door.** `speech.lift`, called from `GMAgent._lift` at every reader (an AST test
-   already holds all readers to it), lifts `<p>` beside `<say>` and returns the mentions
-   with their offsets into the plain beat. Refs are checked against the people standing
-   where the party is, the placeholders `new1`–`new3` resolve to the people the same turn
-   introduced, and an unknown ref attributes nothing and is counted — exactly as speaker
-   tags are handled today.
-4. **Shown back tagged.** The model's own recent beats are shown to it with their tags
-   restored, for the prompt only (`speech.retag`'s move), because that is what took speaker
-   tags from 45% to 80%.
-5. **The checks read tags first and guess only what is untagged.** Each check keeps its
-   guess as the fallback for an untagged mention, so a beat the model forgot to tag is no
-   worse off than today.
-6. **A new mechanical check: the words and the tag disagree.** `<p who=c3>Borin</p>` when
-   `c3` is not Borin, or `<p who=c3>Kesst</p>` for anyone but the player, is detectable
-   in code, and gets a targeted repair like every other detector.
-7. **Where the player sees refs:** nowhere in the story. The sidebar's scene board already
-   prints each person's ref in small type beside their name (`02-state.js`, `#board`),
-   which is the one place the user allowed.
+- **Code finds the mentions and settles what is certain.** A name whose words belong to
+  exactly one person here needs no model at all.
+- **One short call labels the rest, as a multiple choice.** Each mention's answer is an enum
+  of the refs present plus `nobody` — a construct this stack enforces (required properties
+  and enums held 6 of 6 on 2026-09-27; `contains` held 0 of 6). The narrator writes plain
+  prose, so the unmeasured risk to prose quality is gone, and a model that forgets a tag is
+  no longer the failure mode.
+- The price is labelling *after* writing, which lost to inline citation in ALCE — but that
+  condition wrote without its sources, and the labeller here is shown the cast and the tells.
+  Inline tags (the first design) stay unbuilt and unmeasured; the labelling measured good
+  enough that they were not needed to finish the stages.
 
-## What each check gains
+## Built
 
-| check | reads from the tags | expected effect |
+**Stage 0 — a name cannot be taken twice** (`judgement._answers_to`). A name read from the
+prose is refused for anybody when every word of it belongs to one other person present,
+shown or true, living or dead, and the turn's repairs say so. "Borin" beside "Borin
+Lyraxys" is refused; "Bren Varn" beside "Aldo Varn" passes.
+
+**Stage 1 — attribution** (`gm/mentions.py`). In the narration only (speech is a character's
+to say): names of the people present, and descriptions — a determiner, up to three
+describing words, a person noun (the cast roles, the creature nouns, and every descriptor
+head, template and people's name present). `_groom` attributes once, after the rewrite; a
+sentence changed after that is not in the attribution and its checks fall back to their
+guess. Each groomed beat logs a `mentions` row. Off in the test suite, as the interpreter is.
+
+**Stage 2 — the checks read it first, and guess only when it has no answer:**
+
+| check | what it asks the attribution |
+|---|---|
+| `wrong_actor` / `right_actor` | whether the beat mentions the actor — only True is taken, so it can clear the never-named rule and never arm it |
+| `cut_dead_men_walking` | whether the words that matched a dead name mean a living person here |
+| `creature_nouns_for_pc` | whether "the beast" means the player — swapped only then |
+| `apply_introductions` | who the head noun of an apposition ("The man—Korgath Varn—") is |
+
+**Stage 3 — a name on the wrong person** (`Mention.misnamed`, `GMAgent._repair_misnamed`):
+the code's name and the labeller's answer disagree. One targeted rewrite of the flagged
+sentences, kept only if the wrong name is gone; no mechanical swap under it, because the
+flag is the labeller's word against the name's, and a swap on a wrong flag writes the wrong
+name — `creature_nouns_for_pc`'s fault exactly.
+
+## Measured
+
+**On the replay corpus** (`tools/mention_bench.py`, 142 recorded beats, gemma-4-12B heretic):
+
+| | first pass | after the fixes below |
 |---|---|---|
-| `wrong_actor` | whether any mention is the acting ref | the three false flags of 2026-09-27 ("the warrior", "the Korvu") become clean |
-| `cut_dead_men_walking` | which ref the acting mention is | the living "thug" is no longer cut for a dead one |
-| `creature_nouns_for_pc` | whether "the beast" is tagged as `pc` | swaps only a noun the model itself tagged as the player |
-| `apply_introductions` | whose name is given | a name lands only on the ref it was said about |
-| `wrong_hands`, `hailed_by`, `settle_descriptions` | who a blow, a hail, a face belongs to | the same, one at a time |
+| mentions found | 353 | 335 |
+| settled by code, by name | 11 | 11 |
+| label call, median / max | 0.56 s / 1.43 s | 0.54 s / 1.36 s |
+| a graded random 45: right / wrong / can't tell | 37 / 4 / 4 | 40 / 3 / 2 |
 
-## Built in stages, each measured before the next
+The graded misses were mostly one shape: somebody new, described in passing, put on
+whoever was listed ("a man with a scarred hand … arguing with a merchant" → the servant).
+The corpus replays each beat against the scene from *before* its turn, so a person the
+turn's own plan introduced is missing from the list; the rate in the app, which attributes
+after the plan, should be lower. A demonstration of a newcomer answered `nobody` moved it
+only a little. The fixes between the passes: the finder dropped "that" and the possessives
+as determiners ("missing his guard by a hair", "something that makes the nearby crowd
+flinch") and stopped bridging over function words ("a panicked scuffle as people"); a
+surname beside an unknown capitalised word is no longer certain ("the ostler, Lyraea
+Lyraxys" was settled as Aethorin Lyraxys).
 
-0. **Now, independent of the rest: a name cannot be taken twice.** A name read from the
-   prose is refused for anybody if another person present already answers to it, whole
-   or in part, and the refusal is logged. Mechanical, small, and it would have stopped
-   "Borin". It does not wait on tags.
-1. **Tag, lift and log; nothing reads the tags yet.** Teach the tag by the examples, show
-   the model's beats back tagged, lift at the one door, and log per beat: person mentions
-   found by today's guesses, mentions tagged, tags naming nobody here, tag/word
-   disagreements, tags reaching the page (must be 0). Measured on the fight and town
-   scripts, gemma-4-12B, twelve turns each, beside the same runs untagged: tag coverage,
-   beat length, the audit's texture report, and seconds per turn.
-2. **The checks switch to tags, one at a time**, `wrong_actor` first (it has the live
-   false flags to count), each replayed through the corpus and a live run before the next.
-3. **The disagreement check becomes a repair.**
+**`wrong_actor`, on real prose:**
 
-The gate between stage 1 and stage 2 is the user's call on the numbers, not a number
-written here in advance.
+- The three false flags of the 2026-09-27 manoeuvre run ("As the warrior turns to flee…",
+  "The Korvu lunges forward…", "…against the intruder's grip…"), replayed with the live
+  labeller: **3 of 3 cleared**. The cast was rebuilt by hand from that run's log, which did
+  not save the scene.
+- The committed corpus's six flags, against their recorded scenes: the **five beats turned
+  round all stay flagged**; the sixth, sound but written only in pronouns ("He shifts his
+  weight…"), stays flagged too — pronouns are not attributed, by design.
+
+**Live, the fight script, 12 turns, labeller on and off** (`tools/narrator_audit.py`): on,
+21 beats attributed, 35 of 35 mentions labelled, 0.75 s median per call, 0 misnamed, one
+`wrong actor` rewrite — a beat that named nobody at all ("The heavy fist slams into the
+counter just inches from your hand … his blow"), which the attribution cannot help with.
+The on run scored 7 of 12 clean against the control's 10 of 12, and that is the scene, not
+the labeller: the two campaigns rolled different towns, the control's "biggest man" was a
+4-hp drover who died on turn 6, the on run's was Borin Lyraxys at 23 hp who was still
+standing at turn 11, and all five `combat-turn-did-nothing` turns are the script's peaceful
+lines (stand over him, take what he carried, walk out) inside a fight that had not ended.
+Other sessions were using the same Ollama during both runs, so their timings are not clean.
+
+**Not exercised live:** stage 3 (no misnamed flag in the corpus or the run — the corpus
+predates the backstop fix that used to write names onto the wrong person, so its precision
+is unmeasured), the dead-man spare, the beast swap and the apposition lookup. Each is held
+by a test naming its defect.
+
+## What it costs
+
+One short call per groomed beat that mentions anybody, on the model already loaded: about
+0.5–0.75 s. A creature's turn, which made one call after its prose, now makes two.
 
 ## Risks, stated
 
-- **Coverage.** Speaker tags took an extra demonstration pass to reach 80%, and a mention
-  is a smaller, more frequent thing than a line of dialogue. Untagged mentions fall back to
-  today's guesses, so low coverage costs the benefit, not correctness.
-- **Prose quality.** Unmeasured anywhere. Stage 1 exists to measure it before any check
-  depends on it.
-- **Wrong tags.** A tag naming the wrong person present would be believed where a guess
-  might have been right. The disagreement check (step 6) catches the cases where the
-  words give it away; the rest are counted in stage 1 by reading beats by hand.
-- **Token cost.** About six tokens a mention; measured in stage 1 as seconds per turn.
-
-## Not in this plan
-
-- **Tells carrying refs and rendered per reader** — the Inform move taken all the way,
-  so the engine's own sentences would never need `pc_to_second_person` either. Worth its
-  own note once mentions are measured.
-- **Pronouns.** "He" and "she" stay untagged; tagging them is the coreference task the
-  literature says 8B-class models fail at.
+- **A wrong label is believed.** Every consumer is written so a wrong label errs toward the
+  old behaviour or toward doing nothing: `wrong_actor` only clears, the dead-man cut only
+  spares, the beast swap only declines, and the misname repair has no mechanical fallback.
+- **Newcomers put on somebody listed** is the known error: 4 of the 90 graded labels. The
+  other misses were one each: a place name ("the merchant's row" given to the merchant),
+  prose that contradicted itself ("The man at the bar, a sturdy woman…"), and the shared
+  surname, since fixed.
+- **Pronouns** are not attributed; a beat that names nobody still costs a repair.
 
 ## Open questions for the user
 
-1. Stage 0 can go ahead on its own now. Do it?
-2. The sidebar shows refs today. Keep that as it is, hide it, or show it only on hover?
-3. After stage 1: what coverage would you want to see before the checks start trusting
-   tags?
+1. The sidebar shows refs today. Keep that as it is, hide it, or show it only on hover?
+2. Inline tags (the first design) were not built. Worth measuring against the labeller, or
+   leave it?
