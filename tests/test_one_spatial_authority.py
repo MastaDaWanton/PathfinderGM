@@ -113,10 +113,24 @@ def test_nothing_writes_the_roster_directly():
 
 def test_the_place_the_brief_states_comes_from_the_engine():
     """`gm/prompts.py` used to derive the place list itself — a second copy of
-    `Engine.places()`, keyed on a different argument. It receives it now."""
+    `Engine.places()`, keyed on a different argument. It receives it now.
+
+    The place lines moved into `gm/brief/` in the 2026-09-28 fix pass (here.py,
+    roads_out.py, place_facts.py), so the members are held to it too: they read
+    `ctx.here` and `ctx.known`, and none of them derives the place set again."""
     src = Path("gm/prompts.py").read_text(encoding="utf-8")
     assert "spots_for(" not in src, "the brief grew its own derivation again"
     assert "here=None" in src and "known=()" in src
+    members = sorted(Path("gm/brief").glob("*.py"))
+    assert {p.name for p in members} >= {"here.py", "roads_out.py", "place_facts.py"}
+    for path in members:
+        text = path.read_text(encoding="utf-8")
+        for derivation in ("spots_for(", "for_scene(", ".places()", "home_set("):
+            assert derivation not in text, (
+                f"{path.as_posix()}: a brief section derived the places itself "
+                f"({derivation}) instead of reading ctx.known")
+    here_src = Path("gm/brief/here.py").read_text(encoding="utf-8")
+    assert "ctx.here" in here_src and "ctx.known" in here_src
     for caller in ("gm/agent.py", "play/views.py"):
         text = Path(caller).read_text(encoding="utf-8")
         for m in re.finditer(r"scene_brief\(", text):
