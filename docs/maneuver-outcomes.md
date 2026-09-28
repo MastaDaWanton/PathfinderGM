@@ -133,3 +133,40 @@ And the doors the outcomes needed:
   in initiative than its attacker never acts under it. Every timed effect shares this.
 - The bull rush's second check against a creature in the way is not rolled: the push
   stops there and says so.
+
+## Live runs, 2026-09-27
+
+A scripted fight through the real `/api/say` loop (gemma-4-12B, the fixture world, a
+tavern brawl with Borin Lyraxys), eleven lines, each turn's tells set beside the state.
+
+- **Run 1** reached none of the new applicators: "grit in his eyes to blind him" came back
+  as `{"trick": "blinded"}` with no manoeuvre and was rolled against AC; "I shove him back
+  hard" filed `bull_rush` as the weapon, was refused, and was retried as a plain swing;
+  "I grab him by the collar and drag him" came back as drag and was overruled into a
+  grapple, because drag and reposition had no cue in `judgement.MANOEUVRE_CUES`. All
+  three fixed (normalize_attacks, the cue table).
+- **Run 3**, after those fixes: the grit was a dirty trick and the shove a bull rush,
+  both straightened in code. Eight manoeuvres rolled; the engine's side held on every
+  one:
+  - disarm, failed by 10: "Kesst Vayr drops the rapier." — the rapier left `weapons`, the
+    hand was `unarmed`, the ledger held "Kesst Vayr's rapier" at the tavern, and the
+    next swing resolved as an unarmed strike;
+  - bull rush by 7: "driven against something solid and goes nowhere" — the square did
+    not change (the push ran into the bar);
+  - steal the purse, failed by 16 with the fastened +5 in the CMD: the 9 sp stayed his;
+  - dirty trick, trip, overrun failed; the drag line was a grapple by the model's own
+    choice ("grab" is a grapple cue, and nothing overruled it this time).
+- **The prose did not hold to the tells on four of those turns**, the narrator's fault
+  and not the engine's, and not caught by any detector: the player's backfired disarm
+  was narrated as HIS grip failing ("He stumbles back, his balance ruined by the sudden
+  loss of the steel"); the blocked bull rush left him "momentarily stunned"; the failed
+  steal sent "the purse tumbling from his hip" to the floor; the unarmed swing was "your
+  blade", and the failed overrun had "your rapier slips from your grip" — a rapier
+  already on the floor two turns. Every one is prose asserting a mechanical outcome no
+  tell carried; the claims scrubber (`intents.cut_outcome_claims`) does not look at
+  items leaving hands, conditions, or who dropped what. Open.
+- Not seen live: a SUCCESSFUL disarm, steal, trick, drag, reposition or overrun. The
+  dice did not give one in eight rolls; those paths are covered by
+  `tests/test_maneuver_outcomes.py` only. No model chose reposition for "I steer him
+  into the corner" (a plain unarmed attack came back), and review never adds a
+  manoeuvre the model left out.
