@@ -369,35 +369,286 @@
                   pointer-events: none; }
   .maplegend { margin-top: 4px; }
 
-  .spellrow { display: flex; align-items: center; justify-content: space-between;
-              gap: 12px; padding: 5px 0; border-bottom: 1px solid #1d1811; }
-  .spellrow:last-child { border-bottom: 0; }
-  .spellname b { display: block; }
-  .spellname small { color: var(--dim); }
-  .spellrow.missing { opacity: .5; }
-  .prep { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
   .prepbtn { width: 22px; height: 22px; line-height: 1; border-radius: 3px;
              border: 1px solid #2e261c; background: #1a1610; color: var(--gold);
              cursor: pointer; padding: 0; letter-spacing: 0; }
   .prepbtn:disabled { opacity: .3; cursor: default; }
-  /* The Cast button is a word, not a glyph: it takes its own width, and the target
-     picker beside it stays small enough for the row. */
-  .castbtn { width: auto; padding: 0 8px; margin-left: 4px; }
-  /* Cast attaches the spell to your turn and you say where it goes (item 21.1; owner
-     Q46: no target picker), so the old picker beside it is not shown. */
-  .casttarget { display: none; }
+  /* The Cast button is a word, not a glyph: it takes its own width. */
+  .castbtn { width: auto; padding: 0 8px; }
   /* The search over a caster's own list. A cleric chooses from 179 castable spells at
      first level, and a list that long is unusable without one (item 26). */
   .findbox { width: 100%; padding: 4px 7px; margin-bottom: 8px; font: inherit;
              font-size: 12px; background: #16120d; color: var(--ink);
              border: 1px solid #332a1e; border-radius: 3px; }
-  .cols details > summary { cursor: pointer; padding: 5px 0; font: 600 12px var(--display);
-                            letter-spacing: .04em; color: #cbb98f; }
-  .cols details > summary small { color: var(--dim); font-weight: 400; letter-spacing: 0; }
-  .prepcount { min-width: 14px; text-align: center; color: var(--dim);
-               font-variant-numeric: tabular-nums; }
-  .prepcount.has { color: var(--accent); }
   .terms b.spent { color: var(--dim); }
+
+  /* --- The Spells tab (Phase 3 task I5, the owner's mockup) --------------------------
+   * Three columns: caster stats, prepared today, the grimoire index. Built in the sheet's
+   * own materials: the gilt `.card` frame, the leather, Cinzel for anything carved, and no
+   * new accent. The one new thing is a colour per school of magic, and every one of them
+   * is a light, warm-leaning tint that reads on this dark leather as ink would: they tint
+   * the game-icons.net glyphs and the card headers, never body text.
+   *
+   * Motion, by the owner's rule (2026-09-28): answers come at once (120ms), nothing moves
+   * under the pointer or under text being read, nothing loops. The status line under the
+   * heading keeps its height when empty so a message cannot push the cards down. */
+  .spells3, #spelldetail {
+    --sc-abjuration: #8fb0c8; --sc-conjuration: #d9b35f; --sc-divination: #cdd4dc;
+    --sc-enchantment: #d493a8; --sc-evocation: #e0714f; --sc-illusion: #ab94c9;
+    --sc-necromancy: #a3ad6e; --sc-transmutation: #7fb3a2; --sc-universal: #ddc48e;
+  }
+  .spells3 {
+    display: grid; gap: 30px; align-items: start;
+    grid-template-columns: minmax(230px, .72fr) minmax(0, 1.7fr) minmax(290px, 1fr);
+  }
+  .spells3 button { padding: 7px 13px; font-size: 13px; letter-spacing: .1em;
+                    transition-duration: .12s; }
+  .spells3 button::after { transition-duration: .12s; }
+  .spells3 button:focus-visible, .spells3 select:focus-visible,
+  .spells3 input:focus-visible {
+    outline: 2px solid var(--candle); outline-offset: 2px;
+  }
+  .spells3 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
+                 clip: rect(0 0 0 0); white-space: nowrap; }
+  .sx-sub {
+    margin: 18px 0 8px; color: #cbb98f; font: 400 14px/1.2 var(--display);
+    letter-spacing: .1em; font-variant: small-caps;
+  }
+  .sx-sub small { color: var(--dim); font: 13px var(--body); letter-spacing: 0;
+                  font-variant: normal; margin-left: 6px; }
+  .sx-hint { margin: 0 0 6px; color: var(--dim); font: italic 13.5px/1.5 var(--body); }
+  .sx-note, .spells3 .note { margin: 12px 0 0; color: var(--dim);
+                             font: italic 13px/1.5 var(--body); }
+  .sx-empty { color: var(--dim); font: italic 14px/1.5 var(--display); padding: 6px 0; }
+  .sx-say { min-height: 1.5em; margin: 0 0 4px; color: var(--accent);
+            font: 13.5px/1.5 var(--body); }
+  .sx-say.err { color: #e0897c; }
+
+  /* The glyphs: game-icons.net art, one colour per school. The box has its size before
+     the SVG arrives, so the fetch cannot shift anything. */
+  .spells3 .gi { display: inline-block; flex: none; width: 22px; height: 22px;
+                 color: var(--school, var(--gold)); }
+  .spells3 .gi svg { display: block; width: 100%; height: 100%; }
+
+  /* Left: the slots as gem sockets. A gilt bezel round a dark well; a slot still to spend
+     holds a candle-amber stone, a spent one is an empty socket. Colour and the count in
+     words both carry it, so neither is the only way to read it. */
+  .sockets { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+  .sock-head { display: flex; justify-content: space-between; align-items: baseline;
+               font: 13px/1.4 var(--body); color: var(--ink); }
+  .sock-head span:first-child { font: 400 14px/1.2 var(--display); color: var(--gold);
+                                letter-spacing: .06em; font-variant: small-caps; }
+  .sock-dc { color: var(--dim); font-variant-numeric: tabular-nums; }
+  .sock-gems { display: flex; flex-wrap: wrap; gap: 9px; padding: 7px 4px 5px; }
+  .gem {
+    width: 18px; height: 18px; border-radius: 50%; flex: none;
+    background: radial-gradient(circle at 50% 58%, #070504 0 42%, #1a140e 78%);
+    box-shadow: inset 0 2px 3px rgba(0,0,0,.9), 0 0 0 1px #5a4730,
+                0 0 0 3px #16110c, 0 0 0 4px #3f3324;
+  }
+  .gem.lit {
+    background:
+      conic-gradient(from 30deg, rgba(255,246,214,.22) 0 16%, transparent 0 33%,
+                     rgba(255,246,214,.14) 0 50%, transparent 0 66%,
+                     rgba(255,246,214,.18) 0 83%, transparent 0),
+      radial-gradient(circle at 36% 30%, #fff4cf 0 7%, #f0c070 24%, #c07a2a 60%, #5a3210);
+    box-shadow: inset 0 -2px 3px rgba(60,25,5,.65), 0 0 0 1px #8a6f3e,
+                0 0 0 3px #16110c, 0 0 0 4px #7d6845, 0 0 9px rgba(var(--ember), .45);
+  }
+  .sock-count { font: 12.5px/1.4 var(--body); color: var(--ink);
+                font-variant-numeric: tabular-nums; }
+  .sock-count.spent { color: var(--dim); }
+
+  /* Middle: the spell cards. A header in the school's colour over the card leather, the
+     glyph in a dark roundel, a strip of three facts, and the two actions. */
+  .spcards { display: grid; gap: 14px;
+             grid-template-columns: repeat(auto-fill, minmax(226px, 1fr)); }
+  .spcard {
+    display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+    border: 1px solid #3a2f22; border-radius: 3px;
+    background: linear-gradient(#1b1611, #120e0b);
+    box-shadow: inset 0 1px 0 rgba(221,196,142,.08), 0 2px 10px rgba(0,0,0,.45);
+  }
+  .spcard-head {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-bottom: 1px solid color-mix(in srgb, var(--school) 45%, #2b2319);
+    background:
+      linear-gradient(color-mix(in srgb, var(--school) 30%, transparent),
+                      color-mix(in srgb, var(--school) 8%, transparent)),
+      linear-gradient(rgba(14,10,7,.35), rgba(8,6,4,.55)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, auto, 340px auto;
+  }
+  .spcard-head .gi-lg {
+    width: 40px; height: 40px; padding: 7px; border-radius: 50%;
+    background: radial-gradient(#15100c, #0b0806);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--school) 55%, #3a2f22),
+                inset 0 1px 4px rgba(0,0,0,.8);
+  }
+  .spcard-title { min-width: 0; }
+  .spcard-title h5 { margin: 0; color: #f4e6c0; font: 400 15.5px/1.2 var(--display);
+                     letter-spacing: .04em; }
+  .spcard-title span { display: block; color: var(--ink);
+                       font: italic 12.5px/1.35 var(--body); }
+  .spcard-strip {
+    display: grid; margin: 0; border-bottom: 1px solid #2b2319;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+  .spcard-strip > div { padding: 7px 8px; min-width: 0; }
+  .spcard-strip > div + div { border-left: 1px solid #2b2319; }
+  .spcard-strip dt { color: var(--dim); font: 400 11px/1.2 var(--display);
+                     letter-spacing: .02em; white-space: nowrap; overflow: hidden;
+                     text-overflow: ellipsis; }
+  /* Two lines at most: "Will negates (harmless)" is worth reading whole, and the rare
+     save that runs longer keeps its full text in the title. */
+  .spcard-strip dd { margin: 2px 0 0; color: var(--ink); font: 13px/1.3 var(--body);
+                     overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical;
+                     -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
+  .spcard-line { margin: 8px 12px 0; color: var(--dim); font: italic 13px/1.45 var(--body); }
+  .spcard-count { margin: 6px 12px 0; color: var(--ink); font: 13px/1.45 var(--body);
+                  font-variant-numeric: tabular-nums; }
+  .spcard-count b { color: var(--accent); font-weight: 600; }
+  .spcard-act { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px 12px;
+                margin-top: auto; }
+
+  /* Cast is the act this page exists for, so it carries the lit edge; Prepare is the
+     ordinary iron button; Unprepare is quiet. `.prepbtn` is the Cast button's shared
+     class (02-state.js finds it by `.castbtn`), undone here. */
+  .spells3 .prepbtn.castbtn {
+    width: auto; height: auto; line-height: 1; border-radius: 2px;
+    background: linear-gradient(#33291b, #1c160f); border: 1px solid var(--accent);
+    color: #f4e6c0;
+  }
+  .spells3 .spbtn.quiet { background: transparent; border-color: #3a2f22;
+                          color: var(--ink); }
+
+  /* The cantrips: a short list, not cards. They need no preparing and read at a line
+     each. */
+  .sx-cantrips { list-style: none; margin: 0; padding: 0; }
+  .sx-cantrip { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 10px;
+                align-items: center; padding: 6px 0; border-bottom: 1px solid #1d1811; }
+  .sx-cantrip:last-child { border-bottom: 0; }
+  .sx-cname b { display: block; font: 400 14.5px/1.3 var(--body); color: var(--ink); }
+  .sx-cname small { color: var(--dim); font: 12.5px/1.3 var(--body); }
+
+  /* The drop target lights while a row is carried, and brightens under it. An outline
+     only: nothing inside the column moves. */
+  #sx-today.droppable { outline: 1px dashed var(--gold-dim); outline-offset: 9px; }
+  #sx-today.dropping { outline: 2px solid var(--candle); outline-offset: 9px; }
+
+  /* Right: the grimoire index. */
+  .gx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+  .gx-field { display: grid; gap: 3px; min-width: 0; }
+  .gx-field > span { color: var(--dim); font: 400 12px/1.2 var(--display);
+                     letter-spacing: .06em; }
+  .gx-find { grid-column: 1 / -1; }
+  .gx-tools .findbox, .gx-tools select {
+    width: 100%; margin: 0; padding: 7px 9px; font: 14px/1.3 var(--body);
+    color: var(--ink); background: #16120d; border: 1px solid #3f3324; border-radius: 3px;
+  }
+  .gx-tools .findbox::placeholder { color: #8a7d66; font-style: italic; }
+  .gx-count { margin: 10px 0 4px; min-height: 1.4em; color: var(--dim);
+              font: 12.5px/1.4 var(--body); }
+  .gx-rows { list-style: none; margin: 0; padding: 0 4px 0 0;
+             max-height: min(66vh, 760px); overflow-y: auto; }
+  .gx-row {
+    display: grid; align-items: center; gap: 9px; padding: 7px 2px;
+    grid-template-columns: 10px 22px minmax(0, 1fr) auto auto;
+    border-bottom: 1px solid #1d1811;
+  }
+  .gx-row:last-child { border-bottom: 0; }
+  .gx-row[draggable="true"] { cursor: grab; }
+  .gx-row.dragging { opacity: .5; }
+  .gx-grip { width: 10px; height: 20px; opacity: .9;
+             background: radial-gradient(circle, var(--gold-dim) 1.3px, transparent 1.7px)
+                         0 0 / 5px 5px; }
+  .gx-grip.off { visibility: hidden; }
+  .gx-text { min-width: 0; }
+  .gx-text b { display: block; font: 400 14.5px/1.3 var(--body); color: var(--ink); }
+  .gx-text small { display: block; color: var(--dim); font: 12.5px/1.35 var(--body); }
+  .gx-text .gx-have { color: var(--accent); }
+  .gx-lvl {
+    display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    font: 400 13px/1 var(--display); color: var(--gold);
+    background: radial-gradient(#1f1912, #110d0a);
+    box-shadow: 0 0 0 1px var(--gold-dim), inset 0 1px 3px rgba(0,0,0,.8);
+    font-variant-numeric: tabular-nums;
+  }
+  .gx-notyet { color: var(--dim); font: italic 12.5px var(--body); padding: 0 4px; }
+  .gx-credit { margin: 14px 0 0; padding-top: 8px; border-top: 1px solid #2b2319;
+               color: var(--dim); font: 12px/1.5 var(--body); }
+  .gx-credit a { color: var(--accent); }
+
+  /* The Details button in a row: a word under the summary, not another iron button in a
+     300px column that already holds a Prepare. */
+  .spells3 .sx-more {
+    display: inline-block; margin: 2px 0 0; padding: 2px 0; background: none; border: 0;
+    box-shadow: none; color: var(--accent); font: 13px/1.3 var(--body); letter-spacing: 0;
+    font-variant: normal; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .spells3 .sx-more:hover:not(:disabled) { color: #f4e6c0; box-shadow: none; }
+  .spells3 .sx-more::after { display: none; }
+  .spells3 .sx-more[aria-expanded="true"] { color: #f4e6c0; }
+
+  /* What the spell does: one popover over the page, anchored to its button, in the
+     picker's obsidian (#spellpop) with the school's colour along its top edge. Placed by
+     05-sheet.js; it scrolls inside itself, so nothing on the page moves to make room. */
+  #spelldetail { display: none; }
+  #spelldetail.open, #spelldetail:popover-open { display: block; }
+  #spelldetail {
+    position: fixed; inset: auto; margin: 0; z-index: 62;
+    width: min(440px, calc(100vw - 24px)); max-height: min(70vh, 560px); overflow-y: auto;
+    padding: 12px 14px 14px; color: var(--ink); font: 14.5px/1.55 var(--body);
+    background: linear-gradient(rgba(20,15,10,.98), rgba(12,9,6,.99));
+    border: 1px solid var(--gold-dim); border-top: 3px solid var(--school, var(--gold-dim));
+    border-radius: 3px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.7), inset 0 0 0 1px rgba(221,196,142,.07);
+  }
+  #spelldetail:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+  #spelldetail .sd-head { display: flex; align-items: flex-start; gap: 10px; }
+  #spelldetail h4 { margin: 2px 0 0; flex: 1; color: var(--gold);
+                    font: 400 17px/1.2 var(--display); letter-spacing: .05em; }
+  #spelldetail .sd-close { padding: 6px 11px; font-size: 12.5px; letter-spacing: .1em;
+                           background: transparent; border-color: #3a2f22; color: var(--ink);
+                           transition-duration: .12s; }
+  #spelldetail .sd-close:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+  #spelldetail .sd-school { margin: 2px 0 8px; color: var(--ink);
+                            font: italic 13px/1.4 var(--body); }
+  #spelldetail .sd-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+                           gap: 4px 14px; margin: 0 0 10px; padding: 8px 0;
+                           border-top: 1px solid #2b2319; border-bottom: 1px solid #2b2319; }
+  #spelldetail .sd-facts dt { color: var(--dim); font: 400 11.5px/1.2 var(--display);
+                              letter-spacing: .03em; }
+  #spelldetail .sd-facts dd { margin: 1px 0 0; font: 13.5px/1.35 var(--body); }
+  #spelldetail .sd-text p { margin: 0 0 8px; max-width: 70ch; }
+  #spelldetail .sd-wait { color: var(--dim); font-style: italic; margin: 8px 0 0; }
+  @media (max-width: 760px) { #spelldetail { font-size: 15px; } }
+
+  @media (max-width: 1180px) {
+    .spells3 { grid-template-columns: minmax(220px, .8fr) minmax(0, 1.6fr); }
+    .sx-index { grid-column: 1 / -1; }
+  }
+  @media (max-width: 760px) {
+    /* The sheet's 44px side margins are a quarter of a phone; this tab takes 16px, the
+       page's own phone gutter, so the cards get the width. */
+    #sheetbody:has(> .spells3) { padding: 18px 16px 60px; }
+    /* Measured at 375px: the sheet's one grid column is `auto`, so it takes the header's
+       414px minimum and this body was 39px wider than the phone, cut off at the right.
+       The body is held to the screen; the header and the tab strip are left as they
+       are, because squeezing the column squeezed them too (tried: the tab labels
+       shrank to two letters). The header's width is the wider sheet bug. */
+    #sheetbody:has(> .spells3) { width: 100vw; }
+    /* And the gilt clasps hang 34px outside every `.card` (the `::after` art), which a
+       16px gutter cannot hold: 17px of sideways scroll, all of it ornament. The ornament
+       is clipped at the screen's edge instead. */
+    #sheetbody:has(> .spells3) { overflow-x: hidden; }
+    .spells3 { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+    .spcards { grid-template-columns: minmax(0, 1fr); }
+    /* One scroll on a phone, the page's: a list scrolling inside a page is two thumbs'
+       worth of argument about which one moves. */
+    .gx-rows { max-height: none; overflow: visible; }
+    .gx-tools .findbox, .gx-tools select { font-size: 16px; }
+  }
 
   #featq { width: 100%; padding: 7px 9px; margin-bottom: 10px; border-radius: 3px;
            border: 1px solid #2e261c; background: #14120f; color: var(--ink);
