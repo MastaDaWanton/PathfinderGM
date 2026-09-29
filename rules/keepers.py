@@ -65,8 +65,29 @@ def is_keeper(world_entity_id: str) -> bool:
 
 
 def place_of(world_entity_id: str) -> str:
+    """The place a keeper keeps. A counter's keeper at a market (`keeper:<market>#<id>`)
+    keeps the market: the suffix names the counter, never a place, so hours, `shut_here`,
+    "left behind" and going home at night work for a stallholder exactly as they do for
+    any keeper (docs/design-d-people.md §4.8)."""
     wid = str(world_entity_id or "")
-    return wid[len(PREFIX):] if wid.startswith(PREFIX) else ""
+    return wid[len(PREFIX):].split(HOLDER, 1)[0] if wid.startswith(PREFIX) else ""
+
+
+# A market has several counters, each with its own keeper (rules/market.py); the counter
+# is named after the place in the keeper's id, so one market is one place with many
+# people behind its stalls rather than a place per stall.
+HOLDER = "#"
+
+
+def holder_id(place_id: str, counter_id: str) -> str:
+    return f"{entity_id(place_id)}{HOLDER}{counter_id}"
+
+
+def counter_of(world_entity_id: str) -> str:
+    """Which market counter this keeper keeps ("general", "stall-cloth-curios"), or ""
+    for the one keeper of a place."""
+    wid = str(world_entity_id or "")
+    return wid.split(HOLDER, 1)[1] if wid.startswith(PREFIX) and HOLDER in wid else ""
 
 
 # --- the name -------------------------------------------------------------------------------
@@ -206,10 +227,20 @@ def keeps_a_counter(actor) -> bool:
     is nobody here to trade with". The keeper was the merchant and the merchant test
     could not see her.
     """
-    place = place_of(getattr(actor, "world_entity_id", "") or "")
+    wid = getattr(actor, "world_entity_id", "") or ""
+    place = place_of(wid)
     if not place or getattr(actor, "at", "") != place:
         return False
-    return places_mod.category_of(label_of(place)) == "trade"
+    # Somebody behind one of a market's counters keeps that counter, whatever the place.
+    if counter_of(wid):
+        return True
+    label = label_of(place)
+    # The market's own keeper is its master, who sells nothing (`places.RUNNERS`, item 10
+    # of the 2026-09-28 playtest); the trade panel never opens across them.
+    if places_mod.runs_it(label):
+        return False
+    return (places_mod.category_of(label) == "trade"
+            or label in places_mod.SELLS_OUTSIDE_TRADE)
 
 
 def kin_note(scene, actor, at: str = "") -> str:
@@ -265,6 +296,18 @@ def keeper_in(scene, place_id: str):
                  if str(getattr(a, "world_entity_id", "") or "") == wanted), None)
 
 
+def seller_in(scene, place_id: str):
+    """Whoever sells at this place when nobody has asked for a particular counter: its
+    keeper — or, at a market, whose own keeper is its master and sells nothing (I2), the
+    keeper of its general store. Wherever they are standing right now (a stallholder goes
+    home at night), so it answers "who keeps this counter", not "who is here"."""
+    if places_mod.runs_it(label_of(place_id)):
+        wid = holder_id(place_id, "general")
+        return next((a for a in scene.people.values()
+                     if str(getattr(a, "world_entity_id", "") or "") == wid), None)
+    return keeper_in(scene, place_id)
+
+
 def staff(engine):
     """Put somebody behind the counter where the party is standing. Once, ever.
 
@@ -277,31 +320,104 @@ def staff(engine):
     the scene by `tidy_the_fallen` two turns later, and a check for "is there a keeper
     here" would cheerfully mint a new one on the next visit. The scene remembers which
     counters have had somebody put behind them and never does it twice.
-    """
-    from . import npcs
-    from .bestiary import instantiate
 
+    **A market** stands up its master (a town or a city; a village's market has none —
+    the owner, Q28) and its general store, whose keeper is the one the trade button opens
+    across until the player picks another counter. Every other counter's keeper is minted
+    when that counter is first wanted (`stand_up`), so walking into a city market does not
+    put ten people into the brief at once.
+    """
     scene = engine.scene
     if scene.in_encounter:
         return None
     at = str(scene.at or "")
-    if not at or at in scene.staffed:
+    if not at:
         return None
     here = places_mod.find(engine.places(), at)
     if here is None:
         return None
-    title, words = wanted_at(here)
-    if not title:
+    from . import market as market_mod
+
+    location = _location(engine.world, scene.location_id)
+    at_market = market_mod.is_market(at, getattr(scene, "founded", None) or ())
+    made = None
+    if at not in scene.staffed:
+        title, words = wanted_at(here)
+        if not title:
+            return None
+        # Stamped before anything can fail: a keeper that could not be built is a counter
+        # that stays empty, not one that is tried again every turn the party stands there.
+        scene.staffed.append(at)
+        if not (at_market and not places_mod.has_a_master(places_mod.scale_of(location))):
+            made = _mint(scene, engine.world, at, entity_id(at), title, words,
+                         seed_place=here, what=_what(title, here))
+    if at_market:
+        general = market_mod.counter(location, "general")
+        if general is not None:
+            first = stand_up(scene, engine.world, at, general, even_when_shut=True)
+            made = made or first
+    return made
+
+
+def _location(world, location_id: str):
+    """The settlement entity when there is a world to ask, else the bare id — which
+    `places.scale_of` reads as a town, the app's default everywhere."""
+    if world is not None:
+        got = world.get(location_id)
+        if got is not None:
+            return got
+    return location_id
+
+
+def _what(title: str, place) -> str:
+    return f"{title} at {getattr(place, 'name', '') or 'here'}"
+
+
+def stand_up(scene, world, market_id: str, counter, *, even_when_shut: bool = False):
+    """The keeper of one of a market's counters (`rules/market.py`), minted the first
+    time the counter is wanted and the same person every time after; None when there is
+    nobody to be had.
+
+    Nobody, for the same reasons `staff` gives: a fight, a keeper already stood up once
+    and since gone (killed, or swept away), and — for a stall wanted after hours — a
+    market that is packed up for the night, whose stallholders have gone home
+    (`open_now`). Minted through the arrival door like every keeper (`Scene.add`), named
+    out of the world on the counter's own id (`keeper:<market>#<counter>`), so one stall
+    is one person for the whole campaign and the next stall is somebody else.
+    """
+    wid = holder_id(market_id, counter.id)
+    have = next((a for a in scene.people.values()
+                 if str(getattr(a, "world_entity_id", "") or "") == wid), None)
+    if have is not None:
+        return have
+    key = f"{market_id}{HOLDER}{counter.id}"
+    if key in scene.staffed or scene.in_encounter:
         return None
-    # Stamped before anything can fail: a keeper that could not be built is a counter
-    # that stays empty, not one that is tried again every turn the party stands there.
-    scene.staffed.append(at)
+    if not even_when_shut and not open_now(
+            market_id, int(getattr(scene, "clock_minutes", 0) or 0),
+            getattr(scene, "founded", None) or ()):
+        return None
+    scene.staffed.append(key)
+    from types import SimpleNamespace
+
+    what = (counter.title if counter.sort != "stall"
+            else f"the stallholder at {counter.label}")
+    return _mint(scene, world, market_id, wid, counter.title, counter.words,
+                 seed_place=SimpleNamespace(id=key, name=counter.label),
+                 what=f"{what}, at the market")
+
+
+def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, what: str):
+    """Build one keeper, name them out of the world, give them a face, and stand them at
+    `at` through the arrival door. None when the codex has no block for them."""
+    from . import npcs
+    from .bestiary import instantiate
+
     pc = scene.pc()
     level = int(getattr(pc, "level", 1) or 1)
-    name = name_for(here, engine.world,
+    name = name_for(seed_place, world,
                     taken={str(a.name) for a in scene.people.values()},
-                    salt=getattr(scene, "story_seed", 0) or None)
-    wid = entity_id(at)
+                    salt=getattr(scene, "story_seed", 0) or None) or title
     # The codex, exactly as a scheme's cast member reaches it: a stat block by the
     # role's words near the party's level, remembered under this id in `homebrew/npcs/`
     # so the numbers are the same next session and one file on the bench corrects them.
@@ -314,12 +430,14 @@ def staff(engine):
     # The note is what the narrator is told about them — `gm/prompts.py` prints the
     # first sentence of it beside the name — so it says what they are and where, and
     # nothing about what they sell, which is the market's business and not the prose's.
-    where = getattr(here, "name", "") or "here"
-    town = str(getattr(engine.world.get(scene.location_id), "name", "") or "") \
-        if engine.world is not None else ""
-    actor.notes = (f"{title[:1].upper()}{title[1:]} at {where}"
-                   + (f", in {town}" if town else "") + "."
-                   + kin_note(scene, actor, at))
+    town = str(getattr(world.get(scene.location_id), "name", "") or "") \
+        if world is not None else ""
+    if places_mod.runs_it(label_of(at)) and not counter_of(wid):
+        head = (f"The master of the market" + (f" in {town}" if town else "")
+                + ": they run it and sell nothing.")
+    else:
+        head = (f"{what[:1].upper()}{what[1:]}" + (f", in {town}" if town else "") + ".")
+    actor.notes = head + kin_note(scene, actor, at)
     # And a face, here, because nothing downstream can find them one: a keeper's
     # `world_entity_id` is the synthetic `keeper:<place>`, so `names.resident_appearance`
     # looks it up, finds no such resident and returns "". Drenn Ironvale therefore had no
@@ -333,10 +451,62 @@ def staff(engine):
 
     actor.true_name = name
     if not actor.appearance:
-        actor.appearance = names_mod.appearance_for(engine.world, scene.location_id,
+        actor.appearance = names_mod.appearance_for(world, scene.location_id,
                                                    ref=actor.ref or wid)
-    scene.add(actor)
+    # Stood at the place itself, not the place the party happens to be: a counter wanted
+    # from the market is the market's, and the arrival door records where they stand.
+    if str(getattr(scene, "at", "") or "") == at:
+        scene.add(actor)
+    else:
+        scene.arrive(actor, place_id=at)
     return actor
+
+
+def master_here(scene):
+    """The master of the market the party is standing in, if they are here; else None.
+    The market's own keeper (`keeper:<market>`, no counter), at their place."""
+    at = str(getattr(scene, "at", "") or "")
+    if not at or not places_mod.runs_it(label_of(at)):
+        return None
+    who = keeper_in(scene, at)
+    if who is None or getattr(who, "at", "") != at or who.ref not in scene.actors:
+        return None
+    return who
+
+
+# What occupies the master, by the residency slot (midnight = 0, three hours a slot): the
+# clerk of the market's day as Colchester's records and the court of piepowder give it —
+# the pitches set out and the stall money taken when the market bell rings, the measures
+# and the weights walked through the rows, a quarrel heard on the spot, and the day's count
+# (docs/design-d-people.md §4.8). Words, never numbers.
+_OCCUPATION = {
+    2: "setting out the pitches and taking the stall money",
+    3: "walking the rows with the measures, weighing what is sold by weight",
+    4: "walking the rows with the measures, weighing what is sold by weight",
+    5: "hearing a quarrel between two stallholders, on the spot",
+    6: "at the day's count, with the takings and the tally sticks",
+}
+# The slot the master hears people in: the evening count, when the market's business is
+# done and a person who waited can be heard. `audience.hearing` grants a hearing then, so
+# the brush-off's "come back at the count" is a promise the rules keep.
+COUNT_SLOT = 6
+
+
+def occupation(master, clock: int, world=None, location_id: str = "") -> str:
+    """What the master is doing now, in words, flavoured by what the settlement trades
+    in when the world says (`play.settlements[].sells`)."""
+    from .residency import slot_of
+
+    slot = slot_of(int(clock or 0))
+    doing = _OCCUPATION.get(slot, "gone from the rows; the market is shut")
+    sells = ""
+    if world is not None and location_id:
+        row = next((s for s in ((getattr(world, "play", None) or {}).get("settlements") or [])
+                    if isinstance(s, dict) and str(s.get("id")) == str(location_id)), None)
+        sells = " ".join(str((row or {}).get("sells") or "").split()).rstrip(".")
+    if sells and slot in (3, 4):
+        doing += f", and keeping an eye on the {sells[:1].lower()}{sells[1:]} coming in"
+    return doing
 
 
 # --- hours ----------------------------------------------------------------------------------
@@ -433,7 +603,14 @@ def shut_here(scene, seller=None) -> str:
     keeper = seller if seller is not None and is_keeper(
         getattr(seller, "world_entity_id", "") or "") else None
     if keeper is None and seller is None:
-        keeper = keeper_in(scene, str(getattr(scene, "at", "") or ""))
+        at = str(getattr(scene, "at", "") or "")
+        keeper = keeper_in(scene, at)
+        if keeper is None and at:
+            # A village market has no master (Q28): whoever keeps any of its counters
+            # keeps its hours.
+            keeper = next((a for a in scene.people.values()
+                           if is_keeper(getattr(a, "world_entity_id", "") or "")
+                           and place_of(a.world_entity_id) == at), None)
     if keeper is None:
         return ""
     place = place_of(keeper.world_entity_id)

@@ -366,13 +366,19 @@ def _category(key: str) -> str:
 def stocked_at(counter_kind: str) -> list[str]:
     """The GEAR keys a counter of this kind always has on it.
 
-    A tavern or inn sells food and drink; a smithy, what a smith makes; everything else
-    that keeps a counter — the market above all — sells the general goods."""
+    A tavern or inn sells food and drink; a smithy, what a smith makes; a counter at the
+    market (`market:<counter>`) or the stables, what `content/rules/stall-lines.json`
+    gives it; everything else that keeps a counter sells the general goods, which is
+    what the market as a whole ("market") has always sold."""
     kind = str(counter_kind or "").lower().removeprefix("the ")
     if kind in ("tavern", "inn", "alehouse", "taproom"):
         return [k for k in GEAR if _category(k) in ("food", "provisions")] + ["rations"]
     if kind in ("smithy", "workshops"):
         return [k for k in GEAR if k in _SMITH_GOODS]
+    if kind.startswith("market:") or kind == "stables":
+        from . import market
+
+        return list(market.gear_of(kind))
     return [k for k in GEAR if _category(k) != "food"]
 
 
@@ -380,7 +386,13 @@ def stocked_at(counter_kind: str) -> list[str]:
 class Good:
     """One of the Core Rulebook's goods on a shelf, in the shape the counter reads:
     `id`, `name`, `tier`, `price_gp`. `per` is how much one purchase is — fifty feet of
-    rope — and `unit` what it is measured in."""
+    rope — and `unit` what it is measured in.
+
+    `kind` is which part of the sheet a purchase lands on (`deliver`): gear and tack in
+    the pack, a weapon in the weapon list, armour and shields carried to be worn, and a
+    mount into the scene as a creature (`template`, a bestiary block). `key` is the
+    catalogue's own key for it — the weapon table's `longsword`, the armour table's
+    `chain shirt` — which is what the sheet stores."""
     id: str
     name: str
     price_gp: float
@@ -389,6 +401,9 @@ class Good:
     unit: str = ""
     specs: tuple = ()
     staple: bool = True
+    kind: str = "gear"
+    key: str = ""
+    template: str = ""
 
     @property
     def label(self) -> str:
@@ -396,6 +411,16 @@ class Good:
 
 
 GOOD_PREFIX = "gear:"
+# What each kind of good is filed under on a shelf. The id carries the kind, so a row
+# picked on the screen names its own shelf with nothing looked up twice.
+PREFIXES = {"gear": "gear:", "weapon": "weapon:", "armour": "armour:", "shield": "shield:",
+            "mount": "mount:", "tack": "tack:"}
+# The smallest coin, for the four weapons the Core Rulebook prints a dash for (club,
+# quarterstaff, sling, wooden stake). The outfit page gives them away; a counter cannot,
+# because `pricing.worth` reads an authored price of 0 as "no price written" and prices
+# the thing by its tier instead — 3.75 sp for a club. A copper is the nearest a counter
+# comes to free, and it is said here rather than hidden in the number.
+FREE_AT_A_COUNTER_GP = 0.01
 
 
 def good(key: str) -> Good | None:
@@ -404,11 +429,168 @@ def good(key: str) -> Good | None:
         return None
     return Good(id=GOOD_PREFIX + key, name=str(entry["name"]),
                 price_gp=float(entry["cost_gp"]), per=int(entry.get("per", 1) or 1),
-                unit=str(entry.get("unit", "") or ""))
+                unit=str(entry.get("unit", "") or ""), key=key)
 
 
 def goods_at(counter_kind: str) -> list[Good]:
+    kind = str(counter_kind or "").lower().removeprefix("the ")
+    if kind.startswith("market:") or kind == "stables":
+        from . import market
+
+        return list(market.staples_of(kind))
     return [g for g in (good(k) for k in stocked_at(counter_kind)) if g is not None]
+
+
+# --- the rest of the outfit page's catalogue, as goods ------------------------------------------
+#
+# "outfit page should not be reachable but there should be stores that carry all of those
+# items in town split between a general goods store and armorer and a weaponsmith. add an
+# alchemist and have the rest split up between random market stalls" (the owner,
+# 2026-09-28). The outfit page sells the weapon, armour and shield tables and GEAR; GEAR
+# was already goods, and these are the other three, in the same shape and at the same
+# printed prices.
+
+def outfit_weapons() -> dict[str, dict]:
+    """The weapons the outfit page sells, by key: every weapon with a printed price,
+    less the exotic ones over 100 gp.
+
+    The same rule as `play/outfit_views.catalogue`, written twice because a rules module
+    may not import a view; `tests/test_i2_market.py` holds the two copies to one answer,
+    which is CLAUDE.md's "when you fix a rule, grep for every copy of it" made a test."""
+    from . import weapons as weapons_mod
+
+    out = {}
+    for key, w in weapons_mod.all_weapons().items():
+        cost = w.get("cost_gp")
+        if cost in (None, "") or w.get("prof") == "exotic" and float(cost) > 100:
+            continue
+        out[key] = w
+    return out
+
+
+def weapon_good(key: str, w: dict | None = None) -> Good | None:
+    w = w if w is not None else outfit_weapons().get(key)
+    if not w:
+        return None
+    return Good(id=PREFIXES["weapon"] + key, name=str(w.get("name", key)),
+                price_gp=float(w["cost_gp"]) or FREE_AT_A_COUNTER_GP,
+                kind="weapon", key=key)
+
+
+def armour_good(key: str) -> Good | None:
+    a = ARMOUR.get(key)
+    if not a or not a.get("cost_gp"):
+        return None
+    return Good(id=PREFIXES["armour"] + key, name=str(a["name"]),
+                price_gp=float(a["cost_gp"]), kind="armour", key=key)
+
+
+def shield_good(key: str) -> Good | None:
+    s = SHIELDS.get(key)
+    if not s or not s.get("cost_gp"):
+        return None
+    return Good(id=PREFIXES["shield"] + key, name=str(s["name"]),
+                price_gp=float(s["cost_gp"]), kind="shield", key=key)
+
+
+def table_goods(table: str) -> list[Good]:
+    """Every row of one Core table the outfit page sells, as goods."""
+    if table == "weapons":
+        return [weapon_good(k, w) for k, w in outfit_weapons().items()]
+    if table == "armour":
+        return [g for g in (armour_good(k) for k in ARMOUR) if g is not None]
+    if table == "shields":
+        return [g for g in (shield_good(k) for k in SHIELDS) if g is not None]
+    return []
+
+
+def catalogue_ids() -> set[str]:
+    """The id of every good the outfit page sells — what "every item is buyable in play"
+    is measured against."""
+    ids = {GOOD_PREFIX + k for k in GEAR}
+    for table in ("weapons", "armour", "shields"):
+        ids |= {g.id for g in table_goods(table)}
+    return ids
+
+
+def stables_goods() -> list[Good]:
+    """The animals and the tack, at the prices `content/rules/stall-lines.json` carries
+    (d20pfsrd "Animals & Animal Gear"). An animal is a `mount` good with the bestiary
+    block it is made from; the tack is carried like any gear."""
+    from . import market
+
+    doc = market.lines_doc().get("stables") or {}
+    out = []
+    for row in doc.get("animals") or []:
+        out.append(Good(id=PREFIXES["mount"] + str(row["key"]), name=str(row["name"]),
+                        price_gp=float(row["cost_gp"]), kind="mount",
+                        key=str(row["key"]), template=str(row.get("template") or "")))
+    for row in doc.get("tack") or []:
+        out.append(Good(id=PREFIXES["tack"] + str(row["key"]), name=str(row["name"]),
+                        price_gp=float(row["cost_gp"]), kind="tack", key=str(row["key"]),
+                        per=int(row.get("per", 1) or 1), unit=str(row.get("unit") or "")))
+    return out
+
+
+def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
+    """Put what was just paid for where the sheet reads it: (effects, a sentence).
+
+    Called by the engine's `buy` once the coin has moved, and nowhere else — a purchase
+    is one op. Before this, everything bought became a pack entry, which is right for
+    rope and wrong for a sword (the attack reads `weapons`), a hauberk (`wear` reads
+    what is carried) and a horse, which is not a thing in a pack at all.
+
+    **A mount comes into the scene as a creature**, through the arrival door
+    (`Scene.add`), made from its bestiary block, and travels with the party: the
+    `bond.travels-with-you` tag, through the one applicator, filed under `company:<ref>`
+    so the `company` op's "leave" parts with it like anybody else who came along. That
+    is exactly what `rules/journey.py` asks a mount to be — a creature in the party whose
+    template is one of `journey.MOUNTS` — so the journey's ride and gallop paces apply to
+    it with nothing in the journey changed. Bought, never hired (the owner, 2026-09-29);
+    `origin` says so.
+    """
+    count = max(1, int(count or 1))
+    kind = str(getattr(found, "kind", "") or "gear")
+    key = str(getattr(found, "key", "") or getattr(found, "name", ""))
+    if kind == "weapon":
+        for _ in range(count):
+            actor.weapons.append(key)
+        return [], ""
+    if kind in ("armour", "shield"):
+        # Carried, to be put on with `wear`, which reads exactly this.
+        actor.goods[key] = int(actor.goods.get(key, 0) or 0) + count
+        return [], ""
+    if kind == "mount" and getattr(found, "template", ""):
+        from . import states
+        from .activeeffect import ActiveEffect
+        from .bestiary import instantiate
+
+        effects, names = [], []
+        for _ in range(count):
+            # "light horse", not "light horse (combat-trained)": the training is what was
+            # paid for, not what the animal is called.
+            animal = instantiate(found.template, scene=scene,
+                                 name=str(found.name).split(" (")[0])
+            scene.add(animal)
+            source = f"company:{animal.ref}"
+            animal.apply_effect(ActiveEffect(
+                name="travels with you", kind="bond", key=f"{source}:travels",
+                source=source, origin=f"bought:{actor.ref}", duration="until-dismissed",
+                tags=(states.TRAVELS_WITH_YOU,)))
+            effects.append({"ref": animal.ref, "kind": "company", "travels": True,
+                            "bought_by": actor.ref})
+            names.append(animal.name)
+        return effects, (f" The {names[0]} is {actor.name}'s now, and goes where they go."
+                         if len(names) == 1 else
+                         f" {', '.join(names)} are {actor.name}'s now, and go where "
+                         f"they go.")
+    from .crafting import Stock
+
+    per = int(getattr(found, "per", 1) or 1)
+    actor.add_stock(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
+                          potency=1.0, craft=str(getattr(found, "track", "") or "")),
+                    count * per)
+    return [], ""
 
 
 # The words a purchase is measured in and nothing else: "a coil of rope" is rope, "a loaf
@@ -452,17 +634,41 @@ def match_want(want: str, rows) -> tuple[object | None, list]:
         rid = str(getattr(r, "id", "") or (r.get("id") if isinstance(r, dict) else ""))
         from .population import _stem
 
+        # The id's kind prefix ("gear:", "weapon:", "mount:") is filing, not a word the
+        # player could have meant.
+        bare = rid.split(":", 1)[1] if rid.split(":", 1)[0] + ":" in PREFIXES.values() \
+            else rid
         have = {_stem(w) for w in re.findall(
-            r"[a-z][a-z'-]*", f"{name} {rid.replace(GOOD_PREFIX, '').replace('-', ' ')}".lower())}
+            r"[a-z][a-z'-]*", f"{name} {bare.replace('-', ' ')}".lower())}
         if all(w in have for w in words):
             fits.append(r)
     if not fits:
         return None, []
-
-    def price(r):
-        v = getattr(r, "price_gp", None)
-        if v is None and isinstance(r, dict):
-            v = r.get("gp")
-        return float(v or 0)
-    fits.sort(key=price)
+    fits.sort(key=lambda r: fit_rank(want, r))
     return fits[0], fits
+
+
+def _head(text: str) -> str:
+    """The last word of a name, its parenthesis dropped: "light horse (combat-trained)" is
+    a horse, "rope dart" a dart."""
+    from .population import _stem
+
+    words = re.findall(r"[a-z][a-z'-]*", re.sub(r"\([^)]*\)", "", str(text or "")).lower())
+    return _stem(words[-1]) if words else ""
+
+
+def fit_rank(want: str, row) -> tuple:
+    """How well a shelf row answers the want, best first: the thing whose own head noun is
+    the want's comes before a thing that merely has the word in it, and then the cheaper.
+
+    Measured the day the weaponsmith's rack joined the market (I2): "a coil of rope" went
+    to the weaponsmith, because the Core weapon table's "rope dart" costs less than the
+    general store's hemp rope and cheapest-first was the whole ranking. A shopkeeper asked
+    for rope reaches for rope, not for a weapon with rope in it."""
+    words = _want_words(want)
+    wanted = words[-1] if words else ""
+    name = str(getattr(row, "name", "") or (row.get("name") if isinstance(row, dict) else ""))
+    v = getattr(row, "price_gp", None)
+    if v is None and isinstance(row, dict):
+        v = row.get("gp")
+    return (0 if wanted and _head(name) == wanted else 1, float(v or 0))

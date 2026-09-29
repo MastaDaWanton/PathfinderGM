@@ -172,7 +172,8 @@ def test_trying_to_buy_rope_opens_the_counter_with_the_rope_picked(at_the_market
     r = Client().post("/api/say", data=json.dumps({"text": "I try to buy a coil of rope."}),
                       content_type="application/json")
     assert r.status_code == 200, r.content[:300]
-    assert r.json()["trade"] == {"open": True, "want": "a coil of rope"}
+    # And which of the market's counters sells it (I2, docs/fix-interfaces.md §2.10).
+    assert r.json()["trade"] == {"open": True, "want": "a coil of rope", "line": "general"}
     assert any("AT THE COUNTER (fact)" in p for p in seen["prompts"])
 
 

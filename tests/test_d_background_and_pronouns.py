@@ -70,7 +70,10 @@ def test_a_keeper_not_dealt_with_is_in_the_background(worlds):
     brief = _brief(worlds, s, e, "I look around.")
     assert f"IN THE BACKGROUND (fact): {k.name} ({k.ref})" in brief
     e.join_talk(k, how="the player spoke to her")
-    assert "IN THE BACKGROUND" not in _brief(worlds, s, e, "I look around.")
+    # Her line, not every line: a town's market has two keepers since I2 (its master
+    # and its general store), and the other one is still at their work.
+    assert f"IN THE BACKGROUND (fact): {k.name} ({k.ref})" not in _brief(
+        worlds, s, e, "I look around.")
 
 
 def test_the_player_turning_to_the_keeper_brings_her_forward(worlds):
@@ -78,8 +81,8 @@ def test_the_player_turning_to_the_keeper_brings_her_forward(worlds):
     k = _keeper(s)
     reading = {"question": False, "claims": [], "actions": [
         {"act": "talk", "target": k.name, "says": "what she sells"}]}
-    assert "IN THE BACKGROUND" not in _brief(worlds, s, e, f"I ask {k.name} what she sells",
-                                              reading)
+    assert f"IN THE BACKGROUND (fact): {k.name} ({k.ref})" not in _brief(
+        worlds, s, e, f"I ask {k.name} what she sells", reading)
     # And a counter opening this turn is dealing with her, read off the brief's `buying`.
     brief = prompts.scene_brief(worlds, s, worlds.get(s.location_id), here=e.here(),
                                 known=e.places(), buying="a coil of rope")

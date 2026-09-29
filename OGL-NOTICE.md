@@ -22,6 +22,12 @@ from a monster spreadsheet. Names, challenge ratings, ability scores, hit points
 classes, saves, attacks, damage reduction, immunities, skills, feats and descriptions are
 Open Game Content, and each entry records the sourcebook it came from.
 
+`content/bestiary/mounts.json` — the heavy horse, pony, donkey, mule and camel the
+stables sell, from the Pathfinder Bestiary (Horse and its variants), Bestiary 2 (Herd
+Animal, Camel) and Ultimate Equipment. `content/rules/stall-lines.json` carries the
+Ultimate Equipment prices of the animals and their tack; which counter sells what is the
+app's own.
+
 `content/ingredients/herbs-and-parts.json` mixes sources: entries drawn from Pathfinder
 material are Open Game Content, and the setting-specific flora are the user's own.
 

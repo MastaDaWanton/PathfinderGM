@@ -54,6 +54,14 @@ def _keeper(scene, at: str):
     return keepers.keeper_in(scene, at)
 
 
+def _general(scene, at: str = MARKET):
+    """The keeper of a market's general store (I2). Since the owner's ruling of
+    2026-09-29 the market's own keeper is its master, who sells nothing; the counter the
+    trade button opens across at a market is the general store's."""
+    wid = keepers.holder_id(at, "general")
+    return next((a for a in scene.people.values() if a.world_entity_id == wid), None)
+
+
 # --- there ----------------------------------------------------------------------------------
 
 def test_the_market_has_somebody_in_it():
@@ -205,7 +213,10 @@ def test_a_keeper_is_never_stood_up_twice():
         engine.place_party(MARKET)
     at_market = [a for a in scene.people.values()
                  if keepers.place_of(getattr(a, "world_entity_id", "") or "") == MARKET]
-    assert len(at_market) == 1, [a.name for a in at_market]
+    # A town's market stands up two people on the first visit (I2): its master and its
+    # general store. Four more visits stand up nobody.
+    ids = [a.world_entity_id for a in at_market]
+    assert len(ids) == len(set(ids)) == 2, [a.name for a in at_market]
 
 
 def test_nobody_is_staffed_into_a_running_fight():
@@ -246,13 +257,14 @@ def test_the_ledger_survives_a_save(tmp_path, settings):
     settings.CAMPAIGN_DIR = tmp_path
     scene, _ = _table(MARKET)
     saved = {"staffed": list(scene.staffed)}
-    assert saved["staffed"] == [MARKET]
+    # The market, and its general store's counter (I2) — each once.
+    assert saved["staffed"] == [MARKET, f"{MARKET}#general"]
     # The round trip the campaign actually performs.
     c = cm.Campaign(id="keepers-test", world_source="fixtures/pangrella-campaign.json",
                     scene=scene)
     c.save()
     back = cm.Campaign.load(c.path())
-    assert back.scene.staffed == [MARKET]
+    assert back.scene.staffed == [MARKET, f"{MARKET}#general"]
 
 
 # --- the counter the player actually clicks ----------------------------------------------------
@@ -280,7 +292,8 @@ def test_the_trade_panel_opens_across_the_keeper_of_a_shop(tmp_path):
         c.scene.location_id = TOWN
         c.engine().place_party(MARKET)
         c.save()
-        who = _keeper(c.scene, MARKET)
+        # The general store's keeper, not the market's master (I2).
+        who = _general(c.scene)
         assert who is not None
         assert _merchant_here(c.scene) is who, "the counter cannot see its own keeper"
         r = Client().post("/api/trade", data="{}", content_type="application/json")
@@ -315,7 +328,7 @@ def test_a_keeper_away_from_their_counter_is_not_a_shop():
     """"so trans'ed shopkeepers can't sell in the desert" — the CircleMUD shop file
     names the rooms a keeper works in, and a smith on the road is not a smithy."""
     scene, engine = _table(MARKET)
-    who = _keeper(scene, MARKET)
+    who = _general(scene)
     assert keepers.keeps_a_counter(who)
     who.at = GATE
     assert not keepers.keeps_a_counter(who)

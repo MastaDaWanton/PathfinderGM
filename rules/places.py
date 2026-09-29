@@ -274,9 +274,20 @@ POPULATION_BY_SCALE = {
 # `rules/keepers.py` is what reads the last two. Until 2026-09-16 nothing read any of
 # it, and this comment said so.
 STAFFED = {
-    "the market": ("stallholders, and one who runs the pitch",
-                   "the stallholder who runs the pitch",
-                   ("stallholder", "merchant", "trader")),
+    # The market's one person is its MASTER, who sells nothing (item 10 of the 2026-09-28
+    # playtest: "the stallholder who runs the pitch" was both the authority and the only
+    # seller). The sellers are the market's counters — `rules/market.py`, minted on need
+    # by `keepers.stand_up` — and the master is `RUNNERS` below. A village's market has no
+    # master (the owner, Q28): it is kept by its stallholders, and `keepers.staff` stands
+    # nobody up there but the general store.
+    #
+    # The words are design D's "clerk" and "merchant" for the master's own block, and then
+    # "stallholder" where D had "noble": the same words are what `rules/roster.py` offers
+    # the plan as WHO THIS PLACE WOULD HOLD, and the crowd of a market is its
+    # stallholders, not its nobility.
+    "the market": ("stallholders at their stalls, and a master of the market over them",
+                   "the master of the market",
+                   ("clerk", "merchant", "stallholder")),
     "the smithy": ("a smith", "the smith", ("blacksmith", "smith", "armorer")),
     "the mill": ("a miller", "the miller", ("miller", "farmer", "commoner")),
     "the workshops": ("the trades that work there", "the master of the workshops",
@@ -325,6 +336,38 @@ STAFFED = {
     "the customs house": ("an officer who wants to see your papers",
                           "the customs officer", ("customs", "officer", "clerk")),
 }
+
+
+# Places whose one person RUNS the place rather than serving at it — an authority, not a
+# shop (docs/design-d-people.md §4.8). The medieval clerk of the market "had control over
+# prices, weights and measures" and kept a court; he did not trade. `keepers.keeps_a_counter`
+# is false for the keeper of a place named here, whatever its category, and
+# `rules/audience.py` decides when they will hear the player at all.
+#
+# Only the market is built (I2). The master of the workshops, the harbourmaster, the clerk
+# of the counting house and the master of the games have the same shape and join this set
+# one row at a time, each with its counters, when somebody builds them — adding one here
+# before its sellers exist would shut a counter the player can use today.
+RUNNERS = frozenset({"the market"})
+# The smallest settlement whose market has a master. The owner, Q28 (2026-09-29): "town
+# and up"; a village's market is kept by its stallholders and answers to the village's
+# own authority.
+MASTER_FROM = "town"
+# Places outside the "trade" category whose keeper nonetheless sells across a counter.
+# The stables are transport — they are how you leave — and the ostler sells the horses
+# (d20pfsrd "Animals & Animal Gear"; the owner, 2026-09-29: "no renting just buy one").
+SELLS_OUTSIDE_TRADE = frozenset({"the stables"})
+
+
+def runs_it(label: str) -> bool:
+    """Whether the keeper of this place is its authority rather than a seller."""
+    return " ".join(str(label or "").split()).lower() in RUNNERS
+
+
+def has_a_master(scale: str) -> bool:
+    """Whether a market in a settlement of this scale has a master standing in it."""
+    scale = scale if scale in SCALES else "town"
+    return SCALES.index(scale) >= SCALES.index(MASTER_FROM)
 
 
 def staffed(label: str) -> str:

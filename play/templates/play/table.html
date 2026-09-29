@@ -928,12 +928,21 @@
      narrated haggling never managed. */
   #tradepanel {
     position: fixed; inset: 0; z-index: 31;
-    display: none; grid-template-rows: auto 1fr;
+    display: none; grid-template-rows: auto auto 1fr;
     background:
       linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
       url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
   }
   #tradepanel.on { display: grid; }
+  /* A market is its counters (I2): the general store, the armorer, the weaponsmith,
+     the alchemist, the stalls and the horse lines, as the sheet's own tab strip — the
+     same leather, the same small caps — so choosing a counter reads like choosing a page
+     of the sheet. No motion: a tab that slides is a tab that is harder to hit. */
+  #tradelines { padding-top: 10px; }
+  /* Scrolled sideways on a phone, never squeezed: nine counters shrunk to fit a 375px
+     strip read "GE AR WE AL" (measured in the pane at the mobile preset). */
+  #tradelines button { flex: 0 0 auto; }
+  #tradelines[hidden] { display: none; }
   .tradebody {
     display: grid; grid-template-columns: 1fr minmax(240px, 22%) 1fr;
     gap: 18px; padding: 18px 34px 28px; overflow: hidden; min-height: 0;
@@ -2372,6 +2381,8 @@
     <span id="trademsg"></span>
     <button class="close" id="closetrade">Close  ·  Esc</button>
   </div>
+  <nav class="tabs" id="tradelines" role="tablist" aria-label="Counters at this market"
+       hidden></nav>
   <div class="tradebody">
     <div class="tradecol">
       <h2>What you carry <span id="tradepurse"></span></h2>

@@ -7069,8 +7069,10 @@ class Engine:
                      if not mount_refs else
                      f"There are {riders} to carry and {len(mount_refs)} "
                      f"mount{'s' if len(mount_refs) != 1 else ''} to carry them")
-                    + f". On foot it is {walk_words}. A mount is bought at the stables "
-                      f"or hired, and comes along like anybody who travels with you.")
+                    # Bought, never hired (the owner, 2026-09-29): the stables sell them,
+                    # or the market's horse lines where a settlement has no stables.
+                    + f". On foot it is {walk_words}. A mount is bought at the stables, "
+                      f"and comes along like anybody who travels with you.")
             mount_refs = mount_refs[:riders]
         # Setting out is walking away, whatever the road then does.
         parted = self.end_talk("walked away")
@@ -9785,7 +9787,6 @@ class Engine:
         """
         from . import market as market_mod
         from . import pricing
-        from .crafting import Stock
 
         actor = self.scene.actors[intent.actor]
         item_id = str(intent.params["item"]).strip().lower()
@@ -9804,16 +9805,21 @@ class Engine:
         # never does, and "pays the stallholder" read wrong with Azhil Vex standing
         # behind it (live, 2026-09-27).
         here_keeper = keepers_mod.keeper_in(self.scene, str(self.scene.at or ""))
+        # Never the master of a market, who keeps no counter (I2, `places.RUNNERS`).
         who = (self.scene.actors[seller].name if seller
                else here_keeper.name if here_keeper is not None
-               and here_keeper.ref in self.scene.actors else "the stallholder")
+               and here_keeper.ref in self.scene.actors
+               and keepers_mod.keeps_a_counter(here_keeper) else "the stallholder")
 
         place = str(self.scene.location_id or "nowhere")
         stall = str(intent.params.get("stall") or seller or "market")
         day = market_mod.day_of(self.scene.clock_minutes)
 
+        # The stall names the counter when it is one of a market's (`market:armorer`, I2):
+        # the armorer's shelf, not the whole market's.
         counter = market_mod.on_sale(place, stall, day, self.scene.market_taken,
-                                     counter_kind=market_mod.counter_kind_here(self.scene))
+                                     counter_kind=market_mod.counter_kind_here(self.scene,
+                                                                               stall))
         found = next((m for m in counter if str(getattr(m, "id", "")).lower() == item_id),
                      None)
         if found is None:
@@ -9844,14 +9850,13 @@ class Engine:
             )
 
         actor.purse = purse
-        # Onto the shelf as a crafted-shape entry, which is the one container the
-        # inventory panels and the benches both already read. A good measured out comes
-        # in its measure: one purchase of rope is fifty feet, as the outfitting screen
-        # has always sold it.
+        # Where the sheet reads it (`goods.deliver`): gear onto the shelf as a
+        # crafted-shape entry, in its measure (one purchase of rope is fifty feet); a
+        # weapon into the weapon list, armour carried to be worn, and a mount into the
+        # scene as a creature that travels with the party (I2, the owner's 2026-09-29
+        # ruling: mounts are bought, never hired).
         per = int(getattr(found, "per", 1) or 1)
-        actor.add_stock(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
-                              potency=1.0, craft=str(getattr(found, "track", "") or "")),
-                        count * per)
+        arrived, arrived_tell = goods.deliver(self.scene, actor, found, count)
         # A staple is never sold out; a thing drawn onto today's shelf is, once sold.
         if not getattr(found, "staple", False):
             for _ in range(count):
@@ -9861,11 +9866,11 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="buy",
             effects=[{"ref": actor.ref, "kind": "bought", "item": found.name,
-                      "count": count, "paid_cp": cp}],
+                      "count": count, "paid_cp": cp}] + arrived,
             tell=f"{actor.name} pays {who} {pricing.as_text(price)} for "
                  + (f"{count * per} {found.unit} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
-                 + f". ({goods.purse_line(actor.purse, coins)} left.)",
+                 + f". ({goods.purse_line(actor.purse, coins)} left.)" + arrived_tell,
             because=intent.because,
         )
 
