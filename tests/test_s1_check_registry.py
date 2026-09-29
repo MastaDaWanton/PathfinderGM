@@ -513,9 +513,13 @@ def test_head_of_beyond_the_openings(name, head):
 
 def test_head_of_is_wired_into_nothing_yet():
     """Phase 1 delivers the helper; Lane A points every copy of the rule at it in Phase 2.
-    Until then nothing outside gm/checks and the tests imports it."""
+    Until then nothing outside gm/checks and the tests imports it — except the readers the
+    register names (§2.1: "D and F import `head_of` from Phase 2 on"): F's
+    `speech.vocalisations` finds "the watchman" by it."""
+    readers = {"speech.py"}
     users = [p for p in (ROOT / "gm").rglob("*.py")
-             if "checks" not in p.parts and "head_of" in p.read_text(encoding="utf-8")]
+             if "checks" not in p.parts and p.name not in readers
+             and "head_of" in p.read_text(encoding="utf-8")]
     users += [p for p in (ROOT / "play").rglob("*.py")
               if "head_of" in p.read_text(encoding="utf-8")]
     assert users == []

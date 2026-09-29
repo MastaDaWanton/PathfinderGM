@@ -1,8 +1,9 @@
 // The play table, part 07 of 10 (panels). Classic script, sharing one global scope with
 // 01-06 and 08-10, loaded after them.
 //
-// The side column as five panels: Sheet, Scene, Conversation, Map, Rolls
-// (docs/design-f-ui.md §4.1). One component, two modes:
+// The side column as panels: Sheet, Scene, Map, Rolls (docs/design-f-ui.md §4.1). The
+// conversation was a fifth until the owner's ruling of 2026-09-28 (Q42) made it a tray of
+// its own, out of the column (08-conversation.js). One component, two modes:
 //
 // - column mode is the docked column the table has always had;
 // - drawer mode is the phone's slide-over, used under 760px AND on a desktop after
@@ -17,7 +18,7 @@
 // What it exports (docs/fix-interfaces.md §2.11): `onRender(fn)` for the lanes' render
 // hooks, and `Panels = {open, close, collapse, expand, forward, mode}`.
 
-const PANEL_IDS = ["sheet", "scene", "conversation", "map", "rolls"];
+const PANEL_IDS = ["sheet", "scene", "map", "rolls"];
 // Versioned because Electron's storage outlives every reinstall (CLAUDE.md, the stale
 // stylesheet). The pre-paint script at the top of <body> reads the same key for `docked`;
 // if this name changes, change it there too.
@@ -60,12 +61,9 @@ function primeRenderHooks() {
 // {open:{id:bool}, collapsed:{id:bool}, docked:bool}. Unreadable, missing or throwing
 // storage means everything open and docked: Foundry v13 shipped a sidebar collapsed by
 // default with no setting, and two modules exist only to reopen it on load.
-// Conversation's body starts collapsed until the first conversation, and only by default:
-// a collapse the viewer chose is remembered as theirs.
 function readPanelLayout() {
   const out = { open: {}, collapsed: {}, docked: true, chosen: {} };
   for (const id of PANEL_IDS) { out.open[id] = true; out.collapsed[id] = false; }
-  out.collapsed.conversation = true;
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(PANELS_KEY) || "null"); } catch { saved = null; }
   if (!saved || typeof saved !== "object") return out;
@@ -125,9 +123,9 @@ function paintPanels() {
 }
 
 // The edge tabs, which exist only in drawer mode (CSS hides the group in column mode).
-// Sheet always; Scene while a fight is on; Conversation while somebody is talking with
-// you or there are unread lines, with the count. Map keeps its own left-edge tab.
-const EDGE_COUNT = { conversation: 0, scene: 0, sheet: 0, map: 0, rolls: 0 };
+// Sheet always; Scene while a fight is on. Map and the conversation keep their own
+// left-edge tabs.
+const EDGE_COUNT = { scene: 0, sheet: 0, map: 0, rolls: 0 };
 
 function paintEdgeTabs() {
   const s = STATE || {};
@@ -135,7 +133,6 @@ function paintEdgeTabs() {
   const shown = {
     sheet: true,
     scene: !!scene.in_encounter || EDGE_COUNT.scene > 0,
-    conversation: (scene.talk || []).length > 0 || EDGE_COUNT.conversation > 0,
   };
   const drawerOpen = isDrawerOpen();
   document.querySelectorAll("#edgetabs .edgetab").forEach(tab => {
@@ -281,12 +278,12 @@ const Panels = {
     if (was) markArrived(id);
   },
 
-  // Something started that this panel shows: a conversation, a fight. Edge-triggered by
+  // Something started that this panel shows: a fight. Edge-triggered by
   // the caller, and it never moves focus.
   //   column: restore, expand, and scroll it into view inside the column;
   //   drawer: do NOT open the drawer (it would cover the beat about to be read; G0 Q7).
   //           The panel's edge tab shows instead, with `count` when one is given.
-  // A player who closes the panel mid-conversation keeps it closed, because nothing
+  // A player who closes the panel mid-fight keeps it closed, because nothing
   // calls this again until the next one starts.
   forward(id, { count } = {}) {
     if (!PANEL_IDS.includes(id)) return;
@@ -313,24 +310,12 @@ const Panels = {
 };
 
 // --- what comes forward on its own ------------------------------------------------------
-// Both edge-triggered from the state the page already has: `scene.talk` going from empty
-// to not, and `scene.in_encounter` turning on. Lane F's conversation log adds its own
-// trigger (a new line while the panel is collapsed) through `Panels.forward`.
+// Edge-triggered from the state the page already has: `scene.in_encounter` turning on.
+// A conversation starting is the conversation tray's to answer (08-conversation.js).
 onRender((s, prev) => {
   const scene = (s && s.scene) || {};
-  const talking = (scene.talk || []).length > 0;
-  if (!prev) {
-    // The first draw. A conversation already running when the page opens is shown, but
-    // only over the default collapse; one the viewer collapsed themselves stays as it is.
-    if (talking && !PANEL_LAYOUT.chosen.conversation && !isDrawerMode()) {
-      PANEL_LAYOUT.collapsed.conversation = false;
-      paintPanels();
-    }
-    paintEdgeTabs();
-    return;
-  }
+  if (!prev) { paintEdgeTabs(); return; }
   const before = (prev && prev.scene) || {};
-  if (talking && !(before.talk || []).length) Panels.forward("conversation");
   if (scene.in_encounter && !before.in_encounter) Panels.forward("scene");
   paintEdgeTabs();
 });

@@ -267,10 +267,14 @@ def _bobby_beats(tmp_path, monkeypatch):
 
 # --- inert ----------------------------------------------------------------------------------
 
-def test_the_real_registry_holds_no_member_yet_so_the_game_is_unchanged():
-    """Phase 1 ships the registry empty. When the first Phase-2 step lands, this is the
-    assertion to change, on purpose."""
-    assert aftermath.registered() == ()
+def test_the_real_registry_holds_the_members_the_lanes_landed():
+    """Phase 1 shipped the registry empty; this is the assertion each Phase-2 step changes,
+    on purpose. Lane F's conversation log is the beat stage's ORDER 50 (§2.3)."""
+    names = {m.__name__.rsplit(".", 1)[-1]: m for m in aftermath.registered()}
+    assert "conversation_log" in names
+    log = names["conversation_log"]
+    assert (log.STAGE, log.ORDER) == ("beat", 50)
+    assert "opening" in log.DOORS
 
 
 def test_a_member_that_writes_nothing_changes_no_recorded_turn(tmp_path, monkeypatch,

@@ -209,20 +209,12 @@ document.addEventListener("click", async e => {
     combatMenu(list.map(a => `<button data-pick="${slot}:${esc(a.name)}"
       title="${esc((a.text || "").slice(0, 200))}">${esc(a.name)}</button>`).join(""));
   };
-  // Casting is a standard action like any other, and it was the one a spellcaster
-  // could not reach: `cast` was missing from the panel's op list, so a wizard's whole
-  // turn had to be typed and routed through the narrator. The spells offered are the
-  // ones actually prepared, because a spell in the book and a spell in the head are
-  // different things and the engine refuses the second question anyway.
-  if (t.closest("#cb-cast")) {
-    const spells = (STATE.pc && STATE.pc.castable) || [];
-    if (!spells.length) { combatMenu(`<span class="cb-note">Nothing prepared.</span>`);
-      return; }
-    combatMenu(spells.map(sp => `<button data-pick="cast:${esc(sp.id || sp.name)}"
-      title="${esc(sp.summary || sp.name || "")}">${esc(sp.name || sp.id)}${
-        sp.left != null ? ` (${sp.left})` : ""}</button>`).join(""));
-    return;
-  }
+  // Casting in a fight goes through the one spell picker the footer uses (owner Q47,
+  // 10-spells.js): the spell is attached to the say box and the player says where it
+  // goes, "at the one by the door", "into the brush". The list this menu used to build
+  // read `pc.castable`, which offers a prepared caster's whole book when nothing is
+  // prepared (docs/fix-interfaces.md §1.7 F1), and it could only aim at the target chip.
+  if (t.closest("#cb-cast")) { castFromCombatBar(t.closest("#cb-cast")); return; }
   if (t.closest("#cb-ability")) { menuFor(["standard", "full-round", "move"], "standard"); return; }
   if (t.closest("#cb-swift")) { menuFor(["swift", "immediate"], "swift"); return; }
   if (t.closest("#cb-free")) { menuFor(["free"], "free"); return; }
@@ -231,9 +223,7 @@ document.addEventListener("click", async e => {
   if (pick) {
     const [slot, ...rest] = pick.dataset.pick.split(":");
     const name = rest.join(":");
-    if (slot === "cast") COMBAT.standard = { label: `Cast ${name}`,
-      actions: [{ op: "cast", params: { spell: name }, target: COMBAT.target }] };
-    else if (slot === "standard") COMBAT.standard = { label: `Use ${name}`,
+    if (slot === "standard") COMBAT.standard = { label: `Use ${name}`,
       actions: [{ op: "use_ability", params: { ability: name },
                   target: COMBAT.target }] };
     else if (slot === "swift") COMBAT.swift = name;
@@ -327,23 +317,39 @@ async function takeTurn(body, clearInput) {
   try {
     const s = await post("/api/say", body);
     render(s);
-    if (clearInput) $("#input").value = "";   // cleared only once the turn was taken
+    // Cleared only once the turn was taken, the words and the spell chip together: a
+    // refusal (422), a stale screen (412) or a busy table (409) keeps both.
+    if (clearInput) {
+      $("#input").value = "";
+      if (typeof clearAttachments === "function") clearAttachments();
+    }
     if (s.ended) showDeath(s);
     // The player set out to buy something at an open counter: the counter's screen,
     // with the thing picked (play/views.py, `_trade_offer`).
     else if (s.trade && s.trade.open) openTrade(s.trade.want);
   }
   catch (err) {
-    if (!err.handled) $("#err").textContent = err.message;
-    if (err.hint) $("#err").className = "hint";
+    // A refusal the player can fix says why and offers the fix (10-spells.js).
+    if (err.refusal && typeof showRefusal === "function") showRefusal(err.refusal);
+    else {
+      if (!err.handled) $("#err").textContent = err.message;
+      if (err.hint) $("#err").className = "hint";
+    }
   }
   finally { busy(false); }
 }
 
+// A spell chip may go alone: an empty box with a chip is "I cast Burning Hands." and the
+// model reads the likely use from the scene (item 21.1). Only the kind and the id are
+// sent; the server looks the spell up itself and refuses one the character lacks.
 $("#sayform").onsubmit = e => {
   e.preventDefault();
   const text = $("#input").value.trim();
-  if (text) takeTurn({text}, true);
+  const attached = typeof currentAttachments === "function" ? currentAttachments() : [];
+  if (!text && !attached.length) return;
+  const body = { text };
+  if (attached.length) body.attachments = attached.map(a => ({ kind: a.kind, id: a.id }));
+  takeTurn(body, true);
 };
 
 // No `text` at all. The server knows what an empty continue means and writes the

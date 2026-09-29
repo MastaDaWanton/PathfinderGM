@@ -37,10 +37,15 @@ class TestTheDoor:
         assert reverse("cast_act") == "/api/cast"
 
     def test_the_spells_tab_offers_it(self):
+        """Still offered on every row, fight or no fight. Since item 21.1 (Lane F,
+        2026-09-28) the button attaches the spell to the say box as a chip instead of
+        posting `/api/cast` with a target from the picker: "I cast burning hands into the
+        tree tops" had nowhere to go but a person, and the player now says where it goes.
+        The picker is hidden (owner, Q46: no target picker); the route stays for E."""
         html = table_source()
         assert 'class="prepbtn castbtn"' in html
-        assert 'class="casttarget"' in html
-        assert 'post("/api/cast"' in html
+        assert "attachSpell({ id: cast.dataset.spell" in html
+        assert "body.attachments = attached.map" in html
 
     def test_the_view_refuses_off_turn_in_a_fight_and_nothing_else(self):
         src = Path("play/views.py").read_text(encoding="utf-8")

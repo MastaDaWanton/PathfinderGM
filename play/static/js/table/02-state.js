@@ -145,7 +145,15 @@ async function post(url, body) {
   // 422 is the table pushing a turn back across the table rather than an error: the
   // player said what the world does, which is the GM's half. The text they typed is
   // deliberately left in the box so they can rewrite it.
-  if (r.status === 422) { const e = new Error(data.hint); e.hint = true; throw e; }
+  // The same code carries a refusal the player can fix (docs/fix-interfaces.md §2.6:
+  // `{"error", "refusal": {"text", "code", "fix"}}`), handed on whole so the page can
+  // offer the fix; the turn was not taken, and nothing in the box is lost.
+  if (r.status === 422) {
+    const e = new Error(data.hint || data.error || "");
+    e.hint = true;
+    if (data.refusal) e.refusal = data.refusal;
+    throw e;
+  }
   if (r.status === 410) { showDeath(data); const e = new Error(""); e.handled = true; throw e; }
   // 412 and 409 are the two halves of the second-device story and they are deliberately
   // different codes, because the player has to do different things about them.
@@ -375,20 +383,16 @@ function renderTalk(s) {
 }
 
 document.addEventListener("click", async e => {
+  // Cast attaches, it does not send (item 21.1): "I cast burning hands into the tree tops"
+  // did nothing because this button could only aim at a person and fired at once. Now the
+  // spell lands before the input as a chip (10-spells.js) and the player writes where it
+  // goes, which is the one route typed and attached casts share. The sheet closes so the
+  // box it went to is in view.
   const cast = e.target.closest(".castbtn");
   if (cast) {
-    const row = cast.closest(".prep");
-    const pick = row && row.querySelector(".casttarget");
-    const at = pick ? pick.value : "";
-    const who = pick && pick.selectedIndex > 1 ? pick.options[pick.selectedIndex].text : "";
-    const label = `I cast ${cast.dataset.name}` + (at === "self" ? " on myself" :
-                  who ? ` at ${who}` : "");
-    cast.disabled = true;
-    try {
-      render(await post("/api/cast", { spell: cast.dataset.spell, at, label }));
-      const sheet = $("#sheetpanel");
-      if (sheet) { sheet.classList.remove("on"); sheet.setAttribute("aria-hidden", "true"); }
-    } catch (err) { flash(err.message || String(err)); cast.disabled = false; }
+    attachSpell({ id: cast.dataset.spell, name: cast.dataset.name });
+    if (typeof closeSheet === "function") closeSheet();
+    $("#input").focus();
     return;
   }
   const ignore = e.target.closest("[data-ignore]");
