@@ -548,6 +548,11 @@ class GMAgent:
                 # to claim it.
                 raw = judgement.inject_cast(raw, player_input, self.engine.scene,
                                             attached=getattr(self, "attachments", ()))
+                # The plan's own cast with no aim written takes one from the player's
+                # words where they ground it (G2): a name or a thing here, never a guess.
+                raw = judgement.aim_the_cast(
+                    raw, player_input, self.engine.scene,
+                    self.reading if isinstance(self.reading, dict) else None)
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 # After inject_checks so its product is covered too: a check with
                 # neither dc nor opposed_by is refused by validation, and the "engine

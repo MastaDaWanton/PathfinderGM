@@ -464,15 +464,23 @@ def _is_label(ref) -> bool:
 
 
 def _refs_in(raw: dict) -> list:
-    """Every slot of an intent a person's ref can sit in: actor, target, `opposed_by`, `to`."""
+    """Every slot of an intent a person's ref can sit in: actor, target, `opposed_by`,
+    `to`, and a cast's aim — the legacy `at` or `aim: ref:<ref>`. The aim was missing
+    until G2 (2026-09-28): `cast at=new2` went past this binder unread, and the engine
+    resolved the spell at nobody."""
     targets = raw.get("target")
     targets = targets if isinstance(targets, list) else [targets]
     params = raw.get("params") or {}
-    opposed = params.get("opposed_by") if isinstance(params, dict) else None
-    to = params.get("to") if isinstance(params, dict) else None
+    if not isinstance(params, dict):
+        params = {}
+    opposed = params.get("opposed_by")
+    to = params.get("to")
+    aim = params.get("aim")
     return [raw.get("actor"), *targets,
             opposed.get("ref") if isinstance(opposed, dict) else None,
-            *(to if isinstance(to, list) else [to])]
+            *(to if isinstance(to, list) else [to]),
+            params.get("at"),
+            aim[4:] if isinstance(aim, str) and aim.startswith("ref:") else None]
 
 
 # Somebody arriving, in the player's own sentence: "two bravos come round the corner".
@@ -1365,6 +1373,12 @@ def _swap_refs(raw: dict, swap: dict) -> dict:
         params["to"] = swap[to]
     elif isinstance(to, list):
         params["to"] = [swap.get(t, t) if isinstance(t, str) else t for t in to]
+    # And a cast's aim, which `_refs_in` reads (G2: `cast at=new2`).
+    if isinstance(params.get("at"), str) and params["at"] in swap:
+        params["at"] = swap[params["at"]]
+    aim = params.get("aim")
+    if isinstance(aim, str) and aim.startswith("ref:") and aim[4:] in swap:
+        params["aim"] = "ref:" + swap[aim[4:]]
     raw["params"] = params
     return raw
 
@@ -4861,6 +4875,49 @@ def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
         "op": "cast", "actor": pc.ref, "params": params,
         "because": "the player said they cast it",
     }]
+
+
+def aim_the_cast(raw_intents, player_text: str, scene, reading=None) -> list:
+    """The player's own cast that the plan left unaimed takes its aim from the player's
+    words, through the reader a typed and an attached cast already share
+    (`areas.aim_from_words`) — never a guess of ours.
+
+    G2, 2026-09-28: the interpreter read "I cast burning hands at the man standing
+    nearest me" as `cast, target: "the man standing nearest me"`, and the plan's aim
+    came back as a placeholder for nobody. A plan that writes no aim at all is the
+    other half of that: an area spell with none is refused "Where do you aim it?"
+    even when the sentence named the man. The reading's target phrase is read first
+    — it is the words about WHO — then the whole sentence. When neither grounds (no
+    name, no thing here, "the man standing nearest me" in a room of two) nothing is
+    filled, and validation's refusal stands: nearest is the map's question, and no
+    resolver for it is invented here."""
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    phrases = [str(a.get("target") or "") for a in (reading or {}).get("actions") or []
+               if isinstance(a, dict) and a.get("act") == "cast" and a.get("target")]
+    phrases.append(str(player_text))
+    from rules import areas, spells as spells_mod
+
+    out = []
+    for raw in raw_intents:
+        if (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "cast"
+                and raw.get("actor") in (None, "", pc.ref) and not raw.get("target")
+                and isinstance(raw.get("params"), dict)
+                and not any(raw["params"].get(k) not in (None, "", [], ())
+                            for k in ("aim", "at", "square"))):
+            try:
+                spell = spells_mod.get(str(raw["params"].get("spell") or ""))
+            except KeyError:
+                spell = None
+            aim = next((a for a in (areas.aim_from_words(scene, pc.ref, p, spell)
+                                    for p in phrases) if a), None)
+            if aim:
+                raw = dict(raw, params=dict(raw["params"], aim=aim))
+        out.append(raw)
+    return out
 
 
 _A_NUMBER = re.compile(r"\b(\d[\d,]*)\b")
