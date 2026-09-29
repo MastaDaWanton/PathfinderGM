@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en" data-theme="system" data-size="m">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Book and ledger</title>
+<!-- A design mock of the play table, not part of the app. Served from the repository root
+     (python -m http.server); never wired into Django, and docs/ is not bundled. README.md
+     says what is real, what is example, and what the app would need to adopt it. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..600&family=Sofia+Sans+Semi+Condensed:ital,wght@0,400..700;1,400..600&display=swap">
+<link rel="stylesheet" href="table.css?v=12">
+</head>
+<body class="mode-table scene-explore">
+<a class="skip" href="#beats">Skip to the story</a>
+
+<!-- The top bar: who you are, how you are, when it is, and where to look. -->
+<header class="bar" id="bar">
+  <button type="button" class="who" id="who" data-go="character" aria-label="Open the character">
+    <span class="face" id="bar-face" aria-hidden="true"></span>
+    <span class="who-text">
+      <b id="bar-name"></b>
+      <small id="bar-line"></small>
+    </span>
+  </button>
+  <div class="vitals" id="vitals" aria-label="Condition at a glance"></div>
+  <button type="button" class="clock" id="clock" data-go="journal" aria-label="The clock">
+    <span class="clock-time" id="clock-time"></span>
+    <small id="clock-day"></small>
+  </button>
+  <nav class="modes" role="tablist" aria-label="Views" id="modes">
+    <button type="button" role="tab" data-mode="table" aria-selected="true">Table</button>
+    <button type="button" role="tab" data-mode="character" aria-selected="false" tabindex="-1">Character</button>
+    <button type="button" role="tab" data-mode="gear" aria-selected="false" tabindex="-1">Gear</button>
+    <button type="button" role="tab" data-mode="spells" aria-selected="false" tabindex="-1" id="tab-spells">Spells</button>
+    <button type="button" role="tab" data-mode="journal" aria-selected="false" tabindex="-1">Journal</button>
+    <button type="button" role="tab" data-mode="map" aria-selected="false" tabindex="-1">Map</button>
+  </nav>
+  <div class="barend">
+    <div class="playing mockish" role="group" aria-label="Mock: which character">
+      <span>Mock</span>
+      <button type="button" data-char="kesst" aria-pressed="true">Kesst</button>
+      <button type="button" data-char="ysolde" aria-pressed="false">Ysolde</button>
+    </div>
+    <details class="menu" id="pagemenu">
+      <summary aria-label="Page settings and mock scenes">Options</summary>
+      <div class="menupanel">
+        <p class="mlabel" id="lbl-theme">Light</p>
+        <div class="seg" role="group" aria-labelledby="lbl-theme">
+          <button type="button" data-theme-set="system" aria-pressed="true">System</button>
+          <button type="button" data-theme-set="light" aria-pressed="false">Day</button>
+          <button type="button" data-theme-set="dark" aria-pressed="false">Night</button>
+        </div>
+        <p class="mlabel" id="lbl-size">Story text</p>
+        <div class="seg" role="group" aria-labelledby="lbl-size">
+          <button type="button" data-size-set="s" aria-pressed="false">Smaller</button>
+          <button type="button" data-size-set="m" aria-pressed="true">Book</button>
+          <button type="button" data-size-set="l" aria-pressed="false">Larger</button>
+        </div>
+        <hr>
+        <p class="mlabel" id="lbl-char">Mock: playing</p>
+        <div class="seg playing inmenu" role="group" aria-labelledby="lbl-char">
+          <button type="button" data-char="kesst" aria-pressed="true">Kesst, rogue</button>
+          <button type="button" data-char="ysolde" aria-pressed="false">Ysolde, wizard</button>
+        </div>
+        <p class="mlabel">Mock scenes</p>
+        <button type="button" class="mbtn" id="mock-fight">Go to the recorded fight</button>
+        <button type="button" class="mbtn" id="mock-talk">Talk to the guard at the gate</button>
+        <button type="button" class="mbtn" id="mock-trade">Stand at the market counter</button>
+        <label class="check"><input type="checkbox" id="mock-wanted"> Wanted in Zhilvarnia</label>
+        <button type="button" class="mbtn quiet" id="mock-reset">Start again at the gate</button>
+        <p class="mnote">A mock. Nothing here reaches the engine or a model. Replies to your
+          clicks begin "Mock." and are never written to look like the narrator.</p>
+      </div>
+    </details>
+  </div>
+</header>
+
+<!-- The stage: the table's three places, the margin, the page and the rail, over the dock. -->
+<div class="stage" id="stage">
+  <div class="ribbon" id="ribbon" hidden></div>
+
+  <main class="book" id="book" aria-label="The story">
+    <div class="beats" id="beats" tabindex="-1" aria-live="polite"></div>
+    <button type="button" class="newbelow" id="newbelow" hidden>New lines below</button>
+  </main>
+
+  <aside class="rail" id="rail" aria-label="Here"></aside>
+
+  <form class="dock" id="dock" autocomplete="off">
+    <div class="dock-combat" id="dock-combat" hidden></div>
+    <div class="suggest" id="suggest" role="group" aria-label="Suggestions, each fills the pen"></div>
+    <div class="attached" id="attached" hidden></div>
+    <div class="penrow">
+      <label class="vh" for="pen">What do you do?</label>
+      <textarea id="pen" rows="1" placeholder="What do you do?"></textarea>
+      <button type="submit" class="act primary" id="act">Act</button>
+    </div>
+    <div class="deskrow" id="deskrow">
+      <button type="button" class="desk" id="say">Say</button>
+      <button type="button" class="desk" id="continue" title="You keep doing what you are doing, and the world moves a beat">Continue</button>
+      <button type="button" class="desk" id="craft" aria-expanded="false" aria-controls="pop-craft">Craft action</button>
+      <button type="button" class="desk" id="trade">Trade</button>
+      <button type="button" class="desk" id="cast" aria-expanded="false" aria-controls="pop-cast">Cast</button>
+      <button type="button" class="desk here-btn" id="herebtn" aria-controls="rail" aria-expanded="false">Here</button>
+    </div>
+    <div class="pop" id="pop-craft" hidden></div>
+    <div class="pop" id="pop-cast" hidden></div>
+  </form>
+</div>
+
+<!-- The views that replace the table. -->
+<section class="view" id="view-character" hidden aria-label="Character"></section>
+<section class="view" id="view-gear" hidden aria-label="Gear"></section>
+<section class="view" id="view-spells" hidden aria-label="Spells"></section>
+<section class="view" id="view-journal" hidden aria-label="Journal"></section>
+<section class="view" id="view-map" hidden aria-label="Map"></section>
+
+<!-- Overlays: the counter, a journey, a number's reasons, a spell's text, the clock. -->
+<div class="sheet-back" id="trade-back" hidden>
+  <section class="tradesheet" id="tradesheet" role="dialog" aria-modal="true" aria-labelledby="trade-title"></section>
+</div>
+<dialog class="modal" id="journey"></dialog>
+<dialog class="modal" id="details"></dialog>
+<div class="why" id="why" role="tooltip" hidden></div>
+<div class="clockpop" id="clockpop" hidden aria-live="polite"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="data.js?v=12"></script>
+<script src="../../../play/static/js/dice3d.js"></script>
+<script src="../../../play/static/js/scene3d.js"></script>
+<script src="core.js?v=12"></script>
+<script src="table.js?v=12"></script>
+<script src="fight.js?v=12"></script>
+<script src="views.js?v=12"></script>
+<script src="trade.js?v=12"></script>
+</body>
+</html>
