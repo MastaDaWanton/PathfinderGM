@@ -3872,9 +3872,18 @@ def _spell_sheet(actor: Actor) -> dict | None:
         "caster_level": casting.caster_level(actor),
         "highest": casting.highest_spell_level(actor),
         "note": data.get("note", ""),
+        # `held`, `open` and `blocked` are the room rule's own answers (casting.open_slots,
+        # casting.prepare_refusal), so the Spells tab draws spent / ready / open sockets
+        # and disables Prepare with the endpoint's sentence rather than re-deriving the
+        # rule in JavaScript. Measured 2026-09-29: the tab read "1 of 2 left" beside two
+        # prepared spells because nothing told it a spent slot is not an open one.
         "slots": [{"level": lvl, "max": total,
                    "left": casting.slots_left(actor, lvl),
-                   "dc": casting.save_dc(actor, lvl)}
+                   "dc": casting.save_dc(actor, lvl),
+                   **({"held": casting.held_at(actor, lvl),
+                       "open": casting.open_slots(actor, lvl),
+                       "blocked": casting.prepare_refusal(actor, lvl)}
+                      if data.get("kind") == "prepared" else {})}
                   for lvl, total in sorted(casting.slots_for(actor).items())],
         # The two a cleric took, and the extra slot each spell level gets because of them:
         # "one domain spell slot for each level of cleric spell she can cast" (item 27).

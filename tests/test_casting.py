@@ -379,7 +379,12 @@ def test_preparing_over_the_wire(client, wizard_campaign):
 
 
 def test_you_cannot_prepare_more_copies_than_you_have_slots(client, wizard_campaign):
-    """A wizard cannot memorise five fireballs into two slots."""
+    """A wizard cannot memorise five fireballs into two slots.
+
+    The refusal pinned "has 2 level 3 slots and has already prepared 2" until 2026-09-29;
+    that sentence reached the owner as raw red text over the Spells tab, and its room
+    count forgot the slots already spent today (tests/test_spells_prepare_midday.py). It
+    is `casting.prepare_refusal`'s plain sentence now, with the level for the page."""
     for _ in range(2):
         client.post("/api/spells/prepare",
                     data={"action": "prepare", "spell": "fireball"},
@@ -388,7 +393,8 @@ def test_you_cannot_prepare_more_copies_than_you_have_slots(client, wizard_campa
                       data={"action": "prepare", "spell": "fireball"},
                       content_type="application/json")
     assert res.status_code == 409
-    assert "already prepared 2" in res.json()["error"]
+    assert res.json()["error"] == "No open level 3 slot today. Unprepare one first."
+    assert res.json()["level"] == 3
 
 
 def test_you_cannot_prepare_a_spell_off_your_list(client, wizard_campaign):

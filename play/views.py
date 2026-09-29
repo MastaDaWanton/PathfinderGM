@@ -1231,20 +1231,6 @@ def feat_search(request):
     })
 
 
-def _level_of(actor, spell_id: str):
-    """The spell's level for this caster, or None if this build does not ship it.
-
-    A prepared list can name a spell a later build removed or renamed. Raising here would
-    make the whole spell page 500 over one stale id.
-    """
-    from rules import casting, spells as spells_mod
-
-    try:
-        return casting.spell_level_for(actor, spells_mod.get(spell_id))
-    except KeyError:
-        return None
-
-
 @require_POST
 def prepare_spells(request):
     """Prepare, unprepare, or add a spell to the book.
@@ -1303,15 +1289,17 @@ def prepare_spells(request):
         if not casting.knows(pc, spell):
             return JsonResponse(
                 {"error": f"{spell.name} is not in {pc.name}'s spellbook"}, status=400)
-        # Counted against the slots of that level, including what is already prepared:
-        # a wizard cannot memorise five fireballs into two slots.
-        holding = sum(n for sid, n in pc.prepared.items()
-                      if _level_of(pc, sid) == level)
-        room = casting.slots_for(pc).get(level, 0)
-        if holding + count > room:
-            return JsonResponse(
-                {"error": f"{pc.name} has {room} level {level} slots and has already "
-                          f"prepared {holding}"}, status=409)
+        # Counted against the OPEN slots of that level (`casting.open_slots`): the ones
+        # not spent today, less what is already prepared. A wizard cannot memorise five
+        # fireballs into two slots, and cannot refill a slot spent today before a rest
+        # (CRB, "Preparing Wizard Spells"). This read slots-per-day minus held until
+        # 2026-09-29, and let Ysolde prepare Burning Hands again into the slot her cast
+        # had just spent. The refusal is the sentence the Spells tab shows beside the
+        # disabled button, in plain words, with `level` so the page can place it.
+        refused = casting.prepare_refusal(pc, level, count)
+        if refused:
+            return JsonResponse({"error": refused, "level": level,
+                                 "spell": spell.id}, status=409)
         casting.prepare(pc, spell.id, count)
     elif action == "unprepare":
         casting.unprepare(pc, spell.id, count)

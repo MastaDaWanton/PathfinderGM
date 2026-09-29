@@ -791,8 +791,9 @@ function tabSpells(s) {
   </div>`;
 }
 
-// The left column. Slots are gem sockets, lit while a slot is left and dark once spent,
-// so "how much have I got" is read at a glance before the numbers are.
+// The left column. Slots are gem sockets, lit while a prepared spell waits in one, red
+// once spent today, dark while open (`slotSockets`), so "how much have I got" is read at
+// a glance before the numbers are.
 function casterStats(sp) {
   // Cantrips are never spent ("not expended when cast", AoN, Wizard; "do not consume any
   // slots", Sorcerer), so their row counts nothing down. A prepared caster's gems there
@@ -809,16 +810,7 @@ function casterStats(sp) {
           `<i class="gem${i < heldCantrips ? " lit" : ""}"></i>`).join("")}</div>
       <div class="sock-count">${Math.min(heldCantrips, sl.max)} of ${sl.max} prepared, at will</div>`
       : `<div class="sock-count">At will</div>`}
-    </li>` : `
-    <li class="sock-level">
-      <div class="sock-head"><span>${levelName(sl.level)}</span>
-        <span class="sock-dc">DC ${sl.dc}</span></div>
-      <div class="sock-gems" role="img"
-           aria-label="${sl.left} of ${sl.max} level ${sl.level} slots left">${
-        Array.from({ length: sl.max }, (_, i) =>
-          `<i class="gem${i < sl.left ? " lit" : ""}"></i>`).join("")}</div>
-      <div class="sock-count${sl.left ? "" : " spent"}">${sl.left} of ${sl.max} left</div>
-    </li>`).join("");
+    </li>` : slotSockets(sp, sl)).join("");
   return `<section class="card sx-stats" aria-labelledby="sx-stats-h">
     <h3 id="sx-stats-h">Caster stats</h3>
     <div class="terms">
@@ -843,6 +835,56 @@ function casterStats(sp) {
     ${sp.note ? `<p class="sx-note">${esc(sp.note)}</p>` : ""}
   </section>`;
 }
+
+// A spell level's sockets, one per slot, in three states (owner, 2026-09-29: "perhaps a
+// red bubble instead of a bronze one to indicate a spent slot"):
+//   lit (bronze)  a prepared spell waiting in it;
+//   spent (red)   cast today, and not refilled until a rest: "He cannot... fill a slot
+//                 that is empty because he has cast a spell in the meantime" (CRB,
+//                 Preparing Wizard Spells);
+//   dark          open, nothing prepared in it yet.
+// Until then a spent socket was dark like an open one, and the page could not show the
+// difference the owner's Ysolde fell into: 1 of 2 left, and that one already full.
+// Each socket names its state and the line under them says it in words (WCAG 1.4.1),
+// so the colour is never the only way to read it. The counts are the sheet's own
+// (`held`, `open`, from rules/casting.py); a spontaneous caster has no held spells, so
+// their unspent slots are all ready.
+function slotSockets(sp, sl) {
+  const spent = Math.max(0, sl.max - sl.left);
+  const prepared = sp.kind === "prepared";
+  const ready = prepared ? Math.min(sl.held || 0, sl.left) : sl.left;
+  const open = prepared ? Math.max(0, sl.left - ready) : 0;
+  const name = `Level ${sl.level} slot`;
+  const gems = [
+    ...Array.from({ length: ready }, () =>
+      `<i class="gem lit" role="img" aria-label="${name}: ${prepared ? "prepared, ready" : "ready"}"></i>`),
+    ...Array.from({ length: open }, () =>
+      `<i class="gem" role="img" aria-label="${name}: open"></i>`),
+    ...Array.from({ length: spent }, () =>
+      `<i class="gem spent" role="img" aria-label="${name}: spent today"></i>`),
+  ].join("");
+  const words = prepared ? `${ready} ready, ${spent} spent, ${open} open`
+                         : `${sl.left} left, ${spent} spent`;
+  return `
+    <li class="sock-level">
+      <div class="sock-head"><span>${levelName(sl.level)}</span>
+        <span class="sock-dc">DC ${sl.dc}</span></div>
+      <div class="sock-gems" role="group" aria-label="Level ${sl.level} slots">${gems}</div>
+      <div class="sock-count${sl.left ? "" : " spent"}">${words}</div>
+    </li>`;
+}
+
+// Why Prepare is off at a level, or "": the engine's own sentence (rules/casting.py
+// `prepare_refusal`, sent per level as `blocked`), the one the endpoint would refuse with.
+// A short form sits in a grimoire row, where the sentence would repeat down the list.
+const prepBlocked = (sp, level) => {
+  const sl = (sp.slots || []).find(x => x.level === level);
+  return sp.kind === "prepared" && sl && sl.blocked ? sl : null;
+};
+// The owner's words for a spent level (2026-09-29).
+const prepShort = sl => (sl.level > 0 && !sl.left
+  ? "Spent for today; it comes back after a long rest." : "No open slot; unprepare one first.");
+const prepNoteId = level => `sx-full-${level}`;
 
 // The cantrips this caster may cast right now: a prepared caster's prepared ones (a
 // wizard "can prepare a number of cantrips… each day", and a cleric's orisons read the
@@ -869,12 +911,21 @@ function preparedToday(sp) {
   const cantrips = new Map(cantripsToday(sp).map(k => [k.id, k]));
   const cantripRoom = slots.get(0) ? slots.get(0).max : 0;
 
+  // The slot count once, in the level's header. It sat on every card until 2026-09-29,
+  // so two cards read "1 of 2 level 1 slots left" each and looked like two free slots.
+  // Under the header, when Prepare is off at this level, the reason, which every card's
+  // disabled Prepare points to.
   const levels = [...new Set(today.map(k => k.level))].sort((a, b) => a - b);
-  const cards = levels.map(lvl => `
+  const cards = levels.map(lvl => {
+    const sl = slots.get(lvl);
+    const off = prepared ? prepBlocked(sp, lvl) : null;
+    return `
     <h4 class="sx-sub sx-levelhead">${levelName(lvl)}${
-      slots.get(lvl) ? ` <small>DC ${slots.get(lvl).dc}</small>` : ""}</h4>
+      sl ? ` <small>DC ${sl.dc}, ${sl.left} of ${sl.max} slots left</small>` : ""}</h4>
+    ${off ? `<p class="sx-full" id="${prepNoteId(lvl)}">${esc(off.blocked)}</p>` : ""}
     <div class="spcards">${today.filter(k => k.level === lvl)
-      .map(k => spellCard(k, slots.get(lvl), prepared)).join("")}</div>`).join("");
+      .map(k => spellCard(k, off, prepared)).join("")}</div>`;
+  }).join("");
 
   const cantripRows = [...cantrips.values()].sort((a, b) => a.name.localeCompare(b.name));
   const heading = prepared ? "Prepared today" : "Known";
@@ -916,16 +967,19 @@ function preparedToday(sp) {
   </section>`;
 }
 
-function spellCard(k, slot, prepared) {
+// `off` is the level's blocked slot row (`prepBlocked`) or null: Prepare is disabled and
+// described by the level's reason line, so the button that does nothing says why.
+function spellCard(k, off, prepared) {
   const school = schoolKey(k.school);
   // The mockup's strip reads Range, Casting time, Saving throw. The sheet does not send
   // a casting time (rules/sheet.py `_spell_sheet`); components stand in until it does,
-  // and the cell switches to Casting time by itself the day the field arrives.
+  // and the cell switches to Casting time by itself the day the field arrives. "Parts",
+  // not "Components": measured 2026-09-29, the label was cut to "COMPONEN…" in its
+  // column at desktop; the full word stays in the cell's title.
   const middle = k.casting_time
-    ? ["Casting time", spellCap(String(k.casting_time))]
-    : ["Components", (k.components || []).join(", ") || "None"];
+    ? ["Cast time", spellCap(String(k.casting_time)), "Casting time"]
+    : ["Parts", (k.components || []).join(", ") || "None", "Components"];
   const save = saveShort(k.save);
-  const left = slot ? `${slot.left} of ${slot.max} level ${k.level} slots left` : "";
   return `<article class="spcard" style="--school: var(--sc-${school})"
       aria-label="${esc(k.name)}">
     <header class="spcard-head">
@@ -935,18 +989,18 @@ function spellCard(k, slot, prepared) {
     </header>
     <dl class="spcard-strip">
       <div><dt>Range</dt><dd title="${esc(k.range || "")}">${esc(rangeShort(k.range))}</dd></div>
-      <div><dt>${middle[0]}</dt><dd>${esc(middle[1])}</dd></div>
+      <div><dt title="${middle[2]}">${middle[0]}</dt><dd>${esc(middle[1])}</dd></div>
       <div><dt>Save</dt><dd title="${esc(k.save || "")}">${esc(save)}</dd></div>
     </dl>
     <p class="spcard-line">Duration: ${esc(spellCap(plainMeasure(k.duration)) || "not stated")}</p>
-    <p class="spcard-count">${prepared ? `<b>${k.prepared}</b> prepared` : ""}${
-      prepared && left ? "<br>" : ""}${left}</p>
+    ${prepared ? `<p class="spcard-count"><b>${k.prepared}</b> prepared</p>` : ""}
     <div class="spcard-act">
       <button type="button" class="prepbtn castbtn" data-spell="${esc(k.id)}"
               data-name="${esc(k.name)}" aria-label="Cast ${esc(k.name)}">Cast</button>
       ${prepared ? `
         <button type="button" class="spbtn" data-spell="${esc(k.id)}" data-action="prepare"
-                data-name="${esc(k.name)}" aria-label="Prepare another ${esc(k.name)}">Prepare</button>
+                data-name="${esc(k.name)}" aria-label="Prepare another ${esc(k.name)}"${
+                off ? ` disabled aria-describedby="${prepNoteId(k.level)}"` : ""}>Prepare</button>
         <button type="button" class="spbtn quiet" data-spell="${esc(k.id)}"
                 data-action="unprepare" data-name="${esc(k.name)}"
                 aria-label="Unprepare one ${esc(k.name)}">Unprepare</button>` : ""}
@@ -1025,12 +1079,18 @@ function grimoireList(sp) {
     const castIt = `<button type="button" class="prepbtn castbtn" data-spell="${esc(s.id)}"
            data-name="${esc(s.name)}" aria-label="Cast ${esc(s.name)}">Cast</button>`;
     const cantripReady = s.level === 0 && (!prepared || s.prepared > 0);
+    // No open slot at this level: Prepare stays in its place, disabled, with the short
+    // reason under the name and the engine's whole sentence as its description. Until
+    // 2026-09-29 it stayed live and the press came back as red text at the column's top.
+    const off = !cantripReady && s.castable ? prepBlocked(sp, s.level) : null;
+    const whyId = off ? `gx-why-${esc(s.id)}` : "";
     const act = cantripReady ? castIt
       : s.castable
         ? `<button type="button" class="spbtn" data-spell="${esc(s.id)}" data-action="${action}"
-             data-name="${esc(s.name)}" aria-label="${verb} ${esc(s.name)}">${verb}</button>`
+             data-name="${esc(s.name)}" aria-label="${verb} ${esc(s.name)}"${
+             off ? ` disabled aria-describedby="${whyId}"` : ""}>${verb}</button>`
         : `<span class="gx-notyet">Not yet</span>`;
-    const drag = s.castable && !cantripReady;
+    const drag = s.castable && !cantripReady && !off;
     return `<li class="gx-row" style="--school: var(--sc-${school})"
         data-spell="${esc(s.id)}" data-name="${esc(s.name)}"${drag ? ` draggable="true"` : ""}>
       <span class="gx-grip${drag ? "" : " off"}" aria-hidden="true"></span>
@@ -1039,6 +1099,8 @@ function grimoireList(sp) {
         <small>${esc([SPELL_SCHOOLS[school].label, rangePhrase(s.range),
                       plainMeasure(s.duration)].filter(Boolean).join(", "))}</small>
         ${s.prepared ? `<small class="gx-have">${s.prepared} prepared</small>` : ""}
+        ${off ? `<small class="gx-why" id="${whyId}" title="${esc(off.blocked)}">${
+          prepShort(off)}</small>` : ""}
         ${detailsButton(s, "sx-more")}</span>
       <span class="gx-lvl" title="Spell level ${s.level}"><span class="sr">Level </span>${s.level}</span>
       ${act}
@@ -1325,28 +1387,49 @@ document.addEventListener("click", e => {
   // 2026-09-29 on the old tab: every Cast press also prepared the spell once more.
   const prep = e.target.closest("#sheetbody [data-spell][data-action]");
   if (prep && !prep.disabled) {
-    return prepareSpell(prep.dataset.spell, prep.dataset.action, prep.dataset.name);
+    return prepareSpell(prep.dataset.spell, prep.dataset.action, prep.dataset.name, prep);
   }
 });
 
-function spellsSay(text, isError = false) {
+function spellsSay(text) {
   const out = document.getElementById("spellsay");
   if (!out) return;
-  out.classList.toggle("err", isError);
   // Emptied first and filled a beat later, so a region that was just redrawn still
   // announces, and the same sentence twice is still spoken twice.
   out.textContent = "";
   setTimeout(() => { out.textContent = text; }, 30);
 }
 
+// A refusal goes beside the card or row it is about, in the page's quiet notice style,
+// not at the column's top in red. Measured 2026-09-29 (the owner's screenshot): "Ysolde
+// Marrach has 2 level 1 slots and has already prepared 2" sat in red above both cards,
+// naming neither and reading like a crash. The endpoint's words are plain sentences now
+// (rules/casting.py `prepare_refusal`), and the note lands in the pressed button's card,
+// row or cantrip line; a drop has no button, so it lands on the grimoire row the spell
+// was carried from (the column's live region only if that row is filtered away).
+function spellsRefused(spell, text, from) {
+  document.querySelectorAll("#sheetbody .sx-refused").forEach(n => n.remove());
+  const near = (from && from.closest && from.closest(".spcard, .gx-row, .sx-cantrip"))
+    || document.querySelector(`#sheetbody .gx-row[data-spell="${CSS.escape(spell)}"]`);
+  const note = document.createElement("p");
+  note.className = "sx-refused";
+  note.setAttribute("role", "status");
+  if (!near) { spellsSay(text); return; }
+  note.textContent = text;
+  const slot = near.querySelector(".spcard-act, .gx-text, .sx-cname");
+  (slot || near).insertAdjacentElement(slot && slot.classList.contains("spcard-act")
+    ? "beforebegin" : "beforeend", note);
+}
+
 // The server refuses over-preparing and casting what was never prepared; the page only
 // asks. Checking the slot arithmetic here as well would be a second implementation of a
-// rule, and the one on screen is the one the player would believe.
+// rule, and the one on screen is the one the player would believe: a disabled Prepare
+// reads the sheet's `blocked` sentence, which is the endpoint's own refusal.
 //
 // The redraw keeps the reader where they were: `drawSheet` scrolls to the top, and a
 // Prepare pressed halfway down the grimoire used to throw the list away from under the
 // pointer. The scroll positions and the focused button come back after it.
-async function prepareSpell(spell, action, name) {
+async function prepareSpell(spell, action, name, from = null) {
   const body = $("#sheetbody");
   const list = () => document.querySelector("#gx-list .gx-rows");
   const keep = { top: body.scrollTop, list: list() ? list().scrollTop : 0,
@@ -1357,7 +1440,7 @@ async function prepareSpell(spell, action, name) {
   try {
     SHEET = await post("/api/spells/prepare", {action, spell});
   } catch (e) {
-    spellsSay(e.message || String(e), true);
+    spellsRefused(spell, e.message || String(e), from);
     return;
   }
   drawSheet();

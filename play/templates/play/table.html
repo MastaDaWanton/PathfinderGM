@@ -422,7 +422,13 @@
   .sx-empty { color: var(--dim); font: italic 14px/1.5 var(--display); padding: 6px 0; }
   .sx-say { min-height: 1.5em; margin: 0 0 4px; color: var(--accent);
             font: 13.5px/1.5 var(--body); }
-  .sx-say.err { color: #e0897c; }
+  /* Why Prepare is off at a level (under the level's heading), and a refusal the
+     endpoint sent back (in the card or row it is about). The page's quiet notice voice,
+     not an alarm: the red status line at the column's top that these replace read
+     like a crash and named no spell (2026-09-29). */
+  .sx-full { margin: -2px 0 10px; color: var(--dim); font: italic 13.5px/1.5 var(--body); }
+  .sx-refused { margin: 8px 12px 0; color: var(--gold); font: italic 13px/1.45 var(--body); }
+  .gx-text .sx-refused, .sx-cname .sx-refused { margin: 3px 0 0; }
 
   /* The glyphs: game-icons.net art, one colour per school. The box has its size before
      the SVG arrives, so the fetch cannot shift anything. */
@@ -430,9 +436,10 @@
                  color: var(--school, var(--gold)); }
   .spells3 .gi svg { display: block; width: 100%; height: 100%; }
 
-  /* Left: the slots as gem sockets. A gilt bezel round a dark well; a slot still to spend
-     holds a candle-amber stone, a spent one is an empty socket. Colour and the count in
-     words both carry it, so neither is the only way to read it. */
+  /* Left: the slots as gem sockets. A gilt bezel round a dark well; a slot holding a
+     prepared spell is a candle-amber stone, a slot spent today a blood-red one (owner,
+     2026-09-29), an open slot the empty well. Colour, each socket's name and the count in
+     words all carry it, so colour is never the only way to read it. */
   .sockets { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
   .sock-head { display: flex; justify-content: space-between; align-items: baseline;
                font: 13px/1.4 var(--body); color: var(--ink); }
@@ -454,6 +461,21 @@
       radial-gradient(circle at 36% 30%, #fff4cf 0 7%, #f0c070 24%, #c07a2a 60%, #5a3210);
     box-shadow: inset 0 -2px 3px rgba(60,25,5,.65), 0 0 0 1px #8a6f3e,
                 0 0 0 3px #16110c, 0 0 0 4px #7d6845, 0 0 9px rgba(var(--ember), .45);
+  }
+  /* Spent: the lit stone's cut and depth in the page's own blood tokens (--alarm,
+     --bloodglow, --blood), no new colour. It keeps the dark socket's outer ring and
+     loses the glow: the stone is there, and used up. */
+  .gem.spent {
+    background:
+      conic-gradient(from 30deg, rgba(255,246,214,.14) 0 16%, transparent 0 33%,
+                     rgba(255,246,214,.08) 0 50%, transparent 0 66%,
+                     rgba(255,246,214,.11) 0 83%, transparent 0),
+      radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--alarm) 45%, #fff4cf) 0 7%,
+                      var(--alarm) 24%, rgb(var(--bloodglow)) 46%, var(--blood) 72%,
+                      color-mix(in srgb, var(--blood) 55%, #070504));
+    box-shadow: inset 0 -2px 3px rgba(20,4,4,.7),
+                0 0 0 1px color-mix(in srgb, var(--blood) 60%, #8a6f3e),
+                0 0 0 3px #16110c, 0 0 0 4px #3f3324;
   }
   .sock-count { font: 12.5px/1.4 var(--body); color: var(--ink);
                 font-variant-numeric: tabular-nums; }
@@ -496,9 +518,11 @@
   }
   .spcard-strip > div { padding: 7px 8px; min-width: 0; }
   .spcard-strip > div + div { border-left: 1px solid #2b2319; }
+  /* Never an ellipsis: "Components" was cut to "COMPONEN…" at desktop (2026-09-29).
+     The labels are short words now ("Parts"), and a label that still meets a narrow
+     column wraps at its space rather than losing letters. */
   .spcard-strip dt { color: var(--dim); font: 400 11px/1.2 var(--display);
-                     letter-spacing: .02em; white-space: nowrap; overflow: hidden;
-                     text-overflow: ellipsis; }
+                     letter-spacing: .02em; }
   /* Two lines at most: "Will negates (harmless)" is worth reading whole, and the rare
      save that runs longer keeps its full text in the title. */
   .spcard-strip dd { margin: 2px 0 0; color: var(--ink); font: 13px/1.3 var(--body);
@@ -567,6 +591,7 @@
   .gx-text b { display: block; font: 400 14.5px/1.3 var(--body); color: var(--ink); }
   .gx-text small { display: block; color: var(--dim); font: 12.5px/1.35 var(--body); }
   .gx-text .gx-have { color: var(--accent); }
+  .gx-text .gx-why { font-style: italic; }
   .gx-lvl {
     display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
     font: 400 13px/1 var(--display); color: var(--gold);
