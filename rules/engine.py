@@ -3362,7 +3362,6 @@ class Engine:
         Somebody's house, unless its door has been broken; a keeper's shop under a roof
         in the small hours, when the counter is shut and they are abed (a tavern or an
         inn never shuts)."""
-        from . import keepers
         from . import places as places_mod
         from . import residency
 
@@ -3380,16 +3379,10 @@ class Engine:
                 return None
             callee = self._callee_of_body(body)
         else:
-            keeper = keepers.keeper_in(self.scene, target.id)
-            # A SHOP whose keeper lives above it. A guardhouse is manned all night and a
-            # guildhall is nobody's home: measured by the storeys suite, walking into the
-            # guardhouse at midnight was refused as if it were a baker's.
-            kind = keepers.kind_of(target.id, self.scene.founded)
-            if (keeper is None or not keepers.lives_in(target.id)
-                    or places_mod.category_of(f"the {kind}") != "trade"
-                    or residency.slot_of(self.scene.clock_minutes) not in self._NIGHT_SLOTS
-                    or keepers.open_now(target.id, self.scene.clock_minutes,
-                                        self.scene.founded)):
+            # A shop shut for the night (`shut_for_the_night`, the one test the exits
+            # row asks too).
+            keeper = self.shut_for_the_night(target)
+            if keeper is None:
                 return None
             callee = self._callee_of_body(keeper)
         let_in, said = self._knock(callee, target)
@@ -7029,16 +7022,9 @@ class Engine:
         # The warrant reads the road, exactly as it reads the gate. Leaving town by the
         # highway is the most public way out there is, and `_op_travel` already refuses
         # the open road to somebody who is wanted — this is that rule, one scale up.
-        if pc is not None:
-            law = states.standing_with_the_law(
-                pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
-            if law == "wanted" and not pc.has_state("knows.way-past-gate"):
-                found = self.world.get(self.scene.location_id) if self.world else None
-                return self._refuse(
-                    intent,
-                    f"{pc.name} is wanted in {getattr(found, 'name', 'this town')}, and "
-                    f"the road out is watched: they would be taken before the first "
-                    f"milestone. Clear your name, or find another way past the watch.")
+        watched = self.watch_on_the_road(pc)
+        if watched:
+            return self._refuse(intent, watched)
 
         speed = pc.speed_feet if pc is not None else 30
         hours, measured, how = journey_mod.hours_for(leg, speed)
@@ -7369,6 +7355,102 @@ class Engine:
             tell=" ".join(bits),
             because=intent.because,
         )
+
+    def watch_at_the_way_out(self, pc, was_place: str, going_to, known) -> tuple[str, str]:
+        """(refusal, line) for walking from `was_place` to `going_to` past the watch.
+
+        The gate's reading of the warrant, as `_op_travel` has always applied it — moved
+        here, unchanged, so the exits row (play/exits.py, I6) asks the SAME question
+        before a button is offered rather than a second copy of the rule deciding which
+        ways out look open. `refusal` is the sentence a wanted character is refused with;
+        `line` is the suspected character's look-twice. Both "" when the watch has
+        nothing to say. Reads nothing that a walk changes, so asking is free.
+        """
+        from . import places as places_mod
+
+        if pc is None:
+            return "", ""
+        town = places_mod.location_of(was_place) or self.scene.location_id
+        law = states.standing_with_the_law(pc, town)
+        if not law:
+            return "", ""
+        # Any way in or out, not the literal word "gate". `places.ENTRANCES` is the
+        # one list, so the generator and the law cannot disagree about what an
+        # entrance is — and a village, which has a road rather than a gate, was
+        # somewhere a warrant could never be enforced at all.
+        at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
+        # Any way OUT, by place as well as by biome (Lane B, docs/fix-interfaces.md
+        # §1.3 B3). This read `bool(want)`, so a travel by PLACE to ground outside —
+        # which is how the outskirts and the road heads are entered — walked past the
+        # watch unasked. Leaving is from inside to outside, whatever the plan named;
+        # the founded and ventured ground stays the "another way" the refusal names.
+        open_road = places_mod.setting_of(was_place) != "outside" \
+            and places_mod.setting_of(going_to.id) == "outside" \
+            and going_to.origin not in ("found", "venture") \
+            and not (going_to.terrain == places_mod.URBAN)
+        # A way past the watch that somebody showed you — a scheme's witness, a
+        # smuggler's door — is a tag the player holds (`knows.way-past-gate`), and
+        # the road is open to them by it; the gate itself stays shut.
+        has_way = pc.has_state("knows.way-past-gate")
+        if not (at_gate or (open_road and not has_way)):
+            return "", ""
+        found = self.world.get(self.scene.location_id) if self.world else None
+        town_name = str(getattr(found, "name", "") or "the town")
+        if law == "wanted":
+            other_ways = [p.name for p in known
+                          if p.origin in ("found", "venture")
+                          and not p.described_only
+                          and p.terrain != places_mod.URBAN]
+            how = (f"Leave by another way — {', '.join(other_ways)} — or "
+                   f"clear your name."
+                   if other_ways else
+                   "Leave by another way — ground you have founded or "
+                   "ventured into outside the walls — or clear your name.")
+            return (f"{pc.name} is wanted in {town_name}, and the gate is where the "
+                    f"watch stands: they would take you at the arch. {how}"), ""
+        return "", (f"Your name is on the watch's lips in {town_name}: the guards at "
+                    f"the gate look twice, and let you through.")
+
+    def watch_on_the_road(self, pc) -> str:
+        """Why a journey out of here is refused to this character by the law, or "".
+
+        `_op_journey`'s warrant check, given a name for the same reason as
+        `watch_at_the_way_out`: the exits row greys the road with this sentence."""
+        from . import places as places_mod
+
+        if pc is None:
+            return ""
+        law = states.standing_with_the_law(
+            pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
+        if law != "wanted" or pc.has_state("knows.way-past-gate"):
+            return ""
+        found = self.world.get(self.scene.location_id) if self.world else None
+        return (f"{pc.name} is wanted in {getattr(found, 'name', 'this town')}, and "
+                f"the road out is watched: they would be taken before the first "
+                f"milestone. Clear your name, or find another way past the watch.")
+
+    def shut_for_the_night(self, target):
+        """The keeper asleep behind this shop's shut door at this hour, or None.
+
+        `_at_their_door`'s test for a shop, without the knock: a keeper who lives above
+        a trade counter, in the night slots, with the counter shut. Named so the exits
+        row greys the same doors the travel knocks at, from one rule."""
+        from . import keepers
+        from . import places as places_mod
+        from . import residency
+
+        keeper = keepers.keeper_in(self.scene, target.id)
+        # A SHOP whose keeper lives above it. A guardhouse is manned all night and a
+        # guildhall is nobody's home: measured by the storeys suite, walking into the
+        # guardhouse at midnight was refused as if it were a baker's.
+        kind = keepers.kind_of(target.id, self.scene.founded)
+        if (keeper is None or not keepers.lives_in(target.id)
+                or places_mod.category_of(f"the {kind}") != "trade"
+                or residency.slot_of(self.scene.clock_minutes) not in self._NIGHT_SLOTS
+                or keepers.open_now(target.id, self.scene.clock_minutes,
+                                    self.scene.founded)):
+            return None
+        return keeper
 
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.
@@ -7741,45 +7823,9 @@ class Engine:
         # lets you through, which is the difference between the two states.
         law_line = ""
         if moved and pc is not None:
-            town = places_mod.location_of(was_place) or self.scene.location_id
-            law = states.standing_with_the_law(pc, town)
-            # Any way in or out, not the literal word "gate". `places.ENTRANCES` is the
-            # one list, so the generator and the law cannot disagree about what an
-            # entrance is — and a village, which has a road rather than a gate, was
-            # somewhere a warrant could never be enforced at all.
-            at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
-            # Any way OUT, by place as well as by biome (Lane B, docs/fix-interfaces.md
-            # §1.3 B3). This read `bool(want)`, so a travel by PLACE to ground outside —
-            # which is how the outskirts and the road heads are entered — walked past the
-            # watch unasked. Leaving is from inside to outside, whatever the plan named;
-            # the founded and ventured ground stays the "another way" the refusal names.
-            open_road = places_mod.setting_of(was_place) != "outside" \
-                and places_mod.setting_of(going_to.id) == "outside" \
-                and going_to.origin not in ("found", "venture") \
-                and not (going_to.terrain == places_mod.URBAN)
-            # A way past the watch that somebody showed you — a scheme's witness, a
-            # smuggler's door — is a tag the player holds (`knows.way-past-gate`), and
-            # the road is open to them by it; the gate itself stays shut.
-            has_way = pc.has_state("knows.way-past-gate")
-            if law and (at_gate or (open_road and not has_way)):
-                found = self.world.get(self.scene.location_id) if self.world else None
-                town_name = str(getattr(found, "name", "") or "the town")
-                if law == "wanted":
-                    other_ways = [p.name for p in known
-                                  if p.origin in ("found", "venture")
-                                  and not p.described_only
-                                  and p.terrain != places_mod.URBAN]
-                    how = (f"Leave by another way — {', '.join(other_ways)} — or "
-                           f"clear your name."
-                           if other_ways else
-                           "Leave by another way — ground you have founded or "
-                           "ventured into outside the walls — or clear your name.")
-                    return self._refuse(
-                        intent, f"{pc.name} is wanted in {town_name}, and the gate is "
-                                f"where the watch stands: they would take you at the "
-                                f"arch. {how}")
-                law_line = (f"Your name is on the watch's lips in {town_name}: the "
-                            f"guards at the gate look twice, and let you through.")
+            refused, law_line = self.watch_at_the_way_out(pc, was_place, going_to, known)
+            if refused:
+                return self._refuse(intent, refused)
 
         left: list[str] = []
         walked_back = 0

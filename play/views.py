@@ -108,6 +108,17 @@ def _where_state(c) -> dict:
         return {"where_label": "", "where_detail": "", "setting": ""}
 
 
+def _exits_state(c) -> list[dict]:
+    """`scene.exits`: the ways on from here, rebuilt from the engine every state (I6,
+    play/exits.py). The model never touches it; [] when there is nowhere to go from."""
+    from . import exits as exits_mod
+
+    try:
+        return exits_mod.exits(c.engine(), c.world)
+    except Exception:      # noqa: BLE001 — a row of buttons is never worth failing a turn
+        return []
+
+
 def _spellcasting_state(pc) -> dict:
     """How the PC casts, for the Spells button (design F §4.4): shown on `kind`, not on
     `pc.castable`, which offers a prepared caster's whole book when nothing is prepared
@@ -570,6 +581,9 @@ def _state(c) -> dict:
             **_where_state(c),
             "conversation": _conversation_state(c),
             "day_part": residency.day_part(c.scene.clock_minutes),
+            # The "From here" row (I6): every way on, from the engine's own graph, with
+            # the ones the rules would refuse greyed in the rules' own words.
+            "exits": _exits_state(c),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -1355,7 +1369,13 @@ def say(request):
     if bad:
         return JsonResponse({"error": bad}, status=400)
     typed = bool(text)
-    if not text and attached:
+    # A place from the "From here" row (I6): its own door below, after the checks every
+    # turn passes. Not drawn as a chip on the beat — "I go to the market." already says it.
+    place = next((a for a in attached if a.get("kind") == "place"), None)
+    if place is not None:
+        text = text or _go_line(place["name"])
+        typed = False
+    elif not text and attached:
         # A chip and nothing else is a turn: the player means the spell.
         text = f"I cast {attached[0]['name']}."
     if carry_on:
@@ -1424,9 +1444,13 @@ def say(request):
 
     # The player's line, with the chip drawn before it when there is one (design F §4.4);
     # the key only when sent, so every beat before attachments reads as it did.
-    beat = {"who": "player", "text": shown,
-            **({"attachments": [dict(a) for a in attached]} if attached else {})}
+    drawn = [dict(a) for a in attached if a.get("kind") != "place"]
+    beat = {"who": "player", "text": shown, **({"attachments": drawn} if drawn else {})}
     pc = c.scene.pc()
+    if place is not None and c.scene.in_encounter and pc is not None \
+            and c.scene.current_ref() != pc.ref:
+        # The combat bar's rule for a button that acts: not off-turn.
+        return JsonResponse({"error": "It is not your turn."}, status=409)
     if downed.state_of(pc) not in ("fine", "disabled"):
         c.transcript.append(beat)
         outcome = downed.resolve(c)
@@ -1447,6 +1471,8 @@ def say(request):
         return JsonResponse(_state(c))
 
     c.transcript.append(beat)
+    if place is not None:
+        return _take_the_exit(c, place, text)
     world = c.world
     agent = GMAgent(world, c.engine())
     _arm_cards(agent, c)
@@ -1843,13 +1869,16 @@ def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, 
         return (), "Attachments must be a list."
     if len(raw) > 1:
         return (), "Only one spell can be attached to a turn."
+    item = raw[0]
+    # A place from the "From here" row (I6) keeps its own rules (`_read_place`).
+    if isinstance(item, dict) and item.get("kind") == "place":
+        return _read_place(c, item, text, carry_on)
     if carry_on:
         return (), "A spell cannot be attached to Continue — say what you do with it."
     if _CHEAT.match(text) or _GM.match(text):
         return (), "A spell cannot be attached to /gm or /cheat."
-    item = raw[0]
     if not isinstance(item, dict) or item.get("kind") != "spell":
-        return (), "Only a spell can be attached to a turn."
+        return (), "Only a spell or a place can be attached to a turn."
     spell_id = str(item.get("id") or "").strip()
     try:
         spell = spells_mod.get(spell_id)
@@ -1867,6 +1896,99 @@ def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, 
             return (), _aim_help(aim)
         out["aim"] = aim
     return (out,), ""
+
+
+def _go_line(name: str) -> str:
+    """The line a click on the exits row sends and shows: "I go to the market."."""
+    return f"I go to {name}."
+
+
+def _read_place(c, item: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
+    """A place from the "From here" row (I6), checked at the door like a spell chip.
+
+    It must be one of `scene.exits` as the engine builds them this moment — never a
+    place the page remembered from an earlier state — and not one the rules would
+    refuse; a journey (days on the clock) must carry `confirmed`, which the row's second
+    click sends. The words are ours or none: an exit is its own turn, so a line that says
+    something else beside it would be a line the engine silently ignored."""
+    from . import exits as exits_mod
+
+    if carry_on:
+        return (), "A place cannot be attached to Continue. Choose where to go, or continue."
+    if _CHEAT.match(text) or _GM.match(text):
+        return (), "A place cannot be attached to /gm or /cheat."
+    place_id = str(item.get("id") or "").strip()
+    try:
+        found = exits_mod.exits(c.engine(), c.world)
+    except Exception:      # noqa: BLE001 — an unreadable graph offers nowhere to go
+        found = []
+    exit_ = exits_mod.find(found, place_id)
+    if exit_ is None:
+        names = ", ".join(e["name"] for e in found)
+        return (), (f"There is no way from here to {place_id or 'there'}."
+                    + (f" From here you can go to {names}." if names else ""))
+    if exit_["blocked"]:
+        return (), exit_["blocked"]
+    if exit_["journey"] and item.get("confirmed") is not True:
+        return (), (f"{exit_['name']}: {exit_['time_words']}. Confirm the journey "
+                    f"before setting out.")
+    if text and _norm_line(text) != _norm_line(_go_line(exit_["name"])):
+        return (), ("A place from the exits row is a turn of its own. Send it without "
+                    "other words, and say the rest on the next turn.")
+    return ({"kind": "place", "id": exit_["id"], "name": exit_["name"],
+             "journey": bool(exit_["journey"])},), ""
+
+
+def _norm_line(text: str) -> str:
+    return " ".join(str(text or "").split()).lower().rstrip(".!")
+
+
+def _take_the_exit(c, chip: dict, text: str):
+    """The move the row declared, straight to the engine, then the narrator (I6).
+
+    The door `cast_act` and `talk_act` already are: engine-only for the choice, with no
+    model asked WHERE. Measured 2026-09-28 (G2): "I walk to the nearest crossroads" went
+    through the planner, was refused, and was narrated as a walk. A click names the
+    place by the engine's own id, so the plan is built here — one declared `travel`, or
+    one `journey` at the pace the party can keep — and `_advance` runs it and has the
+    narrator describe the walk from the engine's tells, exactly as a spoken turn's plan
+    is run. The line was appended by the caller; a refusal takes it off again."""
+    from . import exits as exits_mod
+
+    pc = c.scene.pc()
+    engine = c.engine()
+    agent = GMAgent(c.world, engine)
+    _arm_cards(agent, c)
+    agent.attachments = (dict(chip),)
+    if chip.get("journey"):
+        params = {"to": chip["id"]}
+        if exits_mod.riding(engine):
+            params["pace"] = "ride"
+        op = {"op": "journey", "actor": pc.ref, "params": params,
+              "because": "the player chose it from the ways on"}
+    else:
+        op = {"op": "travel", "actor": pc.ref, "params": {"place": chip["id"]},
+              "because": "the player chose it from the ways on"}
+    try:
+        intents = engine.validate([op])
+    except IntentError as exc:
+        c.transcript.pop()
+        if getattr(exc, "fixable_by", "") == "player":
+            return _refusal({"text": exc.for_a_person or str(exc), "code": exc.code,
+                             "fix": exc.fix})
+        return JsonResponse({"error": getattr(exc, "for_a_person", "") or str(exc)},
+                            status=400)
+    # Free actions since the last spoken turn ride along as context, as `say` does.
+    pending = list(getattr(c, "pending_free", []) or [])
+    if pending:
+        c.pending_free = []
+        c.history.append({
+            "role": "user",
+            "content": "(Since their last turn, spending no time: "
+                       + "; ".join(pending) + ".)"})
+    plan = TurnPlan(narration="", intents=intents)
+    plan.attachments = [dict(chip)]
+    return _advance(c, agent, "", plan, text)
 
 
 def _gm_answer(c, question: str, shown: str):
