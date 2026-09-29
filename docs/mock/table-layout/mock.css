@@ -70,6 +70,11 @@
   --sunken: inset 2px 3px 6px rgba(0, 0, 0, .7), inset -1px -1px 0 rgba(255, 225, 170, .08);
   /* The app's engraved-bronze letters (table.html "Engraved bronze"). */
   --engraved: 0 -1px 1px rgba(0, 0, 0, .92), 0 1px 0 rgba(255, 225, 175, .16);
+  /* The frame's weight. The owner, 2026-09-29: "make the border 50% thicker". Every
+     gilt edge is 1.5x what it was: the book's and the cards' ring 4px to 6px, the
+     gilt-edged panels 3px to 4.5px, the desk's (the pen's) edge 1px to 1.5px. The clasps
+     and bosses move in by half the ring's growth, to stay centred on it. */
+  --ring: 6px; --gilt-edge: 4.5px; --clasp-in: 25px; --boss-in: 22px;
   --candle-cursor: url("../../../play/static/img/cursor-candle.png") 24 0, auto;
   color-scheme: dark;
 }
@@ -83,17 +88,24 @@ body {
   margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
   display: grid; grid-template-rows: auto auto minmax(0, 1fr);
   height: 100dvh; overflow: hidden;
-  /* The room: a worn plank desk (textures/room-desk.jpg, its relief lit by the page's
-     one lamp), then depth in three layers, all fixed to the window like the desk. The
-     lamp is high and left, so the room is lightest up there and falls into shadow at
-     the far edges; a low warm pool rises where the embers do; the app's own dimming
-     gradient stays over all of it. */
+  /* The room: the owner's own boiler room (textures/room-boiler.jpg), cover-fitted and
+     never tiled. It is a lit picture, brighter than anything the page puts over it, so
+     it is sunk three ways, all fixed to the window with it: a vignette that falls to
+     near-black at the far edges (the lamp is high and left, so it opens there); a warm
+     dimming wash, lighter where the picture's own lamps and door are; and the app's own
+     dimming gradient. The strength of the wash was set by measurement (README, "The boiler
+     room"): the dim labels on the Equipment page's open ground failed 4.5:1 over the lit
+     tiles at a lighter wash.
+     Position: a square picture in a wide window loses its top and bottom, so 47% keeps
+     the hanging lamps and the door's arch in view; on a phone it loses its sides, and
+     22% keeps the door and the lamps instead of the boiler's flank. */
   background:
-    radial-gradient(120% 105% at 30% 22%, transparent 30%, rgba(4, 3, 2, .55) 70%,
-                    rgba(3, 2, 1, .88) 100%) fixed,
-    radial-gradient(60% 45% at 52% 105%, rgba(var(--ember), .10), transparent 70%) fixed,
-    linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)) fixed,
-    url("textures/room-desk.jpg") center / cover no-repeat fixed #0d0b09;
+    radial-gradient(125% 110% at 30% 30%, transparent 32%, rgba(4, 3, 2, .55) 72%,
+                    rgba(3, 2, 1, .9) 100%) fixed,
+    radial-gradient(60% 45% at 52% 105%, rgba(var(--ember), .08), transparent 70%) fixed,
+    linear-gradient(rgba(9, 7, 5, var(--room-dim-top)), rgba(6, 4, 3, var(--room-dim-foot))) fixed,
+    url("textures/room-boiler.jpg") 22% 47% / cover no-repeat fixed #0d0b09;
+  --room-dim-top: .71; --room-dim-foot: .75;
 }
 
 /* The carried candle: the cursor is the candlestick, its hotspot on the flame tip (the
@@ -359,8 +371,8 @@ body:not(.mode-table):not(.mode-map):not(.mode-sheet) .stage { display: none; }
    table by its cast shadow. */
 .side {
   min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 18px;
-  font-size: 14px; line-height: 1.5; border: 3px solid transparent;
-  /* The gilt edge is the last two layers, clipped to the 3px border: border-image takes
+  font-size: 14px; line-height: 1.5; border: var(--gilt-edge) solid transparent;
+  /* The gilt edge is the last two layers, clipped to the gilt border: border-image takes
      one image and the edge now needs the brass over the gilt. Backgrounds, unlike a ring
      drawn on a pseudo-element, stay put when the side scrolls. */
   background:
@@ -521,7 +533,7 @@ body.sheet-hidden .talk { grid-area: talk; }
 /* The gilt ring. */
 .book::before, .framedcard::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-  padding: 4px; z-index: 2;
+  padding: var(--ring); z-index: 2;
   background: var(--brass-grain), var(--gilt);
   background-size: 256px auto, auto; background-blend-mode: soft-light, normal;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -534,9 +546,11 @@ body.sheet-hidden .talk { grid-area: talk; }
    finger's width inside it on the far sides. */
 .book > .rim, .framedcard > .rim {
   position: absolute; inset: 0; pointer-events: none; border-radius: inherit; z-index: 2;
-  box-shadow: inset 1px 1px 0 rgba(255, 244, 205, .55), inset -1px -1px 0 rgba(30, 20, 8, .9),
-              inset 5px 5px 0 -1px rgba(0, 0, 0, 0),
-              inset -6px -8px 14px rgba(0, 0, 0, .55), inset 6px 6px 12px rgba(0, 0, 0, .35);
+  /* Scaled with the ring (1.5x, the owner, 2026-09-29): the lit lip and the dark lip
+     1.5px, the shadow the ring throws onto the page half as far again. */
+  box-shadow: inset 1.5px 1.5px 0 rgba(255, 244, 205, .55),
+              inset -1.5px -1.5px 0 rgba(30, 20, 8, .9),
+              inset -9px -12px 21px rgba(0, 0, 0, .55), inset 9px 9px 18px rgba(0, 0, 0, .35);
 }
 /* The ironmongery, placed exactly as the real table places it on .framed and .card
    (table.html "Third pass"): the pseudo-element reaches 34px past the panel, each corner
@@ -550,10 +564,12 @@ body.sheet-hidden .talk { grid-area: talk; }
     url("textures/clasp-bl.png"), url("textures/clasp-br.png"),
     url("textures/boss-top.png"), url("textures/boss-bottom.png"),
     url("textures/boss-left.png"), url("textures/boss-right.png");
-  background-position: left 24px top 24px, right 24px top 24px,
-                       left 24px bottom 24px, right 24px bottom 24px,
-                       center top 21px, center bottom 21px,
-                       left 21px center, right 21px center;
+  /* 1px further in than the real table's 24px and 21px: the ring is 6px now, not 4px,
+     so its centre line is 1px further in, and each piece is kept centred on it. */
+  background-position: left var(--clasp-in) top var(--clasp-in), right var(--clasp-in) top var(--clasp-in),
+                       left var(--clasp-in) bottom var(--clasp-in), right var(--clasp-in) bottom var(--clasp-in),
+                       center top var(--boss-in), center bottom var(--boss-in),
+                       left var(--boss-in) center, right var(--boss-in) center;
   background-repeat: no-repeat;
   background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                    40px auto, 40px auto, auto 40px, auto 40px;
@@ -617,7 +633,7 @@ body.sheet-hidden .talk { grid-area: talk; }
 .choices { display: grid; gap: 10px; min-height: 0; overflow-y: auto; align-content: start; }
 .desk { position: relative; display: grid; gap: 10px; padding: 14px 16px 16px; min-height: 0;
         grid-template-rows: minmax(0, 1fr) auto auto;
-        border: 1px solid #3a2f22; border-top-color: var(--gold-dim); border-radius: 3px;
+        border: 1.5px solid #3a2f22; border-top-color: var(--gold-dim); border-radius: 3px;
         background:
           linear-gradient(rgba(255, 225, 170, .04), rgba(8, 6, 4, .30)),
           url("textures/card-leather.jpg") #241d15;
@@ -664,7 +680,71 @@ body.sheet-hidden .talk { grid-area: talk; }
 
 /* The pen and the other actions share a line while there is room for both, and the
    actions drop below the pen, never between its two halves, when there is not. */
-.pen { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.pen { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; position: relative; }
+
+/* --- The engine device (device.js) -------------------------------------------------- */
+/* The owner's brass mechanism, mounted on the book's left gilt edge, in the gutter
+   between the side panel and the centre column (the owner, 2026-09-29: "too small ... it
+   needs to be further up ... there is plenty of space", then "have the device just below
+   the top right corner", the side panel's). Its width is what the gutter and the book's
+   empty left margin allow: centred on the ring, it stays clear of the side panel's
+   content on its left and of the book's title on its right (measured in the README). Its
+   height follows the photograph (268 x 773). Its top is 24px below the side panel's top
+   corner: just under the book's top-left clasp's corner piece, so the clasp's corner
+   and its arm along the top still show and the device is bolted over the arm that runs
+   down the edge. It covers where the book's left boss sat, and takes that fitting's
+   place. Absolute, so nothing in the layout knows it is there, and it passes the pointer
+   through. */
+.device { --dv-w: 84px; --dv-off: 4px; position: absolute; z-index: 4; pointer-events: none;
+          width: var(--dv-w); height: calc(var(--dv-w) * 773 / 268);
+          left: calc(var(--ring) / 2 - var(--dv-w) / 2 + var(--dv-off)); top: 24px; }
+.book::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+                                 40px auto, 40px auto, 0 0, auto 40px; }
+.dv-body { position: absolute; inset: 0;
+           /* Its shadow on the frame and the page falls the lamp's way, down and right. */
+           filter: drop-shadow(var(--dv-sx, 2px) var(--dv-sy, 4px) 2px rgba(0, 0, 0, .7))
+                   drop-shadow(calc(var(--dv-sx, 2px) * 2) calc(var(--dv-sy, 4px) * 2) 8px rgba(0, 0, 0, .45)); }
+.dv-body > img, .dv-body > svg { position: absolute; inset: 0; width: 100%; height: 100%;
+                                 display: block; }
+.dv-body > svg { overflow: visible; }
+/* The lamp's bloom is light, so it adds to the brass under it rather than covering it. */
+.dv-bloom, .dv-tablit { mix-blend-mode: screen; }
+/* The tab's halo sits outside the body, so it throws no shadow of its own: screened onto
+   the brass beside the tab (the device is its own group), and over the frame or panel
+   beyond, where there is no brass under it, a faint green spill. */
+.dv-halo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+           mix-blend-mode: screen; opacity: 0; }
+/* Steam: soft sprites, lit from the lamp's side (brighter at the upper left), moved by
+   transform and faded by opacity only. */
+.dv-smoke { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+/* Each puff is three soft lobes, the upper-left one the brightest (the lamp's side), each
+   fading to nothing inside its own box. The first bake was one gradient sized to the
+   box's far corner and clipped round by border-radius: scaled up for the burst it read as
+   a grey disc with a hard rim, not steam. */
+.dv-smoke i { position: absolute; left: 0; top: 0; width: calc(var(--dv-w) * .56);
+              height: calc(var(--dv-w) * .56); opacity: 0;
+              background:
+                radial-gradient(closest-side, rgba(250, 246, 237, 1), rgba(214, 206, 192, .78) 50%,
+                                rgba(150, 142, 130, 0)) 18% 22% / 64% 64% no-repeat,
+                radial-gradient(closest-side, rgba(236, 230, 218, .95), rgba(196, 188, 174, .66) 52%,
+                                rgba(140, 132, 120, 0)) 88% 42% / 58% 58% no-repeat,
+                radial-gradient(closest-side, rgba(220, 213, 200, .9), rgba(180, 172, 158, .6) 52%,
+                                rgba(130, 122, 110, 0)) 40% 90% / 66% 66% no-repeat,
+                radial-gradient(closest-side, rgba(226, 219, 206, .85), rgba(186, 178, 164, .5) 50%,
+                                rgba(130, 122, 110, 0)) 50% 50% / 70% 70% no-repeat;
+              filter: blur(1.5px); will-change: transform, opacity; }
+.dv-slot { display: none; }
+
+/* The turn's stage, said in words over the story's foot (its padding is reserved), so
+   the page reads what the device shows without moving anything. */
+.bookin { position: relative; }
+.stagesay { position: absolute; left: 58px; right: 50px; bottom: 6px; margin: 0; z-index: 1;
+            color: var(--dim); font-style: italic; font-size: 14px; line-height: 1.3;
+            pointer-events: none; }
+.stagesay:empty { display: none; }
+/* While a turn is being taken the controls that would take another are shown asleep, as
+   the app does (06-trade-and-page.js busy: body.resolving). */
+body.resolving .desk .exitbtn, body.resolving .desk .sugg { opacity: .55; }
 .sayform { display: flex; gap: 8px; align-items: stretch; flex: 1 1 340px; min-width: 0; }
 /* The pen's line is a trough cut into the desk. */
 .sayform input {
@@ -840,7 +920,7 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
 /* --- The conversation tray ------------------------------------------------------------ */
 .talk { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-height: 0;
         gap: 10px; padding: 16px 16px 14px; font-size: 15px; line-height: 1.5;
-        border: 3px solid transparent;
+        border: var(--gilt-edge) solid transparent;
         background:
           linear-gradient(rgba(14, 11, 8, .82), rgba(10, 8, 6, .9)),
           url("textures/card-leather.jpg"),
@@ -962,7 +1042,7 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
 /* Worn and wielded: two hands, then the body slots down either side, roughly where each
    is worn (rules/tables.py SLOT_ORDER_LEFT / RIGHT). */
 .doll { grid-area: doll; position: relative; padding: 22px 20px 18px; border-radius: 3px;
-        border: 3px solid transparent;
+        border: var(--gilt-edge) solid transparent;
         background:
           linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
           linear-gradient(#57432d, #4b3a27),
@@ -1042,10 +1122,17 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
 
 /* --- Narrower desktops: one sheet column, character over numbers ------------------- */
 @media (max-width: 1180px) {
+  /* The gutter is the same 18px here and the book is shorter (277px at 1024x768), so the
+     device is 60px wide (173px tall), its width bounded by the sheet column's content on
+     its left (clear by 21px, and by 18px with the tab out) and the book's title on its
+     right (clear by 15px). It was 52px while it hung halfway down the edge, where at 60px
+     its top covered the clasp's tip; at the top it is bolted over that arm by design. The
+     gutter itself is not widened. */
+  .device { --dv-w: 60px; --dv-off: 0px; }
   .stage { grid-template-columns: 280px minmax(0, 1fr);
            grid-template-areas: "sheet book" "sheet desk"; }
   .sheet { grid-area: sheet; display: block; min-height: 0; overflow-y: auto;
-           overflow-x: hidden; border: 3px solid transparent;
+           overflow-x: hidden; border: var(--gilt-edge) solid transparent;
            /* The gilt edge as the sides draw theirs; inside it the same tooled leather, so
               any height the two halves leave shows leather, not the brass beneath. */
            background:
@@ -1093,6 +1180,24 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
 
 /* --- Phone: the story is the page; the sheet is a mode, laid out as the drawer ------ */
 @media (max-width: 760px) {
+  /* The border-drawn gilt edges stay 3px on a phone (100% of their old width, not
+     1.5x): each is inside the box, and at 4.5px a 375px screen lost 3px of every
+     panel's content. The book's and the cards' rings are drawn over the padding, so
+     they cost no width and are 6px here too. */
+  :root { --gilt-edge: 3px; }
+  /* On a phone there is no gutter, so the device lies on its side in the head bar,
+     between the world's name and Talk (device.js moves it into .dv-slot): turned a
+     quarter clockwise, so the lamp and lever are at the right and its lit side is still
+     the top. The slot is the turned device's footprint, so the bar's height is its own.
+     The shadow offsets are given in the device's own turned frame, so on screen it still
+     falls down and to the right. The book gets its left boss back. */
+  .dv-slot { display: block; grid-area: dev; position: relative; justify-self: center;
+             width: calc(var(--dv-w) * 773 / 268); height: var(--dv-w); --dv-w: 30px; }
+  .dv-slot .device { --dv-w: 30px; left: 50%; top: 50%; --dv-sx: 3px; --dv-sy: -1.2px;
+                     transform: translate(-50%, -50%) rotate(90deg); }
+  .book::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+                                   40px auto, 40px auto, auto 40px, auto 40px; }
+  .stagesay { left: 26px; right: 20px; font-size: 13px; }
   body { font-size: 16px; }
   /* The phone's chrome is counted: the strip is one row of the switch and one line of
      what it means. Start again is the page reloaded, so it goes. */
@@ -1102,8 +1207,8 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
   .viewing button { padding: 4px 8px; min-height: 30px; font-size: 13px; }
   .mockstrip label.check { font-size: 13px; }
   #mock-reset { display: none; }
-  .topbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas:
-              "world end" "modes modes"; padding: 6px 12px 7px; gap: 6px; }
+  .topbar { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas:
+              "world dev end" "modes modes modes"; padding: 6px 12px 7px; gap: 6px 10px; }
   .world { grid-area: world; }
   .topend { grid-area: end; }
   /* The tabs keep their words and scroll sideways rather than shrink to initials. */

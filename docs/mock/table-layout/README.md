@@ -16,7 +16,8 @@ then open <http://127.0.0.1:8765/docs/mock/table-layout/>. It has to be served. 
 as a file, the browser refuses the icon fetches, and the icon tiles come up empty. The
 page links the real fonts, icons, cursor and `scene3d.js` under `play/static/` by
 relative path, so it must be served from the root, not from this folder. Its materials
-(leathers, paper, desk, metal) are its own, in `textures/` (see "The texture pass").
+(leathers, paper, metal, the room and the device) are its own, in `textures/` (see "The
+texture pass" and "The boiler room and the engine device").
 
 The dashed strip across the top is the mock's own and not part of the design. **Viewing**
 switches between Kesst Vayr (the recording's rogue) and Ysolde Marrach (the fixture
@@ -40,7 +41,9 @@ bevels, shadows, page stack, pressed controls and coins, the colour tokens and e
 behaviour are as they were; the stylesheet's changes are image URLs, texture scales, the
 gilt's new metal layer, and the room's depth layers.
 
-- **The room** is now a worn plank desk (Poly Haven, Wood Table Large), not black leather.
+- **The room** was a worn plank desk (Poly Haven, Wood Table Large), not black leather.
+  (Since replaced by the owner's own boiler room: see the next section. The desk's reasons
+  are kept here because they set the rules the boiler room was held to.)
   The owner on the first two tries: "the background texture is notably worse, I was hoping
   for something interesting, give it some depth but keep it dark". Those were leathers
   toned to the old texture's spread, which flattened them to wallpaper; one, a scarred
@@ -86,6 +89,182 @@ gilt's new metal layer, and the room's depth layers.
 | Room (the ground) | dim #93866e | 5.53 / **3.63** | 5.20 / 5.00 |
 
 Not replaced: the candle cursor (a drawn candlestick, not a material) and the fonts.
+
+## The boiler room and the engine device
+
+The owner supplied two of their own images on 2026-09-29 and cleared both for this public
+repository (`textures/CREDITS.md`): a boiler room, "take this image and make it the
+background", and a brass mechanism, to become a device that shows where a turn is. The
+owner's notes that followed are answered point by point below.
+
+### The room
+
+- `room-boiler.jpg` is the owner's picture at 1800x1800, cover-fitted and never tiled,
+  `background-position: 22% 47%` so the door and the lamps stay in view on a wide window
+  and on a phone. `fixed`, so it does not scroll with the page.
+- It is dimmed in CSS, not in the file: a wash from 71% black at the top to 75% at the
+  foot, the vignette, and the embers' warm pool. The embers and the candle are as they were.
+- One tint in the file, a highlight roll-off above a luminance knee of 0.22: its lamps and
+  white gauge faces glow instead of blowing through the dimming. Without it the dim labels
+  over the white gauge held 3.53:1 at the brightest 2% under the first dimming, and 3.93
+  even under a deeper one, which had already sunk the room. The fix is the dimming and
+  the roll-off; no token changed.
+- Contrast, measured with the text removed, at the median and at the brightest 2% (the
+  worst case for light text), against the desk of the pass before. Every other surface is
+  unchanged to the second decimal.
+
+| Where | Text | 1440, desk before | 1440, now | 1024, desk before | 1024, now |
+|---|---|---|---|---|---|
+| Open ground (Equipment) | dim #93866e | 5.20 / 5.00 | 5.29 / **4.64** | 5.38 / 5.01 | 5.22 / **4.62** |
+| Open ground, reply line | dim #93866e | 5.24 / 5.00 | 5.24 / **4.59** | 5.45 / 5.28 | 5.30 / **4.64** |
+| Open ground | gold #ddc48e | 10.93 / 10.53 | 11.12 / 9.77 | 11.32 / 10.54 | 10.97 / 9.72 |
+
+  The whole visible ground at once (every pixel of room the panels leave, the dimmest text,
+  dim #93866e): 4.85 at 375x812, 4.77 at 1024x768, 4.73 at 1440x900, worst 2%. All hold
+  4.5:1; the room costs about 0.4 of the desk's margin, the price of a picture with lamps.
+
+### The device
+
+**Cut out, not generated.** `prepare.py` isolates the mechanism from its grey studio
+backdrop with PIL and numpy only (no model, no download): a smooth cubic surface fitted to
+the backdrop well clear of the device (mean residual 2.5 levels), each pixel scored by its
+distance from that surface and by colour (brass is yellow, the backdrop grey); below the
+foot only colour counts, so the cast shadow on the floor is not kept; the device's own
+component flood-filled and its holes closed; the edge eroded 1px and feathered 0.9px, and
+the backdrop's colour taken back out of the part-covered edge pixels, so no grey halo sits
+on a dark page. Hand fixes: the floor shadow rule above, and the tab (below). The frame is
+lit by the page's one lamp (a gentle fall from upper left to lower right; the photograph
+was lit flat). Five files, all in one box so they stack exactly: the frame, the chamber
+behind the opening (the photograph's own movement at a third of its brightness), the
+lip's shadow into the opening, the tab, and `device-geometry.js` (the measured points).
+
+**Gears.** Two procedural SVG gears in the opening, 10 and 16 teeth on one module (8.5
+photograph px), so the centre distance is 8.5 x (10 + 16) / 2 and the small gear turns
+16/10 = **1.6** times for each turn of the large one, the other way. The large gear turns
+1.4 times a second at speed. The mesh offset is worked out from the tooth counts (tooth
+meets gap at the contact), so other counts mesh too. Each gear's brass gradient is
+counter-rotated every frame, so its light stays in the room while it turns. First tried at
+8 and 12 teeth on a larger module: at the drawn size they read as toy sprockets.
+
+**States** (`#device[data-state]`):
+
+| State | Gears | Lever | Lamp | Tab | Steam |
+|---|---|---|---|---|---|
+| idle | still | up | green, calm | in | none |
+| running | turning | down | amber | in | a puff every third of a turn of the large gear |
+| waiting (a roll owed) | eased to a stop | down | amber | in | a thin trickle, one small puff every 0.95 s |
+| ready | ease to a stop, then a heartbeat | pops up with an overshoot | green, flaring then settling | slides out, glowing green | a burst at the halt |
+
+Idle is lever up and a calm green: the table is ready for you, which is true whenever no
+turn is running. The tab goes back in when the green settles to that idle glow, 2.6 s
+after the lever, so it is out only while the green is the answer to a turn (see the open
+questions).
+
+**The ready sequence**, in the model's own clock (fixed 1/120 s steps, so a still frame of
+any moment can be drawn exactly with `#devicet=ms`): the gears ease out over 520 ms
+(never a snap), a burst of steam as they stop, a heartbeat of 700 ms ("the gears should
+stop a heartbeat before the lever lifts up"), then in one beat the lever pops up on a
+damped spring (to about -52 degrees against its -46 rest), the lamp turns green and
+flares, and the tab slides out on a stiffer spring (overshooting by about a tenth of its
+travel); the prose lands 280 ms after that. Measured gear-stop to lever: **700-709 ms** in
+the model in every run (one 8.3 ms step of rounding), and 653-741 ms on the wall clock in
+eleven live turns in headless Chrome, where a capture or a slow frame holds a step for a
+frame; 699-723 ms in the preview pane's own browser. The twelve-frame proof (screenshots, not committed) shows
+the gears at 0 degrees a second at 3740 ms with the lever still down and the lamp amber,
+and the lever moving, the lamp green and the tab coming out at 4440 ms.
+
+**The tab** (the owner, circling it on a crop: "add a glowing bit that pops out green ...
+it should only pop out when its green"). It is the small plate on the top plate's left
+edge, standing 16px proud of the body in the photograph. `prepare.py` cuts it off the frame
+at x < 530 (the crevice where it enters the body stays with the body, as the slot) and
+lengthens it along its face so it can stand 16 photograph px further out than the
+photograph shows and still reach into the slot, overshoot included. It lies under the
+frame, so pulled in (29 photograph px to the right) none of it shows. Out, its face is lit
+green (a copy of the piece through a colour matrix, screened onto it) and a green halo
+outside the body blooms onto the brass beside it and spills faintly onto the frame or
+panel beyond. The glow follows how far out it is, so it dims as it goes in. Out, it stands
+10px proud of the body at 1440, 7px at 1024 and 3.6px on a phone, where, the device being
+turned, it comes out upward.
+
+**Steam** (the owner: puffs "in time with the gears", then "increase the smoke a bunch").
+Soft sprites, each three lobes and a core lit from the lamp's side, moved by transform and
+faded by opacity only, `pointer-events: none`. Running: a puff every third of a turn of the
+large gear (about four a second; 16 in a 3.8 s turn), sizes varied, each living 1.7 s,
+rising 2.7 device widths up the gutter (227px at 1440) and drifting left, away from the
+story, billowing as it goes. The halt: four big puffs 70 ms apart that billow through the
+heartbeat. Waiting: a lazy trickle. Idle: nothing but the burst's last wisp dispersing.
+Where it reaches, measured at its densest (a frame with the steam against the same frame
+without it, animations held): at 1440 x 212-351, and never nearer than 24px to any text or
+control (the portrait's label) or 44px to the book's title; at 1024 x 249-352, nearest
+34px (the title). It stays within the device's own right edge, so it never crosses the
+story, and no text has smoke over it, so no text's contrast changes. On a phone it stays at
+the device's foot (x 141-174, y 84-117), clear of the world's name and the bar's buttons.
+Tried first: one radial gradient sized to the sprite's far corner and clipped round, which
+scaled up for the burst into a grey disc with a hard rim; and puffs born at a third of their
+size, which lost their density before they had any size, so a running turn showed wisps.
+
+### Where it sits
+
+The owner, in order: "too small ... it needs to be further up ... there is plenty of
+space", then "have the device just below the top right corner". It is mounted on the
+book's left gilt edge in the gutter between the left side panel and the centre column,
+its top 24px below the side panel's top-right corner: just under the book's top-left
+clasp's corner piece, so the corner and the clasp's arm along the top still show, and it is
+bolted over the clasp's arm that runs down the edge. It takes the place of the book's left
+boss (hidden where the device is). It is absolute: nothing in the layout moved, and the
+gutter was not widened.
+
+| Width | Device | Box (x, y) | Clear of, on its left | Clear of, on its right |
+|---|---|---|---|---|
+| 1440x900 | 84 x 243px | 267-351, 157-399 | the side panel's content (the portrait frame, 264) by 3px; the tab out reaches its gilt line | the title (360) by 9px |
+| 1024x768 | 60 x 173px | 291-351, 161-334 | the sheet column's content (270) by 21px, by 18px with the tab out | the title (366) by 15px |
+| 375x812 | 30 x 87px, turned | 151-238, 91-121 | the world's name (ends 141) | Talk (starts 248) |
+
+At 1024 it grew from 52px to 60px when it moved up: 60px had been refused while it hung
+halfway down, because its top then covered the clasp's tip; at the top it is bolted over
+that arm by design. On a phone there is no gutter, so it lies on its side in the head bar
+between the world's name and Talk, turned a quarter so the lamp, lever and tab are at the
+right and its lit side stays the top; the bar's height is its own and `scrollWidth` is 375.
+
+### The border, 50% thicker
+
+The owner: "make the border 50% thicker". Every gilt edge is 1.5 times its width, the
+bevels and shadows scaled with it, and the corner fittings re-aligned to the new ring:
+
+| Edge | Before | After |
+|---|---|---|
+| The book's ring and the framed cards' rings | 4px | 6px |
+| Gilt-edged panels (the sides, the sheet column, Talk, the Equipment figure) | 3px | 4.5px (Chrome paints 4px at 1x, 4.5px at 2x) |
+| The pen's (the desk's) edge | 1px | 1.5px |
+| Clasp inset / boss inset | 24px / 21px | 25px / 22px |
+
+On a phone the border-drawn edges stay 3px (at 4.5px a 375px screen lost 3px of every
+panel's content); the rings are drawn over their padding and cost no width, so they are
+6px there too.
+
+### What the real app needs to adopt it
+
+The mock simulates the turn's stages with the app's own names and order (`play/views.py`
+`say`: the model plans the turn, `GMAgent.plan_turn`; the engine resolves it, `_advance`;
+the narrator writes), compressed to seconds. In the app:
+
+- **running** is `busy(true)` around the `post("/api/say")` in `takeTurn`
+  (`04-combat-and-turns.js`), and likewise around `/api/roll` and `/api/combat/act`.
+  `scene.busy` is not this flag (it is why the crafting hub is shut); the server's 409
+  `data.busy` is the mid-turn lock.
+- **ready** is the POST's response arriving, the `table:posted` event in `post()`
+  (`02-state.js`), before `render(s)`.
+- **waiting** is a response with `s.awaiting` set (`showPopup`), resumed by `/api/roll`.
+- The stages happen inside one synchronous `/api/say`, so the page cannot see "planning"
+  versus "narrating". To show them, the server needs to say which stage it is in (a
+  streamed response, or a phase on `/api/revision`); without that the device can show only
+  running, waiting and ready, which is still the whole of what it promises.
+- `takeTurn` must await `Device.ready()` before `render(s)`, which holds the prose back by
+  about 1.5 s (520 ms halt, 700 ms heartbeat, 280 ms settle). Against a turn that takes tens
+  of seconds on a local model that is small, but it is a real cost, and it is the owner's
+  call.
+- The device's files are `device.js`, the `.device` rules in `mock.css`, the markup in
+  `index.html` (`#device`, `#dv-slot`) and the five `textures/device-*` files.
 
 ## What changed in the second pass (the owner's verdict, point by point)
 
@@ -391,7 +570,27 @@ sizing itself to its seven tabs) and 395 (the clasps' box). The Equipment action
 tray, the boards and the spell pages were driven in the page, with no console errors and
 every file answering 200.
 
+The device was checked over the DevTools protocol with true device emulation (so the
+375px shots are real 375px layouts): its four states at 1440, 1024 and 375; the tab in and
+out at each; a twelve-frame scripted turn at 1440 (and six frames each at 1024 and 375)
+with the model's readings written under each frame; the steam's reach against every text
+node and control at its densest; and live turns driven through Say, an exit and a roll
+owed, with the device's log read after (gaps above; no console errors). Two defects were
+found that way and fixed: steam stopped for good after the second turn (the halt turned
+the gear past the next puff's mark, and the test for crossing it never fired again), and
+the tab's clearance at 1024 was 18px, not the 14px first estimated.
+
 ## Open questions for the owner
+
+- **The tab when idle.** Idle is a calm green lamp, and the tab is in, because the brief
+  read "only in the ready state". It goes in 2.6 s after the lever, as the green settles.
+  If "only pop out when its green" meant whenever the lamp is green, it would stay out at
+  rest instead; that is one line.
+- **Holding the prose.** Adopting the device holds each turn's prose back about 1.5 s for
+  the halt, the heartbeat and the lever. Worth it?
+- **The clasp's arm.** At the top of the gutter the device covers the lower part of the
+  book's top-left clasp's descending arm (the corner piece and the top arm show). Keep, or
+  drop the device below the clasp's tip (about 35px lower at 1440)?
 
 - **Encumbrance.** Should the engine carry weights for gear and armour and a carrying
   capacity, so the Equipment page can show a load bar the way Foundry does? Today it can

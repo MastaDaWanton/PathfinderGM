@@ -960,16 +960,20 @@ document.addEventListener("click", e => {
       const go = $("[data-setout]"); if (go) go.focus();
       return;
     }
-    walk(row);
+    // Every move is a turn: the engine and the narrator run before the page moves on
+    // (device.js). The arrival is drawn when the prose appears, as in the app.
+    Turn.take(() => walk(row));
     return;
   }
   if (t.dataset.setout) {
     const row = exitsHere().find(r => r[0] === t.dataset.setout);
-    S.confirm = null;
-    say(`I go to ${row[1]}.`, `Mock. The journey to ${row[1]} is declared and ${
-      row[3].replace(/^about /, "")} pass on the road. The mock ends at the road head, so ` +
-      `you are still standing here.`);
-    renderExits();
+    Turn.take(() => {
+      S.confirm = null;
+      say(`I go to ${row[1]}.`, `Mock. The journey to ${row[1]} is declared and ${
+        row[3].replace(/^about /, "")} pass on the road. The mock ends at the road head, so ` +
+        `you are still standing here.`);
+      renderExits();
+    });
     return;
   }
   if (t.hasAttribute("data-notnow")) {
@@ -992,8 +996,9 @@ document.addEventListener("click", e => {
     return;
   }
   if (t.id === "continue") {
-    say("", `Mock. Continue: ${pc().name} keeps to what ${she()} was doing and the scene ` +
-      `moves a beat. People act, the guard answers or loses patience, and the narrator tells it.`);
+    Turn.take(() => say("", `Mock. Continue: ${pc().name} keeps to what ${she()} was doing ` +
+      `and the scene moves a beat. People act, the guard answers or loses patience, and the ` +
+      `narrator tells it.`));
     return;
   }
   if (t.id === "craft") {
@@ -1125,8 +1130,12 @@ $("#sayform").addEventListener("submit", e => {
   if (!text && !sp) { input.focus(); return; }
   if (!text && sp) text = `I cast ${sp.name}.`;
   const cast = sp ? ` with ${sp.name} attached` : "";
-  say(text, `Mock. The turn goes to the engine${cast}; the narrator's answer arrives here.`);
-  input.value = ""; S.attach = null; renderAttach(); input.focus();
+  // The words stay in the box until the turn is taken, as the app keeps them through a
+  // refusal or a busy table (04-combat-and-turns.js takeTurn).
+  Turn.take(() => {
+    say(text, `Mock. The turn goes to the engine${cast}; the narrator's answer arrives here.`);
+    input.value = ""; S.attach = null; renderAttach(); input.focus();
+  });
 });
 
 $("#portrait-file").addEventListener("change", e => {

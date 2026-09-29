@@ -29,6 +29,7 @@
   </div>
   <p class="mocksay" id="mock-say"></p>
   <label class="check"><input type="checkbox" id="mock-wanted"> Wanted in Zhilvarnia</label>
+  <label class="check"><input type="checkbox" id="mock-owe"> Owe a roll</label>
   <button type="button" id="mock-reset" class="flat"
           title="Back to the gate, with the story and the gear as they began">Start again</button>
 </div>
@@ -51,6 +52,8 @@
     <button type="button" role="tab" id="tab-journal" data-mode="journal" aria-selected="false"
             aria-controls="mode-journal" tabindex="-1">Journal</button>
   </div>
+  <!-- The device's place on a phone (device.js moves it here below 761px). -->
+  <div class="dv-slot" id="dv-slot" aria-hidden="true"></div>
   <div class="topend">
     <!-- A tray, not a tab: it opens beside the story and never over it. -->
     <button type="button" id="talkbtn" class="talkbtn" aria-expanded="false"
@@ -64,6 +67,18 @@
   <!-- Table mode: the story, in a book. -->
   <section class="book" id="book" aria-labelledby="place-name">
     <i class="rim" aria-hidden="true"></i>
+    <!-- The engine device (device.js): the owner's brass mechanism, mounted on the book's
+         left gilt edge in the gutter beside the side panel (on a phone, laid on its side
+         in the head bar: device.js moves it). Decorative to a screen reader, which hears
+         the stage line in the book instead. -->
+    <div class="device" id="device" data-state="idle" aria-hidden="true">
+      <div class="dv-body">
+        <img class="dv-chamber" src="textures/device-chamber.png" alt="">
+        <img class="dv-lip" src="textures/device-lip.png" alt="">
+        <img class="dv-frame" src="textures/device-frame.png" alt="">
+      </div>
+      <div class="dv-smoke"></div>
+    </div>
     <div class="bookin" id="bookin">
       <div class="bookhead">
         <div class="where">
@@ -77,6 +92,7 @@
         </div>
         <p class="face" id="face" aria-live="polite" hidden></p>
       </div>
+      <p class="stagesay" id="stage-say" role="status"></p>
       <div class="story" id="story" role="log" aria-live="polite" aria-label="The story"
            tabindex="0"></div>
     </div>
@@ -135,6 +151,10 @@
         skin, gather and buy, each with the hours it takes.</p>
       <p class="mocknote">Not mocked. The ground here is <span id="craft-ground"></span>.</p>
       <button type="button" class="quiet small" data-close="craftpop">Close</button>
+    </div>
+    <div class="pop" id="rollpop" role="dialog" aria-label="A roll is owed" hidden>
+      <p><b>A roll is owed.</b> In the app the dice mat opens here and the engine waits.</p>
+      <button type="button" class="go small" id="roll">Roll the die</button>
     </div>
     <div class="pop" id="spellpop" role="dialog" aria-label="Spells for this turn" hidden>
       <p class="pophead">Cast with this turn</p>
@@ -298,5 +318,7 @@
      sends and returns an SVG string, so it runs here on the recorded one. -->
 <script src="../../../play/static/js/scene3d.js"></script>
 <script src="mock.js"></script>
+<script src="textures/device-geometry.js"></script>
+<script src="device.js"></script>
 </body>
 </html>
