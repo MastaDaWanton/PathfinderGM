@@ -256,27 +256,52 @@ def test_a_save_written_before_places_heals_on_load(client):
 
 
 def test_travelling_changes_what_grows(client):
+    green = _green_ground(client)
     urban = client.get("/api/forage/table?biome=urban").json()
-    forest = client.get("/api/forage/table?biome=forest").json()
-    assert forest["table"]["rows"] and not urban["table"]["rows"]
+    wild = client.get(f"/api/forage/table?biome={green}").json()
+    assert wild["table"]["rows"] and not urban["table"]["rows"]
 
     d = _walk_to_the_forest(client)
-    assert d["biome"] == "forest"
-    assert client.get("/api/forage/table").json()["here"] == "forest"
+    assert d["biome"] == green
+    assert client.get("/api/forage/table").json()["here"] == green
+
+
+def _green_ground(client) -> str:
+    """Ground this settlement's own land has, and that grows something.
+
+    "forest" until 2026-09-28, when two lanes landed together: Lane B refuses ground the
+    world does not put near the settlement (a desert town has no forest to walk into),
+    and Lane C starts each campaign in a town drawn from its own story seed rather than
+    the same one every time. So the wild ground is read off the start's land, the way a
+    player would read it off the brief."""
+    from play import campaign as cm
+    from rules import geography
+
+    c = cm.current()
+    land = geography.land_around(c.world, c.location)
+    for biome in ("forest", "grassland", "hills", "marsh", "jungle", "mountain",
+                  "desert", "tundra", "coast"):
+        if geography.grounded(land, biome)[0] == "absent":
+            continue
+        if client.get(f"/api/forage/table?biome={biome}").json()["table"]["rows"]:
+            return biome
+    raise AssertionError(f"{c.location.name} has no green ground near it: {land}")
 
 
 def _walk_to_the_forest(client, tries: int = 6) -> dict:
-    """Out of the city and into the trees, a turn at a time.
+    """Out of the city and into the wild ground, a turn at a time.
 
     One post used to be one unwalked step into the forest. Since Lane B (2026-09-28) the
     way out of a city is walked — the crossing, the gate, the outskirts — and every
     street is checked for somebody in the way (`rules/ontheway.py`, 8% a hop), so a walk
-    can be stopped short and taken up again next turn, which is what a player does."""
+    can be stopped short and taken up again next turn, which is what a player does. The
+    ground is whatever green ground this start's land has (`_green_ground`)."""
+    green = _green_ground(client)
     d = {}
     for _ in range(tries):
-        d = client.post("/api/travel", data=json.dumps({"biome": "forest"}),
+        d = client.post("/api/travel", data=json.dumps({"biome": green}),
                         content_type="application/json").json()
-        if d.get("biome") == "forest":
+        if d.get("biome") == green:
             break
     return d
 
@@ -294,7 +319,7 @@ def test_foraging_fills_the_satchel(client):
     `/api/roll` extends."""
     from play import campaign as cm
 
-    assert _walk_to_the_forest(client).get("biome") == "forest"
+    assert _walk_to_the_forest(client).get("biome") == _green_ground(client)
     for _ in range(8):
         r = client.post("/api/forage", data=json.dumps({}),
                         content_type="application/json").json()

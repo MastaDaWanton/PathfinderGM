@@ -74,7 +74,9 @@ def test_lines_both_ways_and_a_grunt_are_logged_in_page_order(small):
             {"who": d, "to": "you", "line": "But I know who has."}]
     rows = beat("Drenn studies you. 'Seen it? No,' he says. 'But I know who has.' Drenn "
                 "lets out a low, dry grunt.", said, player='I ask "Have you seen the leaf?"')
-    assert rows == []
+    # The stage runs every member, and since Lane D merged (2026-09-28) its pronoun step
+    # rightly books "he says" for Drenn; what this test forbids is the log's own failures.
+    assert not [r for r in rows if r.get("kind") in ("vocal-miss", "aftermath-error")]
     log = c.scene.conversation_log
     assert [(e["who"], e["kind"], e["text"]) for e in log] == [
         ("you", "line", "Have you seen the leaf?"),
