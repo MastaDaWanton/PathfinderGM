@@ -203,10 +203,10 @@ def test_the_opening_says_who_where_and_what_is_going_on():
     assert body[0].split()[0] in ("Mid-morning", "Just", "Late", "Early", "Morning",
                                   "Midday", "Afternoon", "Evening", "Dusk")
     assert "Averthorn" in body[0]                                 # exactly where, first
-    # The fact's own words and its own capitals, joined into English: the export
-    # writes "Turf roofs, low stone walls" as a field, and only the last comma
-    # becomes a conjunction.
-    assert "Turf roofs and low stone walls" in body[0]
+    # The fact's own words joined into English, and since 2026-09-28 said as what the
+    # player sees round the spot rather than quoted as a label (the owner: "we need
+    # descriptions of what the room looks like") — so the field's capital goes.
+    assert "The buildings round about are turf roofs and low stone walls" in body[0]
     assert body[1].startswith("You are Averil Stane")            # who, and why
     assert "You came" in body[1]
     assert "has stopped to watch." in body[2]                    # what is going on
@@ -283,7 +283,10 @@ def test_the_opening_is_striking_and_concise():
     # 150 since 2026-09-05: the errand ("You came for a day's paid work…") and the
     # "You could…" line each cost a sentence, on the player's own finding that the
     # screen said neither why they were there nor what they might do about it.
-    assert max(counts) <= 150, counts
+    # 190 since 2026-09-28: the first paragraph describes the spot itself — its
+    # buildings, its light, a sound and a smell — on the owner's ruling that an opening
+    # naming the architecture instead of the room "tells the player nothing".
+    assert max(counts) <= 190, counts
     assert min(counts) >= 60, counts
 
 
@@ -365,14 +368,19 @@ def test_the_world_is_introduced_from_the_place_not_the_dials():
     town.facts["Formal Power"] = "matriarchal clan law"
     town.facts["Daily Norms"] = "morning markets, evening prayers"
     said = opening.the_world_here(town)
-    assert said == ("Averthorn keeps to matriarchal clan law. "
-                    "The day here is morning markets and evening prayers.")
+    # The frames changed 2026-09-28, when the owner's screenshot read "Zhilvarnia
+    # keeps to Council of Elders advises on land use and trade" and "The day here is
+    # Daily markets, …": a clause stands alone, a noun phrase gets a frame that fits it.
+    assert said == ("Averthorn answers to matriarchal clan law. "
+                    "Days here are shaped by morning markets and evening prayers.")
 
     # A place that describes its people and not its government still gets a preface,
     # and the clock still names the place, because that preface does not.
     del town.facts["Formal Power"]
     text = opening.compose(_game(world, town), "a stranger here")
-    assert "Its people are Reeve, freeholders and bonded labour." in text
+    # "Reeve" is the field's capital, not a name the world uses, so it is lowered
+    # (`opening._lower_common`, 2026-09-28).
+    assert "Its people are reeve, freeholders and bonded labour." in text
     assert "Averthorn" in text, "the one thing the overture may not drop"
 
 

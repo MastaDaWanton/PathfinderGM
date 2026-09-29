@@ -10,6 +10,7 @@
   "heritage": "Korvu",
   "world_people_id": "fd4449bc9a64",
   "world_entity_id": null,
+  "background": "bonesetter",
 
   "abilities": { "str": 9, "dex": 14, "con": 12, "int": 17, "wis": 12, "cha": 11 },
 

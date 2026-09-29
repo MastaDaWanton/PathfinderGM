@@ -109,12 +109,18 @@ def test_the_openings_own_company_is_in_the_population(tmp_path):
         cm._LIVE.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         cm._LIVE.clear()
-    company = [a for a in c.scene.actors.values() if not a.is_pc]
+    # The people the start brought in (rules/openings.py, 2026-09-28). The keeper of a
+    # counter the start stands at is the keepers' own business and is not the opening's.
+    brought = set((c.scene.start.get("slots") or {}).values())
+    company = [a for a in c.scene.actors.values() if a.ref in brought]
     assert company
     for actor in company:
         rec = population.of_ref(c.scene, actor.ref)
         assert rec is not None, actor.name
-        assert rec["life"]["face"] in actor.appearance
+        # A world resident wears their own Appearance fact; everybody else the face
+        # their record rolled.
+        if not actor.world_entity_id:
+            assert rec["life"]["face"] in actor.appearance
 
 
 def test_a_crowd_is_not_one_person_with_a_life():
@@ -164,25 +170,26 @@ def test_two_the_ledger_ruled_different_stay_two():
     assert len(s.population) == 2
 
 
-def test_the_openings_company_is_not_booked_a_second_time(tmp_path, monkeypatch):
+def test_the_openings_company_is_not_booked_a_second_time(tmp_path):
     """Measured live 2026-09-25: the opening put "the old man ahead of you" at the
     well-head; the next beat called him "the old man" and a second old man was booked and
     stood beside him. The ledger, whose definiteness test decides that, had never been
     told the opening's company was there."""
     from gm import judgement
     from play import campaign as cm
-    from play import opening
     from rules.sheet import load_pc
 
-    well = next(s for s in opening.SITUATIONS if s.who == "the old man ahead of you")
-    monkeypatch.setattr(opening, "roll", lambda *a, **k: well)
+    # The well queue is a start document now (the kept quiet floor, 2026-09-28), and
+    # its lead is "the old neighbour".
     with override_settings(CAMPAIGN_DIR=str(tmp_path)):
         cm._LIVE.clear()
-        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"), start_id="quiet-the-well-queue")
         cm._LIVE.clear()
+    assert c.scene.start.get("id") == "quiet-the-well-queue"
     before = len(c.scene.actors)
     booked = judgement.note_cast(
-        c.scene, "The old man turns, squints at your bucket, and says nothing.", turn=1)
+        c.scene, "The old neighbour turns, squints at your bucket, and says nothing.",
+        turn=1)
     assert booked == []
     judgement.promote_cast(c.scene, booked, beat="", world=c.world)
     assert len(c.scene.actors) == before

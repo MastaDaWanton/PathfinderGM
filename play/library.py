@@ -84,9 +84,26 @@ def _card(path: Path, shipped: bool) -> WorldCard:
     return WorldCard(
         id=ident, name=world.name, source=str(path), shipped=shipped, premise=premise,
         entities=len(world.entities), events=len(world.chronology),
-        settlements=[e.name for e in world.of_kind("CITY")][:8],
+        # Every settled kind, not only CITY (R0, 2026-09-28): the synthetic export's
+        # villages and towns are `VILLAGE`/`TOWN` and the card listed none of them. The
+        # same set `opening` and `openings` read a settlement by.
+        settlements=[e.name for e in world.entities.values()
+                     if e.kind in _settled_kinds()
+                     or (e.scale or "").lower() in _settled_scales()][:8],
         peoples=[e.name for e in world.of_kind("PEOPLE")][:8],
     )
+
+
+def _settled_kinds() -> tuple[str, ...]:
+    from .opening import SETTLEMENT_KINDS
+
+    return SETTLEMENT_KINDS
+
+
+def _settled_scales() -> tuple[str, ...]:
+    from .opening import SETTLEMENT_SCALES
+
+    return SETTLEMENT_SCALES
 
 
 def worlds() -> list[WorldCard]:
@@ -241,6 +258,7 @@ def characters_in(world_id: str) -> list[dict]:
         summary["campaign"] = by_campaign[entry.id]["id"]
         summary["turns"] = by_campaign[entry.id]["turns"]
         summary["active"] = by_campaign[entry.id]["active"]
+        summary["begun"] = True
         out.append(summary)
     return out
 
@@ -266,6 +284,9 @@ def recent_characters(limit: int = 12) -> list[dict]:
         summary["world"] = where.get(entry.id, "")
         summary["active"] = entry.campaign_id == active
         summary["playable"] = entry.playable()
+        # The outfit page is for creation only (owner, 2026-09-28): once a campaign has
+        # begun, the card offers no way back to it (`outfit_views.begun`).
+        summary["begun"] = bool(entry.campaign_id)
         out.append(summary)
     out.sort(key=lambda e: (not e["active"], not e["playable"], -e["turns_played"]))
     return out[:limit]

@@ -123,10 +123,20 @@ def _old_place_block(world, scene, location, here=None, known=()):
                     f"  ROADS OUT OF {location.name.upper()} (the only settlements that "
                     f"can be reached, and only by journey, which takes days): "
                     f"{', '.join(leg.to_name for leg in out)}.")
+        # The one deliberate change since the freeze (Lane C, 2026-09-28, fix-interfaces
+        # §3.4): the fact loop reads the other exports' keys after the eight, shows
+        # "Urban Life" as "Daily life", and puts the stock "the city's" back to the
+        # settlement's stated size. Everything above is still the base's bytes.
+        from play.opening_prose import stated_scale
+        from rules import geography
+
+        scale = stated_scale(location)
         for key in ("Urban Life", "Social Classes", "Architecture", "Governance",
-                    "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
+                    "Formal Power", "Shadow Power", "Tension", "Daily Norms",
+                    "Daily Life", "Customs", "Conflict", "Landscape"):
             if location.fact(key):
-                lines.append(f"  {key}: {location.fact(key)}")
+                lines.append(f"  {geography.display_key(key)}: "
+                             f"{geography.in_its_own_words(str(location.fact(key)), scale)}")
     return "\n".join(lines)
 
 
@@ -160,8 +170,15 @@ def test_the_place_slot_is_the_old_inline_block_byte_for_byte(worlds, only_the_m
         for label, scene, kw in _stands(worlds, row["id"]):
             old = _old_place_block(worlds, scene, location,
                                    kw.get("here"), kw.get("known", ()))
-            keys = ("Urban Life", "Social Classes", "Architecture", "Governance",
-                    "Formal Power", "Shadow Power", "Tension", "Daily Norms")
+            # The keys as the brief now SHOWS them (Lane C: "Urban Life" reads "Daily
+            # life", and four more exports' keys reach the brief), which is what
+            # `_old_place_block` rebuilds since Lane C's change to it.
+            from rules import geography
+
+            keys = {geography.display_key(k) for k in (
+                "Urban Life", "Social Classes", "Architecture", "Governance",
+                "Formal Power", "Shadow Power", "Tension", "Daily Norms",
+                "Daily Life", "Customs", "Conflict", "Landscape")}
             want = "\n".join(ln for ln in old.split("\n")
                              if any(ln.startswith(f"  {k}: ") for k in keys))
             got, _facts = brief.run("place", _ctx(worlds, scene, location, **kw))

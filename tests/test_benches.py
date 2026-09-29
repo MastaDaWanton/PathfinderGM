@@ -26,7 +26,9 @@ from rules.sheet import load_pc
 def client(tmp_path):
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
-        cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # A quiet start, pinned: since 2026-09-28 a campaign may open on a fight (the
+        # start documents, rules/openings.py), and a shop refuses a character in one.
+        cm.begin_with(load_pc("fixtures/pc-kesst.json"), start_id="quiet-the-bread-stall")
         yield Client()
         cm._LIVE.clear()
 

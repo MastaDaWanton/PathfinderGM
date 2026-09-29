@@ -3712,7 +3712,14 @@ class Engine:
         swayed = self._sway_subject(intent, skill)
         if swayed is not None and (refusal := self._sway_refusal(intent, actor, swayed, skill)):
             return refusal
-        if opposed:
+        # First aid (Lane C, `rules/firstaid.py`): a Heal check aimed at somebody dying
+        # is the rulebook's DC 15 to make them stable, whatever DC the plan wrote.
+        from . import firstaid
+
+        patient = firstaid.patient_of(self, intent) if not opposed else None
+        if patient is not None:
+            resolved_dc = dc_mod.ResolvedDC(value=firstaid.DC, band=None)
+        elif opposed:
             target = opposing_roll.total
             resolved_dc = dc_mod.ResolvedDC(value=target, band=None)
             if intent.params.get("circumstance"):
@@ -3768,6 +3775,9 @@ class Engine:
             tell += self.reward_check(actor, skill, beaten)
 
         effects: list[dict] = []
+        if patient is not None:
+            aided, effects = firstaid.settle(actor, patient, verdict == "success")
+            tell += aided
         if swayed is not None:
             moved_tell, effects = self._sway(actor, swayed, skill, margin,
                                              intent.because)

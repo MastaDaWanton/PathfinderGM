@@ -443,8 +443,10 @@ def test_only_the_people_stage_may_fill_an_empty_who_and_nothing_else_moves(pack
 
 def test_after_opening_runs_both_stages_at_the_opening_door_and_is_wired_to_nothing(
         package, tmp_path):
-    """Inert in Phase 1: Lane C calls it from `new_campaign` in Phase 2. Nothing in play/
-    calls it yet, and with no member it returns nothing."""
+    """Inert in Phase 1; with no member it returns nothing. Lane C wired it in Phase 2
+    (2026-09-28) at the end of `campaign.open_the_story` — the one caller, because
+    `after_opening` reads the opening beat and `new_campaign` returns before that beat
+    is written."""
     from play import campaign as cm
     from rules.sheet import load_pc
 
@@ -464,7 +466,7 @@ def test_after_opening_runs_both_stages_at_the_opening_door_and_is_wired_to_noth
         cm._LIVE.clear()
     callers = [f for f in (ROOT / "play").rglob("*.py")
                if "aftermath" not in f.parts and "after_opening" in f.read_text("utf-8")]
-    assert callers == []
+    assert [f.name for f in callers] == ["campaign.py"]
 
 
 # --- the two call sites in a real turn --------------------------------------------------------
@@ -630,7 +632,12 @@ def test_every_new_state_key_is_there_at_its_default(game):
     # slots (1 + her Intelligence bonus spell), both empty.
     assert s["spellcasting"] == {"kind": "prepared", "nothing_prepared": True,
                                  "empty_slots": {"1": 2}}
-    assert s["start"] == {}
+    # Lane C (2026-09-28): a new campaign opens on a start document, so `start` carries
+    # it; its shape is still §2.10's, read through the one helper.
+    from play import views
+
+    assert s["start"] == views._start_state(c.scene)
+    assert set(s["start"]) <= {"id", "kind", "hand_off"}
 
 
 def test_spellcasting_and_start_read_the_character_and_the_scene():

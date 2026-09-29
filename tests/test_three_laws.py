@@ -226,6 +226,11 @@ _LITERAL_KEY_SITES = {
                           "vocabulary"),
     "rules/survival.py": (4, "the fatigue ladder: thirst escalates fatigued to "
                              "exhausted, and asks for the key it is about to write"),
+    # 2026-09-28 (Lane C): first aid writes the rung the rulebook names — dying off,
+    # stable on — exactly as `bleed_out` does when the patient manages it alone. Its
+    # question ("is this one dying?") asks the vocabulary.
+    "rules/firstaid.py": (2, "first aid's DC 15 Heal check writing the 1e rung: dying "
+                             "lifted, stable written"),
     "play/views.py": (3, "resurrection naming `dead` (the only caller entitled to "
                          "remove it), the life-debt it charges for, and the stance "
                          "toggle whose key comes from a class document"),

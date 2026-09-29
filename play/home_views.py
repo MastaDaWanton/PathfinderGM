@@ -215,7 +215,13 @@ def start_in_world(request):
     if refusal is not None:
         return refusal
 
-    campaign_mod.begin_with(character, world_source=card.source)
+    # Where it starts: the new-campaign screen's chooser (owner's answer Q20: built as a
+    # path and labelled "not built yet" on the page). Absent, the start is drawn; a
+    # choice that does not fit this character is drawn around (`openings.choose`).
+    start_town = str(body.get("start_town") or "").strip() or None
+    start_id = str(body.get("start_id") or "").strip() or None
+    campaign_mod.begin_with(character, world_source=card.source,
+                            start_town=start_town, start_id=start_id)
     return JsonResponse({"ok": True})
 
 

@@ -402,7 +402,18 @@ _ROLE_WORDS = {
     "guard officer": ("guard", "captain", "sergeant", "watch", "officer", "constable"),
     "standing": ("elder", "noble", "councillor", "lord", "lady", "chief", "priest", "master"),
     "companion": ("companion",),
+    # A tie role since the backgrounds shipped (the bonesetter's teacher) and missing
+    # here, so "healer" was matched as the one word and nothing else: a world whose
+    # healers are "physicians" or "herbalists" had none.
+    "healer": ("healer", "physician", "herbalist", "midwife", "bonesetter", "surgeon",
+               "apothecary", "chirurgeon"),
 }
+
+
+def role_words(role: str) -> tuple[str, ...]:
+    """The words a role is matched by, for any reader that must agree with `_role_for`."""
+    role = str(role or "")
+    return _ROLE_WORDS.get(role, (role,) if role else ())
 
 
 def _place_for(engine, kind: str, spec: dict) -> dict | None:
@@ -491,6 +502,55 @@ def _cast_candidates(engine, anywhere: bool = False) -> list[dict]:
     return out
 
 
+def _fits_role(world, row: dict, words) -> bool:
+    """Whether this cast member does the work, by their OWN entity's role fact.
+
+    Item 8, measured 2026-09-28: every one of Aurvantis's 256 and Pangrella's 47 cast rows
+    says `role: "Person"`, so nothing ever matched the row and every tie and every giver
+    fell to the deterministic fallback — cast[0], Drenn Ironvale, first in every game.
+    Their own entities say what they do ("Role: healer"); `geography.role_of` reads that,
+    and whole words, so Pangrella's long role phrases still match.
+    """
+    from . import geography
+
+    said = geography.role_of(world, row).lower()
+    return bool(said) and any(re.search(r"\b" + re.escape(w) + r"\b", said) for w in words)
+
+
+def _pick_person(engine, slot: str, words, taken: set) -> dict | None:
+    """The world person who fills a part: seeded by the CAMPAIGN, never first-in-list.
+
+    Preference, each pool id-sorted before the draw so the answer depends on the story
+    seed and not on the export's order: somebody here whose own role fits; somebody
+    anywhere whose role fits (a tie in the past can be "Wenna Cobbe of Brindle Ford");
+    anybody here; anybody anywhere — a world name before a role word, which the playtest
+    that found every role in a town named "standing" asked for.
+
+    One list of the spoken-for across every binder (`Scene.spoken_for`), so a background
+    tie and a quest giver are never the same person by accident (item 8.3).
+    """
+    from . import openings
+
+    world = engine.world
+    if world is None:
+        return None
+    scene = engine.scene
+    spoken = openings.spoken_for(scene) | {str(t) for t in taken}
+
+    def free(rows):
+        return sorted((c for c in rows if str(c.get("id")) not in spoken),
+                      key=lambda c: str(c.get("id")))
+    here = free(_cast_candidates(engine))
+    anywhere = free(_cast_candidates(engine, anywhere=True))
+    rng = openings.rng_for(getattr(scene, "story_seed", 0) or 0,
+                           f"cast:{slot}:{len(spoken)}")
+    for pool in ([c for c in here if _fits_role(world, c, words)],
+                 [c for c in anywhere if _fits_role(world, c, words)], here, anywhere):
+        if pool:
+            return pool[rng.randrange(len(pool))]
+    return None
+
+
 def _role_for(engine, name: str, spec: dict, filled: dict, taken: set,
               place: bool = True) -> dict | None:
     """A person for the role: a cast member of this place when there is one (grounded,
@@ -505,22 +565,16 @@ def _role_for(engine, name: str, spec: dict, filled: dict, taken: set,
     way; a scheme that means to introduce somebody does not.
     """
     from . import npcs
+    from . import openings
     from .bestiary import instantiate
 
     scene = engine.scene
     role = str(spec.get("role") or "")
     words = _ROLE_WORDS.get(role, (role,))
-    cast = [c for c in _cast_candidates(engine) if c.get("id") not in taken]
-    if not cast:
-        # The town's own people are spoken for: somebody from elsewhere in the world,
-        # here today — grounded, named by the world, never by the role word. The
-        # playtest found every non-giver role in both towns named "standing".
-        cast = [c for c in _cast_candidates(engine, anywhere=True) if c.get("id") not in taken]
-    pick = next((c for c in cast if any(re.search(r"\b" + re.escape(w) + r"\b", str(c.get("role", "")).lower())
-                                        for w in words)), None)
-    if pick is None and cast:
-        # Deterministic: the cast in its own order, so the same world fills the same slot.
-        pick = cast[len(taken) % len(cast)]
+    pick = _pick_person(engine, name, words, taken)
+    if pick is not None:
+        taken.add(str(pick["id"]))
+        openings.speak_for(scene, str(pick["id"]))
     pc = scene.pc()
     level = int(getattr(pc, "level", 1) or 1)
     # A slot may say `"named": true` for a person who should not be "Guard" — a rival
@@ -531,7 +585,6 @@ def _role_for(engine, name: str, spec: dict, filled: dict, taken: set,
                                   prefer_named=named)
         actor = instantiate(template, scene=scene, name=str(pick["name"]),
                             world_entity_id=str(pick["id"]))
-        taken.add(str(pick["id"]))
     else:
         # Named by the role asked for, not by the block: a Game Mastery Guide "Guard"
         # is a fine name in any world and an Inner Sea "Thrune Agent" is not.
@@ -600,6 +653,8 @@ def fill_slots(engine, doc: dict) -> dict:
             got = _item_for(engine, spec, filled)
             if got:
                 filled[name] = got
+    # The local set is only this scheme's own; `_role_for` also reads and writes the
+    # scene's shared `spoken_for`, so a giver is never somebody's background tie.
     taken: set = set()
     for name, spec in slots.items():
         if spec.get("role"):

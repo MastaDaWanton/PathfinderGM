@@ -164,6 +164,16 @@
   }
   h2.sect:first-child { margin-top: 0; }
   .note { color: var(--dim); font: italic 14px/1.6 var(--body); margin: 0 0 14px; }
+  /* Where the game starts (owner's answer Q20, 2026-09-28): "Surprise me" works, the
+     chooser is on the page and says it is not built yet. The page's own tokens only. */
+  .startwhere { border: 1px solid var(--edge); border-radius: 3px; padding: 10px 14px 12px;
+                margin: 0 0 16px; max-width: 34em; }
+  .startwhere legend { color: var(--gold); font: 400 14px/1 var(--display);
+                       letter-spacing: .08em; font-variant: small-caps; padding: 0 6px; }
+  .startwhere label { display: flex; gap: 8px; align-items: center; margin-top: 6px;
+                      cursor: pointer; }
+  .startwhere label.notyet { color: var(--dim); cursor: not-allowed; }
+  .startwhere input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .bad-note { color: #cf9d95; font-size: 13px; }
   #err { color: var(--alarm); min-height: 1.4em; margin-top: 12px; font-size: 14px; }
 
@@ -768,6 +778,8 @@ let WORLD = null;        // the world card opened, if any
 let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
 let PICKED = null;       // pregen chosen when starting a new game
+// {start_town, start_id} once the start chooser exists (Q20: labelled not built yet).
+let START_CHOICE = null;
 let CAT = null;          // the effect catalogue, fetched once
 let KINDS = null;        // what each kind of content holds, from rules/registry.py
 let DRAFT = {};          // the entry being edited, keyed by declared field name
@@ -970,6 +982,18 @@ function paneOneWorld() {
         <em>Build a character from nothing — point buy, class, skills, feats.</em>
         <div class="stat">All eleven classes · the world's races and the Core seven</div>
       </button></div>
+    <!-- Where the game starts. "Surprise me" draws the town and the start from the
+         character (rules/openings.py). Choosing is the path the owner asked to be built
+         and labelled (Q20): the server takes start_town and start_id already, the
+         chooser that would send them is not built yet, so it is shown and disabled. -->
+    <fieldset class="startwhere">
+      <legend>Where it starts</legend>
+      <label><input type="radio" name="startwhere" value="surprise" checked>
+        Surprise me: the town and the start are drawn for this character</label>
+      <label class="notyet" title="Not built yet">
+        <input type="radio" name="startwhere" value="choose" disabled>
+        Choose the town and the start <span class="pill soon">not built yet</span></label>
+    </fieldset>
     <button class="go" data-start="${esc(w.id)}" ${PICKED ? "" : "disabled"}
             style="${PICKED ? "" : "opacity:.4;cursor:not-allowed"}">
       Begin a sandbox${PICKED ? "" : " — pick somebody first"}</button>
@@ -1843,7 +1867,10 @@ function paneCharacters() {
                way back to it — and since 2026-09-19 the purse is the WHOLE gear budget
                (the class kits are gone, item 24), which makes an unspent one a character
                with nothing but their hands. -->
-          ${c.playable && !c.unreadable ? `<button class="quiet"
+          <!-- Creation only, since 2026-09-28: once their game has begun the outfitter
+               is closed to them (the roster and the running sheet drifted apart), and
+               gear is bought from the shops and stalls in town. -->
+          ${c.playable && !c.unreadable && !c.begun ? `<button class="quiet"
             data-outfit="${esc(c.id)}" data-outfit-world="${esc(c.world_source || "")}"
             title="Spend what is left of their purse">Outfit</button>` : ""}
           ${c.active ? "" : `<button class="quiet danger"
@@ -2888,7 +2915,12 @@ document.addEventListener("click", async e => {
   const start = e.target.closest("[data-start]");
   if (start && !start.disabled) {
     try {
-      await post("/api/start", { world: start.dataset.start, source: PICKED });
+      // `start_town` / `start_id` ride here once the chooser is built; until then the
+      // disabled radio cannot be picked and the draw decides.
+      const chosen = document.querySelector('input[name="startwhere"]:checked');
+      const body = { world: start.dataset.start, source: PICKED };
+      if (chosen && chosen.value === "choose" && START_CHOICE) Object.assign(body, START_CHOICE);
+      await post("/api/start", body);
       location.href = "/play/";
     } catch (err) { if (!blockedByModel(err)) $("#err").textContent = err.message; }
     return;

@@ -383,7 +383,12 @@ def test_a_new_campaign_stands_the_company_beside_the_party(tmp_path):
         assert c.scene.at and places.terrain_of(c.scene.at) == "urban"
         standing = [a for a in c.scene.actors.values()
                     if not keepers.is_keeper(a.world_entity_id or "")]
-        assert len(standing) == 2, "the opening companion is standing nowhere"
+        # Everybody the start brought in (rules/openings.py, 2026-09-28) — the lead, and
+        # a patient or a challenger where the start has one — stands where the party is.
+        brought = set((c.scene.start.get("slots") or {}).values())
+        assert brought and brought <= {a.ref for a in standing}, \
+            "the opening companion is standing nowhere"
+        assert len(standing) >= 1 + len(brought)
         # And a keeper where the opening room is one somebody keeps. At schema 1.5 the
         # world's first settlement is a quartered city and a campaign opens in its GREAT
         # SQUARE, which is a junction rather than a shop — so the count depends on the

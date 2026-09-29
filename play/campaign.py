@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import re
-import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -541,18 +540,28 @@ class Campaign:
 # --- The slice's starting situation -------------------------------------------------------
 
 def new_campaign(campaign_id: str = "slice", seed: int | None = None,
-                 character=None, world_source=None) -> Campaign:
+                 character=None, world_source=None, *, start_town: str | None = None,
+                 start_id: str | None = None) -> Campaign:
     """One scene in whatever world is loaded, built from that world's own material.
 
-    Nothing here is invented and nothing here is named. The starting settlement is
-    found — `opening.starting_place` takes the smallest inhabited thing the export
-    describes — because this file used to hold a literal entity id out of the shipped
-    Pangrella fixture, so every other world began nowhere and the opening said so.
+    Nothing here is invented and nothing here is named. Where it begins is DRAWN — the
+    town and the start together, from the campaign's own story seed, weighted by who the
+    character is (`rules/openings.choose`) — because until 2026-09-28 it was found by a
+    ranking that a templated export turned into "the alphabetically last village", and
+    every Aurvantis campaign began in Vormoor with the same four people in it.
 
-    The company is rolled with the situation: whoever the opening puts within speaking
-    distance is who the scene starts with, rather than a guildhand on a gate that only
-    the fixture's own opening ever mentioned.
+    The start is then staged before a word is written: the character's past bound to
+    the world's people, the lead who speaks first standing beside them (their teacher,
+    if the start wants a healer and their past has one), and the incident in motion in
+    the engine — a patient really dying, a challenger really holding initiative
+    (`openings.stage`). The opening is written about what that left behind.
+
+    `start_town` and `start_id` are the new-campaign screen's choice, honoured when they
+    fit; the screen does not offer them yet (owner's answer Q20: the path is built and
+    labelled). A world no start document fits opens the legacy way, unchanged.
     """
+    from rules import openings
+
     from . import opening
 
     # The world this campaign is in, which is not necessarily the shipped one. The setting
@@ -561,15 +570,53 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     # export that happens to ship in the box.
     world_source = world_source or settings.WORLD_EXPORT
     world = load_cached(world_source)
-    town = opening.starting_place(world)
+    # The story's own number — never the dice's (`Scene.story_seed`). A caller's `seed`
+    # fixes both, which is what a reproducible test or audit wants.
+    # Drawn through the dice's own unseeded door rather than `secrets`: the same fresh
+    # entropy in play (`random.Random(None)` reads the OS), and the one door the suite
+    # seeds per test (`tests/conftest.py`), so a test's start is the same on every run —
+    # measured 2026-09-28, a `secrets` draw moved six tests between pass and fail from
+    # one run to the next because the start was a fight in one and a queue in the other.
+    story_seed = seed if seed is not None else Dice(None)._rng.randrange(2 ** 31)
+    pc = character or load_pc(settings.PREGEN_PC)
+    town, doc = openings.choose(world, pc, openings.rng_for(story_seed, "start"),
+                                start_town=start_town, start_id=start_id)
+    if town is None:
+        town = opening.starting_place(world)
     scene = Scene(location_id=town.id if town else None)
-    scene.story_seed = seed if seed is not None else secrets.randbits(31)
+    scene.story_seed = story_seed
+    if doc is not None:
+        # The hour first: who is at their counter, and who has gone home, is decided by
+        # the clock the moment the party is placed.
+        scene.clock_minutes = opening.hour_of(doc.get("when")) * 60
     # Placed, not biomed: the ground is inside the place id and a new campaign stands
     # at its town's first place. The PC first, then the party is placed, THEN the
     # company — `Scene.add` stamps whoever arrives with the party's place, and the
     # review found the other order left the opening companion standing nowhere.
-    scene.add(character or load_pc(settings.PREGEN_PC), zone="near")
+    scene.add(pc, zone="near")
     Engine(scene, Dice(seed), world=world).place_party()
+    if doc is not None:
+        c = Campaign(id=campaign_id, world_source=str(world_source), scene=scene,
+                     seed=seed)
+        # The past before the start, because the start reads it: a tie that names the
+        # healer the start wants makes that person the lead. Acquainting waits until the
+        # lead is standing there.
+        bound = _bind_background(c, acquaint=False)
+        openings.stage(c.engine(), doc, story_seed=story_seed, bound=bound)
+        pc_now = scene.pc()
+        if pc_now is not None and getattr(pc_now, "background", ""):
+            from rules import backgrounds
+
+            try:
+                backgrounds.acquaint(c.engine(), pc_now, bound)
+            except Exception:
+                import logging
+
+                logging.getLogger(__name__).exception("acquainting the start's lead failed")
+        here = opening.situation_for(c)
+        _open_the_world(c, world, here, str((scene.start.get("slots") or {}).get("lead")
+                                            or ""), seed, town)
+        return c
     here = opening.roll(campaign_id, seed)
     # The clock starts at the hour the opening names ("Mid-morning, in the market row"),
     # not at midnight: the hour now decides who is where and which counters are open.
@@ -603,6 +650,15 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
+    _open_the_world(c, world, here, watcher.ref, seed, town)
+    return c
+
+
+def _open_the_world(c: Campaign, world, here, watcher_ref: str, seed, town) -> None:
+    """The cards and the undercurrent a new campaign starts with, for either opening."""
+    from . import opening
+
+    scene = c.scene
     # The situation cards the game starts with (`rules/cards.py`): the errand the
     # player is standing in, always on; and the world's own — its author's, when
     # World Bible ships some, and the ones every export implies: the starting
@@ -611,7 +667,7 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
 
     pc = scene.pc()
     cards_mod.open_card(scene, cards_mod.from_opening(
-        here, scene.at, watcher.ref, pc.name if pc is not None else ""))
+        here, scene.at, watcher_ref, pc.name if pc is not None else ""))
     for card in cards_mod.from_world(world, scene.at):
         cards_mod.open_card(scene, card)
     # The campaign's opening undercurrent — the first world-state this app has ever
@@ -621,10 +677,9 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     # single prompt-builder signature changing. The framing lives in
     # `opening.private_note` because `gm/watcher.py` rewrites this entry in place and
     # finds it by its prefix — two copies of the wrapper is how the search misses one.
-    thread = opening.undercurrent(world, seed)
+    thread = opening.undercurrent(world, seed, place=town)
     if thread:
         c.history.append({"role": "user", "content": opening.private_note(thread)})
-    return c
 
 
 def _open_with(c: Campaign, opened: tuple[str, list[str]]) -> None:
@@ -676,6 +731,10 @@ def opening_text(campaign: Campaign, written: bool = True) -> tuple[str, list[st
     skeleton = opening.compose(campaign, _standing(campaign.world, campaign.scene.pc()))
     could = opening.suggestions_for(here)
     if not written:
+        lead = opening.lead_of(campaign)
+        if lead is not None and lead.appearance and opening_prose.face_given(
+                skeleton, here.who, lead.appearance):
+            lead.described = True
         return skeleton, could
     text, suggestions, wrong = opening_prose.write(campaign, here, skeleton, could)
     floor = text.strip() == skeleton.strip()
@@ -692,6 +751,13 @@ def opening_text(campaign: Campaign, written: bool = True) -> tuple[str, list[st
     # game_begins caught the first version).
     campaign._opening_record = {"floor": floor, "chars": len(text),
                                 "problems": list(wrong)}
+    # The start's lead was described on first sight — the template carries the face,
+    # and the written opening is checked for it and backstopped (`opening_prose`) — so
+    # the face check (Lane A's `settle_descriptions`) owes nothing on turn one.
+    lead = opening.lead_of(campaign)
+    if lead is not None and lead.appearance and opening_prose.face_given(
+            text, here.who, lead.appearance):
+        lead.described = True
     return text, suggestions
 
 
@@ -720,7 +786,13 @@ def _standing(world, pc) -> str:
         return f"{people.name} — flightless, in a city whose nobility is not"
     if "wing" in people.fact("Anatomy", "").lower():
         return f"{people.name} — winged, in a city that expects you to act like it"
-    return (f"{people.name} — {origin.rstrip('.').lower()}"
+    # The origin's first word lowered only when it is not one of the world's names: the
+    # whole line was lowered, and Borin's opening read "Nahyrin — kaelinoran wastes
+    # nomads", this app respelling a place of the world's own (the template grammar the
+    # owner flagged 2026-09-28).
+    from .opening import _lower_common
+
+    return (f"{people.name} — {_lower_common(origin.rstrip('.'), world)}"
             + ("" if known else ", and a stranger here"))
 
 
@@ -991,6 +1063,29 @@ def _heal_background(c) -> None:
     _bind_background(c)
 
 
+def _after_the_opening(c) -> None:
+    """The opening's own after-the-beat pass (`aftermath.after_opening`, fix-interfaces
+    §2.3): the members that opt in to the "opening" door — Lane F's conversation log
+    records the companion's first lines (Q48). Its rows ride on the opening beat, NOT in
+    `turn_log`: an entry there is a turn played, and a start with one is no longer the
+    abandoned start `begin_with` retires.
+
+    Called at the end of `open_the_story`, not of `new_campaign` as the register first
+    placed it: `after_opening` reads the opening beat, and `new_campaign` returns before
+    the opening is written."""
+    try:
+        from .aftermath import after_opening
+
+        rows = after_opening(c)
+    except Exception as exc:                       # noqa: BLE001 — never stops a start
+        rows = [{"kind": "aftermath-error", "member": "after_opening", "error": str(exc)}]
+    if rows:
+        for beat in reversed(c.transcript):
+            if beat.get("who") == "gm":
+                beat["aftermath"] = list(rows)
+                break
+
+
 def open_the_story(c, written: bool = True) -> None:
     """Bind the character's past, then write the opening that can use it.
 
@@ -1014,9 +1109,10 @@ def open_the_story(c, written: bool = True) -> None:
     """
     _bind_background(c)
     _open_with(c, opening_text(c, written=written))
+    _after_the_opening(c)
 
 
-def _bind_background(c) -> None:
+def _bind_background(c, acquaint: bool = True) -> list[dict]:
     """Fill the PC's background ties from the world, once, at the start of a campaign.
 
     Wrapped because a background that cannot bind must never stop a game beginning: the
@@ -1027,7 +1123,14 @@ def _bind_background(c) -> None:
 
     pc = c.scene.pc()
     if pc is None or not getattr(pc, "background", ""):
-        return
+        return []
+    # Once per campaign object. `new_campaign` binds before it stages a start (the start
+    # reads the ties), and `open_the_story` asks again on every door; a second bind would
+    # re-cast the people it names.
+    done = getattr(c, "_bound", None)
+    if done is not None:
+        return done
+    bound: list[dict] = []
     try:
         engine = c.engine()
         bound = backgrounds.bind(engine, pc)
@@ -1035,17 +1138,24 @@ def _bind_background(c) -> None:
         # And whoever the opening put beside them stops being a stranger, if the ties
         # say this character is known here (`backgrounds.acquaint`). Nobody is added:
         # the person is the one the situation already rolled.
-        backgrounds.acquaint(engine, pc, bound)
+        if acquaint:
+            backgrounds.acquaint(engine, pc, bound)
     except Exception:
         pc.background_ties = []
+    c._bound = bound
+    return bound
 
 
-def begin_with(character, world_source=None) -> Campaign:
+def begin_with(character, world_source=None, start_town: str | None = None,
+               start_id: str | None = None) -> Campaign:
     """Start a campaign for a new character.
 
     Named for them, so it sits alongside everyone else's rather than replacing whoever
     was in the one shared slot. Nothing is archived and nothing is lost: the character
     you were playing keeps their campaign, and you can go back to it.
+
+    `start_town` and `start_id` are the picker's path (owner's answer Q20: built and
+    labelled "not built yet" on the screen); unset, the start is drawn.
     """
     from . import roster
 
@@ -1066,7 +1176,8 @@ def begin_with(character, world_source=None) -> Campaign:
             roster.save(stale)
 
     entry = roster.enrol(character)
-    c = new_campaign(entry.id, character=character, world_source=world_source)
+    c = new_campaign(entry.id, character=character, world_source=world_source,
+                     start_town=start_town, start_id=start_id)
     c.character_id = entry.id
     entry.campaign_id = entry.id
     # The *resolved* world, not the argument: `new_campaign` fills a missing source with
