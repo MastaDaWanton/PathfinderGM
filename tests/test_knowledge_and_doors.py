@@ -179,7 +179,16 @@ def test_the_card_does_not_print_one_term_twice_and_the_reason_wraps():
 
 # --- 7: the giver in the room reaches for the player ---------------------------------------------
 
-def test_a_cards_person_standing_here_makes_it_quiet_in_two_turns_and_speaks_first(vormoor):
+def test_a_cards_person_standing_here_makes_it_quiet_in_two_turns_and_shows_it(vormoor):
+    """Item 7 (2026-09-18): a giver sat in the list for many turns and was never on the
+    page — presence was a listing, and a listing makes nothing happen. The pull put them
+    on the page by having them "approach the player and say the first word".
+
+    That wording is gone (2026-09-28, docs/design-d-people.md §4.6): it was Drenn's cold
+    pitch to his own former pupil ("You! You have the look of…", playtest item 12), and
+    the owner's Q27 ruling is that a stranger never seeks the player out for an errand.
+    A stranger standing here is now OVERHEARD — on the page, at it, in the background —
+    which is item 7's fix without the cold open."""
     from rules import cards
 
     giver = instantiate("guildhand", scene=vormoor, name="Myskalyndra Arinisyn")
@@ -191,8 +200,10 @@ def test_a_cards_person_standing_here_makes_it_quiet_in_two_turns_and_speaks_fir
     cards.save(vormoor, [card]) if hasattr(cards, "save") else vormoor.cards.append(card.as_dict())
     pull = cards.thread_to_pull(vormoor, recent=["The market is loud."], turn=4)
     assert pull is not None and pull["title"] == "The lost ledger"
-    assert "Myskalyndra Arinisyn is standing here" in pull["text"]
-    assert "say the first word" in pull["text"]
+    assert pull["approach"] == "overheard"
+    assert "Myskalyndra Arinisyn" in pull["text"] and "in the background" in pull["text"]
+    assert "say the first word" not in pull["text"]
+    assert "does not approach the player" in pull["text"]
 
 
 # --- 22: the watcher's scope --------------------------------------------------------------------------

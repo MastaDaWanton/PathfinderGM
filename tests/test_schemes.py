@@ -36,8 +36,14 @@ def schemes_on(monkeypatch):
 MARKET = f"{TOWN}~urban:the-market"
 
 
+# "The lost thing" opens on day two at the market (the owner's Q22, 2026-09-28): the first
+# market visit is the player's own. These tests are about the scheme, so they start there.
+DAY_TWO = 24 * 60 + 9 * 60
+
+
 def _table(seed=3):
     s = Scene(location_id=TOWN)
+    s.clock_minutes = DAY_TWO
     pc = load_pc("fixtures/pc-kesst.json")
     s.add(pc)
     e = Engine(s, Dice(seed=seed), world=WORLD)
@@ -100,18 +106,24 @@ def test_a_scheme_opens_at_the_market_with_slots_filled_from_the_world():
     assert rival.at != MARKET and slots["wild"]["terrain"] in rival.at
     assert slots["lost"]["name"]
     # The visible quest card is on the table with the slots filled in words.
-    q = cards.quests(s)
+    # (Other schemes that open on day two share the table; this one's cards are its own.)
+    q = [c for c in cards.quests(s) if c.id == inst["cards"]["errand"]]
     assert len(q) == 1 and giver.name in q[0].title and slots["lost"]["name"] in q[0].title
     assert q[0].giver == giver.ref and len(q[0].objectives) == 2
     # The secret card is the GM's alone.
-    truth = next(c for c in cards.load(s) if c.secret)
+    truth = cards.find(s, inst["cards"]["truth"])
+    assert truth.secret
     assert rival.name in " ".join(truth.facts) and giver.name in " ".join(truth.facts)
-    # The foreshadowing is granted at open through the applicator, so the brief carries it.
+    # The foreshadowing is granted through the applicator, so the brief carries it — by
+    # the `noticed` step, the giver being present, no longer at open (2026-09-28: the
+    # playtest's Bobby "noticed" Drenn at hour 0, before they had met).
     assert pc.has_state("knows.giver-hides-something")
     eff = next(x for x in pc.effects if "knows.giver-hides-something" in x.tags)
-    assert eff.source.startswith("scheme:the-lost-thing")
-    # Opening is silent to the prose: nothing happened the player could see.
-    assert not [o for o in res.outcomes if o.op == "scheme" and o.tell]
+    assert eff.source == "scheme:the-lost-thing/noticed"
+    # Opening is silent to the prose: nothing happened the player could see. (Day two
+    # opens other schemes on the same tick; this one's outcomes are its own.)
+    assert not [o for o in res.outcomes if o.op == "scheme" and o.tell
+                and any(ef.get("scheme") == "the-lost-thing" for ef in o.effects)]
 
 
 def test_a_scheme_opens_once_and_survives_the_save():
@@ -135,10 +147,10 @@ def test_arriving_where_the_rival_is_fires_the_most_specific_step_with_a_tell():
     inst = _instance(s)
     rival = s.people[inst["slots"]["rival"]["ref"]]
     res = _out(e, inst)
-    fired = [o for o in res.outcomes if o.op == "scheme"]
-    assert fired and rival.name in fired[0].tell and "has the" in fired[0].tell
+    fired = [o for o in res.outcomes if o.op == "scheme" and rival.name in o.tell]
+    assert fired and "has the" in fired[0].tell
     assert "found" in inst["fired"]
-    q = cards.quests(s)[0]
+    q = cards.find(s, inst["cards"]["errand"])
     assert q.objectives[0]["done"] and len(q.objectives) == 3     # revealed
     assert pc.has_state("knows.rival-has-it")
     # One step per tick: the twist waits for the next.
@@ -175,7 +187,7 @@ def test_a_step_out_of_sight_is_silent_and_goes_to_the_log_and_the_secret_card()
     assert rival.at == MARKET
     assert not [o for o in res.outcomes if o.op == "scheme" and o.tell], "silent"
     assert inst["fired"]["rival-comes-to-town"]["silent"]
-    truth = next(c for c in cards.load(s) if c.secret)
+    truth = cards.find(s, inst["cards"]["truth"])
     assert any("looking for" in f for f in truth.facts)
     # The news it carried is queued, and gossip needs somebody present who heard it.
     assert inst["news"] and inst["news"][0]["carrier"] == "gossip"
@@ -216,7 +228,7 @@ def test_returning_the_thing_pays_the_story_award_and_regard_through_the_applica
     assert giver.has_state("attitude.friendly")
     eff = next(x for x in giver.effects if "attitude.friendly" in x.tags)
     assert eff.source == "scheme:the-lost-thing/returned"
-    assert not cards.quests(s)[0].live
+    assert not cards.find(s, inst["cards"]["errand"]).live
     assert any(giver.name in o.tell for o in res.outcomes if o.op == "scheme")
 
 

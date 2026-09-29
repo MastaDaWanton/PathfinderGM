@@ -90,11 +90,22 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
     from . import states
     from .bestiary import instantiate
 
+    from . import person_words
+
     actor = instantiate(template, scene=scene, name=phrase)
     # Through the door. The fallback that wrote `scene.actors` directly would now
     # write into a derived view and vanish; `add` stamps the place and the zone —
     # the zone the prose put them in, so the map lays them out where the words did.
     scene.add(actor, zone=zone)
+    # What the words already say: "the girl in the market" is she/her (item 5.3, the
+    # 2026-09-28 playtest's c2 walked on as they/them). The record's own phrase first —
+    # it is the words the person was first known by.
+    said = person_words.from_words((rec or {}).get("phrase") or phrase, world,
+                                   getattr(scene, "location_id", "") or "")
+    person_words.apply(actor, said)
+    if rec is not None and rec.get("seen") is False:
+        # Heard of until now (`note(spot=...)`); a body in the room is seen.
+        seen(scene, rec)
     # In the room, not in the fight. Law two: the fact travels as an effect whose
     # tag is `role.bystander`, lifted by the one door into a fight and by a blow
     # given or taken — never by a flag beside it.
@@ -233,32 +244,86 @@ def used_frames(scene, home) -> set[str]:
             if rec.get("home") == home and rec.get("life")}
 
 
-def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = False) -> dict:
+_HINT_WORK = re.compile(r"\b(?:her|his|their)\s+([a-z][a-z'-]{2,})", re.I)
+
+
+def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = False,
+         spot: str | None = None, heard_from: str = "", hint: str = "") -> dict:
     """Record the person this phrase describes, where the party stands; return the record.
 
     The same phrase at the same place is the same person seen again — their `last_seen`
     moves and nothing is rolled twice. A new one is rolled once, seeded by their id, and
     never re-rolled: the roll is stored, not the seed. `fresh`: somebody new whatever the
     words — the planner's newcomer, or the second of two introduced together.
+
+    `spot` names another place in this settlement: somebody an NPC placed there, HEARD
+    OF and not seen (Eric Eve's Epistemology: *familiar*, not *seen* — Inform Recipe Book
+    §5.5). The owner's ruling (Q5, 2026-09-28): a person an NPC places at a real place in
+    this settlement becomes a population record. Measured on the playtest: the watchman
+    said "the girl in the market", nothing wrote her down, and at the market the finder
+    missed her. `heard_from` is the speaker's ref; `hint` is the speaker's words about
+    them, read only for what they work at ("her stall").
     """
+    from . import person_words
+
     if not hasattr(scene, "population") or scene.population is None:
         scene.population = {}
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
-    have = None if fresh else here_as(scene, phrase)
-    if have is not None:
-        seen(scene, have)
-        return have
+    heard = spot is not None and spot != getattr(scene, "at", None)
+    if heard:
+        have = None if fresh else at_spot(scene, phrase, spot)
+        if have is not None:
+            return have
+    else:
+        have = None if fresh else here_as(scene, phrase)
+        if have is not None:
+            seen(scene, have)
+            return have
     pid = _next_id(scene)
     home = getattr(scene, "location_id", None)
-    life = lives.roll(f"{home}|{pid}", phrase=phrase, body=body,
-                      used_frames=used_frames(scene, home))
+    # The roll reads the words with the Q25 ruling applied ("girl" is a young woman
+    # unless the words make her a child) and the work the speaker gave them, if any.
+    said = person_words.from_words(phrase)
+    rolled = person_words.roll_phrase(phrase, said)
+    work = [w for w in _HINT_WORK.findall(str(hint or "")) if lives.occupation_for(w)]
+    if work and not lives.occupation_for(rolled):
+        rolled = f"{rolled} {work[0]}"
+    used = used_frames(scene, home)
+    life = None
+    if heard:
+        # The speaker said they are THERE, now: their life must agree. A roll whose
+        # routine has them elsewhere at this hour (a priest at the shrine at ten) is
+        # rolled again, deterministically, until one keeps them at work — and where a
+        # resident works is where they were first placed (`residency.resolve`). Measured
+        # while building this: the first girl of the market rolled a priest, and at the
+        # market at ten in the morning the finder put her at the shrine.
+        from . import residency
+
+        slot = residency.slot_of(clock)
+        for salt in range(12):
+            cand = lives.roll(f"{home}|{pid}" + (f"|{salt}" if salt else ""),
+                              phrase=rolled, body=body, used_frames=used)
+            probe = {"id": pid, "life": cand.as_dict(), "first_seen": clock}
+            if cand.mobility != "resident" or \
+                    residency.schedule_for(probe)[slot] == residency.WORK:
+                life = cand
+                break
+    if life is None:
+        life = lives.roll(f"{home}|{pid}", phrase=rolled, body=body, used_frames=used)
+    where = spot if heard else getattr(scene, "at", None)
     rec = {
         "id": pid, "phrase": " ".join(str(phrase).split()), "home": home,
-        "spot": getattr(scene, "at", None), "seen_at": getattr(scene, "at", None),
-        "first_seen": clock, "last_seen": clock,
+        "spot": where, "seen_at": "" if heard else where,
+        "first_seen": clock, "last_seen": None if heard else clock,
         "last_met": None, "turn": int(turn), "ref": "", "tier": "glimpse",
         "life": life.as_dict(),
     }
+    if heard:
+        # Written only when they differ from a seen record's defaults (§2.0, §2.4): an
+        # old save's records read `seen` as True and have no `heard_from`.
+        rec["seen"] = False
+        rec["heard_from"] = str(heard_from or "")
+        rec["heard_at"] = clock
     if rec["life"].get("mobility", "resident") != "resident":
         # A traveller's roads are walked from where and when they were last seen.
         rec["anchor"] = {"loc": home, "place": rec["spot"], "t": clock}
@@ -273,6 +338,8 @@ def seen(scene, rec: dict) -> None:
 
     at = getattr(scene, "at", None)
     rec["seen_at"] = at
+    # Heard of no longer: seen is the default, and a default is not written (§2.0).
+    rec.pop("seen", None)
     residency.observe(rec, getattr(scene, "location_id", None) or "", at or "",
                       int(getattr(scene, "clock_minutes", 0) or 0))
 
@@ -493,8 +560,10 @@ def where_now(rec: dict, scene, world=None):
         return residency.where_of_place(str(actor.at), int(rec.get("last_seen") or 0))
     here = getattr(scene, "at", None)
     seen_at = rec.get("seen_at", rec.get("spot"))
-    # Unplaced (a scene nobody has stood anywhere yet) is still one room.
-    if ((seen_at or "") == (here or "")
+    # Unplaced (a scene nobody has stood anywhere yet) is still one room. Somebody only
+    # heard of was never seen anywhere, so the rule "she stays where you saw her" has
+    # nothing to hold: the schedule places them (the speaker's spot is their WORK).
+    if (rec.get("seen", True) is not False and (seen_at or "") == (here or "")
             and int(rec.get("last_seen") or 0) >= int(getattr(scene, "arrived", 0) or 0)):
         return residency.Where("place", places_mod.location_of(here or "") or
                                str(getattr(scene, "location_id", "") or ""), here or "")
@@ -579,8 +648,11 @@ def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
         if fits:
             return Found(scope=AMBIGUOUS, ring=name, people=fits)
     # A description with a relative clause the record cannot answer to ("the woman who
-    # waved at me" of a woman nobody saw wave) is still asking for the woman.
-    head = re.split(r"\s+who\s+", str(phrase), maxsplit=1, flags=re.I)
+    # waved at me" of a woman nobody saw wave) is still asking for the woman. "that" and
+    # "whom" clauses too: measured on the 2026-09-28 playtest, "the girl that the
+    # watchman described to me" searched for ["girl", "work:guard", "describ"] — the
+    # watchman read as her trade — and missed.
+    head = re.split(r"\s+(?:who|whom|that)\s+", str(phrase), maxsplit=1, flags=re.I)
     if len(head) == 2 and head[0].strip():
         return find(scene, head[0], rings=rings, log_miss=log_miss, world=world)
     if log_miss and getattr(scene, "population", None):

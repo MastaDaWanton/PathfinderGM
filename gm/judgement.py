@@ -6031,10 +6031,41 @@ def inject_company(raw_intents, player_text: str, scene, world=None):
             return raw_intents
         if places_mod.terrain_of(getattr(scene, "at", "")) == places_mod.URBAN:
             return raw_intents
-    m = _ADDRESSES.search(str(player_text or ""))
-    if not m:
+    # Who is ADDRESSED, never who is asked ABOUT (item 5.1 of the 2026-09-28 playtest):
+    # "I ask him about the girl in the market" spawned a guildhand called *girl*, engaged,
+    # at the gate — the reading had it right (talk, target "him") and was never asked,
+    # and the regex below took "him about the girl in the market" as the addressee.
+    # Inform's rule (Recipe Book §6.2, the I7 Handbook on ASK ABOUT): the topic token
+    # reaches out of scope; the person token does not. The reading decides when there is
+    # one; the regex is the fallback only when there is none.
+    from . import interpret as _interpret
+
+    # The words after which a sentence names what is asked, not whom: "ask him ABOUT the
+    # girl", "ask the guard WHERE the inn is", "ask her FOR a light". A pronoun addressee
+    # is somebody already here, whom nothing need make.
+    topic = re.compile(r"\s+(?:about|for|regarding|concerning|whether|if|where|what|"
+                       r"when|why|how|who|which|to)\b.*$", re.I)
+    pronoun = re.compile(r"^(?:him|her|them|it|he|she|they|me|you|us|everyone|everybody|"
+                         r"someone|somebody|anyone|anybody)\b", re.I)
+
+    def cut(phrase: str) -> str:
+        head = topic.sub("", " ".join(str(phrase or "").split())).strip(" ,.!?;")
+        return "" if not head or pronoun.match(head) else head
+
+    reading = _interpret.reading_of(player_text)
+    if reading and not reading.get("error"):
+        # The first `talk` or `seek` act with a target decides; its `says` slot is the
+        # topic and is never read as a person.
+        act = next((a for a in reading.get("actions") or []
+                    if a.get("act") in ("talk", "seek") and str(a.get("target") or "").strip()),
+                   None)
+        addressee = cut(act["target"]) if act else ""
+    else:
+        m = _ADDRESSES.search(str(player_text or ""))
+        addressee = cut(m.group(1)) if m else ""
+    if not addressee:
         return raw_intents
-    role = _CIVILIANS.search(m.group(1))
+    role = _CIVILIANS.search(addressee)
     if not role:
         return raw_intents
     word = role.group(1).lower()

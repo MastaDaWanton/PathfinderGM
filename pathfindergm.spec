@@ -39,6 +39,7 @@ CONTENT_DIRS = [
     "schemes",     # authored quest schemes (content/schemes, rules/schemes.py)
     "openings",    # where a campaign begins (content/openings, rules/openings.py)
     "people",      # the charts a life is rolled from (content/people, rules/lives.py)
+    "hooks",       # one demonstration per hook approach (content/hooks, rules/hooks.py)
     "ingredients",
     "materials",
     "spells",

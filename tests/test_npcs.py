@@ -220,6 +220,8 @@ def test_the_scheme_skeleton_fills_a_giver_through_the_chooser(tmp_path, monkeyp
     town = "5bbd0c40345f"
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         s = Scene(location_id=town)
+        # Day two: "The lost thing" opens then, at the market (the owner's Q22).
+        s.clock_minutes = 24 * 60 + 9 * 60
         pc = load_pc("fixtures/pc-kesst.json")
         s.add(pc)
         e = Engine(s, Dice(seed=3), world=world)

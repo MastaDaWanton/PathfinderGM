@@ -103,9 +103,14 @@ class Card:
     # hit two of its keys) — Ruskin's write-back, so a matter's urgency starts again
     # from the beat that mentioned it. Zero until it ever has been.
     mentioned: int = 0
+    # How the matter has reached the player so far, `[{"turn", "approach"}]`
+    # (rules/hooks.py): the next approach is one not yet used, and one that reaches for
+    # the player rests between showings. Written only when there is one (§2.0), so a card
+    # from before it existed round-trips byte-identically.
+    approaches: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
-        return {
+        out = {
             "id": self.id, "title": self.title, "facts": list(self.facts),
             "keys": list(self.keys), "tags": list(self.tags), "people": list(self.people),
             "place": self.place, "stage": self.stage, "clock": self.clock,
@@ -117,6 +122,9 @@ class Card:
             "giver": self.giver, "reward": self.reward,
             "mentioned": self.mentioned,
         }
+        if self.approaches:
+            out["approaches"] = [dict(a) for a in self.approaches]
+        return out
 
     @classmethod
     def from_dict(cls, d: dict) -> "Card":
@@ -140,6 +148,9 @@ class Card:
                         for o in d.get("objectives") or [] if isinstance(o, dict)],
             giver=str(d.get("giver") or ""), reward=str(d.get("reward") or ""),
             mentioned=int(d.get("mentioned", 0) or 0),
+            approaches=[{"turn": int(a.get("turn", 0) or 0),
+                         "approach": str(a.get("approach") or "")}
+                        for a in d.get("approaches") or [] if isinstance(a, dict)],
         )
 
     def is_(self, query: str) -> bool:
@@ -662,8 +673,12 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
     return out
 
 
+# How many approaches a card remembers: enough to vary them, never a growing list.
+APPROACHES_KEPT = 8
+
+
 def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
-                   turn: int = 0) -> dict | None:
+                   turn: int = 0, world=None) -> dict | None:
     """The one open matter nearest to hand: the prose prompt's last block, and the
     facts `gm.narration.review` polices it with.
 
@@ -672,6 +687,15 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
     firing beats five. The text is a fact with one detail attached — the open objective
     if there is one, else the latest thing that happened — and carries no number.
     Returns None when nothing scores, which is most quiet turns.
+
+    When the matter has a person, HOW it reaches the player is the engine's choice from a
+    closed table (`rules.hooks`, design D §4.6), by who they are to the player and what
+    the player is doing. Until 2026-09-28 it was always "they approach the player and say
+    the first word" — which gave the playtest Drenn's cold pitch to his own former pupil
+    (item 12) and let the pull take the beat from the player's own search (item 9.2).
+    Now: a stranger is overheard or mentioned, never a cold open; somebody who knows the
+    player greets them first; a player about their own business is left to it — the
+    pull YIELDS, and the matter is not put in front of the model at all that beat.
     """
     ranked = salience(scene, recent=recent, player_text=player_text, tells=tells,
                       turn=turn)
@@ -683,23 +707,55 @@ def thread_to_pull(scene, *, recent, player_text: str = "", tells=(),
                            if not o.get("done")), "")
     fact = open_objective or (c.facts[-1] if c.facts else "")
     since = int(turn) - int(c.mentioned or c.touched or 0)
-    text = ("STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to let "
+    head = ("STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to let "
             f"show where it fits, never to resolve for the player): {c.title}"
             + (f" — {fact}" if fact else "") + "."
             + (" It has not come up for a while." if "quiet" in why else ""))
-    # The person it belongs to is standing here: they reach for the player. A named
-    # giver sat in the "In the scene" list for many turns and was never named in prose
-    # (2026-09-18, item 7) — presence was a listing, and a listing makes nothing happen.
-    if "present" in why:
-        actors = getattr(scene, "actors", {}) or {}
-        who = next((actors[r].name for r in c.people if r in actors), "")
-        if who:
-            text += (f" {who} is standing here and has a reason to speak of it: they "
-                     f"approach the player and say the first word about it — in their "
-                     f"own words, in this beat.")
-    return {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
-            "keys": identity_keys(c, names), "people": names, "since": since,
-            "urgent": "urgent" in why, "why": why, "text": text}
+    out = {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
+           "keys": identity_keys(c, names), "people": names, "since": since,
+           "urgent": "urgent" in why, "why": why, "text": head}
+    from . import hooks
+    from . import residency
+
+    if hooks.giver_of(scene, c) is None:
+        return out
+    # The player's words, as the interpreter read them this turn — a cache lookup, the
+    # reading already made for the plan (gm/interpret.py). Imported here: rules reads gm
+    # only inside a function (the precedent is `Engine`'s own reading of it).
+    from gm import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text) if player_text else None
+    if reading is not None and reading.get("error"):
+        reading = None
+    world = residency._world(world)
+    ing = hooks.ingredients(c, scene, world, reading)
+    state = hooks.scene_state(scene, c, reading)
+    if state == hooks.ELSEWHERE and not ing["hook"]:
+        # A situation whose person is not here, and who wants nothing of the player:
+        # nobody to send word or to mention them. The matter alone, as it always was.
+        return out
+    how = hooks.approach(ing["to_player"]["relationship"], state, c, turn=turn,
+                         rest=REST_TURNS)
+    if not how:
+        return out
+    first = not c.approaches and how != "waits"
+    out.update({
+        "approach": how, "yielded": state == hooks.BUSY,
+        "giver": dict(ing["giver"]), "to_player": dict(ing["to_player"]),
+        "offer": ing["offer"], "motive": ing["motive"], "doing": ing["doing"],
+        "withholds": ing["withholds"] if how == "asked" else "",
+        "text": hooks.render(ing, how, head=head, first=first),
+    })
+    if out["yielded"]:
+        # A pull that has yielded asks nothing of the beat: the urgency check
+        # (`narration.review`) must not then demand the matter be carried.
+        out["urgent"] = False
+    if how != "waits":
+        # The card remembers how it reached the player, for the next choice and the rest.
+        c.approaches = (list(c.approaches) + [{"turn": int(turn), "approach": how}]
+                        )[-APPROACHES_KEPT:]
+        _store(scene, c)
+    return out
 
 
 def note_mentions(scene, text: str, turn: int = 0) -> list[str]:

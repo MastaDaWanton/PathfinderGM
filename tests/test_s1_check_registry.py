@@ -197,12 +197,14 @@ def test_the_real_registry_holds_each_lanes_checks_and_no_helper():
     """Phase 1 shipped the registry empty; Phase 2's lanes made it their home (changed on
     purpose, as this test's Phase-1 docstring asked). A subset, not an exact list, because
     every lane that merges adds members and an exact list conflicted at each merge: Lane
-    A's six truth checks and Lane B's four space checks are members; the helpers
-    (`_people`, `_page`, `_space`, and any later `_`-module) never are."""
+    A's six truth checks, Lane B's four space checks and Lane D's four people checks are
+    members; the helpers (`_people`, `_page`, `_space`, `_sought`, and any later
+    `_`-module) never are."""
     names = {m.__name__.rsplit(".", 1)[-1] for m in checks.registered()}
     assert {"refused_move", "stop_shown", "direction", "empty_roll", "face_kept",
             "brief_verbatim"} <= names
     assert {"land_described", "bearing_invented", "road_claimed", "route_walked"} <= names
+    assert {"pull_yields", "hook_leaks", "giver_knows_you", "keeper_forward"} <= names
     assert not {n for n in names if n.startswith("_")}
 
 

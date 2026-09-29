@@ -268,11 +268,16 @@ def _bobby_beats(tmp_path, monkeypatch):
 # --- inert ----------------------------------------------------------------------------------
 
 def test_the_real_registry_holds_the_phase_2_steps():
-    """Phase 1 shipped the registry empty; Lane A's `speaker_real` (item 20.4) is its first
-    member — the assertion this test's Phase-1 docstring said to change, on purpose. A
-    later lane adds its own step here."""
-    assert [m.__name__.rsplit(".", 1)[-1] for m in aftermath.registered()] \
-        == ["speaker_real"]
+    """Phase 1 shipped the registry empty; Phase 2's lanes are its members (the change
+    this test's Phase-1 docstring asked for, on purpose): Lane A's `speaker_real` (item
+    20.4) and Lane D's three "beat" steps in the register's order (§2.3:
+    mentioned_elsewhere 20, pronouns_adopted 30, suggestion_pronouns 40). A later lane
+    adds its own step here."""
+    names = [m.__name__.rsplit(".", 1)[-1] for m in aftermath.registered()]
+    assert "speaker_real" in names
+    mine = [n for n in names if n in ("mentioned_elsewhere", "pronouns_adopted",
+                                      "suggestion_pronouns")]
+    assert mine == ["mentioned_elsewhere", "pronouns_adopted", "suggestion_pronouns"]
 
 
 def test_a_member_that_writes_nothing_changes_no_recorded_turn(tmp_path, monkeypatch,
