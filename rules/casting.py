@@ -50,10 +50,11 @@ FULL_CASTER = [
 
 # The sorcerer's slots (Core Table 3-14), which are not the wizard's with a delay: more
 # of them, arriving later, and a new spell level every even level rather than every odd.
-# The 0-level column follows the same convention the wizard table set — the book says a
-# spontaneous caster's cantrips are at will, the engine models slots, and four is the
-# compromise the wizard column already made. Typed out for the same reason FULL_CASTER
-# is: every attempt to generate these tables is right for eight levels and wrong after.
+# The 0-level column is not in the book's table (a sorcerer's cantrips "do not consume
+# any slots"); the four kept here are never spent — `at_will` exempts level 0 from every
+# slot check and every spend — and survive only so the table is the same shape as the
+# others. Typed out for the same reason FULL_CASTER is: every attempt to generate these
+# tables is right for eight levels and wrong after.
 SPONTANEOUS_FULL = [
     [4, 3, 0, 0, 0, 0, 0, 0, 0, 0],
     [4, 4, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -573,11 +574,38 @@ def _level(actor, spell_id: str) -> int | None:
 
 def remember_loadout(actor) -> None:
     """The preparation the player just made, kept as the one the mornings refill from.
-    Called by `/api/spells/prepare` after every change. Cantrips and domain slots are left
-    out: the first need no preparing here, the second are never auto-filled."""
+    Called by `/api/spells/prepare` after every change. Domain slots are left out: they are
+    never auto-filled. Cantrips are kept since 2026-09-29 — they are prepared like any
+    other spell (`at_will`), so the mornings must refill the ones the player chose."""
     actor.loadout = {str(sid): int(n) for sid, n in (actor.prepared or {}).items()
                      if int(n or 0) > 0 and not str(sid).startswith("domain:")
-                     and (_level(actor, sid) or 0) > 0}
+                     and _level(actor, sid) is not None}
+
+
+# --- cantrips and orisons: prepared, then at will ----------------------------------------
+#
+# Every class entry says the same thing in two phrasings (Archives of Nethys, fetched
+# 2026-09-29):
+#   wizard   "Wizards can prepare a number of cantrips, or 0-level spells, each day, as
+#             noted on Table: Wizard under 'Spells per Day.' These spells are cast like any
+#             other spell, but they are not expended when cast and may be used again."
+#   cleric, druid — the same sentence with "orisons".
+#   sorcerer, bard "...learn a number of cantrips... they do not consume any slots and may
+#             be used again."
+#   paladin, ranger — no 0-level spells at all (their tables start at 1st).
+# So a prepared caster's 0-level slots are a count of how many DIFFERENT cantrips they
+# may hold today, not charges; a spontaneous caster's cantrips known are all at will.
+# Measured before the fix: the engine spent "spell slot 0" per cast (a level 5 wizard's
+# Light: 4, 3, 2, 1, 0, then refused) AND skipped the prepared check for level 0, so any
+# cantrip in the book was castable — both halves wrong, in opposite directions.
+
+def at_will(spell_level) -> bool:
+    """Whether a cast at this spell level spends nothing. 0-level spells only: 1e has no
+    other at-will spell level for any class the engine supports."""
+    try:
+        return int(spell_level) == 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _held_by_level(actor) -> dict[int, int]:
@@ -586,20 +614,21 @@ def _held_by_level(actor) -> dict[int, int]:
         if str(sid).startswith("domain:"):
             continue
         lvl = _level(actor, sid)
-        if lvl is not None and lvl > 0:
+        if lvl is not None and lvl >= 0:
             held[lvl] = held.get(lvl, 0) + int(n or 0)
     return held
 
 
 def empty_slots(actor) -> dict[int, int]:
-    """Slots per spell level (above 0) that hold no prepared spell, for the sheet's warning.
+    """Slots per spell level that hold no prepared spell, for the sheet's warning — the
+    0-level ones included, since a cantrip must be prepared to be cast (`at_will`).
     {} for spontaneous casters — any slot casts anything they know — and non-casters."""
     if caster_data(actor).get("kind") != "prepared":
         return {}
     held = _held_by_level(actor)
     out = {}
     for lvl, room in slots_for(actor).items():
-        if lvl > 0 and room - held.get(lvl, 0) > 0:
+        if room - held.get(lvl, 0) > 0:
             out[lvl] = room - held.get(lvl, 0)
     return out
 
@@ -617,6 +646,13 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
     5. A caster who prepares from the whole list (cleric, druid; 1,143 spells) gets no
        invented choice: the slots stand empty and the warning carries it (owner, Q39).
     Domain slots are never auto-filled.
+
+    The 0-level slots are filled the same way (2026-09-29: the `lvl > 0` this read left
+    every wizard's cantrip slots empty on the first morning and every morning after), with
+    two differences. A cantrip is at will, so the book fills them one of each distinct
+    cantrip and never repeats one. And a loadout that names no cantrip — every loadout
+    saved before cantrips were prepared — fills them from the book rather than leaving a
+    wizard who rests with no cantrip to cast.
     """
     data = caster_data(actor)
     out = {"kept": {}, "added": {}, "empty": {}, "from": "none", "reason": reason}
@@ -626,7 +662,7 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
         actor.prepared = {str(k): int(v) for k, v in kept.items() if int(v or 0) > 0}
     out["kept"] = {k: int(v) for k, v in (actor.prepared or {}).items() if int(v or 0) > 0}
     room = {lvl: n - _held_by_level(actor).get(lvl, 0)
-            for lvl, n in slots_for(actor).items() if lvl > 0}
+            for lvl, n in slots_for(actor).items()}
 
     def add(sid: str, lvl: int) -> bool:
         if room.get(lvl, 0) <= 0:
@@ -637,25 +673,40 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
         return True
 
     loadout = {str(k): int(v) for k, v in (getattr(actor, "loadout", None) or {}).items()}
+    # Which levels the book fills: every level with no loadout at all, and the 0-level
+    # slots of a loadout that names no cantrip.
+    from_book: set[int] = set()
     if loadout:
         out["from"] = "loadout"
         for sid, want in loadout.items():
             lvl = _level(actor, sid)
-            if lvl is None or lvl <= 0:
+            if lvl is None or lvl < 0:
                 continue
             if data.get("prepare_from") in ("spellbook", "known") \
                     and sid not in (actor.spellbook or []):
                 continue
             while prepared_count(actor, sid) < want and add(sid, lvl):
                 pass
+        if not any(_level(actor, sid) == 0 for sid in loadout):
+            from_book = {0}
     elif data.get("prepare_from") == "spellbook":
         out["from"] = "book"
+        from_book = set(room)
+    if from_book and data.get("prepare_from") == "spellbook":
         by_level: dict[int, list[str]] = {}
         for sid in actor.spellbook or []:
             lvl = _level(actor, sid)
-            if lvl is not None and lvl > 0 and lvl in room and sid not in by_level.get(lvl, []):
+            if lvl is not None and lvl in from_book and lvl in room \
+                    and sid not in by_level.get(lvl, []):
                 by_level.setdefault(lvl, []).append(str(sid))
         for lvl, ids in by_level.items():
+            if at_will(lvl):
+                # One of each: a second copy of an at-will cantrip buys nothing, and a
+                # cantrip already held is not taken twice.
+                for sid in ids:
+                    if prepared_count(actor, sid) < 1 and not add(sid, lvl):
+                        break
+                continue
             while room.get(lvl, 0) > 0 and ids:
                 for sid in ids:
                     if not add(sid, lvl):
@@ -683,7 +734,8 @@ def prepared_said(actor, got: dict) -> str:
         where = " from the book" if got.get("from") == "book" else ""
         bits.append(f"{actor.name} prepares {', '.join(names)}{where}.")
     for lvl, n in sorted((got.get("empty") or {}).items()):
-        bits.append(f"Level {lvl} slots stand empty: nothing is prepared in "
+        which = "Cantrip" if at_will(lvl) else f"Level {lvl}"
+        bits.append(f"{which} slots stand empty: nothing is prepared in "
                     f"{'one of them' if n == 1 else f'{n} of them'}.")
     return " ".join(bits)
 
@@ -714,7 +766,7 @@ def slots_left(actor, spell_level: int):
 
 
 __all__ = [
-    "CASTERS", "FULL_CASTER", "PROGRESSIONS", "bonus_slots", "can_cast_level",
+    "CASTERS", "FULL_CASTER", "PROGRESSIONS", "at_will", "bonus_slots", "can_cast_level",
     "caster_data", "caster_level", "casting_ability", "define_slots", "empty_slots",
     "ensure_prepared", "highest_spell_level", "is_caster", "knows", "level_on_list",
     "prepare", "prepared_count", "remember_loadout", "save_dc", "slot_pool", "slots_for",

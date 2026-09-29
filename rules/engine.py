@@ -9997,7 +9997,11 @@ class Engine:
                     return deferred
 
             pool = casting.slot_pool(level)
-            spent = actor.spend_pool(pool, 1)
+            # A cantrip or orison is "not expended when cast and may be used again" (AoN,
+            # Wizard/Cleric/Druid; "do not consume any slots", Sorcerer/Bard). Measured
+            # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
+            # went 4, 3, 2, 1, 0 and was then refused. Nothing is spent, nothing unprepared.
+            spent = {"ok": True} if casting.at_will(level) else actor.spend_pool(pool, 1)
             if not spent["ok"]:
                 # The mid-list case, measured: six casts in one list PASS validation
                 # against two prepared slots, because `_check_cast` reads the count
@@ -10062,6 +10066,7 @@ class Engine:
             "area": state.get("area") or (spell.area or spell.effect or spell.targets),
             "targets": targets, "slot": pool,
             "slots_left": casting.slots_left(actor, level),
+            "at_will": casting.at_will(level),
             "element": spell.element, "dice": dice,
             "range_feet": spells_mod.range_feet(spell, cl),
             "effects": spell.effects, "effects_converted": spell.effects_converted,
@@ -10992,9 +10997,17 @@ class Engine:
         # ...with the one exception the book names: a cure spell may be cast in place of a
         # prepared spell of the same level or higher, which is what keeps a cleric useful
         # when the day's preparation did not anticipate the wound (`casting.CONVERTS_TO`).
-        may_convert = (casting.converts_spontaneously(actor, spell)
+        # Conversion is a slot-for-slot trade, so it never reaches a 0-level spell: there
+        # is no slot to spend on one.
+        may_convert = (not casting.at_will(level)
+                       and casting.converts_spontaneously(actor, spell)
                        and bool(casting.sacrifice_for(actor, level)))
-        if data.get("kind") == "prepared" and unprepared and level > 0 and not may_convert:
+        # Level 0 included since 2026-09-29. It was exempt (`and level > 0`), so every
+        # cantrip in a wizard's book — twenty-odd of them — was castable without being
+        # prepared. The rule is that a wizard "can prepare a number of cantrips... each
+        # day" and casts THOSE at will (AoN, Wizard; the cleric's and druid's orisons read
+        # the same): prepared first, then never expended.
+        if data.get("kind") == "prepared" and unprepared and not may_convert:
             # Coded, with the fix a button can offer (item 21.3): measured 2026-09-28,
             # this refusal was raised seven times over one turn — the plan loop retried
             # a fact about the character that no plan could change — then handed to a
@@ -11010,7 +11023,7 @@ class Engine:
                 for_a_person=f"{spell.name} is not prepared. Prepare it in the Spells tab "
                              f"first.",
             )
-        if casting.slots_left(actor, level) < 1:
+        if not casting.at_will(level) and casting.slots_left(actor, level) < 1:
             raise IntentError(
                 f"cast: {actor.name} has no level {level} slots left.",
                 "legality", index, code="no_slots",

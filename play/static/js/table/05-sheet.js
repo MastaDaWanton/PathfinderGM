@@ -794,12 +794,27 @@ function tabSpells(s) {
 // The left column. Slots are gem sockets, lit while a slot is left and dark once spent,
 // so "how much have I got" is read at a glance before the numbers are.
 function casterStats(sp) {
-  const sockets = (sp.slots || []).map(sl => `
+  // Cantrips are never spent ("not expended when cast", AoN, Wizard; "do not consume any
+  // slots", Sorcerer), so their row counts nothing down. A prepared caster's gems there
+  // are the cantrips prepared today, lit one per cantrip held; a spontaneous caster's
+  // row just says at will. It showed "3 of 3 left" draining until 2026-09-29.
+  const heldCantrips = cantripsToday(sp).length;
+  const sockets = (sp.slots || []).map(sl => sl.level === 0 ? `
+    <li class="sock-level">
+      <div class="sock-head"><span>${levelName(0)}</span>
+        <span class="sock-dc">DC ${sl.dc}</span></div>
+      ${sp.kind === "prepared" ? `<div class="sock-gems" role="img"
+           aria-label="${Math.min(heldCantrips, sl.max)} of ${sl.max} cantrips prepared">${
+        Array.from({ length: sl.max }, (_, i) =>
+          `<i class="gem${i < heldCantrips ? " lit" : ""}"></i>`).join("")}</div>
+      <div class="sock-count">${Math.min(heldCantrips, sl.max)} of ${sl.max} prepared, at will</div>`
+      : `<div class="sock-count">At will</div>`}
+    </li>` : `
     <li class="sock-level">
       <div class="sock-head"><span>${levelName(sl.level)}</span>
         <span class="sock-dc">DC ${sl.dc}</span></div>
       <div class="sock-gems" role="img"
-           aria-label="${sl.left} of ${sl.max} ${sl.level === 0 ? "cantrip" : `level ${sl.level}`} slots left">${
+           aria-label="${sl.left} of ${sl.max} level ${sl.level} slots left">${
         Array.from({ length: sl.max }, (_, i) =>
           `<i class="gem${i < sl.left ? " lit" : ""}"></i>`).join("")}</div>
       <div class="sock-count${sl.left ? "" : " spent"}">${sl.left} of ${sl.max} left</div>
@@ -829,12 +844,21 @@ function casterStats(sp) {
   </section>`;
 }
 
+// The cantrips this caster may cast right now: a prepared caster's prepared ones (a
+// wizard "can prepare a number of cantrips… each day", and a cleric's orisons read the
+// same), a spontaneous caster's known ones. Until 2026-09-29 this took every cantrip in
+// the book and on the class list, because the engine skipped the prepared check at level
+// 0 and spent a slot instead; both halves were the wrong way round, and both are fixed.
+function cantripsToday(sp) {
+  const prepared = sp.kind === "prepared";
+  return (sp.known || []).filter(k => !k.missing && k.level === 0
+                                      && (!prepared || k.prepared > 0));
+}
+
 // The middle column. A prepared caster sees what is prepared; anyone else sees what they
-// know. Cantrips are listed apart: the engine casts a 0-level spell without a prepared
-// copy (`_check_cast` exempts level 0), so they never need the Prepare button. They are
-// not at will, though, whatever the brief said: each spends a level-0 slot. Measured
-// 2026-09-29, a level 5 wizard casting Light: 4, 3, 2, 1, 0 slots left, and the fifth
-// was refused "no level 0 slots left". The page says so rather than promise otherwise.
+// know. Cantrips are listed apart, as a short list: prepared like any spell, then cast at
+// will — "not expended when cast and may be used again" (AoN, Wizard) — so their rows
+// carry no count.
 function preparedToday(sp) {
   const prepared = sp.kind === "prepared";
   const known = (sp.known || []).filter(k => !k.missing && k.level !== null && k.level !== undefined);
@@ -842,14 +866,8 @@ function preparedToday(sp) {
   const today = known.filter(k => k.level > 0 && (!prepared || k.prepared > 0));
   const slots = new Map((sp.slots || []).map(sl => [sl.level, sl]));
 
-  // Cantrips from the book and from the list, once each: a cleric's orisons are never in
-  // `known` (it lists what is prepared) and are still castable.
-  const cantrips = new Map();
-  for (const k of known) if (k.level === 0) cantrips.set(k.id, k);
-  for (const g of sp.choose_from || []) {
-    if (g.level !== 0 || !g.castable) continue;
-    for (const c of g.spells) if (!cantrips.has(c.id)) cantrips.set(c.id, { ...c, level: 0 });
-  }
+  const cantrips = new Map(cantripsToday(sp).map(k => [k.id, k]));
+  const cantripRoom = slots.get(0) ? slots.get(0).max : 0;
 
   const levels = [...new Set(today.map(k => k.level))].sort((a, b) => a - b);
   const cards = levels.map(lvl => `
@@ -871,22 +889,28 @@ function preparedToday(sp) {
     ${cards || `<div class="sx-empty">${prepared
       ? "Nothing prepared yet. Choose from the grimoire beside this."
       : "Nothing known yet. Choose from the list beside this."}</div>`}
-    ${cantripRows.length ? `
+    ${cantripRows.length || (prepared && cantripRoom) ? `
       <h4 class="sx-sub sx-levelhead">Cantrips${
         slots.get(0) ? ` <small>DC ${slots.get(0).dc}</small>` : ""}</h4>
-      <p class="sx-hint">No preparing needed${slots.get(0)
-        ? `, but each cast spends a cantrip slot: ${slots.get(0).left} of ${slots.get(0).max} left today`
-        : ""}.</p>
-      <ul class="sx-cantrips">${cantripRows.map(c => `
+      <p class="sx-hint">At will: casting one spends nothing.${prepared
+        ? ` ${cantripRows.length} of ${cantripRoom} prepared today; prepare the others from the grimoire.`
+        : ""}</p>
+      ${cantripRows.length ? `<ul class="sx-cantrips">${cantripRows.map(c => `
         <li class="sx-cantrip" style="--school: var(--sc-${schoolKey(c.school)})">
           ${glyph(spellIcon(c))}
           <span class="sx-cname"><b>${esc(c.name)}</b>
             <small>${esc([SPELL_SCHOOLS[schoolKey(c.school)].label, rangePhrase(c.range),
                           plainMeasure(c.duration)].filter(Boolean).join(", "))}</small>
             ${detailsButton(c, "sx-more")}</span>
+          <span class="sx-cantrip-act" style="display: flex; gap: 6px; align-items: center">
           <button type="button" class="prepbtn castbtn" data-spell="${esc(c.id)}"
-                  data-name="${esc(c.name)}" aria-label="Cast ${esc(c.name)}">Cast</button>
-        </li>`).join("")}</ul>` : ""}
+                  data-name="${esc(c.name)}" aria-label="Cast ${esc(c.name)}">Cast</button>${
+          prepared ? `
+          <button type="button" class="spbtn quiet" data-spell="${esc(c.id)}"
+                  data-action="unprepare" data-name="${esc(c.name)}"
+                  aria-label="Unprepare ${esc(c.name)}">Unprepare</button>` : ""}</span>
+        </li>`).join("")}</ul>`
+      : `<div class="sx-empty">No cantrip prepared yet. Choose from the grimoire beside this.</div>`}` : ""}
     ${missing.length ? `<p class="sx-note">Not in this build, so not shown:
       ${missing.map(k => esc(k.name)).join(", ")}.</p>` : ""}
   </section>`;
@@ -993,16 +1017,20 @@ function grimoireList(sp) {
   const { rows, total } = grimoireRows(sp);
   const row = s => {
     const school = schoolKey(s.school);
-    // Cantrips need no preparing, so their row casts instead; a level not reachable yet
-    // is shown (so the player sees what is coming) but offers nothing.
-    const act = s.level === 0
-      ? `<button type="button" class="prepbtn castbtn" data-spell="${esc(s.id)}"
-           data-name="${esc(s.name)}" aria-label="Cast ${esc(s.name)}">Cast</button>`
+    // A cantrip is prepared like any spell, then cast at will (AoN, Wizard: "can prepare
+    // a number of cantrips… each day"), so a prepared caster's cantrip row casts once it
+    // is prepared and prepares until then; one copy is all a cantrip ever needs. A
+    // spontaneous caster's known cantrips cast. A level not reachable yet is shown (so
+    // the player sees what is coming) but offers nothing.
+    const castIt = `<button type="button" class="prepbtn castbtn" data-spell="${esc(s.id)}"
+           data-name="${esc(s.name)}" aria-label="Cast ${esc(s.name)}">Cast</button>`;
+    const cantripReady = s.level === 0 && (!prepared || s.prepared > 0);
+    const act = cantripReady ? castIt
       : s.castable
         ? `<button type="button" class="spbtn" data-spell="${esc(s.id)}" data-action="${action}"
              data-name="${esc(s.name)}" aria-label="${verb} ${esc(s.name)}">${verb}</button>`
         : `<span class="gx-notyet">Not yet</span>`;
-    const drag = s.level > 0 && s.castable;
+    const drag = s.castable && !cantripReady;
     return `<li class="gx-row" style="--school: var(--sc-${school})"
         data-spell="${esc(s.id)}" data-name="${esc(s.name)}"${drag ? ` draggable="true"` : ""}>
       <span class="gx-grip${drag ? "" : " off"}" aria-hidden="true"></span>
