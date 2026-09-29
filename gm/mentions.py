@@ -186,15 +186,18 @@ def _proper(name: str) -> bool:
 
 def _head(name: str) -> str:
     """A descriptor name's head noun: "man with the marked knuckles" -> "man", "second
-    thug" -> "thug"."""
-    words = re.findall(r"[A-Za-z][A-Za-z'-]*", str(name or "").lower())
-    head = []
-    for w in words:
-        if w in _GLUE and head:
-            break
-        if w not in _GLUE:
-            head.append(w)
-    return head[-1] if head else ""
+    thug" -> "thug", "the watchman waving traffic through" -> "watchman".
+
+    The one rule, `checks._people.head_of`. This copy used to take the last word before
+    the first function word, and was wrong for 10 of the 12 opening companions — it
+    stopped at no participle ("clearing", "minding") and no adverb ("ahead"), so the
+    attribution looked for the watchman as "through" (item 4, 2026-09-28)."""
+    from .checks._people import head_of
+
+    head = head_of(name)
+    if " " in head:
+        head = head.split()[-1]
+    return head.lower()
 
 
 def people(scene) -> list[dict]:

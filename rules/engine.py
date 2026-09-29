@@ -2269,12 +2269,20 @@ class Engine:
         # longer offers these ops to the model at all (gm.prompts.turn_schema), so the
         # message here is for the engine's own doors and for a prompt that has
         # drifted — and it still names the fix rather than the fault.
+        #
+        # Every raise here carries a `code` (docs/fix-interfaces.md §2.6; the cast
+        # branch's are `_check_cast`'s). Only a code in `intents.PLAYER_FIXABLE` stops
+        # the plan loop — "no_such_weapon", "out_of_reach": the character's own gear and
+        # the player's own words, which no second plan can change. The rest name the
+        # plan's mistake ("no_document", "no_such_place", "no_such_target"…) and the
+        # loop retries them as it always has. Measured 2026-09-28 (item 21.3): with no
+        # code at all, a refusal only the player could fix went round seven attempts.
         if intent.op in AMOUNT_OPS and not intent.origin:
             raise IntentError(
                 f"{intent.op}: no document behind this number. Name what does it: "
                 f"use_item item=<id> for a jar, cast spell=<id> for a spell, "
                 f"use_ability ability=<name> for a power. The engine supplies the "
-                f"amount from the document.", "legality", index)
+                f"amount from the document.", "legality", index, code="no_document")
         # The outliers the maps found beside the seven (stage 8d): dice inside a
         # save's branches, a guard's absorb/share numbers, and a pool gained out of
         # nowhere. Each is the model authoring a number; each names the door.
@@ -2286,7 +2294,7 @@ class Engine:
                         f"save: the {branch} damage is a number nobody wrote down. A "
                         f"spell's save carries its own dice (cast spell=<id>); a fall "
                         f"or a fire is hazard rule=<id>. A bare save carries a "
-                        f"condition, not dice.", "legality", index)
+                        f"condition, not dice.", "legality", index, code="no_document")
         if intent.op == "guard" and not intent.origin:
             kind = str(intent.params.get("kind", "redirect"))
             numbered = [k for k in ("amount", "uses") if intent.params.get(k)]
@@ -2295,14 +2303,14 @@ class Engine:
                     f"guard: {kind} with {', '.join(numbered) or 'a number'} is an "
                     f"ability's to declare — use_ability ability=<name> and its "
                     f"document sets the amount. A plain guard is kind=redirect with "
-                    f"no numbers.", "legality", index)
+                    f"no numbers.", "legality", index, code="no_document")
         if intent.op == "resource" and not intent.params.get("spend") \
                 and not intent.origin:
             raise IntentError(
                 f"resource: a pool is not gained by saying so. Pools refill by "
                 f"rest ({{\"op\": \"rest\"}}) or by an ability's document "
                 f"(use_ability ability=<name>); spend=true spends one.",
-                "legality", index)
+                "legality", index, code="no_document")
         # Stage 8's rule, asked of a mind instead of a number.
         #
         # Reported from the table 2026-09-09: "I was able to break the game and use
@@ -2334,7 +2342,7 @@ class Engine:
                     f"ability=<name> for a power on the sheet, use_item item=<id> for "
                     f"an item. To move somebody by ordinary means, talk to them and "
                     f"roll it: check skill=diplomacy, check skill=intimidate, "
-                    f"check skill=bluff.", "legality", index)
+                    f"check skill=bluff.", "legality", index, code="mind_ungated")
         if intent.op == "travel" and intent.params.get("place"):
             # A destination the scene does not hold is refused HERE, where the plan's
             # repair loop reads the message and names a real one — not in `run`,
@@ -2363,11 +2371,11 @@ class Engine:
                     f"new that a place like this would have, found it first in the same "
                     f"plan: {{\"op\": \"found\", \"params\": {{\"name\": "
                     f"{intent.params['place']!r}, \"kind\": \"tavern\"}}}} (kind: what it "
-                    f"is), then travel to it.", "schema")
+                    f"is), then travel to it.", "schema", code="no_such_place")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
             if trouble:
-                raise IntentError(f"hazard: {trouble}", "legality", index)
+                raise IntentError(f"hazard: {trouble}", "legality", index, code="hazard_rule")
         if intent.op == "use_item" and intent.actor:
             actor = self.scene.get(intent.actor)
             said = str(intent.params.get("item", "")).strip().lower()
@@ -2381,14 +2389,14 @@ class Engine:
                                            because=intent.because)
                     if not use.ok:
                         raise IntentError(f"use_item: {'; '.join(use.problems)}",
-                                          "legality", index)
+                                          "legality", index, code="item_use")
                     if how == "coat":
                         weapon = str(intent.params.get("weapon") or actor.equipped
                                      or "").lower()
                         if not weapons_mod.has(weapon):
                             raise IntentError(
                                 f"use_item: {actor.name} has no weapon {weapon!r} to coat",
-                                "legality", index)
+                                "legality", index, code="no_weapon_to_coat")
         if intent.op == "resource" and intent.params.get("spend"):
             # The pool as it stands. A list that spends the same pool twice reaches the
             # printed floor in the resolver for the second one; this is the first.
@@ -2403,13 +2411,14 @@ class Engine:
                 raise IntentError(
                     f"resource: no pool called {pool_id!r} on {target.name}. Their "
                     f"pools are: {', '.join(sorted(target.pools)) or 'none'}.",
-                    "legality", index)
+                    "legality", index, code="no_such_pool")
         if intent.op == "ability_damage":
             ab = str(intent.params.get("ability", "")).strip().lower()
             if ab and ab not in ABILITY_FULL:
                 raise IntentError(
                     f"ability_damage: no ability score called {ab!r}. The six are: "
-                    f"{', '.join(ABILITY_FULL)}.", "schema", index)
+                    f"{', '.join(ABILITY_FULL)}.", "schema", index,
+                    code="no_such_ability_score")
         # `use_ability` with a name nobody has is NOT rejected here, on purpose. The
         # name is usually the PLAYER's ("I use Blood Nova on the merchant"), and
         # `judgement.refuse_unknown_ability` puts it into the list precisely so the
@@ -2422,7 +2431,7 @@ class Engine:
             raise IntentError(
                 "rest: there is a fight going on. Nobody sleeps through a fight, and a "
                 "night's rest cannot be taken mid-encounter.",
-                "legality", index,
+                "legality", index, code="in_a_fight",
             )
         if intent.op == "rest":
             pc = self.scene.pc()
@@ -2430,7 +2439,7 @@ class Engine:
                 raise IntentError(
                     f"rest: {pc.name} is bleeding out, not sleeping. They have to be "
                     f"stabilised first.",
-                    "legality", index,
+                    "legality", index, code="bleeding_out",
                 )
 
         if intent.op == "craft":
@@ -2461,7 +2470,7 @@ class Engine:
                 raise IntentError(
                     f"{intent.op}: {actor.name} is {stopped.lower()} and cannot "
                     f"{intent.op}",
-                    "legality", index,
+                    "legality", index, code="condition_blocks",
                 )
         if intent.op == "attack" and actor:
             key = intent.params.get("weapon") or actor.wielded_key()
@@ -2476,7 +2485,7 @@ class Engine:
                 if granted["key"] and not actor.has_condition(granted["key"]):
                     raise IntentError(
                         f"attack: the {granted['key']} is not formed. Use "
-                        f"{granted['ability']} to form it first.", "legality", index)
+                        f"{granted['ability']} to form it first.", "legality", index, code="not_formed")
             elif actor.stat_block_weapon(key) is not None:
                 # A printed attack: the ogre's greatclub, the owlbear's claws, a
                 # dragon's tail slap. The stat block is the creature's inventory.
@@ -2494,7 +2503,7 @@ class Engine:
                            for a in opt]
                 raise IntentError(
                     f"attack: {actor.name} has no {key}. Its attacks are "
-                    f"{', '.join(dict.fromkeys(printed))}.", "legality", index)
+                    f"{', '.join(dict.fromkeys(printed))}.", "legality", index, code="no_such_weapon")
             elif actor.natural_weapon(key) is not None:
                 # The body's own weapon. Checked before the table, because the table
                 # holds none of them: `weapons_mod.has("bite")` is False for every
@@ -2505,7 +2514,7 @@ class Engine:
                 pass
             elif not weapons_mod.has(key):
                 raise IntentError(
-                    f"attack: {actor.name} has no weapon {key!r}", "legality", index
+                    f"attack: {actor.name} has no weapon {key!r}", "legality", index, code="no_such_weapon"
                 )
             elif (key.lower() not in [w.lower() for w in actor.weapons]
                   and self.scene.out_of_hand(actor.ref, key)):
@@ -2520,13 +2529,13 @@ class Engine:
                          else "lies on the ground")
                 raise IntentError(
                     f"attack: {actor.name}'s {key} {where}. Picking it up is a give "
-                    f"to {actor.ref} of '{rec['name']}'.", "legality", index)
+                    f"to {actor.ref} of '{rec['name']}'.", "legality", index, code="weapon_out_of_hand")
             elif (actor.weapons and key not in actor.weapons
                   and key not in ("unarmed", "improvised")):
                 raise IntentError(
                     f"attack: {actor.name} is not carrying a {key} "
                     f"(has {', '.join(actor.weapons) or 'nothing'})",
-                    "legality", index,
+                    "legality", index, code="no_such_weapon",
                 )
             elif (actor.gear.get(key.lower()) is not None
                   and actor.gear[key.lower()].destroyed):
@@ -2534,11 +2543,11 @@ class Engine:
                 # list, so the pieces could be swung by name at full damage.
                 raise IntentError(
                     f"attack: {actor.name}'s {key} is destroyed — in pieces.",
-                    "legality", index)
+                    "legality", index, code="weapon_destroyed")
             if intent.params.get("power_attack"):
                 why = actor.can_power_attack()
                 if why:
-                    raise IntentError(f"attack: {why}", "legality", index)
+                    raise IntentError(f"attack: {why}", "legality", index, code="cannot_power_attack")
             # "You can use a MELEE weapon that deals lethal damage to deal nonlethal
             # damage instead" (Core Rulebook p.191). An arrow cannot be pulled; a sling
             # of softstones already deals nonlethal and needs no param at all.
@@ -2550,7 +2559,7 @@ class Engine:
                         f"attack: a {held['name']} cannot pull its blow — only a melee "
                         f"weapon can deal non-lethal damage instead of lethal (at -4). "
                         f"Drop `lethality`, or strike with a melee weapon or the fists.",
-                        "legality", index)
+                        "legality", index, code="cannot_pull_blow")
             man = intent.params.get("manoeuvre")
             if man:
                 m = MANEUVERS[man]
@@ -2558,7 +2567,7 @@ class Engine:
                 defender = self.scene.get(targets[0]) if targets else None
                 if defender is None:
                     raise IntentError(
-                        f"attack: a {man} needs a target", "legality", index
+                        f"attack: a {man} needs a target", "legality", index, code="no_such_target"
                     )
                 # "You can only X an opponent who is no more than one size category
                 # larger than you."
@@ -2573,12 +2582,12 @@ class Engine:
                             f"attack: {defender.name} is {defender.size} and "
                             f"{actor.name} is {actor.size} — a {man} only works on a "
                             f"target at most one size category larger.",
-                            "legality", index,
+                            "legality", index, code="too_large",
                         )
                 if m.get("condition") and defender.has_condition(m["condition"]):
                     raise IntentError(
                         f"attack: {defender.name} is already "
-                        f"{m['condition']}", "legality", index,
+                        f"{m['condition']}", "legality", index, code="already",
                     )
             # Reach, asked here so the model gets its retry with the square to step
             # to in hand. Unless this list moves one of them first — then only the
@@ -2599,7 +2608,7 @@ class Engine:
                 why = self._reach_refusal(intent, actor, defender, key)
                 if why:
                     raise IntentError(
-                        f"attack: {why}", "legality", index,
+                        f"attack: {why}", "legality", index, code="out_of_reach",
                         for_a_person=self._reach_refusal(intent, actor, defender, key,
                                                          voice="person"))
 

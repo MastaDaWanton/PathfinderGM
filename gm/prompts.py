@@ -1128,7 +1128,13 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             face = _faces.for_the_page(
                 str(getattr(actor, "appearance", "") or "").strip(),
                 _faces.people_seen_before(actor, scene.people.values()))
-            looks = f" Looks (fact, use it when they are first described): {face}" if face else ""
+            # "Use it when they are first described" licensed a fresh invention on every
+            # beat after the first: the watchman described as an Orc with hair like wet
+            # rope came back as "an older man with a face like cracked leather" two beats
+            # later (item 16.7, 2026-09-28). Every description keeps to it; the page's own
+            # first description is ALREADY DESCRIBED (gm/brief/faces.py).
+            looks = (f" Looks (fact — every description of them keeps to it): {face}"
+                     if face else "")
             # Who this person is TO the player. Both are facts the engine holds and the
             # brief never carried, and without them the narrator writes every non-player
             # as a stranger met just now — which is what the player found after four
@@ -1158,26 +1164,30 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 manner += f" {actor.name} IS A CHILD (fact)."
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
                          f"{manner}{_states_of(actor)}")
-        # Who the player is talking to, as a fact with a rule attached. The step is
-        # the vocabulary's word and the number stays on the panel: the narrator hears
-        # how somebody feels, never what they score (the third law).
-        from rules import attitude as _attitude
+    # Who the player is talking to, as a fact with a rule attached. The step is the
+    # vocabulary's word and the number stays on the panel: the narrator hears how
+    # somebody feels, never what they score (the third law).
+    #
+    # Once, after the list. It sat inside the loop over WHO IS HERE until 2026-09-28
+    # (register §3.4, found when S2 moved the brief's blocks), so a scene of five people
+    # printed the same conversation block five times — demonstration volume for one fact.
+    from rules import attitude as _attitude
 
-        talking = [a for a in scene.actors.values()
-                   if not a.is_pc and a.has_state(states.TALKING)]
-        if talking:
-            lines.append(
-                "  IN CONVERSATION WITH: "
-                + "; ".join(f"{a.name} ({a.ref}), who is {_attitude.of(a)} towards the "
-                            f"player" for a in talking)
-                + ". They answer what the player says. Nobody else here joins in "
-                  "unless the player turns to them. The player is still in this "
-                  "conversation until they take their leave or walk away — do not end "
-                  "it for them, and do not have anyone in it ask the player to roll. "
-                  "If somebody new comes into the scene, write their ARRIVAL first — "
-                  "who looks up, what they see coming, what the newcomer looks like — "
-                  "and let the conversation react to it; nobody appears mid-sentence "
-                  "as if they had always been there.")
+    talking = [a for a in scene.actors.values()
+               if not a.is_pc and a.has_state(states.TALKING)]
+    if talking:
+        lines.append(
+            "  IN CONVERSATION WITH: "
+            + "; ".join(f"{a.name} ({a.ref}), who is {_attitude.of(a)} towards the "
+                        f"player" for a in talking)
+            + ". They answer what the player says. Nobody else here joins in "
+              "unless the player turns to them. The player is still in this "
+              "conversation until they take their leave or walk away — do not end "
+              "it for them, and do not have anyone in it ask the player to roll. "
+              "If somebody new comes into the scene, write their ARRIVAL first — "
+              "who looks up, what they see coming, what the newcomer looks like — "
+              "and let the conversation react to it; nobody appears mid-sentence "
+              "as if they had always been there.")
 
     # The "people" slot: sections about who is here, after the list that says who is
     # (gm/brief/, docs/fix-interfaces.md §2.2). Empty when the fix pass began.

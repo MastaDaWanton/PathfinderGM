@@ -193,6 +193,11 @@ def test_the_whole_brief_is_the_phase_1_base_brief(worlds, only_the_moved):
         location = worlds.get(row["id"])
         for label, scene, kw in _stands(worlds, row["id"]):
             was = base.scene_brief(worlds, copy.deepcopy(scene), location, **kw)
+            # Lane A's one deliberate change to the inline brief (item 16.7, register
+            # §3.2 "line 1167 only"): the face label no longer licenses a new face after
+            # the first. Everything else stays byte-identical to the base.
+            was = was.replace(" Looks (fact, use it when they are first described): ",
+                              " Looks (fact — every description of them keeps to it): ")
             now = prompts.scene_brief(worlds, scene, location, **kw)
             assert now == was, f"{location.name}, {label}"
             checked += 1

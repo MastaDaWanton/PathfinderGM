@@ -3112,7 +3112,47 @@ def _vouched_for(word: str, vouched: set[str]) -> bool:
     return any(word in v or v in word for v in vouched if len(v) >= _STEM)
 
 
-def false_possession(player_text: str, scene) -> str:
+def _spell_names_masked(player_text: str, pc, reading=None) -> str:
+    """The player's line with the name of every spell this character can reach blanked
+    to a neutral word, so a spell's own name is never read as producing a thing.
+
+    Item 21.5, measured 2026-09-28: "I cast burning hands into the tree tops" was read
+    as producing "a tree tops you do not have", because `hands` is one of `_PRODUCE`'s
+    verbs ("hands over") and "burning hands into the tree tops" has that shape. The
+    claim went to the prose as a false-claim block, and the man in the woods mocked a
+    bluff ("so little fire"). The fix is upstream of the verb list: a spell's name is
+    the spell, whatever words it happens to be made of. The names are the book, the
+    prepared list and the class list (`casting.known_spells`), plus the object the
+    interpreter read as a `cast` — never a word list of our own."""
+    names: set[str] = set()
+    try:
+        from rules import casting, spells as spells_mod
+
+        ids = set(getattr(pc, "spellbook", None) or []) \
+            | set((getattr(pc, "prepared", None) or {}).keys())
+        for sid in ids:
+            try:
+                names.add(str(spells_mod.get(str(sid)).name))
+            except KeyError:
+                continue
+        low = str(player_text or "").lower()
+        for spells in (casting.known_spells(pc) or {}).values():
+            for spell in spells:
+                if str(spell.name).lower() in low:
+                    names.add(str(spell.name))
+    except Exception:  # noqa: BLE001 — a sheet that cannot answer masks nothing
+        pass
+    for act in ((reading or {}).get("actions") or []) if isinstance(reading, dict) else []:
+        if isinstance(act, dict) and act.get("act") == "cast" and act.get("object"):
+            names.add(str(act["object"]))
+    text = str(player_text or "")
+    for name in sorted((n for n in names if len(n.strip()) >= 3), key=len, reverse=True):
+        text = re.sub(r"(?<![\w'])" + re.escape(name.strip()) + r"(?![\w'])", "spell",
+                      text, flags=re.I)
+    return text
+
+
+def false_possession(player_text: str, scene, reading=None) -> str:
     """The thing the player says they produce that the sheet cannot account for, or "".
 
     Item 37, reported 2026-09-20 with a screenshot. The player typed *"I pull out my
@@ -3186,6 +3226,7 @@ def false_possession(player_text: str, scene) -> str:
     if str(getattr(pc, "equipped", "") or "").strip():
         vouched |= {"weapon", "blade", "arms"}
 
+    player_text = _spell_names_masked(player_text, pc, reading)
     for m in _PRODUCE.finditer(str(player_text)):
         phrase = " ".join(m.group("thing").split()).lower().strip()
         if not phrase:
@@ -4575,6 +4616,80 @@ def inject_say(raw_intents, player_text: str, scene) -> list:
         params["quoted"] = True
     return list(raw_intents) + [{"op": "say", "because": "the player said it",
                                  "params": params}]
+
+
+# The words that carry no meaning of their own, for the overlap `own_words_only` counts.
+_FUNCTION_WORDS = frozenset((
+    "the a an and or but if then so of to in on at by for with from into onto about as "
+    "is are was were be been being am i me my mine you your yours he him his she her hers "
+    "it its we us our they them their this that these those there here what which who "
+    "whom how why when where not no do does did done have has had will would can could "
+    "shall should may might must just very too also all any some one").split())
+
+
+def _content_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z][a-z'’]+", str(text or "").lower().replace("’", "'"))
+            if w not in _FUNCTION_WORDS and len(w) >= 3}
+
+
+# Below this share of a `say`'s content words found in the player's own line, the words
+# are not the player's. Measured on the five saves (docs/design-a-truth.md, item 6): the
+# seven PC `say`s scored 1.0 six times and 0.0 once — the one defect — so the line sits
+# in an empty middle and moving it either way changes nothing measured.
+OWN_WORDS = 0.5
+
+
+def own_words_only(raw_intents, player_text: str, reading=None, *,
+                   notes: list | None = None) -> list:
+    """A `say` the player's character makes carries the player's words, or none.
+
+    Item 6, 2026-09-28: "I ask him about the girl in the market" reached the engine as
+    Bobby saying "She doesn't like the desperate ones, but she's a friend to those who
+    know what they're looking for" — the watchman's line, with `because: "the player's
+    words commit the turn to it"`. The tell read "Bobby speaks, to the effect that…";
+    the prose got the speaker right by luck and the engine's record did not.
+
+    Detect mechanically: the share of the say's content words that appear in the
+    player's line. Below `OWN_WORDS` the words are replaced — by what the interpreter
+    read the player as saying (`says`), else by the speech the redactor finds in the
+    line (`spoken`) — or, with neither, the say is dropped. Deterministic: once a tell
+    says "Bobby speaks", the page can be right only by luck, so there is nothing for a
+    prose repair to mend. Last in `plan_turn`'s chain, after every injector that can add
+    a say. An NPC's say (an actor that is not the player's) is theirs and left alone.
+    `notes` collects one line per change, for the turn log."""
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    mine = _content_words(player_text)
+    says = ""
+    if isinstance(reading, dict):
+        says = next((str(a.get("says") or "").strip()
+                     for a in reading.get("actions") or []
+                     if isinstance(a, dict) and str(a.get("says") or "").strip()), "")
+    out: list = []
+    for entry in raw_intents:
+        if not (isinstance(entry, dict) and str(entry.get("op", "")).lower() == "say"
+                and str(entry.get("actor") or "pc").lower() in ("pc", "none", "")):
+            out.append(entry)
+            continue
+        params = dict(entry.get("params") or {})
+        words = str(params.get("words") or "").strip()
+        theirs = _content_words(words)
+        if words and (not theirs or len(theirs & mine) / len(theirs) >= OWN_WORDS):
+            out.append(entry)
+            continue
+        instead = says or spoken(player_text)
+        if instead:
+            params["words"] = instead
+            out.append(dict(entry, params=params, because="the player said it"))
+            if notes is not None and words:
+                notes.append(f"a say in words the player never wrote: {words[:80]!r} "
+                             f"-> the player's own {instead[:80]!r}")
+        elif notes is not None:
+            notes.append(f"a say in words the player never wrote: dropped {words[:80]!r}")
+    if not out and raw_intents:
+        # Never an empty list for want of a line: the turn still says it had nothing.
+        out = [{"op": "narrate_only", "because": "nothing the player said was theirs"}]
+    return out
 
 
 def declared_ops(player_text: str, scene, world=None, *, attached=None) -> list[str]:
@@ -6457,7 +6572,8 @@ def name_the_nameless(scene, world) -> list[str]:
     return done
 
 
-def settle_descriptions(scene, beat: str, player_text: str = "") -> list[str]:
+def settle_descriptions(scene, beat: str, player_text: str = "",
+                        attribution=None) -> list[str]:
     """Mark whoever this beat described, and return the refs it still owes a face.
 
     The rule, from item 32 (2026-09-19): the first beat in which an undescribed person
@@ -6470,36 +6586,63 @@ def settle_descriptions(scene, beat: str, player_text: str = "") -> list[str]:
     Someone the beat describes is marked and never asked again. Someone the beat uses
     without describing is returned, and the caller appends their own line: the resident's
     Appearance fact, or their people's body line, both already on the actor.
+
+    `attribution` is the beat's `mentions.Attribution` when the caller has one: who the
+    prose means is its answer before any word match (docs/design-a-truth.md, item 4).
+
+    Whoever is marked described here also keeps the page's own sentences about them
+    (`Actor.described_as`, two at most), so the brief can show the next beat how they
+    were first described (`gm/brief/faces.py`, item 16.7).
     """
-    from .narration import faceless
+    from .checks._people import name_words
+    from .narration import describing_sentences, faceless
 
     if scene is None or not beat:
         return []
+    # The player addressed them by the page's own word for them, never by any word of a
+    # descriptor: "I go through the gate" does not address the watchman waving traffic
+    # through (the last-word rule, item 4, in its second copy).
     addressed = _name_words(redact_speech(player_text or ""))
     owed: list[str] = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
         if a.is_pc or getattr(a, "described", False):
             continue
         name = str(a.name or "")
-        here = _mentions(beat, name)
-        if not here and not (addressed & _name_words(name)):
+        here = _mentions(beat, name, ref=ref, attribution=attribution)
+        if not here and not (addressed & set(name_words(name))):
             continue
         if here and not faceless(beat, name):
             # The beat did the job: a sentence about them carries a body word.
             a.described = True
+            if not getattr(a, "described_as", None):
+                a.described_as = describing_sentences(beat, name)[:2]
             continue
         owed.append(ref)
     return owed
 
 
-def _mentions(beat: str, name: str) -> bool:
-    """Is this person in the beat at all — by the last word of their name, as `faceless`
-    finds them? `faceless` answers False both for "described" and for "not there", so the
-    two cases have to be told apart before one of them is treated as the other."""
-    words = [w for w in re.findall(r"[a-z]+", str(name or "").lower()) if len(w) >= 3]
-    if not words:
-        return False
-    return bool(re.search(rf"\b{re.escape(words[-1])}s?\b", beat, re.I))
+def _mentions(beat: str, name: str, *, ref: str = "", attribution=None) -> bool:
+    """Is this person in the beat at all? `faceless` answers False both for "described"
+    and for "not there", so the two cases have to be told apart before one of them is
+    treated as the other.
+
+    The attribution's answer first, when it has one. Else the page's words for them: a
+    proper name's words, or a descriptor's head noun (`checks._people.head_of`). Until
+    2026-09-28 this was the LAST word of the name — "through" for "the watchman waving
+    traffic through", wrong for 12 of 12 opening companions — so Bobby's watchman was
+    found on the beat that said "the way through" and on neither beat that said "the
+    watchman"."""
+    from .checks._people import name_words
+
+    if attribution is not None and ref:
+        try:
+            if attribution.mentioned_in(beat, ref):
+                return True
+        except Exception:  # noqa: BLE001 — the attribution only ever adds certainty
+            pass
+    words = name_words(name)
+    return any(re.search(rf"\b{re.escape(w)}(?:s|es)?\b", str(beat or ""), re.I)
+               for w in words)
 
 
 def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
@@ -6706,56 +6849,74 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
     prose, never an op, so the only record of it is the beat — a quoted span whose
     sentence, outside the quotes, names a person here, and whose words are aimed at the
     player. "'You're a long way from the interior,' he says" is a hail; "'Fine weather,'
-    the carter tells the drover" is not. Attribution reuses the head-word and name-word
-    matching the introductions use, in the same sentence or the one before.
+    the carter tells the drover" is not.
+
+    **Tags first, then spans over the whole beat** (item 13, 2026-09-28). The prose call
+    tags who said each line and to whom (`speech.lift`), and a tagged `to=you` line by a
+    living person here is a hail with no reading of the page at all — only the check that
+    the line is still on it. Before this the tags were read inside a per-sentence span
+    loop, and on Drenn's beat no sentence held a whole quotation ("'You!" ends one), so
+    two correct `to=you` tags were never read: 0 hails where there were 2. Untagged lines
+    are then found over the whole beat (`checks._people.spans_in_context`), each read with
+    the narration around it, and attributed by the name and head-word matching the
+    introductions use. Tags are per line: one speaker is never given every line in a
+    stretch (Muzny et al. 2017 report "one speaker per paragraph" only to refute it).
     """
-    from .narration import _sentences, unquoted
+    from .checks._people import name_words, spans_in_context
 
     if scene is None or not beat:
         return []
     actors = getattr(scene, "actors", {}) or {}
-    people = [(ref, a) for ref, a in actors.items() if not a.is_pc]
+
+    def _living(a) -> bool:
+        return not a.is_pc and not (getattr(a, "hp", 1) < 0 or (
+            hasattr(a, "has_state") and a.has_state("state.down.dead")))
+
+    people = [(ref, a) for ref, a in actors.items() if _living(a)]
     if not people:
         return []
+    you = re.compile(r"\b(?:you|your|you're|you've|you'll)\b", re.I)
     out: list[str] = []
-    sentences = _sentences(beat)
-    for i, s in enumerate(sentences):
-        for qa, qb in speech.spans(s):
-            # Tagged by the prose call (`speech.lift`): the model said who spoke and to
-            # whom while writing, which is the whole of this function's question. `to`
-            # decides it when given — "you" is a hail, another ref is not, whatever
-            # pronouns the line holds; untagged, the guess below still answers.
-            tagged = speech.speaker(said, s[qa + 1:qb - 1])
-            if tagged is not None and tagged["who"] in actors \
-                    and not actors[tagged["who"]].is_pc:
-                aimed = tagged.get("to") or ""
-                hails = (aimed == "you" or (not aimed and re.search(
-                    r"\b(?:you|your|you're|you've|you'll)\b", s[qa:qb], re.I)))
-                if hails and tagged["who"] not in out:
-                    out.append(tagged["who"])
-                continue
-            if not re.search(r"\b(?:you|your|you're|you've|you'll)\b", s[qa:qb], re.I):
-                continue
-            outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
-            words = _name_words(outside)
-            speaker = None
-            # A named person first, by any word of their name; then a descriptor by
-            # its role word ("the man", "the woman in the corner").
-            for ref, a in people:
-                mine = {w for w in _name_words(a.name) if len(w) >= 3}
-                if mine and mine & words:
-                    speaker = ref
-                    break
-            if speaker is None:
-                role = _ROLE_WORD.search(outside)
-                if role:
-                    head = role.group(0).lower()
-                    for ref, a in people:
-                        if head in _name_words(a.name):
-                            speaker = ref
-                            break
-            if speaker and speaker not in out:
-                out.append(speaker)
+    on_page = speech.lines(beat)
+    # 1. The tags. `to` decides it when given — "you" is a hail, another ref is not,
+    # whatever pronouns the line holds; a tag with no `to` hails when its words do.
+    for rec in said or []:
+        who = str(rec.get("who") or "")
+        if who not in actors or not _living(actors[who]) or who in out:
+            continue
+        if not any(speech.speaker([rec], ln) for ln in on_page):
+            continue          # rewritten away since it was tagged
+        aimed = str(rec.get("to") or "")
+        if aimed == "you" or (not aimed and you.search(str(rec.get("line") or ""))):
+            out.append(who)
+    # 2. The untagged lines, over the whole beat.
+    for qa, qb, outside in spans_in_context(beat):
+        line = beat[qa + 1:qb - 1] if qb - qa >= 2 else ""
+        tagged = speech.speaker(said, line)
+        if tagged is not None and tagged.get("who") in actors:
+            continue          # decided by its tag above, hail or not
+        if not you.search(line):
+            continue
+        words = _name_words(outside)
+        speaker = None
+        # A named person first, by any word of their name, a descriptor by its head
+        # noun (never "through" for the watchman waving traffic through); then by the
+        # role word the narration uses ("the man", "the woman in the corner").
+        for ref, a in people:
+            mine = set(name_words(a.name))
+            if mine and mine & words:
+                speaker = ref
+                break
+        if speaker is None:
+            role = _ROLE_WORD.search(outside)
+            if role:
+                head = role.group(0).lower()
+                for ref, a in people:
+                    if head in _name_words(a.name):
+                        speaker = ref
+                        break
+        if speaker and speaker not in out:
+            out.append(speaker)
     return out
 
 
