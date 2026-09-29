@@ -4,7 +4,12 @@
     "in it: a giver who has lost something, a rival who took it, one twist (the rival",
     "is the giver's kin and the giver lied about how it was lost), one consequence",
     "(handing it to the wrong one costs regard). World-agnostic: every name is a slot",
-    "filled from the world at open. See docs/quest-schemes-plan.md §6."
+    "filled from the world at open. See docs/quest-schemes-plan.md §6.",
+    "2026-09-28 (docs/design-d-people.md 4.6; the owner's Q22): it opens on day two, at the",
+    "market, so the first market visit is the player's own. The giver's tell ('looked away')",
+    "was a grant at open and put a sentence about the giver on the player's sheet before",
+    "they had met; it is now the `noticed` step, when the giver is first present, and the",
+    "looking-away is the hook's `withholds`, shown only when the giver is asked."
   ],
   "schemes": [
     {
@@ -13,7 +18,7 @@
       "about": "A giver's lost keepsake, a rival who took it, and a lie about how it was lost.",
       "opens": [
         "at($market)",
-        "since(campaign) >= 0h"
+        "since(campaign) >= 1d"
       ],
       "slots": {
         "giver": {
@@ -49,7 +54,12 @@
             "Bring the $lost back to $giver"
           ],
           "giver": "$giver",
-          "reward": "$giver's gratitude, and a good word at the market"
+          "reward": "$giver's gratitude, and a good word at the market",
+          "hook": {
+            "motive": "the $lost was a keepsake, and $giver cannot bear to be without it",
+            "doing": "minding the pitch and watching the crowd",
+            "withholds": "looks away when asked how the $lost was lost"
+          }
         },
         {
           "key": "truth",
@@ -59,15 +69,6 @@
             "$rival, $giver's own kin, took the $lost and is out at $wild with it.",
             "$giver did not lose it; $giver says so because the quarrel shames them."
           ]
-        }
-      ],
-      "grants_on_open": [
-        {
-          "to": "pc",
-          "tags": [
-            "knows.giver-hides-something"
-          ],
-          "say": "$giver looked away when asked how the $lost was lost"
         }
       ],
       "steps": [
@@ -191,6 +192,24 @@
           ],
           "tell": {
             "silent": "$rival comes to the market looking for $giver."
+          }
+        },
+        {
+          "id": "noticed",
+          "criteria": [
+            "at($market)",
+            "present($giver)"
+          ],
+          "action": {
+            "do": "grant",
+            "to": "pc",
+            "tags": [
+              "knows.giver-hides-something"
+            ],
+            "say": "$giver keeps glancing at an empty place among their things, and away again when anyone looks"
+          },
+          "tell": {
+            "silent": "$giver is at $market, keeping something back."
           }
         }
       ],

@@ -267,10 +267,14 @@ def _bobby_beats(tmp_path, monkeypatch):
 
 # --- inert ----------------------------------------------------------------------------------
 
-def test_the_real_registry_holds_no_member_yet_so_the_game_is_unchanged():
-    """Phase 1 ships the registry empty. When the first Phase-2 step lands, this is the
-    assertion to change, on purpose."""
-    assert aftermath.registered() == ()
+def test_the_real_registry_holds_the_phase_2_steps():
+    """Phase 1 shipped the registry empty. Changed on purpose by Lane D (2026-09-28),
+    whose three "beat" steps are the first members, in the register's order (§2.3:
+    mentioned_elsewhere 20, pronouns_adopted 30, suggestion_pronouns 40)."""
+    names = [m.__name__.rsplit(".", 1)[-1] for m in aftermath.registered()]
+    mine = [n for n in names if n in ("mentioned_elsewhere", "pronouns_adopted",
+                                      "suggestion_pronouns")]
+    assert mine == ["mentioned_elsewhere", "pronouns_adopted", "suggestion_pronouns"]
 
 
 def test_a_member_that_writes_nothing_changes_no_recorded_turn(tmp_path, monkeypatch,

@@ -38,6 +38,7 @@ CONTENT_DIRS = [
     "races",       # the Core seven as documents (content/races/core.json, rules/races.py)
     "schemes",     # authored quest schemes (content/schemes, rules/schemes.py)
     "people",      # the charts a life is rolled from (content/people, rules/lives.py)
+    "hooks",       # one demonstration per hook approach (content/hooks, rules/hooks.py)
     "ingredients",
     "materials",
     "spells",

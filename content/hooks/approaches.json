@@ -1,0 +1,19 @@
+{
+  "_about": [
+    "One short demonstration per hook approach (rules/hooks.py, docs/design-d-people.md 4.6).",
+    "Shown to the narrator once per card, after the approach's instruction, as 'like this,",
+    "never these words'. Set at a ferry landing over a lost net on purpose: a situation no",
+    "world shares, with no names, so the shape is copied and the words cannot be. CLAUDE.md:",
+    "instruction volume loses to demonstration volume, and the shape of a prompt becomes the",
+    "shape of the output — so each is a different shape. tests/test_d_hooks.py holds them to",
+    "sharing no content word with any fixture world's names and to carrying no digit."
+  ],
+  "approaches": {
+    "overheard": "Down at the landing the ferrywoman is on her knees among coils of rope, turning each one over. 'Three seasons that net lasted,' she mutters to nobody. 'Gone in a night.' She does not look up.",
+    "go_between": "The tanner counts out the change and adds, without looking up, that the ferrywoman has been in a black mood since her net went missing — then asks whether anything else is wanted.",
+    "sends_word": "A boy in a salt-stained shirt catches up, out of breath: the ferrywoman asks, if it is no trouble, that you stop at the landing when you can.",
+    "greets": "'There you are!' The ferrywoman grips your forearm the way she did when you first worked the ropes for her. 'You look fed, at least.' A breath. 'I could use a favour, if you have an hour. My good net is gone, and I would pay a fair crossing for a month to have it back.'",
+    "waits": "The ferrywoman is busy with a paying fare and does not look your way.",
+    "asked": "'The net?' The ferrywoman wipes her hands. 'My mother mended it every winter. Find it and you cross free till the thaw.' Asked how it went missing, she finds something to do with the mooring line."
+  }
+}

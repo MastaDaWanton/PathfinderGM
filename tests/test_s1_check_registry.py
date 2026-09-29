@@ -193,10 +193,13 @@ def test_with_an_empty_registry_the_bobby_beats_groom_byte_identically(monkeypat
     assert len(texts) == 14
 
 
-def test_the_real_registry_holds_no_member_yet_so_the_game_is_unchanged():
-    """Phase 1 ships the registry empty: `_people` is a helper, not a member. When Lane A's
-    first check lands this assertion is the one to change, on purpose."""
-    assert checks.registered() == ()
+def test_the_real_registry_holds_the_phase_2_members_and_no_helper():
+    """Phase 1 shipped the registry empty: `_people` is a helper, not a member. Changed on
+    purpose by Lane D (2026-09-28), whose four checks are the first members; `_people` and
+    D's `_sought` are still helpers and never registered."""
+    names = {m.__name__.rsplit(".", 1)[-1] for m in checks.registered()}
+    assert {"pull_yields", "hook_leaks", "giver_knows_you", "keeper_forward"} <= names
+    assert not {n for n in names if n.startswith("_")}
 
 
 # --- discovery -----------------------------------------------------------------------------
@@ -513,11 +516,13 @@ def test_head_of_beyond_the_openings(name, head):
 
 def test_head_of_is_wired_into_nothing_yet():
     """Phase 1 delivers the helper; Lane A points every copy of the rule at it in Phase 2.
-    Until then nothing outside gm/checks and the tests imports it."""
+    Until then nothing outside gm/checks and the tests imports it — except the new
+    after-the-beat steps, which the register lets D and F import it into from Phase 2 on
+    (fix-interfaces §2.1); they are new readers, not old copies of the rule."""
     users = [p for p in (ROOT / "gm").rglob("*.py")
              if "checks" not in p.parts and "head_of" in p.read_text(encoding="utf-8")]
     users += [p for p in (ROOT / "play").rglob("*.py")
-              if "head_of" in p.read_text(encoding="utf-8")]
+              if "aftermath" not in p.parts and "head_of" in p.read_text(encoding="utf-8")]
     assert users == []
 
 

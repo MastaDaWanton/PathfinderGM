@@ -11468,6 +11468,12 @@ class Engine:
             intent.params["template"], count=count, name=name,
             from_entity_id=intent.params.get("from_entity_id"),
         )
+        # The player's word is honoured (item 5.3 of the 2026-09-28 playtest): "girl"
+        # spawned c2 as they/them, race human, with an Orc face and an old man's years.
+        if name and not intent.params.get("from_entity_id"):
+            from . import person_words
+
+            person_words.honour_spawn(self.scene, self.world, made, str(name))
         # How close they arrive. Without this everything spawned defaulted to `near`,
         # which `begin_encounter` lays out three squares off — and a tavern brawl the
         # player started by swinging opened with the man they punched standing fifteen
