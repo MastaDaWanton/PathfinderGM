@@ -305,12 +305,20 @@ def legs_from(world, here: str) -> list[Leg]:
         seen.add(other)
         found = world.get(other)
         miles = row.get("miles")
+        # `by: "road"` IS the road column (owner's ruling Q12, 2026-09-28). This read
+        # `row["road"]` alone, which no export has ever shipped: 0 of Aurvantis's 132
+        # travel rows carry it, while every one of them says `by: "road"`, so every road
+        # in every world was priced as trackless ground — Vormoor to Dustgate (72 miles,
+        # farmland then mountain) cost 38 hours where the road column gives 27. A stated
+        # `road` grade (highway, trail) still wins over the plain road.
+        by = str(row.get("by") or "").strip().lower()
+        road = str(row.get("road") or "").strip().lower() or ("road" if by == "road" else "")
         out.append(Leg(
             to_id=other,
             to_name=str(getattr(found, "name", "") or row.get("to") or row.get("from")
                         or "somewhere"),
             miles=int(miles) if isinstance(miles, int) and miles > 0 else None,
-            road=str(row.get("road") or ""),
+            road=road,
             crosses=tuple(str(x) for x in (row.get("crosses") or ())),
             days_apart=_depth_apart(world, here, other),
             source="exact" if isinstance(miles, int) and miles > 0 else "derived",
@@ -368,5 +376,107 @@ def describe(leg: Leg, hours: int) -> str:
     if days == 1 and not left:
         return "a day on the road"
     if left:
-        return f"{days} days and a bit on the road"
+        # "1 days and a bit" until 2026-09-28, the first time a ridden road came to a day
+        # and some hours.
+        return f"{'a day' if days == 1 else f'{days} days'} and a bit on the road"
     return f"{days} days on the road"
+
+
+# --- a horse changes it (the owner's ruling Q13, 2026-09-28) ----------------------------
+#
+# "travel between settlement[s] should take days without a horse, half the time with a
+# horse and a third of the full time if you gallop on the horse the whole way [horse
+# fatigue should kick in if the journey is too far]." The multipliers are the owner's and
+# are used as ruled; what the book supplies is WHEN the gallop has to stop (AoN, Rules
+# ID=50, Movement — fetched 2026-09-28):
+#
+#   Hustle            "A character can hustle for 1 hour without a problem. Hustling for
+#                     a second hour in between sleep cycles deals 1 point of nonlethal
+#                     damage, and each additional hour deals twice the damage taken
+#                     during the previous hour of hustling."
+#   Run (overland)    "Attempts to run and rest in cycles effectively work out to a
+#                     hustle."
+#   Mounted movement  "A mount bearing a rider can move at a hustle. The damage it takes
+#                     when doing so, however, is lethal damage, not nonlethal damage."
+#                     "Mounts also become fatigued when they take any damage from
+#                     hustling or forced marches."
+#   Fatigued          cannot run or charge (CRB, Conditions) — and an overland gallop is
+#                     running in cycles, so a fatigued mount has stopped galloping. This
+#                     last step is our reading, stated as ours.
+#
+# So a gallop is a hustle: the first hour of a day is free, the second costs the mount
+# one point of lethal damage and leaves it fatigued, and a fatigued mount is ridden at a
+# walk for the rest of that day. A night's camp is the sleep cycle that resets it. That
+# is "fatigue kicks in when the journey is too far" by rule: a gallop of two hours or less
+# is a third of the walking time; a longer one tires the horse and falls back to riding.
+#
+# Pathfinder Second Edition ABANDONED the doubling damage for a flat cap (Hustle: "for a
+# number of minutes equal to your Constitution modifier × 10", 2e.aonprd.com Actions
+# ID=515). Recorded, not adopted: this is a 1e table, and the 1e rule answers the question
+# the owner asked (when does the horse tire) where the 2e cap only bounds it.
+PACES: dict[str, int] = {"walk": 1, "ride": 2, "gallop": 3}
+PACE_ALIASES = {
+    "": "walk", "foot": "walk", "on foot": "walk", "walking": "walk",
+    "riding": "ride", "mounted": "ride", "horse": "ride", "horseback": "ride",
+    "on horseback": "ride", "trot": "ride",
+    "galloping": "gallop", "hustle": "gallop", "hard": "gallop", "run": "gallop",
+    "fast": "gallop", "at a gallop": "gallop",
+}
+# The creatures a party can ride, by bestiary template: Table 7-9's light and heavy horse
+# and pony, the riding dog and the camel ("Mounts and Related Gear", Ultimate Equipment),
+# as the bestiary spells them. How a party comes to HAVE one is not this module's — see
+# docs/design-b-space.md §10: owned on the sheet, bought at the stables (light horse
+# 75 gp, pony 30 gp), or hired.
+MOUNTS = frozenset({"horse", "warhorse", "pony", "light-horse", "heavy-horse",
+                    "riding-dog", "camel"})
+HUSTLE_FREE_HOURS = 1          # "can hustle for 1 hour without a problem"
+GALLOP_HOURS_A_DAY = 2         # the free hour, and the second that tires the mount
+FATIGUE_ROUNDS = 8 * 60 * 10   # PF1e: fatigue lifts after 8 hours of complete rest
+# The condition the book names for a mount hurt by hustling, as a row of this table — the
+# engine applies what the rule says rather than naming it (tests/test_three_laws.py).
+MOUNT_FATIGUE = "fatigued"
+
+
+def pace_of(said) -> str:
+    """"walk", "ride" or "gallop" from however the plan wrote it; "" when unreadable."""
+    word = " ".join(str(said or "").lower().split())
+    if word in PACES:
+        return word
+    return PACE_ALIASES.get(word, "")
+
+
+def mounted_hours(walk_hours: int, pace: str) -> tuple[int, int]:
+    """(hours on the road at this pace, days the gallop hurt the mount).
+
+    `walk_hours` is what the route costs on foot (`hours_for`). Riding halves it and
+    galloping thirds it, as ruled; a gallop is held to the hustle rule above, day by day
+    of eight travelling hours. A day that does not finish the road is a full eight hours
+    (the gallop and then the ride fill it), so these hours split into days exactly where
+    `_op_journey`'s march splits them.
+    """
+    import math
+
+    walk_hours = max(1, int(walk_hours))
+    pace = pace if pace in PACES else "walk"
+    if pace == "walk":
+        return walk_hours, 0
+    if pace == "ride":
+        return max(1, math.ceil(walk_hours / PACES["ride"])), 0
+    left = float(walk_hours)          # still to cover, in hours of walking
+    spent = 0.0                       # hours actually on the road
+    hurt = 0
+    while left > 1e-9:
+        today = 0.0
+        for n in range(GALLOP_HOURS_A_DAY):
+            if left <= 1e-9:
+                break
+            cover = min(float(PACES["gallop"]), left)
+            spent += cover / PACES["gallop"]
+            today += cover / PACES["gallop"]
+            left -= cover
+            if n + 1 > HUSTLE_FREE_HOURS:
+                hurt += 1
+        cover = min(left, max(0.0, HOURS_PER_DAY - today) * PACES["ride"])
+        spent += cover / PACES["ride"]
+        left -= cover
+    return max(1, math.ceil(spent - 1e-9)), hurt

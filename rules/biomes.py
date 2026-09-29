@@ -326,7 +326,17 @@ def from_world(world, entity) -> list[str]:
     `Climate`. Reading only the location itself would have found nothing for every
     settlement in the world.
     """
-    out: list[str] = ["urban"] if entity is not None and entity.kind == "CITY" else []
+    # A settlement is urban whatever its kind is spelled. This tested `kind == "CITY"`,
+    # which Aurvantis writes on all 64 settlements and the synthetic world on none of its
+    # (`VILLAGE`, `TOWN`), so a synthetic village read as grassland to this one reader
+    # and as a settlement to the other three (R0-1, 2026-09-28). `places._settled` is the
+    # predicate the rest of the code asks.
+    from . import places as places_mod
+
+    settled = entity is not None and bool(
+        getattr(entity, "kind", "") or getattr(entity, "scale", "")) \
+        and places_mod._settled(entity, "")
+    out: list[str] = ["urban"] if settled else []
     seen = 0
     while entity is not None and seen < 6:
         facts = getattr(entity, "facts", None) or {}

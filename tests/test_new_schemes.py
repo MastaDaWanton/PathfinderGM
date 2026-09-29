@@ -231,14 +231,27 @@ def test_going_to_look_finds_them_and_the_reason(monkeypatch):
     _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
     _run(e, "advance_time", {"amount": 26 * 60, "unit": "minutes"})
     _run(e, "advance_time", {"amount": 26 * 60, "unit": "minutes"})
-    _run(e, "travel", {"biome": inst["slots"]["wild"]["terrain"]})
+    _until_there(e, {"biome": inst["slots"]["wild"]["terrain"]},
+                 lambda: s.biome == inst["slots"]["wild"]["terrain"])
     for _ in range(3):
         _wait(e)
     assert "twist" in inst["fired"], "the reason never surfaced"
-    _run(e, "travel", {"place": inst["slots"]["lodging"]["name"]})
+    _until_there(e, {"place": inst["slots"]["lodging"]["name"]},
+                 lambda: e.here().name == inst["slots"]["lodging"]["name"])
     for _ in range(2):
         _wait(e)
     assert inst.get("outcome") == "answered", inst["fired"]
+
+
+def _until_there(e, params, arrived, tries: int = 6):
+    """A walk, taken up again when something stopped it short. Since Lane B (2026-09-28)
+    the way out and back is walked hop by hop — streets, the way out, the outskirts — and
+    each step is checked for somebody in the way (`rules/ontheway.py`)."""
+    for _ in range(tries):
+        _run(e, "travel", params)
+        if arrived():
+            return
+    raise AssertionError(f"{tries} turns and still not there: {e.scene.at}")
 
 
 def test_never_going_is_an_ending_with_a_body_in_it(monkeypatch):

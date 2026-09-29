@@ -148,11 +148,17 @@ def test_the_gate_refuses_the_wanted_with_the_fix_named():
 def test_the_open_road_is_the_gate_by_another_name():
     """Leaving town by biome — "I head into the forest" — never touches the gate place,
     so a gate-only check let a wanted character walk out of the walls by not naming
-    them. A travel by BIOME off urban ground is the road out, and it is watched."""
+    them. A travel by BIOME off urban ground is the road out, and it is watched.
+
+    Grassland since 2026-09-28: the forest this used to ask for is not around
+    Zhilgoroth, and a move onto ground the world does not have is now refused for THAT
+    reason first (Lane B, `absent_ground`), which would pass this test for the wrong one.
+    """
     s, e, pc = _table()
     _want(pc)
-    out = _run(e, "travel", {"biome": "forest"})
+    out = _run(e, "travel", {"biome": "grassland"})
     assert _refused(out), out.tell
+    assert "wanted" in out.tell, out.tell
     assert s.at == MARKET
 
 

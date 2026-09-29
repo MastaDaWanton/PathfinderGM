@@ -64,10 +64,11 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
 }
 
 _WHAT_EACH_IS = """\
-go        walk somewhere within reach (a place in town, into the trees, back to the gate);
-          walking OUT INTO somewhere named is go, not leave
+go        walk somewhere within reach (a place in town, the crossroads, the fields, into
+          the trees, back to the gate); walking OUT INTO somewhere named is go, not leave
 journey   take the road or a ship to another town
-leave     walk out of where you are, with nowhere named
+leave     walk out of where you are — a building, or the settlement itself — with
+          nowhere else named
 look      look, watch, listen, read, examine
 search    look for a THING or a PLACE (water, a way in, somewhere to sleep, tracks)
 seek      look for, ask around for, wave down, head for or turn to a PERSON
@@ -342,6 +343,16 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             p = places_mod.find(places, a["place"]) if places else None
             if p is not None and p.id != here:
                 add("travel")
+            elif p is None and _outward(a["place"]) and _has_outside(places):
+                # "the nearest crossroads", "the path away from town": a phrase no place
+                # here is called, which names the ground outside (Bobby, turns 6 and 7).
+                # The travel is owed; `travel_choices` holds it to the ring's names.
+                add("travel")
+        elif act == "leave" and _leaving(a, scene, places):
+            # Bobby's turn 5: `leave: outside it` mapped to no op at all, and the plan
+            # took the nearest listed place — the way in, INSIDE the village
+            # (docs/playtest-2026-09-28.md, 16.1). Leaving is a move.
+            add("travel")
         elif act == "journey":
             add("journey")
         elif act in ("call_on", "break_in", "rest"):
@@ -359,13 +370,99 @@ def travel_choices(frame: dict | None, scene, places, location) -> tuple[str, ..
     """The place names a declared travel may choose among — the `places` enum of
     `prompts.turn_schema`, so the planner walks to a place that exists and invents none.
 
-    Today's answer, moved here unchanged from `GMAgent.plan_turn` (docs/fix-interfaces.md
-    §2.9): every place here but the one the party stands in. The frame and the settlement
-    are taken so Lane B can offer the ground outside the walls (the ring of places,
-    docs/design-b-space.md) without another signature change; in Phase 1 neither is read.
+    Every place here but the one the party stands in — unless the reading says the
+    party is LEAVING (Lane B, docs/design-b-space.md 16.1):
+
+    - leaving the settlement ("I leave the village", "the path away from town"): the
+      ring's names only — the outskirts, the fields, the roads out. The enum is enforced
+      by the sampler (6 of 6, memory `ollama-schema-enforcement`), so the plan cannot
+      walk to the way in and call it leaving, which is what Bobby's turn 5 did;
+    - leaving a building ("I leave the tavern"): its exits under the sky only.
+
+    With no ring (no world to build one from) the answer is today's.
     """
     here = getattr(scene, "at", None)
-    return tuple(p.name for p in places if p.id != here)
+    everything = tuple(p.name for p in places if p.id != here)
+    going = _going(frame, scene, places, location)
+    if going == "settlement":
+        from rules import places as places_mod
+
+        ring = tuple(p.name for p in places if places_mod.is_ring(p.id) and p.id != here
+                     and "along-the-road-to-" not in p.id)
+        return ring or everything
+    if going == "building":
+        from rules import places as places_mod
+
+        by_id = {p.id: p for p in places}
+        cur = by_id.get(here)
+        street = tuple(by_id[x].name for x in (cur.exits if cur else ())
+                       if x in by_id and not places_mod.is_indoors(
+                           x, by_id[x].terrain, by_id[x].shape))
+        return street or everything
+    return everything
+
+
+# What a player says when the place they are leaving is the settlement itself, or the
+# ground they want is outside it. Matched as whole words in the slot.
+_SETTLEMENT_WORDS = frozenset({"town", "village", "city", "settlement", "outside", "out",
+                               "it", "here", "walls", "hamlet", "place"})
+_OUTWARD_WORDS = frozenset({"road", "roads", "path", "track", "trail", "crossroads",
+                            "crossroad", "fields", "field", "outskirts", "signpost",
+                            "milestone", "countryside", "wilds", "wilderness"})
+_WORDS_RE = re.compile(r"[a-z']+")
+
+
+def _outward(phrase) -> bool:
+    words = set(_WORDS_RE.findall(str(phrase or "").lower()))
+    return bool(words & _OUTWARD_WORDS) or "out of town" in str(phrase or "").lower()
+
+
+def _has_outside(places) -> bool:
+    from rules import places as places_mod
+
+    return any(places_mod.is_ring(p.id) for p in places or ())
+
+
+def _leaving(action: dict, scene, places, location=None) -> str:
+    """"settlement", "building" or "" for one `leave` action of the reading."""
+    from rules import places as places_mod
+
+    here_id = str(getattr(scene, "at", "") or "")
+    if places_mod.setting_of(here_id) == "outside":
+        return ""                      # already out: "leave" names nowhere to go
+    slot = str(action.get("place") or "").strip().lower()
+    words = set(_WORDS_RE.findall(slot))
+    name = str(getattr(location, "name", "") or "").lower()
+    by_id = {p.id: p for p in places or ()}
+    cur = by_id.get(here_id)
+    named = places_mod.find(places, slot) if slot else None
+    indoors = cur is not None and places_mod.is_indoors(cur.id, cur.terrain, cur.shape)
+    if (not slot or words & _SETTLEMENT_WORDS or (name and name in slot)
+            or (location is not None and places_mod.scale_of(location) in words)):
+        if indoors and slot and (named is not None and named.id == here_id):
+            return "building"
+        if indoors and not slot:
+            return "building"
+        return "settlement" if _has_outside(places) or not indoors else "building"
+    if named is not None and named.id == here_id and indoors:
+        return "building"
+    return ""
+
+
+def _going(frame, scene, places, location) -> str:
+    """Whether the reading leaves the settlement, a building, or neither."""
+    for a in (frame or {}).get("actions") or []:
+        if a.get("act") == "leave":
+            got = _leaving(a, scene, places, location)
+            if got:
+                return got
+        if a.get("act") == "go" and a.get("place") and _outward(a["place"]) \
+                and _has_outside(places):
+            from rules import places as places_mod
+
+            if places_mod.find(places, a["place"]) is None:
+                return "settlement"
+    return ""
 
 
 # Which acts of the reading can stand behind an op a word-detector requires. An op with

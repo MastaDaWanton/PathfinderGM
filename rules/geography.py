@@ -19,9 +19,10 @@ its scale, never by `kind == "CITY"`.
 foot", never 38 hours or 72 miles: the third law is that no model authors a number, and a
 number in the brief is one the model will start doing arithmetic with.
 
-**Phase 1.** `where()` reproduces today's panel byte for byte, and nothing in the app calls
-any of this yet; Lane B (the space functions) and Lane C (`role_of`, `in_its_own_words`,
-`display_key`) wire it in Phase 2 (§3.2).
+**Phase 1** wrote these unwired; `where()` reproduced the old panel byte for byte. Lane B
+wired the space functions in Phase 2 (the ring, the brief's roads and land, the travel
+door's grounding, the panel's outside label); Lane C wires `role_of`,
+`in_its_own_words` and `display_key` (§3.2).
 """
 from __future__ import annotations
 
@@ -199,8 +200,29 @@ def land_around(world, settlement) -> Land:
     When the export ships `near` on the settlement's `play.settlements` row (an ask in
     docs/from-world-bible.md) it replaces the derived `near` outright, as a stated road
     beats a derived sea in `journey.crosses_water`.
+
+    Remembered per world object (held and compared by identity): the routes read every
+    neighbour's places to ask whether it is a port, measured at 7 ms a call, and since
+    Lane B wired the land into `Engine.places()` it is asked many times a turn.
     """
     entity = _entity(world, settlement)
+    if world is not None and entity is not None:
+        key = (id(world), str(getattr(entity, "id", "") or ""))
+        held = _LAND_MEMO.get(key)
+        if held is not None and held[0] is world and held[1] is entity:
+            return held[2]
+        got = _land_around(world, entity, settlement)
+        if len(_LAND_MEMO) > 512:
+            _LAND_MEMO.clear()
+        _LAND_MEMO[key] = (world, entity, got)
+        return got
+    return _land_around(world, entity, settlement)
+
+
+_LAND_MEMO: dict = {}
+
+
+def _land_around(world, entity, settlement) -> Land:
     if entity is None:
         return Land(settlement_id=str(settlement or "") if isinstance(settlement, str) else "",
                     near=(), beyond=(), words=(), climate="", water="", coast=False,
@@ -495,22 +517,52 @@ class Where:
 def where(world, scene, here=None) -> Where:
     """Where the party is, as the panel and the brief should both say it.
 
-    PHASE 1 reproduces today's panel exactly (docs/fix-interfaces.md §2.8), so S3 can
-    route `/api/state` through it with no visible change: `02-state.js` prints
-    "{location} · {scale} · {biome}", with `location` the settlement's name and `scale`
-    `places.scale_of` of it. Lane B changes the label outside ("near Vormoor · farmland")
-    in Phase 2; `here` is accepted now so that change needs no new signature.
+    Phase 1 reproduced the old panel exactly ("{location} · {scale} · {biome}"). Lane B
+    (Phase 2) says where the party is: "Vormoor · village" inside, "near Vormoor ·
+    farmland" outside, "under Vormoor · underground" below it, and "on the road to
+    Dustgate · most of a day out of Vormoor" on a road a journey stopped on.
     """
+    from . import outskirts as outskirts_mod
     from . import places as places_mod
 
     location_id = str(getattr(scene, "location_id", "") or "")
     location = world.get(location_id) if (world is not None and location_id) else None
     name = str(getattr(location, "name", "") or "") if location is not None else ""
     scale = places_mod.scale_of(location) if location is not None else ""
-    label = f"{name} · {scale}" if scale else name
     detail = str(getattr(scene, "biome", "") or "")
-    setting = "in" if detail == places_mod.URBAN else "outside"
-    return Where(setting=setting, label=label, detail=detail)
+    at = str(getattr(scene, "at", "") or "")
+    # Phase 2 (Lane B): outside reads as outside. Bobby stood in a forest outside Vormoor
+    # and the panel said VORMOOR · VILLAGE · FOREST (docs/playtest-2026-09-28.md, 20.1),
+    # because the ground outside is filed under the village's own id and the label was
+    # the village's. The setting is parsed off the place id, never stored (Q3), so an old
+    # save standing in that forest loads as "near Vormoor · forest" (Q14) with no heal.
+    setting = places_mod.setting_of(at) if at else (
+        "in" if detail in ("", places_mod.URBAN) else "outside")
+    road = getattr(scene, "road", None) or {}
+    if setting == "outside" and outskirts_mod.is_along(at) and road.get("to_name"):
+        walked = int(road.get("walked") or 0)
+        out_of = f"{name}" if name else "where you set out"
+        return Where(setting="road", label=f"on the road to {road['to_name']}",
+                     detail=(f"{_hours_out(walked)} out of {out_of}" if walked
+                             else f"out of {out_of}"))
+    if setting == "outside":
+        return Where(setting=setting, label=f"near {name}" if name else "outside",
+                     detail=detail)
+    if setting == "under":
+        return Where(setting=setting, label=f"under {name}" if name else "underground",
+                     detail=detail)
+    label = f"{name} · {scale}" if scale else name
+    return Where(setting="in", label=label, detail=detail)
+
+
+def _hours_out(hours: int) -> str:
+    """"a few hours", "most of a day", "two days" — how far along a road, in words."""
+    h = int(hours or 0)
+    if h <= 4:
+        return "a few hours"
+    if h < journey_mod.HOURS_PER_DAY:
+        return "most of a day"
+    return _count_words(round(h / journey_mod.HOURS_PER_DAY), "day")
 
 
 def walk_words(minutes: int) -> str:

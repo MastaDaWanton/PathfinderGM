@@ -193,14 +193,17 @@ def test_with_an_empty_registry_the_bobby_beats_groom_byte_identically(monkeypat
     assert len(texts) == 14
 
 
-def test_the_real_registry_holds_lane_as_members_and_no_helper():
-    """Phase 1 shipped the registry empty; Lane A's truth checks are its first members
-    (changed on purpose, as this test's Phase-1 docstring asked). `_people` and `_page`
-    are helpers, never members."""
-    names = [m.__name__.rsplit(".", 1)[-1] for m in checks.registered()]
-    assert names == ["refused_move", "stop_shown", "direction", "empty_roll",
-                     "face_kept", "brief_verbatim"]
-    assert not any(n.startswith("_") for n in names)
+def test_the_real_registry_holds_each_lanes_checks_and_no_helper():
+    """Phase 1 shipped the registry empty; Phase 2's lanes made it their home (changed on
+    purpose, as this test's Phase-1 docstring asked). A subset, not an exact list, because
+    every lane that merges adds members and an exact list conflicted at each merge: Lane
+    A's six truth checks and Lane B's four space checks are members; the helpers
+    (`_people`, `_page`, `_space`, and any later `_`-module) never are."""
+    names = {m.__name__.rsplit(".", 1)[-1] for m in checks.registered()}
+    assert {"refused_move", "stop_shown", "direction", "empty_roll", "face_kept",
+            "brief_verbatim"} <= names
+    assert {"land_described", "bearing_invented", "road_claimed", "route_walked"} <= names
+    assert not {n for n in names if n.startswith("_")}
 
 
 # --- discovery -----------------------------------------------------------------------------

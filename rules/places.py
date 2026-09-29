@@ -496,6 +496,13 @@ VENTURES: dict[str, dict] = {
               "spots": (("the foot", "the way in"),
                         ("the top", "somewhere to see from"))},
 }
+# The slugs `setting_of` parses against: the reaches of open ground, and the ventures
+# that lie away from the settlement rather than under it. Derived from the two tables
+# above, never listed a second time.
+_WILD_SLUGS = frozenset("-".join(label.split()) for label, _about in _WILD)
+_AWAY_SLUGS = frozenset("-".join(spec["label"].split()) for spec in VENTURES.values()
+                        if int(spec.get("hours") or 0) > 0)
+
 # How many places may hang off one parent MINTED IN PLAY — a founded base, a venture's
 # head. Read only against `scene.founded`, and deliberately not the same question as how
 # many rooms a settlement holds: an alley of three and a sewer of four hang off a town of
@@ -640,6 +647,88 @@ def terrain_of(place_id: str) -> str:
 def location_of(place_id: str) -> str:
     head = str(place_id or "").split(":", 1)[0]
     return head.rsplit(SEP, 1)[0] if SEP in head else head
+
+
+# --- in, under, or outside ----------------------------------------------------------------
+#
+# The middle scale (docs/design-b-space.md, 17.1): between a settlement's rooms and a
+# journey of days there is the ground just outside it — the outskirts, the fields, the
+# shore, the head of each road out, and the crossroads where the roads part. Those are
+# places like any other, filed under the settlement's id with their ground in the head as
+# every place is, and marked by `@` at the head of their spot: `{loc}~farmland:@the-
+# outskirts`. `@` cannot come out of `_slug` (it keeps `[a-z0-9 ]`) and no separator uses
+# it (`~`, `:`, `^` and `/` are taken), so a ring id can never be mistaken for a room.
+#
+# Whether the party is IN the settlement, UNDER it or OUTSIDE it is then a parse of the
+# id, never a field. The plan asked for `Scene.outside`; it was dropped at G0 (Q3) for the
+# reason this repo already learned once — `scene.biome` stored beside `scene.at` was a
+# sibling field, and removing it is what `test_nothing_writes_the_ground_beside_the_place`
+# holds. Bobby's save of 2026-09-28, standing at `…~forest:the-approach`, parses as
+# outside with no migration.
+RING = "@"
+
+# The kinds of place that belong on the road and not in the street. "I walk to the
+# nearest crossroads" was refused on 2026-09-28 as "no such kind of place as
+# 'crossroads'" (Bobby, turns 6 and 7): the kinds were the settlement table's, and the
+# settlement table has no road. A bridge is both — the town's bridge is a way in, a bridge
+# out on the road is a crossing — so it is here as well as in `KINDS`, and which one it
+# is depends on the ground it is founded off (`fits_here`).
+OUTSIDE_KINDS: dict[str, str] = {
+    "road": "a stretch of road, and whoever is on it",
+    "crossroads": "where roads part, and a post to say which way",
+    "milestone": "a stone by the road, and what is cut in it",
+    "ford": "where the road goes through the water rather than over it",
+    "bridge": "a span over the water, and the road either side",
+}
+# The ones that need water under them, as `WATER_KINDS` does in town.
+_OUTSIDE_WATER = frozenset({"ford", "bridge"})
+
+
+def _spot_path(place_id: str) -> list[str]:
+    """The spot of a place id, split at `/`, with any storey taken off."""
+    pid = str(place_id or "")
+    spot = pid.split(":", 1)[1] if ":" in pid else ""
+    spot = spot.rsplit(STOREY, 1)[0] if STOREY in spot else spot
+    return [s for s in spot.split("/") if s]
+
+
+def setting_of(place_id: str) -> str:
+    """"in", "under" or "outside": which side of the settlement's edge this place is.
+
+    A pure parse, in four steps (docs/design-b-space.md §4):
+
+    1. ground `urban` in the head → in (a storey is part of its building);
+    2. the spot's root starts with `@` (the ring) or is one of the `_WILD` reaches of open
+       ground → outside;
+    3. a spot with no `/` at all → outside: an authored non-urban place, open ground;
+    4. otherwise the place was minted under a town room on other ground, and it is
+       outside when any step of its path is a venture that lies out of the settlement
+       (`VENTURES` with hours: the cave, the old mine, the ruins, the tower), and under
+       it otherwise (the sewers, the cellars, the crypt).
+
+    An id that says nothing about its ground (an old save's `at == ""`, the world-less
+    `here`) is `in`: that is where every campaign started before places had ground.
+    """
+    ground = terrain_of(place_id)
+    if not ground or ground == URBAN:
+        return "in"
+    path = _spot_path(place_id)
+    if not path:
+        return "outside"
+    root = path[0]
+    if root.startswith(RING) or root in _WILD_SLUGS:
+        return "outside"
+    if len(path) == 1:
+        return "outside"
+    if any(step in _AWAY_SLUGS for step in path[1:]):
+        return "outside"
+    return "under"
+
+
+def is_ring(place_id: str) -> bool:
+    """Whether this is one of a settlement's outside places (the outskirts, a road head)."""
+    path = _spot_path(place_id)
+    return bool(path) and path[0].startswith(RING)
 
 
 # --- storeys ---------------------------------------------------------------------------
@@ -1232,7 +1321,7 @@ def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
 
 
 def for_scene(location, at: str, terrain_hint: str = "",
-              founded=()) -> tuple[Place, ...]:
+              founded=(), ring=()) -> tuple[Place, ...]:
     """Every place the party can name from where they stand: home, plus the ground
     they are on if it is not home, plus what play has minted here (`founded`).
 
@@ -1247,18 +1336,57 @@ def for_scene(location, at: str, terrain_hint: str = "",
     against where the party stands, so "the alley" by the market and "the alley" by the
     library are two places with one word between them (LambdaMOO's rule: a room exists
     because it was dug from somewhere, with an owner and a link).
+
+    `ring` is the settlement's outside places (`rules/outskirts.py`), handed in by the
+    caller that has a world — this module has none. They join the home set with their
+    exits both ways, so the gate leads out to the outskirts and the outskirts back in. A
+    region of open ground joins only when the party stands on one of its reaches (never
+    for standing on the ring: the fields are farmland, and grafting a farmland wilderness
+    onto them would put "the heart of it" beside the fields), and its first reach is
+    joined to the outskirts so the way back is walked, not jumped.
     """
     home = home_set(location, terrain_hint)
     ground = terrain_of(at)
-    if not ground or ground == home[0].terrain:
-        base = home
+    ring = tuple(ring or ())
+    base = _with_ring(home, ring) if ring else home
+    ids = {p.id for p in base}
+    if is_ring(at) and len(_spot_path(at)) == 1 and at not in ids:
+        # Stood on the outside by an engine that cannot build the ring (no world to hand):
+        # the place is still real, and the id says enough to stand on it. A stretch of
+        # road a journey stopped on is the case that matters — `place_party` validates
+        # against this set.
+        base = base + (Place(id=at, name="on the road" if "along-" in at else "outside",
+                             about="", terrain=ground, exits=()),)
+    elif not ground or ground == home[0].terrain or is_ring(at):
+        pass
     elif home[0].id == "here":
         # No location at all, but the party has been stood on named ground: that
         # ground is all there is.
         base = region_set(location_of(at), ground)
     else:
-        base = home + region_set(location_of(at), ground)
+        region = region_set(location_of(at), ground)
+        outskirts = next((p for p in ring if p.name == "the outskirts"), None)
+        if outskirts is not None and region:
+            region = (_replace(region[0], exits=tuple(region[0].exits) + (outskirts.id,)),
+                      ) + tuple(region[1:])
+            base = tuple(_replace(p, exits=tuple(p.exits) + (region[0].id,))
+                         if p.id == outskirts.id else p for p in base)
+        base = base + region
     return with_founded(with_storeys(base), founded, at)
+
+
+def _with_ring(home: tuple[Place, ...], ring: tuple[Place, ...]) -> tuple[Place, ...]:
+    """The home set with the ring beside it, every town room a ring place names in its
+    exits gaining the way back out — adjacency runs both ways (`_with_a_way_in`)."""
+    ring_ids = {p.id for p in ring}
+    back: dict[str, list[str]] = {}
+    for p in ring:
+        for x in p.exits:
+            if x not in ring_ids:
+                back.setdefault(x, []).append(p.id)
+    joined = tuple(_replace(p, exits=tuple(p.exits) + tuple(
+        x for x in back[p.id] if x not in p.exits)) if p.id in back else p for p in home)
+    return joined + tuple(ring)
 
 
 def with_storeys(base: tuple["Place", ...]) -> tuple["Place", ...]:
@@ -1380,19 +1508,44 @@ _WATER_WORDS = frozenset({"water", "tide", "tides", "tidal", "stilt", "stilts", 
                           "canals", "reef", "lagoon"})
 
 
-def fits_here(kind: str, location) -> str:
+def fits_here(kind: str, location, parent=None) -> str:
     """Why a place of this kind cannot be founded in this settlement, or "" when it can.
 
     A reason in words, because it becomes a refusal the plan can repair and a note the
     reviewer can quote. One step of scale is allowed upward — a village may have a
     town's inn — and not two: a village with a cathedral is the kind of place the
     ruling said had to "at least make sense".
+
+    `parent` is the place it would hang off, and it decides the road's kinds
+    (`OUTSIDE_KINDS`): a crossroads off the outskirts is a crossroads; a crossroads off
+    the market is refused with the fix named — "go to the outskirts first" — because a
+    crossroads is not in a town (the owner's ruling Q11). A bridge off a town room is
+    the settlement's bridge, as it always was.
     """
     kind = " ".join(str(kind or "").split()).lower().removeprefix("the ")
+    outside = parent is not None and setting_of(getattr(parent, "id", "") or "") == "outside"
+    if kind in OUTSIDE_KINDS and (outside or kind not in KINDS):
+        if not outside:
+            where = str(getattr(parent, "name", "") or "the town") if parent is not None \
+                else "the town"
+            return (f"A {kind} is out on the road, not in {where}: go to the outskirts "
+                    f"first, and it can be found from there.")
+        if kind in _OUTSIDE_WATER:
+            ground = str(getattr(parent, "terrain", "") or "")
+            facts = getattr(location, "facts", None) or {}
+            prose = getattr(location, "prose", "") or ""
+            text = " ".join([*(str(v) for v in facts.values()), str(prose)]).lower()
+            if ground not in ("coast", "swamp", "water") \
+                    and not (set(_WORDS.findall(text)) & (_WATER_WORDS | {"river", "ford",
+                                                                          "stream"})):
+                name = str(getattr(location, "name", "") or "here")
+                return f"Nothing the world says about {name} puts water across its roads."
+        return ""
     row = KINDS.get(kind)
     if row is None:
         return (f"There is no such kind of place as {kind!r}. The kinds are: "
-                f"{', '.join(sorted(KINDS))}.")
+                f"{', '.join(sorted(KINDS))}; and out on the road: "
+                f"{', '.join(sorted(OUTSIDE_KINDS))}.")
     name = str(getattr(location, "name", "") or "this place")
     if location is None or not _settled(location, ""):
         return f"{name} is not a settlement, and a {kind} is a settlement's place."

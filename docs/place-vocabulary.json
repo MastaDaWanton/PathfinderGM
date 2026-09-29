@@ -38,6 +38,10 @@
  },
  "vertical_default": "ledge",
  "flat_by_design": [
+  "@the-crossroads",
+  "@the-far-crossroads",
+  "@the-fields",
+  "@the-road-to",
   "the-back-streets",
   "the-edge",
   "the-gaol",
@@ -48,8 +52,8 @@
   "the-way-in"
  ],
  "vertical_balance": {
-  "consumer_tables": "60 of 73",
-  "ratio": 0.822,
+  "consumer_tables": "63 of 80",
+  "ratio": 0.787,
   "why": "the standing instruction is that a generated place is more likely to have verticality than not, without being silly about it. This is what the consumer's own tables came out at."
  },
  "clutter": {
@@ -696,6 +700,13 @@
   "tower": "the tower"
  },
  "known_slugs": [
+  "@along-the-road-to",
+  "@the-crossroads",
+  "@the-far-crossroads",
+  "@the-fields",
+  "@the-outskirts",
+  "@the-road-to",
+  "@the-shore",
   "the-approach",
   "the-arena",
   "the-back-streets",

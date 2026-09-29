@@ -669,3 +669,88 @@ measurement it guards.
 8. **Sea legs from a non-port stilt village** leave from the shore, or does the ruling add
    a landing?
 9. **`02-state.js`:** give it to S6 or to F.
+
+---
+
+## 10. Phase 2: the owner's rulings, mounts, and what was built (2026-09-28)
+
+The owner's Phase-2 answers (docs/fix-interfaces.md §4) override §4 above in two places.
+
+**Q11 — a crossroads is not in a town.** §4's ring put "the crossroads" beside the
+outskirts, the fields and the shore. As built (`rules/outskirts.py`), it is out on the road
+network: the outskirts leads to the crossroads, and the crossroads to each road head. It
+exists only where two or more overland roads lead to different destinations, one per
+fork: a crossroads holds at most five roads (six ways on with the way back), and a sixth
+road hangs off "the far crossroads". Journeys along those roads pass through it — the
+journey tell says "Out by the outskirts, the crossroads and the road to X" and the effect
+carries the names in `went_by`. A crossroads founded in play (`found kind=crossroads`) is
+refused off a town room with the fix `{"kind": "go", "place": "the outskirts"}`.
+
+**Q13 — journeys take days, and a horse changes it.** Research first, as CLAUDE.md
+requires. Primary sources fetched 2026-09-28:
+
+| Rule | Source | Text used |
+|---|---|---|
+| Hustle | AoN Rules ID=50 (CRB Movement) | "A character can hustle for 1 hour without a problem. Hustling for a second hour in between sleep cycles deals 1 point of nonlethal damage, and each additional hour deals twice the damage taken during the previous hour of hustling." "A character who takes any nonlethal damage from hustling becomes fatigued." |
+| Running overland | AoN Rules ID=50 | "Attempts to run and rest in cycles effectively work out to a hustle." |
+| Mounted movement | AoN Rules ID=50 | "A mount bearing a rider can move at a hustle. The damage it takes when doing so, however, is lethal damage, not nonlethal damage." "The creature can also be ridden in a forced march, but its Constitution checks automatically fail." "Mounts also become fatigued when they take any damage from hustling or forced marches." |
+| A day | AoN Rules ID=50 | "A day represents 8 hours of actual travel time." |
+| Mount speeds | AoN Table 7-9 | light and heavy horse 5 miles an hour, 40 a day; pony 4 and 32 |
+| The horse | AoN Bestiary, Horse | hp 15 (2d8+6), Con 17, speed 50 ft |
+| Getting one | Ultimate Equipment, Animals and Mounts | light horse 75 gp (110 combat trained), heavy horse 200 gp, pony 30 gp, riding dog 150 gp, camel 150 gp; stabling 5 sp a day; "can be found in most large cities", availability "as the GM deems fit". No hire price for a mount is listed (carriage passage is 3 cp a mile, a cart 1 cp) — I could not source a rule for hiring a horse |
+| Tried and abandoned | 2e.aonprd.com Actions ID=515 | Pathfinder 2e replaced the doubling damage with a cap: hustle "for a number of minutes equal to your Constitution modifier × 10". Recorded, not adopted: this is a 1e table |
+
+**The design, within the three laws.**
+
+- The owner's multipliers are used as ruled: on foot = the route's time at walking pace
+  (`journey.hours_for`, now on the road column, Q12); riding = half; galloping the whole
+  way = a third. PF1e's own 50-ft horse would be 5/3 of a walker, not 2; the ruling wins,
+  and the book supplies only *when the gallop has to stop*.
+- A gallop is a hustle. Per day of eight travelling hours the first gallop hour is free;
+  the second costs each mount one point of **lethal** damage and leaves it **fatigued**;
+  fatigued, it cannot run (CRB Conditions), and an overland gallop is running in cycles,
+  so the rest of that day is ridden. That last link is our reading, stated as ours. The
+  camp between days is the sleep cycle that resets it. So a road of six walking hours or
+  less is a third; a longer one tires the horse and falls back toward half —
+  "fatigue kicks in if the journey is too far", by rule. `journey.mounted_hours` does the
+  arithmetic; Vormoor to Dustgate is 27 hours on foot, 14 riding, 12 galloping (two days
+  of blown horses).
+- **Fatigue is an `ActiveEffect`** through the one applicator (`add_condition`, source
+  `hustle`), timed at 8 hours of the clock (4,800 rounds — the book's "8 hours of complete
+  rest"), so `Scene.advance` expires it and there is no second ticker. The damage goes
+  through the mount's own `take_damage`. No number comes from a model: the journey op's
+  `pace` param is a closed word (walk/ride/gallop) and every hour is the table's.
+- **A mount is a creature in the party**: a bestiary horse, warhorse or pony
+  (`journey.MOUNTS`) who travels with you (`bond.travels-with-you`) or is named in
+  `with`. One per rider; a party short of mounts is refused with the walking time said.
+  The brief's ROADS OUT tells the planner the `pace` words only when a mount is present.
+- **How a party comes to have one** is designed, not built, because the files are other
+  lanes': owned from the start (C, a background's mount → `_bring_in("horse")` with the
+  bond), bought at the stables (I2: a stall line at `the stables`, 75 gp for a light
+  horse, the ostler as keeper), hired (D/I2: the same creature with a daily wage in the
+  scheme ledger; no hire price is published, so a stabling-scale price is a proposal for
+  the owner). Nothing in the engine changes when those arrive: they bring a creature in
+  through the one door and give it the bond.
+- **Ground beyond the near land** follows the same pace rule (no 4-hour band): its
+  distance is where the world's own routes put it — a road that crosses farmland then
+  mountain puts the mountain half-way along it — at the road column's pace, marched in
+  days with a camp between when it comes to that (`outskirts.beyond_hours`). Ground the
+  world names only in prose stands half a walking day out.
+
+**Also built as recommended:** Q10's minute bands, Q12's road column, Q14 (Bobby's forest
+loads as "near Vormoor · forest"), Q15 (walking back charges the hours walked), Q16 (sea
+legs from a dockless settlement on the water leave from the shore).
+
+**Deviations from §4, with reasons.**
+
+- Hops out on the ring use the road's table pro rata by minutes (at least 1%), not the
+  street table: the ring is outside, and a cutpurse in the fields is the street's joke.
+- Under-town ground (the sewers) keeps the road's table, as it always had; only `in`
+  hops use the street table.
+- The warrant's scope is "from inside to outside" by place or by biome, as the register
+  corrected (§1.3 B3), except founded and ventured ground, which stays the "another way"
+  the refusal names — otherwise the refusal's own fix would be refused.
+- "Into the fields" and "to the shore" by biome go to those ring places; any other ground
+  is open ground past the outskirts, walked through them.
+- Travel by biome to beyond ground rides no horse: `travel` has no `pace` param
+  (rules/intents.py is not this lane's), so riding is the journey's alone.

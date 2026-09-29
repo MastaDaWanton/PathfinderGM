@@ -115,9 +115,24 @@ def _travel(engine, place):
     return _run(engine, "travel", {"place": place})
 
 
-def _out(engine, inst):
-    """Into the wild the way a player does: by naming the ground, not a place id."""
-    return _run(engine, "travel", {"biome": inst["slots"]["wild"]["terrain"]})
+def _out(engine, inst, tries: int = 6):
+    """Into the wild the way a player does: by naming the ground, not a place id.
+
+    And again if the walk was stopped short. Since Lane B (2026-09-28) the way out is
+    walked — the streets to the way out, the outskirts, then the open ground — and each
+    step is checked for somebody in the way (`rules/ontheway.py`), so a walk can end at
+    the gate with a drover's cart across it, and the player simply goes on next turn.
+    """
+    from rules import places as _places
+
+    ground = inst["slots"]["wild"]["terrain"]
+    res = None
+    for _ in range(tries):
+        res = _run(engine, "travel", {"biome": ground})
+        if _places.terrain_of(engine.scene.at) == ground and \
+                _places.setting_of(engine.scene.at) == "outside":
+            break
+    return res
 
 
 def _wait(engine, minutes: int):

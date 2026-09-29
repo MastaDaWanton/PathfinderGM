@@ -17,8 +17,6 @@ leave Lane A's `brief_verbatim` check blind.
 from __future__ import annotations
 
 import ast
-import copy
-import subprocess
 import sys
 import types
 from pathlib import Path
@@ -33,7 +31,6 @@ from rules.dice import Dice
 from rules.engine import Engine, Scene
 
 MOVED = ("here", "roads_out", "place_facts")
-BASE_REF = "phase-1-base"
 
 
 @pytest.fixture
@@ -143,69 +140,42 @@ def _ctx(world, scene, location, here=None, known=(), **_):
         absent="", buying="", reading=None, player_text="")
 
 
-def test_the_place_slot_is_the_old_inline_block_byte_for_byte(worlds, only_the_moved):
+def test_the_place_slot_is_the_old_inline_block_byte_for_byte(worlds, only_the_moved,
+                                                              monkeypatch):
     """The durable half of G1: every settlement of every world, stood in its first
-    place, indoors and in the forest, with and without the engine's places. The place
-    slot's text is the old inline block's text exactly — a lost space before "ROADS OUT"
-    or a reordered UNDERFOOT would each change what the model reads while every
-    behavioural test still passed."""
+    place, indoors and in the forest, with and without the engine's places. A lost space
+    or a reordered line would change what the model reads while every behavioural test
+    still passed.
+
+    Lane B retired this promise for HERE and ROADS OUT on purpose (2026-09-28): the HERE
+    line now says outside when the party is (item 20.1) and ROADS OUT carries each road's
+    facts (items 17.4, 19), and `tests/test_b_brief_space.py` pins those instead. What
+    stays byte-for-byte is the fact-key member, which nobody has changed yet."""
+    real = brief.registered
+    monkeypatch.setattr(brief, "registered", lambda slot=None: tuple(
+        m for m in real(slot) if brief.short_name(m) == "place_facts"))
     checked = 0
     for row in worlds.play.get("settlements") or []:
         location = worlds.get(row["id"])
         for label, scene, kw in _stands(worlds, row["id"]):
-            want = _old_place_block(worlds, scene, location,
-                                    kw.get("here"), kw.get("known", ()))
+            old = _old_place_block(worlds, scene, location,
+                                   kw.get("here"), kw.get("known", ()))
+            keys = ("Urban Life", "Social Classes", "Architecture", "Governance",
+                    "Formal Power", "Shadow Power", "Tension", "Daily Norms")
+            want = "\n".join(ln for ln in old.split("\n")
+                             if any(ln.startswith(f"  {k}: ") for k in keys))
             got, _facts = brief.run("place", _ctx(worlds, scene, location, **kw))
             assert got == want, f"{location.name}, {label}"
             checked += 1
     assert checked >= 5 * len(worlds.play.get("settlements") or [])
 
 
-def _base_prompts():
-    """`gm/prompts.py` as it stood at the Phase-1 base, loaded as a module beside the
-    live one; None when git or the tag is not to hand (a source export, a CI clone
-    without tags)."""
-    try:
-        src = subprocess.run(["git", "show", f"{BASE_REF}:gm/prompts.py"],
-                             capture_output=True, check=True, timeout=30).stdout
-    except (OSError, subprocess.SubprocessError):
-        return None
-    mod = types.ModuleType("gm._prompts_at_base")
-    mod.__package__ = "gm"
-    mod.__file__ = "gm/_prompts_at_base.py"
-    sys.modules[mod.__name__] = mod
-    exec(compile(src.decode("utf-8"), mod.__file__, "exec"), mod.__dict__)
-    return mod
-
-
-def test_the_whole_brief_is_the_phase_1_base_brief(worlds, only_the_moved):
-    """G1 as the register states it (§3.5): with only S2's three moved members
-    registered, `scene_brief` is byte-identical to the base — the whole brief, not only
-    the slot, because the slot's neighbours (`here` for the thread line, the fallback
-    that fills it) moved too. The sampler measured 657 of 657 identical; this repeats it
-    per world. It pins `phase-1-base` on purpose, so a Phase-2 lane that changes the
-    brief deliberately retires it (the frozen-block test above carries on)."""
-    base = _base_prompts()
-    if base is None:
-        pytest.skip(f"git or the {BASE_REF} tag is not available")
-    checked = 0
-    for row in worlds.play.get("settlements") or []:
-        location = worlds.get(row["id"])
-        for label, scene, kw in _stands(worlds, row["id"]):
-            was = base.scene_brief(worlds, copy.deepcopy(scene), location, **kw)
-            # Lane A's one deliberate change to the inline brief (item 16.7, register
-            # §3.2 "line 1167 only"): the face label no longer licenses a new face after
-            # the first. Everything else stays byte-identical to the base.
-            was = was.replace(" Looks (fact, use it when they are first described): ",
-                              " Looks (fact — every description of them keeps to it): ")
-            now = prompts.scene_brief(worlds, scene, location, **kw)
-            assert now == was, f"{location.name}, {label}"
-            checked += 1
-    s = Scene(location_id="")
-    s.add(instantiate("guildhand", scene=s, name="PC"))
-    assert (prompts.scene_brief(worlds, s, None)
-            == base.scene_brief(worlds, copy.deepcopy(s), None)), "no location at all"
-    assert checked
+# `test_the_whole_brief_is_the_phase_1_base_brief` pinned the whole brief to
+# `phase-1-base` "on purpose, so a Phase-2 lane that changes the brief deliberately
+# retires it". Lane B retired it on 2026-09-28: HERE and ROADS OUT changed on purpose
+# (items 17.4, 19, 20.1), and the phase-1 prompts cannot be run world-less to pin the
+# part that did not. The frozen-block test above carries the fact-key member on, and
+# tests/test_b_brief_space.py pins the new HERE and ROADS OUT.
 
 
 # --- discovery -----------------------------------------------------------------------------
@@ -342,13 +312,18 @@ def test_the_report_holds_what_each_section_printed(worlds, only_the_moved):
     assert set(facts) == set(MOVED)
     here = facts["here"]
     assert here["here"] == e.here().id and here["settlement"] == location.name
-    assert f"THE PLACES HERE (the only ones that exist): {', '.join(here['places'])}." in text
+    # IN / OUTSIDE since Lane B (2026-09-28) when the settlement has ground outside.
+    outside = here.get("outside") or []
+    inside = [p for p in here["places"] if p not in outside]
+    listed = (f"IN {location.name.upper()}: {', '.join(inside)}; "
+              f"OUTSIDE {location.name.upper()}: {', '.join(outside)}"
+              if outside and inside else ", ".join(here["places"]))
+    assert f"THE PLACES HERE (the only ones that exist): {listed}." in text
     assert f"NEXT DOOR to {here['here_name']}, and reached in one step: " \
            f"{', '.join(here['next_door'])}." in text
     roads = facts["roads_out"].get("roads") or []
-    if roads:
-        assert f"(the only settlements that can be reached, and only by journey, which " \
-               f"takes days): {', '.join(roads)}." in text
+    for name in roads:
+        assert f"\n    {name} — " in text, name
     for key, value in (facts["place_facts"].get("facts") or {}).items():
         assert f"  {key}: {value}" in text
 
@@ -415,7 +390,11 @@ def test_the_scaffold_is_the_words_the_sections_print(worlds, only_the_moved):
                                here=e.here(), known=e.places())
     assert "NEXT DOOR" in text and "UNDERFOOT" in text
     printed = brief.grams(text)
+    # A line a section prints only on some turns (Lane B's BEARINGS, MOUNTED, the
+    # outside wording) is declared in the member's `SOMETIMES`, and is held to the words
+    # it prints by that lane's own tests (tests/test_b_brief_space.py).
     missing = {g for m in brief.registered() for fixed in m.SCAFFOLD
+               if fixed not in getattr(m, "SOMETIMES", ())
                for g in brief.grams(fixed)} - printed
     if "ROADS OUT" not in text:
         from gm.brief import roads_out
