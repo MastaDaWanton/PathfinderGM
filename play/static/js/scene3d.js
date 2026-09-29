@@ -171,6 +171,9 @@
   // ground legible underneath it and leaves gold meaning "you".
   var GOLD = [0xd9, 0xc0, 0x8a], WASH = 0.26;
 
+  // A spell's area: the flat map's `.spellarea` fill, character for character.
+  var AREA = "#e0701e";
+
   function paint(name, lit, wash) {
     var c = MATERIAL[name] || MATERIAL.tile, out = "#";
     for (var i = 0; i < 3; i++) {
@@ -379,6 +382,51 @@
       }
     }
 
+    /* The latest turn's spell areas (`g.areas`, the engine's ruling on where a cone or
+       burst fell). Until 2026-09-29 only the flat board drew them, so turning on 3D hid
+       exactly the thing a player switches views to check: where the fire went.
+
+       One square per column, as the flat map draws it, and by the flat map's own rule
+       for which: a column with a cell on the level being looked at (its level, or that
+       far above the ground under it) is filled, lying on that cell's floor; a column
+       whose cells are all above or below (a cone into the canopy) is a dashed outline
+       at the lowest of them, so a spell aimed up floats up. The same colours as the
+       flat board's `.spellarea`, written as attributes here because this view keeps
+       `fill` out of the stylesheet (see #view3d in table.html).
+
+       Lifted a hair off the floor so the depth sort puts it over its own tile and under
+       anybody standing in it, and `pointer-events="none"` so a lit square underneath
+       still takes the click that queues a move. Drawn for what the engine sent and
+       nothing more: this adds no cells and removes none. */
+    var shown = {};
+    (g.areas || []).forEach(function (a) {
+      if (!a || !(a.cells || []).length) return;
+      a.cells.forEach(function (cell) {
+        var c = cell[0], r = cell[1], z = cell.length > 2 ? cell[2] : 0;
+        var k = key(c, r), under = ground[k] || 0;
+        var here = z - under === level || z === level;
+        var was = shown[k];
+        if (!was || (here && !was.here) || (here === was.here && z < was.z)) {
+          shown[k] = { c: c, r: r, z: z, here: here, spell: a.spell };
+        }
+      });
+    });
+    Object.keys(shown).forEach(function (k) {
+      var s = shown[k], z = s.z + 0.02;
+      var name = esc(String(s.spell || "a spell").replace(/-/g, " "));
+      // The stroke as a style, not attributes: `#view3d polygon` sets every face's
+      // stroke in the stylesheet, and a stylesheet rule beats a presentation attribute.
+      var attrs = s.here
+        ? ' fill-opacity="0.32" style="stroke:#f0a050;stroke-opacity:.55;stroke-width:.8"'
+        : ' fill-opacity="0" style="stroke:#f0a050;stroke-opacity:.8;stroke-width:1.2;' +
+          'stroke-dasharray:3 2"';
+      face(faces, [[s.c, s.r, z], [s.c + 1, s.r, z], [s.c + 1, s.r + 1, z],
+                   [s.c, s.r + 1, z]], UP, "area",
+           "spellarea3" + (s.here ? "" : " offlevel"),
+           attrs + ' pointer-events="none"',
+           "<title>" + name + (s.here ? "" : ", above or below this floor") + "</title>");
+    });
+
     (actors || []).forEach(function (a) {
       if (!a.at) return;
       var ax = a.at[0], ay = a.at[1], az = a.at.length > 2 ? a.at[2] : 0;
@@ -411,8 +459,10 @@
 
     var body = faces.map(function (f) {
       var pts = f.pts.map(function (p) { return project(p, turn); });
+      // A spell's area is a tint over the board, not a lit surface: the flat map's own
+      // colour, unshaded, so the two views show the same orange.
       return '<polygon class="' + f.cls + '" fill="' +
-        paint(f.mat, shade(f.n, turn), f.wash) +
+        (f.mat === "area" ? AREA : paint(f.mat, shade(f.n, turn), f.wash)) +
         '" points="' +
         pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ") +
         '"' + f.attrs + (f.inner ? ">" + f.inner + "</polygon>" : "/>");
