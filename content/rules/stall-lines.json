@@ -26,9 +26,11 @@
     "bought, never hired (the owner, 2026-09-29). `template` is the bestiary block the",
     "bought animal is made from; rules/journey.py MOUNTS decides which of them can be",
     "ridden on a journey. Where the settlement has no stables of its own, the same",
-    "counter stands at the market as the horse lines. Stabling (5 sp a day) is a",
-    "service, and nothing in the engine charges an owned animal's keep yet, so it is not",
-    "sold: a row that took coin and did nothing would be a price with no rule behind it."
+    "counter stands at the market as the horse lines. Stabling (5 sp a night) and feed",
+    "(5 cp a mount a day) are not sold here: the engine charges them itself, feed per day",
+    "travelled or rested and stabling per night rested where there are stables",
+    "(rules/engine.py, the journey and the rest), so a counter row would charge the keep",
+    "twice."
   ],
   "shops": [
     {"id": "general", "label": "the general store", "title": "the keeper of the general store",
