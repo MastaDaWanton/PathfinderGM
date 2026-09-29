@@ -1,15 +1,23 @@
 /* The table, re-laid: a layout mock in the app's own materials.
 
    Everything visual here is borrowed from play/templates/play/table.html, not invented:
-   the :root tokens are copied verbatim, the textures and the gilt frame are the real files
-   under play/static/img, Cinzel is the app's own woff2, the body face is its Palatino
-   stack, and the radius scale is the app's (2px for controls, 3px for surfaces, 12px for
-   the suggestion "wax seals", round for the medallions).
+   the :root tokens are copied verbatim, the textures, the gilt, the clasps and the bosses
+   are the real files under play/static/img, Cinzel is the app's own woff2, the body face
+   is its Palatino stack, and the radius scale is the app's (2px for controls, 3px for
+   surfaces, 12px for the suggestion "wax seals", round for the medallions).
 
-   Motion, by the owner's rule (2026-09-28, "i dont need reduced motion i just dont want
-   the kind of motion that makes the pages or menus harder to use"): every answer is
-   instant, nothing lifts or slides under the pointer, nothing loops. There are no
-   transitions or animations in this file on purpose. */
+   Depth (second pass, 2026-09-29, the owner: "I want everything to be more 3d"). There is
+   one lamp, and it is scene3d.js's: LIGHT = norm(-0.42, -0.78, 0.47) in screen space,
+   high, left and in front. So every lit edge is a top or left edge, every shadow falls
+   down and to the right, and a shadow's sideways reach is about half its drop (0.42 to
+   0.78, rounded to 0.54 to 1). The --sh-* tokens below carry that ratio so no panel can
+   quietly light itself from somewhere else. No hue is new: shadows are the app's own
+   near-blacks, and highlights are its candle-gold at low alpha.
+
+   Motion, by the owner's rule (2026-09-28): nothing moves under the pointer on its own.
+   The embers and the candle's pool are ambient and pointer-transparent; a button pressed
+   sinks into its own lip, which is feedback to the pointer and allowed; nothing lifts or
+   slides on hover. */
 
 @font-face {
   font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
@@ -40,6 +48,22 @@
   --sc-abjuration: #8fb0c8; --sc-conjuration: #d9b35f; --sc-divination: #cdd4dc;
   --sc-enchantment: #d493a8; --sc-evocation: #e0714f; --sc-illusion: #ab94c9;
   --sc-necromancy: #a3ad6e; --sc-transmutation: #7fb3a2; --sc-universal: #ddc48e;
+
+  /* The lamp, as shadows. Down and right, half as far across as down. */
+  --sh-1: 1px 2px 2px rgba(0, 0, 0, .55);
+  --sh-2: 1px 2px 2px rgba(0, 0, 0, .5), 3px 6px 10px rgba(0, 0, 0, .45);
+  --sh-3: 2px 4px 4px rgba(0, 0, 0, .45), 6px 12px 22px rgba(0, 0, 0, .5),
+          12px 24px 48px rgba(0, 0, 0, .35);
+  /* A raised edge: lit on top and left, dark on bottom and right. */
+  --bevel: inset 1px 1px 0 rgba(255, 232, 180, .16), inset -1px -1px 0 rgba(0, 0, 0, .55);
+  /* Tooled leather: the grain catches the lamp at the top-left and sinks at the foot. */
+  --emboss: inset 1px 2px 0 rgba(255, 225, 170, .07), inset -2px -4px 10px rgba(0, 0, 0, .45),
+            inset 0 0 42px rgba(0, 0, 0, .30);
+  /* A cut or recessed surface: its top-left inner wall is the one in shadow. */
+  --sunken: inset 2px 3px 6px rgba(0, 0, 0, .7), inset -1px -1px 0 rgba(255, 225, 170, .08);
+  /* The app's engraved-bronze letters (table.html "Engraved bronze"). */
+  --engraved: 0 -1px 1px rgba(0, 0, 0, .92), 0 1px 0 rgba(255, 225, 175, .16);
+  --candle-cursor: url("../../../play/static/img/cursor-candle.png") 24 0, auto;
   color-scheme: dark;
 }
 
@@ -50,12 +74,20 @@
 html, body { height: 100%; }
 body {
   margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
-  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr);
   height: 100dvh; overflow: hidden;
   background:
     linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
     url("../../../play/static/img/grimoire-leather.jpg") center / cover no-repeat fixed #0d0b09;
 }
+
+/* The carried candle: the cursor is the candlestick, its hotspot on the flame tip (the
+   app's own rule, table.html). Text fields keep the beam: you cannot place a caret with
+   a candle. */
+body, a, button, select, label, summary, [role="tab"], .exitbtn, .sugg {
+  cursor: var(--candle-cursor);
+}
+input[type="text"], textarea { cursor: text; }
 
 .vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
       overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
@@ -67,227 +99,455 @@ a { color: var(--gold); }
 /* One focus ring for everything: the candle, offset so it never sits on the glyph. */
 :focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
 
-/* --- Buttons: cold iron with a gold face (the app's), and nothing moves ----------- */
+/* --- The room's light: embers, shade, pool (copied from table.html) ---------------- */
+#embers { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden;
+          -webkit-mask-image: linear-gradient(to top, #000 0%, #000 55%, transparent 96%);
+          mask-image: linear-gradient(to top, #000 0%, #000 55%, transparent 96%); }
+#embers i { position: absolute; left: 0; right: 0; top: 0; height: 200%;
+            will-change: transform; }
+#embers i:nth-child(1) {          /* nearest: big soft coals */
+  background-image:
+    radial-gradient(4.5px 4.5px at 18% 22%, rgba(255,160,70,.5), rgba(255,120,40,.14) 55%, transparent 75%),
+    radial-gradient(5px 5px at 74% 64%, rgba(255,180,90,.42), rgba(255,130,50,.12) 55%, transparent 75%),
+    radial-gradient(4px 4px at 44% 88%, rgba(255,150,60,.46), rgba(255,110,40,.12) 55%, transparent 75%);
+  background-size: 300px 300px;
+  filter: blur(.6px);
+  animation: emberrise 18s linear infinite, emberflick 4.1s ease-in-out infinite;
+}
+#embers i:nth-child(2) {          /* near: bright, warm, quick */
+  background-image:
+    radial-gradient(3px 3px at 22% 12%, rgba(255,170,80,.9), rgba(255,140,60,.2) 55%, transparent 75%),
+    radial-gradient(2.6px 2.6px at 68% 38%, rgba(255,195,105,.75), rgba(255,150,70,.18) 55%, transparent 75%),
+    radial-gradient(3.4px 3.4px at 45% 68%, rgba(255,150,60,.8), rgba(255,120,40,.2) 55%, transparent 75%),
+    radial-gradient(2.4px 2.4px at 88% 82%, rgba(255,205,120,.65), transparent 70%),
+    radial-gradient(2.8px 2.8px at 8% 90%, rgba(255,175,85,.75), rgba(255,140,60,.18) 55%, transparent 75%),
+    radial-gradient(2.2px 2.2px at 55% 25%, rgba(255,185,95,.6), transparent 70%),
+    radial-gradient(2.6px 2.6px at 33% 45%, rgba(255,165,75,.7), transparent 70%);
+  background-size: 260px 260px;
+  animation: emberrise 26s linear infinite, emberflick 5.3s ease-in-out infinite;
+  animation-delay: -6s, -1s;
+}
+#embers i:nth-child(3) {          /* mid */
+  background-image:
+    radial-gradient(2px 2px at 15% 25%, rgba(240,180,95,.6), transparent 70%),
+    radial-gradient(1.8px 1.8px at 55% 55%, rgba(232,170,80,.5), transparent 70%),
+    radial-gradient(2.2px 2.2px at 80% 15%, rgba(250,190,100,.55), transparent 70%),
+    radial-gradient(1.7px 1.7px at 35% 85%, rgba(232,197,71,.5), transparent 70%),
+    radial-gradient(1.9px 1.9px at 95% 65%, rgba(240,180,90,.45), transparent 70%),
+    radial-gradient(1.6px 1.6px at 62% 92%, rgba(245,185,95,.45), transparent 70%),
+    radial-gradient(2px 2px at 5% 55%, rgba(238,178,88,.5), transparent 70%);
+  background-size: 340px 340px;
+  animation: emberrise 52s linear infinite, emberflick 7.1s ease-in-out infinite;
+  animation-delay: -13s, -2s;
+}
+#embers i:nth-child(4) {          /* far: dust motes behind the haze */
+  background-image:
+    radial-gradient(1.2px 1.2px at 30% 20%, rgba(220,180,110,.45), transparent 70%),
+    radial-gradient(1.2px 1.2px at 70% 45%, rgba(201,162,39,.4), transparent 70%),
+    radial-gradient(1.4px 1.4px at 10% 60%, rgba(230,190,120,.35), transparent 70%),
+    radial-gradient(1.2px 1.2px at 50% 92%, rgba(220,170,90,.35), transparent 70%),
+    radial-gradient(1.3px 1.3px at 90% 78%, rgba(210,170,100,.35), transparent 70%),
+    radial-gradient(1.1px 1.1px at 42% 8%, rgba(215,175,105,.32), transparent 70%);
+  background-size: 460px 460px;
+  filter: blur(.5px);
+  animation: emberrise 96s linear infinite, emberflick 9.7s ease-in-out infinite;
+  animation-delay: -40s, -5s;
+}
+@keyframes emberrise {
+  0%   { transform: translate(0, 0); }
+  23%  { transform: translate(9px, -11.5%); }
+  47%  { transform: translate(-7px, -23.5%); }
+  74%  { transform: translate(12px, -37%); }
+  100% { transform: translate(0, -50%); }
+}
+@keyframes emberflick {
+  0%, 100% { opacity: .85; }
+  31%      { opacity: .55; }
+  52%      { opacity: 1; }
+  78%      { opacity: .65; }
+}
+#cursorshade {
+  position: fixed; left: 0; top: 0; width: 6000px; height: 6000px;
+  margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 6;
+  transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
+             scale(calc(.94 + .10 * var(--flick, .8)));
+  background: radial-gradient(circle,
+    transparent 0 130px, rgba(4, 3, 2, .05) 240px,
+    rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 100%);
+}
+#cursorlight {
+  position: fixed; left: 0; top: 0; width: 170px; height: 170px;
+  margin: -85px 0 0 -85px; pointer-events: none; z-index: 7;
+  opacity: calc(.5 + .5 * var(--flick, .8));
+  transform: translate(calc(var(--cx, -9000px) + var(--jx, 0px)),
+                       calc(var(--cy, -9000px) + 5px + var(--jy, 0px)));
+  background: radial-gradient(circle,
+    rgba(255, 190, 100, .15), rgba(232, 170, 80, .06) 45%, transparent 70%);
+  mix-blend-mode: screen;
+}
+#cursorlight::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle,
+    rgba(255, 200, 110, .22), rgba(240, 175, 85, .08) 40%, transparent 65%);
+  -webkit-mask-image: repeating-radial-gradient(circle at 32% 30%,
+    #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
+  mask-image: repeating-radial-gradient(circle at 32% 30%,
+    #000 0 22px, rgba(0,0,0,.25) 34px, #000 52px);
+  animation: dappleswing 8.6s ease-in-out infinite alternate;
+}
+@keyframes dappleswing {
+  from { transform: rotate(-16deg) scale(1.04); }
+  to   { transform: rotate(19deg) scale(.98); }
+}
+@media (hover: none) { #cursorlight, #cursorshade { display: none; } }
+
+/* --- Buttons: cast iron with a gold face, standing on a lip, sinking when pressed -- */
 button {
-  background: linear-gradient(#2b2318, #191410); border: 1px solid var(--gold-dim);
-  color: var(--gold); padding: 10px 18px; border-radius: 2px; cursor: pointer;
+  position: relative;
+  background: linear-gradient(#33291c, #1d1711 55%, #16110c);
+  border: 1px solid var(--gold-dim); border-bottom-color: #4a3c28; border-right-color: #564630;
+  color: var(--gold); padding: 10px 18px; border-radius: 2px;
   font: 400 15px/1 var(--display); letter-spacing: .12em; font-variant: small-caps;
-  white-space: nowrap; min-height: 40px;
+  white-space: nowrap; min-height: 40px; text-shadow: var(--engraved);
+  /* The lip is the button's own thickness, showing below and to the right of its face,
+     where the lamp does not reach; the soft shadow is what it casts on the desk. */
+  box-shadow: inset 1px 1px 0 rgba(255, 232, 180, .22), inset -1px -1px 0 rgba(0, 0, 0, .55),
+              1px 2px 0 #3a2d1d, 1px 4px 0 #0e0a07, 3px 7px 10px rgba(0, 0, 0, .5);
+  transition: transform .06s ease-out, box-shadow .06s ease-out;
 }
 button:hover { color: #f4e6c0; border-color: var(--accent); }
-button.quiet { background: rgba(20, 16, 11, .7); color: var(--gold); }
+button:active:not([aria-disabled="true"]) {
+  transform: translate(1px, 3px);
+  box-shadow: inset 1px 1px 0 rgba(255, 232, 180, .08), inset -1px -1px 0 rgba(0, 0, 0, .5),
+              0 1px 0 #0a0806, 1px 1px 2px rgba(0, 0, 0, .5);
+}
+button.quiet { background: linear-gradient(rgba(38, 30, 21, .92), rgba(20, 16, 11, .92)); }
 button.small { padding: 6px 10px; font-size: 13px; min-height: 32px; }
-button.go { border-color: var(--accent); color: #f4e6c0; }
+button.go { border-color: var(--accent); color: #f4e6c0;
+            background: linear-gradient(#4a3a22, #2a2016 55%, #1d1610); }
+button.flat { box-shadow: none; background: transparent; text-shadow: none; }
+button.flat:active { transform: none; box-shadow: none; }
 
-/* --- Top bar: the world, the modes, the sheet toggle ------------------------------ */
-.topbar {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center; gap: 12px; padding: 8px 16px;
-  border-bottom: 1px solid var(--gold-dim);
-  background:
-    linear-gradient(rgba(16, 12, 8, .10), rgba(8, 6, 4, .40)),
-    url("../../../play/static/img/card-leather.jpg") #241d15;
-  background-size: auto, 400px auto;
-  position: relative; z-index: 10;
+/* --- The mock's own strip: flat, dashed, and plainly not the app ----------------------- */
+.mockstrip {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  padding: 6px 16px; font-size: 14px; line-height: 1.3; color: var(--dim);
+  background: repeating-linear-gradient(135deg, rgba(20, 16, 11, .92) 0 10px,
+                                        rgba(26, 21, 15, .92) 10px 20px);
+  border-bottom: 1px dashed var(--gold-dim); position: relative; z-index: 11;
 }
-.world { margin: 0; font: 400 15px/1 var(--display); letter-spacing: .14em;
-         font-variant: small-caps; color: var(--dim); }
-.topend { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
-
-/* The modes, each a word. The owner's mockup had a row of unlabelled icons; here the
-   word is the button and there is no icon to decode. */
-.modes { display: flex; gap: 2px; padding: 3px; border: 1px solid #2e251a;
-         background: rgba(8, 6, 4, .55); border-radius: 3px; }
-.modes button { border: 1px solid transparent; background: transparent; color: var(--dim);
-                padding: 8px 16px; font-size: 15px; letter-spacing: .1em; }
-.modes button:hover { color: var(--ink); border-color: transparent; }
-.modes button[aria-selected="true"] {
-  color: #f4e6c0; border-color: var(--gold-dim);
-  background: linear-gradient(#2b2318, #191410);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
-/* The toggle keeps the width of its longer label, so the tabs never shift when it flips,
-   and it keeps its place (hidden, not removed) in the modes it does not apply to. */
-#sheettoggle { min-width: 11.5em; }
-body:not(.mode-table) #sheettoggle { visibility: hidden; }
-
-.mockctl { position: relative; }
-.mockctl > summary { list-style: none; cursor: pointer; padding: 8px 12px; min-height: 40px;
-                     display: flex; align-items: center; border: 1px dashed var(--gold-dim);
-                     border-radius: 2px; color: var(--dim); font: 400 14px/1 var(--display);
-                     letter-spacing: .1em; font-variant: small-caps; }
-.mockctl > summary::-webkit-details-marker { display: none; }
-.mockctl[open] > summary { color: var(--gold); border-style: solid; }
-.mockpanel { position: absolute; right: 0; top: calc(100% + 6px); width: 300px;
-             padding: 14px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45;
-             background: #1a1510; border: 1px solid var(--gold-dim); border-radius: 3px;
-             box-shadow: 0 12px 30px rgba(0, 0, 0, .6); }
-.mockpanel label { color: var(--dim); font-size: 13px; }
-.mockpanel label.check { color: var(--ink); display: flex; gap: 8px; align-items: center; }
-.mockpanel select { font: inherit; font-size: 14px; color: var(--ink); background: var(--sunk);
-                    border: 1px solid #3a2f22; border-radius: 2px; padding: 7px; }
+.mocktag { margin: 0; font: italic 14px/1 var(--body); color: var(--dim); }
+.viewing { display: flex; align-items: center; gap: 6px; }
+.vlabel { color: var(--ink); }
+.viewing button { font: 400 14px/1.1 var(--body); letter-spacing: 0; font-variant: normal;
+                  text-shadow: none; padding: 5px 10px; min-height: 32px;
+                  border: 1px dashed var(--gold-dim); background: transparent;
+                  box-shadow: none; color: var(--ink); }
+.viewing button small { color: var(--dim); font-size: 13px; }
+.viewing button[aria-checked="true"] { border-style: solid; border-color: var(--accent);
+                                       background: rgba(207, 169, 100, .14); color: #f4e6c0; }
+.viewing button[aria-checked="true"] small { color: var(--gold); }
+.viewing button:active { transform: none; }
+.mocksay { margin: 0; font-style: italic; flex: 1 1 260px; min-width: 0; }
+.mockstrip label.check { display: flex; gap: 6px; align-items: center; color: var(--ink); }
+.mockstrip .flat { font: 400 14px/1 var(--body); letter-spacing: 0; font-variant: normal;
+                   color: var(--gold); border: 1px dashed var(--gold-dim); min-height: 32px;
+                   padding: 5px 10px; }
 .mocknote { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.45;
             font-style: italic; }
 
-/* --- The stage: character | story | numbers -------------------------------------- */
-.stage {
-  display: grid; min-height: 0; gap: 18px; padding: 18px 18px 14px;
-  grid-template-columns: 264px minmax(0, 1fr) 264px;
-  grid-template-areas: "who centre numbers";
+/* --- Top bar: the world, the modes, Talk and the sheet toggle ------------------------- */
+.topbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 12px; padding: 8px 16px 9px;
+  border-bottom: 1px solid var(--gold-dim);
+  background:
+    linear-gradient(rgba(255, 225, 170, .05), rgba(0, 0, 0, 0) 30%, rgba(8, 6, 4, .40)),
+    url("../../../play/static/img/card-leather.jpg") #241d15;
+  background-size: auto, 400px auto;
+  /* A board laid over the stage: it throws its shadow down onto what is below. */
+  box-shadow: inset 0 1px 0 rgba(255, 225, 170, .10), 0 4px 10px rgba(0, 0, 0, .55);
+  position: relative; z-index: 10;
 }
-/* The wrapper is invisible to the grid on a wide screen, so its two halves take the two
-   outer tracks; below 1180px it becomes the one scrolling column they share. */
+.world { margin: 0; font: 400 15px/1 var(--display); letter-spacing: .14em;
+         font-variant: small-caps; color: var(--dim); text-shadow: var(--engraved); }
+.topend { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+
+/* The modes, each a word, cut into a recessed rail; the chosen one is pressed into it. */
+.modes { display: flex; gap: 3px; padding: 4px; border: 1px solid #2e251a;
+         background: rgba(8, 6, 4, .6); border-radius: 3px; box-shadow: var(--sunken); }
+.modes button { border: 1px solid #3b3022; background: linear-gradient(#2a2118, #18130e);
+                color: var(--dim); padding: 8px 14px; font-size: 15px; letter-spacing: .08em;
+                box-shadow: var(--bevel), 1px 2px 0 #090705, 1px 3px 5px rgba(0, 0, 0, .4); }
+.modes button:hover { color: var(--ink); border-color: #4a3c28; }
+.modes button[aria-selected="true"] {
+  color: #f4e6c0; border-color: var(--gold-dim);
+  background: linear-gradient(#17120d, #221a12);
+  transform: translate(1px, 2px);
+  box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset -1px -1px 0 rgba(255, 225, 170, .08),
+              inset 0 -2px 0 var(--accent);
+}
+/* The toggle keeps the width of its longer label, so nothing shifts when it flips, and it
+   keeps its place (hidden, not removed) in the modes it does not apply to. */
+#sheettoggle { min-width: 8.6em; }
+body:not(.mode-table):not(.mode-map) #sheettoggle { visibility: hidden; }
+.talkbtn { display: inline-flex; gap: 8px; align-items: center; }
+.talkbtn[aria-expanded="true"] { color: #f4e6c0; border-color: var(--accent);
+  transform: translate(1px, 2px);
+  box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset -1px -1px 0 rgba(255, 225, 170, .08); }
+.count { min-width: 1.6em; padding: 2px 6px; border-radius: 10px; font: 400 12px/1.2 var(--body);
+         letter-spacing: 0; font-variant: normal; color: #1a130b; text-shadow: none;
+         background: radial-gradient(circle at 35% 30%, #f4e3b2, #c9a86a 55%, #8a6b3a);
+         box-shadow: 1px 1px 2px rgba(0, 0, 0, .6); }
+.count:empty { display: none; }
+
+/* --- The stage: character | story | numbers ------------------------------------------- */
+/* One grid, two rows: the book (or the board) above, the desk below, and the sheet's two
+   halves either side. `.sheet` is invisible to it on a wide screen, so its halves take the
+   outer tracks; the conversation tray takes the numbers' track and lies over it, so the
+   story and the pen are never under it (08-conversation.js measured the old slide-over
+   covering the beat being read). */
+.stage {
+  display: grid; min-height: 0; gap: 16px 18px; padding: 20px 20px 16px;
+  grid-template-columns: 264px minmax(0, 1fr) 264px;
+  grid-template-rows: minmax(45%, 1fr) minmax(0, auto);
+  grid-template-areas: "who book numbers" "who desk numbers";
+  position: relative;
+  /* The clasps' box reaches 34px past the book (the metal itself 10-13px). Unclipped, it
+     widened a 375px phone page to 395px and the browser zoomed the whole page out. The
+     stage's padding is wider than the metal, so clipping at its edge cuts nothing seen. */
+  overflow-x: clip;
+}
 .sheet { display: contents; }
 .side-who { grid-area: who; }
-.centre { grid-area: centre; }
 .side-numbers { grid-area: numbers; }
+.book, .board { grid-area: book; }
+.desk { grid-area: desk; }
+.sheetmore { grid-column: 2; grid-row: 1 / -1; }
+.talk { grid-area: numbers; z-index: 4; }
+.book, .board, .desk, .sheetmore { width: 100%; max-width: 880px; justify-self: center; }
+/* Modes that are not this one. */
+body:not(.mode-table) .book { display: none; }
+body:not(.mode-map) .board { display: none; }
+body:not(.mode-table):not(.mode-map) .desk { display: none; }
+body:not(.mode-sheet) .sheetmore { display: none; }
+/* The board is for looking at, so it takes more of the height than the book does; the
+   desk's choices scroll inside it and the pen stays put. */
+body.mode-map .stage { grid-template-rows: minmax(64%, 1fr) minmax(0, auto); }
+/* The 3D board has no squares to choose, so it keeps no line for the answer. */
+.board.threed .boardsay { display: none; }
+body.mode-sheet .glanceonly { display: none; }
+body:not(.mode-table):not(.mode-map):not(.mode-sheet) .stage { display: none; }
 
-/* The sides are the app's aside: tooled leather, a gilt edge, scrolled on their own. */
+/* The sides: tooled leather in a gilt edge, scrolled on their own. The leather is
+   embossed, lit at its top-left and sinking at its foot, and the whole side stands off the
+   table by its cast shadow. */
 .side {
-  min-height: 0; overflow-y: auto; padding: 16px 16px 18px; font-size: 14px;
-  line-height: 1.5; border: 3px solid transparent; border-image: var(--gilt) 1;
+  min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 18px;
+  font-size: 14px; line-height: 1.5; border: 3px solid transparent; border-image: var(--gilt) 1;
   background:
     linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
     linear-gradient(#57432d, #4b3a27),
     url("../../../play/static/img/leather-tile.jpg") #241d15;
   background-blend-mode: normal, multiply, normal;
   background-size: auto, auto, 512px auto;
+  box-shadow: var(--emboss), var(--sh-2);
   /* The app's --dim measured 3.0:1 against this leather at its lightest (#4b3a27), under
      AA for the small print here. One step lighter in the same hue: 4.4:1 at the lightest
      point and above 5.9:1 across the texture's darker body. */
   --dim: #b3a488;
 }
-.sidehead { margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #2b2319;
+/* A heading is a groove tooled across the leather: dark above, lit below. */
+.sidehead { margin: 18px 0 8px; padding-bottom: 5px; border-bottom: 1px solid #221b13;
+            box-shadow: 0 1px 0 rgba(255, 225, 170, .10);
             color: var(--gold); font: 400 15px/1 var(--display); letter-spacing: .12em;
-            font-variant: small-caps; }
+            font-variant: small-caps; text-shadow: var(--engraved); }
 .sidehead.first { margin-top: 0; }
 
 /* Collapsed: the story takes the width; the measure stays the same, so it only centres. */
-body.sheet-hidden.mode-table .stage { grid-template-columns: minmax(0, 1fr);
-                                      grid-template-areas: "centre"; }
-body.sheet-hidden.mode-table .sheet { display: none; }
+body.sheet-hidden:is(.mode-table, .mode-map) .stage {
+  grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk"; }
+body.sheet-hidden:is(.mode-table, .mode-map) .sheet { display: none; }
+/* With the sheet put away the tray takes a column of its own beside the book; laid over
+   the book it hid "the merchant" and the right of the page, and left the log four lines. */
+body.sheet-hidden.talkopen:is(.mode-table, .mode-map) .stage {
+  grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "book talk" "desk talk"; }
+body.sheet-hidden .talk { grid-area: talk; }
 
-/* --- Who: portrait, name, gear ---------------------------------------------------- */
+/* --- Who: portrait, name, what is in hand and worn --------------------------------- */
 .portrait { aspect-ratio: 4 / 5; position: relative; border-radius: 3px; overflow: hidden;
             background: radial-gradient(80% 70% at 50% 35%, #2a2118, #120e0a);
-            border: 1px solid #1a140e; box-shadow: 0 0 0 1px var(--gold-dim) inset; }
+            border: 1px solid #1a140e;
+            box-shadow: 0 0 0 1px var(--gold-dim) inset, var(--sunken), var(--sh-1); }
 .portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.portrait-empty { position: absolute; inset: 0; margin: 0; display: grid; place-items: center;
+.portrait-empty { position: absolute; inset: 0; display: grid; place-items: center;
                   color: var(--dim); font-style: italic; font-size: 14px;
                   border: 1px dashed rgba(125, 104, 69, .7); border-radius: 3px;
                   margin: 10px; }
-.portrait-actions { display: flex; gap: 6px; margin: 8px 0 12px; }
+.portrait-actions { display: flex; gap: 6px; margin: 10px 0 12px; }
 .portrait-actions button { flex: 1; }
 .pcname { margin: 0; color: var(--gold); font: 400 24px/1.15 var(--display);
-          letter-spacing: .03em; }
+          letter-spacing: .03em; text-shadow: var(--engraved); }
 .pcline { margin: 4px 0 0; color: var(--dim); font-style: italic; }
 .pcstate { margin: 8px 0 0; padding: 5px 9px; border: 1px solid var(--blood);
            background: rgba(var(--bloodglow), .12); color: #e4b1a8; border-radius: 2px;
            font-size: 13px; }
 
-/* Gear: a grid of the repo's own game-icons, tinted gold by currentColor. */
-.gear { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-/* Icon tiles, like a pack in any game: the name is the tile's accessible name and is
-   written out in the line below when a tile is pointed at, focused or chosen. Names under
-   each 52px tile were cut to "Leather" and "Traveler's" at this width. */
-.gear button { display: grid; place-items: center; padding: 0; min-height: 0;
-               aspect-ratio: 1; background: linear-gradient(#1d1811, #151109);
-               border: 1px solid #2b2319; border-radius: 3px; color: var(--gold); }
-.gear button:hover { border-color: var(--accent); color: #f4e6c0; }
-.gear button[aria-pressed="true"] { border-color: var(--accent); color: #f4e6c0;
-                                    box-shadow: inset 0 0 0 1px var(--accent); }
-.gear .gi { width: 62%; height: 62%; }
-/* In hand or on the body: a gilt corner, the way a slot shows it is filled. */
-.gear button.worn { background:
-  linear-gradient(135deg, rgba(207, 169, 100, .38) 0 9px, transparent 9px),
-  linear-gradient(#1d1811, #151109); }
+/* In hand and worn: the icons the owner likes, each with its name beside it, always. */
+.loadout { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.loadout li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 9px;
+              align-items: center; }
+.loadout .where { display: block; color: var(--dim); font: 400 11.5px/1.1 var(--display);
+                  letter-spacing: .1em; font-variant: small-caps; }
+.loadout .what { display: block; color: var(--ink); font-size: 14px; line-height: 1.25;
+                 overflow-wrap: anywhere; }
+.loadout .what::first-letter { text-transform: uppercase; }
+.door { width: 100%; margin-top: 12px; display: flex; justify-content: space-between;
+        gap: 8px; align-items: center; font-size: 14px; }
+.door small { color: var(--dim); font: 400 13px/1 var(--body); letter-spacing: 0;
+              font-variant: normal; text-shadow: none; }
+
+/* An icon on a tile: a small square of dark leather pressed into the page, the glyph
+   standing proud of it in gilt. Shared by the loadout, the list and the slots. */
+.tile { display: grid; place-items: center; aspect-ratio: 1; border-radius: 3px;
+        color: var(--gold); border: 1px solid #2b2319;
+        background: radial-gradient(90% 90% at 30% 25%, #2a2118, #120e0a);
+        box-shadow: var(--sunken); }
+.tile .gi { width: 64%; height: 64%; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .8)); }
+.tile.inuse { color: #f4e6c0; border-color: var(--gold-dim);
+              background: linear-gradient(135deg, rgba(207, 169, 100, .30) 0 8px, transparent 8px),
+                          radial-gradient(90% 90% at 30% 25%, #2d2319, #120e0a); }
 .gi { display: inline-block; flex: none; }
 .gi svg { width: 100%; height: 100%; display: block; }
-/* Reserved height: a description arriving never pushes the credit line. */
-.gearsay { min-height: 3em; margin: 8px 0 6px; font-size: 13px; color: var(--ink); }
-.credit { margin: 10px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
+.credit { margin: 12px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
 
 /* --- Numbers: life, medallions, plaques ------------------------------------------- */
-.bar { height: 8px; background: #221c14; border-radius: 2px; overflow: hidden;
-       box-shadow: inset 0 1px 3px rgba(0, 0, 0, .7); }
+.bar { height: 9px; background: #1a150f; border-radius: 2px; overflow: hidden;
+       box-shadow: var(--sunken); }
 .bar > i { display: block; height: 100%;
-           background: linear-gradient(90deg, #8a6f3e, var(--accent), #e8c47c); }
+           background: linear-gradient(#f0d9a0, #cfa964 45%, #8a6f3e);
+           box-shadow: inset 0 1px 0 rgba(255, 240, 200, .5); }
 .lifesay { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
-.lifesay b { color: var(--gold); font: 400 20px/1 var(--display); }
+.lifesay b { color: var(--gold); font: 400 20px/1 var(--display); text-shadow: var(--engraved); }
 
-/* Six medallions in place of the app's 3x2 boxes: a gilt ring, the score struck in
-   Cinzel, the modifier on a plaque across its foot. */
+/* Six struck coins. The rim is gilt with a lit top-left and a shadowed foot; the field
+   inside is sunk below the rim (so its top-left inner wall is the dark one); the score is
+   raised off the field; the modifier is a plaque riveted across the foot. */
 .medals { list-style: none; margin: 0; padding: 0; display: grid;
-          grid-template-columns: repeat(3, 1fr); gap: 14px 8px; justify-items: center; }
+          grid-template-columns: repeat(3, 1fr); gap: 16px 8px; justify-items: center; }
 .medal { position: relative; width: 70px; height: 70px; border-radius: 50%;
-         padding: 3px; background: var(--gilt);
-         box-shadow: 0 3px 8px rgba(0, 0, 0, .55); }
+         padding: 5px;
+         /* The lamp's glint on the rim, high and left, over the app's gilt. */
+         background: radial-gradient(circle at 28% 22%, rgba(255, 246, 215, .6), transparent 34%),
+                     var(--gilt);
+         box-shadow: inset 1px 1px 1px rgba(255, 244, 210, .7), inset -2px -2px 3px rgba(40, 26, 10, .75),
+                     2px 4px 6px rgba(0, 0, 0, .6), 1px 1px 1px rgba(0, 0, 0, .5); }
 .medal > div { width: 100%; height: 100%; border-radius: 50%; display: grid;
                place-items: center; align-content: center; gap: 1px;
                background: radial-gradient(70% 70% at 40% 30%, #2d241a, #140f0a 75%);
-               box-shadow: inset 0 2px 6px rgba(0, 0, 0, .8); }
+               /* A beaded inner ring between rim and field, as struck coins have. */
+               box-shadow: inset 3px 4px 6px rgba(0, 0, 0, .85),
+                           inset -1px -1px 1px rgba(255, 225, 170, .18),
+                           inset 0 0 0 4px rgba(20, 14, 8, .55),
+                           inset 0 0 0 5px rgba(221, 196, 142, .22),
+                           0 0 0 1px rgba(58, 40, 18, .9); }
 .medal .ab { color: var(--dim); font: 400 11px/1 var(--display); letter-spacing: .12em;
              font-variant: small-caps; }
-.medal .sc { color: var(--gold); font: 400 22px/1 var(--display); }
-.medal .md { position: absolute; left: 50%; bottom: -9px; translate: -50% 0;
+.medal .sc { color: var(--gold); font: 400 22px/1 var(--display);
+             text-shadow: -1px -1px 0 rgba(255, 238, 200, .25), 1px 2px 2px rgba(0, 0, 0, .9); }
+.medal .md { position: absolute; left: 50%; bottom: -10px; translate: -50% 0;
              min-width: 34px; padding: 2px 6px; text-align: center; border-radius: 2px;
-             background: linear-gradient(#2b2318, #191410); border: 1px solid var(--gold-dim);
-             color: #f4e6c0; font: 400 12px/1.2 var(--body); font-variant-numeric: tabular-nums; }
+             background: linear-gradient(#3a2e1f, #1b150f); border: 1px solid var(--gold-dim);
+             color: #f4e6c0; font: 400 12px/1.2 var(--body); font-variant-numeric: tabular-nums;
+             box-shadow: var(--bevel), 1px 2px 3px rgba(0, 0, 0, .6); }
 
+/* Plaques: small raised tablets of the same iron as the buttons. */
 .plaques { margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
-           gap: 6px; }
+           gap: 7px; }
 .plaques > div { padding: 6px 4px; text-align: center; border-radius: 3px;
-                 background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319; }
+                 background: linear-gradient(#2a2118, #16110c); border: 1px solid #2f261b;
+                 box-shadow: var(--bevel), var(--sh-1); }
 .plaques dt { color: var(--dim); font: 400 12px/1.2 var(--display); letter-spacing: .1em;
               font-variant: small-caps; }
-.plaques dd { margin: 2px 0 0; color: var(--gold); font: 400 19px/1.2 var(--display); }
+.plaques dd { margin: 2px 0 0; color: var(--gold); font: 400 19px/1.2 var(--display);
+              text-shadow: var(--engraved); }
+.plaques dd small { display: block; color: var(--dim); font: 400 11px/1.2 var(--body); }
 .xp { margin: 0; color: var(--ink); }
 
-/* --- Centre: the book and the desk ------------------------------------------------ */
-/* The book always keeps at least 45% of the height. Measured at 1024x768: with the desk
-   sized to its content the story was left 100px, three lines. Past that share the desk's
-   choices scroll inside it, and the pen stays where it is. */
-.centre { display: grid; grid-template-rows: minmax(45%, 1fr) minmax(0, auto); min-height: 0;
-          gap: 14px; justify-items: center; }
-.book, .desk, .sheetmore { width: 100%; max-width: 880px; }
-
-/* The book: the real gilt edge and the real clasps, round a column of dark parchment. */
+/* --- The book --------------------------------------------------------------------- */
+/* A right-hand page of an open book, bound in the app's gilt, clasped at its corners.
+   The leaves beneath it show as a stack along the edges away from the lamp (right and
+   foot), each one a hair's offset from the last; the binding is at the left, where the
+   page curves down into the gutter and the light falls off. */
 .book {
-  position: relative; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr);
-  border-radius: 3px;
+  position: relative; min-height: 0; display: grid; border-radius: 3px;
   background:
-    radial-gradient(80% 60% at 50% 20%, rgba(240, 214, 158, .06), transparent 70%),
+    /* the gutter: the page dips into the spine on its left edge */
+    linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
+                    rgba(0, 0, 0, .08) 44px, transparent 90px),
+    /* the page's own curve catching the lamp, high and left */
+    radial-gradient(80% 60% at 35% 15%, rgba(240, 214, 158, .07), transparent 70%),
     linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
     url("../../../play/static/img/card-leather.jpg") #1d1710;
-  background-size: auto, auto, 420px auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, .55);
+  background-size: auto, auto, auto, 420px auto;
+  box-shadow:
+    1px 1px 0 #2e2519, 2px 2px 0 #574731, 3px 3px 0 #2e2519, 4px 4px 0 #4d3f2b,
+    5px 5px 0 #2a2117, 6px 6px 0 #453827, 7px 7px 0 #221b13,
+    var(--sh-3);
 }
-.book::before {
+/* The gilt ring. */
+.book::before, .framedcard::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-  padding: 4px; background: var(--gilt);
+  padding: 4px; background: var(--gilt); z-index: 2;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
 }
-.book::after {
-  content: ""; position: absolute; inset: -14px; pointer-events: none;
+/* The ring's bevel and the shadow it throws onto the page: a metal frame standing proud
+   of the leaf, lit on its top-left lip, dark on its lower-right, and the leaf darker for a
+   finger's width inside it on the far sides. */
+.book > .rim, .framedcard > .rim {
+  position: absolute; inset: 0; pointer-events: none; border-radius: inherit; z-index: 2;
+  box-shadow: inset 1px 1px 0 rgba(255, 244, 205, .55), inset -1px -1px 0 rgba(30, 20, 8, .9),
+              inset 5px 5px 0 -1px rgba(0, 0, 0, 0),
+              inset -6px -8px 14px rgba(0, 0, 0, .55), inset 6px 6px 12px rgba(0, 0, 0, .35);
+}
+/* The ironmongery, placed exactly as the real table places it on .framed and .card
+   (table.html "Third pass"): the pseudo-element reaches 34px past the panel, each corner
+   96px wide sits 24px in from that (so it overhangs the edge by 10px, the way furniture
+   wraps a board), and each 40px boss sits astride the border line, 21px in. The first
+   mock hung 78px corners at a 14px overhang, which put the whole piece outside the frame. */
+.book::after, .framedcard::after {
+  content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
   background-image:
     url("../../../play/static/img/clasp-tl.png"), url("../../../play/static/img/clasp-tr.png"),
-    url("../../../play/static/img/clasp-bl.png"), url("../../../play/static/img/clasp-br.png");
-  background-position: left top, right top, left bottom, right bottom;
-  background-repeat: no-repeat; background-size: 78px auto;
-  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .5));
+    url("../../../play/static/img/clasp-bl.png"), url("../../../play/static/img/clasp-br.png"),
+    url("../../../play/static/img/boss-top.png"), url("../../../play/static/img/boss-bottom.png"),
+    url("../../../play/static/img/boss-left.png"), url("../../../play/static/img/boss-right.png");
+  background-position: left 24px top 24px, right 24px top 24px,
+                       left 24px bottom 24px, right 24px bottom 24px,
+                       center top 21px, center bottom 21px,
+                       left 21px center, right 21px center;
+  background-repeat: no-repeat;
+  background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+                   40px auto, 40px auto, auto 40px, auto 40px;
+  /* The metal's shadow falls the lamp's way, down and right. */
+  filter: drop-shadow(2px 4px 3px rgba(0, 0, 0, .6));
 }
 
-/* One line where it fits: the place, where it is, who is here. Stacked, the head took
-   100px of a 302px book at 1024x768. */
-.bookhead { position: relative; z-index: 1; padding: 22px 48px 10px;
+/* Inside the book: the head stays, the story scrolls. On a phone the whole inside scrolls
+   instead, and the frame and its clasps stay where they are, because they belong to the
+   book and not to its text. */
+.bookin { position: relative; z-index: 1; min-height: 0; display: grid;
+          grid-template-rows: auto minmax(0, 1fr); }
+.bookhead { position: relative; padding: 24px 50px 10px 58px;
             border-bottom: 1px solid rgba(125, 104, 69, .45);
+            box-shadow: 0 1px 0 rgba(255, 225, 170, .05);
             display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }
 .where { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
 .place { margin: 0; color: var(--gold); font: 400 25px/1.15 var(--display);
-         letter-spacing: .04em; text-shadow: 0 2px 10px rgba(0, 0, 0, .85); }
+         letter-spacing: .04em; text-shadow: var(--engraved), 2px 4px 10px rgba(0, 0, 0, .85); }
 .place::first-letter { text-transform: uppercase; }
 .whereline { margin: 0; color: var(--dim); font-style: italic; font-size: 15px; }
 .glance { display: none; }
@@ -297,8 +557,9 @@ body.sheet-hidden.mode-table .sheet { display: none; }
              font-variant: small-caps; }
 .herelist { display: flex; flex-wrap: wrap; gap: 6px; }
 .herelist button { font: 400 15px/1.2 var(--body); letter-spacing: 0; font-variant: normal;
-                   padding: 4px 10px; min-height: 32px; background: transparent;
-                   border-color: rgba(125, 104, 69, .6); color: var(--ink); }
+                   padding: 4px 10px; min-height: 32px; color: var(--ink); text-shadow: none;
+                   border-color: rgba(125, 104, 69, .6);
+                   background: linear-gradient(rgba(40, 32, 22, .7), rgba(20, 16, 11, .7)); }
 .herelist button[aria-expanded="true"] { border-color: var(--accent); color: #f4e6c0; }
 .face { flex-basis: 100%; margin: 2px 0 0; font-size: 15px; font-style: italic;
         color: #d2c7ad; }
@@ -306,57 +567,59 @@ body.sheet-hidden.mode-table .sheet { display: none; }
 /* The story: a readable measure with room either side. `ch` is the width of a zero, and
    Palatino's zero is wide: 66ch measured 76 characters a line on the recorded beat, so
    58ch at 18px, which measured inside the 62 to 72 the owner asked for. */
-.story { position: relative; z-index: 1; overflow-y: auto; min-height: 0;
-         padding: 22px 48px 30px; font-size: 18px; line-height: 1.7; }
+.story { position: relative; overflow-y: auto; min-height: 0;
+         padding: 22px 50px 30px 58px; font-size: 18px; line-height: 1.7; }
 .beat { max-width: 58ch; margin: 0 auto 20px; white-space: pre-wrap; }
 .beat.player { color: var(--player); font-style: italic; }
 .beat.player::before { content: "\2767  "; opacity: .55; font-style: normal; }
 .beat.setup { color: #d8cdb2; }
-/* The drop cap: each of the GM's passages opens the way a grimoire page does. */
+/* The drop cap: each of the GM's passages opens the way a grimoire page does, the letter
+   raised off the page with the lamp on its upper-left. */
 .beat.setup::first-letter {
   float: left; font-family: var(--display); font-size: 3.35em; line-height: .8;
   padding: .06em .1em 0 0; color: var(--candle);
-  text-shadow: 0 0 18px rgba(var(--ember), .30), 0 2px 6px rgba(0, 0, 0, .8);
+  text-shadow: -1px -1px 0 rgba(255, 240, 200, .35), 2px 3px 3px rgba(0, 0, 0, .85),
+               0 0 18px rgba(var(--ember), .30);
 }
 .beat.consequence { color: var(--ink); }
 /* The mock talking, never the narrator: the app's out-of-character register. */
-.beat.aside { white-space: pre-wrap; max-width: 64ch;
-              font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
-              color: #a9bcb2; background: rgba(0, 0, 0, .30); border-left: 2px solid #3c4b43;
-              border-radius: 2px; padding: 9px 12px; }
+.beat.aside, .say-aside { white-space: pre-wrap; max-width: 64ch;
+  font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: #a9bcb2; background: rgba(0, 0, 0, .30); border-left: 2px solid #3c4b43;
+  border-radius: 2px; padding: 9px 12px; }
 
-/* The desk: the ways on, the GM's offers, the pen. */
+/* --- The desk: a leather writing surface under the book ------------------------------ */
 .choices { display: grid; gap: 10px; min-height: 0; overflow-y: auto; align-content: start; }
-.desk { position: relative; display: grid; gap: 10px; padding: 12px 14px 14px; min-height: 0;
+.desk { position: relative; display: grid; gap: 10px; padding: 14px 16px 16px; min-height: 0;
         grid-template-rows: minmax(0, 1fr) auto auto;
-        border-top: 1px solid var(--gold-dim); border-radius: 3px;
+        border: 1px solid #3a2f22; border-top-color: var(--gold-dim); border-radius: 3px;
         background:
-          linear-gradient(rgba(16, 12, 8, .10), rgba(8, 6, 4, .30)),
+          linear-gradient(rgba(255, 225, 170, .04), rgba(8, 6, 4, .30)),
           url("../../../play/static/img/card-leather.jpg") #241d15;
         background-size: auto, 400px auto;
-        box-shadow: 0 -1px 0 rgba(221, 196, 142, .10), 0 8px 30px rgba(0, 0, 0, .45); }
+        box-shadow: var(--emboss), var(--sh-2); }
 
 /* The ways on: square-cut, in the body face, grouped, one line a group (the app's I6). */
-.exits { display: grid; gap: 6px; }
+.exits { display: grid; gap: 7px; }
 .exgroup { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px;
            align-items: baseline; }
 .exlabel { color: var(--dim); font: 400 13px/1.2 var(--display); letter-spacing: .12em;
-           font-variant: small-caps; }
+           font-variant: small-caps; text-shadow: var(--engraved); }
 .exlabel small { display: block; margin-top: 3px; font: italic 12.5px/1.25 var(--body);
                  letter-spacing: 0; font-variant: normal; }
-.exlist { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.exlist { display: flex; flex-wrap: wrap; gap: 7px 6px; min-width: 0; }
 .exitbtn { padding: 6px 11px; min-height: 36px; letter-spacing: 0; font-variant: normal;
            font: 400 15px/1.2 var(--body); border: 1px solid rgba(125, 104, 69, .85);
-           background: rgba(26, 22, 16, .85); color: var(--gold); text-align: left; }
+           color: var(--gold); text-align: left; text-shadow: none;
+           background: linear-gradient(rgba(44, 35, 24, .95), rgba(24, 19, 13, .95)); }
 .exitbtn .t { color: var(--dim); }
 .exitbtn:hover .t { color: var(--ink); }
 .exitbtn.asking { border-color: var(--accent); color: #f4e6c0; }
-/* Shut, not gone. Dashed and dimmed, but at the dim token rather than ash, so the name
-   still reads at AA; the reason is the reserved line below. */
+/* Shut, not gone: dashed and sunk flush into the desk, no lip, nothing to press. */
 .exitbtn.shut { border-style: dashed; border-color: rgba(125, 104, 69, .6);
-                color: var(--dim); background: rgba(12, 9, 6, .6); cursor: not-allowed; }
+                color: var(--dim); background: rgba(12, 9, 6, .6); box-shadow: var(--sunken); }
+.exitbtn.shut:active { transform: none; }
 .exitbtn.shut .t { color: var(--dim); }
-.exitbtn.shut .lock { font-style: italic; }
 /* One line held open whenever a way is shut or a journey is offered, so the reason or
    the "Set out" line fills a space that was already there. */
 .exline { min-height: 3.1em; font-size: 14.5px; line-height: 1.45; color: var(--ink);
@@ -366,22 +629,25 @@ body.sheet-hidden.mode-table .sheet { display: none; }
 .exline .confirm span { flex: 1 1 220px; }
 .exline .dimline { color: var(--dim); }
 
-/* The GM's offers: wax seals, the app's 12px pill. Everything that is not a move. */
-.suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* The GM's offers: wax seals, the app's 12px pill, pressed onto the desk. */
+.suggestions { display: flex; flex-wrap: wrap; gap: 7px 6px; }
 .suggestions:empty { display: none; }
 .sugg { padding: 6px 13px; min-height: 34px; border-radius: 12px; letter-spacing: 0;
         font: 400 14px/1.3 var(--body); font-variant: normal; white-space: normal;
-        text-align: left; background: rgba(26, 22, 16, .85); }
+        text-align: left; text-shadow: none;
+        background: radial-gradient(120% 140% at 30% 20%, rgba(58, 44, 28, .95), rgba(22, 17, 12, .95)); }
 
 /* The pen and the other actions share a line while there is room for both, and the
    actions drop below the pen, never between its two halves, when there is not. */
 .pen { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
 .sayform { display: flex; gap: 8px; align-items: stretch; flex: 1 1 340px; min-width: 0; }
+/* The pen's line is a trough cut into the desk. */
 .sayform input {
   flex: 1 1 220px; min-width: 0; color: var(--ink); padding: 11px 14px; font: inherit;
   font-size: 17px; border-radius: 2px; min-height: 46px;
   background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .6);
+  border-bottom-color: #4a3c28; border-right-color: #4a3c28;
+  box-shadow: inset 2px 3px 7px rgba(0, 0, 0, .75), 0 1px 0 rgba(255, 225, 170, .06);
 }
 .sayform input:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px;
                                border-color: var(--accent); }
@@ -394,127 +660,447 @@ body.sheet-hidden.mode-table .sheet { display: none; }
 .actions button { flex: 0 0 auto; min-height: 46px; }
 
 /* Popovers open over the story's foot, anchored to the desk: nothing below reflows. */
-.pop { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 8px); z-index: 5;
+.pop { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 10px); z-index: 30;
        max-width: 520px; padding: 14px 16px; display: grid; gap: 10px; font-size: 15px;
-       background: #1a1510; border: 1px solid var(--gold-dim); border-radius: 3px;
-       box-shadow: 0 -10px 30px rgba(0, 0, 0, .55); }
+       background: linear-gradient(#211a13, #15110c); border: 1px solid var(--gold-dim);
+       border-radius: 3px; box-shadow: var(--bevel), var(--sh-3); }
 .pop p { margin: 0; }
 .pophead { color: var(--gold); font: 400 15px/1 var(--display); letter-spacing: .12em;
            font-variant: small-caps; }
 .pop > button { justify-self: start; }
-.spellpick { display: grid; gap: 4px; }
+.spellpick { display: grid; gap: 5px; }
 .spellpick button { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px;
                     align-items: center; text-align: left; font: 400 15px/1.2 var(--body);
-                    letter-spacing: 0; font-variant: normal; padding: 6px 10px; }
+                    letter-spacing: 0; font-variant: normal; padding: 6px 10px; text-shadow: none; }
 .spellpick .gi { width: 24px; height: 24px; }
 .spellpick small { color: var(--dim); }
 
-/* --- Sheet mode: the same sheet, with its middle filled ------------------------------- */
-body.mode-sheet .book, body.mode-sheet .desk { display: none; }
-body.mode-sheet .centre { grid-template-rows: auto; align-content: start; overflow-y: auto; }
-.sheetmore { display: grid; gap: 14px; }
-body:not(.mode-sheet) .sheetmore { display: none; }
+/* --- Framed cards: the app's .card, with its gilt, bevel, clasps and bosses ---------- */
+.framedcard { position: relative; padding: 24px 28px; border-radius: 3px;
+  background:
+    radial-gradient(80% 60% at 30% 10%, rgba(240, 214, 158, .05), transparent 70%),
+    linear-gradient(rgba(14, 11, 8, .78), rgba(10, 8, 6, .86)),
+    url("../../../play/static/img/card-leather.jpg") #1d1710;
+  background-size: auto, auto, 420px auto;
+  box-shadow: var(--emboss), var(--sh-3); }
+.framedcard h2 { position: relative; z-index: 1; margin: 18px 0 9px;
+                 color: var(--gold); font: 400 17px/1.1 var(--display); letter-spacing: .12em;
+                 font-variant: small-caps; text-shadow: var(--engraved); }
+.framedcard h2:first-of-type { margin-top: 0; }
+.framedcard > * { position: relative; }
+.framedcard p { margin: 0 0 8px; }
+.framedcard.narrow { max-width: 620px; margin: 30px auto; }
 
-.card { position: relative; padding: 18px 22px; border-radius: 3px;
-        background:
-          linear-gradient(rgba(14, 11, 8, .78), rgba(10, 8, 6, .86)),
-          url("../../../play/static/img/card-leather.jpg") #1d1710;
-        background-size: auto, 420px auto;
-        border: 1px solid var(--gold-dim); }
-.card h2 { margin: 16px 0 8px; color: var(--gold); font: 400 17px/1.1 var(--display);
-           letter-spacing: .12em; font-variant: small-caps; }
-.card h2:first-child { margin-top: 0; }
-.card p { margin: 0 0 8px; }
-.card.narrow { max-width: 620px; margin: 0 auto; }
+/* --- Map mode: the board -------------------------------------------------------------- */
+.board { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0;
+         gap: 10px; padding: 20px 26px 16px; }
+.boardhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+             justify-content: space-between; }
+.board h2 { margin: 0; }
+.boardctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* A segmented control: buttons set side by side in one recess; the chosen one sunk. */
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 3px;
+       background: rgba(8, 6, 4, .6); border: 1px solid #2e251a; box-shadow: var(--sunken);
+       align-items: center; }
+.seg .seglabel { padding: 0 6px 0 4px; color: var(--dim); font-size: 13px; font-style: italic; }
+.seg button { min-height: 32px; padding: 5px 11px; font-size: 13px; letter-spacing: .06em;
+              box-shadow: var(--bevel), 1px 2px 0 #090705; }
+.seg button[aria-pressed="true"] { color: #f4e6c0; border-color: var(--gold-dim);
+  background: linear-gradient(#17120d, #221a12); transform: translate(1px, 2px);
+  box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 0 -2px 0 var(--accent); }
+/* The board sits in a stone well sunk into the card. */
+.boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
+             border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken);
+             overflow: hidden; }
+.boardview svg { width: 100%; height: 100%; max-height: 100%; display: block; }
+.boardfoot { display: grid; gap: 2px; font-size: 14px; }
+.boardfoot p { margin: 0; }
+.boardabout { color: var(--dim); font-style: italic; }
+.boardkey { color: var(--ink); }
+.boardkey i { display: inline-block; width: 11px; height: 11px; border-radius: 2px;
+              margin: 0 5px 0 12px; vertical-align: -1px; box-shadow: 1px 1px 1px #000; }
+.boardkey i:first-child { margin-left: 0; }
+/* Kept open whether or not there is a reply, so one arriving never shrinks the board
+   under the pointer that chose the square. */
+.boardsay { min-height: 44px; }
+.boardsay .say-aside { display: block; padding: 5px 10px; }
+
+/* The flat board: the app's own classes and colours (table.html "a stone relief"). */
+#map { width: 100%; height: 100%; display: block; background: #14110e;
+       border: 1px solid #241d15; border-radius: 3px; }
+#map .rule { stroke: #241d15; stroke-width: .5; }
+#map .blocked { fill: #3a3128; }
+#map .difficult { fill: #2a2416; }
+#map .obscuring { fill: #23262b; }
+#map .reach { fill: var(--gold); opacity: .12; cursor: var(--candle-cursor); }
+#map .reach:hover { opacity: .3; }
+#map .up1 { fill: #3d3527; }
+#map .up2 { fill: #4a4130; }
+#map .up3 { fill: #585039; }
+#map .rail { stroke: #7a6a44; stroke-width: 2.5; stroke-linecap: round; }
+#map .token.offlevel { opacity: .32; }
+#map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1; }
+#map .token.pc { fill: var(--gold); }
+#map .token.foe { fill: #e0261e; stroke: #5a0c08; }
+#map .token.ally { fill: #6fc276; stroke: #1f4a26; }
+#map .token.bystander { fill: #f2ecdd; stroke: #7a6f5a; }
+#map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
+                pointer-events: none; }
+#map .picked { fill: none; stroke: var(--candle); stroke-width: 1.4; }
+/* The 3D board: no fill rules on purpose (scene3d.js lights every face itself). */
+#view3d { width: 100%; height: 100%; display: block; background: #14110e;
+          border: 1px solid #241d15; border-radius: 3px; }
+#view3d polygon { stroke: #15120d; stroke-width: .35; stroke-linejoin: round; }
+#view3d .fig, #view3d .rail3 { stroke: none; }
+#view3d .fig.offlevel { opacity: .38; }
+#view3d .above { opacity: .45; }
+
+/* --- Sheet mode: the combat block and the rest ----------------------------------------- */
+body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0;
+                             padding: 14px 16px 24px; display: grid; gap: 34px;
+                             align-content: start; }
+.statrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+           gap: 10px; margin-bottom: 18px; }
+.stat { padding: 9px 10px 8px; border-radius: 3px; text-align: center;
+        background: linear-gradient(#2a2118, #16110c); border: 1px solid #2f261b;
+        box-shadow: var(--bevel), var(--sh-1); }
+.stat dt { color: var(--dim); font: 400 12.5px/1.2 var(--display); letter-spacing: .1em;
+           font-variant: small-caps; }
+.stat dd { margin: 3px 0 0; color: var(--gold); font: 400 24px/1.1 var(--display);
+           text-shadow: var(--engraved); }
+.stat dd small { color: var(--dim); font: 400 13px/1.2 var(--body); }
+.stat .why { display: block; margin-top: 3px; color: var(--dim); font-size: 12.5px;
+             line-height: 1.3; }
+.why { color: var(--dim); font-size: 13px; line-height: 1.35; }
+
+/* Tables of attacks and manoeuvres: rows cut into the card, one hairline between them. */
+.grid { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.35; }
+.grid caption { text-align: left; caption-side: top; padding: 0 0 6px; }
+.grid th { text-align: left; color: var(--dim); font: 400 12.5px/1.2 var(--display);
+           letter-spacing: .1em; font-variant: small-caps; padding: 6px 8px;
+           border-bottom: 1px solid #221b13; box-shadow: 0 1px 0 rgba(255, 225, 170, .08); }
+.grid td { padding: 8px 8px; vertical-align: top; border-bottom: 1px solid rgba(58, 47, 34, .55); }
+.grid tr:last-child td { border-bottom: 0; }
+.grid td.n { font-variant-numeric: tabular-nums; color: var(--gold); white-space: nowrap; }
+.grid td.n .why { white-space: normal; }
+.grid td b { display: inline-block; color: var(--ink); font-weight: 400; }
+.grid td b::first-letter { text-transform: uppercase; }
+.grid .why { display: block; }
+.grid tr.inhand td { background: rgba(207, 169, 100, .06); }
+.chip { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px;
+        font: 400 11.5px/1.4 var(--body); color: #f4e6c0; border: 1px solid var(--gold-dim);
+        background: rgba(207, 169, 100, .12); vertical-align: 1px; white-space: nowrap; }
+.chip.warn { border-color: var(--blood); color: #e4b1a8; background: rgba(var(--bloodglow), .12); }
+.unknown { color: var(--dim); font-style: italic; }
+.fullattack { margin: 12px 0 0; }
+.gridwrap { overflow-x: auto; }
+
 .skills { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 2px 26px; }
 .skills > div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0;
                 border-bottom: 1px solid rgba(58, 47, 34, .6); }
+.skills > div.dim dt, .skills > div.dim dd { color: var(--ash); }
 .skills dt { color: var(--ink); }
+.skills dt::first-letter { text-transform: uppercase; }
 .skills dd { margin: 0; color: var(--accent); font-variant-numeric: tabular-nums; }
+.feats { margin: 0; }
+.feats dt { color: var(--ink); }
+.feats dd { margin: 0 0 8px; color: var(--dim); font-size: 14px; }
 .plain { margin: 0; padding: 0; list-style: none; }
 .plain li { padding: 3px 0; }
 .matters li { padding: 6px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+.walked li { padding: 4px 0; }
+.walked li::first-letter { text-transform: uppercase; }
 
-/* --- Other modes ------------------------------------------------------------------- */
-.modepage { min-height: 0; overflow-y: auto; padding: 22px 18px 30px; }
-body:not(.mode-table):not(.mode-sheet) .stage { display: none; }
-.journal { max-width: 1060px; margin: 0 auto; display: grid; gap: 16px;
-           grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; }
-.said .who { margin: 12px 0 4px; color: var(--gold); font: 400 14px/1 var(--display);
-             letter-spacing: .1em; font-variant: small-caps; }
-.said .who:first-child { margin-top: 0; }
-.said q { display: block; quotes: none; margin: 0 0 6px; color: #d8c9a3; }
+/* --- The conversation tray ------------------------------------------------------------ */
+.talk { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-height: 0;
+        gap: 10px; padding: 16px 16px 14px; font-size: 15px; line-height: 1.5;
+        border: 3px solid transparent; border-image: var(--gilt) 1;
+        background:
+          linear-gradient(rgba(14, 11, 8, .82), rgba(10, 8, 6, .9)),
+          url("../../../play/static/img/card-leather.jpg") #1d1710;
+        background-size: auto, 420px auto;
+        box-shadow: var(--emboss), var(--sh-3); --dim: #a99a80; }
+.talkhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.talkhead h2 { margin: 0; color: var(--gold); font: 400 17px/1.1 var(--display);
+               letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+.convo-people { display: flex; flex-wrap: wrap; gap: 6px; }
+.convo-people button { font: 400 14px/1.2 var(--body); letter-spacing: 0; font-variant: normal;
+                       padding: 4px 10px; min-height: 32px; text-shadow: none; color: var(--ink); }
+.convo-people button[aria-pressed="true"] { color: #f4e6c0; border-color: var(--accent);
+  transform: translate(1px, 2px);
+  box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 0 -2px 0 var(--accent); }
+.convo-people select { font: 14px var(--body); color: var(--ink); background: var(--sunk);
+                       border: 1px solid #3a2f22; border-radius: 2px; padding: 5px 6px;
+                       min-height: 32px; box-shadow: var(--sunken); max-width: 100%; }
+/* The log is a sunk page of its own; new lines arrive at its foot. */
+.convo-log { min-height: 0; overflow-y: auto; padding: 10px 12px; border-radius: 3px;
+             background: rgba(6, 5, 4, .45); box-shadow: var(--sunken); }
+.cl-day { margin: 0 0 8px; color: var(--dim); font: 400 12px/1 var(--display);
+          letter-spacing: .14em; font-variant: small-caps; text-align: center; }
+.cl-turn { margin: 0 0 12px; }
+.cl-name { display: block; color: var(--gold); font: 400 13.5px/1.2 var(--display);
+           letter-spacing: .06em; margin-bottom: 3px; }
+.cl-name small { margin-left: 6px; color: var(--dim); font: italic 12.5px var(--body);
+                 letter-spacing: 0; }
+.cl-turn p { margin: 0 0 5px; color: #e2d6bb; }
+.cl-turn q { quotes: "\201C" "\201D"; }
+.talkfoot { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid #221b13;
+            box-shadow: inset 0 1px 0 rgba(255, 225, 170, .07); }
+.talkfoot p { margin: 0; color: var(--ink); }
+.talker { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.talker b { font-weight: 400; color: #f4e6c0; }
+.talker b::first-letter { text-transform: uppercase; }
+.talkfoot .say-aside { font-size: 12.5px; padding: 7px 10px; min-height: 5.6em; margin: 0; }
+.talkfoot .say-aside:empty { visibility: hidden; }
 
-/* The Spells page, three columns after I5: what you can spend, today, the book. */
-.spells3 { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; align-items: start;
+/* --- Equipment ------------------------------------------------------------------------ */
+.modepage { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 30px 26px 36px; }
+.eq { max-width: 1320px; margin: 0 auto; display: grid; gap: 22px 22px;
+      grid-template-columns: 200px minmax(0, 1fr) 340px;
+      grid-template-areas: "head head head" "rail list doll"; align-items: start; }
+.eqhead { grid-area: head; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px;
+          padding: 16px 20px; border-radius: 3px; border: 1px solid #3a2f22;
+          background:
+            linear-gradient(rgba(255, 225, 170, .04), rgba(8, 6, 4, .30)),
+            url("../../../play/static/img/card-leather.jpg") #241d15;
+          background-size: auto, 400px auto;
+          box-shadow: var(--emboss), var(--sh-2); }
+.eqtitle { flex: 1 1 320px; }
+.eqtitle h1 { margin: 0; color: var(--gold); font: 400 26px/1.1 var(--display);
+              letter-spacing: .05em; text-shadow: var(--engraved); }
+.eqtitle p { margin: 4px 0 0; color: var(--ink); }
+.eqnums { margin: 0; display: flex; gap: 7px; flex-wrap: wrap; }
+.eqnums > div { min-width: 58px; padding: 5px 9px; text-align: center; border-radius: 3px;
+                background: linear-gradient(#2a2118, #16110c); border: 1px solid #2f261b;
+                box-shadow: var(--bevel), var(--sh-1); }
+.eqnums dt { color: var(--dim); font: 400 11.5px/1.2 var(--display); letter-spacing: .1em;
+             font-variant: small-caps; }
+.eqnums dd { margin: 1px 0 0; color: var(--gold); font: 400 18px/1.15 var(--display);
+             text-shadow: var(--engraved); }
+.eqnums dd.moved { color: #f4e6c0; }
+
+/* The categories run down the side, the trade window's shelves in the trade window's
+   order, each with its count; a shelf with nothing on it is not offered. */
+.eqrail { grid-area: rail; display: grid; gap: 6px; position: sticky; top: 0; }
+.eqrail button { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 9px;
+                 align-items: center; text-align: left; padding: 8px 10px; min-height: 42px;
+                 font-size: 14px; letter-spacing: .06em; }
+.eqrail button .gi { width: 22px; height: 22px; }
+.eqrail button small { color: var(--dim); font: 400 13px/1 var(--body); letter-spacing: 0;
+                       font-variant: normal; font-variant-numeric: tabular-nums; }
+.eqrail button[aria-selected="true"] { color: #f4e6c0; border-color: var(--gold-dim);
+  background: linear-gradient(#17120d, #221a12); transform: translate(1px, 2px);
+  box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 3px 0 0 var(--accent); }
+.eqrail .fitting { margin: 6px 0 0; padding: 8px 10px; border: 1px dashed var(--gold-dim);
+                   border-radius: 3px; font-size: 13.5px; color: var(--ink); }
+.eqrail .fitting button { margin-top: 6px; display: inline-flex; min-height: 30px;
+                          padding: 4px 9px; font-size: 12.5px; }
+
+.eqlist { grid-area: list; min-width: 0; }
+.eqlisthead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+              gap: 4px 14px; margin-bottom: 8px; }
+.eqlisthead h2 { margin: 0; color: var(--gold); font: 400 19px/1.1 var(--display);
+                 letter-spacing: .1em; font-variant: small-caps; text-shadow: var(--engraved); }
+.eqsort { margin: 0; color: var(--dim); font-size: 13.5px; font-style: italic; }
+/* Held open at the height of the longest reply, so one arriving never pushes the rows
+   (and the button just pressed) down. */
+.eqsay { margin: 0 0 10px; min-height: 62px; }
+.eqsay .say-aside { display: block; }
+.eqrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+/* A row is a slip of leather laid on the page: raised, its name always written out. */
+.eqrow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px;
+         align-items: center; padding: 5px 10px 5px 5px; border-radius: 3px;
+         border: 1px solid #332a1e;
+         background: linear-gradient(rgba(44, 35, 25, .92), rgba(24, 19, 14, .92));
+         box-shadow: var(--bevel), var(--sh-1); }
+.eqrow.inuse { border-color: var(--gold-dim);
+               background: linear-gradient(rgba(62, 49, 32, .95), rgba(30, 24, 16, .95)); }
+.eqrow .tile { width: 40px; }
+.eqname { min-width: 0; }
+.eqname b { display: inline-block; font-weight: 400; color: var(--ink); font-size: 16px; }
+.eqname b::first-letter { text-transform: uppercase; }
+.eqname .qty { color: var(--gold); margin-left: 6px; font-variant-numeric: tabular-nums; }
+.eqname .facts { display: block; color: var(--dim); font-size: 13.5px; line-height: 1.35; }
+.eqname .facts .gain { color: #d9e0b0; }
+.eqacts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.eqacts button { min-height: 32px; padding: 5px 10px; font-size: 13px; letter-spacing: .06em; }
+.eqacts button.go { color: #f4e6c0; }
+.eqload { margin: 16px 0 0; padding: 10px 12px; border-radius: 3px; font-size: 14px;
+          background: rgba(6, 5, 4, .4); box-shadow: var(--sunken); color: var(--ink); }
+.eqload b { color: var(--gold); font-weight: 400; }
+
+/* Worn and wielded: two hands, then the body slots down either side, roughly where each
+   is worn (rules/tables.py SLOT_ORDER_LEFT / RIGHT). */
+.doll { grid-area: doll; position: relative; padding: 22px 20px 18px; border-radius: 3px;
+        border: 3px solid transparent; border-image: var(--gilt) 1;
+        background:
+          linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
+          linear-gradient(#57432d, #4b3a27),
+          url("../../../play/static/img/leather-tile.jpg") #241d15;
+        background-blend-mode: normal, multiply, normal;
+        background-size: auto, auto, 512px auto;
+        box-shadow: var(--emboss), var(--sh-2); --dim: #b3a488; }
+.doll h2 { margin: 0 0 12px; color: var(--gold); font: 400 17px/1.1 var(--display);
+           letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+.hands { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+.slots { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 8px; }
+.slotcol { display: grid; gap: 7px; align-content: start; }
+.slotbtn { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px;
+           align-items: center; text-align: left; padding: 5px 7px 5px 5px; min-height: 46px;
+           white-space: normal; font: 400 13.5px/1.2 var(--body); letter-spacing: 0;
+           font-variant: normal; text-shadow: none; color: var(--ink); }
+.slotbtn .tile { width: 34px; }
+.slotbtn .sl { display: block; color: var(--dim); font: 400 11px/1.1 var(--display);
+               letter-spacing: .1em; font-variant: small-caps; }
+.slotbtn .it { display: block; overflow-wrap: anywhere; }
+.slotbtn .it::first-letter { text-transform: uppercase; }
+.slotbtn.empty { border-style: dashed; border-color: rgba(125, 104, 69, .55);
+                 background: rgba(12, 9, 6, .45); box-shadow: var(--sunken); }
+.slotbtn.empty .it { color: var(--dim); font-style: italic; }
+.slotbtn.empty .tile { opacity: .45; }
+.slotbtn[aria-pressed="true"] { border-color: var(--accent); border-style: solid;
+                                box-shadow: inset 0 0 0 1px var(--accent); }
+.dollnote { margin: 12px 0 0; color: var(--dim); font-size: 13px; font-style: italic; }
+
+/* --- Spells ------------------------------------------------------------------------- */
+.spells3 { max-width: 1180px; margin: 0 auto; display: grid; gap: 26px; align-items: start;
            grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.3fr); }
-.slotrow { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+.slotrow { display: grid; gap: 6px; padding: 9px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
 .slotrow .lv { display: flex; justify-content: space-between; }
 .slotrow .lv b { color: var(--gold); font: 400 15px/1.2 var(--display); letter-spacing: .08em; }
 .slotrow .lv span { color: var(--dim); font-size: 14px; }
-.sockets { display: flex; gap: 6px; }
-.sockets i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--gold-dim);
-             background: radial-gradient(circle at 40% 35%, #f0d9a0, #b98f4e 45%, #6b4f28); }
-.today { display: grid; gap: 6px; }
+.sockets { display: flex; gap: 8px; }
+/* A slot is a gem set in the card: domed, lit at its upper-left. */
+.sockets i { width: 20px; height: 20px; border-radius: 50%; border: 1px solid #3a2a14;
+             background: radial-gradient(circle at 35% 30%, #fff1c8 0 8%, #f0d9a0 16%,
+                                         #b98f4e 50%, #6b4f28 85%);
+             box-shadow: 1px 2px 2px rgba(0, 0, 0, .7), inset -1px -2px 2px rgba(40, 26, 10, .6); }
+.today { display: grid; gap: 7px; }
 .today li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center;
-            padding: 6px 8px; border: 1px solid #2b2319; border-radius: 3px;
-            background: rgba(20, 16, 11, .6); }
+            padding: 7px 9px; border: 1px solid #332a1e; border-radius: 3px;
+            background: linear-gradient(rgba(44, 35, 25, .92), rgba(24, 19, 14, .92));
+            box-shadow: var(--bevel), var(--sh-1); }
 .today .gi { width: 28px; height: 28px; }
 .today small { color: var(--dim); }
-.book-grid h3 { margin: 12px 0 8px; color: var(--dim); font: 400 13px/1 var(--display);
+.book-grid h3 { margin: 14px 0 8px; color: var(--dim); font: 400 13px/1 var(--display);
                 letter-spacing: .12em; font-variant: small-caps; }
 .book-grid h3:first-of-type { margin-top: 0; }
-.spellgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
-.spellgrid button { display: grid; justify-items: center; align-content: start; gap: 4px;
-                    padding: 8px 3px 6px; min-height: 84px; white-space: normal;
-                    background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319;
-                    border-radius: 3px; font: 400 11.5px/1.15 var(--body); letter-spacing: 0;
-                    font-variant: normal; color: var(--ink); }
-.spellgrid button:hover { border-color: var(--accent); }
+.spellgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 7px; }
+.spellgrid button { display: grid; justify-items: center; align-content: start; gap: 5px;
+                    padding: 9px 4px 7px; min-height: 88px; white-space: normal;
+                    font: 400 12px/1.15 var(--body); letter-spacing: 0; font-variant: normal;
+                    text-shadow: none; }
 .spellgrid button[aria-pressed="true"] { border-color: var(--accent);
-                                         box-shadow: inset 0 0 0 1px var(--accent); }
-.spellgrid .gi { width: 30px; height: 30px; }
-.spellgrid .prep { outline: 1px solid rgba(207, 169, 100, .35); outline-offset: -4px; }
-.spellsay { min-height: 3em; margin: 10px 0 0; font-size: 14px; }
+                                         box-shadow: inset 0 0 0 1px var(--accent), var(--sh-1); }
+.spellgrid .gi { width: 30px; height: 30px; filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .8)); }
+.spellgrid .prep::after { content: ""; position: absolute; top: 5px; right: 5px; width: 7px;
+                          height: 7px; border-radius: 50%;
+                          background: radial-gradient(circle at 35% 30%, #f0d9a0, #8a6b3a);
+                          box-shadow: 1px 1px 1px #000; }
+.spellsay { min-height: 4.5em; margin: 12px 0 0; font-size: 14px; }
 .sc-abjuration { color: var(--sc-abjuration); } .sc-conjuration { color: var(--sc-conjuration); }
 .sc-divination { color: var(--sc-divination); } .sc-enchantment { color: var(--sc-enchantment); }
 .sc-evocation { color: var(--sc-evocation); } .sc-illusion { color: var(--sc-illusion); }
 .sc-necromancy { color: var(--sc-necromancy); }
 .sc-transmutation { color: var(--sc-transmutation); } .sc-universal { color: var(--sc-universal); }
 
+.journal { max-width: 1060px; margin: 0 auto; display: grid; gap: 34px;
+           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+
 /* --- Narrower desktops: one sheet column, character over numbers ------------------- */
 @media (max-width: 1180px) {
-  .stage { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "sheet centre"; }
+  .stage { grid-template-columns: 280px minmax(0, 1fr);
+           grid-template-areas: "sheet book" "sheet desk"; }
   .sheet { grid-area: sheet; display: block; min-height: 0; overflow-y: auto;
-           border: 3px solid transparent; border-image: var(--gilt) 1; }
-  .sheet .side { overflow: visible; border: 0; }
+           overflow-x: hidden; border: 3px solid transparent; border-image: var(--gilt) 1;
+           box-shadow: var(--sh-2); }
+  .sheet .side { overflow: visible; border: 0; box-shadow: var(--emboss); }
   .sheet .side-numbers { border-top: 1px solid var(--gold-dim); }
+  .talk { grid-area: sheet; }
+  body.mode-sheet .sheetmore { grid-column: 2; }
   .spells3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .spells3 > :last-child { grid-column: 1 / -1; }
+  /* The figure stays beside the list: under it, it was fifty rows away from the Wear
+     button that fills it. */
+  .eq { grid-template-columns: 158px minmax(0, 1fr) 286px; gap: 18px 16px; }
+  .eqrail button { padding: 7px 8px; gap: 7px; font-size: 13px; letter-spacing: .03em; }
+  .doll { padding: 18px 14px 14px; }
+  .modepage { padding: 24px 18px 30px; }
+  /* Seven tabs, Talk and the sheet toggle did not fit three equal columns at 1024px: the
+     right-hand group overran into the tabs. The world's name gives way instead. */
+  .topbar { gap: 8px; padding: 8px 12px 9px; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .modes { justify-self: center; }
+  .modes button { padding: 8px 10px; letter-spacing: .05em; font-size: 14px; }
+  .mocktag { display: none; }
+  .mocksay { flex-basis: 200px; }
+  /* Measured at 1024x768: the book's head took 100px of a 270px book when "Here" fell to
+     a line of its own; a tighter head keeps it on one. */
+  .bookhead { padding: 20px 40px 8px 48px; gap: 4px 14px; }
+  .place { font-size: 22px; }
+  .whereline { font-size: 14px; }
+  .story { padding: 18px 40px 26px 48px; }
+}
+
+/* Between a phone and a small desktop the figure goes above the list, still in reach. */
+@media (max-width: 960px) and (min-width: 761px) {
+  .eq { grid-template-columns: 158px minmax(0, 1fr);
+        grid-template-areas: "head head" "rail doll" "rail list"; }
 }
 
 /* --- Phone: the story is the page; the sheet is a mode, laid out as the drawer ------ */
 @media (max-width: 760px) {
   body { font-size: 16px; }
+  /* The phone's chrome is counted: the strip is one row of the switch and one line of
+     what it means. Start again is the page reloaded, so it goes. */
+  .mockstrip { padding: 5px 12px; gap: 3px 8px; font-size: 13px; }
+  .mocksay { flex-basis: 100%; order: 5; font-size: 12.5px; }
+  .vlabel { display: none; }
+  .viewing button { padding: 4px 8px; min-height: 30px; font-size: 13px; }
+  .mockstrip label.check { font-size: 13px; }
+  #mock-reset { display: none; }
   .topbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas:
-              "world end" "modes modes"; padding: 8px 12px; gap: 8px; }
+              "world end" "modes modes"; padding: 6px 12px 7px; gap: 6px; }
   .world { grid-area: world; }
   .topend { grid-area: end; }
-  .modes { grid-area: modes; justify-content: space-between; }
-  .modes button { flex: 1 1 0; padding: 8px 2px; font-size: 13px; letter-spacing: .04em;
+  /* The tabs keep their words and scroll sideways rather than shrink to initials. */
+  /* min-width 0: as a grid item the row otherwise sizes to its seven tabs, and Ysolde's
+     measured 479px, widening the whole page to 427px on a 375px phone. */
+  .modes { grid-area: modes; min-width: 0; justify-self: stretch; overflow-x: auto;
+           justify-content: flex-start;
+           scrollbar-width: none; padding: 4px 4px 6px; }
+  .modes button { flex: none; padding: 8px 12px; font-size: 13.5px; letter-spacing: .04em;
                   min-height: 40px; }
   #sheettoggle { display: none; }
-  .mockpanel { width: min(300px, calc(100vw - 24px)); }
+  .talkbtn { min-height: 36px; padding: 6px 12px; }
 
-  .stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "centre";
-           grid-template-rows: minmax(0, 1fr); padding: 10px 10px 8px; gap: 10px; }
-  body.mode-table .sheet { display: none; }
+  .stage, body.mode-map .stage {
+    grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk";
+    grid-template-rows: minmax(0, 1fr) minmax(0, auto); padding: 14px 14px 10px; gap: 12px; }
+  body:is(.mode-table, .mode-map) .sheet { display: none; }
+  /* On a phone the tray takes the whole stage. Laid over the book alone it left the log
+     30px at 375x812 once its people and its two buttons were drawn; Close is one tap back
+     to the pen. */
+  .talk, body.sheet-hidden .talk { grid-area: auto; grid-column: 1; grid-row: 1 / -1;
+                                   padding: 12px; gap: 8px; }
+  body.sheet-hidden.talkopen:is(.mode-table, .mode-map) .stage {
+    grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk"; }
+  /* The board keeps the height, and the desk keeps only the pen: the ways on are in Table,
+     and on a phone the controls, the legend and the choices had left the board 26px. */
+  body.mode-map .choices { display: none; }
+  .boardview { min-height: 200px; padding: 6px; }
+  .boardabout { display: none; }
+  .boardhead { gap: 6px; }
+  .board h2 { font-size: 15px; }
+  .seg button { min-height: 30px; padding: 4px 9px; }
+  .boardkey { font-size: 12.5px; line-height: 1.5; }
   /* Sheet mode on a phone is the drawer: the whole sheet in one column that scrolls,
      who first, then the numbers, then the rest. */
-  body.mode-sheet .stage { display: flex; flex-direction: column; overflow-y: auto; }
+  body.mode-sheet .stage { display: flex; flex-direction: column; overflow-y: auto;
+                           overflow-x: hidden; }
   body.mode-sheet .sheet { display: block; overflow: visible; flex: none; }
-  body.mode-sheet .centre { display: block; overflow: visible; order: 2; flex: none; }
+  body.mode-sheet .sheetmore { display: grid; overflow: visible; order: 2; flex: none;
+                               padding: 22px 12px 10px; }
   body.mode-sheet .sheet .side { padding: 14px; }
   /* A full-width 4:5 portrait was 400px of an 812px screen: beside the name instead. */
   .side-who { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 14px;
@@ -527,42 +1113,73 @@ body:not(.mode-table):not(.mode-sheet) .stage { display: none; }
   .side-who > .portrait-actions { grid-column: 2; grid-row: 4; margin: 8px 0 0;
                                    align-self: end; }
   .portrait-empty { margin: 6px; font-size: 12px; text-align: center; }
-  .gear { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
 
-  .centre { gap: 8px; }
-  /* On a phone the head scrolls away with the story, so reading gets the whole book;
-     the place is one flick back up, and the tabs never leave. Measured at 375x812: the
-     fixed head left the story 190px. */
-  .book { display: block; overflow-y: auto; border: 3px solid transparent;
-          border-image: var(--gilt) 1; }
-  /* The ring and the clasps are drawn on the box, and in a box that scrolls they would
-     scroll away with the text; the border-image stays put. */
-  .book::before, .book::after { display: none; }
-  .story { overflow: visible; padding: 12px 18px 20px; font-size: 17px; }
-  .bookhead { padding: 16px 18px 8px; }
+  /* The book keeps its frame and clasps; its inside is what scrolls, head and all, so
+     reading gets the whole page. Measured at 375x812: a fixed head left the story 190px. */
+  .book { display: block; }
+  .bookin { display: block; height: 100%; overflow-y: auto; }
+  .story { overflow: visible; padding: 12px 20px 22px 26px; font-size: 17px; }
+  .bookhead { padding: 18px 18px 8px 26px; align-items: start; }
   .place { font-size: 20px; }
   .whereline { font-size: 14px; }
-  .bookhead { align-items: start; }
   .where { flex: 1 1 60%; }
   .here { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
   .glance { display: block; font: 400 13px/1.2 var(--body); white-space: normal;
             letter-spacing: 0; font-variant: normal; padding: 6px 8px; min-height: 36px;
-            max-width: 9.5em; text-align: left; }
-  .desk { padding: 8px 8px 10px; gap: 7px; }
+            max-width: 9.5em; text-align: left; text-shadow: none; }
+  .desk { padding: 9px 9px 11px; gap: 7px; }
   /* Each group is its label and one row that scrolls sideways, so the desk stays three
      short lines however many ways there are, and the story keeps the screen. */
   .exgroup { grid-template-columns: 70px minmax(0, 1fr); gap: 6px; align-items: center; }
   .exlabel { font-size: 12px; letter-spacing: .08em; }
   .exlabel small { font-size: 11px; }
-  .exlist { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .exlist { flex-wrap: nowrap; overflow-x: auto; padding: 0 4px 6px 0; }
   .exitbtn { flex: none; font-size: 14px; }
-  .mockctl > summary { min-height: 32px; padding: 5px 10px; }
   .exline { padding-left: 0; min-height: 4.4em; font-size: 14px; }
-  .suggestions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .suggestions { flex-wrap: nowrap; overflow-x: auto; padding: 0 4px 6px 0; }
   .sugg { flex: none; max-width: 78vw; }
   .sayform input { font-size: 16px; }
   .actions button { flex: 1 1 auto; padding: 8px 10px; font-size: 14px; }
+
+  .board { padding: 16px 16px 12px; }
   .journal, .spells3 { grid-template-columns: minmax(0, 1fr); }
   .skills { grid-template-columns: minmax(0, 1fr); }
-  .modepage { padding: 12px 10px 20px; }
+  .modepage { padding: 22px 14px 26px; }
+  .framedcard { padding: 20px 18px; }
+
+  /* What is worn first, then the shelves and the list: after fifty rows the figure was out
+     of reach of the Wear buttons that fill it. */
+  .eq { grid-template-columns: minmax(0, 1fr); gap: 16px;
+        grid-template-areas: "head" "doll" "rail" "list"; }
+  .eqhead { padding: 14px; gap: 10px; }
+  .eqtitle h1 { font-size: 22px; }
+  .eqnums { flex-wrap: nowrap; gap: 5px; width: 100%; }
+  .eqnums > div { min-width: 0; flex: 1 1 0; padding: 4px 2px; }
+  .eqnums dt { font-size: 10.5px; letter-spacing: .04em; }
+  .eqnums dd { font-size: 16px; }
+  /* The shelves become one row that scrolls sideways above the list. */
+  .eqrail { position: static; display: flex; overflow-x: auto; gap: 6px;
+            padding: 2px 4px 8px 0; }
+  .eqrail button { flex: none; grid-template-columns: 20px auto auto; }
+  .eqrail .fitting { flex: none; margin: 0; }
+  .eqsay { min-height: 112px; }
+  .eqrow { grid-template-columns: 40px minmax(0, 1fr); }
+  .eqrow .tile { width: 40px; }
+  .eqacts { grid-column: 1 / -1; justify-content: flex-start; }
+  .hands, .slots { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* The attack and manoeuvre tables fold into one small card a row: the name across the
+     top, the numbers in three labelled columns, the long text across the foot. As a table
+     at 375px the range and notes were off the right edge. */
+  .grid, .grid tbody, .grid tr, .grid td { display: block; }
+  .grid thead { display: none; }
+  .grid tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px;
+             padding: 10px 6px; border-bottom: 1px solid rgba(58, 47, 34, .7); }
+  .grid tr:last-child { border-bottom: 0; }
+  .grid td, .grid tr.inhand td { padding: 0; border: 0; background: none; }
+  .grid tr.inhand { background: rgba(207, 169, 100, .06); }
+  .grid td.lead, .grid td.wide { grid-column: 1 / -1; }
+  .grid td.none { display: none; }
+  .grid td[data-label]::before { content: attr(data-label); display: block; color: var(--dim);
+    font: 400 11px/1.3 var(--display); letter-spacing: .08em; font-variant: small-caps; }
+  .grid { font-size: 14px; }
 }

@@ -9,48 +9,62 @@
 <link rel="stylesheet" href="mock.css">
 </head>
 <body class="mode-table">
+<!-- The room's own light, as the real table has it (table.html): embers drifting up the
+     room, the candle's shade and its pool. All three are pointer-transparent and behind
+     nothing the player clicks. -->
+<div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<div id="cursorshade" aria-hidden="true"></div>
+<div id="cursorlight" aria-hidden="true"></div>
 <a class="skip" href="#story">Skip to the story</a>
+
+<!-- The mock's own controls, drawn flat and dashed so nobody takes them for the app. -->
+<div class="mockstrip" role="region" aria-label="Mock controls">
+  <p class="mocktag">Layout mock</p>
+  <div class="viewing" role="radiogroup" aria-labelledby="viewing-label">
+    <span class="vlabel" id="viewing-label">Viewing</span>
+    <button type="button" role="radio" aria-checked="true" data-char="kesst">Kesst Vayr
+      <small>rogue</small></button>
+    <button type="button" role="radio" aria-checked="false" data-char="ysolde"
+            tabindex="-1">Ysolde Marrach <small>wizard</small></button>
+  </div>
+  <p class="mocksay" id="mock-say"></p>
+  <label class="check"><input type="checkbox" id="mock-wanted"> Wanted in Zhilvarnia</label>
+  <button type="button" id="mock-reset" class="flat"
+          title="Back to the gate, with the story and the gear as they began">Start again</button>
+</div>
 
 <header class="topbar">
   <p class="world">Pangrella</p>
   <div class="modes" role="tablist" aria-label="Modes">
     <button type="button" role="tab" id="tab-table" data-mode="table" aria-selected="true"
             aria-controls="stage">Table</button>
+    <button type="button" role="tab" id="tab-map" data-mode="map" aria-selected="false"
+            aria-controls="stage" tabindex="-1">Map</button>
     <button type="button" role="tab" id="tab-sheet" data-mode="sheet" aria-selected="false"
             aria-controls="stage" tabindex="-1">Sheet</button>
+    <button type="button" role="tab" id="tab-equipment" data-mode="equipment"
+            aria-selected="false" aria-controls="mode-equipment" tabindex="-1">Equipment</button>
     <button type="button" role="tab" id="tab-spells" data-mode="spells" aria-selected="false"
-            aria-controls="mode-spells" tabindex="-1">Spells</button>
+            aria-controls="mode-spells" tabindex="-1" hidden>Spells</button>
     <button type="button" role="tab" id="tab-trade" data-mode="trade" aria-selected="false"
             aria-controls="mode-trade" tabindex="-1">Trade</button>
     <button type="button" role="tab" id="tab-journal" data-mode="journal" aria-selected="false"
             aria-controls="mode-journal" tabindex="-1">Journal</button>
   </div>
   <div class="topend">
+    <!-- A tray, not a tab: it opens beside the story and never over it. -->
+    <button type="button" id="talkbtn" class="talkbtn" aria-expanded="false"
+            aria-controls="talk">Talk<span class="count" id="talkcount"></span></button>
     <button type="button" id="sheettoggle" class="quiet" aria-expanded="true"
-            aria-controls="sheet">Hide the sheet</button>
-    <details class="mockctl">
-      <summary>Mock</summary>
-      <div class="mockpanel">
-        <p class="mocknote">A layout mock. Nothing here reaches the engine or a model.</p>
-        <label for="mock-char">Character</label>
-        <select id="mock-char">
-          <option value="kesst">Kesst Vayr, rogue (the recording's own)</option>
-          <option value="ysolde">Ysolde Marrach, wizard (fixtures/pc-caster.json)</option>
-        </select>
-        <label class="check"><input type="checkbox" id="mock-wanted"> Wanted in Zhilvarnia</label>
-        <button type="button" id="mock-reset" class="quiet">Start again at the gate</button>
-        <p class="mocknote">Exits, people, faces, suggestions and the story are copied from
-          the engine and a recorded session. The character's weapons, armour and outfit
-          are the fixture's; the rest of the kit is an example outfitter basket.</p>
-      </div>
-    </details>
+            aria-controls="sheet">Hide sheet</button>
   </div>
 </header>
 
 <div class="stage" id="stage" role="tabpanel" aria-labelledby="tab-table">
-  <main class="centre" id="centre">
-    <!-- Table mode: the story and the writing desk. -->
-    <section class="book" id="book" aria-labelledby="place-name">
+  <!-- Table mode: the story, in a book. -->
+  <section class="book" id="book" aria-labelledby="place-name">
+    <i class="rim" aria-hidden="true"></i>
+    <div class="bookin" id="bookin">
       <div class="bookhead">
         <div class="where">
           <h1 class="place" id="place-name"></h1>
@@ -65,16 +79,41 @@
       </div>
       <div class="story" id="story" role="log" aria-live="polite" aria-label="The story"
            tabindex="0"></div>
-    </section>
+    </div>
+  </section>
 
-    <section class="desk" id="desk" aria-label="What you do">
-      <div class="choices">
-        <nav class="exits" id="exits" aria-label="From here"></nav>
-        <div class="suggestions" id="suggestions" role="group"
-             aria-label="Suggested actions"></div>
+  <!-- Map mode: the same ground the engine plays on, where the book was. -->
+  <section class="board framedcard" id="board" aria-labelledby="board-name">
+    <div class="boardhead">
+      <h2 id="board-name">The ground</h2>
+      <div class="boardctl" role="group" aria-label="How to look at it">
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" data-view="flat" aria-pressed="true">Flat</button>
+          <button type="button" data-view="3d" aria-pressed="false">3D</button>
+        </div>
+        <div class="seg" id="turnctl" role="group" aria-label="Turn the board" hidden>
+          <button type="button" data-turn="-1" aria-label="Turn the board left">Turn left</button>
+          <button type="button" data-turn="1" aria-label="Turn the board right">Turn right</button>
+        </div>
+        <div class="seg" id="levelctl" role="group" aria-label="Looking at"></div>
       </div>
-      <div class="attach" id="attach" hidden></div>
-      <div class="pen">
+    </div>
+    <div class="boardview" id="boardview"></div>
+    <div class="boardfoot">
+      <p class="boardabout" id="board-about"></p>
+      <p class="boardkey" id="board-key"></p>
+      <p class="boardsay" id="board-say" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- The desk: the ways on, the GM's offers, the pen. -->
+  <section class="desk" id="desk" aria-label="What you do">
+    <div class="choices">
+      <nav class="exits" id="exits" aria-label="From here"></nav>
+      <div class="suggestions" id="suggestions" role="group" aria-label="Suggested actions"></div>
+    </div>
+    <div class="attach" id="attach" hidden></div>
+    <div class="pen">
       <form class="sayform" id="sayform" autocomplete="off">
         <label for="input" class="vh">What do you do?</label>
         <input type="text" id="input" placeholder="What do you do?">
@@ -85,42 +124,42 @@
                 title="You keep to what you were doing and the scene moves on">Continue</button>
         <button type="button" id="craft" class="quiet" aria-expanded="false"
                 aria-controls="craftpop">Craft action</button>
-        <button type="button" id="trade" class="quiet">Trade</button>
         <button type="button" id="spells" class="quiet" aria-expanded="false"
                 aria-controls="spellpop" hidden>Spells</button>
       </div>
-      </div>
-      <!-- Both open over the story's foot, not under the buttons, so nothing in the desk
-           moves when they do. -->
-      <div class="pop" id="craftpop" role="dialog" aria-label="Craft action" hidden>
-        <p><b>Craft action</b> opens the crafting hub where you stand: forage, prospect,
-          skin, gather and buy, each with the hours it takes.</p>
-        <p class="mocknote">Not mocked. The ground here is <span id="craft-ground"></span>.</p>
-        <button type="button" class="quiet small" data-close="craftpop">Close</button>
-      </div>
-      <div class="pop" id="spellpop" role="dialog" aria-label="Spells for this turn" hidden>
-        <p class="pophead">Cast with this turn</p>
-        <div class="spellpick" id="spellpick"></div>
-        <button type="button" class="quiet small" data-close="spellpop">Close</button>
-      </div>
-    </section>
+    </div>
+    <!-- Both open over the story's foot, not under the buttons, so nothing in the desk
+         moves when they do. -->
+    <div class="pop" id="craftpop" role="dialog" aria-label="Craft action" hidden>
+      <p><b>Craft action</b> opens the crafting hub where you stand: forage, prospect,
+        skin, gather and buy, each with the hours it takes.</p>
+      <p class="mocknote">Not mocked. The ground here is <span id="craft-ground"></span>.</p>
+      <button type="button" class="quiet small" data-close="craftpop">Close</button>
+    </div>
+    <div class="pop" id="spellpop" role="dialog" aria-label="Spells for this turn" hidden>
+      <p class="pophead">Cast with this turn</p>
+      <div class="spellpick" id="spellpick"></div>
+      <button type="button" class="quiet small" data-close="spellpop">Close</button>
+    </div>
+  </section>
 
-    <!-- Sheet mode: the rest of the same sheet, between its two sides. -->
-    <section class="sheetmore" id="sheetmore" aria-label="The rest of the sheet">
-      <div class="card">
-        <h2>Skills</h2>
-        <dl class="skills" id="skills"></dl>
-      </div>
-      <div class="card">
-        <h2>Feats</h2>
-        <ul class="plain" id="feats"></ul>
-        <h2>Background</h2>
-        <p id="background"></p>
-        <h2>Notes</h2>
-        <p id="notes"></p>
-      </div>
-    </section>
-  </main>
+  <!-- Sheet mode: the rest of the sheet, between its two sides. -->
+  <section class="sheetmore" id="sheetmore" aria-label="The rest of the sheet">
+    <div class="framedcard" id="combat"></div>
+    <div class="framedcard" id="defencecard"></div>
+    <div class="framedcard">
+      <h2>Skills</h2>
+      <dl class="skills" id="skills"></dl>
+    </div>
+    <div class="framedcard">
+      <h2>Feats</h2>
+      <dl class="feats" id="feats"></dl>
+      <h2>Background</h2>
+      <p id="background"></p>
+      <h2>Notes</h2>
+      <p id="notes"></p>
+    </div>
+  </section>
 
   <!-- One sheet, split round the story: who the character is on the left, their numbers
        on the right. Below 1180px the two halves become one column; on a phone the sheet
@@ -141,15 +180,9 @@
       <p class="pcline" id="pc-line"></p>
       <p class="pcstate" id="pc-state" hidden></p>
 
-      <h3 class="sidehead">Gear</h3>
-      <div class="gear" id="gear" role="group" aria-label="Gear"></div>
-      <p class="gearsay" id="gear-say" aria-live="polite"></p>
-      <p class="credit">Icons by Lorc, Delapouite, Skoll, Sbed, Willdabeast, Carl Olsen, Caro
-        Asercion and Lucas from <a href="https://game-icons.net">game-icons.net</a>,
-        <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>, recoloured.
-        Which icon is whose:
-        <a href="../../../play/static/icons/items/CREDITS.txt">items</a>,
-        <a href="../../../play/static/icons/spells/CREDITS.txt">spells</a>.</p>
+      <h3 class="sidehead">In hand and worn</h3>
+      <ul class="loadout" id="loadout"></ul>
+      <button type="button" class="door" id="open-equipment"></button>
     </aside>
 
     <aside class="side side-numbers" aria-label="Your numbers">
@@ -162,26 +195,79 @@
       <h3 class="sidehead">Abilities</h3>
       <ul class="medals" id="medals"></ul>
 
-      <h3 class="sidehead">Defence</h3>
-      <dl class="plaques" id="defence"></dl>
+      <h3 class="sidehead glanceonly">Defence</h3>
+      <dl class="plaques glanceonly" id="defence"></dl>
 
-      <h3 class="sidehead">Saves</h3>
-      <dl class="plaques" id="saves"></dl>
+      <h3 class="sidehead glanceonly">Saves</h3>
+      <dl class="plaques glanceonly" id="saves"></dl>
 
       <h3 class="sidehead">Experience</h3>
       <p class="xp" id="xp"></p>
     </aside>
   </div>
+
+  <!-- The conversation tray (08-conversation.js): what was said, per person, and the two
+       ways out of a conversation below the log, never inside its scroll. -->
+  <aside class="talk" id="talk" aria-labelledby="talk-head" hidden>
+    <div class="talkhead">
+      <h2 id="talk-head">Conversation</h2>
+      <button type="button" class="quiet small" id="talkclose">Close</button>
+    </div>
+    <div class="convo-people" id="convo-people" role="group" aria-label="Whose words"></div>
+    <div class="convo-log" id="convo-log" tabindex="0" role="log"
+         aria-label="What was said"></div>
+    <div class="talkfoot" id="talkfoot"></div>
+  </aside>
 </div>
+
+<section class="modepage" id="mode-equipment" role="tabpanel" aria-labelledby="tab-equipment"
+         hidden>
+  <div class="eq">
+    <header class="eqhead">
+      <div class="eqtitle">
+        <h1>Equipment</h1>
+        <p>Wield and wear from what you carry. New things are bought at a counter.</p>
+      </div>
+      <dl class="eqnums" id="eq-nums"></dl>
+      <button type="button" id="eq-trade" class="quiet">Go to Trade</button>
+    </header>
+    <nav class="eqrail" id="eq-rail" role="tablist" aria-orientation="vertical"
+         aria-label="What you carry, by kind"></nav>
+    <section class="eqlist" id="eq-list" role="tabpanel" aria-labelledby="eq-listhead">
+      <div class="eqlisthead">
+        <h2 id="eq-listhead"></h2>
+        <p class="eqsort" id="eq-sort"></p>
+      </div>
+      <p class="eqsay" id="eq-say" aria-live="polite"></p>
+      <ul class="eqrows" id="eq-rows"></ul>
+      <p class="eqload" id="eq-load"></p>
+      <p class="credit">Icons by Lorc, Delapouite, Skoll, Sbed, Willdabeast, Carl Olsen, Caro
+        Asercion and Lucas from <a href="https://game-icons.net">game-icons.net</a>,
+        <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>, recoloured.
+        Which icon is whose:
+        <a href="../../../play/static/icons/items/CREDITS.txt">items</a>,
+        <a href="../../../play/static/icons/spells/CREDITS.txt">spells</a>.</p>
+    </section>
+    <aside class="doll" id="doll" aria-labelledby="doll-head">
+      <h2 id="doll-head">Worn and wielded</h2>
+      <div class="hands" id="hands"></div>
+      <div class="slots" id="slots"></div>
+      <p class="dollnote">Choose a slot to see what you carry that goes there.</p>
+    </aside>
+  </div>
+</section>
 
 <section class="modepage" id="mode-spells" role="tabpanel" aria-labelledby="tab-spells" hidden>
   <div class="spells3" id="spells3"></div>
 </section>
 
 <section class="modepage" id="mode-trade" role="tabpanel" aria-labelledby="tab-trade" hidden>
-  <div class="card narrow">
+  <div class="framedcard narrow">
     <h2>At the counter</h2>
     <p id="trade-say"></p>
+    <p>Buy and sell here. What you buy goes into your pack, and you put it on from
+      Equipment.</p>
+    <p><button type="button" class="quiet" id="trade-equipment">Open equipment</button></p>
     <p class="mocknote">The counter itself is the Trade page already shipped (what you carry,
       the deal, their wares). This mock only shows where its door sits.</p>
   </div>
@@ -190,7 +276,7 @@
 <section class="modepage" id="mode-journal" role="tabpanel" aria-labelledby="tab-journal"
          hidden>
   <div class="journal">
-    <div class="card">
+    <div class="framedcard">
       <h2>Matters in play</h2>
       <ul class="plain matters">
         <li>A meal you could afford and the name of somebody who hires</li>
@@ -199,14 +285,18 @@
       <p class="mocknote">Both are the names the recording's own experience lines gave
         these matters.</p>
     </div>
-    <div class="card">
-      <h2>What was said</h2>
-      <div class="said" id="said"></div>
+    <div class="framedcard">
+      <h2>Where you have been</h2>
+      <ol class="plain walked" id="walked"></ol>
+      <p class="mocknote">What was said is in Talk now, per person.</p>
     </div>
   </div>
 </section>
 
 <script src="data.js"></script>
+<!-- The app's own 3D board renderer, unchanged: it reads the grid payload /api/state
+     sends and returns an SVG string, so it runs here on the recorded one. -->
+<script src="../../../play/static/js/scene3d.js"></script>
 <script src="mock.js"></script>
 </body>
 </html>
