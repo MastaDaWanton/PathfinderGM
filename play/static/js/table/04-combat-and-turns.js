@@ -348,7 +348,10 @@ $("#sayform").onsubmit = e => {
   const attached = typeof currentAttachments === "function" ? currentAttachments() : [];
   if (!text && !attached.length) return;
   const body = { text };
-  if (attached.length) body.attachments = attached.map(a => ({ kind: a.kind, id: a.id }));
+  // `attachmentsForSay` (10-spells.js) keeps a chip's `aim` when it has one; the map
+  // below dropped it, so an aim picked with the chip never reached the server (I3).
+  if (attached.length) body.attachments = typeof attachmentsForSay === "function"
+    ? attachmentsForSay() : attached.map(a => ({ kind: a.kind, id: a.id }));
   takeTurn(body, true);
 };
 
