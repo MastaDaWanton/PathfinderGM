@@ -403,7 +403,7 @@ function tabInventory(s) {
           <td><b>${esc(j.name)}</b>${j.poisons && j.poisons.length
             ? ` <span class="poisonmark" title="This will poison whoever drinks it">☠</span>` : ""}</td>
           <td>${j.count}</td>
-          <td class="why">${esc((j.effects || []).join(" · ") || "nothing the engine can run")}${
+          <td class="why">${esc((j.effects || []).join(" · ") || "for show, no effect in play")}${
             (j.drawbacks || []).length ? ` <em>${esc(j.drawbacks.join(" "))}</em>` : ""}</td>
           <td class="useact">
             ${j.drinkable ? `<button class="mini" data-use="${esc(j.id)}" data-how="drink"
