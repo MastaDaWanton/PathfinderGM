@@ -155,6 +155,21 @@ def apply(entry, buys: list[dict]) -> tuple[dict, list[str]]:
             "stock": [f"{s.count}x {s.base}" for s in actor.stock.values()]}, []
 
 
+CLOSED = ("{name} has already begun their game, so the outfitter is closed to them: "
+          "gear is bought from the shops and stalls in town now.")
+
+
+def begun(entry) -> bool:
+    """Whether this character's campaign has begun — the outfit page is creation only.
+
+    The owner's answer, 2026-09-28: "outfit page should not be reachable". Measured by
+    the lead at G1: buying here after the game began changed the roster's copy of the
+    sheet and not the running campaign's (`weapons: [unarmed, longsword]` on the roster,
+    `unarmed strike` at the table), so the two drifted apart. `campaign_id` is set by
+    `begin_with` and by nothing that only enrols, which is exactly the line."""
+    return bool(getattr(entry, "campaign_id", ""))
+
+
 @ensure_csrf_cookie
 @require_GET
 def outfit_page(request):
@@ -181,6 +196,8 @@ def outfit_state(request, character_id: str):
         "weapons": list(actor.weapons), "armour": actor.armour, "shield": actor.shield,
         "stock": [f"{s.count}x {s.base}" for s in actor.stock.values()],
         "proficient": {k: actor.is_proficient(k) for k in ("simple", "martial")},
+        "begun": begun(entry),
+        "closed": CLOSED.format(name=actor.name) if begun(entry) else "",
     })
 
 
@@ -189,6 +206,10 @@ def outfit_buy(request, character_id: str):
     entry = roster.load(character_id)
     if entry is None:
         return JsonResponse({"error": f"no character {character_id!r}"}, status=404)
+    if begun(entry):
+        # Refused with the reason named, so the roster and the running sheet cannot
+        # drift apart again (see `begun`).
+        return JsonResponse({"error": CLOSED.format(name=entry.name)}, status=409)
     body = read_body(request)
     got, problems = apply(entry, body.get("buys") or [])
     if problems:

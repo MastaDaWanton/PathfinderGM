@@ -74,20 +74,21 @@ def place_of(world_entity_id: str) -> str:
 def name_stock(world, location_id: str = "") -> tuple[list[str], list[str], set[str]]:
     """The world's own names: given names, family names, and the ones already worn.
 
-    Families are the settlement's own when it has any — a keeper in Ashwatch is one of
-    the two families Ashwatch's cast belongs to, which is what makes a small town read
-    as a small town — and the rest of the world's when it has none. Given names are
-    drawn from the whole world: ninety-six of them in Aurvantis against ten family
-    names, and a town of four people cannot supply a first name that is not already a
-    specific person's.
+    Families are the settlement's own when it has any — its own `play.names` pool
+    (`names.town_pool`) and the families its cast belongs to, which is what makes a
+    small town read as a small town — then its people's pool, then the rest of the
+    world's cast. Given names are the town's or its people's pool, and the whole world's
+    cast only for an export with no pools.
 
-    Both lists keep the export's own order, which is stable across runs, so the
-    seeded pick below is stable too.
+    Every list keeps the export's own order, which is stable across runs, so the seeded
+    pick below is stable too.
     """
+    from . import names as names_mod
+
     play = getattr(world, "play", None) or {}
     cast = play.get("cast") or []
     here = str(location_id or "")
-    given: list[str] = []
+    cast_given: list[str] = []
     local: list[str] = []
     other: list[str] = []
     taken: set[str] = set()
@@ -98,8 +99,8 @@ def name_stock(world, location_id: str = "") -> tuple[list[str], list[str], set[
         if not parts:
             continue
         taken.add(" ".join(parts).lower())
-        if parts[0] not in given:
-            given.append(parts[0])
+        if parts[0] not in cast_given:
+            cast_given.append(parts[0])
         if len(parts) < 2:
             continue
         family = parts[-1]
@@ -108,16 +109,44 @@ def name_stock(world, location_id: str = "") -> tuple[list[str], list[str], set[
                 local.append(family)
         elif family not in other:
             other.append(family)
-    return given, (local or other), taken
+    # The town's own pool first, then its cast's families (the playtest's item 8.4:
+    # the market was kept by an Ironvale in every game while Vormoor's sixteen pool
+    # families went unread), then the people's pool, then the rest of the world's cast.
+    own = names_mod.town_pool(world, here) if world is not None else None
+    people = names_mod.pool_for(world, here) if (world is not None and here) else None
+    families = _merged([str(f) for f in (own or {}).get("family") or []], local)
+    if not families:
+        families = [str(f) for f in (people or {}).get("family") or []] or other
+    # Given names from the people who live here — the town's pool, else their people's —
+    # and the cast's only for a world that ships no pools (R0, 2026-09-28: a keeper's
+    # given name ignored the people entirely).
+    given = ([str(g) for g in (own or {}).get("given") or []]
+             or [str(g) for g in (people or {}).get("given") or []] or cast_given)
+    return given, families, taken
 
 
-def name_for(place, world, taken: set[str] | frozenset[str] = frozenset()) -> str:
+def _merged(*lists) -> list[str]:
+    out: list[str] = []
+    for seq in lists:
+        for x in seq:
+            if x and x not in out:
+                out.append(x)
+    return out
+
+
+def name_for(place, world, taken: set[str] | frozenset[str] = frozenset(), *,
+             salt=None) -> str:
     """Who the person at this place is called. The same answer every session.
 
     Falls back to what they are — "the smith" — when the world lends no names, which is
     every world-less engine in the suite and any export that ships no cast. A keeper
     with no name is still a keeper; a keeper with an invented name is a thing the world
     does not contain.
+
+    `salt` is the campaign's story seed. The owner's ruling (Q18, 2026-09-28): a place's
+    keeper is the same person for the whole of one campaign and a different person in
+    the next, so the market is not an Ashla Ironvale in every game ever played. Without
+    it the answer is the place's alone, as it always was.
     """
     title = places_mod.keeper_of(getattr(place, "name", "") or "")[0]
     given, families, world_names = name_stock(
@@ -129,7 +158,8 @@ def name_for(place, world, taken: set[str] | frozenset[str] = frozenset()) -> st
     # family and the given name are drawn off different halves of it: taking both off
     # the same number walks the two lists in lockstep and gives a world of Bregan
     # Sootspar, Halvik Halloran, Karsh Sootspar.
-    n = places_mod._seed(getattr(place, "id", "") or "")
+    pid = getattr(place, "id", "") or ""
+    n = places_mod._seed(pid if salt is None else f"{salt}:{pid}")
     family = families[(n >> 12) % len(families)]
     for i in range(len(given)):
         name = f"{given[(n + i) % len(given)]} {family}"
@@ -269,7 +299,8 @@ def staff(engine):
     pc = scene.pc()
     level = int(getattr(pc, "level", 1) or 1)
     name = name_for(here, engine.world,
-                    taken={str(a.name) for a in scene.people.values()})
+                    taken={str(a.name) for a in scene.people.values()},
+                    salt=getattr(scene, "story_seed", 0) or None)
     wid = entity_id(at)
     # The codex, exactly as a scheme's cast member reaches it: a stat block by the
     # role's words near the party's level, remembered under this id in `homebrew/npcs/`

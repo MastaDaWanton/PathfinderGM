@@ -126,10 +126,20 @@ def _old_place_block(world, scene, location, here=None, known=()):
                     f"  ROADS OUT OF {location.name.upper()} (the only settlements that "
                     f"can be reached, and only by journey, which takes days): "
                     f"{', '.join(leg.to_name for leg in out)}.")
+        # The one deliberate change since the freeze (Lane C, 2026-09-28, fix-interfaces
+        # §3.4): the fact loop reads the other exports' keys after the eight, shows
+        # "Urban Life" as "Daily life", and puts the stock "the city's" back to the
+        # settlement's stated size. Everything above is still the base's bytes.
+        from play.opening_prose import stated_scale
+        from rules import geography
+
+        scale = stated_scale(location)
         for key in ("Urban Life", "Social Classes", "Architecture", "Governance",
-                    "Formal Power", "Shadow Power", "Tension", "Daily Norms"):
+                    "Formal Power", "Shadow Power", "Tension", "Daily Norms",
+                    "Daily Life", "Customs", "Conflict", "Landscape"):
             if location.fact(key):
-                lines.append(f"  {key}: {location.fact(key)}")
+                lines.append(f"  {geography.display_key(key)}: "
+                             f"{geography.in_its_own_words(str(location.fact(key)), scale)}")
     return "\n".join(lines)
 
 
@@ -185,6 +195,10 @@ def test_the_whole_brief_is_the_phase_1_base_brief(worlds, only_the_moved):
     that fills it) moved too. The sampler measured 657 of 657 identical; this repeats it
     per world. It pins `phase-1-base` on purpose, so a Phase-2 lane that changes the
     brief deliberately retires it (the frozen-block test above carries on)."""
+    # Retired as its docstring says a Phase-2 lane would: Lane C changed the fact loop
+    # on purpose (2026-09-28); the frozen-block test above carries the rest.
+    pytest.skip("retired by Lane C's place_facts change (fix-interfaces §3.4); the "
+                "frozen-block test above carries on")
     base = _base_prompts()
     if base is None:
         pytest.skip(f"git or the {BASE_REF} tag is not available")

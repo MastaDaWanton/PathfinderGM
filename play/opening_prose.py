@@ -57,9 +57,11 @@ player reads: four paragraphs, then a question, about 280 words in all. Each par
 is three to five sentences.
 
 The order is how a person orients, and it is the whole craft:
-1. WHERE. Name the place and say what kind of place it is, then the exact spot the
-   player is standing in — what it looks, sounds and smells like, built from the
-   place's own writing below. This is the longest paragraph.
+1. WHERE. Name the place and say what kind of place it is — copy what kind of place it
+   is from the material, never bigger — then the exact spot the player is standing in:
+   its shape, what the buildings round it are made of, the light, a sound and a smell,
+   built from the place's own writing below. Say what the buildings look like, never
+   the name of their style. This is the longest paragraph.
 2. WHY. Who the player is (shown by what they carry and where they come from, never
    a class name), why they came here today — the errand in the material — and what
    they are doing at this moment. If the material gives them a past here, it is the
@@ -85,10 +87,20 @@ player ("you realise", "you decide", "something tells you"). Write to the player
 # yard, well, gate, square, workshop, doorway, cart, step, crossing or ritual. The
 # Continue examples taught this repo that the model finishes the nearest stopped thing
 # in front of it, so the example is a ferry landing — copyable, and caught if copied.
+#
+# A VILLAGE since 2026-09-28, and one that copies its size from the material. The old
+# example had no scale line and answered "Hollin Stair is a fishing town … Twenty men" —
+# it demonstrated working the size out from the facts, and the failure measured that day
+# was exactly that: Vormoor, a village, written up as "a sprawling settlement … the city's
+# bustling thoroughfares". The failing case is the small place, so the one demonstration
+# is a small place saying what the material says it is.
 EXAMPLE = {
     "user": (
         "Material:\n"
-        "Place: Hollin Stair. Its facts: Architecture: slate roofs, stone stairs cut "
+        "Place: Hollin Stair.\n"
+        "What kind of place (a fact; copy it, never make it bigger): Hollin Stair is a "
+        "village of a few hundred people, and everyone knows everyone.\n"
+        "Its facts: Architecture: slate roofs, stone stairs cut "
         "into the cliff; Formal Power: a harbour reeve elected by the boat-owners; "
         "Daily Norms: the tide sets the day.\n"
         "The place's own writing: Hollin Stair climbs its cliff in flights of stone, "
@@ -111,7 +123,7 @@ EXAMPLE = {
         "are waiting for the ferry. The porters have stopped talking. What do you do?"
     ),
     "assistant": json.dumps({"opening": (
-        "Hollin Stair is a fishing town that climbs its cliff in flights of wet stone, "
+        "Hollin Stair is a village that climbs its cliff in flights of wet stone, "
         "the houses stacked under slate above the boats drawn up at the foot. You are "
         "on the landing at the bottom of it, where the stair meets the water: a shelf "
         "of black rock slick with weed, nets steaming in the cold, the smell of tar "
@@ -126,7 +138,8 @@ EXAMPLE = {
         "the ferry is the only way over, and you have been standing here long enough "
         "to have counted the boats twice.\n\n"
         "The porters at the water's edge have stopped talking, all at once. Not a lull "
-        "— a stop. Twenty men with their loads down, looking out at the empty channel, "
+        "— a stop. Every one of them with a load down, looking out at the empty channel "
+        "— everybody on this landing knows everybody else's boat — "
         "and the gulls have lifted off the shallows together. The tide sets the day "
         "here and the boat-owners set everything else, which is why a ferry that has "
         "not come is not a delay to these men but a verdict: somebody with a hull has "
@@ -194,7 +207,8 @@ def copied_from_the_example(text: str) -> list[str]:
 # person who does not exist, a number, the ferry — not for prose that is merely less
 # than was asked.
 _SOFT = ("only ", "it describes nothing", "give two to four suggestions",
-         "it never uses the character's own past", "nobody here has spoken")
+         "it never uses the character's own past", "nobody here has spoken",
+         "it never shows what")
 
 
 def hard_problems(found: list[str]) -> list[str]:
@@ -220,6 +234,85 @@ def underneath(campaign) -> str:
     return ""
 
 
+def stated_scale(place) -> str:
+    """The settlement's size in this app's three words — only when the world SAID one.
+
+    `places.scale_of` answers "town" for a place whose scale it cannot read, which is the
+    right default for the map and the wrong thing to hand a model as a fact."""
+    if place is None:
+        return ""
+    from rules import places as places_mod
+
+    said = " ".join(str(getattr(place, "scale", "") or "").split()).lower()
+    if said in places_mod.PLACES_BY_SCALE or said in places_mod.SCALE_ALIASES:
+        return places_mod.scale_of(place)
+    return ""
+
+
+def the_room(campaign) -> str:
+    """The spot the party stands in, as the template says it — its shape (the brief's
+    UNDERFOOT), what the buildings round it are made of, the light and the air."""
+    from . import opening
+
+    try:
+        here = opening.situation_for(campaign)
+        return opening.the_spot(campaign, here).removeprefix("You are ")
+    except Exception:
+        return ""
+
+
+# Words that make a village or a town bigger than the world says it is (item 1): the
+# 2026-09-28 draft called Vormoor, a village, "a sprawling settlement" with "the city's
+# bustling thoroughfares". Hard: a draft still wrong after its repair falls to the
+# template, which states the size itself.
+TOO_BIG = {
+    "village": ("city", "cities", "sprawling", "metropolis", "metropolitan",
+                "tens of thousands", "districts", "thoroughfares", "thoroughfare",
+                "boulevard", "boulevards", "teeming", "crowds"),
+    "town": ("metropolis", "metropolitan", "sprawling", "tens of thousands", "the city"),
+}
+
+
+def too_big(text: str, scale: str, allowed: set[str] | None = None) -> list[str]:
+    """The size words a draft uses that the settlement's stated scale refuses.
+
+    A word inside a capitalised name the material allows ("the City Watch") is the
+    world's name for something, not a claim about size, and is left alone."""
+    words = TOO_BIG.get(str(scale or ""), ())
+    allowed = allowed or set()
+    found = []
+    for w in words:
+        for m in re.finditer(r"\b" + re.escape(w) + r"\b", text or "", re.I):
+            token = m.group(0)
+            if token[:1].isupper() and token.split()[0] in allowed:
+                continue
+            found.append(w)
+            break
+    return found
+
+
+# What a person standing somewhere can see, hear or smell of it: the materials and forms
+# `opening.built_of` keeps, and the light and the air. A first paragraph with fewer than
+# three of these names a place without showing it — the owner's complaint of 2026-09-28,
+# "we need descriptions of what the room looks like".
+_SENSED = frozenset("""
+smell smells smelled scent stink stench reek reeks sound sounds noise noisy voices voice
+creak creaks clatter clang hum murmur shout shouts calling bells bell light lit shadow
+shadows sun sunlight lamp lamps lantern lanterns smoke smoky dust dusty mud muddy cobbles
+cobbled stones straw sawdust sand sandy water wet damp rain wind cold heat warm hearth
+fire awning awnings stall stalls cart carts rope ropes timber timbers plank planks
+beam beams rafters steps stair stairs floor floors ground grass puddle puddles weed tar
+fish bread dung sweat beer incense wax candle candles iron rust salt brine
+""".split())
+
+
+def physical_detail(paragraph: str) -> list[str]:
+    from . import opening
+
+    words = {w.lower() for w in re.findall(r"[A-Za-z]+", paragraph or "")}
+    return sorted(words & (_SENSED | opening._BUILT))
+
+
 def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
     """What the model may draw on, and every name it is allowed to use.
 
@@ -228,14 +321,37 @@ def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
     export never lists as entities, and a check that reported "Salt Market" as an
     invention would be refusing the world's own words.
     """
+    from rules import geography
+
     place, pc = campaign.location, campaign.scene.pc()
     lines = []
+    scale = stated_scale(place)
     if place is not None:
-        facts = "; ".join(f"{k}: {v}" for k, v in (place.facts or {}).items())
-        lines.append(f"Place: {place.name}." + (f" Its facts: {facts}." if facts else ""))
-        prose = (getattr(place, "prose", "") or "").strip()
+        # The world's stock "the city's" put back to this settlement's size, and "Urban
+        # Life" shown as "Daily life", before the model reads a word of it (item 1,
+        # 2026-09-28: 96 of those phrases in Aurvantis's non-cities reached the model).
+        facts = "; ".join(f"{geography.display_key(k)}: "
+                          f"{geography.in_its_own_words(str(v), scale)}"
+                          for k, v in (place.facts or {}).items())
+        lines.append(f"Place: {place.name}.")
+        # WHAT KIND OF PLACE, as a fact to copy. It was only inside "The template says",
+        # the text the model is told to rewrite, and the draft of 2026-09-28 made a
+        # village "a sprawling settlement".
+        if scale:
+            from rules import places as places_mod
+
+            lines.append("What kind of place (a fact; copy it, never make it bigger): "
+                         f"{place.name} is {places_mod.what_it_is(scale)}.")
+        if facts:
+            lines.append(f"Its facts: {facts}.")
+        prose = geography.in_its_own_words((getattr(place, "prose", "") or "").strip(),
+                                           scale)
         if prose:
             lines.append(f"The place's own writing: {prose}")
+        room = the_room(campaign)
+        if room:
+            lines.append(f"The spot they stand in (describe THIS, as a person standing "
+                         f"there sees, hears and smells it): {room}")
     if pc is not None:
         carrying = ", ".join(pc.carried()) or "nothing much"
         people = campaign.world.get(pc.world_people_id) if pc.world_people_id else None
@@ -253,6 +369,23 @@ def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
         lines.append(f"Why they are here today: {situation.errand}")
     lines.append(f"Situation: {situation.when}. {situation.where}. {situation.doing}")
     lines.append(f"Already happening: {situation.edge}")
+    if getattr(situation, "start_id", ""):
+        # The start's lead and the moment the player takes over (rules/openings.py).
+        from . import opening
+
+        lead = opening.lead_of(campaign)
+        name = situation.who
+        part = (f"{name}, {situation.label}" if situation.label and name != situation.label
+                else name)
+        lines.append(f"Who speaks first: {part}, {situation.look}.")
+        face = getattr(lead, "appearance", "") if lead is not None else ""
+        if face:
+            lines.append(f"What {name} looks like (say it when they first appear): {face}")
+        if situation.says:
+            lines.append(f"What {name} says to the player: {situation.says}")
+        if situation.moment:
+            lines.append(f"Stop at this moment; the player takes over here, so narrate "
+                         f"nothing after it: {situation.moment}")
     thread = underneath(campaign)
     if thread:
         lines.append("What is really going on underneath (show its visible edge only, "
@@ -342,14 +475,45 @@ def repair_near_misses(text: str, allowed: set[str], *names: str) -> tuple[str, 
 def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
              prose: str = "", skeleton: str = "",
              suggestions: list[str] | None = None,
-             past: list[str] | None = None) -> list[str]:
+             past: list[str] | None = None, *, scale: str = "", room: str = "",
+             lead: tuple[str, str] | None = None, start: dict | None = None
+             ) -> list[str]:
     """Everything wrong with a draft, each named so the repair call can fix only that.
 
     Hard problems first, in the order they have always come; the two soft ones the
     player asked for on 2026-09-18 last (the bound past used, the person beside them
     speaking first), so callers reading the first problem read the one that matters.
+
+    The 2026-09-28 checks, keyword-only so every older caller reads what it always did:
+    `scale` (the size the world stated: a village called a city is refused), `room` (the
+    spot's own description: a first paragraph that shows nothing of it is refused),
+    `lead` ((name, appearance): the face given where they first appear, soft) and
+    `start` (`Scene.start`: narrating past the hand-off is refused).
     """
     out = []
+    first_para = text.split("\n\n")[0] if text else ""
+    big = too_big(text, scale, allowed)
+    if big and place_name:
+        from rules import places as places_mod
+
+        out.append(f"it calls {place_name} " + ", ".join(repr(w) for w in big)
+                   + f" — {place_name} is {places_mod.what_it_is(scale)}; describe it "
+                     f"at that size")
+    if room and text:
+        label = re.search(r"-style\b|\barchitecture\b", first_para, re.I)
+        if label:
+            out.append(f"the first paragraph names the buildings' style as a label "
+                       f"({label.group(0)!r}); say what they are made of and look like "
+                       f"from where the player stands")
+        if len(physical_detail(first_para)) < 3:
+            out.append(f"the first paragraph shows nothing of the spot itself; describe "
+                       f"it as someone standing there sees, hears and smells it: {room}")
+    if start and text:
+        crossed = _crossed(text, start)
+        if crossed:
+            moment = str((start.get("hand_off") or {}).get("moment") or "")
+            out.append("it narrates past the moment the player takes over ("
+                       + ", ".join(repr(c) for c in crossed) + "); stop at: " + moment)
     if prose and skeleton and not drawn_from_the_place(text, prose, skeleton):
         out.append("it describes nothing the place's own writing describes; put one "
                    "physical detail from that writing into the first paragraph")
@@ -407,7 +571,72 @@ def problems(text: str, allowed: set[str], place_name: str, pc_name: str,
         out.append("nobody here has spoken to the player; give the person beside them "
                    "one line, in quotes, said to the player — a question or a remark "
                    "about what is happening")
+    if lead and lead[0] and lead[1] and text and not face_given(text, *lead):
+        out.append(f"it never shows what {lead[0]} looks like where they first appear; "
+                   f"describe them there, from: {lead[1]}")
     return out
+
+
+def _face_words(appearance: str) -> set[str]:
+    """The words of five letters or more a face is recognisable by."""
+    body = str(appearance or "").split(":", 1)[-1]
+    return {w.lower() for w in re.findall(r"[A-Za-z]{5,}", body)} - _STOP
+
+
+def face_given(text: str, name: str, appearance: str) -> bool:
+    """Whether the paragraph that first names this person also shows their face.
+
+    The rule `judgement.settle_descriptions` holds every later beat to, applied to the
+    opening, which never ran it: the watchman of 2026-09-28 was described on the THIRD
+    beat of talking to him (item 4)."""
+    words = _face_words(appearance)
+    if not words:
+        return True
+    head = [w for w in re.findall(r"[A-Za-z]{3,}", name or "")
+            if w.lower() not in ("the", "and")]
+    # A label is known by its head noun ("the cage owner" -> "owner"); a name by any
+    # part of it, since "Drenn" alone names Drenn Ironvale.
+    if str(name or "").lower().startswith("the ") and head:
+        head = head[-1:]
+    # Any paragraph that names them, not only the first: a lead the character's own past
+    # supplies is named in the WHY paragraph ("Ruk Halloran used to pay you by the
+    # name") before they are SEEN in the WHAT one, which is where the face belongs
+    # (measured on the first offline starts run: nine of ninety tied leads flagged).
+    naming = [para for para in (text or "").split("\n\n")
+              if any(re.search(r"\b" + re.escape(k) + r"\b", para, re.I) for k in head)]
+    if not naming:
+        return True
+    return any({w.lower() for w in re.findall(r"[A-Za-z]{5,}", para)} & words
+               for para in naming)
+
+
+def with_face(text: str, name: str, appearance: str) -> str:
+    """The world's face line added to the paragraph that first names this person."""
+    from . import opening
+
+    line = opening.face_line(name, appearance)
+    if not line:
+        return text
+    paras = (text or "").split("\n\n")
+    head = [w for w in re.findall(r"[A-Za-z]{3,}", name or "") if w.lower() != "the"]
+    if str(name or "").lower().startswith("the ") and head:
+        head = head[-1:]
+    naming = [i for i, para in enumerate(paras)
+              if any(re.search(r"\b" + re.escape(k) + r"\b", para, re.I) for k in head)]
+    if not naming:
+        return text
+    # Where they are SEEN — the paragraph where they speak — before a mere mention of
+    # them in the character's past.
+    spoken = [i for i in naming if speech.has_speech(paras[i], 4)]
+    i = (spoken or naming)[0]
+    paras[i] = paras[i].rstrip() + " " + line
+    return "\n\n".join(paras)
+
+
+def _crossed(text: str, start: dict) -> list[str]:
+    from rules import openings
+
+    return openings.crossed(text, start)
 
 
 def _ask(messages: list[dict], cfg: dict) -> tuple[str, list[str]]:
@@ -465,12 +694,30 @@ def write(campaign, situation, skeleton: str,
 
     past = [str(t).strip() for t in (getattr(pc, "background_ties", None) or [])
             if str(t).strip()] if pc is not None else []
+    from . import opening
+
+    start = dict(getattr(campaign.scene, "start", None) or {})
+    lead_actor = opening.lead_of(campaign)
+    lead = ((situation.who, str(getattr(lead_actor, "appearance", "") or ""))
+            if lead_actor is not None else None)
+    room = the_room(campaign)
+    scale = stated_scale(place)
 
     def check(draft, offered):
         return problems(draft, allowed, place.name if place is not None else "",
                         pc.name if pc is not None else "",
                         prose=getattr(place, "prose", "") or "", skeleton=skeleton,
-                        suggestions=offered, past=past)
+                        suggestions=offered, past=past, scale=scale, room=room,
+                        lead=lead, start=start or None)
+
+    def shipped(draft):
+        # The backstop for the face at first sight (design C §4.7): if both drafts left
+        # the lead faceless where they first appear, the world's own face line goes on
+        # the end of that paragraph, so nobody is owed a description on turn three.
+        draft = narration.destutter(draft)
+        if lead and lead[1] and not face_given(draft, *lead):
+            draft = with_face(draft, lead[0], lead[1])
+        return draft
 
     found: list[str] = []
     best: tuple[str, list[str], list[str]] | None = None
@@ -480,7 +727,7 @@ def write(campaign, situation, skeleton: str,
                                       place.name if place is not None else "")
         found = check(draft, offered)
         if draft and not found:
-            return narration.destutter(draft), offered, []
+            return shipped(draft), offered, []
         if draft and not hard_problems(found):
             best = (draft, offered, found)
         if draft:
@@ -493,7 +740,7 @@ def write(campaign, situation, skeleton: str,
                                           place.name if place is not None else "")
             found = check(draft, offered)
             if draft and not found:
-                return narration.destutter(draft), offered, []
+                return shipped(draft), offered, []
             if draft and not hard_problems(found):
                 best = (draft, offered, found)
     except Exception as exc:                       # noqa: BLE001 — the floor is the point
@@ -506,7 +753,7 @@ def write(campaign, situation, skeleton: str,
     if best is not None and len(best[0].split()) >= len(skeleton.split()):
         draft, offered, soft = best
         clean = [s for s in offered if isinstance(s, str) and 3 <= len(s.split()) <= 16]
-        return (narration.destutter(draft),
+        return (shipped(draft),
                 clean[:4] if 2 <= len(clean) else list(fallback_suggestions or []),
                 soft)
     return *floor, found

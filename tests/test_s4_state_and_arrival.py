@@ -165,12 +165,15 @@ def test_nobody_in_the_partys_place_stands_without_a_square(worlds, tmp_path):
 # --- recognise: the knows-you door (inert until Lane C writes `acquainted`) ---------------
 
 def test_recognise_is_inert_while_nobody_is_acquainted(tmp_path):
-    """Phase 1 writes nothing to `acquainted`, so an arrival must gain no bond."""
+    """With nobody `acquainted`, an arrival gains no bond. Phase 1 wrote nothing there;
+    since Lane C (2026-09-28) a new campaign binds the pregen's background and fills it,
+    so the empty list is set here — the rule under test is the door's, not the bind's."""
     from rules import backgrounds
 
     with override_settings(CAMPAIGN_DIR=str(tmp_path / "campaigns")):
         c = cm.new_campaign("s4-inert", seed=7)
     scene = c.scene
+    scene.acquainted = []
     who = scene.add(instantiate("guildhand", scene=scene, name="Wenna",
                                 world_entity_id="ent-wenna"))
     assert scene.acquainted == []
@@ -372,9 +375,13 @@ def test_new_scene_keys_are_omitted_at_default_and_kept_when_set(tmp_path):
         c = cm.new_campaign("s4-keys", seed=None)
         path = c.save()
         scene = json.loads(path.read_text(encoding="utf-8"))["scene"]
-        # A fresh campaign's story seed is random, so it is written; the rest are at default.
+        # A fresh campaign's story seed is random, so it is written; since Lane C
+        # (2026-09-28) so are its start, the people it spoke for and the people who know
+        # the character. The rest are at default.
         assert "story_seed" in scene
-        assert not any(k in scene for k in NEW_SCENE_KEYS if k != "story_seed")
+        written_by_c = {"story_seed", "start", "spoken_for", "acquainted"}
+        assert not any(k in scene for k in NEW_SCENE_KEYS if k not in written_by_c)
+        assert all(k in scene for k in written_by_c if getattr(c.scene, k))
         c.scene.start = {"id": "called-to-the-cage", "kind": "injury", "where": "arena",
                          "slots": {"lead": "c2"}, "hand_off": {"kind": "check"},
                          "tells": ["The cage door is open."]}
@@ -414,7 +421,8 @@ def test_the_story_seed_is_stable_and_is_not_the_dice_seed(tmp_path):
     # Read-only properties; `start_id` too, and neither is a field of the save.
     with pytest.raises(AttributeError):
         again.story_seed = 3
-    assert again.start_id == ""
+    # The start the campaign opened on (Lane C), read off the scene.
+    assert again.start_id == again.scene.start.get("id", "")
     again.scene.start = {"id": "the-hiring-table"}
     assert again.start_id == "the-hiring-table"
     with pytest.raises(AttributeError):

@@ -181,8 +181,13 @@ def test_the_numbers_come_from_the_codex_and_are_remembered(tmp_path, settings):
     """A keeper is a person the codex chose, filed under their own id, so their numbers
     are the same next session and one file on the NPCs bench corrects them
     (docs/npc-codex.md). The id is stamped `keeper:` because World Bible did not write
-    this person and nothing should mistake them for cast."""
-    settings.CAMPAIGN_DIR = tmp_path
+    this person and nothing should mistake them for cast.
+
+    One level down from `tmp_path`: the codex file lives in CAMPAIGN_DIR's PARENT, and
+    `tmp_path`'s parent is shared by every test on the worker — measured 2026-09-28, a
+    keeper remembered by an earlier test (named with a campaign's story seed) answered
+    this one."""
+    settings.CAMPAIGN_DIR = tmp_path / "campaigns"
     scene, _ = _table(MARKET)
     who = _keeper(scene, MARKET)
     wid = keepers.entity_id(MARKET)

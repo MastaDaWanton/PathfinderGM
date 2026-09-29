@@ -284,8 +284,8 @@ SCRIPTS = {
     #
     # Each line is the playtest's own sentence or the nearest thing to it, so the live run
     # meets the defect the way the player did (docs/playtest-2026-09-28.md). A fourth,
-    # `starts`, needs thirty fresh campaigns rather than thirty turns of one, which this
-    # harness cannot express — its steps are in docs/fix-baseline-2026-09-28.md.
+    # `starts`, needs thirty fresh campaigns rather than thirty turns of one, so it is its
+    # own mode rather than a script: `--starts 30 [--world …] [--offline]` (`starts()`).
     #
     # Out of the gate and into the land (items 16, 17, 19, 20). The Bobby session: `leave`
     # became a walk to the way in, the crossroads and the road away were refused and
@@ -723,6 +723,93 @@ def _known_names(c) -> set[str]:
         return {a.name for a in c.scene.actors.values() if a.name}
 
 
+def starts(n: int, world: str = "", character: str = "fixtures/pc-kesst.json",
+           written: bool = True, model: str = "", first_seed: int = 1000) -> dict:
+    """The `starts` mode: `n` fresh campaigns, one per story seed, and what each opened on.
+
+    Lane C's live gate (docs/design-c-starts.md §8, fix plan G2): thirty seeds reach at
+    least five towns and eight kinds of start; no village or town is called a city; the
+    lead is described on first sight; nothing is narrated past the hand-off; no invented
+    names; the template-fallback rate recorded as the baseline. The character's
+    background cycles through every background and none, because a start is drawn FOR
+    a background. `written=False` measures the engine side alone, with no model — the
+    town and kind criteria can be checked offline before any Ollama time is spent.
+    """
+    from gm.narration import invented_names
+    from play import opening, opening_prose
+    from rules import backgrounds, openings
+
+    real_for_role = None
+    if model:
+        from play import modelcfg
+
+        real_for_role = modelcfg.for_role
+
+        def _override(role: str) -> dict:
+            cfg = dict(real_for_role(role))
+            if role in ("narrator", "prose"):
+                cfg["model"] = model
+            return cfg
+        modelcfg.for_role = _override
+    bgs = [""] + sorted(backgrounds.all_backgrounds())
+    rows: list[dict] = []
+    try:
+        with override_settings(CAMPAIGN_DIR=Path(os.environ.get("TEMP", "/tmp"))
+                               / f"narrator-audit-starts-{int(time.time())}"):
+            cm._LIVE.clear()
+            for i in range(n):
+                pc = load_pc(character)
+                pc.background = bgs[i % len(bgs)]
+                started = time.monotonic()
+                c = cm.new_campaign(f"starts-{i}", seed=first_seed + i, character=pc,
+                                    world_source=world or None)
+                cm.open_the_story(c, written=written)
+                beat = c.transcript[-1]
+                text = str(beat.get("text") or "")
+                here = opening.situation_for(c)
+                skeleton = opening.compose(c, cm._standing(c.world, c.scene.pc()))
+                _material, allowed = opening_prose.material(c, here, skeleton)
+                scale = opening_prose.stated_scale(c.location)
+                lead = opening.lead_of(c)
+                rows.append({
+                    "seed": first_seed + i, "background": pc.background,
+                    "town": c.location.name if c.location is not None else "",
+                    "scale": scale, "start": c.start_id,
+                    "kind": str((c.scene.start or {}).get("kind") or ""),
+                    "lead": lead.name if lead is not None else "",
+                    "floor": bool((beat.get("opening") or {}).get("floor", not written)),
+                    "problems": list((beat.get("opening") or {}).get("problems") or []),
+                    "size_words": opening_prose.too_big(text, scale, allowed),
+                    "face_given": (lead is None or not lead.appearance
+                                   or opening_prose.face_given(text, here.who,
+                                                               lead.appearance)),
+                    "crossed": openings.crossed(text, c.scene.start or {}),
+                    "invented": sorted(invented_names(text, allowed)),
+                    "seconds": round(time.monotonic() - started, 1),
+                })
+                cm._LIVE.clear()
+    finally:
+        if real_for_role is not None:
+            from play import modelcfg
+
+            modelcfg.for_role = real_for_role
+    towns = sorted({r["town"] for r in rows})
+    kinds = sorted({r["kind"] for r in rows if r["kind"]})
+    return {
+        "rows": rows, "towns": towns, "kinds": kinds,
+        "called_bigger": [r for r in rows if r["size_words"]],
+        "faceless": [r for r in rows if not r["face_given"]],
+        "crossed": [r for r in rows if r["crossed"]],
+        "invented": [r for r in rows if r["invented"]],
+        "floor": sum(1 for r in rows if r["floor"]),
+        "passes": {"towns >= 5": len(towns) >= 5, "kinds >= 8": len(kinds) >= 8,
+                   "no place called bigger": not any(r["size_words"] for r in rows),
+                   "faces on first sight": all(r["face_given"] for r in rows),
+                   "no hand-off crossed": not any(r["crossed"] for r in rows),
+                   "no invented names": not any(r["invented"] for r in rows)},
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--turns", type=int, default=10)
@@ -734,7 +821,32 @@ def main() -> None:
     ap.add_argument("--json", default="", help="write the full run here")
     ap.add_argument("--record", default="",
                     help="append each turn to this JSONL replay-corpus file")
+    ap.add_argument("--starts", type=int, default=0,
+                    help="the starts mode: this many fresh campaigns, one per seed")
+    ap.add_argument("--offline", action="store_true",
+                    help="with --starts: the engine side only, no prose model")
     args = ap.parse_args()
+
+    if args.starts:
+        result = starts(args.starts, args.world, args.character,
+                        written=not args.offline, model=args.model)
+        print(f"starts: {len(result['rows'])} campaigns, {len(result['towns'])} towns, "
+              f"{len(result['kinds'])} kinds ({', '.join(result['kinds'])})")
+        for r in result["rows"]:
+            print(f"  {r['seed']:5d} {r['background'] or '-':18s} {r['town'][:18]:18s} "
+                  f"{r['scale']:8s} {r['start']:24s} {r['lead'][:22]:22s}"
+                  f"{' FLOOR' if r['floor'] else ''}"
+                  f"{' SIZE:' + ','.join(r['size_words']) if r['size_words'] else ''}"
+                  f"{' FACELESS' if not r['face_given'] else ''}"
+                  f"{' CROSSED:' + ','.join(r['crossed']) if r['crossed'] else ''}"
+                  f"{' INVENTED:' + ','.join(r['invented']) if r['invented'] else ''}")
+        print(f"template floor: {result['floor']}/{len(result['rows'])}")
+        for name, ok in result["passes"].items():
+            print(f"  {'PASS' if ok else 'FAIL'}  {name}")
+        if args.json:
+            Path(args.json).write_text(json.dumps(result, indent=1, default=str),
+                                       encoding="utf-8")
+        return
 
     print(f"narrator audit: {args.turns} turns of '{args.script}'\n")
     result = audit(args.turns, args.script, args.world, args.character,

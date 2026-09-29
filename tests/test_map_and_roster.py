@@ -111,15 +111,16 @@ def test_a_fight_moves_nobody_who_is_already_standing_somewhere(table):
     assert "positions.pop" not in src, "the fight re-lays nobody who has a square"
 
 
-def _opening(who: str):
-    """A fresh campaign whose opening person is `who` — the table is rolled per seed."""
+def _opening(start_id: str, character: str = "fixtures/pc-kesst.json"):
+    """A fresh campaign opened on one named start document (rules/openings.py). Until
+    2026-09-28 the opening person came from the rolled `SITUATIONS` table and this
+    searched seeds for them; the starts are documents now, and a start can be named."""
     from play import campaign as cm
+    from rules.sheet import load_pc
 
-    for seed in range(1, 200):
-        c = cm.new_campaign(seed=seed)
-        if any(a.name == who for a in c.scene.actors.values()):
-            return c
-    raise AssertionError(f"no seed opens on {who!r}")
+    c = cm.new_campaign(seed=11, character=load_pc(character), start_id=start_id)
+    assert c.scene.start.get("id") == start_id, f"{start_id} did not open"
+    return c
 
 
 def test_the_person_the_scene_introduces_stands_somewhere_from_the_start():
@@ -128,8 +129,8 @@ def test_the_person_the_scene_introduces_stands_somewhere_from_the_start():
     down before he arrived and nothing placed arrivals. The first swing at him had the
     fight invent a square fifteen feet off. People in the scene have a place on the
     board; the fight does not make one up."""
-    c = _opening("the foreman with the tally board")
-    ref = next(r for r, a in c.scene.actors.items() if not a.is_pc)
+    c = _opening("quiet-the-bread-stall")
+    ref = c.scene.start["slots"]["lead"]
     stood = c.scene.positions.get(ref)
     assert stood is not None, "introduced by the scene and standing nowhere"
     e = c.engine()
@@ -138,14 +139,16 @@ def test_the_person_the_scene_introduces_stands_somewhere_from_the_start():
     assert c.scene.positions[ref] == stood, "the swing moved him"
 
 
-@pytest.mark.parametrize("who", ["the stranger sharing the step",
-                                 "the neighbour beside you who knows the words"])
-def test_the_opening_person_beside_you_is_beside_you(who):
-    """Both were added `near` whatever their description said, and stood fifteen feet off
-    — "sharing the step" is one of the engine's own `engaged` cues. Their zone is read
-    from their description now, by the cues the prose is read by."""
-    c = _opening(who)
-    ref = next(r for r, a in c.scene.actors.items() if a.name == who)
+@pytest.mark.parametrize("start_id,slot,character", [
+    ("called-to-the-cage", "patient", "fixtures/pc-thessaly.json"),
+])
+def test_the_opening_person_beside_you_is_beside_you(start_id, slot, character):
+    """"The stranger sharing the step" and "the neighbour beside you" were added `near`
+    whatever their description said, and stood fifteen feet off (measured 2026-09-28).
+    A start document says where each person it brings stands (`zone`), and the patient
+    at your feet is at your feet: five feet, one square."""
+    c = _opening(start_id, character)
+    ref = c.scene.start["slots"][slot]
     assert c.scene.zones[ref] == "engaged"
     assert c.scene.distance_between("pc", ref) == 5
 

@@ -220,7 +220,7 @@ def bind(engine, actor) -> list[dict]:
     taken: set = set()
     filled: dict = {}
     for i, tie in enumerate(doc.get("ties") or []):
-        who = where = ""
+        who = where = entity = ""
         if tie.get("place"):
             got = schemes_mod._place_for(engine, tie["place"], {})
             if got:
@@ -237,6 +237,7 @@ def bind(engine, actor) -> list[dict]:
                                         filled, taken, place=False)
             if got:
                 who = str(got.get("name") or "")
+                entity = str(got.get("entity") or "")
         says = str(tie.get("says") or "")
         # A tie whose people or places the world could not supply says nothing rather
         # than saying "$who". A half-filled sentence in the narrator's brief is worse
@@ -244,7 +245,15 @@ def bind(engine, actor) -> list[dict]:
         if ("$who" in says and not who) or ("$where" in says and not where):
             continue
         says = says.replace("$who", who).replace("$where", where)
-        bound.append({"says": says, "who": who, "where": where})
+        bound.append({"says": says, "who": who, "where": where,
+                      "role": str(tie.get("role") or ""), "entity": entity})
+        # Somebody who knew the character before the first turn knows them whenever
+        # they meet, not only if they happen to be the one standing beside them at the
+        # opening (docs/design-c-starts.md §4.8.4): the arrival door reads this list
+        # (`recognise`) and gives them `bond.knows-you` on sight.
+        scene = getattr(engine, "scene", None)
+        if entity and scene is not None and entity not in scene.acquainted:
+            scene.acquainted.append(entity)
     if bound:
         actor.apply_effect(ActiveEffect(
             name=str(doc.get("name") or doc["id"]), kind="background",
@@ -296,22 +305,38 @@ def acquaint(engine, actor, bound: list[dict]) -> str:
     from . import attitude as attitude_mod
     from .activeeffect import ActiveEffect
 
-    if actor is None or not any(str(b.get("where") or "").strip() for b in bound or []):
-        return ""
     scene = getattr(engine, "scene", None)
-    if scene is None:
+    if actor is None or scene is None:
         return ""
-    # Whoever the opening put within speaking distance, and only them: this runs once,
-    # before the first turn, when the scene holds the player and one other person.
-    beside = [a for a in scene.actors.values() if not a.is_pc and not a.is_down]
-    if len(beside) != 1:
+    # A start document names its lead (`scene.start["slots"]["lead"]`), and a start's
+    # scene holds more than two people — a patient, a challenger, the keeper of the
+    # stall — so the lead is who this is about. The lead the character's own past
+    # supplied (they are `acquainted`) knows them whether or not a tie names a place
+    # here; anybody else only when the ties say this character is known in this town.
+    lead_ref = str(((getattr(scene, "start", None) or {}).get("slots") or {}).get("lead")
+                   or "")
+    lead = scene.people.get(lead_ref) if lead_ref else None
+    tied_lead = lead is not None and str(lead.world_entity_id or "") in scene.acquainted
+    if not tied_lead and not any(str(b.get("where") or "").strip() for b in bound or []):
         return ""
-    who = beside[0]
+    if lead is not None:
+        if lead.is_down:
+            return ""
+        who = lead
+    else:
+        # Whoever the opening put within speaking distance, and only them: this runs
+        # once, before the first turn, when the scene holds the player and one other.
+        beside = [a for a in scene.actors.values() if not a.is_pc and not a.is_down]
+        if len(beside) != 1:
+            return ""
+        who = beside[0]
     doc = get(getattr(actor, "background", "")) or {}
     source = f"background:{doc.get('id') or 'background'}"
-    who.apply_effect(ActiveEffect(
-        name="knows you", kind="bond", key=f"{source}:knows-you", source=source,
-        origin=source, duration="until-dismissed", tags=(states.KNOWS_YOU,)))
+    # Once: the arrival door has already bonded a tied lead on the way in (`recognise`).
+    if not any(e.kind == "bond" and e.key == f"{source}:knows-you" for e in who.effects):
+        who.apply_effect(ActiveEffect(
+            name="knows you", kind="bond", key=f"{source}:knows-you", source=source,
+            origin=source, duration="until-dismissed", tags=(states.KNOWS_YOU,)))
     # To the step at which somebody walks out of here with you — the same named step
     # `_op_company` asks for, because being known here is what makes a companion
     # possible on turn one. Named through the track's own constant: the commit that

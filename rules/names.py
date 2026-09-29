@@ -88,6 +88,24 @@ def pool_for(world, location_id: str | None, people_id: str | None = None) -> di
     return all_pools[0]
 
 
+def town_pool(world, location_id: str | None) -> dict | None:
+    """The settlement's OWN name pool — the `play.names` row whose `home_id` is the town —
+    or None.
+
+    Aurvantis ships sixty-four of them, one per settlement: Vormoor's holds sixteen
+    families (Grimstone, Fellhaven, …) that nothing read until 2026-09-28, while every
+    keeper there took a family off the town's four cast members and the market was kept
+    by an Ironvale in every game (playtest item 8.4). A world with none (Pangrella) gets
+    None, and the caller falls back.
+    """
+    if world is None or not location_id:
+        return None
+    for p in pools(world):
+        if str(p.get("home_id") or "") == str(location_id):
+            return p
+    return None
+
+
 def _pick(seq: list, seed: str, salt: str) -> str:
     if not seq:
         return ""

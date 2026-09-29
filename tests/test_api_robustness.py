@@ -170,9 +170,12 @@ def test_a_face_that_is_not_a_number_is_refused_not_crashed(client):
     c = cm.current()
     if c.scene.pc() is None or c.scene.awaiting or c.scene.in_encounter:
         pytest.skip("needs a quiet live campaign")
-    had_company = [r for r, a in c.scene.actors.items() if not a.is_pc]
-    if had_company:
-        pytest.skip("foraging needs solitude and this scene has company")
+    # Foraging needs solitude. Since 2026-09-28 every campaign opens with its start's
+    # people beside the character (rules/openings.py), which turned this into a skip
+    # every run; the people are sent off rather than the test.
+    for ref in [r for r, a in c.scene.actors.items() if not a.is_pc]:
+        c.scene.people.pop(ref, None)
+    c.save()
 
     r = client.post("/api/forage", data="{}", content_type="application/json")
     if r.status_code != 200 or "roll" not in r.json():
