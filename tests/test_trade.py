@@ -904,7 +904,12 @@ def test_the_trade_panel_needs_a_merchant_and_the_state_says_so():
             r = Client().post("/api/trade", data="{}",
                               content_type="application/json")
             assert r.status_code == 409
-            assert "nobody here to trade" in r.json()["error"].lower()
+            # Three honest refusals since I2 (2026-09-29): nobody here at all, "Nobody is
+            # at the general store just now." at a market's counter, or the counter's
+            # shut line — which one depends on where the shared campaign stands, so this
+            # failed by test order until it accepted each.
+            said = r.json()["error"].lower()
+            assert "nobody" in said or "shut" in said or "closed" in said, said
         # ...and with one, it opens, keyed to that merchant's own stall.
         from rules.sheet import from_dict
         added = from_dict({"name": "the stallholder", "kind": "npc", "hp": 4,
@@ -917,11 +922,21 @@ def test_the_trade_panel_needs_a_merchant_and_the_state_says_so():
         # are the only one, and whoever was already here otherwise: the live test
         # campaign is shared across files, and a merchant left standing by an
         # earlier test made this read "merchant" once the file order changed.
-        import re as _re
+        # Asked of the one rule that keys a stall (`views._stall_of`), not rebuilt here:
+        # since I2 (2026-09-29) a counter's keeper is keyed `market:<counter>` and a
+        # vendor with no counter by the slug of their name, so this test failed whenever
+        # the shared campaign held a counter keeper — order-dependent, measured failing
+        # in worktrees and once on the integration branch.
+        # At a market with counters the panel opens on a counter and says which (`line`,
+        # §2.10); anywhere else it is keyed by the vendor present.
+        from play.views import _stall_of
 
-        found = _merchant_here(c.scene)
-        assert r.json()["stall"] == _re.sub(r"[^a-z0-9]+", "-",
-                                            found.name.lower()).strip("-")
+        body = r.json()
+        if body.get("line"):
+            # The stall key is `market:<counter>` for the counter `line` names.
+            assert body["stall"].split(":")[-1] == body["line"], body.get("lines")
+        else:
+            assert body["stall"] == _stall_of(c)[1]
     finally:
         c.scene.remove("m1")
 
