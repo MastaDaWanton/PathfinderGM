@@ -566,7 +566,14 @@ def audit(turns: int, script: str, world: str, character: str,
 
             # And the things review cannot see, because they are about the *engine*.
             turn_log = getattr(c, "turn_log", None) or []
-            outcomes = (turn_log[-1].get("outcomes") if turn_log else None) or []
+            # The turn's own row, not the log's last row: since Phase 2 the beat is
+            # followed by prose, mention, speech-tag and after-the-beat rows, so the last
+            # row carries no outcomes and every fighting turn read as "did nothing"
+            # (measured 2026-09-29: a Magic Missile that dealt 4 and turned its target
+            # hostile was scored as a combat turn that did nothing).
+            own = next((row for row in reversed(turn_log)
+                        if row.get("kind") in ("turn", "resolution")), None)
+            outcomes = (own.get("outcomes") if own else None) or []
             # A turn that suspended for the player's d20 has done plenty — the attack
             # exists, the engine is waiting on a die. Scored as "did nothing" at first,
             # which reported three faults in fifty on llama3.1 that were all a punch
