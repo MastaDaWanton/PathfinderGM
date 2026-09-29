@@ -29,6 +29,13 @@ def ysolde(prepared=None, loadout=None):
     return from_dict(d, ref="pc")
 
 
+def book_cantrips(actor, n=3):
+    """The first n cantrips in the book's own order: what an empty cantrip loadout fills
+    the 0-level slots with since 2026-09-29 (tests/test_cantrips_at_will.py)."""
+    return {sid: 1 for sid in [s for s in actor.spellbook
+                               if casting._level(actor, s) == 0][:n]}
+
+
 def night(actor):
     s = Scene(location_id="5bbd0c40345f")
     s.add(actor)
@@ -64,7 +71,9 @@ def test_e_rest_keeps_what_was_not_cast():
     s.initiative, s.sides, s.turn = [], {}, 0
     out = e.run(e.validate([{"op": "rest", "actor": "pc", "because": "t",
                              "params": {"kind": "night"}}])).outcomes[0]
-    assert w.prepared == {"burning-hands": 1, "magic-missile": 1}
+    # The cantrip slots fill from the book too: this loadout predates prepared cantrips
+    # and names none, so the book's first three are prepared (2026-09-29, cantrips).
+    assert w.prepared == {"burning-hands": 1, "magic-missile": 1, **book_cantrips(w)}
     assert "prepares Magic Missile" in out.tell
 
 
@@ -77,20 +86,22 @@ def test_e_a_bare_night_no_longer_wipes():
 
 def test_e_fresh_wizard_is_prepared_from_book_order():
     """No loadout ever: a book caster's empty slots fill from the book in its own order, one
-    of each distinct spell before any repeat — Burning Hands, then Magic Missile."""
+    of each distinct spell before any repeat — Burning Hands, then Magic Missile. Since
+    2026-09-29 the three cantrip slots fill the same way (they were skipped, `lvl > 0`)."""
     w = ysolde()
     out = night(w)
-    assert w.prepared == {"burning-hands": 1, "magic-missile": 1}
-    assert "prepares Burning Hands, Magic Missile from the book" in out.tell
+    assert w.prepared == {"burning-hands": 1, "magic-missile": 1, **book_cantrips(w)}
+    assert "Burning Hands, Magic Missile" in out.tell and "from the book" in out.tell
     assert casting.empty_slots(w) == {}
 
 
 def test_e_the_loadout_decides_over_the_book():
     """The player's last preparation (Kingmaker's persistent memorised list) is what the
-    morning refills — two missiles, not the book's first two."""
+    morning refills — two missiles, not the book's first two. A loadout naming no cantrip
+    (every one saved before 2026-09-29) leaves the cantrip slots to the book."""
     w = ysolde(loadout={"magic-missile": 2})
     night(w)
-    assert w.prepared == {"magic-missile": 2}
+    assert w.prepared == {"magic-missile": 2, **book_cantrips(w)}
 
 
 def test_e_list_caster_is_warned_not_guessed():
@@ -107,19 +118,20 @@ def test_e_list_caster_is_warned_not_guessed():
     assert "Level 1 slots stand empty" in out.tell
 
 
-def test_e_nothing_prepared_offers_only_cantrips():
+def test_e_nothing_prepared_offers_nothing():
     """`_castable_summary` read `if prepared and not left`, and `{}` is falsy — so a
     prepared caster with NOTHING prepared was offered the whole book (fix-interfaces §1.7
-    F1), every button past the cantrips one the engine would refuse."""
-    from rules import spells as spells_mod
+    F1), every button past the cantrips one the engine would refuse.
 
+    This pinned "offers only cantrips" until 2026-09-29, when cantrips stopped being
+    castable unprepared (AoN, Wizard: a wizard "can prepare a number of cantrips... each
+    day"): nothing prepared now offers nothing, and a prepared cantrip is offered."""
     w = ysolde()
-    offered = _castable_summary(w)
-    assert offered and all(
-        casting.spell_level_for(w, spells_mod.get(x["id"])) == 0 for x in offered)
-    w.prepared = {"burning-hands": 1}
+    assert _castable_summary(w) == []
+    cantrip = next(iter(book_cantrips(w, 1)))
+    w.prepared = {"burning-hands": 1, cantrip: 1}
     ids = {x["id"] for x in _castable_summary(w)}
-    assert "burning-hands" in ids and "magic-missile" not in ids
+    assert ids == {"burning-hands", cantrip}
 
 
 def test_e_spontaneous_casters_are_left_alone():
@@ -151,10 +163,12 @@ def test_e_the_sheet_warns_of_empty_slots_and_the_prepare_tab_remembers(campaign
     """`/api/state` `spellcasting.empty_slots` names the empty slots (§2.10), and every
     change on the Spells tab is the loadout the next morning refills."""
     s = Client().get("/api/state").json()
-    assert s["spellcasting"]["empty_slots"] == {"1": 2}
+    # "0" since 2026-09-29: a cantrip slot holds a prepared cantrip, and these are empty.
+    assert s["spellcasting"]["empty_slots"] == {"0": 3, "1": 2}
     r = Client().post("/api/spells/prepare", data=json.dumps(
         {"action": "prepare", "spell": "burning-hands"}), content_type="application/json")
     assert r.status_code == 200
     pc = campaign.scene.pc()
     assert pc.loadout == {"burning-hands": 1}
-    assert Client().get("/api/state").json()["spellcasting"]["empty_slots"] == {"1": 1}
+    assert Client().get("/api/state").json()["spellcasting"]["empty_slots"] == {"0": 3,
+                                                                                 "1": 1}

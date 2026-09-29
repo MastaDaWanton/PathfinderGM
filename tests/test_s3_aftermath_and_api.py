@@ -637,9 +637,11 @@ def test_every_new_state_key_is_there_at_its_default(game):
     if s["scene"]["grid"] is not None:
         assert s["scene"]["grid"]["areas"] == []
     # A wizard's first morning is filled from her book since item 21.4's fix (2026-09-28),
-    # so the Spells button shows with nothing left empty; the warning's shape is Lane E's.
+    # so the Spells button shows; the warning's shape is Lane E's. The three cantrip slots
+    # stand empty since 2026-09-29 (cantrips are prepared, tests/test_cantrips_at_will.py):
+    # this fixture's book holds two 1st-level spells and no cantrip to fill them with.
     assert s["spellcasting"] == {"kind": "prepared", "nothing_prepared": False,
-                                 "empty_slots": {}}
+                                 "empty_slots": {"0": 3}}
     # Lane C (2026-09-28): a new campaign opens on a start document, so `start` carries
     # it; its shape is still §2.10's, read through the one helper.
     from play import views

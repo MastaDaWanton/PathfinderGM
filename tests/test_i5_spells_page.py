@@ -16,9 +16,11 @@ Defects these record, each measured before it was fixed:
     with no action. The server reads a missing action as "prepare": a POST with none
     took Sleep from 0 prepared to 1. So every Cast press also prepared the spell again,
     or, with the level full, threw an alert over the chip it had just attached.
-  * The brief called cantrips "castable at will"; the engine spends a level-0 slot per
+  * The brief called cantrips "castable at will"; the engine spent a level-0 slot per
     cast. A level 5 wizard casting Light read 4, 3, 2, 1, 0 slots and the fifth was
-    refused. The page says "each cast spends a cantrip slot", never "at will".
+    refused. The first build of this page said "each cast spends a cantrip slot"; the
+    ENGINE was the one that was wrong (AoN, Wizard: cantrips "are not expended when
+    cast"), and since the 2026-09-29 fix the page shows prepared cantrips as at will.
   * At 375px the sheet's one grid column took the header's 414px minimum, and the gilt
     clasps hang 34px outside every card: the tab scrolled 17px sideways. The phone rules
     hold the body to the screen and clip the ornament.
@@ -85,8 +87,11 @@ def _wizard_spells() -> dict:
 
     book = ("acid-splash", "light", "daze", "magic-missile", "burning-hands", "shield",
             "sleep", "mage-armor", "invisibility", "web", "fireball", "haste")
+    # Two of the three cantrips prepared, Daze left in the book: cantrips are prepared
+    # like any spell and cast at will (2026-09-29, tests/test_cantrips_at_will.py).
     pc = wizard(level=5, book=book, prepared={"magic-missile": 2, "shield": 1,
-                                              "invisibility": 1, "fireball": 1})
+                                              "invisibility": 1, "fireball": 1,
+                                              "acid-splash": 1, "light": 1})
     casting.define_slots(pc)
     return full_sheet(pc)["spells"]
 
@@ -156,17 +161,28 @@ def test_the_three_columns_are_there_in_the_mockups_order(spells, tmp_path):
 
 def test_the_slots_are_gem_sockets_lit_while_they_last(spells, tmp_path):
     """Lit = available, dark = spent, one socket per slot, and the count in words beside
-    them so colour is never the only way to read it."""
+    them so colour is never the only way to read it.
+
+    The cantrip row is the exception since 2026-09-29: a cantrip is "not expended when
+    cast" (AoN, Wizard), so its gems are the cantrips PREPARED today (two of four here)
+    and the words say at will. It read "4 of 4 left" and drained per cast before."""
     els = _tree(_render(spells, tmp_path)["html"])
     levels = [e for e in els if e["attrs"].get("class") == "sock-level"]
     assert len(levels) == len(spells["slots"])
+    held = len([k for k in spells["known"] if k.get("level") == 0 and k["prepared"]])
+    assert held == 2
     for lvl, slot in zip(levels, spells["slots"]):
         gems = [e for e in els if lvl in e["ancestors"] and e["tag"] == "i"
                 and "gem" in e["attrs"].get("class", "")]
         lit = [g for g in gems if "lit" in g["attrs"]["class"].split()]
+        assert f"DC {slot['dc']}" in lvl["text"]
+        if slot["level"] == 0:
+            assert len(gems) == slot["max"] and len(lit) == held
+            assert f"{held} of {slot['max']} prepared, at will" in lvl["text"]
+            assert "left" not in lvl["text"]
+            continue
         assert len(gems) == slot["max"] and len(lit) == slot["left"]
         assert f"{slot['left']} of {slot['max']} left" in lvl["text"]
-        assert f"DC {slot['dc']}" in lvl["text"]
 
 
 def test_prepared_spells_are_cards_with_the_strip_and_both_buttons(spells, tmp_path):
@@ -203,22 +219,37 @@ def test_cast_attaches_and_never_prepares(spells, tmp_path):
     assert "attachSpell({ id: cast.dataset.spell" in state
 
 
-def test_cantrips_need_no_preparing_and_the_page_does_not_promise_at_will(spells, tmp_path):
-    """The engine exempts level 0 from preparation but spends a level-0 slot per cast:
-    4, 3, 2, 1, 0, then refused. So cantrips get Cast and no Prepare, no drag, and a line
-    saying each cast spends a cantrip slot."""
+def test_prepared_cantrips_are_at_will_and_the_rest_are_prepared_first(spells, tmp_path):
+    """AoN, Wizard: wizards "can prepare a number of cantrips, or 0-level spells, each
+    day" and those "are not expended when cast and may be used again".
+
+    This test pinned the opposite until 2026-09-29 ("the page does not promise at
+    will"): the engine then skipped the prepared check at level 0 and spent a level-0
+    slot per cast — a level 5 wizard's Light went 4, 3, 2, 1, 0 and was refused. Both
+    halves were wrong. Now the middle column lists only the PREPARED cantrips, each with
+    Cast and Unprepare, under a line saying at will; the unprepared one (Daze) is offered
+    in the grimoire with Prepare and can be dragged, like any other spell."""
     html = _render(spells, tmp_path)["html"]
     els = _tree(html)
     rows = [e for e in els if e["attrs"].get("class") == "sx-cantrip"]
-    assert len(rows) == len([k for k in spells["known"] if k.get("level") == 0])
+    casts = [e for r in rows for e in els if r in e["ancestors"]
+             and "castbtn" in e["attrs"].get("class", "")]
+    assert {b["attrs"]["data-spell"] for b in casts} == {"acid-splash", "light"}
     for r in rows:
         buttons = [e for e in els if r in e["ancestors"] and e["tag"] == "button"]
-        assert [b["text"].strip() for b in buttons] == ["Details", "Cast"]
-    assert "each cast spends a cantrip slot" in html
-    assert "at will" not in html.lower()
-    grim0 = [e for e in els if e["attrs"].get("class") == "gx-row"
-             and e["attrs"]["data-spell"] in {"acid-splash", "light", "daze"}]
-    assert grim0 and all("draggable" not in r["attrs"] for r in grim0)
+        assert [b["text"].strip() for b in buttons] == ["Details", "Cast", "Unprepare"]
+    assert "At will: casting one spends nothing." in html
+    assert "2 of 4 prepared today" in html
+    assert "spends a cantrip slot" not in html
+    grim = {e["attrs"]["data-spell"]: e for e in els if e["attrs"].get("class") == "gx-row"}
+
+    def acts(row):
+        return [e["text"].strip() for e in els if row in e["ancestors"]
+                and e["tag"] == "button" and e["text"].strip() != "Details"]
+
+    for sid in ("acid-splash", "light"):
+        assert acts(grim[sid]) == ["Cast"] and "draggable" not in grim[sid]["attrs"]
+    assert acts(grim["daze"]) == ["Prepare"] and grim["daze"]["attrs"]["draggable"] == "true"
 
 
 def test_every_button_and_field_has_a_name(spells, tmp_path):
@@ -377,8 +408,9 @@ def test_every_spell_has_a_details_button(spells, tmp_path):
 
     holders = ([e for e in els if e["tag"] == "article"]
                + [e for e in els if e["attrs"].get("class") in ("gx-row", "sx-cantrip")])
-    # 4 cards, 3 cantrip rows, 12 grimoire rows for this wizard.
-    assert len(holders) == 4 + 3 + 12
+    # 4 cards, 2 prepared cantrip rows (Daze is in the book, not prepared: cantrips are
+    # prepared since 2026-09-29), 12 grimoire rows for this wizard.
+    assert len(holders) == 4 + 2 + 12
     for h in holders:
         found = details_in(h)
         assert len(found) == 1, h["attrs"]

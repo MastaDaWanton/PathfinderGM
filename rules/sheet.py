@@ -4253,7 +4253,9 @@ def _castable_summary(actor: Actor) -> list[dict]:
             level = casting.spell_level_for(actor, spell)
         except Exception:
             name, summary, level = sid, "", None
-        if kind == "prepared" and not left and level != 0:
+        # Cantrips too, since 2026-09-29: a prepared caster casts the cantrips prepared
+        # today, at will, and not the rest of the book (`casting.at_will`).
+        if kind == "prepared" and not left:
             continue          # a prepared caster cannot cast what is not in their head
         if kind != "prepared" and prepared and not left:
             continue
