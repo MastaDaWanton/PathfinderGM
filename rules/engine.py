@@ -4053,6 +4053,17 @@ class Engine:
         # never meets the gate below: finishing a bound prisoner opens no battle, and the
         # blow is resolved on the spot, never deferred. `rules/coup_de_grace.py`.
         coup = bool(intent.params.get("coup_de_grace"))
+        # Whether the one struck can tell who struck them (owner, Q34, for swords and
+        # spells alike): a hidden attacker sniping from ten feet or more who keeps hidden
+        # opens no fight and costs no attitude — `attitude.perceived` carries the rule and
+        # its sources. Asked once, on the first entry, and kept in the attack's state, so
+        # a resume from the dice popup never rolls the Stealth contest again.
+        from . import attitude as attitude_mod
+
+        held = partial.get("attack_state")
+        sniping: list = []
+        seen = (bool(held.get("seen", True)) if held is not None
+                else attitude_mod.perceived(self, actor, defender, rolls=sniping))
         # The moment of first violence opens the battle and stops there. Measured in
         # play (2026-08-27): a spoken turn spawned an opponent, began the encounter,
         # swung, confirmed a critical, killed, ended the fight and paid out XP — an
@@ -4063,7 +4074,7 @@ class Engine:
         # battle is joined, and the swing itself is the player's to declare on their
         # own first combat turn. A swing at somebody already down opens nothing — one
         # living combatant is no encounter — and resolves as the mercy stroke it is.
-        if partial.get("attack_state") is None and not coup:
+        if partial.get("attack_state") is None and not coup and seen:
             opened = False
             if not self.scene.in_encounter:
                 opened = self._ensure_encounter(intent.actor, intent.target)
@@ -4106,7 +4117,7 @@ class Engine:
                           f"{', '.join(foes) or defender.name}. Nothing has landed "
                           f"yet — the first blow is still to be struck."),
                     because=intent.because)
-        if not coup:
+        if not coup and seen:
             self._ensure_encounter(intent.actor, intent.target)
         weapon = actor.weapon(weapon_key)
         # An improvised weapon IS the object: the tell names the chunk of wood, not
@@ -4191,6 +4202,9 @@ class Engine:
 
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
+        if held is None:
+            state["seen"] = seen
+            state["rolls"].extend(sniping)
         # (weapon, iteration) per swing. One weapon for a character; for a monster, the
         # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
         sequence = actor.attack_plan(weapon_key, full)
@@ -4621,6 +4635,16 @@ class Engine:
         rolls = [_roll_from_dict(r) for r in state["rolls"]]
         effects = list(state["effects"]) + crossed
         any_hit = any(e.get("kind") == "damage" for e in effects)
+        # Harm moves how they feel (item 22.3; owner, Q37: the sword door obeys the rule
+        # the spell door does). Damage, or a harmful condition landed by the blow.
+        if any_hit or any(e.get("kind") == "condition" and e.get("ref") == defender.ref
+                          and attitude_mod.harmful_condition(str(e.get("condition", "")))
+                          for e in effects):
+            felt = attitude_mod.harmed(self, defender, actor, f"attack:{weapon_key}",
+                                       seen=bool(state.get("seen", True)))
+            if felt:
+                effects.append(felt)
+                state["tells"].append(attitude_mod.harm_said(felt, defender.name))
         # A thrown thing is on the ground now, at this spot, with its record — the
         # player's, or whoever's it was before they picked it up. One applicator:
         # the same `place_prop` the sunder and the drop use.
@@ -9182,19 +9206,83 @@ class Engine:
         and no creature carries an SR *number* the engine can check against, so nothing is
         rolled and the printed line is reported as it always was. Half a check would be
         worse than none — see docs/spells.md §5.1.
+
+        **Who is in it, since 2026-09-28** (docs/design-e-magic.md; items 22.1–22.3). An
+        area spell used to take its victims from `intent.target` alone, and the Spells tab
+        sent none for a cone: Bobby's Burning Hands rolled 1d4 = 1 with `targets: []` and
+        the man it was pointed at stood at 4 of 4. Now the area is laid on the map from
+        the caster and the aim (`rules/areas.py`, the one place membership is decided),
+        every creature in it saves and takes its share, the things in it are listed, and a
+        cast that caught nobody rolls nothing and says so (`no_victim`). With no map the
+        aim alone decides, as before.
+
+        **Harm opens the fight and moves attitude, when it is seen.** A spell that rolls
+        damage or lays a harmful condition (`attitude.harmful_spell`) on somebody not on
+        the caster's side is violence, and the first one defers through the battle gate
+        exactly as a first swing does (owner, Q31): the encounter forms, nothing is spent
+        or rolled, and the player casts it on their own first turn. Each creature it
+        harms is told through `attitude.harmed`, the one rule the sword door shares (Q37).
+        A caster nobody perceives — the sniping rule, `attitude.perceived` — opens no
+        fight and costs no attitude (owner, Q34).
         """
+        from . import areas, attitude as attitude_mod
+
         actor = self.scene.actors[intent.actor]
         spell = spells_mod.get(str(intent.params["spell"]))
         level = casting.spell_level_for(actor, spell)
         dc = casting.save_dc(actor, level)
         cl = casting.caster_level(actor)
+        plan = spells_mod.casting_plan(spell, cl)
+        dice = plan["dice"]
 
         # The slot is spent once, on the way in, and never again on a resume. `state`
         # living in `partial` is what distinguishes the two: a cast that suspends for the
         # player's damage roll comes back through here with its state, and re-spending
-        # would cost a second slot for one fireball.
+        # would cost a second slot for one fireball. Everything decided about WHERE the
+        # spell went is decided once too, and kept in the state: a resume must not lay the
+        # area again after somebody moved, nor roll the Stealth contest twice.
         state = partial.get("cast_state")
         if state is None:
+            state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": []}
+            aim = self._cast_aim(intent, actor)
+            if aim.kind == "object":
+                # Held by the thing's own name ("canopy"), the player's words kept for
+                # the tell ("the tree tops").
+                found = areas.find_object(self.scene, aim.value)
+                if found:
+                    aim = areas.Aim("object", str(found["name"]).lower(),
+                                    said=f"the {aim.value}")
+            area = areas.lay(self.scene, actor.ref, spell, cl, aim)
+            if area.shape != "none":
+                caught = areas.caught(self.scene, area)
+            else:
+                caught = intent.targets() or ([intent.params["at"]]
+                                              if intent.params.get("at") else [])
+                if not caught and aim.kind == "ref":
+                    caught = [aim.value]
+                if not caught and aim.kind == "self":
+                    caught = [actor.ref]
+            objects = areas.objects_caught(self.scene, area, spell)
+            harms = attitude_mod.harmful_spell(spell, cl)
+            foes = [r for r in caught if r in self.scene.actors
+                    and self._against(actor, self.scene.actors[r])]
+            seen = {}
+            if harms:
+                for r in caught:
+                    if r != actor.ref and r in self.scene.actors:
+                        seen[r] = attitude_mod.perceived(
+                            self, actor, self.scene.actors[r], rolls=state["rolls"])
+            state.update({"aim": aim.as_dict(), "aim_param": aim.as_param(),
+                          "area": area.as_dict() if area.shape != "none" else None,
+                          "caught": list(caught), "objects": objects,
+                          "harmful": bool(harms and foes), "harms": bool(harms),
+                          "seen": seen, "fell_short": bool(area.fell_short)})
+            noticed = [r for r in foes if seen.get(r, True)]
+            if harms and noticed:
+                deferred = self._cast_gate(intent, actor, spell, aim, noticed, state)
+                if deferred is not None:
+                    return deferred
+
             pool = casting.slot_pool(level)
             spent = actor.spend_pool(pool, 1)
             if not spent["ok"]:
@@ -9206,7 +9294,8 @@ class Engine:
                 # Validate is NOT taught to simulate the list; that is a second resolver.
                 return self._refuse(
                     intent, f"{actor.name} has no {pool} left, so {spell.name} is not "
-                            f"cast. What was cast before it stands.")
+                            f"cast. What was cast before it stands.", code="no_slots",
+                    for_a_person=f"{actor.name} has no level {level} spell slots left.")
             # The prepared copy is spent with the slot — for every prepared caster, not
             # only the ones who prepare from a book (item 25).
             converted = ""
@@ -9226,17 +9315,13 @@ class Engine:
                             lost = given
                         converted = (f"{actor.name} gives up {lost} to cast "
                                      f"{spell.name} instead.")
-            state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": []}
             if converted:
                 state["tells"].append(converted)
         pool = casting.slot_pool(level)
 
-        targets = intent.targets() or ([intent.params["at"]] if intent.params.get("at")
-                                       else [])
+        targets = list(state.get("caught") or [])
         save = (spell.saving_throw or "").strip()
         sr = (spell.spell_resistance or "").strip()
-        plan = spells_mod.casting_plan(spell, cl)
-        dice = plan["dice"]
 
         bits = [f"caster level {cl}"]
         if save and save.lower() not in ("none", "no", "—", "-"):
@@ -9246,35 +9331,59 @@ class Engine:
         if spell.duration:
             bits.append(spell.duration)
 
+        live = [ref for ref in targets if ref in self.scene.actors]
+        # Nothing to roll against: nobody in it. The dice line "1d4 — 1." with no victim
+        # was the bare roll the prose then invented a burned face for (item 22.4).
+        no_victim = bool(dice) and not live
+
         # Everything a narrator, a player and a GM correcting a conversion all need. The
-        # keys that were here before are untouched; `effects_converted` is new and is the
-        # one a GM most needs, because 385 of these numbers were read by a machine and
-        # nobody has checked them.
+        # keys that were here before are untouched but `area`, which is the laid area now
+        # when there is one; `effects_converted` is the one a GM most needs, because 385
+        # of these numbers were read by a machine and nobody has checked them. The new
+        # keys (fix-interfaces §2.7) are written only when they say something.
         cast_effect = {
             "ref": actor.ref, "kind": "cast", "spell": spell.id,
             "name": spell.name, "spell_level": level, "dc": dc,
             "caster_level": cl, "save": save, "spell_resistance": sr,
             "duration": spell.duration, "range": spell.range,
-            "area": spell.area or spell.effect or spell.targets,
+            "area": state.get("area") or (spell.area or spell.effect or spell.targets),
             "targets": targets, "slot": pool,
             "slots_left": casting.slots_left(actor, level),
             "element": spell.element, "dice": dice,
             "range_feet": spells_mod.range_feet(spell, cl),
             "effects": spell.effects, "effects_converted": spell.effects_converted,
         }
+        aim_said = self._aim_words(state)
+        if (state.get("aim") or {}).get("kind", "none") != "none":
+            cast_effect["aim"] = dict(state["aim"], said=aim_said)
+        if state.get("area"):
+            cast_effect["caught"] = list(targets)
+        if state.get("objects"):
+            cast_effect["caught_objects"] = [
+                {"kind": o["kind"], "name": o["name"], "burns": bool(o.get("burns"))}
+                for o in state["objects"]]
+        if no_victim:
+            cast_effect["no_victim"] = True
+        if state.get("harmful"):
+            cast_effect["harmful"] = True
+        if state.get("fell_short"):
+            cast_effect["fell_short"] = True
+
+        where = self._cast_where(actor, spell, state, targets, no_victim, aim_said)
 
         if not spell.effects:
             # One of the 2,655. Unchanged, deliberately: the outcome states the facts and
             # whatever the GM then declares arrives as its own validated intent.
+            lit, lit_said = self._ignite_caught(actor, spell, state)
             return Outcome(
-                intent_id=intent.id, op="cast", effects=[cast_effect],
-                tell=f"{actor.name} casts {spell.name} ({'; '.join(bits)}).",
+                intent_id=intent.id, op="cast", effects=[cast_effect] + lit,
+                rolls=[_roll_from_dict(r) for r in state["rolls"]],
+                tell=" ".join([f"{actor.name} casts {spell.name} ({'; '.join(bits)})."]
+                              + where + lit_said),
                 because=intent.because,
             )
 
-        live = [ref for ref in targets if ref in self.scene.actors]
-
-        if dice and state["stage"] == "dice":
+        if dice and live and state["stage"] == "dice":
             roll = self._roll_or_suspend_stage(
                 intent, actor, [],
                 f"{spell.name} — {'healing' if plan['kind'] == 'heal' else 'damage'}",
@@ -9300,6 +9409,10 @@ class Engine:
                 )
                 state["rolls"].append(save_roll.as_dict())
                 saved = d20_succeeds(save_roll, dc)
+                # Half from full without parsing a tell: the saved flag only. The DC and
+                # total live on the save's Roll, under its own visibility (§1.6 E12).
+                state["effects"].append({"kind": "save", "ref": target.ref,
+                                         "save": plan["save"], "saved": bool(saved)})
                 effect = plan["save_effect"]
                 if saved and effect == "negates":
                     amount = 0
@@ -9364,13 +9477,32 @@ class Engine:
             crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
         effects.extend(crossed)
 
-        tells = [f"{actor.name} casts {spell.name} ({'; '.join(bits)})."]
-        if dice:
+        tells = [f"{actor.name} casts {spell.name} ({'; '.join(bits)})."] + where
+        if dice and "rolled" in state:
             tells.append(f"{dice} — {state.get('rolled', 0)}.")
         tells.extend(state["tells"])
         crossed_said = self._hp_state_tell(crossed).strip()
         if crossed_said:
             tells.append(crossed_said)
+
+        # What the harm does to how they feel — once, after every roll, and only for a
+        # spell that harms (being caught is the attack, so a made save counts).
+        if state.get("harms"):
+            for ref in live:
+                victim = self.scene.actors.get(ref)
+                if victim is None or ref == actor.ref:
+                    continue
+                felt = attitude_mod.harmed(self, victim, actor, f"spell:{spell.id}",
+                                           seen=(state.get("seen") or {}).get(ref, True))
+                if felt:
+                    effects.append(felt)
+                    line = attitude_mod.harm_said(felt, victim.name)
+                    if line:
+                        tells.append(line)
+
+        lit, lit_said = self._ignite_caught(actor, spell, state)
+        effects.extend(lit)
+        tells.extend(lit_said)
 
         # The riders, in two piles. The ones the engine can run — a manifestation, a
         # summon, an operation on another spell, anything waiting on a trigger — are run;
@@ -9390,6 +9522,179 @@ class Engine:
             rolls=[_roll_from_dict(r) for r in state["rolls"]],
             effects=effects, tell=" ".join(tells), because=intent.because,
         )
+
+    # --- where a cast went (rules/areas.py does the geometry) ---------------------------
+
+    def _cast_aim(self, intent: Intent, actor: Actor):
+        """The cast's aim: the `aim` param, else the legacy `at` or `square`, else the
+        intent's own target."""
+        from . import areas
+
+        aim = areas.aim_of(intent.params, actor.ref)
+        if aim.kind == "none" and intent.targets():
+            first = intent.targets()[0]
+            aim = areas.Aim("self") if first == actor.ref else areas.Aim("ref", first)
+        return aim
+
+    def _against(self, actor: Actor, other: Actor) -> bool:
+        """Whether harming `other` is harming somebody not on `actor`'s side — the half of
+        Invisibility's definition of an attack that is about WHO: "any spell ... whose area
+        or effect includes a foe". In a fight, the sides say; out of one, the party is the
+        PC and whoever travels with them."""
+        if other is actor or other.has_state("state.down.dead"):
+            return False
+        for refs in (self.scene.sides or {}).values():
+            if actor.ref in refs:
+                return other.ref not in refs
+        if actor.is_pc:
+            return not (other.is_pc or other.has_state(states.TRAVELS_WITH_YOU))
+        return other.is_pc or other.has_state(states.TRAVELS_WITH_YOU)
+
+    def _cast_gate(self, intent: Intent, actor: Actor, spell, aim, foes: list[str],
+                   state: dict) -> Outcome | None:
+        """The battle gate, for a spell: first violence opens the fight and never resolves
+        it (tests/test_battle_gate.py), whichever door the violence came through.
+
+        Harmful magic was the one violence that never started a fight (item 22.2):
+        `_op_cast` never called `_ensure_encounter`. Now a first harmful cast opens the
+        encounter and stops, exactly as `_op_attack`'s first swing does — no slot spent,
+        nothing rolled — and the caster keeps the turn to cast it as declared (owner,
+        Q31: the gate, not a surprise round). `_ensure_encounter` takes one target, so the
+        area's other victims are drawn in with `join_fight` and `rally`, or they would
+        stay bystanders inside the flames. Inside a running fight nothing defers: a caught
+        bystander is simply brought in, like a swing at one.
+
+        Only the player's cast is deferred. Another caster's opens the fight and resolves:
+        `_their_first_blow` rolls an NPC's deferred SWING in the same batch, and there is
+        no such door for a spell, so deferring it would leave the cast undone."""
+        def on_a_side(ref: str) -> bool:
+            return any(ref in refs for refs in (self.scene.sides or {}).values())
+
+        opened = False
+        if not self.scene.in_encounter:
+            opened = self._ensure_encounter(actor.ref, foes[0])
+        for ref in foes:
+            if self.scene.in_encounter and not on_a_side(ref):
+                self.join_fight(ref)
+                self.rally(ref)
+        if not actor.is_pc or not (opened or self._battle_joined):
+            return None
+        self._battle_joined = True
+        for i, (ref, _) in enumerate(self.scene.initiative):
+            if ref == actor.ref:
+                self.scene.turn = i
+                self.scene.acted.add(actor.ref)
+                break
+        mine = next((s for s, refs in self.scene.sides.items() if actor.ref in refs), None)
+        names = [self.scene.actors[r].name
+                 for s, refs in self.scene.sides.items() if s != mine
+                 for r in refs if r in self.scene.actors
+                 and not self.scene.actors[r].is_down]
+        params = {"spell": spell.id}
+        if aim.as_param():
+            params["aim"] = aim.as_param()
+        return Outcome(
+            intent_id=intent.id, op="cast",
+            rolls=[_roll_from_dict(r) for r in state.get("rolls") or []],
+            effects=[{"ref": actor.ref, "kind": "battle_joined", "op": "cast",
+                      "target": foes[0], "params": params}],
+            tell=(f"Battle is joined: {actor.name} squares off against "
+                  f"{', '.join(names) or self.scene.actors[foes[0]].name}. Nothing has "
+                  f"been cast yet — {spell.name} is still to be spoken."),
+            because=intent.because)
+
+    def _aim_words(self, state: dict) -> str:
+        """What the cast was aimed at, in words: a person's name, a thing's, or "". A
+        direction is never a word here — the world has no bearings (item 19.5)."""
+        aim = state.get("aim") or {}
+        kind, value = aim.get("kind", "none"), str(aim.get("value", ""))
+        if aim.get("said"):
+            return str(aim["said"])
+        if kind == "ref" and value in self.scene.actors:
+            return self.scene.actors[value].name
+        if kind == "object":
+            return f"the {value}"
+        if kind == "direction" and value in ("up", "down"):
+            return "overhead" if value == "up" else "below"
+        return ""
+
+    def _cast_where(self, actor: Actor, spell, state: dict, targets: list[str],
+                    no_victim: bool, aim_said: str) -> list[str]:
+        """The sentences that say where the cast went and whom it caught — facts for the
+        narrator, never a compass word."""
+        from . import areas
+
+        out: list[str] = []
+        aim = state.get("aim") or {}
+        area = state.get("area") or {}
+        kind = aim.get("kind", "none")
+        if kind == "object" and aim_said:
+            prep = "up into" if aim.get("value") == "canopy" else "at"
+            out.append(f"It is aimed {prep} {aim_said}.")
+        elif kind == "direction" and aim_said:
+            out.append(f"It is aimed {aim_said}.")
+        if state.get("fell_short") and aim_said:
+            out.append(f"It falls short of {aim_said}.")
+        if area.get("measured") and targets:
+            word = {"cone": "cone", "line": "line", "cylinder": "column",
+                    "cube": "area", "square": "area"}.get(area.get("shape"), "burst")
+            names = [self.scene.actors[r].name for r in targets if r in self.scene.actors]
+            if names:
+                out.append(f"The {word} catches {', '.join(names)}.")
+        if no_victim:
+            out.append("The flames reach nobody." if areas.is_fire(spell)
+                       else f"{spell.name} reaches nobody.")
+        return out
+
+    def _ignite_caught(self, actor: Actor, spell, state: dict) -> tuple[list, list]:
+        """Light what a fire spell caught, once per cast — the flag in the state keeps a
+        resume from lighting it twice."""
+        if state.get("lit") or not any(o.get("burns") for o in state.get("objects") or []):
+            return [], []
+        state["lit"] = True
+        return self._ignite([o for o in state["objects"] if o.get("burns")],
+                            {"caster": actor.ref, "source": spell.name})
+
+    def _ignite(self, objects: list[dict], ctx: dict) -> tuple[list[dict], list[str]]:
+        """Set alight what a fire spell caught: "Flammable materials burn if the flames
+        touch them" (Burning Hands). One executor, beside `_manifest`, and the same shape:
+        a `Manifestation` for the burning, and one of smoke (`obscuring`) over burning
+        ground — smoke gives concealment (CRB, Smoke Effects). Smoke from a canopy rises,
+        so none is laid on the ground under it.
+
+        How long it burns is the one duration the CRB gives a fire, the forest fire's
+        "2d4 × 10 minutes", rolled on the engine's dice. It does not spread: no spread rate
+        at this scale could be sourced (docs/design-e-magic.md §4.4; escalation to the
+        CR 6 forest fire is the owner's Q33, for I3). The hazards that make standing in it
+        cost something are I3's rows (`burning-brush`, `smoke`); until they land the fire
+        is a fact on the map and in the tell, and nothing invents a number for it."""
+        effects: list[dict] = []
+        tells: list[str] = []
+        minutes = self.dice.roll("2d4", label="how long the fire burns",
+                                 visibility="hidden").total * 10
+        rounds = minutes * 10
+        for obj in objects:
+            cells = [tuple(c) for c in (obj.get("at") or [])]
+            if obj.get("kind") == "prop" and obj.get("square"):
+                sq = obj["square"]
+                cells = [(int(sq[0]), int(sq[1]))]
+            name = str(obj.get("name") or "it")
+            made = self.scene.place(Manifestation(
+                what=f"burning {name}", terrain="none", squares=cells,
+                rounds_left=rounds, source=str(ctx.get("source", "")),
+                owner=str(ctx.get("caster", ""))))
+            effects.append({"kind": "manifest", **made.as_dict()})
+            said = f"The {name} catches fire"
+            if obj.get("kind") == "feature" and name != "canopy":
+                ground = sorted({(c[0], c[1]) for c in cells})
+                smoke = self.scene.place(Manifestation(
+                    what="smoke", terrain="obscuring", squares=ground,
+                    rounds_left=rounds, source=str(ctx.get("source", "")),
+                    owner=str(ctx.get("caster", ""))))
+                effects.append({"kind": "manifest", **smoke.as_dict()})
+                said += ", and smoke rises from it"
+            tells.append(said + ".")
+        return effects, tells
 
     def _retaliate(self, struck: Actor, by: Actor) -> list[dict]:
         """Whatever the creature that was just hit does back, on its own.
@@ -9619,13 +9924,25 @@ class Engine:
             centre[0], centre[1], self.scene.grid.ground(centre))
         size = int(spec.get("size") or 0)
         shape = str(spec.get("shape") or "radius")
+        # Through `rules/areas.py`, the one place an area is laid, since 2026-09-28: the
+        # grid's own shapes measured from a square's centre, so a 20-ft fog cloud covered
+        # 61 squares where the book's intersection rule gives 44 (docs/design-e-magic.md
+        # §3.3). Fog clouds and every other manifestation shrink to the book's size.
+        from . import areas
+
         if not size or shape == "point":
             return [tuple(centre)]
         if shape == "line":
             towards = ctx.get("towards") or (centre[0] + 1, centre[1])
-            return sorted(gridmod.line(tuple(centre), tuple(towards), size))
+            cells, _ = areas.line_cells(self.scene, centre[:2], centre[2], tuple(towards),
+                                        size)
+            return sorted(cells | {tuple(centre)})
         if shape == "cone":
-            return sorted(gridmod.cone(tuple(centre), str(ctx.get("facing") or "e"), size))
+            facing = str(ctx.get("facing") or "e").lower()
+            if facing not in gridmod.DIRECTIONS:
+                facing = "e"
+            cells, _ = areas.cone_cells(self.scene, centre[:2], centre[2], facing, size)
+            return sorted(cells)
         if shape in ("wall", "square"):
             span = max(1, size // gridmod.SQUARE_FT)
             return [(centre[0] + dx, centre[1]) for dx in range(span)] if shape == "wall" \
@@ -9634,7 +9951,7 @@ class Engine:
         # Nothing below the floor. A sphere centred on the ground reaches down as far as
         # it reaches up, and there is no level under level zero to fill — the first run
         # of this put a bank of fog in the cellar of a room that has no cellar.
-        return sorted(c for c in gridmod.burst(tuple(centre), size) if c[2] >= 0)
+        return sorted(areas.burst_cells(tuple(centre), size, self.scene))
 
     def _summon(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """Bring a creature in through the same door everything else arrives by."""
@@ -9847,7 +10164,8 @@ class Engine:
         if not casting.is_caster(actor):
             raise IntentError(
                 f"cast: {actor.name} is a {actor.char_class or 'creature'} and does not "
-                f"cast spells.", "legality", index,
+                f"cast spells.", "legality", index, code="not_known",
+                for_a_person=f"{actor.name} does not cast spells.",
             )
         try:
             spell = spells_mod.get(str(intent.params["spell"]))
@@ -9878,24 +10196,32 @@ class Engine:
         if level is None:
             raise IntentError(
                 f"cast: {spell.name} is not on the {data.get('list', 'caster')} list.",
-                "legality", index,
+                "legality", index, code="not_on_list",
+                for_a_person=f"{spell.name} is not a {data.get('list', 'caster')} spell.",
             )
         if level > casting.highest_spell_level(actor):
             raise IntentError(
                 f"cast: {spell.name} is a level {level} spell and {actor.name} is a "
                 f"level {actor.level} {actor.char_class} — they reach level "
                 f"{casting.highest_spell_level(actor)}.", "legality", index,
+                code="too_high",
+                for_a_person=f"{spell.name} is a level {level} spell, beyond what "
+                             f"{actor.name} can cast yet.",
             )
         if not casting.can_cast_level(actor, level):
             ability = casting.casting_ability(actor)
             raise IntentError(
                 f"cast: a level {level} spell needs {ability.title()} {10 + level} and "
                 f"{actor.name} has {actor.ability_score(ability)}.", "legality", index,
+                code="ability_too_low",
+                for_a_person=f"A level {level} spell needs {ability.title()} {10 + level}; "
+                             f"{actor.name} has {actor.ability_score(ability)}.",
             )
         if not casting.knows(actor, spell):
             raise IntentError(
                 f"cast: {spell.name} is not in {actor.name}'s spellbook.",
-                "legality", index,
+                "legality", index, code="not_known",
+                for_a_person=f"{spell.name} is not in {actor.name}'s spellbook.",
             )
         # Every PREPARED caster, not only the ones who prepare from a book. This read
         # `prepare_from == "spellbook"` until 2026-09-19, so the check fired for wizards and
@@ -9912,18 +10238,102 @@ class Engine:
         may_convert = (casting.converts_spontaneously(actor, spell)
                        and bool(casting.sacrifice_for(actor, level)))
         if data.get("kind") == "prepared" and unprepared and level > 0 and not may_convert:
+            # Coded, with the fix a button can offer (item 21.3): measured 2026-09-28,
+            # this refusal was raised seven times over one turn — the plan loop retried
+            # a fact about the character that no plan could change — then handed to a
+            # second model and narrated as nothing. A player-fixable code ends the loop
+            # (Lane A) and reaches the player as this sentence and a Prepare button.
             raise IntentError(
                 f"cast: {actor.name} did not prepare {spell.name} today."
                 + (f" A cure spell may be cast in place of a prepared spell of that "
                    f"level or higher, and {actor.name} has none prepared to give up."
                    if casting.converts_spontaneously(actor, spell) else ""),
-                "legality", index,
+                "legality", index, code="unprepared",
+                fix={"kind": "prepare", "spell": spell.id},
+                for_a_person=f"{spell.name} is not prepared. Prepare it in the Spells tab "
+                             f"first.",
             )
         if casting.slots_left(actor, level) < 1:
             raise IntentError(
                 f"cast: {actor.name} has no level {level} slots left.",
-                "legality", index,
+                "legality", index, code="no_slots",
+                for_a_person=f"{actor.name} has no level {level} spell slots left today. "
+                             f"A night's rest brings them back.",
             )
+        self._check_aim(intent, index, actor, spell)
+
+    def _check_aim(self, intent: Intent, index: int, actor: Actor, spell) -> None:
+        """The aim, checked before anything is spent, each refusal coded (§2.6).
+
+        Player-fixable where the refusing fact is the player's own words — a thing that is
+        not here, a square out of range, an area spell aimed at nothing — and plan-fixable
+        where it is the plan's choice of ref or of the aim's form."""
+        from . import areas
+
+        raw = intent.params.get("aim")
+        aim = self._cast_aim(intent, actor)
+        cl = casting.caster_level(actor)
+        shape = areas.shape_of(spell, cl)
+        plan = spells_mod.casting_plan(spell, cl)
+        if raw and aim.kind == "ref" and aim.value not in self.scene.actors:
+            here = [f"{r} ({a.name})" for r, a in self.scene.actors.items()
+                    if r != actor.ref][:8]
+            raise IntentError(
+                f"cast: nobody here is {aim.value!r}. Aim at one of: "
+                f"{', '.join(here) or 'nobody'}.", "refs", index, code="no_such_target")
+        if aim.kind == "object":
+            if areas.find_object(self.scene, aim.value) is None:
+                here = areas.objects_here(self.scene)
+                raise IntentError(
+                    f"cast: nothing here called {aim.value!r}. Here: "
+                    f"{', '.join(here) or 'nothing to aim at but the people present'}.",
+                    "legality", index, code="no_such_object",
+                    for_a_person=(f"There is nothing here called {aim.value}."
+                                  + (f" Here: {', '.join(here)}." if here else "")))
+        if aim.kind in ("direction", "point") and plan.get("targets_counted"):
+            raise IntentError(
+                f"cast: {spell.name} picks out creatures; name one (aim ref:<ref>) rather "
+                f"than a direction or a square.", "legality", index, code="wrong_aim")
+        if aim.kind == "direction" and shape and shape["shape"] not in ("cone", "line"):
+            raise IntentError(
+                f"cast: {spell.name} bursts at a point; aim it at a creature, a thing or a "
+                f"square, not a direction.", "legality", index, code="wrong_aim")
+        if aim.kind == "self" and shape and shape["shape"] in ("cone", "line"):
+            raise IntentError(
+                f"cast: {spell.name} shoots away from the caster; aim it at somebody, "
+                f"something or a direction.", "legality", index, code="wrong_aim")
+        if aim.kind == "point" and self.scene.has_grid:
+            cell = aim.cell()
+            if not self.scene.grid.inside(cell[:2]):
+                raise IntentError(
+                    f"cast: square {aim.value} is off the map "
+                    f"({self.scene.grid.width}x{self.scene.grid.height}).",
+                    "legality", index, code="out_of_range",
+                    for_a_person="That spot is off the map.")
+            here = self.scene.positions.get(actor.ref)
+            reach = spells_mod.range_feet(spell, cl)
+            if here is not None and reach is not None:
+                far = gridmod.distance(tuple(here[:2]), tuple(cell[:2]))
+                if far > reach:
+                    raise IntentError(
+                        f"cast: that spot is {far} ft away and {spell.name} reaches "
+                        f"{reach} ft.", "legality", index, code="out_of_range",
+                        for_a_person=f"That spot is {far} ft away; {spell.name} reaches "
+                                     f"{reach} ft.")
+                if not areas._clear(self.scene, (here[0] + 0.5, here[1] + 0.5),
+                                    (cell[0], cell[1]), ignore={tuple(here[:2])}):
+                    raise IntentError(
+                        f"cast: nothing reaches that spot from where {actor.name} stands "
+                        f"— something solid is in the way.", "legality", index,
+                        code="no_line_of_effect",
+                        for_a_person="Something solid stands between you and that spot.")
+        if shape and aim.kind == "none" and not shape.get("on_you"):
+            raise IntentError(
+                f"cast: {spell.name} fills an area and needs aiming: at somebody "
+                f"(ref:<ref>), at something here (object:<name>), a direction for a cone "
+                f"or line (dir:n..nw, up), or a square (point:x,y).", "legality", index,
+                code="no_aim",
+                for_a_person=f"Where do you aim {spell.name}? Say at whom or at what.")
 
     def _op_compel(self, intent: Intent, partial: dict) -> Outcome:
         """Pull somebody towards the actor.
@@ -11370,6 +11780,15 @@ class Engine:
 
         result = actor.rest(kind)
         refilled = actor.refresh_pools("rest.night", self.dice)
+        # The morning's preparation (item 21.4): what was not cast is still prepared, and
+        # the empty slots refill from the player's last loadout — or, for a wizard who has
+        # never prepared, from the book in its own order. A cleric with nothing chosen is
+        # left empty and told so (owner, Q39). No study hour is added (Q40): the night
+        # already runs to dawn.
+        prep_said = ""
+        if casting.is_caster(actor):
+            got = casting.ensure_prepared(actor, reason="rest")
+            prep_said = casting.prepared_said(actor, got)
         hours = result["hours"]
         # Everyone, not only the sleeper. Rest ticked the resting actor alone, so an
         # NPC standing in the same scene kept every timed buff through an eight-hour
@@ -11407,6 +11826,8 @@ class Engine:
             bits.append("Recovered: " + ", ".join(refilled) + ".")
         if ended:
             bits.append("Ended: " + ", ".join(ended) + ".")
+        if prep_said:
+            bits.append(prep_said)
 
         return Outcome(
             intent_id=intent.id, op="rest",

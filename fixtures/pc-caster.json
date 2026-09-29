@@ -1,0 +1,42 @@
+{
+  "name": "Ysolde Marrach",
+  "kind": "pc",
+  "level": 1,
+  "class": "wizard",
+  "race": "human",
+  "pronouns": "she/her",
+  "size": "medium",
+
+  "heritage": "",
+  "world_people_id": null,
+  "world_entity_id": null,
+
+  "abilities": { "str": 8, "dex": 14, "con": 12, "int": 17, "wis": 12, "cha": 10 },
+
+  "ranks": {
+    "knowledge (arcana)": 1,
+    "knowledge (nature)": 1,
+    "spellcraft": 1,
+    "perception": 1
+  },
+
+  "feats": ["iron will"],
+
+  "armour": "none",
+  "shield": "none",
+  "weapons": ["quarterstaff", "dagger"],
+  "equipped": "quarterstaff",
+
+  "hp": 7,
+
+  "spellbook": [
+    "burning-hands", "magic-missile", "color-spray", "sleep", "mage-armor", "shield",
+    "acid-splash", "arcane-mark", "bleed", "dancing-lights", "daze", "detect-magic",
+    "detect-poison", "disrupt-undead", "flare", "ghost-sound", "light", "mage-hand",
+    "mending", "message", "open-close", "prestidigitation", "ray-of-frost", "read-magic",
+    "resistance", "touch-of-fatigue"
+  ],
+  "prepared": {},
+
+  "notes": "A wizard with a real book, for the magic lane's tests and the cast-area audit (docs/fix-interfaces.md §3.4: every shipped pregen had an empty spellbook, so no live run could cast anything). Every 0-level wizard spell of the Core Rulebook's own list, as the book grants, and 3 + Int 1st-level spells, Burning Hands first. Nothing is prepared: her first night's rest prepares from the book in its own order (casting.ensure_prepared)."
+}

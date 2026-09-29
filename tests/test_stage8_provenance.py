@@ -385,6 +385,9 @@ def test_the_players_own_cast_with_no_actor_written_is_the_player_casting():
     stand_on(s, "urban")
     s.add(wizard(level=5, prepared={"magic-missile": 1}))
     s.add(instantiate("thug", scene=s, name="the thug"))
+    # In a fight: a first harmful cast outside one defers through the battle gate.
+    s.initiative, s.sides, s.round, s.turn = (
+        [("pc", 20), ("c1", 10)], {"pc": ["pc"], "them": ["c1"]}, 1, 0)
     engine = Engine(s, Dice(seed=5))
     raw = judgement.fill_missing_actor(
         [{"op": "cast", "params": {"spell": "magic missile", "at": "c1"}}],

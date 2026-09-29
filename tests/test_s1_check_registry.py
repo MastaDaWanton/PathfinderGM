@@ -548,9 +548,11 @@ def test_travel_choices_is_todays_tuple():
                           for p in places)
 
 
-def test_declared_ops_and_inject_cast_accept_attachments_and_ignore_them():
-    """The keyword only, in Phase 1 (Lane E reads it in Phase 2): the same answer with a
-    spell attached as without."""
+def test_declared_ops_and_inject_cast_accept_attachments_and_read_them():
+    """Phase 1 shipped the keyword only; Lane E reads it in Phase 2. With nothing attached
+    the answer is the one it always was (the inert seam). With a spell attached the turn
+    is committed to a `cast` of THAT spell, whatever the words say: "into the tree tops"
+    names no spell, and the chip is the declaration (item 21.1)."""
     from gm import judgement
 
     agent = _agent()
@@ -558,10 +560,12 @@ def test_declared_ops_and_inject_cast_accept_attachments_and_ignore_them():
     attached = ({"kind": "spell", "id": "burning-hands", "name": "Burning Hands"},)
     for words in ("I cast magic missile at the thug", "I walk to the market",
                   "I buy a rope"):
-        assert judgement.declared_ops(words, scene, WORLD, attached=attached) == \
+        assert judgement.declared_ops(words, scene, WORLD, attached=()) == \
             judgement.declared_ops(words, scene, WORLD)
-        assert judgement.inject_cast([], words, scene, attached=attached) == \
-            judgement.inject_cast([], words, scene)
+        assert "cast" in judgement.declared_ops(words, scene, WORLD, attached=attached)
+        cast = [r for r in judgement.inject_cast([], words, scene, attached=attached)
+                if r.get("op") == "cast"]
+        assert [c["params"]["spell"] for c in cast] == ["burning-hands"]
 
 
 def _spec_assignments() -> dict[str, ast.AST]:

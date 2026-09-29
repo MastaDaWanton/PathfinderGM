@@ -1080,6 +1080,9 @@ def test_every_number_that_lands_names_a_document_it_came_from():
     s2 = Scene(location_id="5bbd0c40345f"); stand_on(s2, "urban")
     s2.add(wizard(level=5, prepared={"magic-missile": 1}))
     s2.add(instantiate("thug", scene=s2, name="the thug"))
+    # In a fight: a first harmful cast outside one defers through the battle gate.
+    s2.initiative, s2.sides, s2.round, s2.turn = (
+        [("pc", 20), ("c1", 10)], {"pc": ["pc"], "them": ["c1"]}, 1, 0)
     landed += records(cast(Engine(s2, Dice(seed=5)), "magic-missile"))
     # A class ability's standing document — Blood Rage banks temporary hit points.
     from tests.test_ability_documents import _fight

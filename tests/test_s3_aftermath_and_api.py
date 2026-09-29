@@ -581,6 +581,9 @@ def test_the_agent_carries_the_brief_facts_and_the_attachments_into_narration(
         return real(self, *a, **k)
 
     monkeypatch.setattr(GMAgent, "narrate_turn", spy)
+    # Prepared: since Lane E an attached spell is checked against the character before
+    # the model is asked, and an unprepared one is a 422 (item 21.3).
+    game["c"].scene.pc().prepared = {"burning-hands": 1}
     r = _say({"text": "", "attachments": [{"kind": "spell", "id": "burning-hands"}]})
     assert r.status_code == 200, r.content[:300]
     assert {"here", "roads_out", "place_facts"} <= set(seen["facts"])
@@ -620,9 +623,11 @@ def test_every_new_state_key_is_there_at_its_default(game):
     assert s["scene"]["day_part"] == residency.day_part(c.scene.clock_minutes)
     if s["scene"]["grid"] is not None:
         assert s["scene"]["grid"]["areas"] == []
-    # A wizard with a book and nothing prepared: the Spells button shows, and says so.
+    # A wizard with a book and nothing prepared: the Spells button shows, and says so —
+    # and since Lane E the sheet's warning has the slots to name: Thessaly's two level 1
+    # slots (1 + her Intelligence bonus spell), both empty.
     assert s["spellcasting"] == {"kind": "prepared", "nothing_prepared": True,
-                                 "empty_slots": {}}
+                                 "empty_slots": {"1": 2}}
     assert s["start"] == {}
 
 
@@ -744,19 +749,37 @@ def test_each_attachment_rule_is_a_400_with_a_sentence(game, body, says):
 @pytest.mark.parametrize("aim", ["ref:c1", "self", "dir:ne", "point:3,4", "point:3,4,1",
                                  "object:the cart"])
 def test_every_aim_the_register_names_is_accepted(game, aim):
+    """Every form of the grammar passes the door (never the 400 a malformed aim gets).
+    Since Lane E the engine then judges it against the scene: an aim at something that is
+    not here, or out of reach, is the player's to fix and answers the §2.6 422 — no beat,
+    no plan — and any other is stored on the beat as sent."""
+    # Prepared: since Lane E an attached spell is checked against the character before
+    # the model is asked, and an unprepared one is a 422 (item 21.3).
+    game["c"].scene.pc().prepared = {"burning-hands": 1}
+    c = game["c"]
+    was = len(c.transcript)
     r = _say({"text": "I cast it.", "attachments": [{"kind": "spell", "id": "burning-hands",
                                                      "aim": aim}]})
-    assert r.status_code == 200, r.content[:300]
-    player = [b for b in game["c"].transcript if b["who"] == "player"][-1]
+    assert r.status_code in (200, 422), r.content[:300]
+    if r.status_code == 422:
+        assert r.json()["refusal"]["code"] in ("no_such_object", "out_of_range",
+                                               "no_line_of_effect")
+        assert len(c.transcript) == was and game["planned"] == {}
+        return
+    player = [b for b in c.transcript if b["who"] == "player"][-1]
     assert player["attachments"][0]["aim"] == aim
 
 
 def test_a_bare_chip_is_a_turn_stored_and_not_acted_on(game, monkeypatch):
     """Empty text with one spell: the shown line is "I cast Burning Hands.", the chip is on
-    the player's beat and the turn log's `turn` row, the planner holds it — and nothing
-    was cast: the plan did not change for it (Lane E makes the engine read it).
+    the player's beat and the turn log's `turn` row, the planner holds it. The plan here
+    is a stub that declares nothing, so nothing is cast (the planner's own `inject_cast`
+    is what turns the chip into a cast — tests/test_e_magic_attach.py).
     `player_input.check` never sees the line we wrote."""
     from play import player_input
+    # Prepared: since Lane E an attached spell is checked against the character before
+    # the model is asked, and an unprepared one is a 422 (item 21.3).
+    game["c"].scene.pc().prepared = {"burning-hands": 1}
 
     checked = []
     real = player_input.check
