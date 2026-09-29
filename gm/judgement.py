@@ -3676,11 +3676,18 @@ def fill_missing_actor(raw_intents, player_text: str, scene) -> list:
     # character who SAYS "I will punch him" has not swung at anybody.
     swinging = bool(player_text) and _player_is_the_one_swinging(
         redact_speech(str(player_text)))
+    # And `check`, measured live 2026-09-29 on the owner's gemma: "I search the crossroads
+    # for tracks, then head out" was refused "check: unknown actor None" on five attempts
+    # of five, then two fallback attempts failed on something else, and the turn degraded
+    # to narration. The same gate as the attack: the player's own words declare the check
+    # (`inject_checks` reads them, and gives the PC as its actor when it adds one).
+    checking = bool(player_text) and bool(inject_checks([], str(player_text), scene))
     out = []
     for r in raw_intents:
         if isinstance(r, dict) and not r.get("actor"):
             op = str(r.get("op", "")).lower()
-            if op in _ACTS_ITSELF or (op == "attack" and swinging):
+            if op in _ACTS_ITSELF or (op == "attack" and swinging) \
+                    or (op == "check" and checking):
                 r = dict(r, actor=pc.ref)
         out.append(r)
     return out

@@ -63,6 +63,13 @@ class TurnPlan:
 # model swap under VRAM pressure, not the queue. A rescue that has not arrived in two
 # minutes is not a rescue; the floor line is better than the wait.
 PRIMARY_TIMEOUT = 600
+
+# The ops a declared entry is the player's character doing, which `_merge_declared` gives
+# the PC as actor. The engine refuses these without one (`Engine._check_refs` for check,
+# save, attack and move; `_check_cast` for cast). World ops (introduce, found, spawn) are
+# not the character's and are left as the model wrote them.
+_PLAYERS_OWN = ("check", "save", "attack", "move", "manoeuvre", "cast", "use_item",
+                "use_ability")
 FALLBACK_TIMEOUT = 120
 
 
@@ -466,7 +473,9 @@ class GMAgent:
                 # The ops the player's words committed the turn to, which the schema asks
                 # for as required keys because Ollama does not enforce `contains`
                 # (`prompts.turn_schema`): merged in where the list left them out.
-                raw = self._merge_declared(raw, data.get("declared"))
+                raw = self._merge_declared(
+                    raw, data.get("declared"),
+                    actor=getattr(self.engine.scene.pc(), "ref", ""))
                 # A give to the player that the reading never asked for is conjuring.
                 raw, conjured = interpret.drop_unread_gifts(
                     raw, self.reading if isinstance(self.reading, dict) else None)
@@ -2431,7 +2440,7 @@ class GMAgent:
             return ()
 
     @staticmethod
-    def _merge_declared(raw, declared) -> list:
+    def _merge_declared(raw, declared, actor: str = "") -> list:
         """The `declared` ops of the reply, added to its intents where missing.
 
         A declared op the intents already carry is left to the intents' own version: the
@@ -2457,6 +2466,11 @@ class GMAgent:
                 params.pop("words", None)
             entry = {"op": op, "params": params,
                      "because": "the player's words commit the turn to it"}
+            # The player's own act is the player's: the schema's `declared` bodies carry
+            # no actor, and a merged `check` without one was refused "check: unknown
+            # actor None" on every attempt (live, 2026-09-29, five of five on gemma).
+            if actor and op in _PLAYERS_OWN:
+                entry["actor"] = actor
             if body.get("target"):
                 entry["target"] = body["target"]
             if op in ("travel", "journey"):

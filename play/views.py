@@ -1521,7 +1521,7 @@ def _plan_and_run(c, text: str, acting: tuple, claim: str = "", attached=None):
     # The plan loop stopped on a refusal only the player can fix (Lane A sets
     # `TurnPlan.refusal`, §2.6): the same 422 as the dry check above, and the turn never
     # happened — the line comes off the transcript the way the 502 path takes it off.
-    stopped = getattr(plan, "refusal", None)
+    stopped = getattr(plan, "refusal", None) or _attached_not_planned(plan, acting)
     if stopped:
         c.transcript.pop()
         _put_back_free_actions(c, pending)
@@ -1539,6 +1539,49 @@ def _plan_and_run(c, text: str, acting: tuple, claim: str = "", attached=None):
     # prose brings the keeper to the counter, and the player pays on the screen.
     offer = _trade_offer(c, text) if getattr(resp, "status_code", 200) == 200 else None
     return _with(resp, {"trade": offer}) if offer else resp
+
+
+def _attached_not_planned(plan, acting) -> dict | None:
+    """The refusal for a plan that lost what the player attached, or None.
+
+    The attached place or spell is the player's declaration and the engine's to carry
+    out (`judgement.travel_to_the_attached`, `_cast_the_attached`). A plan without it
+    can only be the loop giving up: every attempt refused, and the turn degraded to a
+    narrated nothing. Measured live 2026-09-29: seven refused plans for "I search the
+    crossroads for tracks, then head out" beside "the outskirts" became `narrate_only`,
+    the search was narrated, the party never moved, and the page cleared the chip and
+    the words as though it had.
+
+    Which way out, and why. The words before the move are the first command of the
+    chain and the move the second; Zork's main loop clears the rest of the line when a
+    command fails (`P-CONT`, gmain.zil), so the move does NOT run. Nor is the failed
+    command narrated: the words go back to the player to send again, and a search
+    narrated now would be narrated twice. So nothing runs (no beat, no clock, no NPC
+    turn), the words and the chip stay, and the sentence says why. The same for a
+    spell: a degraded plan never narrates a cast that did not happen and then clears the
+    chip. A turn with nothing attached still degrades to narration, as the owner ruled;
+    this is only for an attachment, whose thing is the engine's to do or to refuse."""
+    chip = next((a for a in (acting or ()) if isinstance(a, dict)
+                 and a.get("kind") in ("place", "spell")), None)
+    if chip is None:
+        return None
+    intents = list(getattr(plan, "intents", None) or ())
+    if chip["kind"] == "place":
+        if any(i.op in ("travel", "journey")
+               and chip["id"] in (str(i.params.get("place") or ""), str(i.params.get("to") or ""))
+               for i in intents):
+            return None
+        text = (f"That could not be made into a turn, so nothing happened and "
+                f"{chip['name']} is still attached. Say it another way, or send the move "
+                f"on its own.")
+    else:
+        if any(i.op == "cast" and str(i.params.get("spell") or "") == chip["id"]
+               for i in intents):
+            return None
+        text = (f"That could not be made into a turn, so {chip.get('name') or chip['id']} "
+                f"was not cast and is still attached. Say it another way, or press Say "
+                f"with the spell alone.")
+    return {"text": text, "code": "unshaped", "fix": None}
 
 
 def _put_back_free_actions(c, pending: list) -> None:
@@ -2018,8 +2061,56 @@ def _only_the_going(c, clause: str) -> bool:
     return ops <= _GOING_OPS
 
 
+def _where(c) -> tuple:
+    """Where the party stands, as a thing to compare: the place, the settlement, the road."""
+    return (c.scene.at, c.scene.location_id,
+            json.dumps(c.scene.road or {}, sort_keys=True, default=str))
+
+
+def _why_it_did_not_move(c) -> str:
+    """The engine's own sentence for a move that did not happen, from the last turn's
+    outcomes, or ""."""
+    turn = next((e for e in reversed(c.turn_log or []) if e.get("kind") == "turn"), None)
+    for o in (turn or {}).get("outcomes") or []:
+        if str(o.get("op", "")) in ("travel", "journey") and o.get("tell"):
+            return str(o["tell"])
+    return ""
+
+
 def _the_way_there(c, chip: dict, text: str, typed: bool, acting: tuple, claim: str,
                    beat: dict):
+    """A place chip's turn, held to one rule whatever path it took: the chip's move is the
+    engine's, so a turn that answers 200 has moved the party, or is waiting on a die that
+    will, or says in `unfinished` that the move is still to do and keeps the chip.
+
+    The ratchet, measured 2026-09-29 on the owner's gemma: "I search the crossroads for
+    tracks, then head out" beside "the outskirts" degraded to a narrated nothing after
+    seven refused plans, answered 200 with no move and no `unfinished`, and the page
+    cleared the chip and the words, so the move was lost with nothing said. The paths
+    below now say so themselves; this is the net under them, so a path added tomorrow
+    cannot drop the move silently either."""
+    before = _where(c)
+    resp = _toward(c, chip, text, typed, acting, claim, beat)
+    if getattr(resp, "status_code", 0) != 200 or c.ended or c.scene.awaiting \
+            or _where(c) != before:
+        return resp
+    try:
+        payload = json.loads(resp.content)
+    except (ValueError, TypeError):
+        return resp
+    if payload.get("unfinished"):
+        return resp
+    import logging
+
+    logging.getLogger(__name__).warning(
+        "a place chip's turn ended without its move and without saying so: %s",
+        chip.get("id"))
+    return _unfinished(c, resp, [text if typed else _go_line(chip["name"])],
+                       keep_chip=True, arrived=False, why=_why_it_did_not_move(c))
+
+
+def _toward(c, chip: dict, text: str, typed: bool, acting: tuple, claim: str,
+            beat: dict):
     """A place chip on Say (I6, owner 2026-09-29: "attach like a spell does and then apply
     when you send"), with the words deciding WHEN in the turn the move happens.
 
@@ -2064,7 +2155,7 @@ def _the_way_there(c, chip: dict, text: str, typed: bool, acting: tuple, claim: 
         # This beat is the words done now; the rest get their own line when they run.
         beat["text"] = now_text
 
-    before = (c.scene.at, c.scene.location_id)
+    before = _where(c)
     if not moves:
         # The chip is not spent: it is not drawn on a beat that does not go anywhere.
         beat.pop("attachments", None)
@@ -2085,9 +2176,18 @@ def _the_way_there(c, chip: dict, text: str, typed: bool, acting: tuple, claim: 
         resp = _take_the_exit(c, chip, now_text)
     else:
         resp = _plan_and_run(c, now_text, (mine,), claim, (dict(chip),))
-    if not later or resp.status_code != 200:
+    if resp.status_code != 200:
         return resp
-    moved = (c.scene.at, c.scene.location_id) != before
+    moved = _where(c) != before
+    if not moved and not c.ended and not c.scene.awaiting:
+        # The words before the move ran and the move did not (the engine refused the walk
+        # at the end of the list): the move and everything after it come back to the pen
+        # with the chip, and the engine's own sentence for why.
+        move = [parts[at]] if at is not None else [_go_line(chip["name"])]
+        return _unfinished(c, resp, move + later, keep_chip=True, arrived=False,
+                           why=_why_it_did_not_move(c))
+    if not later:
+        return resp
     if c.ended or c.scene.awaiting or c.scene.in_encounter or not moved:
         return _unfinished(c, resp, later, keep_chip=False, arrived=moved)
 

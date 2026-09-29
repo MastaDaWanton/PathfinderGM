@@ -326,13 +326,21 @@ def desk(worlds, tmp_path, monkeypatch):
     from play import concurrency, views
 
     monkeypatch.setattr(watcher, "kick", lambda c: None)
-    calls = {"plans": [], "refuse": ""}
+    calls = {"plans": [], "refuse": "", "degrade": False}
 
     def plan(agent, text, *a, **kw):
         scene = agent.engine.scene
         chips = tuple(getattr(agent, "attachments", ()) or ())
         calls["plans"].append({"text": text, "at": scene.at, "chips": chips})
         agent.last_said = []
+        if calls["degrade"]:
+            # What `plan_turn` hands back when every attempt was refused: a narrated
+            # nothing, with the chip's move nowhere in it.
+            return TurnPlan(narration="You look, and the moment does not answer.",
+                            intents=agent.engine.validate(
+                                [{"op": "narrate_only",
+                                  "because": "the turn could not be shaped"}]),
+                            repairs=["turn degraded to narration after 7 failed attempts"])
         if calls["refuse"] and calls["refuse"] in text:
             made = TurnPlan(narration="", intents=agent.engine.validate(
                 [{"op": "narrate_only", "because": "t"}]))
@@ -491,3 +499,189 @@ def test_no_clause_is_the_move_so_it_comes_last(worlds, desk):
     (plan,) = desk["calls"]["plans"]
     assert plan["text"] == "I nod to the watchman." and plan["chips"][0]["id"] == way["id"]
     assert c.scene.at == way["id"]
+
+
+# --- the silent drop, measured live 2026-09-29 -----------------------------------------------
+#
+# Borin at the crossroads, "the outskirts" attached, "I search the crossroads for tracks,
+# then head out": five gemma attempts refused "check: unknown actor None", two fallback
+# attempts refused on a placeholder, the turn degraded to `narrate_only`, the search was
+# narrated, the party never moved, and the page cleared the chip and the words.
+
+def _agent_at_the_market(monkeypatch, reply: dict):
+    import json as _json
+
+    from gm import agent as agent_mod
+    from _a_truth import MARKET, VORMOOR, WORLD
+
+    s = Scene(location_id=VORMOOR.id)
+    s.add(load_pc("fixtures/pc-thessaly.json"))
+    e = Engine(s, Dice(seed=5), world=WORLD)
+    e.place_party(MARKET)
+    calls = []
+
+    class _Reply:
+        text = _json.dumps(reply)
+        seconds, model = 0.0, "fake"
+
+        def json(self):
+            return _json.loads(self.text)
+
+    monkeypatch.setattr(agent_mod.client, "chat", lambda *a, **k: calls.append(1) or _Reply())
+    way = next(x for x in exits_mod.exits(e, WORLD) if not x["journey"] and not x["blocked"])
+    return agent_mod.GMAgent(WORLD, e), way, calls
+
+
+@pytest.mark.parametrize("chip", [True, False], ids=["with-chip", "no-chip"])
+def test_a_check_the_player_declared_is_the_pcs_whatever_the_model_left_out(
+        monkeypatch, chip):
+    """Defect 1. "check: unknown actor None", five attempts of five. The schema asks for
+    the declared ops as required keys of `declared`, whose bodies carry no actor, and
+    `_merge_declared` put a `check` built from one into the intents with none; the engine
+    refuses a check without an actor (`_check_refs`), and a refs refusal regenerates, so
+    every attempt died the same way. NOT the chip's doing: the merge is unchanged since
+    f6781a7 and the same reply fails the same way with no chip (the `no-chip` case). Now
+    a declared check, and a check the model wrote with no actor for words that declare
+    one, are the PC's, as `inject_checks` makes them."""
+    gm, way, calls = _agent_at_the_market(monkeypatch, {
+        "narration": "", "declared": {"check": {"params": {"skill": "perception"}}},
+        "intents": []})
+    if chip:
+        gm.attachments = ({"kind": "place", "id": way["id"], "name": way["name"],
+                           "journey": False},)
+    plan = gm.plan_turn("I search the stalls for tracks, then head out", history=[])
+    assert len(calls) == 1, plan.rejections
+    checks = [i for i in plan.intents if i.op == "check"]
+    assert checks and checks[0].actor == "pc"
+    assert not any("degraded" in r for r in plan.repairs)
+    gm, way, calls = _agent_at_the_market(monkeypatch, {
+        "narration": "", "intents": [{"op": "check", "params": {"skill": "perception",
+                                                                "dc": 15}}]})
+    plan = gm.plan_turn("I search the stalls for tracks", history=[])
+    assert [(i.op, i.actor) for i in plan.intents][:1] == [("check", "pc")], plan.rejections
+
+
+def test_a_degraded_plan_does_not_swallow_the_place_chip(worlds, desk):
+    """Defect 2. The degraded plan (`narrate_only`, every attempt refused) answered 200:
+    the search narrated, the party still at the crossroads, no `unfinished`, and the page
+    cleared the chip and the words. The chain rule decides it: the words before the move
+    are the first command and failed, and a failed command stops the rest (Zork's
+    P-CONT), so the move does not run; nor is the failed command narrated, since the
+    words go back to be sent again. Nothing runs: a 422 with no beat and no clock, the
+    party where it was, and the sentence says the place is still attached."""
+    c = desk["c"]
+    way = _way(c)
+    start, was, clock = c.scene.at, len(c.transcript), c.scene.clock_minutes
+    desk["calls"]["degrade"] = True
+    r = _say(f"I search the crossroads for tracks, then head for {way['name']}", way)
+    assert r.status_code == 422, r.content[:300]
+    body = r.json()
+    assert body["refusal"]["code"] == "unshaped"
+    assert f"{way['name']} is still attached" in body["error"]
+    assert c.scene.at == start and len(c.transcript) == was and c.scene.clock_minutes == clock
+
+
+def test_a_degraded_plan_does_not_swallow_a_spell_chip():
+    """The same rule for spells: a plan without the attached cast is refused before it
+    runs, so a cast that did not happen is never narrated and then cleared."""
+    from gm.agent import TurnPlan
+    from play import views
+
+    s, pc, man = _scene_with_a_man()
+    e = Engine(s, Dice(seed=3))
+    chip = ({"kind": "spell", "id": "burning-hands", "name": "Burning Hands"},)
+    nothing = TurnPlan(narration="", intents=e.validate([{"op": "narrate_only",
+                                                          "because": "t"}]))
+    refusal = views._attached_not_planned(nothing, chip)
+    assert refusal["code"] == "unshaped"
+    assert "Burning Hands was not cast and is still attached" in refusal["text"]
+    assert views._attached_not_planned(nothing, ()) is None, "no chip: degrade as ever"
+
+
+def test_a_move_the_engine_refused_comes_back_with_the_chip(worlds, desk, monkeypatch):
+    """The plan held the move and the engine refused it when it ran (the watch at the
+    gate, a way shut since the page drew it). The words before it ran; the move and the
+    rest come back to the pen with the chip, and the engine's sentence says why."""
+    from rules.engine import Engine as _Engine, Outcome
+
+    def refused(self, intent, partial):
+        return Outcome(intent_id=intent.id, op="travel", status="refused",
+                       tell="The watch turns you back at the gate.", because=intent.because)
+
+    monkeypatch.setattr(_Engine, "_op_travel", refused)
+    c = desk["c"]
+    way = _way(c)
+    start = c.scene.at
+    r = _say(f"I wave to the crowd, then head to {way['name']}", way)
+    assert r.status_code == 200, r.content[:300]
+    assert c.scene.at == start
+    left = r.json()["unfinished"]
+    assert left["keep_chip"] is True
+    assert left["text"] == f"I head to {way['name']}."
+    assert left["why"] == "The watch turns you back at the gate."
+
+
+def test_the_ratchet_no_place_turn_ends_without_its_move_or_a_word_about_it(
+        worlds, desk, monkeypatch):
+    """The net under every path: a 200 for a place chip that did not move the party, owes
+    no die, and carries no `unfinished` is turned into one that keeps the chip. Proved by
+    a path that forgets (the inner turn answers 200 and moves nobody)."""
+    from play import views
+
+    c = desk["c"]
+    way = _way(c)
+    monkeypatch.setattr(views, "_toward", lambda c, *a, **k: views.JsonResponse(
+        views._state(c)))
+    r = _say("I head out", way)
+    assert r.status_code == 200
+    left = r.json()["unfinished"]
+    assert left["keep_chip"] is True and left["text"] == "I head out."
+
+
+@pytest.mark.parametrize("line", [
+    "I slip out quietly", "I search the crossroads for tracks, then head out",
+    "I walk there and ask after the smith", "I buy a loaf of bread, then go",
+    "I nod to the watchman"])
+@pytest.mark.parametrize("degrade", [False, True], ids=["plans", "degrades"])
+def test_every_place_turn_moves_or_keeps_the_chip(worlds, desk, line, degrade):
+    """The invariant, over the shapes a place turn takes and a planner that works or
+    gives up: the party moved to the chip's place, or the answer keeps the chip (in
+    `unfinished` or a refusal that is not a 200). Never a 200 that moved nobody and
+    said nothing — the live defect of 2026-09-29."""
+    c = desk["c"]
+    way = _way(c)
+    desk["calls"]["degrade"] = degrade
+    r = _say(line, way)
+    moved = c.scene.at == way["id"]
+    if r.status_code == 200 and not moved:
+        assert r.json()["unfinished"]["keep_chip"] is True, (line, r.json().get("unfinished"))
+    elif r.status_code != 200:
+        assert c.scene.at != way["id"]
+
+
+@needs_node
+def test_the_page_keeps_the_chip_when_a_200_did_not_move_the_party(tmp_path):
+    """The page's own check under the server's: `takeTurn` cleared the chip and the words
+    on any 200. Now a 200 after a place chip whose way is still a way on from here (so it
+    was not taken), with no die owed and no `unfinished`, keeps both and says so."""
+    code = (exits_dom.TABLE / "04-combat-and-turns.js").read_text(encoding="utf-8")
+    start = code.index("async function takeTurn(")
+    fn = code[start:code.index("\n}\n", start) + 3]
+    state = exits_dom.exits_state(False)
+    got = exits_dom.run(tmp_path, f"""
+      ELS.send = el("send");
+      let CLEARED = 0, SHOWN = null;
+      const post = async () => ({json.dumps(state)});
+      function render() {{}} function busy() {{}} function showDeath() {{}}
+      function openTrade() {{}}
+      clearAttachments = () => {{ CLEARED += 1; }};
+      showUnfinished = u => {{ SHOWN = u; }};
+      {fn}
+      ELS.input.value = "I search the crossroads for tracks, then head out";
+      takeTurn({{ text: ELS.input.value,
+                  attachments: [{{ kind: "place", id: "p:arena" }}] }}, true)
+        .then(() => done({{ CLEARED, SHOWN, value: ELS.input.value }}));
+    """)
+    assert got["CLEARED"] == 0
+    assert got["value"] == "I search the crossroads for tracks, then head out"
+    assert got["SHOWN"]["keep_chip"] is True

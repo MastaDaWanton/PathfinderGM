@@ -321,7 +321,18 @@ async function takeTurn(body, clearInput) {
     // (422), a stale screen (412) or a busy table (409) keeps both. A turn that did only
     // part of the words (`unfinished`, play/views.py `_the_way_there`) puts the rest
     // back in the box, and keeps the place chip when the move itself is still to come.
-    const rest = s.unfinished || null;
+    let rest = s.unfinished || null;
+    // And never a chip cleared for a move that did not happen. The server says so in
+    // `unfinished` (play/views.py `_the_way_there`); this is the page's own check under
+    // it. Measured live 2026-09-29: a degraded plan answered 200 with the party still at
+    // the crossroads, and the chip and the words were cleared as though it had gone. A
+    // way that is still a way on from here was not taken, unless a die is owed first.
+    const place = (body.attachments || []).find(a => a.kind === "place");
+    if (place && !rest && !s.awaiting
+        && ((s.scene && s.scene.exits) || []).some(e => e.id === place.id)) {
+      rest = { text: $("#input").value, keep_chip: true,
+               line: "The move did not happen; it is still attached." };
+    }
     if (clearInput) {
       $("#input").value = rest ? (rest.text || "") : "";
       if (!(rest && rest.keep_chip) && typeof clearAttachments === "function") {

@@ -54,8 +54,15 @@ def table(tmp_path, monkeypatch):
         calls["plan"] += 1
         calls["attachments"] = getattr(agent, "attachments", None)
         agent.last_said = []
+        # The chip's cast, as the real chain's `inject_cast` puts it in: since 2026-09-29
+        # a plan without the attached cast is refused rather than run
+        # (play/views.py `_attached_not_planned`).
+        from gm import judgement
+
+        raw = judgement.inject_cast([], text, agent.engine.scene,
+                                    attached=calls["attachments"])
         made = TurnPlan(narration="", intents=agent.engine.validate(
-            [{"op": "narrate_only", "because": "t"}]))
+            raw or [{"op": "narrate_only", "because": "t"}]))
         if calls["refusal"]:
             made.refusal = calls["refusal"]
         return made
