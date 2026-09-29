@@ -350,11 +350,13 @@ def closing_move(scene, actor, defender,
     feet off spends his turn crossing the room, which is what 1e has him do, rather than
     standing still because the square he wanted was out of range.
 
-    For the turns the engine composes on a creature's behalf, never for a turn a model
-    or the player declared: those are refused with the square named, and closing the
-    distance stays theirs to choose. A fallback that swung from where it stood would
-    now be refused every round, and "holds back" at fifteen feet, for ever, is the bug
-    the fallback was written to end.
+    For the turns the engine composes on a creature's behalf. A blow a model or the
+    player declared is closed by `Engine._closing_step` instead (the owner's ruling of
+    2026-09-29: "close the distance and strike if one move reaches"), which walks only
+    when the step ARRIVES — a declared blow more than one move off is refused with the
+    square named, never turned into a walk the player did not ask for. A fallback that
+    swung from where it stood would be refused every round, and "holds back" at
+    fifteen feet, for ever, is the bug the fallback was written to end.
     """
     miss = out_of_reach(scene, actor, defender, weapon_key)
     if miss is None:

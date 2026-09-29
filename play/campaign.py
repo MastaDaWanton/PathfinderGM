@@ -330,6 +330,10 @@ class Campaign:
             "acquainted": (list(self.scene.acquainted), []),
             "conversation_log": ([dict(e) for e in self.scene.conversation_log], []),
             "conversation_seq": (int(self.scene.conversation_seq), 0),
+            # The round each combatant walked in (G2, close-and-strike). Saved for the
+            # reason `reacted` is: a fight put down mid-turn would otherwise hand back a
+            # move action already walked.
+            "move_spent": (dict(self.scene.move_spent), {}),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -396,6 +400,7 @@ class Campaign:
             initiative=[tuple(t) for t in s.get("initiative", [])],
             acted=set(s.get("acted", [])),
             attacked=set(s.get("attacked", [])),
+            move_spent={k: int(v) for k, v in (s.get("move_spent") or {}).items()},
             turn=s.get("turn", -1),
             turn_is_next=bool(s.get("turn_is_next", False)),
             sides={k: list(v) for k, v in (s.get("sides") or {}).items()},
