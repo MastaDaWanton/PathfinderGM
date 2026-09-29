@@ -207,6 +207,7 @@ function renderClock() {
   $("#clock-time").textContent = hhmm(S.minutes);
   $("#clock-day").innerHTML = `<span class="dp">${esc(upper(partOf(S.minutes)))}, </span>day ${S.day}`;
   document.body.dataset.daypart = lampFor(S.minutes);
+  if (typeof renderCarried === "function") renderCarried();
 }
 // Moves the clock and returns the ledger slip that records it. An hour or more pops the dial,
 // which answers the action and then gets out of the way; the slip keeps the record, so a player

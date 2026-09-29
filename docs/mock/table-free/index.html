@@ -9,11 +9,25 @@
      says what is real, what is example, and what the app would need to adopt it. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..600&family=Sofia+Sans+Semi+Condensed:ital,wght@0,400..700;1,400..600&display=swap">
-<link rel="stylesheet" href="table.css?v=12">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Literata:ital,opsz,wght@0,7..72,400..700;1,7..72,400..600&family=Sofia+Sans+Semi+Condensed:ital,wght@0,400..700;1,400..600&display=swap">
+<link rel="stylesheet" href="table.css?v=26">
 </head>
 <body class="mode-table scene-explore">
 <a class="skip" href="#beats">Skip to the story</a>
+
+<!-- The paper's edges. A sheet's torn (deckled) edge is fractal noise displacing the sheet's
+     own outline; it is applied only to empty backing layers, never to anything with text in
+     it, so no letter is ever displaced. -->
+<svg class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+  <filter id="deckle" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="4" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="deckle-fine" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="3" seed="11" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</svg>
 
 <!-- The top bar: who you are, how you are, when it is, and where to look. -->
 <header class="bar" id="bar">
@@ -81,6 +95,17 @@
 <div class="stage" id="stage">
   <div class="ribbon" id="ribbon" hidden></div>
 
+  <!-- The open book, drawn behind the story and the dock: the leather cover, the marbled edge
+       of the text block, the ledger leaf tipped in on the left and the page on the right.
+       Nothing here holds text; the story scrolls over it. -->
+  <div class="spread" aria-hidden="true">
+    <div class="cover"></div>
+    <div class="leaf ledgerleaf"></div>
+    <div class="leaf recto"></div>
+    <div class="gutter"></div>
+  </div>
+  <div class="railpaper" aria-hidden="true"></div>
+
   <main class="book" id="book" aria-label="The story">
     <div class="beats" id="beats" tabindex="-1" aria-live="polite"></div>
     <button type="button" class="newbelow" id="newbelow" hidden>New lines below</button>
@@ -93,6 +118,9 @@
     <div class="suggest" id="suggest" role="group" aria-label="Suggestions, each fills the pen"></div>
     <div class="attached" id="attached" hidden></div>
     <div class="penrow">
+      <!-- At the foot of the ledger leaf, the balance carried forward, as an account book
+           closes each page: the hour, life and purse, beside the pen that spends them. -->
+      <div class="carried" id="carried" aria-label="Carried forward"></div>
       <label class="vh" for="pen">What do you do?</label>
       <textarea id="pen" rows="1" placeholder="What do you do?"></textarea>
       <button type="submit" class="act primary" id="act">Act</button>
@@ -127,13 +155,13 @@
 <div class="clockpop" id="clockpop" hidden aria-live="polite"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script src="data.js?v=12"></script>
+<script src="data.js?v=26"></script>
 <script src="../../../play/static/js/dice3d.js"></script>
 <script src="../../../play/static/js/scene3d.js"></script>
-<script src="core.js?v=12"></script>
-<script src="table.js?v=12"></script>
-<script src="fight.js?v=12"></script>
-<script src="views.js?v=12"></script>
-<script src="trade.js?v=12"></script>
+<script src="core.js?v=26"></script>
+<script src="table.js?v=26"></script>
+<script src="fight.js?v=26"></script>
+<script src="views.js?v=26"></script>
+<script src="trade.js?v=26"></script>
 </body>
 </html>

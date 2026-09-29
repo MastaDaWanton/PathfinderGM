@@ -1,193 +1,284 @@
-/* Book and ledger: the free table mock.
+/* Book and ledger, second edition: the table as a writing desk under one lamp.
  *
- * Two voices, set apart on purpose. What the GM writes is a book (Literata, a face drawn
- * for long reading on screens). What the rules engine decides is a ledger (Sofia Sans Semi
- * Condensed, tabular figures) and sits in the ruled margin beside the paragraph it
- * caused. The architecture already severs the two (the narrator is fed tells, never
- * numbers); the page shows the seam instead of hiding it.
+ * The idea. You play at a desk. On it lies an open book: the GM's prose is printed on the
+ * right-hand page, and a leaf of blue-grey account paper is tipped in on the left, where the
+ * rules keep their ledger beside the paragraph each entry caused. It is a facing-page edition
+ * (the Loeb layout: original on the left, reading text on the right), except the left page is
+ * the engine's account of what happened. Everything else is an object on the same desk: a
+ * leather strap across the top, a loose sheet of paper for the way ahead, a baize dice tray.
  *
- * Tokens first. Everything below reads them, and the light theme only redefines them.
- * Shape: 3px on controls, 6px on things that float over the page, a full circle only
- * where the circle means something (a spell socket, an action pip, a token on the grid).
+ * One light for everything. The app's 3D board (play/static/js/scene3d.js) lights its faces
+ * with LIGHT = (-0.42, -0.78, 0.47): from the upper left, above. Every shadow on this page
+ * falls to the lower right in the ratio that light gives (x : y = 0.42 : 0.78, about 1 : 1.9),
+ * and every raised control catches the light on its top-left edge. The board and the page
+ * agree about where the lamp is.
+ *
+ * Materials, and the one rule that makes them usable:
+ *   raised (a paper tag with a lit top-left edge and a shadow) = you can press it;
+ *   pressed in (a debossed tag)                                 = it is the one chosen;
+ *   printed (ink on the paper, no edge)                         = information.
+ *   A figure with a dotted underline is a footnote: press it for what it is made of.
+ *
+ * Texture files are CC0 or public domain (textures/CREDITS.md). Paper and cloth arrive as grey
+ * detail maps and are tinted here by multiply, so the palette stays in the tokens below and
+ * the contrast of ink on paper can be measured (README, "Contrast").
  */
 
 @property --lamp-h { syntax: "<number>"; inherits: true; initial-value: 38; }
 @property --lamp-a { syntax: "<number>"; inherits: true; initial-value: 0.1; }
 
 :root {
-  --room: #161a20;
-  --page: #1b2028;
-  --panel: #212731;
-  --panel-2: #29303c;
-  --rule: #313a47;
-  --rule-2: #465163;
-  --ink: #e8e2d5;
-  --ink-2: #adb5bf;
-  --ink-3: #8a939e;
-  --accent: #74b8a8;
-  --accent-2: #a2d6c8;
-  --accent-wash: rgba(116, 184, 168, .13);
-  --on-accent: #0c1614;
-  --blood: #e2786a;
-  --blood-wash: rgba(226, 120, 106, .14);
-  --shadow: 0 18px 50px rgba(5, 8, 12, .55);
+  /* The desk and the leather. */
+  --desk: #3b2819;
+  --leather: #3d2617;
+  --on-leather: #f1e5ca;
+  --on-leather-2: #d6c3a0;
+  /* The book's paper, and the ledger's blue-grey account stock. */
+  --paper: #f0e8d7;
+  --paper-card: #f6f0e3;
+  --paper-shade: #e3d7bf;
+  --paper-edge: #c7b58f;
+  --stock: #d9e0dc;
+  --stock-2: #cbd3cf;
+  /* Ink. Iron-gall brown-black for the book; the clerk's blue-black for the ledger. */
+  --ink: #2a2019;
+  --ink-2: #463a2d;
+  --ink-3: #5a4b3c;
+  --lg-ink: #1a2944;
+  --lg-ink-2: #313e57;
+  /* The two pigments of a ledger's ruling, and of a rubricated page. */
+  --lapis: #263f8e;           /* yours, open, go: the one accent */
+  --lapis-2: #1f3577;
+  --lapis-wash: rgba(43, 69, 150, .13);
+  --on-lapis: #f6f1e6;
+  --rubric: #8e2317;          /* debit: foes, spent, shut, damage; and the rubricated initial */
+  --rubric-wash: rgba(163, 41, 27, .11);
+  --rule-blue: rgba(58, 92, 160, .34);
+  --rule-red: rgba(170, 45, 32, .55);
+  --rule-ink: rgba(60, 44, 30, .38);
+  --rule-ink-2: rgba(60, 44, 30, .6);
+  /* Shadow: one lamp, upper left. Elevation 1 to 4. */
+  --sh-c: 34, 18, 6;
+  --sh-1: 1px 2px 2px rgba(var(--sh-c), .38);
+  --sh-2: 2px 4px 5px rgba(var(--sh-c), .38);
+  --sh-3: 5px 9px 14px rgba(var(--sh-c), .42);
+  --sh-4: 11px 20px 34px rgba(var(--sh-c), .5);
+  --lit: inset 1px 1px 0 rgba(255, 252, 240, .7), inset -1px -1px 0 rgba(90, 60, 30, .2);
+  --deboss: inset 1px 2px 3px rgba(60, 38, 16, .38), inset -1px -1px 0 rgba(255, 250, 235, .45);
+  /* Textures. */
+  --tx-desk: url(textures/desk-walnut.jpg);
+  --tx-leather: url(textures/leather-brown.jpg);
+  --tx-paper: url(textures/paper-grain.jpg);
+  --tx-stock: url(textures/ledger-fibre.jpg);
+  --tx-marble: url(textures/marbled-endpaper.jpg);
+  --tx-baize: url(textures/baize-nap.jpg);
+  --desk-dim: .38;
 
+  --title: "IM Fell English", "Iowan Old Style", Georgia, serif;
   --book: "Literata", Georgia, "Times New Roman", serif;
   --ledger: "Sofia Sans Semi Condensed", "Arial Narrow", "Segoe UI", sans-serif;
 
   --story-size: 20px;
-  --measure: calc(var(--story-size) * 31.5); /* about 66 characters of Literata; see README */
+  --measure: calc(var(--story-size) * 31.5); /* 66 characters of Literata, measured; README */
   --margin-w: 13.5rem;
   --gutter: 2.25rem;
+  --outer: 40px;
+  --pad-x: 24px;               /* the story's side padding; the spread is measured from it */
   --rail-w: 21rem;
   --bar-h: 58px;
   --r: 3px;
-  --r-float: 6px;
   --lamp-h: 38;
-  --lamp-a: .10;
-  color-scheme: dark;
+  --lamp-a: .14;
+  color-scheme: light;
 }
 :root[data-size="s"] { --story-size: 18px; }
 :root[data-size="l"] { --story-size: 23px; }
 
-/* Day. A cool paper, not cream: the lamp still warms it at dusk. */
-:root[data-theme="light"] {
-  --room: #d5dbe0; --page: #f6f7f8; --panel: #ecf0f2; --panel-2: #e1e6ea;
-  --rule: #cdd5db; --rule-2: #a9b3bc;
-  --ink: #1b222a; --ink-2: #47525e; --ink-3: #5f6a76;
-  --accent: #23695c; --accent-2: #174d43; --accent-wash: rgba(35, 105, 92, .10);
-  --on-accent: #f3fbf8; --blood: #a8322a; --blood-wash: rgba(168, 50, 42, .09);
-  --shadow: 0 18px 50px rgba(40, 55, 70, .22);
-  color-scheme: light;
+/* Night is the same desk by lamplight, not an inverted interface: the room darkens and the
+   paper warms and dims a little, and the ink keeps its contrast (measured, README). */
+:root[data-theme="dark"] {
+  --paper: #e9dcc2; --paper-card: #efe4cd; --paper-shade: #dccbad; --paper-edge: #bba57b;
+  --stock: #d2d6cd; --stock-2: #c3c8bf; --desk-dim: .62; --lamp-a: .22;
 }
-@media (prefers-color-scheme: light) {
+@media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
-    --room: #d5dbe0; --page: #f6f7f8; --panel: #ecf0f2; --panel-2: #e1e6ea;
-    --rule: #cdd5db; --rule-2: #a9b3bc;
-    --ink: #1b222a; --ink-2: #47525e; --ink-3: #5f6a76;
-    --accent: #23695c; --accent-2: #174d43; --accent-wash: rgba(35, 105, 92, .10);
-    --on-accent: #f3fbf8; --blood: #a8322a; --blood-wash: rgba(168, 50, 42, .09);
-    --shadow: 0 18px 50px rgba(40, 55, 70, .22);
-    color-scheme: light;
+    --paper: #e9dcc2; --paper-card: #efe4cd; --paper-shade: #dccbad; --paper-edge: #bba57b;
+    --stock: #d2d6cd; --stock-2: #c3c8bf; --desk-dim: .62; --lamp-a: .22;
   }
 }
 
-/* The lamp over the page follows the hour: rose at dawn, plain by day, amber at dusk,
-   blue at night. It is the only motion nobody asked for, and it sits behind the text. */
-body[data-daypart="dawn"]   { --lamp-h: 12;  --lamp-a: .12; }
-body[data-daypart="day"]    { --lamp-h: 200; --lamp-a: .05; }
-body[data-daypart="dusk"]   { --lamp-h: 32;  --lamp-a: .16; }
-body[data-daypart="night"]  { --lamp-h: 222; --lamp-a: .16; }
+/* The lamp's colour follows the hour, by the engine's own words for it: rose at dawn, almost
+   nothing by day, amber at dusk, a cold blue at night. It lights the desk, behind everything. */
+body[data-daypart="dawn"]  { --lamp-h: 14; }
+body[data-daypart="day"]   { --lamp-h: 44; --lamp-a: .08; }
+body[data-daypart="dusk"]  { --lamp-h: 30; }
+body[data-daypart="night"] { --lamp-h: 215; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
-  background: var(--room);
   color: var(--ink);
   font: 400 15px/1.4 var(--ledger);
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  background:
+    radial-gradient(90% 75% at 12% -8%, hsl(var(--lamp-h) 85% 72% / var(--lamp-a)), transparent 62%),
+    radial-gradient(120% 90% at 40% 30%, transparent 45%, rgba(12, 6, 2, .55) 100%),
+    linear-gradient(rgba(16, 8, 3, var(--desk-dim)), rgba(16, 8, 3, var(--desk-dim))),
+    var(--tx-desk) 0 0 / 900px auto,
+    var(--desk);
   transition: --lamp-h 2.4s ease, --lamp-a 2.4s ease;
 }
+.defs { position: absolute; width: 0; height: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--lapis); outline-offset: 2px; }
 .vh { position: absolute !important; width: 1px; height: 1px; overflow: hidden;
       clip: rect(0 0 0 0); white-space: nowrap; }
-.skip { position: absolute; left: -999px; top: 8px; z-index: 50; background: var(--accent);
-        color: var(--on-accent); padding: 6px 10px; border-radius: var(--r); }
+.skip { position: absolute; left: -999px; top: 8px; z-index: 50; background: var(--lapis);
+        color: var(--on-lapis); padding: 6px 10px; border-radius: var(--r); }
 .skip:focus { left: 8px; }
 [hidden] { display: none !important; }
 
-/* --- Buttons: one family, three weights ---------------------------------------------- */
-.btn, .desk, .act, .mbtn, .seg button, .chipbtn {
-  border: 1px solid var(--rule-2); background: var(--panel); color: var(--ink);
-  border-radius: var(--r); padding: 7px 12px; line-height: 1.15; min-height: 34px;
-  font-weight: 500; letter-spacing: .01em;
+/* --- Paper, as a reusable material --------------------------------------------------------- */
+.sheet, .pop, .modal, .menupanel, .why, .toast, .clockcard, .tradesheet, #rail .paper-in {
+  background: var(--tx-paper) 0 0 / 640px auto, var(--paper);
+  background-blend-mode: multiply;
 }
-.btn:hover, .desk:hover, .mbtn:hover, .seg button:hover { border-color: var(--accent); }
-.btn:active, .desk:active, .act:active { transform: translateY(1px); }
-.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent);
-           font-weight: 650; }
-.primary:hover { background: var(--accent-2); border-color: var(--accent-2); }
-.quiet { background: transparent; }
-.danger { border-color: var(--blood); color: var(--blood); background: transparent; }
-button:disabled, button[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
-.small { min-height: 28px; padding: 4px 9px; font-size: 13.5px; }
-.linkish { background: none; border: 0; padding: 0; color: var(--accent); text-decoration:
-           underline; text-underline-offset: 3px; min-height: 0; }
 
-/* --- The bar ------------------------------------------------------------------------------ */
-.bar {
-  height: var(--bar-h); display: flex; align-items: center; gap: 18px;
-  padding: 0 16px; border-bottom: 1px solid var(--rule); background: var(--panel);
-  position: relative; z-index: 20;
+/* --- Controls: paper tags on the desk ----------------------------------------------------- */
+.btn, .desk, .act, .mbtn, .seg button, .chipbtn, .exit, .target, .opt, .need, .shelftabs button,
+.stepper, .boardtabs button, .menu summary {
+  border: 1px solid rgba(78, 56, 32, .45); color: var(--ink);
+  background: linear-gradient(180deg, rgba(255, 253, 245, .45), rgba(255, 253, 245, 0) 55%),
+              var(--tx-paper) 30% 40% / 420px auto, var(--paper-card);
+  background-blend-mode: normal, multiply, normal;
+  border-radius: var(--r); box-shadow: var(--lit), var(--sh-1);
+  transition: box-shadow .12s ease, transform .12s ease;
 }
-.who { display: flex; align-items: center; gap: 10px; background: none; border: 0;
+.btn, .desk, .act, .mbtn, .seg button, .chipbtn {
+  padding: 7px 12px; line-height: 1.15; min-height: 34px; font-weight: 600; letter-spacing: .01em;
+}
+.btn:hover:not(:disabled), .desk:hover, .mbtn:hover, .seg button:hover, .exit:hover, .target:hover,
+.opt:hover:not(:disabled), .need:hover, .shelftabs button:hover, .boardtabs button:hover,
+.menu summary:hover {
+  box-shadow: var(--lit), var(--sh-2); border-color: rgba(60, 40, 20, .65);
+}
+.btn:active:not(:disabled), .desk:active, .act:active, .mbtn:active, .exit:active, .opt:active,
+.target:active { box-shadow: var(--deboss); transform: translate(1px, 1px); }
+/* Chosen: pressed into the paper, and inked in lapis. */
+[aria-pressed="true"].btn, .seg button[aria-pressed="true"], .shelftabs button[aria-selected="true"],
+.boardtabs button[aria-pressed="true"], .target[aria-pressed="true"], #say[aria-pressed="true"] {
+  box-shadow: var(--deboss); color: var(--lapis-2); border-color: rgba(43, 69, 150, .6);
+  background: var(--tx-paper) 0 0 / 420px auto, var(--paper-shade); background-blend-mode: multiply;
+}
+.primary, .btn.primary, .act {
+  color: var(--on-lapis); border-color: #182a5e;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 55%),
+              var(--tx-paper) 0 0 / 420px auto, var(--lapis);
+  background-blend-mode: normal, multiply, normal;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .28), inset -1px -1px 0 rgba(0, 0, 0, .28), var(--sh-1);
+  font-weight: 650;
+}
+.primary:hover:not(:disabled), .act:hover {
+  background-color: var(--lapis-2);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .28), inset -1px -1px 0 rgba(0, 0, 0, .28), var(--sh-2);
+}
+.quiet { background: transparent; box-shadow: none; border-color: rgba(78, 56, 32, .35); }
+.quiet:hover { box-shadow: var(--sh-1); }
+.danger { color: var(--rubric); border-color: var(--rubric); }
+button:disabled, button[aria-disabled="true"] { opacity: .5; cursor: not-allowed; box-shadow: none; }
+.small { min-height: 28px; padding: 4px 9px; font-size: 13.5px; }
+.linkish { background: none; border: 0; padding: 0; color: var(--lapis); text-decoration:
+           underline; text-underline-offset: 3px; min-height: 0; box-shadow: none; }
+
+/* --- The strap: leather across the top of the desk ------------------------------------------ */
+.bar {
+  height: var(--bar-h); display: flex; align-items: center; gap: 18px; padding: 0 16px;
+  position: relative; z-index: 20; color: var(--on-leather);
+  background:
+    linear-gradient(180deg, rgba(255, 220, 170, .10), rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .28)),
+    linear-gradient(rgba(22, 10, 3, .42), rgba(22, 10, 3, .42)),
+    var(--tx-leather) 0 0 / 420px auto, var(--leather);
+  box-shadow: 0 1px 0 rgba(255, 220, 170, .12) inset, 3px 6px 10px rgba(12, 6, 2, .55);
+}
+/* Saddle stitching along the strap's lower edge. */
+.bar::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: 5px; height: 0;
+              border-bottom: 1.5px dashed rgba(236, 214, 170, .38); pointer-events: none; }
+.who { display: flex; align-items: center; gap: 10px; background: none; border: 0; color: inherit;
        padding: 4px 6px 4px 0; text-align: left; min-width: 0; border-radius: var(--r); }
-.face { width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid;
-        place-items: center; background: var(--panel-2); border: 1px solid var(--rule-2);
-        font: 600 17px/1 var(--book); color: var(--accent); background-size: cover;
-        background-position: center; }
+/* The character's roundel: a pressed paper disc pinned to the strap. */
+.face { width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center;
+        font: 400 20px/1 var(--title); color: var(--lapis-2);
+        background: var(--tx-paper) 0 0 / 300px auto, var(--paper-card); background-blend-mode: multiply;
+        background-size: cover; background-position: center;
+        box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .6), inset -2px -2px 3px rgba(80, 50, 20, .3),
+                    2px 3px 4px rgba(10, 5, 2, .6); }
 .who-text { display: grid; min-width: 0; }
-.who-text b { font: 600 17px/1.15 var(--book); white-space: nowrap; }
-.who-text small { color: var(--ink-2); font-size: 13px; white-space: nowrap; overflow: hidden;
+.who-text b { font: 400 19px/1.1 var(--title); white-space: nowrap; letter-spacing: .01em; }
+.who-text small { color: var(--on-leather-2); font-size: 13px; white-space: nowrap; overflow: hidden;
                   text-overflow: ellipsis; }
 .vitals { display: flex; align-items: center; gap: 16px; }
 .vital { display: grid; gap: 3px; background: none; border: 0; padding: 0; text-align: left;
          color: inherit; }
-.vital .k { font-size: 12px; color: var(--ink-2); }
+.vital .k { font-size: 12px; color: var(--on-leather-2); }
 .vital .v { font-size: 16px; font-weight: 650; }
-.vital .v small { font-size: 12.5px; color: var(--ink-2); font-weight: 500; margin-left: 5px; }
-.lifebar { width: 96px; height: 5px; background: var(--rule); border-radius: 3px;
-           overflow: hidden; }
-.lifebar i { display: block; height: 100%; background: var(--accent); }
-.lifebar.low i { background: var(--blood); }
-.clock { display: grid; justify-items: start; gap: 1px; background: none; border: 0;
-         padding: 2px 10px; border-left: 1px solid var(--rule); border-right: 1px solid var(--rule);
+.vital .v small { font-size: 12.5px; color: var(--on-leather-2); font-weight: 500; margin-left: 5px; }
+/* Life is a groove tooled into the leather, filled with lapis (rubric when it runs low). */
+.lifebar { width: 96px; height: 6px; border-radius: 3px; overflow: hidden;
+           background: rgba(10, 4, 1, .55); box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .7),
+           0 1px 0 rgba(255, 220, 170, .15); }
+.lifebar i { display: block; height: 100%; background: linear-gradient(#5d79c9, var(--lapis)); }
+.lifebar.low i { background: linear-gradient(#d0503d, var(--rubric)); }
+.clock { display: grid; justify-items: start; gap: 1px; background: none; border: 0; color: inherit;
+         padding: 2px 12px; border-left: 1px solid rgba(0, 0, 0, .45); border-right: 1px solid rgba(0, 0, 0, .45);
+         box-shadow: 1px 0 0 rgba(255, 220, 170, .08), -1px 0 0 rgba(255, 220, 170, .08) inset;
          border-radius: 0; }
 .clock-time { font-size: 16px; font-weight: 650; }
-.clock small { color: var(--ink-2); font-size: 12.5px; }
-.modes { display: flex; gap: 2px; margin-left: auto; }
-.modes button { background: none; border: 0; border-bottom: 2px solid transparent;
-                padding: 18px 10px 16px; color: var(--ink-2); font-weight: 600; font-size: 15px;
-                border-radius: 0; }
-.modes button:hover { color: var(--ink); }
-.modes button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.clock small { color: var(--on-leather-2); font-size: 12.5px; }
+/* The views as thumb-index tabs: the chosen one is a paper label pasted on the strap, the
+   others are tooled into the leather. */
+.modes { display: flex; gap: 4px; margin-left: auto; align-items: center; }
+.modes button { background: none; border: 0; padding: 7px 10px; font-weight: 650; font-size: 15px;
+                color: var(--on-leather-2); border-radius: 2px;
+                text-shadow: -1px -1px 0 rgba(0, 0, 0, .55), 1px 1px 0 rgba(255, 225, 180, .1); }
+.modes button:hover { color: var(--on-leather); }
+.modes button[aria-selected="true"] {
+  color: var(--ink); text-shadow: none;
+  background: var(--tx-paper) 0 0 / 300px auto, var(--paper-card); background-blend-mode: multiply;
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .6), 2px 3px 4px rgba(10, 5, 2, .6);
+}
 .barend { display: flex; align-items: center; gap: 10px; }
-.playing { display: flex; align-items: center; gap: 0; border: 1px dashed var(--rule-2);
+.playing { display: flex; align-items: center; gap: 0; border: 1px dashed rgba(236, 214, 170, .45);
            border-radius: var(--r); padding: 2px; }
-.playing span { font-size: 12px; color: var(--ink-3); padding: 0 6px; }
-.playing button { background: none; border: 0; padding: 5px 9px; border-radius: 2px;
-                  font-weight: 600; color: var(--ink-2); }
-.playing button[aria-pressed="true"] { background: var(--panel-2); color: var(--ink); }
+.playing span { font-size: 12px; color: var(--on-leather-2); padding: 0 6px; }
+.playing button { background: none; border: 0; padding: 5px 9px; border-radius: 2px; font-weight: 650;
+                  color: var(--on-leather-2); }
+.playing button[aria-pressed="true"] { color: var(--ink);
+  background: var(--tx-paper) 0 0 / 300px auto, var(--paper-card); background-blend-mode: multiply;
+  box-shadow: 1px 2px 3px rgba(10, 5, 2, .55); }
 .menu { position: relative; }
-.menu summary { list-style: none; cursor: pointer; padding: 7px 11px;
-                border: 1px solid var(--rule-2); border-radius: var(--r); font-weight: 600; }
+.menu summary { list-style: none; cursor: pointer; padding: 7px 11px; font-weight: 650; }
 .menu summary::-webkit-details-marker { display: none; }
-.menu[open] summary { border-color: var(--accent); }
-.menupanel { position: absolute; right: 0; top: calc(100% + 8px); width: 290px; z-index: 40;
-             background: var(--panel); border: 1px solid var(--rule-2);
-             border-radius: var(--r-float); padding: 12px 14px 14px; box-shadow: var(--shadow);
-             display: grid; gap: 8px; }
-.mlabel { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
-.seg { display: flex; }
-.seg button { flex: 1; border-radius: 0; margin-left: -1px; font-size: 14px; min-height: 32px;
-              padding: 5px 6px; }
-.seg button:first-child { border-radius: var(--r) 0 0 var(--r); margin-left: 0; }
-.seg button:last-child { border-radius: 0 var(--r) var(--r) 0; }
-.seg button[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent);
-                                   position: relative; z-index: 1; }
-.menupanel hr { border: 0; border-top: 1px solid var(--rule); width: 100%; margin: 6px 0 2px; }
+.menu[open] summary { box-shadow: var(--deboss); }
+.menupanel { position: absolute; right: 0; top: calc(100% + 10px); width: 300px; z-index: 40;
+             color: var(--ink); border-radius: 2px; padding: 14px 16px 16px; box-shadow: var(--sh-4),
+             inset 0 0 30px rgba(140, 100, 50, .18); display: grid; gap: 8px; }
+.mlabel { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); font-weight: 600; }
+.seg { display: flex; gap: 4px; }
+.seg button { flex: 1; font-size: 14px; min-height: 32px; padding: 5px 6px; }
+.menupanel hr { border: 0; border-top: 3px double var(--rule-ink); width: 100%; margin: 6px 0 2px; }
 .mbtn { text-align: left; }
-.mnote { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.35; }
+.mnote { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
-.playing.inmenu { border: 0; padding: 0; }
-.playing.inmenu button { border: 1px solid var(--rule-2); padding: 5px 6px; color: var(--ink); }
-.playing.inmenu button[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent); }
-.playing.inview { justify-self: start; width: max-content; margin-bottom: 4px; }
-.playing.inview span { display: inline; }
+.check input { accent-color: var(--lapis); width: 16px; height: 16px; }
+.playing.inmenu { border: 0; padding: 0; gap: 4px; }
+.playing.inmenu button { padding: 5px 6px; color: var(--ink); }
+.playing.inview { justify-self: start; width: max-content; margin-bottom: 6px;
+                  border-color: var(--rule-ink-2); }
+.playing.inview span { display: inline; color: var(--ink-2); }
+.playing.inview button { color: var(--ink-2); }
 
 /* --- The stage ---------------------------------------------------------------------------- */
 .stage {
@@ -198,636 +289,721 @@ button:disabled, button[aria-disabled="true"] { opacity: .5; cursor: not-allowed
   grid-template-areas: "ribbon ribbon" "book rail" "dock rail";
 }
 body:not(.mode-table) .stage { display: none; }
+.book, .dock, .rail, .ribbon { position: relative; z-index: 1; }
 
-/* The shared lane: the ledger margin and the book measure, centred together. Both the
-   story and the dock sit on it, so the margin runs down into the dock and the pen lines
-   up under the prose it answers. */
+/* The open book, behind the story. Geometry shares the lane's numbers so the ledger leaf lies
+   exactly under the margin and the page under the measure. */
+.spread { grid-area: 2 / 1 / 4 / 2; position: relative; z-index: 0; pointer-events: none;
+  --lane: min(calc(var(--margin-w) + var(--gutter) + var(--measure)), calc(100% - 2 * var(--pad-x) - 12px));
+  --left: calc(50% - var(--lane) / 2 - var(--outer));
+  --seam: calc(var(--left) + var(--outer) + var(--margin-w) + var(--gutter) / 2); }
+.spread > * { position: absolute; }
+/* The cover: dark leather boards, a little larger than the text block. */
+.cover { top: 8px; bottom: 4px; left: calc(var(--left) - 12px);
+         width: calc(var(--lane) + 2 * var(--outer) + 24px); border-radius: 5px;
+         background: linear-gradient(rgba(20, 9, 3, .5), rgba(20, 9, 3, .5)),
+                     var(--tx-leather) 0 0 / 420px auto, var(--leather);
+         box-shadow: inset 1px 1px 0 rgba(255, 220, 170, .14), var(--sh-4); }
+/* The text block's edge, marbled, showing past the pages toward the lower right: account books
+   were bound with marbled edges so a removed leaf would show. */
+.cover::before { content: ""; position: absolute; top: 12px; bottom: 1px; left: 16px; right: 3px;
+                 background: var(--tx-marble) 0 0 / 260px auto; border-radius: 2px;
+                 filter: saturate(.85) brightness(.9);
+                 box-shadow: inset 0 0 0 1px rgba(30, 15, 5, .35); }
+.leaf { top: 14px; bottom: 12px; filter: url(#deckle) drop-shadow(1px 2px 2px rgba(var(--sh-c), .45)); }
+.recto { left: var(--seam); width: calc(var(--lane) - var(--margin-w) - var(--gutter) / 2 + var(--outer));
+         background: var(--tx-paper) 20% 0 / 760px auto, var(--paper); background-blend-mode: multiply;
+         box-shadow: inset 0 0 44px rgba(140, 96, 40, .22), inset 0 0 0 1px rgba(120, 90, 50, .2); }
+/* The ledger leaf: blue-grey account stock, ruled in the clerk's two inks. */
+.ledgerleaf { left: var(--left); width: calc(var(--outer) + var(--margin-w) + var(--gutter) / 2);
+              background: var(--tx-stock) 0 0 / 520px auto, var(--stock); background-blend-mode: multiply;
+              box-shadow: inset 0 0 36px rgba(60, 80, 90, .18), inset 0 0 0 1px rgba(60, 80, 90, .18); }
+/* The binding: the pages curve down into the gutter and the lamp does not reach it. */
+.gutter { top: 14px; bottom: 12px; left: calc(var(--seam) - 22px); width: 44px;
+          background: linear-gradient(90deg, rgba(40, 24, 10, 0), rgba(40, 24, 10, .16) 42%,
+                      rgba(40, 24, 10, .34) 50%, rgba(40, 24, 10, .12) 58%, rgba(40, 24, 10, 0));
+          mix-blend-mode: multiply; }
+
+/* The shared lane: the ledger margin and the book measure, centred together. The story and
+   the dock both sit on it, so the margin runs down into the dock. */
 .lane, .beat, .dock > *:not(.pop) {
   display: grid;
   grid-template-columns: var(--margin-w) minmax(0, var(--measure));
   column-gap: var(--gutter);
   justify-content: center;
 }
-
-.book {
-  grid-area: book; position: relative; min-height: 0;
-  background:
-    radial-gradient(120% 70% at 58% -12%,
-      hsl(var(--lamp-h) 70% 62% / var(--lamp-a)), transparent 62%),
-    var(--page);
-}
-.beats { height: 100%; overflow-y: auto; padding: 28px 24px 40px; scroll-behavior: auto;
-         outline: none; }
+.book { grid-area: book; min-height: 0; }
+.beats { height: 100%; overflow-y: auto; padding: 34px var(--pad-x) 40px; outline: none;
+         scrollbar-gutter: stable both-edges; scrollbar-width: thin;
+         scrollbar-color: rgba(90, 64, 36, .5) transparent; }
 .beat { position: relative; }
-/* The margin is ruled like a ledger, and the rule is continuous from beat to beat. */
+
+/* The ledger's ruling: blue lines every 22px, and the red money rule before the figures. It is
+   painted on each entry so it scrolls with the entries it rules. */
 .gloss {
-  grid-column: 1; padding: 0 14px 22px 10px; min-height: 100%;
+  grid-column: 1; padding: 0 14px 22px 8px; min-height: 100%;
   background:
-    repeating-linear-gradient(180deg, transparent 0 21px, var(--rule) 21px 22px),
-    var(--ledger-paper);
-  background-position: 0 0;
-  box-shadow: inset -1px 0 var(--rule-2), inset -4px 0 var(--page), inset -5px 0 var(--rule-2);
+    linear-gradient(90deg, transparent calc(100% - 52px), var(--rule-red) calc(100% - 52px),
+                    var(--rule-red) calc(100% - 51px), transparent calc(100% - 51px)),
+    repeating-linear-gradient(180deg, transparent 0 21px, var(--rule-blue) 21px 22px);
   display: flex; flex-direction: column; gap: 22px; align-items: stretch;
 }
-:root { --ledger-paper: color-mix(in srgb, var(--page) 55%, var(--panel)); }
 .prose { grid-column: 2; padding: 0 0 6px; }
 
-/* The GM's prose: the book. */
-.prose p { font: 400 var(--story-size)/1.62 var(--book); margin: 0 0 .9em;
-           hanging-punctuation: first; text-wrap: pretty; }
-.beat.gm .prose p:first-child::first-letter { }
-.placehead { margin: 8px 0 18px; }
-.placehead h1 { font: 600 calc(var(--story-size) * 1.75)/1.1 var(--book); margin: 0;
-                letter-spacing: -.01em; }
-.placehead p { margin: 6px 0 0; font: 400 15px/1.3 var(--ledger); color: var(--ink-2); }
-/* Your words: set in the book's italic, hung off a rule in the accent. */
-.beat.you .prose p { font-style: italic; color: var(--ink-2); padding-left: 16px;
-                     border-left: 2px solid var(--accent); margin: 4px 0 20px; }
-.beat.you .prose p b { font-style: normal; font: 600 13px/1 var(--ledger); color: var(--accent);
-                       display: block; margin-bottom: 4px; letter-spacing: .02em; }
-/* An out-of-character line from the mock itself. Never set in the book's voice. */
-.beat.oc .prose p { font: 400 15px/1.45 var(--ledger); color: var(--ink-2);
-                    background: var(--panel); border: 1px dashed var(--rule-2);
-                    border-radius: var(--r); padding: 8px 12px; }
+/* The GM's prose: printed, the ink sitting in the paper (a hair of spread, no gloss). */
+.prose p { font: 400 var(--story-size)/1.62 var(--book); margin: 0 0 .9em; color: var(--ink);
+           hanging-punctuation: first; text-wrap: pretty;
+           text-shadow: 0 0 .6px rgba(42, 32, 25, .35); }
+/* Rubrication: the first paragraph after a place opens on a red initial, three lines deep. */
+.beat.place + .beat.gm .prose p:first-child::first-letter,
+.beat.place + .beat.oc + .beat.gm .prose p:first-child::first-letter {
+  font: 400 calc(var(--story-size) * 3.35)/.8 var(--title); color: var(--rubric);
+  float: left; margin: .07em .1em 0 0; text-shadow: none;
+}
+.placehead { margin: 10px 0 20px; }
+.placehead h1 { font: 400 calc(var(--story-size) * 1.9)/1.05 var(--title); margin: 0; color: var(--ink);
+                letter-spacing: .005em; }
+.placehead p { margin: 8px 0 0; font: 500 15px/1.3 var(--ledger); color: var(--ink-2);
+               padding-top: 6px; border-top: 3px double var(--rule-ink); }
+/* Your words: italic, with a lapis paragraph mark hung in the margin, as a scribe marked a
+   new speaker. */
+.beat.you .prose p { font-style: italic; color: var(--ink-2); margin: 4px 0 20px; position: relative;
+                     padding-left: 1.15em; }
+.beat.you .prose p::before { content: "\00B6"; position: absolute; left: 0; top: 0;
+                             font: 400 1.05em/1.62 var(--title); color: var(--lapis); font-style: normal; }
+.beat.you .prose p b { font: 650 13px/1 var(--ledger); color: var(--lapis); display: block;
+                       margin-bottom: 4px; letter-spacing: .02em; font-style: normal; }
+/* The interface's own voice (the mock's "Mock." lines, "the GM is writing"): pencil on the
+   page, set off by a pencil bracket. Never the book's type. */
+.beat.oc .prose p { font: italic 400 15px/1.5 var(--ledger); color: var(--ink-2); text-shadow: none;
+                    padding: 2px 0 2px 14px; border-left: 2px solid rgba(90, 84, 76, .5); }
+.beat.writing .prose p { color: var(--lapis-2); }
 .beat.new { animation: arrive .22s ease-out both; }
 @keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
 
-/* An entry in the margin: one engine decision, written out in full, ON the ledger's rules.
-   Every line is exactly one rule tall (22px), so the figures sit on the lines like a book
-   kept by hand, and the total is always the last word on its line. No box: a box on ruled
-   paper is a sticky note, and the first build's boxes read as a stack of cards. */
-.slip { font: 400 13.5px/22px var(--ledger); color: var(--ink-2); }
-.slip h4 { margin: 0; font: 650 14px/22px var(--ledger); color: var(--ink);
+/* An entry in the ledger: written on the rules, one 22px line each, total on the right of the
+   red money rule. */
+.slip { font: 400 13.5px/22px var(--ledger); color: var(--lg-ink-2); }
+.slip h4 { margin: 0; font: 700 14px/22px var(--ledger); color: var(--lg-ink);
            display: flex; justify-content: space-between; gap: 8px; }
 .slip h4 em { font-style: normal; font-weight: 700; }
-.slip h4 em.good { color: var(--accent); }
-.slip h4 em.bad { color: var(--blood); }
-.slip .sum { display: flex; align-items: center; gap: 6px; height: 22px; color: var(--ink); }
-.slip .sum .die { display: inline-grid; place-items: center; min-width: 22px; height: 18px;
-                  padding: 0 4px; border: 1px solid var(--rule-2); border-radius: var(--r);
-                  font-weight: 700; font-size: 13px; line-height: 1; }
-.slip .sum .die.nat20 { border-color: var(--accent); color: var(--accent); }
-.slip .sum .die.nat1 { border-color: var(--blood); color: var(--blood); }
+.slip h4 em.good { color: var(--lapis); }
+.slip h4 em.bad { color: var(--rubric); }
+.slip .sum { display: flex; align-items: center; gap: 6px; height: 22px; color: var(--lg-ink); }
+.slip .sum .die { display: inline-grid; place-items: center; min-width: 22px; height: 18px; padding: 0 4px;
+                  border: 1px solid rgba(26, 41, 68, .55); border-radius: 3px; font-weight: 700;
+                  font-size: 13px; line-height: 1; background: rgba(255, 255, 255, .35); }
+.slip .sum .die.nat20 { border-color: var(--lapis); color: var(--lapis); }
+.slip .sum .die.nat1 { border-color: var(--rubric); color: var(--rubric); }
 .slip .sum .tot { margin-left: auto; font-size: 17px; font-weight: 700; }
 .slip ul { list-style: none; margin: 0; padding: 0; }
 .slip li { display: flex; justify-content: space-between; gap: 8px; height: 22px; }
-.slip li span:last-child { color: var(--ink); }
+.slip li span:last-child { color: var(--lg-ink); min-width: 40px; text-align: right; }
 .slip .vs li span:last-child { font-weight: 700; }
-.slip .k { color: var(--ink-3); }
-.stamp { display: block; font: 600 13px/22px var(--ledger); color: var(--ink-3); text-align: right; }
+.slip .k { color: var(--lg-ink-2); }
+.stamp { display: block; font: 700 13px/22px var(--ledger); color: var(--lg-ink-2); text-align: left; }
 
-.newbelow { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
-            background: var(--accent); color: var(--on-accent); border: 0;
-            border-radius: var(--r); padding: 7px 14px; font-weight: 650;
-            box-shadow: var(--shadow); }
+.newbelow { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2;
+            color: var(--on-lapis); border: 1px solid #182a5e; border-radius: var(--r);
+            padding: 7px 14px; font-weight: 650; background: var(--lapis); box-shadow: var(--sh-3); }
 
-/* --- The ribbon: initiative, in combat only ------------------------------------------------ */
-.ribbon { grid-area: ribbon; border-bottom: 1px solid var(--rule); background: var(--panel);
-          display: flex; align-items: stretch; gap: 0; padding: 0 16px; overflow-x: auto; }
-.ribbon .round { display: grid; align-content: center; padding: 8px 16px 8px 0;
-                 border-right: 1px solid var(--rule); margin-right: 8px; white-space: nowrap; }
-.ribbon .round b { font-size: 17px; }
-.ribbon .round small { color: var(--ink-2); font-size: 12.5px; }
+/* --- The order of battle: a strip of account paper laid across the top in a fight -------------- */
+.ribbon { grid-area: ribbon; display: flex; align-items: stretch; gap: 6px; overflow-x: auto;
+          margin: 8px 12px 0; padding: 6px 12px 8px; border-radius: 2px;
+          background: var(--tx-stock) 0 0 / 520px auto, var(--stock); background-blend-mode: multiply;
+          box-shadow: var(--sh-2), inset 0 0 0 1px rgba(40, 60, 80, .18); }
+.ribbon .round { display: grid; align-content: center; padding: 4px 16px 4px 4px; white-space: nowrap;
+                 border-right: 1px solid var(--rule-red); margin-right: 6px; color: var(--lg-ink); }
+.ribbon .round b { font: 400 20px/1.1 var(--title); }
+.ribbon .round b span { font: 700 18px/1 var(--ledger); }
+.ribbon .round small { color: var(--lg-ink-2); font-size: 12.5px; }
 .turn { display: grid; grid-template-columns: auto 1fr; column-gap: 9px; align-items: center;
-        padding: 8px 14px; border: 0; background: none; text-align: left; white-space: nowrap;
-        border-bottom: 3px solid transparent; border-radius: 0; }
-.turn .init { grid-row: span 2; font: 700 18px/1 var(--ledger); width: 30px; height: 30px;
-              display: grid; place-items: center; border-radius: 50%;
-              border: 1px solid var(--rule-2); }
-.turn b { font-weight: 650; font-size: 14.5px; }
-.turn small { color: var(--ink-2); font-size: 12.5px; }
-.turn.foe .init { border-color: var(--blood); color: var(--blood); }
-.turn.you .init { border-color: var(--accent); color: var(--accent); }
-.turn.now { border-bottom-color: var(--accent); background: var(--accent-wash); }
-.turn.now.foe { border-bottom-color: var(--blood); background: var(--blood-wash); }
-.turn.done { opacity: .62; }
+        padding: 5px 12px 5px 6px; border: 1px solid transparent; background: none; text-align: left;
+        white-space: nowrap; border-radius: 3px; color: var(--lg-ink); }
+/* Initiative is a wooden counter, lit from the upper left like everything on the desk. */
+.turn .init { grid-row: span 2; font: 700 16px/1 var(--ledger); width: 32px; height: 32px;
+              display: grid; place-items: center; border-radius: 50%; color: var(--on-lapis);
+              background: radial-gradient(circle at 35% 30%, #6f86c9, var(--lapis) 55%, #172a60);
+              box-shadow: 2px 3px 3px rgba(var(--sh-c), .5), inset -2px -2px 3px rgba(0, 0, 0, .3); }
+.turn.foe .init { background: radial-gradient(circle at 35% 30%, #d8715f, var(--rubric) 55%, #5e140b); }
+.turn b { font-weight: 700; font-size: 14.5px; }
+.turn small { color: var(--lg-ink-2); font-size: 12.5px; }
+.turn.now { border-color: rgba(26, 41, 68, .35); box-shadow: var(--lit), var(--sh-1);
+            background: var(--tx-paper) 0 0 / 420px auto, var(--paper-card); background-blend-mode: multiply; }
+.turn.done { opacity: .66; }
 
-/* --- The rail ------------------------------------------------------------------------------- */
-.rail { grid-area: rail; border-left: 1px solid var(--rule); background: var(--panel);
-        overflow-y: auto; padding: 18px 18px 28px; min-height: 0; }
-.rail h2 { font: 650 15px/1.2 var(--ledger); margin: 0 0 10px; color: var(--ink);
+/* --- The loose sheet: where you are, who is here, how your body is ----------------------------- */
+.railpaper { grid-area: rail; z-index: 0; margin: 12px 12px 10px 6px; border-radius: 2px;
+             background: var(--tx-paper) 60% 30% / 700px auto, var(--paper); background-blend-mode: multiply;
+             box-shadow: inset 0 0 40px rgba(140, 96, 40, .2);
+             filter: url(#deckle) drop-shadow(4px 8px 8px rgba(var(--sh-c), .5)); }
+.scene-fight .railpaper { margin-top: 8px; }
+.rail { grid-area: rail; overflow-y: auto; padding: 30px 30px 30px 26px; min-height: 0; margin: 12px 12px 10px 6px;
+        scrollbar-width: thin; scrollbar-color: rgba(90, 64, 36, .5) transparent; }
+.rail h2 { font: 400 21px/1.15 var(--title); margin: 0 0 10px; color: var(--ink);
            display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.rail h2 small { font-weight: 500; color: var(--ink-2); font-size: 13px; }
-.rail section + section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.rail h2 small { font: 500 13px/1.2 var(--ledger); color: var(--ink-2); }
+.rail section + section { margin-top: 22px; padding-top: 16px; border-top: 3px double var(--rule-ink); }
 .railclose { display: none; }
 .exgroup { margin-bottom: 12px; }
-.exgroup h3 { margin: 0 0 6px; font: 600 13px/1.2 var(--ledger); color: var(--ink-2);
+.exgroup h3 { margin: 0 0 6px; font: 650 13px/1.2 var(--ledger); color: var(--ink-2);
               display: flex; justify-content: space-between; }
-.exgroup h3 small { font-weight: 500; color: var(--ink-3); }
-.exits { display: grid; gap: 4px; }
+.exgroup h3 small { font-weight: 500; color: var(--ink-2); }
+.exits { display: grid; gap: 6px; }
 .exit { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 10px;
-        width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--rule);
-        background: var(--page); border-radius: var(--r); min-height: 38px; }
+        width: 100%; text-align: left; padding: 8px 10px; min-height: 38px; }
 .exit b { font: 500 16px/1.2 var(--book); }
 .exit span { font-size: 13px; color: var(--ink-2); white-space: nowrap; }
-.exit:hover { border-color: var(--accent); }
-.exit.shut { border-style: dashed; background: transparent; }
-.exit.shut b { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1px; }
-.exit.journey span { color: var(--accent); font-weight: 600; }
-.exit.risky { border-color: var(--blood); }
-.exit.risky span { color: var(--blood); font-weight: 600; }
-.shutwhy { margin: 2px 0 8px; font-size: 13.5px; color: var(--ink-2); padding: 7px 10px;
-           border-left: 2px solid var(--blood); background: var(--blood-wash);
-           border-radius: 0 var(--r) var(--r) 0; line-height: 1.4; }
+/* A shut way is not a tag any more: it is struck through where it is printed. */
+.exit.shut { background: transparent; box-shadow: none; border: 1px dashed var(--rule-ink-2); }
+.exit.shut b { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--rubric);
+               text-decoration-thickness: 1.5px; }
+.exit.journey span { color: var(--lapis); font-weight: 650; }
+.exit.risky { border-color: var(--rubric); }
+.exit.risky span { color: var(--rubric); font-weight: 650; }
+.shutwhy { margin: 2px 0 8px; font-size: 13.5px; color: var(--ink); padding: 7px 10px;
+           border-left: 3px solid var(--rubric); background: var(--rubric-wash); line-height: 1.45; }
 .person { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: start;
-          padding: 10px 0; border-bottom: 1px solid var(--rule); }
+          padding: 10px 0; border-bottom: 1px solid var(--rule-ink); }
 .person:last-child { border-bottom: 0; }
-.person b { font: 600 16px/1.2 var(--book); }
-.person .att { font-size: 12.5px; color: var(--ink-2); }
-.person .att.hostile { color: var(--blood); font-weight: 600; }
-.person p { grid-column: 1 / -1; margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.4; }
+.person b { font: 400 19px/1.15 var(--title); }
+.person .att { font-size: 12.5px; color: var(--ink-2); font-style: italic; }
+.person .att.hostile { color: var(--rubric); font-weight: 650; }
+.person p { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.45; }
 .needs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.need { border: 1px solid var(--rule); border-radius: var(--r); padding: 7px 8px; background: var(--page);
-        text-align: left; }
+.need { padding: 7px 8px; text-align: left; }
 .need b { display: block; font-size: 13.5px; }
 .need span { font-size: 12.5px; color: var(--ink-2); }
-.need.danger { border-color: var(--blood); }
-.railnote { font-size: 13px; color: var(--ink-3); margin: 8px 0 0; line-height: 1.4; }
+.need.danger { border-color: var(--rubric); }
+.railnote { font-size: 13.5px; color: var(--ink-2); margin: 8px 0 0; line-height: 1.45; }
 
-/* The conversation, in the rail: speech only, and a way out that is always there. */
-.talk { display: grid; gap: 10px; }
+/* The conversation, at the head of the sheet: speech only, and a way out that is always there. */
+.talk { display: grid; gap: 10px; padding-bottom: 6px; }
 .talkhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .talklog { display: grid; gap: 10px; max-height: 46vh; overflow-y: auto; padding-right: 4px; }
 .line { margin: 0; font: 400 16px/1.5 var(--book); }
-.line b { display: block; font: 600 12.5px/1.2 var(--ledger); color: var(--ink-2); margin-bottom: 2px; }
-.line.mine { padding-left: 12px; border-left: 2px solid var(--accent); font-style: italic; }
-.line.oc { font: 400 14px/1.45 var(--ledger); color: var(--ink-2); border: 1px dashed var(--rule-2);
-           border-radius: var(--r); padding: 6px 10px; }
+.line b { display: block; font: 650 12.5px/1.2 var(--ledger); color: var(--ink-2); margin-bottom: 2px; }
+.line.mine { padding-left: 12px; border-left: 2px solid var(--lapis); font-style: italic; }
+.line.oc { font: italic 400 14px/1.45 var(--ledger); color: var(--ink-2);
+           border-left: 2px solid rgba(90, 84, 76, .5); padding: 2px 0 2px 12px; }
 .regard { font-size: 13px; color: var(--ink-2); display: flex; align-items: center; gap: 8px; }
-.regard i { flex: 1; height: 4px; background: var(--rule); border-radius: 2px; position: relative; }
+.regard i { flex: 1; height: 5px; border-radius: 3px; position: relative;
+            background: rgba(60, 44, 30, .16); box-shadow: inset 1px 1px 1px rgba(60, 40, 20, .3); }
 .regard i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w);
-                   background: var(--ink-2); border-radius: 2px; }
+                   background: var(--ink-2); border-radius: 3px; }
 .talkacts { display: flex; gap: 6px; flex-wrap: wrap; }
 
-/* The fight, in the rail: the board, then who can be struck, then the ways out. */
-.boardtabs { display: flex; gap: 0; }
-.boardtabs button { border-radius: 0; margin-left: -1px; }
-.boardtabs button:first-child { border-radius: var(--r) 0 0 var(--r); }
-.boardtabs button:last-child { border-radius: 0 var(--r) var(--r) 0; }
-.boardtabs button[aria-pressed="true"] { background: var(--accent-wash); border-color: var(--accent); }
-.board { margin-top: 10px; border: 1px solid var(--rule); border-radius: var(--r);
-         background: var(--page); position: relative; }
+/* The fight, on the sheet: a printed board with wooden counters, then the targets, then ways out. */
+.boardtabs { display: flex; gap: 4px; }
+.board { margin-top: 10px; position: relative; color: var(--ink-2); border-radius: 2px;
+         background: var(--tx-paper) 10% 10% / 500px auto, var(--paper-card); background-blend-mode: multiply;
+         box-shadow: var(--sh-2), inset 0 0 0 1px rgba(78, 56, 32, .35), inset 0 0 24px rgba(140, 96, 40, .16); }
 .board svg { display: block; width: 100%; height: auto; }
 .board .turns { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 4px; }
-.board .turns button { background: var(--panel); }
-.sq { fill: transparent; stroke: var(--rule); stroke-width: 1; }
-.sq.blocked { fill: var(--rule-2); stroke: var(--rule-2); }
-.sq.high { fill: var(--panel-2); }
+.sq { fill: transparent; stroke: rgba(90, 70, 50, .35); stroke-width: 1; }
+.sq.blocked { fill: url(#inkhatch); stroke: rgba(42, 32, 25, .7); }
+.sq.high { fill: rgba(150, 120, 80, .2); }
 .sq.rough { fill: url(#hatch); }
-.sq.reach { fill: var(--accent-wash); cursor: pointer; }
-.sq.reach:hover, .sq.reach:focus { fill: var(--accent); fill-opacity: .35; outline: none; }
-.sq.threat { fill: var(--blood-wash); }
+.sq.reach { fill: var(--lapis-wash); cursor: pointer; }
+.sq.reach:hover, .sq.reach:focus { fill: var(--lapis); fill-opacity: .3; outline: none; }
+.sq.threat { fill: var(--rubric-wash); }
 .sq.door { fill: none; stroke: var(--ink-2); stroke-dasharray: 3 3; }
-.sq.aim { stroke: var(--accent); stroke-width: 2; }
-.parapet { stroke: var(--ink-3); stroke-width: 3; }
-.coord { font: 600 9px/1 var(--ledger); fill: var(--ink-3); }
-.tok circle { stroke-width: 2; }
-.tok.pc circle { fill: var(--accent); stroke: var(--accent-2); }
-.tok.foe circle { fill: var(--blood); stroke: var(--blood); fill-opacity: .9; }
-.tok.by circle { fill: var(--panel-2); stroke: var(--ink-3); }
-.tok.down circle { fill-opacity: .25; stroke-dasharray: 3 2; }
-.tok text { font: 700 11px/1 var(--ledger); fill: var(--on-accent); pointer-events: none; }
-.tok.foe text { fill: #fff; }
+.sq.aim { stroke: var(--lapis); stroke-width: 2.5; }
+.parapet { stroke: var(--ink); stroke-width: 3; }
+.coord { font: 700 9px/1 var(--ledger); fill: var(--ink-2); }
+.tok circle { stroke-width: 1.5; }
+.tok.pc circle { fill: url(#woodpc); stroke: #142457; }
+.tok.foe circle { fill: url(#woodfoe); stroke: #4e1108; }
+.tok.by circle { fill: url(#woodby); stroke: #5a4a36; }
+.tok.down circle { fill-opacity: .35; stroke-dasharray: 3 2; }
+.tok text { font: 700 11px/1 var(--ledger); fill: #f6f1e6; pointer-events: none; }
 .tok.by text, .tok.down text { fill: var(--ink); }
-.path { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 5 4;
-        stroke-linecap: round; }
+.path { fill: none; stroke: var(--lapis); stroke-width: 2.5; stroke-dasharray: 5 4; stroke-linecap: round; }
 #view3d { display: block; width: 100%; height: 260px; }
-#view3d polygon.fig.pc { stroke: var(--accent-2); }
-.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--ink-2);
-          margin: 8px 0 0; }
-.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px;
-            vertical-align: -1px; }
+#view3d polygon.fig.pc { stroke: #142457; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--ink-2); margin: 8px 0 0; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .target { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center;
-          width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--rule);
-          border-radius: var(--r); background: var(--page); margin-bottom: 4px; }
-.target[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 var(--accent); }
-.target .dot { width: 12px; height: 12px; border-radius: 50%; grid-row: span 2; }
-.target .dot.foe { background: var(--blood); }
-.target .dot.by { background: var(--ink-3); }
-.target b { font: 600 15px/1.2 var(--book); }
+          width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 6px; }
+.target .dot { width: 14px; height: 14px; border-radius: 50%; grid-row: span 2;
+               box-shadow: 1px 2px 2px rgba(var(--sh-c), .45); }
+.target .dot.foe { background: radial-gradient(circle at 35% 30%, #d8715f, var(--rubric) 60%, #5e140b); }
+.target .dot.by { background: radial-gradient(circle at 35% 30%, #b8a58a, #7a6850); }
+.target b { font: 400 18px/1.15 var(--title); }
 .target small { grid-column: 2; color: var(--ink-2); font-size: 12.5px; }
-.target .dist { grid-row: span 2; grid-column: 3; font-weight: 650; font-size: 14px; }
+.target .dist { grid-row: span 2; grid-column: 3; font-weight: 700; font-size: 14px; }
 
-/* --- The dock ----------------------------------------------------------------------------- */
-.dock { grid-area: dock; border-top: 1px solid var(--rule); background: var(--panel);
-        padding: 12px 24px 14px; display: grid; gap: 8px; position: relative; }
+/* --- The dock: the foot of the page, where you write ------------------------------------------ */
+.dock { grid-area: dock; padding: 16px var(--pad-x) 30px; display: grid; gap: 8px; }
+/* The foot rule: a double rule across the lane, the way a ledger page is ruled off. */
+.dock::before { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+                width: min(calc(var(--margin-w) + var(--gutter) + var(--measure)), calc(100% - 2 * var(--pad-x) - 12px));
+                border-top: 3px double var(--rule-ink-2); }
 .dock > * > :only-child, .dock > * > .span { grid-column: 2; }
-.suggest { }
 .suggest .list { grid-column: 2; display: grid; gap: 2px; }
-.suggest .lab { grid-column: 1; font-size: 13px; color: var(--ink-3); padding-top: 6px;
-                text-align: right; }
-.sugg { text-align: left; background: none; border: 0; border-radius: var(--r);
-        padding: 4px 8px 4px 10px; font: italic 400 16px/1.35 var(--book); color: var(--ink-2);
-        border-left: 2px solid var(--rule-2); }
-.sugg:hover, .sugg:focus-visible { color: var(--ink); border-left-color: var(--accent);
-                                   background: var(--accent-wash); }
-.penrow > textarea, .penrow > .act { grid-column: 2; }
+.suggest .lab { grid-column: 1; font-size: 13px; color: var(--lg-ink-2); padding-top: 6px; text-align: right;
+                font-weight: 600; }
+.sugg { text-align: left; background: none; border: 0; border-radius: 2px;
+        padding: 4px 8px 4px 12px; font: italic 400 16px/1.35 var(--book); color: var(--ink-2);
+        border-left: 2px solid rgba(43, 69, 150, .35); }
+.sugg:hover, .sugg:focus-visible { color: var(--ink); border-left-color: var(--lapis); background: var(--lapis-wash); }
+.penrow > textarea, .penrow > .act { grid-column: 2; grid-row: 1; }
 .penrow { position: relative; }
-.penrow textarea { width: 100%; resize: none; min-height: 48px; max-height: 30vh;
-                   padding: 12px 92px 12px 14px; border-radius: var(--r);
-                   border: 1px solid var(--rule-2); background: var(--page);
+/* The pen's line is pressed into the page, not a box floating on it. */
+.penrow textarea { width: 100%; resize: none; min-height: 50px; max-height: 30vh;
+                   padding: 13px 92px 12px 14px; border-radius: 3px; color: var(--ink);
+                   border: 1px solid rgba(78, 56, 32, .5);
+                   background: var(--tx-paper) 0 0 / 520px auto, var(--paper-shade); background-blend-mode: multiply;
+                   box-shadow: var(--deboss);
                    font: 400 17px/1.45 var(--book); }
-.penrow textarea::placeholder { color: var(--ink-3); font-style: italic; }
-.penrow textarea:focus { outline: none; border-color: var(--accent);
-                         box-shadow: 0 0 0 3px var(--accent-wash); }
-.penrow .act { position: absolute; right: 7px; bottom: 7px; min-height: 34px; padding: 6px 16px; }
-.penrow .mode-say { grid-column: 1; align-self: center; justify-self: end; font-size: 13px;
-                    color: var(--accent); font-weight: 600; }
-.deskrow { }
+.penrow textarea::placeholder { color: var(--ink-2); font-style: italic; }
+.penrow textarea:focus { outline: none; border-color: var(--lapis);
+                         box-shadow: var(--deboss), 0 0 0 3px var(--lapis-wash); }
+/* Act sits inside the pen's own cell, at its lower right; the first build positioned it on the
+   whole dock row, which put it past the end of the line at 1440. */
+.penrow .act { justify-self: end; align-self: end; margin: 0 8px 8px 0; min-height: 34px; padding: 6px 16px; }
+/* Carried forward: the ledger's balance at the foot of the leaf, beside the pen. */
+.carried { grid-column: 1; grid-row: 1; align-self: end; color: var(--lg-ink); font-size: 13.5px;
+           padding: 0 14px 0 8px; }
+.carried h4 { margin: 0; font: 700 13px/22px var(--ledger); color: var(--lg-ink-2); }
+.carried ul { list-style: none; margin: 0; padding: 0; }
+.carried li { display: flex; justify-content: space-between; line-height: 22px; }
+.carried li span:last-child { font-weight: 700; min-width: 44px; text-align: right; }
+.carried li:last-child span:last-child { border-bottom: 3px double var(--lg-ink); line-height: 19px; }
+@media (max-width: 1239px) { .carried { display: none; } }
 .deskrow .row { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
-.deskrow .lab { grid-column: 1; }
 .here-btn { display: none; }
 .attached .row { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
-.chipbtn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px;
-           min-height: 30px; background: var(--accent-wash); border-color: var(--accent); }
-.chipbtn .gi { width: 18px; height: 18px; color: var(--accent); }
+.chipbtn { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; min-height: 30px;
+           color: var(--lapis-2); border-color: rgba(43, 69, 150, .55); }
+.chipbtn .gi { width: 18px; height: 18px; color: var(--lapis); }
 .chipbtn .x { border: 0; background: none; padding: 0 4px; color: var(--ink-2); font-size: 16px;
-              line-height: 1; min-height: 0; }
+              line-height: 1; min-height: 0; box-shadow: none; }
 
-/* The combat dock: the turn's budget in the margin column, the actions under the pen. */
+/* The turn's budget, in the ledger column: four counters, spent ones turned face down. */
 .dock-combat { row-gap: 8px; }
-.economy { grid-column: 1; display: grid; gap: 4px; align-content: start; }
-.economy h3 { margin: 0 0 2px; font: 650 14px/1.2 var(--ledger); }
-.pip { display: grid; grid-template-columns: 14px 1fr auto; gap: 7px; align-items: center;
-       font-size: 13.5px; }
-.pip i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent);
-         background: var(--accent); }
-.pip.used i { background: transparent; border-color: var(--rule-2); }
-.pip.used { color: var(--ink-3); }
-.pip small { color: var(--ink-3); font-size: 12px; }
+.economy { grid-column: 1; display: grid; gap: 4px; align-content: start; color: var(--lg-ink); }
+.economy h3 { margin: 0 0 2px; font: 400 19px/1.1 var(--title); }
+.pip { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; font-size: 13.5px;
+       font-weight: 600; }
+.pip i { width: 14px; height: 14px; border-radius: 50%;
+         background: radial-gradient(circle at 35% 30%, #6f86c9, var(--lapis) 55%, #172a60);
+         box-shadow: 1px 2px 2px rgba(var(--sh-c), .45); }
+.pip.used i { background: transparent; box-shadow: inset 1px 1px 2px rgba(var(--sh-c), .45);
+              border: 1px dashed rgba(26, 41, 68, .45); }
+.pip.used { color: var(--lg-ink-2); font-weight: 500; }
+.pip small { color: var(--lg-ink-2); font-size: 12px; }
 .cacts { grid-column: 2; display: grid; gap: 8px; }
 .cacts .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .cacts .row .sp { flex: 1; }
-.plan { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; align-items: center;
-        font-size: 13.5px; color: var(--ink-3); flex: 1; min-width: 0; }
+.plan { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; align-items: center; font-size: 13.5px;
+        color: var(--ink-2); flex: 1; min-width: 0; font-style: italic; }
+.plan .chipbtn { font-style: normal; }
 .commitrow { align-items: flex-start !important; }
 .boardbtn { display: none; }
 .hint { font-size: 13.5px; color: var(--ink-2); margin: 0; }
-.hint.bad { color: var(--blood); }
+.hint.bad { color: var(--rubric); font-weight: 600; }
 
-/* Popovers over the dock: opened in place, never shifting what was under the pointer. */
+/* Popovers: a sheet laid over the foot of the page; they open in place and move nothing. */
 .pop { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
        width: min(640px, calc(100% - 32px)); max-height: 60vh; overflow-y: auto; z-index: 30;
-       background: var(--panel); border: 1px solid var(--rule-2); border-radius: var(--r-float);
-       box-shadow: var(--shadow); padding: 14px 16px 16px; }
-.pop h3 { margin: 0 0 4px; font: 650 16px/1.2 var(--ledger); display: flex;
-          justify-content: space-between; align-items: baseline; }
+       border-radius: 2px; box-shadow: var(--sh-4), inset 0 0 36px rgba(140, 96, 40, .2);
+       padding: 16px 18px 18px; color: var(--ink); }
+.pop h3 { margin: 0 0 4px; font: 400 22px/1.15 var(--title); display: flex; justify-content: space-between;
+          align-items: baseline; }
 .pop p { margin: 0 0 10px; color: var(--ink-2); font-size: 14px; }
-.optgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
-.opt { display: grid; gap: 2px; text-align: left; padding: 8px 10px; border: 1px solid var(--rule);
-       background: var(--page); border-radius: var(--r); }
-.opt:hover:not(:disabled) { border-color: var(--accent); }
-.opt b { font-weight: 650; font-size: 14.5px; }
+.optgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.opt { display: grid; gap: 2px; text-align: left; padding: 8px 10px; }
+.opt b { font-weight: 700; font-size: 14.5px; }
 .opt small { color: var(--ink-2); font-size: 12.5px; line-height: 1.3; }
-.opt .gi { width: 20px; height: 20px; color: var(--accent); }
+.opt .gi { width: 20px; height: 20px; color: var(--lapis); }
 .opt.withicon { grid-template-columns: 22px 1fr; column-gap: 8px; }
 .opt.withicon small { grid-column: 2; }
 .range { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; }
-.range input { flex: 1; accent-color: var(--accent); }
+.range input { flex: 1; accent-color: var(--lapis); }
 .range b { min-width: 72px; text-align: right; }
-.grouplab { margin: 12px 0 6px; font: 600 13px/1.2 var(--ledger); color: var(--ink-2); }
+.grouplab { margin: 12px 0 6px; font: 650 13px/1.2 var(--ledger); color: var(--ink-2); }
 
-/* --- The views: character, gear, spells, journal, map ---------------------------------------- */
-.view { height: calc(100dvh - var(--bar-h)); overflow-y: auto; background: var(--page);
-        padding: 28px 28px 60px; }
-.viewin { max-width: 1240px; margin: 0 auto; }
-.view h1 { font: 600 32px/1.1 var(--book); margin: 0 0 4px; letter-spacing: -.01em; }
-.view .sub { color: var(--ink-2); margin: 0 0 22px; font-size: 15px; }
-.view h2 { font: 650 16px/1.2 var(--ledger); margin: 0 0 10px; display: flex;
+/* --- The views: one long sheet each, laid on the desk ---------------------------------------- */
+.view { height: calc(100dvh - var(--bar-h)); overflow-y: auto; padding: 22px 22px 60px;
+        scrollbar-width: thin; scrollbar-color: rgba(236, 214, 170, .4) transparent; }
+.viewin { max-width: 1240px; margin: 0 auto; position: relative; isolation: isolate;
+          padding: 34px 40px 44px; color: var(--ink); }
+.viewin::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 2px;
+                  background: var(--tx-paper) 0 0 / 760px auto, var(--paper); background-blend-mode: multiply;
+                  box-shadow: inset 0 0 60px rgba(140, 96, 40, .22), inset 0 0 0 1px rgba(120, 90, 50, .2);
+                  filter: url(#deckle) drop-shadow(5px 9px 10px rgba(var(--sh-c), .5)); }
+.view h1 { font: 400 40px/1.05 var(--title); margin: 0 0 6px; }
+.view .sub { color: var(--ink-2); margin: 0 0 24px; font-size: 15px; }
+.view h2 { font: 400 22px/1.15 var(--title); margin: 0 0 10px; display: flex;
            justify-content: space-between; align-items: baseline; gap: 10px; }
-.view h2 small { font-weight: 500; color: var(--ink-2); font-size: 13px; }
-.card { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--r);
-        padding: 16px 18px; }
-.cols { display: grid; gap: 18px; }
+.view h2 small { font: 500 13px/1.2 var(--ledger); color: var(--ink-2); }
+/* No boxes on a page: a section is ruled off with a double rule, as a printer would. */
+.card { padding: 14px 0 0; border-top: 3px double var(--rule-ink-2); }
+.cols { display: grid; gap: 22px 34px; }
 
-/* Character. Every number is a button: press it and it says what it is made of. */
-.charhead { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center;
-            margin-bottom: 22px; }
-.portrait { width: 104px; height: 104px; border-radius: var(--r-float); border: 1px solid var(--rule-2);
-            background: var(--panel-2) center/cover; display: grid; place-items: center;
-            font: 600 40px/1 var(--book); color: var(--accent); position: relative; overflow: hidden; }
-.portrait label { position: absolute; inset: auto 0 0 0; font: 600 12px/1 var(--ledger);
-                  background: rgba(10, 14, 18, .72); color: #e9e3d6; padding: 6px; text-align: center;
-                  cursor: pointer; }
+/* Character. Every figure is a footnote: press it and it says what it is made of. */
+.charhead { display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center; margin-bottom: 24px; }
+/* The portrait: a card tipped onto the page with photo corners. */
+.portrait { width: 108px; height: 108px; border-radius: 2px; display: grid; place-items: center;
+            font: 400 46px/1 var(--title); color: var(--lapis-2); position: relative; overflow: hidden;
+            background: var(--tx-paper) 0 0 / 300px auto, var(--paper-shade); background-blend-mode: multiply;
+            background-size: cover; background-position: center;
+            box-shadow: var(--sh-2), inset 0 0 0 5px var(--paper-card), inset 0 0 0 6px rgba(78, 56, 32, .4); }
+.portrait label { position: absolute; inset: auto 0 0 0; font: 650 12px/1 var(--ledger);
+                  background: rgba(42, 32, 25, .78); color: #f3ead6; padding: 6px; text-align: center; cursor: pointer; }
 .portrait input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.xp { min-width: 220px; display: grid; gap: 6px; font-size: 14px; color: var(--ink-2); }
-.xp .xpbar { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
-.xp .xpbar i { display: block; height: 100%; background: var(--accent); }
+.xp { min-width: 230px; display: grid; gap: 6px; font-size: 14px; color: var(--ink-2); }
+.xp .xpbar { height: 6px; border-radius: 3px; overflow: hidden; background: rgba(60, 44, 30, .14);
+             box-shadow: inset 1px 1px 1px rgba(60, 40, 20, .3); }
+.xp .xpbar i { display: block; height: 100%; background: var(--lapis); }
 .charcols { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 .num { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-align: inherit;
-       border-bottom: 1px dotted var(--ink-3); border-radius: 0; cursor: help; }
-.num:hover, .num:focus-visible { border-bottom-color: var(--accent); color: var(--accent); }
-.abil { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.abil .num { display: grid; justify-items: center; padding: 8px 4px 7px; border: 1px solid var(--rule);
-             border-radius: var(--r); background: var(--page); }
-.abil .num:hover { border-color: var(--accent); }
+       border-bottom: 1px dotted var(--ink-2); border-radius: 0; cursor: help; }
+.num:hover, .num:focus-visible { border-bottom-color: var(--lapis); color: var(--lapis-2); }
+/* Printed figures, boxed in ink: they are footnoted, not pressed, so they stay flat. Every
+   figure the engine decides is set in the clerk's face and ink, never in IM Fell, whose
+   old-style numerals made "+1" read as "+I" on the first pass. */
+.abil { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.abil .num { display: grid; justify-items: center; padding: 8px 4px 7px;
+             border: 1px solid var(--rule-ink-2); border-radius: 2px; outline: 1px solid var(--rule-ink);
+             outline-offset: -4px; }
+.abil .num:hover { border-color: var(--lapis); }
 .abil small { font-size: 12.5px; color: var(--ink-2); }
-.abil b { font-size: 22px; line-height: 1.1; }
-.abil em { font-style: normal; font-size: 14px; color: var(--ink-2); }
-.defrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
-.stat { display: grid; gap: 1px; padding: 8px 10px; border: 1px solid var(--rule); border-radius: var(--r);
-        background: var(--page); text-align: left; }
+.abil b { font: 700 26px/1.1 var(--ledger); color: var(--lg-ink); }
+.abil em { font-style: normal; font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.defrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.stat { display: grid; gap: 1px; padding: 8px 10px; border: 1px solid var(--rule-ink-2); border-radius: 2px;
+        text-align: left; }
 .stat small { font-size: 12.5px; color: var(--ink-2); }
-.stat b { font-size: 21px; line-height: 1.1; }
-.stat:hover { border-color: var(--accent); }
-.stat.num { border-bottom: 1px solid var(--rule); }
-.stat.num:hover { color: inherit; border-color: var(--accent); }
+.stat b { font: 700 24px/1.1 var(--ledger); color: var(--lg-ink); }
+.stat:hover { border-color: var(--lapis); }
+.stat.num { border-bottom: 1px solid var(--rule-ink-2); }
+.stat.num:hover { color: inherit; border-color: var(--lapis); }
 .hpline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-.hpline b { font-size: 28px; }
-.hpline .lifebar { flex: 1; width: auto; height: 7px; }
+.hpline b { font: 700 32px/1 var(--ledger); color: var(--lg-ink); }
+.hpline .lifebar { flex: 1; width: auto; height: 7px; background: rgba(60, 44, 30, .16);
+                   box-shadow: inset 1px 1px 1px rgba(60, 40, 20, .3); }
 table.ledger { width: 100%; border-collapse: collapse; font-size: 14.5px; }
-table.ledger th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12.5px;
-                  padding: 0 8px 6px 0; border-bottom: 1px solid var(--rule-2); white-space: nowrap; }
+table.ledger th { text-align: left; font-weight: 650; color: var(--ink-2); font-size: 12.5px;
+                  padding: 0 8px 6px 0; border-bottom: 1px solid var(--rule-ink-2); white-space: nowrap; }
 table.ledger td { padding: 7px 8px 7px 0; vertical-align: top; }
-table.ledger tbody tr + tr td { border-top: 1px solid var(--rule); }
+table.ledger tbody tr + tr td { border-top: 1px solid var(--rule-ink); }
 table.ledger td.r, table.ledger th.r { text-align: right; }
-table.ledger td b { font-weight: 600; }
+table.ledger td b { font-weight: 650; }
 table.ledger td small { display: block; color: var(--ink-2); font-size: 12.5px; }
-.provokes { color: var(--blood); font-weight: 600; }
+.provokes { color: var(--rubric); font-weight: 650; }
 .safe { color: var(--ink-2); }
-.tag { display: inline-block; font-size: 12px; padding: 1px 6px; border: 1px solid var(--rule-2);
-       border-radius: var(--r); color: var(--ink-2); margin-left: 6px; font-weight: 600; }
-.tag.on { border-color: var(--accent); color: var(--accent); }
-.skilllist { columns: 1; }
+.tag { display: inline-block; font-size: 12px; padding: 1px 6px; border: 1px solid var(--rule-ink-2);
+       border-radius: 2px; color: var(--ink-2); margin-left: 6px; font-weight: 650; }
+.tag.on { border-color: var(--lapis); color: var(--lapis); }
 .skillrow { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 5px 0;
-            border-bottom: 1px solid var(--rule); font-size: 14.5px; }
-.skillrow .cls { color: var(--accent); font-size: 12px; margin-left: 6px; }
+            border-bottom: 1px solid var(--rule-ink); font-size: 14.5px; }
+.skillrow .cls { color: var(--lapis); font-size: 12px; margin-left: 6px; font-weight: 650; }
 .skillrow.untrained { color: var(--ink-3); }
-.plainlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14.5px; }
-.plainlist small { color: var(--ink-2); display: block; font-size: 12.5px; }
-.stack { display: grid; gap: 18px; }
+.plainlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14.5px; }
+.plainlist small { color: var(--ink-2); display: block; font-size: 13px; }
+.stack { display: grid; gap: 22px; }
 
-/* Gear: the worn list on the left, what is carried on the right, names always shown. */
+/* Gear: what is on you, then what you carry, names always printed beside the pictures. */
 .gearcols { grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); align-items: start; }
-.slot { display: grid; grid-template-columns: 28px 1fr auto; gap: 2px 10px; align-items: center;
-        padding: 9px 0; border-bottom: 1px solid var(--rule); }
+.slot { display: grid; grid-template-columns: 30px 1fr auto; gap: 2px 10px; align-items: center;
+        padding: 9px 0; border-bottom: 1px solid var(--rule-ink); }
 .slot:last-child { border-bottom: 0; }
 .slot .where { grid-column: 2; font-size: 12.5px; color: var(--ink-2); }
 .slot b { grid-column: 2; font: 500 16px/1.2 var(--book); }
-.slot .gi { grid-row: span 2; width: 26px; height: 26px; color: var(--ink-2); }
+.slot .gi { grid-row: span 2; width: 28px; height: 28px; color: var(--ink-2); }
 .slot.empty b { color: var(--ink-3); font-style: italic; }
 .slot .btn { grid-row: span 2; grid-column: 3; }
 .gi { display: inline-block; width: 22px; height: 22px; flex: none; }
 .gi svg { width: 100%; height: 100%; display: block; }
 .gi svg path { fill: currentColor; }
 .gi svg path[fill="#000"], .gi svg path[fill="#000000"] { fill: transparent; }
-.shelftabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
-.shelftabs button { background: none; border: 1px solid var(--rule); border-radius: var(--r);
-                    padding: 6px 10px; font-weight: 600; color: var(--ink-2); min-height: 32px; }
-.shelftabs button small { font-weight: 500; margin-left: 5px; color: var(--ink-3); }
-.shelftabs button[aria-selected="true"] { border-color: var(--accent); color: var(--ink);
-                                          background: var(--accent-wash); }
+/* Woodcut-dark pictures: printed in the book's ink, pressed into the paper. */
+.item .gi, .slot .gi, .ware .gi, .book-list .gi { filter: drop-shadow(.5px .5px 0 rgba(255, 250, 235, .6)); }
+.shelftabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.shelftabs button { padding: 6px 10px; font-weight: 650; color: var(--ink-2); min-height: 32px; }
+.shelftabs button small { font-weight: 500; margin-left: 5px; color: var(--ink-2); }
 .filter { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-.filter input { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--rule-2);
-                border-radius: var(--r); background: var(--page); }
-.filter select { padding: 7px 8px; border: 1px solid var(--rule-2); border-radius: var(--r);
-                 background: var(--page); }
-.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 0 18px; }
+.filter input, .filter select { padding: 8px 10px; border: 1px solid rgba(78, 56, 32, .5); border-radius: 3px;
+                                color: var(--ink); box-shadow: var(--deboss);
+                                background: var(--tx-paper) 0 0 / 520px auto, var(--paper-shade);
+                                background-blend-mode: multiply; }
+.filter input { flex: 1; min-width: 0; }
+.filter input::placeholder { color: var(--ink-2); }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 0 24px; }
 .item { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 1px 10px;
-        align-items: center; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+        align-items: center; padding: 8px 0; border-bottom: 1px solid var(--rule-ink); }
 .item .gi { grid-row: span 2; width: 24px; height: 24px; color: var(--ink-2); }
 .item b { font: 500 15.5px/1.25 var(--book); min-width: 0; }
-.item b .qty { font: 600 13px/1 var(--ledger); color: var(--ink-2); margin-left: 6px; }
+.item b .qty { font: 700 13px/1 var(--ledger); color: var(--ink-2); margin-left: 6px; }
 .item small { grid-column: 2; font-size: 12.5px; color: var(--ink-2); }
-.item small .ex { color: var(--ink-3); }
+.item small .ex { color: var(--ink-2); font-style: italic; }
 .item .acts { grid-row: span 2; grid-column: 3; display: flex; gap: 4px; }
-.item.worn b::after { content: "on you"; font: 600 11.5px/1 var(--ledger); color: var(--accent);
-                      margin-left: 8px; }
-.empty { color: var(--ink-3); font-style: italic; padding: 12px 0; }
+.item.worn b::after { content: "on you"; font: 700 11.5px/1 var(--ledger); color: var(--lapis); margin-left: 8px; }
+.empty { color: var(--ink-2); font-style: italic; padding: 12px 0; }
 .purse { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; margin-top: 12px; color: var(--ink-2); }
 .purse b { color: var(--ink); }
 
-/* Spells: sockets per level, then the prepared cards, then the book. */
+/* Spells: the day's slots as sockets set into the page, then the prepared spells as cards. */
 .slots { display: grid; gap: 10px; }
 .slotrow { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 12px; }
 .slotrow b { font-size: 15px; }
-.sockets { display: flex; gap: 8px; }
-.socket { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--accent);
-          background: radial-gradient(circle at 40% 35%, var(--accent-2), var(--accent) 60%);
-          box-shadow: 0 0 10px var(--accent-wash); }
-.socket.spent { border-color: var(--blood); background: transparent;
-                box-shadow: inset 0 0 0 3px var(--blood-wash); }
+.sockets { display: flex; gap: 10px; }
+/* A socket is a hollow pressed into the paper; an open slot holds a lit lapis bead, a spent
+   one is empty and ringed in rubric. */
+.socket { width: 24px; height: 24px; border-radius: 50%; position: relative;
+          box-shadow: inset 1px 2px 3px rgba(var(--sh-c), .55), inset -1px -1px 0 rgba(255, 250, 235, .6); }
+.socket::after { content: ""; position: absolute; inset: 3px; border-radius: 50%;
+                 background: radial-gradient(circle at 35% 30%, #aebce8, #5d79c9 35%, var(--lapis) 60%, #142457);
+                 box-shadow: 1px 2px 2px rgba(var(--sh-c), .5); }
+.socket.spent { box-shadow: inset 1px 2px 3px rgba(var(--sh-c), .55), inset 0 0 0 2px var(--rubric); }
+.socket.spent::after { display: none; }
 .slotrow small { color: var(--ink-2); font-size: 13px; }
-.spellcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
-.spell { display: grid; grid-template-columns: 30px 1fr; gap: 2px 10px; padding: 12px 12px 10px;
-         border: 1px solid var(--rule); border-radius: var(--r); background: var(--panel); }
-.spell .gi { width: 28px; height: 28px; color: var(--accent); grid-row: span 2; }
-.spell h3 { margin: 0; font: 600 17px/1.2 var(--book); }
+.spellcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.spell { display: grid; grid-template-columns: 30px 1fr; gap: 2px 10px; padding: 14px 14px 12px; border-radius: 3px;
+         background: var(--tx-paper) 20% 20% / 420px auto, var(--paper-card); background-blend-mode: multiply;
+         box-shadow: var(--lit), var(--sh-2), inset 0 0 0 1px rgba(78, 56, 32, .3); }
+.spell .gi { width: 28px; height: 28px; color: var(--lapis); grid-row: span 2; }
+.spell h3 { margin: 0; font: 400 21px/1.1 var(--title); }
 .spell .meta { font-size: 12.5px; color: var(--ink-2); }
 .spell dl { grid-column: 1 / -1; margin: 8px 0 8px; display: grid; grid-template-columns: auto 1fr;
             gap: 2px 10px; font-size: 13.5px; }
 .spell dt { color: var(--ink-2); }
 .spell dd { margin: 0; }
 .spell .acts { grid-column: 1 / -1; display: flex; gap: 6px; }
-.spell.spent { opacity: .6; }
-.book-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 16px; }
-.book-list button { display: flex; gap: 8px; align-items: center; background: none; border: 0;
-                    padding: 5px 0; text-align: left; border-bottom: 1px solid var(--rule); border-radius: 0; }
+.spell.spent { opacity: .6; box-shadow: var(--sh-1); }
+.book-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 18px; }
+.book-list button { display: flex; gap: 8px; align-items: center; background: none; border: 0; color: var(--ink);
+                    padding: 5px 0; text-align: left; border-bottom: 1px solid var(--rule-ink); border-radius: 0; }
+.book-list button:hover { color: var(--lapis-2); }
 .book-list .gi { width: 18px; height: 18px; color: var(--ink-2); }
-.book-list small { margin-left: auto; color: var(--ink-3); font-size: 12px; }
+.book-list small { margin-left: auto; color: var(--ink-2); font-size: 12px; }
 
 /* Journal. */
 .jcols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; }
-.matter { padding: 10px 0; border-bottom: 1px solid var(--rule); }
-.matter b { font: 600 17px/1.3 var(--book); display: block; }
+.matter { padding: 10px 0; border-bottom: 1px solid var(--rule-ink); }
+.matter b { font: 400 20px/1.2 var(--title); display: block; }
 .matter small { color: var(--ink-2); font-size: 13px; }
 .saidby { margin: 14px 0 6px; font: 650 14px/1.2 var(--ledger); color: var(--ink-2); }
-.saidline { margin: 0 0 8px; font: 400 17px/1.55 var(--book); padding-left: 12px;
-            border-left: 2px solid var(--rule-2); }
+.saidline { margin: 0 0 8px; font: 400 17px/1.55 var(--book); padding-left: 14px; position: relative; }
+.saidline::before { content: "\201C"; position: absolute; left: -2px; top: -4px; font: 400 26px/1 var(--title);
+                    color: var(--rubric); }
 .daylog { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
 .daylog li { display: grid; grid-template-columns: 92px 1fr; gap: 10px; }
-.daylog time { color: var(--ink-2); }
+.daylog time { color: var(--ink-2); font-weight: 650; }
 
-/* Map. */
-.mapwrap { position: relative; background: var(--panel); border: 1px solid var(--rule);
-           border-radius: var(--r); }
+/* Map: drawn in ink on the sheet. */
+.mapwrap { position: relative; border-radius: 2px;
+           background: var(--tx-paper) 40% 40% / 600px auto, var(--paper-card); background-blend-mode: multiply;
+           box-shadow: var(--sh-2), inset 0 0 0 1px rgba(78, 56, 32, .3), inset 0 0 40px rgba(140, 96, 40, .16); }
 .mapwrap svg { display: block; width: 100%; height: auto; }
-.edge { stroke: var(--rule-2); stroke-width: 1.2; }
+.edge { stroke: rgba(60, 44, 30, .5); stroke-width: 1.2; }
 .edge.road { stroke-dasharray: 5 4; }
-.node circle { fill: var(--page); stroke: var(--ink-3); stroke-width: 1.5; }
+.node circle { fill: var(--paper-card); stroke: var(--ink-2); stroke-width: 1.5; }
 .node text { font: 500 12px/1 var(--ledger); fill: var(--ink-2); paint-order: stroke;
-             stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
-.node.near circle { stroke: var(--accent); fill: var(--accent-wash); }
+             stroke: var(--paper-card); stroke-width: 4px; stroke-linejoin: round; }
+.node.near circle { stroke: var(--lapis); fill: #dde2ef; }
 .node.near text { fill: var(--ink); }
-.node.here circle { fill: var(--accent); stroke: var(--accent-2); }
+.node.here circle { fill: var(--lapis); stroke: #142457; }
 .node.here text { fill: var(--ink); font-weight: 700; }
 .node.out circle { stroke-dasharray: 3 2; }
 .node { cursor: pointer; }
-.node:hover circle, .node:focus circle { stroke: var(--accent); stroke-width: 2.5; }
+.node:hover circle, .node:focus circle { stroke: var(--lapis); stroke-width: 2.5; }
 .node:focus { outline: none; }
-.node.sel circle { stroke: var(--accent-2); stroke-width: 3; }
-.maprail { display: grid; gap: 12px; align-content: start; }
+.node.sel circle { stroke: var(--rubric); stroke-width: 3; }
+.maprail { display: grid; gap: 16px; align-content: start; }
 .mapcols { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; }
 .route { list-style: none; margin: 6px 0 12px; padding: 0; counter-reset: leg; display: grid; gap: 4px; }
-.route li { counter-increment: leg; display: grid; grid-template-columns: 22px 1fr auto; gap: 8px;
-            font-size: 14px; }
-.route li::before { content: counter(leg); color: var(--ink-3); text-align: right; }
+.route li { counter-increment: leg; display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; font-size: 14px; }
+.route li::before { content: counter(leg); color: var(--ink-2); text-align: right; }
 .route li span { color: var(--ink-2); }
 
-/* --- Trade: the counter against your pack, over the table -------------------------------------- */
-.sheet-back { position: fixed; inset: 0; z-index: 60; background: rgba(8, 11, 15, .55);
+/* --- Trade: the shop's counter-book, laid over the desk ---------------------------------------- */
+.sheet-back { position: fixed; inset: 0; z-index: 60; background: rgba(14, 7, 2, .5);
               display: grid; place-items: end center; }
-.tradesheet { width: min(1180px, 100%); height: min(86dvh, 820px); background: var(--page);
-              border: 1px solid var(--rule-2); border-bottom: 0; border-radius: var(--r-float) var(--r-float) 0 0;
-              box-shadow: var(--shadow); display: grid; grid-template-rows: auto minmax(0, 1fr);
-              animation: rise .2s ease-out both; }
+.tradesheet { width: min(1180px, 100%); height: min(86dvh, 820px); color: var(--ink); border-radius: 2px 2px 0 0;
+              box-shadow: var(--sh-4), inset 0 0 60px rgba(140, 96, 40, .22);
+              display: grid; grid-template-rows: auto minmax(0, 1fr); animation: rise .2s ease-out both; }
 @keyframes rise { from { transform: translateY(24px); opacity: 0; } }
-.tradehead { display: flex; align-items: center; gap: 16px; padding: 14px 18px;
-             border-bottom: 1px solid var(--rule); }
-.tradehead h2 { margin: 0; font: 600 22px/1.2 var(--book); }
-.tradehead p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.tradehead { display: flex; align-items: center; gap: 16px; padding: 16px 20px;
+             border-bottom: 3px double var(--rule-ink-2); }
+.tradehead h2 { margin: 0; font: 400 30px/1.1 var(--title); }
+.tradehead p { margin: 2px 0 0; color: var(--ink-2); font-size: 14px; }
 .tradehead .sp { flex: 1; }
 .basketjump { display: none; }
-.tradecols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .9fr) minmax(0, 1fr);
-             min-height: 0; }
-.tradecols > section { min-height: 0; overflow-y: auto; padding: 14px 16px 20px; }
-.tradecols > section + section { border-left: 1px solid var(--rule); }
-.tradecols h3 { margin: 0 0 10px; font: 650 15px/1.2 var(--ledger); display: flex;
-                justify-content: space-between; }
-.tradecols h3 small { font-weight: 500; color: var(--ink-2); }
+.tradecols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(300px, .9fr) minmax(0, 1fr); min-height: 0; }
+.tradecols > section { min-height: 0; overflow-y: auto; padding: 14px 18px 20px; }
+.tradecols > section + section { border-left: 1px solid var(--rule-ink); }
+.tradecols h3 { margin: 0 0 10px; font: 400 21px/1.15 var(--title); display: flex; justify-content: space-between;
+                align-items: baseline; }
+.tradecols h3 small { font: 500 13px/1.2 var(--ledger); color: var(--ink-2); }
 .ware { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; gap: 0 10px;
-        align-items: center; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+        align-items: center; padding: 7px 0; border-bottom: 1px solid var(--rule-ink); }
 .ware .gi { width: 22px; height: 22px; color: var(--ink-2); }
 .ware b { font: 500 15px/1.25 var(--book); }
 .ware b small { display: block; font: 400 12.5px/1.2 var(--ledger); color: var(--ink-2); }
-.ware .price { font-weight: 650; font-size: 14px; white-space: nowrap; }
-.basket { background: var(--panel); }
+.ware .price { font-weight: 700; font-size: 14px; white-space: nowrap; }
+/* The basket is kept on the clerk's stock, ruled with the red money rule, totals double-ruled. */
+.basket { background: linear-gradient(90deg, transparent calc(100% - 100px), var(--rule-red) calc(100% - 100px),
+                      var(--rule-red) calc(100% - 99px), transparent calc(100% - 99px)),
+                      var(--tx-stock) 0 0 / 520px auto, var(--stock);
+          background-blend-mode: normal, multiply, normal; color: var(--lg-ink);
+          box-shadow: inset 6px 0 10px -6px rgba(var(--sh-c), .4); }
+.basket h3 { color: var(--lg-ink); }
 .bline { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
-         padding: 8px 0; border-bottom: 1px solid var(--rule); }
+         padding: 8px 0; border-bottom: 1px solid var(--rule-blue); }
 .bline b { font: 500 15px/1.2 var(--book); }
-.bline b small { display: block; font: 600 12px/1.2 var(--ledger); color: var(--ink-2); }
-.bline.sell b small { color: var(--accent); }
-.stepper { display: inline-flex; align-items: center; border: 1px solid var(--rule-2);
-           border-radius: var(--r); }
-.stepper button { border: 0; background: none; width: 28px; height: 28px; padding: 0; font-weight: 700; }
-.stepper span { min-width: 22px; text-align: center; font-weight: 650; }
+.bline b small { display: block; font: 650 12px/1.2 var(--ledger); color: var(--lg-ink-2); }
+.bline.sell b small { color: var(--lapis); }
+.bline .price { min-width: 84px; text-align: right; font-weight: 700; }
+.stepper { display: inline-flex; align-items: center; }
+.stepper button { border: 0; background: none; width: 28px; height: 28px; padding: 0; font-weight: 700; color: var(--ink); }
+.stepper span { min-width: 22px; text-align: center; font-weight: 700; }
 .totals { margin-top: 12px; display: grid; gap: 4px; font-size: 14.5px; }
 .totals div { display: flex; justify-content: space-between; }
-.totals .grand { font-size: 18px; font-weight: 700; padding-top: 6px; border-top: 1px solid var(--rule-2); }
-.totals .off { color: var(--accent); }
-.haggle { margin-top: 12px; padding: 10px 12px; border: 1px dashed var(--rule-2);
-          border-radius: var(--r); font-size: 13.5px; color: var(--ink-2); display: grid; gap: 8px; }
-.haggle b { color: var(--ink); }
+.totals .grand { font-size: 19px; font-weight: 700; padding-top: 6px; border-top: 1px solid var(--lg-ink); }
+.totals .grand span:last-child { border-bottom: 3px double var(--lg-ink); }
+.totals .off { color: var(--lapis); }
+.haggle { margin-top: 12px; padding: 10px 12px; border: 1px dashed rgba(26, 41, 68, .45); border-radius: 2px;
+          font-size: 13.5px; color: var(--lg-ink-2); display: grid; gap: 8px; }
+.haggle b { color: var(--lg-ink); }
 .tradego { display: flex; gap: 8px; margin-top: 14px; }
 .tradego .primary { flex: 1; }
 
-/* --- Dialogs, the reasons tip, the clock, the toast --------------------------------------------- */
-.modal { border: 1px solid var(--rule-2); border-radius: var(--r-float); background: var(--panel);
-         color: var(--ink); padding: 20px 22px; width: min(520px, calc(100vw - 32px));
-         box-shadow: var(--shadow); }
-.modal::backdrop { background: rgba(8, 11, 15, .55); }
-.modal h2 { margin: 0 0 6px; font: 600 22px/1.2 var(--book); }
+/* --- Sheets over the desk: dialogs, the footnote, the clock, the toast ------------------------ */
+.modal { border: 0; border-radius: 2px; color: var(--ink); padding: 22px 24px; width: min(540px, calc(100vw - 32px));
+         box-shadow: var(--sh-4), inset 0 0 50px rgba(140, 96, 40, .22); }
+.modal::backdrop { background: rgba(14, 7, 2, .55); }
+.modal h2 { margin: 0 0 6px; font: 400 30px/1.1 var(--title); }
 .modal p { margin: 0 0 12px; color: var(--ink-2); line-height: 1.5; }
 .modal .spelltext { font: 400 16.5px/1.6 var(--book); color: var(--ink); max-height: 46vh; overflow-y: auto; }
-.modal .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.modal .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 .modal dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 14px; margin: 8px 0 14px; }
 .modal dt { color: var(--ink-2); }
 .modal dd { margin: 0; }
-.why { position: fixed; z-index: 70; width: 270px; background: var(--panel); border: 1px solid var(--accent);
-       border-radius: var(--r-float); box-shadow: var(--shadow); padding: 10px 12px; font-size: 14px; }
-.why h4 { margin: 0 0 6px; font-size: 14px; display: flex; justify-content: space-between; }
+/* A number's reasons, as a footnote slip cut from the ledger's stock. */
+.why { position: fixed; z-index: 70; width: 280px; border-radius: 2px; padding: 10px 12px 12px; font-size: 14px;
+       color: var(--lg-ink);
+       background: linear-gradient(90deg, transparent calc(100% - 50px), var(--rule-red) calc(100% - 50px),
+                   var(--rule-red) calc(100% - 49px), transparent calc(100% - 49px)),
+                   var(--tx-stock) 0 0 / 520px auto, var(--stock);
+       background-blend-mode: normal, multiply, normal; box-shadow: var(--sh-3), inset 0 0 0 1px rgba(26, 41, 68, .25); }
+.why h4 { margin: 0 0 6px; font-size: 14.5px; display: flex; justify-content: space-between; font-weight: 700; }
 .why ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .why li { display: flex; justify-content: space-between; gap: 10px; }
-.why li span:first-child { color: var(--ink-2); }
-.why p { margin: 6px 0 0; color: var(--ink-2); font-size: 13px; line-height: 1.4; }
+.why li span:first-child { color: var(--lg-ink-2); }
+.why li span:last-child { min-width: 34px; text-align: right; font-weight: 650; }
+.why p { margin: 6px 0 0; color: var(--lg-ink-2); font-size: 13px; line-height: 1.4; }
 .clockpop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center;
-            background: rgba(8, 11, 15, .5); cursor: pointer; }
-.clockcard { background: var(--panel); border: 1px solid var(--rule-2); border-radius: var(--r-float);
-             box-shadow: var(--shadow); padding: 22px 28px 20px; display: grid; justify-items: center;
-             gap: 10px; min-width: 300px; animation: rise .2s ease-out both; }
-.dial { width: 150px; height: 150px; }
-.dial .face-c { fill: var(--page); stroke: var(--rule-2); stroke-width: 2; }
-.dial .tick { stroke: var(--ink-3); stroke-width: 2; }
-.dial .sweep { fill: var(--accent-wash); stroke: none; }
-.dial .hand { stroke: var(--accent); stroke-width: 4; stroke-linecap: round;
-              transform-origin: 75px 75px; }
-.dial .hub { fill: var(--accent); }
-.clockcard b { font-size: 26px; }
+            background: rgba(14, 7, 2, .45); cursor: pointer; }
+.clockcard { border-radius: 2px; box-shadow: var(--sh-4), inset 0 0 40px rgba(140, 96, 40, .22);
+             padding: 24px 30px 22px; display: grid; justify-items: center; gap: 10px; min-width: 300px;
+             color: var(--ink); animation: rise .2s ease-out both; }
+/* The dial is a printed disc on a card, the hand inked in lapis. */
+.dial { width: 150px; height: 150px; filter: drop-shadow(2px 4px 3px rgba(var(--sh-c), .45)); }
+.dial .face-c { fill: var(--paper-card); stroke: var(--ink-2); stroke-width: 2; }
+.dial .tick { stroke: var(--ink); stroke-width: 2; }
+.dial .hand { stroke: var(--lapis); stroke-width: 4; stroke-linecap: round; transform-origin: 75px 75px; }
+.dial .hub { fill: var(--rubric); }
+.clockcard b { font: 700 32px/1 var(--ledger); color: var(--lg-ink); }
 .clockcard p { margin: 0; color: var(--ink-2); text-align: center; max-width: 320px; }
-.clockcard .days { font: 600 15px/1.2 var(--ledger); color: var(--accent); }
-.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 90;
-         background: var(--ink); color: var(--room); padding: 9px 14px; border-radius: var(--r);
-         font-weight: 600; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
+.clockcard .days { font: 700 15px/1.2 var(--ledger); color: var(--lapis); }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 90; color: var(--ink);
+         padding: 10px 16px; border-radius: 2px; font-weight: 650; max-width: calc(100vw - 32px);
+         box-shadow: var(--sh-3), inset 0 0 0 1px rgba(78, 56, 32, .35); }
 
-/* The app's dice mat (dice3d.js, unchanged), in this page's materials: pewter dice, verdigris
-   where one lands. A crit and a fumble keep the app's own green and red faces. */
+/* The app's dice mat (dice3d.js, unchanged) set in a baize-lined tray: bone dice, the landed
+   face inked in lapis; the app's own green crit and red fumble faces are kept. */
 #d3d-mat { z-index: 85 !important; }
-body #d3d-mat { background: rgba(8, 11, 15, .74); font-family: var(--ledger); }
-body #d3d-card { background: var(--panel); border-color: var(--rule-2); color: var(--ink);
-                 border-radius: var(--r-float); box-shadow: var(--shadow); }
-body #d3d-card h3 { font: 600 22px/1.2 var(--book); color: var(--ink); font-variant: normal;
-                    letter-spacing: 0; }
-body #d3d-why { color: var(--ink-2); font-style: normal; font-size: 14px; }
-body #d3d-terms { background: var(--page); border-color: var(--rule); border-radius: var(--r); }
-body #d3d-terms .r { color: var(--ink-2); font-size: 14px; }
-body #d3d-terms .r b { color: var(--ink); font-weight: 600; }
-body #d3d-terms .r.tot, body #d3d-terms .r.tot b { color: var(--ink); font-weight: 700; }
-body #d3d-verdict { font: 700 19px/1 var(--ledger); font-variant: normal; letter-spacing: 0; }
-body #d3d-verdict.good { color: var(--accent); }
-body #d3d-verdict.bad { color: var(--blood); }
-body #d3d-acts button { background: var(--accent); color: var(--on-accent); border-color: var(--accent);
-                        font: 650 15px/1 var(--ledger); font-variant: normal; letter-spacing: 0;
-                        border-radius: var(--r); }
-body #d3d-acts button.ghost { background: transparent; color: var(--ink-2); border-color: var(--rule-2); }
-body #d3d-die .f, body #d3d-die2 .f { --m1: #9aa5b0; --m2: #5b6570; --m3: #7c8792; --m4: #313840;
-                                      --ink: #12171c; }
-body #d3d-die .f.land, body #d3d-die2 .f.land { --m1: #a6d8cb; --m2: #4d8b7e; --m3: #7bb7a9;
-                                                --m4: #28524a; --ink: #0a1916; }
+body #d3d-mat { background: rgba(14, 7, 2, .62); font-family: var(--ledger); }
+body #d3d-card { color: #f3ead6; border: 0; border-radius: 6px; padding: 26px 26px 20px;
+  background: radial-gradient(90% 70% at 30% 20%, rgba(255, 255, 255, .08), transparent 60%),
+              var(--tx-baize) 0 0 / 300px auto, #26396e;
+  background-blend-mode: normal, multiply, normal;
+  box-shadow: inset 0 0 0 10px #4a2f1b, inset 0 0 0 11px rgba(0, 0, 0, .5), inset 3px 5px 14px 10px rgba(0, 0, 0, .5),
+              var(--sh-4); }
+body #d3d-card h3 { font: 400 26px/1.1 var(--title); color: #f3ead6; font-variant: normal; letter-spacing: 0; }
+body #d3d-why { color: #d8cfbc; font-style: normal; font-size: 14px; }
+body #d3d-terms { color: var(--lg-ink); border: 0; border-radius: 2px; box-shadow: var(--sh-2);
+  background: var(--tx-stock) 0 0 / 520px auto, var(--stock); background-blend-mode: multiply; }
+body #d3d-terms .r { color: var(--lg-ink-2); font-size: 14px; }
+body #d3d-terms .r b { color: var(--lg-ink); font-weight: 650; }
+body #d3d-terms .r.tot, body #d3d-terms .r.tot b { color: var(--lg-ink); font-weight: 700; border-color: var(--lg-ink); }
+body #d3d-verdict { font: 700 18px/1 var(--ledger); font-variant: normal; letter-spacing: 0; display: table;
+  margin: 12px auto; padding: 7px 14px; border-radius: 2px; color: var(--ink);
+  background: var(--tx-paper) 0 0 / 420px auto, var(--paper-card); background-blend-mode: multiply;
+  box-shadow: var(--lit), var(--sh-2); }
+body #d3d-verdict:empty { display: none; }
+body #d3d-verdict.good { color: var(--lapis); }
+body #d3d-verdict.bad { color: var(--rubric); }
+body #d3d-note { color: #d8cfbc; }
+body #d3d-acts button { color: var(--on-lapis); border: 1px solid #182a5e; border-radius: var(--r);
+  font: 650 15px/1 var(--ledger); font-variant: normal; letter-spacing: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 55%), var(--lapis);
+  box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .28), 1px 2px 3px rgba(0, 0, 0, .5); }
+body #d3d-acts button.ghost { background: transparent; color: #e3d9c4; border-color: rgba(243, 234, 214, .45); box-shadow: none; }
+body #d3d-die .f, body #d3d-die2 .f { --m1: #f4ecda; --m2: #b9ab8c; --m3: #dcd1b6; --m4: #7c6e54; --ink: #2a2019; }
+body #d3d-die .f.land, body #d3d-die2 .f.land { --m1: #fbf5e6; --m2: #c8bb9c; --m3: #e8dec5; --m4: #8c7e62; --ink: #1f3577; }
 
 /* The fight, tightened: the dock drops what a turn does not use, and the board gets room. */
 @media (min-width: 1240px) { body.scene-fight { --rail-w: 25rem; } }
 .scene-fight #deskrow, .scene-fight #attached { display: none; }
-/* One line of suggestions in a fight, scrolled sideways: at 1024x768 two wrapped lines left
-   the story six lines of its own. */
-.scene-fight .suggest .list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto;
-                              scrollbar-width: thin; }
-.scene-fight .sugg { font-size: 15px; padding: 3px 9px; border: 1px solid var(--rule);
-                     border-left: 2px solid var(--rule-2); flex: none; white-space: nowrap; }
+.scene-fight .suggest .list { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+.scene-fight .sugg { font-size: 15px; padding: 3px 9px; flex: none; white-space: nowrap; }
 
-/* --- Medium: the margin folds into the page as a strip above each paragraph ------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .beat.new, .tradesheet, .clockcard, body.rail-open .rail { animation: none !important; }
+  body { transition: none; }
+}
+
+/* --- Medium: the ledger leaf folds away, and its entries are pasted in as slips ----------------- */
 @media (max-width: 1239px) {
-  :root { --margin-w: 0px; --gutter: 0px; --rail-w: 19.5rem; }
+  :root { --margin-w: 0px; --gutter: 0px; --rail-w: 19.5rem; --outer: 30px; --pad-x: 46px; }
+  .ledgerleaf, .gutter { display: none; }
+  .recto { left: var(--left); width: calc(var(--lane) + 2 * var(--outer)); }
   .gloss { grid-column: 1 / -1; grid-row: 1; flex-direction: row; flex-wrap: wrap; background: none;
-           box-shadow: none; padding: 0 0 10px; min-height: 0; }
+           padding: 0 0 12px; min-height: 0; gap: 10px; }
   .gloss:empty, .gloss:has(> .stamp:only-child) { display: none; }
   .gloss .stamp { display: none; }
-  /* Folded above the paragraph there are no rules to write on, so an entry becomes a slip. */
-  .gloss { gap: 8px; }
-  .gloss .slip { flex: 0 1 auto; min-width: 190px; max-width: 290px; line-height: 20px;
-                 background: var(--ledger-paper); border: 1px solid var(--rule);
-                 border-radius: var(--r); padding: 4px 10px 6px; }
+  /* A slip of the ledger's stock, pasted above the paragraph it belongs to. */
+  .gloss .slip { flex: 0 1 auto; min-width: 190px; max-width: 290px; line-height: 20px; border-radius: 1px;
+                 padding: 5px 10px 7px; background: var(--tx-stock) 0 0 / 520px auto, var(--stock);
+                 background-blend-mode: multiply;
+                 box-shadow: var(--sh-2), inset 0 0 0 1px rgba(26, 41, 68, .18); }
   .gloss .slip h4, .gloss .slip li, .gloss .slip .sum { line-height: 20px; height: auto; }
   .prose { grid-column: 1 / -1; }
   .beat { grid-template-columns: minmax(0, var(--measure)); }
   .lane, .dock > *:not(.pop) { grid-template-columns: minmax(0, var(--measure)); }
   .dock > *:not(.pop) > * { grid-column: 1 !important; }
+  .dock::before { width: min(var(--measure), calc(100% - 2 * var(--pad-x) - 12px)); }
   .suggest .lab { display: none; }
-  .penrow .mode-say { display: none; }
-  .economy { grid-auto-flow: column; grid-template-columns: auto; justify-content: start;
-             gap: 4px 14px; }
-  .economy h3 { grid-row: span 1; align-self: center; margin: 0 6px 0 0; }
-  .pip { grid-template-columns: 14px auto auto; }
+  .economy { grid-auto-flow: column; grid-template-columns: auto; justify-content: start; gap: 4px 14px; }
+  .economy h3 { align-self: center; margin: 0 6px 0 0; }
+  .pip { grid-template-columns: 16px auto auto; }
   .charcols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
   .charcols > :nth-child(3) { grid-column: 1 / -1; }
   .tradecols { grid-template-columns: minmax(0, 1fr) minmax(280px, .9fr); }
-  .tradecols > .mine { grid-column: 1 / -1; border-left: 0 !important; border-top: 1px solid var(--rule); }
+  .tradecols > .mine { grid-column: 1 / -1; border-left: 0 !important; border-top: 1px solid var(--rule-ink); }
 }
-/* At 1024 the bar measured 1085px of content: the mock switch leaves the bar (it is still at
-   the head of Character and Spells), and the gaps close up. */
+/* At 1024 the bar measured 1085px of content: the mock switch leaves the bar (it is in the
+   Options menu and at the head of Character and Spells), and the gaps close up. */
 @media (max-width: 1100px) {
   .bar { gap: 12px; }
-  .modes button { padding: 18px 7px 16px; }
+  .modes { gap: 2px; }
+  .modes button { padding: 7px 7px; }
   .vitals .vital.touch { display: none; }
   .clock { padding: 2px 8px; white-space: nowrap; }
   .barend > .playing { display: none; }
   .lifebar { width: 80px; }
 }
 
-/* --- Narrow: one column; the rail becomes a sheet the dock opens ------------------------------ */
+/* --- Narrow: one page; the loose sheet is kept in a drawer the dock opens -------------------- */
 @media (max-width: 859px) {
-  :root { --bar-h: 100px; }
+  :root { --bar-h: 104px; --outer: 12px; --pad-x: 22px; }
   body { font-size: 15px; }
-  .bar { flex-wrap: wrap; height: auto; min-height: var(--bar-h); padding: 8px 12px 0; gap: 8px 12px; }
+  .bar { flex-wrap: wrap; height: auto; min-height: var(--bar-h); padding: 8px 12px 10px; gap: 8px 12px; }
+  .bar::after { bottom: 3px; }
   :root { --story-size: 18px; }
   :root[data-size="s"] { --story-size: 16.5px; }
   :root[data-size="l"] { --story-size: 20.5px; }
@@ -839,55 +1015,64 @@ body #d3d-die .f.land, body #d3d-die2 .f.land { --m1: #a6d8cb; --m2: #4d8b7e; --
   .vitals .vital.ac, .vitals .vital.touch { display: none; }
   .vital .k { display: none; }
   .lifebar { width: 52px; }
-  .clock { border: 0; padding: 0; justify-items: end; }
+  .clock { border: 0; padding: 0; justify-items: end; box-shadow: none; }
   .clock .dp { display: none; }
-  .modes { order: 5; width: calc(100% + 24px); margin: 0 -12px; overflow-x: auto; padding: 0 6px;
-           border-top: 1px solid var(--rule); scrollbar-width: none; }
-  .modes button { padding: 10px 9px 9px; font-size: 14.5px; flex: none; }
+  .modes { order: 5; width: calc(100% + 24px); margin: 0 -12px; overflow-x: auto; padding: 2px 10px 4px;
+           scrollbar-width: none; }
+  .modes button { padding: 6px 9px; font-size: 14.5px; flex: none; }
   .barend { order: 4; }
   .barend > .playing { display: none; }
   .menu summary { padding: 6px 9px; font-size: 14px; }
   .stage { height: calc(100dvh - var(--bar-h)); grid-template-columns: minmax(0, 1fr);
            grid-template-areas: "ribbon" "book" "dock"; }
-  .rail { position: fixed; inset: auto 0 0 0; max-height: 78dvh; z-index: 45; border-left: 0;
-          border-top: 1px solid var(--rule-2); border-radius: var(--r-float) var(--r-float) 0 0;
-          box-shadow: var(--shadow); display: none; padding-top: 12px; }
+  .spread { grid-area: 2 / 1 / 4 / 2; }
+  .cover { left: 3px; width: auto; right: 3px; top: 6px; bottom: 2px; }
+  .recto { left: 8px; right: 8px; width: auto; top: 10px; bottom: 8px; }
+  .railpaper { display: none; }
+  .rail { position: fixed; inset: auto 0 0 0; max-height: 78dvh; z-index: 45; margin: 0;
+          border-radius: 2px 2px 0 0; display: none; padding: 12px 18px 22px;
+          background: var(--tx-paper) 0 0 / 640px auto, var(--paper); background-blend-mode: multiply;
+          box-shadow: 0 -8px 26px rgba(var(--sh-c), .55), inset 0 0 40px rgba(140, 96, 40, .2); }
   body.rail-open .rail { display: block; animation: rise .18s ease-out both; }
   .railclose { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
-               position: sticky; top: -12px; background: var(--panel); padding: 6px 0; z-index: 2; }
-  /* First in the row on a phone: the ways on are the moves, and they live in the sheet. */
-  .here-btn { display: inline-flex; order: -1; border-color: var(--accent); }
-  .beats { padding: 18px 16px 30px; }
-  .dock { padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); gap: 6px; }
+               position: sticky; top: -12px; padding: 8px 0; z-index: 2; font: 400 20px/1 var(--title);
+               background: var(--tx-paper) 0 0 / 640px auto, var(--paper); background-blend-mode: multiply;
+               border-bottom: 3px double var(--rule-ink); }
+  .here-btn { display: inline-flex; order: -1; color: var(--lapis-2); border-color: rgba(43, 69, 150, .6); }
+  .beats { padding: 22px var(--pad-x) 30px; scrollbar-gutter: auto; }
+  .dock { padding: 10px var(--pad-x) calc(18px + env(safe-area-inset-bottom)); gap: 6px; }
+  .dock::before { width: calc(100% - 40px); }
   .suggest .list { display: flex; overflow-x: auto; gap: 6px; scroll-snap-type: x mandatory;
-                   scrollbar-width: none; margin: 0 -12px; padding: 0 12px; }
-  .sugg { flex: 0 0 78%; scroll-snap-align: start; border: 1px solid var(--rule);
-          border-left: 2px solid var(--rule-2); font-size: 15px; padding: 6px 10px; }
+                   scrollbar-width: none; margin: 0 -20px; padding: 0 20px 4px; }
+  .sugg { flex: 0 0 78%; scroll-snap-align: start; font-size: 15px; padding: 6px 10px;
+          border: 1px solid var(--rule-ink); border-left: 2px solid rgba(43, 69, 150, .45); }
   .penrow textarea { font-size: 16px; min-height: 46px; padding-right: 76px; }
   .penrow .act { padding: 6px 12px; }
-  .deskrow .row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 5px; }
+  .deskrow .row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; padding: 2px 4px 6px 2px; }
   .desk { flex: none; padding: 6px 10px; min-height: 34px; font-size: 14.5px; }
   .gloss .slip { min-width: 0; max-width: none; flex: 1 1 100%; }
-  .placehead h1 { font-size: calc(var(--story-size) * 1.5); }
-  .ribbon { padding: 0 8px; }
+  .placehead h1 { font-size: calc(var(--story-size) * 1.6); }
+  .ribbon { margin: 6px 8px 0; padding: 4px 8px 6px; }
   .ribbon .round { padding-right: 10px; margin-right: 4px; }
-  .turn { padding: 6px 9px; }
-  .turn .init { width: 26px; height: 26px; font-size: 15px; }
-  .cacts .row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .turn { padding: 4px 9px 4px 4px; }
+  .turn .init { width: 28px; height: 28px; font-size: 14px; }
+  .cacts .row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 1px 3px 5px 1px; }
   .cacts .row .btn { flex: none; }
   .cacts .commitrow { flex-wrap: wrap; overflow: visible; }
   .cacts .commitrow .plan { flex-basis: 100%; }
   .cacts .commitrow .btn { flex: 1; }
-  .boardbtn { display: inline-flex; border-color: var(--accent); }
+  .boardbtn { display: inline-flex; color: var(--lapis-2); border-color: rgba(43, 69, 150, .6); }
   .economy { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .economy h3 { font-size: 17px; }
   .pip small { display: none; }
-  .pip { grid-template-columns: 12px auto; gap: 5px; }
+  .pip { grid-template-columns: 14px auto; gap: 5px; }
   .pip.used span { text-decoration: line-through; }
-  .view { padding: 18px 14px 50px; }
-  .view h1 { font-size: 26px; }
+  .view { padding: 10px 8px 40px; }
+  .viewin { padding: 24px 18px 34px; }
+  .view h1 { font-size: 32px; }
   .charhead { grid-template-columns: auto 1fr; }
   .charhead .xp { grid-column: 1 / -1; min-width: 0; }
-  .portrait { width: 76px; height: 76px; font-size: 30px; }
+  .portrait { width: 80px; height: 80px; font-size: 34px; }
   .charcols, .gearcols, .jcols, .mapcols { grid-template-columns: minmax(0, 1fr); }
   .charcols > :nth-child(3) { grid-column: auto; }
   .items { grid-template-columns: minmax(0, 1fr); }
@@ -897,14 +1082,13 @@ body #d3d-die .f.land, body #d3d-die2 .f.land { --m1: #a6d8cb; --m2: #4d8b7e; --
   .tradesheet { height: 94dvh; }
   .tradehead { flex-wrap: wrap; padding: 12px 14px; gap: 8px; }
   .tradecols { display: block; overflow-y: auto; }
-  .basketjump { display: inline-flex; border-color: var(--accent); }
+  .basketjump { display: inline-flex; color: var(--lapis-2); }
   .tradehead .sp { display: none; }
-  .tradecols > section { overflow: visible; border-left: 0 !important; border-top: 1px solid var(--rule); }
+  .tradecols > section { overflow: visible; border-left: 0 !important; border-top: 1px solid var(--rule-ink); }
   .slotrow { grid-template-columns: 90px 1fr; }
   .slotrow small { grid-column: 1 / -1; }
   .pop { width: calc(100% - 16px); }
   .dial { width: 120px; height: 120px; }
-  /* A map shrunk to a phone's width is unreadable; it keeps a readable size and pans. */
   .mapwrap { overflow-x: auto; }
   .mapwrap svg { width: 760px; max-width: none; }
 }

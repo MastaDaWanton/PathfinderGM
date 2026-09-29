@@ -261,7 +261,20 @@ function renderDock() {
   $("#cast").hidden = !isCaster();
   $("#craft").hidden = fight;
   $("#trade").hidden = fight;
+  renderCarried();
   paintIcons($("#dock"));
+}
+// The balance carried forward at the foot of the ledger leaf. Only where the leaf is shown
+// (the CSS hides it when the margin folds away); the bar carries the same facts everywhere.
+function renderCarried() {
+  const el = $("#carried");
+  if (!el) return;
+  const s = sheet();
+  el.hidden = S.scene === "fight";
+  el.innerHTML = `<h4>Carried forward</h4><ul>
+    <li><span>Day ${S.day}</span><span>${hhmm(S.minutes)}</span></li>
+    <li><span>Life</span><span>${s.hp.current} / ${s.hp.max}</span></li>
+    <li><span>Purse, gold</span><span>${(me().purse / 100).toFixed(2)}</span></li></ul>`;
 }
 // Wrap the desk buttons in the lane's second column once.
 (function laneDesk() {

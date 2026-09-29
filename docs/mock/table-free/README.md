@@ -1,15 +1,15 @@
 # Book and ledger: a free mock of the play table
 
 The owner asked for a second mock with no limitations: "make it the best you can usable and
-stylish whatever you want", for Pathfinder GM. This is it. It sits beside
-`docs/mock/table-layout/` (the first mock, which preserved the app's leather and gilt) and
-shares nothing with it but data.
+stylish whatever you want", for Pathfinder GM. This is it, in its second edition. It sits
+beside `docs/mock/table-layout/` (the first mock, which preserved the app's leather and gilt)
+and shares nothing with it but data.
 
 It is **not part of the app**. There is no Django view and no URL, nothing under `play/`
 changed, and `docs/` is not bundled (`pathfindergm.spec`). Nothing on the page reaches the
-engine or a model. Every reply to a click is either real engine output copied into
-`data.js`, a number computed from the real sheet, or a line that begins "Mock." and is set in
-the interface's voice, never the narrator's.
+engine or a model. Every reply to a click is one of three things: real engine output copied
+into `data.js`, a number computed from the real sheet, or a line that begins "Mock." and is
+set in the interface's voice, never the narrator's.
 
 ## Opening it
 
@@ -19,165 +19,345 @@ From the repository root:
 python -m http.server 8767 --bind 127.0.0.1
 ```
 
-then open <http://127.0.0.1:8767/docs/mock/table-free/>. It must be served from the root: it
-loads the app's own `play/static/js/dice3d.js`, `play/static/js/scene3d.js` and the
-game-icons SVGs by relative path, and a file:// page cannot fetch the icons.
+Then open <http://127.0.0.1:8767/docs/mock/table-free/>. It must be served from the root,
+because it loads by relative path:
 
-**Options** (top right) holds the page settings (light: System, Day, Night; story text:
-Smaller, Book, Larger) and the mock's scenes: go to the recorded fight, talk to the guard,
-stand at the market counter, be wanted in Zhilvarnia, start again. The dashed **Mock: Kesst |
-Ysolde** switch in the bar (and at the head of Character and Spells, so a phone has it too)
-swaps the rogue for the wizard.
+- the app's own `play/static/js/dice3d.js` and `play/static/js/scene3d.js`;
+- the game-icons SVGs;
+- the textures in `textures/`.
+
+A file:// page cannot fetch the icons.
+
+**Options** (top right) holds three groups:
+
+- The page settings: the light (System, Day, Night) and the story text size (Smaller, Book,
+  Larger).
+- The character switch (Kesst the rogue, Ysolde the wizard). It is also in the strap at 1440
+  and at the head of the Character and Spells views.
+- The mock's scenes: go to the recorded fight, talk to the guard, stand at the market counter,
+  be wanted in Zhilvarnia, start again.
+
+## The second edition: what changed, and why the first read as generic
+
+The owner reviewed the first edition (c4f2308): "its too flat and ultimately lack
+originality pull in texture from the internet and make your design more unique".
+
+He was right, and the frontend-design skill names exactly why:
+
+- **It sat in a stock cluster.** Slate panels (#161a20 to #29303c) with a single verdigris
+  accent is the skill's "near-black with a single bright accent" cluster, one of the defaults
+  it lists as a tell.
+- **Its structure was a template.** Every surface was the same flat rectangle with the same
+  3px radius and the same grey hairline, which is the "SaaS-card kit" in a darker colour.
+- **Its identity was in the words, not the look.** "Book" and "ledger" were only names: the
+  book was a dark rectangle, and the ledger was a column of grey lines.
+- **Nothing had a material, a thickness or a light.** The page did not look like it could
+  exist anywhere.
+
+The second edition keeps everything that worked:
+
+- the structure: book and ledger, the rules in the margin beside the paragraph they caused,
+  and the one dock that changes shape;
+- every number opening to its parts;
+- gear with its names always shown;
+- the trade basket;
+- every flow.
+
+What changed is what things are made of.
 
 ## The design read
 
-Reading this as: a long-session play surface for one person who reads for hours and fights
-now and then, where the prose is written slowly by a local model and every number is decided
-instantly by a rules engine. Dials: variance 5 (an application, not a landing page), motion 3
-(the owner's rule: motion only in answer to an action, or ambient behind content), density 6
-(the page airy, the ledger dense).
+This is a long-session play surface for one person who reads for hours and fights now and
+then. It is framed as a writing desk under one lamp: a book is written as you play, and the
+rules keep their account on a ledger leaf bound in beside it. It is built from real materials
+(CC0 and public-domain scans), in native CSS, with the app's own 3D board and dice.
 
-**The idea, in two sentences.** The table is split by who is speaking: the GM's prose is set
-as a book in the centre, and everything the rules engine decides is written in a second,
-ledger voice on the ruled margin beside the paragraph it caused. Everything you can do lives
-in one dock under the pen, which changes shape with the situation (exploring, talking,
-fighting) instead of sending you to another screen, so the eye has two homes: the page and
-the dock.
+The dials:
 
-The architecture already severs the two voices: the narrator is fed tells and nothing else
-about mechanics, and no model authors a number (`CLAUDE.md`, the three laws). The page shows
-that seam instead of hiding it. A player who wants to know why a blow landed looks left, at the
-line beside the sentence that said so.
+- **Variance 5**: this is an application, not a landing page.
+- **Motion 3**: the owner's rule is motion only in answer to an action, or ambient behind
+  content.
+- **Density 6**: the page is airy and the ledger is dense.
+
+**The idea, in two sentences.** The table is an open book on a lamplit desk, printed as a
+facing-page edition. The GM's prose is on the right-hand page, and a leaf of blue-grey account
+paper is tipped in on the left, where the rules keep their ledger in a clerk's hand beside the
+paragraph each entry caused. Everything else is an object on the same desk, all lit from the
+one direction the app's 3D board already uses:
+
+- a leather strap for the bar;
+- a loose sheet for the way ahead;
+- wooden counters for the board;
+- a baize tray for the dice.
+
+The seam between the two voices is real in the architecture. The narrator is fed tells and
+nothing else about mechanics, and no model authors a number (`CLAUDE.md`, the three laws). The
+facing page shows that seam instead of hiding it. The Loeb Classical Library prints the
+original on the left and the reading text on the right; here the left page is the engine's
+account of what happened, and the right page is the story told from it.
+
+### The plan, and the critique of it before any code
+
+The first plan was cream paper, a high-contrast serif and a red accent. Checked against the
+skill's list, that is cluster 1 almost exactly: warm cream, a serif display and a terracotta
+accent. So the plan was revised before building:
+
+- **Cream is not the ground.** The dominant surfaces are the dark walnut desk and the
+  blue-grey ledger stock. The book's paper appears as a textured object with a torn edge,
+  thickness and a shadow, never as a flat page background.
+- **The accent is lapis, not red.** Ultramarine (#263f8e) was the dearest pigment in a
+  scriptorium, and blue is one of a ledger's two ruling inks. It means "yours, open, go" and
+  nothing else.
+- **Red is confined to what a page flags.** It is the ruling ink's other colour, used for the
+  rubricated initial and for debits: foes, spent, shut and damage.
+- **The display face has no hairline contrast.** IM Fell English (the Fell types, 1670s) is a
+  rough letterpress face whose ink spreads into the paper. It is used only for titles, names and
+  the one initial, and it was checked against the skill's banned serifs.
+- **The structure is one no template has.** A two-stock facing-page spread, with the rules
+  kept on their own stock of paper.
+
+### Research, and what it changed
+
+Before designing, a second research pass covered book-object and narrative-game interfaces.
+Primary sources were used where reachable; anything else is marked.
+
+- **Obsidian, Pentiment.**
+  - Each kind of writer gets its own script, designed by Lettermatic
+    (<https://lettermatic.com/custom/pentiment>, and director interview
+    <https://www.gamedeveloper.com/design/pentiment-director-explains-how-going-all-in-on-fonts-helped-elevate-the-medieval-detective-rpg->).
+  - Patch 1.1 added instant text display, because watching the letters write themselves wore
+    thin. The patch notes were reached only through reports: <https://www.gamespot.com/articles/pentiment-update-1-1-adds-new-minigame/1100-6509974/>.
+  - **Taken:** three hands, one per voice (below).
+  - **Refused:** any write-out animation. Text appears at once.
+- **Glossed manuscripts.** The main text sits in the largest hand, and the gloss is written
+  smaller around it (<https://sites.nd.edu/manuscript-studies/2015/09/17/reading-between-and-around-the-lines-an-introduction-to-glosses-and-commentaries/>).
+  Initials are graded by importance, and rubrics are set in red (the Walters, W.269:
+  <https://www.thedigitalwalters.org/Data/WaltersManuscripts/html/W269/description.html>;
+  the Getty: <https://www.getty.edu/education/for_teachers/curricula/manuscripts/manuscripts_lesson01.html>).
+  **Taken:**
+  - the ledger as a gloss, in a smaller hand, keyed to its paragraph;
+  - a three-line red initial only where a new place opens;
+  - a lapis paragraph mark opening each of your turns. It first hung in the margin, but at 1440 that put it in the binding's shadow, so it moved inside the page.
+
+  The Getty notes that medieval marginalia often have no relation to the text. The margin here
+  is refused that freedom: every entry belongs to the paragraph beside it.
+- **Ledgers and account books.**
+  - Machine ruling was "always blue and red" (<https://bookbindersmuseum.org/collections/equipment/the-pen-ruling-machine/>).
+  - The pages were debtor and creditor (<https://plainsightproject.org/early-double-entry-accounting>).
+  - Marbled edges and endpapers were tamper-evident: a torn-out leaf breaks the pattern
+    (<https://ucdculturalheritagecollections.com/2021/02/18/marbled-papers-a-brief-history-of-an-endangered-bookcraft/>).
+
+  **Taken:**
+  - blue lines every 22px and a red money rule before the figures;
+  - "Carried forward" at the foot of the ledger leaf (hour, life, purse);
+  - double-ruled totals in the basket;
+  - the text block's marbled edge, which here means the record is append-only: nothing can be
+    torn out.
+
+  I found no archive source for "carried forward" itself. It is standard bookkeeping
+  (<https://en.wikipedia.org/wiki/Ledger>).
+- **Lucas Pope, Return of the Obra Dinn.** A late change forced visible covers and a dark
+  border round the book, and it improved it (<https://dukope.com/devlogs/obra-dinn/tig-37/>).
+  **Taken:** the book's leather boards show round the spread, on a dark desk.
+- **Lucas Pope, Papers, Please on phones.** The desk was removed for readability: "I swung all
+  the way to readability" (<https://dukope.com/devlogs/papers-please/mobile/>). **Taken:** at
+  375px the desk and the cover shrink to a few pixels, and the page is nearly full bleed.
+- **inkle, 80 Days and Sorcery!**
+  - inkle rejected steampunk brass as "cheap and kitsch" (from a search excerpt of Road to the
+    IGF: <https://www.gamedeveloper.com/design/road-to-the-igf-inkle-s-i-80-days-i->).
+  - It judged Sorcery!'s material textures as not having "aged especially well"
+    (<https://www.gamedeveloper.com/business/postmortem-i-steve-jackson-s-sorcery-i-series-by-inkle>).
+  - Jon Ingold's rule: every screen shows "which bits are buttons… which are displays"
+    (<https://www.vice.com/en/article/the-makers-of-mobile-hit-80-days-on-the-importance-of-amazing-ui-852/>).
+
+  This was the most important warning, so the materials are held to a rule. Every material
+  stands for something in the game:
+  - paper is the record;
+  - the blue stock is the rules' account;
+  - leather is the book's binding;
+  - marble is the append-only edge;
+  - baize is where dice are thrown.
+
+  None is ornament. There is no brass, no gilt, no rivets and no wax seals. Ingold's rule
+  became this page's affordance rule (below).
+- **Failbetter, Sunless Skies' reading redesign.**
+  - The reading panel is centred and results stay on the page, scrolling up.
+  - Vollkorn was chosen for period tone and readability.
+  - Bright colour is reserved for interaction.
+  - Source: <https://www.gamedeveloper.com/design/reading-by-gaslight-a-look-inside-sunless-skies-ui-redesign>.
+
+  **Taken:** lapis only on what you can press or what is yours.
+- **Text on textured grounds.**
+  - NASA Ames (Scharff, Hill and Ahumada 2000) found that texture slowed reading mainly when
+    text contrast was low (<https://ntrs.nasa.gov/search.jsp?R=20040088111>).
+  - WebAIM says to test the lowest-contrast spot (<https://webaim.org/articles/contrast/>).
+
+  **Taken:** every paper and stock texture was lightened to a narrow band, and contrast was
+  measured at the darkest 2% of each texture, not only its average (see Contrast).
+
+The first edition's research on CRPG and VTT play screens still stands, and is kept below it.
 
 ## The token system
 
-### Palette: lamplit slate, with a day paper
+### Three hands
 
-| Token | Night | Day | Job |
+- **The printer** is IM Fell English. It sets place names, people's names, section titles,
+  the red initial and the paragraph mark. Its old-style numerals made "+1" read as "+I", so it
+  never sets a number.
+- **The book** is Literata, TypeTogether's face for long reading on screens. It sets the GM's
+  prose, your own words (italic), suggestions (italic) and item names. The story is 20px at
+  line-height 1.62 (18px on a phone).
+- **The clerk** is Sofia Sans Semi Condensed, with tabular figures, in blue-black ink. It sets
+  the ledger, every figure the engine decides (abilities, AC, life, prices, the clock) and
+  every control label.
+
+The measure is `var(--story-size) * 31.5`. It measured **66 characters a line** at 1440x900
+and **59.5** at 1024x768, on the recording's gate paragraph.
+
+### Palette
+
+| Token | Day | Night (lamplight) | Job |
 |---|---|---|---|
-| `--room` | `#161a20` | `#d5dbe0` | behind everything |
-| `--page` | `#1b2028` | `#f6f7f8` | the book |
-| `--panel` | `#212731` | `#ecf0f2` | bar, rail, dock |
-| `--ink` | `#e8e2d5` | `#1b222a` | body text |
-| `--accent` (verdigris) | `#74b8a8` | `#23695c` | you, open, lit, go |
-| `--blood` | `#e2786a` | `#a8322a` | foes, spent, shut, damage |
+| `--paper` | `#f0e8d7` × paper grain | `#e9dcc2` × paper grain | the book, the loose sheet, the views |
+| `--stock` | `#d9e0dc` × ledger fibre | `#d2d6cd` × ledger fibre | the rules' account paper |
+| `--ink` | `#2a2019` | same | the book's iron-gall ink |
+| `--ink-2` | `#463a2d` | same | secondary text on paper |
+| `--lg-ink` / `--lg-ink-2` | `#1a2944` / `#313e57` | same | the clerk's blue-black |
+| `--lapis` | `#263f8e` | same | the one accent: yours, open, go |
+| `--rubric` | `#8e2317` | same | debit and rubrication |
+| desk / leather | walnut and brown leather textures under a dark overlay | darker overlay | the room and the binding |
 
-One accent, and it means "yours / open / go" everywhere: your token, a lit spell socket, a
-reachable square, the primary button. Blood is not decoration; it means foe, spent, shut or
-hurt, and nothing else. The ledger margin is a mix of page and panel
-(`color-mix(in srgb, var(--page) 55%, var(--panel))`), ruled every 22px with a double rule
-at its edge, like account paper.
+**Night is the same desk by lamplight, not an inverted interface.** The desk darkens, the
+paper warms and dims a little, and the ink keeps its contrast. The research for the first
+edition gave the reason: NN/g found light text grounds better for reading, and players often
+play at night.
 
-**The lamp.** A faint radial light over the page takes its hue from the hour (the engine's
-own `residency.day_part` words, exported for every hour into `data.js`): rose at dawn, almost
-nothing by day, amber at dusk, blue at night. It transitions over 2.4s and sits behind the
-text. It is the only motion nobody asked for, and it carries information: the page's colour
-says what time it is.
+**The lamp's colour follows the hour.** It uses the engine's own `residency.day_part` words:
+rose at dawn, faint by day, amber at dusk, a cold blue at night. It lights the desk from the
+upper left and shifts over 2.4s, behind everything.
 
-**Light and dark.** The default follows the system. NN/g's review found light mode better for
-acuity and proofreading, with the gap growing as text gets smaller, and recommends light as
-the default with a dark switch; players often play at night, so both are first-class and the
-choice is remembered per viewer.
+### One light
 
-### Type: two voices
+`scene3d.js` lights the 3D board with `LIGHT = (-0.42, -0.78, 0.47)`: from the upper left, and
+above. Everything on this page is lit from the same place:
 
-- **Literata** (TypeTogether for Google Play Books, drawn for long reading on screens): the
-  GM's prose, place names, your own words (italic), suggestions (italic, because they are
-  words you might say), people's faces, item and spell names.
-- **Sofia Sans Semi Condensed**, tabular figures: the ledger and every control. Condensed,
-  because the margin is 13.5rem and a to-hit line has to fit on one rule.
+- **Shadows** fall to the lower right in that light's ratio (x : y = 0.42 : 0.78, about
+  1 : 1.9). There are four elevations: `1px 2px 2px`, `2px 4px 5px`, `5px 9px 14px` and
+  `11px 20px 34px`.
+- **Raised controls** catch the light on their top-left edge and shade on the bottom right.
+- **Board counters, sockets and initiative counters** are radial-lit from the upper left.
+- **The binding** shades into the gutter.
 
-Story text is 20px (18px on a phone) at line-height 1.62, with Smaller / Book / Larger. The
-measure is `var(--story-size) * 31.5`, which measured **66 characters a line** on the
-recording's gate paragraph at 1440x900 (the first try, 34em, resolved against the 15px UI
-size and gave 55; 33 story-sizes gave 69.4). Rello, Pielot and Marcos (CHI 2016) found
-fixation times still falling at 18pt; the Larger setting is there for that.
+### What things are made of
 
-### Layout
+- **The desk.** Walnut (Poly Haven), under a darkening overlay and a vignette.
+- **The book.** Leather boards (Poly Haven), larger than the text block. The text block's
+  marbled edge (a 1720 Leiden endpaper) shows past the pages at the lower right. Two leaves lie
+  on top:
+  - **The ledger leaf** is blue-grey stock, the fibre of a backlit sheet of laid paper.
+  - **The recto** is book paper, from a public-domain paper scan.
 
-```
-1440x900, exploring
-+-------------------------------------------------------------------------------------+
-| (K) Kesst Vayr   Life 9/9 ===   AC 15   Touch, flat 13 12 | 08:10 Early morning,  |
-|                                                            day 1 | Table Character ... |
-+---------------+------------------------------------------------+--------------------+
-| ledger margin | the book, 66 characters                        | Here               |
-|  07:52        |  You: I ask the smith about the ore he uses.   |  From here         |
-|  Said, 4 lines|  The smith looks at the ore...                 |   Next door ...    |
-|               |  The gate                                      |   Outside ...      |
-|  Moved        |  The heat of the smithy fades...               |  People here       |
-|  Time 08:10   |                                                |   The guard [Talk] |
-|---------------+------------------------------------------------|  Your body         |
-|    Suggested  |  I tell him I'm headed for the outskirts.      |   Thirst Hunger    |
-|               |  [ What do you do?                     ] [Act] |   Rest             |
-|               |  Say  Continue  Craft action  Trade  Cast      |                    |
-+---------------+------------------------------------------------+--------------------+
+  Both have torn edges and a shadow, and the binding is shaded between them.
+- **Torn edges.** An SVG `feTurbulence` plus `feDisplacementMap` filter is applied only to
+  empty backing layers, so no letter is ever displaced.
+- **The ledger's ruling.** It is painted on each entry, so it scrolls with the entries it rules.
+- **Ink sits in the paper.** Every texture is a grey detail map, multiplied under its paper
+  colour. Prose has a hair of ink spread (`text-shadow: 0 0 .6px`), and pictures of items are
+  printed in the book's ink, not stamped on top.
+- **The strap.** Leather with saddle stitching along its lower edge.
+  - The chosen view is a paper thumb-index label pasted on the strap; the others are tooled
+    into the leather (debossed text).
+  - Life is a groove filled with lapis, which turns rubric when it runs low.
+- **The loose sheet (the rail).** Book paper with a torn edge, lying on the desk to the right.
+- **The board.** Printed on card:
+  - inked hatching for walls;
+  - a wash for the gallery;
+  - lapis for the squares you can reach and rubric for the foes' reach;
+  - turned wooden counters with shadows (lapis for you, rubric for foes).
+- **Dice.** The app's `Dice3D` mat, re-dressed from outside by CSS:
+  - a tray lined with lapis baize, with a wooden rim;
+  - bone dice, with the landed face inked in lapis;
+  - the terms on a ledger slip, and the verdict on a paper label.
+- **Spells.** Slots are hollows pressed into the page, each holding a lit lapis bead when
+  open. A spent slot is an empty hollow ringed in rubric. Prepared spells are cards lying on
+  the sheet.
+- **Footnotes.** A number's reasons open on a slip cut from the ledger's stock, with its money
+  rule.
+- **Trade.** The shop's counter book. The basket is kept on ledger stock with the money rule,
+  and its total is double-ruled.
 
-In a fight the same page grows a ribbon and the rail becomes the board:
-| Round 1 | (16) Borin Lyraxys, has acted | (9) Kesst Vayr, your turn |
-| margin: rolls |  prose                                   | The board [Flat|3D]   |
-| Your turn     |  Strike Full attack Ability Swift Free   | Targets (distance)    |
-|  o Standard   |  plan: Move to D4 x  Strike Borin x  [End turn] [Commit turn]  |
-|  o Move ...   |  [ Add words for the GM ]         [Add]  | Ways out (withdraw)   |
-```
+### The affordance rule (from Ingold)
 
-The margin and the book share one centred grid lane, and the dock sits on the same lane, so
-the margin runs down into the dock: in a fight the turn's budget (Standard, Move, Swift, Free)
-is written in the margin column, beside the actions that spend it.
+- **Raised** is a paper tag with a lit top-left edge and a shadow: you can press it.
+- **Pressed in** is debossed, and inked in lapis: it is the one chosen (a pressed tab, the Say
+  toggle, the chosen target). The pen's line is pressed into the page too.
+- **Printed** is ink on paper with no edge: it is information.
+- **A figure with a dotted underline** is a footnote: press it for what it is made of.
 
-- **1240px and up**: three columns, as drawn.
-- **860 to 1239px** (1024x768): the margin folds into the page. Each beat's entries become
-  slips in a row above the paragraph they belong to, so the link between roll and sentence is
-  kept by position when the margin is gone.
-- **Below 860px** (375px): one column. The rail becomes a sheet: **Here** (first in the dock
-  row, outlined) in exploration, **Board** (first in the action row) in a fight. The mode tabs
-  are a second bar row that scrolls sideways. Suggestions become one sideways row of cards.
+## Contrast, measured on the textures
 
-Alignment: text is left-aligned throughout; numbers right-aligned in their column.
+This is measured in the browser, by reading every seventh pixel of each texture multiplied by
+its paper colour. It reports the median and the darkest 2% of the paper, not only the average,
+because WebAIM says to test the lowest-contrast spot. The first measurement failed:
 
-### Shape and principles
+- `--ink-3` was at 3.35:1 at the darkest 2%.
+- `--rubric` on the ledger stock was at 2.92:1 at night.
 
-- Radius: 3px on every control and card, 6px on anything that floats over the page
-  (menus, dialogs, the counter, the dice mat), a full circle only where a circle means
-  something (a spell socket, an action pip, a token, an initiative number).
-- **Every number opens to its parts.** Press AC, a save, a skill, a to-hit, a damage figure,
-  CMB, a manoeuvre, a need: a card lists `full_sheet()`'s own terms (base 10, leather armour
-  +2, Dex +3). It stays open until dismissed.
-- **Rolls are shown in full, not collapsed.** Each entry lists the die, every modifier with
-  its source, the total, and what it was against with the engine's own explanation
-  ("AC 10 (flat-footed) with cover").
-- **The engine answers first.** A new turn writes its entries in the margin at once, and the
-  page says "The GM is writing. The rules have already answered, in the margin." while the
-  prose is slow. The brief measured local latency in minutes; this is designed for, not hidden.
-- **Nothing yanks the reader.** A new beat lands with its first line at the top of the page,
-  not scrolled to the bottom. If you have scrolled back to reread, nothing moves under you; a
-  "New lines below" button appears instead.
-- **Each choice appears once.** A move is an exit in the rail, never also a chip; chips are
-  everything else and fill the pen, never send.
-- **Your turns are dated** in the margin (the ledger's date column), so reading back says when.
+So the paper grain was lightened (to a band of 212 to 255) and the stock grain likewise (214
+to 255), and `--ink-2`, `--ink-3`, `--lg-ink-2`, `--lapis` and `--rubric` were darkened.
+After those changes:
+
+| Text on | Ink | Day, median | Day, darkest 2% | Night, median | Night, darkest 2% |
+|---|---|---|---|---|---|
+| page paper | `--ink` (prose) | 10.99 | 9.05 | 9.89 | 8.17 |
+| page paper | `--ink-2` | 7.62 | 6.27 | 6.85 | 5.66 |
+| page paper | `--ink-3` | 5.78 | 4.76 | 5.21 | 4.30 |
+| page paper | `--lapis` | 6.64 | 5.47 | 5.97 | 4.93 |
+| page paper | `--rubric` | 6.03 | 4.97 | 5.43 | 4.48 |
+| tag paper (buttons) | `--ink` | 11.78 | 9.69 | 10.63 | 8.76 |
+| pressed paper (pen, chosen) | `--lapis` | 5.69 | 4.70 | 5.11 | 4.23 |
+| ledger stock | `--lg-ink` | 9.05 | 7.60 | 8.25 | 6.95 |
+| ledger stock | `--lg-ink-2` | 6.68 | 5.61 | 6.09 | 5.13 |
+| ledger stock | `--rubric` | 5.44 | 4.57 | 4.96 | 4.18 |
+| leather strap | `--on-leather` (#f1e5ca) | 12.27 | 11.14 at the lightest 2% | same | same |
+| leather strap | `--on-leather-2` (#d6c3a0) | 8.89 | 8.07 at the lightest 2% | same | same |
+| lapis button | `--on-lapis` | 8.54 | | | |
+
+Every median passes 4.5:1. Four darkest-2% values fall between 4.18 and 4.48, all at night:
+
+- `--ink-3` on page paper, 4.30;
+- `--rubric` on page paper, 4.48;
+- `--lapis` on pressed paper, 4.23;
+- `--rubric` on ledger stock, 4.18.
+
+Those spots are the texture's foxing specks. The worst case is small rubric text on the
+ledger stock at night, used for "miss" and "hit, damage" in bold 14px.
+
+Not included: the darkened edges of each sheet (a 40px inner shadow), where text does not
+run.
 
 ## What the table does, and where
 
 | Asked for | Where it is |
 |---|---|
-| The story, long-form | The book. Recorded prose verbatim; place headings in Literata |
+| The story, long-form | The book's right-hand page. Recorded prose verbatim; place headings in IM Fell, and a red initial where a place opens |
 | The pen, Say, Continue, Craft action, suggestions | The dock. Enter acts; Say toggles speech (your line is set in quotes); Continue adds a beat and moves the clock (ruling 2026-09-18: the PC keeps their action, the world advances); Craft action opens hours (1 to 48) and the ways of gathering on this ground; suggestions fill the pen |
 | Exits, journeys, shut ways | The rail's **From here**: Next door, Outside, Roads, with time in words (a shared time said once per group). Wanted in Zhilvarnia greys the watched ways; pressing one opens the engine's reason under it. The road to Xylorvotha asks before five days pass |
 | Leaving mid-fight is a withdraw | The fight rail's **Ways out**: every way is a withdraw (your whole turn), and the line above says whose reach covers the way to the door before you commit. A committed withdraw rolls those foes' strikes and leaves the fight |
-| Initiative, whose turn, round | The ribbon over the stage |
+| Initiative, whose turn, round | The order of battle: a strip of ledger stock across the top, with wooden counters |
 | Action economy, Strike, Full attack, Ability, Cast, Swift, Free, Commit, End turn | The combat dock. Actions are planned as chips and nothing happens until Commit. Full attack is refused once you have moved. Strike out of reach is refused with the squares named ("Borin Lyraxys is at E4, 15 ft from B4. Your rapier reaches 5 ft") |
 | Targets with attitude | The fight rail's **Targets**, with distance from where you will stand after your planned move |
 | 2D grid and 3D view | The board, Flat or 3D. Flat shows walls, the gallery and its rail, rough ground, reachable squares, foes' reach, the door, and your planned path. A move whose path leaves a threatened square says who gets the attack of opportunity; a single clean square is a 5-foot step and says it does not provoke. 3D is the app's own `Scene3D.render`, fed the same grid, turned in quarter turns; its reachable squares are clickable too |
-| Dice | The app's own `Dice3D.land` for your rolls (attack, manoeuvre, haggle), re-dressed in this page's tokens: pewter dice, a verdigris face where it lands. Foes' rolls are the engine's and go straight to the margin |
+| Dice | The app's own `Dice3D.land` for your rolls (attack, manoeuvre, haggle), set in a baize-lined dice tray: bone dice, the landed face inked in lapis. Foes' rolls are the engine's and go straight to the margin |
 | The character | **Character**: portrait slot, abilities, saves, needs, features and feats, life, AC/touch/flat-footed, CMD, initiative, every weapon's to-hit (iteratives written +a/+b when there are any), damage, crit, type and range; every manoeuvre with its bonus and whether it provokes; every skill, class skills marked, trained-only ones "untrained" |
 | Conditions, XP, body's needs | Bar (life, AC, touch, flat, conditions when any), rail (needs), Character (XP bar, needs with the engine's own detail) |
 | Equipment | **Gear**: what is on you by slot, the purse in the world's coin, and what you carry with names always shown, kind tabs with counts, a find box, order by kind / name / value; Wield, Wear, Take off, Use, Drop on every row. 43 things for the rogue |
-| Spells | **Spells** (casters only): sockets per level (lit open, red spent), prepared cards with the numbers on the card (range, target, save and DC), Details, Cast. Cast puts the spell on your turn as a chip under the pen; it is not sent. Rest and prepare (9 hours) brings slots back and pops the clock |
+| Spells | **Spells** (casters only): sockets per level (a lit lapis bead is open, an empty hollow ringed in red is spent), prepared cards with the numbers on the card (range, target, save and DC), Details, Cast. Cast puts the spell on your turn as a chip under the pen; it is not sent. Rest and prepare (9 hours) brings slots back and pops the clock |
 | Trade | Trade, only where somebody keeps a counter (the market, the merchants row), else it names the nearest counter. One basket holds buying and selling with steppers, the net price, a haggle roll, and "you are N short" before you can pay |
 | Conversation | **Talk** on a person: the rail's top becomes the conversation (speech only), with regard, Ignore and Take your leave. Hide folds it to one line without ending it; it is sticky until you leave it (ruling 2026-09-24) |
 | Journal, clock, map | **Journal**: matters in play, the road so far, what people said word for word. **Clock** in the bar; an hour or more pops a dial that sweeps the hours and counts the days, then closes itself (the margin keeps the record). **Map**: the 43 places of Zhilvarnia as the exits join them; press one for the route and Walk there |
 
-## Research, and what it changed
+## Research for the first edition: play screens
 
 The standing instruction is to search before designing. A research pass collected primary
 sources where they could be reached; claims it could not source are marked here as such.
@@ -232,6 +412,7 @@ sources where they could be reached; claims it could not source are marked here 
   (<https://narrativenews.substack.com/p/inkles-jon-ingold-on-the-craft-of>): readers judge a
   wall of text before reading a word. Taken: a heading per place, generous leading, the
   measure held at 66.
+
 - **Readability**: Bringhurst's 45 to 75 characters, 66 ideal (<http://webtypography.net/2.1.2>);
   Dyson and Haselgrove 2001 on screen line length
   (<https://www.researchgate.net/publication/220106760>); Rello, Pielot and Marcos, CHI 2016, on
@@ -244,34 +425,44 @@ sources where they could be reached; claims it could not source are marked here 
 ## Decisions, and what was rejected
 
 - **Rejected: a combat log panel.** The app's table keeps rolls in a separate Rolls panel
-  (`#panel-rolls`). A log panel is where Owlcat, Larian and Foundry all put it, and all three
-  then spent patches making it readable. The margin puts each roll beside its sentence, which
-  a log cannot do.
-- **Rejected: a separate combat screen** (Sunless Sea, above).
-- **Rejected: an icon grid for gear.** The owner said icon-only is painful with lots of gear,
-  and Wrath's inventory was fixed by modders with search and filters. Names, counts, a find box.
-- **Rejected: pills for suggestions.** They are words you might say, so they are set as your
-  own italic lines, hung off a rule, not as buttons in the SaaS style.
-- **Rejected: boxes in the margin.** The first build drew each roll as a bordered card on the
-  ruled margin; on screen it read as a stack of sticky notes. Entries are now written on the
-  rules, one 22px line each. The boxes return only where there are no rules to write on (the
-  folded margin at 1024).
-- **Rejected: auto-closing popovers and fading chrome** (Foundry v13's complaints).
-- **Rejected: odds before a strike.** Disco Elysium shows odds, but the player in 1e does not
-  know a foe's AC, and printing it would leak what the engine knows. The to-hit is shown; the
-  AC arrives with the roll.
-- **Rejected: a stat sidebar always on screen.** The bar carries life, AC, touch and
-  flat-footed, conditions and the clock; the whole sheet is one tab away, and every figure on it
-  explains itself.
-- **Kept from the first mock**: exits from the place graph, one choice in one place, shut ways
-  that say why, the journey confirm, the free outfit page's absence (gear comes from counters).
-- **The fight stays on the page's palette.** Foes are blood, you are verdigris, bystanders are
-  ink. The 3D view is the app's renderer with the app's own materials (it keeps its brown
-  stone); the dice mat is re-dressed from outside by CSS.
-- **Motion, all of it**: a new beat fades in over 0.22s (it answers your action); the counter
-  and the phone sheet rise 0.2s when opened; the dice tumble (the app's own); the clock dial
-  sweeps 1.4s when an hour or more passes; the lamp shifts hue over 2.4s behind the text.
-  Menus and popovers open instantly and never move what was under the pointer.
+  (`#panel-rolls`). Owlcat, Larian and Foundry all put the log in a panel, and all three then
+  spent patches making it readable. The ledger leaf puts each roll beside its sentence, which a
+  log cannot do.
+- **Rejected: a separate combat screen** (Sunless Sea). The fight happens in the same book.
+- **Rejected: an icon grid for gear.** The owner said icon-only is painful with lots of gear.
+  Names, counts and a find box instead.
+- **Rejected: decorative material.** Brass, gilt, rivets, wax seals, a candle and a quill are
+  all refused. inkle called steampunk brass kitsch, and said Sorcery!'s textures aged badly.
+  Every material here stands for part of the game.
+- **Rejected: a write-out animation for the prose.** Pentiment added instant display after
+  launch. Text appears at once.
+- **Rejected: a desk on the phone.** Lucas Pope removed his desk on mobile. At 375px the page
+  is nearly full bleed, with a few pixels of cover.
+- **Rejected: IM Fell for figures.** Its old-style "1" reads as "I". Every number is set in the
+  clerk's face.
+- **Rejected: rotated sheets.** A tilted sheet looks more like a desk and reads worse. Every
+  sheet lies square.
+- **Rejected: boxes in the margin** (first edition). Entries are written on the ledger's rules.
+  Where the leaf folds away (below 1240px), each entry becomes a slip of the same stock pasted
+  above its paragraph.
+- **Rejected: a candle flicker.** It would have been the one ambient motion. It was refused
+  because a flickering light behind text is exactly the motion that makes a page harder to read.
+- **Rejected: odds before a strike.** The player in 1e does not know a foe's AC. The to-hit is
+  shown; the AC arrives with the roll.
+- **Kept from the first mock:**
+  - exits from the place graph, and one choice in one place;
+  - shut ways that say why (now struck through in rubric), and the journey confirm;
+  - gear from counters only.
+- **Motion, all of it:**
+  - a new beat fades in over 0.22s (it answers your action);
+  - the counter and the phone sheet rise 0.2s when opened;
+  - the dice tumble (the app's own);
+  - the clock dial sweeps 1.4s when an hour or more passes;
+  - the lamp shifts colour over 2.4s behind everything;
+  - controls lift on hover and press in on click, over 0.12s.
+
+  Menus and popovers open instantly and never move what was under the pointer. Reduced motion
+  turns off the fades and rises.
 
 ## What is real and what is example
 
@@ -343,21 +534,55 @@ recording predates the nonlethal-strikes fix.
   per way out, which foes' reach covers it.
 - **A theme and size setting**, stored per viewer (the mock uses localStorage).
 
+## What the real app would need to adopt it
+
+- **Fonts, bundled.** IM Fell English, Literata and Sofia Sans Semi Condensed are all SIL OFL
+  on Google Fonts. The mock links Google Fonts, but the executable is offline. The woff2 files
+  (IM Fell English roman and italic, Literata variable roman and italic, Sofia Sans Semi
+  Condensed variable) would go into `play/static/fonts/` beside Cinzel with their OFL text, and
+  an `@font-face` would replace the link.
+- **Textures, bundled.** The six files in `textures/` (551 KB) would go into
+  `play/static/img/` with `textures/CREDITS.md`. They are CC0 or public domain, and the app
+  already ships its own leather and paper jpgs there. No other third-party asset is used.
+- **The SVG edge filter.** It is inline markup in the page (`#deckle`). Nothing to bundle.
+- **A tell-to-beat link.** The ledger needs each outcome attached to the beat it produced.
+  The turn log already records outcomes per turn (`added_turn_log` in the recordings); the
+  page also needs the beat id, the rolls' `modifiers` and `dc.explain`. The engine already
+  produces the last two.
+- **Render the engine's answer before the prose.** Today the page waits for the whole turn.
+  The ledger entries could be sent as soon as the engine resolves, with the prose streaming
+  after. It is the single change that most helps a slow local model.
+- **Per-number terms on the sheet.** `full_sheet()` already returns terms for everything
+  shown. The sheet view would render them as the footnote slips.
+- **Weapon ranges.** `rules.tables.WEAPONS["dagger"]` has no thrown range, so the Range column
+  says "melee, 5 ft" for a dagger. This is a data gap in the tables, not a UI one.
+- **Distance for targets and the board's reach.** The engine already has the grid and reach
+  (`rules/grid.py`, `Scene.positions`, the melee-reach refusals). The mock's own reach walk
+  would be replaced by the server's `reachable` payload, which `scene3d.js` already reads.
+- **Withdraw risk per exit.** The mock measures the path to one door. The engine would name,
+  for each way out, which foes' reach covers it.
+- **A theme and size setting**, stored per viewer (the mock uses localStorage).
+
 ## Unfinished, honestly
 
-- The 3D view keeps the app's brown materials; only the flat board and the dice are in this
-  page's palette.
-- The map is a spring layout of the exits: it is legible at 1440 and pans on a phone, but some
-  labels touch ("west crossing" and "well"), and positions mean nothing geographic. Walk there
-  moves you in one step, where the engine would walk each leg.
-- The body's needs do not change as time passes here, not even across a five-day road.
-- A five-foot step, a withdraw and attacks of opportunity follow the book in outline only; the
-  withdraw measures the path to the door for every way out.
-- The spell cast in exploration spends its slot and says so, but targets are not chosen outside
-  a fight.
-- Iteratives render as "+a/+b" when the sheet's `sequence` is above one, but both fixtures are
-  level 1, so that path has not been seen with real data.
-- Reduced motion is not specially handled (the brief did not ask); `dice3d.js` handles its own.
-- Checked in the browser at 1440x900, 1024x768 and 375x812, night and day, with no console
-  errors across every mode and flow described above. Not checked in the packaged Electron app,
-  since nothing here is part of it.
+- **The 3D view keeps the app's own brown materials.** Its light matches this page by
+  construction, but its stone does not match the page's paper.
+- **The dice keep dice3d.js's own gilt bevels.** Only the faces were re-coloured to bone, from
+  outside.
+- **The map is a spring layout of the exits.** Some labels touch ("west crossing" and "well"),
+  and positions mean nothing geographic. "Walk there" moves you in one step, where the engine
+  would walk each leg.
+- **The body's needs do not change as time passes here,** not even across a five-day road.
+- **The fight rules are simplified.** A five-foot step, a withdraw and attacks of opportunity
+  follow the book in outline only. The withdraw measures the path to the door for every way
+  out.
+- **Iteratives have not been seen with real data.** They render as "+a/+b" when the sheet's
+  `sequence` is above one, but both fixtures are level 1.
+- **Contrast has four spots under 4.5:1 at night.** They are at the darkest 2% of the textures;
+  the figures are in the table above.
+- **The texture of the ledger leaf does not scroll with the story.** The leaf is a fixed sheet
+  behind the text, while its ruling is painted on the entries and does scroll. At rest the two
+  agree. While scrolling, the rules move over a still sheet, which a real book would not do.
+- **Checked** in the browser at 1440x900, 1024x768 and 375x812, day and night, with no console
+  errors, across every mode and flow above. Not checked in the packaged Electron app, since
+  nothing here is part of it.

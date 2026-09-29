@@ -175,14 +175,26 @@ function board2D() {
     const side = ref === "pc" ? "pc" : "foe";
     const at = ref === "pc" && mv ? mv.to : [x, y];
     const initials = p.name.replace(/^the /i, "")[0].toUpperCase();
-    return `<g class="tok ${side}${p.hp <= 0 ? " down" : ""}" ${ref === "pc" ? "" : `data-pick="${ref}"`}>
+    return `<g class="tok ${side}${p.hp <= 0 ? " down" : ""}" filter="url(#tokshadow)" ${ref === "pc" ? "" : `data-pick="${ref}"`}>
       <circle cx="${M + at[0] * C + C / 2}" cy="${M + at[1] * C + C / 2}" r="${C / 2 - 4}"/>
       <text x="${M + at[0] * C + C / 2}" y="${M + at[1] * C + C / 2 + 4}" text-anchor="middle">${esc(initials)}</text>
       <title>${esc(p.name)}, ${sqName(at)}</title></g>`;
   }).join("");
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="The board, ${g.width} by ${g.height} squares">
     <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <line x1="0" y1="0" x2="0" y2="6" stroke="currentColor" stroke-opacity=".35" stroke-width="2"/></pattern></defs>
+      <line x1="0" y1="0" x2="0" y2="6" stroke="currentColor" stroke-opacity=".35" stroke-width="2"/></pattern>
+      <pattern id="inkhatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="4" height="4" fill="#3b2d22" fill-opacity=".55"/>
+        <line x1="0" y1="0" x2="0" y2="4" stroke="#2a2019" stroke-width="1.6"/></pattern>
+      <!-- Counters: turned wood, lit from the upper left like the 3D board (scene3d.js LIGHT). -->
+      <radialGradient id="woodpc" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#8ea3dc"/>
+        <stop offset=".5" stop-color="#2b4596"/><stop offset="1" stop-color="#142457"/></radialGradient>
+      <radialGradient id="woodfoe" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#e08a78"/>
+        <stop offset=".5" stop-color="#a3291b"/><stop offset="1" stop-color="#4e1108"/></radialGradient>
+      <radialGradient id="woodby" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#d9c9ad"/>
+        <stop offset=".6" stop-color="#8f7c60"/><stop offset="1" stop-color="#4f4232"/></radialGradient>
+      <filter id="tokshadow" x="-40%" y="-40%" width="200%" height="200%">
+        <feDropShadow dx="1.6" dy="3" stdDeviation="1.4" flood-color="#220e04" flood-opacity=".5"/></filter></defs>
     ${coords}${cells}${rail}${path}${toks}</svg>`;
 }
 function board3D() {
@@ -235,10 +247,10 @@ function renderFightRail() {
       <div class="board" id="board">${f.view === "2d" ? board2D() : board3D()}
         ${f.view === "3d" ? `<div class="turns"><button type="button" class="btn small" data-turn="-1" aria-label="Turn the board left">Turn left</button>
           <button type="button" class="btn small" data-turn="1" aria-label="Turn the board right">Turn right</button></div>` : ""}</div>
-      <p class="legend"><span><i style="background:var(--accent)"></i>you</span>
-        <span><i style="background:var(--blood)"></i>foes, and their reach</span>
-        <span><i style="background:var(--accent-wash);border:1px solid var(--accent)"></i>you can reach</span>
-        <span><i style="background:var(--panel-2);border:1px solid var(--rule-2)"></i>the gallery</span></p></section>
+      <p class="legend"><span><i style="background:var(--lapis)"></i>you</span>
+        <span><i style="background:var(--rubric)"></i>foes, and their reach</span>
+        <span><i style="background:var(--lapis-wash);border:1px solid var(--lapis)"></i>you can reach</span>
+        <span><i style="background:rgba(150,120,80,.3);border:1px solid var(--rule-ink-2)"></i>the gallery</span></p></section>
     <section aria-labelledby="h-targets"><h2 id="h-targets">Targets <small>from ${sqName(from)}</small></h2>${targets}</section>
     <section aria-labelledby="h-ways"><h2 id="h-ways">Ways out <small>a withdraw, your whole turn</small></h2>
       <p class="railnote" style="margin:0 0 8px">Through the door at ${sqName(DOOR)}: ${esc(risk)}.</p>
@@ -248,7 +260,7 @@ function renderFightRail() {
 function renderRibbon() {
   const f = S.fight;
   $("#ribbon").hidden = false;
-  $("#ribbon").innerHTML = `<div class="round"><b>Round ${f.round}</b><small>${f.order.length} in the fight</small></div>` +
+  $("#ribbon").innerHTML = `<div class="round"><b>Round <span>${f.round}</span></b><small>${f.order.length} in the fight</small></div>` +
     f.order.map(([ref, init], i) => {
       const p = f.people[ref];
       const cls = ref === "pc" ? "you" : "foe";
