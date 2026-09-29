@@ -145,7 +145,8 @@
      because the one thing this must never be mistaken for is the fiction. */
   /* While a turn resolves, nothing that takes an action can be pressed (see busy()). */
   body.resolving #combatbar button, body.resolving .castbtn,
-  body.resolving [data-use], body.resolving #talk button {
+  body.resolving [data-use], body.resolving #talk button,
+  body.resolving #spellbtn, body.resolving #attachments button, body.resolving .errfix {
     pointer-events: none; opacity: .55;
   }
   .beat.aside {
@@ -212,8 +213,11 @@
     transition: opacity .3s ease;
   }
   button:hover::after, .sugg:hover::after, .pick:hover::after { opacity: 1; }
+  /* Lit, not lifted. The 1px hop on hover went (owner, 2026-09-28: no motion that makes
+     the page harder to use): a row of buttons that jump under the pointer is harder to
+     aim along, which the panel bar had already found. The glow and the ember stay. */
   button:hover:not(:disabled) {
-    color: #f4e6c0; border-color: var(--accent); transform: translateY(-1px);
+    color: #f4e6c0; border-color: var(--accent);
     box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 14px rgba(var(--ember), .10);
   }
   button:active:not(:disabled) { transform: translateY(0); }
@@ -379,7 +383,9 @@
   /* The Cast button is a word, not a glyph: it takes its own width, and the target
      picker beside it stays small enough for the row. */
   .castbtn { width: auto; padding: 0 8px; margin-left: 4px; }
-  .casttarget { max-width: 120px; margin-left: 6px; font-size: 12px; }
+  /* Cast attaches the spell to your turn and you say where it goes (item 21.1; owner
+     Q46: no target picker), so the old picker beside it is not shown. */
+  .casttarget { display: none; }
   /* The search over a caster's own list. A cleric chooses from 179 castable spells at
      first level, and a list that long is unusable without one (item 26). */
   .findbox { width: 100%; padding: 4px 7px; margin-bottom: 8px; font: inherit;
@@ -421,7 +427,6 @@
                       box-shadow .25s ease;
           animation: inkbleed .7s cubic-bezier(.22,.8,.36,1) both; }
   .sugg:hover { color: #f4e6c0; border-color: var(--accent);
-                transform: translateY(-1px);
                 box-shadow: 0 3px 12px rgba(0,0,0,.45), 0 0 12px rgba(var(--ember), .10); }
   /* The conversation panel: a bar per person for their regard, and the exits. */
   #talk { margin: 10px 0 4px; padding: 8px 10px; border: 1px solid var(--line, #6b5a3a);
@@ -808,7 +813,9 @@
   #maptab:hover { color: #ffe7b4; border-color: var(--gold); }
   #maptray {
     position: fixed; left: 0; top: 0; bottom: 0; width: min(560px, 72vw); z-index: 61;
-    transform: translateX(-102%); transition: transform .32s cubic-bezier(.2,.7,.3,1);
+    /* 150ms, not the 320ms it slid in before: a tray opens and closes fast and never
+       holds up the next click (owner, 2026-09-28). */
+    transform: translateX(-102%); transition: transform .15s ease-out;
     background: linear-gradient(rgba(14,10,7,.90), rgba(8,6,4,.95));
     border-right: 1px solid rgba(201,168,106,.34);
     box-shadow: 10px 0 40px rgba(0,0,0,.7);
@@ -1018,7 +1025,7 @@
     /* Off-screen rather than hidden, so it slides rather than appears — same
        reasoning as `#maptray`. */
     transform: translateX(102%);
-    transition: transform .32s cubic-bezier(.2,.7,.3,1);
+    transition: transform .15s ease-out;
     border-width: 0 0 0 4px;
     box-shadow: -14px 0 40px rgba(0,0,0,.6);
   }
@@ -1196,7 +1203,6 @@
   /* An empty panel says what will appear in it. Ink rather than the dim grey the
      older `.sub` lines use, which falls under 4.5:1 on the leather. */
   .panelempty { margin: 0; color: var(--ink); font: italic 13px/1.5 var(--body); }
-  #talk:not([hidden]) ~ .panelempty, #convo:not([hidden]) ~ .panelempty,
   #mapwrap:not(:empty) ~ .panelempty { display: none; }
   #panelsnone { display: none; }
   #panels:not(:has(.panel:not([hidden]))) #panelsnone { display: block; }
@@ -1208,19 +1214,202 @@
     border: 0;
   }
 
-  /* Lane F's mount points, inert until Phase 2 fills them. The spell picker is shut
-     unless open, including in a browser that predates popovers, where the attribute
-     alone would leave it on the page. Two rules, because a selector a browser cannot
-     parse takes the whole rule with it. */
-  #spellpop { display: none; }
-  #spellpop.open { display: block; }
-  #spellpop:popover-open { display: block; }
-
   /* A chip sent with a player beat, drawn before the words in the transcript. */
   .beat .chip {
     display: inline-block; padding: 0 9px; border: 1px solid var(--gold-dim);
     border-radius: 12px; color: var(--gold); font-style: normal; font-size: 13px;
     line-height: 1.6; vertical-align: 1px;
+  }
+
+  /* --- The conversation tray (Lane F, 08-conversation.js) -------------------
+   * Owner, Q42: its own tray, openable and closeable, with Ignore and Take your leave
+   * in it, and out of the column. Built in the map tray's idiom, rule for rule: the
+   * same vertical tab on the left edge (under MAP), the same dark glass, the same
+   * slide. Only faster: 140ms, so it never holds up the next click. Nothing inside it
+   * moves on its own; new lines land at the foot and the log only follows them when
+   * the reader was already there. */
+  #talktab {
+    position: fixed; left: 0; top: calc(46% + 84px); z-index: 60; cursor: pointer;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-left: 0;
+    border-radius: 0 3px 3px 0; background: linear-gradient(#241d15, #17120d);
+    color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
+    font-variant: normal; box-shadow: 3px 0 14px rgba(0,0,0,.6);
+  }
+  #talktab:hover:not(:disabled) { color: #ffe7b4; border-color: var(--gold); }
+  #talktab:focus-visible, #maptab:focus-visible {
+    outline: 1px solid var(--accent); outline-offset: -3px;
+  }
+  /* The tab is under the tray while it is open, and two left-edge trays never share
+     the screen: the map's tab goes too. */
+  body.talkopen #talktab, body.talkopen #maptab { visibility: hidden; }
+  #talktray {
+    position: fixed; left: 0; top: 0; bottom: 0; width: min(400px, 88vw); z-index: 61;
+    transform: translateX(-102%); transition: transform .14s ease-out;
+    background: linear-gradient(rgba(14,10,7,.90), rgba(8,6,4,.95));
+    border-right: 1px solid rgba(201,168,106,.34);
+    box-shadow: 10px 0 40px rgba(0,0,0,.7);
+    display: flex; flex-direction: column; padding: 14px 16px 16px;
+    font: 14px/1.55 var(--body);
+  }
+  #talktray.on { transform: translateX(0); }
+  #talktray .traybar {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #2b2319;
+  }
+  #talktray h2 {
+    margin: 0; color: var(--gold); font: 400 16px/1 var(--display); letter-spacing: .13em;
+    font-variant: small-caps;
+  }
+  #talktray .traybar button, #convo-people button, #convo-latest, .convo-more {
+    padding: 6px 10px; font-size: 12px; letter-spacing: .08em;
+  }
+  #convo:not([hidden]) {
+    display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; position: relative;
+  }
+  /* Whose words: pressed is the ordinary iron button, lit; the rest are empty slots,
+     dashed, the panel bar's own convention. */
+  #convo-people { display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+                  margin-bottom: 8px; }
+  #convo-people button[aria-pressed="false"] {
+    background: transparent; border-style: dashed;
+  }
+  #convo-people button[aria-pressed="true"] { border-color: var(--accent); color: #f4e6c0; }
+  #convo-people select {
+    max-width: 100%; padding: 5px 7px; font: 12.5px/1.3 var(--body); color: var(--ink);
+    background: #16120d; border: 1px solid #332a1e; border-radius: 2px;
+  }
+  #convo-people select:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+  #convo-log {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 6px 4px 34px 0;
+    border-top: 1px solid #2b2319;
+  }
+  #convo-log:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+  /* Over the foot of the log rather than below it, so its coming and going never moves
+     Ignore and Take your leave under the pointer. */
+  #convo-latest { position: absolute; right: 8px; bottom: 8px; z-index: 1; }
+  .convo-more { display: block; margin: 4px auto 10px; }
+  .cl-turn { margin: 0 0 12px; }
+  .cl-name {
+    display: block; color: var(--gold); font: 400 13px/1.3 var(--display);
+    letter-spacing: .08em; font-variant: small-caps; margin-bottom: 2px;
+  }
+  .cl-name small { color: var(--ink); font: italic 12px/1 var(--body); letter-spacing: 0;
+                   font-variant: normal; margin-left: 6px; }
+  .cl-turn p { margin: 0 0 4px; }
+  .cl-turn q { quotes: "\201C" "\201D"; color: var(--saidink, #d8c9a3); }
+  .cl-you .cl-name, .cl-you q { color: var(--player); }
+  /* A grunt or a laugh: the dim italic the design asked for, one step lighter than
+     --dim so it clears 4.5:1 on this glass. */
+  .cl-turn .cl-vocal { color: #b3a58a; font-style: italic; }
+  .cl-day {
+    margin: 4px 0 12px; padding-top: 6px; border-top: 1px solid #2b2319; color: var(--ink);
+    font: 400 12px/1.3 var(--display); letter-spacing: .1em; font-variant: small-caps;
+  }
+  #talktray #talk { flex: none; margin: 10px 0 0; }
+  .trayempty { margin: 6px 0 0; color: var(--ink); font: italic 13px/1.5 var(--body); }
+  #convo:not([hidden]) ~ .trayempty, #talk:not([hidden]) ~ .trayempty { display: none; }
+  @media (prefers-reduced-motion: reduce) { #talktray { transition: none; } }
+
+  /* --- The spell picker and the chip (Lane F, 10-spells.js) ------------------
+   * Shut unless open, including in a browser that predates popovers, where the
+   * attribute alone would leave it on the page. Two rules, because a selector a browser
+   * cannot parse takes the whole rule with it. */
+  #spellpop { display: none; }
+  #spellpop.open { display: block; }
+  #spellpop:popover-open { display: block; }
+  #spellpop {
+    position: fixed; inset: auto; margin: 0; z-index: 62;
+    width: min(360px, calc(100vw - 24px)); max-height: min(70vh, 520px); overflow-y: auto;
+    padding: 12px 12px 14px; color: var(--ink); font: 14px/1.5 var(--body);
+    background: linear-gradient(rgba(20,15,10,.97), rgba(12,9,6,.98));
+    border: 1px solid var(--gold-dim); border-radius: 3px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.7), inset 0 0 0 1px rgba(221,196,142,.07);
+  }
+  .sp-title { margin: 0 0 8px; color: var(--gold); font: 400 15px/1 var(--display);
+              letter-spacing: .13em; font-variant: small-caps; }
+  .sp-note { margin: 0 0 10px; color: var(--ink); font: italic 13px/1.5 var(--body); }
+  .sp-level { margin: 0 0 10px; }
+  .sp-levelhead {
+    display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding-bottom: 3px;
+    border-bottom: 1px solid #2b2319; color: var(--gold); font: 400 13px/1.3 var(--display);
+    letter-spacing: .1em; font-variant: small-caps;
+  }
+  /* Slot pips: one square a slot, filled while it is unspent, and the same count in
+     words beside them for anyone who does not read squares. */
+  .sp-pips { display: inline-flex; gap: 3px; }
+  .sp-pips i { width: 8px; height: 8px; border: 1px solid var(--accent); border-radius: 1px; }
+  .sp-pips i.on { background: var(--accent); }
+  .sp-left { margin-left: auto; color: var(--ink); font: 12px/1 var(--body);
+             letter-spacing: 0; font-variant: normal; }
+  #spellpop .sp-spell {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%;
+    padding: 7px 9px; margin: 0; text-align: left; background: transparent;
+    border: 1px solid transparent; color: var(--ink); font: 14px/1.35 var(--body);
+    letter-spacing: 0; font-variant: normal; box-shadow: none;
+  }
+  #spellpop .sp-spell:hover:not(:disabled), #spellpop .sp-spell:focus-visible {
+    border-color: var(--gold-dim); color: #f4e6c0; box-shadow: none;
+  }
+  /* Out of reach, with the reason in words: a tooltip does not exist on a touch screen.
+     Not the page's faint .35 disabled, because the reason has to be read. */
+  #spellpop .sp-spell:disabled { opacity: 1; color: #a89b82; }
+  .sp-why { color: #b3a58a; font: italic 12.5px/1.3 var(--body); }
+  #spellpop .findbox { font-size: 14px; padding: 6px 8px; }
+  #spellpop .sp-open { margin-top: 4px; padding: 7px 12px; font-size: 12px; }
+
+  /* The chip: the spell rides beside the words, never inside them, on a line of its own
+     above the box. Measured at 1440x900 with the chip inline: the box fell to 230px,
+     the placeholder read "What do you do with Burnin" and "Craft action" broke onto two
+     lines. The row only wraps while a chip is there. */
+  #sayform:has(#attachments:not([hidden])) { flex-wrap: wrap; }
+  #attachments:not([hidden]) { display: flex; align-items: center; gap: 6px;
+                               flex: 1 0 100%; }
+  .chip.att {
+    display: inline-flex; align-items: center; gap: 6px; padding: 0 3px 0 11px;
+    min-height: 34px; border: 1px solid var(--accent); border-radius: 12px;
+    background: rgba(26,22,16,.82); color: var(--gold); font: 15px/1.2 var(--body);
+    white-space: nowrap;
+  }
+  .chip-kind { color: var(--ink); font: 400 11px/1 var(--display); letter-spacing: .12em;
+               font-variant: small-caps; }
+  #attachments .chip-x {
+    flex: none; width: 28px; height: 28px; min-height: 0; padding: 0; border: 1px solid transparent;
+    border-radius: 12px; background: transparent; color: var(--gold); letter-spacing: 0;
+    font: 14px/1 var(--body); box-shadow: none;
+  }
+  #attachments .chip-x:hover:not(:disabled), #attachments .chip-x:focus-visible {
+    border-color: var(--accent); color: #f4e6c0; box-shadow: none;
+  }
+  /* The first Backspace selects the chip; the second takes it. */
+  .chip.att.armed { border-color: #f4e6c0; box-shadow: 0 0 0 2px rgba(var(--ember), .45); }
+  #err .errfix { margin-left: 10px; padding: 6px 12px; font-size: 12px; }
+
+  /* --- The time-skip clock (Lane F, 09-clock.js) -----------------------------
+   * Twelve identical black strips on a brass face, no numerals (owner, Q45), in main so
+   * it never covers the column. The spin is the one motion on the table that is wanted
+   * for itself; it runs 2.2s inside a fixed 4s, never takes focus and lets every click
+   * through except one on the face, which dismisses it. */
+  #clockpop {
+    position: absolute; left: 50%; top: 38%; width: 168px; height: 168px;
+    margin: -84px 0 0 -84px; z-index: 8; pointer-events: none;
+    opacity: 0; transform: scale(.94);
+    transition: opacity .2s ease-out, transform .2s ease-out;
+  }
+  #clockpop.on { opacity: 1; transform: none; }
+  #clockpop.going { opacity: 0; transform: none; transition: opacity .4s ease-in; }
+  #clockpop svg { display: block; width: 100%; height: 100%; pointer-events: auto;
+                  cursor: pointer; filter: drop-shadow(0 8px 18px rgba(0,0,0,.75)); }
+  .clockcap {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 10px;
+    padding: 4px 12px; white-space: nowrap; color: var(--gold);
+    font: 400 15px/1.3 var(--display); letter-spacing: .1em; font-variant: small-caps;
+    background: rgba(12,9,6,.88); border: 1px solid var(--gold-dim); border-radius: 2px;
+  }
+
+  @media (max-width: 760px) {
+    #clockpop { width: 136px; height: 136px; margin: -68px 0 0 -68px; }
+    #spellpop .sp-spell { min-height: 44px; }
   }
 
   .opensheet {
@@ -1699,7 +1888,8 @@
         <button type="button" id="cb-coup" hidden
           title="Full round: no roll to hit, an automatic critical, and a Fortitude save or death">Coup de grâce</button>
         <button type="button" id="cb-ability">Ability…</button>
-        <button type="button" id="cb-cast">Cast…</button>
+        <button type="button" id="cb-cast" aria-controls="spellpop" aria-haspopup="dialog"
+                aria-expanded="false">Cast…</button>
         <button type="button" id="cb-swift">Swift…</button>
         <button type="button" id="cb-free">Free…</button>
         <button type="button" id="cb-clear" class="quiet">Clear</button>
@@ -1737,12 +1927,15 @@
            raise. -->
       <button type="button" id="tradeaction" class="quiet"
               title="Buy and sell at the counter">Trade</button>
-      <!-- Shown by 10-spells.js when the character casts spells at all. -->
-      <button type="button" id="spellbtn" class="quiet" popovertarget="spellpop"
+      <!-- Shown by 10-spells.js when the character casts spells at all. Opened by script
+           rather than `popovertarget`, because the combat bar's Cast… opens the same
+           picker and one opener has to know where the other left it. -->
+      <button type="button" id="spellbtn" class="quiet" aria-controls="spellpop"
+              aria-haspopup="dialog" aria-expanded="false"
               title="Choose a spell to cast this turn" hidden>Spells</button>
     </form>
     <!-- The spell picker (Lane F). Popover, so Esc and a click outside close it. -->
-    <div id="spellpop" popover="auto" aria-label="Spells"></div>
+    <div id="spellpop" popover="auto" role="dialog" aria-label="Spells"></div>
     <!-- What was attached or removed, said once for screen readers; present from load. -->
     <div id="saystatus" class="vh" role="status"></div>
     <!-- The excursion panel. Foraging lived only on the bench page, where it was a
@@ -1774,7 +1967,8 @@
   </footer>
 </main>
 
-<!-- The column, as five panels (docs/design-f-ui.md §4.1; 07-panels.js drives it).
+<!-- The column, as four panels (docs/design-f-ui.md §4.1; 07-panels.js drives it; the
+     conversation left it for a tray of its own, owner Q42).
      Every id the renderers write into moved here unchanged, so none of them changed.
      The order is fixed and never rearranged by the page: text that moves under a reader
      is worse than text left where it was. Several panels show at once, so the bar is a
@@ -1785,8 +1979,6 @@
             aria-controls="panel-sheet">Sheet</button>
     <button type="button" class="panelbtn" data-panel="scene" aria-pressed="true"
             aria-controls="panel-scene">Scene</button>
-    <button type="button" class="panelbtn" data-panel="conversation" aria-pressed="true"
-            aria-controls="panel-conversation">Talk</button>
     <button type="button" class="panelbtn" data-panel="map" aria-pressed="true"
             aria-controls="panel-map">Map</button>
     <button type="button" class="panelbtn" data-panel="rolls" aria-pressed="true"
@@ -1825,32 +2017,9 @@
     </div>
   </section>
 
-  <section class="panel" id="panel-conversation" data-panel="conversation"
-           aria-labelledby="panel-conversation-title">
-    <div class="panelhead">
-      <button type="button" class="paneltoggle" id="panel-conversation-title"
-              aria-expanded="true" aria-controls="panel-conversation-body">Conversation</button>
-      <button type="button" class="panelclose" aria-label="Close the conversation panel"
-              title="Close the conversation panel">✕</button>
-    </div>
-    <div class="panelbody" id="panel-conversation-body">
-      <!-- What was said, per person (Lane F, 08-conversation.js). The controls in #talk
-           sit below the log's scroll region, never inside it: Disco Elysium's log held
-           its live choices, and scrolling back left players unable to reach them. -->
-      <div id="convo" hidden>
-        <div id="convo-people"></div>
-        <div id="convo-log" role="log" aria-live="off"></div>
-        <button type="button" id="convo-latest" hidden>Go to the latest line</button>
-      </div>
-      <!-- The conversation, while there is one (2026-09-24): who is in it, how each of
-           them stands towards you, and the one button that ends it. Engine-held state;
-           the button posts straight to the engine with no model call, because an exit
-           that has to be noticed by a narrator is an exit that sometimes is not. -->
-      <div id="talk" hidden></div>
-      <p class="panelempty">Nobody is talking with you. When someone is, they appear here
-        with how they regard you and a way to take your leave.</p>
-    </div>
-  </section>
+  <!-- The conversation is not a panel (owner, Q42, 2026-09-28): "it should be openable
+       and closeable while the buttons to ignore or leave conversation should be there as
+       well. It should be removed from the panel." It is the tray after #maptray. -->
 
   <section class="panel" id="panel-map" data-panel="map" aria-labelledby="panel-map-title">
     <div class="panelhead">
@@ -1888,7 +2057,7 @@
 <!-- The drawer's way in: shown only in drawer mode (a phone, or a desktop that hid the
      column). In column mode the panels are simply there, and a tab would be a button
      that scrolls you to something already on screen. Sheet always; Scene while a fight
-     is on; Conversation while somebody is talking with you, with a count of new lines.
+     is on. The conversation has its own tab on the left, under the map's.
      Upper-case to match the map's tab on the other edge. -->
 <div id="edgetabs" role="group" aria-label="Open a panel">
   <button type="button" class="edgetab" id="sheettab" data-panel="sheet" data-name="Sheet"
@@ -1896,15 +2065,40 @@
   <button type="button" class="edgetab" data-panel="scene" data-name="Scene"
           aria-controls="panels" aria-expanded="false" title="In the scene"
           hidden>SCENE</button>
-  <button type="button" class="edgetab" data-panel="conversation" data-name="Talk"
-          aria-controls="panels" aria-expanded="false" title="Conversation"
-          hidden>TALK<span class="edgecount" hidden></span></button>
 </div>
 <div id="maptray">
   <div class="traybar"><b>The ground</b>
     <button id="mapclose" title="Close">✕</button></div>
   <div id="maptrayinner"></div>
 </div>
+
+<!-- The conversation tray (Lane F, 08-conversation.js; owner Q42). The map tray's idiom:
+     a tab on the left edge and a slide-over, open and closed by the player. It holds what
+     was said, per person, and the live controls, Ignore and Take your leave, in #talk
+     BELOW the log's scroll region, never inside it: Disco Elysium's log held its live
+     choices, and scrolling back left players unable to reach them. On a phone a
+     conversation starting counts on the tab and never opens the tray over the story. -->
+<button type="button" id="talktab" aria-controls="talktray" aria-expanded="false"
+        title="The conversation">TALK<span class="edgecount" hidden></span></button>
+<section id="talktray" aria-labelledby="talktray-title" inert>
+  <div class="traybar">
+    <h2 id="talktray-title">Conversation</h2>
+    <button type="button" id="talkclose" class="quiet">Close</button>
+  </div>
+  <div id="convo" hidden>
+    <div id="convo-people" role="group" aria-label="Whose words to show"></div>
+    <div id="convo-log" role="log" aria-live="off" aria-labelledby="talktray-title"
+         tabindex="0"></div>
+    <button type="button" id="convo-latest" class="quiet" hidden>Go to the latest line</button>
+  </div>
+  <!-- The conversation, while there is one (2026-09-24): who is in it, how each of them
+       stands towards you, and the one button that ends it. Engine-held state; the button
+       posts straight to the engine with no model call, because an exit that has to be
+       noticed by a narrator is an exit that sometimes is not. -->
+  <div id="talk" hidden></div>
+  <p class="trayempty" id="convo-empty">Nobody has spoken with you yet. What people say to
+    you, and what you say back, is kept here.</p>
+</section>
 
 <div id="veil"><div class="popup" id="popup"></div></div>
 

@@ -22,11 +22,14 @@ from django.test import Client
 
 from pagesource import TABLE, TABLE_SCRIPTS
 
-PANELS = ("sheet", "scene", "conversation", "map", "rolls")
+# The conversation was a fifth panel until the owner's ruling of 2026-09-28 (Q42): "It
+# should be removed from the panel." It is a tray of its own now, `#talktray` (Lane F).
+PANELS = ("sheet", "scene", "map", "rolls")
 
 MOUNTS = (
     ["panels", "panelbar"]
     + [f"panel-{p}" for p in PANELS] + [f"panel-{p}-body" for p in PANELS]
+    + ["talktab", "talktray", "talkclose"]
     + ["convo", "convo-people", "convo-log", "convo-latest", "edgetabs", "clockpop",
        "clocksay", "spellbtn", "spellpop", "attachments", "saystatus"]
 )
@@ -132,14 +135,20 @@ def test_each_panel_has_the_shape_the_register_names(page):
 
 def test_the_renderers_live_in_the_panels_the_design_gives_them(page):
     """docs/design-f-ui.md §4.1's table: Sheet holds #sheet; Scene #order, #board and
-    #gmview; Conversation #convo above #talk; Map #mapwrap; Rolls #rolls."""
+    #gmview; Map #mapwrap; Rolls #rolls. The conversation, #convo above #talk, is in its
+    own tray and in no panel (owner, Q42)."""
     _, els = page
     where = {"sheet": ["sheet"], "scene": ["order", "board", "gmview"],
-             "conversation": ["convo", "talk"], "map": ["mapwrap"], "rolls": ["rolls"]}
+             "map": ["mapwrap"], "rolls": ["rolls"]}
     for p, ids in where.items():
         (body,) = _by_id(els, f"panel-{p}-body")
         for i in ids:
             assert body in _by_id(els, i)[0]["ancestors"], f"#{i} is not in the {p} panel"
+    (tray,) = _by_id(els, "talktray")
+    (aside,) = _by_id(els, "panels")
+    for i in ("convo", "talk"):
+        assert tray in _by_id(els, i)[0]["ancestors"], f"#{i} is not in the tray"
+        assert aside not in _by_id(els, i)[0]["ancestors"], f"#{i} is still in the column"
     assert _by_id(els, "convo")[0]["index"] < _by_id(els, "talk")[0]["index"]
     convo = _by_id(els, "convo")[0]
     for i in ("convo-people", "convo-log", "convo-latest"):

@@ -323,3 +323,402 @@ def line_openers(sentence: str) -> set[str]:
     """The capitalised words that open somebody's line in this sentence: "Enjoy",
     "Ask", "Meet" — the first word of speech, which is not a name."""
     return {m.group(1) for m in _LINE_OPENER.finditer(str(sentence or ""))}
+
+
+# --- the sounds people make that are not words -------------------------------------------
+#
+# docs/design-f-ui.md §4.2, playtest item 7.2: "just the dialogue and vocalizations such as
+# grunting or laughing". The conversation log wants the grunt beside the line, and a grunt
+# is untagged prose — so it is DETECTED here, in code, never asked of the model as a tag.
+# Three reasons a `<vocal>` tag was refused before it was tried: speaker tagging was all or
+# nothing per beat (4 of 8, measured 2026-09-25) and a second tag inherits that; `lift`
+# wraps a tag's unquoted inner text in quote marks, so `<say who=c1>grunts</say>` would
+# become a spoken line "grunts"; and a detector would still be needed for untagged beats.
+#
+# Precision over recall, on purpose. A missed grunt costs one italic row in a log; a grunt
+# booked to the wrong person puts words in somebody's mouth, which is the defect the whole
+# fix pass is about. So the vocabulary is closed (the MUD-socials tradition: `laugh`,
+# `cackle`… as a declared list, not a guess), the speaker has to be found by one of three
+# rules that each answer only when there is exactly one person they could mean, and a
+# vocal word nobody can be found for is reported as a miss for measuring, never booked.
+#
+# Measured on the owner's playtest of 2026-09-28 (tests/replays/bobby-2026-09-28, the
+# thirteen beats): the four grunts and laughs a reader books to the watchman or the man in
+# the jerkin are found, to the right person, and none of the eight near misses is booked —
+# "the village hums", "the low moan of the wind", "his voice a low growl", "'…,' he
+# grunts" (a dialogue tag: the line itself is logged) and "he gasps for breath"
+# (breathing). tests/test_f_vocalisations.py holds it.
+
+_VOCALS = ("laugh", "chuckle", "giggle", "cackle", "snicker", "snigger", "chortle",
+           "guffaw", "titter", "grunt", "groan", "moan", "sigh", "huff", "snort", "scoff",
+           "sniff", "sob", "whimper", "wail", "gasp", "growl", "snarl", "hiss", "hum",
+           "whistle", "cough", "yelp", "shriek", "scream", "tut")
+# Short verbs that double their last letter: sobbed, hummed, tutted.
+_DOUBLES = frozenset({"sob", "hum", "tut"})
+
+
+def _third(base: str) -> str:
+    return base + ("es" if base.endswith(("s", "sh", "ch", "x", "z")) else "s")
+
+
+def _past(base: str) -> str:
+    if base.endswith("e"):
+        return base + "d"
+    return base + (base[-1] if base in _DOUBLES else "") + "ed"
+
+
+# "laughs", "laughed": what somebody else does. The bare "laugh" is only ever the
+# player's own "I laugh" — in prose it is the noun ("a laugh", "stifles a laugh"), which
+# is the reason a bare form is never read as a verb here.
+_VERB_FORMS = {f: b for b in _VOCALS for f in (_third(b), _past(b))}
+_BASE_FORMS = {b: b for b in _VOCALS}
+_VERB_RE = re.compile(r"\b(" + "|".join(sorted(_VERB_FORMS, key=len, reverse=True))
+                      + r")\b", re.I)
+_BASE_RE = re.compile(r"\b(" + "|".join(sorted(set(_VERB_FORMS) | set(_BASE_FORMS),
+                                               key=len, reverse=True)) + r")\b", re.I)
+# The noun after a verb of making a sound: "lets out a low, dry grunt", "gives a short,
+# dry laugh", "a short, dry bark of a laugh". At most five words between, so a sentence
+# cannot wander from "gives" to a laugh three clauses later.
+_NOUNS = "|".join(sorted(_VOCALS, key=len, reverse=True))
+_NOUN_RE = re.compile(
+    r"\b(?P<trig>lets\s+out|let\s+out|letting\s+out|gives|gave|give)\s+"
+    r"(?P<mid>(?:an?\s+)?(?:[a-z'’-]+,?\s+){0,5}?)"
+    r"(?P<noun>" + _NOUNS + r")(?:s|es)?\b", re.I)
+# "says with a short laugh": the sound beside a line of speech. Only after a verb of
+# speaking or of face, and with at most three words between, so "with a whistle round
+# his neck" is not a whistle blown.
+_WITH_VERBS = frozenset((
+    "says said replies replied answers answered adds added asks asked admits admitted "
+    "agrees agreed murmurs murmured mutters muttered continues continued nods nodded "
+    "shrugs shrugged grins grinned smiles smiled speaks spoke repeats repeated "
+    "offers offered concedes conceded").split())
+_WITH_RE = re.compile(
+    r"\b(?P<verb>[a-z]+)\s+with\s+(?P<mid>(?:an?\s+)(?:[a-z'’-]+,?\s+){0,3}?)"
+    r"(?P<noun>" + _NOUNS + r")(?:s|es)?\b", re.I)
+_THROAT_RE = re.compile(r"\b(?P<verb>clears|cleared|clear)\s+(?:his|her|their|its|my)\s+throat\b",
+                        re.I)
+# The player's own emote: "*grunts*", "*laughs softly*".
+_EMOTE_RE = re.compile(r"\*\s*(?P<body>[A-Za-z][A-Za-z ,'’-]{0,40}?)\s*\*")
+
+# Refused outright: a sound somebody did not make.
+_NEGATION = frozenset((
+    "not never no without nor stifles stifled stifling suppresses suppressed swallows "
+    "swallowed holds held bites bit fights fought".split()))
+# Breathing is not a vocalisation, whatever the verb: "he gasps for breath" (Bobby, beat 13).
+_BREATH_RE = re.compile(r"^\s*for\s+(?:breath|air)\b", re.I)
+# Words between a subject and its verb that are not the subject: "and then he gives".
+_ADVERBS = frozenset((
+    "then just only also still again even suddenly finally simply merely almost nearly "
+    "soon once instead abruptly quietly softly briefly".split()))
+_LEADS = frozenset("and but so yet or then".split())
+# Heads that are many people, never one: "the crowd laughs" books nobody.
+_COLLECTIVE = frozenset((
+    "crowd folk people men women everyone everybody onlookers others all "
+    "guards soldiers villagers children".split()))
+_FEMALE = frozenset((
+    "woman girl lady lass maid maiden mother sister daughter wife widow queen priestess "
+    "nun aunt fishwife midwife clanswoman matron crone hag grandmother mistress").split())
+_MALE = frozenset((
+    "man boy lad father brother son husband king uncle monk clansman fellow grandfather "
+    "lord master").split())
+_DETS = frozenset("the that this".split())
+# Where a vocal clause ends, for the phrase that is kept.
+_CLAUSE_END = re.compile(
+    r"[,;:.!?\n]|\s(?:and|as|before|while|but|then|that|which|until|so)\s", re.I)
+_WORDS = re.compile(r"[A-Za-z][A-Za-z'’-]*")
+
+
+def _gender(person: dict, head: str) -> str:
+    """"f", "m" or "" from what the scene says: the stated pronouns, else a head noun
+    that carries it ("the girl"). They/them says nothing here — every person the world
+    gave no gender reads they/them (Bobby's save: all nine), and the page calls them he."""
+    pro = str(person.get("pronouns") or "").lower()
+    if pro.startswith("she"):
+        return "f"
+    if pro.startswith("he"):
+        return "m"
+    return "f" if head in _FEMALE else "m" if head in _MALE else ""
+
+
+def _keys(people) -> list[tuple[str, str, str, bool]]:
+    """(ref, key, gender, proper) for every non-PC person: a proper name whole and by its
+    first word when no one else shares it, a description by its head noun ("the watchman
+    waving traffic through" is found as "the watchman")."""
+    from gm.checks._people import _PERSON, head_of
+
+    rows: list[tuple[str, str, str, bool]] = []
+    firsts: dict[str, int] = {}
+    named = []
+    for ref, p in (people or {}).items():
+        if (p or {}).get("is_pc"):
+            continue
+        name = " ".join(str((p or {}).get("name") or "").split())
+        if not name:
+            continue
+        head = head_of(name)
+        words = head.split()
+        # A lone capitalised trade ("Guard") is a description, not somebody's name.
+        proper = bool(words) and not (len(words) == 1 and words[0].lower() in _PERSON)
+        if proper:
+            named.append((ref, head, p))
+            firsts[words[0]] = firsts.get(words[0], 0) + 1
+        elif head:
+            rows.append((ref, head.lower(), _gender(p, head.lower()), False))
+    for ref, head, p in named:
+        rows.append((ref, head, _gender(p, ""), True))
+        first = head.split()[0]
+        if first != head and firsts.get(first) == 1 and len(first) >= 3:
+            rows.append((ref, first, _gender(p, ""), True))
+    return rows
+
+
+def _mentioned(stretch: str, keys) -> set[tuple[str, str]]:
+    """(ref, gender) of every person `stretch` names: a proper name as written, a head
+    noun after "the/that/this" and at most two words ("the old watchman")."""
+    found = set()
+    for ref, key, gender, proper in keys:
+        if proper:
+            pat = r"\b" + re.escape(key) + r"\b"
+            hit = re.search(pat, stretch)
+        else:
+            pat = (r"\b(?:the|that|this)\s+(?:[a-z'’-]+\s+){0,2}?" + re.escape(key)
+                   + r"(?:'s|’s)?\b")
+            hit = re.search(pat, stretch, re.I)
+        if hit and not (not proper and key in _COLLECTIVE):
+            found.add((ref, gender))
+    return found
+
+
+def _subject(prefix: str) -> list[str]:
+    """The words of the clause before a verb, adverbs and leading conjunctions dropped."""
+    cut = max(prefix.rfind(c) for c in ",;:—–()\n")
+    words = _WORDS.findall(prefix[cut + 1:])
+    while words and words[0].lower() in _LEADS:
+        words.pop(0)
+    while words and (words[-1].lower() in _ADVERBS
+                     or (words[-1].lower().endswith("ly") and len(words[-1]) > 4)):
+        words.pop()
+    return words
+
+
+def _named(words: list[str], keys) -> list[str]:
+    """The refs a subject's words end on, by name or by "the <head>"."""
+    hits = []
+    tail = " ".join(words)
+    for ref, key, _gender_, proper in keys:
+        if proper:
+            if tail == key or tail.endswith(" " + key):
+                hits.append(ref)
+        elif words and words[-1].lower() == key and key not in _COLLECTIVE:
+            before = [w.lower() for w in words[-4:-1]]
+            if any(w in _DETS for w in before):
+                hits.append(ref)
+    return list(dict.fromkeys(hits))
+
+
+def _negated(words_before: list[str]) -> bool:
+    last = [w.lower() for w in words_before[-3:]]
+    return any(w in _NEGATION or w.endswith(("n't", "n’t")) for w in last)
+
+
+def _phrase(text: str, start: int, end_min: int, cap: int = 10) -> str:
+    """From `start` to the clause's end, never shorter than `end_min`, at most `cap`
+    words: "lets out a low, dry grunt", "laughs softly at you"."""
+    m = _CLAUSE_END.search(text, end_min)
+    stop = m.start() if m else len(text)
+    words = text[start:stop].split()[:cap]
+    return " ".join(words).strip(" ,;:'\"“”‘’")
+
+
+def _sentences(blank: str) -> list[tuple[int, int]]:
+    """(start, end) of each sentence of the blanked beat — quotations are spaces, so a
+    full stop inside a line never ends the sentence around it."""
+    out, at = [], 0
+    for m in re.finditer(r"[.!?]+(?=\s|$)|\n", blank):
+        out.append((at, m.end()))
+        at = m.end()
+    if at < len(blank):
+        out.append((at, len(blank)))
+    return out
+
+
+def _speakers_in(text: str, a: int, b: int, said, pc: set[str]) -> set[str]:
+    """The tagged speakers of the quotations inside text[a:b], the PC left out."""
+    who = set()
+    for s, e in spans(text):
+        if s >= a and e <= b + 1:
+            rec = speaker(said, text[s + 1:e - 1] if e - s >= 2 else "")
+            if rec and rec.get("who") and rec["who"] not in pc:
+                who.add(rec["who"])
+    return who
+
+
+def vocalisations(text: str, said=(), people=None, *, player: bool = False) -> list[dict]:
+    """The grunts, laughs and sighs in `text`, each with who made it — or a miss.
+
+    Each is `{"who": ref, "to": "you" | ref | "", "text": phrase, "src": tier, "at":
+    offset}`; `src` is how the speaker was found:
+
+      * ``tag-adjacent`` — "he" beside a quotation the prose call tagged, with one speaker
+        in the sentence ("'Two days,' he says with a short laugh");
+      * ``named`` — the subject is a person's name, or "the <head noun>" of exactly one
+        person ("Drenn grunts", "the watchman laughs");
+      * ``pronoun`` — "he"/"she" with exactly one person it can mean, in the same sentence
+        before it or, failing any, the nearest earlier sentence of the paragraph that names
+        or quotes anybody (up to three back). Gender only excludes: a "he" is never "the
+        girl". This tier costs about a third in the literature (PDNC: 98.6 % explicit
+        against 68.9 % implicit), so two candidates are a miss, not a guess;
+      * ``player`` — with `player=True`, the player's own words: "I laugh", "*grunts*".
+
+    A miss is the same dict with `"who": ""` and `"why"` ("pronoun", "ambiguous", "no
+    person"), for the turn log to count — recall is measured before any tag is considered.
+
+    Nothing inside a quotation is ever a vocalisation (`blanked`): a quoted "Hmph." is a
+    line. Refused, and not reported: a negated sound ("does not laugh", "without a
+    laugh"), a dialogue tag whose verb is the sound ("'…,' he grunts" — the line is logged,
+    the grunt is how it was said) and breathing ("gasps for breath").
+
+    `people` is ref -> {"name", "pronouns", "is_pc"} (`play.aftermath.people_of`). With
+    `player=False` (GM prose) the PC is never the speaker: the narrator does not decide
+    what the player's character did. With `player=True` only the PC is.
+    """
+    text = str(text or "")
+    if not text.strip():
+        return []
+    blank = blanked(text)
+    people = people or {}
+    pc_refs = {r for r, p in people.items() if (p or {}).get("is_pc")}
+    pc = next(iter(sorted(pc_refs)), "")
+    keys = [] if player else _keys(people)
+    quotes = spans(text)
+    found: list[dict] = []
+    taken: list[tuple[int, int]] = []
+
+    def free(a: int, b: int) -> bool:
+        return not any(a < y and x < b for x, y in taken)
+
+    def to_of(phrase: str) -> str:
+        m = re.search(r"\bat\s+(you|yourself)\b", phrase, re.I)
+        if m:
+            return "you"
+        m = re.search(r"\bat\s+(.+)$", phrase)
+        if m and keys:
+            hit = {ref for ref, _g in _mentioned(m.group(1), keys)}
+            if len(hit) == 1:
+                return hit.pop()
+        return ""
+
+    # Every candidate: (verb or trigger start, where the phrase must reach, form).
+    cands: list[tuple[int, int, int, str]] = []
+    for m in (_BASE_RE if player else _VERB_RE).finditer(blank):
+        cands.append((m.start(), m.end(), m.end(), "verb"))
+    for m in _NOUN_RE.finditer(blank):
+        cands.append((m.start(), m.end(), m.end(), "noun"))
+    for m in _WITH_RE.finditer(blank):
+        if m.group("verb").lower() in _WITH_VERBS:
+            cands.append((m.start(), m.end(), m.end(), "with"))
+    for m in _THROAT_RE.finditer(blank):
+        cands.append((m.start(), m.end(), m.end(), "verb"))
+    # Longest first at a place, so "lets out a laugh" is read before its bare "laugh".
+    cands.sort(key=lambda c: (c[0], -(c[1] - c[0])))
+    sentences = _sentences(blank)
+
+    for start, end, reach, form in cands:
+        if not free(start, end):
+            continue
+        s_at = next((i for i, (a, b) in enumerate(sentences) if a <= start < b), None)
+        if s_at is None:
+            continue
+        s_start, s_end = sentences[s_at]
+        prefix = blank[s_start:start]
+        # For "says with a laugh" the match starts at the verb of speaking, so the words
+        # before it are the speaker, as they are for "Drenn grunts".
+        words = _subject(prefix)
+        if _negated(_WORDS.findall(prefix)[-3:]):
+            continue
+        if form == "verb" and _BREATH_RE.match(blank[end:]):
+            continue
+        phrase = _phrase(blank, start, reach)
+        if not phrase:
+            continue
+        head = [w.lower() for w in words]
+
+        if player:
+            if head and head[-1] == "i" and pc:
+                taken.append((start, end))
+                found.append({"who": pc, "to": to_of(phrase), "text": phrase,
+                              "src": "player", "at": start})
+            continue
+        if form == "verb" and _VERB_FORMS.get(blank[start:end].lower()) is None \
+                and not _THROAT_RE.match(blank, start):
+            continue
+        # A sound used as the verb of a line of speech is how the line was said.
+        if form == "verb":
+            before = next((e for s, e in reversed(quotes) if e <= start), None)
+            subj_at = s_start + prefix.rfind(words[0]) if words else start
+            if before is not None and not re.sub(r"[\s,]", "", text[before:max(before, subj_at)]):
+                continue
+            after = next((s for s, e in quotes if s >= end), None)
+            if after is not None and re.fullmatch(r"\s*(?:\w+ly\s*)?[,:]?\s*",
+                                                  text[end:after]):
+                continue
+
+        who, src, why = "", "", ""
+        if head and head[-1] in ("he", "she"):
+            want = "f" if head[-1] == "she" else "m"
+            ok = lambda g: g in ("", want)  # noqa: E731 — gender only ever excludes
+            tagged = _speakers_in(text, s_start, s_end, said, pc_refs)
+            if len(tagged) == 1:
+                who, src = tagged.pop(), "tag-adjacent"
+            else:
+                here = {r for r, g in _mentioned(blank[s_start:start], keys) if ok(g)}
+                if len(here) == 1:
+                    who, src = here.pop(), "pronoun"
+                elif here:
+                    why = "ambiguous"
+                else:
+                    # Back through the paragraph, at most three sentences, to the nearest
+                    # one that names or quotes anybody; a paragraph break ends the search.
+                    for back in range(s_at - 1, s_at - 4, -1):
+                        if back < 0:
+                            break
+                        a, b = sentences[back]
+                        if not blank[a:b].strip():
+                            break
+                        near = {r for r, g in _mentioned(blank[a:b], keys) if ok(g)}
+                        near |= _speakers_in(text, a, b, said, pc_refs)
+                        if near:
+                            if len(near) == 1:
+                                who, src = near.pop(), "pronoun"
+                            else:
+                                why = "ambiguous"
+                            break
+                    if not who and not why:
+                        why = "pronoun"
+        elif head:
+            hits = _named(words, keys)
+            if len(hits) == 1:
+                who, src = hits[0], "named"
+            else:
+                why = "ambiguous" if hits else "no person"
+        else:
+            why = "no person"
+        taken.append((start, end))
+        if who in pc_refs:
+            continue
+        found.append({"who": who, "to": to_of(phrase) if who else "", "text": phrase,
+                      "src": src, "at": start, **({"why": why} if not who else {})})
+
+    # The player's emotes, which name no subject at all.
+    if player and pc:
+        for m in _EMOTE_RE.finditer(text):
+            body = m.group("body").strip()
+            first = body.split()[0].lower() if body.split() else ""
+            if first in _VERB_FORMS or first in _BASE_FORMS or body.lower().startswith(
+                    ("lets out", "let out", "clears", "clear")):
+                if free(m.start(), m.end()):
+                    taken.append((m.start(), m.end()))
+                    found.append({"who": pc, "to": to_of(body), "text": body,
+                                  "src": "player", "at": m.start()})
+    found.sort(key=lambda f: f["at"])
+    return found
