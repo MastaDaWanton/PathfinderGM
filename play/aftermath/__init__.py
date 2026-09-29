@@ -164,10 +164,21 @@ def _said_snapshot(said) -> list[dict]:
 def _said_kept(before: list[dict], after, stage: str) -> str:
     """What a member did to `said` that it may not do, or "".
 
-    The one change allowed anywhere is the "people" stage giving an empty `who` a ref and
-    saying so with `"made"` — A's `speaker_real` (§2.3). Everything else is the page's
-    record of who said which line, and a bookkeeping step does not get to rewrite it."""
+    The changes allowed are the "people" stage's, and only two — both A's `speaker_real`
+    (§2.3): giving an empty `who` a ref and saying so with `"made"`, and ADDING a record
+    for a line nobody tagged, which says so with `"made"` equal to its `who` and `"from":
+    "page"`. The second was added after the Phase-2 live gate (G2, 2026-09-29): a beat
+    with no tags at all has no record to fill, and "a man in a stained leather apron" who
+    spoke twice to the player was left with nothing to carry his lines. Everything else is
+    the page's record of who said which line, and a bookkeeping step does not get to
+    rewrite it."""
     after = list(after or [])
+    if stage == "people" and len(after) > len(before):
+        extra = after[len(before):]
+        if all(isinstance(r, dict) and r.get("who") and r.get("made") == r.get("who")
+               and r.get("from") == "page" and str(r.get("line") or "").strip()
+               for r in extra):
+            after = after[:len(before)]
     if len(after) != len(before):
         return f"said went from {len(before)} records to {len(after)}"
     for i, (was, now) in enumerate(zip(before, after)):

@@ -2605,8 +2605,15 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # fine to the parser, so the tagged hails are logged beside what the old
             # guess would have said, and a disagreement means one of them is wrong.
             c.turn_log.append({"kind": "speech-tags",
+                               # The model's tags only: a line `speaker_real` read off
+                               # the page (`"from": "page"`) is counted apart, so the
+                               # tagging rate stays the model's (G2, 2026-09-29).
                                "tagged": len({(r["who"], r["to"], r["line"])
-                                              for r in agent.last_said if r["who"]}),
+                                              for r in agent.last_said
+                                              if r["who"] and r.get("from") != "page"}),
+                               **({"read_off_page": read_off} if (read_off := sum(
+                                   1 for r in agent.last_said
+                                   if r.get("from") == "page")) else {}),
                                # Tags naming nobody here: the model's own claim, kept.
                                "unknown_refs": sorted({r.get("was", "")
                                                        for r in agent.last_said

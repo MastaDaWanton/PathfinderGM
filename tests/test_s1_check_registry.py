@@ -205,6 +205,8 @@ def test_the_real_registry_holds_each_lanes_checks_and_no_helper():
             "brief_verbatim"} <= names
     assert {"land_described", "bearing_invented", "road_claimed", "route_walked"} <= names
     assert {"pull_yields", "hook_leaks", "giver_knows_you", "keeper_forward"} <= names
+    # The G2 fix (2026-09-29): the turn narrator's size words.
+    assert {"size_words"} <= names
     assert not {n for n in names if n.startswith("_")}
 
 
