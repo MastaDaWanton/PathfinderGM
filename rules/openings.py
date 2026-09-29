@@ -1150,8 +1150,6 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                 slots[slot] = refs[0]
                 foes.extend(refs)
                 phrases[slot] = group_phrase(label, len(refs))
-                if got_land_row is not None:
-                    _no_person_about_it(scene, refs)
                 fight = _run(engine, doc, [{
                     "op": "begin_encounter", "because": f"the start: {doc['id']}",
                     "params": {"sides": {"party": [pc.ref], slot: refs}}}])
@@ -1241,22 +1239,10 @@ def _up_to_the_party(engine, doc: dict, pc, refs: list[str]) -> list[str]:
     return out
 
 
-def _no_person_about_it(scene, refs) -> None:
-    """A beast the land sent is not a person: no given name, no people's face.
-
-    `Engine._bring_in` gives every arrival in a world a true name and a face from the
-    local people's pools, and it cannot tell a wolf from a woman. Measured on the first
-    caravan draw (Pangrella, 2026-09-29): "the medium giant scorpion" stood on the board
-    with a Korvu's face — "four limbs ending in sharp talons … a line of blue ink dots
-    across the knuckles" — which the brief's WHO IS HERE would have handed the narrator
-    for the first fight of the game. Only the creatures this start drew from the land
-    (never a humanoid: `RAIDER_TYPES`) are cleared; the engine-wide fix is its own task.
-    """
-    for ref in refs:
-        actor = scene.people.get(ref)
-        if actor is not None:
-            actor.appearance = ""
-            actor.true_name = ""
+# A beast the land sends for a start is not a person, and gets no given name and no
+# people's face. This module cleared both itself for its own creatures until the
+# engine-wide rule landed (2026-09-29, `engine._a_person` in `_bring_in`, measured on a
+# Pangrella giant scorpion wearing a Korvu's face); every spawn obeys it now.
 
 
 def _where_words(spot, town_name: str) -> str:
