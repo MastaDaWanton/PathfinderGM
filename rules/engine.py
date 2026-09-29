@@ -1776,6 +1776,26 @@ class _NeedsPlayerRoll(Exception):
         self.partial = partial or {}
 
 
+class _ReactionsOwed(Exception):
+    """Raised inside an op handler that has just found it is about to walk out of a fight.
+
+    `_reactions_before` asks its question of the intent before it resolves, which works
+    for a `move` because validation already said the move is legal. A `travel` or a
+    `journey` is the other way round: the op alone knows whether the party will actually
+    go — a dozen refusals live inside it (a shut door, ground that is not there, a party
+    short of horses) — and a swing drawn by a walk that is then refused is the engine
+    inventing an opening, the reason `_provoked_by_pick_up` checks the thing is really
+    lying there. So the op asks at its point of commitment, after every refusal and before
+    anything changes, and raises this; `_drive` splices the swings in front of the op and
+    runs it again with `withdrew` set, the way a suspended roll resumes.
+    """
+
+    def __init__(self, intents: list[dict], struck_by: list[str]):
+        super().__init__("attacks of opportunity owed first")
+        self.intents = intents
+        self.struck_by = struck_by
+
+
 @dataclass
 class Manifestation:
     """Something a spell put into the scene and left standing there.
@@ -2860,6 +2880,15 @@ class Engine:
                 self.scene.pending_partial = suspend.partial
                 self.scene.awaiting = suspend.prompt
                 return Resolution(outcomes=outcomes, awaiting=suspend.prompt)
+            except _ReactionsOwed as owed:
+                # Walking out of a fight: the swings go in front, and the walk runs
+                # again behind them knowing who struck (`withdrew`, which the op reads
+                # instead of asking twice). Written into the raw intent, so it survives
+                # a suspension for somebody's dice between the swings and the walk.
+                raw["params"] = dict(raw.get("params") or {}, withdrew=owed.struck_by)
+                raw["_reacted"] = True
+                queue[0:0] = owed.intents
+                continue
             queue.pop(0)
             partial = {}
             outcomes.append(outcome)
@@ -2910,11 +2939,19 @@ class Engine:
         "Pick up an item": a move action, attack of opportunity yes). The shape is a
         dispatch rather than an `if` because the next triggers (casting in a threatened
         square, standing up from prone) are the same machinery with a different question.
+
+        Walking out of the fight — a `travel` or `journey` begun mid-encounter — is the
+        one trigger this dispatch cannot answer in advance, and does not: the op asks at
+        its point of commitment (`_leaving_the_fight`) and raises `_ReactionsOwed`, for
+        the reason that exception gives. Until 2026-09-29 nothing asked at all, and a
+        player could walk out of any melee for free while the exits row said it provoked.
         """
         if not self.scene.in_encounter:
             return []
         if raw.get("op") == "give":
             return self._provoked_by_pick_up(raw)
+        if raw.get("op") in ("travel", "journey"):
+            return []                   # asked by the op itself: `_leaving_the_fight`
         if raw.get("op") != "move":
             return []
 
@@ -2974,6 +3011,62 @@ class Engine:
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
+
+    def _leaving_the_fight(self, intent: Intent, pc) -> "Outcome | None":
+        """Walking out of a fight, asked by `_op_travel` and `_op_journey` at the point
+        they commit to going: the attacks of opportunity first, and no walk for a body
+        they dropped.
+
+        The first time through, `withdrew` is absent: whoever is owed a swing
+        (`reactions.provoked_by_withdraw` — leaving is the WITHDRAW action, CRB p.188,
+        so a visible foe who threatens only the starting square gets nothing) has it
+        taken off their allowance, and `_ReactionsOwed` puts the swings in front of this
+        op. Each is an ordinary `attack` intent through `_drive`, so its dice, its tell
+        and the claims scrubber are the ones every other blow has.
+
+        The second time, the swings have landed. A walker they put down does not leave —
+        "an attack of opportunity interrupts the normal flow of actions", resolved before
+        the provoking action goes on (CRB p.180), and a dying creature "can take no
+        actions" — so the fight goes on and the outcome names who struck, the same stop
+        `_op_move` makes ("does not get there") and `_op_attack` makes ("never swings").
+        None when the party may go.
+
+        Only the PC withdraws. Escorts leave with the party without ever being moved on
+        the board, so they have no square to be struck leaving; in 1e every creature
+        that moves out provokes, and modelling theirs waits on companions walking out as
+        movement (docs/fix-interfaces.md).
+        """
+        if pc is None or not self.scene.in_encounter:
+            return None
+        struck_by = intent.params.get("withdrew")
+        if struck_by is None:
+            owed: list[dict] = []
+            for watcher, reaction in reactions.provoked_by_withdraw(self.scene, pc.ref):
+                if not self._spend_reaction(watcher, reaction.budget):
+                    continue
+                owed.append({
+                    "op": reaction.op, "actor": watcher, "target": pc.ref,
+                    "because": f"{pc.name} turned to leave the fight",
+                    # A single swing, never the attacker's iteratives (`_reactions_before`).
+                    "params": {"full_attack": False, "reaction": reaction.id},
+                    "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+                })
+            if owed:
+                raise _ReactionsOwed(owed, [o["actor"] for o in owed])
+            return None
+        if not (pc.is_down or not pc.can_act()):
+            return None
+        why = (pc.blocking_condition() or "down").lower()
+        names = [self.scene.actors[r].name for r in struck_by if r in self.scene.actors]
+        who = (", ".join(names[:-1]) + " and " + names[-1]) if len(names) > 1 \
+            else (names[0] if names else "a blow")
+        return Outcome(
+            intent_id=intent.id, op=intent.op, status="prevented",
+            effects=[{"ref": pc.ref, "kind": "leave_stopped", "why": why,
+                      "struck_by": [r for r in struck_by if r in self.scene.actors]}],
+            tell=f"{pc.name} turns to leave the fight and is struck at by {who}; "
+                 f"{pc.name} is {why} and never gets away.",
+            because=intent.because)
 
     def _spend_reaction(self, ref: str, budget: str) -> bool:
         """Take one from this creature's allowance, or refuse.
@@ -7077,6 +7170,12 @@ class Engine:
                     + f". On foot it is {walk_words}. A mount is bought at the stables, "
                       f"and comes along like anybody who travels with you.")
             mount_refs = mount_refs[:riders]
+        # Out of a fight, the road starts with a withdraw: every refusal is behind us and
+        # nothing has changed yet, so this is where the swings are owed and a PC they
+        # drop stays in the fight (`_leaving_the_fight`).
+        stopped = self._leaving_the_fight(intent, pc)
+        if stopped is not None:
+            return stopped
         # Setting out is walking away, whatever the road then does.
         parted = self.end_talk("walked away")
 
@@ -7653,6 +7752,11 @@ class Engine:
         from . import journey as journey_mod
 
         fell_away: list[str] = []
+        # The bond is lifted below, once nothing can refuse the walk: a travel run twice
+        # (the attacks of opportunity a withdraw owes go first, `_leaving_the_fight`)
+        # must find the same companions falling away the second time, and a refused one
+        # must leave the company as it was — `_op_journey`'s rule for its own refusals.
+        falling: list = []
         for r, a in self.scene.actors.items():
             if r in escorts or a.is_pc or not a.has_state(states.TRAVELS_WITH_YOU):
                 continue
@@ -7665,7 +7769,7 @@ class Engine:
                 continue
             if (attitude_mod.step_of(attitude_mod.of(a))
                     < attitude_mod.step_of(attitude_mod.COMES_ALONG)):
-                a.remove_effects(source=f"company:{r}")
+                falling.append((r, a))
                 fell_away.append(a.name)
                 continue
             escorts.append(r)
@@ -7704,6 +7808,15 @@ class Engine:
                       f"is bought at the stables, and comes along like anybody who "
                       f"travels with you.")
             mount_refs = mount_refs[:riders]
+        # Out of a fight, the walk starts with a withdraw — here, after every refusal
+        # that can be known before the walk and before anything has changed
+        # (`_leaving_the_fight`). A PC the swings drop stays where they stood.
+        if moved:
+            stopped = self._leaving_the_fight(intent, pc)
+            if stopped is not None:
+                return stopped
+        for r, a in falling:
+            a.remove_effects(source=f"company:{r}")
         ridden_minutes = 0          # minutes of the walk spent at the pace, for the tell
         tired_mounts: list[str] = []
 

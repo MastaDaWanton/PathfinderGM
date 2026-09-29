@@ -16,11 +16,15 @@
 //
 // In a fight (G3 leftovers, 2026-09-29) the row stays, because running is a choice a
 // player is entitled to, but it stops looking like a stroll. Every open way is marked
-// "provokes" and the first click asks "Leave the fight?" before the second one goes: in
-// PF1e, moving out of a threatened square provokes an attack of opportunity from each
-// foe who threatens it (CRB, Combat, "Attacks of Opportunity"). The page reads
-// `scene.in_encounter` and says so; it does not work out who threatens whom, because
-// that is the engine's question and a page that answered it would be a second rulebook.
+// "withdraw" and the first click asks "Leave the fight?" before the second one goes.
+// Leaving mid-fight is PF1e's withdraw (CRB p.188), and the engine rolls it
+// (`reactions.provoked_by_withdraw`): a foe you can see who threatens only the square you
+// start in gets no swing, while one whose reach covers your way out, or one you cannot
+// see, still strikes, and a blow that drops you keeps you in the fight. The mark said
+// "provokes" until the engine did it; it names the action now because whether a given
+// foe swings is the engine's question. The page reads `scene.in_encounter` and says so;
+// it does not work out who threatens whom, because a page that answered it would be a
+// second rulebook.
 // The journeys' confirm idiom was reused rather than a dialog invented: one line under
 // the row, the same buttons, Esc and "Stay" to back out.
 //
@@ -99,8 +103,9 @@ function renderExits(s) {
         }><span class="ex-name">${esc(e.name)}</span>${
           time ? `<span class="ex-time"><span class="ex-sep" aria-hidden="true"> · </span>${
             esc(time)}</span>` : ""}${
-          risky ? `<span class="ex-risk" aria-hidden="true">provokes</span><span class="vh">
-            (leaving the fight provokes attacks of opportunity)</span>` : ""}${
+          risky ? `<span class="ex-risk" aria-hidden="true">withdraw</span><span class="vh">
+            (leaving the fight is a withdraw: foes whose reach covers the way out still
+            strike)</span>` : ""}${
           shut ? `<span class="vh"> (shut)</span>` : ""}</button>`;
       }).join("")}</div></div>`;
   }).join("");
@@ -109,8 +114,9 @@ function renderExits(s) {
   if (asking && fighting) {
     confirm = `<div class="ex-confirm fight" id="exits-confirm" role="group"
           aria-label="Leave the fight">
-        <span><b>Leave the fight?</b> Walking away to ${esc(asking.name)} provokes an
-        attack of opportunity from every foe who threatens you.${asking.journey ? ` ${
+        <span><b>Leave the fight?</b> Walking away to ${esc(asking.name)} is a withdraw.
+        A foe beside you that you can see gets no swing, but one whose reach covers your
+        way out still strikes, and so does one you cannot see.${asking.journey ? ` ${
           esc(upFirst(asking.time_words))}. The days pass on the road.` : ""}</span>
         <button type="button" class="exitgo" data-exitgo="${esc(asking.id)}">Leave</button>
         <button type="button" class="exitgo quiet" data-exitcancel>Stay</button>
