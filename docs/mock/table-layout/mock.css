@@ -1,0 +1,568 @@
+/* The table, re-laid: a layout mock in the app's own materials.
+
+   Everything visual here is borrowed from play/templates/play/table.html, not invented:
+   the :root tokens are copied verbatim, the textures and the gilt frame are the real files
+   under play/static/img, Cinzel is the app's own woff2, the body face is its Palatino
+   stack, and the radius scale is the app's (2px for controls, 3px for surfaces, 12px for
+   the suggestion "wax seals", round for the medallions).
+
+   Motion, by the owner's rule (2026-09-28, "i dont need reduced motion i just dont want
+   the kind of motion that makes the pages or menus harder to use"): every answer is
+   instant, nothing lifts or slides under the pointer, nothing loops. There are no
+   transitions or animations in this file on purpose. */
+
+@font-face {
+  font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
+  src: local("Cinzel"), url("../../../play/static/fonts/Cinzel-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap;
+  src: local("Cinzel SemiBold"),
+       url("../../../play/static/fonts/Cinzel-SemiBold.woff2") format("woff2");
+}
+
+:root {
+  /* Copied from table.html :root. */
+  --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua",
+             Georgia, serif;
+  --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --bg: #0d0b09; --panel: #161210; --edge: #3a2f22; --sunk: #0b0908;
+  --ink: #e8ddc4; --dim: #93866e; --ash: #6d675e;
+  --accent: #cfa964; --gold: #ddc48e; --gold-dim: #7d6845;
+  --candle: #f0c070; --ember: 255, 176, 84;
+  --blood: #6e1f1f; --bloodglow: 168, 44, 40; --alarm: #b0483c;
+  --player: #8fb0c8;
+  --glass: rgba(16, 12, 9, .66); --glass-edge: rgba(221, 196, 142, .14);
+  /* The gilt the app draws its frames with (aside border-image, .panel::before). */
+  --gilt: linear-gradient(135deg, #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%,
+                          #c9a86a 86%, #f4e3b2 100%);
+  /* The spell schools, from the Spells tab. */
+  --sc-abjuration: #8fb0c8; --sc-conjuration: #d9b35f; --sc-divination: #cdd4dc;
+  --sc-enchantment: #d493a8; --sc-evocation: #e0714f; --sc-illusion: #ab94c9;
+  --sc-necromancy: #a3ad6e; --sc-transmutation: #7fb3a2; --sc-universal: #ddc48e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+* { scrollbar-width: thin; scrollbar-color: #3a2f22 transparent; }
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+body {
+  margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
+  display: grid; grid-template-rows: auto minmax(0, 1fr);
+  height: 100dvh; overflow: hidden;
+  background:
+    linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
+    url("../../../play/static/img/grimoire-leather.jpg") center / cover no-repeat fixed #0d0b09;
+}
+
+.vh { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+      overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+.skip { position: absolute; left: 12px; top: -60px; z-index: 50; padding: 8px 12px;
+        background: var(--panel); color: var(--gold); border: 1px solid var(--accent); }
+.skip:focus { top: 8px; }
+a { color: var(--gold); }
+
+/* One focus ring for everything: the candle, offset so it never sits on the glyph. */
+:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+
+/* --- Buttons: cold iron with a gold face (the app's), and nothing moves ----------- */
+button {
+  background: linear-gradient(#2b2318, #191410); border: 1px solid var(--gold-dim);
+  color: var(--gold); padding: 10px 18px; border-radius: 2px; cursor: pointer;
+  font: 400 15px/1 var(--display); letter-spacing: .12em; font-variant: small-caps;
+  white-space: nowrap; min-height: 40px;
+}
+button:hover { color: #f4e6c0; border-color: var(--accent); }
+button.quiet { background: rgba(20, 16, 11, .7); color: var(--gold); }
+button.small { padding: 6px 10px; font-size: 13px; min-height: 32px; }
+button.go { border-color: var(--accent); color: #f4e6c0; }
+
+/* --- Top bar: the world, the modes, the sheet toggle ------------------------------ */
+.topbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 12px; padding: 8px 16px;
+  border-bottom: 1px solid var(--gold-dim);
+  background:
+    linear-gradient(rgba(16, 12, 8, .10), rgba(8, 6, 4, .40)),
+    url("../../../play/static/img/card-leather.jpg") #241d15;
+  background-size: auto, 400px auto;
+  position: relative; z-index: 10;
+}
+.world { margin: 0; font: 400 15px/1 var(--display); letter-spacing: .14em;
+         font-variant: small-caps; color: var(--dim); }
+.topend { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+
+/* The modes, each a word. The owner's mockup had a row of unlabelled icons; here the
+   word is the button and there is no icon to decode. */
+.modes { display: flex; gap: 2px; padding: 3px; border: 1px solid #2e251a;
+         background: rgba(8, 6, 4, .55); border-radius: 3px; }
+.modes button { border: 1px solid transparent; background: transparent; color: var(--dim);
+                padding: 8px 16px; font-size: 15px; letter-spacing: .1em; }
+.modes button:hover { color: var(--ink); border-color: transparent; }
+.modes button[aria-selected="true"] {
+  color: #f4e6c0; border-color: var(--gold-dim);
+  background: linear-gradient(#2b2318, #191410);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+/* The toggle keeps the width of its longer label, so the tabs never shift when it flips,
+   and it keeps its place (hidden, not removed) in the modes it does not apply to. */
+#sheettoggle { min-width: 11.5em; }
+body:not(.mode-table) #sheettoggle { visibility: hidden; }
+
+.mockctl { position: relative; }
+.mockctl > summary { list-style: none; cursor: pointer; padding: 8px 12px; min-height: 40px;
+                     display: flex; align-items: center; border: 1px dashed var(--gold-dim);
+                     border-radius: 2px; color: var(--dim); font: 400 14px/1 var(--display);
+                     letter-spacing: .1em; font-variant: small-caps; }
+.mockctl > summary::-webkit-details-marker { display: none; }
+.mockctl[open] > summary { color: var(--gold); border-style: solid; }
+.mockpanel { position: absolute; right: 0; top: calc(100% + 6px); width: 300px;
+             padding: 14px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45;
+             background: #1a1510; border: 1px solid var(--gold-dim); border-radius: 3px;
+             box-shadow: 0 12px 30px rgba(0, 0, 0, .6); }
+.mockpanel label { color: var(--dim); font-size: 13px; }
+.mockpanel label.check { color: var(--ink); display: flex; gap: 8px; align-items: center; }
+.mockpanel select { font: inherit; font-size: 14px; color: var(--ink); background: var(--sunk);
+                    border: 1px solid #3a2f22; border-radius: 2px; padding: 7px; }
+.mocknote { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.45;
+            font-style: italic; }
+
+/* --- The stage: character | story | numbers -------------------------------------- */
+.stage {
+  display: grid; min-height: 0; gap: 18px; padding: 18px 18px 14px;
+  grid-template-columns: 264px minmax(0, 1fr) 264px;
+  grid-template-areas: "who centre numbers";
+}
+/* The wrapper is invisible to the grid on a wide screen, so its two halves take the two
+   outer tracks; below 1180px it becomes the one scrolling column they share. */
+.sheet { display: contents; }
+.side-who { grid-area: who; }
+.centre { grid-area: centre; }
+.side-numbers { grid-area: numbers; }
+
+/* The sides are the app's aside: tooled leather, a gilt edge, scrolled on their own. */
+.side {
+  min-height: 0; overflow-y: auto; padding: 16px 16px 18px; font-size: 14px;
+  line-height: 1.5; border: 3px solid transparent; border-image: var(--gilt) 1;
+  background:
+    linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
+    linear-gradient(#57432d, #4b3a27),
+    url("../../../play/static/img/leather-tile.jpg") #241d15;
+  background-blend-mode: normal, multiply, normal;
+  background-size: auto, auto, 512px auto;
+  /* The app's --dim measured 3.0:1 against this leather at its lightest (#4b3a27), under
+     AA for the small print here. One step lighter in the same hue: 4.4:1 at the lightest
+     point and above 5.9:1 across the texture's darker body. */
+  --dim: #b3a488;
+}
+.sidehead { margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #2b2319;
+            color: var(--gold); font: 400 15px/1 var(--display); letter-spacing: .12em;
+            font-variant: small-caps; }
+.sidehead.first { margin-top: 0; }
+
+/* Collapsed: the story takes the width; the measure stays the same, so it only centres. */
+body.sheet-hidden.mode-table .stage { grid-template-columns: minmax(0, 1fr);
+                                      grid-template-areas: "centre"; }
+body.sheet-hidden.mode-table .sheet { display: none; }
+
+/* --- Who: portrait, name, gear ---------------------------------------------------- */
+.portrait { aspect-ratio: 4 / 5; position: relative; border-radius: 3px; overflow: hidden;
+            background: radial-gradient(80% 70% at 50% 35%, #2a2118, #120e0a);
+            border: 1px solid #1a140e; box-shadow: 0 0 0 1px var(--gold-dim) inset; }
+.portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.portrait-empty { position: absolute; inset: 0; margin: 0; display: grid; place-items: center;
+                  color: var(--dim); font-style: italic; font-size: 14px;
+                  border: 1px dashed rgba(125, 104, 69, .7); border-radius: 3px;
+                  margin: 10px; }
+.portrait-actions { display: flex; gap: 6px; margin: 8px 0 12px; }
+.portrait-actions button { flex: 1; }
+.pcname { margin: 0; color: var(--gold); font: 400 24px/1.15 var(--display);
+          letter-spacing: .03em; }
+.pcline { margin: 4px 0 0; color: var(--dim); font-style: italic; }
+.pcstate { margin: 8px 0 0; padding: 5px 9px; border: 1px solid var(--blood);
+           background: rgba(var(--bloodglow), .12); color: #e4b1a8; border-radius: 2px;
+           font-size: 13px; }
+
+/* Gear: a grid of the repo's own game-icons, tinted gold by currentColor. */
+.gear { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+/* Icon tiles, like a pack in any game: the name is the tile's accessible name and is
+   written out in the line below when a tile is pointed at, focused or chosen. Names under
+   each 52px tile were cut to "Leather" and "Traveler's" at this width. */
+.gear button { display: grid; place-items: center; padding: 0; min-height: 0;
+               aspect-ratio: 1; background: linear-gradient(#1d1811, #151109);
+               border: 1px solid #2b2319; border-radius: 3px; color: var(--gold); }
+.gear button:hover { border-color: var(--accent); color: #f4e6c0; }
+.gear button[aria-pressed="true"] { border-color: var(--accent); color: #f4e6c0;
+                                    box-shadow: inset 0 0 0 1px var(--accent); }
+.gear .gi { width: 62%; height: 62%; }
+/* In hand or on the body: a gilt corner, the way a slot shows it is filled. */
+.gear button.worn { background:
+  linear-gradient(135deg, rgba(207, 169, 100, .38) 0 9px, transparent 9px),
+  linear-gradient(#1d1811, #151109); }
+.gi { display: inline-block; flex: none; }
+.gi svg { width: 100%; height: 100%; display: block; }
+/* Reserved height: a description arriving never pushes the credit line. */
+.gearsay { min-height: 3em; margin: 8px 0 6px; font-size: 13px; color: var(--ink); }
+.credit { margin: 10px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--dim); }
+
+/* --- Numbers: life, medallions, plaques ------------------------------------------- */
+.bar { height: 8px; background: #221c14; border-radius: 2px; overflow: hidden;
+       box-shadow: inset 0 1px 3px rgba(0, 0, 0, .7); }
+.bar > i { display: block; height: 100%;
+           background: linear-gradient(90deg, #8a6f3e, var(--accent), #e8c47c); }
+.lifesay { margin: 6px 0 0; font-variant-numeric: tabular-nums; }
+.lifesay b { color: var(--gold); font: 400 20px/1 var(--display); }
+
+/* Six medallions in place of the app's 3x2 boxes: a gilt ring, the score struck in
+   Cinzel, the modifier on a plaque across its foot. */
+.medals { list-style: none; margin: 0; padding: 0; display: grid;
+          grid-template-columns: repeat(3, 1fr); gap: 14px 8px; justify-items: center; }
+.medal { position: relative; width: 70px; height: 70px; border-radius: 50%;
+         padding: 3px; background: var(--gilt);
+         box-shadow: 0 3px 8px rgba(0, 0, 0, .55); }
+.medal > div { width: 100%; height: 100%; border-radius: 50%; display: grid;
+               place-items: center; align-content: center; gap: 1px;
+               background: radial-gradient(70% 70% at 40% 30%, #2d241a, #140f0a 75%);
+               box-shadow: inset 0 2px 6px rgba(0, 0, 0, .8); }
+.medal .ab { color: var(--dim); font: 400 11px/1 var(--display); letter-spacing: .12em;
+             font-variant: small-caps; }
+.medal .sc { color: var(--gold); font: 400 22px/1 var(--display); }
+.medal .md { position: absolute; left: 50%; bottom: -9px; translate: -50% 0;
+             min-width: 34px; padding: 2px 6px; text-align: center; border-radius: 2px;
+             background: linear-gradient(#2b2318, #191410); border: 1px solid var(--gold-dim);
+             color: #f4e6c0; font: 400 12px/1.2 var(--body); font-variant-numeric: tabular-nums; }
+
+.plaques { margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+           gap: 6px; }
+.plaques > div { padding: 6px 4px; text-align: center; border-radius: 3px;
+                 background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319; }
+.plaques dt { color: var(--dim); font: 400 12px/1.2 var(--display); letter-spacing: .1em;
+              font-variant: small-caps; }
+.plaques dd { margin: 2px 0 0; color: var(--gold); font: 400 19px/1.2 var(--display); }
+.xp { margin: 0; color: var(--ink); }
+
+/* --- Centre: the book and the desk ------------------------------------------------ */
+/* The book always keeps at least 45% of the height. Measured at 1024x768: with the desk
+   sized to its content the story was left 100px, three lines. Past that share the desk's
+   choices scroll inside it, and the pen stays where it is. */
+.centre { display: grid; grid-template-rows: minmax(45%, 1fr) minmax(0, auto); min-height: 0;
+          gap: 14px; justify-items: center; }
+.book, .desk, .sheetmore { width: 100%; max-width: 880px; }
+
+/* The book: the real gilt edge and the real clasps, round a column of dark parchment. */
+.book {
+  position: relative; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr);
+  border-radius: 3px;
+  background:
+    radial-gradient(80% 60% at 50% 20%, rgba(240, 214, 158, .06), transparent 70%),
+    linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
+    url("../../../play/static/img/card-leather.jpg") #1d1710;
+  background-size: auto, auto, 420px auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .55);
+}
+.book::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  padding: 4px; background: var(--gilt);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+.book::after {
+  content: ""; position: absolute; inset: -14px; pointer-events: none;
+  background-image:
+    url("../../../play/static/img/clasp-tl.png"), url("../../../play/static/img/clasp-tr.png"),
+    url("../../../play/static/img/clasp-bl.png"), url("../../../play/static/img/clasp-br.png");
+  background-position: left top, right top, left bottom, right bottom;
+  background-repeat: no-repeat; background-size: 78px auto;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .5));
+}
+
+/* One line where it fits: the place, where it is, who is here. Stacked, the head took
+   100px of a 302px book at 1024x768. */
+.bookhead { position: relative; z-index: 1; padding: 22px 48px 10px;
+            border-bottom: 1px solid rgba(125, 104, 69, .45);
+            display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }
+.where { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.place { margin: 0; color: var(--gold); font: 400 25px/1.15 var(--display);
+         letter-spacing: .04em; text-shadow: 0 2px 10px rgba(0, 0, 0, .85); }
+.place::first-letter { text-transform: uppercase; }
+.whereline { margin: 0; color: var(--dim); font-style: italic; font-size: 15px; }
+.glance { display: none; }
+.here { display: flex; flex-wrap: wrap; align-items: baseline; margin-left: auto;
+        gap: 6px 10px; font-size: 15px; }
+.herelabel { color: var(--dim); font: 400 13px/1 var(--display); letter-spacing: .12em;
+             font-variant: small-caps; }
+.herelist { display: flex; flex-wrap: wrap; gap: 6px; }
+.herelist button { font: 400 15px/1.2 var(--body); letter-spacing: 0; font-variant: normal;
+                   padding: 4px 10px; min-height: 32px; background: transparent;
+                   border-color: rgba(125, 104, 69, .6); color: var(--ink); }
+.herelist button[aria-expanded="true"] { border-color: var(--accent); color: #f4e6c0; }
+.face { flex-basis: 100%; margin: 2px 0 0; font-size: 15px; font-style: italic;
+        color: #d2c7ad; }
+
+/* The story: a readable measure with room either side. `ch` is the width of a zero, and
+   Palatino's zero is wide: 66ch measured 76 characters a line on the recorded beat, so
+   58ch at 18px, which measured inside the 62 to 72 the owner asked for. */
+.story { position: relative; z-index: 1; overflow-y: auto; min-height: 0;
+         padding: 22px 48px 30px; font-size: 18px; line-height: 1.7; }
+.beat { max-width: 58ch; margin: 0 auto 20px; white-space: pre-wrap; }
+.beat.player { color: var(--player); font-style: italic; }
+.beat.player::before { content: "\2767  "; opacity: .55; font-style: normal; }
+.beat.setup { color: #d8cdb2; }
+/* The drop cap: each of the GM's passages opens the way a grimoire page does. */
+.beat.setup::first-letter {
+  float: left; font-family: var(--display); font-size: 3.35em; line-height: .8;
+  padding: .06em .1em 0 0; color: var(--candle);
+  text-shadow: 0 0 18px rgba(var(--ember), .30), 0 2px 6px rgba(0, 0, 0, .8);
+}
+.beat.consequence { color: var(--ink); }
+/* The mock talking, never the narrator: the app's out-of-character register. */
+.beat.aside { white-space: pre-wrap; max-width: 64ch;
+              font: 13px/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace;
+              color: #a9bcb2; background: rgba(0, 0, 0, .30); border-left: 2px solid #3c4b43;
+              border-radius: 2px; padding: 9px 12px; }
+
+/* The desk: the ways on, the GM's offers, the pen. */
+.choices { display: grid; gap: 10px; min-height: 0; overflow-y: auto; align-content: start; }
+.desk { position: relative; display: grid; gap: 10px; padding: 12px 14px 14px; min-height: 0;
+        grid-template-rows: minmax(0, 1fr) auto auto;
+        border-top: 1px solid var(--gold-dim); border-radius: 3px;
+        background:
+          linear-gradient(rgba(16, 12, 8, .10), rgba(8, 6, 4, .30)),
+          url("../../../play/static/img/card-leather.jpg") #241d15;
+        background-size: auto, 400px auto;
+        box-shadow: 0 -1px 0 rgba(221, 196, 142, .10), 0 8px 30px rgba(0, 0, 0, .45); }
+
+/* The ways on: square-cut, in the body face, grouped, one line a group (the app's I6). */
+.exits { display: grid; gap: 6px; }
+.exgroup { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px;
+           align-items: baseline; }
+.exlabel { color: var(--dim); font: 400 13px/1.2 var(--display); letter-spacing: .12em;
+           font-variant: small-caps; }
+.exlabel small { display: block; margin-top: 3px; font: italic 12.5px/1.25 var(--body);
+                 letter-spacing: 0; font-variant: normal; }
+.exlist { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.exitbtn { padding: 6px 11px; min-height: 36px; letter-spacing: 0; font-variant: normal;
+           font: 400 15px/1.2 var(--body); border: 1px solid rgba(125, 104, 69, .85);
+           background: rgba(26, 22, 16, .85); color: var(--gold); text-align: left; }
+.exitbtn .t { color: var(--dim); }
+.exitbtn:hover .t { color: var(--ink); }
+.exitbtn.asking { border-color: var(--accent); color: #f4e6c0; }
+/* Shut, not gone. Dashed and dimmed, but at the dim token rather than ash, so the name
+   still reads at AA; the reason is the reserved line below. */
+.exitbtn.shut { border-style: dashed; border-color: rgba(125, 104, 69, .6);
+                color: var(--dim); background: rgba(12, 9, 6, .6); cursor: not-allowed; }
+.exitbtn.shut .t { color: var(--dim); }
+.exitbtn.shut .lock { font-style: italic; }
+/* One line held open whenever a way is shut or a journey is offered, so the reason or
+   the "Set out" line fills a space that was already there. */
+.exline { min-height: 3.1em; font-size: 14.5px; line-height: 1.45; color: var(--ink);
+          font-style: italic; padding-left: 92px; }
+.exline .confirm { font-style: normal; display: flex; flex-wrap: wrap; gap: 8px;
+                   align-items: center; }
+.exline .confirm span { flex: 1 1 220px; }
+.exline .dimline { color: var(--dim); }
+
+/* The GM's offers: wax seals, the app's 12px pill. Everything that is not a move. */
+.suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.suggestions:empty { display: none; }
+.sugg { padding: 6px 13px; min-height: 34px; border-radius: 12px; letter-spacing: 0;
+        font: 400 14px/1.3 var(--body); font-variant: normal; white-space: normal;
+        text-align: left; background: rgba(26, 22, 16, .85); }
+
+/* The pen and the other actions share a line while there is room for both, and the
+   actions drop below the pen, never between its two halves, when there is not. */
+.pen { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; }
+.sayform { display: flex; gap: 8px; align-items: stretch; flex: 1 1 340px; min-width: 0; }
+.sayform input {
+  flex: 1 1 220px; min-width: 0; color: var(--ink); padding: 11px 14px; font: inherit;
+  font-size: 17px; border-radius: 2px; min-height: 46px;
+  background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .6);
+}
+.sayform input:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px;
+                               border-color: var(--accent); }
+.sayform input::placeholder { color: #8a7d66; font-style: italic; }
+#say { min-width: 88px; min-height: 46px; }
+.attach { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.attach .chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 4px 3px 10px;
+                border: 1px solid var(--accent); border-radius: 12px; color: #f4e6c0; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button { flex: 0 0 auto; min-height: 46px; }
+
+/* Popovers open over the story's foot, anchored to the desk: nothing below reflows. */
+.pop { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 8px); z-index: 5;
+       max-width: 520px; padding: 14px 16px; display: grid; gap: 10px; font-size: 15px;
+       background: #1a1510; border: 1px solid var(--gold-dim); border-radius: 3px;
+       box-shadow: 0 -10px 30px rgba(0, 0, 0, .55); }
+.pop p { margin: 0; }
+.pophead { color: var(--gold); font: 400 15px/1 var(--display); letter-spacing: .12em;
+           font-variant: small-caps; }
+.pop > button { justify-self: start; }
+.spellpick { display: grid; gap: 4px; }
+.spellpick button { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px;
+                    align-items: center; text-align: left; font: 400 15px/1.2 var(--body);
+                    letter-spacing: 0; font-variant: normal; padding: 6px 10px; }
+.spellpick .gi { width: 24px; height: 24px; }
+.spellpick small { color: var(--dim); }
+
+/* --- Sheet mode: the same sheet, with its middle filled ------------------------------- */
+body.mode-sheet .book, body.mode-sheet .desk { display: none; }
+body.mode-sheet .centre { grid-template-rows: auto; align-content: start; overflow-y: auto; }
+.sheetmore { display: grid; gap: 14px; }
+body:not(.mode-sheet) .sheetmore { display: none; }
+
+.card { position: relative; padding: 18px 22px; border-radius: 3px;
+        background:
+          linear-gradient(rgba(14, 11, 8, .78), rgba(10, 8, 6, .86)),
+          url("../../../play/static/img/card-leather.jpg") #1d1710;
+        background-size: auto, 420px auto;
+        border: 1px solid var(--gold-dim); }
+.card h2 { margin: 16px 0 8px; color: var(--gold); font: 400 17px/1.1 var(--display);
+           letter-spacing: .12em; font-variant: small-caps; }
+.card h2:first-child { margin-top: 0; }
+.card p { margin: 0 0 8px; }
+.card.narrow { max-width: 620px; margin: 0 auto; }
+.skills { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 2px 26px; }
+.skills > div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0;
+                border-bottom: 1px solid rgba(58, 47, 34, .6); }
+.skills dt { color: var(--ink); }
+.skills dd { margin: 0; color: var(--accent); font-variant-numeric: tabular-nums; }
+.plain { margin: 0; padding: 0; list-style: none; }
+.plain li { padding: 3px 0; }
+.matters li { padding: 6px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+
+/* --- Other modes ------------------------------------------------------------------- */
+.modepage { min-height: 0; overflow-y: auto; padding: 22px 18px 30px; }
+body:not(.mode-table):not(.mode-sheet) .stage { display: none; }
+.journal { max-width: 1060px; margin: 0 auto; display: grid; gap: 16px;
+           grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; }
+.said .who { margin: 12px 0 4px; color: var(--gold); font: 400 14px/1 var(--display);
+             letter-spacing: .1em; font-variant: small-caps; }
+.said .who:first-child { margin-top: 0; }
+.said q { display: block; quotes: none; margin: 0 0 6px; color: #d8c9a3; }
+
+/* The Spells page, three columns after I5: what you can spend, today, the book. */
+.spells3 { max-width: 1180px; margin: 0 auto; display: grid; gap: 16px; align-items: start;
+           grid-template-columns: minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.3fr); }
+.slotrow { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+.slotrow .lv { display: flex; justify-content: space-between; }
+.slotrow .lv b { color: var(--gold); font: 400 15px/1.2 var(--display); letter-spacing: .08em; }
+.slotrow .lv span { color: var(--dim); font-size: 14px; }
+.sockets { display: flex; gap: 6px; }
+.sockets i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--gold-dim);
+             background: radial-gradient(circle at 40% 35%, #f0d9a0, #b98f4e 45%, #6b4f28); }
+.today { display: grid; gap: 6px; }
+.today li { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center;
+            padding: 6px 8px; border: 1px solid #2b2319; border-radius: 3px;
+            background: rgba(20, 16, 11, .6); }
+.today .gi { width: 28px; height: 28px; }
+.today small { color: var(--dim); }
+.book-grid h3 { margin: 12px 0 8px; color: var(--dim); font: 400 13px/1 var(--display);
+                letter-spacing: .12em; font-variant: small-caps; }
+.book-grid h3:first-of-type { margin-top: 0; }
+.spellgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.spellgrid button { display: grid; justify-items: center; align-content: start; gap: 4px;
+                    padding: 8px 3px 6px; min-height: 84px; white-space: normal;
+                    background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319;
+                    border-radius: 3px; font: 400 11.5px/1.15 var(--body); letter-spacing: 0;
+                    font-variant: normal; color: var(--ink); }
+.spellgrid button:hover { border-color: var(--accent); }
+.spellgrid button[aria-pressed="true"] { border-color: var(--accent);
+                                         box-shadow: inset 0 0 0 1px var(--accent); }
+.spellgrid .gi { width: 30px; height: 30px; }
+.spellgrid .prep { outline: 1px solid rgba(207, 169, 100, .35); outline-offset: -4px; }
+.spellsay { min-height: 3em; margin: 10px 0 0; font-size: 14px; }
+.sc-abjuration { color: var(--sc-abjuration); } .sc-conjuration { color: var(--sc-conjuration); }
+.sc-divination { color: var(--sc-divination); } .sc-enchantment { color: var(--sc-enchantment); }
+.sc-evocation { color: var(--sc-evocation); } .sc-illusion { color: var(--sc-illusion); }
+.sc-necromancy { color: var(--sc-necromancy); }
+.sc-transmutation { color: var(--sc-transmutation); } .sc-universal { color: var(--sc-universal); }
+
+/* --- Narrower desktops: one sheet column, character over numbers ------------------- */
+@media (max-width: 1180px) {
+  .stage { grid-template-columns: 280px minmax(0, 1fr); grid-template-areas: "sheet centre"; }
+  .sheet { grid-area: sheet; display: block; min-height: 0; overflow-y: auto;
+           border: 3px solid transparent; border-image: var(--gilt) 1; }
+  .sheet .side { overflow: visible; border: 0; }
+  .sheet .side-numbers { border-top: 1px solid var(--gold-dim); }
+  .spells3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .spells3 > :last-child { grid-column: 1 / -1; }
+}
+
+/* --- Phone: the story is the page; the sheet is a mode, laid out as the drawer ------ */
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .topbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas:
+              "world end" "modes modes"; padding: 8px 12px; gap: 8px; }
+  .world { grid-area: world; }
+  .topend { grid-area: end; }
+  .modes { grid-area: modes; justify-content: space-between; }
+  .modes button { flex: 1 1 0; padding: 8px 2px; font-size: 13px; letter-spacing: .04em;
+                  min-height: 40px; }
+  #sheettoggle { display: none; }
+  .mockpanel { width: min(300px, calc(100vw - 24px)); }
+
+  .stage { grid-template-columns: minmax(0, 1fr); grid-template-areas: "centre";
+           grid-template-rows: minmax(0, 1fr); padding: 10px 10px 8px; gap: 10px; }
+  body.mode-table .sheet { display: none; }
+  /* Sheet mode on a phone is the drawer: the whole sheet in one column that scrolls,
+     who first, then the numbers, then the rest. */
+  body.mode-sheet .stage { display: flex; flex-direction: column; overflow-y: auto; }
+  body.mode-sheet .sheet { display: block; overflow: visible; flex: none; }
+  body.mode-sheet .centre { display: block; overflow: visible; order: 2; flex: none; }
+  body.mode-sheet .sheet .side { padding: 14px; }
+  /* A full-width 4:5 portrait was 400px of an 812px screen: beside the name instead. */
+  .side-who { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 14px;
+              align-content: start; }
+  .side-who > * { grid-column: 1 / -1; }
+  .side-who > .portrait { grid-column: 1; grid-row: 1 / span 4; align-self: start; }
+  .side-who > .pcname { grid-column: 2; grid-row: 1; font-size: 21px; }
+  .side-who > .pcline { grid-column: 2; grid-row: 2; }
+  .side-who > .pcstate { grid-column: 2; grid-row: 3; }
+  .side-who > .portrait-actions { grid-column: 2; grid-row: 4; margin: 8px 0 0;
+                                   align-self: end; }
+  .portrait-empty { margin: 6px; font-size: 12px; text-align: center; }
+  .gear { grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); }
+
+  .centre { gap: 8px; }
+  /* On a phone the head scrolls away with the story, so reading gets the whole book;
+     the place is one flick back up, and the tabs never leave. Measured at 375x812: the
+     fixed head left the story 190px. */
+  .book { display: block; overflow-y: auto; border: 3px solid transparent;
+          border-image: var(--gilt) 1; }
+  /* The ring and the clasps are drawn on the box, and in a box that scrolls they would
+     scroll away with the text; the border-image stays put. */
+  .book::before, .book::after { display: none; }
+  .story { overflow: visible; padding: 12px 18px 20px; font-size: 17px; }
+  .bookhead { padding: 16px 18px 8px; }
+  .place { font-size: 20px; }
+  .whereline { font-size: 14px; }
+  .bookhead { align-items: start; }
+  .where { flex: 1 1 60%; }
+  .here { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
+  .glance { display: block; font: 400 13px/1.2 var(--body); white-space: normal;
+            letter-spacing: 0; font-variant: normal; padding: 6px 8px; min-height: 36px;
+            max-width: 9.5em; text-align: left; }
+  .desk { padding: 8px 8px 10px; gap: 7px; }
+  /* Each group is its label and one row that scrolls sideways, so the desk stays three
+     short lines however many ways there are, and the story keeps the screen. */
+  .exgroup { grid-template-columns: 70px minmax(0, 1fr); gap: 6px; align-items: center; }
+  .exlabel { font-size: 12px; letter-spacing: .08em; }
+  .exlabel small { font-size: 11px; }
+  .exlist { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .exitbtn { flex: none; font-size: 14px; }
+  .mockctl > summary { min-height: 32px; padding: 5px 10px; }
+  .exline { padding-left: 0; min-height: 4.4em; font-size: 14px; }
+  .suggestions { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+  .sugg { flex: none; max-width: 78vw; }
+  .sayform input { font-size: 16px; }
+  .actions button { flex: 1 1 auto; padding: 8px 10px; font-size: 14px; }
+  .journal, .spells3 { grid-template-columns: minmax(0, 1fr); }
+  .skills { grid-template-columns: minmax(0, 1fr); }
+  .modepage { padding: 12px 10px 20px; }
+}
