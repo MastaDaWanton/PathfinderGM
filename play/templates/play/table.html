@@ -728,9 +728,10 @@
   #exits .exitbtn:hover:not(.shut) { color: #f4e6c0; border-color: var(--accent);
                                      box-shadow: none; }
   #exits .exitbtn:hover:not(.shut) .ex-time { color: var(--ink); }
-  #exits .exitbtn:focus-visible, #exits .exitgo:focus-visible {
+  #exits .exitbtn:focus-visible {
     outline: 2px solid var(--candle); outline-offset: 2px; }
-  /* A journey waiting on "Set out" stays lit, so the line under the row has an owner. */
+  /* The way attached as the chip stays lit (`aria-pressed`), so the chip in the say form
+     has an owner in the row; pressing it again takes the chip back. */
   #exits .exitbtn.asking { border-color: var(--accent); color: #f4e6c0; }
   /* Shut, not gone: the reason is the line below while it is pointed at or focused.
      `aria-disabled` rather than `disabled`, so the keyboard can still reach it. */
@@ -742,28 +743,14 @@
   #exits .ex-why { font-size: 13.5px; line-height: 1.4; color: var(--ink);
                    font-style: italic; }
   #exits .ex-why:empty { display: none; }
-  #exits .ex-confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-                       padding: 7px 10px; border-left: 2px solid var(--accent);
-                       background: rgba(0, 0, 0, .34); font-size: 14px; }
-  #exits .ex-confirm > span { flex: 1 1 240px; }
   /* In a fight every open way is a withdraw, and says so on the button in the combat bar's
      own colours (its target's alarm border and #e8b0a8 text), so a player scanning the
-     row sees it is not a stroll before the confirm line asks. #e8b0a8 on the button's
-     leather is about 9:1; the page's --alarm as text would be 3.3:1, under AA. */
+     row sees it is not a stroll before the chip's line says what it costs. #e8b0a8 on
+     the button's leather is about 9:1; the page's --alarm as text would be 3.3:1. */
   #exits .exitbtn.risky { border-color: var(--alarm); }
   #exits .exitbtn .ex-risk { margin-left: 8px; color: #e8b0a8;
                              font: 400 13px/1 var(--display); letter-spacing: .06em;
                              font-variant: small-caps; white-space: nowrap; }
-  #exits .ex-confirm.fight { border-left-color: var(--alarm); }
-  #exits .ex-confirm.fight b { color: #e8b0a8; font-weight: 400; }
-  /* A phone: the question on its own lines and both answers side by side under it.
-     Measured at 375px: the sentence took the row and left "Leave" beside it and "Stay"
-     alone on the next line, the two halves of one choice a thumb's reach apart. */
-  @media (max-width: 560px) {
-    #exits .ex-confirm > span { flex-basis: 100%; }
-  }
-  #exits .exitgo { padding: 6px 14px; font-size: 13px; }
-  #exits .exitgo.quiet { background: transparent; color: var(--dim); }
   body.resolving #exits button { pointer-events: none; opacity: .55; }
   /* The conversation panel: a bar per person for their regard, and the exits. */
   #talk { margin: 10px 0 4px; padding: 8px 10px; border: 1px solid var(--line, #6b5a3a);
@@ -2027,6 +2014,32 @@
   }
   /* The first Backspace selects the chip; the second takes it. */
   .chip.att.armed { border-color: #f4e6c0; box-shadow: 0 0 0 2px rgba(var(--ember), .45); }
+  /* A place chip's line (11-exits.js): a journey's days, or what a withdraw costs. It was
+     the exits row's confirm line, in its look (the accent rule at the left, the dark
+     wash), and sits on its own line under the chip, visible, because it is what the
+     player weighs before pressing Say. A withdraw wears the combat bar's alarm border. */
+  .att-note { flex: 1 0 100%; padding: 6px 10px; border-left: 2px solid var(--accent);
+              background: rgba(0, 0, 0, .34); color: var(--ink); font-size: 14px;
+              line-height: 1.4; }
+  .chip.att.risky { border-color: var(--alarm); }
+  .chip.att.risky ~ .att-note { border-left-color: var(--alarm); }
+  /* The owner's motion rule: nothing moves under the pointer. `main` is a flex column
+     with the footer at the bottom, so anything that grows in the footer grows UPWARD
+     and lifts everything above it: measured 2026-09-29 at 1722x855, attaching "the
+     market" lifted the row 44px (704 to 660), so a second press meant to take the chip
+     back landed on the Outside group instead. (The row's old confirm line, "below the
+     buttons", lifted it the same way.) While the row is shown on a desktop, the chip's
+     line is kept open, empty until a chip fills it, with a place's line beside the
+     chip rather than under it. A phone is left alone: its footer scrolls, and a taller
+     sticky form grows over the content rather than lifting it. */
+  @media (min-width: 761px) {
+    #exits:not([hidden]) + #sayform { flex-wrap: wrap; }
+    #exits:not([hidden]) + #sayform > #attachments {
+      display: flex; align-items: center; gap: 6px 10px; flex: 1 0 100%; min-height: 42px; }
+    #exits:not([hidden]) + #sayform > #attachments[hidden] { visibility: hidden; }
+    #exits:not([hidden]) + #sayform .att-note { flex: 1 1 320px; padding: 3px 10px;
+                                                font-size: 13.5px; line-height: 1.3; }
+  }
   #err .errfix { margin-left: 10px; padding: 6px 12px; font-size: 12px; }
 
   /* --- The time-skip clock (Lane F, 09-clock.js) -----------------------------

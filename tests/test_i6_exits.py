@@ -277,8 +277,13 @@ def test_the_ring_is_reached_by_the_row_too(worlds, table):
 
 def test_an_attachment_not_in_the_exits_is_a_400_with_a_sentence(worlds, table):
     """A place the engine holds but that is not a way on from here, a place that is
-    nowhere, and words beside the click: each a 400 with a sentence, and the turn never
-    happened (no beat, no clock, no plan)."""
+    nowhere, and a place chip on Continue: each a 400 with a sentence, and the turn never
+    happened (no beat, no clock, no plan).
+
+    Words beside the chip were a 400 here too until 2026-09-29 ("a turn of its own"),
+    because the click went straight to the engine and the words were silently ignored.
+    The owner asked for the words to say where in the turn the move happens; they are
+    read now (tests/test_exits_attach.py), not refused."""
     loc = next(_with_a_ring(worlds))
     c = table["stand"](loc)
     here_ids = {x["id"] for x in _state()["scene"]["exits"]}
@@ -289,8 +294,6 @@ def test_an_attachment_not_in_the_exits_is_a_400_with_a_sentence(worlds, table):
     if far is not None:
         bodies.append({"text": "", "attachments": [{"kind": "place", "id": far.id}]})
     first = next(iter(here_ids))
-    bodies.append({"text": "I go there and burn it down",
-                   "attachments": [{"kind": "place", "id": first}]})
     bodies.append({"carry_on": True, "attachments": [{"kind": "place", "id": first}]})
     for body in bodies:
         r = _say(body)
@@ -301,9 +304,10 @@ def test_an_attachment_not_in_the_exits_is_a_400_with_a_sentence(worlds, table):
 
 
 def test_a_journey_asks_before_it_spends_days(worlds, table):
-    """A journey is days on the clock. The row's first click only asks; the server holds
-    the same line, so a journey attachment without `confirmed` is a 400 that says how far
-    it is, and nothing moves. Confirmed, the engine takes the declared `journey`."""
+    """A journey is days on the clock. The page confirms it by the attach-then-Say (the
+    chip carries `confirmed`, and its line says the days); the server holds the same
+    line, so a journey attachment without `confirmed` is a 400 that says how far it is,
+    and nothing moves. Confirmed, the engine takes the declared `journey`."""
     loc, spot = _journey_spot(worlds)
     assert loc is not None, "every export has a way out that is a journey"
     c = table["stand"](loc, spot)

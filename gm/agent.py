@@ -568,6 +568,11 @@ class GMAgent:
                 raw = judgement.fill_bare_checks(raw)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)
+                # A place from the exits row is WHERE, as a spell chip is which spell:
+                # held to the chip before the travel readers below can ask the player
+                # again about a room their words named on the way out.
+                raw = judgement.travel_to_the_attached(
+                    raw, self.engine.scene, getattr(self, "attachments", ()))
                 # A travel the model wrote with nowhere in it takes the place the
                 # player named, so validation can find it or name "found it first".
                 raw = judgement.fill_empty_travel(raw, player_input, self.engine.scene)
@@ -634,6 +639,11 @@ class GMAgent:
                     raw, player_input,
                     self.reading if isinstance(self.reading, dict) else None,
                     notes=own_words)
+                # And the attached spell or place put where the words do it, after
+                # every injector above has appended its own (gm/sequence.py).
+                raw = judgement.order_the_attached(
+                    raw, player_input, self.engine.scene,
+                    getattr(self, "attachments", ()))
                 data = dict(data, intents=raw)
                 try:
                     intents = self.engine.validate(raw)

@@ -209,9 +209,12 @@ function render(s, hold) {
   const seen = window._beatsSeen || 0;
   // A player beat sent with an attachment (a spell chip, docs/fix-interfaces.md §2.10)
   // shows the chip before the words, so "I cast Burning Hands." is never the only trace.
+  // A place chip is drawn only beside the player's own words (play/views.py `say`):
+  // "I slip out quietly." must still say where they went.
   const chips = b => (b.attachments || []).map(a =>
     `<span class="chip" data-kind="${esc(a.kind || "")}" data-id="${esc(a.id || "")}">${
-      a.kind === "spell" ? `<span class="vh">Spell: </span>` : ""}${
+      a.kind === "spell" ? `<span class="vh">Spell: </span>`
+        : a.kind === "place" ? `<span class="vh">Going to: </span>` : ""}${
       esc(a.name || a.id || "")}</span> `).join("");
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
