@@ -45,7 +45,9 @@ class TestTheDoor:
         html = table_source()
         assert 'class="prepbtn castbtn"' in html
         assert "attachSpell({ id: cast.dataset.spell" in html
-        assert "body.attachments = attached.map" in html
+        # Sent with the turn, aim included since I3 (2026-09-29): `attachmentsForSay`.
+        assert "body.attachments = typeof attachmentsForSay" in html
+        assert "function attachmentsForSay()" in html
 
     def test_the_view_refuses_off_turn_in_a_fight_and_nothing_else(self):
         src = Path("play/views.py").read_text(encoding="utf-8")
