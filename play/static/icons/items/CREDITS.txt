@@ -1,0 +1,107 @@
+Trade window item icons
+
+The icons in this folder are from game-icons.net (https://game-icons.net), licensed under
+the Creative Commons Attribution 3.0 Unported licence (CC BY 3.0):
+https://creativecommons.org/licenses/by/3.0/
+
+Icons made by Lorc (http://lorcblog.blogspot.com), Delapouite (http://delapouite.com),
+Skoll, Sbed (http://opengameart.org/content/95-game-icons), Willdabeast, Carl Olsen,
+Caro Asercion and Lucas, from game-icons.net.
+
+Changes made: the black background square of each icon was removed and the glyph's fill
+set to "currentColor", so the app can tint it to the page's palette. The shapes are
+unchanged. Each file is named <author>-<icon>.svg.
+
+Fetched 2026-09-29 from the official repository, https://github.com/game-icons/icons,
+through its jsDelivr mirror (https://cdn.jsdelivr.net/gh/game-icons/icons@master/).
+
+
+By Lorc, CC BY 3.0:
+  lorc-arrow-cluster.svg   lorc/arrow-cluster.svg
+  lorc-battle-axe.svg      lorc/battle-axe.svg
+  lorc-beer-stein.svg      lorc/beer-stein.svg
+  lorc-boots.svg           lorc/boots.svg
+  lorc-breastplate.svg     lorc/breastplate.svg
+  lorc-broadsword.svg      lorc/broadsword.svg
+  lorc-bubbling-flask.svg  lorc/bubbling-flask.svg
+  lorc-candle-light.svg    lorc/candle-light.svg
+  lorc-cheese-wedge.svg    lorc/cheese-wedge.svg
+  lorc-claw-hammer.svg     lorc/claw-hammer.svg
+  lorc-crystal-wand.svg    lorc/crystal-wand.svg
+  lorc-fishing-net.svg     lorc/fishing-net.svg
+  lorc-gem-necklace.svg    lorc/gem-necklace.svg
+  lorc-gem-pendant.svg     lorc/gem-pendant.svg
+  lorc-gems.svg            lorc/gems.svg
+  lorc-grapple.svg         lorc/grapple.svg
+  lorc-halberd.svg         lorc/halberd.svg
+  lorc-holy-symbol.svg     lorc/holy-symbol.svg
+  lorc-knapsack.svg        lorc/knapsack.svg
+  lorc-lantern-flame.svg   lorc/lantern-flame.svg
+  lorc-mail-shirt.svg      lorc/mail-shirt.svg
+  lorc-manacles.svg        lorc/manacles.svg
+  lorc-meat.svg            lorc/meat.svg
+  lorc-metal-bar.svg       lorc/metal-bar.svg
+  lorc-mirror-mirror.svg   lorc/mirror-mirror.svg
+  lorc-plain-dagger.svg    lorc/plain-dagger.svg
+  lorc-quill-ink.svg       lorc/quill-ink.svg
+  lorc-scale-mail.svg      lorc/scale-mail.svg
+  lorc-scythe.svg          lorc/scythe.svg
+  lorc-spears.svg          lorc/spears.svg
+  lorc-swap-bag.svg        lorc/swap-bag.svg
+  lorc-trident.svg         lorc/trident.svg
+  lorc-wheat.svg           lorc/wheat.svg
+  lorc-whip.svg            lorc/whip.svg
+
+By Delapouite, CC BY 3.0:
+  delapouite-backpack.svg       delapouite/backpack.svg
+  delapouite-bo.svg             delapouite/bo.svg
+  delapouite-bow-arrow.svg      delapouite/bow-arrow.svg
+  delapouite-bread.svg          delapouite/bread.svg
+  delapouite-caltrops.svg       delapouite/caltrops.svg
+  delapouite-camel-head.svg     delapouite/camel-head.svg
+  delapouite-camping-tent.svg   delapouite/camping-tent.svg
+  delapouite-clothes.svg        delapouite/clothes.svg
+  delapouite-crowbar.svg        delapouite/crowbar.svg
+  delapouite-first-aid-kit.svg  delapouite/first-aid-kit.svg
+  delapouite-flail.svg          delapouite/flail.svg
+  delapouite-flanged-mace.svg   delapouite/flanged-mace.svg
+  delapouite-flint-spark.svg    delapouite/flint-spark.svg
+  delapouite-horse-head.svg     delapouite/horse-head.svg
+  delapouite-hot-meal.svg       delapouite/hot-meal.svg
+  delapouite-leather-armor.svg  delapouite/leather-armor.svg
+  delapouite-lockpicks.svg      delapouite/lockpicks.svg
+  delapouite-ring.svg           delapouite/ring.svg
+  delapouite-rope-coil.svg      delapouite/rope-coil.svg
+  delapouite-saddle.svg         delapouite/saddle.svg
+  delapouite-sitting-dog.svg    delapouite/sitting-dog.svg
+  delapouite-sleeping-bag.svg   delapouite/sleeping-bag.svg
+  delapouite-sling.svg          delapouite/sling.svg
+  delapouite-torch.svg          delapouite/torch.svg
+  delapouite-two-coins.svg      delapouite/two-coins.svg
+  delapouite-warhammer.svg      delapouite/warhammer.svg
+  delapouite-water-flask.svg    delapouite/water-flask.svg
+  delapouite-whistle.svg        delapouite/whistle.svg
+  delapouite-wine-bottle.svg    delapouite/wine-bottle.svg
+  delapouite-wood-club.svg      delapouite/wood-club.svg
+
+By Skoll, CC BY 3.0:
+  skoll-bracers.svg        skoll/bracers.svg
+  skoll-donkey.svg         skoll/donkey.svg
+  skoll-musket.svg         skoll/musket.svg
+  skoll-pestle-mortar.svg  skoll/pestle-mortar.svg
+
+By Sbed, CC BY 3.0:
+  sbed-vial.svg  sbed/vial.svg
+
+By Willdabeast, CC BY 3.0:
+  willdabeast-round-shield.svg  willdabeast/round-shield.svg
+
+By Carl Olsen, CC BY 3.0:
+  carl-olsen-crossbow.svg  carl-olsen/crossbow.svg
+
+By Caro Asercion, CC BY 3.0:
+  caro-asercion-round-potion.svg  caro-asercion/round-potion.svg
+
+By Lucas, CC BY 3.0:
+  lucasms-belt.svg   lucasms/belt.svg
+  lucasms-cloak.svg  lucasms/cloak.svg
