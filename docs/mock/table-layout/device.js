@@ -1,17 +1,18 @@
 // The engine device: the owner's brass mechanism, bolted to the book's left gilt edge just
-// below the top of the gutter, showing where a turn is. Two gears turn while the pipeline
-// runs, steam puffing from the foot in time with them; they ease to a stop when the
-// narrator is ready (with a burst of steam), and a heartbeat later the lever pops up, the
-// lamp turns from amber to green and the tab on the top plate slides out glowing green,
-// and only then does the prose appear. A roll owed stops the gears with the lamp still
-// amber: the engine is waiting on the player.
+// below the top of the gutter, showing whether a turn is running. Two gears turn while it
+// runs, steam puffing from the foot in time with them; when the response lands they ease
+// to a stop (with a burst of steam), and a heartbeat later the lever pops up, the lamp
+// turns from amber to green and the tab on the top plate slides out glowing green. The
+// prose does not wait for any of it (the owner, 2026-09-29: "dont hold back narration for
+// it"). A roll owed stops the gears with the lamp still amber: the engine is waiting on
+// the player.
 //
 // States, on #device as data-state (for tests and for CSS):
 //   idle     nothing running; lever up, lamp a calm green, tab in, no steam
-//   running  the pipeline is at work; gears turning, lever down, lamp amber, steam puffs
+//   running  a turn is running; gears turning, lever down, lamp amber, steam puffs
 //   waiting  a roll is owed; gears stopped, lever down, lamp amber, a thin trickle
-//   ready    the narrator is ready; gears easing to a stop, then the lever, the green and
-//            the tab; when the green settles to its idle glow the tab goes back in
+//   ready    the response has landed; gears easing to a stop, then the lever, the green
+//            and the tab; when the green settles to its idle glow the tab goes back in
 //
 // Motion here answers the player's own action (Say, Continue, a way on), which the owner
 // asked for in as many words. Nothing moves under the pointer: the device and its steam
@@ -38,7 +39,6 @@
     SPIN_UP: 260,          // ms time constant of the gears coming up to speed
     HALT: 520,             // ms from full speed to still (an ease-out, never a snap)
     HEARTBEAT: 700,        // ms between the gears stopping and the lever lifting
-    PROSE_AFTER_LEVER: 280,// ms: the lever has overshot and settled before the text lands
     CALM: 2600,            // ms for the green to settle to its idle glow; the tab goes in
     // Steam. The owner, twice: puffs "in time with the gears", then "increase the smoke a
     // bunch". Every half turn of the large gear read as a leak; a third of a turn (about
@@ -331,7 +331,7 @@
       sp.style.opacity = (F.dens * Math.min(1, u * 5) * Math.pow(1 - u, 0.9)).toFixed(3);
     });
     const say = { idle: "The engine is at rest.", running: "The engine is working.",
-      waiting: "The engine is waiting on your roll.", ready: "The narrator is ready." };
+      waiting: "The engine is waiting on your roll.", ready: "The turn is in." };
     el.setAttribute("aria-label", say[M.mode]);
   }
 
@@ -344,15 +344,12 @@
     acc += Math.min(1000, now - last); last = now;
     while (acc >= T.STEP) { step(T.STEP); acc -= T.STEP; }
     draw();
-    for (const f of pending.splice(0)) if (M.t >= f.at) f.fn(); else pending.push(f);
     const moving = M.mode !== "idle" || M.omega > 0.01 || M.puffs.length
       || Math.abs(M.lever - M.leverTarget) > 0.05 || Math.abs(M.leverV) > 0.05
       || Math.abs(M.tab - M.tabTarget) > 0.002 || Math.abs(M.tabV) > 0.002;
-    if (moving || pending.length) raf = requestAnimationFrame(loop); else raf = 0;
+    raf = moving ? requestAnimationFrame(loop) : 0;
   }
   function wake() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(loop); } }
-  const pending = [];
-  const at = (ms, fn) => pending.push({ at: M.t + ms, fn });
 
   const api = {
     run() { M.halt = null; M.stopAt = null; M.leverAt = null; M.readyAt = null;
@@ -360,17 +357,12 @@
             M.nextPuff = M.largeTurns + T.PUFF_EVERY; event("running"); wake(); },
     wait() { M.mode = "waiting"; M.halt = { t0: M.t, w0: M.omega, then: "wait" };
              M.stopAt = null; M.tabTarget = 0; event("waiting"); wake(); },
-    // Resolves when the prose may appear: gears stopped, a heartbeat, the lever up.
+    // The response has landed: the gears ease to a stop, a heartbeat, then the lever, the
+    // green and the tab. Nothing waits on it (the owner's ruling, 2026-09-29: "dont hold
+    // back narration for it"); the prose is already on the page.
     ready() {
       M.mode = "ready"; M.halt = { t0: M.t, w0: M.omega, then: "ready" }; M.stopAt = null;
       event("ready"); wake();
-      return new Promise(res => {
-        const check = () => {
-          if (M.readyAt != null && M.t >= M.readyAt + T.PROSE_AFTER_LEVER) { res(); return; }
-          at(T.STEP, check);
-        };
-        at(T.STEP, check);
-      });
     },
     log: () => M.log.slice(),
     model: () => M,
@@ -397,11 +389,6 @@
       }
       step(T.STEP);
     }
-    // The words the page shows at that moment, so a still frame reads as the live one.
-    const stageLine = document.getElementById("stage-say");
-    if (stageLine) stageLine.textContent = { running: "The engine resolves it.",
-      waiting: "A roll is owed. The engine waits on your die.",
-      ready: M.readyAt == null ? "The narrator is ready." : "" }[M.mode] || "";
     if (M.mode === "waiting") document.getElementById("rollpop").hidden = false;
     requestAnimationFrame(draw);
     document.documentElement.dataset.devicelog = JSON.stringify(M.log);
@@ -411,20 +398,20 @@
   place();
 })();
 
-// --- The turn: a simulated pipeline with the app's own stages ------------------------
-// Stage names and order are the real turn's (play/views.py `say`): the model plans the
-// turn (GMAgent.plan_turn), the engine resolves it (`_advance`), and the narrator writes
-// the beat; a roll owed stops it with `awaiting` set until the player rolls (/api/roll).
-// Durations are compressed for the mock; on a local model the plan and the narration
-// each take tens of seconds (README, "The engine device").
+// --- The turn: a simulated request, as the app sees one --------------------------------
+// The owner, 2026-09-29: "dont hold back narration for it and dont worry about displaying
+// what its doing." So the page knows only what the app's client knows: a turn is running
+// from busy(true) until the response lands (one state, no planning-versus-narrating), or
+// the engine is waiting on the player's die (`awaiting`, resumed by /api/roll). The prose
+// is shown the moment the response lands; the device's halt, heartbeat, lever, green and
+// tab play out alongside it and hold nothing back. Durations are compressed for the mock;
+// on a local model a turn takes tens of seconds.
 window.Turn = (function () {
-  const stage = document.getElementById("stage-say");
   const owe = document.getElementById("mock-owe");
   const pop = document.getElementById("rollpop");
-  const D = { PLAN: 1400, ENGINE: 900, ROLL: 700, NARRATE: 1800 };
+  const D = { UNTIL_ROLL: 2300, AFTER_ROLL: 700, RESPONSE: 4100 };
   let busy = false;
   const wait = ms => new Promise(r => setTimeout(r, ms));
-  const say = text => { if (stage) stage.textContent = text; };
   function lock(on) {
     busy = on;
     document.body.classList.toggle("resolving", on);
@@ -435,28 +422,22 @@ window.Turn = (function () {
     lock(true);
     const D2 = window.Device;
     D2 && D2.run();
-    say("Planning the turn.");
-    await wait(D.PLAN);
-    say("The engine resolves it.");
-    await wait(D.ENGINE);
     if (owe && owe.checked) {
+      await wait(D.UNTIL_ROLL);
       D2 && D2.wait();
-      say("A roll is owed. The engine waits on your die.");
       pop.hidden = false;
       const roll = pop.querySelector("button");
       roll.focus();
       await new Promise(r => roll.addEventListener("click", r, { once: true }));
       pop.hidden = true;
       D2 && D2.run();
-      say("The engine resolves the roll.");
-      await wait(D.ROLL);
+      await wait(D.AFTER_ROLL);
+    } else {
+      await wait(D.RESPONSE);
     }
-    say("The narrator writes.");
-    await wait(D.NARRATE);
-    say("The narrator is ready.");
-    if (D2) await D2.ready();
+    // The response: the prose now, the device's sequence alongside it.
     done();
-    say("");
+    D2 && D2.ready();
     lock(false);
     return true;
   }

@@ -735,13 +735,6 @@ body.sheet-hidden .talk { grid-area: talk; }
               filter: blur(1.5px); will-change: transform, opacity; }
 .dv-slot { display: none; }
 
-/* The turn's stage, said in words over the story's foot (its padding is reserved), so
-   the page reads what the device shows without moving anything. */
-.bookin { position: relative; }
-.stagesay { position: absolute; left: 58px; right: 50px; bottom: 6px; margin: 0; z-index: 1;
-            color: var(--dim); font-style: italic; font-size: 14px; line-height: 1.3;
-            pointer-events: none; }
-.stagesay:empty { display: none; }
 /* While a turn is being taken the controls that would take another are shown asleep, as
    the app does (06-trade-and-page.js busy: body.resolving). */
 body.resolving .desk .exitbtn, body.resolving .desk .sugg { opacity: .55; }
@@ -1197,7 +1190,6 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
                      transform: translate(-50%, -50%) rotate(90deg); }
   .book::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                                    40px auto, 40px auto, auto 40px, auto 40px; }
-  .stagesay { left: 26px; right: 20px; font-size: 13px; }
   body { font-size: 16px; }
   /* The phone's chrome is counted: the strip is one row of the switch and one line of
      what it means. Start again is the page reloaded, so it goes. */

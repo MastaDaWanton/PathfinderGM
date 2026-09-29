@@ -70,7 +70,7 @@
     <!-- The engine device (device.js): the owner's brass mechanism, mounted on the book's
          left gilt edge in the gutter beside the side panel (on a phone, laid on its side
          in the head bar: device.js moves it). Decorative to a screen reader, which hears
-         the stage line in the book instead. -->
+         the story itself arrive (the story is a polite live log) and the roll owed. -->
     <div class="device" id="device" data-state="idle" aria-hidden="true">
       <div class="dv-body">
         <img class="dv-chamber" src="textures/device-chamber.png" alt="">
@@ -92,7 +92,6 @@
         </div>
         <p class="face" id="face" aria-live="polite" hidden></p>
       </div>
-      <p class="stagesay" id="stage-say" role="status"></p>
       <div class="story" id="story" role="log" aria-live="polite" aria-label="The story"
            tabindex="0"></div>
     </div>

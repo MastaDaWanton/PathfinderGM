@@ -166,7 +166,8 @@ any moment can be drawn exactly with `#devicet=ms`): the gears ease out over 520
 stop a heartbeat before the lever lifts up"), then in one beat the lever pops up on a
 damped spring (to about -52 degrees against its -46 rest), the lamp turns green and
 flares, and the tab slides out on a stiffer spring (overshooting by about a tenth of its
-travel); the prose lands 280 ms after that. Measured gear-stop to lever: **700-709 ms** in
+travel). The prose does not wait for any of it: it is already on the page from the moment
+the response landed (the owner's ruling, below). Measured gear-stop to lever: **700-709 ms** in
 the model in every run (one 8.3 ms step of rounding), and 653-741 ms on the wall clock in
 eleven live turns in headless Chrome, where a capture or a slow frame holds a step for a
 frame; 699-723 ms in the preview pane's own browser. The twelve-frame proof (screenshots, not committed) shows
@@ -244,25 +245,25 @@ panel's content); the rings are drawn over their padding and cost no width, so t
 
 ### What the real app needs to adopt it
 
-The mock simulates the turn's stages with the app's own names and order (`play/views.py`
-`say`: the model plans the turn, `GMAgent.plan_turn`; the engine resolves it, `_advance`;
-the narrator writes), compressed to seconds. In the app:
+The owner's ruling, 2026-09-29, on the two questions this section used to end with
+(holding the prose back for the device, and showing the turn's stages): "dont hold back
+narration for it and dont worry about displaying what its doing." So the device knows only
+what the app's client already knows, and never delays the story. The mock does the same:
+one running state from Say to the response (compressed to about 4 s), the prose on the page
+the moment the response lands, and the halt, heartbeat, lever, green, tab and burst playing
+out alongside it; a roll owed is the one pause, because the engine really is waiting on the
+player. Measured in a live turn: the prose is on the page at the response, and the lever
+lifts about 1.2 s later (the 520 ms halt and the 700 ms heartbeat), with the tab out and
+the steam's last burst still rising while the text is read.
 
-- **running** is `busy(true)` around the `post("/api/say")` in `takeTurn`
+- **running** is `busy(true)`: around the `post("/api/say")` in `takeTurn`
   (`04-combat-and-turns.js`), and likewise around `/api/roll` and `/api/combat/act`.
   `scene.busy` is not this flag (it is why the crafting hub is shut); the server's 409
   `data.busy` is the mid-turn lock.
-- **ready** is the POST's response arriving, the `table:posted` event in `post()`
-  (`02-state.js`), before `render(s)`.
+- **the response** (the POST's reply, the `table:posted` event in `post()`, `02-state.js`)
+  calls `Device.ready()` and renders at once. `ready()` returns nothing to wait on: the
+  halt-then-green sequence runs on its own.
 - **waiting** is a response with `s.awaiting` set (`showPopup`), resumed by `/api/roll`.
-- The stages happen inside one synchronous `/api/say`, so the page cannot see "planning"
-  versus "narrating". To show them, the server needs to say which stage it is in (a
-  streamed response, or a phase on `/api/revision`); without that the device can show only
-  running, waiting and ready, which is still the whole of what it promises.
-- `takeTurn` must await `Device.ready()` before `render(s)`, which holds the prose back by
-  about 1.5 s (520 ms halt, 700 ms heartbeat, 280 ms settle). Against a turn that takes tens
-  of seconds on a local model that is small, but it is a real cost, and it is the owner's
-  call.
 - The device's files are `device.js`, the `.device` rules in `mock.css`, the markup in
   `index.html` (`#device`, `#dv-slot`) and the five `textures/device-*` files.
 
@@ -586,8 +587,6 @@ the tab's clearance at 1024 was 18px, not the 14px first estimated.
   read "only in the ready state". It goes in 2.6 s after the lever, as the green settles.
   If "only pop out when its green" meant whenever the lamp is green, it would stay out at
   rest instead; that is one line.
-- **Holding the prose.** Adopting the device holds each turn's prose back about 1.5 s for
-  the halt, the heartbeat and the lever. Worth it?
 - **The clasp's arm.** At the top of the gutter the device covers the lower part of the
   book's top-left clasp's descending arm (the corner piece and the top arm show). Keep, or
   drop the device below the clasp's tip (about 35px lower at 1440)?
