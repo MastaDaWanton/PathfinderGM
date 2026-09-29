@@ -194,9 +194,12 @@ def test_with_an_empty_registry_the_bobby_beats_groom_byte_identically(monkeypat
 
 
 def test_the_real_registry_holds_no_member_yet_so_the_game_is_unchanged():
-    """Phase 1 ships the registry empty: `_people` is a helper, not a member. When Lane A's
-    first check lands this assertion is the one to change, on purpose."""
-    assert checks.registered() == ()
+    """Phase 1 shipped the registry empty: `_people` is a helper, not a member. Changed on
+    purpose when Phase 2's checks landed — Lane B's four space checks are members, and
+    the helpers (`_people`, `_space`) still are not."""
+    names = {m.__name__.rsplit(".", 1)[-1] for m in checks.registered()}
+    assert {"land_described", "bearing_invented", "road_claimed", "route_walked"} <= names
+    assert not {n for n in names if n.startswith("_")}
 
 
 # --- discovery -----------------------------------------------------------------------------

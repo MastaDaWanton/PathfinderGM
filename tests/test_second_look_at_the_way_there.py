@@ -58,6 +58,16 @@ class TestWeatherOnAHopIsNobody:
     the count; travel did not. Reproduced by forcing the road's table to weather on a
     hop to the forest."""
 
+    # Ground that is really out there. This walked into "forest" until 2026-09-28, which
+    # is not around this town: Lane B refuses a move onto absent ground (`absent_ground`),
+    # so the weather would never have been reached.
+    @staticmethod
+    def _ground(e):
+        from rules import geography
+
+        land = geography.land_around(e.world, e.world.get(e.scene.location_id))
+        return (land.beyond or land.near)[0]
+
     def test_the_walk_does_not_raise_and_nobody_arrives(self, monkeypatch):
         s, e, pc = _party()
         monkeypatch.setattr(ontheway, "road", lambda *a, **k: _meeting("weather"))
@@ -65,7 +75,7 @@ class TestWeatherOnAHopIsNobody:
         before = len(s.actors)
         tell = " ".join(o.tell for o in _outcomes(e, [
             {"op": "travel", "actor": pc.ref, "because": "t",
-             "params": {"biome": "forest"}}]))
+             "params": {"biome": self._ground(e)}}]))
         assert len(s.actors) == before
         assert "no walking through this" in tell
 
@@ -77,9 +87,10 @@ class TestWeatherOnAHopIsNobody:
         clock = s.clock_minutes
         tell = " ".join(o.tell for o in _outcomes(e, [
             {"op": "travel", "actor": pc.ref, "because": "t",
-             "params": {"biome": "forest"}}]))
-        # The hour the wall costs, and then at least the 1d4+1 the weather does.
-        assert s.clock_minutes - clock >= 60 + 2 * 60
+             "params": {"biome": self._ground(e)}}]))
+        # The walk's own minutes (the first hop out stops for the storm), and then at
+        # least the 1d4+1 hours the weather does.
+        assert s.clock_minutes - clock > 2 * 60
         assert "go by before it lets you" in tell
 
 
@@ -241,7 +252,11 @@ class TestStoppedShortSaysWhereTheyAre:
             {"op": "journey", "actor": pc.ref, "because": "t", "params": {"to": ROAD_TO}}])]
         assert "One journey a turn" in tells[1]
         assert e.here().name in tells[1], tells[1]
-        assert ROAD_TO not in tells[1], tells[1]
+        # Since Lane B (2026-09-28) the place a stopped journey stands on is the stretch
+        # of that road, "on the road to {town}" — the far town's name is in it, rightly.
+        # What must never be said is that the party is AT the town it did not reach.
+        assert f"is at {ROAD_TO}" not in tells[1], tells[1]
+        assert e.here().name == f"on the road to {ROAD_TO}", e.here().name
 
 
 class TestTheWatchReadsWhereYouGot:

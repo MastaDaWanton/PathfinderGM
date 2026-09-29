@@ -260,10 +260,25 @@ def test_travelling_changes_what_grows(client):
     forest = client.get("/api/forage/table?biome=forest").json()
     assert forest["table"]["rows"] and not urban["table"]["rows"]
 
-    d = client.post("/api/travel", data=json.dumps({"biome": "forest"}),
-                    content_type="application/json").json()
+    d = _walk_to_the_forest(client)
     assert d["biome"] == "forest"
     assert client.get("/api/forage/table").json()["here"] == "forest"
+
+
+def _walk_to_the_forest(client, tries: int = 6) -> dict:
+    """Out of the city and into the trees, a turn at a time.
+
+    One post used to be one unwalked step into the forest. Since Lane B (2026-09-28) the
+    way out of a city is walked — the crossing, the gate, the outskirts — and every
+    street is checked for somebody in the way (`rules/ontheway.py`, 8% a hop), so a walk
+    can be stopped short and taken up again next turn, which is what a player does."""
+    d = {}
+    for _ in range(tries):
+        d = client.post("/api/travel", data=json.dumps({"biome": "forest"}),
+                        content_type="application/json").json()
+        if d.get("biome") == "forest":
+            break
+    return d
 
 
 def test_an_invented_biome_is_refused_with_the_ones_that_exist(client):
@@ -279,8 +294,7 @@ def test_foraging_fills_the_satchel(client):
     `/api/roll` extends."""
     from play import campaign as cm
 
-    client.post("/api/travel", data=json.dumps({"biome": "forest"}),
-                content_type="application/json")
+    assert _walk_to_the_forest(client).get("biome") == "forest"
     for _ in range(8):
         r = client.post("/api/forage", data=json.dumps({}),
                         content_type="application/json").json()

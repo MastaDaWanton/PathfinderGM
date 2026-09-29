@@ -160,11 +160,16 @@ def street(dice, level: int = 1) -> Meeting | None:
                    aggressive=(kind == "trouble"))
 
 
-def road(dice, hours: int, biome: str, level: int = 1) -> Meeting | None:
+def road(dice, hours: int, biome: str, level: int = 1, *,
+         minutes: int | None = None) -> Meeting | None:
     """The march, checked once a watch until something happens or the road runs out.
 
     Stops rolling at the first hit, as asked, which is also what the published procedure
     does with a day's four checks in practice: the party is no longer travelling.
+
+    `minutes` is a step shorter than an hour — a half-mile hop between the outskirts and
+    the fields (`rules/outskirts.py`) — checked at its share of a watch, never less than
+    one in a hundred.
     """
     from . import bestiary
 
@@ -172,10 +177,14 @@ def road(dice, hours: int, biome: str, level: int = 1) -> Meeting | None:
     # every stub of a walk up to a whole watch — makes stepping outside the walls for an
     # hour as dangerous as a dawn-to-noon march, and that step is the most common move
     # in the game: `_op_travel` charges exactly one hour for it.
-    full, rest = divmod(max(0, int(hours)), WATCH_HOURS)
-    shares = [ROAD_PERCENT] * full
-    if rest or not full:
-        shares.append(max(1, round(ROAD_PERCENT * (rest or int(hours)) / WATCH_HOURS)))
+    if minutes is not None:
+        shares = [max(1, round(ROAD_PERCENT * max(0, int(minutes))
+                               / (WATCH_HOURS * 60)))]
+    else:
+        full, rest = divmod(max(0, int(hours)), WATCH_HOURS)
+        shares = [ROAD_PERCENT] * full
+        if rest or not full:
+            shares.append(max(1, round(ROAD_PERCENT * (rest or int(hours)) / WATCH_HOURS)))
     for w, chance in enumerate(shares, start=1):
         if dice.roll("1d100", label="the road", visibility="hidden").total > chance:
             continue
@@ -228,7 +237,46 @@ def hours_walked(meeting: "Meeting | None", hours: int) -> int:
     return min(int(hours), int(meeting.after) * WATCH_HOURS)
 
 
-def describe(meeting: Meeting, where: str = "", law: str = "") -> str:
+# Why each kind of stop is a stop, in a clause. Said beside who it was (`describe`'s
+# `who`), because a tell that says only "You get no further" left the prose free to turn
+# the stop into scenery: on 2026-09-28 the patrol that stopped Bobby at the way in came
+# back as "the watchmen are making their rounds" (docs/playtest-2026-09-28.md, 16).
+WHY = {
+    "press": "the cart is across the way and will not shift",
+    "squabble": "the crowd round them will not part",
+    "hawker": "they want a sale out of you",
+    "beggar": "they want alms",
+    "patrol": "they are looking at faces, yours among them",
+    "cutpurse": "they want your purse",
+    "trouble": "they were waiting for somebody, and you will do",
+    "travellers": "they have stopped where you are",
+    "toll": "they want paying before you pass",
+    "creature": "it is in the way",
+}
+
+
+def _names(who) -> str:
+    who = [str(w) for w in (who or ()) if str(w)]
+    if len(who) <= 1:
+        return "".join(who)
+    return ", ".join(who[:-1]) + " and " + who[-1]
+
+
+def describe(meeting: Meeting, where: str = "", law: str = "", who=()) -> str:
+    """The tell's clause: what stopped you, and — when the caller knows them — who.
+
+    `who` is the names of the people the engine just brought in for this meeting. With
+    them the tell ends "Stopped by Guard and second Guard: they are looking at faces", so
+    a stop names who and why and cannot be read as background.
+    """
+    said = _describe(meeting, where, law)
+    names = _names(who)
+    if said and names and meeting.kind in WHY:
+        said += f" Stopped by {names}: {WHY[meeting.kind]}."
+    return said
+
+
+def _describe(meeting: Meeting, where: str = "", law: str = "") -> str:
     """The tell's clause: what stopped you, in the engine's own voice.
 
     `law` is what this town's watch holds against the player (`states.standing_with_the_law`),

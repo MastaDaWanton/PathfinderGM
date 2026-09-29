@@ -276,14 +276,15 @@ def test_where_matches_the_live_state_of_a_new_campaign(worlds, tmp_path):
     assert got.detail == state["biome"]
 
 
-def test_where_outside_town_is_still_todays_label():
+def test_where_outside_town_reads_as_outside():
     """Bobby stood at `bde94b038cba~forest:the-approach` under the label "Vormoor ·
-    village · forest". Phase 1 keeps that (Lane B changes it); only `setting` says
-    outside."""
+    village · forest" — the market's own label, so "outside" was invisible on the panel
+    (item 20.1). Phase 1 kept that; Lane B changed it (Q14: his save loads as "near
+    Vormoor · forest", with no heal)."""
     world = load_cached(AURVANTIS)
     scene = Scene(location_id="bde94b038cba", at="bde94b038cba~forest:the-approach")
     got = geography.where(world, scene)
-    assert got == geography.Where("outside", "Vormoor · village", "forest")
+    assert got == geography.Where("outside", "near Vormoor", "forest")
 
 
 def test_walk_words_are_words():

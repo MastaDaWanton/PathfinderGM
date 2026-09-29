@@ -1,8 +1,10 @@
 """HERE, THE PLACES HERE, NEXT DOOR and UNDERFOOT: which settlement, which part of it.
 
 Moved out of `prompts.scene_brief` unchanged (fix pass S2, docs/fix-interfaces.md §2.2),
-so Lane B can change it without editing a file it does not own. The lines are the same
-bytes they were inline; tests/test_s2_brief_registry.py holds them to that.
+so Lane B could change it without editing a file it does not own. Lane B's changes
+(2026-09-28): the HERE line says outside, under or on the road when the party is (20.1),
+and THE PLACES HERE is split IN / OUTSIDE when the settlement has ground outside (17.1).
+A scene with no ring — no world to build one from — reads exactly as it did.
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ SCAFFOLD = (
     "HERE:",
     "The party is at",
     "Not anywhere else in",
+    "and not anywhere else;",
     "they are there now.",
     "THE PLACES HERE (the only ones that exist):",
     "To move between them use",
@@ -25,6 +28,8 @@ SCAFFOLD = (
     "UNDERFOOT at",
     "(what is physically here, and what the map is drawn from):",
 )
+# Printed only when the party stands outside the settlement (Lane B, 20.1).
+SOMETIMES = ("and not anywhere else;",)
 
 
 def section(ctx) -> tuple[str, dict]:
@@ -38,8 +43,22 @@ def section(ctx) -> tuple[str, dict]:
     from rules import places as _places_for_scale
 
     scale = _places_for_scale.what_it_is(_places_for_scale.scale_of(location)) or 'a place'
-    lines = [f"\nHERE: {location.name}, {scale}."]
-    facts: dict = {"settlement": location.name, "scale": scale}
+    # Outside reads as outside (Lane B, item 20.1): Bobby stood in a forest past the way
+    # in and the brief said "HERE: Vormoor, a village…" — the same line it gave the
+    # market — because the ground outside is filed under the settlement's own id. The
+    # setting is parsed off the place id (`places.setting_of`), never stored.
+    from rules import geography as _geography
+
+    where = _geography.where(ctx.world, ctx.scene, ctx.here) if ctx.scene is not None \
+        else None
+    setting = where.setting if where is not None else "in"
+    if setting == "road":
+        lines = [f"\nHERE: {where.label}, {where.detail}; {location.name} is {scale}."]
+    elif setting in ("outside", "under"):
+        lines = [f"\nHERE: {setting} {location.name}, {scale}."]
+    else:
+        lines = [f"\nHERE: {location.name}, {scale}."]
+    facts: dict = {"settlement": location.name, "scale": scale, "setting": setting}
     # Which part of it, and what leads out — stated the same way the cast is, because
     # it is the same rule. "WHO IS HERE (these refs are the only ones that exist)"
     # has grounded people since it was written; this file's own docstring has asked
@@ -52,11 +71,28 @@ def section(ctx) -> tuple[str, dict]:
     # runs, with the same one function the engine calls).
     here, known = ctx.here, ctx.known
     if here is not None and len(known) > 1:
+        from rules import places as _places
+
         others = [p.name for p in known if p.id != here.id]
-        lines.append(f"  The party is at {here.name}. Not anywhere else in "
-                     f"{location.name}; they are there now.")
+        if setting == "in":
+            lines.append(f"  The party is at {here.name}. Not anywhere else in "
+                         f"{location.name}; they are there now.")
+        else:
+            lines.append(f"  The party is at {here.name}, {setting if setting != 'road' else 'outside'} "
+                         f"{location.name}, and not anywhere else; they are there now.")
+        # IN and OUTSIDE the settlement as two lists when it has ground outside (the
+        # ring, `rules/outskirts.py`), so each stays short and the model can see which
+        # side of the edge a name is on. Without a ring the line is today's.
+        outside = [p.name for p in known if _places.setting_of(p.id) == "outside"]
+        inside = [p.name for p in known if _places.setting_of(p.id) != "outside"]
+        if outside and inside:
+            listed = (f"IN {location.name.upper()}: {', '.join(inside)}; "
+                      f"OUTSIDE {location.name.upper()}: {', '.join(outside)}")
+            facts["outside"] = outside
+        else:
+            listed = ", ".join(p.name for p in known)
         lines.append(f"  THE PLACES HERE (the only ones that exist): "
-                     f"{', '.join(p.name for p in known)}. To move between them use "
+                     f"{listed}. To move between them use "
                      f'{{"op": "travel", "params": {{"place": "{others[0]}"}}}}. '
                      f"Anything else is refused, and so is a SECOND travel in the "
                      f"same plan — one journey a turn.")

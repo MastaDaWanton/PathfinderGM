@@ -89,6 +89,15 @@ def test_nothing_writes_the_ground_beside_the_place():
     assert _assignments("biome") == [], _assignments("biome")
 
 
+def test_nothing_writes_outside_beside_the_place():
+    """The plan asked for `Scene.outside`; it was dropped (Q3, 2026-09-28) because it
+    would be `scene.biome` again under a new name — a sibling of `scene.at` that a door
+    could forget to write. Inside, under or outside is parsed off the place id
+    (`places.setting_of`), and nothing may store it."""
+    assert _assignments("outside") == [], _assignments("outside")
+    assert _assignments("setting") == [], _assignments("setting")
+
+
 def test_nothing_writes_where_into_the_thread():
     """Two writers of one fact reached one prompt: `scene.at` and a regex over the
     player's own sentence, and a single brief could assert two rooms."""

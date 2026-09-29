@@ -109,8 +109,11 @@ BY_SPOT: dict[str, Shape] = {
                            about="a long room with a table down it"),
     "the-high-ground": Shape(16, 16, None, clumps=3, clump_max=2, rise=14, rise_to=3,
                              vertical="slope", about="ground that climbs, and something to stand behind"),
+    # "the way in, and little to hide behind" until 2026-09-28: the gate's own words on
+    # the edge of a forest (docs/playtest-2026-09-28.md, 20.3). Bobby stood among the
+    # trees and the map's caption put him at the village entrance he had left.
     "the-approach": Shape(18, 14, None, clumps=3, clump_max=2,
-                          vertical="slope", about="the way in, and little to hide behind"),
+                          vertical="slope", about="the near edge of it, and little to hide behind"),
     "the-heart-of-it": Shape(14, 14, None, clumps=9, clump_max=2, rough=8,
                              vertical="scatter", about="close, and hard going"),
     "the-edge": Shape(18, 16, None, clumps=4, clump_max=2, rough=4,
@@ -231,7 +234,32 @@ BY_SPOT: dict[str, Shape] = {
                                 about="where four streets meet, and the balconies over them"),
     "the-west-crossing": Shape(14, 14, None, clumps=5, clump_max=2, rise=2,
                                about="where four streets meet, and the balconies over them"),
+
+    # --- the ground just outside (rules/outskirts.py, 2026-09-28) --------------------
+    # `@` marks the ring; a road head and a stretch of road carry the destination's id
+    # after their slug, and `shape_for` reads them by the slug alone. Every one is under
+    # the sky, and each has its own caption: "no caption names another place" is the
+    # defect 20.3 measured.
+    "@the-outskirts": Shape(20, 14, None, clumps=4, clump_max=2, rough=3,
+                            vertical="scatter",
+                            about="the last walls and sheds, and the land opening past them"),
+    "@the-crossroads": Shape(18, 18, None, clumps=2, clump_max=1, rough=2,
+                             vertical="none", about="tracks meeting, and a post where they part"),
+    "@the-far-crossroads": Shape(18, 18, None, clumps=2, clump_max=1, rough=2,
+                                 vertical="none",
+                                 about="a second parting, with fewer wheel-ruts"),
+    "@the-fields": Shape(20, 18, None, clumps=3, clump_max=2, rough=6,
+                         vertical="none", about="furrows, a field wall, and a hut at the corner"),
+    "@the-shore": Shape(20, 14, None, clumps=4, clump_max=2, rough=8, rise=3, rise_to=1,
+                        vertical="scatter", about="wet ground, wrack, and the waterline"),
+    "@the-road-to": Shape(20, 10, None, clumps=2, clump_max=2, rough=2,
+                          vertical="none", about="a road leaving, ruts either side of it"),
+    "@along-the-road-to": Shape(20, 10, None, clumps=3, clump_max=2, rough=4,
+                                vertical="scatter", about="the road, and the verge beside it"),
 }
+
+# A road head's slug ends in the destination's id; its shape is its kind's.
+_SPOT_PREFIXES = ("@along-the-road-to", "@the-road-to")
 
 # Everything else, by the ground it stands on.
 BY_TERRAIN: dict[str, Shape] = {
@@ -440,6 +468,7 @@ def shape_for(place_id: str, terrain: str = "", authored: "Shape | None" = None)
     """
     bare = str(place_id or "").rsplit(STOREY, 1)[0]
     spot = bare.rsplit(":", 1)[-1].rsplit("/", 1)[-1].strip().lower()
+    spot = next((p for p in _SPOT_PREFIXES if spot.startswith(p + "-")), spot)
     found = authored or BY_SPOT.get(spot) or BY_TERRAIN.get(
         str(terrain or "").strip().lower(), OPEN)
     level = _storey(place_id)

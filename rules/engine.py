@@ -6485,6 +6485,20 @@ class Engine:
         # outside the town. With no world the hint is empty and a bare id reads as
         # a settlement (`places._settled`); a caller that knows better says so.
         if self.world is not None and found is not None:
+            # A settlement's open ground is the ground the world puts around it
+            # (`geography.land_around`), the same reading the travel door grounds a
+            # move against — so the wild place a scheme sends the party to is ground
+            # that is there. This read `biomes.from_world` alone, whose matcher takes
+            # "ash-fields" for grassland (docs/fix-interfaces.md §1.3 B4); two readers
+            # of the land would send a scheme to ground the travel door then refuses.
+            if places_mod._settled(found, ""):
+                from . import geography
+
+                land = geography.land_around(self.world, found)
+                ground = next((b for b in (*land.near, *land.beyond)
+                               if b not in ("coast", "water", places_mod.URBAN)), "")
+                if ground:
+                    return ground
             found_biomes = biomes.from_world(self.world, found)
             return next((b for b in found_biomes if b != places_mod.URBAN), "grassland")
         return ""
@@ -6504,7 +6518,22 @@ class Engine:
         # scene still has its places without one.
         return places_mod.for_scene(found or self.scene.location_id, self.scene.at,
                                     terrain_hint=self._terrain_hint(found),
-                                    founded=self.scene.founded)
+                                    founded=self.scene.founded,
+                                    ring=self._ring(found, self.scene.at))
+
+    def _ring(self, found, at: str = "") -> tuple:
+        """The settlement's outside places (`rules/outskirts.py`), or () with no world.
+
+        The middle scale Bobby needed on 2026-09-28: "I leave the village and stand
+        outside it" had nowhere to go but the way in, inside the village. Derived from the
+        world's roads and land every time, never stored — the same bargain as every
+        generated place.
+        """
+        from . import outskirts
+
+        if self.world is None or found is None:
+            return ()
+        return outskirts.ring(self.world, found, at)
 
     def here(self):
         """The place the party is standing in. Never None — they are always somewhere."""
@@ -6534,7 +6563,9 @@ class Engine:
             known = places_mod.for_scene(
                 found or self.scene.location_id, place_id,
                 terrain_hint=places_mod.terrain_of(place_id),
-                founded=self.scene.founded)
+                founded=self.scene.founded,
+                # The ground outside is a real place of this location too (Lane B).
+                ring=self._ring(found, place_id))
             target = places_mod.find(known, place_id)
             if target is None:
                 raise ValueError(f"place_party: no place {place_id!r} here; the places "
@@ -6764,6 +6795,36 @@ class Engine:
 
         speed = pc.speed_feet if pc is not None else 30
         hours, measured, how = journey_mod.hours_for(leg, speed)
+        on_foot = hours
+
+        # On foot, riding, or at a gallop (the owner's ruling Q13; `journey.mounted_hours`
+        # carries the sourced rules). Checked before anything moves: a refusal here must
+        # leave the conversation and the company exactly as they were.
+        pace = journey_mod.pace_of(intent.params.get("pace")) or "walk"
+        if how == "sea":
+            pace = "walk"             # a horse does not make a ship go faster
+        mount_refs: list[str] = []
+        if pace != "walk":
+            party = [str(w) for w in (intent.params.get("with") or [])
+                     if str(w) in self.scene.actors]
+            party += [r for r, a in self.scene.actors.items()
+                      if r not in party and not a.is_pc
+                      and a.has_state(states.TRAVELS_WITH_YOU)]
+            mount_refs = [r for r in party
+                          if str(getattr(self.scene.actors[r], "from_template", "") or "")
+                          in journey_mod.MOUNTS and not self.scene.actors[r].is_down]
+            riders = 1 + len([r for r in party if r not in mount_refs])
+            if len(mount_refs) < riders:
+                walk_words = journey_mod.describe(leg, hours)
+                return self._refuse(
+                    intent,
+                    (f"Nobody in the party has a horse to ride to {leg.to_name}"
+                     if not mount_refs else
+                     f"There are {riders} to carry and {len(mount_refs)} "
+                     f"mount{'s' if len(mount_refs) != 1 else ''} to carry them")
+                    + f". On foot it is {walk_words}. A mount is bought at the stables "
+                      f"or hired, and comes along like anybody who travels with you.")
+            mount_refs = mount_refs[:riders]
         # Setting out is walking away, whatever the road then does.
         parted = self.end_talk("walked away")
 
@@ -6780,6 +6841,24 @@ class Engine:
             # progress is gone, and so is its record — a stale one otherwise waits
             # for the party to come back to the same origin and claim it.
             self.scene.road = {}
+        # The road's length on foot, and the hours it takes at the pace chosen. The road
+        # remembers progress in hours ON FOOT, so a road half galloped and then walked
+        # is still half a road.
+        walk_left = hours
+        hours, hurt_days = journey_mod.mounted_hours(walk_left, pace)
+        from_id = self.scene.location_id
+        from . import outskirts as outskirts_mod
+
+        # The way out to the road, through the ring: journeys along those roads pass
+        # through the crossroads (owner's ruling Q11), and the tell says so.
+        known_now = self.places()
+        head = outskirts_mod.road_for(known_now, leg.to_id)
+        through: list[str] = []
+        if head is not None and self.scene.at != head.id:
+            through = [p.name for p in (places_mod.find(known_now, x)
+                                        for x in places_mod.route(known_now, self.scene.at,
+                                                                  head.id))
+                       if p is not None and places_mod.is_ring(p.id)]
 
         # The fight does not come with you, and neither does anybody who is not.
         fight_ended = bool(self.scene.initiative)
@@ -6877,20 +6956,33 @@ class Engine:
             self.scene.road = {}
             self.place_party()
         elif stopped_short:
-            # Stopped on the road, which is a real place: the open ground this route
-            # crosses, outside the town they set out from. `travel` has reached that
-            # ground by biome since stage 8c and this is the same door — a party halted
-            # in open country can be fought, camped with, and walked on from.
+            # Stopped on the road, which is a real place: the stretch of THIS road they
+            # got to, `@along-the-road-to-{to_id}` (Lane B). It stood the party at
+            # `region_set(origin)[0]` — "the approach", beside the town they had left,
+            # hours out (docs/design-b-space.md §1). The ground is what the route crosses
+            # at the fraction walked; progress stays in `Scene.road`, which already
+            # existed, and the place is derived from it and the id.
+            walked_units = round(progress * walk_left / max(1, remaining)) if remaining \
+                else progress
             self.scene.road = {"to": leg.to_id, "to_name": leg.to_name,
                                "from": self.scene.location_id,
                                # Hours spent sitting out weather are hours, not
                                # progress: they cost the clock and the body and move
-                               # nobody an inch nearer the far end.
-                               "walked": resumed + progress}
-            ground = (leg.crosses[0] if leg.crosses else "") \
-                or places_mod.terrain_of(self.scene.at) or "plains"
-            out = places_mod.region_set(self.scene.location_id, ground)
-            self.place_party(out[0].id if out else "")
+                               # nobody an inch nearer the far end. And they are hours
+                               # ON FOOT, whatever the pace was.
+                               "walked": resumed + walked_units}
+            crosses = [c for c in (biomes.canonical(str(x)) for x in leg.crosses) if c]
+            total = max(1, on_foot)
+            if crosses:
+                ground = crosses[min(len(crosses) - 1,
+                                     int(len(crosses) * (resumed + walked_units) / total))]
+            else:
+                ground = places_mod.terrain_of(self.scene.at) or "grassland"
+            if ground == places_mod.URBAN:
+                ground = "grassland"
+            along = outskirts_mod.ring_id(self.scene.location_id, ground,
+                                          outskirts_mod.along_slug(leg.to_id))
+            self.place_party(along)
             # The turn's journey is spent, and it names where the party IS — the
             # refusal a second travel gets says "is at {here}", and until 2026-09-23
             # this said the far town, which they had just been told they did not reach.
@@ -6908,15 +7000,52 @@ class Engine:
             if ref in self.scene.people:
                 self.scene.move(ref, self.scene.at)
 
+        # The gallop's toll on the mounts, by the hustle rule (`journey.mounted_hours`):
+        # a point of lethal damage for each day galloped past the first free hour, and
+        # fatigued — through the one applicator, as a condition that lifts with eight
+        # hours of the clock (the book's "8 hours of complete rest"), never a flag.
+        mount_note = ""
+        if hurt_days and mount_refs:
+            days_out = max(1, -(-progress // journey_mod.HOURS_PER_DAY)) if stopped_short \
+                else hurt_days
+            hurt = min(hurt_days, days_out)
+            tired = []
+            for ref in mount_refs:
+                horse = self.scene.actors.get(ref)
+                if horse is None:
+                    continue
+                horse.take_damage(hurt)
+                horse.add_condition(journey_mod.MOUNT_FATIGUE,
+                                    rounds=journey_mod.FATIGUE_ROUNDS, source="hustle")
+                tired.append(horse.name)
+            if tired:
+                mount_note = (f"The gallop has blown {', '.join(tired)}: pushed past the "
+                              f"first hour, a mount is hurt by it and tires, and walks "
+                              f"the rest of the day.")
+        elif pace == "ride" and mount_refs:
+            mount_note = "Mounted, the road goes at twice the pace of walking it."
+
+        # The register's fields on every branch (docs/fix-interfaces.md §2.7).
+        common = {"from_id": from_id, "setting": places_mod.setting_of(self.scene.at),
+                  "direction": "out" if stopped_short else "in",
+                  "place": self.scene.at}
+        if pace != "walk":
+            common.update(pace=pace, on_foot=on_foot, mounts=list(mount_refs))
+        if through:
+            common["went_by"] = through
+
         if not arrived:
             bits = [f"The road to {leg.to_name} was longer than {pc.name if pc else 'the party'} "
                     f"could walk: they turned back before it was done."]
             if toll_note:
                 bits.append(toll_note.strip())
+            if mount_note:
+                bits.append(mount_note)
             return Outcome(
                 intent_id=intent.id, op="journey", status="prevented",
                 effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
-                          "hours": hours, "arrived": False, "how": how, "left": left}],
+                          "hours": hours, "arrived": False, "how": how, "left": left,
+                          **common}],
                 tell=" ".join(bits),
                 because=intent.because,
             )
@@ -6934,21 +7063,33 @@ class Engine:
             bits = [f"{hours} hour{'s' if hours != 1 else ''} out of "
                     f"{getattr(self.world.get(self.scene.location_id), 'name', 'town') if self.world else 'town'} "
                     f"on the road to {leg.to_name}, and the road stops being yours.",
-                    ontheway.describe(met)]
+                    ontheway.describe(met, who=[self.scene.actors[m["ref"]].name
+                                                for m in made
+                                                if m["ref"] in self.scene.actors])]
+            if through:
+                bits.insert(0, f"Out by {_and_then(tuple(through))}.")
             if toll_note:
                 bits.append(toll_note.strip())
+            if mount_note:
+                bits.append(mount_note)
             return Outcome(
                 intent_id=intent.id, op="journey",
                 effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                           "hours": hours, "arrived": False, "how": how, "left": left,
                           "stopped_short": True, "met": met.kind,
-                          "place": self.scene.at}],
+                          **common, "met_refs": [m["ref"] for m in made]}],
                 tell=" ".join(b for b in bits if b),
                 because=intent.because,
             )
 
         bits = [f"{journey_mod.describe(leg, hours).capitalize()}, and {leg.to_name} "
                 f"is ahead of you."]
+        if through:
+            # Q11: the roads out part at the crossroads, and a journey along one of them
+            # passes through it — said, so the page walks it rather than inventing one.
+            bits.insert(0, f"Out by {_and_then(tuple(through))}.")
+        if mount_note:
+            bits.append(mount_note)
         if parted:
             bits.insert(0, parted)
         if met is not None:
@@ -6975,7 +7116,7 @@ class Engine:
             effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                       "hours": hours, "measured": measured, "how": how,
                       "left": left, "fight_ended": fight_ended,
-                      "met": met.kind if met is not None else ""}],
+                      "met": met.kind if met is not None else "", **common}],
             tell=" ".join(bits),
             because=intent.because,
         )
@@ -7056,6 +7197,7 @@ class Engine:
         # between the model CHOOSING a place and the model INVENTING one. A rewrite
         # naming a real place works, so this raises rather than printing: the model can
         # repair it, which is the test stage 7 sets for a correct raise.
+        from . import outskirts as outskirts_mod
         from . import places as places_mod
 
         known = self.places()
@@ -7102,9 +7244,26 @@ class Engine:
             # a region called urban outside the town it was trying to enter.
             going_to = known[0]
         else:
-            # Open ground of a kind the party is not on: the region's first place.
-            going_to = places_mod.region_set(
-                places_mod.location_of(known[0].id) or self.scene.location_id, biome)[0]
+            # The fields and the shore ARE that ground: "into the fields" is the fields,
+            # not a farmland wilderness minted beside them (Lane B). Anything else — the
+            # trees, the hills — is open ground past the outskirts, reached through them.
+            going_to = next((p for p in known if places_mod.is_ring(p.id)
+                             and p.name in (outskirts_mod.FIELDS, outskirts_mod.SHORE)
+                             and p.terrain == biome), None)
+            if going_to is None:
+                # Is it there at all? The world says what ground lies around a
+                # settlement (`geography.land_around`), and a move onto ground it does not
+                # have is refused and SHOWN, with the ground that is there named. Bobby
+                # walked "west into the gnarled dense trees" around Vormoor on 2026-09-28
+                # — a forest the previous beat had invented — and the engine accepted
+                # `biome: forest` unchecked (docs/playtest-2026-09-28.md, 20.2).
+                refused = self._absent_ground(intent, biome, known)
+                if refused is not None:
+                    return refused
+                # Open ground of a kind the party is not on: the region's first place.
+                going_to = places_mod.region_set(
+                    places_mod.location_of(known[0].id) or self.scene.location_id,
+                    biome)[0]
 
         # Escorts: refs are validated against the view already; names are resolved here,
         # against the view, and an ambiguous name refuses rather than guessing which of
@@ -7173,34 +7332,88 @@ class Engine:
         # A route that comes back empty — 40 of Aurvantis's 10,792 pairs, and any
         # minted place the exits have not been wired for — falls back to the single
         # step this door has always taken, checked once.
+        #
+        # WHAT IT COSTS, hop by hop (Lane B, 2026-09-28). A crossing of town was free —
+        # "still 08:00 after two crossings of town" (docs/playtest-2026-09-28.md, 16.5) —
+        # and only a step between the walls and open ground cost anything, a flat hour.
+        # Each hop now costs the minutes the rules' local movement gives it
+        # (`outskirts.hop_minutes`: the owner's Q10 bands in town, half a mile a ring
+        # hop, three miles into open ground), summed over the hops actually walked, so
+        # a meeting cuts the sum short where it cuts the walk short. Ground beyond the
+        # near land is as far as the world's own roads put it, at the journey's pace
+        # (Q13): hours, and days if it comes to that.
         met = None
         went_by: tuple[str, ...] = ()
+        went_by_about: list[dict] = []
         meant_for = going_to.name
+        minutes = 0
+        far_hours = far_walked = 0
+        grounded_as = ""
+        found_loc = self.world.get(self.scene.location_id) if self.world else None
+        scale = places_mod.scale_of(found_loc) if found_loc is not None else "town"
+        speed = int(getattr(pc, "speed_feet", 30) or 30) if pc is not None else 30
+        if moved and want and places_mod.setting_of(going_to.id) == "outside" \
+                and not places_mod.is_ring(going_to.id) and found_loc is not None \
+                and places_mod._settled(found_loc, ""):
+            from . import geography
+
+            grounded_as, _words = geography.grounded(
+                geography.land_around(self.world, found_loc), going_to.terrain)
+            if grounded_as == "beyond":
+                far_hours = outskirts_mod.beyond_hours(self.world, found_loc,
+                                                       going_to.terrain, speed)
         if moved:
             level = int(getattr(pc, "level", 1) or 1) if pc is not None else 1
-            passed: list[str] = []
-            for hop_id in (places_mod.route(known, was_place, going_to.id)
-                           or (going_to.id,)):
+            passed: list = []
+            hops = places_mod.route(known, was_place, going_to.id)
+            if not hops and places_mod.find(known, going_to.id) is None:
+                # Open ground is out past the outskirts: the walk goes through the way
+                # out, the way the player would, and is checked and timed on each step.
+                out = next((p for p in known if p.name == outskirts_mod.OUTSKIRTS
+                            and places_mod.is_ring(p.id)), None)
+                if out is not None and (places_mod.setting_of(was_place) != "outside"
+                                        or places_mod.is_ring(was_place)):
+                    lead = () if out.id == was_place else places_mod.route(
+                        known, was_place, out.id)
+                    if lead or out.id == was_place:
+                        hops = tuple(lead) + (going_to.id,)
+            prev = here
+            for hop_id in (hops or (going_to.id,)):
                 hop = places_mod.find(known, hop_id) or going_to
-                if hop.terrain == places_mod.URBAN:
+                underway = hop.id in self._hours_underway
+                if underway:
+                    # A venture's way in (two hours to a cave) is `_op_venture`'s to
+                    # charge, and it has; the one meeting path checks those hours once.
+                    step_hours = self._hours_underway.pop(hop.id, 1) or 1
+                    step = 0
+                elif hop.id == going_to.id and far_hours:
+                    step_hours, step = far_hours, 0
+                else:
+                    step = outskirts_mod.hop_minutes(prev, hop, scale, speed)
+                    step_hours = 0
+                if places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level)
                 else:
-                    # Outside the walls is the road's table, and an hour of it: the
-                    # same hour this op charges below for crossing the wall. Unless
-                    # the way into this hop costs more — a venture's two hours into a
-                    # cave — which `_op_venture` says through `_hours_underway`, so
-                    # the one meeting path checks the whole way in, once.
-                    met = ontheway.road(
-                        self.dice, self._hours_underway.pop(hop.id, 1) or 1,
-                        hop.terrain, level)
+                    # Outside is the road's table, the chance pro rata by the time the
+                    # step takes (the published 20% a six-hour watch).
+                    met = ontheway.road(self.dice, step_hours or 1, hop.terrain, level,
+                                        **({} if step_hours else {"minutes": step}))
+                minutes += step
+                if step_hours and not underway:
+                    # Only the part walked before the meeting, for a march of hours.
+                    far_walked = ontheway.hours_walked(met, step_hours) \
+                        if met is not None else step_hours
                 if met is not None:
                     going_to = hop
                     break
-                passed.append(hop.name)
+                passed.append(hop)
+                prev = hop
             # The last hop of a quiet walk is the destination, and the tell names that
             # separately. An interrupted walk stops somewhere that is now the
             # destination, so everything in hand is a place passed through.
-            went_by = tuple(passed) if met is not None else tuple(passed[:-1])
+            kept = passed if met is not None else passed[:-1]
+            went_by = tuple(p.name for p in kept)
+            went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about]
 
         # Read AFTER the walk, against the place the party actually reached. Until
         # 2026-09-23 this block ran first, against the place the plan named, so a
@@ -7232,8 +7445,15 @@ class Engine:
             # entrance is — and a village, which has a road rather than a gate, was
             # somewhere a warrant could never be enforced at all.
             at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
-            open_road = bool(want) and was_ground == places_mod.URBAN \
-                and going_to.terrain != places_mod.URBAN
+            # Any way OUT, by place as well as by biome (Lane B, docs/fix-interfaces.md
+            # §1.3 B3). This read `bool(want)`, so a travel by PLACE to ground outside —
+            # which is how the outskirts and the road heads are entered — walked past the
+            # watch unasked. Leaving is from inside to outside, whatever the plan named;
+            # the founded and ventured ground stays the "another way" the refusal names.
+            open_road = places_mod.setting_of(was_place) != "outside" \
+                and places_mod.setting_of(going_to.id) == "outside" \
+                and going_to.origin not in ("found", "venture") \
+                and not (going_to.terrain == places_mod.URBAN)
             # A way past the watch that somebody showed you — a scheme's witness, a
             # smuggler's door — is a tag the player holds (`knows.way-past-gate`), and
             # the road is open to them by it; the gate itself stays shut.
@@ -7243,7 +7463,8 @@ class Engine:
                 town_name = str(getattr(found, "name", "") or "the town")
                 if law == "wanted":
                     other_ways = [p.name for p in known
-                                  if p.origin and not p.described_only
+                                  if p.origin in ("found", "venture")
+                                  and not p.described_only
                                   and p.terrain != places_mod.URBAN]
                     how = (f"Leave by another way — {', '.join(other_ways)} — or "
                            f"clear your name."
@@ -7258,6 +7479,7 @@ class Engine:
                             f"guards at the gate look twice, and let you through.")
 
         left: list[str] = []
+        walked_back = 0
         stayed_down: list[str] = []
         fight_ended = False
         xp_line = ""
@@ -7299,12 +7521,27 @@ class Engine:
                     left.append(a.name)
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
-                # Between the walls and the open ground is an hour on foot either way
-                # — the playtest measured a two-hour wild place reached in no time, so
-                # a scheme keyed on the hours never came. Inside the walls, or across
-                # the same open ground, stays free: the map is small there.
-                if (was_ground == places_mod.URBAN) != (going_to.terrain == places_mod.URBAN):
-                    self.scene.advance(60, charge_body=False)
+                # The walk's minutes, charged once (the hop sum above). This was an hour
+                # for a step between the walls and open ground and nothing for anything
+                # else — the playtest measured a two-hour wild place reached in no time,
+                # and then a village crossed twice with the clock still on 08:00. Minutes
+                # are the clock's and not the body's, as the hour was.
+                if minutes:
+                    self.scene.advance(minutes, charge_body=False)
+                # Ground beyond the near land is hours or days: a march, charged to the
+                # body day by day with a camp between, the rule a journey pays.
+                if far_walked:
+                    self._march(pc, far_walked, going_to.terrain)
+                # Walking back along a road a journey stopped on costs the hours walked
+                # out (owner's ruling Q15). The road used to forget itself for free the
+                # moment the party was back inside the walls.
+                if self.scene.road and (outskirts_mod.is_along(was_place)
+                                        or places_mod.setting_of(going_to.id) == "in"):
+                    back = int(self.scene.road.get("walked") or 0)
+                    if back and places_mod.setting_of(was_place) == "outside":
+                        self._march(pc, back, places_mod.terrain_of(was_place))
+                        walked_back = back
+                    self.scene.road = {}
             else:
                 # A scene with no player (some tests) is placed rather than moved: the
                 # party record has three writers and this door is not a fourth.
@@ -7336,7 +7573,7 @@ class Engine:
             # key, so until 2026-09-23 a party stopped three hours out, back in town
             # for the night, set out next morning with three hours already credited.
             # The road remembers only while you are on it.
-            if self.scene.road and going_to.terrain == places_mod.URBAN:
+            if self.scene.road and places_mod.setting_of(going_to.id) == "in":
                 self.scene.road = {}
             # Walking out is walking away: the conversation ends, and the tell says
             # they were left mid-sentence if no leave was taken (2026-09-24).
@@ -7349,6 +7586,7 @@ class Engine:
         # the ground that has just been laid. After the move, never before: they are in
         # the place the party stopped at, and `_bring_in` places them on its grid.
         met_tell = ""
+        met_refs: list[str] = []
         if met is not None:
             # The watch reads the warrant here too, which is the half this band shipped
             # without: the gate is where a warrant is enforced, and the street is where
@@ -7358,8 +7596,14 @@ class Engine:
             if pc is not None:
                 law_now = states.standing_with_the_law(
                     pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
-            met_tell = ontheway.describe(met, going_to.name, law=law_now)
             made = self._meet_on_the_way(met, zone="near")
+            met_refs = [m["ref"] for m in made]
+            # A stop names who and why (Lane B, item 16.3): "the watch comes down the
+            # road … You get no further" became background prose — "the watchmen are
+            # making their rounds" — because the tell never said who had stopped you.
+            met_tell = ontheway.describe(
+                met, going_to.name, law=law_now,
+                who=[self.scene.actors[r].name for r in met_refs if r in self.scene.actors])
             if met.kind == "weather":
                 # The one band that is nobody. It costs what it costs on the road
                 # between towns — hours, off the clock — and here it costs the same,
@@ -7398,6 +7642,23 @@ class Engine:
             bits.append(parted)
         if not moved:
             bits.append(f"You are already at {going_to.name}.")
+        setting = places_mod.setting_of(self.scene.at if moved else going_to.id)
+        was_setting = places_mod.setting_of(was_place)
+        direction = ""
+        if moved:
+            inside = ("in", "under")
+            direction = ("out" if was_setting in inside and setting == "outside" else
+                         "in" if was_setting == "outside" and setting in inside else
+                         "along")
+        if moved and direction == "out":
+            # Leaving is said as leaving. Bobby's "I leave the village" came back as "the
+            # gates of Vormoor open to receive you" (item 16.4): the tell named a place
+            # and never a direction, and the prose picked one.
+            town_name = str(getattr(found_loc, "name", "") or "the settlement")
+            bits.append(f"You leave {town_name} behind.")
+        elif moved and direction == "in":
+            town_name = str(getattr(found_loc, "name", "") or "the settlement")
+            bits.append(f"You come back into {town_name}.")
         if going_to.terrain != was_ground:
             bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
         if went_by:
@@ -7405,9 +7666,33 @@ class Engine:
             # to describe them (see `gm/prompts.scene_brief`) and can only do that if
             # the engine says which ones they were — a model left to infer the route
             # invents streets, which is the failure this whole module exists to stop.
-            bits.append(f"The way there ran through {_and_then(went_by)}.")
+            #
+            # And each with its own line (item 16.2): "The way there ran through the
+            # well" gave the page half a sentence to walk. The place's own words — the
+            # world's where it wrote them — are the material; a check (`route_walked`)
+            # asks that the prose walks them.
+            abouts = {row["name"]: str(row["about"]).strip().rstrip(".")
+                      for row in went_by_about}
+            said_route = [f"{n} ({abouts[n]})" if abouts.get(n) else n for n in went_by]
+            bits.append(f"The way there ran through {_and_then(tuple(said_route))}.")
         if moved:
             bits.append(f"You are at {going_to.name} now.")
+        if moved and direction == "out" and found_loc is not None:
+            from . import geography
+
+            land = geography.land_around(self.world, found_loc)
+            if land.near or land.beyond:
+                close = geography._listed(land.near) or "open ground"
+                further = (f", and {geography._listed(land.beyond[:2])} beyond it"
+                           if land.beyond else "")
+                bits.append(f"Past the last house the land opens: {close}{further}.")
+        spent = minutes + (far_walked + walked_back) * 60
+        if moved and spent:
+            from . import geography
+
+            bits.append(f"It takes {geography.walk_words(spent)}.")
+        if walked_back:
+            bits.append("The road you had walked out along is walked back, every hour of it.")
         if met_tell:
             bits.append(met_tell)
         if met is not None and meant_for != going_to.name:
@@ -7429,15 +7714,86 @@ class Engine:
             bits.append(law_line)
         if note:
             bits.append(note)
+        effect = {"kind": "biome", "biome": going_to.terrain, "was": was_ground,
+                  "left": left, "place": self.scene.at, "was_place": was_place,
+                  "fight_ended": fight_ended, "went_by": list(went_by),
+                  "met": met.kind if met is not None else ""}
+        # The register's fields (docs/fix-interfaces.md §2.7), each only when set.
+        extra = {"minutes": spent if moved else 0,
+                 "went_by_about": went_by_about,
+                 "setting": setting, "was_setting": was_setting,
+                 "direction": direction,
+                 "stopped_short": bool(met is not None and meant_for != going_to.name),
+                 "meant_for": meant_for if met is not None and meant_for != going_to.name
+                 else "",
+                 "met_refs": met_refs, "grounded": grounded_as,
+                 "road_to": self._road_to(going_to.id) if moved else ""}
+        effect.update({k: v for k, v in extra.items() if v})
         return Outcome(
             intent_id=intent.id, op="travel",
-            effects=[{"kind": "biome", "biome": going_to.terrain, "was": was_ground,
-                      "left": left, "place": self.scene.at, "was_place": was_place,
-                      "fight_ended": fight_ended, "went_by": list(went_by),
-                      "met": met.kind if met is not None else ""}],
+            effects=[effect],
             tell=" ".join(bits),
             because=intent.because,
         )
+
+    def _road_to(self, place_id: str) -> str:
+        """The World Bible id of the settlement a road head leads to, or ""."""
+        from . import journey as journey_mod
+        from . import outskirts as outskirts_mod
+
+        slug = outskirts_mod.road_head_of(place_id)
+        if not slug or self.world is None:
+            return ""
+        from . import places as places_mod
+
+        for leg in journey_mod.legs_from(self.world, self.scene.location_id):
+            if places_mod._slug(str(leg.to_id).replace("-", " ").replace("_", " ")) == slug:
+                return leg.to_id
+        return ""
+
+    def _absent_ground(self, intent: Intent, biome: str, known) -> "Outcome | None":
+        """A move onto ground the world says is not around this settlement, refused and
+        shown (docs/playtest-2026-09-28.md, 20.2), or None when the ground is there, is
+        further out, or the world said nothing (`unknown` is accepted and recorded — the
+        three-way honesty `journey.pace` already keeps).
+
+        Player-fixable (`absent_ground`, docs/fix-interfaces.md §2.6): the refusing fact
+        is the world, not the plan's choice of a ref, and the player's fix is to name
+        ground that is there — so the page shows the sentence and the plan loop does not
+        spend seven retries on it.
+        """
+        from . import geography
+        from . import outskirts as outskirts_mod
+        from . import places as places_mod
+
+        found = self.world.get(self.scene.location_id) if self.world else None
+        if found is None or not places_mod._settled(found, ""):
+            return None
+        land = geography.land_around(self.world, found)
+        how, _redirect = geography.grounded(land, biome)
+        if how != "absent":
+            return None
+        name = str(getattr(found, "name", "") or "here")
+        said = [f"There is no {biomes.describe(biome).split(',')[0].lower()} near {name}."]
+        if land.near:
+            said.append(f"Outside it is {', '.join(land.near)}.")
+        if land.beyond:
+            said.append(f"Further out, {', '.join(land.beyond)}.")
+        wider = next((w for _who, w in land.words if geography.ground_in(w)), "")
+        if wider:
+            said.append(f"The wider land is {wider.rstrip('.')}.")
+        sentence = " ".join(said)
+        go = next((p.name for p in known if places_mod.is_ring(p.id)
+                   and p.name in (outskirts_mod.FIELDS, outskirts_mod.SHORE)
+                   and p.terrain in land.near), "") \
+            or next((p.name for p in known if p.name == outskirts_mod.OUTSKIRTS), "")
+        out = self._refuse(intent, sentence, code="absent_ground", for_a_person=sentence,
+                           fix={"kind": "go", "place": go} if go else None)
+        import dataclasses
+
+        return dataclasses.replace(out, effects=[
+            {"kind": "refused-ground", "biome": biome,
+             "near": list(land.near), "beyond": list(land.beyond)}])
 
     def _meet_on_the_way(self, met, *, zone: str) -> list[dict]:
         """Whoever a meeting is, put on the board where the party now stands.
@@ -8003,8 +8359,14 @@ class Engine:
             return self._refuse(
                 intent, f"There is no {intent.params.get('parent')} here to found it off. "
                         f"From here you can reach {', '.join(p.name for p in known)}.")
-        if places_mod.find(known, name) is not None:
-            return self._refuse(intent, f"{name} is already a place here.")
+        there = places_mod.find(known, name)
+        if there is not None:
+            # Bobby's turns 6 and 7: "I walk to the nearest crossroads" planned a `found`
+            # of one. Vormoor has a crossroads now (the ring), and the refusal says to go
+            # there — the fix is a place, not a new one.
+            return self._refuse(intent, f"{name} is already a place here: {there.name}. "
+                                        f"Go there rather than making it again.",
+                                fix={"kind": "go", "place": there.name})
         if len(places_mod.children_of(self.scene.founded, parent.id)) >= places_mod.MOST_CHILDREN:
             return self._refuse(
                 intent, f"{parent.name} already has as many places hanging off it as one "
@@ -8048,19 +8410,33 @@ class Engine:
                 parent = up
         if kind:
             location = self.world.get(self.scene.location_id) if self.world else None
-            why = places_mod.fits_here(kind, location)
+            why = places_mod.fits_here(kind, location, parent)
             if why:
-                return self._refuse(intent, why)
+                # A road's kind off a town room: the fix is a place to go (Lane B, the
+                # register's `{"kind": "go"}` fix), so the plan can walk out first.
+                outskirts = next((p for p in known if p.name == "the outskirts"
+                                  and places_mod.is_ring(p.id)), None)
+                go = (kind in places_mod.OUTSIDE_KINDS and outskirts is not None
+                      and places_mod.setting_of(parent.id) != "outside")
+                return self._refuse(intent, why, fix={"kind": "go", "place": outskirts.name}
+                                    if go else None)
+        # A road's kind stands on its parent's ground and is shaped as open ground; it is
+        # not a settlement kind, so it carries no `kind` to shape it as a room.
+        road_kind = kind in places_mod.OUTSIDE_KINDS and \
+            places_mod.setting_of(parent.id) == "outside"
         place = self.found_place(name, parent,
-                                 about=str(intent.params.get("about") or ""),
-                                 owner=owner, origin="found", kind=kind)
+                                 about=str(intent.params.get("about") or "")
+                                 or (places_mod.OUTSIDE_KINDS[kind] if road_kind else ""),
+                                 owner=owner, origin="found",
+                                 kind="" if road_kind else kind)
         pc = self.scene.pc()
         held = f", held by {owner.name}" if owner is not None else ""
         what = f" It is a {kind}." if kind else ""
         return Outcome(
             intent_id=intent.id, op="found",
             effects=[{"kind": "place", "id": place.id, "name": name,
-                      "parent": parent.id, "owner": place.owner, "is": kind}],
+                      "parent": parent.id, "owner": place.owner, "is": kind,
+                      "setting": places_mod.setting_of(place.id)}],
             tell=f"{name} is a place now, off {parent.name}{held}.{what} "
                  f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
             because=intent.because)

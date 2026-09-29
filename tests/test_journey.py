@@ -295,7 +295,12 @@ def test_the_brief_does_not_offer_a_road_that_is_not_there():
 
     s, e, pc = _party()
     brief = prompts.scene_brief(WORLD, s, WORLD.get(PANGRELLA), recent=[], turn=1)
-    roads = [ln for ln in brief.splitlines() if "ROADS OUT" in ln][0]
-    for leg in journey.legs_from(WORLD, PANGRELLA):
-        assert leg.to_name in roads
-    assert roads.count(",") < 3, roads
+    # One row per road since Lane B (2026-09-28): the block is the header and a line
+    # for each destination with its facts, where it was one line of names.
+    lines = brief.splitlines()
+    at = next(i for i, ln in enumerate(lines) if "ROADS OUT" in ln)
+    rows = [ln for ln in lines[at + 1:] if ln.startswith("    ") and " — " in ln]
+    legs = journey.legs_from(WORLD, PANGRELLA)
+    assert [r.split(" — ")[0].strip() for r in rows[:len(legs)]] == \
+        [leg.to_name for leg in legs]
+    assert len(legs) < 3
