@@ -418,7 +418,13 @@ class GMAgent:
                                         self.reading if isinstance(self.reading, dict)
                                         and "error" not in self.reading else None,
                                         self.engine.scene, self.engine.places(),
-                                        location)))
+                                        location),
+                                    # A declared cast's aim chooses among the aims that
+                                    # exist here (`areas.legal_aims`) — the people, the
+                                    # caster, the features and props, and for a cone or
+                                    # a line the map's axes.
+                                    aims=self._cast_aims(player_input)
+                                    if "cast" in declared else ()))
             except client.ModelUnavailable as exc:
                 down.add(model)
                 rejections.append(f"attempt {n + 1}: {model} could not be reached: {exc}")
@@ -609,6 +615,11 @@ class GMAgent:
                 # addressed to them (the schema already required it; this is the net).
                 raw = judgement.inject_introduce(raw, player_input, self.engine.scene,
                                                  self.world)
+                # And never somebody the sentence only asks ABOUT, whoever wrote the
+                # introduce: "I ask the nearest person about the girl who sells herbs"
+                # introduced the herb seller and spoke to her (G3, 2026-09-29).
+                raw = judgement.asked_about_not_addressed(raw, player_input,
+                                                          self.engine.scene)
                 # An insult aimed at somebody provokes them (rules/provocation.py).
                 raw = judgement.inject_provoke(raw, player_input, self.engine.scene)
                 raw = judgement.inject_say(raw, player_input, self.engine.scene)
@@ -2375,6 +2386,39 @@ class GMAgent:
             if m:
                 out.append(" ".join(m.group(1).split()))
         return out
+
+    def _cast_aims(self, player_input: str) -> tuple[str, ...]:
+        """The legal aims for the player's cast this turn (`areas.legal_aims`), for the
+        schema's `aim` enum; () when there is no caster to aim for, and the schema then
+        falls back to the people, the caster and the directions.
+
+        The spell is the one the reading's cast names, else the sentence's own — so a
+        burst is not offered a direction and a cone is offered all of them."""
+        from rules import areas
+
+        from . import interpret
+
+        scene = self.engine.scene
+        pc = scene.pc() if hasattr(scene, "pc") else None
+        if pc is None:
+            return ()
+        spell = None
+        reading = self.reading if isinstance(self.reading, dict) \
+            and "error" not in self.reading else None
+        for a in (reading or {}).get("actions") or []:
+            if isinstance(a, dict) and a.get("act") == "cast":
+                for slot in ("object", "target", "place"):
+                    spell = interpret.spell_named(scene, a.get(slot))
+                    if spell is not None:
+                        break
+            if spell is not None:
+                break
+        if spell is None:
+            spell = interpret.spell_named(scene, player_input)
+        try:
+            return tuple(areas.legal_aims(scene, pc.ref, spell))
+        except Exception:  # noqa: BLE001 — a schema hint must never take the turn down
+            return ()
 
     @staticmethod
     def _merge_declared(raw, declared) -> list:

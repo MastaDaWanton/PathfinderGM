@@ -186,3 +186,90 @@ def resident_appearance(world, entity_id: str | None) -> str:
     if ent is None:
         return ""
     return str(getattr(ent, "facts", {}).get("Appearance", "") or "").strip()
+
+
+# --- a person's label as the engine prints it ------------------------------------------
+#
+# Measured live 2026-09-29 (G3): the engine's own tell read "You leave man mid-sentence",
+# and the Bobby corpus's turn log is full of the same shape — "On the board: girl (c2).",
+# "You are with Guard, girl, the watchman waving traffic through", "Bobby speaks to man in
+# a stained leather jerkin". A person the prose described is booked under the prose's
+# words, and those words are a KIND of person ("man", "girl", "herbalist vendor"), which in
+# English takes its article. There were already three private copies of this rule
+# (`narration.definite`, `prompts._definite`, `xp._definite`), each written after one of
+# these reached the page; the engine's ~300 tells never had one. So the rule lives here,
+# once, and the engine applies it to every tell it finishes (`Engine._resolve_one`,
+# `Engine._tick_schemes`) rather than at three hundred print sites.
+_DETERMINERS = frozenset({
+    "the", "a", "an", "your", "his", "her", "their", "its", "my", "our", "some", "this",
+    "that", "these", "those", "every", "each", "no", "another", "any", "one", "whose",
+})
+
+
+def is_descriptor(name: str) -> bool:
+    """Whether a person's name is a kind of person that needs its article — "man",
+    "girl", "man with the ledger" — rather than a proper name ("Grix", "Guard") or a
+    phrase that already carries one ("the watchman waving traffic through")."""
+    words = str(name or "").split()
+    return bool(words) and words[0][:1].islower() and words[0].lower() not in _DETERMINERS
+
+
+def definite(name: str) -> str:
+    """"man" → "the man"; "Grix" and "the watchman" stay as they are."""
+    name = " ".join(str(name or "").split())
+    return f"the {name}" if is_descriptor(name) else name
+
+
+_QUOTED = re.compile(r"\"[^\"]*\"|“[^”]*”")
+_WORD_BEFORE = re.compile(r"([A-Za-z'’]+)\s+$")
+_SENTENCE_START = re.compile(r"(?:^|[.!?]\s+|\n\s*)$")
+
+
+def with_articles(text: str, names) -> str:
+    """Every bare descriptor-name of a person in `text` given its article.
+
+    Idempotent, and careful in three ways that each have a failure behind them: the
+    player's own quoted words are never touched; a name that sits inside another
+    person's longer name ("man" inside "the man with the ledger") is that other person
+    and is left alone, longest names claimed first; and a name already following a
+    determiner ("the man", "your man") is already definite. At the start of a sentence
+    the article is capitalised: "The man takes it badly."
+    """
+    text = str(text or "")
+    low = text.lower()
+    wanted = sorted({" ".join(str(n or "").split()) for n in names or ()
+                     if str(n or "").strip()
+                     and " ".join(str(n).split()).lower() in low}, key=len, reverse=True)
+    if not text or not wanted:
+        return text
+    claimed = [m.span() for m in _QUOTED.finditer(text)]
+    edits: list[tuple[int, int, str]] = []
+
+    def free(lo: int, hi: int) -> bool:
+        return not any(lo < b and a < hi for a, b in claimed)
+
+    for name in wanted:
+        # The name as it is kept, and — for a descriptor — as a sentence opening
+        # capitalises it ("Man comes round" from a `.capitalize()`d tell).
+        forms = [re.escape(name)]
+        if is_descriptor(name):
+            forms.append(re.escape(name[:1].upper() + name[1:]))
+        rx = re.compile(rf"(?<![\w'’-])(?:{'|'.join(forms)})(?![\w-])")
+        for m in rx.finditer(text):
+            lo, hi = m.span()
+            if not free(lo, hi):
+                continue
+            before = text[:lo]
+            opening = bool(_SENTENCE_START.search(before))
+            if m.group(0) != name and not opening:
+                continue                 # a capitalised word mid-sentence is not them
+            claimed.append((lo, hi))
+            if not is_descriptor(name):
+                continue
+            prev = _WORD_BEFORE.search(before)
+            if prev and prev.group(1).lower() in _DETERMINERS:
+                continue
+            edits.append((lo, hi, f"{'The' if opening else 'the'} {name}"))
+    for lo, hi, new in sorted(edits, reverse=True):
+        text = text[:lo] + new + text[hi:]
+    return text

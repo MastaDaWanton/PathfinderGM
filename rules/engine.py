@@ -2771,7 +2771,7 @@ class Engine:
         # Whoever is no longer in a fit state to be talked to leaves the conversation,
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
-        resolution.outcomes.extend(self._settle_talk())
+        resolution.outcomes.extend(self._articled(o) for o in self._settle_talk())
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -2795,7 +2795,7 @@ class Engine:
             extra = [Outcome(intent_id="", op="scheme", effects=[{"kind": "scheme_error",
                                                                    "error": str(exc)}],
                              tell="", because="")]
-        resolution.outcomes.extend(extra)
+        resolution.outcomes.extend(self._articled(o) for o in extra)
         return resolution
 
     def resume(self, face: int) -> Resolution:
@@ -2999,7 +2999,24 @@ class Engine:
         handler = getattr(self, f"_op_{intent.op}", None)
         if handler is None:
             raise IntentError(f"no handler for op {intent.op!r}", "schema")
-        return handler(intent, partial)
+        return self._articled(handler(intent, partial))
+
+    def _articled(self, outcome):
+        """A tell names every person by a label with its article (`names.with_articles`).
+
+        Measured live 2026-09-29: "You leave man mid-sentence" — a person the prose had
+        booked as a kind of person, printed by a tell as if it were a proper name. The
+        engine prints names at some three hundred sites; the article is put on here, once,
+        where every op's tell leaves the engine."""
+        from . import names as names_mod
+
+        tell = getattr(outcome, "tell", "")
+        if tell:
+            # Everybody's name, proper ones too: a proper name claims its own span, so a
+            # descriptor inside somebody else's longer name is never given an article.
+            outcome.tell = names_mod.with_articles(
+                tell, [a.name for a in self.scene.people.values() if not a.is_pc])
+        return outcome
 
     # narrate_only ---------------------------------------------------------------------
 
@@ -7259,6 +7276,13 @@ class Engine:
                               f"the rest of the day.")
         elif pace == "ride" and mount_refs:
             mount_note = "Mounted, the road goes at twice the pace of walking it."
+        # Their keep: a day's feed for every day this road took, ridden or led (G3,
+        # 2026-09-29 — nothing charged it before). Nights on the road are camps, never
+        # a stable's.
+        keep_note, keep_fx = self._keep_the_mounts(
+            -(-max(1, int(hours)) // journey_mod.HOURS_PER_DAY))
+        if keep_note:
+            mount_note = (mount_note + " " + keep_note).strip()
 
         # The register's fields on every branch (docs/fix-interfaces.md §2.7).
         common = {"from_id": from_id, "setting": places_mod.setting_of(self.scene.at),
@@ -7280,7 +7304,7 @@ class Engine:
                 intent_id=intent.id, op="journey", status="prevented",
                 effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                           "hours": hours, "arrived": False, "how": how, "left": left,
-                          **common}],
+                          **common}] + keep_fx,
                 tell=" ".join(bits),
                 because=intent.because,
             )
@@ -7312,7 +7336,7 @@ class Engine:
                 effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                           "hours": hours, "arrived": False, "how": how, "left": left,
                           "stopped_short": True, "met": met.kind,
-                          **common, "met_refs": [m["ref"] for m in made]}],
+                          **common, "met_refs": [m["ref"] for m in made]}] + keep_fx,
                 tell=" ".join(b for b in bits if b),
                 because=intent.because,
             )
@@ -7351,7 +7375,7 @@ class Engine:
             effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                       "hours": hours, "measured": measured, "how": how,
                       "left": left, "fight_ended": fight_ended,
-                      "met": met.kind if met is not None else "", **common}],
+                      "met": met.kind if met is not None else "", **common}] + keep_fx,
             tell=" ".join(bits),
             because=intent.because,
         )
@@ -12658,11 +12682,26 @@ class Engine:
             bits.append("Ended: " + ", ".join(ended) + ".")
         if prep_said:
             bits.append(prep_said)
+        # The mounts' keep for the day rested (G3, 2026-09-29): a day's feed, and a night
+        # in the stables where the party sleeps inside a settlement that has them — the
+        # ostler's bill, 5 sp. Out on open ground the horse is picketed and only fed.
+        keep_fx: list[dict] = []
+        if actor.is_pc:
+            from . import market as market_mod
+            from . import places as places_mod
+
+            inside =places_mod.setting_of(self.scene.at) == "in" and bool(self.world) \
+                and market_mod.has_stables(self.world.get(self.scene.location_id)
+                                           or self.scene.location_id)
+            keep_note, keep_fx = self._keep_the_mounts(1, stabled=inside)
+            if keep_note:
+                bits.append(keep_note)
 
         return Outcome(
             intent_id=intent.id, op="rest",
             effects=[{"ref": actor.ref, "kind": "rest", "healed": result["healed"],
-                      "hours": hours, "hp_after": actor.hp, "origin": "rule:rest"}],
+                      "hours": hours, "hp_after": actor.hp, "origin": "rule:rest"}]
+            + keep_fx,
             tell=" ".join(bits)
                  + (f" In the night, level {levelled['level']} settles: "
                     f"+{levelled['hp']} hp"
@@ -12670,6 +12709,48 @@ class Engine:
                     if levelled and levelled.get("ok") else ""),
             because=intent.because,
         )
+
+    def _keep_the_mounts(self, days: int, *, stabled: bool = False) -> tuple[str, list[dict]]:
+        """Charge the party's mounts their keep: (the tell, the effect records).
+
+        Feed for each of `days` (`journey.FEED_CP_A_DAY` a mount), and — `stabled` — one
+        night's stabling (`journey.STABLING_CP_A_NIGHT` a mount). Out of the player
+        character's purse through `goods.spend`, the one door money leaves a purse by,
+        stabling first (it is the bill the ostler presents) and each paid or not whole.
+        A purse that cannot pay is said, and the animal goes without; no penalty is
+        invented beyond the saying (the book prices the keep and names none)."""
+        from . import goods
+        from . import journey as journey_mod
+
+        pc = self.scene.pc()
+        mounts = journey_mod.owned_mounts(self.scene)
+        days = max(0, int(days or 0))
+        if pc is None or not mounts or (not days and not stabled):
+            return "", []
+        coins = goods.coinage()
+        n = len(mounts)
+        who = mounts[0].name if n == 1 else f"{n} mounts"
+        bits, effects = [], []
+        bills = []
+        if stabled:
+            bills.append(("stabling", journey_mod.STABLING_CP_A_NIGHT * n,
+                          f"no stall for {who} tonight"))
+        if days:
+            bills.append(("feed", journey_mod.FEED_CP_A_DAY * n * days,
+                          f"{who} {'goes' if n == 1 else 'go'} hungry"))
+        for what, cp, without in bills:
+            price = goods.purse_line(goods.coins_for(cp), coins)
+            purse, paid = goods.spend(pc.purse, cp)
+            if paid:
+                pc.purse = purse
+                bits.append(f"{price} for the {what}.")
+            else:
+                bits.append(f"The {what} is {price}, and the purse cannot pay it: {without}.")
+            effects.append({"kind": "upkeep", "what": what, "cp": cp, "paid": paid,
+                            "mounts": [m.ref for m in mounts], "by": pc.ref,
+                            "origin": "rule:mount-upkeep"})
+        tell = " ".join(bits)
+        return tell[:1].upper() + tell[1:], effects
 
     def _op_eat(self, intent: Intent, partial: dict) -> Outcome:
         """A meal. Resets the hunger clock and nothing else — food is not medicine."""
@@ -12798,6 +12879,14 @@ class Engine:
                        if how == "already_here" and n == 1 else None)
                 if rec is not None and rec.get("ref") in self.scene.actors:
                     rec = None
+                # A bare head noun ("man") for the one person here the prose described
+                # by it ("man with the whetstone"), who has no body yet: them, under their
+                # description (G3, 2026-09-29: a scene entry named just "man").
+                # `here_as` passes over anybody on this visit's ledger, which is right
+                # for the prose's own "a guard" arriving and wrong for the plan naming
+                # somebody already here by the word the player used.
+                if rec is None and how == "already_here" and n == 1:
+                    rec = population.described_here(self.scene, who)
                 if rec is None:
                     rec = population.note(self.scene, who, fresh=True)
                 actor = population.embody(self.scene, who, template, zone=zone,

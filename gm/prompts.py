@@ -682,9 +682,8 @@ of these; if you do, the character walks away as hurt as they arrived and the pl
 see it on the sheet. A jar the character is not carrying cannot be used: say so.
 A fall, a fire, acid, cold, thirst — the world hurting someone with no spell or blade
 behind it — is a rule you cite, never dice you write: {"op": "hazard", "params":
-{"rule": "falling", "distance_ft": 30, "to": "<ref>"}}. The rules are falling
-(distance_ft), catching-fire, lava, acid (rounds), cold, heat, thirst (hours),
-starvation (days); you supply only that one number and the rule supplies the dice.
+{"rule": "falling", "distance_ft": 30, "to": "<ref>"}}. The rules are {HAZARD RULES};
+you supply only that one number and the rule supplies the dice.
 Add "deliberate": true for a chosen jump. A trap is narrated this stage, not rolled.
 When the party moves onto different ground, say so: {"op": "travel", "params":
 {"biome": "forest"}}. The biomes are urban, grassland, farmland, forest, jungle, swamp,
@@ -1399,6 +1398,28 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     return head + (examples if with_examples else []) + kept_history + tail
 
 
+HAZARD_TOKEN = "{HAZARD RULES}"
+
+
+def hazard_rules_line() -> str:
+    """The hazard rules the briefing lists, read from content/rules/hazards.json, each
+    with the one number its slot takes: "falling (distance_ft), catching-fire (rounds), …".
+
+    Read from the file, never a hand-kept copy. Measured 2026-09-29 (I3's hand-off): the
+    briefing's own list stopped at the eight stage 8d shipped, and `burning-brush` and
+    `smoke` — rows I3 added, which the engine rolls — were rules the model was never told
+    it could cite. CLAUDE.md's rule about every copy of a rule, applied by removing the
+    copy."""
+    from rules import hazards
+
+    return ", ".join(f"{rid} ({row['slot']['name']})"
+                     for rid, row in hazards.rows().items())
+
+
+def with_hazard_rules(text: str) -> str:
+    return text.replace(HAZARD_TOKEN, hazard_rules_line()) if HAZARD_TOKEN in text else text
+
+
 def call_one_messages(briefing_scene: str, history: list[dict], player_input: str,
                       in_combat: bool = False, enemy: str | None = None,
                       examples: list[dict] | None = None,
@@ -1416,7 +1437,7 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
     fight would put nine hundred characters of cellar-and-weather in front of a model
     being asked for three sentences, and demonstration volume is what wins.
     """
-    briefing = BRIEFING + (COMBAT_BRIEFING_EXTRA if in_combat else "")
+    briefing = with_hazard_rules(BRIEFING) + (COMBAT_BRIEFING_EXTRA if in_combat else "")
     # An explicit set replaces both — Continue is the caller that passes one, and its
     # examples have to be the only scene-shaped thing the model can see.
     if examples is None:
@@ -2309,8 +2330,14 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
 
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                 min_chars: int = 0, must_contain: tuple[str, ...] = (),
-                ops: tuple[str, ...] = (), places: tuple[str, ...] = ()) -> dict:
+                ops: tuple[str, ...] = (), places: tuple[str, ...] = (),
+                aims: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
+
+    `aims` is the scene's legal aims for a declared cast (`areas.legal_aims`), handed to
+    `_declared_op` so the `aim` enum holds the features and props here as well as the
+    people; without it the enum fell back to people, self and directions (I3's hand-off,
+    closed 2026-09-29).
 
     `refs` pins the cast: the enum makes it impossible to aim at somebody who is not in
     the scene, which is the single most common rejection in the logs and the reason
@@ -2393,7 +2420,7 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         # `allOf` above stays for providers that do enforce it.
         schema["properties"]["declared"] = {
             "type": "object",
-            "properties": {op: _declared_op(op, refs, places) for op in wanted},
+            "properties": {op: _declared_op(op, refs, places, aims) for op in wanted},
             "required": list(wanted)}
         schema["required"] = ["narration", "declared", "intents"]
     return schema

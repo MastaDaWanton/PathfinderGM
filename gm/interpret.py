@@ -649,6 +649,87 @@ def target_of(frame: dict | None, acts=("seek", "call_on", "talk", "give", "buy"
     return ""
 
 
+# --- who is asked, and who is only asked ABOUT ---------------------------------------------
+#
+# Inform's rule for ASK … ABOUT (Recipe Book §6.2; the I7 Handbook): the person token must
+# be in scope, the topic token reaches out of it. `judgement.inject_company` learned it for
+# the spawn door (item 5.1 of the 2026-09-28 playtest). Measured live 2026-09-29 on G3's
+# market-seek turn 1, the same sentence came through the OTHER door: "I ask the nearest
+# person about the girl who sells herbs in the market." read `talk, target: the nearest
+# person, says: about the girl who sells herbs in the market` — right — and the plan still
+# wrote `introduce who="herbalist vendor"` and a `say` TO her. The girl is the topic.
+_TOPIC_OPENS = re.compile(r"^(?:about|regarding|concerning|after|of)\s+(.+)$", re.I)
+_ASKED_ABOUT = re.compile(
+    r"\b(?:ask|asks|asking|question|questions|enquire|enquires|inquire|inquires|"
+    r"talk|talks|speak|speaks|chat|chats|tell|tells)\b[^.!?;\"“]*?"
+    r"\b(?:about|regarding|concerning|after)\s+([^.!?;\"“]+)", re.I)
+_NOT_A_DESCRIBING_WORD = frozenset({
+    "the", "a", "an", "some", "any", "who", "that", "which", "in", "at", "on", "of", "by",
+    "to", "for", "from", "with", "and", "or", "is", "are", "person", "people", "one",
+    "someone", "somebody", "anyone", "anybody", "folk", "nearest", "closest", "nearby",
+    "next", "here", "there", "me", "my", "him", "her", "them", "his", "their",
+})
+
+
+def topics(frame: dict | None, sentence: str = "") -> list[str]:
+    """The phrases the sentence asks ABOUT: a `talk` act's "about …" `says` slot, the part
+    of its span after "about", and — with no reading — the sentence's own "ask … about …"."""
+    out: list[str] = []
+    for a in (frame or {}).get("actions") or []:
+        if a.get("act") not in ("talk", "insult", "seek"):
+            continue
+        for slot in ("says", "span"):
+            said = " ".join(str(a.get(slot) or "").split())
+            m = _TOPIC_OPENS.match(said) if slot == "says" else _ASKED_ABOUT.search(said)
+            if m and m.group(1).strip() not in out:
+                out.append(m.group(1).strip())
+    if not out:
+        from .speech import blanked
+
+        for m in _ASKED_ABOUT.finditer(blanked(str(sentence or ""))):
+            topic = " ".join(m.group(1).split()).strip()
+            if topic and topic not in out:
+                out.append(topic)
+    return out
+
+
+def addressee(frame: dict | None, sentence: str = "") -> str:
+    """Who a `talk` act speaks to, in the player's words — "the nearest person"; "" when
+    the reading names nobody (the regex's answer is `judgement.person_sought`'s)."""
+    for a in (frame or {}).get("actions") or []:
+        if a.get("act") in ("talk", "insult") and str(a.get("target") or "").strip():
+            return " ".join(str(a["target"]).split())
+    return ""
+
+
+def _describing(phrase: str) -> set[str]:
+    from rules import population
+
+    words = [w for w in re.findall(r"[a-z][a-z'-]+", str(phrase or "").lower())
+             if w not in _NOT_A_DESCRIBING_WORD]
+    return {population._stem(w) for w in words} | set(population._tokens(" ".join(words)))
+
+
+def _shares(a: set[str], b: set[str]) -> bool:
+    """A word in common: the same stem or synonym token ("vendor" and "sells" are both
+    `sell`), or one stem the start of the other ("herbalist", "herbs")."""
+    if a & b:
+        return True
+    return any(len(x) >= 4 and len(y) >= 4 and (x.startswith(y) or y.startswith(x))
+               for x in a for y in b if not x.startswith("work:") and not y.startswith("work:"))
+
+
+def in_topic(phrase: str, topic_list, addressed: str = "") -> bool:
+    """Whether a person phrase is somebody the sentence only asks ABOUT: it shares a
+    describing word with a topic and none with the person addressed."""
+    mine = _describing(phrase)
+    if not mine or not topic_list:
+        return False
+    if addressed and _shares(mine, _describing(addressed)):
+        return False
+    return any(_shares(mine, _describing(t)) for t in topic_list)
+
+
 def bought(frame: dict | None) -> str:
     for a in (frame or {}).get("actions") or []:
         if a.get("act") == "buy" and a.get("object"):

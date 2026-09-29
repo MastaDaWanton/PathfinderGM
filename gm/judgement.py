@@ -6563,7 +6563,8 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     if theirs:
         blank = [r for r in theirs if not _describes(r.get("params") or {})]
         phrase = _introducible(player_text) if blank else ""
-        if not phrase:
+        if not phrase or _points_at_somebody_here(phrase, scene) \
+                or _only_asked_about(phrase, player_text):
             return raw_intents
         return [dict(r, params=dict(r.get("params") or {}, who=phrase))
                 if any(r is b for b in blank) else r for r in raw_intents]
@@ -6579,6 +6580,13 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     phrase = person_sought(player_text)
     if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
         return raw_intents
+    # "The nearest person" is somebody standing here, never a newcomer — and a person the
+    # sentence only asks ABOUT is not the one looked for (G3, 2026-09-29, market-seek
+    # turn 1: "I ask the nearest person about the girl who sells herbs in the market"
+    # had this detector declare `introduce` for "nearest person", which the plan filled
+    # with the herb girl, spoken TO).
+    if _points_at_somebody_here(phrase, scene) or _only_asked_about(phrase, player_text):
+        return raw_intents
     found = scope_mod.look_for(world, phrase, scene, getattr(scene, "location_id", None),
                                indefinite=sought_indefinitely(player_text))
     if found.get("scope") not in ("", scope_mod.UNMET):
@@ -6592,6 +6600,184 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     return [{"op": "introduce",
              "because": "the player went looking for somebody the scene does not hold yet",
              "params": {"who": phrase}}] + list(raw_intents)
+
+
+# "the nearest person", "whoever is closest", "someone nearby": a pointer at somebody
+# already standing here, which no introduce can answer.
+_NEARNESS = re.compile(r"\b(?:nearest|closest|nearby|next to (?:me|you)|beside (?:me|you)"
+                       r"|to hand|within earshot)\b", re.I)
+
+
+def _points_at_somebody_here(phrase: str, scene) -> bool:
+    """Whether a sought phrase only points at a person present — "the nearest person" —
+    and somebody is present to be it."""
+    if not _NEARNESS.search(str(phrase or "")):
+        return False
+    return any(not a.is_pc for a in (getattr(scene, "actors", {}) or {}).values())
+
+
+def _only_asked_about(phrase: str, player_text: str) -> bool:
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    reading = reading if reading and not reading.get("error") else None
+    return _interpret.in_topic(phrase, _interpret.topics(reading, player_text),
+                               _interpret.addressee(reading, player_text))
+
+
+def _nearest_here(scene) -> str:
+    """The ref of the one person nearest the player's character, or "" when two are as
+    near (never a choice made for the player). Measured on the map when there is one,
+    else by the zone they stand in."""
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    conscious = getattr(scene, "conscious", None)
+    present = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
+               if not a.is_pc and (conscious(r) if callable(conscious) else True)]
+    if not present or pc is None:
+        return ""
+    rank = {"engaged": 0, "near": 1, "far": 2}
+
+    def how_far(r):
+        feet = scene.distance_between(pc.ref, r) if hasattr(scene, "distance_between") \
+            else None
+        if feet is not None:
+            return feet
+        return 1000 * rank.get(str((getattr(scene, "zones", {}) or {}).get(r, "near")), 1)
+
+    ordered = sorted(present, key=how_far)
+    if len(ordered) > 1 and how_far(ordered[0]) == how_far(ordered[1]):
+        return ""
+    return ordered[0]
+
+
+def asked_about_not_addressed(raw_intents, player_text: str, scene) -> list:
+    """A person the sentence only asks ABOUT is neither introduced nor spoken to.
+
+    Measured live 2026-09-29, G3's market-seek turn 1: "I ask the nearest person about the
+    girl who sells herbs in the market." The reading was right — `talk, target: the
+    nearest person, says: about the girl who sells herbs in the market` — and the plan was
+    `introduce who="herbalist vendor"` (c3) plus `say to=new1`, "Tell me about the girl
+    who sells herbs in the market", said TO the herb seller. Inform's ASK … ABOUT: the
+    person token is in scope; the topic reaches out of it and is never addressed.
+
+    So an `introduce` whose words sit in the topic and not in the addressee is dropped,
+    and a line said to it — or to somebody present who is only the topic — goes to the
+    person actually asked when the words point at one ("the nearest person": the one
+    nearest, if one is), else to nobody in particular. The topic stays a topic: a
+    heard-of record is the aftermath's to write when an answer places her
+    (`play/aftermath/mentioned_elsewhere.py`)."""
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    from rules.intents import INTRODUCED_REFS
+
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    reading = reading if reading and not reading.get("error") else None
+    topic_list = _interpret.topics(reading, player_text)
+    if not topic_list:
+        return raw_intents
+    asked = _interpret.addressee(reading, player_text)
+    actors = getattr(scene, "actors", {}) or {}
+    # Who the line should go to instead: somebody present the addressee's words name, or
+    # the nearest when they only point.
+    instead = ""
+    if asked and _NEARNESS.search(asked):
+        instead = _nearest_here(scene)
+    elif asked:
+        from rules import population
+
+        found = population.find(scene, re.sub(r"^(?:the|a|an)\s+", "", asked, flags=re.I),
+                                rings=(population.HERE,), log_miss=False)
+        if found.scope == population.HERE and found.people[0].get("ref") in actors:
+            instead = found.people[0]["ref"]
+    # The placeholders each introduce hands out, in order, before and after the drop.
+    old_refs: dict[int, list[str]] = {}
+    kept_refs: dict[int, list[str]] = {}
+    i_old = i_new = 0
+    dropped: set[str] = set()
+    for k, r in enumerate(raw_intents):
+        if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "introduce"):
+            continue
+        p = r.get("params") or {}
+        try:
+            n = max(1, int(p.get("count", 1) or 1))
+        except (TypeError, ValueError):
+            n = 1
+        mine = list(INTRODUCED_REFS[i_old:i_old + n])
+        i_old += n
+        old_refs[k] = mine
+        if _interpret.in_topic(str(p.get("who") or ""), topic_list, asked):
+            dropped.update(mine)
+            continue
+        kept_refs[k] = list(INTRODUCED_REFS[i_new:i_new + n])
+        i_new += n
+    renamed = {o: nw for k in kept_refs for o, nw in zip(old_refs[k], kept_refs[k])}
+    topical = {r for r, a in actors.items()
+               if not a.is_pc and _interpret.in_topic(a.name, topic_list, asked)}
+    if not dropped and not topical:
+        return raw_intents
+
+    def swap(v):
+        if isinstance(v, str):
+            if v in dropped or (v in topical and v != instead):
+                return instead or None
+            return renamed.get(v, v)
+        if isinstance(v, list):
+            got = [swap(x) for x in v]
+            return [x for x in got if x]
+        return v
+
+    out = []
+    for k, r in enumerate(raw_intents):
+        if k in old_refs and k not in kept_refs:
+            continue                     # the topic, introduced: not made
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        op = str(r.get("op", "")).lower()
+        r = dict(r)
+        if op == "say":
+            p = dict(r.get("params") or {})
+            for key in ("to", "at"):
+                if key in p:
+                    got = swap(p[key])
+                    if got:
+                        p[key] = got
+                    else:
+                        p.pop(key)
+            r["params"] = p
+            if r.get("target") is not None:
+                r["target"] = swap(r["target"])
+                if not r["target"]:
+                    r.pop("target")
+        else:
+            # Anything else aimed at a dropped placeholder has nobody to reach; at a
+            # renumbered one, the new number.
+            if any(x in dropped for x in _refs_in(r)):
+                continue
+            r = _renamed(r, renamed)
+        out.append(r)
+    return out
+
+
+def _renamed(raw: dict, renamed: dict) -> dict:
+    if not renamed:
+        return raw
+    out = dict(raw)
+    for key in ("actor", "target"):
+        if isinstance(out.get(key), str):
+            out[key] = renamed.get(out[key], out[key])
+    p = {}
+    for k, v in (out.get("params") or {}).items():
+        if isinstance(v, str):
+            p[k] = renamed.get(v, v)
+        elif isinstance(v, list):
+            p[k] = [renamed.get(x, x) if isinstance(x, str) else x for x in v]
+        else:
+            p[k] = v
+    out["params"] = p
+    return out
 
 
 def absent_answer(scene, world, player_text: str, location_id: str | None = None) -> str:
