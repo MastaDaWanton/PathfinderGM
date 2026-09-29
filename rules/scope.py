@@ -104,21 +104,126 @@ def matches(entity, phrase: str) -> bool:
                 or want & _words(_role_of(entity)))
 
 
+# A relative clause: "the girl THAT the watchman described", "the man WHO sold me bread".
+# The person meant is the head noun before it; the clause names somebody else, or a deed.
+# Not after a preposition, where the same word is a determiner ("the man at that stall",
+# "by which door") and what follows is still part of the head.
+_RELATIVE = re.compile(r"\s+(who|whom|whose|which|that)\s+", re.I)
+_PREPOSITIONS = frozenset({
+    "at", "by", "in", "near", "on", "behind", "beside", "from", "over", "under", "with",
+    "to", "of", "for", "into", "onto", "past", "through", "across", "around", "about",
+})
+
+
+def head_phrase(phrase: str) -> str:
+    """The phrase with its relative clause dropped: whom it names, not what it says of
+    them. "the girl that the watchman described to me" is "the girl".
+
+    Measured on the 2026-09-28 playtest (turn 4): with the watchman in the room, "the
+    girl that the watchman described" shared the word "watchman" with him and nobody
+    else, so `in_the_room` answered with the watchman — the one person the sentence
+    says she is NOT. `population.find` had the same fault and drops `who`/`whom`/`that`
+    clauses since Lane D; this is the same rule for the room and the world."""
+    text = " ".join(str(phrase or "").split())
+    for m in _RELATIVE.finditer(text):
+        before = text[:m.start()].split()
+        if not before or before[-1].lower() in _PREPOSITIONS:
+            continue
+        head = text[:m.start()].strip(" ,")
+        if _words(head):
+            return head
+    return text
+
+
+def _name_run(name: str) -> list[str]:
+    """A name as the run of words a phrase must contain to have said it whole —
+    articles and stop words dropped, so "the watchman waving traffic through" is said
+    whole by "watchman waving traffic through"."""
+    return [w for w in _WORDS.findall(str(name or "").lower())
+            if len(w) > 2 and w not in _NOT_A_NAME]
+
+
+def _says_whole(said: list[str], name: str) -> bool:
+    run = _name_run(name)
+    if not run or len(run) > len(said):
+        return False
+    return any(said[i:i + len(run)] == run for i in range(len(said) - len(run) + 1))
+
+
 def in_the_room(scene, phrase: str) -> str:
     """The ref of the person here that phrase names, or "". Asked first, always: the
-    answer to "where is the smith" is usually "behind you"."""
-    want = _words(phrase)
+    answer to "where is the smith" is usually "behind you".
+
+    Three rules, each from a measured miss (Lane D, 2026-09-28):
+
+      * **A relative clause is not the person** (`head_phrase`): "the girl that the
+        watchman described" is looked for as "the girl", so the watchman standing here
+        is not who it means.
+      * **A name said whole beats a word of it**, and a description matched by what the
+        phrase is about beats a word shared by chance. The shown name or the true name,
+        every word of it in order, outranks any count of shared words: "Bregan Sootspar"
+        is Bregan even beside a keeper called Gribbet Sootspar. Next, a person shown by
+        a description ("the watchman waving traffic through") whose description holds
+        the phrase's head noun ("the watchman at the gate").
+      * **A word counts once.** The shown name and the true name were scored separately
+        and added, so a keeper whose name and true name were both "Gribbet Sootspar" scored
+        the shared family name twice — two, the same as the giver's given name plus family
+        name — and won the tie by coming first in the room. Now it is the words the phrase
+        shares with everything the person is called, counted once.
+
+    What was rejected: returning "" on a tie. Two people who share only a family name are
+    genuinely ambiguous, but every caller already falls through to the population's own
+    "which do you mean" when this answers nothing and a whole-name match was the missing
+    piece in every case measured; the first-in-the-room tie-break is kept as it was."""
+    head = head_phrase(phrase)
+    want = _words(head)
     if scene is None or not want:
         return ""
-    best, score = "", 0
+    said = [w for w in _WORDS.findall(head.lower()) if len(w) > 2 and w not in _NOT_A_NAME]
+    noun = _head_noun(head)
+    best, score = "", (0, 0, 0)
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
         if getattr(a, "is_pc", False):
             continue
-        shared = len(want & _words(getattr(a, "name", "")))
-        shared += len(want & _words(getattr(a, "true_name", "")))
-        if shared > score:
-            best, score = ref, shared
+        shown = str(getattr(a, "name", "") or "")
+        true = str(getattr(a, "true_name", "") or "")
+        names = [shown, true]
+        owns: set[str] = set()
+        for n in names:
+            owns |= _words(n)
+        shared = len(want & owns)
+        if not shared:
+            continue
+        whole = max((len(_name_run(n)) for n in names if n.strip() and _says_whole(said, n)),
+                    default=0)
+        # A description shown as the name ("the watchman waving traffic through") is
+        # matched by what the phrase is about — its head noun — not by any word it holds.
+        described = int(bool(noun) and _is_description(shown, true)
+                         and noun in _words(shown))
+        key = (whole, described, shared)
+        if key > score:
+            best, score = ref, key
     return best
+
+
+def _head_noun(head: str) -> str:
+    """The last word before the first preposition: "the girl in the market" is about a
+    girl, "Drenn Ironvale" about Ironvale's bearer. "" when there is none."""
+    words = [w for w in _WORDS.findall(str(head or "").lower())]
+    cut = []
+    for w in words:
+        if w in _PREPOSITIONS and cut:
+            break
+        cut.append(w)
+    cut = [w for w in cut if len(w) > 2 and w not in _NOT_A_NAME]
+    return cut[-1] if cut else ""
+
+
+def _is_description(shown: str, true: str) -> bool:
+    """Whether the shown name is a description rather than a name: it differs from the
+    true name and opens in lower case ("the stranger sharing the step")."""
+    shown = str(shown or "").strip()
+    return bool(shown) and shown != str(true or "").strip() and shown[:1].islower()
 
 
 def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
@@ -182,8 +287,12 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
         town = None
     town_name = str(getattr(town, "name", "") or "")
 
+    # The world is asked for whom the phrase names, not for the people its clause
+    # mentions: "the girl that the watchman described" matched every CHARACTER whose Role
+    # says watchman, and answered that one was elsewhere.
+    whom = head_phrase(phrase)
     found = [e for e in getattr(world, "entities", {}).values()
-             if getattr(e, "kind", "") == "CHARACTER" and matches(e, phrase)]
+             if getattr(e, "kind", "") == "CHARACTER" and matches(e, whom)]
     if found:
         # The one here in town first, because "not in this room" is a shorter walk than
         # "in another city" and the player will want the nearer answer.
@@ -228,11 +337,11 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
     where = town_name or "this place"
     # A trade or a description is not the world's to refuse. The mayor is (an office the
     # settlement's own record answers), and so is a name nobody in the world carries.
-    named = any(w[:1].isupper() for w in phrase.split())
-    if not (_words(phrase) & OFFICES) and not named:
+    named = any(w[:1].isupper() for w in whom.split())
+    if not (_words(whom) & OFFICES) and not named:
         return {**out, "scope": UNMET, "where": town_name, "line": ""}
     line = f"There is no {phrase} in {where}."
-    if _words(phrase) & OFFICES:
+    if _words(whom) & OFFICES:
         facts = dict(getattr(town, "facts", {}) or {}) if town is not None else {}
         instead = str(facts.get("Formal Power") or facts.get("Governance") or "").strip()
         instead = re.split(r"(?<=[.!?])\s", instead)[0] if instead else ""

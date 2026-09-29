@@ -74,7 +74,16 @@ _CRITERIA = {
 SHAPES = ("at($place)", "left($place)", "arrived($place)", "has(pc, tag)",
           "has($slot, tag)", "has(pc, state.wanted.$town)", "since(open) >= 2h",
           "since(open) >= 2d", "since(left($market)) >= 1h", "clock >= 600",
-          "event:give($slot)", "alive($slot)", "present($slot)", "holds(pc, $item)")
+          "event:give($slot)", "event:talk($slot)", "alive($slot)", "present($slot)",
+          "holds(pc, $item)")
+# The events `_events_from` reads out of a tick's outcomes. A criterion naming any other
+# can never hold: `event:talk` was written into the design (docs/design-d-people.md
+# §4.6) before anything emitted it, and the grammar alone would have accepted it and
+# left the step dead without a word.
+EVENTS = ("travel", "give", "talk", "objective_done", "quest_taken", "fight_ended")
+# What a quest card's `hook` block may say (rules/hooks.py `ingredients`): words for the
+# narrator, never a number and never a slot the scheme does not declare.
+HOOK_FIELDS = ("motive", "doing", "withholds")
 # Criteria a player can change by acting. `since` and `clock` are not among them;
 # `has`/`holds` only when the subject is the player; `alive`/`present` only beside a
 # place or event criterion (a person's state is the world's to change, not the
@@ -220,10 +229,35 @@ def validate(doc: dict) -> list[str]:
         for o in card.get("objectives") or []:
             check_slots(o, f"{at}.objectives")
             check_digits(o, f"{at}.objectives")
+        # The hook reaches the narrator word for word (`hooks.render`), so it is held to
+        # what a card's title is held to: declared slots, no digits — and only the three
+        # fields the pull reads, so a misspelt one is named instead of silently unread.
+        hook = card.get("hook")
+        if hook is not None:
+            if not isinstance(hook, dict):
+                problems.append(f"{at}.hook: an object with {', '.join(HOOK_FIELDS)}.")
+            else:
+                for k, v in hook.items():
+                    if k not in HOOK_FIELDS:
+                        problems.append(f"{at}.hook.{k}: not read — a hook says "
+                                        f"{', '.join(HOOK_FIELDS)}.")
+                        continue
+                    if not isinstance(v, str) or not v.strip():
+                        problems.append(f"{at}.hook.{k}: a sentence in words.")
+                        continue
+                    check_slots(v, f"{at}.hook.{k}")
+                    check_digits(v, f"{at}.hook.{k}")
+                if card.get("secret"):
+                    problems.append(f"{at}.hook: a secret card is never pulled; the hook "
+                                    f"belongs on the card the player can see.")
     keys = {c.get("key") for c in doc.get("cards") or [] if isinstance(c, dict)}
     for c in doc.get("opens") or []:
-        if _criterion_kind(c) is None:
+        found = _criterion_kind(c)
+        if found is None:
             problems.append(f"opens: {c!r} is not a criterion; the shapes are {', '.join(SHAPES)}.")
+        elif found[0] == "event" and found[1].group(1) not in EVENTS:
+            problems.append(f"opens: {c!r} names an event nothing emits; the events are "
+                            f"{', '.join(EVENTS)}.")
         check_slots(c, "opens")
     steps = doc.get("steps") or []
     if not steps:
@@ -267,6 +301,9 @@ def validate(doc: dict) -> list[str]:
                 problems.append(f"{at}: {c!r} is not a criterion; the shapes are {', '.join(SHAPES)}.")
                 continue
             kinds_here.append(found[0])
+            if found[0] == "event" and found[1].group(1) not in EVENTS:
+                problems.append(f"{at}: {c!r} names an event nothing emits; the events are "
+                                f"{', '.join(EVENTS)}.")
             if found[0] in _PLAYER_CHANGEABLE:
                 changeable = True
             if found[0] in ("has", "holds") and found[1].group(2) == "pc":
@@ -906,14 +943,32 @@ def _criterion_holds(engine, inst: dict, doc: dict, text: str, events: list[dict
     return False
 
 
-def _events_from(outcomes) -> list[dict]:
-    """What happened this tick, in the engine's own words: op names and their people."""
+def _events_from(outcomes, pc_ref: str = "") -> list[dict]:
+    """What happened this tick, in the engine's own words: op names and their people.
+
+    `talk` is an exchange between the player and one other person, from the `said` effect
+    a `say` outcome carries (`Engine._op_say`): the player speaking to them, or them
+    speaking to the player. `to` is always the other person, so `event:talk($giver)`
+    reads as "the player and the giver spoke". Two people talking to each other within
+    the player's hearing is not the player talking to either.
+
+    Before this, the-lost-thing's `noticed` step could only key on the giver being
+    present (Lane D moved it off the open), so the player "noticed" the giver keeping
+    something back without ever having exchanged a word with them."""
     out = []
     for o in outcomes or []:
         op = str(getattr(o, "op", ""))
         for eff in getattr(o, "effects", None) or []:
             if not isinstance(eff, dict):
                 continue
+            if op == "say" and eff.get("kind") == "said":
+                # An empty `who` is the player: `_op_say` speaks as the PC when the
+                # intent names no actor.
+                who, to = str(eff.get("who") or ""), str(eff.get("to") or "")
+                mine = {"", str(pc_ref or "")}
+                other = to if who in mine else who if to and to in mine else ""
+                if other and other not in mine:
+                    out.append({"event": "talk", "to": other})
             if op == "travel" or eff.get("kind") == "travel":
                 out.append({"event": "travel"})
             if op == "give" and eff.get("kind") in ("give", "took", "gave", "given", "handed", "bought"):
@@ -1080,7 +1135,7 @@ def tick(engine, outcomes) -> list:
     if pc is None:
         return []
     turn = int(getattr(engine, "turn", 0) or 0)
-    events = _events_from(outcomes)
+    events = _events_from(outcomes, pc.ref)
     made: list = []
     if not ENABLED:
         return made

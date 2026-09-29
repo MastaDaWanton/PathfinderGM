@@ -74,6 +74,13 @@ def _instance(scene, sid="the-lost-thing"):
     return next(i for i in scene.schemes if i["scheme"] == sid)
 
 
+def _meet(engine, inst):
+    """The player speaks to the giver. The `noticed` step keys on `event:talk($giver)`
+    since Phase 3 (I4): the glance away is seen in an exchange, not by walking past."""
+    return _run(engine, "say", {"words": "Good morning.",
+                                "to": inst["slots"]["giver"]["ref"]})
+
+
 # --- the document ---------------------------------------------------------------------
 
 def test_the_shipped_scheme_validates_and_names_no_one():
@@ -115,8 +122,10 @@ def test_a_scheme_opens_at_the_market_with_slots_filled_from_the_world():
     assert truth.secret
     assert rival.name in " ".join(truth.facts) and giver.name in " ".join(truth.facts)
     # The foreshadowing is granted through the applicator, so the brief carries it — by
-    # the `noticed` step, the giver being present, no longer at open (2026-09-28: the
-    # playtest's Bobby "noticed" Drenn at hour 0, before they had met).
+    # the `noticed` step, no longer at open (2026-09-28: the playtest's Bobby "noticed"
+    # Drenn at hour 0, before they had met), and only once they have spoken (I4).
+    assert not pc.has_state("knows.giver-hides-something")
+    _meet(e, inst)
     assert pc.has_state("knows.giver-hides-something")
     eff = next(x for x in pc.effects if "knows.giver-hides-something" in x.tags)
     assert eff.source == "scheme:the-lost-thing/noticed"
@@ -145,6 +154,7 @@ def test_arriving_where_the_rival_is_fires_the_most_specific_step_with_a_tell():
     s, e, pc = _table()
     _wait(e, 1)
     inst = _instance(s)
+    _meet(e, inst)
     rival = s.people[inst["slots"]["rival"]["ref"]]
     res = _out(e, inst)
     fired = [o for o in res.outcomes if o.op == "scheme" and rival.name in o.tell]
@@ -238,6 +248,7 @@ def test_giving_it_to_the_rival_costs_the_givers_regard():
     inst = _instance(s)
     giver = s.people[inst["slots"]["giver"]["ref"]]
     rival = s.people[inst["slots"]["rival"]["ref"]]
+    _meet(e, inst)
     _out(e, inst)
     _wait(e, 1)            # the twist
     schemes.hand_item(s, pc, inst["slots"]["lost"]["name"])

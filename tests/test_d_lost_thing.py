@@ -43,6 +43,14 @@ def _wait(e, minutes=1):
                             origin="author:test"))
 
 
+def _talk(e, giver):
+    """The player speaks to the giver: `noticed` keys on `event:talk($giver)` since
+    Phase 3 (I4), so the tell is seen in an exchange, never by walking past."""
+    return e.run(e.validate([{"op": "say", "actor": "pc", "because": "t",
+                              "params": {"words": "Good morning.", "to": giver.ref}}],
+                            origin="author:test"))
+
+
 def _opened(s):
     return next((i for i in s.schemes if i["scheme"] == "the-lost-thing"), None)
 
@@ -71,6 +79,8 @@ def test_it_opens_on_day_two_and_the_tell_comes_with_the_giver(worlds):
     assert inst is not None
     giver = s.people[inst["slots"]["giver"]["ref"]]
     assert giver.at == s.at
+    assert "noticed" not in inst["fired"], "present alone is not an exchange (I4)"
+    _talk(e, giver)
     assert "noticed" in inst["fired"] and inst["fired"]["noticed"]["silent"]
     assert pc.has_state("knows.giver-hides-something")
     noticed = " ".join(pc.noticed())
@@ -91,4 +101,6 @@ def test_no_noticed_line_before_the_giver_is_present(worlds):
     assert not pc.has_state("knows.giver-hides-something")
     s.move(giver.ref, s.at)
     _wait(e)
+    assert not pc.has_state("knows.giver-hides-something"), "present, not yet spoken to"
+    _talk(e, giver)
     assert pc.has_state("knows.giver-hides-something")
