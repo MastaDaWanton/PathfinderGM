@@ -3171,50 +3171,147 @@ def _merchant_here(scene):
     work when the user is in a dialogue with a merchant, otherwise the exchange of
     objects can be handled through the prompts." The narrated path (the sell/buy
     injectors) deliberately keeps working anywhere; this gates only the panel.
-    """
-    from rules import keepers
 
+    **Never the master of a market** (I2): the market's own keeper runs it and sells
+    nothing (`places.RUNNERS`), so the panel opens across one of its counters instead.
+    Of several people who keep a counter here, the one the player is talking with wins,
+    then the general store's keeper — the counter a market opens on when nobody asked
+    for another.
+    """
+    from rules import keepers, states
+
+    found = []
     for ref, a in scene.actors.items():
         if a.is_pc or a.is_down:
             continue
+        wid = str(getattr(a, "world_entity_id", "") or "")
         # Whoever keeps this counter, first and by what they ARE rather than by what
         # they are called. The name test below cannot see a keeper: they are named out
         # of the world ("Gorvothys Vyrnys") precisely so that they are a person and not
         # a job title, and a panel that only opens for people called "the stallholder"
         # would refuse every real shopkeeper this app builds.
         if keepers.keeps_a_counter(a):
-            return a
+            found.append(a)
+            continue
+        if keepers.is_keeper(wid) and not keepers.counter_of(wid) \
+                and places_mod.runs_it(keepers.label_of(keepers.place_of(wid))):
+            continue
         if _MERCHANT.search(str(a.name or "")) or _MERCHANT.search(str(a.kind or "")):
-            return a
-    return None
+            found.append(a)
+    if not found:
+        return None
+    talking = [a for a in found if a.has_state(states.TALKING)]
+    if talking:
+        return talking[0]
+    general = [a for a in found
+               if keepers.counter_of(getattr(a, "world_entity_id", "") or "") == "general"]
+    return (general or found)[0]
+
+
+def _market_here(c) -> tuple[str, tuple]:
+    """(the market's place id, its counters) when the party stands in a market that has
+    counters (`rules/market.py`); ("", ()) anywhere else."""
+    from rules import market
+
+    at = str(c.scene.at or "")
+    if not at or not market.is_market(at, getattr(c.scene, "founded", None) or ()):
+        return "", ()
+    location = c.location
+    return at, market.counters(location if location is not None else c.scene.location_id)
+
+
+def _counter_pick(c, want: str = "", line: str = ""):
+    """(counter, its keeper or None, the market's id, every counter) for a trade at a
+    market; (None, None, "", ()) anywhere else.
+
+    Which counter: the one the panel named (`line`), else the one that sells the thing
+    the player asked for (`market.counter_for_want`: "a coil of rope" is the general
+    store's hemp), else the counter of the stallholder the player is talking with, else
+    the general store. Its keeper is minted on first need through the arrival door
+    (`keepers.stand_up`) — design D §4.8 — and is None when the market is packed up for
+    the night or they are gone. Never the master."""
+    from rules import keepers, market, states
+
+    at, choices = _market_here(c)
+    if not choices:
+        return None, None, "", ()
+    chosen = next((x for x in choices if x.id == str(line or "")), None) if line else None
+    if chosen is None and want:
+        chosen, _found = market.counter_for_want(
+            want, choices, str(c.scene.location_id or "nowhere"),
+            market.day_of(c.scene.clock_minutes), c.scene.market_taken)
+    if chosen is None:
+        for a in c.scene.actors.values():
+            cid = keepers.counter_of(getattr(a, "world_entity_id", "") or "")
+            if cid and a.has_state(states.TALKING):
+                chosen = next((x for x in choices if x.id == cid), None)
+                if chosen is not None:
+                    break
+    if chosen is None:
+        chosen = next((x for x in choices if x.id == "general"), choices[0])
+    seller = keepers.stand_up(c.scene, c.world, at, chosen)
+    if seller is not None and (seller.ref not in c.scene.actors or seller.is_down):
+        seller = None
+    return chosen, seller, at, choices
+
+
+def _lines_of(c, at: str, choices) -> list[dict]:
+    """The market's counters for the panel: id, what it is, and who keeps it when they
+    have been met (anonymous until then — design D §4.8)."""
+    from rules import keepers
+
+    out = []
+    for x in choices:
+        wid = keepers.holder_id(at, x.id)
+        who = next((a for a in c.scene.people.values()
+                    if str(getattr(a, "world_entity_id", "") or "") == wid), None)
+        out.append({"id": x.id, "label": x.label,
+                    "seller": str(who.name) if who is not None else ""})
+    return out
+
+
+def _offer_and_seller(c, player_text: str):
+    """The counter a purchase opens and who is behind it: (offer or None, seller)."""
+    from rules import keepers
+
+    want = judgement.purchase_sought(player_text)
+    if not want or c.scene.in_encounter:
+        return None, None
+    pc = c.scene.pc()
+    if pc is None:
+        return None, None
+    counter, seller, _at, choices = _counter_pick(c, want=want)
+    if choices:
+        if seller is None or keepers.shut_here(c.scene, seller):
+            return None, None
+        if _counter_refusal(c, pc, seller) is not None:
+            return None, None
+        return {"open": True, "want": want, "line": counter.id}, seller
+    merchant = _merchant_here(c.scene)
+    if keepers.shut_here(c.scene) or merchant is None:
+        return None, None
+    if _counter_refusal(c, pc) is not None:
+        return None, None
+    return {"open": True, "want": want, "line": ""}, merchant
 
 
 def _trade_offer(c, player_text: str) -> dict | None:
-    """{"open": True, "want": ...} when the player set out to buy something and there is
-    an open counter here to buy it at; else None.
+    """{"open": True, "want": ..., "line": ...} when the player set out to buy something
+    and there is an open counter here to buy it at; else None.
 
     The user's ruling (2026-09-27): "I try to buy a coil of rope." should "open the trade
     tab [potentially with Rope in the basket]". Not opened at a shut counter (the keeper
     has said when to come back, `keepers.shut_here`), with nobody keeping one, or for a
     customer the keeper will not serve (`_counter_refusal`) — each of those is the
-    beat's to say, and an empty panel would contradict it."""
-    from rules import keepers
-
-    want = judgement.purchase_sought(player_text)
-    if not want or c.scene.in_encounter:
-        return None
-    pc = c.scene.pc()
-    if pc is None or keepers.shut_here(c.scene) or _merchant_here(c.scene) is None:
-        return None
-    if _counter_refusal(c, pc) is not None:
-        return None
-    return {"open": True, "want": want}
+    beat's to say, and an empty panel would contradict it. At a market, `line` is the
+    counter that sells the thing (I2), and it is never the master."""
+    return _offer_and_seller(c, player_text)[0]
 
 
 def _buying_note(c, player_text: str) -> str:
     """The brief's line when the turn opens the counter: the prose brings the keeper to
     it and settles nothing — the screen is where the coin moves."""
-    offer = _trade_offer(c, player_text)
+    offer, seller = _offer_and_seller(c, player_text)
     if not offer:
         # A purchase that opens nothing sells nothing, and the beat says why. Live
         # 2026-09-27, the market shut for the night: the prose invented a vendor, sold
@@ -3229,14 +3326,21 @@ def _buying_note(c, player_text: str) -> str:
                    else "The keeper here will not serve the player."))
         return (f"The player tries to buy {want}, and nothing is sold: {why} Nobody "
                 f"hands anything over and no coin changes hands in the prose.")
-    who = getattr(_merchant_here(c.scene), "name", "") or "the keeper"
+    who = getattr(seller, "name", "") or "the keeper"
+    where = ""
+    if offer.get("line"):
+        _at, choices = _market_here(c)
+        label = next((x.label for x in choices if x.id == offer["line"]), "")
+        # Which counter, by name: the market is its counters, and the prose that walks
+        # the player to "the stallholder" without saying which invents one (item 10).
+        where = f" at {label}" if label else ""
     return (f"The player is buying {offer['want']}: the counter's own screen opens for it "
-            f"after this beat. {who} comes to the counter and may show the goods and name "
-            f"a price; nothing is handed over and no coin changes hands in the prose — "
-            f"the player pays on the screen.")
+            f"after this beat. {who}{where} comes to the counter and may show the goods "
+            f"and name a price; nothing is handed over and no coin changes hands in the "
+            f"prose — the player pays on the screen.")
 
 
-def _counter_refusal(c, pc):
+def _counter_refusal(c, pc, merchant=None):
     """The merchant's answer to a wanted character: no, with the reason named. Else
     None (docs/wanted.md, reader two).
 
@@ -3247,10 +3351,13 @@ def _counter_refusal(c, pc):
     counter ask this one helper, for the reason `_cannot_act` gives: a rule with two
     homes drifts. Asked through the vocabulary, so the one `remove_effects(source=...)`
     that clears the name reopens the counter with nothing else touched.
+
+    `merchant` is the counter's keeper when the caller already knows it (a market's
+    counters, I2); else whoever `_merchant_here` finds.
     """
     from rules import attitude, states
 
-    merchant = _merchant_here(c.scene)
+    merchant = merchant if merchant is not None else _merchant_here(c.scene)
     town = str(c.scene.location_id or "")
     if merchant is None:
         return None
@@ -3275,7 +3382,7 @@ def _counter_refusal(c, pc):
         f"Clear your name, or trade somewhere the watch is not looking.")}, status=409)
 
 
-def _stall_of(c) -> tuple[str, str, int]:
+def _stall_of(c, counter=None) -> tuple[str, str, int]:
     """Which shop, on which day. Read the same way `craft_views` reads it, so a stall's
     money and its stock agree about where and when this is.
 
@@ -3283,14 +3390,24 @@ def _stall_of(c) -> tuple[str, str, int]:
     different shelves and two different tills — and the same vendor's stock holds for
     the in-game day (`day_of` is the clock in 24-hour windows), which is the persistence
     the table asked for.
+
+    One of a market's counters (I2) is keyed by its kind, `market:<counter>` — the shelf
+    and the till are the counter's (Morrowind's per-merchant gold), and the engine's
+    `buy` reads the same key to know which counter it is standing at. The stables are
+    keyed `stables` for the same reason.
     """
     from rules import market
 
+    here = (str(c.scene.location_id or "nowhere"), "", market.day_of(c.scene.clock_minutes))
+    if counter is not None:
+        return here[0], counter.kind, here[2]
+    kind = market.counter_kind_here(c.scene)
+    if market.is_counter_kind(kind):
+        return here[0], kind, here[2]
     merchant = _merchant_here(c.scene)
     stall = re.sub(r"[^a-z0-9]+", "-", str(merchant.name).lower()).strip("-") \
         if merchant else "market"
-    return (str(c.scene.location_id or "nowhere"), stall,
-            market.day_of(c.scene.clock_minutes))
+    return here[0], stall, here[2]
 
 
 def _row(item, price: float, count: int = 1) -> dict:
@@ -3301,13 +3418,19 @@ def _row(item, price: float, count: int = 1) -> dict:
             "tier": str(getattr(item, "tier", "") or "common"), "count": count,
             "gp": round(price, 2), "price": pricing.as_text(price),
             # What the engine can actually run with it, which is a quarter of the price
-            # when the answer is nothing — worth showing beside the number.
-            "does_something": bool(getattr(item, "specs", None))}
+            # when the answer is nothing — worth showing beside the number. A weapon, a
+            # suit of armour and a horse are all things the engine runs (I2).
+            "does_something": bool(getattr(item, "specs", None))
+            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")}
 
 
 @require_POST
 def trade(request):
-    """Both sides of a counter: what you are carrying, and what they have."""
+    """Both sides of a counter: what you are carrying, and what they have.
+
+    At a market (I2) the body may name the counter (`line`); the answer says which one
+    it opened on (`line`), every counter the market has (`lines`) and who is behind this
+    one (`seller`) — docs/fix-interfaces.md §2.10."""
     from rules import goods, market, pricing, states
 
     c = campaign_mod.current()
@@ -3317,43 +3440,70 @@ def trade(request):
 
     from rules import keepers as _keepers
 
-    shut = _keepers.shut_here(c.scene)
-    if shut:
-        return JsonResponse({"error": shut}, status=409)
-    if _merchant_here(c.scene) is None:
-        return JsonResponse({"error": (
-            "There is nobody here to trade with. Find a stall and speak to whoever "
-            "keeps it — or simply say what you sell or buy, and the scene handles "
-            "it.")}, status=409)
-    refusal = _counter_refusal(c, pc)
+    body = read_body(request)
+    want = " ".join(str(body.get("want") or "").split())[:80]
+    counter, merchant, at, choices = _counter_pick(c, want=want,
+                                                   line=str(body.get("line") or ""))
+    if choices:
+        if merchant is None:
+            shut = _keepers.shut_here(c.scene)
+            return JsonResponse({"error": shut or (
+                f"Nobody is at {counter.label} just now.")}, status=409)
+        shut = _keepers.shut_here(c.scene, merchant)
+        if shut:
+            return JsonResponse({"error": shut}, status=409)
+    else:
+        shut = _keepers.shut_here(c.scene)
+        if shut:
+            return JsonResponse({"error": shut}, status=409)
+        merchant = _merchant_here(c.scene)
+        if merchant is None:
+            return JsonResponse({"error": (
+                "There is nobody here to trade with. Find a stall and speak to whoever "
+                "keeps it — or simply say what you sell or buy, and the scene handles "
+                "it.")}, status=409)
+    refusal = _counter_refusal(c, pc, merchant)
     if refusal:
         return refusal
 
-    body = read_body(request)
-    place, stall, day = _stall_of(c)
-    stall = str(body.get("stall") or stall)
+    place, stall, day = _stall_of(c, counter)
+    if counter is None:
+        stall = str(body.get("stall") or stall)
+    kind = counter.kind if counter is not None else market.counter_kind_here(c.scene, stall)
     tier = str(body.get("tier") or market.DEFAULT_STALL_TIER)
+    if market.is_counter_kind(kind):
+        tier = market.till_tier(kind, tier)
 
     till = market.purse(place, stall, day, tier)
     left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
-    counter = market.on_sale(place, stall, day, c.scene.market_taken, tier,
-                             counter_kind=market.counter_kind_here(c.scene))
+    shelf = market.on_sale(place, stall, day, c.scene.market_taken, tier, counter_kind=kind)
     # What the player's words asked for, picked on the counter if it is there — and if
     # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
     # and nothing is guessed in its place.
-    want = " ".join(str(body.get("want") or "").split())[:80]
     pick, want_line = "", ""
     if want:
-        found, _fits = goods.match_want(want, counter)
+        found, _fits = goods.match_want(want, shelf)
         if found is not None:
             pick = str(getattr(found, "id", ""))
         else:
-            who = getattr(_merchant_here(c.scene), "name", "") or "The keeper"
+            who = getattr(merchant, "name", "") or "The keeper"
             thing = re.sub(r"^(?:a|an|some|the)\s+", "", want)
-            want_line = f"{who} has no {thing} on the counter. This is what there is."
+            want_line = (f"{who} has no {thing} on the counter"
+                         # True only when every counter was asked: a want with no
+                         # `line` is matched across the whole market first.
+                         + (", and nobody at the market sells it"
+                            if choices and not body.get("line") else "")
+                         + ". This is what there is.")
+    if choices:
+        # A keeper minted for this counter is part of the save from now on.
+        c.save()
 
     return JsonResponse({
         "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
+        "line": counter.id if counter is not None else "",
+        "counter": counter.label if counter is not None else "",
+        "lines": _lines_of(c, at, choices) if choices else [],
+        "seller": {"ref": merchant.ref, "name": str(merchant.name)},
         "till": {"gp": left, "text": pricing.as_text(max(0.0, left))},
         "purse": goods.purse_line(pc.purse, goods.coinage()),
         "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
@@ -3366,7 +3516,7 @@ def trade(request):
             (_row(s, pricing.what_a_shop_pays(s, seller=pc, town=place), s.count)
              for s in pc.stock.values()),
             key=lambda r: -r["gp"]),
-        "theirs": sorted((_row(m, pricing.worth(m, buyer=pc, town=place)) for m in counter),
+        "theirs": sorted((_row(m, pricing.worth(m, buyer=pc, town=place)) for m in shelf),
                          key=lambda r: -r["gp"]),
         "law": states.standing_with_the_law(pc, place),
     })
@@ -3391,25 +3541,37 @@ def trade_do(request):
         return refusal
     from rules import keepers as _keepers
 
-    shut = _keepers.shut_here(c.scene)
+    body = read_body(request)
+    counter, merchant, _at, choices = _counter_pick(c, line=str(body.get("line") or ""))
+    if choices:
+        if merchant is None:
+            return JsonResponse({"error": _keepers.shut_here(c.scene) or (
+                f"Nobody is at {counter.label} just now.")}, status=409)
+        shut = _keepers.shut_here(c.scene, merchant)
+    else:
+        shut = _keepers.shut_here(c.scene)
+        merchant = _merchant_here(c.scene)
     if shut:
         return JsonResponse({"error": shut}, status=409)
-    if _merchant_here(c.scene) is None:
+    if merchant is None:
         return JsonResponse({"error": "There is nobody here to trade with."},
                             status=409)
-    refusal = _counter_refusal(c, pc)
+    refusal = _counter_refusal(c, pc, merchant)
     if refusal:
         return refusal
 
-    body = read_body(request)
     op = str(body.get("op", "")).strip().lower()
     if op not in ("sell", "buy"):
         return JsonResponse({"error": "sell or buy"}, status=400)
 
-    place, stall, day = _stall_of(c)
+    place, stall, day = _stall_of(c, counter)
     params = {"item": str(body.get("item", "")).strip().lower(),
               "count": read_int(body, "count", 1, lo=1, hi=999),
-              "stall": str(body.get("stall") or stall)}
+              "stall": stall if counter is not None else str(body.get("stall") or stall)}
+    # At a market's counter the keeper is named, so the tell says who was paid — never
+    # the master, who sells nothing (I2).
+    if counter is not None:
+        params["from_" if op == "buy" else "to"] = merchant.ref
     # The haggle, when the screen has offered a partial and the player took it. Only ever
     # lowers what is asked — see `_op_sell`.
     if op == "sell" and body.get("accept") is not None:

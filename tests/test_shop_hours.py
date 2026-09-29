@@ -23,6 +23,9 @@ VORMOOR = WORLD.by_name("Vormoor", kind="CITY").id
 HOUR = 60
 
 
+# `keepers.seller_in`, not `keeper_in`: since I2 (the owner's ruling of 2026-09-29) a
+# market's own keeper is its master, who sells nothing, and a village's market has none
+# (Q28); the counter that keeps the market's hours for these tests is its general store.
 def _at_the_market(clock):
     s = Scene(location_id=VORMOOR)
     s.add(load_pc("fixtures/pc-kesst.json"))
@@ -37,14 +40,14 @@ def _at_the_market(clock):
 
 def test_the_market_is_open_by_day_and_its_keeper_sells():
     s, e, market = _at_the_market(10 * HOUR)
-    keeper = keepers.keeper_in(s, market.id)
+    keeper = keepers.seller_in(s, market.id)
     assert keeper is not None and keeper.ref in s.actors
     assert keepers.shut_here(s) == ""
 
 
 def test_at_night_the_stall_is_packed_up_and_its_keeper_has_gone_home():
     s, e, market = _at_the_market(23 * HOUR)
-    keeper = keepers.keeper_in(s, market.id)
+    keeper = keepers.seller_in(s, market.id)
     assert keeper is not None and keeper.ref not in s.actors
     assert residency.is_offstage(keeper.at)
     shut = keepers.shut_here(s)
@@ -61,7 +64,7 @@ def test_a_shut_counter_refuses_to_sell_and_says_when_to_come_back():
 
 def test_the_keeper_comes_back_when_the_counter_opens():
     s, e, market = _at_the_market(23 * HOUR)
-    keeper = keepers.keeper_in(s, market.id)
+    keeper = keepers.seller_in(s, market.id)
     elsewhere = next(p for p in e.places() if p.id != market.id)
     e.run(e.validate([{"op": "travel", "params": {"place": elsewhere.name}}],
                      origin="author:test"))

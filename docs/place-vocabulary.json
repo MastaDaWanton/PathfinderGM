@@ -199,8 +199,8 @@
    "smallest": "village",
    "category": "trade",
    "read_by": "market",
-   "staffed": "stallholders, and one who runs the pitch",
-   "keeper": "the stallholder who runs the pitch"
+   "staffed": "stallholders at their stalls, and a master of the market over them",
+   "keeper": "the master of the market"
   },
   {
    "name": "the smithy",

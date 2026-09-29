@@ -98,7 +98,8 @@ def _keeper_at(s, e, name):
     place = next(p for p in e.places() if p.name == name)
     e.run(e.validate([{"op": "travel", "params": {"place": place.name}}],
                      origin="author:test"))
-    k = keepers.keeper_in(s, place.id)
+    # The seller: at a market that is its general store's keeper since I2.
+    k = keepers.seller_in(s, place.id)
     assert k is not None, f"nobody keeps {name}"
     return place, k
 

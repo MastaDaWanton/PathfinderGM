@@ -17,16 +17,22 @@ let TRADE = null, PICK = null;
 // that said it opens this panel with the thing already picked, and the server matches
 // it against the real shelf — or says the keeper has none, and picks nothing
 // (2026-09-27, the user's ruling: a purchase "should open the trade tab").
-async function openTrade(want) {
+// `line` is one of a market's counters (I2: the general store, the armorer, a stall…);
+// left out, the server opens on the counter that sells what was wanted, else the one
+// the player is talking to, else the general store — never the market's master.
+async function openTrade(want, line) {
   $("#tradepanel").classList.add("on");
   $("#tradepanel").setAttribute("aria-hidden", "false");
   $("#trademsg").textContent = "";
   PICK = null;
+  const body = {};
+  if (typeof want === "string" && want) body.want = want;
+  if (typeof line === "string" && line) body.line = line;
   try {
     // `post` already reads the body, throws on a bad status and hands back the parsed
     // object. Calling `.json()` on its return is how this screen first shipped, and the
     // panel opened completely empty with "r.json is not a function" in the corner.
-    TRADE = await post("/api/trade", typeof want === "string" && want ? {want} : {});
+    TRADE = await post("/api/trade", body);
   } catch (e) {
     $("#trademsg").textContent = e.message;
     return;
@@ -47,7 +53,7 @@ async function closeTrade() {
   render(await getState());
 }
 
-$("#tradeaction").onclick = openTrade;
+$("#tradeaction").onclick = () => openTrade();
 
 // The button follows the server's answer rather than keeping its own copy of the rule.
 // Disabled is deliberate over hidden: a player who wonders why sees the reason in the
@@ -71,8 +77,52 @@ function tradeRow(x, side) {
     <span class="gp">${esc(x.price)}</span></button>`;
 }
 
+// The market's counters, as the sheet's tab strip. Only at a market: a smithy or an
+// inn is one counter, and a strip of one tab is noise.
+function drawLines() {
+  const nav = $("#tradelines");
+  const lines = (TRADE && TRADE.lines) || [];
+  nav.hidden = lines.length < 2;
+  nav.innerHTML = lines.map(l => {
+    const on = l.id === TRADE.line;
+    return `<button type="button" role="tab" data-line="${esc(l.id)}"
+      aria-selected="${on}" title="${esc(l.seller ? `${l.label} — ${l.seller}` : l.label)}"
+      >${esc(l.label.replace(/^the /, ""))}</button>`;
+  }).join("");
+  // On a phone the strip scrolls: the counter a purchase opened on (the horse lines,
+  // last of nine) is brought into view rather than left off the edge.
+  const on = nav.querySelector('[aria-selected="true"]');
+  if (on && !nav.hidden) on.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+async function switchLine(id) {
+  if (!TRADE || id === TRADE.line) return;
+  PICK = null;
+  $("#trademsg").textContent = "";
+  try {
+    TRADE = await post("/api/trade", { line: id });
+  } catch (e) {
+    $("#trademsg").textContent = e.message;
+    return;
+  }
+  drawTrade();
+}
+
+$("#tradelines").addEventListener("click", e => {
+  const b = e.target.closest("[data-line]");
+  if (b) switchLine(b.dataset.line);
+});
+
 function drawTrade() {
-  $("#trademeta").textContent = `${TRADE.stall} · day ${TRADE.day}`;
+  // Which counter, and who keeps it: "The armorer", then her name. A counter with no
+  // name of its own (a tavern, a smithy) keeps the old heading.
+  const label = TRADE.counter || "";
+  $("#tradename").textContent = label
+    ? label.replace(/^the /, "").replace(/^./, c => c.toUpperCase())
+    : "At the counter";
+  const who = (TRADE.seller && TRADE.seller.name) || TRADE.stall;
+  $("#trademeta").textContent = `${who} · day ${TRADE.day}`;
+  drawLines();
   $("#tradepurse").textContent = TRADE.purse;
   $("#tradetill").textContent = `${TRADE.till.text} in the till`;
   $("#tradmine").innerHTML = TRADE.mine.length
@@ -145,6 +195,8 @@ $("#tradego").addEventListener("click", async () => {
   const rows = PICK.side === "sell" ? TRADE.mine : TRADE.theirs;
   const x = rows.find(r => r.id === PICK.id);
   const body = { op: PICK.side, item: PICK.id, count: 1 };
+  // The counter this is, at a market: the armorer's rack, not the general store's.
+  if (TRADE.line) body.line = TRADE.line;
   // The agreed price travels with a sale, so what the screen offered is what the
   // engine pays. It can only ever lower the ask — see `_op_sell`.
   if (PICK.side === "sell") body.accept = Math.min(x.gp, TRADE.till.gp);
@@ -156,7 +208,7 @@ $("#tradego").addEventListener("click", async () => {
     $("#trademsg").textContent = err.message;
   }
   PICK = null;
-  TRADE = await post("/api/trade", {});
+  TRADE = await post("/api/trade", TRADE.line ? { line: TRADE.line } : {});
   drawTrade();
 });
 
