@@ -174,7 +174,11 @@ function spellRows(sp) {
     if (prepared) {
       // A prepared caster casts what is in their head today; the rest of the book is
       // counted below the list rather than printed as forty greyed rows.
-      if (!k.prepared) { unprepared++; continue; }
+      // Cantrips are the exception: the engine casts a 0-level spell from the book
+      // without a prepared copy (`_check_cast` exempts level 0), so they are offered.
+      // Measured 2026-09-29: a wizard's popover listed Burning Hands and Magic Missile
+      // and none of the twenty cantrips the server was offering at will.
+      if (!k.prepared && k.level > 0) { unprepared++; continue; }
     } else if (k.level > 0 && (!slot || slot.left <= 0)) {
       why = `no slot left at level ${k.level}`;
     }
