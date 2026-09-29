@@ -89,7 +89,10 @@ def test_the_unprepared_cast_is_one_refusal_and_no_retries(monkeypatch, coded_ca
         {"op": "cast", "actor": "pc", "params": {"spell": "burning-hands"}}]})
     plan = gm.plan_turn(line, history=[])
     assert len(calls) == 1, "one plan call, no retry and no second model"
-    assert plan.refusal == {"text": "Thessaly Corr did not prepare Burning Hands today.",
+    # The sentence is Lane E's `for_a_person` from `_check_cast` since both lanes merged:
+    # the player-facing line with its fix named, not the engine's third-person reason.
+    assert plan.refusal == {"text": "Burning Hands is not prepared. Prepare it in the "
+                                    "Spells tab first.",
                             "code": "unprepared",
                             "fix": {"kind": "prepare", "spell": "burning-hands"}}
     assert [i.op for i in plan.intents] == ["narrate_only"]
