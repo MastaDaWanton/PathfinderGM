@@ -303,7 +303,50 @@ cobbled stones straw sawdust sand sandy water wet damp rain wind cold heat warm 
 fire awning awnings stall stalls cart carts rope ropes timber timbers plank planks
 beam beams rafters steps stair stairs floor floors ground grass puddle puddles weed tar
 fish bread dung sweat beer incense wax candle candles iron rust salt brine
+road roads rut ruts track tracks verge verges ditch hedge hedges hedgerow field fields
+furrow furrows hill hills slope rise crest scrub gravel dirt earth wagon wagons wheel
+wheels harness traces hooves oxen mule mules horse horses
 """.split())
+
+
+def land_lines(campaign) -> list[str]:
+    """THE LAND AROUND the settlement, for an outside start's material: the ground here,
+    close by and further out, the wider land in the world's own words, its weather and
+    water — `geography.land_around`, the source `gm/brief/land_around.py` prints from, so
+    the opening and the first turn's brief describe the same land. Values unedited; only
+    the labels are the app's."""
+    from rules import geography
+
+    place, world = campaign.location, getattr(campaign, "world", None)
+    if place is None or world is None:
+        return []
+    try:
+        land = geography.land_around(world, place)
+    except Exception:
+        return []
+    if land.source == "unknown":
+        return []
+    out = [f"The land around {place.name} (fact; describe from these, in your own words):"]
+    try:
+        from rules import places as places_mod
+
+        terrain = places_mod.terrain_of(campaign.scene.at or "")
+    except Exception:
+        terrain = ""
+    if terrain:
+        out.append(f"  underfoot here: {terrain}.")
+    if land.near:
+        out.append(f"  close by: {', '.join(land.near)}.")
+    if land.beyond:
+        out.append(f"  further out: {', '.join(land.beyond)}.")
+    wider = [(who, words) for who, words in land.words if geography.ground_in(words)]
+    for who, words in wider[:3]:
+        out.append(f"  the wider land, {who}: {words.rstrip('.')}.")
+    if land.climate:
+        out.append(f"  weather: {land.climate.rstrip('.')}.")
+    if land.water:
+        out.append(f"  water: {land.water.rstrip('.')}.")
+    return out if len(out) > 1 else []
 
 
 def physical_detail(paragraph: str) -> list[str]:
@@ -349,6 +392,19 @@ def material(campaign, situation, skeleton: str) -> tuple[str, set[str]]:
         if prose:
             lines.append(f"The place's own writing: {prose}")
         room = the_room(campaign)
+        from . import opening
+
+        if opening.outside_start(campaign):
+            # A road start: out on the road with the settlement ahead, and the BRIEF's
+            # "what the buildings round it are made of" does not apply — there are none.
+            # Said as a fact beside the spot, and the land given in the world's own
+            # words (Lane B's LAND AROUND, `gm/brief/land_around.py`'s source), so what
+            # the model describes is this road and this land, not a room of the town.
+            lines.append(f"Where they stand (a fact): outside {place.name}, on the road "
+                         f"with {place.name} ahead of them, not in it — describe the road "
+                         f"and the land around it, never a room or the buildings round "
+                         f"them.")
+            lines.extend(land_lines(campaign))
         if room:
             lines.append(f"The spot they stand in (describe THIS, as a person standing "
                          f"there sees, hears and smells it): {room}")

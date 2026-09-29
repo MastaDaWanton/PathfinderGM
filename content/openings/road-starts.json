@@ -1,0 +1,61 @@
+{
+  "_about": [
+    "Starts on the road outside a settlement (rules/openings.py; docs/design-c-starts.md 4.5; the owner's answer Q24, 2026-09-28: the caravan attack and the road-in are the first road set). The envelope is core.json's.",
+    "where.at = road stands the party at one of the settlement's road heads, 'the road to X' where a route the world wrote leaves it (Lane B's ring, rules/outskirts.py), drawn from the story seed; a settlement with no road out cannot host one. The town is ahead of them, never around them.",
+    "The owner's own example, 2026-09-28: 'walking toward a town and as i crest a hill i see a caravan under attack. this on the road scenario would be the best start and its simple.' The caravan hand draws it six times as often as anyone else (fits.backgrounds).",
+    "The caravan's attackers are what the ground holds (fight from: land): the bestiary by the road head's own biome and a CR window around the party, spent against the Core Rulebook's XP budget for an average encounter at the party's level; bandits from the codex where the book stocks nothing for that ground. $raiders in the edge is filled with what the engine staged ('two wolves'), because a document cannot know what the land will send.",
+    "The drovers are the caravan's own people: on the board, in no side, bystanders the fight is round."
+  ],
+  "starts": [
+    {
+      "id": "road-caravan-attack",
+      "name": "The caravan on the road",
+      "kind": "attack",
+      "fits": {"backgrounds": ["caravan-hand"], "open": true, "people": "any"},
+      "where": {"at": "road"},
+      "when": "Late morning",
+      "doing": "You are walking beside the second wagon with a hand on the traces.",
+      "edge": "The lead wagon has stopped dead across the road, with $raiders coming at it off the open ground ahead.",
+      "lead": {"role": "trader", "words": ["merchant", "trader", "teamster", "carter"],
+               "label": "the wagon master",
+               "look": "standing up on the box and shouting",
+               "says": "Get the wagons round, all of you. Nobody runs, and nobody leaves a wagon."},
+      "incident": [
+        {"do": "bring", "slot": "drovers", "label": "the drover",
+         "words": ["teamster", "drover", "carter", "commoner"], "count": "two", "zone": "near"},
+        {"do": "fight", "slot": "raiders", "label": "the raider", "from": "land",
+         "words": ["bandit", "raider", "brigand"], "count": "two", "zone": "near"}
+      ],
+      "hand_off": {"at": "fight",
+                   "moment": "The nearest attacker comes at the wagon you are walking beside."},
+      "errand": "You came on this road with the wagons, for the pay at the far end of it.",
+      "suggestions": ["Put myself between the attackers and the wagon", "Cut the horses loose",
+                      "Get the wagon master down off the box"],
+      "tags": ["start.attack", "start.road"],
+      "grants": [],
+      "opens_scheme": ""
+    },
+    {
+      "id": "road-in",
+      "name": "The road in",
+      "kind": "arrival",
+      "fits": {"backgrounds": [], "open": true, "people": "any"},
+      "where": {"at": "road"},
+      "when": "Afternoon",
+      "doing": "You are walking the last stretch of the road, with the first roofs in sight ahead.",
+      "edge": "A cart has lost a wheel in the ruts and the carter is trying to lift it alone.",
+      "lead": {"role": "", "words": ["carter", "teamster", "commoner"],
+               "label": "the carter",
+               "look": "red in the face under the cart's tail",
+               "says": "Would you. It will not come up for one, and nobody else has stopped."},
+      "incident": [],
+      "hand_off": {"at": "arrival",
+                   "moment": "The carter lets the cart down and straightens up, waiting on you."},
+      "errand": "You came on foot because the road ended here, with a purse about a week from empty.",
+      "suggestions": ["Help lift the cart", "Ask what the place ahead is like", "Walk on"],
+      "tags": ["start.arrival", "start.road"],
+      "grants": [],
+      "opens_scheme": ""
+    }
+  ]
+}

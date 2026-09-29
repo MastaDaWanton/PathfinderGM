@@ -300,17 +300,43 @@ def from_start(doc: dict, scene) -> Situation:
     who = str(actor.name) if actor is not None and actor.name else label
     hand = dict(doc.get("hand_off") or {})
     where = str(start.get("where") or "")
+    # An outside start says where it stands as the road does — "on the road to Dustgate,
+    # outside Vormoor" — not "at the road to Dustgate", which reads as a room.
+    where_words = str(start.get("where_words") or "")
+    phrases = dict(start.get("phrases") or {})
     return Situation(
         when=str(doc.get("when") or "Mid-morning"),
-        where=f"at {where}" if where else "here",
-        doing=str(doc.get("doing") or ""), who=who, edge=str(doc.get("edge") or ""),
+        where=where_words or (f"at {where}" if where else "here"),
+        doing=_filled(doc.get("doing"), phrases), who=who,
+        edge=_filled(doc.get("edge"), phrases),
         template="", errand=str(doc.get("errand") or ""),
         look=str(lead.get("look") or ""), kind=str(doc.get("kind") or ""),
         hand_off=tuple(sorted((str(k), v) for k, v in hand.items()
                               if isinstance(v, (str, bool, int)))),
         moment=str(hand.get("moment") or ""), start_id=str(doc.get("id") or ""),
         suggestions=tuple(str(s) for s in doc.get("suggestions") or ()),
-        label=label, says=str(lead.get("says") or ""))
+        label=label, says=_filled(lead.get("says"), phrases))
+
+
+def _filled(text, phrases: dict) -> str:
+    """A start document's `$slot` as the people the engine staged for it ("two wolves"),
+    capitalised where it opens a sentence. The document cannot know what the land will
+    send; the record (`Scene.start["phrases"]`) does. A slot with no phrase is left as
+    the document wrote it — the validator refuses an undeclared one."""
+    text = str(text or "")
+    if "$" not in text or not phrases:
+        return text
+
+    def sub(m):
+        said = str(phrases.get(m.group(1)) or "")
+        if not said:
+            return m.group(0)
+        before = text[:m.start()].rstrip()
+        if not before or before.endswith((".", "!", "?", "“", '"')):
+            said = said[:1].upper() + said[1:]
+        return said
+
+    return re.sub(r"\$(\w+)", sub, text)
 
 
 def _seed_from(text: str) -> int:
@@ -647,7 +673,11 @@ def compose(campaign, standing: str) -> str:
         from rules import places as _places
 
         kind = _places.what_it_is(_places.scale_of(place))
-        where += f" in {place.name}{', ' + kind if kind else ''}."
+        # A road start is OUTSIDE the settlement, with it ahead: "Late morning, outside
+        # Vormoor" — "in Vormoor" would put the party back in the room the start moved
+        # them out of (docs/fix-interfaces.md §3.3, I1).
+        where += (", outside " if outside_start(campaign) else " in ") + \
+            f"{place.name}{', ' + kind if kind else ''}."
     else:
         where += "."
     # THE ROOM, not a label for its style. The owner, on 2026-09-28's first screen —
@@ -866,6 +896,46 @@ _SENSES = {
 }
 
 
+def outside_start(campaign) -> bool:
+    """Whether this campaign opened on a start that stands the party outside the
+    settlement (a road start, an outskirts start) — read off the start's own record."""
+    start = getattr(getattr(campaign, "scene", None), "start", None) or {}
+    return bool(start.get("id")) and start.get("setting") == "outside"
+
+
+# What open ground sounds and smells like, for an outside start's template floor. One
+# line, as `_SENSES` is one line a spot: the model material carries the world's own land.
+_OPEN_AIR = "wind over open ground, and a smell of dust and trodden earth"
+
+
+def the_land(campaign) -> str:
+    """The land around the road, from the world: "Round about is farmland, and past it
+    mountain." Lane B's LAND AROUND (`geography.land_around`), the same words the brief
+    prints outside — the ground near the settlement and the ground further out, never a
+    biome the world did not give. "" when the world said nothing."""
+    from rules import geography
+
+    place = campaign.location
+    world = getattr(campaign, "world", None)
+    if place is None or world is None:
+        return ""
+    try:
+        land = geography.land_around(world, place)
+    except Exception:
+        return ""
+    near = [g for g in land.near if g != "coast"]
+    coast = "coast" in land.near or land.coast
+    bits = []
+    if near:
+        bits.append(f"Round about is {_listed(', '.join(near))}")
+    elif coast:
+        bits.append("Round about is the coast")
+    if land.beyond:
+        bits.append(f"and past it {_listed(', '.join(land.beyond))}" if bits
+                    else f"Further out is {_listed(', '.join(land.beyond))}")
+    return (", ".join(bits) + ".") if bits else ""
+
+
 def the_spot(campaign, here: Situation) -> str:
     """The first paragraph's room: where exactly, its shape, its buildings, its air."""
     from rules import floorplan
@@ -876,6 +946,19 @@ def the_spot(campaign, here: Situation) -> str:
         spot = places_mod.find(campaign.engine().places(), campaign.scene.at)
     except Exception:
         spot = None
+    if here.start_id and spot is not None and outside_start(campaign):
+        # A road start is described as the road and the land, not as a room: the owner's
+        # "descriptions of what the room looks like" (2026-09-28) means, out here, what
+        # is underfoot and what lies round about — Lane B's ring place's own caption
+        # ("a road leaving, ruts either side of it") and the world's land around the
+        # settlement. No "buildings round about": there are none on the road.
+        about = floorplan.describe(spot.id, spot.terrain, spot.shape)
+        bits = [f"You are {here.where}" + (f": {about}." if about else ".")]
+        land = the_land(campaign)
+        if land:
+            bits.append(land)
+        bits.append(f"{_light(hour_of(here.when))}, with {_OPEN_AIR}.")
+        return " ".join(bits)
     label = " ".join(str(getattr(spot, "name", "") or "").lower().split())
     if here.start_id and spot is not None:
         about = floorplan.describe(spot.id, spot.terrain, spot.shape)

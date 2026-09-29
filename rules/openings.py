@@ -57,12 +57,15 @@ KINDS = ("attack", "injury", "rescue", "chase", "brawl", "fire", "offer", "arriv
          "summons", "accused", "quiet")
 # Where the player takes over, and what the engine is holding at that moment.
 HANDOFFS = ("check", "fight", "offer", "speech", "arrival")
-# Where the start stands the party. `road` and `outskirts` VALIDATE now and are refused at
-# placement (`placeable`) until Phase 3's I1 lands Lane B's outskirts: a road start with no
-# road to stand on would be the gate wearing a road's name.
+# Where the start stands the party. `road` and `outskirts` validated from Phase 2 and were
+# refused at placement until Lane B's outskirts existed (a road start with no road to stand
+# on would have been the gate wearing a road's name). Phase 3's I1 placed them: a road start
+# stands the party at one of the settlement's road heads, an outskirts start at the
+# outskirts — Lane B's ring (`rules/outskirts.py`), real place ids, never a room of the town.
 WHERE_AT = ("place", "lodging", "road", "outskirts")
-NOT_YET = {"road": "a road start needs the outskirts (I1)",
-           "outskirts": "an outskirts start needs the outskirts (I1)"}
+# What still cannot be placed, and why. Empty since I1; kept as the one door a future
+# `where.at` waits behind, so the picker and the draw ask one question.
+NOT_YET: dict[str, str] = {}
 # Who the character is to the town: its own people, a stranger to it, or either.
 PEOPLE = ("own", "stranger", "any")
 # The incident's verbs. Each becomes an arrival through the scene's one door or an
@@ -75,6 +78,30 @@ WOUNDS = ("hurt", "staggered", "dying")
 ZONES = ("engaged", "near", "far")
 # How many a `bring` or a `fight` means, in words: a document never carries a digit.
 COUNTS = {"one": 1, "two": 2, "three": 3, "a few": 3}
+# Where a `fight` step's attackers come from. "" is the document's own words through the
+# codex (`npcs.choose`), which is where people are found; `land` is what the ground the
+# party stands on actually holds — the bestiary by that ground's biome and a CR window
+# around the party, `ontheway.road`'s and `gathering.creature_for`'s door exactly — with
+# the words as the floor for ground the book stocks nothing for (design C §4.2: "or
+# `bestiary.search(biome, window)` on a road, as `ontheway.road` does").
+FOES_FROM = ("", "land")
+
+# --- what comes at a caravan (a `fight` step `from: land`) ------------------------------------
+#
+# The creature types that come at travellers on sight. `ontheway.AGGRESSIVE` without the
+# plant and the ooze — they wait where they are and a wagon rolls past them; a caravan is
+# attacked by things that move — and with the monstrous humanoid (the harpy, the ogre's
+# kind), which does. Humanoids are left out as `gathering.creature_for` leaves them out, and
+# for a second reason here: a world's peoples are its own (the owner's ruling, memory
+# "the world owns its own races"), and a bestiary "Orc" raiding the road would be the
+# rulebook's orc passing judgement on a people the world wrote differently. People who rob
+# caravans come from the document's own words instead — bandits, found through the codex.
+RAIDER_TYPES = frozenset({"animal", "magical beast", "vermin", "monstrous humanoid"})
+# Too small to stop a wagon: a porcupine, a rat and a hawk are all "grassland, CR 1/4" in
+# the book and none of them is a caravan attack.
+TOO_SMALL = frozenset({"fine", "diminutive", "tiny"})
+# Number words for a group phrase ("two wolves"): prose never carries a digit.
+_NUMBER_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
 
 # The weights (docs/design-c-starts.md §4.4; owner's answers Q19 and Q21, 2026-09-28).
 FOR_THE_BACKGROUND = 6.0    # a start written for this character's background
@@ -346,6 +373,9 @@ def validate(doc: dict) -> list[str]:
                 p.append(f"{w}: zone is one of {', '.join(ZONES)}.")
             if str(step.get("count") or "one") not in COUNTS:
                 p.append(f"{w}: count in words: {', '.join(COUNTS)}.")
+            if verb == "fight" and str(step.get("from") or "") not in FOES_FROM:
+                p.append(f"{w}: from is empty (the words, through the codex) or `land` "
+                         f"(what the ground holds, from the bestiary).")
             declared.add(slot)
         elif verb == "wound":
             if slot not in declared:
@@ -396,9 +426,23 @@ def validate(doc: dict) -> list[str]:
                 p.append(f"{w}: a knows.* grant carries a `say` — the sentence the "
                          f"narrator may state as true.")
         _plain_words(g.get("say"), f"{w}.say", p)
+    # A `$slot` in the text the opening reads is the people the incident brought in, said
+    # as the engine made them ("two wolves"), because a document names nobody and cannot
+    # know what the ground will hold. One that no step declares would reach the page as a
+    # dollar sign.
+    for field, text in (("doing", doc.get("doing")), ("edge", doc.get("edge")),
+                        ("lead.says", lead.get("says"))):
+        for name in _SLOT.findall(str(text or "")):
+            if name not in declared or name == "lead":
+                p.append(f"{field}: ${name} is not a slot the incident brings in.")
     scheme = str(doc.get("opens_scheme") or "")
     if scheme and not _ID.fullmatch(scheme):
         p.append("opens_scheme: a scheme id, or empty.")
+    elif scheme and scheme not in schemes_mod.all_schemes():
+        # Refused rather than skipped at staging: a start that says it opens a story and
+        # silently does not is the `open_card` bug over again (schemes._open_one_card).
+        p.append(f"opens_scheme: {scheme!r} is not a scheme; the schemes are "
+                 f"{', '.join(sorted(schemes_mod.all_schemes()))}.")
     return p
 
 
@@ -466,8 +510,41 @@ def _town(world, town) -> dict:
             "spots": spots, "labels": labels, "scale": places_mod.scale_of(town),
             "people": names_mod.people_of(world, town.id),
             "roles": [r for r in roles if r],
-            "water": _has_water(world, town, labels)}
+            "water": _has_water(world, town, labels),
+            "ring": _ring_of(world, town)}
     return got
+
+
+def _ring_of(world, town) -> tuple:
+    """The settlement's outside places (Lane B's ring), or () — a world-less draw, or a
+    settlement the export gives no roads and no land, has nowhere outside to stand."""
+    try:
+        from . import outskirts
+
+        return tuple(outskirts.ring(world, town))
+    except Exception:
+        return ()
+
+
+def _outside_spots(ring, at: str) -> list:
+    """Where an outside start may stand: a road head for `road`, the outskirts for
+    `outskirts`.
+
+    A road head is `the road to {To}` — the ring's place where a route the world wrote
+    leaves the settlement. `the way to {To}` (a route the export never said was a road) is
+    taken only when there is no road at all: a caravan on a way nobody wrote down as a
+    road is still on the only way there is, but a written road is preferred when there is
+    one. Never the stretch a stopped journey leaves (`@along-…`), which exists only while
+    somebody stands on it, and never the crossroads, the fields or the shore.
+    """
+    from . import outskirts
+
+    if at == "outskirts":
+        return [p for p in ring if " ".join(str(p.name).split()).lower()
+                == outskirts.OUTSKIRTS]
+    heads = [p for p in ring if outskirts.road_head_of(p.id) and not outskirts.is_along(p.id)]
+    roads = [p for p in heads if str(p.name).lower().startswith("the road to ")]
+    return sorted(roads or heads, key=lambda p: str(p.id))
 
 
 def _kind_labels(word: str) -> tuple[str, ...]:
@@ -500,6 +577,11 @@ def spot_for(world, town, doc: dict, rng: random.Random | None = None):
     """The place in this town the start stands the party at, or None if it has none."""
     where = doc.get("where") or {}
     at = str(where.get("at") or "")
+    if at in ("road", "outskirts"):
+        found = _outside_spots(_town(world, town)["ring"], at)
+        if not found:
+            return None
+        return found[0] if rng is None else found[rng.randrange(len(found))]
     spots = _town(world, town)["spots"]
     by_label = {" ".join(p.name.lower().split()): p for p in spots}
     wanted: list[str] = []
@@ -686,6 +768,160 @@ def wound_amount(actor, to: str) -> int:
     return max(1, hp // 2)
 
 
+def _xp_of(row: dict) -> int:
+    """What a bestiary row is worth: its own xp column, else its CR on the Core table."""
+    from . import xp as xp_mod
+
+    stated = int(row.get("xp") or 0)
+    if stated:
+        return stated
+    cr = row.get("cr_value")
+    if cr is None:
+        return 0
+    rung = min(xp_mod.CR_AWARD, key=lambda k: abs(float(k) - float(cr)))
+    return int(xp_mod.CR_AWARD[rung])
+
+
+def encounter_cr(total_xp: int) -> float:
+    """The encounter's CR from its total XP, by the Core Rulebook's Table 12-1 reading:
+    the highest CR whose award the total reaches (two CR 1/2 creatures, 400 XP, are a CR 1
+    encounter). Zero XP is no encounter."""
+    from . import xp as xp_mod
+
+    reached = [cr for cr, award in xp_mod.CR_AWARD.items() if award <= int(total_xp)]
+    return float(max(reached)) if reached else 0.0
+
+
+def budget_for(level: int) -> int:
+    """The XP an opening fight is built to, for a party of this level.
+
+    The Core Rulebook ("Designing Encounters", Table 12-1) prices an AVERAGE encounter at
+    CR = APL, and its XP table turns that into a budget the creatures' own awards are
+    spent from. The CRB also takes one off the APL for a party of three or fewer; that
+    is NOT applied here, on purpose: the same road already meets a single creature up to
+    CR level+1 (`ontheway.ABOVE`), and a solo 1st-level budget of 200 XP inside the road's
+    window (CR 1/3 upward) buys exactly one CR 1/3–1/2 creature, every time — one viper
+    is not a caravan attack. At CR = level the opening fight is two CR 1/2s or one CR 1:
+    never harder than what the road it stands on already throws.
+    """
+    from . import xp as xp_mod
+
+    level = max(1, min(20, int(level or 1)))
+    return int(xp_mod.CR_AWARD[level])
+
+
+def _in_numbers(row: dict, n: int) -> bool:
+    """Whether the book lets this creature come in this number: an organization of
+    "solitary" and nothing else means one."""
+    org = " ".join(str(row.get("organization") or "").lower().split())
+    return n <= 1 or not org or not re.fullmatch(r"solitary\.?", org)
+
+
+def foes_from_the_land(biome: str, level: int, most: int,
+                       rng: random.Random) -> tuple[dict, int] | None:
+    """(bestiary row, how many) for a fight the ground itself supplies, or None.
+
+    The bestiary by the ground's biome inside `ontheway`'s CR window (level-2 .. level+1,
+    the road's own), only the kinds that come at travellers (`RAIDER_TYPES`) and nothing
+    too small to stop a wagon, and only the creatures the book itself places on this
+    ground (`biomes_any` false: 4,636 of the 7,133 are "any", and a farmland that answers
+    with a homunculus is the book's floor, not the land). Then spent against the budget
+    (`budget_for`): the most of them the document allows whose awards fit the budget and
+    use more than half of it, so the fight is near the party's level whichever creature
+    the ground gives — fewer of a bigger one, never more than the document said.
+
+    Seeded from the story (`rng`), not the dice: which creature the start staged is part
+    of the start, and the same story seed must open on the same road and the same wolves.
+    None when the ground stocks nothing that fits: the caller falls back to the words.
+    """
+    from . import bestiary
+    from . import ontheway
+
+    if not biome:
+        return None
+    level = max(1, int(level or 1))
+    low = max(1 / 3, level - ontheway.BELOW)
+    high = max(1, level + ontheway.ABOVE)
+    rows = [r for r in bestiary.search(biome=biome, cr_min=low, cr_max=high, limit=5000)
+            if r.get("cr_value") is not None and not r.get("biomes_any")
+            and r.get("creature_type") in RAIDER_TYPES
+            and str(r.get("size") or "").lower() not in TOO_SMALL
+            and _xp_of(r) > 0]
+    budget = budget_for(level)
+    for n in range(max(1, int(most)), 0, -1):
+        each = budget / n
+        fit = sorted((r for r in rows if each / 2 < _xp_of(r) <= each and _in_numbers(r, n)),
+                     key=lambda r: str(r.get("id")))
+        if fit:
+            return fit[rng.randrange(len(fit))], n
+    return None
+
+
+def _within_budget(template: str, count: int, level: int) -> int:
+    """How many of a codex block the opening fight can hold: as many as the document
+    asks while the encounter stays within one CR of the party's own (`encounter_cr`)."""
+    from . import bestiary
+
+    row = bestiary.lookup(template) or {}
+    each = _xp_of({"xp": row.get("xp"), "cr_value": None})
+    if each <= 0:
+        return max(1, int(count))
+    n = max(1, int(count))
+    while n > 1 and encounter_cr(n * each) > max(1, int(level)) + 1:
+        n -= 1
+    return n
+
+
+def creature_noun(name: str) -> str:
+    """A bestiary name as a common noun: "Dog, Riding" is a riding dog, "Wolf" a wolf.
+
+    A size the book prefixes to tell its variants apart ("Medium Giant Scorpion") is
+    the index's, not a word anybody on the road would use: "the medium giant scorpion"
+    was the first caravan draw's attacker (2026-09-29)."""
+    name = " ".join(str(name or "").split())
+    head, _, tail = name.partition(", ")
+    if tail:
+        name = f"{tail} {head}"
+    name = re.sub(r"^(?:fine|diminutive|tiny|small|medium|large|huge|gargantuan|colossal)"
+                  r"\s+(?=\S+\s)", "", name, flags=re.I)
+    return name.lower()
+
+
+def _plural(noun: str) -> str:
+    """English plural of a creature noun's last word — enough for the bestiary's nouns
+    (wolf → wolves, lynx → lynxes, harpy → harpies, lizardfolk → lizardfolk)."""
+    words = noun.split()
+    if not words:
+        return noun
+    last = words[-1]
+    if last.endswith(("folk", "sheep", "deer", "fish", "people")):
+        pl = last
+    elif last.endswith("man"):
+        pl = last[:-3] + "men"
+    elif last.endswith("fe"):
+        pl = last[:-2] + "ves"
+    elif last.endswith("f") and not last.endswith("ff"):
+        pl = last[:-1] + "ves"
+    elif last.endswith(("s", "x", "z", "ch", "sh")):
+        pl = last + "es"
+    elif last.endswith("y") and last[-2:-1] not in "aeiou":
+        pl = last[:-1] + "ies"
+    else:
+        pl = last + "s"
+    return " ".join(words[:-1] + [pl])
+
+
+def group_phrase(noun: str, n: int) -> str:
+    """"a wolf", "two wolves" — the incident's people as the opening says them."""
+    noun = " ".join(str(noun or "").split()).lower()
+    noun = re.sub(r"^(?:the|a|an)\s+", "", noun)
+    if not noun:
+        return ""
+    if int(n) <= 1:
+        return f"{'an' if noun[:1] in 'aeiou' else 'a'} {noun}"
+    return f"{_NUMBER_WORDS.get(int(n), 'several')} {_plural(noun)}"
+
+
 def crossed(text: str, start: dict) -> list[str]:
     """Phrases in `text` that narrate past the start's hand-off, for the repair to name."""
     hand = (start or {}).get("hand_off") or {}
@@ -830,13 +1066,24 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
     scene, world = engine.scene, engine.world
     town = world.get(scene.location_id) if world is not None else None
     spot = spot_for(world, town, doc, rng_for(story_seed, "spot")) if town is not None else None
-    if spot is not None:
+    outside = spot is not None and places_mod.setting_of(spot.id) == "outside"
+    if outside:
+        # Lane B's ring place, by its id: it is a real place of this location (the engine
+        # validates it against the set the id's own ground implies), and a name lookup
+        # from inside the town would not see it until the party was already out there.
+        if spot.id != scene.at:
+            engine.place_party(spot.id)
+    elif spot is not None:
         target = places_mod.find(engine.places(), spot.name)
         if target is not None and target.id != scene.at:
             engine.place_party(target.id)
     pc = scene.pc()
     slots: dict[str, str] = {}
     tells: list[str] = []
+    # Who the incident brought in, as the opening says them ("two wolves"), per slot —
+    # the document's `$slot` is filled from this, never from a model.
+    phrases: dict[str, str] = {}
+    foes: list[str] = []
 
     lead = doc.get("lead") or {}
     row = _lead_person(engine, doc, bound or [], rng_for(story_seed, "lead"))
@@ -854,6 +1101,7 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                                  zone=str(step.get("zone") or "near"))
             if made is not None:
                 slots[slot] = made.ref
+                phrases[slot] = group_phrase(str(step.get("label") or ""), count_of(step))
         elif verb == "wound" and slots.get(slot) in scene.people:
             target = scene.people[slots[slot]]
             amount = wound_amount(target, str(step.get("to")))
@@ -868,20 +1116,48 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
             from . import npcs
 
             level = int(getattr(pc, "level", 1) or 1)
-            got = npcs.choose([str(w) for w in step.get("words") or ()], level) or {}
+            label, count, template = str(step.get("label")), count_of(step), ""
+            got_land_row = None
+            if str(step.get("from") or "") == "land":
+                # What this ground holds, at the party's level (`foes_from_the_land`):
+                # the owner's caravan under attack is attacked by the land it crosses.
+                ground = (str(getattr(spot, "terrain", "") or "")
+                          or places_mod.terrain_of(scene.at or ""))
+                got_land = foes_from_the_land(ground, level, count,
+                                              rng_for(story_seed, f"foes:{slot}"))
+                if got_land is not None:
+                    row, count = got_land
+                    got_land_row = row
+                    template = str(row.get("id") or "")
+                    label = "the " + creature_noun(str(row.get("name") or template))
+            if not template:
+                got = npcs.choose([str(w) for w in step.get("words") or ()], level) or {}
+                template = str(got.get("id") or "thug")
+                if str(step.get("from") or "") == "land":
+                    # The same budget holds for people as for beasts: the codex answers
+                    # the words at CR level-1 (`npcs.target_cr`), so two of them are a
+                    # CR level+1 fight — one more than the road's own and within the
+                    # window; beyond the budget by more than that, fewer come.
+                    count = _within_budget(template, count, level)
             res = _run(engine, doc, [{
                 "op": "spawn", "because": f"the start: {doc['id']}",
-                "params": {"template": str(got.get("id") or "thug"),
-                           "count": count_of(step), "name": str(step.get("label")),
+                "params": {"template": template,
+                           "count": count, "name": label,
                            "zone": str(step.get("zone") or "near")}}])
             refs = [a["ref"] for o in res.outcomes for e in (o.effects or [])
                     if e.get("kind") == "spawn" for a in e.get("actors") or []]
             if refs:
                 slots[slot] = refs[0]
+                foes.extend(refs)
+                phrases[slot] = group_phrase(label, len(refs))
+                if got_land_row is not None:
+                    _no_person_about_it(scene, refs)
                 fight = _run(engine, doc, [{
                     "op": "begin_encounter", "because": f"the start: {doc['id']}",
                     "params": {"sides": {"party": [pc.ref], slot: refs}}}])
                 tells.extend(fight.tells())
+                if str((doc.get("hand_off") or {}).get("at") or "") == "fight":
+                    tells.extend(_up_to_the_party(engine, doc, pc, refs))
 
     filled = {name: {"kind": "actor", "ref": ref,
                      "name": scene.people[ref].name if ref in scene.people else ""}
@@ -902,5 +1178,126 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
     record = {"id": doc["id"], "kind": str(doc.get("kind") or ""),
               "where": spot.name if spot is not None else "",
               "slots": slots, "hand_off": hand, "tells": tells}
+    # Only what an outside start or a `$slot` needs is added, so an in-town start's
+    # record is the same shape it has been since Phase 2.
+    if outside and town is not None:
+        # Where the party stands, as the opening says it: out on the road, not in a room
+        # of the town. The setting is the place id's own (`places.setting_of`), the town
+        # the one the road leaves.
+        record["setting"] = "outside"
+        record["outside"] = str(town.name)
+        record["where_words"] = _where_words(spot, str(town.name))
+    if phrases:
+        record["phrases"] = phrases
+    if foes:
+        record["foes"] = foes
+    opened = _open_its_scheme(engine, doc, source)
+    if opened:
+        record["opened"] = opened
     scene.start = record
     return record
+
+
+def _up_to_the_party(engine, doc: dict, pc, refs: list[str]) -> list[str]:
+    """Hand over at the moment the party can act: the PC's own first turn.
+
+    Initiative is the engine's roll, and a wolf that beats the caravan hand acts first.
+    Handing over with the turn on the wolf is the state `views._hand_the_turn_back`
+    exists to end — "an encounter whose turn sits on an NPC when a request ends is a dead
+    game": the Spells tab refuses "It is not your turn" until something runs the order.
+    Running the wolf's turn through the GM is a model call, which a start never makes.
+
+    So the start document authors what its attackers do before the hand-off, and it is
+    what every fight start's moment already says: they COME ON ("the nearest attacker
+    comes at the wagon you are walking beside", "the nearer of the two … comes on"). Each
+    attacker ahead of the party in the order spends its first turn on the closing move
+    the engine composes for creatures (`position.closing_move`, a validated `move` with
+    its tell, provoking as any move does); one already in reach holds. Nobody is struck
+    before the player takes over, which is the hand-off's rule (`CROSSED["fight"]`).
+    What it trades, said plainly: an attacker that won initiative gives up its first
+    swing — the price of the player never opening the game unable to act.
+    """
+    from . import position as position_mod
+    from .intents import IntentError
+
+    scene = engine.scene
+    out: list[str] = []
+    if pc is None:
+        return out
+    for _ in range(len(scene.initiative)):
+        ref = scene.current_ref()
+        if ref is None or ref == pc.ref or ref not in refs:
+            break
+        actor = scene.people.get(ref)
+        if actor is not None and actor.can_act():
+            closing = position_mod.closing_move(scene, actor, pc,
+                                                actor.equipped or "unarmed")
+            if closing is not None:
+                try:
+                    out.extend(_run(engine, doc, [closing[0]]).tells())
+                except (IntentError, ValueError, KeyError):
+                    pass
+        scene.advance_turn()
+    return out
+
+
+def _no_person_about_it(scene, refs) -> None:
+    """A beast the land sent is not a person: no given name, no people's face.
+
+    `Engine._bring_in` gives every arrival in a world a true name and a face from the
+    local people's pools, and it cannot tell a wolf from a woman. Measured on the first
+    caravan draw (Pangrella, 2026-09-29): "the medium giant scorpion" stood on the board
+    with a Korvu's face — "four limbs ending in sharp talons … a line of blue ink dots
+    across the knuckles" — which the brief's WHO IS HERE would have handed the narrator
+    for the first fight of the game. Only the creatures this start drew from the land
+    (never a humanoid: `RAIDER_TYPES`) are cleared; the engine-wide fix is its own task.
+    """
+    for ref in refs:
+        actor = scene.people.get(ref)
+        if actor is not None:
+            actor.appearance = ""
+            actor.true_name = ""
+
+
+def _where_words(spot, town_name: str) -> str:
+    """"on the road to Dustgate, outside Vormoor"; "on the outskirts of Vormoor"."""
+    from . import outskirts
+
+    name = " ".join(str(getattr(spot, "name", "") or "").split())
+    if name.lower() == outskirts.OUTSKIRTS:
+        return f"on the outskirts of {town_name}"
+    return f"on {name}, outside {town_name}" if name else f"outside {town_name}"
+
+
+def _open_its_scheme(engine, doc: dict, source: str) -> list[str]:
+    """Open the scheme a start names (`opens_scheme`), once, and say which.
+
+    The owner's answer to Q22 (2026-09-28): "The lost thing" opens on day two at the
+    market by its own criteria, "and starts may also open it". A start that opens one
+    skips the scheme's `opens` criteria — the start IS the reason it began — but not its
+    slots, its cards or its grants, which `schemes.open_scheme` fills from the world
+    exactly as the day-two open would. Refused, loudly, when the scheme is missing or
+    broken: the validator already refuses the document, so reaching here with a bad id
+    means homebrew changed under a running draw.
+    """
+    import logging
+
+    from . import schemes as schemes_mod
+
+    sid = str(doc.get("opens_scheme") or "").strip()
+    if not sid:
+        return []
+    sdoc = schemes_mod.all_schemes().get(sid)
+    scene = engine.scene
+    if sdoc is None or schemes_mod.validate(sdoc):
+        logging.getLogger(__name__).warning("start %s names scheme %r, which is %s",
+                                            doc.get("id"), sid,
+                                            "missing" if sdoc is None else "invalid")
+        return []
+    if schemes_mod._find(scene, sid) is not None:
+        return []
+    inst = schemes_mod.open_scheme(engine, sdoc, turn=0)
+    # Which door opened it, on the instance itself: the day-two open and a start's open
+    # must be told apart when the campaign is audited.
+    inst["opened_by"] = source
+    return [sid]
