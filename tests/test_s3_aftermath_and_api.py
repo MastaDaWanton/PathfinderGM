@@ -39,6 +39,7 @@ import pytest
 from django.test import Client, override_settings
 
 import replays
+from gm import judgement
 from play import aftermath
 from play.aftermath import AfterBeat, AftermathContractError
 
@@ -501,8 +502,26 @@ def game(tmp_path, monkeypatch):
         planned["attachments"] = getattr(agent, "attachments", "unset")
         planned["text"] = text
         agent.last_said = []
-        return TurnPlan(narration="", intents=agent.engine.validate(
-            [{"op": "narrate_only", "because": "t"}]))
+        # An attached spell is in every plan the real chain makes (`inject_cast` puts the
+        # chip's cast in), and since 2026-09-29 a plan without it is refused rather than
+        # run (play/views.py `_attached_not_planned`), so the stub carries it as well,
+        # aimed north-east when the chip and the words left it unaimed, as the model
+        # would choose from the aims' enum.
+        from rules.intents import IntentError
+
+        raw = judgement.inject_cast([], text, agent.engine.scene,
+                                    attached=planned["attachments"])
+        for r in raw:
+            r.setdefault("params", {}).setdefault("aim", "dir:ne")
+        try:
+            intents = agent.engine.validate(raw or [{"op": "narrate_only", "because": "t"}])
+        except IntentError:
+            # An aim the engine will not take for this spell (a cone at `self`): the
+            # model's retry would pick another from the enum, so the stub does.
+            for r in raw:
+                r["params"]["aim"] = "dir:ne"
+            intents = agent.engine.validate(raw)
+        return TurnPlan(narration="", intents=intents)
 
     monkeypatch.setattr(views.GMAgent, "plan_turn", plan)
     monkeypatch.setattr(gm_client, "chat", lambda *a, **k: _Reply(
@@ -790,11 +809,12 @@ def test_every_aim_the_register_names_is_accepted(game, aim):
     assert player["attachments"][0]["aim"] == aim
 
 
-def test_a_bare_chip_is_a_turn_stored_and_not_acted_on(game, monkeypatch):
+def test_a_bare_chip_is_a_turn_stored_and_its_cast_planned(game, monkeypatch):
     """Empty text with one spell: the shown line is "I cast Burning Hands.", the chip is on
-    the player's beat and the turn log's `turn` row, the planner holds it. The plan here
-    is a stub that declares nothing, so nothing is cast (the planner's own `inject_cast`
-    is what turns the chip into a cast — tests/test_e_magic_attach.py).
+    the player's beat and the turn log's `turn` row, the planner holds it, and the plan
+    carries the chip's cast (the stub puts it in as `inject_cast` does; until 2026-09-29
+    this stub declared nothing and the turn ran with no cast, the very shape that is now
+    refused rather than run — `_attached_not_planned`).
     `player_input.check` never sees the line we wrote."""
     from play import player_input
     # Prepared: since Lane E an attached spell is checked against the character before
@@ -813,7 +833,7 @@ def test_a_bare_chip_is_a_turn_stored_and_not_acted_on(game, monkeypatch):
     assert game["planned"] == {"attachments": tuple(chip), "text": "I cast Burning Hands."}
     turn = [row for row in c.turn_log if row.get("kind") == "turn"][-1]
     assert turn["attachments"] == chip
-    assert [o["op"] for o in turn["outcomes"]] == ["narrate_only"]
+    assert "cast" in [o["op"] for o in turn["outcomes"]]
     assert checked == []
     assert [b for b in r.json()["transcript"] if b["who"] == "player"][-1] == player
     # Typed words beside the chip are checked as ever, and are the line shown.
