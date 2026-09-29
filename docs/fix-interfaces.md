@@ -318,7 +318,9 @@ when there are any.
 - **`"people"`**: immediately before `for ref in judgement.hailed_by(…)` (≈2112), after
   `apply_introductions`. This meets A's requirement that `speaker_real` runs before
   `hailed_by`. This stage alone may set `who` (and add `"made": ref`) on a `said` record
-  whose `who` is empty; nothing else in `said` may change.
+  whose `who` is empty, and (G2, 2026-09-29) append a record for an untagged line it
+  embodied a speaker for (`"made"` equal to `who`, `"from": "page"`); nothing else in
+  `said` may change.
 - **`"beat"`**: after the `speech-tags` row (≈2215), before `c.history.append`. It needs
   `beat_index` and the kept `said` (F). `c.suggestions` is already set (D).
 
