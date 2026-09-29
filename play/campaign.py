@@ -501,7 +501,21 @@ class Campaign:
         scene.story_seed = (int(s["story_seed"]) if s.get("story_seed") is not None
                             else opening._seed_from(campaign.id))
         campaign._heal_places(str(s.get("biome") or ""), unplaced)
+        campaign._retire_stale_masters()
         return campaign
+
+    def _retire_stale_masters(self) -> None:
+        """A save from before I2 can hold a market master in a village, which I2 says has
+        none (Q28): kept as a resident who lives there, never deleted
+        (`keepers.retire_stale_masters`). Nothing changes in any other save, so every save
+        without one still round-trips byte for byte."""
+        from rules import keepers
+
+        try:
+            world = self.world
+        except Exception:  # noqa: BLE001 — a world that will not load is reported elsewhere
+            return
+        keepers.retire_stale_masters(self.scene, world)
 
     def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
         """A save from before actors had a place, stood somewhere real.

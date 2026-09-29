@@ -81,6 +81,64 @@ def here_as(scene, phrase: str) -> dict | None:
     return rec
 
 
+# --- a booking keeps its description --------------------------------------------------
+#
+# Measured live 2026-09-29 (G3): a scene entry named just "man", and the engine's tell
+# "You leave man mid-sentence". The plan's `introduce` says who in as few words as it
+# likes ("man"), and `_op_introduce` named the body with those words even when the person
+# it bound to was a record the prose had described ("man in a stained leather jerkin" is
+# how the Bobby corpus's c8 was booked, and p8 "man with the whetstone" beside him). A
+# bare head noun distinguishes nobody once a second man walks in; the description is what
+# the player will paraphrase and what the finder matches.
+
+# Where a description starts after its head word: "man WITH the ledger", "woman IN the
+# doorway", "watchman WAVING traffic through".
+_TAIL_START = frozenset({
+    "with", "in", "at", "by", "from", "of", "who", "that", "wearing", "carrying", "holding",
+    "near", "beside", "behind", "on", "under", "outside", "inside", "selling", "mending",
+})
+_ARTICLE = re.compile(r"^(?:the|a|an|some)\s+", re.I)
+
+
+def head_of(phrase: str) -> str:
+    """The word a description is built on: "older man with a face" → "man"."""
+    words = _ARTICLE.sub("", " ".join(str(phrase or "").split())).lower().split()
+    for i, w in enumerate(words):
+        if i and (w in _TAIL_START or w.endswith("ing")):
+            return words[i - 1].strip(",.")
+    return words[-1].strip(",.") if words else ""
+
+
+def is_bare(phrase: str) -> bool:
+    """A head noun and nothing else — "man", "the girl"."""
+    return len(_ARTICLE.sub("", " ".join(str(phrase or "").split())).split()) == 1
+
+
+def fuller(phrase: str, rec: dict | None) -> str:
+    """The record's own words when `phrase` is only their head noun, else `phrase`."""
+    said = " ".join(str((rec or {}).get("phrase") or "").split())
+    if (said and is_bare(phrase) and not is_bare(said)
+            and head_of(said) == head_of(phrase)):
+        return said
+    return phrase
+
+
+def described_here(scene, phrase: str) -> dict | None:
+    """The one record at this spot, with no body in the room, whom a bare head noun
+    means because the prose described them: "man" when the population holds "man with
+    the whetstone" here and no other man. None when the phrase is not bare, or when two
+    unembodied people here share the head — that is a "which do you mean", not a pick."""
+    if not is_bare(phrase):
+        return None
+    head = head_of(phrase)
+    where = getattr(scene, "at", None)
+    bodies = getattr(scene, "people", {}) or {}
+    fits = [r for r in (getattr(scene, "population", {}) or {}).values()
+            if r.get("spot") == where and not (r.get("ref") and r["ref"] in bodies)
+            and not is_bare(r.get("phrase", "")) and head_of(r.get("phrase", "")) == head]
+    return fits[0] if len(fits) == 1 else None
+
+
 def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
            rec: dict | None = None):
     """One person becomes an actor in the room: the one door the prose's people
@@ -92,6 +150,9 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
 
     from . import person_words
 
+    # The words the record was first known by, when the booking came with fewer: never a
+    # bare "man" for somebody the prose described as "the man with the ledger".
+    phrase = fuller(phrase, rec)
     actor = instantiate(template, scene=scene, name=phrase)
     # Through the door. The fallback that wrote `scene.actors` directly would now
     # write into a derived view and vanish; `add` stamps the place and the zone —
@@ -327,6 +388,38 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
     if rec["life"].get("mobility", "resident") != "resident":
         # A traveller's roads are walked from where and when they were last seen.
         rec["anchor"] = {"loc": home, "place": rec["spot"], "t": clock}
+    scene.population[pid] = rec
+    return rec
+
+
+def keep_as_resident(scene, actor, place_id: str) -> dict:
+    """A person who already has a body, recorded as somebody who lives in the settlement
+    `place_id` is in and is found at that place: their existing record if they have one,
+    else a new one with a life rolled like anybody's — and a resident's, whatever the roll
+    said about travelling, because that is what they are. Used for a keeper an older save
+    stood up where there is no longer a counter for them (`keepers.retire_stale_masters`).
+    """
+    from . import places as places_mod
+
+    have = of_ref(scene, actor.ref)
+    if have is not None:
+        return have
+    if not hasattr(scene, "population") or scene.population is None:
+        scene.population = {}
+    pid = _next_id(scene)
+    home = places_mod.location_of(place_id) or getattr(scene, "location_id", None)
+    life = lives.roll(f"{home}|{pid}", phrase=str(actor.name),
+                      body=str(getattr(actor, "appearance", "") or ""),
+                      used_frames=used_frames(scene, home)).as_dict()
+    life["mobility"] = "resident"
+    clock = int(getattr(scene, "clock_minutes", 0) or 0)
+    met_before = bool(getattr(actor, "true_name", ""))
+    rec = {
+        "id": pid, "phrase": str(actor.name), "home": home, "spot": place_id,
+        "seen_at": place_id, "first_seen": clock, "last_seen": clock,
+        "last_met": None, "turn": 0, "ref": actor.ref,
+        "tier": "acquaintance" if met_before else "glimpse", "life": life,
+    }
     scene.population[pid] = rec
     return rec
 

@@ -427,8 +427,50 @@ PACE_ALIASES = {
 # as the bestiary spells them. How a party comes to HAVE one is not this module's — see
 # docs/design-b-space.md §10: owned on the sheet, bought at the stables (light horse
 # 75 gp, pony 30 gp), or hired.
-MOUNTS = frozenset({"horse", "warhorse", "pony", "light-horse", "heavy-horse",
-                    "riding-dog", "camel"})
+#
+# Donkey and mule since 2026-09-29 (G3): the stables sold them for 8 gp (content/rules/
+# stall-lines.json) from blocks in content/bestiary/mounts.json, and they were missing
+# here, so a bought mule never sped a journey. Ultimate Equipment: "Donkeys and mules
+# have the same statistics as ponies" — so the pony's speed, 40 ft (Bestiary, Horse,
+# pony variant). Sources as recorded in content/bestiary/mounts.json, read from
+# legacy.aonprd.com/bestiary/horse.html and d20pfsrd (Herd Animal, Camel; Pony) on
+# 2026-09-29; the page was not re-fetched for this row. Speeds in feet, the bestiary's:
+# the owner's journey multipliers (Q13: half the time riding, a third galloping) are the
+# rule for every mount alike and do NOT scale with these — the speeds are the record of
+# what each animal is, for the day the owner rules otherwise.
+MOUNT_SPEEDS: dict[str, int] = {
+    "horse": 50, "light-horse": 50, "warhorse": 50, "heavy-horse": 50, "pony": 40,
+    "riding-dog": 40, "dog-riding": 40, "camel": 50, "donkey": 40, "mule": 40,
+}
+MOUNTS = frozenset(MOUNT_SPEEDS)
+
+# A mount's keep. The owner's price source (d20pfsrd "Animals & Animal Gear", Ultimate
+# Equipment, recorded in docs/fix-interfaces.md §3.4): feed 5 cp a day, stabling 5 sp a
+# day. Until 2026-09-29 nothing charged either — a bought horse ate for nothing for ever,
+# which is why stall-lines.json declined to sell stabling at all. Charged by the engine
+# (`Engine._keep_the_mounts`) through `goods.spend`: feed for every day on the road or
+# rested, stabling for a night slept in a settlement that has stables. A purse that
+# cannot pay is said, and the animal goes without — the book prices the keep and names
+# no penalty for skipping it, so none is invented here.
+FEED_CP_A_DAY = 5
+STABLING_CP_A_NIGHT = 50
+
+
+def owned_mounts(scene) -> list:
+    """The mounts that are the party's: a creature of a `MOUNTS` template, travelling with
+    them, not dead. Wherever they stand — a horse stabled in the next room is still fed."""
+    from . import states
+
+    out = []
+    for a in (getattr(scene, "people", {}) or {}).values():
+        if getattr(a, "is_pc", False):
+            continue
+        if str(getattr(a, "from_template", "") or "") not in MOUNTS:
+            continue
+        if not a.has_state(states.TRAVELS_WITH_YOU) or a.has_state("state.down.dead"):
+            continue
+        out.append(a)
+    return out
 HUSTLE_FREE_HOURS = 1          # "can hustle for 1 hour without a problem"
 GALLOP_HOURS_A_DAY = 2         # the free hour, and the second that tires the mount
 FATIGUE_ROUNDS = 8 * 60 * 10   # PF1e: fatigue lifts after 8 hours of complete rest

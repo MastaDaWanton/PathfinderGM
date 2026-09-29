@@ -367,7 +367,36 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
                          if not line.startswith(' "world_source": '))
 
     assert not any(f'"{k}":' in written for k in NEW_SCENE_KEYS)
-    assert without_source(written) == without_source(original)
+    # The one change a load is allowed to make (G3 item 7, 2026-09-29): all four of these
+    # saves hold Ashla Ironvale as `keeper:<market>` in Vormoor, whose scale is a village —
+    # a market master where I2 says a village has none, and not its seller either. The
+    # load retires her from the role (keeper id off, her note rewritten) and records her
+    # as a resident, never deleting her. Everything else must match byte for byte, and
+    # the migrated save must itself round-trip byte for byte.
+    orig, now = json.loads(original), json.loads(written)
+    retired = [ref for ref, a in (orig["scene"].get("people") or {}).items()
+               if a.get("world_entity_id") != now["scene"]["people"][ref].get("world_entity_id")]
+    for ref in retired:
+        was, got = orig["scene"]["people"][ref], now["scene"]["people"][ref]
+        assert str(was.get("world_entity_id") or "").startswith("keeper:"), ref
+        assert got.get("world_entity_id") is None and got["name"] == was["name"]
+        was["world_entity_id"], was["notes"] = None, got["notes"]
+    added = set(now["scene"].get("population") or {}) - set(orig["scene"].get("population")
+                                                            or {})
+    assert {now["scene"]["population"][p]["ref"] for p in added} == set(retired)
+    if added:
+        orig["scene"].setdefault("population", {}).update(
+            {p: now["scene"]["population"][p] for p in added})
+    orig.pop("world_source", None)
+    now.pop("world_source", None)
+    assert now == orig
+    if not retired:
+        assert without_source(written) == without_source(original)
+    else:
+        with override_settings(CAMPAIGN_DIR=str(data_root / "campaigns")):
+            path = c.save()
+            again = cm.Campaign.load(path).save().read_text(encoding="utf-8")
+        assert without_source(again) == without_source(written)
 
 
 def test_new_scene_keys_are_omitted_at_default_and_kept_when_set(tmp_path):

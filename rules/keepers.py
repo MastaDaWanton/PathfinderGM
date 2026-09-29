@@ -462,6 +462,44 @@ def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, wha
     return actor
 
 
+def retire_stale_masters(scene, world) -> list[str]:
+    """On load: a market keeper an older build stood up where I2 says there is none, kept
+    as a resident who lives there. Returns the refs retired.
+
+    I2 (merged 2026-09-29) ruled that a village's market has no master (Q28) and that a
+    master sells nothing; a save from before it holds the old `keeper:<market>` in a
+    village — measured at G3, neither master (the village has none, so `master_here` is
+    never asked) nor seller (`seller_in` reads the general store's holder), a person the
+    counters could not use and the brief still introduced as "the master of the market".
+
+    Never deleted: they are somebody the player may have met, with a name and a face. The
+    keeper's id is taken off them (so no counter or master rule reads them), their note
+    says what they are now, and they get a population record at the market as a resident
+    who lives in the settlement (`population.keep_as_resident`), so the finder and the
+    day's rounds treat them like anybody else who lives there."""
+    from . import population
+
+    out: list[str] = []
+    for ref, actor in list((getattr(scene, "people", {}) or {}).items()):
+        wid = str(getattr(actor, "world_entity_id", "") or "")
+        if getattr(actor, "is_pc", False) or not is_keeper(wid) or counter_of(wid):
+            continue
+        place = place_of(wid)
+        if not place or not places_mod.runs_it(label_of(place)):
+            continue
+        location = _location(world, places_mod.location_of(place))
+        if places_mod.has_a_master(places_mod.scale_of(location)):
+            continue
+        actor.world_entity_id = None
+        town = str(getattr(location, "name", "") or "") if not isinstance(location, str) \
+            else ""
+        actor.notes = ("Lives in " + (town or "the village")
+                       + ", and is often about the market; keeps no counter there.")
+        population.keep_as_resident(scene, actor, place)
+        out.append(ref)
+    return out
+
+
 def master_here(scene):
     """The master of the market the party is standing in, if they are here; else None.
     The market's own keeper (`keeper:<market>`, no counter), at their place."""
