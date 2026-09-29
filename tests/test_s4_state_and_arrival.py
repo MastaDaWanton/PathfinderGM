@@ -40,7 +40,9 @@ from rules.sheet import from_dict, load_pc, to_dict
 # The six scene keys this pass adds (register §2.4). A save written by the Phase-1 base
 # build has none of them; that is what "an old save" means below.
 NEW_SCENE_KEYS = ("story_seed", "start", "spoken_for", "acquainted",
-                  "conversation_log", "conversation_seq")
+                  "conversation_log", "conversation_seq",
+                  # G2 close-and-strike (2026-09-29): the round each combatant walked.
+                  "move_spent")
 
 
 def _unplaced(scene) -> list[str]:

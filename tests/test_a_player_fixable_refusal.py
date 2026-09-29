@@ -149,7 +149,9 @@ def test_the_non_cast_legality_refusals_carry_codes():
 
 def test_out_of_reach_is_the_players_and_the_player_reads_the_square():
     """"out_of_reach" is in PLAYER_FIXABLE: closing the distance is the character's move
-    action to spend, and the refusal's `for_a_person` names the square the map names."""
+    action to spend, and the refusal's `for_a_person` names the square the map names.
+    Since the close-and-strike ruling (2026-09-29) a gap one move closes is walked, not
+    refused, so this is asked with Kesst's move action already walked this round."""
     from rules.bestiary import instantiate
 
     # The board test_maneuver_reach.py measured the defect on: the thug fifteen feet off.
@@ -158,6 +160,7 @@ def test_out_of_reach_is_the_players_and_the_player_reads_the_square():
     s.add(instantiate("thug", scene=s, name="the thug"))
     e = Engine(s, Dice(seed=7))
     e._ensure_encounter("pc", "c1")
+    s.move_spent["pc"] = s.round
     with pytest.raises(IntentError) as got:
         e.validate([{"op": "attack", "actor": "pc", "target": "c1", "params": {}}])
     assert got.value.code == "out_of_reach" and got.value.fixable_by == "player"

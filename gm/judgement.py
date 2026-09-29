@@ -1692,6 +1692,7 @@ def rearm(scene, ref: str, raw_intents) -> tuple[list, list[str]]:
     # A move and no swing is two move actions — the pick-up, then the move — and
     # legal: a creature that stoops for its sap and runs keeps its run.
     drop_moves = False
+    closing: dict | None = None
     if keep_attack is not None and moves and not draw_rides_a_move:
         if _target_in_reach(scene, ref, keep_attack.get("target")):
             drop_moves = True
@@ -1699,7 +1700,25 @@ def rearm(scene, ref: str, raw_intents) -> tuple[list, list[str]]:
         else:
             keep_attack = None
             repairs.append("rearm: the target is out of reach; it closes instead of swinging")
+    elif keep_attack is not None and not draw_rides_a_move \
+            and not _target_in_reach(scene, ref, keep_attack.get("target")):
+        # A swing with no move beside it, out of reach. Since the close-and-strike ruling
+        # (2026-09-29) the engine walks the step in front of such a blow — a move action
+        # the pick-up has already spent, which the engine cannot see (a pick-up is a
+        # `give`, not a walk). So it is settled here, the way the branch above settles
+        # it: the swing goes, and the creature closes with its second move action.
+        keep_attack = None
+        repairs.append("rearm: the target is out of reach; it closes instead of swinging")
+        from rules import position as position_mod
+
+        target = str((attacks[0] or {}).get("target") or "")
+        if target in scene.actors:
+            found = position_mod.closing_move(scene, scene.actors[ref],
+                                              scene.actors[target], weapon)
+            closing = found[0] if found is not None else None
     out = [first]
+    if closing is not None:
+        out.append(closing)
     for r in raw_intents:
         if any(r is a for a in attacks) and r is not keep_attack:
             if keep_attack is not None:

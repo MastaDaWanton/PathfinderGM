@@ -15,6 +15,13 @@ written out — and the fix is a SQUARE, not "move first": the model plans in zo
 The attacker is never moved by the refusal. Only turns the engine composes for a creature
 itself (the fallback, the blow that opens a fight from their side) declare their own
 closing move, as a real intent that is told and provokes.
+
+Changed by the owner's ruling of 2026-09-29 ("yes close the distance and strike if one
+move reaches"; tests/test_g2_close_and_strike.py): a declared blow that ONE move action
+reaches is no longer refused — the engine walks the step and swings once. The refusals
+below are measured with the attacker's move action already walked this round
+(`_walked`), which is where the refusal still stands; before the ruling they were
+measured on a fresh turn.
 """
 from __future__ import annotations
 
@@ -50,6 +57,13 @@ def _attack(params=None, actor="pc", target="c1"):
             "because": "test", "params": dict(params or {})}
 
 
+def _walked(scene, ref: str = "pc") -> None:
+    """Spend `ref`'s move action this round — the case the reach refusal is left for
+    since the close-and-strike ruling (2026-09-29): one move would otherwise close the
+    gap, and nothing would be refused."""
+    scene.move_spent[ref] = scene.round
+
+
 def _named_square(message: str) -> tuple[int, int]:
     got = re.search(r'"square": \[(\d+), (\d+)\]', message)
     assert got, f"the refusal names no square to step to: {message}"
@@ -76,8 +90,10 @@ def test_the_board_the_defect_was_measured_on():
 @pytest.mark.parametrize("key", sorted(MANEUVERS))
 def test_a_manoeuvre_from_15_feet_is_refused_with_the_square_named(key):
     """A disarm from 15 feet resolved; the thug was never in reach. So did every other
-    manoeuvre in the table — none of the ten asked."""
+    manoeuvre in the table — none of the ten asked. (Move action walked: see
+    `_walked`.)"""
     scene, engine = _fight()
+    _walked(scene)
     with pytest.raises(IntentError) as err:
         engine.validate([_attack({"manoeuvre": key})])
     said = str(err.value)
@@ -92,8 +108,10 @@ def test_a_manoeuvre_from_15_feet_is_refused_with_the_square_named(key):
 
 def test_a_plain_melee_swing_from_15_feet_is_refused_too():
     """The same gap in the ordinary attack: a rapier thrust from fifteen feet hit the thug
-    for 8. Closed together with the manoeuvres, on the user's ruling (2026-09-27)."""
+    for 8. Closed together with the manoeuvres, on the user's ruling (2026-09-27).
+    (Move action walked: see `_walked`.)"""
     scene, engine = _fight()
+    _walked(scene)
     with pytest.raises(IntentError) as err:
         engine.validate([_attack()])
     said = str(err.value)
@@ -105,8 +123,11 @@ def test_a_plain_melee_swing_from_15_feet_is_refused_too():
 def test_the_named_move_then_the_manoeuvre_resolves_in_one_list(key):
     """The repair the refusal asks for. Validation sees the list before any of it runs,
     so an attack after a move of its own attacker is left to the floor at resolution —
-    otherwise the fixed list would be refused for the distance it is about to close."""
+    otherwise the fixed list would be refused for the distance it is about to close.
+    (The refusal that names the square is asked with the move action walked; the list
+    itself is the explicit move the engine has never gated.)"""
     scene, engine = _fight()
+    _walked(scene)
     try:
         engine.validate([_attack({"manoeuvre": key})])
     except IntentError as exc:
@@ -173,8 +194,10 @@ def _armed(scene, weapon):
 
 def test_a_reach_weapon_strikes_at_ten_feet_and_not_beside_you():
     """Both halves of the rule land together, as they do for attacks of opportunity
-    (`reactions._reach_of`): the half easy to forget is the one that costs the player."""
+    (`reactions._reach_of`): the half easy to forget is the one that costs the player.
+    (Move action walked, or the step back to ten feet is taken: see `_walked`.)"""
     scene, engine = _fight()
+    _walked(scene)
     _armed(scene, "glaive")
     scene.positions["pc"] = (5, 10)
     engine.validate([_attack({"weapon": "glaive"})])            # 10 ft: in reach
@@ -186,8 +209,10 @@ def test_a_reach_weapon_strikes_at_ten_feet_and_not_beside_you():
 
 def test_a_whip_trips_at_ten_feet_but_a_grapple_is_the_bodys():
     """Disarm, sunder and trip are made with the weapon (`MANEUVERS_WITH_THE_WEAPON`);
-    the whip carries the trip quality so it can be. A grab is a hand's reach."""
+    the whip carries the trip quality so it can be. A grab is a hand's reach.
+    (Move action walked: see `_walked`.)"""
     scene, engine = _fight()
+    _walked(scene)
     _armed(scene, "whip")
     scene.positions["pc"] = (5, 10)
     engine.validate([_attack({"weapon": "whip", "manoeuvre": "trip"})])
@@ -204,8 +229,10 @@ def test_a_bow_has_no_reach_to_be_out_of():
 
 def test_a_large_creature_reaches_ten_feet_with_its_body():
     """Measured edge to edge, so a 2x2 body anchored at (6,10) has its near edge ten feet
-    from the player — out of a Medium arm's reach, inside a Large one's."""
+    from the player — out of a Medium arm's reach, inside a Large one's.
+    (The player's move action walked: see `_walked`.)"""
     scene, engine = _fight()
+    _walked(scene)
     ogre = scene.get("c1")
     ogre.size = "large"
     scene.positions["c1"] = (6, 10)
@@ -305,8 +332,10 @@ def test_a_bystander_takes_no_attack_of_opportunity():
 
 def test_the_prompt_the_model_reads_is_the_refusal_it_repairs_from():
     """The retry loop hands the refusal back to the model verbatim; the move in it has to
-    parse as an intent of its own, or the model is asked to copy something malformed."""
+    parse as an intent of its own, or the model is asked to copy something malformed.
+    (Move action walked: see `_walked`.)"""
     scene, engine = _fight()
+    _walked(scene)
     with pytest.raises(IntentError) as err:
         engine.validate([_attack({"manoeuvre": "disarm"})])
     move = json.loads(re.search(r'(\{"op": "move".*?\}\})', str(err.value)).group(1))
@@ -349,9 +378,14 @@ def _post(client, actions):
 def test_the_panel_says_which_square_to_click_and_shows_no_json(panel):
     """The first live run (2026-09-28) put the model's repair sentence on the page:
     `{"op": "move", "actor": "pc", "params": {"square": [6, 8]}}` in red under the
-    prose. The panel is read by a person; the square is named the way the map names it."""
+    prose. The panel is read by a person; the square is named the way the map names it.
+    Since the close-and-strike ruling (2026-09-29) the strike alone closes and lands
+    when one move reaches, so the refusal is read with the move action walked. The
+    explicit move-and-strike list after it is the panel's own and still resolves."""
     client, cm = panel
     scene = cm.current().scene
+    _walked(scene)
+    cm.current().save()
     assert scene.distance_between("pc", "c1") == 15
     r = _post(client, [{"op": "attack", "target": "c1", "params": {}}])
     assert r.status_code == 400

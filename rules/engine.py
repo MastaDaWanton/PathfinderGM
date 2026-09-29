@@ -209,6 +209,16 @@ class Scene:
     # Strikes keys off it: the passive grants its extra swings only on *subsequent*
     # attacks against the same target, so the fight has to remember first blood.
     attacked: set[str] = field(default_factory=set)
+    # The round each combatant last spent its move action walking the grid, by ref. The
+    # one piece of action economy the engine keeps, and kept for one reader: the closing
+    # step before a blow (`Engine._closing_step`, the owner's ruling of 2026-09-29) is a
+    # move action, and "in a normal round, you can perform a standard action and a move
+    # action" (aonprd.com/Rules.aspx?ID=129) — a creature that has already walked this round does not walk
+    # again for free. A round number rather than a set cleared on the turn, so it needs
+    # no second ticker: a stale entry is simply a round that is not this one. Only a
+    # square actually changed counts — a zone relabel moves no body (docs/fix-interfaces
+    # §3.4) and must not cost the step that would.
+    move_spent: dict[str, int] = field(default_factory=dict)
     round: int = 0
     clock_minutes: int = 0
     # The narrative thread: what the player is engaged in when no op carries it —
@@ -1340,6 +1350,9 @@ class Scene:
         self.round = 0
         self.acted = set()
         self.attacked = set()
+        # The next fight starts at round one again, and a walk from this one's round one
+        # would read as already spent.
+        self.move_spent = {}
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -1505,6 +1518,7 @@ class Scene:
         self.zones.pop(ref, None)
         self.positions.pop(ref, None)
         self.acted.discard(ref)
+        self.move_spent.pop(ref, None)
         self.spawn_feet.pop(ref, None)
         # Leaked by three of the four old depart doors and persisted, so a stale age was
         # waiting for whoever wore the ref next; with refs never reused it is merely
@@ -2654,6 +2668,15 @@ class Engine:
                     and not intent.params.get("undecided") \
                     and not ({intent.actor, defender.ref} & set(moved)):
                 why = self._reach_refusal(intent, actor, defender, key)
+                # One move reaches them: the blow stands, and `_drive` walks the closing
+                # step in front of it (the owner's ruling, 2026-09-29). The attacker is
+                # counted as moving in this list, so a second blow behind this one is
+                # measured on the board after the step, by the floor, like any blow
+                # behind a move.
+                if why and self._closing_step(intent, actor, defender, key) is not None:
+                    if isinstance(moved, set):
+                        moved.add(intent.actor)
+                    why = ""
                 if why:
                     raise IntentError(
                         f"attack: {why}", "legality", index, code="out_of_reach",
@@ -2794,6 +2817,27 @@ class Engine:
                 if fired:
                     queue[0:0] = fired
                     raw["_reacted"] = True
+                    continue
+            # A blow one move short: the move goes in front of it as a real intent, so it
+            # provokes through `_reactions_before` exactly as a declared move does, and
+            # an attack of opportunity that drops the attacker stops the blow behind it
+            # (`_op_attack`'s "never swings"). Asked once per blow — the flag — and never
+            # on a resume, which is the same blow part-way through its dice.
+            if not partial and not raw.pop("_closed", False):
+                step = self._close_before(raw)
+                if step is not None:
+                    # The step is the move action and this blow the standard one; any
+                    # further blow of the same attacker's in this list would be a full
+                    # attack after a move, which the rule does not allow. Marked in its
+                    # params, so the mark survives a suspension for the player's dice.
+                    for later in queue[1:]:
+                        if later.get("op") == "attack" \
+                                and later.get("actor") == raw.get("actor") \
+                                and not (later.get("params") or {}).get("reaction"):
+                            later["params"] = dict(later.get("params") or {},
+                                                   after_close=True)
+                    queue[0:0] = [step]
+                    raw["_closed"] = True
                     continue
 
             intent = _intent_from_dict(raw)
@@ -4076,6 +4120,13 @@ class Engine:
                 effects=[{"ref": actor.ref, "kind": "attack_stopped", "why": why}],
                 tell=f"{actor.name} is {why} and never swings.",
                 because=intent.because)
+        # A second blow behind one that closed the distance (`_drive` marks it): a move
+        # action and a standard action leave ONE attack — "the only movement you can take
+        # during a full attack is a 5-foot step" (aonprd.com/Rules.aspx?ID=145).
+        if partial.get("attack_state") is None and intent.params.get("after_close"):
+            return self._refuse(
+                intent, f"{actor.name} closed the distance this turn, and a move leaves "
+                        f"time for one blow, already struck. Nothing more is rolled.")
         # Two live people and no word from the player about which: nobody chooses for
         # them. `judgement.check_the_target` parks the candidates here, and the refusal
         # is prose on the page (Inform's check rulebook), never a lost turn.
@@ -4758,8 +4809,10 @@ class Engine:
         What the refusal names is a SQUARE. The model plans in zones, and a
         `move zone=engaged` on a mapped fight relabels the zone and leaves the body
         where it stood — so "move first" alone is an instruction nobody can carry out.
-        The attacker is never moved here: closing the distance is their move action to
-        spend, or not.
+        The attacker is never moved HERE. Since the owner's ruling of 2026-09-29 a blow
+        that one move action reaches is not refused at all — `_closing_step` answers
+        first and `_drive` walks the step — so this sentence is what is left: the gap
+        is more than one move, or the move action is already spent this round.
 
         Three readers, three sentences (`voice`). "model": the fix as a JSON move to
         copy, for the repair loop. "tell": the printed floor's, the fault alone — a
@@ -4821,6 +4874,98 @@ class Engine:
                     f"move toward them this turn and strike on the next.")
         return (f"{fault} Move first — to square [{x}, {y}], {cost} ft — with {step} "
                 f"before the attack in the same list.")
+
+    def _closing_step(self, intent: Intent, actor: Actor, defender: Actor,
+                      weapon_key: str) -> tuple[tuple[int, int], int] | None:
+        """The square one move action carries this attacker to, from which the blow it
+        declared lands, and the feet the walk costs; None when the blow must be refused
+        (`_reach_refusal`) or needs no step.
+
+        Measured live 2026-09-28 (`tools/narrator_audit.py --script fight`): "I punch him
+        in the face." came back 422 — "Kesst Vayr reaches 5 ft and Gorvoth Vexarion is
+        15 ft away ... Click square 5,6 on the map to move there (10 ft), then strike."
+        — three turns running, and the fight never moved. The owner's ruling
+        (2026-09-29): "yes close the distance and strike if one move reaches."
+
+        The rule it rests on (Core Rulebook, Combat; aonprd.com/Rules.aspx?ID=129, 130,
+        137, 145): "In a normal round, you can perform a standard action and a move action";
+        a move action moves you up to your speed; "Making an attack is a standard
+        action" — ONE attack, because the iteratives need the full-round action, and
+        "the only movement you can take during a full attack is a 5-foot step". So the
+        step is a move action and never a charge (a full-round action this engine does
+        not have), and the blow behind it is single whatever the attacker's BAB.
+
+        The walk is `position.square_in_reach` — `Grid.reachable` over the occupancy the
+        move op refuses by, difficult terrain at double ("each square of difficult
+        terrain counts as 2 squares of movement", aonprd.com/Rules.aspx?ID=177) — so the square is one the
+        move op would accept. Not for a reaction (an attack of opportunity is taken
+        where you stand), a coup de grâce (a full-round action), a target still
+        undecided, a body that cannot move, or an attacker who has walked this round
+        already (`Scene.move_spent`).
+        """
+        from . import position as position_mod
+
+        if not self.scene.in_encounter or not self.scene.has_grid:
+            return None
+        params = intent.params or {}
+        if params.get("reaction") or params.get("coup_de_grace") \
+                or params.get("undecided"):
+            return None
+        if actor.is_down or actor.blocking_key("move") or actor.blocking_key("attack"):
+            return None
+        if defender.has_state("state.down.dead"):
+            return None
+        if self.scene.move_spent.get(actor.ref) == self.scene.round:
+            return None
+        miss = position_mod.out_of_reach(self.scene, actor, defender, weapon_key,
+                                         manoeuvre=str(params.get("manoeuvre") or ""),
+                                         thrown=bool(params.get("thrown")))
+        if miss is None:
+            return None
+        speed = int(getattr(actor, "speed_feet", 0) or 0)
+        if speed <= 0:
+            return None
+        found = position_mod.square_in_reach(self.scene, actor, defender, miss.reach,
+                                             miss.gap)
+        if found is None or found[1] > speed:
+            return None
+        return found
+
+    def _close_before(self, raw: dict) -> dict | None:
+        """The move intent a blow one move short is owed, spliced in front of it by
+        `_drive`; None for anything else.
+
+        A real `move`, not a shift of `Scene.positions` inside the attack: the move op
+        is the one door a body crosses the grid by, and going through it is what makes
+        the step provoke (`_reactions_before`, "moving out of a threatened square
+        usually provokes attacks of opportunity", aonprd.com/Rules.aspx?ID=102), be told, and be spent
+        (`Scene.move_spent`). Asked under the same conditions as `_op_attack`'s reach
+        floor — a blow that opens the fight this batch is deferred by the battle gate
+        and rolls nothing, so it closes nothing either: its step is taken with the blow
+        on the attacker's first combat turn.
+        """
+        if raw.get("op") != "attack" or self._battle_joined:
+            return None
+        intent = _intent_from_dict(raw)
+        actor = self.scene.actors.get(intent.actor or "")
+        targets = intent.targets()
+        defender = self.scene.actors.get(targets[0]) if targets else None
+        if actor is None or defender is None:
+            return None
+        weapon_key = (intent.params.get("weapon") or actor.wielded_key()).lower()
+        found = self._closing_step(intent, actor, defender, weapon_key)
+        if found is None:
+            return None
+        (x, y), _ = found
+        # A move and a standard action: the blow after the step is one attack at the
+        # highest bonus, never the full attack a model declared nor a stated iterative
+        # (the panel's split full attack names one per swing).
+        raw["params"] = dict(intent.params, full_attack=False)
+        raw["params"].pop("iteration", None)
+        return {"op": "move", "actor": actor.ref, "id": f"{intent.id}-close",
+                "target": None, "visibility": intent.visibility,
+                "because": f"closing on {defender.name}",
+                "params": {"square": [x, y], "closing_on": defender.ref}}
 
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
@@ -5536,6 +5681,7 @@ class Engine:
 
         self.scene.initiative = rolls
         self.scene.round = 1
+        self.scene.move_spent = {}
         self.end_talk("a fight starts")
         sides = {"pc": pc_side, "them": [r for r in them if r in standing]}
         self.scene.sides = sides
@@ -10879,11 +11025,27 @@ class Engine:
             zone = self.scene.zones.get(ref, zone)
             cost = self._move_cost(ref, from_square, tuple(square))
             crossed = f" ({cost} ft)" if cost is not None else ""
+            # The move action, spent: a body that crossed the grid in a fight has walked
+            # this round, and the closing step before a blow asks (`_closing_step`).
+            if self.scene.in_encounter and from_square is not None \
+                    and tuple(from_square) != tuple(square):
+                self.scene.move_spent[ref] = self.scene.round
+            effect = {"ref": ref, "kind": "position", "from": from_square,
+                      "to": tuple(square), "feet": cost, "zone": zone}
+            tell = f"{actor.name} moves to {zone}{crossed}."
+            # The step `_close_before` put in front of a blow: told as what it is, so the
+            # narrator hears that the distance was closed before the swing it dresses.
+            # `closing_on` is written by code only — the parser refuses it from a model.
+            foe = self.scene.actors.get(str(intent.params.get("closing_on") or ""))
+            if foe is not None:
+                effect["closing_on"] = foe.ref
+                tell = (f"{actor.name} closes {cost} ft on {foe.name} to strike."
+                        if cost is not None else
+                        f"{actor.name} closes on {foe.name} to strike.")
             return Outcome(
                 intent_id=intent.id, op="move",
-                effects=[{"ref": ref, "kind": "position", "from": from_square,
-                          "to": tuple(square), "feet": cost, "zone": zone}],
-                tell=f"{actor.name} moves to {zone}{crossed}.",
+                effects=[effect],
+                tell=tell,
                 because=intent.because,
             )
 
@@ -11189,6 +11351,7 @@ class Engine:
         order.sort(key=lambda t: -t[1])
         self.scene.initiative = order
         self.scene.round = 1
+        self.scene.move_spent = {}
         self.end_talk("a fight starts")
         # Nobody has acted at the top of round one, so everyone is flat-footed until
         # their first turn comes round.
