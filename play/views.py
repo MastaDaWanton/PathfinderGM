@@ -2402,7 +2402,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
             # and the merchant are in scene without having been described"). The line is
             # the world's own — the resident's Appearance fact, or their people's body
             # line — so the next beat cannot re-invent them.
-            owed = set(judgement.settle_descriptions(c.scene, text, player_input))
+            owed = set(judgement.settle_descriptions(c.scene, text, player_input, attribution=getattr(agent, "attribution", None)))
             # The one the player looked over owes a face too, whether or not she is new
             # here: "I look the woman in the doorway over carefully".
             looked = judgement.examined(player_input, c.scene)

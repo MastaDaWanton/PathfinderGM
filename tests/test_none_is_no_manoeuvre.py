@@ -120,16 +120,19 @@ def test_the_slots_are_read_once():
 def test_the_recorded_turn_stands_on_the_first_reply(n, tmp_path, monkeypatch):
     """Turn 1 of each audit, the model's first plan reply as it was written: refused on
     "no such weapon 'none'" before, five times, then narration. Now the first reply
-    stands: the words to Borin (the plan's `new1`/`new2`, bound by `bind_placeholders`),
-    a plain attack on him, and the provocation."""
+    stands: a plain attack on Borin (the plan's `new1`/`new2`, bound by
+    `bind_placeholders`) and the provocation."""
     rec = recorded(RECORDED)[n]
     assert rec["player"] == "I pick a fight with the biggest man in the room."
     assert '"manoeuvre": "none"' in rec["calls"][1]["raw"]
     plan, scene = replay_plan(rec, tmp_path, monkeypatch)
 
     assert plan.rejections == [], plan.rejections
-    assert [i.op for i in plan.intents] == ["say", "attack", "provoke"]
-    say, attack, _ = plan.intents
+    # The plan's `say` ("I've had enough of this.") was the MODEL's words in the player's
+    # mouth — the player wrote no speech — and since item 6 (2026-09-28,
+    # `judgement.own_words_only`) such a say is dropped, not booked as the player's.
+    assert [i.op for i in plan.intents] == ["attack", "provoke"]
+    attack, _ = plan.intents
     assert scene.actors["c2"].name == "Borin Lyraxys"
-    assert attack.target == "c2" and say.params["to"] == "c2"
+    assert attack.target == "c2"
     assert "weapon" not in attack.params and "manoeuvre" not in attack.params

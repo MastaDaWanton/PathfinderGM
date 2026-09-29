@@ -43,6 +43,10 @@ class TurnPlan:
     attempts: list[Attempt] = field(default_factory=list)
     repairs: list[str] = field(default_factory=list)
     rejections: list[str] = field(default_factory=list)
+    # A refusal only the PLAYER can fix, when one ended the turn before anything
+    # resolved: {"text", "code", "fix"} (docs/fix-interfaces.md §2.6). The view answers
+    # it as a 422 — no beat, no clock, no NPC turn. None on every other turn.
+    refusal: dict | None = None
 
     @property
     def seconds(self) -> float:
@@ -422,6 +426,8 @@ class GMAgent:
                     raise
                 continue
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
+            # What `own_words_only` changed on this attempt, for the turn log.
+            own_words: list[str] = []
 
             try:
                 data = reply.json()
@@ -606,8 +612,30 @@ class GMAgent:
                 # because it reads the player's own sentence and competes with nothing.
                 raw = judgement.answer_the_absent(raw, player_input, self.engine.scene,
                                                   self.world)
+                # Last of all: a say in the player's character's mouth carries the
+                # player's words or none (item 6) — after every injector that can add one.
+                raw = judgement.own_words_only(
+                    raw, player_input,
+                    self.reading if isinstance(self.reading, dict) else None,
+                    notes=own_words)
                 data = dict(data, intents=raw)
-                intents = self.engine.validate(raw)
+                try:
+                    intents = self.engine.validate(raw)
+                except IntentError as exc:
+                    # A refusal only the player can fix, on an op the player declared,
+                    # ends the turn here: shown to them once, never retried (item 21.3).
+                    # One the plan invented is dropped and the rest validated again.
+                    stop, raw = self._players_refusal(exc, raw, declared, player_input)
+                    if stop is not None:
+                        rejections.append(f"attempt {n + 1} [{exc.check}, "
+                                          f"{exc.code}]: {exc} — the player's to fix")
+                        return self._refused_plan(stop, attempts, rejections)
+                    if raw is None:
+                        raise
+                    rejections.append(f"attempt {n + 1} [{exc.check}, {exc.code}, "
+                                      f"dropped]: {exc} — an op the player never asked for")
+                    data = dict(data, intents=raw)
+                    intents = self.engine.validate(raw)
             except IntentError as exc:
                 # The GM naming people it wanted to exist — "attack thug1" — is the one
                 # rejection it will not learn from, hint and example notwithstanding. It
@@ -657,7 +685,7 @@ class GMAgent:
             # should have done.
             verdict = judgement.review(player_input, intents, self.engine.scene,
                                         previous=previous_intents)
-            repairs = list(verdict.as_log()) + self._context_note()
+            repairs = list(verdict.as_log()) + self._context_note() + own_words
             if not verdict.ok and n < last:
                 complaint = " ".join(o.message for o in verdict.objections)
                 rejections.append(f"attempt {n + 1} [judgement]: {complaint}")
@@ -726,6 +754,73 @@ class GMAgent:
             repairs=[f"turn degraded to narration after {len(schedule)} failed "
                      f"attempts"],
             rejections=rejections)
+
+    # --- A refusal the player has to fix ---------------------------------------------
+
+    def _players_refusal(self, exc: IntentError, raw: list, declared, player_input: str
+                         ) -> tuple[dict | None, list | None]:
+        """What to do with a validation refusal before the plan loop retries it.
+
+        Item 21.3, measured 2026-09-28: "cast: Bobby did not prepare Burning Hands
+        today." came back seven times of seven, across two models, and then the turn was
+        disguised as "the moment does not answer". No plan could have fixed it — the fix
+        was the player's (prepare the spell). Self-correction helps when the feedback is
+        reliable and the fix is within reach (Kamoi et al. 2024); here the feedback was
+        reliable and the fix was out of the model's reach entirely.
+
+        Returns (refusal, None) when the turn ends here: the code is one only the player
+        can fix (`IntentError.fixable_by`, rules/intents.py PLAYER_FIXABLE), the op is
+        one the player's words declared, and it is the player's character acting.
+        Returns (None, raw without that intent) when the same refusal lands on an op the
+        player never asked for — the plan invented it, so it goes and the rest stands.
+        (None, None) otherwise: the loop's own retry, as before.
+
+        A weapon is the player's to fix only when the player named it: a plan that
+        picked a blade the character does not carry is the plan's mistake, and a retry
+        mends it."""
+        if exc.fixable_by != "player" or exc.index is None:
+            return None, None
+        from rules import engine as engine_mod
+        from rules.intents import parse_all
+
+        try:
+            parsed = parse_all(raw)
+            ordered = engine_mod._introduce_after_travel(
+                engine_mod._found_before_travel(parsed))
+            intent = ordered[exc.index]
+            at = next(k for k, p in enumerate(parsed) if p is intent)
+        except Exception:  # noqa: BLE001 — unreadable: the loop's own retry answers it
+            return None, None
+        pc = self.engine.scene.pc()
+        players = intent.actor in (None, "", "pc") or (pc is not None
+                                                        and intent.actor == pc.ref)
+        if not players:
+            return None, None
+        if exc.code == "no_such_weapon":
+            named = str(intent.params.get("weapon") or "").strip().lower()
+            if not named or named not in str(player_input or "").lower():
+                return None, None
+        if intent.op in set(declared or ()):
+            text = str(exc.for_a_person or "").strip() or re.sub(
+                r"^[a-z_]+:\s*", "", str(exc)).strip()
+            return {"text": text, "code": exc.code, "fix": exc.fix}, None
+        rest = [r for k, r in enumerate(raw) if k != at]
+        return None, (rest or [{"op": "narrate_only",
+                                "because": "the only op was one nobody asked for"}])
+
+    def _refused_plan(self, refusal: dict, attempts: list, rejections: list) -> TurnPlan:
+        """The turn a player-fixable refusal ends: nothing resolves, the refusal is the
+        whole answer, and no second model is asked. The narration is the refusal's own
+        sentence — never "the moment does not answer", and never a prose beat for a
+        false claim the player did not make (item 21.3)."""
+        return TurnPlan(
+            narration=refusal["text"],
+            intents=self.engine.validate([{"op": "narrate_only",
+                                           "because": "refused, for the player to fix"}]),
+            suggestions=[], attempts=attempts,
+            repairs=[f"refused for the player to fix ({refusal['code']}): "
+                     f"{refusal['text']}"],
+            rejections=rejections, refusal=dict(refusal))
 
     # --- An NPC's turn -------------------------------------------------------------------
 
@@ -1532,11 +1627,102 @@ class GMAgent:
                           ) -> tuple[str, list[str], list[Attempt]]:
         """Repair what the narrator checks found, sentence by sentence.
 
-        A STUB in Phase 1 (S1): the text comes back unchanged. Lane A fills it in, in the
-        shape of `_repair_state_claims` — one rewrite of the flagged `sentences` with the
-        fact named, re-checked; cut on failure; then the member's `backstop`
-        (`checks.owner_of(kind)`)."""
-        return text, [], []
+        The house shape (CLAUDE.md, "detect mechanically, repair with a targeted call"),
+        as `_repair_state_claims` has it: each flagged sentence is rewritten ONCE with
+        the finding's fact named, and the rewrite is kept only if the member that found
+        the fault no longer finds it in the beat with the rewrite in place. What still
+        fails goes to that member's deterministic `backstop` (cut, or the engine's own
+        sentence), which runs whether or not a rewrite was tried. A finding that names
+        no sentence goes straight to its backstop: a whole-passage "make it consistent"
+        rewrite is what Re3's own ablation found did nothing (docs/design-a-truth.md §3).
+
+        Heaviest finding first, and at most `_TRUTH_CALLS` model calls a beat — a local
+        model's minute is the player's minute; the backstop under every member but
+        `face_kept` makes the rest free. Returns (text, notes, attempts)."""
+        from dataclasses import replace
+
+        from . import checks
+        from .checks._page import page_sentences
+
+        notes: list[str] = []
+        attempts: list[Attempt] = []
+        pc = self.engine.scene.pc()
+        calls = 0
+        order = sorted(range(len(findings)), key=lambda i: (-int(findings[i].weight or 0), i))
+        members = []
+        for i in order:
+            f = findings[i]
+            member = checks.owner_of(f.kind)
+            if member is not None and member not in members:
+                members.append(member)
+            for sentence in f.sentences:
+                if not sentence or sentence not in text:
+                    continue
+                fixed = ""
+                if calls < self._TRUTH_CALLS:
+                    calls += 1
+                    try:
+                        reply = client.chat(
+                            _truth_repair_messages(sentence, f.fix_hint or f.detail),
+                            self.prose_model, self.prose_host, as_json=True, think=False,
+                            temperature=0.3, num_predict=240, provider=self.prose_provider,
+                            api_key=self.prose_key,
+                            schema={"type": "object",
+                                    "properties": {"sentence": {"type": "string",
+                                                                "maxLength": 500}},
+                                    "required": ["sentence"]})
+                        attempts.append(Attempt("repair", reply.seconds, reply.model,
+                                                reply.text, note=f"truth: {f.kind}"))
+                        fixed = self._lift(str(reply.json().get("sentence", "")).strip())
+                        if fixed and pc is not None:
+                            fixed, _ = narration_mod.pc_to_second_person(fixed, pc.name)
+                    except Exception as exc:  # a failed repair must not lose the turn
+                        attempts.append(Attempt("repair", 0.0, self.prose_model,
+                                                note=f"truth: {f.kind}: failed: {exc}"))
+                        fixed = ""
+                if not fixed:
+                    continue
+                candidate = text.replace(sentence, fixed, 1)
+                still = []
+                if member is not None:
+                    try:
+                        still = [g for g in member.find(replace(ctx, text=candidate))
+                                 if g.kind == f.kind]
+                    except Exception:  # noqa: BLE001 — unjudgeable: keep the original
+                        still = [f]
+                new = {w for w, _ in page_sentences(fixed)} | {fixed.strip()}
+                if any(set(g.sentences) & new or not g.sentences for g in still):
+                    notes.append(f"{f.kind}: the rewrite still did it: {fixed[:80]!r}")
+                    continue
+                text = candidate
+                notes.append(f"{f.kind}: {sentence[:80]!r} -> {fixed[:80]!r}")
+        # The backstops, over the beat as it now stands: only a member that still finds
+        # something is asked, so a rewrite that held costs nothing here.
+        for member in members:
+            if not callable(getattr(member, "backstop", None)):
+                continue
+            try:
+                left = [g for g in member.find(replace(ctx, text=text))]
+            except Exception:  # noqa: BLE001 — a broken member costs its own backstop
+                continue
+            if not left:
+                continue
+            try:
+                text, cut = member.backstop(replace(ctx, text=text), text, left)
+            except Exception as exc:  # noqa: BLE001
+                notes.append(f"{left[0].kind}: backstop failed: {type(exc).__name__}")
+                continue
+            notes += list(cut)
+        for i in order:
+            f = findings[i]
+            member = checks.owner_of(f.kind)
+            if member is not None and not callable(getattr(member, "backstop", None)):
+                if any(s in text for s in f.sentences):
+                    notes.append(f"{f.kind}: no backstop; left as written")
+        return re.sub(r"[ \t]{2,}", " ", text or "").strip(), notes, attempts
+
+    # How many sentence rewrites the truth checks may ask for in one beat.
+    _TRUTH_CALLS = 3
 
     # The finding kinds with no deterministic backstop below them — the only ones worth
     # a second model call, because for everything else the backstop repairs for free
@@ -2201,7 +2387,16 @@ class GMAgent:
         for op, body in declared.items():
             if op in have or not isinstance(body, dict):
                 continue
-            entry = {"op": op, "params": dict(body.get("params") or {}),
+            params = dict(body.get("params") or {})
+            if op == "say":
+                # The words of a declared say are the MODEL's, written into the schema's
+                # required key; the player's words are what commit the turn to it.
+                # Measured 2026-09-28 (item 6): the watchman's line "She doesn't like
+                # the desperate ones…" was minted here as Bobby's say. The say keeps
+                # who it is to; its words come from the player's line
+                # (`judgement.own_words_only`, last in the chain), or it is dropped.
+                params.pop("words", None)
+            entry = {"op": op, "params": params,
                      "because": "the player's words commit the turn to it"}
             if body.get("target"):
                 entry["target"] = body["target"]
@@ -2378,6 +2573,22 @@ def _suggestions(data: dict, limit: int = 3) -> list[str]:
         if 3 <= len(text) <= 120 and text not in out:
             out.append(text)
     return out[:limit]
+
+
+_TRUTH_REPAIR = """You correct one sentence of a story so it agrees with what actually
+happened. You are told what is wrong with it and what is true. Rewrite that sentence only:
+keep its voice, its detail and its length, change what is wrong and nothing else. The
+player is "you". Do not say how any roll turned out.
+
+Reply with a JSON object: {"sentence": "..."}."""
+
+
+def _truth_repair_messages(sentence: str, fact: str) -> list[dict]:
+    """One flagged sentence and the fact it broke, for `_repair_sentences`. Not
+    `prompts.repair_messages`: that briefing is about a roll's outcome, and these facts
+    are where the player stands, who was hurt and how somebody looks."""
+    return [{"role": "system", "content": _TRUTH_REPAIR},
+            {"role": "user", "content": f"What is true: {fact}\n\nThe sentence:\n{sentence}"}]
 
 
 def _with_correction(base: list[dict], bad_reply: str, problem: str) -> list[dict]:

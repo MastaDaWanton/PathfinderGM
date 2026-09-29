@@ -67,7 +67,7 @@ def test_a_promoted_person_carries_a_true_name_and_a_face_and_the_brief_says_bot
     # The model's own guess is replaced with it in code when the person introduces
     # themselves.
     assert stranger.true_name not in brief
-    assert "Looks (fact, use it when they are first described):" in brief
+    assert "Looks (fact — every description of them keeps to it):" in brief
     # The panel still shows the descriptor until the name is given in play.
     assert stranger.name == "stranger"
 
@@ -157,7 +157,7 @@ def test_the_view_appends_the_face_when_the_beat_left_it_out():
     from play import views
 
     src = inspect.getsource(views._finish)
-    assert "judgement.settle_descriptions(c.scene, text, player_input)" in src
+    assert "judgement.settle_descriptions(c.scene, text, player_input," in src
     assert "apply_introductions(c.scene, text, player_input," in src
 
 

@@ -446,12 +446,27 @@ def introduced_by(text: str, asked_for_name: bool = False,
     out: list[tuple[str, str, str]] = []
     if not text:
         return out
+    # The quotations of the whole beat, found once over the whole beat. Looking for them
+    # inside one sentence at a time is the defect of item 13 (2026-09-28): a line that
+    # runs across a full stop — "'You! You have the look…'" — is a whole quotation in no
+    # sentence, and its tag was never read. A name given in the second sentence of a
+    # line is inside the line's one span here.
+    whole = speech.spans(text)
+    starts: list[int] = []
+    cursor = 0
+    for s in _sentences(text):
+        at = text.find(s, cursor)
+        starts.append(at if at >= 0 else -1)
+        if at >= 0:
+            cursor = at + len(s)
 
-    def _tagged(sentence: str, at: int) -> str:
-        for a, b in speech.spans(sentence):
-            if a <= at < b:
-                rec = speech.speaker(said, sentence[a + 1:b - 1])
-                return rec["who"] if rec else ""
+    def _tagged(i: int, sentence: str, at: int) -> str:
+        if starts[i] >= 0:
+            pos = starts[i] + at
+            for a, b in whole:
+                if a <= pos < b:
+                    rec = speech.speaker(said, text[a + 1:b - 1])
+                    return rec["who"] if rec else ""
         # A line cut across sentences has lost its close: from its opening mark on.
         opened = speech.first_opening(sentence)
         if opened is not None and opened <= at:
@@ -468,9 +483,13 @@ def introduced_by(text: str, asked_for_name: bool = False,
             # Inside speech, or it is the narrator's own sentence about somebody. Asked
             # of the scanner's lenient sentence question — was a line OPENED before the
             # phrase — and not by counting quote marks, which "it's" and "don't" threw
-            # off by one (2026-09-25).
+            # off by one (2026-09-25). And first of all by the whole beat's quotations:
+            # a name given in the second sentence of a line ("'You! I am Drenn…'") sits
+            # in a sentence with no opening mark of its own (item 13).
+            inside = starts[i] >= 0 and any(a <= starts[i] + m.start() < b
+                                            for a, b in whole)
             opened = speech.first_opening(s)
-            if opened is None or opened > m.start():
+            if not inside and (opened is None or opened > m.start()):
                 continue
             # Who is speaking: the last capitalised-or-role word outside the quotes,
             # in this sentence then the one before.
@@ -486,7 +505,7 @@ def introduced_by(text: str, asked_for_name: bool = False,
             else:
                 after = re.search(r"\b(?:the|a|an)\s+([a-z]{3,})\b", outside.lower())
                 head = after.group(1) if after else ""
-            out.append((head, name, _tagged(s, m.start())))
+            out.append((head, name, _tagged(i, s, m.start())))
     if asked_for_name and not out:
         from .judgement import _ROLE_WORD
 
@@ -497,7 +516,7 @@ def introduced_by(text: str, asked_for_name: bool = False,
             outside = unquoted(s) + " " + (unquoted(sentences[i - 1]) if i else "")
             role = _ROLE_WORD.search(outside)
             out.append((role.group(0).lower() if role else "", m.group(1).strip(),
-                        _tagged(s, m.start())))
+                        _tagged(i, s, m.start())))
     return out
 
 
@@ -701,16 +720,64 @@ def faceless(text: str, phrase: str) -> bool:
 
     "The woman is not described at all" (2026-09-18): a paragraph on the room, of the
     woman only her gaze and manner. The body checks stop the WRONG body; this is the one
-    that requires a body."""
-    words = [w for w in re.findall(r"[a-z]+", str(phrase or "").lower()) if len(w) >= 3]
-    if not words:
-        return False
-    head = words[-1]
-    about = [s for s in _sentences(unquoted(text))
-             if re.search(rf"\b{re.escape(head)}s?\b", s, re.I)]
+    that requires a body.
+
+    Found by the page's word for them (`checks._people.head_of`), never the last word of
+    the name: "the watchman waving traffic through" was looked for as "through" (item 4,
+    2026-09-28).
+
+    And a gaze, a gesture or one thing worn is not a description (`_describes`).
+    Measured on the Bobby corpus the same day: the watchman's first beat said only "the
+    heavy leather of his gloves creaking", the opening only "his eyes fixed on the
+    wagon" — each counted as describing him, so the world's own face for him (an Orc,
+    hair like wet rope, ink on the knuckles) was owed on no beat until the last-word
+    rule tripped over "the way through" two turns later."""
+    from .checks._people import names_person
+
+    about = [s for s in _sentences(unquoted(text)) if names_person(s, phrase)]
     if not about:
         return False
-    return not any(_APPEARANCE.search(s) for s in about)
+    return not any(_describes(s) for s in about)
+
+
+# The appearance words that are a body rather than something worn, and the gaze and
+# gesture uses of a body word. A body word describes; worn things describe only in pairs
+# (a coat and boots), because one — "the leather of his gloves" — is a detail of a scene,
+# not a person the next beat can picture.
+_WORN = frozenset({"hooded", "coat", "apron", "tunic", "robe", "robes", "dress", "shawl",
+                   "boots", "leather"})
+_NOT_ALONE = frozenset({"heavy", "dark", "missing", "lined", "short", "ring", "rings"})
+_GESTURE = re.compile(
+    r"\b(?:eyes?|hands?|gaze)\s+(?:\w+ly\s+)?(?:\w+(?:s|ed|ing)|narrow|widen|fixed|rest|"
+    r"meet|lock|dart|flick|drift|settle|linger|land|flash|stay|go|move|find|follow|"
+    r"trace|scan|sweep|shift|drop|fall|close|open|glint|gleam|light|burn)\b", re.I)
+
+
+def _describes(sentence: str) -> bool:
+    """Whether one sentence carries what somebody looks like: a body word that is not
+    a gaze or a gesture, or two different things they wear."""
+    gestures = [m.span() for m in _GESTURE.finditer(sentence)]
+    worn: set[str] = set()
+    for m in _APPEARANCE.finditer(sentence):
+        if any(a <= m.start() < b for a, b in gestures):
+            continue
+        w = m.group(0).lower()
+        if w in _NOT_ALONE:
+            continue
+        if w in _WORN or w.startswith(("cloak", "ring")):
+            worn.add(w)
+            continue
+        return True
+    return len(worn) >= 2
+
+
+def describing_sentences(text: str, phrase: str) -> list[str]:
+    """The narration sentences that name this person and describe them, in order — what
+    `Actor.described_as` keeps of the page's first description (item 16.7)."""
+    from .checks._people import names_person
+
+    return [s for s in _sentences(unquoted(text))
+            if names_person(s, phrase) and _describes(s)]
 
 
 def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
@@ -1023,7 +1090,14 @@ _BUSINESS_AS_USUAL = re.compile(
 _WOUNDED = re.compile(
     r"\b(?:wounded|bleeding|bleeds|blood\s+(?:pours|runs|spurts|sprays)|"
     r"staggers?|staggered|reels?|reeled|cries?\s+out|screams?|howls?\s+in\s+pain|"
-    r"shattered|broken|cracks?\s+(?:open|apart)|gashed|torn\s+open)\b", re.I)
+    r"shattered|broken|cracks?\s+(?:open|apart)|gashed|torn\s+open|"
+    # Fire and impact, the two harms a spell's damage roll narrates and the wound words
+    # above never held: the burned man of item 22.4 was "scorched", "blackened by soot"
+    # and "thrown backward", and passed as unhurt. Past forms only — "a burning torch"
+    # beside a guard is a torch.
+    r"burned|burnt|scorched|singed|seared|charred|blistered|blackened\s+by|"
+    r"thrown\s+(?:back|backward|backwards|clear)|knocked\s+(?:back|down|flat)|"
+    r"(?:gasps?|groans?|growls?)\s+(?:of|in|with)\s+pain)\b", re.I)
 
 
 def _name_stems(name: str) -> list[str]:
@@ -1037,13 +1111,24 @@ def _name_stems(name: str) -> list[str]:
     `guards` and the prose wrote "the guard's scream is cut short". Without the stem the
     detector reads those as two different people and passes a death it should have
     caught, which is exactly the way a checker fails silently.
+
+    And the head noun whatever its length (`checks._people.head_of`): the four-letter
+    floor below dropped "man", so "the man in a stained leather jerkin" was found only by
+    "stained", "leather" and "jerkin" — and the beat that burned him said "the man"
+    (item 22.4, 2026-09-28).
     """
+    from .checks._people import head_of
+
     stems = []
     for w in _WORD.findall(name.lower()):
         w = w.strip("'")
         if len(w) <= 3 or w in _NOT_A_NAME:
             continue
         stems.append(w[:-1] if w.endswith("s") and len(w) > 4 else w)
+    head = head_of(name)
+    if head and " " not in head and head.islower() and head not in stems \
+            and head not in _NOT_A_NAME:
+        stems.append(head)
     return stems
 
 
@@ -1062,6 +1147,33 @@ def _sentences_about(text: str, name: str) -> list[str]:
     hit = re.compile(edge + r"(?:" + "|".join(re.escape(x) for x in stems)
                      + r")(?:s|es)?" + edge, re.I)
     return [s for s in _SENTENCE.findall(text or "") if hit.search(s)]
+
+
+def _sentences_about_linked(text: str, name: str, state: dict) -> list[str]:
+    """`_sentences_about` and the pronoun run after it (`checks._people.linked`): the
+    sentence that names him, then "his face blackened by soot" and "He hits the ground",
+    which name nobody. Stopped by a sentence naming anybody else in `state`. The same
+    linker the truth checks read through (`_people.about`), so the two cannot disagree
+    about which sentences are his (item 22.4)."""
+    from .checks._people import linked
+
+    stems = _name_stems(name)
+    if not stems:
+        return []
+    edge = chr(92) + "b"
+
+    def _hit(stem_list):
+        return re.compile(edge + r"(?:" + "|".join(re.escape(x) for x in stem_list)
+                          + r")(?:s|es)?" + edge, re.I) if stem_list else None
+
+    mine = _hit(stems)
+    other_stems = [s for n in state if str(n) != name for s in _name_stems(str(n))
+                   if s not in stems]
+    theirs = _hit(other_stems)
+    sents = _SENTENCE.findall(text or "")
+    keep = linked(sents, lambda s: bool(mine.search(s)),
+                  lambda s: bool(theirs and theirs.search(s)))
+    return [sents[i] for i in keep]
 
 
 def contradicts_state(text: str, state: dict | None) -> list[tuple]:
@@ -1083,7 +1195,7 @@ def contradicts_state(text: str, state: dict | None) -> list[tuple]:
     for name, how in state.items():
         if not isinstance(how, dict):
             continue
-        for sentence in _sentences_about(bare_text, str(name)):
+        for sentence in _sentences_about_linked(bare_text, str(name), state):
             bare = sentence
             if how.get("alive") and _FELLED.search(bare):
                 out.append((name, "down or dead", sentence.strip()))
@@ -4317,8 +4429,14 @@ def place_the_face(text: str, name: str, line: str) -> str:
     # covers is the one the reader sees.
     blank = _blanked(text)
     spans = list(_SENTENCE.finditer(blank))
+    from .checks._people import name_words
+
     whole = " ".join(str(name or "").split())
-    first_word = whole.split()[0] if whole.split() else ""
+    # A proper name's first word ("Ashla"), or a descriptor's head noun ("watchman").
+    # Not a descriptor's first word: that was "the", and "the watchman waving traffic
+    # through" had his face placed after the first sentence holding "the" (item 4).
+    words = name_words(whole)
+    first_word = words[0] if words else ""
     found = None
     for handle in (whole, first_word):
         if len(handle) < 3:

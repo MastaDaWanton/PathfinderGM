@@ -304,7 +304,7 @@ def test_the_turn_path_settles_descriptions_over_everybody_present():
     from play import views
 
     src = inspect.getsource(views._finish)
-    assert "judgement.settle_descriptions(c.scene, text, player_input)" in src
+    assert "judgement.settle_descriptions(c.scene, text, player_input," in src
     assert "nobody stands here undescribed" in src
 
 

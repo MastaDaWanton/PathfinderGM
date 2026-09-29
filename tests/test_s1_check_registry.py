@@ -193,10 +193,14 @@ def test_with_an_empty_registry_the_bobby_beats_groom_byte_identically(monkeypat
     assert len(texts) == 14
 
 
-def test_the_real_registry_holds_no_member_yet_so_the_game_is_unchanged():
-    """Phase 1 ships the registry empty: `_people` is a helper, not a member. When Lane A's
-    first check lands this assertion is the one to change, on purpose."""
-    assert checks.registered() == ()
+def test_the_real_registry_holds_lane_as_members_and_no_helper():
+    """Phase 1 shipped the registry empty; Lane A's truth checks are its first members
+    (changed on purpose, as this test's Phase-1 docstring asked). `_people` and `_page`
+    are helpers, never members."""
+    names = [m.__name__.rsplit(".", 1)[-1] for m in checks.registered()]
+    assert names == ["refused_move", "stop_shown", "direction", "empty_roll",
+                     "face_kept", "brief_verbatim"]
+    assert not any(n.startswith("_") for n in names)
 
 
 # --- discovery -----------------------------------------------------------------------------
@@ -383,9 +387,15 @@ def test_a_throwaway_member_finding_reaches_the_repair_through_a_real_door(
                     "repairs": ["repaired one"]}]
 
 
-def test_the_repair_is_a_stub_until_lane_a():
+def test_the_repair_leaves_a_finding_no_member_owns_alone(monkeypatch):
+    """The stub is Lane A's repair now (tests/test_a_truth_repair.py). What stays true: a
+    finding that names no sentence and has no member to backstop it costs no model call
+    and changes nothing."""
+    from gm import client as gm_client
+
+    monkeypatch.setattr(gm_client, "chat", lambda *a, **k: pytest.fail("no call owed"))
     agent = _agent()
-    f = _finding("k", ["A sentence."])
+    f = _finding("k", [])
     assert agent._repair_sentences("A sentence.", [f], _ctx(agent)) == ("A sentence.", [], [])
 
 
@@ -511,14 +521,20 @@ def test_head_of_beyond_the_openings(name, head):
     assert head_of(name) == head
 
 
-def test_head_of_is_wired_into_nothing_yet():
-    """Phase 1 delivers the helper; Lane A points every copy of the rule at it in Phase 2.
-    Until then nothing outside gm/checks and the tests imports it."""
-    users = [p for p in (ROOT / "gm").rglob("*.py")
-             if "checks" not in p.parts and "head_of" in p.read_text(encoding="utf-8")]
-    users += [p for p in (ROOT / "play").rglob("*.py")
-              if "head_of" in p.read_text(encoding="utf-8")]
-    assert users == []
+def test_every_copy_of_the_head_rule_now_agrees_with_head_of():
+    """Phase 1 delivered the helper wired into nothing; Lane A pointed every copy of the
+    rule at it (CLAUDE.md: when you fix a rule, grep for every copy). Measured by what
+    each copy answers on the twelve companions, not by reading their source."""
+    from gm import judgement, mentions
+    from play.opening import SITUATIONS
+
+    for s in SITUATIONS:
+        head = head_of(s.who)
+        assert mentions._head(s.who) == head, s.who
+        assert head in narration._name_stems(s.who), s.who
+        assert judgement._mentions(f"The {head} looks up.", s.who), s.who
+        assert not narration.faceless(f"The {head} is a gaunt figure, grey at the "
+                                      f"temples.", s.who), s.who
 
 
 # --- the other seams ---------------------------------------------------------------------
