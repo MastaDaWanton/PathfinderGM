@@ -12652,7 +12652,8 @@ class Engine:
                     actor.appearance = names_mod.resident_appearance(self.world,
                                                                      from_entity_id)
                     actor.true_name = actor.name
-                elif not actor.true_name:
+                elif not actor.true_name and _a_person(
+                        getattr(actor, "from_template", "") or template):
                     taken = [a.true_name for a in self.scene.actors.values()
                              if getattr(a, "true_name", "")]
                     taken += [a.name for a in self.scene.actors.values()]
@@ -13198,6 +13199,31 @@ def _instrument(weapon: dict, weapon_key: str) -> str:
         return ""
     name = " ".join(str(weapon.get("name") or key).split())
     return f" with the {name}" if name else ""
+
+
+def _a_person(template: str) -> bool:
+    """Whether a spawned creature is one of the local people, and so gets a true name
+    and a face from their pools.
+
+    `_bring_in` gave every arrival in a world a name and a face from the local people's
+    pools, and could not tell a wolf from a woman. Measured 2026-09-29 while building the
+    road starts: on Pangrella "the medium giant scorpion" spawned with the appearance
+    "Korvu: Korvu have four limbs ending in sharp talons … a line of blue ink dots across
+    the knuckles" and a person's true name, which the brief's WHO IS HERE then handed the
+    narrator. The same happened to whatever the road and foraging drew from the land.
+
+    Decided here: a humanoid is a person (a bandit, a thug, a goblin); every other type —
+    animal, vermin, magical beast, outsider, and monstrous humanoid too, because a local
+    people's body line is always wrong for a minotaur or a harpy — gets neither. The
+    hand-made civilian blocks (guildhand, watchman) are not in the imported bestiary and
+    are people by construction.
+    """
+    from . import bestiary
+
+    row = bestiary.imported().get(str(template or "").strip().lower())
+    if row is None:
+        return True
+    return str(row.get("creature_type") or "").strip().lower() == "humanoid"
 
 
 def _damage_note(d: dict) -> str:
