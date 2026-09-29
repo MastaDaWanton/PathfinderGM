@@ -187,8 +187,12 @@ async function openSheet() {
     $("#sheetbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
     return;
   }
+  // Scoped to the sheet, as `askGender` is and for the same reason: the trade panel
+  // reuses `.sheethead` and sits earlier in the document, so the bare selector put the
+  // sheet's sigil in the COUNTER's header (found 2026-09-29 measuring the phone header:
+  // the sheet's sigil was 0x0, and the trade window wore it instead).
   if (!$("#sheethead-sigil")) {
-    $(".sheethead").insertAdjacentHTML("afterbegin",
+    $("#sheetpanel .sheethead").insertAdjacentHTML("afterbegin",
       `<span id="sheethead-sigil">${SIGIL_SVG}</span>`);
   }
   $("#sheetname").textContent = SHEET.identity.name;
@@ -209,7 +213,23 @@ async function openSheet() {
     b.onclick = () => { SHEET_TAB = b.dataset.tab; drawSheet(); };
   });
   drawSheet();
+  sheetTabEdges();
 }
+
+// On a phone the tab strip is one row that scrolls sideways (table.html, "The sheet on
+// a phone"). Which edges have more past them is read from the strip itself and set as
+// two classes the stylesheet fades, so the strip says "more this way" only when there
+// is. Measured, not assumed: a 1px slack keeps a strip that fits from fading its end.
+function sheetTabEdges() {
+  const strip = document.getElementById("sheettabs");
+  if (!strip) return;
+  const room = strip.scrollWidth - strip.clientWidth;
+  strip.classList.toggle("more-left", room > 1 && strip.scrollLeft > 1);
+  strip.classList.toggle("more-right", room > 1 && strip.scrollLeft < room - 1);
+}
+document.getElementById("sheettabs").addEventListener("scroll", sheetTabEdges,
+                                                      { passive: true });
+window.addEventListener("resize", sheetTabEdges);
 
 function closeSheet() {
   // A spell's details lie over the sheet in the top layer; they go with it.
@@ -221,6 +241,10 @@ function closeSheet() {
 function drawSheet() {
   $("#sheettabs").querySelectorAll("button").forEach(b =>
     b.setAttribute("aria-selected", String(b.dataset.tab === SHEET_TAB)));
+  // The chosen tab in view on a strip that scrolls, without moving the page: `nearest`
+  // leaves a tab that is already showing where it is.
+  const chosen = $("#sheettabs").querySelector('[aria-selected="true"]');
+  if (chosen && chosen.scrollIntoView) chosen.scrollIntoView({ block: "nearest", inline: "nearest" });
   const entry = TABS.find(t => t[0] === SHEET_TAB);
   $("#sheetbody").innerHTML = entry ? entry[2](SHEET) : "";
   $("#sheetbody").scrollTop = 0;
@@ -1615,9 +1639,7 @@ function askGender(missing) {
   if (!missing) { if (bar) bar.remove(); return; }
   if (bar) return;
   bar = document.createElement("div");
-  bar.id = "genderask";
-  bar.style.cssText = "flex:1;display:flex;gap:8px;align-items:center;"
-    + "font:13px/1.4 var(--body);color:var(--ink-dim)";
+  bar.id = "genderask";      // styled in table.html, so a phone can give it a line
   bar.innerHTML = `Nothing on this sheet says what they are, so the narration will
     pick for them.
     <button class="quiet" data-setgender="woman">woman</button>

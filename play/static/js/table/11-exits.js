@@ -14,15 +14,35 @@
 // own sentence shown while it is pointed at or focused, because hiding the gate is how a
 // wanted player learns the watch is there by walking into it.
 //
+// In a fight (G3 leftovers, 2026-09-29) the row stays, because running is a choice a
+// player is entitled to, but it stops looking like a stroll. Every open way is marked
+// "provokes" and the first click asks "Leave the fight?" before the second one goes: in
+// PF1e, moving out of a threatened square provokes an attack of opportunity from each
+// foe who threatens it (CRB, Combat, "Attacks of Opportunity"). The page reads
+// `scene.in_encounter` and says so; it does not work out who threatens whom, because
+// that is the engine's question and a page that answered it would be a second rulebook.
+// The journeys' confirm idiom was reused rather than a dialog invented: one line under
+// the row, the same buttons, Esc and "Stay" to back out.
+//
 // The owner's motion rule: nothing here animates. The reason line and the confirm line
 // open BELOW the buttons, so nothing moves under the pointer that opened them.
 
 const EXIT_GROUPS = [["next_door", "Next door"], ["outside", "Outside"], ["road", "Roads"]];
-let EXIT_CONFIRM = null;          // the journey waiting for its second click, by id
+let EXIT_CONFIRM = null;          // the way waiting for its second click, by id
+
+// Which ways ask before they go: a journey (days on the clock), and every way in a fight.
+function exitAsks(e, fighting) {
+  return !!(e && !e.blocked && (e.journey || fighting));
+}
 
 // "a few minutes' walk" reads as "a few minutes" in a row that is all walking.
 function exitTime(words) {
   return String(words || "").replace(/(?:'s|') walk$/, "");
+}
+
+function upFirst(text) {
+  const t = String(text || "");
+  return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
 function exitNorm(text) {
@@ -52,14 +72,17 @@ function renderExits(s) {
   if (!box) return;
   const scene = (s && s.scene) || {};
   const exits = scene.exits || [];
+  const fighting = !!scene.in_encounter;
   dropDuplicateSuggestions(exits);
   if (!exits.length || s.awaiting || s.ended) {
     box.hidden = true; box.innerHTML = ""; EXIT_CONFIRM = null;
     return;
   }
-  if (EXIT_CONFIRM && !exits.some(e => e.id === EXIT_CONFIRM && e.journey && !e.blocked)) {
+  // A question whose reason has gone (the fight ended, the way shut) is not left open.
+  if (EXIT_CONFIRM && !exits.some(e => e.id === EXIT_CONFIRM && exitAsks(e, fighting))) {
     EXIT_CONFIRM = null;
   }
+  box.classList.toggle("fighting", fighting);
   const groups = EXIT_GROUPS.map(([key, label]) => {
     const mine = exits.filter(e => e.group === key);
     if (!mine.length) return "";
@@ -67,32 +90,61 @@ function renderExits(s) {
       <span class="ex-label" id="ex-g-${key}">${label}</span><div class="ex-list">${mine.map(e => {
         const shut = !!e.blocked;
         const time = exitTime(e.time_words);
+        const risky = fighting && !shut;
         return `<button type="button" class="exitbtn${shut ? " shut" : ""}${
-          EXIT_CONFIRM === e.id ? " asking" : ""}" data-exit="${esc(e.id)}"${
-          shut ? ` aria-disabled="true" data-why="${esc(e.blocked)}"` : ""}${
-          e.journey ? ` aria-expanded="${EXIT_CONFIRM === e.id}" aria-controls="exits-confirm"` : ""
+          risky ? " risky" : ""}${EXIT_CONFIRM === e.id ? " asking" : ""}" data-exit="${
+          esc(e.id)}"${shut ? ` aria-disabled="true" data-why="${esc(e.blocked)}"` : ""}${
+          exitAsks(e, fighting)
+            ? ` aria-expanded="${EXIT_CONFIRM === e.id}" aria-controls="exits-confirm"` : ""
         }><span class="ex-name">${esc(e.name)}</span>${
           time ? `<span class="ex-time"><span class="ex-sep" aria-hidden="true"> · </span>${
             esc(time)}</span>` : ""}${
+          risky ? `<span class="ex-risk" aria-hidden="true">provokes</span><span class="vh">
+            (leaving the fight provokes attacks of opportunity)</span>` : ""}${
           shut ? `<span class="vh"> (shut)</span>` : ""}</button>`;
       }).join("")}</div></div>`;
   }).join("");
   const asking = exits.find(e => e.id === EXIT_CONFIRM);
-  box.innerHTML = groups
-    + `<div class="ex-why" id="exits-why" aria-live="polite"></div>`
-    + (asking ? `<div class="ex-confirm" id="exits-confirm" role="group"
+  let confirm = "";
+  if (asking && fighting) {
+    confirm = `<div class="ex-confirm fight" id="exits-confirm" role="group"
+          aria-label="Leave the fight">
+        <span><b>Leave the fight?</b> Walking away to ${esc(asking.name)} provokes an
+        attack of opportunity from every foe who threatens you.${asking.journey ? ` ${
+          esc(upFirst(asking.time_words))}. The days pass on the road.` : ""}</span>
+        <button type="button" class="exitgo" data-exitgo="${esc(asking.id)}">Leave</button>
+        <button type="button" class="exitgo quiet" data-exitcancel>Stay</button>
+      </div>`;
+  } else if (asking) {
+    confirm = `<div class="ex-confirm" id="exits-confirm" role="group"
           aria-label="Confirm the journey">
         <span>${esc(asking.name)}: ${esc(asking.time_words)}. The days pass on the
         road.</span>
         <button type="button" class="exitgo" data-exitgo="${esc(asking.id)}">Set out</button>
         <button type="button" class="exitgo quiet" data-exitcancel>Not now</button>
-      </div>` : "");
+      </div>`;
+  }
+  box.innerHTML = groups
+    + `<div class="ex-why" id="exits-why" aria-live="polite"></div>` + confirm;
   box.hidden = false;
 }
 
 function exitWhy(btn) {
   const line = document.getElementById("exits-why");
   if (line) line.textContent = btn && btn.dataset.why ? btn.dataset.why : "";
+}
+
+// On a phone the footer scrolls under a sticky input row, and focusing "Leave" only
+// scrolls it as far as the footer's edge, which is behind that row: measured at 375x812,
+// the question sat at 699 to 811px under an input starting at 627px, answered by
+// buttons nobody could see. So the footer is scrolled on by exactly the overlap.
+function revealConfirm() {
+  const line = document.getElementById("exits-confirm");
+  const say = document.getElementById("sayform");
+  const foot = line && line.closest("footer");
+  if (!line || !say || !foot || getComputedStyle(say).position !== "sticky") return;
+  const over = line.getBoundingClientRect().bottom - say.getBoundingClientRect().top + 8;
+  if (over > 0) foot.scrollTop += over;
 }
 
 function goToExit(id, confirmed) {
@@ -110,12 +162,13 @@ document.addEventListener("click", e => {
   if (btn) {
     const id = btn.dataset.exit;
     if (btn.getAttribute("aria-disabled") === "true") { exitWhy(btn); return; }
-    const x = ((STATE.scene || {}).exits || []).find(v => v.id === id);
-    if (x && x.journey && EXIT_CONFIRM !== id) {
+    const scene = STATE.scene || {};
+    const x = (scene.exits || []).find(v => v.id === id);
+    if (exitAsks(x, !!scene.in_encounter) && EXIT_CONFIRM !== id) {
       EXIT_CONFIRM = id;
       renderExits(STATE);
       const go = document.querySelector("#exits [data-exitgo]");
-      if (go) go.focus();
+      if (go) { go.focus(); revealConfirm(); }
       return;
     }
     goToExit(id, !!(x && x.journey));

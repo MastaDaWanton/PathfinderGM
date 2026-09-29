@@ -128,7 +128,8 @@ function renderMap(s) {
   // Hands caught nobody, the prose burned a man, and nothing on the page showed where the
   // cone had actually gone. Drawn as each cell's square on the floor; a cell on the level
   // being looked at is filled, one above or below it (a cone into the canopy) outlined,
-  // so a spell aimed up reads as up. Only the flat board draws it for now.
+  // so a spell aimed up reads as up. The 3D view reads the same `g.areas` by the same
+  // rule in scene3d.js, so these are only the flat board's squares.
   const spellAreas = (g.areas || []).filter(a => a && (a.cells || []).length);
   if (spellAreas.length && !MAP_3D) {
     const shown = new Map();
