@@ -14,8 +14,9 @@ python -m http.server 8765 --bind 127.0.0.1
 
 then open <http://127.0.0.1:8765/docs/mock/table-layout/>. It has to be served. Opened
 as a file, the browser refuses the icon fetches, and the icon tiles come up empty. The
-page links the real fonts, textures, icons, clasps and `scene3d.js` under `play/static/`
-by relative path, so it must be served from the root, not from this folder.
+page links the real fonts, icons, cursor and `scene3d.js` under `play/static/` by
+relative path, so it must be served from the root, not from this folder. Its materials
+(leathers, paper, desk, metal) are its own, in `textures/` (see "The texture pass").
 
 The dashed strip across the top is the mock's own and not part of the design. **Viewing**
 switches between Kesst Vayr (the recording's rogue) and Ysolde Marrach (the fixture
@@ -27,7 +28,66 @@ A link can open any state directly, for sending the owner straight to a thing:
 `#char=ysolde&mode=spells`, `#mode=map&view=3d&turn=1`, `#mode=equipment&fit=shoulders`,
 `#talk=1`, `#hide=1`, `#wanted=1`.
 
-## What changed in this pass (the owner's verdict, point by point)
+## The texture pass
+
+The owner, on the version below: "while attempting to keep the leather and bronze look get
+textures from the internet for everything replacing mine with better ones. id like to
+improve the quality of the look without changing the layout or the 3d styling." Every
+material image is now a CC0 photograph, prepared by `textures/prepare.py` (resize, crop,
+tint, and re-light by the page's one lamp; it downloads nothing) and credited file by file
+in `textures/CREDITS.md`. Nothing under `play/` changed. The layout, the geometry, the
+bevels, shadows, page stack, pressed controls and coins, the colour tokens and every
+behaviour are as they were; the stylesheet's changes are image URLs, texture scales, the
+gilt's new metal layer, and the room's depth layers.
+
+- **The room** is now a worn plank desk (Poly Haven, Wood Table Large), not black leather.
+  The owner on the first two tries: "the background texture is notably worse, I was hoping
+  for something interesting, give it some depth but keep it dark". Those were leathers
+  toned to the old texture's spread, which flattened them to wallpaper; one, a scarred
+  black leather, read as a cobweb over the open ground of Spells and Equipment. The desk
+  has its depth from its own normal map, lit by the page's lamp, so every plank edge, crack
+  and nail hole is lit from the same side as the bevels; its occlusion map darkens the
+  seams; a vignette falls to shadow at the far edges and a low warm pool rises where the
+  embers do (both CSS, so they cost nothing and stay centred). It is cover-fitted and never
+  repeats. Why it beats the grimoire leather: that was a black photograph whose light came
+  from wherever it was photographed, and whose detail was mostly lost under the page's
+  dimming; the desk keeps the room dark (the dim labels on it measure 5.00:1 at the worst
+  2%, where the old measured 3.63) while showing a real surface lit the way the page is,
+  and a book on a desk is what the table is.
+- **Leathers**: the card leather (Brown Leather) and the sides' tooled leather (Fabric
+  Leather 02) are real grain toned to the old colours, where the old card leather varied
+  by 4 levels in 255.
+- **The page** is paper now (ambientCG Paper 006) at the old page's dark, so the story's
+  contrast is unchanged (12.16:1 at the median, was 12.19).
+- **The metal**: the clasps and bosses keep their exact silhouettes and sizes, so they sit
+  exactly where they did, but are re-made in photographed bronze and brass (ambientCG
+  Metal 047 B and 048 C) and re-lit by the page's lamp. The old ones were one render
+  mirrored into four corners, so its light was mirrored too. The gilt rings, gilt edges and
+  coin rims keep their gradient and gain a brass grain over it; the four gilt-edged panels
+  now draw the edge as a background clipped to their 3px border (a `border-image` takes one
+  image, and the edge now needs two).
+- **Contrast** was measured on every reading surface with its text removed, at the median
+  and at the brightest 2% (the worst case for light text), before and after. Every surface
+  holds 4.5:1 for the dimmest text on it. Two failed before and now pass: the desk under
+  the book (dim labels 3.68:1, now 4.66) and the top bar (3.73, now 4.75). The fix was a
+  tint on the card leather, not a token.
+
+| Surface | Dimmest text | Before, median / worst 2% | After |
+|---|---|---|---|
+| Page (story) | story #d8cdb2 | 12.19 / 11.06 | 12.16 / 11.05 |
+| Page head | dim #93866e | 4.93 / 4.66 | 4.97 / 4.58 |
+| Desk under the book | dim #93866e | 4.21 / **3.68** | 5.12 / 4.66 |
+| Top bar | dim #93866e | 4.33 / **3.73** | 5.29 / 4.75 |
+| Sides (tooled) | side dim #b3a488 | 6.89 / 6.37 | 6.91 / 6.11 |
+| Framed card | dim #93866e | 5.30 / 4.87 | 5.45 / 5.08 |
+| Talk tray | talk dim #a99a80 | 6.93 / 6.86 | 7.12 / 7.02 |
+| Equipment head | ink #e8ddc4 | 11.28 / 10.22 | 13.77 / 12.61 |
+| Worn and wielded | side dim #b3a488 | 6.86 / 6.37 | 6.89 / 6.11 |
+| Room (the ground) | dim #93866e | 5.53 / **3.63** | 5.20 / 5.00 |
+
+Not replaced: the candle cursor (a drawn candlestick, not a material) and the fonts.
+
+## What changed in the second pass (the owner's verdict, point by point)
 
 > "I like the design but Im not sure about how well it functions."
 
@@ -210,8 +270,8 @@ Each of these was found by asking the engine for the number and not getting one.
 
 ## The design decisions (standing)
 
-- **Redesign, preserve.** The app's `:root` tokens copied verbatim, its textures
-  (`grimoire-leather`, `card-leather`, `leather-tile`), its gilt, clasps and bosses,
+- **Redesign, preserve.** The app's `:root` tokens copied verbatim, its textures' roles
+  (now filled by the photographs in `textures/`), its gilt, clasps and bosses,
   Cinzel and the Palatino stack, its radius scale (2px controls, 3px surfaces, 12px
   suggestion seals, round medallions), and its engraved-bronze letter shadows. No new
   accent colour. One lighter step of `--dim` inside the leather sides, because the app's

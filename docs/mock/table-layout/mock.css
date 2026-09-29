@@ -1,10 +1,13 @@
 /* The table, re-laid: a layout mock in the app's own materials.
 
    Everything visual here is borrowed from play/templates/play/table.html, not invented:
-   the :root tokens are copied verbatim, the textures, the gilt, the clasps and the bosses
-   are the real files under play/static/img, Cinzel is the app's own woff2, the body face
-   is its Palatino stack, and the radius scale is the app's (2px for controls, 3px for
-   surfaces, 12px for the suggestion "wax seals", round for the medallions).
+   the :root tokens are copied verbatim, the gilt is its gradient, Cinzel is the app's own
+   woff2, the body face is its Palatino stack, and the radius scale is the app's (2px for
+   controls, 3px for surfaces, 12px for the suggestion "wax seals", round for the
+   medallions). The materials in those roles are CC0 photographs in textures/ (the texture
+   pass, 2026-09-29: textures/CREDITS.md), each toned to the app's own texture it replaces;
+   the clasps and bosses keep the app's silhouettes, pixel for pixel, so they sit where
+   the real table puts them.
 
    Depth (second pass, 2026-09-29, the owner: "I want everything to be more 3d"). There is
    one lamp, and it is scene3d.js's: LIGHT = norm(-0.42, -0.78, 0.47) in screen space,
@@ -42,6 +45,10 @@
   --player: #8fb0c8;
   --glass: rgba(16, 12, 9, .66); --glass-edge: rgba(221, 196, 142, .14);
   /* The gilt the app draws its frames with (aside border-image, .panel::before). */
+  /* Photographed brass, as grey grain around the middle (textures/prepare.py), laid over
+     the gilt in soft-light: the gradient keeps the gold and the lamp, this adds the metal's
+     surface. Used wherever the gilt is: the rings, the gilt edges, the coins' rims. */
+  --brass-grain: url("textures/brass-grain.jpg");
   --gilt: linear-gradient(135deg, #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%,
                           #c9a86a 86%, #f4e3b2 100%);
   /* The spell schools, from the Spells tab. */
@@ -76,9 +83,17 @@ body {
   margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
   display: grid; grid-template-rows: auto auto minmax(0, 1fr);
   height: 100dvh; overflow: hidden;
+  /* The room: a worn plank desk (textures/room-desk.jpg, its relief lit by the page's
+     one lamp), then depth in three layers, all fixed to the window like the desk. The
+     lamp is high and left, so the room is lightest up there and falls into shadow at
+     the far edges; a low warm pool rises where the embers do; the app's own dimming
+     gradient stays over all of it. */
   background:
-    linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
-    url("../../../play/static/img/grimoire-leather.jpg") center / cover no-repeat fixed #0d0b09;
+    radial-gradient(120% 105% at 30% 22%, transparent 30%, rgba(4, 3, 2, .55) 70%,
+                    rgba(3, 2, 1, .88) 100%) fixed,
+    radial-gradient(60% 45% at 52% 105%, rgba(var(--ember), .10), transparent 70%) fixed,
+    linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)) fixed,
+    url("textures/room-desk.jpg") center / cover no-repeat fixed #0d0b09;
 }
 
 /* The carried candle: the cursor is the candlestick, its hotspot on the flame tip (the
@@ -263,7 +278,7 @@ button.flat:active { transform: none; box-shadow: none; }
   border-bottom: 1px solid var(--gold-dim);
   background:
     linear-gradient(rgba(255, 225, 170, .05), rgba(0, 0, 0, 0) 30%, rgba(8, 6, 4, .40)),
-    url("../../../play/static/img/card-leather.jpg") #241d15;
+    url("textures/card-leather.jpg") #241d15;
   background-size: auto, 400px auto;
   /* A board laid over the stage: it throws its shadow down onto what is below. */
   box-shadow: inset 0 1px 0 rgba(255, 225, 170, .10), 0 4px 10px rgba(0, 0, 0, .55);
@@ -344,13 +359,19 @@ body:not(.mode-table):not(.mode-map):not(.mode-sheet) .stage { display: none; }
    table by its cast shadow. */
 .side {
   min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 18px;
-  font-size: 14px; line-height: 1.5; border: 3px solid transparent; border-image: var(--gilt) 1;
+  font-size: 14px; line-height: 1.5; border: 3px solid transparent;
+  /* The gilt edge is the last two layers, clipped to the 3px border: border-image takes
+     one image and the edge now needs the brass over the gilt. Backgrounds, unlike a ring
+     drawn on a pseudo-element, stay put when the side scrolls. */
   background:
     linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
     linear-gradient(#57432d, #4b3a27),
-    url("../../../play/static/img/leather-tile.jpg") #241d15;
-  background-blend-mode: normal, multiply, normal;
-  background-size: auto, auto, 512px auto;
+    url("textures/side-leather.jpg"),
+    var(--brass-grain), var(--gilt) #241d15;
+  background-blend-mode: normal, multiply, normal, soft-light, normal;
+  background-size: auto, auto, 300px auto, 256px auto, auto;
+  background-clip: padding-box, padding-box, padding-box, border-box, border-box;
+  background-origin: padding-box, padding-box, padding-box, border-box, border-box;
   box-shadow: var(--emboss), var(--sh-2);
   /* The app's --dim measured 3.0:1 against this leather at its lightest (#4b3a27), under
      AA for the small print here. One step lighter in the same hue: 4.4:1 at the lightest
@@ -439,7 +460,9 @@ body.sheet-hidden .talk { grid-area: talk; }
          padding: 5px;
          /* The lamp's glint on the rim, high and left, over the app's gilt. */
          background: radial-gradient(circle at 28% 22%, rgba(255, 246, 215, .6), transparent 34%),
-                     var(--gilt);
+                     var(--brass-grain), var(--gilt);
+         background-size: auto, 120px auto, auto;
+         background-blend-mode: normal, soft-light, normal;
          box-shadow: inset 1px 1px 1px rgba(255, 244, 210, .7), inset -2px -2px 3px rgba(40, 26, 10, .75),
                      2px 4px 6px rgba(0, 0, 0, .6), 1px 1px 1px rgba(0, 0, 0, .5); }
 .medal > div { width: 100%; height: 100%; border-radius: 50%; display: grid;
@@ -488,8 +511,8 @@ body.sheet-hidden .talk { grid-area: talk; }
     /* the page's own curve catching the lamp, high and left */
     radial-gradient(80% 60% at 35% 15%, rgba(240, 214, 158, .07), transparent 70%),
     linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
-    url("../../../play/static/img/card-leather.jpg") #1d1710;
-  background-size: auto, auto, auto, 420px auto;
+    url("textures/page-paper.jpg") #1d1710;
+  background-size: auto, auto, auto, 560px auto;
   box-shadow:
     1px 1px 0 #2e2519, 2px 2px 0 #574731, 3px 3px 0 #2e2519, 4px 4px 0 #4d3f2b,
     5px 5px 0 #2a2117, 6px 6px 0 #453827, 7px 7px 0 #221b13,
@@ -498,7 +521,9 @@ body.sheet-hidden .talk { grid-area: talk; }
 /* The gilt ring. */
 .book::before, .framedcard::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
-  padding: 4px; background: var(--gilt); z-index: 2;
+  padding: 4px; z-index: 2;
+  background: var(--brass-grain), var(--gilt);
+  background-size: 256px auto, auto; background-blend-mode: soft-light, normal;
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -521,10 +546,10 @@ body.sheet-hidden .talk { grid-area: talk; }
 .book::after, .framedcard::after {
   content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
   background-image:
-    url("../../../play/static/img/clasp-tl.png"), url("../../../play/static/img/clasp-tr.png"),
-    url("../../../play/static/img/clasp-bl.png"), url("../../../play/static/img/clasp-br.png"),
-    url("../../../play/static/img/boss-top.png"), url("../../../play/static/img/boss-bottom.png"),
-    url("../../../play/static/img/boss-left.png"), url("../../../play/static/img/boss-right.png");
+    url("textures/clasp-tl.png"), url("textures/clasp-tr.png"),
+    url("textures/clasp-bl.png"), url("textures/clasp-br.png"),
+    url("textures/boss-top.png"), url("textures/boss-bottom.png"),
+    url("textures/boss-left.png"), url("textures/boss-right.png");
   background-position: left 24px top 24px, right 24px top 24px,
                        left 24px bottom 24px, right 24px bottom 24px,
                        center top 21px, center bottom 21px,
@@ -595,7 +620,7 @@ body.sheet-hidden .talk { grid-area: talk; }
         border: 1px solid #3a2f22; border-top-color: var(--gold-dim); border-radius: 3px;
         background:
           linear-gradient(rgba(255, 225, 170, .04), rgba(8, 6, 4, .30)),
-          url("../../../play/static/img/card-leather.jpg") #241d15;
+          url("textures/card-leather.jpg") #241d15;
         background-size: auto, 400px auto;
         box-shadow: var(--emboss), var(--sh-2); }
 
@@ -680,7 +705,7 @@ body.sheet-hidden .talk { grid-area: talk; }
   background:
     radial-gradient(80% 60% at 30% 10%, rgba(240, 214, 158, .05), transparent 70%),
     linear-gradient(rgba(14, 11, 8, .78), rgba(10, 8, 6, .86)),
-    url("../../../play/static/img/card-leather.jpg") #1d1710;
+    url("textures/card-leather.jpg") #1d1710;
   background-size: auto, auto, 420px auto;
   box-shadow: var(--emboss), var(--sh-3); }
 .framedcard h2 { position: relative; z-index: 1; margin: 18px 0 9px;
@@ -815,11 +840,15 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
 /* --- The conversation tray ------------------------------------------------------------ */
 .talk { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; min-height: 0;
         gap: 10px; padding: 16px 16px 14px; font-size: 15px; line-height: 1.5;
-        border: 3px solid transparent; border-image: var(--gilt) 1;
+        border: 3px solid transparent;
         background:
           linear-gradient(rgba(14, 11, 8, .82), rgba(10, 8, 6, .9)),
-          url("../../../play/static/img/card-leather.jpg") #1d1710;
-        background-size: auto, 420px auto;
+          url("textures/card-leather.jpg"),
+          var(--brass-grain), var(--gilt) #1d1710;
+        background-size: auto, 300px auto, 256px auto, auto;
+        background-blend-mode: normal, normal, soft-light, normal;
+        background-clip: padding-box, padding-box, border-box, border-box;
+        background-origin: padding-box, padding-box, border-box, border-box;
         box-shadow: var(--emboss), var(--sh-3); --dim: #a99a80; }
 .talkhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .talkhead h2 { margin: 0; color: var(--gold); font: 400 17px/1.1 var(--display);
@@ -863,7 +892,7 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
           padding: 16px 20px; border-radius: 3px; border: 1px solid #3a2f22;
           background:
             linear-gradient(rgba(255, 225, 170, .04), rgba(8, 6, 4, .30)),
-            url("../../../play/static/img/card-leather.jpg") #241d15;
+            url("textures/card-leather.jpg") #241d15;
           background-size: auto, 400px auto;
           box-shadow: var(--emboss), var(--sh-2); }
 .eqtitle { flex: 1 1 320px; }
@@ -933,13 +962,16 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
 /* Worn and wielded: two hands, then the body slots down either side, roughly where each
    is worn (rules/tables.py SLOT_ORDER_LEFT / RIGHT). */
 .doll { grid-area: doll; position: relative; padding: 22px 20px 18px; border-radius: 3px;
-        border: 3px solid transparent; border-image: var(--gilt) 1;
+        border: 3px solid transparent;
         background:
           linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
           linear-gradient(#57432d, #4b3a27),
-          url("../../../play/static/img/leather-tile.jpg") #241d15;
-        background-blend-mode: normal, multiply, normal;
-        background-size: auto, auto, 512px auto;
+          url("textures/side-leather.jpg"),
+          var(--brass-grain), var(--gilt) #241d15;
+        background-blend-mode: normal, multiply, normal, soft-light, normal;
+        background-size: auto, auto, 300px auto, 256px auto, auto;
+        background-clip: padding-box, padding-box, padding-box, border-box, border-box;
+        background-origin: padding-box, padding-box, padding-box, border-box, border-box;
         box-shadow: var(--emboss), var(--sh-2); --dim: #b3a488; }
 .doll h2 { margin: 0 0 12px; color: var(--gold); font: 400 17px/1.1 var(--display);
            letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
@@ -1013,7 +1045,18 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
   .stage { grid-template-columns: 280px minmax(0, 1fr);
            grid-template-areas: "sheet book" "sheet desk"; }
   .sheet { grid-area: sheet; display: block; min-height: 0; overflow-y: auto;
-           overflow-x: hidden; border: 3px solid transparent; border-image: var(--gilt) 1;
+           overflow-x: hidden; border: 3px solid transparent;
+           /* The gilt edge as the sides draw theirs; inside it the same tooled leather, so
+              any height the two halves leave shows leather, not the brass beneath. */
+           background:
+             linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
+             linear-gradient(#57432d, #4b3a27),
+             url("textures/side-leather.jpg"),
+             var(--brass-grain), var(--gilt) #241d15;
+           background-blend-mode: normal, multiply, normal, soft-light, normal;
+           background-size: auto, auto, 300px auto, 256px auto, auto;
+           background-clip: padding-box, padding-box, padding-box, border-box, border-box;
+           background-origin: padding-box, padding-box, padding-box, border-box, border-box;
            box-shadow: var(--sh-2); }
   .sheet .side { overflow: visible; border: 0; box-shadow: var(--emboss); }
   .sheet .side-numbers { border-top: 1px solid var(--gold-dim); }
