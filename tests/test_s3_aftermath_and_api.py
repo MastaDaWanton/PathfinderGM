@@ -53,7 +53,8 @@ OLD_SCENE = ["location", "scale", "what_it_is", "biome", "biome_describe", "roun
              "in_encounter", "talk", "busy", "turn_ref", "initiative", "clock_minutes",
              "actors", "grid", "pools"]
 NEW_TOP = ["spellcasting", "start"]
-NEW_SCENE = ["where_label", "where_detail", "setting", "conversation", "day_part"]
+NEW_SCENE = ["where_label", "where_detail", "setting", "conversation", "day_part",
+             "exits"]          # I6, the "From here" row (Phase 3)
 
 
 # --- helpers ------------------------------------------------------------------------------
@@ -735,7 +736,7 @@ def test_the_conversation_endpoint_pages_back_oldest_first(game):
                                         {"kind": "spell", "id": "magic-missile"}]},
      "Only one spell can be attached to a turn."),
     ({"text": "I use it", "attachments": [{"kind": "item", "id": "rope"}]},
-     "Only a spell can be attached to a turn."),
+     "Only a spell or a place can be attached to a turn."),
     ({"text": "", "attachments": [{"kind": "spell", "id": "not-a-spell"}]},
      "There is no spell called not-a-spell."),
     ({"text": "", "attachments": [{"kind": "spell", "id": "fireball"}]},
