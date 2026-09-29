@@ -619,17 +619,93 @@ def _held_by_level(actor) -> dict[int, int]:
     return held
 
 
+# --- open slots: preparing into the rest of the day ---------------------------------------
+#
+# The rule (Archives of Nethys, Core Rulebook, Magic > Arcane Spells, "Preparing Wizard
+# Spells", fetched 2026-09-29): "When preparing spells for the day, a wizard can leave some
+# of these spell slots open. Later during that day, he can repeat the preparation process
+# as often as he likes... He cannot, however, abandon a previously prepared spell to
+# replace it with another one or fill a slot that is empty because he has cast a spell in
+# the meantime. That sort of preparation requires a mind fresh from rest."
+#
+# So the room at a level is the slots NOT YET SPENT today, less the spells held in them.
+# Measured 2026-09-29 (the owner's screenshot): Ysolde, wizard 1, two level 1 slots, cast
+# Burning Hands (`_op_cast` spent the slot AND the prepared copy), and the room check —
+# slots per day minus spells held, 2 − 1 — let her prepare Burning Hands again into the
+# slot she had just spent. The page then read "1 of 2 level 1 slots left" beside two
+# prepared spells, and the next Prepare hit the raw "has 2 level 1 slots and has already
+# prepared 2". Every reader of the room now asks `open_slots`, so a spent slot is never
+# counted as empty — not by the prepare endpoint, not by the sheet's warning, not by the
+# morning (whose pools are refreshed before it runs, so nothing changes there).
+#
+# Cantrips keep their own rule: at will, never spent (`at_will`), so their room is the
+# 0-level count less the cantrips held, whatever has been cast.
+#
+# The owner's house rule departs from the book in two places (ruling 2026-09-29: "prepare
+# is fine whenever for the sake of user experience but once a slot is used is un fillable
+# until after a long rest"): preparing and unpreparing are free at any time, with no
+# preparation time on the clock (the book's "at least 15 minutes" for a later session is
+# not charged), and swapping the spell in an UNSPENT slot is allowed (the book's "cannot
+# abandon a previously prepared spell to replace it" is not enforced). What holds is the
+# spent slot: unpreparing never touches the pools, so it can never turn a spent slot back
+# into an open one; only the night's rest (`rest.night`, `Engine` rest) refills them.
+
+def unspent_slots(actor, spell_level: int) -> int:
+    """The slots at this level not yet spent today. The pool is the record; a caster
+    whose pools were never defined (a bare test actor) has spent nothing."""
+    total = slots_for(actor).get(int(spell_level), 0)
+    pool = actor.pool(slot_pool(spell_level)) if hasattr(actor, "pool") else None
+    if pool is None:
+        return total
+    return max(0, min(int(pool.current), total))
+
+
+def held_at(actor, spell_level: int) -> int:
+    """How many prepared spells this caster holds at this level (domain slots apart)."""
+    return _held_by_level(actor).get(int(spell_level), 0)
+
+
+def open_slots(actor, spell_level: int) -> int:
+    """How many more spells this prepared caster may prepare at this level right now."""
+    lvl = int(spell_level)
+    held = _held_by_level(actor).get(lvl, 0)
+    if at_will(lvl):
+        return max(0, slots_for(actor).get(lvl, 0) - held)
+    return max(0, unspent_slots(actor, lvl) - held)
+
+
+def prepare_refusal(actor, spell_level: int, count: int = 1) -> str:
+    """Why preparing `count` more at this level is refused, in plain words, or "".
+
+    The Spells tab shows this same sentence beside a disabled Prepare (rules/sheet.py
+    sends it per level), so the page and the endpoint cannot disagree about the rule."""
+    lvl = int(spell_level)
+    room = open_slots(actor, lvl)
+    if room >= max(1, int(count)):
+        return ""
+    if at_will(lvl):
+        return (f"No open cantrip slot today: {actor.name} holds "
+                f"{slots_for(actor).get(lvl, 0)} cantrips. Unprepare one first.")
+    if unspent_slots(actor, lvl) <= 0:
+        return (f"Every level {lvl} slot is spent for today; they come back after a "
+                f"long rest.")
+    if room <= 0:
+        return f"No open level {lvl} slot today. Unprepare one first."
+    return f"Only {room} open level {lvl} slot{'s' if room != 1 else ''} today."
+
+
 def empty_slots(actor) -> dict[int, int]:
-    """Slots per spell level that hold no prepared spell, for the sheet's warning — the
-    0-level ones included, since a cantrip must be prepared to be cast (`at_will`).
+    """Open slots per spell level (`open_slots`), for the sheet's warning — the 0-level
+    ones included, since a cantrip must be prepared to be cast (`at_will`). A slot spent
+    today is not empty: it cannot be filled until the next rest.
     {} for spontaneous casters — any slot casts anything they know — and non-casters."""
     if caster_data(actor).get("kind") != "prepared":
         return {}
-    held = _held_by_level(actor)
     out = {}
-    for lvl, room in slots_for(actor).items():
-        if room - held.get(lvl, 0) > 0:
-            out[lvl] = room - held.get(lvl, 0)
+    for lvl in slots_for(actor):
+        room = open_slots(actor, lvl)
+        if room > 0:
+            out[lvl] = room
     return out
 
 
@@ -661,8 +737,10 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
     if kept is not None:
         actor.prepared = {str(k): int(v) for k, v in kept.items() if int(v or 0) > 0}
     out["kept"] = {k: int(v) for k, v in (actor.prepared or {}).items() if int(v or 0) > 0}
-    room = {lvl: n - _held_by_level(actor).get(lvl, 0)
-            for lvl, n in slots_for(actor).items()}
+    # The open room, not slots-per-day: a slot spent today is not refilled until a rest
+    # (`open_slots`). The rest refreshes the pools before calling this, so a morning sees
+    # every slot unspent.
+    room = {lvl: open_slots(actor, lvl) for lvl in slots_for(actor)}
 
     def add(sid: str, lvl: int) -> bool:
         if room.get(lvl, 0) <= 0:
@@ -768,7 +846,8 @@ def slots_left(actor, spell_level: int):
 __all__ = [
     "CASTERS", "FULL_CASTER", "PROGRESSIONS", "at_will", "bonus_slots", "can_cast_level",
     "caster_data", "caster_level", "casting_ability", "define_slots", "empty_slots",
-    "ensure_prepared", "highest_spell_level", "is_caster", "knows", "level_on_list",
-    "prepare", "prepared_count", "remember_loadout", "save_dc", "slot_pool", "slots_for",
-    "slots_left", "spell_level_for", "unprepare",
+    "ensure_prepared", "held_at", "highest_spell_level", "is_caster", "knows",
+    "level_on_list", "open_slots", "prepare", "prepare_refusal", "prepared_count", "remember_loadout",
+    "save_dc", "slot_pool", "slots_for", "slots_left", "spell_level_for", "unprepare",
+    "unspent_slots",
 ]

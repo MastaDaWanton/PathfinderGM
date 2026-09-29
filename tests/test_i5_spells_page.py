@@ -160,12 +160,18 @@ def test_the_three_columns_are_there_in_the_mockups_order(spells, tmp_path):
 
 
 def test_the_slots_are_gem_sockets_lit_while_they_last(spells, tmp_path):
-    """Lit = available, dark = spent, one socket per slot, and the count in words beside
+    """One socket per slot, in three states since 2026-09-29, and the count in words beside
     them so colour is never the only way to read it.
 
-    The cantrip row is the exception since 2026-09-29: a cantrip is "not expended when
-    cast" (AoN, Wizard), so its gems are the cantrips PREPARED today (two of four here)
-    and the words say at will. It read "4 of 4 left" and drained per cast before."""
+    This pinned two states (lit = left, dark = spent) until the owner's Ysolde screenshot
+    of 2026-09-29: a slot spent today and a slot open for preparing both drew dark, and
+    the tab read "1 of 2 left" while that one slot was already full. Now lit = a prepared
+    spell waiting, red (`spent`) = cast today, dark = open; the words say "N ready, N
+    spent, N open" (tests/test_spells_prepare_midday.py drives the spent case).
+
+    The cantrip row is the exception: a cantrip is "not expended when cast" (AoN,
+    Wizard), so its gems are the cantrips PREPARED today (two of four here) and the words
+    say at will. It read "4 of 4 left" and drained per cast before."""
     els = _tree(_render(spells, tmp_path)["html"])
     levels = [e for e in els if e["attrs"].get("class") == "sock-level"]
     assert len(levels) == len(spells["slots"])
@@ -181,13 +187,21 @@ def test_the_slots_are_gem_sockets_lit_while_they_last(spells, tmp_path):
             assert f"{held} of {slot['max']} prepared, at will" in lvl["text"]
             assert "left" not in lvl["text"]
             continue
-        assert len(gems) == slot["max"] and len(lit) == slot["left"]
-        assert f"{slot['left']} of {slot['max']} left" in lvl["text"]
+        spent = [g for g in gems if "spent" in g["attrs"]["class"].split()]
+        ready = min(slot["held"], slot["left"])
+        assert len(gems) == slot["max"] and len(lit) == ready
+        assert len(spent) == slot["max"] - slot["left"]
+        assert (f"{ready} ready, {slot['max'] - slot['left']} spent, "
+                f"{slot['left'] - ready} open") in lvl["text"]
 
 
 def test_prepared_spells_are_cards_with_the_strip_and_both_buttons(spells, tmp_path):
     """One card per prepared spell of level 1 and up; each has the school's colour, a
-    glyph, the Range / middle / Save strip, the counts, Cast and Prepare."""
+    glyph, the Range / middle / Save strip, its own prepared count, Cast and Prepare.
+
+    Each card carried "N of M level X slots left" as well until 2026-09-29, so Ysolde's
+    two level 1 cards each read "1 of 2 level 1 slots left" and looked like two free
+    slots; the count is the level header's now, once (test_spells_prepare_midday.py)."""
     els = _tree(_render(spells, tmp_path)["html"])
     cards = [e for e in els if e["tag"] == "article"]
     want = {k["name"] for k in spells["known"] if k.get("level", 0) and k["prepared"]}
@@ -198,7 +212,7 @@ def test_prepared_spells_are_cards_with_the_strip_and_both_buttons(spells, tmp_p
         assert [e["text"] for e in inside if e["tag"] == "dt"][0::2] == ["Range", "Save"]
         labels = [e["text"].strip() for e in inside if e["tag"] == "button"]
         assert labels[:2] == ["Cast", "Prepare"]
-        assert "prepared" in c["text"] and "slots left" in c["text"]
+        assert "prepared" in c["text"] and "slots left" not in c["text"]
 
 
 def test_cast_attaches_and_never_prepares(spells, tmp_path):
