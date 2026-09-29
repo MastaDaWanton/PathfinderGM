@@ -2251,11 +2251,27 @@ _CREATURE_OPS = _FIGHT_OPS + ("damage", "ability_damage")
 _NUMERIC_PARAMS = {"amount": "number", "count": "integer", "hours": "integer"}
 
 
-def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...]) -> dict:
+def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
+                 aims: tuple[str, ...] = ()) -> dict:
     """One required op's shape in the reply's `declared` object: its target and params,
     the params the op requires marked required — and a travel's place held to the names
     of the places this town really has (generation under a list of valid names; GENRE,
-    arXiv 2010.00904), so the model chooses among them and invents none."""
+    arXiv 2010.00904), so the model chooses among them and invents none.
+
+    A cast's `aim` is held the same way (I3; docs/design-e-magic.md §4.6 step 5): "if they
+    write nothing, the model infers the use" — from an enum of the aims that exist, so it
+    chooses and cannot invent one. Ollama enforces an enum (6 of 6, memory
+    `ollama-schema-enforcement`); a free-string aim came back as a placeholder for nobody
+    (G2, 2026-09-28: `at=new2`, "the flames reach nobody", and the page burned an invented
+    man). `aims` is `areas.legal_aims` for the scene when the caller has one; without it
+    the enum is built from what this function already holds — the people present
+    (`ref:`), the caster (`self`) and the map's directions — and a thing here reaches the
+    cast through the player's own words (`judgement.aim_the_cast`) instead. Not required:
+    the chip or the words may already have aimed it, and a required property is one the
+    sampler must fill (the interpreter's slot measurement, 220 of 220).
+
+    A journey's or travel's `pace` is the closed word Lane B's rules read (walk, ride,
+    gallop; `journey.PACES`), never a free string."""
     from rules.intents import OPS as _OP_TABLE
 
     from rules.intents import FLAG_PARAMS
@@ -2271,6 +2287,18 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...]) -> dic
     if op == "travel" and places:
         props["place"] = {"type": "string", "enum": list(places)}
         need = ["place"]
+    if "pace" in props:
+        from rules.journey import PACES
+
+        props["pace"] = {"type": "string", "enum": list(PACES)}
+    if op == "cast" and "aim" in props:
+        from rules import areas
+
+        legal = [a for a in (aims or ()) if areas.valid(a)]
+        if not legal:
+            legal = [f"ref:{r}" for r in refs if areas.valid(f"ref:{r}")]
+            legal += ["self"] + [f"dir:{d}" for d in areas.DIRECTIONS]
+        props["aim"] = {"type": "string", "enum": list(dict.fromkeys(legal))}
     shape: dict = {"type": "object", "properties": {
         "params": {"type": "object", "properties": props, "required": need}},
         "required": ["params"]}

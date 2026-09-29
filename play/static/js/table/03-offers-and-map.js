@@ -122,6 +122,37 @@ function renderMap(s) {
         lvl ? "," + lvl : ""}"`));
   }
 
+  // The latest turn's spell areas (`scene.grid.areas`, §2.10): the engine's ruling on
+  // where the cone or burst fell, drawn so the player can see it and dispute it the way a
+  // table would (rules/areas.py: "the cells go to the map"). Measured 2026-09-28: Burning
+  // Hands caught nobody, the prose burned a man, and nothing on the page showed where the
+  // cone had actually gone. Drawn as each cell's square on the floor; a cell on the level
+  // being looked at is filled, one above or below it (a cone into the canopy) outlined,
+  // so a spell aimed up reads as up. Only the flat board draws it for now.
+  const spellAreas = (g.areas || []).filter(a => a && (a.cells || []).length);
+  if (spellAreas.length && !MAP_3D) {
+    const shown = new Map();
+    for (const a of spellAreas) {
+      for (const cellAt of a.cells) {
+        const [c, r] = cellAt;
+        const z = cellAt.length > 2 ? cellAt[2] : 0;
+        const key = `${c},${r}`;
+        const here = z - at(c, r) === MAP_LEVEL || z === MAP_LEVEL;
+        const was = shown.get(key);
+        if (!was || (here && !was.here)) shown.set(key, { c, r, here, spell: a.spell });
+      }
+    }
+    for (const { c, r, here, spell } of shown.values()) {
+      const name = String(spell || "a spell").replace(/-/g, " ");
+      parts.push(`<rect class="spellarea${here ? "" : " offlevel"}" x="${c * CELL}" y="${
+        r * CELL}" width="${CELL}" height="${CELL}" fill="#e0701e" fill-opacity="${
+        here ? 0.32 : 0}" stroke="#f0a050" stroke-opacity="${here ? 0.55 : 0.8}"
+        stroke-width="${here ? 0.8 : 1.2}"${here ? "" : ` stroke-dasharray="3 2"`}
+        pointer-events="none"><title>${esc(name)}${here ? "" : ", above or below this floor"
+        }</title></rect>`);
+    }
+  }
+
   // Grid lines last of the terrain, so they sit over the fills and under the tokens.
   for (let c = 0; c <= g.width; c++)
     parts.push(`<line class="rule" x1="${c * CELL}" y1="0" x2="${

@@ -56,7 +56,13 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "buy": ("object", "target", "place"), "sell": ("object", "target"),
     "give": ("target", "object", "place"), "take": ("object", "target"),
     "steal": ("object", "target"), "attack": ("target", "object", "place", "time"),
-    "cast": ("object", "target"), "use": ("object", "target"), "consume": ("object",),
+    # `place` as well since I3 (2026-09-29): where a spell goes is as often a place-shaped
+    # phrase ("into the tree tops", "into the empty air above my head") as a person, and a
+    # slot the act cannot have is dropped in code — so the phrase was lost before the aim
+    # reader could see it. Bobby's reading of "I cast burning hands into the tree tops"
+    # came back `object: burning hands, target: the tree tops`; another reading of the
+    # same line may put the treetops in `place`, and both now reach `cast_aim`.
+    "cast": ("object", "target", "place"), "use": ("object", "target"), "consume": ("object",),
     "wait": ("place", "time", "target"), "rest": ("place", "time"),
     "call_on": ("target", "place"), "break_in": ("target", "object", "place"),
     "stealth": ("target", "place"), "athletics": ("place",), "gather": ("object", "time"),
@@ -339,6 +345,16 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
 
     for a in (frame or {}).get("actions") or []:
         act = a.get("act")
+        if act == "cast" and scene is not None:
+            # Where the spell goes, grounded here once: the cast's object, target or place
+            # that is not the spell's own name, read by the same reader a typed and an
+            # attached cast share (`areas.aim_from_words`). Kept on the action, so the
+            # planner is shown it as fact (`brief_lines`) and the turn log records what
+            # the words aimed at. No op is added: the cast is declared by its spell's
+            # name (`judgement.inject_cast`), which the reading does not know.
+            aim = cast_aim(frame, scene, a)
+            if aim:
+                a["aim"] = aim
         if act == "go" and a.get("place"):
             p = places_mod.find(places, a["place"]) if places else None
             if p is not None and p.id != here:
@@ -364,6 +380,74 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
         elif act == "talk" and a.get("says"):
             add("say")
     return ops
+
+
+def spell_named(scene, words) -> object | None:
+    """The spell the player's caster can reach whose name the words hold, or None — the
+    longest name wins, so "cure light wounds" is not "cure". Asked of the book, the
+    prepared list and the class's own list, as `judgement.inject_cast` asks."""
+    from rules import casting, spells as spells_mod
+
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    said = " ".join(str(words or "").lower().split())
+    if pc is None or not said or not casting.is_caster(pc):
+        return None
+    ids = [sp.id for lvl in casting.known_spells(
+        pc, up_to=casting.highest_spell_level(pc)).values() for sp in lvl]
+    ids += [s for s in (getattr(pc, "prepared", {}) or {}) if s not in ids]
+    best, found = "", None
+    for sid in ids:
+        try:
+            sp = spells_mod.get(sid)
+        except KeyError:
+            continue
+        name = " ".join(str(sp.name).lower().split())
+        if name and name in said and len(name) > len(best):
+            best, found = name, sp
+    return found
+
+
+def cast_aim(frame: dict | None, scene, action: dict | None = None,
+             spell=None) -> str | None:
+    """Where the reading's cast is aimed, as an aim (`areas.AIM_PATTERN`), or None.
+
+    Measured 2026-09-28 (docs/playtest-2026-09-28.md 21.2): "I cast burning hands into the
+    tree tops" was read `cast, object: burning hands, target: the tree tops` — the
+    treetops a *target*, as if a creature — and nothing turned that phrase into anything
+    a cast could be pointed at. A cast act's target, place and object that is not the
+    spell's own name are each grounded by `areas.aim_from_words` (a person here → `ref:`,
+    a thing or a feature → `object:`, "above my head" → `dir:up`), target first: it is the
+    words about WHO or WHAT. The spell is the one the action names when the caster can
+    reach it, so a direction is not offered to a burst.
+
+    `action` is one cast action of the frame; the first cast action when None."""
+    from rules import areas
+
+    if scene is None or not frame:
+        return None
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return None
+    acts = [action] if action is not None else [
+        a for a in frame.get("actions") or [] if isinstance(a, dict) and a.get("act") == "cast"]
+    for a in acts:
+        if not isinstance(a, dict) or a.get("act") != "cast":
+            continue
+        chosen = spell
+        if chosen is None:
+            for slot in ("object", "target", "place"):
+                chosen = spell_named(scene, a.get(slot))
+                if chosen is not None:
+                    break
+        own = " ".join(str(getattr(chosen, "name", "") or "").lower().split())
+        for slot in ("target", "place", "object"):
+            phrase = " ".join(str(a.get(slot) or "").split())
+            if not phrase or (own and own in phrase.lower()):
+                continue
+            aim = areas.aim_from_words(scene, pc.ref, phrase, chosen)
+            if aim:
+                return aim
+    return None
 
 
 def travel_choices(frame: dict | None, scene, places, location) -> tuple[str, ...]:
@@ -538,7 +622,7 @@ def brief_lines(frame: dict | None) -> str:
                 "something the character does. Answer it; the character does nothing.")
     rows = []
     for n, a in enumerate(frame.get("actions") or [], 1):
-        slots = ", ".join(f"{s}: {a[s]}" for s in SLOTS if a.get(s))
+        slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim") if a.get(s))
         rows.append(f"{n}. {a['act']}" + (f" — {slots}" if slots else ""))
     out = ""
     if rows:

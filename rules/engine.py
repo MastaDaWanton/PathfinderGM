@@ -1365,10 +1365,20 @@ class Scene:
         # with the fight too; since item 28 the grid stays, and measured 2026-09-25 the
         # cleared list left its squares in `grid.obscuring` with nothing claiming them —
         # the room stayed blind and walled until the party walked out.
+        #
+        # Except a fire in the world (I3, 2026-09-29; docs/design-e-magic.md §6: "a fire
+        # lit outside a fight must outlive that"). Brush a spell set alight is not a thing
+        # the fight conjured; it burns its 2d4 × 10 minutes and expires on the clock like
+        # anything timed. Known by its ward's `hazard` (`Engine._ignite`), not by its name.
+        world = {w.manifest_id for w in self.wards
+                 if (w.spec or {}).get("hazard") and w.rounds_left is not None
+                 and (w.spec or {}).get("at", "") == (self.at or "")}
         for made in list(self.manifests):
-            self.lift(made)
-        self.manifests = []
-        self.wards = []
+            if made.id not in world:
+                self.lift(made)
+        self.manifests = [m for m in self.manifests if m.id in world]
+        self.wards = [w for w in self.wards if w.manifest_id in world
+                      and (w.spec or {}).get("hazard")]
         self.hazards = []
 
     # --- the props ledger: one applicator for where a thing is -----------------------
@@ -7532,10 +7542,18 @@ class Engine:
         # same track `_op_company` asks — not a second rule, and not a bond that
         # outlives the feeling it was granted for.
         from . import attitude as attitude_mod
+        from . import journey as journey_mod
 
         fell_away: list[str] = []
         for r, a in self.scene.actors.items():
             if r in escorts or a.is_pc or not a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            # A mount is owned, not befriended (I3): a bought horse is indifferent on the
+            # track, and asked the loyalty question it "did not come with you any more"
+            # at the first step out of the gate — measured by this lane's pace tests. The
+            # journey never asked it of a mount; neither does this.
+            if str(getattr(a, "from_template", "") or "") in journey_mod.MOUNTS:
+                escorts.append(r)
                 continue
             if (attitude_mod.step_of(attitude_mod.of(a))
                     < attitude_mod.step_of(attitude_mod.COMES_ALONG)):
@@ -7548,6 +7566,38 @@ class Engine:
         was_place = self.scene.at
         was_ground = here.terrain
         moved = going_to.id != was_place
+
+        # THE PACE, for a short trip out of town (I3, 2026-09-29). Lane B built riding and
+        # galloping for journeys (owner, Q13) and could not give `travel` the param, so a
+        # party with horses walked to the woods. The same closed word and the same rules:
+        # riding halves the time outside the walls and a gallop thirds it
+        # (`journey.PACES`), a gallop past the book's free hour hurts and tires the mount
+        # (`journey.mounted_hours`, the hustle rule), one mount a rider, and a party short
+        # of mounts is refused before anything moves. Only ground OUTSIDE is ridden faster:
+        # a horse in the lanes of a town goes at the crowd's pace, and the in-town bands
+        # (Q10) are a crowd's.
+        from . import journey as journey_mod
+
+        pace = journey_mod.pace_of(intent.params.get("pace")) or "walk"
+        mount_refs: list[str] = []
+        if pace != "walk" and moved:
+            mount_refs = [r for r in escorts
+                          if str(getattr(self.scene.actors[r], "from_template", "") or "")
+                          in journey_mod.MOUNTS and not self.scene.actors[r].is_down]
+            riders = 1 + len([r for r in escorts if r not in mount_refs])
+            if len(mount_refs) < riders:
+                return self._refuse(
+                    intent,
+                    ("Nobody in the party has a horse to ride"
+                     if not mount_refs else
+                     f"There are {riders} to carry and {len(mount_refs)} "
+                     f"mount{'s' if len(mount_refs) != 1 else ''} to carry them")
+                    + f", so the way to {going_to.name} is walked or not at all. A mount "
+                      f"is bought at the stables, and comes along like anybody who "
+                      f"travels with you.")
+            mount_refs = mount_refs[:riders]
+        ridden_minutes = 0          # minutes of the walk spent at the pace, for the tell
+        tired_mounts: list[str] = []
 
         # THE WAY THERE, hop by hop, and whatever is on it.
         #
@@ -7599,6 +7649,13 @@ class Engine:
             if grounded_as == "beyond":
                 far_hours = outskirts_mod.beyond_hours(self.world, found_loc,
                                                        going_to.terrain, speed)
+        # Ground beyond the near land, ridden: the journey's own arithmetic on the hours
+        # it would take on foot — halved riding, thirded galloping while the hustle rule
+        # lets the horse, and the days the gallop hurt it (paid after the walk, below).
+        far_hurt = 0
+        far_on_foot = far_hours
+        if far_hours and mount_refs:
+            far_hours, far_hurt = journey_mod.mounted_hours(far_hours, pace)
         if moved:
             level = int(getattr(pc, "level", 1) or 1) if pc is not None else 1
             passed: list = []
@@ -7628,6 +7685,13 @@ class Engine:
                 else:
                     step = outskirts_mod.hop_minutes(prev, hop, scale, speed)
                     step_hours = 0
+                if mount_refs and step and "outside" in (
+                        places_mod.setting_of(hop.id), places_mod.setting_of(prev.id)):
+                    # Ridden: the step outside at the pace's multiple. A gallop this short
+                    # sits inside the hustle rule's free hour, so it costs the horse
+                    # nothing (`journey.HUSTLE_FREE_HOURS`).
+                    step = max(1, -(-step // journey_mod.PACES[pace]))
+                    ridden_minutes += step
                 if places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level)
                 else:
@@ -7769,6 +7833,25 @@ class Engine:
                 # body day by day with a camp between, the rule a journey pays.
                 if far_walked:
                     self._march(pc, far_walked, going_to.terrain)
+                # The gallop's toll on the mounts, as the journey pays it: a point of
+                # lethal damage and fatigued for each day galloped past the free hour,
+                # through the one applicator (a condition with the book's eight hours on
+                # its clock). A ride cut short by a meeting hurt them only for the days
+                # it actually lasted.
+                if far_hurt and mount_refs:
+                    days_out = max(1, -(-far_walked // journey_mod.HOURS_PER_DAY))
+                    hurt = min(far_hurt, days_out)
+                    for ref in mount_refs:
+                        # The store, not the view: the PC has moved and the mounts
+                        # follow below, so for this moment they stand in the old place.
+                        horse = self.scene.people.get(ref)
+                        if horse is None:
+                            continue
+                        horse.take_damage(hurt)
+                        horse.add_condition(journey_mod.MOUNT_FATIGUE,
+                                            rounds=journey_mod.FATIGUE_ROUNDS,
+                                            source="hustle")
+                        tired_mounts.append(horse.name)
                 # Walking back along a road a journey stopped on costs the hours walked
                 # out (owner's ruling Q15). The road used to forget itself for free the
                 # moment the party was back inside the walls.
@@ -7797,6 +7880,19 @@ class Engine:
             # discard-and-derive, which is `lay_the_ground`'s whole job.
             self.scene.grid = None
             self.scene.positions.clear()
+            # A fire burns where it was lit (I3). Its squares are the old place's map, and
+            # left standing they would burn whoever stood on the same numbers here — so a
+            # fire in a place walked out of is taken down through the one door. Nothing
+            # keeps a place's fires while the party is away; it has burnt out by the time
+            # anybody could come back to look (2d4 × 10 minutes).
+            for w in list(self.scene.wards):
+                spec = w.spec or {}
+                if spec.get("hazard") and spec.get("at", "") != going_to.id:
+                    made = next((m for m in self.scene.manifests
+                                 if m.id == w.manifest_id), None)
+                    if made is not None:
+                        self.scene._end_standing(made)
+                    self.scene._end_standing(w)
             self.lay_the_ground()
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
@@ -7930,6 +8026,13 @@ class Engine:
             bits.append(f"It takes {geography.walk_words(spent)}.")
         if walked_back:
             bits.append("The road you had walked out along is walked back, every hour of it.")
+        if moved and mount_refs and (ridden_minutes or far_hours):
+            # The pace said, and what it cost the mounts, in words (the third law).
+            bits.append("Mounted, the ground outside goes by at "
+                        + ("a gallop." if pace == "gallop" else "twice a walker's pace."))
+            if tired_mounts:
+                bits.append(f"The gallop has blown {', '.join(tired_mounts)}: pushed past "
+                            f"the first hour, a mount is hurt by it and tires.")
         if met_tell:
             bits.append(met_tell)
         if met is not None and meant_for != going_to.name:
@@ -7965,6 +8068,10 @@ class Engine:
                  else "",
                  "met_refs": met_refs, "grounded": grounded_as,
                  "road_to": self._road_to(going_to.id) if moved else ""}
+        if moved and mount_refs and (ridden_minutes or far_hours):
+            # The journey's own keys (§2.7's `journey` row), so one reader serves both.
+            extra.update(pace=pace, mounts=list(mount_refs), tired=list(tired_mounts),
+                         on_foot_hours=far_on_foot)
         effect.update({k: v for k, v in extra.items() if v})
         return Outcome(
             intent_id=intent.id, op="travel",
@@ -9854,9 +9961,18 @@ class Engine:
                 if not caught and aim.kind == "self":
                     caught = [actor.ref]
             objects = areas.objects_caught(self.scene, area, spell)
-            harms = attitude_mod.harmful_spell(spell, cl)
+            harm = attitude_mod.harm_of(spell, cl)
+            harms = bool(harm)
             foes = [r for r in caught if r in self.scene.actors
                     and self._against(actor, self.scene.actors[r])]
+            # A charm or a magical sleep is harm only to an unfriendly eye (owner's
+            # ruling, I3): of the player's victims, only those below friendly hold it
+            # against them, so only they can open a fight over it. Another caster's is
+            # an attack like any other — the ruling is about how people feel towards
+            # the player, the only caster the app keeps feelings about.
+            gated = harm == "gated" and actor.is_pc
+            if gated:
+                foes = [r for r in foes if attitude_mod.resents(self.scene.actors[r])]
             seen = {}
             if harms:
                 for r in caught:
@@ -9867,6 +9983,7 @@ class Engine:
                           "area": area.as_dict() if area.shape != "none" else None,
                           "caught": list(caught), "objects": objects,
                           "harmful": bool(harms and foes), "harms": bool(harms),
+                          "gated": gated,
                           "seen": seen, "fell_short": bool(area.fell_short)})
             noticed = [r for r in foes if seen.get(r, True)]
             if harms and noticed:
@@ -10084,7 +10201,8 @@ class Engine:
                 if victim is None or ref == actor.ref:
                     continue
                 felt = attitude_mod.harmed(self, victim, actor, f"spell:{spell.id}",
-                                           seen=(state.get("seen") or {}).get(ref, True))
+                                           seen=(state.get("seen") or {}).get(ref, True),
+                                           gated=bool(state.get("gated")))
                 if felt:
                     effects.append(felt)
                     line = attitude_mod.harm_said(felt, victim.name)
@@ -10255,15 +10373,51 @@ class Engine:
 
         How long it burns is the one duration the CRB gives a fire, the forest fire's
         "2d4 × 10 minutes", rolled on the engine's dice. It does not spread: no spread rate
-        at this scale could be sourced (docs/design-e-magic.md §4.4; escalation to the
-        CR 6 forest fire is the owner's Q33, for I3). The hazards that make standing in it
-        cost something are I3's rows (`burning-brush`, `smoke`); until they land the fire
-        is a fact on the map and in the tell, and nothing invents a number for it."""
+        at this scale could be sourced, and the owner ruled a patch (Q33: "a patch, 2d4 ×
+        10 min, no spread"), so the CR 6 forest fire is never reached from here.
+
+        **What standing in it costs** (I3, 2026-09-29). Measured on the G2 cast-area run: the
+        flames licked a stall's awnings and the undergrowth, the tell said they caught, and
+        nothing followed — a manifestation with no ward is scenery. Each burning patch now
+        carries a ward from `content/rules/hazards.json`'s `burning-brush` row (Catching on
+        Fire: Reflex DC 15 or 1d6 fire, each round a creature stands in it) and each bank
+        of smoke one from the `smoke` row (Fortitude DC 15 or 1d6 nonlethal; its
+        concealment is the smoke's own obscuring squares). The numbers are the rows',
+        never this method's, and each row names what of the book it does not yet do. The
+        wards fire where the rounds are real — a fight's (`Scene.tick_standing`) — and
+        expire on the clock with their fire, in minutes when time passes outside one
+        (`Scene.advance` → rounds, the one ticker).
+
+        The ward's spec also carries the hazard's id and the place the fire is in
+        (`hazard`, `at`): the brief's BURNING HERE line (`gm/brief/burning.py`) reads the
+        scene's standing fires by those, never by the words of a manifestation's name, and
+        says nothing of a fire in a place the party has walked out of."""
+        from . import hazards as hazards_mod
+
         effects: list[dict] = []
         tells: list[str] = []
         minutes = self.dice.roll("2d4", label="how long the fire burns",
                                  visibility="hidden").total * 10
         rounds = minutes * 10
+        caster = str(ctx.get("caster", ""))
+        source = str(ctx.get("source", ""))
+
+        def ward_for(rule: str, made: Manifestation, what: str) -> None:
+            row = hazards_mod.get(rule) or {}
+            w = row.get("ward") or {}
+            if not w:
+                return
+            hit = {"type": "damage", "dice": str(w["dice"]),
+                   "damage_type": str(w.get("type", "untyped")),
+                   "lethality": str(w.get("lethality", "lethal"))}
+            self.scene.wards.append(Ward(
+                owner="", trigger="each_round", recipient="area",
+                spec={"type": "save_gate", "target": str(w["save"]),
+                      "on_failure": [hit], "on_success": [],
+                      "hazard": rule, "at": str(self.scene.at or ""), "what": what},
+                caster=caster, rounds_left=rounds, source=str(row.get("name", rule)),
+                dc=int(w["dc"]), manifest_id=made.id))
+
         for obj in objects:
             cells = [tuple(c) for c in (obj.get("at") or [])]
             if obj.get("kind") == "prop" and obj.get("square"):
@@ -10272,19 +10426,26 @@ class Engine:
             name = str(obj.get("name") or "it")
             made = self.scene.place(Manifestation(
                 what=f"burning {name}", terrain="none", squares=cells,
-                rounds_left=rounds, source=str(ctx.get("source", "")),
-                owner=str(ctx.get("caster", ""))))
-            effects.append({"kind": "manifest", **made.as_dict()})
+                rounds_left=rounds, source=source, owner=caster))
+            ward_for("burning-brush", made, name)
+            effects.append({"kind": "manifest", **made.as_dict(), "hazard": "burning-brush",
+                            "minutes": minutes})
             said = f"The {name} catches fire"
             if obj.get("kind") == "feature" and name != "canopy":
                 ground = sorted({(c[0], c[1]) for c in cells})
                 smoke = self.scene.place(Manifestation(
                     what="smoke", terrain="obscuring", squares=ground,
-                    rounds_left=rounds, source=str(ctx.get("source", "")),
-                    owner=str(ctx.get("caster", ""))))
-                effects.append({"kind": "manifest", **smoke.as_dict()})
+                    rounds_left=rounds, source=source, owner=caster))
+                ward_for("smoke", smoke, name)
+                effects.append({"kind": "manifest", **smoke.as_dict(), "hazard": "smoke",
+                                "minutes": minutes})
                 said += ", and smoke rises from it"
+            said += "; standing in it risks catching fire" if cells and name != "canopy" \
+                else ""
             tells.append(said + ".")
+        if objects:
+            tells.append("It burns as a patch and does not spread, and it will burn "
+                         "itself out before long.")
         return effects, tells
 
     def _retaliate(self, struck: Actor, by: Actor) -> list[dict]:

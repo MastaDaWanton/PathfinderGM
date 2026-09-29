@@ -314,7 +314,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `with` names the refs who come along; everyone else stays behind, because travel
     # is the scene transition. Before it shed anybody, a gatekeeper wounded in the city
     # followed the player to the forest and took an NPC turn forever.
-    "travel": ((), ("biome", "place", "note", "with"), "hidden"),
+    #
+    # `pace` (I3, 2026-09-29) is the journey's closed word — walk, ride, gallop — for the
+    # short trips out of town a travel makes: the fields, the crossroads, the ground past
+    # the outskirts. Lane B built riding for journeys only because this schema was not
+    # theirs, so a party on horseback crossed to the woods at a walk. The engine reads it
+    # through Lane B's own rules (`journey.pace_of`, `journey.mounted_hours`).
+    "travel": ((), ("biome", "place", "note", "with", "pace"), "hidden"),
     # Leaving the town altogether, which `travel` has never been able to do: it moves the
     # ground underfoot inside one settlement, and `Scene.location_id` was written once at
     # campaign creation and never again. A separate op rather than another `travel` param
@@ -1168,6 +1174,20 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"square is point:<x>,<y>, a thing here is object:<its name>.",
                     "schema", index)
             p["aim"] = said
+
+    elif op == "travel":
+        # A closed word, refused with the words named rather than read as a walk: a
+        # "canter" the engine quietly walked would be a horse the player paid for and
+        # never rode. The journey's aliases ("on horseback", "at a gallop") are accepted.
+        if p.get("pace") not in (None, ""):
+            from . import journey
+
+            said = journey.pace_of(p["pace"])
+            if not said:
+                raise IntentError(
+                    f"travel: pace {p['pace']!r} is not a pace. It is one of "
+                    f"{', '.join(journey.PACES)}; leave it out to walk.", "schema", index)
+            p["pace"] = said
 
     elif op == "defence":
         kinds = ("damage_reduction", "immunity", "resistance", "vulnerability")

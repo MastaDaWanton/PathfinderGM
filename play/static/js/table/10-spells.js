@@ -39,7 +39,30 @@ function spellSay(text) {
 }
 
 // --- the chip ------------------------------------------------------------------------------
-function currentAttachments() { return SPELLS.chips.map(c => ({ ...c })); }
+// The aim grammar, the server's own (`rules/areas.AIM_PATTERN`, §2.7), held here only so a
+// chip never carries an aim the door would 400 on. Where a spell goes is normally the
+// player's words in the box — "into the tree tops", "above my head", "at the man" — sent
+// as the turn's text beside the chip and grounded by the server against the scene
+// (`areas.aim_from_words`: the people present first, then the things here, then the
+// directions). That reader lives once, on the server; a second copy here would drift.
+// A chip carries an `aim` of its own only when a caller already holds one in the grammar
+// (`attachSpellChip(id, name, aim)`).
+const AIM_RE = /^(ref:[A-Za-z0-9_-]+|self|dir:(n|ne|e|se|s|sw|w|nw|up|down)|point:\d+,\d+(,\d+)?|object:[^\n]{1,60})$/;
+
+function currentAttachments() {
+  return SPELLS.chips.map(c => {
+    const out = { kind: c.kind, id: c.id, name: c.name };
+    if (c.aim && AIM_RE.test(c.aim)) out.aim = c.aim;
+    return out;
+  });
+}
+
+// The body a turn's attachments go in: kind, id, and the aim when the chip has one. The
+// name is the server's to look up (it refuses a spell the character lacks).
+function attachmentsForSay() {
+  return currentAttachments().map(a => (a.aim ? { kind: a.kind, id: a.id, aim: a.aim }
+                                              : { kind: a.kind, id: a.id }));
+}
 
 function drawAttachments() {
   const box = document.getElementById("attachments");
@@ -68,14 +91,25 @@ function drawAttachments() {
 function attachSpell(spell) {
   if (!spell || !spell.id) return;
   const was = SPELLS.chips[0];
-  SPELLS.chips = [{ kind: "spell", id: String(spell.id), name: String(spell.name || spell.id) }];
+  const chip = { kind: "spell", id: String(spell.id), name: String(spell.name || spell.id) };
+  if (spell.aim && AIM_RE.test(String(spell.aim))) chip.aim = String(spell.aim);
+  SPELLS.chips = [chip];
   SPELLS.armed = false;
   drawAttachments();
   const name = SPELLS.chips[0].name;
+  // Where it goes is said in words (owner Q46: no target picker), so the sentence says
+  // so: "into the tree tops" was the line that could not be aimed (item 21.2).
   spellSay(was && was.id !== spell.id
-    ? `${name} attached in place of ${was.name}. Write what you do with it, or press Say.`
-    : `${name} attached. Write what you do with it, or press Say.`);
+    ? `${name} attached in place of ${was.name}. Write where it goes, or press Say.`
+    : `${name} attached. Write where it goes, at whom or at what, or press Say.`);
 }
+
+// A stable door for other parts of the table (the Spells tab's cards, I5) to attach a
+// spell as a chip without knowing this file's internals. `aim` is optional and must be in
+// the server's grammar; anything else is dropped rather than sent to be refused.
+window.attachSpellChip = function attachSpellChip(id, name, aim) {
+  attachSpell({ id, name, aim });
+};
 
 function removeAttachment({ announce = true } = {}) {
   const was = SPELLS.chips[0];
@@ -337,16 +371,29 @@ function castFromCombatBar(button) {
 document.addEventListener("input", e => {
   const find = e.target.closest && e.target.closest("#spellpick-find");
   if (!find) return;
-  const q = find.value.trim().toLowerCase();
+  const q = find.value.trim().toLowerCase().replace(/\s+/g, " ");
   // Hidden in place rather than redrawn, so the caret and the focus stay in the box.
+  //
+  // By `style.display`, not the `hidden` attribute alone. Measured 2026-09-29: "burn"
+  // still showed Magic Missile — the match was right and the row stayed on screen,
+  // because `#spellpop .sp-spell { display: flex }` outranks the user-agent's
+  // `[hidden] { display: none }`. A level with no match hid correctly (its rule sets no
+  // display), which is why only rows sharing a level with a hit leaked through.
+  //
+  // And by the start of a word, so "mis" finds Magic Missile and "and" does not find
+  // Burning Hands: a substring anywhere in a name is a loose filter over forty spells.
+  const starts = name => q.split(" ").every(part =>
+    name.split(/[\s'-]+/).some(w => w.startsWith(part)));
   spellPop().querySelectorAll(".sp-level").forEach(level => {
     let any = false;
     level.querySelectorAll(".sp-spell").forEach(b => {
-      const hit = !q || b.dataset.name.toLowerCase().includes(q);
+      const hit = !q || starts(b.dataset.name.toLowerCase());
       b.hidden = !hit;
+      b.style.display = hit ? "" : "none";
       any = any || hit;
     });
     level.hidden = !any;
+    level.style.display = any ? "" : "none";
   });
 });
 
