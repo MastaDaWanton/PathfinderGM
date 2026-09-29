@@ -49,19 +49,37 @@ function spellSay(text) {
 // (`attachSpellChip(id, name, aim)`).
 const AIM_RE = /^(ref:[A-Za-z0-9_-]+|self|dir:(n|ne|e|se|s|sw|w|nw|up|down)|point:\d+,\d+(,\d+)?|object:[^\n]{1,60})$/;
 
+// The chip slot is one thing whatever rides in it: a spell (Lane F) or, since
+// 2026-09-29, a place from the "From here" row (11-exits.js). The owner: "when you click
+// a next door button it should attach like a spell does and then apply when you send".
+// So the remove button, the two-press Backspace, Esc, the status sentences and the 422
+// that keeps words and chip are the spell chip's own, not a copy of them. A chip is
+// `{kind, id, name}`, plus `aim` for a spell and `label`, `note` and `journey` for a
+// place: its kind word ("Go", "Journey", "Withdraw") and the line held under it.
+function chipKind(c) {
+  return c.kind === "spell" ? "Spell" : (c.label || "Go");
+}
+
 function currentAttachments() {
   return SPELLS.chips.map(c => {
     const out = { kind: c.kind, id: c.id, name: c.name };
     if (c.aim && AIM_RE.test(c.aim)) out.aim = c.aim;
+    if (c.kind === "place" && c.journey) out.confirmed = true;
     return out;
   });
 }
 
 // The body a turn's attachments go in: kind, id, and the aim when the chip has one. The
-// name is the server's to look up (it refuses a spell the character lacks).
+// name is the server's to look up (it refuses a spell the character lacks). A journey
+// chip carries `confirmed`: attaching it and pressing Say is the confirmation the server
+// asks of days on the road, where the row used to ask with a line of its own.
 function attachmentsForSay() {
-  return currentAttachments().map(a => (a.aim ? { kind: a.kind, id: a.id, aim: a.aim }
-                                              : { kind: a.kind, id: a.id }));
+  return currentAttachments().map(a => {
+    const out = { kind: a.kind, id: a.id };
+    if (a.aim) out.aim = a.aim;
+    if (a.confirmed) out.confirmed = true;
+    return out;
+  });
 }
 
 function drawAttachments() {
@@ -69,39 +87,67 @@ function drawAttachments() {
   const input = document.getElementById("input");
   if (!box) return;
   const c = SPELLS.chips[0];
+  if (typeof reflectExitChip === "function") reflectExitChip();
   if (!c) {
     box.innerHTML = "";
     box.hidden = true;
     if (input) input.placeholder = INPUT_PLACEHOLDER;
     return;
   }
+  const kind = chipKind(c);
   // The remove button names what it removes ("Remove Burning Hands"), and its name is not
   // part of the chip's own: Gutenberg #82042 fixed chips that read "Burning Hands Remove".
-  box.innerHTML = `<span class="chip att${SPELLS.armed ? " armed" : ""}" role="group"
-      data-kind="spell" data-id="${esc(c.id)}" aria-label="Spell: ${esc(c.name)}"><span
-      class="chip-kind" aria-hidden="true">Spell</span><span class="chip-label"
+  // A place's line (the days a journey spends, what a withdraw costs) is held visibly
+  // under the chip: it was the row's confirm line, and a sentence a player must weigh
+  // before pressing Say cannot live only in a screen reader's ear.
+  box.innerHTML = `<span class="chip att${SPELLS.armed ? " armed" : ""}${
+      c.kind === "place" && c.label === "Withdraw" ? " risky" : ""}" role="group"
+      data-kind="${esc(c.kind)}" data-id="${esc(c.id)}" aria-label="${esc(kind)}: ${
+      esc(c.name)}"${c.note ? ` aria-describedby="att-note"` : ""}><span
+      class="chip-kind" aria-hidden="true">${esc(kind)}</span><span class="chip-label"
       aria-hidden="true">${esc(c.name)}</span><button type="button" class="chip-x"
-      aria-label="Remove ${esc(c.name)}" title="Remove ${esc(c.name)}">✕</button></span>`;
+      aria-label="Remove ${esc(c.name)}" title="Remove ${esc(c.name)}">✕</button></span>${
+      c.note ? `<span class="att-note" id="att-note">${esc(c.note)}</span>` : ""}`;
   box.hidden = false;
   // Short enough to be read whole in the phone's box; "or just press Say" is in the
   // sentence the status region speaks when the chip is attached.
-  if (input) input.placeholder = `What do you do with ${c.name}?`;
+  if (input) {
+    input.placeholder = c.kind === "place" ? `How do you go to ${c.name}? Or just press Say.`
+                                           : `What do you do with ${c.name}?`;
+  }
+}
+
+// One attachment a turn: a new chip of either kind replaces the old one and says so.
+function attachChip(chip, sentence) {
+  if (!chip || !chip.id) return;
+  const was = SPELLS.chips[0];
+  SPELLS.chips = [chip];
+  SPELLS.armed = false;
+  drawAttachments();
+  const replaced = was && !(was.kind === chip.kind && was.id === chip.id);
+  spellSay(replaced ? `${chip.name} attached in place of ${was.name}. ${sentence.again}`
+                    : `${chip.name} attached. ${sentence.first}`);
 }
 
 function attachSpell(spell) {
   if (!spell || !spell.id) return;
-  const was = SPELLS.chips[0];
   const chip = { kind: "spell", id: String(spell.id), name: String(spell.name || spell.id) };
   if (spell.aim && AIM_RE.test(String(spell.aim))) chip.aim = String(spell.aim);
-  SPELLS.chips = [chip];
-  SPELLS.armed = false;
-  drawAttachments();
-  const name = SPELLS.chips[0].name;
   // Where it goes is said in words (owner Q46: no target picker), so the sentence says
   // so: "into the tree tops" was the line that could not be aimed (item 21.2).
-  spellSay(was && was.id !== spell.id
-    ? `${name} attached in place of ${was.name}. Write where it goes, or press Say.`
-    : `${name} attached. Write where it goes, at whom or at what, or press Say.`);
+  attachChip(chip, { again: "Write where it goes, or press Say.",
+                     first: "Write where it goes, at whom or at what, or press Say." });
+}
+
+// The exits row's door into the slot (11-exits.js). `place` is `{id, name, label, note,
+// journey}`, built there from the engine's own `scene.exits`.
+function attachPlace(place) {
+  if (!place || !place.id) return;
+  const chip = { kind: "place", id: String(place.id), name: String(place.name || place.id),
+                 label: place.label || "Go", note: place.note || "",
+                 journey: !!place.journey };
+  attachChip(chip, { again: "Write how you go and what else you do, or press Say.",
+                     first: "Write how you go and what else you do, or press Say." });
 }
 
 // A stable door for other parts of the table (the Spells tab's cards, I5) to attach a
@@ -110,6 +156,8 @@ function attachSpell(spell) {
 window.attachSpellChip = function attachSpellChip(id, name, aim) {
   attachSpell({ id, name, aim });
 };
+
+function attachedChip() { return SPELLS.chips[0] || null; }
 
 function removeAttachment({ announce = true } = {}) {
   const was = SPELLS.chips[0];
@@ -122,6 +170,20 @@ function removeAttachment({ announce = true } = {}) {
 // Called by 04's `takeTurn` once a turn was taken, and only then: a refusal, a stale
 // screen or a busy table keep both the words and the chip.
 function clearAttachments() { removeAttachment({ announce: false }); }
+
+// A turn that did some of the words and not the rest (play/views.py `_unfinished`): the
+// rest is back in the pen, prefilled by 04, and the line says where the player is and
+// what is not yet done, visibly and to a screen reader. The chain stopped the way a
+// parser's does when a command in it fails (gm/sequence.py); nothing was dropped.
+function showUnfinished(u) {
+  if (!u || !u.line) return;
+  const err = document.getElementById("err");
+  if (err) {
+    err.className = "hint";
+    err.textContent = u.why ? `${u.line} ${u.why}` : u.line;
+  }
+  spellSay(u.line);
+}
 
 document.addEventListener("keydown", e => {
   if (!SPELLS.chips.length) return;
@@ -138,17 +200,32 @@ document.addEventListener("keydown", e => {
       }
       return;
     }
+    // Esc takes back a chip the first Backspace selected, and nothing else: in the box
+    // it is also the key a player presses to get out of a panel.
+    if (SPELLS.armed && e.key === "Escape") {
+      e.preventDefault();
+      removeAttachment();
+      return;
+    }
     if (SPELLS.armed && !["Shift", "Control", "Alt", "Meta"].includes(e.key)) {
       SPELLS.armed = false;
       drawAttachments();
     }
     return;
   }
-  if (e.target.closest && e.target.closest("#attachments .chip-x")
-      && (e.key === "Delete" || e.key === "Backspace")) {
+  const onChip = e.target.closest && e.target.closest("#attachments .chip-x");
+  if (onChip && (e.key === "Delete" || e.key === "Backspace" || e.key === "Escape")) {
     e.preventDefault();
     removeAttachment();
     $("#input").focus();
+    return;
+  }
+  // Esc from the exits row takes back the place it attached, as it used to close the
+  // row's confirm line; focus stays on the way that was pressed.
+  if (e.key === "Escape" && SPELLS.chips[0].kind === "place"
+      && e.target.closest && e.target.closest("#exits")) {
+    e.preventDefault();
+    removeAttachment();
   }
 });
 
@@ -463,6 +540,7 @@ onRender(function spellsButton(s) {
   if (!kind) {
     // Somebody who does not cast is playing now: nothing of the last caster's stays.
     if (spellPickerOpen()) closeSpellPicker();
-    if (SPELLS.chips.length) clearAttachments();
+    // A spell only: a place chip is anybody's.
+    if (SPELLS.chips.some(c => c.kind === "spell")) clearAttachments();
   }
 });

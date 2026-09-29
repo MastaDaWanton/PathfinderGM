@@ -317,12 +317,18 @@ async function takeTurn(body, clearInput) {
   try {
     const s = await post("/api/say", body);
     render(s);
-    // Cleared only once the turn was taken, the words and the spell chip together: a
-    // refusal (422), a stale screen (412) or a busy table (409) keeps both.
+    // Cleared only once the turn was taken, the words and the chip together: a refusal
+    // (422), a stale screen (412) or a busy table (409) keeps both. A turn that did only
+    // part of the words (`unfinished`, play/views.py `_the_way_there`) puts the rest
+    // back in the box, and keeps the place chip when the move itself is still to come.
+    const rest = s.unfinished || null;
     if (clearInput) {
-      $("#input").value = "";
-      if (typeof clearAttachments === "function") clearAttachments();
+      $("#input").value = rest ? (rest.text || "") : "";
+      if (!(rest && rest.keep_chip) && typeof clearAttachments === "function") {
+        clearAttachments();
+      }
     }
+    if (rest && typeof showUnfinished === "function") showUnfinished(rest);
     if (s.ended) showDeath(s);
     // The player set out to buy something at an open counter: the counter's screen,
     // with the thing picked (play/views.py, `_trade_offer`).

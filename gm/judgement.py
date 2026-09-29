@@ -4753,6 +4753,13 @@ def declared_ops(player_text: str, scene, world=None, *, attached=None) -> list[
             ops.append(op)
     if _attached_spell(attached) is not None and "cast" not in ops:
         ops.append("cast")
+    # A place from the exits row is the declaration of the move, as a spell chip is of
+    # the cast: the schema asks for it up front, and `travel_to_the_attached` holds the
+    # plan to the chip's place whatever the words or the model named.
+    place = _attached_place(attached)
+    if place is not None:
+        want = "journey" if place.get("journey") else "travel"
+        ops = [op for op in ops if op not in ("travel", "journey")] + [want]
     return ops
 
 
@@ -4762,11 +4769,126 @@ def _attached_spell(attached) -> dict | None:
                  and a.get("kind") == "spell" and a.get("id")), None)
 
 
-def _cast_the_attached(raw_intents, scene, chip: dict) -> list:
+def _attached_place(attached) -> dict | None:
+    """The place attachment riding this turn (the exits row, I6), or None."""
+    return next((a for a in (attached or ()) if isinstance(a, dict)
+                 and a.get("kind") == "place" and a.get("id")), None)
+
+
+# --- the order of doing -------------------------------------------------------------------
+#
+# The owner, 2026-09-29: "the interpreter should be able to see where in the described
+# action the move should take place same with spells". The chip says WHICH place or spell;
+# the words say WHEN in the turn (gm/sequence.py, and the parsers' research there). Until
+# then the attached cast was appended to the end of whatever the plan held, so "I cast
+# burning hands, then tell the man to run" warned him first and burned him after.
+
+# Clause verbs to the op they make, for a clause the declarers do not read on its own
+# ("I tell him goodbye" names nobody `inject_say` can find in a unit scene). A fallback
+# only: `declared_ops` on the clause is asked first.
+_CLAUSE_OPS = (
+    (re.compile(r"\b(?:say|says|tell|ask|shout|whisper|greet|call|speak|talk|thank|warn)\b",
+                re.I), "say"),
+    (re.compile(r"\b(?:attack|strike|stab|slash|shoot|hit|punch|kick|swing)\b", re.I),
+     "attack"),
+    (re.compile(r"\b(?:drink|quaff|use|apply)\b", re.I), "use_item"),
+    (re.compile(r"\b(?:give|hand|pay|toss)\b", re.I), "give"),
+    (re.compile(r"\b(?:wait|linger)\b", re.I), "advance_time"),
+    (re.compile(r"\b(?:forage|gather)\b", re.I), "forage"),
+)
+_MOVE_OPS = ("travel", "journey")
+
+
+def _clause_ops(clause: str, scene, world=None) -> set[str]:
+    try:
+        ops = set(declared_ops(clause, scene, world))
+    except Exception:       # noqa: BLE001 — a reader that trips reads nothing
+        ops = set()
+    for rx, op in _CLAUSE_OPS:
+        if rx.search(clause):
+            ops.add(op)
+    return ops
+
+
+def order_by_words(raw_intents, parts: list, at: int | None, mine, scene,
+                   world=None) -> list:
+    """The plan's intents in the order the words do them, with the attached op (`mine`
+    picks it out) at clause `at`.
+
+    Each other intent is matched to the first clause that declares its op; one matched to
+    a clause before `at` goes before, after `at` goes after. An intent no clause declares
+    (the model's own `narrate_only`, a check it chose) stays before the attached op,
+    because it was validated against the scene as it stands and the attached op is the
+    one that may change the scene. Otherwise the plan's own order is kept. `at` None, or
+    a line of one clause, leaves the list as the plan wrote it."""
+    if not isinstance(raw_intents, list) or at is None or len(parts) < 2:
+        return raw_intents
+    ops_of = [_clause_ops(p, scene, world) if i != at else set()
+              for i, p in enumerate(parts)]
+    before, attached, after = [], [], []
+    for r in raw_intents:
+        if mine(r):
+            attached.append(r)
+            continue
+        op = str((r or {}).get("op", "")).lower() if isinstance(r, dict) else ""
+        slot = next((i for i, ops in enumerate(ops_of) if op in ops), None)
+        (after if slot is not None and slot > at else before).append(r)
+    return before + attached + after
+
+
+def travel_to_the_attached(raw_intents, scene, attached) -> list:
+    """The place chip beats the words and the model on WHERE, as the spell chip does on
+    which spell (`_cast_the_attached`): the plan's first travel or journey takes the
+    chip's place by the engine's own id, a plan with none gets one, and any second is
+    dropped — one chip is one move. It goes LAST: the words beside a place chip are cut
+    at the move (play/views.py `_the_way_there`), so everything the plan holds is done
+    here, before the walk, and whatever the words put after it is planned again at the
+    destination. Idempotent, so the chain can call it twice."""
+    chip = _attached_place(attached)
+    pc = scene.pc() if scene is not None else None
+    if chip is None or pc is None or not isinstance(raw_intents, list):
+        return raw_intents
+    kept, first = [], None
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() in _MOVE_OPS:
+            first = first or r
+            continue
+        kept.append(r)
+    if chip.get("journey"):
+        params = {"to": str(chip["id"])}
+        if chip.get("pace"):
+            params["pace"] = str(chip["pace"])
+        op = "journey"
+    else:
+        params, op = {"place": str(chip["id"])}, "travel"
+    move = {"op": op, "actor": pc.ref, "params": params,
+            "because": (first or {}).get("because") or "the player chose it from the ways on"}
+    return kept + [move]
+
+
+def order_the_attached(raw_intents, player_text: str, scene, attached) -> list:
+    """Last in the planner's chain, after every injector has appended what it reads: the
+    attached op put back where the words put it. Injectors append, so a `say` read from
+    "I warn the man, then cast burning hands" lands after the cast unless this runs after
+    them; the place chip's move goes last (`travel_to_the_attached`)."""
+    if _attached_place(attached) is not None:
+        return travel_to_the_attached(raw_intents, scene, attached)
+    chip = _attached_spell(attached)
+    if chip is not None and isinstance(raw_intents, list) and scene is not None:
+        return _cast_the_attached(raw_intents, scene, chip, player_text)
+    return raw_intents
+
+
+def _cast_the_attached(raw_intents, scene, chip: dict, player_text: str = "") -> list:
     """The chip beats the words and the model on WHICH spell (docs/design-e-magic.md
     §4.6): the plan's cast takes the chip's spell id, and its aim when the plan named
     none; a plan with no cast gets one; any second cast is dropped, because one chip is
-    one spell. One route for typed and attached casts — both reach the same op."""
+    one spell. One route for typed and attached casts — both reach the same op.
+
+    And the words say WHEN (owner, 2026-09-29): the cast sits at the clause that names
+    the spell, casts, or declares nothing else (`sequence.cast_clause`), with what the
+    words do before it before and after it after (`order_by_words`). With no such clause
+    the plan's own position stands, and a cast the plan lacked goes last."""
     pc = scene.pc() if scene is not None else None
     if pc is None or not isinstance(raw_intents, list):
         return raw_intents
@@ -4788,6 +4910,15 @@ def _cast_the_attached(raw_intents, scene, chip: dict) -> list:
             params["aim"] = str(chip["aim"])
         out.append({"op": "cast", "actor": pc.ref, "params": params,
                     "because": "the player attached the spell"})
+    if player_text:
+        from . import sequence
+
+        parts = sequence.clauses(player_text)
+        at = sequence.cast_clause(parts, str(chip.get("name") or chip["id"]).replace("-", " "),
+                                  quiet=lambda p: not _clause_ops(p, scene))
+        out = order_by_words(out, parts, at,
+                             lambda r: isinstance(r, dict)
+                             and str(r.get("op", "")).lower() == "cast", scene)
     return out
 
 
@@ -4823,7 +4954,7 @@ def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
     honoured before any of the reading below (`_cast_the_attached`)."""
     chip = _attached_spell(attached)
     if chip is not None and isinstance(raw_intents, list) and scene is not None:
-        return _cast_the_attached(raw_intents, scene, chip)
+        return _cast_the_attached(raw_intents, scene, chip, player_text)
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text or _ABOUT_A_SPELL.search(player_text):

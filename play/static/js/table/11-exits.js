@@ -7,37 +7,41 @@
 // outside from a way out, and the roads from their heads. Nothing here decides where a
 // place is or whether it can be reached; the page only draws what the engine said.
 //
-// A click sends "I go to <name>." with a place attachment, and the engine moves the party
-// there directly (play/views.py `_take_the_exit`). A journey spends days, so the first
-// click only asks: a confirm line opens under the row, and "Set out" (or the same button
-// again) sends it. A way the rules would refuse stays in the row, shut, with the rules'
-// own sentence shown while it is pointed at or focused, because hiding the gate is how a
-// wanted player learns the watch is there by walking into it.
+// A click ATTACHES the place, as a spell is attached, and Say sends it (the owner, the
+// same day: "when you click a next door button it should attach like a spell does and
+// then apply when you send"). Until then a click sent "I go to <name>." at once, and a
+// journey or any way out of a fight opened a confirm line under the row that a second
+// click answered. The chip is that confirmation now: attaching is the first step and Say
+// the second, so the confirm line went, and what it told the player stays visible as the
+// line held under the chip (10-spells.js `drawAttachments`): a journey's days, and what
+// a withdraw costs. The chip lives in 10-spells.js's one slot, so a place replaces a
+// spell and a spell a place, and the chip's ✕, the two-press Backspace and Esc are the
+// spell chip's own. Words written beside it say how, and what else is done before or
+// after the move; the server reads the order (gm/sequence.py).
+//
+// A way the rules would refuse stays in the row, shut, with the rules' own sentence shown
+// while it is pointed at or focused, because hiding the gate is how a wanted player
+// learns the watch is there by walking into it.
 //
 // In a fight (G3 leftovers, 2026-09-29) the row stays, because running is a choice a
 // player is entitled to, but it stops looking like a stroll. Every open way is marked
-// "withdraw" and the first click asks "Leave the fight?" before the second one goes.
-// Leaving mid-fight is PF1e's withdraw (CRB p.188), and the engine rolls it
+// "withdraw", and its chip is a Withdraw chip whose line says what that costs. Leaving
+// mid-fight is PF1e's withdraw (CRB p.188), and the engine rolls it
 // (`reactions.provoked_by_withdraw`): a foe you can see who threatens only the square you
 // start in gets no swing, while one whose reach covers your way out, or one you cannot
-// see, still strikes, and a blow that drops you keeps you in the fight. The mark said
-// "provokes" until the engine did it; it names the action now because whether a given
-// foe swings is the engine's question. The page reads `scene.in_encounter` and says so;
-// it does not work out who threatens whom, because a page that answered it would be a
-// second rulebook.
-// The journeys' confirm idiom was reused rather than a dialog invented: one line under
-// the row, the same buttons, Esc and "Stay" to back out.
+// see, still strikes. The page reads `scene.in_encounter` and says so; it does not work
+// out who threatens whom, because a page that answered it would be a second rulebook.
 //
-// The owner's motion rule: nothing here animates. The reason line and the confirm line
-// open BELOW the buttons, so nothing moves under the pointer that opened them.
+// The owner's motion rule: nothing here animates, and nothing opens in the row any more:
+// the reason line opens BELOW the buttons, and the chip is drawn in the say form under
+// the row, so nothing moves under the pointer that pressed it.
 
 const EXIT_GROUPS = [["next_door", "Next door"], ["outside", "Outside"], ["road", "Roads"]];
-let EXIT_CONFIRM = null;          // the way waiting for its second click, by id
 
-// Which ways ask before they go: a journey (days on the clock), and every way in a fight.
-function exitAsks(e, fighting) {
-  return !!(e && !e.blocked && (e.journey || fighting));
-}
+// What leaving the fight costs, in the words the confirm line used to say it.
+const WITHDRAW_LINE = "Leaving the fight is a withdraw: a foe beside you that you can see "
+  + "gets no swing, but one whose reach covers your way out still strikes, and so does "
+  + "one you cannot see.";
 
 // "a few minutes' walk" reads as "a few minutes" in a row that is all walking.
 function exitTime(words) {
@@ -52,6 +56,22 @@ function upFirst(text) {
 function exitNorm(text) {
   return String(text || "").toLowerCase().replace(/[.!]+$/, "")
     .replace(/^the\s+/, "").replace(/\s+/g, " ").trim();
+}
+
+// The chip a way makes: its kind word and the line held under it.
+function exitChip(e, fighting) {
+  const days = e.journey ? `${upFirst(e.time_words)}; the days pass on the road.` : "";
+  if (fighting) {
+    return { id: e.id, name: e.name, journey: !!e.journey, label: "Withdraw",
+             note: days ? `${WITHDRAW_LINE} ${days}` : WITHDRAW_LINE };
+  }
+  return { id: e.id, name: e.name, journey: !!e.journey,
+           label: e.journey ? "Journey" : "Go", note: days };
+}
+
+function attachedExitId() {
+  const c = typeof attachedChip === "function" ? attachedChip() : null;
+  return c && c.kind === "place" ? c.id : null;
 }
 
 // A suggestion that is nothing but a move to one of the exits is the row's job now, so
@@ -71,6 +91,26 @@ function dropDuplicateSuggestions(exits) {
   if (!box.querySelector(".sugg")) box.innerHTML = "";
 }
 
+// A place chip follows the state it was attached in: a fight that began makes it a
+// Withdraw chip, one that ended makes it a walk again, and a way that shut or is no
+// longer a way from here takes the chip off with a sentence saying so. Only while the
+// row is shown: a roll owed hides the row and says nothing about the ways.
+function refreshPlaceChip(exits, fighting) {
+  const c = typeof attachedChip === "function" ? attachedChip() : null;
+  if (!c || c.kind !== "place") return;
+  const e = exits.find(x => x.id === c.id);
+  if (!e || e.blocked) {
+    removeAttachment({ announce: false });
+    spellSay(e ? `${c.name} is shut: ${e.blocked}` : `${c.name} is no longer a way on from here.`);
+    return;
+  }
+  const fresh = exitChip(e, fighting);
+  if (fresh.label !== c.label || fresh.note !== c.note) {
+    Object.assign(c, fresh);
+    drawAttachments();
+  }
+}
+
 function renderExits(s) {
   const box = document.getElementById("exits");
   if (!box) return;
@@ -79,13 +119,11 @@ function renderExits(s) {
   const fighting = !!scene.in_encounter;
   dropDuplicateSuggestions(exits);
   if (!exits.length || s.awaiting || s.ended) {
-    box.hidden = true; box.innerHTML = ""; EXIT_CONFIRM = null;
+    box.hidden = true; box.innerHTML = "";
     return;
   }
-  // A question whose reason has gone (the fight ended, the way shut) is not left open.
-  if (EXIT_CONFIRM && !exits.some(e => e.id === EXIT_CONFIRM && exitAsks(e, fighting))) {
-    EXIT_CONFIRM = null;
-  }
+  refreshPlaceChip(exits, fighting);
+  const pressed = attachedExitId();
   box.classList.toggle("fighting", fighting);
   const groups = EXIT_GROUPS.map(([key, label]) => {
     const mine = exits.filter(e => e.group === key);
@@ -95,12 +133,11 @@ function renderExits(s) {
         const shut = !!e.blocked;
         const time = exitTime(e.time_words);
         const risky = fighting && !shut;
+        const on = !shut && pressed === e.id;
         return `<button type="button" class="exitbtn${shut ? " shut" : ""}${
-          risky ? " risky" : ""}${EXIT_CONFIRM === e.id ? " asking" : ""}" data-exit="${
-          esc(e.id)}"${shut ? ` aria-disabled="true" data-why="${esc(e.blocked)}"` : ""}${
-          exitAsks(e, fighting)
-            ? ` aria-expanded="${EXIT_CONFIRM === e.id}" aria-controls="exits-confirm"` : ""
-        }><span class="ex-name">${esc(e.name)}</span>${
+          risky ? " risky" : ""}${on ? " asking" : ""}" data-exit="${esc(e.id)}"${
+          shut ? ` aria-disabled="true" data-why="${esc(e.blocked)}"`
+               : ` aria-pressed="${on}"`}><span class="ex-name">${esc(e.name)}</span>${
           time ? `<span class="ex-time"><span class="ex-sep" aria-hidden="true"> · </span>${
             esc(time)}</span>` : ""}${
           risky ? `<span class="ex-risk" aria-hidden="true">withdraw</span><span class="vh">
@@ -109,30 +146,19 @@ function renderExits(s) {
           shut ? `<span class="vh"> (shut)</span>` : ""}</button>`;
       }).join("")}</div></div>`;
   }).join("");
-  const asking = exits.find(e => e.id === EXIT_CONFIRM);
-  let confirm = "";
-  if (asking && fighting) {
-    confirm = `<div class="ex-confirm fight" id="exits-confirm" role="group"
-          aria-label="Leave the fight">
-        <span><b>Leave the fight?</b> Walking away to ${esc(asking.name)} is a withdraw.
-        A foe beside you that you can see gets no swing, but one whose reach covers your
-        way out still strikes, and so does one you cannot see.${asking.journey ? ` ${
-          esc(upFirst(asking.time_words))}. The days pass on the road.` : ""}</span>
-        <button type="button" class="exitgo" data-exitgo="${esc(asking.id)}">Leave</button>
-        <button type="button" class="exitgo quiet" data-exitcancel>Stay</button>
-      </div>`;
-  } else if (asking) {
-    confirm = `<div class="ex-confirm" id="exits-confirm" role="group"
-          aria-label="Confirm the journey">
-        <span>${esc(asking.name)}: ${esc(asking.time_words)}. The days pass on the
-        road.</span>
-        <button type="button" class="exitgo" data-exitgo="${esc(asking.id)}">Set out</button>
-        <button type="button" class="exitgo quiet" data-exitcancel>Not now</button>
-      </div>`;
-  }
-  box.innerHTML = groups
-    + `<div class="ex-why" id="exits-why" aria-live="polite"></div>` + confirm;
+  box.innerHTML = groups + `<div class="ex-why" id="exits-why" aria-live="polite"></div>`;
   box.hidden = false;
+}
+
+// The pressed state follows the chip without redrawing the row (10-spells.js calls this
+// whenever the chip changes), so focus stays on the button that was pressed.
+function reflectExitChip() {
+  const id = attachedExitId();
+  document.querySelectorAll("#exits .exitbtn[aria-pressed]").forEach(b => {
+    const on = b.dataset.exit === id;
+    b.setAttribute("aria-pressed", String(on));
+    b.classList.toggle("asking", on);
+  });
 }
 
 function exitWhy(btn) {
@@ -140,55 +166,20 @@ function exitWhy(btn) {
   if (line) line.textContent = btn && btn.dataset.why ? btn.dataset.why : "";
 }
 
-// On a phone the footer scrolls under a sticky input row, and focusing "Leave" only
-// scrolls it as far as the footer's edge, which is behind that row: measured at 375x812,
-// the question sat at 699 to 811px under an input starting at 627px, answered by
-// buttons nobody could see. So the footer is scrolled on by exactly the overlap.
-function revealConfirm() {
-  const line = document.getElementById("exits-confirm");
-  const say = document.getElementById("sayform");
-  const foot = line && line.closest("footer");
-  if (!line || !say || !foot || getComputedStyle(say).position !== "sticky") return;
-  const over = line.getBoundingClientRect().bottom - say.getBoundingClientRect().top + 8;
-  if (over > 0) foot.scrollTop += over;
-}
-
-function goToExit(id, confirmed) {
-  const e = ((STATE && STATE.scene && STATE.scene.exits) || []).find(x => x.id === id);
+// A click attaches the way, or takes it back when it is the one attached. Nothing is sent.
+function toggleExit(id) {
+  const scene = (STATE && STATE.scene) || {};
+  const e = (scene.exits || []).find(x => x.id === id);
   if (!e || e.blocked) return;
-  const place = { kind: "place", id: e.id };
-  if (confirmed) place.confirmed = true;
-  EXIT_CONFIRM = null;
-  // The input and any spell chip are left as they are: the move is its own turn.
-  takeTurn({ text: `I go to ${e.name}.`, attachments: [place] }, false);
+  if (attachedExitId() === id) { removeAttachment(); return; }
+  attachPlace(exitChip(e, !!scene.in_encounter));
 }
 
 document.addEventListener("click", e => {
   const btn = e.target.closest && e.target.closest("#exits .exitbtn");
-  if (btn) {
-    const id = btn.dataset.exit;
-    if (btn.getAttribute("aria-disabled") === "true") { exitWhy(btn); return; }
-    const scene = STATE.scene || {};
-    const x = (scene.exits || []).find(v => v.id === id);
-    if (exitAsks(x, !!scene.in_encounter) && EXIT_CONFIRM !== id) {
-      EXIT_CONFIRM = id;
-      renderExits(STATE);
-      const go = document.querySelector("#exits [data-exitgo]");
-      if (go) { go.focus(); revealConfirm(); }
-      return;
-    }
-    goToExit(id, !!(x && x.journey));
-    return;
-  }
-  const go = e.target.closest && e.target.closest("#exits [data-exitgo]");
-  if (go) { goToExit(go.dataset.exitgo, true); return; }
-  if (e.target.closest && e.target.closest("#exits [data-exitcancel]")) {
-    const was = EXIT_CONFIRM;
-    EXIT_CONFIRM = null;
-    renderExits(STATE);
-    const back = was && document.querySelector(`#exits [data-exit="${CSS.escape(was)}"]`);
-    if (back) back.focus();
-  }
+  if (!btn) return;
+  if (btn.getAttribute("aria-disabled") === "true") { exitWhy(btn); return; }
+  toggleExit(btn.dataset.exit);
 });
 
 // The reason for a shut way, as a visible line while it is pointed at or focused.
@@ -208,15 +199,6 @@ document.addEventListener("focusout", e => {
   const btn = e.target.closest && e.target.closest("#exits .exitbtn.shut");
   const to = e.relatedTarget;
   if (btn && !(to && to.closest && to.closest("#exits .exitbtn.shut"))) exitWhy(null);
-});
-document.addEventListener("keydown", e => {
-  if (e.key !== "Escape" || !EXIT_CONFIRM) return;
-  if (!(e.target.closest && e.target.closest("#exits"))) return;
-  const was = EXIT_CONFIRM;
-  EXIT_CONFIRM = null;
-  renderExits(STATE);
-  const back = document.querySelector(`#exits [data-exit="${CSS.escape(was)}"]`);
-  if (back) back.focus();
 });
 
 onRender(s => renderExits(s));

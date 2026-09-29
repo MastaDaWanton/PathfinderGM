@@ -3,9 +3,9 @@
 
   (1) The exits row mid-fight. The row offered "the arena · a few minutes" during an
       encounter exactly as it did in a quiet street, one click from walking out. In a
-      fight every open way is now marked "withdraw" and the first click asks "Leave the
-      fight?" before the second goes, the journeys' own confirm idiom. The page reads
-      `scene.in_encounter`; it works out nothing about who threatens whom.
+      fight every open way is now marked "withdraw", and (since 2026-09-29) a click
+      attaches a Withdraw chip whose line says what leaving costs, and Say sends it. The
+      page reads `scene.in_encounter`; it works out nothing about who threatens whom.
 
   (6) The sheet at 375x812, measured in the browser pane before the fix: the panel's one
       grid column was `auto` and came out 458px wide, the Close button was off the right
@@ -32,6 +32,8 @@ from pathlib import Path
 
 import pytest
 
+import _exits_dom as exits_dom
+
 ROOT = Path(__file__).resolve().parent.parent
 TABLE = ROOT / "play" / "static" / "js" / "table"
 PAGE = ROOT / "play" / "templates" / "play" / "table.html"
@@ -55,46 +57,16 @@ def _node(tmp_path: Path, script: str) -> dict:
 
 
 # --- (1) the exits row in a fight -------------------------------------------------------
-
-# Just enough of a page for 11-exits.js to run: one #exits box, a click listener caught,
-# and `takeTurn` recorded instead of sent.
-_EXITS_PRELUDE = r"""
-const BOX = { hidden: true, innerHTML: "", classList: { on: new Set(),
-  toggle(c, v) { v ? this.on.add(c) : this.on.delete(c); } } };
-const LISTENERS = {};
-const document = {
-  getElementById: id => id === "exits" ? BOX : null,
-  querySelector: () => null,
-  addEventListener: (t, f) => { LISTENERS[t] = f; },
-};
-const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
-  .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const SENT = [];
-function takeTurn(body) { SENT.push(body); }
-function onRender() {}
-let STATE = null;
-function click(id) {
-  const btn = { dataset: { exit: id }, getAttribute: () => null };
-  LISTENERS.click({ target: { closest: sel => sel.includes(".exitbtn") ? btn : null } });
-}
-"""
-
+#
+# The row's script runs with the spells script beside it, as on the page: since
+# 2026-09-29 a click attaches the way into the spell chip's slot (tests/_exits_dom.py).
 
 def _exits_state(fighting: bool) -> dict:
-    return {"scene": {"in_encounter": fighting, "exits": [
-        {"id": "p:arena", "name": "the arena", "group": "next_door",
-         "time_words": "a few minutes' walk", "blocked": "", "journey": False},
-        {"id": "p:gate", "name": "the gate", "group": "outside",
-         "time_words": "a few minutes' walk", "blocked": "The watch has your name.",
-         "journey": False},
-        {"id": "r:north", "name": "the north road", "group": "road",
-         "time_words": "about three days on foot", "blocked": "", "journey": True},
-    ]}}
+    return exits_dom.exits_state(fighting)
 
 
 def _run_exits(tmp_path, steps: str) -> dict:
-    code = _read(TABLE / "11-exits.js")
-    return _node(tmp_path, _EXITS_PRELUDE + code + "\n" + steps)
+    return exits_dom.run(tmp_path, steps)
 
 
 @needs_node
@@ -107,12 +79,10 @@ def test_in_a_fight_every_open_way_says_it_is_a_withdraw_and_the_shut_one_does_n
     leaving is a withdraw, so one visible foe beside you gets no swing and the mark
     promising one on every way would have been wrong the other way round."""
     got = _run_exits(tmp_path, f"""
-      STATE = {json.dumps(_exits_state(True))};
-      renderExits(STATE);
+      renderAll({json.dumps(_exits_state(True))});
       const fight = BOX.innerHTML, fightClass = [...BOX.classList.on];
-      STATE = {json.dumps(_exits_state(False))};
-      renderExits(STATE);
-      console.log(JSON.stringify({{ fight, fightClass, calm: BOX.innerHTML }}));
+      renderAll({json.dumps(_exits_state(False))});
+      done({{ fight, fightClass, calm: BOX.innerHTML }});
     """)
     buttons = re.findall(r"<button[^>]*class=\"exitbtn[^\"]*\"[^>]*>.*?</button>",
                          got["fight"], re.S)
@@ -121,73 +91,69 @@ def test_in_a_fight_every_open_way_says_it_is_a_withdraw_and_the_shut_one_does_n
     for open_way in (arena, road):
         assert "risky" in open_way and ">withdraw<" in open_way
         assert "leaving the fight is a withdraw" in open_way
-        assert 'aria-expanded="false"' in open_way, "it asks before it goes"
-    assert "shut" in gate and "withdraw" not in gate
+        assert 'aria-pressed="false"' in open_way, "a toggle: it attaches, it does not go"
+    assert "shut" in gate and "withdraw" not in gate and "aria-pressed" not in gate
     assert "fighting" in got["fightClass"]
     assert "withdraw" not in got["calm"], "out of a fight the row is the quiet row"
 
 
 @needs_node
-def test_mid_fight_the_first_click_asks_and_only_the_second_leaves(tmp_path):
-    """The journeys already asked before spending days; a walk out of a fight asked
-    nothing. First click: the "Leave the fight?" line and no turn sent. Second click on
-    the same way: one turn, "I go to the arena.", with the place attached. Out of a fight
-    the same way goes on the first click, as it always did."""
+def test_mid_fight_a_click_attaches_a_withdraw_chip_whose_line_says_what_it_costs(tmp_path):
+    """The journeys asked before spending days, and a walk out of a fight asked "Leave the
+    fight?" on a line under the row that a second click answered. Since the owner's
+    "attach like a spell does and then apply when you send" (2026-09-29) the click sends
+    nothing: it attaches a Withdraw chip, and the confirm line's sentence is held visibly
+    under the chip. Say is the second step. Out of a fight the same way is a Go chip with
+    no line under it."""
     got = _run_exits(tmp_path, f"""
-      STATE = {json.dumps(_exits_state(True))};
-      renderExits(STATE);
+      renderAll({json.dumps(_exits_state(True))});
       click("p:arena");
-      const asked = BOX.innerHTML, sentAfterOne = SENT.length;
+      const fight = ELS.attachments.innerHTML, sentAfterClick = SENT.length;
+      const fightSay = sayBody();
+      removeAttachment({{ announce: false }});
+      renderAll({json.dumps(_exits_state(False))});
       click("p:arena");
-      const fightSent = SENT.slice();
-      SENT.length = 0;
-      STATE = {json.dumps(_exits_state(False))};
-      renderExits(STATE);
-      click("p:arena");
-      console.log(JSON.stringify({{ asked, sentAfterOne, fightSent, calmSent: SENT }}));
+      done({{ fight, sentAfterClick, fightSay, calm: ELS.attachments.innerHTML,
+              calmSay: sayBody() }});
     """)
-    assert got["sentAfterOne"] == 0
-    assert "Leave the fight?" in got["asked"]
-    assert "Walking away to the arena is a withdraw." in got["asked"]
-    assert "whose reach covers your" in got["asked"], "the confirm says who still strikes"
-    assert ">Leave</button>" in got["asked"] and ">Stay</button>" in got["asked"]
-    assert [s["text"] for s in got["fightSent"]] == ["I go to the arena."]
-    assert got["fightSent"][0]["attachments"] == [{"kind": "place", "id": "p:arena"}]
-    assert [s["text"] for s in got["calmSent"]] == ["I go to the arena."]
+    assert got["sentAfterClick"] == 0, "a click attaches; it does not send a turn"
+    assert ">Withdraw<" in got["fight"] and ">the arena<" in got["fight"]
+    assert 'class="att-note"' in got["fight"], "the line is visible, not screen-reader only"
+    assert "Leaving the fight is a withdraw" in got["fight"]
+    assert "whose reach covers your way out still strikes" in got["fight"]
+    assert got["fightSay"]["attachments"] == [{"kind": "place", "id": "p:arena"}]
+    assert ">Go<" in got["calm"] and "att-note" not in got["calm"]
+    assert got["calmSay"] == {"text": "", "attachments": [{"kind": "place", "id": "p:arena"}]}
 
 
 @needs_node
-def test_a_question_left_open_when_the_fight_ends_is_closed(tmp_path):
-    """A "Leave the fight?" line with no fight under it would be a question about
-    nothing; the next state that is not a fight closes it (a journey's would stay)."""
+def test_a_withdraw_chip_left_attached_when_the_fight_ends_becomes_a_walk(tmp_path):
+    """A withdraw line with no fight under it would be a warning about nothing; the next
+    state that is not a fight makes the chip a Go chip and takes the line away (a
+    journey's line of days would stay)."""
     got = _run_exits(tmp_path, f"""
-      STATE = {json.dumps(_exits_state(True))};
-      renderExits(STATE);
+      renderAll({json.dumps(_exits_state(True))});
       click("p:arena");
-      STATE = {json.dumps(_exits_state(False))};
-      renderExits(STATE);
-      console.log(JSON.stringify({{ html: BOX.innerHTML, open: EXIT_CONFIRM }}));
+      renderAll({json.dumps(_exits_state(False))});
+      done({{ html: ELS.attachments.innerHTML, chip: attachedChip() }});
     """)
-    assert got["open"] is None
-    assert 'id="exits-confirm"' not in got["html"]
+    assert got["chip"]["label"] == "Go" and got["chip"]["note"] == ""
+    assert "withdraw" not in got["html"].lower()
 
 
 @needs_node
 def test_a_fight_on_a_journey_says_both_and_still_confirms_the_journey(tmp_path):
-    """Leaving a fight by the road is both things: the line names the provocation and
-    the days, and the second click carries `confirmed`, which the server demands of a
-    journey (play/views.py `_read_place`)."""
+    """Leaving a fight by the road is both things: the chip's line names the withdraw and
+    the days, and Say carries `confirmed`, which the server demands of a journey
+    (play/views.py `_read_place`)."""
     got = _run_exits(tmp_path, f"""
-      STATE = {json.dumps(_exits_state(True))};
-      renderExits(STATE);
+      renderAll({json.dumps(_exits_state(True))});
       click("r:north");
-      const asked = BOX.innerHTML;
-      click("r:north");
-      console.log(JSON.stringify({{ asked, sent: SENT }}));
+      done({{ html: ELS.attachments.innerHTML, say: sayBody() }});
     """)
-    assert "Leave the fight?" in got["asked"]
-    assert "About three days on foot. The days pass on the road." in got["asked"]
-    assert got["sent"][0]["attachments"] == [
+    assert "Leaving the fight is a withdraw" in got["html"]
+    assert "About three days on foot; the days pass on the road." in got["html"]
+    assert got["say"]["attachments"] == [
         {"kind": "place", "id": "r:north", "confirmed": True}]
 
 
@@ -196,7 +162,7 @@ def test_the_fight_mark_is_styled_readably_and_without_dashes_or_motion():
     leather) and the --alarm border. The page's --alarm as TEXT measures 3.3:1 there,
     under WCAG AA, which is why it is only the border."""
     page = _read(PAGE)
-    block = page[page.index("#exits .exitbtn.risky"):page.index("#exits .exitgo {")]
+    block = page[page.index("#exits .exitbtn.risky"):page.index("body.resolving #exits button")]
     assert "border-color: var(--alarm)" in block
     assert re.search(r"\.ex-risk \{[^}]*color: #e8b0a8", block)
     assert "animation" not in block and "transition" not in block

@@ -1358,11 +1358,14 @@ def say(request):
         return JsonResponse({"error": bad}, status=400)
     typed = bool(text)
     # A place from the "From here" row (I6): its own door below, after the checks every
-    # turn passes. Not drawn as a chip on the beat — "I go to the market." already says it.
+    # turn passes. Sent with no words (or only the row's own go line) it is "I go to the
+    # market." and no chip, since the line already says it; with words of the player's,
+    # the words are theirs and the chip is drawn on the beat (`_the_way_there`).
     place = next((a for a in attached if a.get("kind") == "place"), None)
     if place is not None:
-        text = text or _go_line(place["name"])
-        typed = False
+        if not text or _norm_line(text) == _norm_line(_go_line(place["name"])):
+            text = _go_line(place["name"])
+            typed = False
     elif not text and attached:
         # A chip and nothing else is a turn: the player means the spell.
         text = f"I cast {attached[0]['name']}."
@@ -1431,8 +1434,10 @@ def say(request):
             return _refusal(refused)
 
     # The player's line, with the chip drawn before it when there is one (design F §4.4);
-    # the key only when sent, so every beat before attachments reads as it did.
-    drawn = [dict(a) for a in attached if a.get("kind") != "place"]
+    # the key only when sent, so every beat before attachments reads as it did. A place
+    # is drawn only beside the player's own words: "I slip out quietly." must still say
+    # where they went, and "I go to the market." already does.
+    drawn = [dict(a) for a in attached if a.get("kind") != "place" or typed]
     beat = {"who": "player", "text": shown, **({"attachments": drawn} if drawn else {})}
     pc = c.scene.pc()
     if place is not None and c.scene.in_encounter and pc is not None \
@@ -1460,7 +1465,16 @@ def say(request):
 
     c.transcript.append(beat)
     if place is not None:
-        return _take_the_exit(c, place, text)
+        return _the_way_there(c, place, text, typed, acting, claim, beat)
+    return _plan_and_run(c, text, acting, claim, attached)
+
+
+def _plan_and_run(c, text: str, acting: tuple, claim: str = "", attached=None):
+    """A spoken turn from the planner on: plan `text`, run it, narrate it. The player's
+    line is already the last beat of the transcript, and every failure below takes it
+    off again, so a caller that appended its own line (a follow-up at the destination,
+    `_the_way_there`) gets the same bargain. Lifted out of `say` unchanged so the place
+    chip's two halves run the one path every spoken turn runs."""
     world = c.world
     agent = GMAgent(world, c.engine())
     _arm_cards(agent, c)
@@ -1470,6 +1484,7 @@ def say(request):
     # none. Set every turn on a fresh agent, so it never outlives the turn, as `claim`
     # does not.
     agent.attachments = acting
+    attached = acting if attached is None else attached
 
     # Free actions taken since the last spoken turn ride along as context rather than
     # having cost turns of their own. Into `history`, not `player_input`: the injectors
@@ -1896,9 +1911,15 @@ def _read_place(c, item: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
 
     It must be one of `scene.exits` as the engine builds them this moment — never a
     place the page remembered from an earlier state — and not one the rules would
-    refuse; a journey (days on the clock) must carry `confirmed`, which the row's second
-    click sends. The words are ours or none: an exit is its own turn, so a line that says
-    something else beside it would be a line the engine silently ignored."""
+    refuse; a journey (days on the clock) must carry `confirmed`, which the page sends
+    with a journey chip, because attaching it and then pressing Say is the confirmation.
+
+    Words beside it are the player's, and are not refused here. Until 2026-09-29 any
+    words other than the go line were a 400 ("a turn of its own"), because the click
+    went straight to `_take_the_exit` and words beside a move were silently ignored.
+    The owner then asked for the chip to attach like a spell's, and for the words to say
+    WHEN the move happens ("where in the described action the move should take place");
+    `_the_way_there` cuts the line at the move and runs each half where it belongs."""
     from . import exits as exits_mod
 
     if carry_on:
@@ -1920,9 +1941,6 @@ def _read_place(c, item: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
     if exit_["journey"] and item.get("confirmed") is not True:
         return (), (f"{exit_['name']}: {exit_['time_words']}. Confirm the journey "
                     f"before setting out.")
-    if text and _norm_line(text) != _norm_line(_go_line(exit_["name"])):
-        return (), ("A place from the exits row is a turn of its own. Send it without "
-                    "other words, and say the rest on the next turn.")
     return ({"kind": "place", "id": exit_["id"], "name": exit_["name"],
              "journey": bool(exit_["journey"])},), ""
 
@@ -1977,6 +1995,129 @@ def _take_the_exit(c, chip: dict, text: str):
     plan = TurnPlan(narration="", intents=intents)
     plan.attachments = [dict(chip)]
     return _advance(c, agent, "", plan, text)
+
+
+# What a clause beside a place chip may declare and still be only the going: the move
+# itself, and Stealth, which is HOW one goes ("I slip out quietly" reads as a Stealth
+# check: measured 2026-09-29, `declared_ops` gave ['check'] for it in all three exports).
+_GOING_OPS = {"travel", "journey", "move"}
+
+
+def _only_the_going(c, clause: str) -> bool:
+    """A clause that is the move and nothing else, which takes the engine's own door
+    (`_take_the_exit`) with the words as its manner, and asks no planner. Detected in
+    code from the declarers, never asked of a model (CLAUDE.md, declaration detection)."""
+    if judgement.purchase_sought(clause):
+        return False
+    ops = set(judgement.declared_ops(clause, c.scene, c.world))
+    if "check" in ops:
+        skills = {str((r.get("params") or {}).get("skill", "")).lower()
+                  for r in judgement.inject_checks([], clause, c.scene) or ()}
+        if skills <= {"stealth"}:
+            ops.discard("check")
+    return ops <= _GOING_OPS
+
+
+def _the_way_there(c, chip: dict, text: str, typed: bool, acting: tuple, claim: str,
+                   beat: dict):
+    """A place chip on Say (I6, owner 2026-09-29: "attach like a spell does and then apply
+    when you send"), with the words deciding WHEN in the turn the move happens.
+
+    No words, or only the going ("I slip out quietly", "I run for it"): the engine's own
+    door, no model asked where (`_take_the_exit`), the words handed to the narrator as
+    the player's line. Otherwise the line is cut into clauses in the order of doing
+    (gm/sequence.py) at the move, and each half runs where it belongs:
+
+      * Up to and including the move: planned and run here, through the one spoken-turn
+        path, with the move held to the chip's place and put LAST
+        (`judgement.travel_to_the_attached`). No clause recognisably the move puts it
+        last, because leaving is what usually ends a turn.
+      * After the move: planned again at the destination, against the people there, as
+        a second turn — "the meaning of the noun phrase depends on where the player is by
+        then" (DM4 §34). It cannot be one intent list: validation reads the scene being
+        left, where the market's keeper is not.
+      * A purchase before the move stops the chain there. A purchase is made on the
+        counter's screen after the beat (owner's ruling 2026-09-27), and walking off in
+        the same turn would open the next place's counter instead; the chip stays for
+        the next Say.
+
+    A half that cannot run stops the rest, as Zork's main loop clears the rest of the
+    input on a fatal action (gm/sequence.py): the move stands, and the unrun words go
+    back into the pen with a line saying so (`_unfinished`), never silently dropped.
+    """
+    from gm import sequence
+
+    if not typed:
+        return _take_the_exit(c, chip, text)
+    parts = sequence.clauses(text)
+    at = sequence.move_clause(parts, chip["name"])
+    stop = next((i for i, p in enumerate(parts)
+                 if (at is None or i < at) and judgement.purchase_sought(p)), None)
+    if stop is not None:
+        now, later, moves = parts[:stop + 1], parts[stop + 1:], False
+    elif at is None:
+        now, later, moves = parts, [], True
+    else:
+        now, later, moves = parts[:at + 1], parts[at + 1:], True
+    now_text = sequence.joined(now) or text
+    if later:
+        # This beat is the words done now; the rest get their own line when they run.
+        beat["text"] = now_text
+
+    before = (c.scene.at, c.scene.location_id)
+    if not moves:
+        # The chip is not spent: it is not drawn on a beat that does not go anywhere.
+        beat.pop("attachments", None)
+        resp = _plan_and_run(c, now_text, (), claim)
+        if resp.status_code != 200:
+            return resp
+        return _unfinished(c, resp, later or [_go_line(chip["name"])], keep_chip=True,
+                           arrived=False)
+    mine = dict(chip)
+    if chip.get("journey"):
+        from . import exits as exits_mod
+
+        if exits_mod.riding(c.engine()):
+            mine["pace"] = "ride"
+    # The engine's door only for a line that is recognisably the move: "I nod to the
+    # watchman" declares nothing either, but it is a nod, and the planner hears it.
+    if at is not None and len(now) == 1 and _only_the_going(c, now[0]):
+        resp = _take_the_exit(c, chip, now_text)
+    else:
+        resp = _plan_and_run(c, now_text, (mine,), claim, (dict(chip),))
+    if not later or resp.status_code != 200:
+        return resp
+    moved = (c.scene.at, c.scene.location_id) != before
+    if c.ended or c.scene.awaiting or c.scene.in_encounter or not moved:
+        return _unfinished(c, resp, later, keep_chip=False, arrived=moved)
+
+    later_text = sequence.joined(later)
+    c.transcript.append({"who": "player", "text": later_text})
+    resp2 = _plan_and_run(c, later_text, (), "")
+    if resp2.status_code == 200:
+        return resp2
+    try:
+        why = json.loads(resp2.content).get("error") or ""
+    except (ValueError, TypeError):
+        why = ""
+    c.save()
+    return _unfinished(c, JsonResponse(_state(c)), later, keep_chip=False, arrived=True,
+                       why=why)
+
+
+def _unfinished(c, resp, later: list, keep_chip: bool, arrived: bool, why: str = ""):
+    """The turn's response, plus the words it did not get to: `unfinished` carries them
+    back to the pen prefilled (`text`), whether the place chip stays for the next Say
+    (`keep_chip`), and the status line the page shows and speaks — "You are at the
+    market. Not yet done: buy bread." — so nothing the player wrote is silently lost."""
+    from gm import sequence
+
+    todo = sequence.plain(later)
+    line = f"Not yet done: {todo}."
+    if arrived:
+        line = f"You are at {c.engine().here().name}. {line}"
+    return _with(resp, {"unfinished": {"text": sequence.joined(later), "line": line,
+                                       "keep_chip": keep_chip, "why": why}})
 
 
 def _gm_answer(c, question: str, shown: str):
