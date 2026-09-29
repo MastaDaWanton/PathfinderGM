@@ -212,6 +212,8 @@ async function openSheet() {
 }
 
 function closeSheet() {
+  // A spell's details lie over the sheet in the top layer; they go with it.
+  if (typeof detailOpen === "function" && detailOpen()) closeDetail(false);
   $("#sheetpanel").classList.remove("on");
   $("#sheetpanel").setAttribute("aria-hidden", "true");
 }
@@ -640,137 +642,565 @@ document.addEventListener("input", e => {
 });
 
 // --- Spells ---
-// --- Spells ---
-// Slots across the top, the book underneath. The DC sits on the slot row rather than on
-// each spell, because it is a property of the level and repeating it against forty spells
-// is forty chances to read the wrong one.
+// Three columns, after the owner's mockup (Phase 3 task I5, 2026-09-29): what the caster
+// has to spend on the left, what is in their head today in the middle, the whole book on
+// the right. The DC sits on the slot row rather than on each spell, because it is a
+// property of the level and repeating it against forty spells is forty chances to read
+// the wrong one.
+//
+// Art is game-icons.net (CC BY 3.0; credited in play/static/icons/spells/CREDITS.txt and
+// on the manual's licence line). Each file is the upstream glyph with its black square
+// removed and its fill set to currentColor, so one CSS colour per school tints it.
+// Inlined rather than used as a CSS mask: a mask needs the static server to call the file
+// image/svg+xml, and on Windows Python reads that answer from the registry, which is the
+// same trap `.js` fell into (pathfindergm/urls.py). A fetch reads the text whatever the
+// server calls it.
+const SPELL_SCHOOLS = {
+  abjuration:    { label: "Abjuration",    icon: "lorc-magic-shield" },
+  conjuration:   { label: "Conjuration",   icon: "lorc-magic-portal" },
+  divination:    { label: "Divination",    icon: "lorc-crystal-ball" },
+  enchantment:   { label: "Enchantment",   icon: "lorc-psychic-waves" },
+  evocation:     { label: "Evocation",     icon: "delapouite-bolt-spell-cast" },
+  illusion:      { label: "Illusion",      icon: "lorc-duality-mask" },
+  necromancy:    { label: "Necromancy",    icon: "lorc-dread-skull" },
+  transmutation: { label: "Transmutation", icon: "lorc-potion-ball" },
+  universal:     { label: "Universal",     icon: "lorc-star-swirl" },
+};
+// A spell gets its own picture only where the match is plain at 20px; everything else
+// wears its school's sigil, which is always true and never a guess.
+const SPELL_ICONS = {
+  "acid-splash": "lorc-acid-blob", "animate-dead": "skoll-raise-zombie",
+  "bleed": "lorc-bleeding-wound", "bless": "lorc-prayer",
+  "burning-hands": "lorc-glowing-hands", "charm-person": "lorc-charm",
+  "color-spray": "lorc-rainbow-star", "create-water": "sbed-water-drop",
+  "daze": "delapouite-knocked-out-stars", "detect-magic": "lorc-third-eye",
+  "disrupt-undead": "lorc-broken-skull", "expeditious-retreat": "lorc-run",
+  "feather-fall": "lorc-feathered-wing", "fireball": "lorc-fireball",
+  "fly": "lorc-feathered-wing", "grease": "delapouite-oil-can", "haste": "lorc-sprint",
+  "identify": "lorc-magnifying-glass", "invisibility": "delapouite-invisible",
+  "light": "lorc-candle-light", "lightning-bolt": "lorc-lightning-branches",
+  "mage-armor": "lorc-energy-shield", "mage-hand": "lorc-magic-palm",
+  "magic-missile": "lorc-missile-swarm", "mirror-image": "lorc-mirror-mirror",
+  "prestidigitation": "delapouite-magick-trick", "ray-of-frost": "lorc-ice-bolt",
+  "scorching-ray": "lorc-fire-ray", "shield": "lorc-shield-reflect",
+  "sleep": "lorc-sleepy", "spiritual-weapon": "lorc-winged-sword", "web": "lorc-spider-web",
+};
+const schoolKey = s => (SPELL_SCHOOLS[String(s || "").toLowerCase()]
+  ? String(s).toLowerCase() : "universal");
+const spellIcon = sp => SPELL_ICONS[sp.id]
+  || (/^cure-.*-wounds$/.test(sp.id || "") ? "delapouite-healing" : "")
+  || SPELL_SCHOOLS[schoolKey(sp.school)].icon;
+// The box is sized before the glyph arrives, so nothing moves when it does.
+const glyph = (name, cls = "") =>
+  `<i class="gi${cls ? " " + cls : ""}" data-icon="${esc(name)}" aria-hidden="true"></i>`;
+
+// Beside this script, wherever the server put it: "/static/js/table/05-sheet.js?v=…"
+// resolves "../../icons/spells/" to "/static/icons/spells/" in the browser and the
+// packaged app alike.
+const SPELL_ICON_BASE = (() => {
+  const s = document.querySelector('script[src*="js/table/05-sheet.js"]');
+  try { return new URL("../../icons/spells/", s.src).href; }
+  catch { return "/static/icons/spells/"; }
+})();
+const SPELL_ICON_SVG = new Map();
+// CC BY 3.0 asks for the authors and the licence where the work is used: the foot of the
+// grimoire, the Background tab's licence note and the manual's footer all say it.
+const spellIconCredit = () => `Spell icons by Lorc, Delapouite, Sbed and Skoll from
+  <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a>,
+  <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+  rel="noopener">CC BY 3.0</a>, recoloured.
+  <a href="${esc(SPELL_ICON_BASE)}CREDITS.txt" target="_blank" rel="noopener">Which icon is
+  whose</a>.`;
+
+function paintSpellIcons(root) {
+  if (!root) return;
+  const want = new Set();
+  root.querySelectorAll("i.gi[data-icon]").forEach(i => {
+    if (i.firstChild) return;
+    const svg = SPELL_ICON_SVG.get(i.dataset.icon);
+    if (typeof svg === "string") i.innerHTML = svg;
+    else want.add(i.dataset.icon);
+  });
+  for (const name of want) {
+    if (SPELL_ICON_SVG.has(name)) continue;     // already on its way
+    SPELL_ICON_SVG.set(name, null);
+    // Only names from the two tables above reach here, so the path cannot be steered.
+    fetch(SPELL_ICON_BASE + encodeURIComponent(name) + ".svg")
+      .then(r => (r.ok ? r.text() : ""))
+      .then(text => {
+        const svg = text.includes("<svg") ? text : "";
+        SPELL_ICON_SVG.set(name, svg);
+        if (svg) document.querySelectorAll(`i.gi[data-icon="${CSS.escape(name)}"]`)
+          .forEach(i => { if (!i.firstChild) i.innerHTML = svg; });
+      })
+      .catch(() => SPELL_ICON_SVG.set(name, ""));
+  }
+}
+// Whoever draws the sheet (drawSheet, a level-up, the inventory's use button), the
+// pictures follow: one observer rather than a call at every place that sets innerHTML.
+new MutationObserver(() => { paintSpellIcons($("#sheetbody")); countGrimoire(); })
+  .observe($("#sheetbody"), { childList: true, subtree: true });
+
+// --- plain words for the rules text ------------------------------------------------------
+// The catalogue keeps durations and ranges parsed, "minutes/level (10)" and "feet (60)";
+// the page says them the way a player would read them aloud.
+const spellCap = t => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+function plainMeasure(text) {
+  return String(text || "").trim().replace(
+    /\b(rounds?|minutes?|hours?|days?|feet|miles?)(\/level)?\s*\((\d+)\)/gi,
+    (_m, unit, per, n) => {
+      const u = unit.toLowerCase();
+      if (u === "feet") return `${n} ft${per ? " per level" : ""}`;
+      const one = u.replace(/s$/, "");
+      return `${n} ${n === "1" ? one : one + "s"}${per ? " per level" : ""}`;
+    });
+}
+function rangeShort(r) {
+  const m = /^(close|medium|long)\b/i.exec(String(r || "").trim());
+  return m ? spellCap(m[1].toLowerCase()) : spellCap(plainMeasure(r)) || "None";
+}
+// The same, as a phrase for a summary line: "close range", "60 ft", "touch".
+function rangePhrase(r) {
+  const short = rangeShort(r);
+  if (/^(Close|Medium|Long)$/.test(short)) return `${short.toLowerCase()} range`;
+  return short === "None" ? "" : short.charAt(0).toLowerCase() + short.slice(1);
+}
+const saveShort = s => (!s || /^none$/i.test(String(s).trim()) ? "None" : spellCap(String(s).trim()));
+// "conjuration (creation) · [acid] · wizard 1, …": the subschool and descriptors are
+// the only parts of the index line a card does not already show another way.
+function schoolLine(sp) {
+  const label = SPELL_SCHOOLS[schoolKey(sp.school)].label;
+  const head = String(sp.line || "").split("·");
+  const sub = /\(([^)]+)\)/.exec(head[0] || "");
+  const desc = /\[([^\]]+)\]/.exec(sp.line || "");
+  return `${label}${sub ? ` (${sub[1]})` : ""}${desc ? `, ${desc[1]}` : ""}`;
+}
+const ABILITY_NAMES = { int: "Intelligence", wis: "Wisdom", cha: "Charisma" };
+const levelName = n => (n === 0 ? "Cantrips" : `Level ${n}`);
+
+// --- the tab ------------------------------------------------------------------------------
 function tabSpells(s) {
   const sp = s.spells;
   if (!sp) {
     return tabEmpty(`${esc(s.identity.name)} does not cast spells.`);
   }
-
-  const byLevel = new Map();
-  for (const k of sp.known) {
-    const lvl = k.level === null || k.level === undefined ? "?" : k.level;
-    if (!byLevel.has(lvl)) byLevel.set(lvl, []);
-    byLevel.get(lvl).push(k);
-  }
-
-  const slots = sp.slots.map(sl => `
-    <div class="t"><span>Level ${sl.level}${
-      sl.level > 0 ? ` <small>DC ${sl.dc}</small>` : ""}</span>
-      <b class="${sl.left ? "" : "spent"}">${sl.left} <small>of ${sl.max}</small></b></div>`
-  ).join("");
-
-  const book = [...byLevel.entries()].sort((a, b) => (a[0] === "?") - (b[0] === "?")
-                                                     || a[0] - b[0]).map(([lvl, list]) => `
-    <h3>Level ${lvl}</h3>
-    ${list.map(k => `
-      <div class="spellrow${k.missing ? " missing" : ""}">
-        <div class="spellname">
-          <b>${esc(k.name)}</b>
-          ${k.missing
-            ? `<small>not in this build</small>`
-            : `<small>${esc([k.school, k.range, k.duration].filter(Boolean).join(" · "))}${
-                 k.save ? ` · ${esc(k.save)}` : ""}</small>`}
-        </div>
-        ${k.missing ? "" : `
-          <div class="prep">
-            <button class="prepbtn" data-spell="${esc(k.id)}" data-action="unprepare"
-                    ${k.prepared ? "" : "disabled"} title="Unprepare">−</button>
-            <span class="prepcount${k.prepared ? " has" : ""}">${k.prepared}</span>
-            <button class="prepbtn" data-spell="${esc(k.id)}" data-action="prepare"
-                    title="Prepare">+</button>
-            <!-- Cast from here, fight or no fight (2026-09-24). The combat bar was the
-                 only door and it is hidden outside an encounter, so a wizard in a
-                 tavern had no way to cast light. The target is a person in the room,
-                 yourself, or nobody, and the intent goes to the engine as declared. -->
-            <select class="casttarget" data-spell="${esc(k.id)}" title="Target">
-              <option value="">nobody</option>
-              <option value="self">yourself</option>
-              ${((STATE && STATE.scene && STATE.scene.actors) || []).filter(a => !a.is_pc).map(a =>
-                `<option value="${esc(a.ref)}">${esc(a.name)}</option>`).join("")}
-            </select>
-            <button class="prepbtn castbtn" data-spell="${esc(k.id)}"
-                    data-name="${esc(k.name)}" title="Cast ${esc(k.name)}">Cast</button>
-          </div>`}
-      </div>`).join("")}`).join("");
-
-  return `<div class="cols">
-    <div class="card">
-      <h3>Slots</h3>
-      <div class="terms">${slots || tabEmpty("No slots at this level.")}</div>
-      <div class="terms" style="margin-top:10px">
-        <div class="t"><span>Caster level</span><b>${sp.caster_level}</b></div>
-        <div class="t"><span>Casting ability</span><b>${esc(sp.ability.toUpperCase())}</b></div>
-        <div class="t"><span>Highest spell</span><b>Level ${sp.highest}</b></div>
-      </div>
-      ${(sp.domain_slots || []).length ? `
-        <h3 style="margin-top:12px">Domain slots</h3>
-        <div class="terms">${sp.domain_slots.map(d => `
-          <div class="t"><span>Level ${d.level}</span><b>${d.max}</b></div>`).join("")}</div>
-        <p class="note">One a level, and only a domain spell goes in it.</p>` : ""}
-      ${(sp.domains || []).length ? `
-        <h3 style="margin-top:12px">Domains</h3>
-        <div class="terms">${sp.domains.map(d => `
-          <div class="t"><span>${esc(d.name)}</span>
-            <b>${d.spells.length} <small>spell${d.spells.length === 1 ? "" : "s"}</small></b>
-          </div>`).join("")}</div>` : ""}
-      ${sp.note ? `<div class="sub" style="margin-top:10px">${esc(sp.note)}</div>` : ""}
-    </div>
-    <div class="card">
-      <h3>${sp.kind === "prepared" ? "Prepared today" : "Known"}</h3>
-      ${book || tabEmpty(sp.kind === "prepared"
-        ? "Nothing prepared yet — choose from the list beside this."
-        : "Nothing in the book yet.")}
-    </div>
-    <div class="card">
-      <h3>${sp.kind === "prepared" ? "What can be prepared" : "What can be learned"}</h3>
-      ${spellChoices(sp)}
-    </div>
+  return `<div class="spells3">
+    ${casterStats(sp)}
+    ${preparedToday(sp)}
+    ${grimoireIndex(sp)}
   </div>`;
 }
 
-// The third region, and the reported half of item 26: "this spells panel should show a
-// list of all known spells as well". A cleric prepares from the whole cleric list — 1,143
-// spells, of which 179 are castable at first level — so it is grouped by spell level,
-// searchable, and each level folds. A wizard's book needs none of that and gets the same
-// widget with nothing to hide.
-let SPELL_FIND = "";
-function spellChoices(sp) {
+// The left column. Slots are gem sockets, lit while a slot is left and dark once spent,
+// so "how much have I got" is read at a glance before the numbers are.
+function casterStats(sp) {
+  const sockets = (sp.slots || []).map(sl => `
+    <li class="sock-level">
+      <div class="sock-head"><span>${levelName(sl.level)}</span>
+        <span class="sock-dc">DC ${sl.dc}</span></div>
+      <div class="sock-gems" role="img"
+           aria-label="${sl.left} of ${sl.max} ${sl.level === 0 ? "cantrip" : `level ${sl.level}`} slots left">${
+        Array.from({ length: sl.max }, (_, i) =>
+          `<i class="gem${i < sl.left ? " lit" : ""}"></i>`).join("")}</div>
+      <div class="sock-count${sl.left ? "" : " spent"}">${sl.left} of ${sl.max} left</div>
+    </li>`).join("");
+  return `<section class="card sx-stats" aria-labelledby="sx-stats-h">
+    <h3 id="sx-stats-h">Caster stats</h3>
+    <div class="terms">
+      <div class="t"><span>Caster level</span><b>${sp.caster_level}</b></div>
+      <div class="t"><span>Casting ability</span><b>${esc(ABILITY_NAMES[sp.ability]
+        || String(sp.ability || "").toUpperCase())}</b></div>
+      <div class="t"><span>Highest spell level</span><b>${sp.highest}</b></div>
+    </div>
+    <h4 class="sx-sub">Spell slots</h4>
+    ${sockets ? `<ul class="sockets">${sockets}</ul>` : tabEmpty("No slots at this level.")}
+    ${(sp.domain_slots || []).length ? `
+      <h4 class="sx-sub">Domain slots</h4>
+      <div class="terms">${sp.domain_slots.map(d => `
+        <div class="t"><span>Level ${d.level}</span><b>${d.max}</b></div>`).join("")}</div>
+      <p class="note">One a level, and only a domain spell goes in it.</p>` : ""}
+    ${(sp.domains || []).length ? `
+      <h4 class="sx-sub">Domains</h4>
+      <div class="terms">${sp.domains.map(d => `
+        <div class="t"><span>${esc(d.name)}</span>
+          <b>${d.spells.length} <small>spell${d.spells.length === 1 ? "" : "s"}</small></b>
+        </div>`).join("")}</div>` : ""}
+    ${sp.note ? `<p class="sx-note">${esc(sp.note)}</p>` : ""}
+  </section>`;
+}
+
+// The middle column. A prepared caster sees what is prepared; anyone else sees what they
+// know. Cantrips are listed apart: the engine casts a 0-level spell without a prepared
+// copy (`_check_cast` exempts level 0), so they never need the Prepare button. They are
+// not at will, though, whatever the brief said: each spends a level-0 slot. Measured
+// 2026-09-29, a level 5 wizard casting Light: 4, 3, 2, 1, 0 slots left, and the fifth
+// was refused "no level 0 slots left". The page says so rather than promise otherwise.
+function preparedToday(sp) {
+  const prepared = sp.kind === "prepared";
+  const known = (sp.known || []).filter(k => !k.missing && k.level !== null && k.level !== undefined);
+  const missing = (sp.known || []).filter(k => k.missing);
+  const today = known.filter(k => k.level > 0 && (!prepared || k.prepared > 0));
+  const slots = new Map((sp.slots || []).map(sl => [sl.level, sl]));
+
+  // Cantrips from the book and from the list, once each: a cleric's orisons are never in
+  // `known` (it lists what is prepared) and are still castable.
+  const cantrips = new Map();
+  for (const k of known) if (k.level === 0) cantrips.set(k.id, k);
+  for (const g of sp.choose_from || []) {
+    if (g.level !== 0 || !g.castable) continue;
+    for (const c of g.spells) if (!cantrips.has(c.id)) cantrips.set(c.id, { ...c, level: 0 });
+  }
+
+  const levels = [...new Set(today.map(k => k.level))].sort((a, b) => a - b);
+  const cards = levels.map(lvl => `
+    <h4 class="sx-sub sx-levelhead">${levelName(lvl)}${
+      slots.get(lvl) ? ` <small>DC ${slots.get(lvl).dc}</small>` : ""}</h4>
+    <div class="spcards">${today.filter(k => k.level === lvl)
+      .map(k => spellCard(k, slots.get(lvl), prepared)).join("")}</div>`).join("");
+
+  const cantripRows = [...cantrips.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const heading = prepared ? "Prepared today" : "Known";
+  return `<section class="card sx-today" id="sx-today" data-drop="${prepared ? "prepare" : "learn"}"
+      aria-labelledby="sx-today-h" aria-describedby="sx-today-hint">
+    <h3 id="sx-today-h">${heading}</h3>
+    <p class="sx-hint" id="sx-today-hint">${prepared
+      ? "Drag a spell here from the grimoire, or press its Prepare button."
+      : "Drag a spell here from the list, or press its Learn button."}
+      Cast attaches the spell to what you say next.</p>
+    <p class="sx-say" id="spellsay" role="status" aria-live="polite"></p>
+    ${cards || `<div class="sx-empty">${prepared
+      ? "Nothing prepared yet. Choose from the grimoire beside this."
+      : "Nothing known yet. Choose from the list beside this."}</div>`}
+    ${cantripRows.length ? `
+      <h4 class="sx-sub sx-levelhead">Cantrips${
+        slots.get(0) ? ` <small>DC ${slots.get(0).dc}</small>` : ""}</h4>
+      <p class="sx-hint">No preparing needed${slots.get(0)
+        ? `, but each cast spends a cantrip slot: ${slots.get(0).left} of ${slots.get(0).max} left today`
+        : ""}.</p>
+      <ul class="sx-cantrips">${cantripRows.map(c => `
+        <li class="sx-cantrip" style="--school: var(--sc-${schoolKey(c.school)})">
+          ${glyph(spellIcon(c))}
+          <span class="sx-cname"><b>${esc(c.name)}</b>
+            <small>${esc([SPELL_SCHOOLS[schoolKey(c.school)].label, rangePhrase(c.range),
+                          plainMeasure(c.duration)].filter(Boolean).join(", "))}</small>
+            ${detailsButton(c, "sx-more")}</span>
+          <button type="button" class="prepbtn castbtn" data-spell="${esc(c.id)}"
+                  data-name="${esc(c.name)}" aria-label="Cast ${esc(c.name)}">Cast</button>
+        </li>`).join("")}</ul>` : ""}
+    ${missing.length ? `<p class="sx-note">Not in this build, so not shown:
+      ${missing.map(k => esc(k.name)).join(", ")}.</p>` : ""}
+  </section>`;
+}
+
+function spellCard(k, slot, prepared) {
+  const school = schoolKey(k.school);
+  // The mockup's strip reads Range, Casting time, Saving throw. The sheet does not send
+  // a casting time (rules/sheet.py `_spell_sheet`); components stand in until it does,
+  // and the cell switches to Casting time by itself the day the field arrives.
+  const middle = k.casting_time
+    ? ["Casting time", spellCap(String(k.casting_time))]
+    : ["Components", (k.components || []).join(", ") || "None"];
+  const save = saveShort(k.save);
+  const left = slot ? `${slot.left} of ${slot.max} level ${k.level} slots left` : "";
+  return `<article class="spcard" style="--school: var(--sc-${school})"
+      aria-label="${esc(k.name)}">
+    <header class="spcard-head">
+      ${glyph(spellIcon(k), "gi-lg")}
+      <div class="spcard-title"><h5>${esc(k.name)}</h5>
+        <span>${esc(schoolLine(k))}</span></div>
+    </header>
+    <dl class="spcard-strip">
+      <div><dt>Range</dt><dd title="${esc(k.range || "")}">${esc(rangeShort(k.range))}</dd></div>
+      <div><dt>${middle[0]}</dt><dd>${esc(middle[1])}</dd></div>
+      <div><dt>Save</dt><dd title="${esc(k.save || "")}">${esc(save)}</dd></div>
+    </dl>
+    <p class="spcard-line">Duration: ${esc(spellCap(plainMeasure(k.duration)) || "not stated")}</p>
+    <p class="spcard-count">${prepared ? `<b>${k.prepared}</b> prepared` : ""}${
+      prepared && left ? "<br>" : ""}${left}</p>
+    <div class="spcard-act">
+      <button type="button" class="prepbtn castbtn" data-spell="${esc(k.id)}"
+              data-name="${esc(k.name)}" aria-label="Cast ${esc(k.name)}">Cast</button>
+      ${prepared ? `
+        <button type="button" class="spbtn" data-spell="${esc(k.id)}" data-action="prepare"
+                data-name="${esc(k.name)}" aria-label="Prepare another ${esc(k.name)}">Prepare</button>
+        <button type="button" class="spbtn quiet" data-spell="${esc(k.id)}"
+                data-action="unprepare" data-name="${esc(k.name)}"
+                aria-label="Unprepare one ${esc(k.name)}">Unprepare</button>` : ""}
+      ${detailsButton(k)}
+    </div>
+  </article>`;
+}
+
+// The right column: the whole book (a wizard) or the whole list (a cleric), searchable,
+// sorted, filtered by school. A cleric chooses from 179 castable spells at first level,
+// and a list that long is unusable without the search (item 26). The filters redraw the
+// list alone, so the search box keeps its caret and the page keeps its place.
+let SPELL_FIND = "", SPELL_SCHOOL = "", SPELL_SORT = "level";
+function grimoireIndex(sp) {
+  const prepared = sp.kind === "prepared";
   const groups = sp.choose_from || [];
-  if (!groups.length) return tabEmpty("Nothing on this caster's list yet.");
+  const schools = [...new Set(groups.flatMap(g => g.spells.map(s => schoolKey(s.school))))]
+    .sort();
+  return `<section class="card sx-index" aria-labelledby="sx-index-h">
+    <h3 id="sx-index-h">${prepared ? "Grimoire index" : "What can be learned"}</h3>
+    ${groups.length ? `
+    <div class="gx-tools">
+      <label class="gx-field gx-find"><span>Search</span>
+        <input id="spellfind" class="findbox" type="search" value="${esc(SPELL_FIND)}"
+               autocomplete="off" placeholder="Spell name"></label>
+      <label class="gx-field"><span>Sort</span>
+        <select id="spellsort">
+          <option value="level"${SPELL_SORT === "level" ? " selected" : ""}>Lowest level</option>
+          <option value="level-desc"${SPELL_SORT === "level-desc" ? " selected" : ""}>Highest level</option>
+          <option value="name"${SPELL_SORT === "name" ? " selected" : ""}>Name</option>
+        </select></label>
+      <label class="gx-field"><span>School</span>
+        <select id="spellschool">
+          <option value="">All schools</option>
+          ${schools.map(k => `<option value="${k}"${SPELL_SCHOOL === k ? " selected" : ""}>${
+            SPELL_SCHOOLS[k].label}</option>`).join("")}
+        </select></label>
+    </div>
+    <p class="gx-count" id="gx-count" aria-live="polite"></p>
+    <div id="gx-list">${grimoireList(sp)}</div>` : tabEmpty("Nothing on this caster's list yet.")}
+    <p class="gx-credit">${spellIconCredit()}</p>
+  </section>`;
+}
+
+function grimoireRows(sp) {
   const find = SPELL_FIND.trim().toLowerCase();
-  return `
-    <input id="spellfind" class="findbox" type="search" placeholder="Find a spell…"
-           value="${esc(SPELL_FIND)}" autocomplete="off">
-    ${groups.map(g => {
-      const rows = g.spells.filter(s => !find || s.name.toLowerCase().includes(find));
-      // Levels they cannot cast yet are folded shut: they are there so a player can see
-      // what is coming, not so they can scroll past it every time.
-      const open = g.castable || find ? " open" : "";
-      const hidden = g.total - g.spells.length;
-      return `<details${open}><summary>Level ${g.level}
-        <small>${g.total} spell${g.total === 1 ? "" : "s"}${
-          g.castable ? "" : " · not yet"}</small></summary>
-        ${rows.map(s => `
-          <div class="spellrow">
-            <div class="spellname"><b>${esc(s.name)}</b>
-              <small>${esc([s.school, s.range, s.duration].filter(Boolean).join(" · "))}</small>
-            </div>
-            <div class="prep">
-              <span class="prepcount${s.prepared ? " has" : ""}">${s.prepared || ""}</span>
-              <button class="prepbtn" data-spell="${esc(s.id)}"
-                data-action="${sp.kind === "prepared" ? "prepare" : "learn"}"
-                title="${sp.kind === "prepared" ? "Prepare this" : "Add to the book"}"
-                ${g.castable ? "" : "disabled"}>+</button>
-            </div>
-          </div>`).join("") || `<p class="note">Nothing here matches.</p>`}
-        ${hidden > 0 && !find
-          ? `<p class="note">and ${hidden} more — search to find them.</p>` : ""}
-      </details>`;
-    }).join("")}`;
+  const rows = [];
+  let total = 0;
+  for (const g of sp.choose_from || []) {
+    total += g.spells.length;
+    for (const s of g.spells) {
+      if (find && !s.name.toLowerCase().includes(find)) continue;
+      if (SPELL_SCHOOL && schoolKey(s.school) !== SPELL_SCHOOL) continue;
+      rows.push({ ...s, level: g.level, castable: g.castable });
+    }
+  }
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  rows.sort(SPELL_SORT === "name" ? byName
+    : SPELL_SORT === "level-desc" ? (a, b) => b.level - a.level || byName(a, b)
+    : (a, b) => a.level - b.level || byName(a, b));
+  return { rows, total };
+}
+
+function grimoireList(sp) {
+  const prepared = sp.kind === "prepared";
+  const action = prepared ? "prepare" : "learn";
+  const verb = prepared ? "Prepare" : "Learn";
+  const { rows, total } = grimoireRows(sp);
+  const row = s => {
+    const school = schoolKey(s.school);
+    // Cantrips need no preparing, so their row casts instead; a level not reachable yet
+    // is shown (so the player sees what is coming) but offers nothing.
+    const act = s.level === 0
+      ? `<button type="button" class="prepbtn castbtn" data-spell="${esc(s.id)}"
+           data-name="${esc(s.name)}" aria-label="Cast ${esc(s.name)}">Cast</button>`
+      : s.castable
+        ? `<button type="button" class="spbtn" data-spell="${esc(s.id)}" data-action="${action}"
+             data-name="${esc(s.name)}" aria-label="${verb} ${esc(s.name)}">${verb}</button>`
+        : `<span class="gx-notyet">Not yet</span>`;
+    const drag = s.level > 0 && s.castable;
+    return `<li class="gx-row" style="--school: var(--sc-${school})"
+        data-spell="${esc(s.id)}" data-name="${esc(s.name)}"${drag ? ` draggable="true"` : ""}>
+      <span class="gx-grip${drag ? "" : " off"}" aria-hidden="true"></span>
+      ${glyph(spellIcon(s))}
+      <span class="gx-text"><b>${esc(s.name)}</b>
+        <small>${esc([SPELL_SCHOOLS[school].label, rangePhrase(s.range),
+                      plainMeasure(s.duration)].filter(Boolean).join(", "))}</small>
+        ${s.prepared ? `<small class="gx-have">${s.prepared} prepared</small>` : ""}
+        ${detailsButton(s, "sx-more")}</span>
+      <span class="gx-lvl" title="Spell level ${s.level}"><span class="sr">Level </span>${s.level}</span>
+      ${act}
+    </li>`;
+  };
+  // A level with more spells than the sheet sends says so; the search reaches only what
+  // was sent (rules/sheet.py `_CHOOSE_PAGE`, 60 a level).
+  const unsent = (sp.choose_from || []).reduce((n, g) => n + Math.max(0, g.total - g.spells.length), 0);
+  return `${rows.length ? `<ul class="gx-rows">${rows.map(row).join("")}</ul>`
+      : `<div class="sx-empty">No spell matches.</div>`}
+    ${unsent ? `<p class="sx-note">${unsent} more on this list are not shown here.</p>` : ""}
+    <span hidden data-gx-shown="${rows.length}" data-gx-total="${total}"></span>`;
+}
+
+function redrawGrimoire() {
+  const box = document.getElementById("gx-list");
+  if (!box || !SHEET || !SHEET.spells) return;
+  box.innerHTML = grimoireList(SHEET.spells);
+  countGrimoire();
+}
+function countGrimoire() {
+  const mark = document.querySelector("#gx-list [data-gx-shown]");
+  const out = document.getElementById("gx-count");
+  if (!mark || !out) return;
+  const shown = Number(mark.dataset.gxShown), total = Number(mark.dataset.gxTotal);
+  const text = shown === total ? `${total} spell${total === 1 ? "" : "s"}`
+    : `Showing ${shown} of ${total}`;
+  // Only when it changed: the observer that calls this watches the node it writes to,
+  // and an unconditional write would wake it again forever.
+  if (out.textContent !== text) out.textContent = text;
+}
+
+// --- what the spell does ------------------------------------------------------------------
+// Owner, 2026-09-29: "the spell cards need a button to see ... the description of what the
+// spell does. For the sake of space a button might be better." One popover for the whole
+// tab, anchored to the Details button that opened it: it lies over the page rather than
+// opening inside a card, so no card below moves and no line being read is pushed down.
+// The text is the catalogue's own, from `GET /api/spells/<id>` (home_views.spell_detail),
+// fetched once a spell and kept; the sheet's spells block carries no description.
+//
+// Popover "auto" gives Esc and a click outside for free (Baseline 2025, Electron 33's
+// Chromium 130 has it); the class fallback below does both by hand for anything older.
+const SPELL_DETAIL = { cache: new Map(), button: null, downOnOpen: false, returnFocus: false };
+
+function detailsButton(sp, cls = "spbtn quiet") {
+  return `<button type="button" class="${cls} sx-details" data-details="${esc(sp.id)}"
+      data-name="${esc(sp.name)}" aria-expanded="false" aria-controls="spelldetail"
+      aria-label="Details: ${esc(sp.name)}">Details</button>`;
+}
+
+function detailPop() {
+  let p = document.getElementById("spelldetail");
+  if (p) return p;
+  p = document.createElement("div");
+  p.id = "spelldetail";
+  p.setAttribute("role", "dialog");
+  p.setAttribute("aria-labelledby", "spelldetail-h");
+  p.tabIndex = -1;
+  if (typeof p.showPopover === "function") {
+    p.setAttribute("popover", "auto");
+    p.addEventListener("toggle", e => { if (e.newState === "closed") detailClosed(); });
+  }
+  document.body.appendChild(p);
+  return p;
+}
+const detailOpen = () => {
+  const p = document.getElementById("spelldetail");
+  return !!p && (p.classList.contains("open")
+                 || (typeof p.showPopover === "function" && p.matches(":popover-open")));
+};
+
+function markDetailButton(b, open) {
+  if (!b) return;
+  b.setAttribute("aria-expanded", String(open));
+  b.textContent = open ? "Hide details" : "Details";
+  b.setAttribute("aria-label", `${open ? "Hide details" : "Details"}: ${b.dataset.name}`);
+}
+
+// Below the button when there is room, above it when there is more there; never wider
+// than the screen less its gutters, so a phone reads it whole.
+function placeDetail() {
+  const p = document.getElementById("spelldetail"), b = SPELL_DETAIL.button;
+  if (!p || !b || !detailOpen()) return;
+  const r = b.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+  if (r.bottom < 0 || r.top > vh) { closeDetail(false); return; }
+  const w = Math.min(440, vw - 24);
+  p.style.width = `${w}px`;
+  p.style.left = `${Math.round(Math.max(12, Math.min(r.left, vw - w - 12)))}px`;
+  const below = vh - r.bottom - 14, above = r.top - 14;
+  if (below >= 280 || below >= above) {
+    p.style.top = `${Math.round(r.bottom + 6)}px`; p.style.bottom = "auto";
+    p.style.maxHeight = `${Math.round(Math.max(160, below))}px`;
+  } else {
+    p.style.top = "auto"; p.style.bottom = `${Math.round(vh - r.top + 6)}px`;
+    p.style.maxHeight = `${Math.round(Math.max(160, above))}px`;
+  }
+}
+
+function detailFacts(d, level) {
+  const comps = (d.components || []).join(", ")
+    + (d.component_cost ? ` (${d.component_cost})` : "");
+  const facts = [
+    ["Level", level === null || level === undefined ? "" : String(level)],
+    ["Casting time", spellCap(d.casting_time || "")],
+    ["Components", comps],
+    ["Range", spellCap(plainMeasure(d.range))],
+    ["Area", spellCap(plainMeasure(d.area))], ["Effect", spellCap(plainMeasure(d.effect))],
+    ["Targets", spellCap(plainMeasure(d.targets))],
+    ["Duration", spellCap(plainMeasure(d.duration))],
+    ["Saving throw", spellCap(d.saving_throw || "")],
+    ["Spell resistance", spellCap(d.spell_resistance || "")],
+  ].filter(([, v]) => v);
+  return `<dl class="sd-facts">${facts.map(([k, v]) =>
+    `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
+}
+
+function detailHtml(id, name, d) {
+  const sp = (SHEET && SHEET.spells) || {};
+  const mine = (sp.known || []).find(k => k.id === id)
+    || (sp.choose_from || []).flatMap(g => g.spells.map(s => ({ ...s, level: g.level })))
+         .find(s => s.id === id) || {};
+  const head = `<div class="sd-head"><h4 id="spelldetail-h">${esc(name)}</h4>
+    <button type="button" class="spbtn quiet sd-close" aria-label="Close details of ${esc(name)}">Close</button></div>`;
+  if (!d) return `${head}<p class="sd-wait">Reading the spell.</p>`;
+  if (d.error) return `${head}<p class="sd-wait">${esc(d.error)}</p>`;
+  const school = SPELL_SCHOOLS[schoolKey(d.school)].label
+    + (d.subschool ? ` (${d.subschool})` : "")
+    + ((d.descriptors || []).length ? `, ${d.descriptors.join(", ")}` : "");
+  const text = String(d.description || "").trim();
+  return `${head}<p class="sd-school">${esc(school)}</p>
+    ${detailFacts(d, mine.level)}
+    <div class="sd-text">${text
+      ? text.split(/\n\s*\n|\n/).filter(Boolean).map(p => `<p>${esc(p)}</p>`).join("")
+      : "<p>The catalogue has no description for this spell.</p>"}</div>`;
+}
+
+async function openDetail(button) {
+  const p = detailPop();
+  const id = button.dataset.details, name = button.dataset.name;
+  if (SPELL_DETAIL.button && SPELL_DETAIL.button !== button) markDetailButton(SPELL_DETAIL.button, false);
+  SPELL_DETAIL.button = button;
+  p.style.setProperty("--school", button.closest("[style*='--school']")
+    ? button.closest("[style*='--school']").style.getPropertyValue("--school") : "var(--sc-universal)");
+  p.innerHTML = detailHtml(id, name, SPELL_DETAIL.cache.get(id));
+  if (typeof p.showPopover === "function") { if (!p.matches(":popover-open")) p.showPopover(); }
+  else p.classList.add("open");
+  markDetailButton(button, true);
+  placeDetail();
+  p.focus({ preventScroll: true });
+  if (SPELL_DETAIL.cache.has(id)) return;
+  let d;
+  try {
+    const r = await fetch(`/api/spells/${encodeURIComponent(id)}`);
+    d = await readJSON(r);
+    if (!r.ok) d = { error: d.error || "The spell could not be read." };
+  } catch (err) {
+    d = { error: err.message || "The spell could not be read." };
+  }
+  if (!d.error) SPELL_DETAIL.cache.set(id, d);
+  // Filled only if it is still this spell's popover that is open.
+  if (detailOpen() && SPELL_DETAIL.button === button) {
+    const had = p.contains(document.activeElement);
+    p.innerHTML = detailHtml(id, name, d);
+    placeDetail();
+    if (had || document.activeElement === document.body) p.focus({ preventScroll: true });
+  }
+}
+
+function closeDetail(returnFocus = true) {
+  const p = document.getElementById("spelldetail");
+  if (!p) return;
+  SPELL_DETAIL.returnFocus = returnFocus;
+  if (typeof p.showPopover === "function" && p.matches(":popover-open")) p.hidePopover();
+  if (p.classList.contains("open")) { p.classList.remove("open"); detailClosed(); }
+}
+
+// Focus goes back to the button only when the player shut it on purpose: Esc, Close, or
+// the same button again. A click elsewhere is its own answer to "where am I", so the
+// browser's light dismiss (which arrives here with no `closeDetail` call) leaves it be.
+// Unconditional once asked, because the browser's own restore picks the element focused
+// when the popover FIRST opened: opened from Magic Missile, switched to Daze, closed
+// with Close, and focus landed on Magic Missile (measured 2026-09-29).
+function detailClosed() {
+  const b = SPELL_DETAIL.button;
+  const back = SPELL_DETAIL.returnFocus === true;
+  SPELL_DETAIL.returnFocus = false;
+  markDetailButton(b, false);
+  SPELL_DETAIL.button = null;
+  if (back && b && document.contains(b)) b.focus({ preventScroll: true });
 }
 
 // --- Equipment ---
@@ -861,31 +1291,147 @@ document.addEventListener("click", e => {
   const del = e.target.closest(".delslot");
   if (del) return slotAction({action: "remove", slot: del.dataset.slot,
                               index: Number(del.dataset.index)});
-  const prep = e.target.closest(".prepbtn");
-  if (prep) return prepareSpell(prep.dataset.spell, prep.dataset.action);
+  // `data-action` is required, not implied. The Cast button carries `prepbtn` too (it is
+  // how 02-state.js's attach handler and its tests find it), and the old `.prepbtn`
+  // match sent it here with no action — which the server reads as "prepare". Measured
+  // 2026-09-29 on the old tab: every Cast press also prepared the spell once more.
+  const prep = e.target.closest("#sheetbody [data-spell][data-action]");
+  if (prep && !prep.disabled) {
+    return prepareSpell(prep.dataset.spell, prep.dataset.action, prep.dataset.name);
+  }
 });
+
+function spellsSay(text, isError = false) {
+  const out = document.getElementById("spellsay");
+  if (!out) return;
+  out.classList.toggle("err", isError);
+  // Emptied first and filled a beat later, so a region that was just redrawn still
+  // announces, and the same sentence twice is still spoken twice.
+  out.textContent = "";
+  setTimeout(() => { out.textContent = text; }, 30);
+}
 
 // The server refuses over-preparing and casting what was never prepared; the page only
 // asks. Checking the slot arithmetic here as well would be a second implementation of a
 // rule, and the one on screen is the one the player would believe.
-async function prepareSpell(spell, action) {
+//
+// The redraw keeps the reader where they were: `drawSheet` scrolls to the top, and a
+// Prepare pressed halfway down the grimoire used to throw the list away from under the
+// pointer. The scroll positions and the focused button come back after it.
+async function prepareSpell(spell, action, name) {
+  const body = $("#sheetbody");
+  const list = () => document.querySelector("#gx-list .gx-rows");
+  const keep = { top: body.scrollTop, list: list() ? list().scrollTop : 0,
+                 focus: document.activeElement && document.activeElement.dataset
+                   ? { spell: document.activeElement.dataset.spell,
+                       action: document.activeElement.dataset.action || "" } : null };
+  const who = name || spell;
   try {
     SHEET = await post("/api/spells/prepare", {action, spell});
-    drawSheet();
   } catch (e) {
-    alert(e.message);
+    spellsSay(e.message || String(e), true);
+    return;
   }
+  drawSheet();
+  body.scrollTop = keep.top;
+  if (list()) list().scrollTop = keep.list;
+  if (keep.focus && keep.focus.spell) {
+    const sel = s => document.querySelector(`#sheetbody ${s}[data-spell="${CSS.escape(keep.focus.spell)}"]`);
+    const again = (keep.focus.action && sel(`[data-action="${keep.focus.action}"]`))
+      || sel("#gx-list [data-action]") || sel(".castbtn");
+    if (again && !again.disabled) again.focus({ preventScroll: true });
+  }
+  spellsSay(action === "prepare" ? `${who} prepared.`
+    : action === "unprepare" ? `${who} unprepared.`
+    : action === "learn" ? `${who} added to the book.` : `${who} done.`);
 }
-// The spell search redraws the list as it is typed. The value is kept in SPELL_FIND
-// rather than read off the node, because `drawSheet` replaces the node — and the caret is
-// put back at the end, which is where somebody typing expects it.
+
+// Dragging a row from the grimoire into "Prepared today" prepares it (the owner's
+// mockup). The row's own Prepare button is the same act for a keyboard or a touch
+// screen, where HTML drag and drop does not reach. The drop zone lights at once and
+// nothing slides: the owner's rule is no motion that makes a page harder to use.
+let SPELL_DRAG = null;
+const dropZone = t => (t && t.closest ? t.closest("#sheetbody #sx-today") : null);
+document.addEventListener("dragstart", e => {
+  const row = e.target.closest && e.target.closest('#sheetbody .gx-row[draggable="true"]');
+  if (!row) return;
+  SPELL_DRAG = { id: row.dataset.spell, name: row.dataset.name };
+  e.dataTransfer.effectAllowed = "copy";
+  e.dataTransfer.setData("text/plain", row.dataset.name);
+  row.classList.add("dragging");
+  const zone = document.getElementById("sx-today");
+  if (zone) zone.classList.add("droppable");
+});
+document.addEventListener("dragend", () => {
+  SPELL_DRAG = null;
+  document.querySelectorAll("#sheetbody .dragging, #sheetbody .droppable, #sheetbody .dropping")
+    .forEach(el => el.classList.remove("dragging", "droppable", "dropping"));
+});
+document.addEventListener("dragover", e => {
+  const zone = dropZone(e.target);
+  if (!zone || !SPELL_DRAG) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+  zone.classList.add("dropping");
+});
+document.addEventListener("dragleave", e => {
+  const zone = dropZone(e.target);
+  if (zone && !zone.contains(e.relatedTarget)) zone.classList.remove("dropping");
+});
+document.addEventListener("drop", e => {
+  const zone = dropZone(e.target);
+  if (!zone || !SPELL_DRAG) return;
+  e.preventDefault();
+  const d = SPELL_DRAG;
+  SPELL_DRAG = null;
+  zone.classList.remove("dropping", "droppable");
+  prepareSpell(d.id, zone.dataset.drop || "prepare", d.name);
+});
+
+// Details: one button opens, the same button (now "Hide details") or Close or Esc or a
+// click outside shuts. The popover's own light dismiss runs on pointerdown, before the
+// click, so a press on the open button would shut it and then open it again; noted here
+// so the click reads "it was open" and leaves it shut (10-spells.js met the same).
+document.addEventListener("pointerdown", e => {
+  const b = e.target.closest && e.target.closest(".sx-details");
+  SPELL_DETAIL.downOnOpen = !!b && b === SPELL_DETAIL.button && detailOpen();
+}, true);
+document.addEventListener("click", e => {
+  const b = e.target.closest(".sx-details");
+  if (b) {
+    const wasOpen = SPELL_DETAIL.downOnOpen || (detailOpen() && SPELL_DETAIL.button === b);
+    SPELL_DETAIL.downOnOpen = false;
+    if (wasOpen) closeDetail(true); else openDetail(b);
+    return;
+  }
+  if (e.target.closest("#spelldetail .sd-close")) { closeDetail(true); return; }
+  // The fallback has no light dismiss of its own.
+  const p = document.getElementById("spelldetail");
+  if (p && p.classList.contains("open") && !p.contains(e.target)) closeDetail(false);
+});
+// It follows its button while the sheet scrolls, and goes when the button does (a redraw
+// after Prepare replaces every button on the tab).
+// Captured, because the grimoire's list scrolls inside the page and scroll events do not
+// bubble. A button scrolled out of sight takes its popover with it (`placeDetail`).
+$("#sheetbody").addEventListener("scroll", () => {
+  if (detailOpen()) requestAnimationFrame(placeDetail);
+}, { passive: true, capture: true });
+window.addEventListener("resize", () => { if (detailOpen()) placeDetail(); });
+new MutationObserver(() => {
+  if (SPELL_DETAIL.button && !document.contains(SPELL_DETAIL.button)) closeDetail(false);
+}).observe($("#sheetbody"), { childList: true, subtree: true });
+
+// The search, the sort and the school filter redraw the list alone: the box keeps its
+// caret and focus because it is never replaced.
 document.addEventListener("input", e => {
   const find = e.target.closest("#spellfind");
   if (!find) return;
   SPELL_FIND = find.value;
-  drawSheet();
-  const again = document.getElementById("spellfind");
-  if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+  redrawGrimoire();
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "spellsort") { SPELL_SORT = e.target.value; redrawGrimoire(); return; }
+  if (e.target.id === "spellschool") { SPELL_SCHOOL = e.target.value; redrawGrimoire(); }
 });
 document.addEventListener("change", e => {
   const input = e.target.closest(".slotinput");
@@ -939,6 +1485,7 @@ function tabBackground(s) {
         which section 10 requires travel with it. This project is not published by,
         endorsed by, or affiliated with Paizo Inc.
       </div>
+      <div class="why" style="margin-top:8px">${spellIconCredit()}</div>
     </div>
   </div>`;
 }
@@ -982,5 +1529,13 @@ $("#sheetpanel").addEventListener("click", async e => {
 
 $("#closesheet").onclick = closeSheet;
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && $("#sheetpanel").classList.contains("on")) closeSheet();
+  if (e.key !== "Escape") return;
+  // One Esc, one layer: a spell's details close first and the sheet stays open behind
+  // them. Without this the same key shut both, and focus had nowhere to go back to.
+  if (typeof detailOpen === "function" && detailOpen()) {
+    e.preventDefault();
+    closeDetail(true);
+    return;
+  }
+  if ($("#sheetpanel").classList.contains("on")) closeSheet();
 });

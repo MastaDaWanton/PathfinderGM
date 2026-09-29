@@ -1,0 +1,64 @@
+Spell and school icons
+
+The icons in this folder are from game-icons.net (https://game-icons.net), licensed under
+the Creative Commons Attribution 3.0 Unported licence (CC BY 3.0):
+https://creativecommons.org/licenses/by/3.0/
+
+Icons made by Lorc (http://lorcblog.blogspot.com), Delapouite (http://delapouite.com),
+Sbed (http://opengameart.org/content/95-game-icons) and Skoll, from game-icons.net.
+
+Changes made: the black background square of each icon was removed and the glyph's fill
+set to "currentColor", so the app can colour it by school of magic. The shapes are
+unchanged. Each file is named <author>-<icon>.svg.
+
+Fetched 2026-09-29 from the official repository, https://github.com/game-icons/icons,
+through its jsDelivr mirror (https://cdn.jsdelivr.net/gh/game-icons/icons@master/).
+
+By Lorc, CC BY 3.0:
+  lorc-acid-blob.svg            lorc/acid-blob.svg
+  lorc-bleeding-wound.svg       lorc/bleeding-wound.svg
+  lorc-broken-skull.svg         lorc/broken-skull.svg
+  lorc-candle-light.svg         lorc/candle-light.svg
+  lorc-charm.svg                lorc/charm.svg
+  lorc-crystal-ball.svg         lorc/crystal-ball.svg
+  lorc-dread-skull.svg          lorc/dread-skull.svg
+  lorc-duality-mask.svg         lorc/duality-mask.svg
+  lorc-energy-shield.svg        lorc/energy-shield.svg
+  lorc-feathered-wing.svg       lorc/feathered-wing.svg
+  lorc-fire-ray.svg             lorc/fire-ray.svg
+  lorc-fireball.svg             lorc/fireball.svg
+  lorc-glowing-hands.svg        lorc/glowing-hands.svg
+  lorc-ice-bolt.svg             lorc/ice-bolt.svg
+  lorc-lightning-branches.svg   lorc/lightning-branches.svg
+  lorc-magic-palm.svg           lorc/magic-palm.svg
+  lorc-magic-portal.svg         lorc/magic-portal.svg
+  lorc-magic-shield.svg         lorc/magic-shield.svg
+  lorc-magnifying-glass.svg     lorc/magnifying-glass.svg
+  lorc-mirror-mirror.svg        lorc/mirror-mirror.svg
+  lorc-missile-swarm.svg        lorc/missile-swarm.svg
+  lorc-potion-ball.svg          lorc/potion-ball.svg
+  lorc-prayer.svg               lorc/prayer.svg
+  lorc-psychic-waves.svg        lorc/psychic-waves.svg
+  lorc-rainbow-star.svg         lorc/rainbow-star.svg
+  lorc-run.svg                  lorc/run.svg
+  lorc-shield-reflect.svg       lorc/shield-reflect.svg
+  lorc-sleepy.svg               lorc/sleepy.svg
+  lorc-spider-web.svg           lorc/spider-web.svg
+  lorc-sprint.svg               lorc/sprint.svg
+  lorc-star-swirl.svg           lorc/star-swirl.svg
+  lorc-third-eye.svg            lorc/third-eye.svg
+  lorc-winged-sword.svg         lorc/winged-sword.svg
+
+By Delapouite, CC BY 3.0:
+  delapouite-bolt-spell-cast.svg    delapouite/bolt-spell-cast.svg
+  delapouite-healing.svg            delapouite/healing.svg
+  delapouite-invisible.svg          delapouite/invisible.svg
+  delapouite-knocked-out-stars.svg  delapouite/knocked-out-stars.svg
+  delapouite-magick-trick.svg       delapouite/magick-trick.svg
+  delapouite-oil-can.svg            delapouite/oil-can.svg
+
+By Sbed, CC BY 3.0:
+  sbed-water-drop.svg           sbed/water-drop.svg
+
+By Skoll, CC BY 3.0:
+  skoll-raise-zombie.svg        skoll/raise-zombie.svg
