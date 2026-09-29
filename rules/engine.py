@@ -2164,6 +2164,52 @@ class Engine:
             f"anybody. Somebody already here is aimed at by their own ref — here: {here}. "
             f"Somebody new comes in by {arrive}.", "refs", index)
 
+    def _check_cast_aim_ref(self, intent: Intent, index: int,
+                            extra: set[str] | None) -> None:
+        """A cast aimed at a ref nobody here holds is refused, never resolved at nobody.
+
+        Measured live 2026-09-28 (G2, gemma-4-12B, Aurvantis, the cast-area script): with
+        Kaelith Dagmar (c1) and the innkeeper (c2) in the room, "I cast burning hands at
+        the man standing nearest me" was planned `cast burning-hands at=new2` — the
+        placeholder for a person nobody introduced. Validation passed it and the engine
+        RESOLVED it: "The flames reach nobody.", `caught: []`, `no_victim: true`. The page
+        then invented a man called Dagan Havenstone and burned him, and the next turn's
+        "I cast magic missile at him" reached nobody the same way and hit him again.
+
+        Two holes, both closed here. The legacy `at` was never checked at all —
+        `_check_aim` looked only at the `aim` param. And that check lived in
+        `_check_legality`, which is not handed the refs an earlier `introduce` or `spawn`
+        in the same list will make, so `introduce` then `aim ref:new1` was refused as
+        though new1 could never exist. Here the aim is one more ref, checked with
+        `extra` beside the actor and the target, and the refusal is plan-fixable
+        (`no_such_target`, docs/fix-interfaces.md §2.6): the loop retries it with the
+        people who ARE here named, in the attack op's words (`_refuse_placeholder`).
+        """
+        from . import areas
+
+        caster = str(intent.actor or "")
+        aim = areas.aim_of(intent.params, caster)
+        if aim.kind != "ref" or self._known(aim.value, extra):
+            return
+        ref = aim.value
+        here = ", ".join(f"{r} ({a.name})" for r, a in self.scene.actors.items()
+                         if r != caster and not a.has_state("state.down.dead")) or "nobody"
+        arrive = ("a spawn written before it" if self.scene.in_encounter
+                  else "an introduce written before it (a foe arriving to fight: a spawn)")
+        if re.fullmatch(r"new[ _-]?\d+", ref.strip(), re.I):
+            from .intents import INTRODUCED_REFS
+
+            lead = (f"{ref!r} is the placeholder introduce hands out "
+                    f"({', '.join(INTRODUCED_REFS)}), and nothing earlier in this plan "
+                    f"introduces anybody.")
+        else:
+            lead = self._elsewhere(ref) or f"nobody here is {ref!r}."
+        raise IntentError(
+            f"cast: {lead} A spell is aimed at somebody here by their own ref (aim "
+            f"ref:<ref>) — here: {here}. If the player means somebody not yet in the "
+            f"scene, bring them in by {arrive} in this same plan, and aim at the ref it "
+            f"hands out.", "refs", index, code="no_such_target")
+
     def _check_refs(self, intent: Intent, index: int,
                     extra: set[str] | None = None) -> None:
         if intent.op == "introduce":
@@ -2207,6 +2253,8 @@ class Engine:
         for t in intent.targets():
             if not self._known(t, extra):
                 self._refuse_ref(intent, index, t, "target", extra)
+        if intent.op == "cast":
+            self._check_cast_aim_ref(intent, index, extra)
         # `with` was read at one production line and validated by none: the model could
         # name a ref the store holds in another room, and travel would have moved a
         # creature it could not see. Names are allowed (resolved by `_op_travel`) and
@@ -9651,8 +9699,10 @@ class Engine:
             if area.shape != "none":
                 caught = areas.caught(self.scene, area)
             else:
-                caught = intent.targets() or ([intent.params["at"]]
-                                              if intent.params.get("at") else [])
+                # The aim, not the raw `at`: they are the same ref but for `at: "self"`,
+                # which `aim_of` reads as the caster and the raw slot read as a person
+                # called "self" who was never there.
+                caught = intent.targets()
                 if not caught and aim.kind == "ref":
                     caught = [aim.value]
                 if not caught and aim.kind == "self":
@@ -10665,17 +10715,14 @@ class Engine:
         where it is the plan's choice of ref or of the aim's form."""
         from . import areas
 
-        raw = intent.params.get("aim")
         aim = self._cast_aim(intent, actor)
         cl = casting.caster_level(actor)
         shape = areas.shape_of(spell, cl)
         plan = spells_mod.casting_plan(spell, cl)
-        if raw and aim.kind == "ref" and aim.value not in self.scene.actors:
-            here = [f"{r} ({a.name})" for r, a in self.scene.actors.items()
-                    if r != actor.ref][:8]
-            raise IntentError(
-                f"cast: nobody here is {aim.value!r}. Aim at one of: "
-                f"{', '.join(here) or 'nobody'}.", "refs", index, code="no_such_target")
+        # An aim at a ref nobody holds is `_check_cast_aim_ref`'s, asked in `_check_refs`
+        # with the refs an earlier introduce or spawn in the list will make. It was asked
+        # here, of the `aim` param only and of the scene as it stands, so a legacy `at`
+        # passed unchecked and resolved at nobody (G2, 2026-09-28).
         if aim.kind == "object":
             if areas.find_object(self.scene, aim.value) is None:
                 here = areas.objects_here(self.scene)
@@ -12812,6 +12859,14 @@ def _rename_refs(raw: dict, names: dict) -> dict:
     if isinstance(params.get("sides"), dict):
         params["sides"] = {k: [swap(r) for r in v] if isinstance(v, list) else v
                            for k, v in params["sides"].items()}
+    # A cast's aim holds a person too — the legacy `at`, and `aim: ref:<ref>`. Left out,
+    # `introduce` then `cast at=new1` validated (new1 is legal after the introduce) and
+    # then resolved at "new1", a ref nobody holds: the flames reached nobody (G2).
+    if isinstance(params.get("at"), str):
+        params["at"] = swap(params["at"])
+    aim = params.get("aim")
+    if isinstance(aim, str) and aim.startswith("ref:"):
+        params["aim"] = "ref:" + swap(aim[4:])
     raw["params"] = params
     return raw
 

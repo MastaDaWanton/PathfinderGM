@@ -173,7 +173,10 @@ def aim_of(params: dict, caster_ref: str = "") -> Aim:
             return Aim()
     at = str(params.get("at") or "").strip()
     if at:
-        return Aim("self") if at == caster_ref else Aim("ref", at)
+        # `at: "self"` is the aim grammar's own word for the caster written in the legacy
+        # slot. Read as a ref it named nobody — and since G2 (2026-09-28) a ref nobody
+        # holds is refused, where it used to resolve at nobody.
+        return Aim("self") if at in (caster_ref, "self") else Aim("ref", at)
     square = params.get("square")
     if square not in (None, "", [], ()):
         return Aim("point", ",".join(str(int(v)) for v in tuple(square)))
