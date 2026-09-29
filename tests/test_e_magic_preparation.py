@@ -138,7 +138,12 @@ def campaign(tmp_path):
 
     with override_settings(CAMPAIGN_DIR=str(tmp_path / "campaigns")):
         cm._LIVE.clear()
-        yield cm.begin_with(ysolde())
+        c = cm.begin_with(ysolde())
+        # A new campaign fills the first morning (item 21.4); this test is about the
+        # warning and the Spells tab, so it starts from the emptied state.
+        c.scene.pc().prepared = {}
+        c.save()
+        yield c
         cm._LIVE.clear()
 
 

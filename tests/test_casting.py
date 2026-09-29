@@ -360,7 +360,13 @@ def wizard_campaign(tmp_path, settings):
     settings.CAMPAIGN_DIR = str(tmp_path)
     from play import campaign as campaign_mod
 
-    return campaign_mod.begin_with(wizard(prepared={}))
+    c = campaign_mod.begin_with(wizard(prepared={}))
+    # A new campaign fills a prepared caster's first morning (item 21.4); these tests are
+    # about preparing over the wire, so they start from the emptied state a day's casting
+    # leaves.
+    c.scene.pc().prepared = {}
+    c.save()
+    return c
 
 
 def test_preparing_over_the_wire(client, wizard_campaign):

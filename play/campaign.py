@@ -594,6 +594,13 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     # company — `Scene.add` stamps whoever arrives with the party's place, and the
     # review found the other order left the opening companion standing nowhere.
     scene.add(pc, zone="near")
+    # The first morning's preparation (playtest item 21.4, 2026-09-28): a wizard began
+    # with fifty spells in the book and none prepared, so the first cast of the campaign
+    # was refused. `ensure_prepared` fills the empty slots from the book in 1e's order
+    # and leaves a list caster (Q39) empty with the sheet's warning.
+    from rules import casting
+
+    casting.ensure_prepared(pc, reason="start")
     Engine(scene, Dice(seed), world=world).place_party()
     if doc is not None:
         c = Campaign(id=campaign_id, world_source=str(world_source), scene=scene,

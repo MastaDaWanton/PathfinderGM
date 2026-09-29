@@ -73,6 +73,9 @@ def table(tmp_path, monkeypatch):
 
         def begin(prepared):
             c = cm.begin_with(ysolde(prepared))
+            # A new campaign fills the first morning (item 21.4); each test names the
+            # prepared list it is about, so that list is put back as asked.
+            c.scene.pc().prepared = dict(prepared)
             man = c.scene.add(instantiate("guildhand", scene=c.scene,
                                           name="the man in a stained jerkin"))
             for ref in [r for r in c.scene.people if r not in ("pc", man.ref)]:

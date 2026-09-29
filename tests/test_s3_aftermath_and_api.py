@@ -636,11 +636,10 @@ def test_every_new_state_key_is_there_at_its_default(game):
     assert s["scene"]["day_part"] == residency.day_part(c.scene.clock_minutes)
     if s["scene"]["grid"] is not None:
         assert s["scene"]["grid"]["areas"] == []
-    # A wizard with a book and nothing prepared: the Spells button shows, and says so —
-    # and since Lane E the sheet's warning has the slots to name: Thessaly's two level 1
-    # slots (1 + her Intelligence bonus spell), both empty.
-    assert s["spellcasting"] == {"kind": "prepared", "nothing_prepared": True,
-                                 "empty_slots": {"1": 2}}
+    # A wizard's first morning is filled from her book since item 21.4's fix (2026-09-28),
+    # so the Spells button shows with nothing left empty; the warning's shape is Lane E's.
+    assert s["spellcasting"] == {"kind": "prepared", "nothing_prepared": False,
+                                 "empty_slots": {}}
     # Lane C (2026-09-28): a new campaign opens on a start document, so `start` carries
     # it; its shape is still §2.10's, read through the one helper.
     from play import views

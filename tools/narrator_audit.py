@@ -504,11 +504,16 @@ def audit(turns: int, script: str, world: str, character: str,
                     why = json.dumps(r.json())[:200]
                 except Exception:
                     why = (r.content or b"")[:200].decode("utf-8", "replace")
-                tally["turn-failed"] += 1
-                rows.append({"n": n, "said": said, "faults": ["turn-failed"],
+                # A 422 is the player-fixable refusal (docs/fix-interfaces.md §2.6):
+                # no turn was spent and the reason came back in plain words, which is
+                # the refusal working, not the narrator failing. Counted apart so a run
+                # full of "prepare it first" does not read as a broken table.
+                fault = "refused" if r.status_code == 422 else "turn-failed"
+                tally[fault] += 1
+                rows.append({"n": n, "said": said, "faults": [fault],
                              "status": r.status_code, "why": why,
                              "seconds": round(seconds, 1)})
-                print(f"  turn {n + 1:3d}  {seconds:5.1f}s  turn-failed "
+                print(f"  turn {n + 1:3d}  {seconds:5.1f}s  {fault} "
                       f"({r.status_code} {why[:80]})")
                 if _unreachable(r.status_code, why):
                     unreachable += 1
