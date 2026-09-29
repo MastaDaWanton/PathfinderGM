@@ -472,6 +472,9 @@ def test_the_bench_says_why_foraging_is_refused_before_it_is_pressed(client):
     # in a real campaign at all.
     for ref in [r for r in c.scene.actors if r != "pc"]:
         c.scene.depart(ref)
+    # And no fight: since I1 placed the road starts this seed opens on the caravan
+    # attack, whose initiative outlives the attackers leaving the board.
+    c.scene.end_encounter()
     assert client.get("/api/forage/table").json()["busy"] == ""
 
     c.scene.add(instantiate("thug", scene=c.scene, name="the thug"))

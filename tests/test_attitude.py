@@ -245,6 +245,11 @@ def test_a_shopkeeper_who_dislikes_you_will_not_serve_you(tmp_path):
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # Whatever the draw opened on, no fight follows the party to the market: since
+        # I1 placed the road starts this seed opens on the caravan attack, and a counter
+        # is not staffed in the middle of an encounter (the test teleports, it does not
+        # walk away from the fight).
+        c.scene.end_encounter()
         c.scene.location_id = TOWN
         c.engine().place_party(MARKET)
         c.save()
