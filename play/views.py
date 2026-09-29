@@ -3421,7 +3421,72 @@ def _row(item, price: float, count: int = 1) -> dict:
             # when the answer is nothing — worth showing beside the number. A weapon, a
             # suit of armour and a horse are all things the engine runs (I2).
             "does_something": bool(getattr(item, "specs", None))
-            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")}
+            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount"),
+            # I7, the trade window: which side tab and card mark the row is filed under,
+            # and whether the counter can sell more than one. The rows said neither — a
+            # carried jar's id is "willow-bark-tea#1" and a bench material's is bare, so
+            # the page could not have told a potion from a lump of bismuth.
+            "shelf": _shelf_of(item),
+            "staple": bool(getattr(item, "staple", False))}
+
+
+# The trade window's categories (I7), in the player's words and in the order its side
+# tabs show them.
+SHELVES = ("weapons", "armour", "consumables", "gear", "magic", "valuables", "materials",
+           "animals")
+_VALUABLE = re.compile(
+    r"\b(?:gems?|jewel\w*|pearls?|rub(?:y|ies)|emeralds?|sapphires?|diamonds?|opals?|"
+    r"garnets?|amethysts?|topaz|jade|onyx|agate|ivory|necklace|brooch|bracelet|earrings?|"
+    r"circlet|crown|chalice|goblet|idol|statuette|figurine|coins?|ingot)\b", re.I)
+
+
+def _shelf_of(item) -> str:
+    """Which of `SHELVES` a row belongs on: a good's own kind first, a carried jar's own
+    fields next, and its name last — the order `goods.kind_of` files a purchase in, and
+    for the same reason: what a thing *is* beats what it is called. One answer for both
+    columns, so a potion is a consumable whether it is on your side or theirs."""
+    from rules import goods
+    from rules.crafting import Stock
+
+    kind = str(getattr(item, "kind", "") or "")
+    name = str(getattr(item, "name", "") or "")
+    if kind in ("mount", "tack"):
+        return "animals"
+    if kind == "weapon" or getattr(item, "weapon", None):
+        return "weapons"
+    if kind in ("armour", "shield") or getattr(item, "armour", None):
+        return "armour"
+    if isinstance(item, Stock):
+        if item.holds_spell or item.enhancement or item.craft == "enchanter":
+            return "magic"
+        if kind in ("ore", "intermediate"):
+            return "materials"
+        table = goods.kind_of(name)
+        if table == "weapon":
+            return "weapons"
+        if table in ("armour", "shield"):
+            return "armour"
+        if (item.how or item.craft in ("herbalist", "herbalism", "alchemist")
+                or table == "consumable" or name.lower() in _food_names()):
+            return "consumables"
+        return "valuables" if _VALUABLE.search(name) else "gear"
+    if not isinstance(item, goods.Good):
+        # A bench's material: the enchanter's finished wondrous items are things to use,
+        # everything else is what a workshop makes things from.
+        return "magic" if kind == "wondrous" else "materials"
+    if goods._category(item.key) in ("food", "provisions") \
+            or goods.kind_of(name) == "consumable":
+        return "consumables"
+    return "gear"
+
+
+def _food_names() -> frozenset:
+    """A loaf of bread bought at a counter is carried as a plain jar named "loaf of bread"
+    (`goods.deliver`); the gear list's food rows are how it is known for food."""
+    from rules import goods
+
+    return frozenset(str(e["name"]).lower() for e in goods.GEAR.values()
+                     if e.get("category") in ("food", "provisions"))
 
 
 @require_POST

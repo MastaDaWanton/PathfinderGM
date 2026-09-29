@@ -9868,7 +9868,7 @@ class Engine:
             effects=[{"ref": actor.ref, "kind": "bought", "item": found.name,
                       "count": count, "paid_cp": cp}] + arrived,
             tell=f"{actor.name} pays {who} {pricing.as_text(price)} for "
-                 + (f"{count * per} {found.unit} of {found.name}"
+                 + (f"{goods.measure(count * per, found.unit)} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
                  + f". ({goods.purse_line(actor.purse, coins)} left.)" + arrived_tell,
             because=intent.because,

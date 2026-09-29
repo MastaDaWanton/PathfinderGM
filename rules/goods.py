@@ -277,7 +277,7 @@ def describe(name: str, count: int = 1) -> str:
     unit = unit_for(name)
     # Measured goods read as a quantity, not a tally: fifty feet of rope, never
     # "50 × rope", which is what the count alone said.
-    head = (f"{name} — {count} {unit}" if unit
+    head = (f"{name} — {measure(count, unit)}" if unit
             else f"{count} × {name}" if count != 1 else str(name))
     if entry is None:
         return (head if unit else f"{head} — carried; "
@@ -407,7 +407,17 @@ class Good:
 
     @property
     def label(self) -> str:
-        return f"{self.name} ({self.per} {self.unit})" if self.unit else self.name
+        # "animal feed (1 day)", not "(1 days)": the unit is written plural in the tables
+        # ("days", "hours") and one of it is singular. Seen on the trade window
+        # (docs/fix-interfaces.md, I7). "ft" is its own singular.
+        return f"{self.name} ({measure(self.per, self.unit)})" if self.unit else self.name
+
+
+def measure(n: int, unit: str) -> str:
+    """"1 day", "2 days", "50 ft": a count in its unit, singular for one. The tables write
+    the unit plural, and the trade window showed "animal feed (1 days)" (I7); the buy tell
+    reads this too, so the two cannot disagree."""
+    return f"{n} {unit.removesuffix('s') if n == 1 else unit}"
 
 
 GOOD_PREFIX = "gear:"

@@ -11,20 +11,175 @@
    All three, and the third is why this screen exists rather than a better prompt:
    picking a jar off a list and being paid for it has nothing in it for a model to
    decide, so it goes straight to the engine the way the combat panel does. */
-let TRADE = null, PICK = null;
+let TRADE = null;
+
+/* The trade window, after the owner's mockup (I7, 2026-09-29): what you carry on the
+   left as a list filed under tabs down its side, the deal in the middle as a basket with
+   one button, their wares on the right as cards. Before it, the middle column held one
+   picked thing at a time and a button that paid for that one thing; the basket is what
+   every shop screen since the Ultima VII-era barter window does, and what the owner drew.
+
+   The basket is the page's until the button is pressed, and nothing else: no coin moves
+   and nothing is reserved. Each line goes to the engine as its own `buy` or `sell` op on
+   /api/trade/do, sales first so their coin can pay for the purchases, exactly as if the
+   player had pressed the old Pay button once per line. One basket per counter, so the
+   armorer's deal is not the general store's, and walking away (closing) empties them. */
+const TRADE_DEALS = new Map();
+let TRADE_SHELF = "all";
+
+// The side tabs and the cards' category marks, in the order the tabs run. The ids are
+// the server's `shelf` (`play/views.py` SHELVES); the words are the player's.
+const TRADE_SHELVES = {
+  weapons:     { label: "Weapons",          icon: "lorc-broadsword" },
+  armour:      { label: "Armour",           icon: "lorc-breastplate" },
+  consumables: { label: "Consumables",      icon: "lorc-bubbling-flask" },
+  gear:        { label: "Gear",             icon: "lorc-knapsack" },
+  magic:       { label: "Magic items",      icon: "lorc-gem-pendant" },
+  valuables:   { label: "Valuables",        icon: "lorc-gems" },
+  materials:   { label: "Materials",        icon: "skoll-pestle-mortar" },
+  animals:     { label: "Animals and tack", icon: "delapouite-horse-head" },
+};
+// A thing gets its own picture where the match is plain at 20px, read off its name within
+// its shelf; everything else wears its shelf's picture, which is always true and never a
+// guess (the Spells page's rule, I5). First match wins, so the crossbow is asked before
+// the bow.
+const TRADE_ITEM_ICONS = {
+  weapons: [
+    [/crossbow/, "carl-olsen-crossbow"],
+    [/\b(arrows?|bolts?|bullets?|cartridges?|pellets?|shot)\b/, "lorc-arrow-cluster"],
+    [/pistol|musket|rifle|blunderbuss|firearm|\bguns?\b/, "skoll-musket"],
+    [/bow\b/, "delapouite-bow-arrow"],
+    [/axe\b/, "lorc-battle-axe"],
+    [/hammer|maul\b/, "delapouite-warhammer"],
+    [/mace|morningstar|morning star/, "delapouite-flanged-mace"],
+    [/club|cudgel|\bsap\b/, "delapouite-wood-club"],
+    [/quarterstaff|\bstaff\b/, "delapouite-bo"],
+    [/dagger|knife|kukri|stiletto|\bdirk\b|kerambit/, "lorc-plain-dagger"],
+    [/trident/, "lorc-trident"],
+    [/spear|javelin|lance\b|\bpike\b|pilum/, "lorc-spears"],
+    [/halberd|glaive|guisarme|ranseur|bardiche|corbin|fauchard|lucerne|poleaxe|polearm/,
+     "lorc-halberd"],
+    [/flail|nunchaku/, "delapouite-flail"],
+    [/whip/, "lorc-whip"],
+    [/sling/, "delapouite-sling"],
+    [/scythe|sickle|\bkama\b/, "lorc-scythe"],
+  ],
+  armour: [
+    [/shield|buckler/, "willdabeast-round-shield"],
+    [/chain|mail shirt/, "lorc-mail-shirt"],
+    [/scale/, "lorc-scale-mail"],
+    [/leather|padded|\bhide\b|studded/, "delapouite-leather-armor"],
+  ],
+  gear: [
+    [/rope/, "delapouite-rope-coil"], [/torch/, "delapouite-torch"],
+    [/lantern|\blamp\b/, "lorc-lantern-flame"], [/\btent\b/, "delapouite-camping-tent"],
+    [/backpack/, "delapouite-backpack"], [/bedroll|blanket/, "delapouite-sleeping-bag"],
+    [/waterskin/, "delapouite-water-flask"], [/flint/, "delapouite-flint-spark"],
+    [/healer/, "delapouite-first-aid-kit"], [/grappling|climber/, "lorc-grapple"],
+    [/crowbar/, "delapouite-crowbar"], [/hammer|piton/, "lorc-claw-hammer"],
+    [/\bsack\b|pouch/, "lorc-swap-bag"], [/mirror/, "lorc-mirror-mirror"],
+    [/thieves|lockpick/, "delapouite-lockpicks"], [/holy symbol/, "lorc-holy-symbol"],
+    [/manacle|shackle/, "lorc-manacles"], [/candle/, "lorc-candle-light"],
+    [/\bink\b|paper|quill/, "lorc-quill-ink"], [/whistle/, "delapouite-whistle"],
+    [/\bnet\b/, "lorc-fishing-net"], [/outfit|clothes|clothing/, "delapouite-clothes"],
+    [/caltrop/, "delapouite-caltrops"],
+  ],
+  consumables: [
+    [/bread|\bloaf\b/, "delapouite-bread"], [/cheese/, "lorc-cheese-wedge"],
+    [/\bmeat\b/, "lorc-meat"], [/\bale\b|beer|mead/, "lorc-beer-stein"],
+    [/wine/, "delapouite-wine-bottle"], [/meal|ration|stew/, "delapouite-hot-meal"],
+    [/potion|elixir|tincture|draught|tonic|\btea\b|brew|philt/, "caro-asercion-round-potion"],
+    [/antitoxin|antidote|\bvial\b|\boil\b/, "sbed-vial"],
+  ],
+  magic: [
+    [/\bring\b/, "delapouite-ring"], [/cloak|cape|mantle/, "lucasms-cloak"],
+    [/belt|girdle/, "lucasms-belt"], [/bracer/, "skoll-bracers"],
+    [/boots|slippers/, "lorc-boots"], [/wand|\brod\b|\bstaff\b/, "lorc-crystal-wand"],
+    [/amulet|necklace|periapt|pendant/, "lorc-gem-necklace"],
+    [/elixir|potion/, "caro-asercion-round-potion"],
+  ],
+  valuables: [
+    [/coins?\b|ingot/, "delapouite-two-coins"], [/\bring\b/, "delapouite-ring"],
+    [/necklace|pendant|amulet/, "lorc-gem-necklace"],
+  ],
+  materials: [
+    [/\bore\b|ingot|iron|steel|silver|gold|copper|bronze|brass|\blead\b|zinc|pewter|bismuth|metal|mithral|adamant|\btin\b/,
+     "lorc-metal-bar"],
+  ],
+  animals: [
+    [/horse|pony/, "delapouite-horse-head"], [/camel/, "delapouite-camel-head"],
+    [/\bdog\b|mastiff/, "delapouite-sitting-dog"], [/donkey|mule/, "skoll-donkey"],
+    [/feed|fodder|grain|oats/, "lorc-wheat"],
+    [/saddle|bridle|\bbit\b|harness|barding/, "delapouite-saddle"],
+  ],
+};
+// Said once, in the player's words. It was "nothing the engine can run", in red, on the
+// tack (the owner, 2026-09-29): developer language, and an alarm for what is only the
+// reason a price is low.
+const TRADE_INERT = "for show, no effect in play";
+
+const tradeShelf = x => (TRADE_SHELVES[x.shelf] ? x.shelf : "gear");
+function tradeIcon(x) {
+  const shelf = tradeShelf(x);
+  const name = String(x.name || "").toLowerCase();
+  const hit = (TRADE_ITEM_ICONS[shelf] || []).find(([re]) => re.test(name));
+  return hit ? hit[1] : TRADE_SHELVES[shelf].icon;
+}
+const tradeGlyph = (name, cls = "") =>
+  `<i class="tgi${cls ? " " + cls : ""}" data-icon="${esc(name)}" aria-hidden="true"></i>`;
+// "Uncommon", only when it is not common: a line saying "common" under every rope and
+// torch said nothing, forty times.
+const tradeRarity = x => (x.tier && x.tier !== "common"
+  ? x.tier.charAt(0).toUpperCase() + x.tier.slice(1) : "");
+
+// Beside this script, wherever the server put it, the way 05-sheet.js finds the spell
+// icons: "/static/js/table/06-trade-and-page.js?v=..." resolves "../../icons/items/" to
+// "/static/icons/items/" in the browser and the packaged app alike. Inlined by fetch, not
+// used as a CSS mask, for I5's reason: a mask needs the static server to call the file
+// image/svg+xml, which on Windows is the registry's answer, not ours.
+const TRADE_ICON_BASE = (() => {
+  const s = document.querySelector('script[src*="js/table/06-trade-and-page.js"]');
+  try { return new URL("../../icons/items/", s.src).href; }
+  catch { return "/static/icons/items/"; }
+})();
+const TRADE_ICON_SVG = new Map();
+function paintTradeIcons(root) {
+  if (!root) return;
+  const want = new Set();
+  root.querySelectorAll("i.tgi[data-icon]").forEach(i => {
+    if (i.firstChild) return;
+    const svg = TRADE_ICON_SVG.get(i.dataset.icon);
+    if (typeof svg === "string") i.innerHTML = svg;
+    else want.add(i.dataset.icon);
+  });
+  for (const name of want) {
+    if (TRADE_ICON_SVG.has(name)) continue;       // already on its way
+    TRADE_ICON_SVG.set(name, null);
+    // Only names from the tables above reach here, so the path cannot be steered.
+    fetch(TRADE_ICON_BASE + encodeURIComponent(name) + ".svg")
+      .then(r => (r.ok ? r.text() : ""))
+      .then(text => {
+        const svg = text.includes("<svg") ? text : "";
+        TRADE_ICON_SVG.set(name, svg);
+        if (svg) document.querySelectorAll(`#tradepanel i.tgi[data-icon="${CSS.escape(name)}"]`)
+          .forEach(i => { if (!i.firstChild) i.innerHTML = svg; });
+      })
+      .catch(() => TRADE_ICON_SVG.set(name, ""));
+  }
+}
 
 // `want` is what the player's own words set out to buy ("a coil of rope"): the turn
-// that said it opens this panel with the thing already picked, and the server matches
-// it against the real shelf — or says the keeper has none, and picks nothing
-// (2026-09-27, the user's ruling: a purchase "should open the trade tab").
+// that said it opens this panel with the thing already in the basket, and the server
+// matches it against the real shelf, or says the keeper has none, and puts nothing in
+// (2026-09-27, the user's ruling: a purchase "should open the trade tab [potentially
+// with Rope in the basket]").
 // `line` is one of a market's counters (I2: the general store, the armorer, a stall…);
 // left out, the server opens on the counter that sells what was wanted, else the one
-// the player is talking to, else the general store — never the market's master.
+// the player is talking to, else the general store, never the market's master.
 async function openTrade(want, line) {
   $("#tradepanel").classList.add("on");
   $("#tradepanel").setAttribute("aria-hidden", "false");
   $("#trademsg").textContent = "";
-  PICK = null;
   const body = {};
   if (typeof want === "string" && want) body.want = want;
   if (typeof line === "string" && line) body.line = line;
@@ -37,17 +192,31 @@ async function openTrade(want, line) {
     $("#trademsg").textContent = e.message;
     return;
   }
-  if (TRADE.pick) PICK = { side: "buy", id: TRADE.pick };
+  // Put in once, not once per mention: a second "I buy rope" opens on the same basket.
+  if (TRADE.pick && !tradeDeal().some(l => l.side === "buy" && l.id === TRADE.pick)) {
+    tradeAdd("buy", TRADE.pick, false);
+  }
   if (TRADE.want_line) $("#trademsg").textContent = TRADE.want_line;
   drawTrade();
-  const picked = PICK && document.querySelector(
-    `#tradtheirs [data-id="${CSS.escape(PICK.id)}"]`);
-  if (picked) picked.scrollIntoView({ block: "nearest" });
+  const card = (TRADE.pick && document.querySelector(
+    `#tradtheirs [data-id="${CSS.escape(TRADE.pick)}"]`))
+    || document.querySelector("#tradtheirs .tr-card");
+  if (card) {
+    card.scrollIntoView({ block: "nearest" });
+    card.focus({ preventScroll: true });
+  }
 }
 
 async function closeTrade() {
+  // The keyboard goes back to the button that opened the window, not to the top of the
+  // page, which is where a hidden panel's lost focus lands.
+  if ($("#tradepanel").contains(document.activeElement) && !$("#tradeaction").disabled) {
+    $("#tradeaction").focus({ preventScroll: true });
+  }
   $("#tradepanel").classList.remove("on");
   $("#tradepanel").setAttribute("aria-hidden", "true");
+  // Walking away from the counter puts everything back on it.
+  TRADE_DEALS.clear();
   // The purse and the satchel have both moved; the page behind this is now stale, and
   // the transcript has gained a line for every trade that happened.
   render(await getState());
@@ -64,19 +233,91 @@ function reflectMerchant(s) {
   const who = (s && s.merchant) || "";
   btn.disabled = !who;
   btn.title = who ? `Trade with ${who}`
-                  : "Nobody here keeps a counter — say what you sell or buy, "
+                  : "Nobody here keeps a counter. Say what you sell or buy, "
                     + "or find a stall.";
 }
 
-function tradeRow(x, side) {
-  const on = PICK && PICK.side === side && PICK.id === x.id ? " on" : "";
-  return `<button class="traderow${on}" data-side="${side}" data-id="${esc(x.id)}">
-    <span><b>${esc(x.name)}</b>${x.count > 1 ? ` ×${x.count}` : ""}
-      <span class="why${x.does_something ? "" : " inert"}">${
-        x.tier}${x.does_something ? "" : " · nothing the engine can run"}</span></span>
-    <span class="gp">${esc(x.price)}</span></button>`;
+// --- the basket ---------------------------------------------------------------------
+// This counter's lines, in the order they were put in: [{side, id, n}].
+function tradeDeal() {
+  const key = (TRADE && (TRADE.line || TRADE.stall)) || "";
+  if (!TRADE_DEALS.has(key)) TRADE_DEALS.set(key, []);
+  return TRADE_DEALS.get(key);
+}
+const tradeRowOf = (side, id) =>
+  ((side === "sell" ? TRADE.mine : TRADE.theirs) || []).find(r => r.id === id);
+// How many one line can hold: what you carry of it, or, at their side, as many as you
+// like of a thing the counter always stocks (rope, a longsword) and the one there is of
+// a thing drawn onto today's shelf (the engine sells a drawn thing once).
+function tradeMax(side, x) {
+  if (!x) return 0;
+  if (side === "sell") return Math.max(0, x.count || 0);
+  return x.staple ? 99 : Math.max(1, x.count || 1);
+}
+function tradeAdd(side, id, draw = true) {
+  const x = tradeRowOf(side, id);
+  if (!x) return;
+  const lines = tradeDeal();
+  const have = lines.find(l => l.side === side && l.id === id);
+  if (have) have.n = Math.min(tradeMax(side, x), have.n + 1);
+  else lines.push({ side, id, n: 1 });
+  if (draw) tradeRedraw();
+}
+function tradeStep(side, id, by) {
+  const lines = tradeDeal();
+  const l = lines.find(y => y.side === side && y.id === id);
+  if (!l) return;
+  l.n = Math.max(1, Math.min(tradeMax(side, tradeRowOf(side, id)), l.n + by));
+  tradeRedraw();
+}
+function tradeDrop(side, id) {
+  const lines = tradeDeal();
+  const at = lines.findIndex(l => l.side === side && l.id === id);
+  if (at >= 0) lines.splice(at, 1);
+  tradeRedraw();
 }
 
+// A line whose thing has gone (sold out, or no longer carried) leaves the basket, and a
+// count above what there is comes down to it.
+function tradeTidy() {
+  const lines = tradeDeal();
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const x = tradeRowOf(lines[i].side, lines[i].id);
+    if (!x || tradeMax(lines[i].side, x) < 1) lines.splice(i, 1);
+    else lines[i].n = Math.min(lines[i].n, tradeMax(lines[i].side, x));
+  }
+  return lines;
+}
+
+// Everything the button needs to know, in copper so nothing drifts by a rounding: the
+// sales first, each capped by what is still in the till after the ones before it (a
+// stall short of the asking price puts down what it has, and taking it is the player's
+// call: "i can still sell to them if i am willing to any get what they can give").
+function tradeSums() {
+  const cp = gp => Math.round((gp || 0) * 100);
+  let till = Math.max(0, cp(TRADE.till.gp));
+  const out = { buys: [], sells: [], buy: 0, ask: 0, got: 0 };
+  for (const l of tradeTidy()) {
+    const x = tradeRowOf(l.side, l.id);
+    const worth = cp(x.gp) * l.n;
+    if (l.side === "buy") {
+      out.buys.push({ ...l, x, worth });
+      out.buy += worth;
+    } else {
+      const got = Math.min(worth, till);
+      till -= got;
+      out.sells.push({ ...l, x, worth, got });
+      out.ask += worth;
+      out.got += got;
+    }
+  }
+  out.net = out.buy - out.got;                    // > 0: you pay; < 0: you take
+  out.purse = cp(TRADE.purse_gp);
+  out.short = Math.max(0, out.buy - out.got - out.purse);
+  return out;
+}
+
+// --- drawing ------------------------------------------------------------------------
 // The market's counters, as the sheet's tab strip. Only at a market: a smithy or an
 // inn is one counter, and a strip of one tab is noise.
 function drawLines() {
@@ -86,7 +327,7 @@ function drawLines() {
   nav.innerHTML = lines.map(l => {
     const on = l.id === TRADE.line;
     return `<button type="button" role="tab" data-line="${esc(l.id)}"
-      aria-selected="${on}" title="${esc(l.seller ? `${l.label} — ${l.seller}` : l.label)}"
+      aria-selected="${on}" title="${esc(l.seller ? `${l.label}, kept by ${l.seller}` : l.label)}"
       >${esc(l.label.replace(/^the /, ""))}</button>`;
   }).join("");
   // On a phone the strip scrolls: the counter a purchase opened on (the horse lines,
@@ -97,7 +338,6 @@ function drawLines() {
 
 async function switchLine(id) {
   if (!TRADE || id === TRADE.line) return;
-  PICK = null;
   $("#trademsg").textContent = "";
   try {
     TRADE = await post("/api/trade", { line: id });
@@ -125,50 +365,173 @@ function drawTrade() {
   drawLines();
   $("#tradepurse").textContent = TRADE.purse;
   $("#tradetill").textContent = `${TRADE.till.text} in the till`;
-  $("#tradmine").innerHTML = TRADE.mine.length
-    ? TRADE.mine.map(x => tradeRow(x, "sell")).join("")
-    : `<div class="empty">You are carrying nothing anyone would buy.</div>`;
-  $("#tradtheirs").innerHTML = TRADE.theirs.length
-    ? TRADE.theirs.map(x => tradeRow(x, "buy")).join("")
-    : `<div class="empty">The stall is bare today.</div>`;
+  tradeRedraw();
+}
+
+// Everything the basket touches, redrawn together, with the keyboard's place kept: a
+// press of + on a stepper redraws the line it is on, and the focus has to still be on
+// that + afterwards or the next press goes nowhere.
+function tradeRedraw() {
+  const a = document.activeElement;
+  const hold = a && $("#tradepanel").contains(a) && a.closest("[data-id]")
+    ? { id: a.closest("[data-id]").dataset.id, side: a.closest("[data-side]").dataset.side,
+        role: a.dataset.act || (a.classList.contains("tr-line") ? "line" : "item"),
+        where: a.closest("#tradewhat") ? "#tradewhat" : a.closest("#tradmine")
+          ? "#tradmine" : "#tradtheirs" }
+    : a && a.closest && a.closest("#tradeshelves") ? { shelf: a.dataset.shelf } : null;
+  tradeTidy();
+  drawMine();
+  drawWares();
   drawDeal();
+  paintTradeIcons($("#tradepanel"));
+  if (!hold) return;
+  let back = null;
+  if (hold.shelf) {
+    back = document.querySelector(`#tradeshelves [data-shelf="${CSS.escape(hold.shelf)}"]`);
+  } else {
+    const box = document.querySelector(`${hold.where} [data-side="${hold.side}"][data-id="${
+      CSS.escape(hold.id)}"]`);
+    back = box && (hold.role === "line" || hold.role === "item" ? box
+      : box.querySelector(`[data-act="${hold.role}"]:not(:disabled)`) || box);
+    // A removed line hands the focus to the one after it, else to the button.
+    if (!back && hold.where === "#tradewhat") {
+      back = document.querySelector("#tradewhat .tr-line") || $("#tradego");
+    }
+  }
+  if (back) back.focus({ preventScroll: true });
+}
+
+function drawMine() {
+  const mine = TRADE.mine || [];
+  const nav = $("#tradeshelves");
+  const counts = {};
+  for (const x of mine) counts[tradeShelf(x)] = (counts[tradeShelf(x)] || 0) + 1;
+  const shelves = Object.keys(TRADE_SHELVES).filter(k => counts[k]);
+  if (TRADE_SHELF !== "all" && !counts[TRADE_SHELF]) TRADE_SHELF = "all";
+  nav.hidden = !mine.length;
+  const tab = (id, label, icon, n) => {
+    const on = TRADE_SHELF === id;
+    return `<button type="button" role="tab" data-shelf="${id}" aria-selected="${on}"
+      tabindex="${on ? 0 : -1}" aria-controls="tradmine" aria-label="${esc(label)}, ${n}">
+      ${tradeGlyph(icon)}<span class="tr-lab">${esc(label)}</span><small>${n}</small></button>`;
+  };
+  nav.innerHTML = tab("all", "All", "lorc-knapsack", mine.length)
+    + shelves.map(k => tab(k, TRADE_SHELVES[k].label, TRADE_SHELVES[k].icon, counts[k]))
+      .join("");
+  // Sorted by name within a tab: this is a list you look something up in.
+  const shown = mine.filter(x => TRADE_SHELF === "all" || tradeShelf(x) === TRADE_SHELF)
+    .slice().sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const inDeal = new Set(tradeDeal().filter(l => l.side === "sell").map(l => l.id));
+  $("#tradmine").setAttribute("aria-label",
+    TRADE_SHELF === "all" ? "Everything you carry" : TRADE_SHELVES[TRADE_SHELF].label);
+  $("#tradmine").innerHTML = shown.length ? shown.map(x => {
+    // Rarity only. "For show" is said once, on the deal's line, where the price is
+    // decided: under every row it was eight lines of the same sentence in a pack of eight.
+    const notes = tradeRarity(x) ? `<span class="tr-rare">${esc(tradeRarity(x))}</span>` : "";
+    return `<button type="button" class="traderow${inDeal.has(x.id) ? " on" : ""}"
+      data-side="sell" data-id="${esc(x.id)}"
+      aria-label="Sell ${esc(x.name)}${x.count > 1 ? `, you have ${x.count}` : ""}, ${
+        esc(x.price)}${x.count > 1 ? " each" : ""}">
+      ${tradeGlyph(tradeIcon(x))}
+      <span class="tr-nm"><b>${esc(x.name)}</b>${
+        x.count > 1 ? ` <span class="tr-n">×${x.count}</span>` : ""}${
+        notes ? `<span class="tr-note">${notes}</span>` : ""}</span>
+      <span class="gp">${esc(x.price)}${x.count > 1 ? "<small>each</small>" : ""}</span>
+    </button>`;
+  }).join("") : `<p class="tr-empty">${mine.length
+    ? "Nothing of that kind in your pack."
+    : "You are carrying nothing a shop would buy."}</p>`;
+}
+
+function drawWares() {
+  const theirs = TRADE.theirs || [];
+  const n = new Map(tradeDeal().filter(l => l.side === "buy").map(l => [l.id, l.n]));
+  $("#tradtheirs").innerHTML = theirs.length ? theirs.map(x => {
+    const shelf = TRADE_SHELVES[tradeShelf(x)];
+    const inDeal = n.get(x.id);
+    return `<button type="button" class="tr-card${inDeal ? " in" : ""}" data-side="buy"
+      data-id="${esc(x.id)}" aria-label="Buy ${esc(x.name)}${
+        tradeRarity(x) ? ` (${esc(tradeRarity(x).toLowerCase())})` : ""}, ${esc(x.price)}${
+        inDeal ? `, ${inDeal} in the deal` : ""}">
+      ${tradeGlyph(tradeIcon(x), "tr-art")}
+      <span class="tr-cname">${esc(x.name)}${tradeRarity(x)
+        ? `<span class="tr-note tr-rare">${esc(tradeRarity(x))}</span>` : ""}</span>
+      <span class="tr-foot"><span title="${esc(shelf.label)}">${
+        tradeGlyph(shelf.icon, "tr-mark")}</span><span class="gp">${esc(x.price)}</span></span>
+      ${inDeal ? `<span class="tr-in" aria-hidden="true">${inDeal} in the deal</span>` : ""}
+    </button>`;
+  }).join("") : `<p class="tr-empty">The counter is bare today.</p>`;
 }
 
 function drawDeal() {
+  const s = tradeSums();
   const go = $("#tradego");
-  if (!PICK) {
-    $("#tradewhat").textContent = "Pick something from either side.";
-    $("#tradesum").textContent = "";
-    $("#tradeshort").textContent = "";
-    go.disabled = true; go.textContent = "—";
+  const line = (l, got) => {
+    const x = l.x;
+    const max = tradeMax(l.side, x);
+    // Beside the number it explains: a thing the engine runs nothing from is priced as
+    // such (a quarter, when you sell it; `pricing.what_a_shop_pays`).
+    const note = x.does_something ? "" : TRADE_INERT;
+    return `<li class="tr-line" tabindex="0" data-side="${l.side}" data-id="${esc(l.id)}"
+      aria-label="${esc(x.name)}, ${l.n}. Plus and minus change how many, Delete removes it.">
+      ${tradeGlyph(tradeIcon(x))}
+      <span class="tr-nm">${esc(x.name)}${note ? `<span class="tr-note">${note}</span>` : ""}</span>
+      <span class="gp">${coinText(got / 100)}${
+        l.side === "sell" && got < l.worth ? `<small>of ${coinText(l.worth / 100)}</small>` : ""}</span>
+      <span class="tr-ctl">
+        <span class="tr-step" role="group" aria-label="How many ${esc(x.name)}">
+          <button type="button" data-act="dec" aria-label="One fewer"${
+            l.n <= 1 ? " disabled" : ""}>−</button>
+          <output aria-live="polite">${l.n}</output>
+          <button type="button" data-act="inc" aria-label="One more"${
+            l.n >= max ? " disabled" : ""}>+</button>
+        </span>
+        <button type="button" class="tr-drop" data-act="drop">Remove</button>
+      </span>
+    </li>`;
+  };
+  const parts = [];
+  if (s.buys.length) {
+    parts.push(`<h3>You buy</h3><ul class="tr-lines">${
+      s.buys.map(l => line(l, l.worth)).join("")}</ul>`);
+  }
+  if (s.sells.length) {
+    parts.push(`<h3>You sell</h3><ul class="tr-lines">${
+      s.sells.map(l => line(l, l.got)).join("")}</ul>`);
+  }
+  $("#tradewhat").innerHTML = parts.join("") || `<p class="tr-empty">Nothing in the deal
+    yet.</p><p class="tr-hint">Choose from their wares to buy, or from what you carry to
+    sell. Enter adds the one in focus; on a line, + and − change how many.</p>`;
+
+  const short = $("#tradeshort");
+  short.classList.remove("bad");
+  short.textContent = "";
+  const empty = !s.buys.length && !s.sells.length;
+  $("#tradetotlab").textContent = empty ? "Total"
+    : s.net > 0 ? "You pay" : s.net < 0 ? "You receive" : "Even";
+  $("#tradesum").textContent = empty ? "" : coinText(Math.abs(s.net) / 100);
+  if (empty) {
+    go.disabled = true;
+    go.textContent = "Trade";
     return;
   }
-  const rows = PICK.side === "sell" ? TRADE.mine : TRADE.theirs;
-  const x = rows.find(r => r.id === PICK.id);
-  if (!x) { PICK = null; return drawDeal(); }
-
-  if (PICK.side === "sell") {
-    // The whole reason the middle column exists. A stall short of the asking price
-    // puts down what it has and says so — "i can still sell to them if i am willing
-    // to any get what they can give" — and taking it is the player's call.
-    const offered = Math.min(x.gp, TRADE.till.gp);
-    $("#tradewhat").textContent = `You hand over ${x.name}.`;
-    $("#tradesum").textContent = coinText(offered);
-    $("#tradeshort").textContent = offered < x.gp
-      ? `They cannot raise the ${x.price} it is worth — that is everything in the till.`
-      : "";
-    go.disabled = offered <= 0;
-    go.textContent = offered <= 0 ? "They have nothing left today"
-                                  : `Take ${coinText(offered)}`;
-  } else {
-    const short = x.gp > TRADE.purse_gp;
-    $("#tradewhat").textContent = `You buy ${x.name}.`;
-    $("#tradesum").textContent = x.price;
-    $("#tradeshort").textContent = short
-      ? `You have ${TRADE.purse}.` : "";
-    go.disabled = short;
-    go.textContent = short ? "You cannot afford it" : `Pay ${x.price}`;
+  // Said beside the number, in the dim ink: an offer below the worth is the till's
+  // answer, not an error, and taking it is the player's call.
+  if (s.got < s.ask) {
+    short.textContent = s.got <= 0
+      ? `There is nothing left in the till today, so your goods fetch nothing here.`
+      : `The till holds ${coinText(s.got / 100)} of the ${coinText(s.ask / 100)} your goods `
+        + `are worth. That is everything they have today.`;
   }
+  if (s.short > 0) {
+    short.classList.add("bad");
+    short.textContent = `You are ${coinText(s.short / 100)} short. Your purse holds `
+      + `${TRADE.purse}.`;
+  }
+  const nothing = !s.buys.length && s.got <= 0;
+  go.disabled = s.short > 0 || nothing;
+  go.textContent = s.net > 0 ? `Trade, pay ${coinText(s.net / 100)}`
+    : s.net < 0 ? `Trade, take ${coinText(-s.net / 100)}` : "Trade";
 }
 
 // Whole gold down to copper, in the same shape `pricing.as_text` writes server-side.
@@ -183,33 +546,109 @@ function coinText(gp) {
   return parts.join(" ") || "0 cp";
 }
 
+// --- input --------------------------------------------------------------------------
+// A card or a row is a button: a click, Enter or Space puts one in the deal (or one
+// more). The stepper and Remove are their own buttons; on a basket line, + and − and
+// Delete do the same from the keyboard.
 $("#tradepanel").addEventListener("click", e => {
-  const row = e.target.closest("[data-side]");
-  if (!row) return;
-  PICK = { side: row.dataset.side, id: row.dataset.id };
-  drawTrade();
+  const act = e.target.closest("[data-act]");
+  if (act) {
+    const l = act.closest(".tr-line");
+    if (!l) return;
+    if (act.dataset.act === "inc") tradeStep(l.dataset.side, l.dataset.id, +1);
+    else if (act.dataset.act === "dec") tradeStep(l.dataset.side, l.dataset.id, -1);
+    else if (act.dataset.act === "drop") tradeDrop(l.dataset.side, l.dataset.id);
+    return;
+  }
+  const shelf = e.target.closest("[data-shelf]");
+  if (shelf) {
+    TRADE_SHELF = shelf.dataset.shelf;
+    tradeRedraw();
+    return;
+  }
+  const row = e.target.closest(".traderow[data-side], .tr-card[data-side]");
+  if (row) tradeAdd(row.dataset.side, row.dataset.id);
+});
+
+$("#tradewhat").addEventListener("keydown", e => {
+  const l = e.target.closest(".tr-line");
+  if (!l || e.ctrlKey || e.metaKey || e.altKey) return;
+  const by = { "+": 1, "=": 1, "-": -1, "_": -1, "−": -1 }[e.key];
+  if (by) {
+    e.preventDefault();
+    tradeStep(l.dataset.side, l.dataset.id, by);
+  } else if ((e.key === "Delete" || e.key === "Backspace") && e.target === l) {
+    e.preventDefault();
+    tradeDrop(l.dataset.side, l.dataset.id);
+  }
+});
+
+// The side tabs are one tab stop, walked with the arrows (WAI-ARIA's tabs pattern,
+// vertical here), and choosing one shows it at once.
+$("#tradeshelves").addEventListener("keydown", e => {
+  const keys = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+  const tabs = [...$("#tradeshelves").querySelectorAll("[data-shelf]")];
+  const at = tabs.indexOf(e.target.closest("[data-shelf]"));
+  if (at < 0) return;
+  let to = null;
+  if (e.key in keys) to = (at + keys[e.key] + tabs.length) % tabs.length;
+  else if (e.key === "Home") to = 0;
+  else if (e.key === "End") to = tabs.length - 1;
+  if (to === null) return;
+  e.preventDefault();
+  TRADE_SHELF = tabs[to].dataset.shelf;
+  tradeRedraw();
+  const now = document.querySelector(`#tradeshelves [data-shelf="${CSS.escape(TRADE_SHELF)}"]`);
+  if (now) now.focus();
 });
 
 $("#tradego").addEventListener("click", async () => {
-  if (!PICK) return;
-  const rows = PICK.side === "sell" ? TRADE.mine : TRADE.theirs;
-  const x = rows.find(r => r.id === PICK.id);
-  const body = { op: PICK.side, item: PICK.id, count: 1 };
-  // The counter this is, at a market: the armorer's rack, not the general store's.
-  if (TRADE.line) body.line = TRADE.line;
-  // The agreed price travels with a sale, so what the screen offered is what the
-  // engine pays. It can only ever lower the ask — see `_op_sell`.
-  if (PICK.side === "sell") body.accept = Math.min(x.gp, TRADE.till.gp);
-
-  $("#tradego").disabled = true;
-  try {
-    $("#trademsg").textContent = (await post("/api/trade/do", body)).tell;
-  } catch (err) {
-    $("#trademsg").textContent = err.message;
+  if (!TRADE) return;
+  const s = tradeSums();
+  if (s.short > 0) return;
+  const go = $("#tradego");
+  go.disabled = true;
+  go.textContent = "Trading";
+  const line = TRADE.line;
+  const done = [], tells = [];
+  let failed = "";
+  // Sales first, so what the stall pays is in the purse before the purchases ask for it.
+  for (const l of [...s.sells, ...s.buys]) {
+    if (l.side === "sell" && l.got <= 0) continue;
+    const body = { op: l.side, item: l.id, count: l.n };
+    // The counter this is, at a market: the armorer's rack, not the general store's.
+    if (line) body.line = line;
+    // The agreed price travels with a sale, so what the screen offered is what the
+    // engine pays. It can only ever lower the ask (see `_op_sell`).
+    if (l.side === "sell") body.accept = l.got / 100;
+    try {
+      const r = await post("/api/trade/do", body);
+      if (r.tell) tells.push(r.tell);
+      done.push(l);
+    } catch (err) {
+      failed = err.message;
+      break;
+    }
   }
-  PICK = null;
-  TRADE = await post("/api/trade", TRADE.line ? { line: TRADE.line } : {});
+  // What went through leaves the basket; what did not stays, with the reason beside it.
+  const lines = tradeDeal();
+  for (const d of done) {
+    const at = lines.findIndex(y => y.side === d.side && y.id === d.id);
+    if (at >= 0) lines.splice(at, 1);
+  }
+  $("#trademsg").textContent = [...tells, failed].filter(Boolean).join(" ");
+  try {
+    TRADE = await post("/api/trade", line ? { line } : {});
+  } catch (err) {
+    $("#trademsg").textContent = [...tells, err.message].filter(Boolean).join(" ");
+  }
   drawTrade();
+  // The button has gone quiet with the basket empty; the wares are where the keyboard
+  // goes next.
+  if (document.activeElement === go || !$("#tradepanel").contains(document.activeElement)) {
+    const next = go.disabled ? document.querySelector("#tradtheirs .tr-card") : go;
+    if (next) next.focus({ preventScroll: true });
+  }
 });
 
 $("#closetrade").onclick = closeTrade;

@@ -943,42 +943,279 @@
      strip read "GE AR WE AL" (measured in the pane at the mobile preset). */
   #tradelines button { flex: 0 0 auto; }
   #tradelines[hidden] { display: none; }
+  /* The trade window (I7, the owner's mockup, 2026-09-29). Three columns in the sheet's
+     own materials: what you carry as a list filed under tabs down its side, the deal as
+     a basket with ONE button, their wares as cards. No new colour: gold for money and
+     the glyphs, the dim ink for anything quiet, the card leather for what is selected.
+
+     Motion, by the owner's rule (2026-09-28): answers come at once (120ms colour only),
+     nothing moves under the pointer, nothing loops. So the heading's candle glow, which
+     loops everywhere else, stands still here; the Trade button sits at the foot of the
+     deal and stays there, and a message or a longer basket takes room from the basket,
+     never from under the button. */
+  #tradepanel .sheethead h1 { animation: none; }
+  /* The panel shell's edge tabs sit above every overlay (z-index 60), and over this one
+     they covered a card's price at 375px. The window is modal; its own Close is the way
+     back to them. */
+  body:has(#tradepanel.on) :is(#edgetabs, #talktab, #maptab) { visibility: hidden; }
+  #trademsg { font: 13.5px/1.5 var(--body); color: var(--ink); margin-left: auto;
+              max-width: 46%; }
+  #trademsg:empty { display: none; }
+  #trademsg + .close { margin-left: 16px; }
   .tradebody {
-    display: grid; grid-template-columns: 1fr minmax(240px, 22%) 1fr;
-    gap: 18px; padding: 18px 34px 28px; overflow: hidden; min-height: 0;
+    display: grid; gap: 22px; padding: 18px 34px 22px; overflow: hidden; min-height: 0;
+    grid-template-columns: minmax(270px, 1fr) minmax(270px, .86fr) minmax(0, 1.55fr);
   }
-  .tradecol { display: flex; flex-direction: column; min-height: 0; }
+  .tradecol { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
   .tradecol > h2 {
     font: 600 15px/1 var(--display); letter-spacing: .16em; text-transform: uppercase;
-    color: var(--gold); margin: 0 0 10px; padding-bottom: 8px;
+    color: var(--gold); margin: 0 0 12px; padding-bottom: 8px;
     border-bottom: 1px solid var(--gold-dim);
   }
-  .tradecol > h2 span { float: right; color: var(--ink-dim); letter-spacing: .04em;
-    text-transform: none; font-family: var(--body); font-weight: 400; }
+  .tradecol > h2 span { float: right; color: var(--dim); letter-spacing: .02em;
+    text-transform: none; font: 400 14px/1 var(--body); }
   .tradelist { overflow-y: auto; min-height: 0; flex: 1; padding-right: 6px; }
-  .traderow {
-    display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline;
-    width: 100%; text-align: left; padding: 8px 10px; margin-bottom: 4px;
-    background: rgba(0,0,0,.18); border: 1px solid transparent; border-radius: 3px;
-    color: var(--ink); font: 14px/1.35 var(--body); cursor: pointer;
+  #tradepanel button { transition-duration: .12s; }
+  #tradepanel button::after { transition-duration: .12s; }
+  #tradepanel button:focus-visible, #tradepanel a:focus-visible {
+    outline: 2px solid var(--candle); outline-offset: 2px;
   }
-  .traderow:hover { border-color: var(--gold-dim); background: rgba(0,0,0,.30); }
+  #tradepanel .sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
+                    clip: rect(0 0 0 0); white-space: nowrap; }
+  /* The glyphs: game-icons.net art, tinted gold. The box has its size before the SVG
+     arrives, so the fetch cannot shift anything. */
+  #tradepanel .tgi { display: inline-block; flex: none; width: 20px; height: 20px;
+                     color: var(--gold); }
+  #tradepanel .tgi svg { display: block; width: 100%; height: 100%; }
+
+  /* Left: what you carry. The tabs run down the side of the list, as the owner drew
+     them, in the sheet tab's own small caps; the chosen one is the same card leather
+     the sheet's chosen tab wears, open towards the list it names. */
+  .tr-carrybody { flex: 1; min-height: 0; display: grid;
+                  grid-template-columns: 158px minmax(0, 1fr); }
+  .tr-shelves { display: flex; flex-direction: column; gap: 3px; padding-top: 2px;
+                overflow-y: auto; }
+  .tr-shelves[hidden] { display: none; }
+  .tr-shelves button {
+    display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px;
+    align-items: center; width: 100%; padding: 8px 9px; text-align: left;
+    background: transparent; border: 1px solid transparent; border-right: 0;
+    border-radius: 3px 0 0 3px; color: var(--dim); box-shadow: none;
+    font: 400 14px/1.15 var(--display); letter-spacing: .04em; font-variant: small-caps;
+  }
+  .tr-shelves button .tgi { width: 18px; height: 18px; color: var(--gold-dim); }
+  .tr-shelves button small { font: 12.5px/1 var(--body); letter-spacing: 0;
+                             font-variant-numeric: tabular-nums; color: var(--dim); }
+  .tr-shelves button:hover:not(:disabled) { color: var(--ink); box-shadow: none; }
+  .tr-shelves button[aria-selected="true"] {
+    color: var(--gold); border-color: var(--gold-dim);
+    background:
+      linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 340px auto;
+    box-shadow: inset 0 1px 0 rgba(221,196,142,.16);
+  }
+  .tr-shelves button[aria-selected="true"] .tgi { color: var(--gold); }
+  #tradmine { border-left: 1px solid var(--gold-dim); padding: 2px 6px 0 10px; }
+  .traderow {
+    display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px;
+    align-items: center; width: 100%; text-align: left; padding: 8px 10px;
+    margin-bottom: 4px; background: rgba(0,0,0,.18); border: 1px solid transparent;
+    border-radius: 3px; color: var(--ink); font: 14.5px/1.35 var(--body);
+    letter-spacing: 0; font-variant: normal; cursor: pointer;
+  }
+  .traderow:hover:not(:disabled) { border-color: var(--gold-dim); background: rgba(0,0,0,.30);
+                                   color: var(--ink); }
   .traderow.on { border-color: var(--accent); background: rgba(0,0,0,.36); }
-  .traderow b { font-weight: 500; }
-  .traderow .why { display: block; font-size: 12px; color: var(--ink-dim); }
-  /* A jar the engine cannot run anything from is worth a quarter as much, and the
-     reason has to be visible next to the number or the price looks arbitrary. */
-  .traderow .inert { color: var(--alarm); opacity: .75; }
-  .traderow .gp { font-variant-numeric: tabular-nums; color: var(--gold); }
+  .traderow .tr-nm { min-width: 0; }
+  .traderow b { font-weight: 400; }
+  .traderow .tr-n { color: var(--dim); font-variant-numeric: tabular-nums; }
+  /* A thing the engine runs nothing from is worth a quarter as much, and the reason
+     sits beside the number or the price looks arbitrary. Said in the player's words, in
+     the dim ink: it explains a price, it is not a warning. */
+  .tr-note { display: block; font: italic 12.5px/1.35 var(--body); color: var(--dim); }
+  .tr-rare { color: var(--accent); font-style: normal; }
+  .traderow .gp { text-align: right; }
+  #tradepanel .gp { font-variant-numeric: tabular-nums; color: var(--gold);
+                    white-space: nowrap; }
+  #tradepanel .gp small { display: block; color: var(--dim); font: 12px/1.2 var(--body); }
+  .tr-empty { color: var(--dim); font: italic 14.5px/1.5 var(--body); margin: 4px 0; }
+  .tr-purse { display: flex; justify-content: space-between; align-items: baseline;
+              gap: 12px; margin: 12px 0 0; padding-top: 10px;
+              border-top: 1px solid var(--gold-dim); font: 14.5px/1.4 var(--body); }
+  .tr-purse span { color: var(--dim); }
+  .tr-purse b { color: var(--gold); font-weight: 400; text-align: right; }
+
+  /* Middle: the deal. Framed like the old middle column, one rule each side; the basket
+     takes whatever height is left, and scrolls inside itself. */
   .tradedeal {
     border-left: 1px solid var(--gold-dim); border-right: 1px solid var(--gold-dim);
-    padding: 0 16px; display: flex; flex-direction: column; gap: 12px;
+    padding: 0 18px;
   }
-  .tradedeal .what { font: 15px/1.4 var(--body); color: var(--ink); min-height: 3em; }
-  .tradedeal .sum { font: 22px/1 var(--display); color: var(--gold); }
-  .tradedeal .short { font: 13px/1.5 var(--body); color: var(--alarm); }
-  .tradedeal button { width: 100%; }
-  #trademsg { font: 13px/1.5 var(--body); color: var(--ink-dim); }
+  .tr-basket { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+  .tr-basket h3 { margin: 4px 0 6px; color: #cbb98f; font: 400 14px/1.2 var(--display);
+                  letter-spacing: .08em; font-variant: small-caps; }
+  .tr-basket h3 + .tr-lines + h3 { margin-top: 14px; }
+  .tr-lines { list-style: none; margin: 0; padding: 0; }
+  .tr-line {
+    display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 6px 10px;
+    align-items: center; padding: 8px 6px; border-bottom: 1px solid #2b2319;
+    border-radius: 2px;
+  }
+  .tr-line:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px; }
+  .tr-line .tr-nm { min-width: 0; font: 14.5px/1.3 var(--body); }
+  .tr-line .tr-ctl { grid-column: 2 / -1; display: flex; align-items: center;
+                     justify-content: space-between; gap: 10px; }
+  .tr-step { display: inline-flex; align-items: center; gap: 0;
+             border: 1px solid #3f3324; border-radius: 3px; background: #16120d; }
+  #tradepanel .tr-step button {
+    width: 32px; height: 30px; padding: 0; border: 0; border-radius: 0;
+    background: transparent; color: var(--gold); box-shadow: none;
+    font: 400 18px/1 var(--body); letter-spacing: 0;
+  }
+  #tradepanel .tr-step button:hover:not(:disabled) { color: #f4e6c0; box-shadow: none;
+                                                     background: rgba(0,0,0,.3); }
+  .tr-step output { min-width: 3ch; text-align: center; color: var(--ink);
+                    font: 15px/30px var(--body); font-variant-numeric: tabular-nums;
+                    border-left: 1px solid #3f3324; border-right: 1px solid #3f3324; }
+  #tradepanel .tr-drop {
+    padding: 4px 0; background: none; border: 0; box-shadow: none; color: var(--dim);
+    font: 13px/1.3 var(--body); letter-spacing: 0; font-variant: normal;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  #tradepanel .tr-drop:hover:not(:disabled) { color: var(--ink); box-shadow: none; }
+  #tradepanel .tr-drop::after, #tradepanel .tr-step button::after { display: none; }
+  .tr-hint { margin: 12px 0 0; color: var(--dim); font: italic 13px/1.5 var(--body); }
+
+  /* The total, by a stack of coin. The number is the biggest thing in the column, and
+     the button under it says the same number in words. */
+  .tr-total { display: flex; align-items: center; gap: 12px; margin-top: 12px;
+              padding-top: 12px; border-top: 1px solid var(--gold-dim); }
+  #tradepanel .tr-coins {
+    width: 46px; height: 46px; padding: 8px; border-radius: 50%; color: var(--candle);
+    background: radial-gradient(#15100c, #0b0806);
+    box-shadow: 0 0 0 1px var(--gold-dim), inset 0 1px 4px rgba(0,0,0,.8);
+  }
+  .tr-totlab { display: block; color: var(--dim); font: 13px/1.3 var(--body); }
+  .tradedeal .sum { display: block; min-height: 26px; font: 400 24px/1.1 var(--display);
+                    color: var(--gold); font-variant-numeric: tabular-nums; }
+  /* Kept at its height when empty, so a sentence arriving cannot push the button. */
+  .tradedeal .short { min-height: 3em; margin: 8px 0 8px; font: 13px/1.5 var(--body);
+                      color: var(--dim); }
+  .tradedeal .short.bad { color: #e0897c; }
+  /* The one primary act on the window: the lit edge the Spells page gives Cast. */
+  #tradepanel .tr-go {
+    width: 100%; padding: 14px 16px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; background: linear-gradient(#33291b, #1c160f);
+    border: 1px solid var(--accent); color: #f4e6c0;
+    font: 400 16px/1.1 var(--display); letter-spacing: .08em; font-variant: small-caps;
+  }
+  #tradepanel .tr-go:disabled { opacity: .45; border-color: var(--gold-dim);
+                                color: var(--gold); }
+
+  /* Right: their wares, as cards. The card is the Spells page's (`.spcard`): dark
+     leather, a gilt hairline, the glyph in a roundel. A card in the deal wears the
+     candle edge and says how many, in a corner, over nothing. */
+  .tr-cards { display: grid; gap: 10px; align-content: start;
+              grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); }
+  .tr-card {
+    position: relative; display: grid; grid-template-rows: auto 1fr auto;
+    justify-items: center; gap: 6px; min-width: 0; min-height: 168px; padding: 12px 10px 10px;
+    text-align: center; color: var(--ink); cursor: pointer;
+    border: 1px solid #3a2f22; border-radius: 3px;
+    background: linear-gradient(#1b1611, #120e0b);
+    box-shadow: inset 0 1px 0 rgba(221,196,142,.08), 0 2px 10px rgba(0,0,0,.45);
+    font: 14px/1.3 var(--body); letter-spacing: 0; font-variant: normal;
+  }
+  .tr-card:hover:not(:disabled) { border-color: var(--gold-dim); color: var(--ink);
+    box-shadow: inset 0 1px 0 rgba(221,196,142,.08), 0 2px 10px rgba(0,0,0,.45); }
+  .tr-card.in { border-color: var(--accent);
+    background:
+      linear-gradient(rgba(20, 15, 9, .10), rgba(12, 9, 6, .40)),
+      url("{% static 'img/card-leather.jpg' %}") #241d15;
+    background-size: auto, 340px auto; }
+  #tradepanel .tr-art {
+    width: 52px; height: 52px; padding: 10px; border-radius: 50%;
+    background: radial-gradient(#15100c, #0b0806);
+    box-shadow: 0 0 0 1px #5a4730, inset 0 1px 4px rgba(0,0,0,.8);
+  }
+  .tr-cname { align-self: start; overflow-wrap: anywhere; display: -webkit-box;
+              -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+              overflow: hidden; }
+  .tr-cname .tr-note { margin-top: 2px; }
+  .tr-foot { display: flex; align-items: center; justify-content: space-between;
+             gap: 6px; width: 100%; padding-top: 6px; border-top: 1px solid #2b2319; }
+  #tradepanel .tr-mark { width: 16px; height: 16px; color: var(--dim); }
+  .tr-in { position: absolute; top: 7px; right: 7px; padding: 2px 7px; border-radius: 9px;
+           background: #0f0b08; border: 1px solid var(--accent); color: #f4e6c0;
+           font: 12px/1.3 var(--body); font-variant-numeric: tabular-nums; }
+  .tr-credit { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid #2b2319;
+               color: var(--dim); font: 12px/1.5 var(--body); }
+  .tr-credit a { color: var(--accent); }
+
+  /* A narrow desktop keeps three columns; the side tabs give up their words, keeping
+     the glyph and the count (each tab is still named for a screen reader). */
+  @media (max-width: 1280px) {
+    .tradebody { grid-template-columns: minmax(230px, 1fr) minmax(250px, .9fr)
+                                        minmax(0, 1.3fr); padding: 16px 20px 20px; }
+    .tr-carrybody { grid-template-columns: 58px minmax(0, 1fr); }
+    .tr-shelves button { grid-template-columns: 18px auto; gap: 4px; padding: 8px 6px; }
+    .tr-shelves button .tr-lab { position: absolute; width: 1px; height: 1px;
+                                 overflow: hidden; clip: rect(0 0 0 0); }
+  }
+  /* A tablet and a phone: one column, scrolled as a page, and the deal pinned to the
+     bottom of the screen so the button is always under the thumb. Measured at 375px
+     before this (I2's note): three columns of about 100px each, a card too narrow for
+     a price. Their wares come first, because a purchase is what opens this window. */
+  @media (max-width: 1000px) {
+    #tradepanel .sheethead { flex-wrap: wrap; gap: 6px 14px; padding: 12px 16px 10px; }
+    #tradepanel .sheethead h1 { font-size: 25px; }
+    #tradepanel .sheethead .meta { align-self: center; padding: 0; }
+    #tradepanel .sheethead .close { margin-left: auto; padding: 10px 14px; }
+    #trademsg { order: 5; flex-basis: 100%; max-width: none; margin: 0; }
+    #tradelines { padding: 8px 16px 0; }
+    .tradebody { display: flex; flex-direction: column; gap: 22px; overflow-y: auto;
+                 padding: 14px 16px 0; }
+    /* `flex: none`: a column of this scroller is as tall as what is in it. Left to
+       shrink (the desktop's `min-height: 0`), the deal came out 80px tall with its
+       button 150px below the bottom of a 812px screen, and the carried list slid
+       under the cards (measured at 375x812). */
+    .tradecol, .tradelist { flex: none; }
+    .tradelist { overflow: visible; padding-right: 0; }
+    .tr-wares { order: 1; }
+    .tr-carry { order: 2; }
+    .tradedeal {
+      order: 3; position: sticky; bottom: 0; z-index: 2; margin: 0 -16px;
+      padding: 10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      border: 0; border-top: 1px solid var(--gold-dim);
+      background:
+        linear-gradient(rgba(14, 10, 7, .55), rgba(8, 6, 4, .82)),
+        url("{% static 'img/card-leather.jpg' %}") #1d1710;
+      background-size: auto, 340px auto;
+      box-shadow: 0 -10px 28px rgba(0,0,0,.6);
+    }
+    .tradedeal > h2 { margin-bottom: 6px; padding-bottom: 6px; }
+    .tr-basket { flex: none; max-height: 22vh; }
+    .tr-basket .tr-hint { display: none; }
+    .tr-total { margin-top: 8px; padding-top: 8px; }
+    #tradepanel .tr-coins { width: 38px; height: 38px; padding: 7px; }
+    .tradedeal .short { min-height: 0; margin: 6px 0; }
+    .tradedeal .short:empty { display: none; }
+    .tr-carrybody { grid-template-columns: 1fr; }
+    .tr-shelves { flex-direction: row; overflow-x: auto; overflow-y: hidden; gap: 4px;
+                  padding-bottom: 8px; border-bottom: 1px solid var(--gold-dim); }
+    .tr-shelves button { flex: 0 0 auto; width: auto; grid-template-columns: 18px auto auto;
+                         gap: 6px; border: 1px solid transparent; border-radius: 3px; }
+    .tr-shelves button .tr-lab { position: static; width: auto; height: auto;
+                                 overflow: visible; clip: auto; }
+    #tradmine { border-left: 0; padding: 8px 0 0; }
+    .tr-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .tr-credit { margin-bottom: 4px; }
+  }
+  @media (max-width: 420px) {
+    .tr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .tr-card { min-height: 150px; padding: 10px 8px 8px; }
+  }
   #sheetpanel::after {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     box-shadow: inset 0 0 220px 60px rgba(0,0,0,.72);
@@ -2378,27 +2615,45 @@
   <div class="sheethead">
     <h1 id="tradename">At the counter</h1>
     <div class="meta" id="trademeta"></div>
-    <span id="trademsg"></span>
+    <span id="trademsg" role="status" aria-live="polite"></span>
     <button class="close" id="closetrade">Close  ·  Esc</button>
   </div>
   <nav class="tabs" id="tradelines" role="tablist" aria-label="Counters at this market"
        hidden></nav>
+  <!-- I7, the owner's layout (2026-09-29): what you carry, filed under tabs down its
+       side; the deal, a basket with one button; their wares, as cards. -->
   <div class="tradebody">
-    <div class="tradecol">
-      <h2>What you carry <span id="tradepurse"></span></h2>
-      <div class="tradelist" id="tradmine"></div>
-    </div>
-    <div class="tradecol tradedeal">
-      <h2>The deal</h2>
-      <div class="what" id="tradewhat">Pick something from either side.</div>
-      <div class="sum" id="tradesum"></div>
-      <div class="short" id="tradeshort"></div>
-      <button class="quiet" id="tradego" disabled>—</button>
-    </div>
-    <div class="tradecol">
-      <h2>Their wares <span id="tradetill"></span></h2>
-      <div class="tradelist" id="tradtheirs"></div>
-    </div>
+    <section class="tradecol tr-carry" aria-labelledby="tr-carry-h">
+      <h2 id="tr-carry-h">What you carry</h2>
+      <div class="tr-carrybody">
+        <div class="tr-shelves" id="tradeshelves" role="tablist"
+             aria-orientation="vertical" aria-label="Your things, by kind"></div>
+        <div class="tradelist" id="tradmine" role="tabpanel"></div>
+      </div>
+      <p class="tr-purse"><span>Your purse</span> <b id="tradepurse"></b></p>
+    </section>
+    <section class="tradecol tradedeal" aria-labelledby="tr-deal-h">
+      <h2 id="tr-deal-h">The deal</h2>
+      <div class="tr-basket" id="tradewhat"></div>
+      <div class="tr-total">
+        <i class="tgi tr-coins" data-icon="delapouite-two-coins" aria-hidden="true"></i>
+        <div><span class="tr-totlab" id="tradetotlab">Total</span>
+             <b class="sum" id="tradesum"></b></div>
+      </div>
+      <p class="short" id="tradeshort"></p>
+      <button type="button" class="tr-go" id="tradego" disabled>Trade</button>
+    </section>
+    <section class="tradecol tr-wares" aria-labelledby="tr-wares-h">
+      <h2 id="tr-wares-h">Their wares <span id="tradetill"></span></h2>
+      <div class="tradelist tr-cards" id="tradtheirs"></div>
+      <p class="tr-credit">Item icons by Lorc, Delapouite, Skoll, Sbed, Willdabeast, Carl
+        Olsen, Caro Asercion and Lucas from
+        <a href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a>,
+        <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank"
+        rel="noopener">CC BY 3.0</a>, recoloured.
+        <a href="{% static 'icons/items/CREDITS.txt' %}" target="_blank"
+        rel="noopener">Which icon is whose</a>.</p>
+    </section>
   </div>
 </div>
 
