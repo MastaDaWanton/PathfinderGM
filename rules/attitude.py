@@ -40,6 +40,8 @@ carries this as an open gap rather than a quiet one.
 """
 from __future__ import annotations
 
+import re
+
 from . import states
 
 # The track, worst to best. `states.ATTITUDES` is the one definition; this is a name for
@@ -382,13 +384,35 @@ from .provocation import INSULT as _INSULT  # noqa: E402
 
 HARMED = _INSULT  # "Harmed me" weighs what "Insulted" does (RimWorld −15 each)
 
+# **Charm and magical sleep, harm to an unfriendly eye only** (owner, 2026-09-28, the
+# register's §3.4 row for I3: "yes if the people who saw are not friendly"). Lane E left
+# both out — "a charm opening a fight would be absurd" (docs/design-e-magic.md §4.5) — and
+# the owner ruled they count: when the source is perceived, AND only for the witnesses
+# (the victim included) whose attitude towards the caster is below friendly. A friendly or
+# helpful onlooker, and anybody travelling with you, does not turn on you for it. The
+# families are the tags these conditions self-tag to (`charmed` and `asleep` are not in
+# `states.TAGS`), asked as prefixes like every other.
+#
+# Magical sleep in the shipped spells lands as `unconscious`/`helpless` with the spell's
+# own note saying it is sleep ("magical slumber", "asleep"), so a sleep effect is known by
+# its effect document (`_sleep_spec`), the way `states.IMMUNITY_COVERS` knows a sleep
+# effect by what it declares itself to be — measured over the corpus 2026-09-29: sleep,
+# deep slumber, cloak of dreams, forgetful slumber, symbol of sleep and touch of slumber
+# (six), and not night terrors, whose "ruined sleep" lands fatigue. A charm is known by
+# the book's own classification, the enchantment (charm) subschool: its mechanics are
+# prose (the charm lands later, through the mind gate), so there is no condition spec to
+# read.
+UNFRIENDLY_EYES_ONLY = ("condition.charmed", "condition.asleep", "condition.sleeping")
+
 # The families a harmful or unpleasant condition sits in — asked as PREFIX questions of
 # the vocabulary, never by name (the first law). Nauseated and sickened are the owner's
-# own examples (`state.impaired`); a charm is not harm and is not here (`attitude.*`,
-# `condition.charmed`), which is why a charm person never opens a fight.
+# own examples (`state.impaired`); charm and sleep since I3, behind the witness gate.
 HARMFUL_STATES = ("state.down", "state.unable", "state.held", "state.impaired",
                   "state.fear", "state.senses", "state.wound", "state.helpless",
-                  "state.position.prone")
+                  "state.position.prone", *UNFRIENDLY_EYES_ONLY)
+
+_SLEEP_KEYS = frozenset(states.IMMUNITY_COVERS["sleep"])
+_SLEEP_NOTE = re.compile(r"\b(?:slumber|asleep|sleeping|sleeps|falls? asleep)\b", re.I)
 
 
 def harmful_condition(key: str) -> bool:
@@ -397,31 +421,76 @@ def harmful_condition(key: str) -> bool:
                for fam in HARMFUL_STATES)
 
 
-def harmful_spell(spell, caster_level: int) -> bool:
-    """Whether casting this spell on somebody harms them: it rolls damage, or it lays a
-    harmful condition on a failed save (Q34). Invisibility's own definition of an attack
-    is the line — "any spell targeting a foe or whose area or effect includes a foe" — with
-    the owner's narrowing to harm."""
+def gated_condition(key: str) -> bool:
+    """Whether this condition is harm only to an unfriendly eye (charm, magical sleep)."""
+    return any(states.matches(t, fam) for t in states.tags_for(str(key or ""))
+               for fam in UNFRIENDLY_EYES_ONLY)
+
+
+def _sleep_spec(spec: dict) -> bool:
+    """An `apply_condition` that is a sleep effect: it lands a sleep condition by name, or
+    lands unconscious or helpless and says, in its own note, that the creature sleeps."""
+    key = str(spec.get("target") or "").strip().lower()
+    if key in _SLEEP_KEYS:
+        return True
+    return key in ("unconscious", "helpless") and bool(_SLEEP_NOTE.search(
+        str(spec.get("note") or "")))
+
+
+def resents(actor) -> bool:
+    """Whether this creature, seeing the caster charm or put somebody to sleep, holds it
+    against them: below friendly, and not travelling with the party (owner's ruling)."""
+    if actor is None or getattr(actor, "is_pc", False):
+        return False
+    if actor.has_state(states.TRAVELS_WITH_YOU):
+        return False
+    return step_of(of(actor)) < step_of(COMES_ALONG)
+
+
+def harm_of(spell, caster_level: int) -> str:
+    """How casting this spell on somebody harms them: "harm" when it rolls damage or lays
+    a harmful condition on a failed save (Q34); "gated" when its only harm is a charm or a
+    magical sleep, which counts only before an unfriendly eye (`resents`); "" when it does
+    no harm. Invisibility's own definition of an attack is the line — "any spell
+    targeting a foe or whose area or effect includes a foe" — with the owner's narrowing
+    to harm."""
     from . import spells as spells_mod
 
     plan = spells_mod.casting_plan(spell, caster_level)
     if plan.get("kind") == "damage" and plan.get("dice"):
-        return True
+        return "harm"
+    found = {"harm": False, "gated": False}
 
-    def walk(specs) -> bool:
-        for spec in specs or []:
-            if not isinstance(spec, dict):
-                continue
+    def walk(specs) -> None:
+        specs = [s for s in specs or [] if isinstance(s, dict)]
+        # Sleep lands as a pair — unconscious ("magical slumber") and helpless, the second
+        # with no note of its own — so a branch that is a sleep effect is sleep throughout.
+        asleep = any(str(s.get("type", "")) == "apply_condition" and _sleep_spec(s)
+                     for s in specs)
+        for spec in specs:
             kind = str(spec.get("type", ""))
-            if kind == "apply_condition" and harmful_condition(spec.get("target", "")):
-                return True
+            if kind == "apply_condition":
+                key = spec.get("target", "")
+                if gated_condition(key) or _sleep_spec(spec) or (
+                        asleep and str(key).strip().lower() in ("unconscious", "helpless")):
+                    found["gated"] = True
+                elif harmful_condition(key):
+                    found["harm"] = True
             if kind == "damage" and spec.get("dice"):
-                return True
+                found["harm"] = True
             for key in ("on_failure", "on_success", "effects", "options"):
-                if walk(spec.get(key)):
-                    return True
-        return False
-    return walk(spells_mod.effects_at(spell, caster_level))
+                walk(spec.get(key))
+    walk(spells_mod.effects_at(spell, caster_level))
+    if found["harm"]:
+        return "harm"
+    if found["gated"] or str(getattr(spell, "subschool", "") or "").lower() == "charm":
+        return "gated"
+    return ""
+
+
+def harmful_spell(spell, caster_level: int) -> bool:
+    """Whether casting this spell on somebody can harm them at all (`harm_of`)."""
+    return bool(harm_of(spell, caster_level))
 
 
 def perceived(engine, by, victim, *, rolls: list | None = None) -> bool:
@@ -455,7 +524,8 @@ def perceived(engine, by, victim, *, rolls: list | None = None) -> bool:
     return notice.total > stealth.total
 
 
-def harmed(engine, victim, by, source: str, *, seen: bool | None = None) -> dict | None:
+def harmed(engine, victim, by, source: str, *, seen: bool | None = None,
+           gated: bool = False) -> dict | None:
     """What being harmed by `by` does to how `victim` stands towards the player, through
     the one applicator. Returns the effect record (the tell is `harm_said`), or None when
     nothing moves: `by` is not the player (attitudes are towards the party, and the app
@@ -464,10 +534,16 @@ def harmed(engine, victim, by, source: str, *, seen: bool | None = None) -> dict
 
     `seen` is `perceived(...)`'s answer when the caller already has it; asked here
     otherwise. Unseen harm changes no attitude and returns a `harm_unseen` record: the
-    victim knows they were hurt, not by whom."""
+    victim knows they were hurt, not by whom.
+
+    `gated` is harm that only an unfriendly eye resents — a charm, a magical sleep
+    (`harm_of` == "gated"): a victim who is friendly or better, or travels with you, is
+    not moved by it at all (owner's ruling; `resents`)."""
     if victim is None or by is None or victim is by or not getattr(by, "is_pc", False):
         return None
     if getattr(victim, "is_pc", False) or victim.has_state("state.down.dead"):
+        return None
+    if gated and not resents(victim):
         return None
     if seen is None:
         seen = perceived(engine, by, victim)

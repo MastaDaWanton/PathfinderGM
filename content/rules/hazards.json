@@ -21,6 +21,25 @@
     "dice_per_unit": "1d6",
     "type": "fire"
   },
+  "burning-brush": {
+    "name": "burning brush",
+    "source": "CRB, Environment: Catching on Fire (aonprd.com/Rules.aspx?ID=331) — characters exposed to burning oil, bonfires and noninstantaneous magic fires 'are allowed a DC 15 Reflex saving throw' to avoid catching fire, and one who catches 'takes 1d6 points of damage immediately'; Burning Hands: 'Flammable materials burn if the flames touch them'. Ground a fire spell has lit is a bonfire to whoever stands in it.",
+    "slot": {"name": "rounds", "min": 1, "max": 10, "per": 1},
+    "dice_per_unit": "1d6",
+    "type": "fire",
+    "ward": {"save": "ref", "dc": 15, "dice": "1d6", "type": "fire", "lethality": "lethal"},
+    "not_yet": "The book's fire goes on burning a creature each round after it catches, until a Reflex save succeeds (+4 rolling on the ground, at once in water), even once it has stepped out. Here the risk is asked each round a creature stands in the burning squares, and ends when it leaves them: a ward cannot hold a per-creature fire."
+  },
+  "smoke": {
+    "name": "smoke",
+    "source": "CRB, Environment: Smoke Effects — 'A character who breathes heavy smoke must make a Fortitude save each round (DC 15, +1 per previous check) or spend that round choking and coughing. A character who chokes for 2 consecutive rounds takes 1d6 points of nonlethal damage. Smoke obscures vision, giving concealment (20% miss chance) to characters within it.'",
+    "slot": {"name": "rounds", "min": 2, "max": 20, "per": 2},
+    "dice_per_unit": "1d6",
+    "type": "untyped",
+    "lethality": "nonlethal",
+    "ward": {"save": "fort", "dc": 15, "dice": "1d6", "type": "untyped", "lethality": "nonlethal"},
+    "not_yet": "The concealment is the smoke's own obscuring squares. The choking is simplified: a ward holds one DC for everyone and cannot count a creature's previous checks or its consecutive rounds, so a failed Fortitude save costs the 1d6 nonlethal at once, where the book waits for a second failure in a row and raises the DC by one a check. As a cited `hazard` the row is the book's: one 1d6 per two rounds of choking."
+  },
   "lava": {
     "name": "lava",
     "source": "CRB, Environment: Lava Effects — 2d6 fire per round of contact; 20d6 per round immersed",

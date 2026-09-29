@@ -103,8 +103,33 @@ FEATURE_WORDS: dict[str, tuple[str, ...]] = {
 FLAMMABLE = ("cloth", "parchment", "paper", "rope", "straw", "thatch", "oil", "hay",
              "canvas", "tinder", "kindling", "linen", "sackcloth", "scroll", "dry wood")
 
-_UP_WORDS = re.compile(r"\b(?:up(?:ward|wards)?|overhead|into the sky|skyward|aloft)\b",
-                       re.I)
+# Straight up, in the words a player uses for it. Measured 2026-09-29 (G2, the cast-area
+# script): "I cast burning hands into the empty air above my head" grounded to nothing —
+# only "up", "overhead", "into the sky", "skyward" and "aloft" were read — and the player
+# was asked "Where do you aim Burning Hands?" about a sentence that said where. "Above my
+# head", "into the air" (with a word or two between: "the empty air", "the open air"),
+# "at the sky", "heavenward" are the same aim.
+_UP_WORDS = re.compile(
+    r"\b(?:up(?:ward|wards)?|overhead|skyward|skywards|heavenward|heavenwards|aloft"
+    r"|above (?:my|his|her|their|our|your) heads?"
+    r"|(?:into|at|to|towards|toward|in) the (?:[a-z]+ ){0,2}(?:sky|air|heavens)"
+    r"|into the air|in the air)\b", re.I)
+# Straight down: at the ground, into the earth. A cone laid downward is `cone_cells`'
+# own "down" wedge. Not the bare word "down", which is a road ("down the lane") far more
+# often than an aim.
+_DOWN_WORDS = re.compile(
+    r"\b(?:downward|downwards|(?:at|into|onto) the (?:ground|earth|floor|dirt)"
+    r"|at my feet)\b", re.I)
+# The map's own axes, when the player names one: "west", "to the north-east",
+# "northwards". The world has no bearings (item 19.5) and a tell never says one; the map
+# does have axes, and a player looking at it may aim along them, so they are read as the
+# map's. Longest first, so "north-east" is not read as "north".
+_COMPASS = re.compile(
+    r"\b(north[- ]?east|north[- ]?west|south[- ]?east|south[- ]?west|north|south|east"
+    r"|west)(?:wards?)?\b", re.I)
+_COMPASS_AXIS = {"north": "n", "south": "s", "east": "e", "west": "w",
+                 "northeast": "ne", "northwest": "nw", "southeast": "se",
+                 "southwest": "sw"}
 _SELF_WORDS = re.compile(r"\b(?:myself|on me|at me|centred on me|centered on me)\b", re.I)
 
 # The spells whose area lays a flat footprint rather than a volume.
@@ -773,8 +798,14 @@ def aim_from_words(scene, caster_ref: str, words: str, spell=None) -> str | None
 
     A person present named in full, or by a word of their name no one else here shares →
     `ref:`; the caster → `self`; a feature or prop here ("tree tops" → the canopy) →
-    `object:`; "up", "overhead" → `dir:up`. Checked in that order, so "at the man by the
-    trees" is the man."""
+    `object:`; "up", "overhead", "above my head", "into the empty air" → `dir:up`; "at
+    the ground" → `dir:down`; a compass word → that map axis. Checked in that order, so
+    "at the man by the trees" is the man and "the branches above my head" the canopy.
+
+    A direction is offered only to a spell that can be pointed one way — a cone or a line
+    — or to one whose shape is not known here: a burst "into the air" names no point, and
+    `_check_aim` refuses a direction to it as `wrong_aim`, which would be a refusal made
+    out of the player's own clear words."""
     said = " ".join(str(words or "").lower().split())
     if not said:
         return None
@@ -799,20 +830,34 @@ def aim_from_words(scene, caster_ref: str, words: str, spell=None) -> str | None
         name = str(rec.get("name", "")).lower()
         if name and re.search(r"\b" + re.escape(name) + r"\b", said):
             return f"object:{name}"[:67]
+    if spell is not None:
+        shape = shape_of(spell, 1)
+        if shape and shape.get("shape") not in ("cone", "line"):
+            return None
     if _UP_WORDS.search(said):
         return "dir:up"
+    if _DOWN_WORDS.search(said):
+        return "dir:down"
+    m = _COMPASS.search(said)
+    if m:
+        return "dir:" + _COMPASS_AXIS[re.sub(r"[- ]", "", m.group(1).lower())]
     return None
 
 
 def legal_aims(scene, caster_ref: str, spell=None) -> list[str]:
     """Every aim the spell could take here — the enum a model chooses from, so it cannot
-    invent one (I3 wires it into the plan's schema): the people present, the caster, the
-    features and props here, and straight up."""
+    invent one (`prompts._declared_op(..., aims=...)`): the people present, the caster,
+    the features and props here, straight up, and for a cone or a line the map's axes."""
     out = [f"ref:{r}" for r, a in scene.actors.items()
            if r != caster_ref and not a.has_state("state.down.dead")]
     out.append("self")
     out += [f"object:{n}"[:67] for n in objects_here(scene)]
     out.append("dir:up")
+    # A cone or a line can be pointed along any of the map's axes as well; a burst cannot
+    # (`_check_aim` refuses it), so it is not offered one to choose.
+    shape = shape_of(spell, 1) if spell is not None else {}
+    if shape.get("shape") in ("cone", "line"):
+        out += [f"dir:{d}" for d in DIRECTIONS if d != "up"]
     return [a for a in out if valid(a)]
 
 
