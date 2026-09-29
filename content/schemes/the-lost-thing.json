@@ -9,7 +9,10 @@
     "market, so the first market visit is the player's own. The giver's tell ('looked away')",
     "was a grant at open and put a sentence about the giver on the player's sheet before",
     "they had met; it is now the `noticed` step, when the giver is first present, and the",
-    "looking-away is the hook's `withholds`, shown only when the giver is asked."
+    "looking-away is the hook's `withholds`, shown only when the giver is asked.",
+    "2026-09-29 (Phase 3, I4): `noticed` also needs `event:talk($giver)` — the player and the",
+    "giver have spoken — so the glance away is something seen in an exchange, never",
+    "a thing known of a man the player only walked past."
   ],
   "schemes": [
     {
@@ -198,7 +201,8 @@
           "id": "noticed",
           "criteria": [
             "at($market)",
-            "present($giver)"
+            "present($giver)",
+            "event:talk($giver)"
           ],
           "action": {
             "do": "grant",

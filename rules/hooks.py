@@ -143,7 +143,10 @@ def resolve_target(scene, world, target: str) -> str:
     from . import scope as scope_mod
     from . import states
 
-    t = " ".join(str(target or "").split())
+    # Whom the phrase names, not whom its clause mentions: "the girl that the watchman
+    # described to me" shared "the" and "watchman" with "the watchman waving traffic
+    # through" and resolved to him (I4, beside `scope.in_the_room`'s same fix).
+    t = scope_mod.head_phrase(" ".join(str(target or "").split()))
     if not t:
         return ""
     if _pronoun(t):
@@ -447,9 +450,11 @@ def render(ing: dict, how: str, *, head: str = "", first: bool = False) -> str:
             f"dealing with fits it, they mention {name}'s trouble in passing, in one "
             f"sentence of their own; nobody brings {name} on stage.")
     elif how == "sends_word":
+        known = f" {tie}" if tie else ""
         parts.append(
-            f"Word comes from {name}{role}: a runner or a note asks the player to come by. "
-            f"{name} does not appear.")
+            f"Word comes from {name}{role}, who knows the player:{known} a runner or a note "
+            f"asks them to come by, as one asks a favour of somebody known. {name} does "
+            f"not appear.")
     elif how == "greets":
         known = f" {tie}" if tie else ""
         parts.append(
@@ -463,9 +468,24 @@ def render(ing: dict, how: str, *, head: str = "", first: bool = False) -> str:
     elif how == "asked":
         why = f" Why it matters to them: {motive}." if motive else ""
         gives = f" What they offer: {offer}." if offer else ""
-        parts.append(
-            f"The player has turned to {name}{ref}{role}. {name} says what they want, why, "
-            f"and what they offer, in their own words.{why}{gives}")
+        rel = (ing.get("to_player") or {}).get("relationship", STRANGER)
+        if rel in (TIED, KNOWN):
+            # The row the 2026-09-28 playtest needed and the first table left cold: the
+            # player turning to somebody who knows them. Asked, Drenn was told only "says
+            # what they want" and pitched his own former pupil as a stranger ("You have
+            # the look of someone who can navigate the nuances of a search"). Somebody
+            # who knows the player answers as they know them, and puts it as a favour.
+            known = f" {tie}" if tie else ""
+            parts.append(
+                f"The player has turned to {name}{ref}{role}, who knows them.{known} "
+                f"{name} answers as someone who knows the player — never as a stranger, "
+                f"never giving their own name as if meeting for the first time — and "
+                f"asks it as a favour between people who know each other: what they "
+                f"want, why, and what they offer, in their own words.{why}{gives}")
+        else:
+            parts.append(
+                f"The player has turned to {name}{ref}{role}. {name} says what they want, "
+                f"why, and what they offer, in their own words.{why}{gives}")
         if withholds:
             parts.append(f"If the player asks how it came about, {name} {withholds} — "
                          f"shown in what they do, never explained.")
