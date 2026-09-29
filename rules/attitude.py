@@ -340,6 +340,164 @@ def tells_their_name(actor) -> bool:
     return step_of(of(actor)) >= step_of(TELLS_NAME_FROM)
 
 
+# --- harm: what hurting somebody does to how they feel -----------------------------------
+#
+# Measured 2026-09-28 (item 22.3): Bobby's Burning Hands caught a man and nothing about the
+# man changed — no fight, no attitude, and a swing with a rapier moved nobody's attitude
+# either. No rule anywhere turned harm into feeling. The PF1e book gives no line for "a
+# creature you attack becomes hostile" (the Diplomacy table lists DCs only), so the shape
+# is the engine's own, from the research of docs/design-e-magic.md §4.5:
+#
+#   * A stranger harmed moves to hostile, held as an ActiveEffect through the one
+#     applicator (`Engine._set_attitude`, until dismissed). Regard drops to the hostile
+#     floor with it, and nothing recovers it with time: only talk mends it (owner, Q36) —
+#     `provocation.recover` only returns what `note_grudge` recorded, and harm records
+#     none.
+#   * Somebody on your side (travelling with you, or friendly and better) takes no step:
+#     they lose HARMED regard (owner, Q35), RimWorld's "Harmed me" at the same weight as
+#     its "Insulted", in the mapping `rules/provocation.py` already made.
+#   * Already hostile: nothing more to lose.
+#
+# **Harm counts only when the source is perceived** (owner, Q34, for swords and spells
+# alike — Q37). "If i shoot a blowdart from concealment or [pass] a stealth check then
+# nobody saw that I did it so no one dislikes me for it or tries to fight me." The rule
+# the book gives for attacking from hiding, applied to both doors (`perceived` below):
+#
+#   * Stealth (aonprd.com/Skills.aspx?ItemName=Stealth): "Your Stealth immediately ends
+#     after you make an attack roll, whether or not the attack is successful (except when
+#     sniping ...)". Sniping: "If you've already successfully used Stealth at least 10 feet
+#     from your target, you can make one ranged attack and then immediately use Stealth
+#     again. You take a -20 penalty on your Stealth check to maintain your obscured
+#     location."
+#   * Invisibility (aonprd.com/Rules.aspx?ID=431): "If an invisible creature strikes a
+#     character, the character struck knows the location of the creature that struck him."
+#
+# So a hidden attacker within 5 ft (a blow in reach) is perceived; one 10 ft or more away
+# who is invisible is not; one hidden by Stealth rolls Stealth at -20 against the victim's
+# Perception, and stays unidentified on a result at least as high. A spell is held to the
+# same rule as an arrow. Not sourced, and not applied: whether casting's verbal and
+# somatic components give a hidden caster away (a later book's rule; not fetched).
+
+from .provocation import INSULT as _INSULT  # noqa: E402
+
+HARMED = _INSULT  # "Harmed me" weighs what "Insulted" does (RimWorld −15 each)
+
+# The families a harmful or unpleasant condition sits in — asked as PREFIX questions of
+# the vocabulary, never by name (the first law). Nauseated and sickened are the owner's
+# own examples (`state.impaired`); a charm is not harm and is not here (`attitude.*`,
+# `condition.charmed`), which is why a charm person never opens a fight.
+HARMFUL_STATES = ("state.down", "state.unable", "state.held", "state.impaired",
+                  "state.fear", "state.senses", "state.wound", "state.helpless",
+                  "state.position.prone")
+
+
+def harmful_condition(key: str) -> bool:
+    """Whether landing this condition is harm, asked of its tags."""
+    return any(states.matches(t, fam) for t in states.tags_for(str(key or ""))
+               for fam in HARMFUL_STATES)
+
+
+def harmful_spell(spell, caster_level: int) -> bool:
+    """Whether casting this spell on somebody harms them: it rolls damage, or it lays a
+    harmful condition on a failed save (Q34). Invisibility's own definition of an attack
+    is the line — "any spell targeting a foe or whose area or effect includes a foe" — with
+    the owner's narrowing to harm."""
+    from . import spells as spells_mod
+
+    plan = spells_mod.casting_plan(spell, caster_level)
+    if plan.get("kind") == "damage" and plan.get("dice"):
+        return True
+
+    def walk(specs) -> bool:
+        for spec in specs or []:
+            if not isinstance(spec, dict):
+                continue
+            kind = str(spec.get("type", ""))
+            if kind == "apply_condition" and harmful_condition(spec.get("target", "")):
+                return True
+            if kind == "damage" and spec.get("dice"):
+                return True
+            for key in ("on_failure", "on_success", "effects", "options"):
+                if walk(spec.get(key)):
+                    return True
+        return False
+    return walk(spells_mod.effects_at(spell, caster_level))
+
+
+def perceived(engine, by, victim, *, rolls: list | None = None) -> bool:
+    """Whether `victim` perceives who harmed them — the sniping rule above.
+
+    Rolls (hidden, the engine's own dice) are appended to `rolls` when there is a Stealth
+    contest, so the outcome carries them. A caller that suspends mid-resolution asks once
+    and keeps the answer: a resume must not roll the contest again."""
+    if by is None or victim is None or not by.has_state("state.hidden"):
+        return True
+    gap = engine._gap_ft(by, victim) if hasattr(engine, "_gap_ft") else None
+    if gap is None:
+        # No map: the zones say whether it was a blow in reach.
+        zone = engine.scene.zones.get(victim.ref if by.is_pc else by.ref, "near")
+        close = zone == "engaged"
+    else:
+        close = gap <= 5
+    if close:
+        return True
+    if by.has_state("state.hidden.invisible"):
+        return False
+    from .dice import Modifier
+
+    stealth = engine.dice.d20(list(by.skill_modifiers("stealth"))
+                              + [Modifier(-20, "sniping, to stay hidden")],
+                              label=f"{by.name} Stealth, sniping", visibility="hidden")
+    notice = engine.dice.d20(list(victim.skill_modifiers("perception")),
+                             label=f"{victim.name} Perception", visibility="hidden")
+    if rolls is not None:
+        rolls.extend([stealth.as_dict(), notice.as_dict()])
+    return notice.total > stealth.total
+
+
+def harmed(engine, victim, by, source: str, *, seen: bool | None = None) -> dict | None:
+    """What being harmed by `by` does to how `victim` stands towards the player, through
+    the one applicator. Returns the effect record (the tell is `harm_said`), or None when
+    nothing moves: `by` is not the player (attitudes are towards the party, and the app
+    keeps no per-observer ones), the victim is the player, is `by`, or is dead, or was
+    already hostile.
+
+    `seen` is `perceived(...)`'s answer when the caller already has it; asked here
+    otherwise. Unseen harm changes no attitude and returns a `harm_unseen` record: the
+    victim knows they were hurt, not by whom."""
+    if victim is None or by is None or victim is by or not getattr(by, "is_pc", False):
+        return None
+    if getattr(victim, "is_pc", False) or victim.has_state("state.down.dead"):
+        return None
+    if seen is None:
+        seen = perceived(engine, by, victim)
+    if not seen:
+        return {"kind": "harm_unseen", "ref": victim.ref, "by": by.ref, "source": source}
+    was = of(victim)
+    if victim.has_state(states.TRAVELS_WITH_YOU) or step_of(was) >= step_of(COMES_ALONG):
+        before, after = nudge_regard(victim, -HARMED, f"harmed by {by.name}")
+        return {"kind": "attitude", "ref": victim.ref, "from": was, "to": of(victim),
+                "why": "harmed", "regard": [before, after], "source": source}
+    if was == HOSTILE:
+        return None
+    engine._set_attitude(victim, HOSTILE, None, source)
+    return {"kind": "attitude", "ref": victim.ref, "from": was, "to": HOSTILE,
+            "why": "harmed", "source": source}
+
+
+def harm_said(record: dict | None, name: str) -> str:
+    """The tell for a `harmed` record, in words (the third law)."""
+    if not record:
+        return ""
+    if record.get("kind") == "harm_unseen":
+        return f"{name} is hurt and cannot tell who did it."
+    if record.get("regard"):
+        before, after = record["regard"]
+        line = regard_said(name, before, after)
+        return line or f"{name} will not forget that."
+    return said(name, record.get("from", DEFAULT), record.get("to", HOSTILE))
+
+
 def said(who: str, was: str, now: str) -> str:
     """The tell, in words and never in numbers — the third law.
 

@@ -403,7 +403,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `choose` names which branch of a `choose_one` effect the caster picked. A spell
     # that offers five forms and is cast without naming one applies none of them, which
     # is the whole point of the type: applying all five is what it exists to stop.
-    "cast": (("spell",), ("at", "level", "defensively", "square", "choose"), "hidden"),
+    #
+    # `aim` is where the spell is pointed when it is not a creature, in a closed grammar
+    # (`areas.AIM_PATTERN`): `ref:<ref>`, `self`, `dir:<map direction|up|down>`,
+    # `point:<x>,<y>[,<z>]`, `object:<words>`. "Burning hands into the tree tops" could not
+    # be said at all before it (item 21.2), and a cone sent with no target resolved as
+    # `targets: []` (item 22). `at` is still read, as `ref:<at>`.
+    "cast": (("spell",), ("at", "level", "defensively", "square", "choose", "aim"),
+             "hidden"),
     # Crafted potions and tinctures doing something. `how` is drink, throw or coat, and
     # the difference is real: a splash weapon is a ranged touch attack and a coated blade
     # waits for the next hit. Before these an item was a paragraph in a satchel.
@@ -1146,6 +1153,21 @@ def _check_params(intent: Intent, index: int) -> None:
         # Where a reposition puts its target — the attacker's choice.
         if p.get("square") not in (None, ""):
             p["square"] = _square(p["square"], op, index)
+
+    elif op == "cast":
+        # The aim's grammar is closed, and checked here so a malformed one is the plan's
+        # to repair with the forms named, rather than a guess the engine makes later.
+        if p.get("aim") not in (None, ""):
+            from . import areas
+
+            said = " ".join(str(p["aim"]).split())
+            if not areas.valid(said):
+                raise IntentError(
+                    f"cast: aim {p['aim']!r} is not an aim. A creature is ref:<ref>, the "
+                    f"caster is self, a direction is dir:n|ne|e|se|s|sw|w|nw|up|down, a "
+                    f"square is point:<x>,<y>, a thing here is object:<its name>.",
+                    "schema", index)
+            p["aim"] = said
 
     elif op == "defence":
         kinds = ("damage_reduction", "immunity", "resistance", "vulnerability")

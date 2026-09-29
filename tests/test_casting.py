@@ -48,7 +48,17 @@ def table(caster):
     s = Scene(location_id="5bbd0c40345f")
     s.add(caster)
     s.add(instantiate("thug", scene=s, name="the thug"))
+    _in_a_fight(s)
     return s, Engine(s, Dice(seed=5))
+
+
+def _in_a_fight(s):
+    """A fight already running, the caster's turn. Since 2026-09-28 a first harmful cast
+    outside one opens the fight and defers, like a first swing (item 22.2; owner Q31;
+    tests/test_e_magic_harm.py) — these tests are about what a cast does once cast."""
+    s.initiative = [("pc", 20), ("c1", 10)]
+    s.sides = {"pc": ["pc"], "them": ["c1"]}
+    s.round, s.turn = 1, 0
 
 
 def cast(engine, spell, at="c1"):
@@ -275,13 +285,17 @@ def test_a_spell_that_does_not_exist_is_refused():
 
 # --- preparation ---------------------------------------------------------------------------------
 
-def test_a_night_clears_what_was_prepared():
-    """Slots refill and preparation does not. Leaving them prepared would let a wizard
-    sleep off their spending and keep the spells they had already cast."""
+def test_a_night_keeps_what_was_not_cast():
+    """Changed 2026-09-28 (item 21.4): this pinned `Actor.rest` wiping `prepared`, and the
+    wipe meant every prepared caster woke with nothing. 1e keeps "the ones that he
+    already had prepared from the previous day and has not yet used" (CRB magic chapter),
+    and the spells already cast are gone with their slots — `_op_cast` unprepares the
+    copy it spends. So a night keeps the list as it stands; the refill is
+    `casting.ensure_prepared` (tests/test_e_magic_preparation.py)."""
     w = wizard()
+    held = dict(w.prepared)
     w.rest("night")
-    assert w.prepared == {}
-    assert casting.slots_left(w, 3) == 2
+    assert w.prepared == held
 
 
 def test_preparing_the_same_spell_twice_holds_two_copies():

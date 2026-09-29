@@ -547,6 +547,147 @@ def unprepare(actor, spell_id: str, count: int = 1) -> int:
     return max(0, left)
 
 
+# --- the morning's preparation ----------------------------------------------------------
+#
+# Measured 2026-09-28 (item 21.4): Bobby, a wizard with fifty spells in his book, began the
+# campaign with nothing prepared, and the cause under it was worse — `Actor.rest` set
+# `prepared = {}` every night, so every prepared caster also WOKE with nothing. Its comment
+# guarded against keeping spells already cast, but `_op_cast` has spent the prepared copy
+# with the slot since item 25, so the line only destroyed the spells 1e says survive:
+# "...the ones that he already had prepared from the previous day and has not yet used"
+# (CRB magic chapter). The wipe is gone; this refills the rest.
+#
+# The shape is Pathfinder: Kingmaker's persistent memorised list, re-prepared on rest
+# (community reports; secondary), rather than a blank page each morning — BG3 moved the
+# same way. The player's last preparation is `Actor.loadout`; the Spells tab may still
+# change it at any time out of a fight, as it always could.
+
+def _level(actor, spell_id: str) -> int | None:
+    from . import spells as spells_mod
+
+    try:
+        return spell_level_for(actor, spells_mod.get(str(spell_id)))
+    except KeyError:
+        return None
+
+
+def remember_loadout(actor) -> None:
+    """The preparation the player just made, kept as the one the mornings refill from.
+    Called by `/api/spells/prepare` after every change. Cantrips and domain slots are left
+    out: the first need no preparing here, the second are never auto-filled."""
+    actor.loadout = {str(sid): int(n) for sid, n in (actor.prepared or {}).items()
+                     if int(n or 0) > 0 and not str(sid).startswith("domain:")
+                     and (_level(actor, sid) or 0) > 0}
+
+
+def _held_by_level(actor) -> dict[int, int]:
+    held: dict[int, int] = {}
+    for sid, n in (actor.prepared or {}).items():
+        if str(sid).startswith("domain:"):
+            continue
+        lvl = _level(actor, sid)
+        if lvl is not None and lvl > 0:
+            held[lvl] = held.get(lvl, 0) + int(n or 0)
+    return held
+
+
+def empty_slots(actor) -> dict[int, int]:
+    """Slots per spell level (above 0) that hold no prepared spell, for the sheet's warning.
+    {} for spontaneous casters — any slot casts anything they know — and non-casters."""
+    if caster_data(actor).get("kind") != "prepared":
+        return {}
+    held = _held_by_level(actor)
+    out = {}
+    for lvl, room in slots_for(actor).items():
+        if lvl > 0 and room - held.get(lvl, 0) > 0:
+            out[lvl] = room - held.get(lvl, 0)
+    return out
+
+
+def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") -> dict:
+    """Fill a prepared caster's empty slots, in 1e's order. Returns
+    {"kept": {id: n}, "added": {id: n}, "empty": {level: n}, "from": "loadout"|"book"|"none"}.
+
+    1. Spontaneous casters and non-casters: nothing to do.
+    2. What is still prepared stays (`kept`, default the prepared list as it stands).
+    3. Each level's remaining room is refilled from the loadout, the last preparation the
+       player made.
+    4. No loadout ever (a fresh character) and a caster who prepares from a book: the book,
+       in the book's own order, one of each distinct spell before any repeat.
+    5. A caster who prepares from the whole list (cleric, druid; 1,143 spells) gets no
+       invented choice: the slots stand empty and the warning carries it (owner, Q39).
+    Domain slots are never auto-filled.
+    """
+    data = caster_data(actor)
+    out = {"kept": {}, "added": {}, "empty": {}, "from": "none", "reason": reason}
+    if data.get("kind") != "prepared":
+        return out
+    if kept is not None:
+        actor.prepared = {str(k): int(v) for k, v in kept.items() if int(v or 0) > 0}
+    out["kept"] = {k: int(v) for k, v in (actor.prepared or {}).items() if int(v or 0) > 0}
+    room = {lvl: n - _held_by_level(actor).get(lvl, 0)
+            for lvl, n in slots_for(actor).items() if lvl > 0}
+
+    def add(sid: str, lvl: int) -> bool:
+        if room.get(lvl, 0) <= 0:
+            return False
+        prepare(actor, sid, 1)
+        out["added"][sid] = out["added"].get(sid, 0) + 1
+        room[lvl] -= 1
+        return True
+
+    loadout = {str(k): int(v) for k, v in (getattr(actor, "loadout", None) or {}).items()}
+    if loadout:
+        out["from"] = "loadout"
+        for sid, want in loadout.items():
+            lvl = _level(actor, sid)
+            if lvl is None or lvl <= 0:
+                continue
+            if data.get("prepare_from") in ("spellbook", "known") \
+                    and sid not in (actor.spellbook or []):
+                continue
+            while prepared_count(actor, sid) < want and add(sid, lvl):
+                pass
+    elif data.get("prepare_from") == "spellbook":
+        out["from"] = "book"
+        by_level: dict[int, list[str]] = {}
+        for sid in actor.spellbook or []:
+            lvl = _level(actor, sid)
+            if lvl is not None and lvl > 0 and lvl in room and sid not in by_level.get(lvl, []):
+                by_level.setdefault(lvl, []).append(str(sid))
+        for lvl, ids in by_level.items():
+            while room.get(lvl, 0) > 0 and ids:
+                for sid in ids:
+                    if not add(sid, lvl):
+                        break
+    out["empty"] = empty_slots(actor)
+    if not out["added"]:
+        out["from"] = "none" if not out["kept"] else out["from"]
+    return out
+
+
+def prepared_said(actor, got: dict) -> str:
+    """The rest's tell for the morning's preparation, in words: what was prepared and
+    which levels stand empty. No numbers but counts of spells."""
+    from . import spells as spells_mod
+
+    bits = []
+    if got.get("added"):
+        names = []
+        for sid, n in got["added"].items():
+            try:
+                name = spells_mod.get(sid).name
+            except KeyError:
+                name = sid
+            names.append(name + (f" ×{n}" if n > 1 else ""))
+        where = " from the book" if got.get("from") == "book" else ""
+        bits.append(f"{actor.name} prepares {', '.join(names)}{where}.")
+    for lvl, n in sorted((got.get("empty") or {}).items()):
+        bits.append(f"Level {lvl} slots stand empty: nothing is prepared in "
+                    f"{'one of them' if n == 1 else f'{n} of them'}.")
+    return " ".join(bits)
+
+
 def slot_pool(spell_level: int) -> str:
     """Slots are ordinary resource pools, so they refresh on a night's rest, survive a
     save and show on the sheet without a second mechanism for any of it."""
@@ -574,8 +715,8 @@ def slots_left(actor, spell_level: int):
 
 __all__ = [
     "CASTERS", "FULL_CASTER", "PROGRESSIONS", "bonus_slots", "can_cast_level",
-    "caster_data", "caster_level", "casting_ability", "define_slots",
-    "highest_spell_level", "is_caster", "knows", "level_on_list", "prepare",
-    "prepared_count", "save_dc", "slot_pool", "slots_for", "slots_left", "spell_level_for",
-    "unprepare",
+    "caster_data", "caster_level", "casting_ability", "define_slots", "empty_slots",
+    "ensure_prepared", "highest_spell_level", "is_caster", "knows", "level_on_list",
+    "prepare", "prepared_count", "remember_loadout", "save_dc", "slot_pool", "slots_for",
+    "slots_left", "spell_level_for", "unprepare",
 ]

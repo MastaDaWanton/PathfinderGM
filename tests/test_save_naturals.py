@@ -132,6 +132,10 @@ def test_the_spell_save(face, bonus, saved):
     s = _thug_scene()
     _wizard_at(s)
     _cursed(s.actors["c1"], "ref", bonus)
+    # In a fight already: a first harmful cast outside one opens the fight and rolls
+    # nothing (item 22.2), and this loaded die has one face to give.
+    s.initiative, s.sides, s.round, s.turn = (
+        [("pc", 20), ("c1", 10)], {"pc": ["pc"], "them": ["c1"]}, 1, 0)
     e = Engine(s, Loaded(face))
     out = e.run(e.validate([{"op": "cast", "actor": "pc", "because": "test",
                              "visibility": "hidden",

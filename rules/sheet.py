@@ -3309,10 +3309,13 @@ class Actor:
         from . import survival
 
         survival.sleep(self, hours)
-        # A night undoes the morning's preparation as well as the day's wounds. Leaving
-        # them prepared would let a wizard sleep off their slot spending and keep the
-        # spells they had already cast — the slots refill and the preparation does not.
-        self.prepared = {}
+        # The preparation is NOT wiped. It was (`self.prepared = {}`), to stop a wizard
+        # keeping spells already cast — but `_op_cast` has spent the prepared copy with the
+        # slot since item 25, so all the wipe still did was destroy what 1e keeps: "the
+        # ones that he already had prepared from the previous day and has not yet used"
+        # (CRB magic chapter). Measured 2026-09-28 (item 21.4): every prepared caster
+        # woke with nothing. What is left stays; `casting.ensure_prepared` refills the
+        # rest from the player's last loadout (`Engine._op_rest`).
 
         restored = {}
         for ab in list(self.ability_damage):
@@ -4233,19 +4236,27 @@ def _castable_summary(actor: Actor) -> list[dict]:
     prepared = dict(getattr(actor, "prepared", None) or {})
     if not book and not prepared:
         return []
+    # Asked of the class, not of whether `prepared` happens to be empty. It read
+    # `if prepared and not left`, and `{}` is falsy — so a prepared caster with NOTHING
+    # prepared was offered the whole book (fix-interfaces §1.7 F1), and every button
+    # beyond the cantrips was one the engine would refuse.
+    kind = str(casting.caster_data(actor).get("kind", "") or "")
 
     out: list[dict] = []
     for sid in sorted(set(book) | set(prepared)):
         left = prepared.get(sid)
-        if prepared and not left:
-            continue          # a prepared caster cannot cast what is not in their head
         try:
             from . import spells as spells_mod
 
             spell = spells_mod.get(sid)
             name, summary = spell.name, spell.line
+            level = casting.spell_level_for(actor, spell)
         except Exception:
-            name, summary = sid, ""
+            name, summary, level = sid, "", None
+        if kind == "prepared" and not left and level != 0:
+            continue          # a prepared caster cannot cast what is not in their head
+        if kind != "prepared" and prepared and not left:
+            continue
         out.append({"id": sid, "name": name, "summary": summary,
                     "left": left})
     return out

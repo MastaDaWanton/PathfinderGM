@@ -4696,7 +4696,8 @@ def declared_ops(player_text: str, scene, world=None, *, attached=None) -> list[
     """The ops the player's own words already commit the turn to.
 
     `attached` is the turn's attachments (a spell chosen from the Spells button,
-    docs/fix-interfaces.md §2.10): accepted and not read yet — Lane E reads it in Phase 2.
+    docs/fix-interfaces.md §2.10). A spell attached commits the turn to a `cast` whatever
+    the words say — "into the tree tops" names no spell, and the chip is the declaration.
 
     Each injector is asked what it would add to an empty turn. Whatever it names is
     something the player has plainly declared, so the schema can insist on it up front
@@ -4717,7 +4718,44 @@ def declared_ops(player_text: str, scene, world=None, *, attached=None) -> list[
         op = str((entry or {}).get("op", "")).strip()
         if op and op not in ops:
             ops.append(op)
+    if _attached_spell(attached) is not None and "cast" not in ops:
+        ops.append("cast")
     return ops
+
+
+def _attached_spell(attached) -> dict | None:
+    """The spell attachment riding this turn, or None."""
+    return next((a for a in (attached or ()) if isinstance(a, dict)
+                 and a.get("kind") == "spell" and a.get("id")), None)
+
+
+def _cast_the_attached(raw_intents, scene, chip: dict) -> list:
+    """The chip beats the words and the model on WHICH spell (docs/design-e-magic.md
+    §4.6): the plan's cast takes the chip's spell id, and its aim when the plan named
+    none; a plan with no cast gets one; any second cast is dropped, because one chip is
+    one spell. One route for typed and attached casts — both reach the same op."""
+    pc = scene.pc() if scene is not None else None
+    if pc is None or not isinstance(raw_intents, list):
+        return raw_intents
+    out, done = [], False
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "cast":
+            if done:
+                continue
+            params = dict(r.get("params") or {}) if isinstance(r.get("params"), dict) else {}
+            params["spell"] = str(chip["id"])
+            if chip.get("aim") and not params.get("aim"):
+                params["aim"] = str(chip["aim"])
+            r = dict(r, params=params, actor=r.get("actor") or pc.ref)
+            done = True
+        out.append(r)
+    if not done:
+        params = {"spell": str(chip["id"])}
+        if chip.get("aim"):
+            params["aim"] = str(chip["aim"])
+        out.append({"op": "cast", "actor": pc.ref, "params": params,
+                    "because": "the player attached the spell"})
+    return out
 
 
 # --- casting a spell ---------------------------------------------------------------------
@@ -4748,7 +4786,11 @@ _ABOUT_A_SPELL = re.compile(
 def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
     """Make a declared spell reach the engine.
 
-    `attached`: the turn's attachments, accepted and not read yet (Lane E, Phase 2)."""
+    `attached`: the turn's attachments. A spell chip is the declaration on its own and is
+    honoured before any of the reading below (`_cast_the_attached`)."""
+    chip = _attached_spell(attached)
+    if chip is not None and isinstance(raw_intents, list) and scene is not None:
+        return _cast_the_attached(raw_intents, scene, chip)
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text or _ABOUT_A_SPELL.search(player_text):
@@ -4804,6 +4846,17 @@ def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
         if actor.name.lower() in said:
             params["at"] = ref
             break
+    # Or something: "into the tree tops" is the canopy (item 21.2), grounded by the same
+    # reader the attached chip uses, so a typed cast and an attached one aim alike.
+    if "at" not in params:
+        from rules import areas
+
+        try:
+            aim = areas.aim_from_words(scene, pc.ref, player_text, spells_mod.get(chosen))
+        except KeyError:
+            aim = None
+        if aim:
+            params["aim"] = aim
     return list(raw_intents) + [{
         "op": "cast", "actor": pc.ref, "params": params,
         "because": "the player said they cast it",
@@ -5842,15 +5895,20 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
         return
     killed, struck = [], []
     for o in outcomes or []:
-        for e in getattr(o, "effects", None) or []:
-            if not isinstance(e, dict):
-                continue
+        effects = [e for e in (getattr(o, "effects", None) or []) if isinstance(e, dict)]
+        # Harm nobody saw the source of (owner, Q34): the crowd saw somebody hurt, not the
+        # player do it, so it is no heat on the player (`attitude.perceived`).
+        unseen = {e.get("ref") for e in effects if e.get("kind") == "harm_unseen"}
+        for e in effects:
             a = scene.actors.get(e.get("ref"))
-            if a is None or getattr(a, "is_pc", False):
+            if a is None or getattr(a, "is_pc", False) or e.get("ref") in unseen:
                 continue
             if e.get("kind") == "condition" and e.get("condition") == "dead":
                 killed.append(a.name)
-            elif e.get("kind") == "damage" and str(getattr(o, "op", "")) in ("attack", "damage"):
+            # A spell's damage too (item 22.3): Burning Hands through a man in front of a
+            # crowd counted for nothing, because only the sword's ops were read.
+            elif e.get("kind") == "damage" and str(getattr(o, "op", "")) in (
+                    "attack", "damage", "cast"):
                 struck.append(a.name)
     if killed:
         scene.heat = {"note": f"the player just killed {', '.join(killed)} in "

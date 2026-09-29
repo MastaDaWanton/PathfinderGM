@@ -60,7 +60,17 @@ def table(caster, seed=5):
     s = Scene(location_id="5bbd0c40345f")
     s.add(caster)
     s.add(instantiate("thug", scene=s, name="the thug"))
+    _in_a_fight(s)
     return s, Engine(s, Dice(seed=seed))
+
+
+def _in_a_fight(s):
+    """A fight already running, the caster's turn. Since 2026-09-28 a first harmful cast
+    outside one opens the fight and defers, like a first swing (item 22.2; owner Q31;
+    tests/test_e_magic_harm.py) — these tests are about what a cast does once cast."""
+    s.initiative = [("pc", 20), ("c1", 10)]
+    s.sides = {"pc": ["pc"], "them": ["c1"]}
+    s.round, s.turn = 1, 0
 
 
 def cast(engine, spell, at="c1", visibility=None):

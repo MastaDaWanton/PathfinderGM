@@ -121,7 +121,30 @@ def _spellcasting_state(pc) -> dict:
             kind = ""
     nothing = kind == "prepared" and not any(
         int(n or 0) > 0 for n in (getattr(pc, "prepared", None) or {}).values())
-    return {"kind": kind, "nothing_prepared": bool(nothing), "empty_slots": {}}
+    # The slots a morning left empty, for the sheet's warning (item 21.4) — keyed by the
+    # level as a string, the shape §2.10 gives the wire.
+    empty = ({str(lvl): int(n) for lvl, n in casting.empty_slots(pc).items()}
+             if kind == "prepared" else {})
+    return {"kind": kind, "nothing_prepared": bool(nothing), "empty_slots": empty}
+
+
+def _latest_areas(c) -> list[dict]:
+    """`scene.grid.areas`: [{"spell", "cells"}] for the casts of the latest resolved turn,
+    or []. A turn with no cast shows none — an area is the turn's ruling, not scenery."""
+    for entry in reversed(getattr(c, "turn_log", None) or []):
+        if entry.get("kind") not in ("turn", "resolution"):
+            continue
+        out = []
+        for o in entry.get("outcomes") or []:
+            if o.get("op") != "cast":
+                continue
+            for e in o.get("effects") or []:
+                area = e.get("area") if e.get("kind") == "cast" else None
+                if isinstance(area, dict) and area.get("squares"):
+                    out.append({"spell": e.get("spell", ""),
+                                "cells": [list(x) for x in area["squares"]]})
+        return out
+    return []
 
 
 def _start_state(scene) -> dict:
@@ -291,6 +314,13 @@ def cast_act(request):
         params["at"] = pc.ref
     elif at:
         params["at"] = at
+    # Where it is pointed when that is not a person (item 21.2): the same grammar, the
+    # same check at the door, as a spell attached to a spoken turn.
+    aim = body.get("aim")
+    if aim not in (None, ""):
+        if not isinstance(aim, str) or not _AIM.match(aim):
+            return JsonResponse({"error": _aim_help(aim)}, status=400)
+        params["aim"] = aim
     label = str(body.get("label") or f"I cast {spell}").strip()
     engine = c.engine()
     agent = GMAgent(c.world, engine)
@@ -304,8 +334,16 @@ def cast_act(request):
     except (IntentError, ValueError, KeyError) as exc:
         scene.restore(undo)
         c.transcript.pop()
-        return JsonResponse({"error": str(exc)}, status=400)
-    return _finish(c, agent, resolution, "", label, plan=None, hand_over=True)
+        # A refusal the player can fix is the one shape both doors answer in (§2.6):
+        # 422, the sentence, and the fix a button can offer.
+        if getattr(exc, "fixable_by", "") == "player":
+            return _refusal({"text": getattr(exc, "for_a_person", "") or str(exc),
+                             "code": exc.code, "fix": exc.fix})
+        return JsonResponse({"error": getattr(exc, "for_a_person", "") or str(exc)},
+                            status=400)
+    # A button's label is not the player's words: "" for the after-the-beat steps.
+    return _finish(c, agent, resolution, "", label, plan=None, hand_over=True,
+                   player_text="")
 
 
 def _grid_state(scene) -> dict | None:
@@ -436,9 +474,12 @@ def _state(c) -> dict:
     coins = goods_mod.coinage(c.world, c.location)
 
     def with_areas(grid):
-        # The latest turn's spell areas, for the map's overlay: Lane E fills it (§2.10).
+        # The latest turn's spell areas, for the map's overlay (§2.10): the cells each
+        # cast's area covered, read off the last resolved turn in the log, so the map
+        # shows the ruling the engine made and the player can dispute it the way a table
+        # would (docs/design-e-magic.md §3.1).
         if grid is not None:
-            grid["areas"] = []
+            grid["areas"] = _latest_areas(c)
         return grid
 
     return {
@@ -1263,6 +1304,9 @@ def prepare_spells(request):
     else:
         return JsonResponse(
             {"error": "action must be learn, forget, prepare or unprepare"}, status=400)
+    # What the player chose is what the mornings refill (`casting.ensure_prepared`).
+    if action in ("prepare", "unprepare", "forget"):
+        casting.remember_loadout(pc)
 
     c.save()
     return JsonResponse(full_sheet(pc))
@@ -1369,6 +1413,15 @@ def say(request):
     if c.ended:
         return JsonResponse(_ended_payload(c), status=410)
 
+    # A spell attached is acted on (Lane E): checked against the character BEFORE any
+    # model call, and its aim grounded from the player's words. A refusal the player can
+    # fix answers now, as the one 422 shape (§2.6): no beat, no clock, no NPC turn.
+    acting = attached
+    if attached and not carry_on:
+        acting, refused = _dry_cast(c, attached, text if typed else "")
+        if refused:
+            return _refusal(refused)
+
     # The player's line, with the chip drawn before it when there is one (design F §4.4);
     # the key only when sent, so every beat before attachments reads as it did.
     beat = {"who": "player", "text": shown,
@@ -1398,10 +1451,11 @@ def say(request):
     agent = GMAgent(world, c.engine())
     _arm_cards(agent, c)
     agent.false_claim = claim
-    # Read by the planner's `declared_ops(attached=…)` and the narrator checks — accepted
-    # and not yet acted on (Lane E). Set every turn on a fresh agent, so it never outlives
-    # the turn, as `claim` does not.
-    agent.attachments = attached
+    # Read by the planner's `declared_ops(attached=…)`, `inject_cast(attached=…)` and the
+    # narrator checks: the chip, with the aim grounded from the words when it carried
+    # none. Set every turn on a fresh agent, so it never outlives the turn, as `claim`
+    # does not.
+    agent.attachments = acting
 
     # Free actions taken since the last spoken turn ride along as context rather than
     # having cost turns of their own. Into `history`, not `player_input`: the injectors
@@ -1429,8 +1483,20 @@ def say(request):
     except IntentError as exc:
         c.transcript.pop()
         _put_back_free_actions(c, pending)
+        if getattr(exc, "fixable_by", "") == "player":
+            return _refusal({"text": exc.for_a_person or str(exc), "code": exc.code,
+                             "fix": exc.fix})
         return JsonResponse({"error": f"The GM could not produce a legal turn. {exc}"},
                             status=502)
+
+    # The plan loop stopped on a refusal only the player can fix (Lane A sets
+    # `TurnPlan.refusal`, §2.6): the same 422 as the dry check above, and the turn never
+    # happened — the line comes off the transcript the way the 502 path takes it off.
+    stopped = getattr(plan, "refusal", None)
+    if stopped:
+        c.transcript.pop()
+        _put_back_free_actions(c, pending)
+        return _refusal(stopped)
 
     # The interpreter's reading of the sentence rides with the plan into the turn log,
     # beside the detectors' opinion, so every disagreement is on the record
@@ -1575,7 +1641,8 @@ def combat_act(request):
 
     # A turn the player has not finished does not pass to anybody. This is what
     # `end_turn` was always supposed to mean.
-    return _finish(c, agent, resolution, "", label, plan=None, hand_over=end_turn)
+    return _finish(c, agent, resolution, "", label, plan=None, hand_over=end_turn,
+                   player_text="")
 
 
 @require_POST
@@ -1706,6 +1773,58 @@ _AIM = re.compile(r"^(ref:[A-Za-z0-9_-]+|self|dir:(n|ne|e|se|s|sw|w|nw|up|down)"
                   r"|point:\d+,\d+(,\d+)?|object:[^\n]{1,60})$")
 
 
+def _aim_help(aim) -> str:
+    return (f"{aim!r} is not an aim a spell can take: a person (ref:c1), yourself (self), "
+            f"a direction (dir:n), a square (point:3,4) or a thing (object:the cart).")
+
+
+def _dry_cast(c, attached: tuple, text: str):
+    """Before any model is asked (item 21.3): the attached spell's cast, validated in a
+    snapshot. Returns `(attachments, refusal)` — the attachments with an aim grounded from
+    the player's own words where the chip carried none (`areas.aim_from_words`), and the
+    §2.6 refusal dict when the cast cannot happen for a reason only the player can fix.
+
+    Measured 2026-09-28: an unprepared Burning Hands went through seven plan attempts,
+    each refused with the same sentence, a hand-off to a second model and a narrate_only
+    — and the player never learned why. The refusal is a fact about the character; no plan
+    can change it, so no model is asked."""
+    from rules import areas, spells as spells_mod
+
+    chip = next((a for a in attached if a.get("kind") == "spell"), None)
+    if chip is None:
+        return attached, None
+    pc = c.scene.pc()
+    chip = dict(chip)
+    if not chip.get("aim"):
+        try:
+            spell = spells_mod.get(chip["id"])
+        except KeyError:
+            spell = None
+        found = areas.aim_from_words(c.scene, pc.ref, text, spell) if pc else None
+        if found:
+            chip["aim"] = found
+    params = {"spell": chip["id"]}
+    if chip.get("aim"):
+        params["aim"] = chip["aim"]
+    engine = c.engine()
+    undo = c.scene.snapshot()
+    refusal = None
+    try:
+        engine.validate([{"op": "cast", "actor": pc.ref, "params": params,
+                          "because": "the player attached it"}])
+    except IntentError as exc:
+        # `no_aim` is left to the model: "if they write nothing, the model infers the
+        # use" (item 21.1). Everything else the player can fix is answered now.
+        if exc.fixable_by == "player" and exc.code != "no_aim":
+            refusal = {"text": exc.for_a_person or str(exc), "code": exc.code,
+                       "fix": exc.fix}
+    except (ValueError, KeyError):
+        pass
+    finally:
+        c.scene.restore(undo)
+    return tuple([chip] + [a for a in attached if a.get("kind") != "spell"]), refusal
+
+
 def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
     """The turn's attachments, checked at the door: `(attachments, "")`, or `((), why)`
     with a sentence for the player when one breaks a rule of §2.10.
@@ -1745,9 +1864,7 @@ def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, 
     if "aim" in item:
         aim = item.get("aim")
         if not isinstance(aim, str) or not _AIM.match(aim):
-            return (), (f"{aim!r} is not an aim a spell can take: a person (ref:c1), "
-                        f"yourself (self), a direction (dir:n), a square (point:3,4) or "
-                        f"a thing (object:the cart).")
+            return (), _aim_help(aim)
         out["aim"] = aim
     return (out,), ""
 
@@ -2081,7 +2198,8 @@ def _arm_cards(agent, c) -> None:
     agent.ledger = c.ledger
 
 
-def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True):
+def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
+            player_text=None):
     """Narrate what the engine decided, then let the world answer.
 
     `hand_over` is False for an action that does not end your turn — a free action, a
@@ -2096,7 +2214,11 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True)
     # Which door this turn came through, for the after-the-beat steps (play/aftermath):
     # Continue carries no words of the player's, so a step that logs them logs nothing.
     door = "carry_on" if player_input == CARRY_ON else "turn"
-    player_text = "" if door == "carry_on" else (player_input or "")
+    # `player_text` is "" for a button (the Spells tab, the combat panel): "I cast Burning
+    # Hands" written by a button is not the player's own words, and the after-the-beat
+    # steps must not read it as if typed (fix-interfaces §3.4, S3's finding).
+    if player_text is None:
+        player_text = "" if door == "carry_on" else (player_input or "")
     attached = _attached_this_turn(c)
 
     # The thread first, so the brief below states the engagement this very turn

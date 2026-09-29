@@ -333,7 +333,12 @@ def test_dice_can_scale_per_level(notation, cl, want):
 
 def test_fog_cloud_writes_real_squares_onto_the_map():
     """The user's own example. `Grid.obscuring` is a set the map already draws and that
-    `line_of_sight` already reads, so a bank of fog is 61 squares of it — not a sentence."""
+    `line_of_sight` already reads, so a bank of fog is 44 squares of it — not a sentence.
+
+    44, not the 61 this pinned until 2026-09-28: the grid's `burst` measured from a
+    square's centre, and the book measures from an intersection with a square in when its
+    far corner is inside the radius (Aiming a Spell; `rules/areas.py`). Fog clouds shrank
+    to the book's size with every other area (docs/fix-interfaces.md §3.4)."""
     override("fog-cloud", [{
         "type": "manifest", "what": "a bank of fog", "terrain": "obscuring",
         "shape": "radius", "size": 20, "duration": {"amount": 10, "unit": "minute"},
@@ -345,13 +350,13 @@ def test_fog_cloud_writes_real_squares_onto_the_map():
 
     assert len(scene.manifests) == 1
     made = scene.manifests[0]
-    # Sixty-one SQUARES of ground, as it always was — but the fog is a sphere of cells
+    # Forty-four SQUARES of ground, the book's count — and the fog is a sphere of cells
     # now, because Aiming a Spell defines a spread as extending "in all directions" and
     # this engine used to fill a disc. The ground it covers is the number a player
     # pictures; the cells are what decides who is standing in it, including anybody on a
     # gallery above the floor.
     assert made.terrain == "obscuring"
-    assert len({(s[0], s[1]) for s in made.squares}) == 61
+    assert len({(s[0], s[1]) for s in made.squares}) == 44
     assert all(len(s) == 3 and s[2] >= 0 for s in made.squares), "fog below the floor"
     assert scene.grid.obscuring, "the fog never reached the map"
     assert scene.grid.line_of_sight((5, 5), (12, 5)) is False, "sight went through the fog"
