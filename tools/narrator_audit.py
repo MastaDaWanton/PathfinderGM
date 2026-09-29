@@ -322,11 +322,15 @@ SCRIPTS = {
     # cast — one refusal shown to the player, not seven retries — when Sleep is in the
     # book but not prepared.
     "cast-area": [
+        # A wizard 1 has two level-1 slots, filled on the first morning in book order
+        # (Burning Hands, Magic Missile): the first cast is the one that proves an area
+        # catching a person, the second spends the other slot, and the rest are the
+        # refusals a spent caster should get (measured 2026-09-28: the old order spent
+        # Burning Hands on empty air and never tested a victim).
         "I look around at who is standing near me.",
-        "I cast burning hands into the empty air above my head.",
         "I cast burning hands at the man standing nearest me.",
-        "I cast burning hands at the two of them together.",
-        "I cast burning hands into the dry brush at the roadside.",
+        "I cast magic missile at him.",
+        "I cast burning hands into the empty air above my head.",
         "I cast sleep on the whole crowd.",
         "I stand my ground and watch what they do.",
     ],
