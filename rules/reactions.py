@@ -132,25 +132,35 @@ def threatens(scene, watcher_ref: str, square) -> bool:
     map. A reaction that fired on an unmeasurable battlefield would be the engine inventing
     geometry, and the GM's zones do not carry enough to tell whether a square was left.
     """
+    return tuple(square) in threatened_by(scene, watcher_ref)
+
+
+def threatened_by(scene, watcher_ref: str) -> set:
+    """Every square this creature threatens right now — `threatens`, as the whole set.
+
+    Split out so a question asked of many squares (the way out of a fight,
+    `provoked_by_withdraw`) builds the set once per watcher instead of once per square.
+    One rule either way: `threatens` is this set's membership test.
+    """
     if not scene.has_grid:
-        return False
+        return set()
     anchor = scene.positions.get(watcher_ref)
     watcher = scene.actors.get(watcher_ref)
     # Threatening a square is about being able to swing into it.
     if anchor is None or watcher is None or watcher.blocking_key("attack"):
-        return False
+        return set()
     if disarmed_and_empty_handed(scene, watcher):
-        return False
+        return set()
     reach = _reach_of(watcher)
     if reach <= 0:
-        return False
+        return set()
     threatened = gridmod.threatened_squares(anchor, watcher.size, reach=reach)
     if reach_gap(watcher):
         # A reach weapon cannot strike what is right beside you. Subtracting the adjacent
         # ring here rather than in `grid` keeps geometry ignorant of inventory.
         threatened -= gridmod.threatened_squares(anchor, watcher.size,
                                                  reach=gridmod.SQUARE_FT)
-    return tuple(square) in threatened
+    return threatened
 
 
 def disarmed_and_empty_handed(scene, actor) -> bool:
@@ -314,6 +324,183 @@ def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
     return out
 
 
+# The most watchers the way-out search weighs every combination of. The search tries
+# each set of attackers of opportunity from the smallest up, so it is 2^n walks of the
+# board: six is 64 walks and covers any fight this app has run. Past it, see
+# `_owed_on_the_way_out`'s fallback.
+_MOST_TO_WEIGH = 6
+
+
+def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
+    """Who gets an attack of opportunity because this creature walks out of the fight.
+
+    Leaving a fight for somewhere else — a `travel` or a `journey` begun mid-encounter —
+    is the WITHDRAW action (CRB p.188, aonprd.com/Rules.aspx?Name=Withdraw&Category=
+    Full-Round%20Actions), not a plain move, because it is the one action 1e gives for
+    exactly this and a player walking off the board is spending the whole round on it:
+
+    - "The square you start out in is not considered threatened by any opponent you can
+      see", so a visible foe who threatens only that square gets no swing. One man with
+      a club beside you does not get a free hit as you back away from him.
+    - "Invisible enemies still get attacks of opportunity against you, and you can't
+      withdraw from combat if you're blinded" — so an unseen foe keeps the start square,
+      and a blinded mover keeps no exemption at all.
+    - "If, during the process of withdrawing, you move out of a threatened square (other
+      than the one you started in), enemies get attacks of opportunity as normal." This
+      is where reach comes back in: an ogre beside you threatens every square you can
+      step into, so it still swings; a glaive-wielder standing ten feet off does not,
+      because the first step directly away is out of his reach.
+
+    The destination is off the map — another place — so the route is not the player's
+    to draw here. What is decided instead is the route a sensible withdrawer would take:
+    the way off the board (an unthreatened square, or the map's edge) that leaves the
+    fewest foes owed a swing, by `_owed_on_the_way_out`. Each foe is owed at most once
+    however many of its squares are crossed ("Moving out of more than one square
+    threatened by the same opponent in the same round doesn't count as more than one
+    opportunity", CRB p.180). A five-foot step never applies: a walk out of the place is
+    more than five feet by definition.
+
+    Allies, bystanders and anyone who cannot swing are skipped exactly as
+    `provoked_by_move` skips them. Nothing on a scene with no map, for `threatens`'s
+    reason.
+    """
+    if not scene.has_grid:
+        return []
+    mover = scene.actors.get(mover_ref)
+    at = scene.positions.get(mover_ref)
+    if mover is None or at is None:
+        return []
+    start = (at[0], at[1])
+
+    from . import states
+
+    watchers: dict[str, tuple[list[Reaction], set]] = {}
+    for ref, watcher in scene.actors.items():
+        if ref == mover_ref or _allied(scene, ref, mover_ref):
+            continue
+        if watcher.has_state(states.BYSTANDER):
+            continue
+        owed = [r for r in reactions_for(watcher) if r.fires_on("leaves_threatened_square")]
+        zone = threatened_by(scene, ref) if owed else set()
+        if zone:
+            watchers[ref] = (owed, zone)
+    if not watchers:
+        return []
+
+    cache: dict = {}
+
+    def threat(anchor) -> frozenset:
+        if anchor not in cache:
+            body = gridmod.footprint(anchor, mover.size)
+            cache[anchor] = frozenset(r for r, (_owed, zone) in watchers.items()
+                                      if any(sq in zone for sq in body))
+        return cache[anchor]
+
+    at_start = threat(start)
+    if mover.has_state("state.senses.blinded"):
+        # "You can't withdraw from combat if you're blinded": no square is exempt.
+        seen: set[str] = set()
+    else:
+        seen = {r for r in at_start if _seen_by(scene, mover_ref, r)}
+    owed_refs = (at_start - seen) | _owed_on_the_way_out(scene, mover_ref, start, threat,
+                                                         set(watchers), at_start)
+
+    out: list[tuple[str, Reaction]] = []
+    for ref in scene.actors:                  # the scene's order, so the swings are stable
+        if ref in owed_refs:
+            out.extend((ref, reaction) for reaction in watchers[ref][0])
+    return out
+
+
+def _seen_by(scene, viewer_ref: str, ref: str) -> bool:
+    """Can the withdrawer see this foe — the Withdraw clause's "any opponent you can see".
+
+    Unseen is the vocabulary's `state.hidden` (invisible, or anything a document hides
+    under it) or no clear line between the two on the map (a wall, a fog cloud's
+    obscuring squares). Not modelled: see invisibility, darkness and its darkvision —
+    the map has no light level yet, so a foe in the dark reads as seen.
+    """
+    foe = scene.actors.get(ref)
+    viewer = scene.actors.get(viewer_ref)
+    if foe is None or viewer is None or foe.has_state("state.hidden"):
+        return False
+    a, b = scene.positions.get(viewer_ref), scene.positions.get(ref)
+    if a is None or b is None:
+        return False
+    mine = gridmod.footprint((a[0], a[1]), viewer.size)
+    theirs = gridmod.footprint((b[0], b[1]), foe.size)
+    return any(scene.grid.line_of_sight(p, q) for p in mine for q in theirs)
+
+
+def _owed_on_the_way_out(scene, mover_ref: str, start, threat, candidates: set,
+                         at_start: frozenset) -> set:
+    """The fewest foes whose threatened squares the withdrawer must leave after the first.
+
+    A breadth-first walk of the board from the start square, stepping only where the
+    mover's body fits (inside no wall, on no foe's body — allies may be passed, as the
+    rule allows), until it reaches a square nobody threatens or steps off the map's
+    edge. Every square left on the way after the start provokes from whoever threatens
+    it, so the walk is tried with each set of foes allowed to threaten the squares it
+    crosses, smallest set first; the first set with a way out is the answer. Ties go to
+    the scene's order, which keeps the choice stable from run to run.
+
+    Past `_MOST_TO_WEIGH` foes, and when no way out exists at all (walled in, or the only
+    gap is through somebody), the answer is every foe who threatens the start square or
+    any square beside it — a withdrawer surrounded that thoroughly has nowhere clean to
+    go, and handing the swings out generously is the rule's own default ("enemies get
+    attacks of opportunity as normal").
+    """
+    from itertools import combinations
+
+    grid = scene.grid
+    mover = scene.actors[mover_ref]
+    bodies: set = set()
+    for ref, anchor in scene.positions.items():
+        other = scene.actors.get(ref)
+        if ref == mover_ref or other is None or _allied(scene, ref, mover_ref):
+            continue
+        # "You can move through a square occupied by a helpless opponent without
+        # penalty" (CRB p.193, Moving Through a Square) — the dead included.
+        if other.is_helpless or other.is_down:
+            continue
+        bodies.update(gridmod.footprint((anchor[0], anchor[1]), other.size))
+
+    steps = [(dx, dy) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dx or dy]
+
+    def way_out(allowed: frozenset) -> bool:
+        seen = {start}
+        frontier = [start]
+        while frontier:
+            nxt = []
+            for x, y in frontier:
+                for dx, dy in steps:
+                    q = (x + dx, y + dy)
+                    if q in seen:
+                        continue
+                    seen.add(q)
+                    body = gridmod.footprint(q, mover.size)
+                    if any(not grid.inside(sq) for sq in body):
+                        return True          # off the edge of the board: out of the fight
+                    if any(sq in grid.blocked or sq in bodies for sq in body):
+                        continue
+                    here = threat(q)
+                    if not here:
+                        return True
+                    if here <= allowed:
+                        nxt.append(q)
+            frontier = nxt
+        return False
+
+    order = [r for r in scene.actors if r in candidates]
+    if len(order) <= _MOST_TO_WEIGH:
+        for k in range(len(order) + 1):
+            for allowed in combinations(order, k):
+                if way_out(frozenset(allowed)):
+                    return set(allowed)
+    beside = {(start[0] + dx, start[1] + dy) for dx, dy in steps}
+    return set(at_start).union(*(threat(q) for q in beside))
+
+
 def _allied(scene, a: str, b: str) -> bool:
     for members in (scene.sides or {}).values():
         if a in members and b in members:
@@ -322,5 +509,5 @@ def _allied(scene, a: str, b: str) -> bool:
 
 
 __all__ = ["Reaction", "TRIGGERS", "budget_for", "disarmed_and_empty_handed",
-           "provoked_by_action", "provoked_by_move", "reach_with", "reactions_for",
-           "threatens"]
+           "provoked_by_action", "provoked_by_move", "provoked_by_withdraw", "reach_with",
+           "reactions_for", "threatened_by", "threatens"]

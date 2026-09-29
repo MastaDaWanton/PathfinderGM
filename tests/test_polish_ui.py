@@ -3,7 +3,7 @@
 
   (1) The exits row mid-fight. The row offered "the arena · a few minutes" during an
       encounter exactly as it did in a quiet street, one click from walking out. In a
-      fight every open way is now marked "provokes" and the first click asks "Leave the
+      fight every open way is now marked "withdraw" and the first click asks "Leave the
       fight?" before the second goes, the journeys' own confirm idiom. The page reads
       `scene.in_encounter`; it works out nothing about who threatens whom.
 
@@ -98,10 +98,14 @@ def _run_exits(tmp_path, steps: str) -> dict:
 
 
 @needs_node
-def test_in_a_fight_every_open_way_says_it_provokes_and_the_shut_one_does_not(tmp_path):
+def test_in_a_fight_every_open_way_says_it_is_a_withdraw_and_the_shut_one_does_not(tmp_path):
     """Measured before: mid-fight the row was the quiet street's row, "the arena · a few
     minutes" and nothing else. Now each open way carries the mark and the full sentence
-    for a screen reader; a shut way stays shut and unmarked, because it cannot be taken."""
+    for a screen reader; a shut way stays shut and unmarked, because it cannot be taken.
+
+    The mark read "provokes" until the engine rolled it (tests/test_leaving_provokes.py):
+    leaving is a withdraw, so one visible foe beside you gets no swing and the mark
+    promising one on every way would have been wrong the other way round."""
     got = _run_exits(tmp_path, f"""
       STATE = {json.dumps(_exits_state(True))};
       renderExits(STATE);
@@ -115,12 +119,12 @@ def test_in_a_fight_every_open_way_says_it_provokes_and_the_shut_one_does_not(tm
     assert len(buttons) == 3
     arena, gate, road = buttons
     for open_way in (arena, road):
-        assert "risky" in open_way and ">provokes<" in open_way
-        assert "leaving the fight provokes attacks of opportunity" in open_way
+        assert "risky" in open_way and ">withdraw<" in open_way
+        assert "leaving the fight is a withdraw" in open_way
         assert 'aria-expanded="false"' in open_way, "it asks before it goes"
-    assert "shut" in gate and "provokes" not in gate
+    assert "shut" in gate and "withdraw" not in gate
     assert "fighting" in got["fightClass"]
-    assert "provokes" not in got["calm"], "out of a fight the row is the quiet row"
+    assert "withdraw" not in got["calm"], "out of a fight the row is the quiet row"
 
 
 @needs_node
@@ -144,7 +148,8 @@ def test_mid_fight_the_first_click_asks_and_only_the_second_leaves(tmp_path):
     """)
     assert got["sentAfterOne"] == 0
     assert "Leave the fight?" in got["asked"]
-    assert "Walking away to the arena provokes an" in got["asked"]
+    assert "Walking away to the arena is a withdraw." in got["asked"]
+    assert "whose reach covers your" in got["asked"], "the confirm says who still strikes"
     assert ">Leave</button>" in got["asked"] and ">Stay</button>" in got["asked"]
     assert [s["text"] for s in got["fightSent"]] == ["I go to the arena."]
     assert got["fightSent"][0]["attachments"] == [{"kind": "place", "id": "p:arena"}]
