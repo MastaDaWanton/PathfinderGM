@@ -323,10 +323,12 @@ def test_the_sheet_carries_the_six_scores_and_what_the_class_grants():
 
 
 def test_the_defense_tab_actually_renders_them():
-    from pathlib import Path
-
+    """The six scores were the old Defense page's `class="abilities"` block; since the
+    table rebuild (stage 2) they are the right-hand panel's struck coins, beside the
+    Sheet tab's cards, and the class features are in its Feats and traits card."""
     page = table_source()
-    assert 'class="abilities"' in page
+    assert '$("#medals").innerHTML = Object.entries(pc.abilities' in page
+    assert 'class="v2-coin' in page
     assert "s.class_features" in page
 
 

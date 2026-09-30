@@ -153,7 +153,9 @@ def test_the_class_tab_exists_and_draws_the_table():
     from pathlib import Path
 
     page = table_source()
-    assert '["class",     "Class",     s => tabClass(s)]' in page
+    # The Class page is the Sheet tab's Class card since the table rebuild (stage 2).
+    assert 'sheetCard("sc-class", "Class", tabClass(s)' in page
+    assert "${classCard(s)}" in page
     assert "function tabClass(s)" in page
     assert "The whole table" in page
     assert 'id="levelup"' in page
@@ -221,7 +223,9 @@ def test_the_page_shows_the_tiers_and_is_honest_about_the_engine():
     page = table_source()
     assert "Control Blood ${esc(tier)}" in page
     assert "the source does not describe it" in page
-    assert "the engine does not" in page and "execute these yet" in page
+    # Reworded in the table rebuild (stage 2) to the player's words: "the rules", not
+    # "the engine".
+    assert "the rules do not run these yet" in page and "yours to" in page
 
 
 # --- over the wire ---------------------------------------------------------------------

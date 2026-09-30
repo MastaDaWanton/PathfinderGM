@@ -150,8 +150,10 @@ def test_the_three_columns_are_there_in_the_mockups_order(spells, tmp_path):
     grimoire index on the right, in that source order so a phone stacks them the same."""
     els = _tree(_render(spells, tmp_path)["html"])
     sections = [e for e in els if e["tag"] == "section"]
+    # Since the table rebuild's stage 2 each column is the design's framed card (the
+    # theme's gilt ring, clasps and card leather), in the same order.
     assert [s["attrs"]["class"] for s in sections] == [
-        "card sx-stats", "card sx-today", "card sx-index"]
+        f"v2-framed v2-card-leather sx-card {c}" for c in ("sx-stats", "sx-today", "sx-index")]
     heads = [e["text"].strip() for e in els if e["tag"] == "h3"]
     assert heads == ["Caster stats", "Prepared today", "Grimoire index"]
     # The drop target is the middle column, and it prepares.

@@ -69,7 +69,9 @@ def _panel_markup() -> str:
 def _css() -> str:
     src = TABLE.read_text(encoding="utf-8")
     css = src[src.index("<style>"):src.index("</style>")]
-    return css[css.index("/* The trade window (I7"):css.index("#sheetpanel::after")]
+    # To the rule after the trade window's own block: `#sheetpanel::after` until the
+    # table rebuild's stage 2 removed the sheet's vignette with its window.
+    return css[css.index("/* The trade window (I7"):css.index("  .sheethead {\n")]
 
 
 class _Tree(HTMLParser):

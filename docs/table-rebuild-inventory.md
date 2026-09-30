@@ -8,6 +8,13 @@ because of the standing instruction to trace the real path first: every feature,
 control, panel, popover, keyboard shortcut and state the table had, and where each one
 goes. Nothing may disappear silently.
 
+Stage 2 (2026-09-30) built the rows that stage 1 carried for it: the Sheet, Equipment,
+Spells, Trade and Journal tabs in the approved design, every number on them the engine's
+(`/api/sheet`, which gained each swing of a full attack, a weapon's range, weight,
+finesse and traits, whether a manoeuvre provokes or needs both hands, feint's Bluff,
+and `equipment.carried`, the one list Equipment draws). What stage 2 changed and why is
+in the rows' own words below (H1 to H22).
+
 `tests/test_table_rebuild.py` reads the tables below. Each row is one item:
 
 - **Stage 1** is one of:
@@ -183,23 +190,28 @@ The owner's rulings cited below are in `docs/mock/table-layout/README.md` (READM
 
 | # | Item | Where it goes | Stage 1 | Anchor |
 |---|---|---|---|---|
-| H1 | The full sheet: Defense, Offense, Skills, Class, Feats & Traits, Companions, Background | the Sheet tab, the sheet panel in the centre column (17-tab-sheet.js) | carried-2 | `["defense",   "Defense"` |
-| H2 | The sheet's header: sigil, name, identity line, error line, Close and Esc | the sheet panel's head, in every sheet-backed tab | carried-2 | `id="sheethead-sigil"` |
-| H3 | The gender prompt | the sheet panel's head | carried-2 | `id = "genderask"` |
-| H4 | The tab strip that scrolls on a phone and fades its edges | `#sheettabs` | carried-2 | `function sheetTabEdges(` |
-| H5 | The glossary popover on a named feature | `[data-gloss]`, `#glosscard` | carried-2 | `id = "glosscard"` |
-| H6 | Taking a level (the hit-point die lands first) | Class tab, `#levelup` | carried-2 | `id="levelup"` |
-| H7 | Equipment slots (add and remove a line in a slot) | the Equipment tab (the sheet's Equipment page) | carried-2 | `function tabEquipment(` |
-| H8 | The inventory with its actions: drink, throw, coat, wear | the Equipment tab (the sheet's Inventory page), `[data-use]`, `[data-wear]` | carried-2 | `function tabInventory(` |
+| H1 | The full sheet: Defense, Offense, Skills, Class, Feats & Traits, Companions, Background | the Sheet tab's one column of framed cards, Combat first (initiative, base attack, CMB, CMD with flat-footed, speed; every carried weapon, each swing of a full attack; the full attack in a sentence), then Defence (AC, touch, flat-footed, saves with their terms, life's edges, conditions), Skills, Feats and traits, Class, Background and notes (stage 2, 05 `pageSheet`) | built | `function pageSheet(` `function combatCard(` |
+| H2 | The sheet's header: sigil, name, identity line, error line, Close and Esc | the identity line (people, race, class, size, gender, pronouns) moved to the Background card; the error line is `#sheetnote` above every sheet page; Esc goes back to Table (the sigil, the name and Close: H18) | built | `class="idline"` `id="sheeterr"` |
+| H3 | The gender prompt | `#sheetnote`, above every sheet page | built | `id = "genderask"` |
+| H4 | The tab strip that scrolls on a phone and fades its edges | removed: the design has no strip, each tab is its own page (README, "One sheet, split round the story") | dropped | `function sheetTabEdges(` `id="sheettabs"` |
+| H5 | The glossary popover on a named feature | `[data-gloss]`, `#glosscard`, in the details' obsidian and gilt edge | built | `id = "glosscard"` |
+| H6 | Taking a level (the hit-point die lands first) | the Sheet tab's Class card, `#levelup`; a refusal (not enough experience) in `#levelerr` | built | `id="levelup"` |
+| H7 | Equipment slots (add and remove a line in a slot) | Equipment's Worn and wielded: every slot the rules have, in their order; a slot pressed shows what you carry that fits it and its own lines (write in one, empty one, add or remove a line) | built | `function slotEditor(` `data-eqslot` |
+| H8 | The inventory with its actions: drink, throw, coat, wear | Equipment's list (play/views.py `_carried`): the trade window's shelves down the side with counts, A to Z, every name written beside its icon with its quantity; Wield and Wear run the engine's `wear` op, a wondrous item goes into its slot through `/api/slots`, a jar is drunk, thrown or coated through `/api/use` | built | `function pageEquipment(` `data-eqact` |
 | H9 | Take off and drop | not offered: the engine has neither op (README, "What the engine does not know") | gap | `There is no drop and no take off` |
-| H10 | The Spells page: slots as gem sockets, prepared cards, the grimoire index, prepare, drag to prepare, Details | the Spells tab (17's sheet panel on its Spells page) | carried-2 | `function tabSpells(` |
+| H10 | The Spells page: slots as gem sockets, prepared cards, the grimoire index, prepare, drag to prepare, Details | the Spells tab, on the design's framed cards: sockets lit while unspent and red once spent today, prepared cards with Details, cantrips at will, Cast attaching a chip, the house rule said beside the sockets | built | `function tabSpells(` `sx-house` |
 | H11 | The spell picker popover (find, arrows, "Open your spells") | `#spellpop`, from Spells and from Cast | built | `id="spellpop"` |
-| H12 | A spell's details popover, Esc first | `#spelldetail` | carried-2 | `id = "spelldetail"` |
-| H13 | The trade window: counters, shelves, what you carry, the basket, their wares, one Trade button, Esc | the Trade tab (20-tab-trade.js), `#tradepanel` in the frame | carried-2 | `id="tradepanel"` |
+| H12 | A spell's details popover, Esc first | `#spelldetail`, restyled | built | `id = "spelldetail"` |
+| H13 | The trade window: counters, shelves, what you carry, the basket, their wares, one Trade button, Esc | the Trade tab, `#tradepanel` as the design's framed card, with the owner's sentence and a door to Equipment in its head | built | `id="tradepanel"` `Buy and sell here. What you buy goes into your pack` |
 | H14 | Trade with nobody keeping a counter | the Trade tab says why, in the words the old button's title used | built | `Nobody here keeps a counter` |
 | H15 | A purchase in words opens the counter with the thing in the basket | `openTrade(s.trade.want)` now enters the Trade tab | built | `openTrade(s.trade.want)` |
-| H16 | The quest log and the adventure log | the Journal tab (the sheet's Quests and Adventures pages) | carried-2 | `function tabQuests(` |
-| H17 | Companions | the Sheet tab's Companions page | carried-2 | `"companions"` |
+| H16 | The quest log and the adventure log | the Journal tab: Matters in play (the quest cards), What people said (`/api/conversation`, a person at a time), Where you have been; the adventure log is not kept yet, and the page says so | built | `function tabQuests(` `function journalSaid(` |
+| H17 | Companions | the Sheet tab's Background card, a line of its own | built | `data-page="companions"` |
+| H18 | The sheet's own header: its sigil, the name in capitals, the identity line under it, Close | removed: the design has no sheet header; the name is the left panel's, the identity line moved to the Background card (H2), and the tabs are the way out (README, "One sheet, split round the story") | dropped | `id="sheetname"` `id="sheetmeta"` `id="closesheet"` `id="sheethead-sigil"` |
+| H19 | All ten combat manoeuvres and feint, each with its bonus, whether it provokes, what success does and its limits | the Combat card, a row each; feint's Bluff where the engine has it, "not known" for the rest | built | `<b>feint</b>` `function combatCard(` |
+| H20 | Go to Trade from Equipment, and Open equipment from Trade (the owner's ruling: buy at a counter, equip what you carry) | Equipment's head `#eq-trade`; the trade window's head and its empty notice | built | `id="eq-trade"` `data-open-equipment` |
+| H21 | The numbers wearing moves (AC, touch, flat-footed, the saves) | Equipment's head, from the engine's sheet, marked where the last act moved them | built | `id="eq-nums"` |
+| H22 | Where you have been | the Journal, from `scene.places_found` | built | `Where you have been` |
 
 ## Death, the downed, the roster
 
@@ -219,7 +231,7 @@ The owner's rulings cited below are in `docs/mock/table-layout/README.md` (READM
 | K3 | m toggles the map | now the Map tab and back | built | `e.key === "m"` |
 | K4 | Esc: closes the spell details, then a sheet-backed tab, the counter, the clock, the tray, the picker | each owner's own handler; a sheet-backed tab and the counter go back to Table | built | `e.key === "Escape"` |
 | K5 | Arrow keys along the tabs (the APG tabs pattern), Home and End | 12-shell.js | built | `ArrowRight` |
-| K6 | The trade basket's + and minus and Delete, the shelves' arrows | 06 | carried-2 | `"+": 1, "=": 1` |
+| K6 | The trade basket's + and minus and Delete, the shelves' arrows | 06, unchanged; the Equipment shelves walk the same way | built | `"+": 1, "=": 1` |
 | K7 | The spell picker's arrows | 10 | built | `e.key !== "ArrowDown" && e.key !== "ArrowUp"` |
 
 ## Behind the page
@@ -241,7 +253,13 @@ hidden, reason where a thing is absent":
 - **Portraits.** Nothing in the app stores one. The left panel's frame says so (N19).
 - **Take off and drop.** `_op_wear` swaps, nothing sets armour or a shield back to none,
   and there is no drop op (README, "What the engine does not know"). The Equipment tab
-  offers neither; its intro line says so (H9).
+  offers neither; its head says so (H9). A name written in any other slot comes off by
+  emptying its line (`/api/slots`), which the old Equipment page could do too.
+- **An off hand.** The engine holds one weapon (`Actor.equipped`); Worn and wielded's Off
+  hand box says "one weapon at a time".
+- **Weight and load.** Only weapons carry a weight in the rules; Equipment writes it on
+  their rows and says load is not tracked. A thrown weapon's to-hit is not computed
+  (the Combat card says "thrown to-hit not known"), nor is feint's effect.
 - **Touch and flat-footed AC, and the armour's name, in the state.** `/api/state` carries
   `pc.ac` only and names no armour or shield; the sides read both from `/api/sheet`
   after each state is drawn (N20), one GET a turn. The state could carry them.
@@ -261,11 +279,13 @@ hidden, reason where a thing is absent":
   18's bodies (the Sheet's combat block, the Equipment page); stage 3 replaces 16's
   (the Places chart beside Flat and 3D) and restyles `#talktray`.
 - **The sheet panel is one element, moved.** `#sheetpanel` is carried into whichever of
-  Sheet, Equipment, Spells and Journal is open, and scoped with `SHEET_SCOPE` to that
-  tab's pages. Stage 2 can drop the move and give each tab its own markup.
-- **The sides** are drawn by 14-sides.js from the state alone; the combat block's numbers
-  (touch, flat-footed, CMB, CMD) need `/api/sheet`, which stage 2 reads.
+  Sheet, Equipment, Spells and Journal is open (17-tab-sheet.js), and 05's `TABS` draws
+  that tab's own page into it: `pageSheet`, `pageEquipment`, `tabSpells`, `pageJournal`.
+  Stage 2 kept the move rather than four bodies, because everything that acts on the
+  sheet (Prepare and its kept scroll, a spell's details, the drink button, taking a
+  level, the gender prompt) finds it by `#sheetbody`.
+- **The sides** are drawn by 14-sides.js from the state alone; the Sheet tab's cards read
+  `/api/sheet`.
 - **The device** knows three signals and nothing else: `table:busy` (06's `busy`),
   `table:posted` (02's `post`) and the render of a state with or without `awaiting`.
-</content>
-</invoke>
+
