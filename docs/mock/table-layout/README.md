@@ -547,6 +547,25 @@ hidden it takes a column of its own beside the book. On a phone it takes the who
 itself; the Talk button counts new lines ("2 new"), the log is dialogue only (Q43/Q44),
 and the two ways out sit below the log, never inside its scroll.
 
+## The doors out of the table (2026-09-30)
+
+The owner asked whether the mock still had a way to the crafting tab and the landing page.
+It had neither; the real table has three doors, and the mock now has the same three, each
+pointing at the app's own path. The mock cannot serve those paths, so a click writes where
+it goes in the mock's strip ("Mock: this opens the crafting bench (/craft/) in the app.")
+and stays on the page: never a dead click.
+
+- **Worlds & characters** (`/`, the app's `02-state.js`): a small italic line above the
+  world's name in the top bar's far left, read as where the world sits ("Worlds &
+  characters" over "Pangrella"). It leaves the table, so it is quiet and as far as the bar
+  allows from the tabs, the pen and a fight's controls, where a hand reaching for any of
+  them does not pass; the bar's height and everything in it are unchanged, on a phone too.
+- **Open the full bench** (`/craft/`, the app's `table.html` "open the full bench"): in
+  the Craft action popover, beside Close. The popover still says the hub itself is not
+  mocked.
+- **Crafting bench** (`/craft/`, the app's `02-state.js` "Crafting bench"): in the sheet,
+  under the Equipment door, the same kind of door.
+
 ## What is real
 
 - **Exits**: `play/exits.py exits()` run on the Pangrella fixture for all 43 places in

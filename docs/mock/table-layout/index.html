@@ -35,7 +35,12 @@
 </div>
 
 <header class="topbar">
-  <p class="world">Pangrella</p>
+  <!-- The way back to the landing page, as the app's table has it (02-state.js: "Worlds &
+       characters", href "/"). The mock cannot serve it: data-app-link says so on a click. -->
+  <nav class="worldnav" aria-label="Where you are">
+    <a class="leave" href="/" data-app-link="Worlds &amp; characters">Worlds &amp; characters</a>
+    <p class="world">Pangrella</p>
+  </nav>
   <div class="modes" role="tablist" aria-label="Modes">
     <button type="button" role="tab" id="tab-table" data-mode="table" aria-selected="true"
             aria-controls="stage">Table</button>
@@ -156,8 +161,13 @@
     <div class="pop" id="craftpop" role="dialog" aria-label="Craft action" hidden>
       <p><b>Craft action</b> opens the crafting hub where you stand: forage, prospect,
         skin, gather and buy, each with the hours it takes.</p>
-      <p class="mocknote">Not mocked. The ground here is <span id="craft-ground"></span>.</p>
-      <button type="button" class="quiet small" data-close="craftpop">Close</button>
+      <p class="mocknote">The hub itself is not mocked. The ground here is
+        <span id="craft-ground"></span>.</p>
+      <!-- The app's own door out of the hub (table.html: "open the full bench", /craft/). -->
+      <div class="poprow">
+        <a class="btn quiet small" href="/craft/" data-app-link="the crafting bench">Open the full bench</a>
+        <button type="button" class="quiet small" data-close="craftpop">Close</button>
+      </div>
     </div>
     <div class="pop" id="rollpop" role="dialog" aria-label="A roll is owed" hidden>
       <p><b>A roll is owed.</b> In the app the dice mat opens here and the engine waits.</p>
@@ -210,6 +220,8 @@
       <h3 class="sidehead">In hand and worn</h3>
       <ul class="loadout" id="loadout"></ul>
       <button type="button" class="door" id="open-equipment"></button>
+      <!-- The bench, from the sheet as in the app (02-state.js "Crafting bench", /craft/). -->
+      <a class="btn door" href="/craft/" data-app-link="the crafting bench">Crafting bench</a>
     </aside>
 
     <aside class="side side-numbers" aria-label="Your numbers">

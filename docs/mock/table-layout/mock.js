@@ -1095,6 +1095,16 @@ document.addEventListener("click", e => {
   if (t.id === "mock-reset") { reset(); return; }
 });
 
+// The app's own doors out of the table (the landing page, the crafting bench) are links to
+// paths this static mock cannot serve. A click says where it goes instead of going
+// nowhere, in the mock's own strip, where the mock speaks for itself.
+document.addEventListener("click", e => {
+  const a = e.target.closest && e.target.closest("a[data-app-link]");
+  if (!a) return;
+  e.preventDefault();
+  $("#mock-say").textContent = `Mock: this opens ${a.dataset.appLink} (${a.getAttribute("href")}) in the app.`;
+});
+
 document.addEventListener("change", e => {
   if (e.target.id === "convo-earlier" && e.target.value) {
     S.convoPick = e.target.value; renderTalk(); $("#convo-earlier").focus();
