@@ -665,9 +665,24 @@ def run_checks(http: Http, repo: Path) -> None:
         # read, its skill bonus is applied live, and the tie is filled from the world
         # that shipped in the same bundle.
         "background": "apprenticed",
-        "begin": True, "world": ""})
-    note("character created and campaign begun",
-         [] if s == 200 else [f"{s}: {j(body)}"])
+        "begin": False, "world": ""})
+    made = j(body)
+    faults = [] if s == 200 and made.get("id") else [f"{s}: {made}"]
+    # Kits became a purse of gold (the outfit page), so the fighter no longer arrives
+    # holding a longsword, and `check_a_feat_names_itself` found no longsword row to read
+    # Weapon Focus from — a stale check, failing since 5cabed1, not a broken build. The
+    # prover now does what a player does: create, buy the sword at the outfitter while
+    # the character is still unplayed (the outfit page refuses once a campaign begins),
+    # then begin by switching to them, which starts an enrolled character's campaign.
+    if not faults:
+        s, body = http.post(f"/api/outfit/{made['id']}/buy",
+                            {"buys": [{"kind": "weapon", "key": "longsword", "count": 1}]})
+        if s != 200:
+            faults.append(f"buying the longsword: {s}: {j(body)}")
+        s, body = http.post("/api/character/switch", {"id": made["id"]})
+        if s != 200:
+            faults.append(f"beginning the campaign: {s}: {j(body)}")
+    note("character created, outfitted and campaign begun", faults)
 
     s, body = http.get("/api/sheet")
     past = (j(body).get("background") or {}).get("past") or {}
