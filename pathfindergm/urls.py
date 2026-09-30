@@ -8,6 +8,11 @@ from django.contrib.staticfiles.views import serve as _serve
 # scripts still run then; the play table's six script files (2026-09-25) would not survive
 # a move to modules. Stated here rather than left to the machine.
 mimetypes.add_type("text/javascript", ".js")
+# The same for stylesheets, pinned before the first one shipped (theme-v2.css,
+# 2026-09-30; every page before it styled itself inline). A stylesheet answered as
+# `text/plain` is not applied by a page in standards mode, and nothing on screen says why:
+# the page just loses its materials on the one machine whose registry disagrees.
+mimetypes.add_type("text/css", ".css")
 
 
 def static_serve(request, path, **kwargs):
