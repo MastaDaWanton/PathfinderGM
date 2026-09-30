@@ -276,38 +276,21 @@
   // though Map keeps the pen and a turn can be taken there. Its model is not touched by
   // any of this: moving or hiding the element never restarts or freezes a turn.
   //
-  // The anchor, in the stage's own coordinates: x is the centre column's left edge (the
-  // side panel's right edge and the stage's gap; with the sheet hidden there is no panel,
-  // and it is the centre column's own left edge, as before), y the panel's top (or the
-  // column's). mock.css turns it into the device's box, so on the Table tab the numbers
-  // are the ones the book gave it: 267,157 at 1440 and 291,161 at 1024.
+  // Where exactly is CSS's alone (mock.css .device): it takes the centre column's grid area
+  // as its box, so it follows the column at every width and on every tab with no measuring.
+  // A first version measured the column in script and set the offset once; at 1792 the
+  // book is centred in a wider column, and a page whose script ran before its layout had
+  // settled kept a stale offset (measured -35,137, off the window's edge).
   const home = el.parentElement, slot = document.getElementById("dv-slot");
   const phone = matchMedia("(max-width: 760px)");
   let turned = false;
-  const box = s => { const e = document.querySelector(s); const r = e && e.getBoundingClientRect();
-    return r && r.width ? r : null; };
-  function anchor() {
-    const stage = home.getBoundingClientRect();
-    const col = box("#book") || box("#board") || box(".sheetmore");
-    const panel = box(".sheet") || box(".side-who");
-    if (!col) return;
-    const x = col.left, y = panel ? panel.top : col.top;
-    el.style.setProperty("--dv-x", `${(x - stage.left).toFixed(1)}px`);
-    el.style.setProperty("--dv-y", `${(y - stage.top).toFixed(1)}px`);
-  }
   function place() {
     turned = phone.matches && !!slot;
     if (turned) slot.appendChild(el);
-    else {
-      if (el.parentElement !== home) home.prepend(el);
-      anchor();
-    }
+    else if (el.parentElement !== home) home.prepend(el);
     draw();
   }
   phone.addEventListener("change", place);
-  // Every change of tab, of the sheet's showing and of the window moves the anchor.
-  new MutationObserver(place).observe(document.body, { attributes: true, attributeFilter: ["class"] });
-  addEventListener("resize", place);
   function draw() {
     const aL = MESH - M.aS / RATIO;                     // turned so tooth meets gap
     gS.setAttribute("transform", `rotate(${M.aS.toFixed(2)} ${sx} ${sy})`);

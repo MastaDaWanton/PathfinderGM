@@ -249,9 +249,28 @@ gutter was not widened.
 **On every tab with the left panel (2026-09-30).** It was a child of the book, so it
 existed only on the Table tab (measured 0x0 on Map, Sheet, Equipment, Trade and Journal),
 though Map keeps the pen and a turn can be taken there. It now belongs to the stage, the
-table's frame: device.js anchors it to the centre column's left edge and the left panel's
-top, so it hangs on the gilt edge of whatever the centre column holds. Measured on every
-tab:
+table's frame, and CSS alone places it: its box is the centre column's grid area, the one
+the book, the map and the sheet's pages fill (each at most 880px and centred in it), so it
+hangs on the gilt edge of whatever the column holds, at every width, with nothing measured
+in script. (A first version measured the column in script and set the offset once; a page
+whose script ran before its layout settled kept a stale offset, -35,137 at 1792, off the
+window's edge.) Where the window is wider than the panels and an 880px column, the column
+is centred and the device hangs on its edge in the wider gutter, as it always did:
+
+| Width | Table, Map and Sheet | Left panel's right edge | Centre column's left edge |
+|---|---|---|---|
+| 1024x768 | 291,161.4 60x173 | 300 | 318 |
+| 1280x800 | 267,157 84x242 | 284 | 302 |
+| 1440x900 | 267,157 84x242 | 284 | 302 |
+| 1792x958 | 421,157 84x242 | 284 | 456 |
+| 1920x1080 | 485,157 84x242 | 284 | 520 |
+| 2560x1440 | 805,157 84x242 | 284 | 840 |
+
+With the sheet hidden: 45,161 at 1024, 245,157 at 1440, 421,157 at 1792 and 485,157 at
+1920 (the book's edge, as before). On the Table tab at 1440 and 1024 the device is the
+same to the pixel as when it lived in the book (0 of 34,968 and 21,300 pixels differ round
+it against 5b342c1; its box is 405d6d4's). No text or control is under it on Table, Map
+(Flat and Places) or Sheet at any of the six widths. Measured on every tab:
 
 | Tab | 1440x900 | 1024x768 |
 |---|---|---|

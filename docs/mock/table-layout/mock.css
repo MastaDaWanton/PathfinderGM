@@ -83,6 +83,9 @@
      floating up and out beyond the gilt. The bosses were 2px out the same way, and now
      centre on the same line at 24px. */
   --ring: 6px; --gilt-edge: 4.5px; --clasp-in-x: 29px; --clasp-in-y: 28px; --boss-in: 24px;
+  /* The centre column's widest: the book, the map, the desk and the sheet's pages (and so
+     where the engine device hangs). */
+  --col-max: 880px;
   --candle-cursor: url("../../../play/static/img/cursor-candle.png") 24 0, auto;
   color-scheme: dark;
 }
@@ -360,7 +363,7 @@ body:not(.mode-table):not(.mode-map) #sheettoggle { visibility: hidden; }
 .desk { grid-area: desk; }
 .sheetmore { grid-column: 2; grid-row: 1 / -1; }
 .talk { grid-area: numbers; z-index: 4; }
-.book, .board, .desk, .sheetmore { width: 100%; max-width: 880px; justify-self: center; }
+.book, .board, .desk, .sheetmore { width: 100%; max-width: var(--col-max); justify-self: center; }
 /* Modes that are not this one. */
 body:not(.mode-table) .book { display: none; }
 body:not(.mode-map) .board { display: none; }
@@ -703,14 +706,18 @@ body.sheet-hidden .talk { grid-area: talk; }
    place, and the Map frame's the same way. Absolute, so nothing in the layout knows it is
    there, and it passes the pointer through.
    It is a child of the stage, not of the book, so it is on every tab that shows the left
-   panel (Table, Map, Sheet): device.js sets --dv-x and --dv-y to the centre column's left
-   edge and the panel's top, in the stage's coordinates, and this places it from them
-   exactly as it was placed inside the book. With the sheet hidden there is no panel and
-   the anchor is the centre column's own top-left corner. */
+   panel (Table, Map, Sheet). Its box is the centre column's grid area ("book": an
+   absolutely placed grid item takes its area as its containing block), the area the book,
+   the map and the sheet's pages all fill, each at most --col-max wide and centred in it.
+   So its left edge is the column's left edge plus half of whatever the column is wider
+   than --col-max, and its top the row's top, the panel's: no script measures anything,
+   and it is where the book's own left edge is at every width and on every tab. With the
+   sheet hidden, the "book" area is the whole width and it follows the centred book. */
 .device { --dv-w: 84px; --dv-off: 4px; position: absolute; z-index: 4; pointer-events: none;
-          width: var(--dv-w); height: calc(var(--dv-w) * 773 / 268);
-          left: calc(var(--dv-x, 0px) + var(--ring) / 2 - var(--dv-w) / 2 + var(--dv-off));
-          top: calc(var(--dv-y, 0px) + 24px); }
+          grid-area: book; width: var(--dv-w); height: calc(var(--dv-w) * 773 / 268);
+          left: calc(max(0px, (100% - var(--col-max)) / 2) + var(--ring) / 2 - var(--dv-w) / 2
+                     + var(--dv-off));
+          top: 24px; }
 .book::after, .board::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                                  40px auto, 40px auto, 0 0, auto 40px; }
 .dv-body { position: absolute; inset: 0;
