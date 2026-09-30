@@ -157,12 +157,15 @@ The owner's rulings cited below are in `docs/mock/table-layout/README.md` (READM
 | N12 | The panel bar of toggles and each panel's close | removed: the right panel shows its two disclosures always; nothing to restore them from (the design has no bar) | dropped | `id="panelbar"` |
 | N13 | Hide the column | became Hide sheet (S10) | dropped | `id="panelmode"` |
 | N14 | The phone drawer | the Sheet tab is the sheet on a phone (README, "Phone (375px) ... the sheet as a mode") | dropped | `body.drawer aside {` |
-| N15 | The edge tabs (SHEET, SCENE) | the tabs on top (README, same ruling) | dropped | `id="edgetabs"` |
-| N16 | Full character sheet button | the Sheet tab is the door | dropped | `id="opensheet"` |
+| N15 | The edge tabs (SHEET, SCENE) | the tabs on top (README, same ruling) | dropped | `id="edgetabs"` `id="sheettab"` |
+| N16 | Full character sheet button | replaced by the Sheet tab, the one door to the sheet (README, "One sheet, split round the story") | dropped | `id="opensheet"` |
 | N17 | Who is playing (the roster) | left panel, a door under the bench | built | `id="openroster"` |
 | N18 | Worlds & characters, in the side panel | moved to the top bar (S5) | built | `Worlds &amp; characters` |
 | N19 | The portrait | a frame that says portraits are not kept; the app stores none | gap | `Portraits are not kept yet` |
-| N20 | Touch and flat-footed AC beside AC | the right panel shows AC and speed; touch and flat-footed are on the Sheet's Defense tab (the state payload carries only `ac`) | carried-2 | `Touch and flat-footed are on the Sheet` |
+| N20 | Touch and flat-footed AC beside AC | the right panel's AC plaque, read from /api/sheet after each state (the state carries only `ac`); until it answers, a line says where they are | built | `ac_touch.total` `Touch and flat-footed are on the Sheet` |
+| N21 | The Sheet panel in the column | replaced by the stage's two sides (README, "One sheet, split round the story") | dropped | `id="panel-sheet"` `id="panel-sheet-body"` `id="panel-sheet-title"` |
+| N22 | The Map panel in the column | replaced by the Map tab (README, "Map is a tab, Talk is a tray") | dropped | `id="panel-map"` `id="panel-map-body"` `id="panel-map-title"` |
+| N23 | "Every panel is closed" | nothing on the side closes any more (the design has no bar, N12) | dropped | `id="panelsnone"` |
 
 ## The map
 
@@ -172,7 +175,7 @@ The owner's rulings cited below are in `docs/mock/table-layout/README.md` (READM
 | M2 | The 3D board, turned in quarter turns | Map tab, `Scene3D.render` | carried-3 | `data-mapturn` |
 | M3 | The floors ("the floor", "+10 ft") | Map tab head, `data-maplevel` | carried-3 | `data-maplevel` |
 | M4 | The place's name and what it is made of | Map tab head and foot | carried-3 | `The ground` |
-| M5 | The map tray, its MAP edge tab and its close | removed: Map is a tab (README, "Map is a tab, Talk is a tray") | dropped | `id="maptray"` |
+| M5 | The map tray, its MAP edge tab and its close | removed: Map is a tab (README, "Map is a tab, Talk is a tray") | dropped | `id="maptray"` `id="maptab"` `id="mapclose"` `id="maptrayinner"` |
 | M6 | The map panel's small copy and its open button | removed with the tray: the tab replaces both (README, same section: 18px a square, "legible only as a shape") | dropped | `id="mapopen"` |
 | M7 | The Places chart under the fog | stage 3, reading `scene.places_found` (merged; `play/places_found.py`) | carried-3 | `places_found` |
 
@@ -239,8 +242,9 @@ hidden, reason where a thing is absent":
 - **Take off and drop.** `_op_wear` swaps, nothing sets armour or a shield back to none,
   and there is no drop op (README, "What the engine does not know"). The Equipment tab
   offers neither; its intro line says so (H9).
-- **Touch and flat-footed AC in the state.** `/api/state` carries `pc.ac` only; the Sheet
-  tab's Defense page has both (N20). Stage 2's combat block reads `/api/sheet`.
+- **Touch and flat-footed AC, and the armour's name, in the state.** `/api/state` carries
+  `pc.ac` only and names no armour or shield; the sides read both from `/api/sheet`
+  after each state is drawn (N20), one GET a turn. The state could carry them.
 - **A face for the people here.** The actor payload has no appearance, so a Here chip
   opens a line about how the person stands (hurt or not, conditions), from the same data
   the old "In the scene" panel showed (B8). The engine has `names.appearance_for`; the
