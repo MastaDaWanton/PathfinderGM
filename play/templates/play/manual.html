@@ -1,10 +1,12 @@
-{% load static %}
+{% load static assets %}
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pathfinder GM — the manual</title>
+<!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <style>
   /* Every number on this page comes from the catalogues themselves — see
      `play.views.manual`. A manual that lists features from memory is the first
@@ -37,9 +39,17 @@
       linear-gradient(rgba(10,8,6,.72), rgba(10,8,6,.72)),
       url("{% static 'img/leather-tile.jpg' %}") repeat var(--bg);
   }
+  /* The backdrop above is kept as it was (the owner, 2026-09-30: "leave the background
+     as the black leather i have it as now"); it is this page's own washed tile, not the
+     other pages' grimoire leather, for the scrolling reason given there.
+     Theme v2: the header is the card leather every other page's header carries, at the
+     shelf's header tint. It was a flat two-stop brown standing in for that leather. */
   header {
     border-bottom: 1px solid var(--gold-dim); padding: 18px 30px 14px;
-    background: linear-gradient(#1b1510, #120e0a);
+    background:
+      linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
+      var(--tex-card-leather) #1d1710;
+    background-size: auto, 340px auto;
     display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap;
   }
   header h1 { margin: 0; font: 400 26px/1 var(--display); color: var(--gold);

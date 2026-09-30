@@ -1,10 +1,12 @@
-{% load static %}
+{% load static assets %}
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Class builder — Pathfinder GM</title>
+<!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <style>
   /* The bench's own vocabulary, not a second one. Everything below is the craft page's
      and the shelf's: the same two faces, the same palette, the same leather writing
@@ -32,9 +34,8 @@
        needed. A grid child will not shrink below its content without `min-height: 0`. */
     margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
     height: 100vh; overflow: hidden; display: flex; flex-direction: column;
-    background:
-      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
-      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
+    /* The black grimoire leather under its .40 / .58 dimming: .page-backdrop-leather on
+       <body>, the theme's copy of exactly what was here (the owner kept it). */
   }
 
   /* --- banner ------------------------------------------------------------------ */
@@ -42,7 +43,7 @@
     border-bottom: 1px solid var(--gold-dim); padding: 0 30px;
     background:
       linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
-      url("{% static 'img/card-leather.jpg' %}") #1d1710;
+      var(--tex-card-leather) #1d1710;
     background-size: auto, 340px auto;
     display: flex; align-items: flex-end; gap: 26px; flex-wrap: wrap;
   }
@@ -125,7 +126,7 @@
     color: var(--gold);
     background:
       linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
+      var(--tex-card-leather) #241d15;
     background-size: auto, 340px auto;
     border-color: var(--gold-dim); box-shadow: inset 2px 0 0 rgba(217,192,138,.22);
   }
@@ -148,14 +149,16 @@
   /* --- the writing surface ------------------------------------------------------
      A leather page, not a bound cover: the same treatment the effect builder and the
      forge use, and for the reason stated there — a form is a page in the book, so it
-     takes the grain and the gold edge but none of the ironmongery. */
+     takes the grain and the gold edge but none of the ironmongery.
+     Theme v2: the grain and the gold edge are the theme's (`v2-card-leather
+     v2-gilt-edge` on the element), at this page's own tint. The gilt edge is wider than
+     the 1px hairline it replaces, so the padding gives the difference back and the form
+     sits where it did. */
   .leaf {
-    overflow-y: auto; margin-bottom: 0; padding: 20px 26px 60px;
-    background:
-      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
-    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
+    overflow-y: auto; margin-bottom: 0;
+    padding: calc(21px - var(--gilt-edge)) calc(27px - var(--gilt-edge)) calc(61px - var(--gilt-edge));
+    --leather-top: rgba(16, 12, 8, .04); --leather-foot: rgba(8, 6, 4, .20);
+    border-radius: 3px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
   }
   h2.sect {
@@ -281,7 +284,7 @@
   }
 </style>
 </head>
-<body>
+<body class="page-backdrop-leather">
 <header>
   <h1>Class builder
     <small>Everything a Pathfinder class is, as fields. A simple class fills in the first
@@ -304,7 +307,7 @@
 
 <main>
   <nav id="nav"></nav>
-  <section class="leaf">
+  <section class="leaf v2-card-leather v2-gilt-edge">
     <div id="problems" class="clean">Checking…</div>
     <div id="body"></div>
   </section>

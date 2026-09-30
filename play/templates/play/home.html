@@ -1,10 +1,15 @@
-{% load static %}
+{% load static assets %}
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pathfinder GM</title>
+<!-- The shared materials (theme v2). Linked ahead of this page's own styles, so this
+     page's :root keeps its palette; the leathers, gilt and ironmongery below read the
+     theme's image tokens. The shelf is built by script, so it keeps its own selectors and
+     reads the tokens rather than taking the theme's classes. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <style>
   @font-face {
     font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
@@ -28,9 +33,8 @@
        A grid or flex child will not shrink below its content without `min-height: 0`. */
     margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
     height: 100vh; overflow: hidden; display: flex; flex-direction: column;
-    background:
-      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
-      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
+    /* The black grimoire leather under its .40 / .58 dimming: .page-backdrop-leather on
+       <body>, the theme's copy of exactly what was here (the owner kept it). */
   }
 
   header {
@@ -57,7 +61,7 @@
     color: var(--gold);
     background:
       linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
+      var(--tex-card-leather) #241d15;
     background-size: auto, 340px auto;
     border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
   }
@@ -72,7 +76,7 @@
     display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
+      var(--tex-card-leather) #241d15;
     background-size: auto, 400px auto;
     border: 1px solid var(--brew-dim);
     border-radius: 3px; padding: 18px 22px; margin-bottom: 26px;
@@ -258,14 +262,24 @@
 
   /* The writing surfaces — the bench editor and the forge — are leather panels
      like everything else that holds content. No fittings: a form is a page in
-     the book, not a bound cover. */
+     the book, not a bound cover.
+     Theme v2: the new card leather, and the gold edge (a 1px hairline of gold at 25%
+     before) is the theme's gilt edge, the gilt and its brass grain clipped to a
+     transparent border, as the table's panels draw it (the theme's `.v2-card-leather
+     .v2-gilt-edge`, written out here because the script builds these). The padding
+     gives back what the wider edge takes, so the content sits where it did. */
   .build, .forge {
+    border: var(--gilt-edge) solid transparent; border-radius: 3px;
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
-    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
-    padding: 22px 26px; box-shadow: 0 8px 32px rgba(0, 0, 0, .5),
+      var(--tex-card-leather),
+      var(--brass-grain), var(--gilt) #241d15;
+    background-size: auto, 400px auto, 256px auto, auto;
+    background-blend-mode: normal, normal, soft-light, normal;
+    background-clip: padding-box, padding-box, border-box, border-box;
+    background-origin: padding-box, padding-box, border-box, border-box;
+    padding: calc(23px - var(--gilt-edge)) calc(27px - var(--gilt-edge));
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .5),
     inset 0 1px 0 rgba(255, 230, 150, .06);
   }
 
@@ -282,6 +296,10 @@
     overflow: hidden; text-overflow: ellipsis; }
   .forge .cards.races .cardinfo { display: inline-block; margin-top: 8px; padding: 3px 9px;
     font-size: 12px; cursor: pointer; }
+  /* It is a <span class="quiet">, and `.quiet` is styled for buttons and anchors only, so
+     "details" printed in the browser's default black on the leather: 1.33:1, measured
+     2026-09-30 with the text removed. The colour alone, so nothing moves. */
+  .forge .cards.races span.cardinfo { color: var(--gold); }
   #racecard { display: none; position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6);
     align-items: center; justify-content: center; }
   #racecard.on { display: flex; }
@@ -446,7 +464,7 @@
     isolation: isolate; position: relative;
     background:
       linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
+      var(--tex-card-leather) #241d15;
     background-size: auto, 400px auto;
     border-color: rgba(201, 162, 39, .25);
     box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
@@ -459,17 +477,25 @@
      to light along the bottom lip, which is what makes a band read as raised
      rather than painted — masked to a ring so the leather shows through the
      middle, glowing faintly, and sitting at z-index 2: over the surface,
-     under the clasps and corner pieces at 3, which bolt through it. */
+     under the clasps and corner pieces at 3, which bolt through it.
+     Theme v2: the table's framed card (the theme's `.v2-framed`, written out on
+     `.card` because the script builds the cards). The ring is --ring (6px) with the
+     brass's grain laid over the gilt, its lips lit on the top-left and dark on the
+     lower-right, and it now lies ON the card's edge rather than hanging 4px outside
+     it: inset -1px so it covers the card's own 1px border, and its outer edge is the
+     card's. (The two outer shadows it used to carry were cut away by its own mask and
+     never drew.) */
   .card::before {
-    content: ""; position: absolute; inset: -4px; pointer-events: none;
-    border-radius: inherit; z-index: 2; padding: 5px;
-    background: linear-gradient(135deg,
-      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%);
+    content: ""; position: absolute; inset: -1px; pointer-events: none;
+    border-radius: inherit; z-index: 2; padding: var(--ring);
+    background: var(--brass-grain), var(--gilt);
+    background-size: 256px auto, auto; background-blend-mode: soft-light, normal;
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask-composite: exclude;
-    box-shadow: 0 0 16px rgba(255, 176, 84, .16), 0 3px 8px rgba(0, 0, 0, .55);
+    box-shadow: inset 1.5px 1.5px 0 rgba(255, 244, 205, .55),
+                inset -1.5px -1.5px 0 rgba(30, 20, 8, .9);
   }
   .card.pick:hover, .card:hover {
     border-color: rgba(232, 197, 71, .45);
@@ -493,7 +519,7 @@
     border-color: rgba(255, 214, 128, .9);
     background-image:
       linear-gradient(rgba(224, 168, 60, .17), rgba(224, 168, 60, .05)),
-      url("{% static 'img/card-leather.jpg' %}");
+      var(--tex-card-leather);
     box-shadow: 0 0 0 1px rgba(255, 214, 128, .5),
                 0 0 34px rgba(224, 168, 60, .5),
                 0 12px 34px rgba(0, 0, 0, .6),
@@ -503,9 +529,12 @@
   /* The bevel ring is real metal in this design, so a selected card is that metal
      lit rather than a coloured outline drawn on top of it. */
   .card.pick.on::before, .card.on::before {
-    background: linear-gradient(135deg, #fff3d4 0%, #f2cd82 18%, #c08f42 44%,
+    background: var(--brass-grain),
+                linear-gradient(135deg, #fff3d4 0%, #f2cd82 18%, #c08f42 44%,
                                         #7d5a24 60%, #f2d18c 84%, #fff7e2 100%);
-    box-shadow: 0 0 28px rgba(255, 190, 90, .55), 0 3px 8px rgba(0, 0, 0, .55);
+    background-size: 256px auto, auto;
+    box-shadow: inset 1.5px 1.5px 0 rgba(255, 250, 225, .7),
+                inset -1.5px -1.5px 0 rgba(30, 20, 8, .9);
     animation: chosenglow 3.2s ease-in-out infinite;
   }
   .card.pick.on h3, .card.on h3 {
@@ -521,7 +550,7 @@
   header {
     background:
       linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
-      url("{% static 'img/card-leather.jpg' %}") #1d1710;
+      var(--tex-card-leather) #1d1710;
     background-size: auto, 340px auto;
   }
   /* 4. Embers, third generation: thicker and deeper. Four layers now — a new
@@ -612,28 +641,26 @@
      transparency and mirrored as files because CSS cannot flip a background.
      See table.html for the full note. */
   .card::after {
-    content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
-    background-image:
-      url("{% static 'img/clasp-tl.png' %}"),
-      url("{% static 'img/clasp-tr.png' %}"),
-      url("{% static 'img/clasp-bl.png' %}"),
-      url("{% static 'img/clasp-br.png' %}"),
-      url("{% static 'img/boss-top.png' %}"),
-      url("{% static 'img/boss-bottom.png' %}"),
-      url("{% static 'img/boss-left.png' %}"),
-      url("{% static 'img/boss-right.png' %}");
+    content: ""; position: absolute; inset: -35px; pointer-events: none; z-index: 3;
+    background-image: var(--clasp-tl), var(--clasp-tr), var(--clasp-bl), var(--clasp-br),
+                      var(--boss-top), var(--boss-bottom), var(--boss-left), var(--boss-right);
     /* Geometry that clasps rather than covers: the pseudo-element reaches
        34px past the card so every centre boss sits astride the border line —
-       half proud of the edge, half over the leather. The corners keep their
-       old 9px overhang via inward offsets. */
-    background-position: left 24px top 24px, right 24px top 24px,
-                         left 24px bottom 24px, right 24px bottom 24px,
-                         center top 21px, center bottom 21px,
-                         left 21px center, right 21px center;
+       half proud of the edge, half over the leather.
+       Theme v2: the re-surfaced bronze and brass, registered on the ring's centre line
+       at the theme's insets (clasps 29/28px, bosses 24px; at 24/21 the arms rode 3-5px
+       outside the ring). -35px, not -34: an absolute box is placed from the padding
+       edge, and the card has a 1px border, so this is 34px past its outer edge, where
+       the table's measurements were taken. */
+    background-position: left var(--clasp-in-x) top var(--clasp-in-y), right var(--clasp-in-x) top var(--clasp-in-y),
+                         left var(--clasp-in-x) bottom var(--clasp-in-y), right var(--clasp-in-x) bottom var(--clasp-in-y),
+                         center top var(--boss-in), center bottom var(--boss-in),
+                         left var(--boss-in) center, right var(--boss-in) center;
     background-repeat: no-repeat;
     background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                      40px auto, 40px auto, auto 40px, auto 40px;
-    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .5));
+    /* The metal's shadow falls the one lamp's way, down and right. */
+    filter: drop-shadow(2px 4px 3px rgba(0, 0, 0, .6));
   }
 
 
@@ -721,7 +748,9 @@
       var(--sdx, 0px) var(--sdy, 6px) calc(22px * var(--flicks, .8))
         rgba(0, 0, 0, calc(.62 * var(--flicks, .8) + .18)),
       inset 0 1px 0 rgba(255, 230, 150, .08),
-      inset 0 0 42px rgba(0, 0, 0, .40);
+      inset 0 0 42px rgba(0, 0, 0, .40),
+      /* Theme v2: the shadow the ring throws onto the card, down and right. */
+      var(--ring-cast);
     transition: box-shadow .12s ease-out;
   }
   /* The struck numbers soak up the passing light: their glow flares with the
@@ -738,7 +767,7 @@
   }
 </style>
 </head>
-<body>
+<body class="page-backdrop-leather">
 <div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div id="cursorshade" aria-hidden="true"></div>
 <div id="cursorlight" aria-hidden="true"></div>

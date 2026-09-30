@@ -1,10 +1,14 @@
-{% load static %}
+{% load static assets %}
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Crafting — Pathfinder GM</title>
+<!-- The shared materials (theme v2), ahead of this page's styles so its palette stands.
+     The three panels are built by script, so they read the theme's tokens under their
+     own selectors rather than taking its classes. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <style>
   @font-face {
     font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
@@ -31,9 +35,8 @@
     margin: 0; color: var(--ink); font: 16px/1.6 var(--body);
     height: 100vh; overflow: hidden;
     display: flex; flex-direction: column;
-    background:
-      linear-gradient(rgba(10, 8, 6, .40), rgba(7, 5, 4, .58)),
-      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
+    /* The black grimoire leather under its .40 / .58 dimming: .page-backdrop-leather on
+       <body>, the theme's copy of exactly what was here (the owner kept it). */
   }
 
   /* --- banner and discipline tabs --- */
@@ -41,7 +44,7 @@
     border-bottom: 1px solid var(--gold-dim);
     background:
       linear-gradient(rgba(14, 10, 7, .22), rgba(8, 6, 4, .44)),
-      url("{% static 'img/card-leather.jpg' %}") #1d1710;
+      var(--tex-card-leather) #1d1710;
     background-size: auto, 340px auto;
     padding: 0 26px; display: flex; align-items: flex-end; gap: 22px; flex-wrap: wrap;
   }
@@ -74,7 +77,7 @@
     color: var(--gold);
     background:
       linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
+      var(--tex-card-leather) #241d15;
     background-size: auto, 340px auto;
     border-color: var(--gold-dim); box-shadow: inset 0 2px 0 rgba(217,192,138,.22);
   }
@@ -98,6 +101,14 @@
      scrolls as a whole instead of three panels scrolling inside a fixed frame. */
   @media (max-width: 1180px) {
     body { height: auto; min-height: 100vh; overflow: visible; }
+    /* The panels' clasp box reaches 35px past each panel and main pads 30px, so the
+       page was 3px wider than a phone before theme v2 and 4px after (the layout
+       viewport measured 378 and 379 at 375). The metal itself stays 24px inside; only
+       the transparent box is clipped, and on the x axis only, so the top and bottom
+       clasps are untouched. `overflow-x: clip` on the root was tried first and did
+       nothing: Chrome still sized the layout viewport from the overflow. Wider than
+       this the body clips it already. */
+    main { overflow-x: clip; }
     main { grid-template-columns: 1fr; }
     .panel > .inner { overflow-y: visible; }
   }
@@ -107,15 +118,24 @@
        arrives neutral grey and evenly lit; the `color` blend layer gives it the bench's
        own tan, and there is no baked-in lighting to fight, which is what disqualified
        the page hide when it was tried here. Fixed attachment keeps the grain still
-       while the shelf scrolls over it. */
+       while the shelf scrolls over it.
+       Theme v2: the tooled leather that replaced leather-tile.jpg in the table mockup
+       (Fabric Leather 02 as grey grain, the seamless half, at the mock's 300px), through
+       the same two browns and the same multiply: the theme's `.v2-tooled-leather`.
+       Tinted darker than it was (.04 / .16 of black), by measurement: this page's --dim
+       (#8e816a: "Only what I am carrying", "Nothing yet...", the preview's notes) held
+       3.92:1 median and 3.45 on the brightest 2% of the new grain at 375 (3.66 on the
+       old one), text removed. .30 / .42 gave 4.13, .46 / .56 4.50; .50 / .60 gives 4.82
+       / 4.63 at 375 and 4.95 / 4.70 at 1440. The mock instead lifts --dim inside its
+       tooled sides (#b3a488); here the texture was tinted and the token left alone. */
     background:
-      linear-gradient(rgba(0, 0, 0, .04), rgba(0, 0, 0, .16)),
+      linear-gradient(rgba(0, 0, 0, .50), rgba(0, 0, 0, .60)),
       linear-gradient(#57432d, #4b3a27),
-      url("{% static 'img/leather-tile.jpg' %}") #241d15;
+      var(--tex-side-leather) #241d15;
     background-blend-mode: normal, multiply, normal;
     background-repeat: no-repeat, no-repeat, repeat;
     background-attachment: scroll, scroll, fixed;
-    background-size: auto, auto, 512px auto;
+    background-size: auto, auto, 300px auto;
     border: 1px solid rgba(201, 162, 39, .25);
     border-radius: 3px; box-shadow: inset 0 0 40px rgba(0,0,0,.45),
     0 8px 32px rgba(0, 0, 0, .5), inset 0 1px 0 rgba(255, 230, 150, .06);
@@ -124,37 +144,35 @@
   .panel { position: relative; }
   /* The world card's own frame, applied whole — the user's reference, "exactly".
      Bevel ring at z2, ironmongery at z3 bolting through it; both on .panel rather
-     than .inner, so they hold still while the shelf scrolls inside. */
+     than .inner, so they hold still while the shelf scrolls inside.
+     Theme v2: the shelf's world card moved to the table's framed card, so this follows
+     (see home.html `.card::before` for the account): the 6px ring with the brass's grain
+     and its lips, lying on the panel's edge over its 1px border rather than 4px outside
+     it; the re-surfaced clasps and bosses registered on the ring's centre line. */
   .panel::before {
-    content: ""; position: absolute; inset: -4px; pointer-events: none;
-    border-radius: inherit; z-index: 2; padding: 5px;
-    background: linear-gradient(135deg,
-      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%);
+    content: ""; position: absolute; inset: -1px; pointer-events: none;
+    border-radius: inherit; z-index: 2; padding: var(--ring);
+    background: var(--brass-grain), var(--gilt);
+    background-size: 256px auto, auto; background-blend-mode: soft-light, normal;
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask-composite: exclude;
-    box-shadow: 0 0 16px rgba(255, 176, 84, .16), 0 3px 8px rgba(0, 0, 0, .55);
+    box-shadow: inset 1.5px 1.5px 0 rgba(255, 244, 205, .55),
+                inset -1.5px -1.5px 0 rgba(30, 20, 8, .9);
   }
   .panel::after {
-    content: ""; position: absolute; inset: -34px; pointer-events: none; z-index: 3;
-    background-image:
-      url("{% static 'img/clasp-tl.png' %}"),
-      url("{% static 'img/clasp-tr.png' %}"),
-      url("{% static 'img/clasp-bl.png' %}"),
-      url("{% static 'img/clasp-br.png' %}"),
-      url("{% static 'img/boss-top.png' %}"),
-      url("{% static 'img/boss-bottom.png' %}"),
-      url("{% static 'img/boss-left.png' %}"),
-      url("{% static 'img/boss-right.png' %}");
-    background-position: left 24px top 24px, right 24px top 24px,
-                         left 24px bottom 24px, right 24px bottom 24px,
-                         center top 21px, center bottom 21px,
-                         left 21px center, right 21px center;
+    content: ""; position: absolute; inset: -35px; pointer-events: none; z-index: 3;
+    background-image: var(--clasp-tl), var(--clasp-tr), var(--clasp-bl), var(--clasp-br),
+                      var(--boss-top), var(--boss-bottom), var(--boss-left), var(--boss-right);
+    background-position: left var(--clasp-in-x) top var(--clasp-in-y), right var(--clasp-in-x) top var(--clasp-in-y),
+                         left var(--clasp-in-x) bottom var(--clasp-in-y), right var(--clasp-in-x) bottom var(--clasp-in-y),
+                         center top var(--boss-in), center bottom var(--boss-in),
+                         left var(--boss-in) center, right var(--boss-in) center;
     background-repeat: no-repeat;
     background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                      40px auto, 40px auto, auto 40px, auto 40px;
-    filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .5));
+    filter: drop-shadow(2px 4px 3px rgba(0, 0, 0, .6));
   }
 
   .panel > h2 {
@@ -475,7 +493,7 @@
 </style>
 <script src="{% static 'js/dice3d.js' %}"></script>
 </head>
-<body>
+<body class="page-backdrop-leather">
 <div id="cursorshade" aria-hidden="true"></div>
 <div id="cursorlight" aria-hidden="true"></div>
 
