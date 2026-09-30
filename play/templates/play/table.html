@@ -2372,6 +2372,9 @@
   /* The body scrolls; the framed cards' clasps reach 10px past the ring, so it keeps a
      gutter that holds them, and clips them sideways rather than scrolling for them. */
   .sheetbody { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 16px 36px; }
+  /* The old page's empty-state line was set in Cinzel, whose lower case is small
+     capitals, so "Type to search" read as shouting on a card. The body face here. */
+  .sheetbody .empty { font: italic 14.5px/1.5 var(--body); color: var(--dim); }
   .modepage .sheetbody { padding: 12px 16px 36px; }
 
   /* --- The framed cards of the Sheet and the Journal ----------------------------------- */
@@ -2395,6 +2398,7 @@
      the column sits further right and nothing is under it. */
   @media (min-width: 1181px) {
     body.mode-sheet .sheetmore .sheetcard { padding-left: 48px; }
+    body.mode-sheet .sheetmore .sheetbody > .empty { padding-left: 76px; }
   }
   .why { color: var(--dim); font: italic 13.5px/1.45 var(--body); }
   .unknown { color: var(--dim); font-style: italic; }
