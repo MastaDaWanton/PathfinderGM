@@ -90,20 +90,68 @@ def _road_words(road, leg, hours: int, ride: bool) -> str:
 def exits(engine, world) -> list[dict]:
     """`[{"id", "name", "group", "time_words", "blocked", "journey"}]` for where the party
     stands. [] when they stand nowhere yet."""
-    from rules import geography, journey as journey_mod, keepers, outskirts
+    scene = engine.scene
+    if not str(scene.at or ""):
+        return []
+    here = engine.here()
+    rows = ways_from(engine, world, (here.id,)).get(here.id, [])
+    return [{k: v for k, v in row.items() if k != "minutes"} for row in rows]
+
+
+def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
+    """The exits row as it would read standing in each of `place_ids`, without moving
+    anybody: `{place_id: [row, ...]}`, each row the `exits()` row plus `minutes` (the
+    walk's minutes; 0 for a journey, whose time is days in words).
+
+    The fog-of-war chart (play/places_found.py) asks this of every place the player has
+    been and every place one way from them; `exits()` asks it of where they stand. One
+    body for both, so the chart can never draw a way the row would not offer, nor grey
+    one the row would let through. The mock's data builder had to stand the party in each
+    place in turn (`place_party`) to read this; the graph never needed the party there,
+    only the place — `watch_at_the_way_out` already took the place walked from.
+
+    An id that is not one of `engine.places()` (a place of another settlement, a reach of
+    wild ground the party is no longer on) is left out: the graph read live is the graph
+    from where the party stands.
+    """
+    from rules import geography, journey as journey_mod
     from rules import places as places_mod
 
     scene = engine.scene
     if not str(scene.at or ""):
-        return []
+        return {}
     pc = scene.pc()
     known = engine.places()
-    here = engine.here()
     loc = world.get(scene.location_id) if world is not None else None
     scale = places_mod.scale_of(loc) if loc is not None else "town"
     speed = int(getattr(pc, "speed_feet", 30) or 30) if pc is not None else 30
     clock = int(scene.clock_minutes or 0)
 
+    # Asked once for every place: none of it depends on which place the row is for.
+    roads_here: list = []
+    ride, watched, legs = False, "", {}
+    if loc is not None:
+        ride = riding(engine)
+        watched = _page_words(engine.watch_on_the_road(pc))
+        legs = {leg.to_id: leg for leg in journey_mod.legs_from(world, scene.location_id)}
+        roads_here = list(geography.roads_out(world, loc, speed))
+
+    out: dict[str, list[dict]] = {}
+    for place_id in place_ids:
+        here = places_mod.find(known, place_id)
+        if here is None or here.id in out:
+            continue
+        out[here.id] = _rows_from(engine, here, known, pc, loc, scale, speed, clock,
+                                  roads_here, ride, watched, legs)
+    return out
+
+
+def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
+               roads_here, ride, watched, legs) -> list[dict]:
+    from rules import geography, journey as journey_mod, keepers, outskirts
+    from rules import places as places_mod
+
+    scene = engine.scene
     out: list[dict] = []
     seen = {here.id}
 
@@ -120,9 +168,10 @@ def exits(engine, world) -> list[dict]:
         if p is None or p.id in seen or p.described_only:
             return
         seen.add(p.id)
+        minutes = _minutes(known, path, scale, speed)
         out.append({"id": p.id, "name": p.name, "group": group,
-                    "time_words": geography.walk_words(_minutes(known, path, scale, speed)),
-                    "blocked": blocked_for(p), "journey": False})
+                    "time_words": geography.walk_words(minutes),
+                    "blocked": blocked_for(p), "journey": False, "minutes": minutes})
 
     # One step along the graph's own edges. A step out onto the ring is "outside".
     adjacent = [places_mod.find(known, x) for x in here.exits]
@@ -150,12 +199,9 @@ def exits(engine, world) -> list[dict]:
 
     # Journeys, from where each one leaves.
     if loc is not None:
-        ride = riding(engine)
-        watched = _page_words(engine.watch_on_the_road(pc))
-        legs = {leg.to_id: leg for leg in journey_mod.legs_from(world, scene.location_id)}
         head_slug = outskirts.road_head_of(here.id)
         roads = []
-        for road in geography.roads_out(world, loc, speed):
+        for road in roads_here:
             if road.how in ("road", ""):
                 # The head of this road, or the stretch of it a stopped journey left
                 # the party on (both carry the destination's slug).
@@ -180,7 +226,7 @@ def exits(engine, world) -> list[dict]:
             roads.append((hours, {
                 "id": road.to_id, "name": road.to_name, "group": "road",
                 "time_words": _road_words(road, leg, hours, ride and not sea),
-                "blocked": watched, "journey": True}))
+                "blocked": watched, "journey": True, "minutes": 0}))
         out.extend(entry for _h, entry in sorted(roads, key=lambda t: t[0]))
     return out
 

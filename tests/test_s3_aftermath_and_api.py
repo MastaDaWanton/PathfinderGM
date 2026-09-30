@@ -55,7 +55,8 @@ OLD_SCENE = ["location", "scale", "what_it_is", "biome", "biome_describe", "roun
              "actors", "grid", "pools"]
 NEW_TOP = ["spellcasting", "start"]
 NEW_SCENE = ["where_label", "where_detail", "setting", "conversation", "day_part",
-             "exits"]          # I6, the "From here" row (Phase 3)
+             "exits",          # I6, the "From here" row (Phase 3)
+             "places_found"]   # the fog-of-war place chart (2026-09-30)
 
 
 # --- helpers ------------------------------------------------------------------------------

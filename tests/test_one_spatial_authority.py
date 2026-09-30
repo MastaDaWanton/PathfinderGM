@@ -28,10 +28,13 @@ _PLACE_WRITERS = {
                                         "stood somewhere real without unseating anybody",
     ("rules/engine.py", "_heal_places"): "",
 }
-# `scene.at` itself — the party record — has the same three, plus the load-failure floor.
+# `scene.at` itself — the party record — has one writer, plus the load-failure floor.
+# `move` (the PC moved, so the party moved) and `place_party` (placement) both stand the
+# party through `Scene.stand` since 2026-09-30, so `at` and the record of where the party
+# has been (`Scene.been`, the fog-of-war chart's) are written in one step and cannot
+# drift: the engine had kept no record of where the player had been.
 _SCENE_AT_WRITERS = {
-    ("rules/engine.py", "move"): "the PC moved, so the party moved",
-    ("rules/engine.py", "place_party"): "placement",
+    ("rules/engine.py", "stand"): "the party stands somewhere: `at`, and `been` with it",
     ("play/campaign.py", "_heal_places"): "a world that will not load leaves the party at "
                                           "'here' rather than nowhere on the way to the "
                                           "sentence that says so",

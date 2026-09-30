@@ -334,6 +334,11 @@ class Campaign:
             # reason `reacted` is: a fight put down mid-turn would otherwise hand back a
             # move action already walked.
             "move_spent": (dict(self.scene.move_spent), {}),
+            # Where the party has stood (the fog-of-war place chart). Its default is what
+            # `load` reads a save without it as — where the party stands now — so a
+            # campaign that has not moved since the update is written exactly as before.
+            "been": (self.scene.places_been(),
+                     [self.scene.at] if self.scene.at else []),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -459,6 +464,11 @@ class Campaign:
             # load and save by this one.
             conversation_log=[dict(e) for e in (s.get("conversation_log") or [])],
             conversation_seq=int(s.get("conversation_seq", 0) or 0),
+            # A save from before the record is seeded from where it stands: the one
+            # place the campaign can prove the party has been. Guessing more (every
+            # place named in the transcript) would draw places onto the player's map
+            # that they only heard of.
+            been=[str(x) for x in (s.get("been") or ([s["at"]] if s.get("at") else []))],
         )
         # `people` from a version-2 save, `actors` from a version-1 one. Straight into
         # the store rather than through `add`, because `add` stamps the party's place
