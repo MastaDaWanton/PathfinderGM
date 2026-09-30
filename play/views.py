@@ -887,8 +887,12 @@ def switch_character(request):
     """
     body = read_body(request)
     character_id = str(body.get("id", "")).strip()
+    # The start picker's path (Q20), used only when this begins an unplayed character's
+    # campaign; see `campaign.switch_to`.
+    start_town = str(body.get("start_town") or "").strip() or None
+    start_id = str(body.get("start_id") or "").strip() or None
     try:
-        c = campaign_mod.switch_to(character_id)
+        c = campaign_mod.switch_to(character_id, start_town=start_town, start_id=start_id)
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
     except ValueError as exc:

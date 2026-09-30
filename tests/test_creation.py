@@ -489,6 +489,39 @@ def test_the_forge_survives_a_server_that_answers_in_html():
     assert "did not answer in JSON" in page
 
 
+def test_switching_to_an_unplayed_character_honours_a_chosen_start(client):
+    """The build prover begins its outfitted fighter through `/api/character/switch`, and
+    starts are drawn: on 2026-09-30 the draw was the caravan ambush, the campaign opened
+    mid-fight, and the prover's "combat panel refuses an attack out of combat" check failed
+    on its premise rather than on the build. The switch door now takes the start picker's
+    `start_id` (owner's answer Q20) when it BEGINS a campaign, as the new-campaign door
+    already did; a campaign already under way ignores it and resumes where it stopped."""
+    from play import campaign as cm
+
+    made = client.post("/api/character/create",
+                       data=json.dumps(spec(name="Quiet Start", begin=False)),
+                       content_type="application/json").json()["id"]
+    r = client.post("/api/character/switch",
+                    data=json.dumps({"id": made, "start_id": "quiet-the-common-room"}),
+                    content_type="application/json")
+    assert r.status_code == 200, r.content
+    c = cm.current()
+    assert c.scene.start.get("id") == "quiet-the-common-room"
+    assert not c.scene.in_encounter
+
+    # Resuming: the start is not re-drawn, whatever the body asks for.
+    other = client.post("/api/character/create",
+                        data=json.dumps(spec(name="Somebody Else", begin=False)),
+                        content_type="application/json").json()["id"]
+    client.post("/api/character/switch", data=json.dumps({"id": other}),
+                content_type="application/json")
+    r = client.post("/api/character/switch",
+                    data=json.dumps({"id": made, "start_id": "road-caravan-attack"}),
+                    content_type="application/json")
+    assert r.status_code == 200, r.content
+    assert cm.current().scene.start.get("id") == "quiet-the-common-room"
+
+
 # --- taking a character off the roster --------------------------------------------------
 
 def test_a_character_can_be_deleted(client, tmp_path, settings):

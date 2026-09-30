@@ -679,7 +679,11 @@ def run_checks(http: Http, repo: Path) -> None:
                             {"buys": [{"kind": "weapon", "key": "longsword", "count": 1}]})
         if s != 200:
             faults.append(f"buying the longsword: {s}: {j(body)}")
-        s, body = http.post("/api/character/switch", {"id": made["id"]})
+        # A quiet start, asked for by name: starts are drawn, the draw can be the caravan
+        # ambush (it was, 2026-09-30), and the checks below assume no fight has begun
+        # ("combat panel refuses an attack out of combat").
+        s, body = http.post("/api/character/switch",
+                            {"id": made["id"], "start_id": "quiet-the-common-room"})
         if s != 200:
             faults.append(f"beginning the campaign: {s}: {j(body)}")
     note("character created, outfitted and campaign begun", faults)

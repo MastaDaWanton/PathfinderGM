@@ -863,8 +863,16 @@ def set_active(campaign_id: str) -> None:
     files.write_text(_pointer(), campaign_id)
 
 
-def switch_to(character_id: str) -> Campaign:
-    """Play somebody else. Their campaign resumes where it stopped."""
+def switch_to(character_id: str, *, start_town: str | None = None,
+              start_id: str | None = None) -> Campaign:
+    """Play somebody else. Their campaign resumes where it stopped.
+
+    `start_town` and `start_id` are the start picker's path (owner's answer Q20), honoured
+    only when this call BEGINS a campaign: an enrolled character who has never played.
+    A campaign already under way resumes where it stopped and ignores them. They were
+    added for the build prover, whose fighter is outfitted while unplayed and then begun
+    here: the draw landed on the caravan ambush on 2026-09-30 and the prover's "no fight
+    yet" check failed on a premise, not on the build."""
     from . import roster
 
     entry = roster.load(character_id)
@@ -887,7 +895,8 @@ def switch_to(character_id: str) -> Campaign:
         # the shipped default when finally played. Empty still means the default, which
         # is what every entry written before the field existed carries.
         c = new_campaign(campaign_id, character=entry.actor,
-                         world_source=entry.world_source or None)
+                         world_source=entry.world_source or None,
+                         start_town=start_town, start_id=start_id)
         c.character_id = character_id
         open_the_story(c)
         c.save()
