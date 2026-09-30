@@ -430,3 +430,17 @@ document.addEventListener("table:posted", e => {
   // `Device.wait()` for a roll owed, `Device.ready()` for a turn done.
   deviceSay(e.detail && e.detail.awaiting ? "wait" : "ready");
 });
+
+// A roll owed that no turn of this page's asked for: a page opened (or reloaded) with a
+// die pending, or the other device's turn drawn here by the resync. The state says the
+// engine is waiting on the player, so the device says so too; and when a drawn state
+// owes nothing while the device still waits (the other device rolled it), it comes to
+// rest. Found live: a page reloaded over a pending attack roll showed the device idle.
+onRender(function deviceWaits(s) {
+  if (DEVICE_TURN.inFlight) return;
+  const D = window.Device;
+  if (!D || typeof D.state !== "function") return;
+  const owed = !!(s && s.awaiting);
+  if (owed && D.state() === "idle") D.wait();
+  else if (!owed && D.state() === "waiting") D.stop();
+});

@@ -2161,7 +2161,7 @@
 
   /* Who: the portrait's frame, the name, what is in hand and worn, the doors. */
   .portrait { aspect-ratio: 4 / 5; position: relative; border-radius: 3px; overflow: hidden;
-              margin-bottom: 12px;
+              margin-bottom: 6px;
               background: radial-gradient(80% 70% at 50% 35%, #2a2118, #120e0a);
               border: 1px solid #1a140e;
               box-shadow: 0 0 0 1px var(--gold-dim) inset, var(--sunken), var(--sh-1); }
@@ -2169,6 +2169,8 @@
                     padding: 14px; text-align: center; color: var(--dim); font-style: italic;
                     font-size: 14px; line-height: 1.45; margin: 10px !important;
                     border: 1px dashed rgba(125, 104, 69, .7); border-radius: 3px; }
+  .portrait-note { margin: 0 0 12px !important; color: var(--dim); font-style: italic;
+                   font-size: 13px; }
   .pcname { margin: 0; color: var(--gold); font: 400 24px/1.15 var(--display);
             letter-spacing: .03em; text-shadow: var(--engraved); }
   .pcline { margin: 4px 0 0 !important; color: var(--dim); font-style: italic; }
@@ -2504,7 +2506,9 @@
 
   /* --- Sheet: the sheet panel carried into the centre column ------------------------- */
   body.mode-sheet .sheetmore { min-height: 0; display: grid; }
-  .modepage { min-height: 0; display: flex; flex-direction: column;
+  /* Clipped sideways as the stage is: a framed card's clasps reach 34px past it, and on
+     a 375px phone the Trade tab's notice widened the page to 397px (measured). */
+  .modepage { min-height: 0; display: flex; flex-direction: column; overflow-x: clip;
               padding: 20px 20px 16px; gap: 12px; }
   .modepage > * { width: 100%; max-width: 1320px; align-self: center; flex: none; }
   .modepage > #sheetpanel.on, .modepage > #tradepanel.on { flex: 1 1 0; height: auto; }
@@ -2625,10 +2629,14 @@
       grid-area: auto; grid-column: 1; grid-row: 1 / -1; padding: 12px; }
     body.sheet-hidden.talkopen:is(.mode-table, .mode-map) .stage {
       grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk"; }
+    /* Under the tray the book's clasps, which reach 34px past it, showed at the tray's
+       top corners. What the tray covers is put out of sight while it is open. */
+    body.talkopen:is(.mode-table, .mode-map) :is(.book, .board, .desk) { visibility: hidden; }
     /* The board keeps the height, and the desk keeps only the pen: the ways on are in
        Table, and on a phone they had left the board 26px. */
     body.mode-map .choices { display: none; }
-    .board { padding: 16px 16px 12px; }
+    /* Clear of the clasps' corner pieces, which sat over the heading's first letter. */
+    .board { padding: 22px 18px 12px 26px; }
     .boardview { min-height: 200px; padding: 6px; }
     .boardhead h2 { font-size: 15px; }
     /* The sheet on a phone is a page of its own: the whole sheet in one column that
@@ -2648,6 +2656,8 @@
     .side-who > .pcname { grid-column: 2; grid-row: 1; font-size: 21px; }
     .side-who > .pcline { grid-column: 2; grid-row: 2; }
     .side-who > .pcstate { grid-column: 2; grid-row: 3; }
+    .side-who > .portrait-note { grid-column: 2; grid-row: 4; margin: 6px 0 0 !important;
+                                 align-self: end; }
     .portrait-empty { margin: 6px !important; font-size: 12px; padding: 6px; }
 
     /* The book keeps its frame and clasps; its inside is what scrolls, head and all, so
@@ -2678,6 +2688,7 @@
     #combatbar .cb-acts { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
     #combatbar .cb-acts .v2-btn { flex: none; }
     .modepage { padding: 14px 12px 10px; }
+    .modepage > .notice { width: auto; align-self: stretch; margin: 24px 12px; padding: 22px 20px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2922,9 +2933,13 @@
   <div class="sheet" id="sheet">
     <aside class="side side-who v2-tooled-leather v2-gilt-edge" id="side-who"
            aria-label="Your character">
+      <!-- The design's portrait frame. The app stores no portrait, so the frame says so
+           and the reason sits under it, clear of the device's steam, which billows up
+           the gutter over this frame's right-hand edge. -->
       <div class="portrait" id="portrait">
-        <p class="portrait-empty">No portrait. Portraits are not kept yet.</p>
+        <p class="portrait-empty">No portrait yet</p>
       </div>
+      <p class="portrait-note">Portraits are not kept yet.</p>
       <h2 class="pcname" id="pc-name"></h2>
       <p class="pcline" id="pc-line"></p>
       <p class="pcstate" id="pc-state" hidden></p>

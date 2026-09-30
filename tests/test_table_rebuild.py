@@ -432,7 +432,15 @@ const document = {
   addEventListener: (k, fn) => { (L[k] = L[k] || []).push(fn); },
 };
 const window = { DEVICE_GEOMETRY: null, matchMedia: () => ({ matches: false }) };
-window.Device = new Proxy({}, { get: (_, k) => () => CALLS.push(k) });
+let MODE = "idle";
+window.Device = { run: () => { CALLS.push("run"); MODE = "running"; },
+                  wait: () => { CALLS.push("wait"); MODE = "waiting"; },
+                  ready: () => { CALLS.push("ready"); MODE = "idle"; },
+                  stop: () => { CALLS.push("stop"); MODE = "idle"; },
+                  state: () => MODE };
+const HOOKS = [];
+function onRender(fn) { HOOKS.push(fn); }
+const draw = s => HOOKS.forEach(fn => fn(s, null));
 const fire = (k, detail) => (L[k] || []).forEach(fn => fn({ detail }));
 """
 
@@ -444,7 +452,10 @@ def test_the_device_answers_the_three_signals_the_page_really_has(tmp_path):
     is running; the POST's reply is the answer, `ready` or, with a roll owed, `wait`; a
     turn that ends with no reply (a refusal, a busy table) comes to rest with `stop`. A
     post outside a turn (a counter's deal, the die's face) moves nothing, and a reply is
-    answered once, however many posts a turn makes."""
+    answered once, however many posts a turn makes. And a roll owed that no turn of
+    this page's asked for (a page reloaded over a pending die, measured live showing the
+    device idle; or the other device's turn drawn by the resync) is shown as waiting, and
+    comes to rest when a drawn state owes nothing; a turn in flight draws nothing here."""
     src = _DEVICE_STUB + (TABLE_SCRIPTS / "13-device.js").read_text(encoding="utf-8") + """
     const seq = [];
     const mark = label => { seq.push([label, CALLS.splice(0)]); };
@@ -459,6 +470,11 @@ def test_the_device_answers_the_three_signals_the_page_really_has(tmp_path):
     fire("table:busy", { on: false });                             mark("busy off");
     fire("table:busy", { on: true });                              mark("say again");
     fire("table:busy", { on: false });                             mark("refused, no reply");
+    draw({ awaiting: { label: "Attack" } });                       mark("opened over a roll owed");
+    draw({ awaiting: { label: "Attack" } });                       mark("drawn again");
+    draw({ awaiting: null });                                      mark("the other device rolled it");
+    fire("table:busy", { on: true });                              mark("a turn");
+    draw({ awaiting: { label: "Damage" } });                       mark("its own draw, mid-turn");
     console.log(JSON.stringify(seq));"""
     f = tmp_path / "device.js"
     f.write_text(src, encoding="utf-8")
@@ -468,7 +484,10 @@ def test_the_device_answers_the_three_signals_the_page_really_has(tmp_path):
     assert got == {"post outside a turn": [], "say": ["run"], "reply owes a roll": ["wait"],
                    "busy off after it": [], "the die's face": [], "roll": ["run"],
                    "reply": ["ready"], "a second post": [], "busy off": [],
-                   "say again": ["run"], "refused, no reply": ["stop"]}
+                   "say again": ["run"], "refused, no reply": ["stop"],
+                   "opened over a roll owed": ["wait"], "drawn again": [],
+                   "the other device rolled it": ["stop"], "a turn": ["run"],
+                   "its own draw, mid-turn": []}
 
 
 def test_the_signals_are_sent_where_the_page_already_knows_them():
@@ -534,3 +553,6 @@ def test_the_phone_is_the_designs_phone():
     assert "body:is(.mode-table, .mode-map) .sheet { display: none; }" in phone
     stage = _rule(_css(), "  .stage")
     assert "overflow-x: clip" in stage, "the clasps' box widens a phone page without it"
+    # The tabs that take the whole page hold framed cards too: the Trade tab's notice
+    # widened a 375px page to 397px until its page was clipped the same way (measured).
+    assert "overflow-x: clip" in _rule(_css(), "  .modepage")
