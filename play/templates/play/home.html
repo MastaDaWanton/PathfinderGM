@@ -460,12 +460,25 @@
   .forge .traits { color: var(--dim); font-size: 12.5px; font-style: italic; }
 
   /* --- Second pass: obsidian crystal, matching the table ------------------------ */
+  /* The side bars' leather (the owner, 2026-09-30: "use the lighter leather texture used
+     on the side bars for the cards"): the theme's `.v2-tooled-leather` exactly, its grey
+     grain multiplied through the app's two browns under .16 / .30 of black at 300px,
+     written out here because the script builds the cards. It is lighter than the card
+     leather it replaces, so the text on it is brightened (below), not the leather
+     darkened back. */
   .card {
     isolation: isolate; position: relative;
     background:
-      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      var(--tex-card-leather) #241d15;
-    background-size: auto, 400px auto;
+      linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
+      linear-gradient(#57432d, #4b3a27),
+      var(--tex-side-leather) #241d15;
+    background-blend-mode: normal, multiply, normal;
+    background-size: auto, auto, 300px auto;
+    /* The side bars' own dim, as their leather is: on it this page's --dim (#8e816a)
+       measured 3.97:1 on the brightest 2% of a card, 3.15 inside a chosen one and 3.48
+       on a pill, text removed (and 3.62 / 4.13 in those two already on the old leather).
+       #b3a488 is the mockup's dim for this leather, as on the craft bench's panels. */
+    --dim: #b3a488;
     border-color: rgba(201, 162, 39, .25);
     box-shadow: 0 8px 32px rgba(0, 0, 0, .6),
                 inset 0 1px 0 rgba(255, 230, 150, .08);
@@ -517,9 +530,14 @@
      itself catches light now, and the heading with it. */
   .card.pick.on, .card.on {
     border-color: rgba(255, 214, 128, .9);
+    /* The gold wash over the same side-bar leather, layer for layer. */
     background-image:
       linear-gradient(rgba(224, 168, 60, .17), rgba(224, 168, 60, .05)),
-      var(--tex-card-leather);
+      linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
+      linear-gradient(#57432d, #4b3a27),
+      var(--tex-side-leather);
+    background-blend-mode: normal, normal, multiply, normal;
+    background-size: auto, auto, auto, 300px auto;
     box-shadow: 0 0 0 1px rgba(255, 214, 128, .5),
                 0 0 34px rgba(224, 168, 60, .5),
                 0 12px 34px rgba(0, 0, 0, .6),
