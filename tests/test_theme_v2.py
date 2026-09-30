@@ -127,6 +127,30 @@ def test_the_stylesheet_is_served_as_css_whatever_the_registry_says():
     assert r["Cache-Control"] == "no-cache"
 
 
+PAGES = ["home", "craft", "classbuilder", "racebuilder", "spellbuilder", "manual", "outfit"]
+# The files theme v2 replaced (img/v2/CREDITS.md, "Replaces"). grimoire-leather.jpg is not
+# here: the owner kept it as every page's backdrop. leather-tile.jpg is the manual's own
+# backdrop, kept for the same reason, and nowhere else.
+REPLACED = ["img/card-leather.jpg", "img/clasp-", "img/boss-", "img/leather-tile.jpg"]
+
+
+def test_the_themed_pages_link_it_first_and_read_no_replaced_texture():
+    """Two ways the swap goes quietly wrong. Linked after a page's own <style>, the
+    theme's :root re-colours the page (its --dim #93866e over the shelf's #8e816a, its
+    --accent over theirs): a palette change nobody asked for. And a rule left pointing at
+    an old file keeps the old leather on one surface of a page that otherwise wears the
+    new: the swap looks done in every screenshot but the one view that shows that
+    surface."""
+    for name in PAGES:
+        text = (ROOT / "play" / "templates" / "play" / f"{name}.html").read_text(encoding="utf-8")
+        link = "{% asset 'css/theme-v2.css' %}"
+        assert link in text, f"{name}.html does not link the theme"
+        assert text.index(link) < text.index("<style>"), f"{name}.html links the theme after its own styles"
+        stale = [r for r in REPLACED if r in text
+                 and not (name == "manual" and r == "img/leather-tile.jpg")]
+        assert not stale, f"{name}.html still reads {stale}"
+
+
 def test_the_frame_geometry_is_the_approved_mocks():
     """The clasps were placed three times before they sat on the ring (mock README, "The
     clasps registered on the ring"): 24/21px left the arms 3-5px outside it. The theme's

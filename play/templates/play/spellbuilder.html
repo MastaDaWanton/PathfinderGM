@@ -1,5 +1,7 @@
-{% load static %}
+{% load static assets %}
 <title>Spell builder — Pathfinder GM</title>
+<!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <style>
   /* The app's own vocabulary, taken from the craft bench and the class builder rather
      than re-invented — a page that looks like a different application is the thing the
@@ -20,7 +22,7 @@
   header {
     display: flex; align-items: baseline; gap: 16px; padding: 12px 26px;
     border-bottom: 1px solid var(--gold-dim);
-    background: url("{% static 'img/card-leather.jpg' %}") center / cover #241d15;
+    background: var(--tex-card-leather) center / cover #241d15;
   }
   header h1 {
     margin: 0; color: var(--gold); font: 400 21px/1 var(--display);
@@ -35,14 +37,15 @@
   /* The writing surface, matched to the class builder's `.leaf` rather than approximated:
      card-leather at 400px with a dark wash over it. Tiling `leather-tile` raw came out
      several shades too pale against this page, which is the kind of near-miss that makes
-     a sibling page read as a different application. */
+     a sibling page read as a different application.
+     Theme v2: still matched to the class builder's, which is now the theme's card
+     leather and gilt edge (`v2-card-leather v2-gilt-edge` on the element) at this tint,
+     the padding giving back what the wider edge takes. */
   .leaf {
-    max-width: 900px; margin: 0 auto; padding: 20px 26px 30px;
-    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
-    background:
-      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    max-width: 900px; margin: 0 auto;
+    padding: calc(21px - var(--gilt-edge)) calc(27px - var(--gilt-edge)) calc(31px - var(--gilt-edge));
+    --leather-top: rgba(16, 12, 8, .04); --leather-foot: rgba(8, 6, 4, .20);
+    border-radius: 3px;
   }
   h2.sect {
     margin: 26px 0 4px; padding-bottom: 5px; color: var(--gold);
@@ -94,7 +97,7 @@
 </header>
 
 <main>
-  <div class="leaf">
+  <div class="leaf v2-card-leather v2-gilt-edge">
     <!-- Start from an existing spell. Everything is copied except the name, because a
          copied name would make Save overwrite the spell being learned from. -->
     <div class="startfrom">

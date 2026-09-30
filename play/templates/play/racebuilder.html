@@ -1,5 +1,7 @@
-{% load static %}
+{% load static assets %}
 <title>Race editor — Pathfinder GM</title>
+<!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <style>
   /* The spell builder's vocabulary, so the three builder pages read as one application. */
   :root {
@@ -18,7 +20,7 @@
   header {
     display: flex; align-items: baseline; gap: 16px; padding: 12px 26px;
     border-bottom: 1px solid var(--gold-dim);
-    background: url("{% static 'img/card-leather.jpg' %}") center / cover #241d15;
+    background: var(--tex-card-leather) center / cover #241d15;
   }
   header h1 {
     margin: 0; color: var(--gold); font: 400 21px/1 var(--display);
@@ -29,13 +31,14 @@
   a.back { color: var(--gold); text-decoration: none; font-size: 13px; }
   a.back:hover { color: #ffe7b4; }
   main { height: calc(100vh - 52px); overflow: auto; padding: 22px 26px 60px; }
+  /* Theme v2: the card leather and gilt edge are the theme's (`v2-card-leather
+     v2-gilt-edge` on the element) at this tint; the padding gives back what the wider
+     edge takes, so the form sits where it did. */
   .leaf {
-    max-width: 980px; margin: 0 auto; padding: 20px 26px 30px;
-    border: 1px solid rgba(201, 162, 39, .25); border-radius: 3px;
-    background:
-      linear-gradient(rgba(16, 12, 8, .04), rgba(8, 6, 4, .20)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
+    max-width: 980px; margin: 0 auto;
+    padding: calc(21px - var(--gilt-edge)) calc(27px - var(--gilt-edge)) calc(31px - var(--gilt-edge));
+    --leather-top: rgba(16, 12, 8, .04); --leather-foot: rgba(8, 6, 4, .20);
+    border-radius: 3px;
   }
   h2.sect {
     margin: 26px 0 4px; padding-bottom: 5px; color: var(--gold);
@@ -101,7 +104,7 @@
 </header>
 
 <main>
-  <div class="leaf">
+  <div class="leaf v2-card-leather v2-gilt-edge">
     <div class="startfrom">
       <div class="grow">
         <label for="pick">Start from a race that exists</label>

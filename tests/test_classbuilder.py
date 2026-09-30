@@ -599,14 +599,23 @@ def test_the_builder_declares_the_same_palette_as_the_craft_bench():
 
 
 def test_the_builder_uses_the_shipped_leather_and_the_shipped_face():
-    """Reuse of the app's vocabulary, not a parallel one: the same two background images,
-    the same display face, loaded through `{% static %}` so the packaged build finds them.
+    """Reuse of the app's vocabulary, not a parallel one: the same backdrop and leather,
+    the same display face, loaded so the packaged build finds them.
+
+    Since theme v2 (2026-09-30) the leathers are not image paths in this template but the
+    shared stylesheet every page links (play/static/css/theme-v2.css; its images are held
+    to real files by tests/test_theme_v2.py). It is linked through `{% asset %}`, which is
+    `{% static %}` plus a content stamp, and BEFORE the page's own <style>: after it, the
+    theme's :root would override this page's palette.
     """
     text = TEMPLATE.read_text(encoding="utf-8")
-    assert "{% load static %}" in text
-    for asset in ("img/grimoire-leather.jpg", "img/card-leather.jpg",
-                  "fonts/Cinzel-Regular.woff2"):
-        assert asset in text, f"{asset} is what the rest of the app is made of"
+    assert "{% load static assets %}" in text
+    link = "{% asset 'css/theme-v2.css' %}"
+    assert link in text, "the builder no longer links the shared materials"
+    assert text.index(link) < text.index("<style>"), "the theme must come before the page's styles"
+    for material in ("page-backdrop-leather", "v2-card-leather", "var(--tex-card-leather)"):
+        assert material in text, f"{material} is what the rest of the app is made of"
+    assert "fonts/Cinzel-Regular.woff2" in text
     assert 'font-variant: small-caps' in text
 
 
