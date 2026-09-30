@@ -1,27 +1,28 @@
-// The play table, part 07 of 10 (panels). Classic script, sharing one global scope with
-// 01-06 and 08-10, loaded after them.
+// The play table, part 07 (panels). Classic script, sharing one global scope with 01-06
+// and 08-21, loaded after 06.
 //
-// The side column as panels: Sheet, Scene, Map, Rolls (docs/design-f-ui.md §4.1). The
-// conversation was a fifth until the owner's ruling of 2026-09-28 (Q42) made it a tray of
-// its own, out of the column (08-conversation.js). One component, two modes:
+// Two things live here, and the first is unchanged since the 2026-09-28 panel shell:
 //
-// - column mode is the docked column the table has always had;
-// - drawer mode is the phone's slide-over, used under 760px AND on a desktop after
-//   "Hide the column", written once as `body.drawer aside` rules.
+// 1. The render hooks (`onRender`, `runRenderHooks`), which every later part of the
+//    table draws through (docs/fix-interfaces.md §2.11).
+// 2. The panels. Until the table rebuild (docs/table-rebuild-inventory.md) the side
+//    column was four panels, Sheet, Scene, Map and Rolls, with a bar of toggles, a close
+//    on each, "Hide the column" and a phone drawer with tabs on the right edge. The
+//    owner's approved design replaced that column with the stage's two sides and the
+//    tabs on top (docs/mock/table-layout/README.md): the sheet in brief is the two sides
+//    (14-sides.js), the map is a tab, the phone's sheet is a tab. What is left of the
+//    panels is the two the design had no other place for, "In the scene" and "Rolls",
+//    as disclosures at the foot of the right side, folded or open and remembered.
+//    "Hide the column" became Hide sheet, the same choice under the same stored key.
 //
-// Several panels show at once, so this is a toolbar of toggle buttons plus a disclosure
-// per panel, not the APG tabs pattern (which assumes one displayed panel — Foundry's
-// Sticky Sidebar exists precisely because one-tab-at-a-time was a regression). Every
-// renderer that wrote into the old aside writes into the same ids inside a panel body;
-// nothing here draws game content.
-//
-// What it exports (docs/fix-interfaces.md §2.11): `onRender(fn)` for the lanes' render
-// hooks, and `Panels = {open, close, collapse, expand, forward, mode}`.
+// What it exports (§2.11): `onRender(fn)` for the lanes' render hooks, and
+// `Panels = {open, close, collapse, expand, forward, mode}`, the same names with the
+// meanings the new layout gives them (each says below).
 
-const PANEL_IDS = ["sheet", "scene", "map", "rolls"];
+const PANEL_IDS = ["scene", "rolls"];
 // Versioned because Electron's storage outlives every reinstall (CLAUDE.md, the stale
 // stylesheet). The pre-paint script at the top of <body> reads the same key for `docked`;
-// if this name changes, change it there too.
+// if this name changes, change it there too. `docked: false` is "the sheet is hidden".
 const PANELS_KEY = "pgm.table.panels.v1";
 const PANELS_NARROW = window.matchMedia ? window.matchMedia("(max-width: 760px)") : null;
 const PANELS_STILL = window.matchMedia
@@ -30,7 +31,7 @@ const PANELS_STILL = window.matchMedia
 // --- render hooks ----------------------------------------------------------------------
 //
 // `render()` in 02 calls `runRenderHooks(s, prev)` on every draw. The page's first draw
-// happens at the bottom of 06, before this file and 08-10 have loaded, so 02 guards the
+// happens at the bottom of 06, before this file and 08-21 have loaded, so 02 guards the
 // call and the hooks are primed once the document has finished parsing: every hook then
 // sees the state on screen with `prev === null`, which is how a hook tells the first
 // draw (never a reason to pop a clock or bring a panel forward) from a turn.
@@ -58,18 +59,18 @@ function primeRenderHooks() {
 
 // --- the layout, remembered per viewer -------------------------------------------------
 //
-// {open:{id:bool}, collapsed:{id:bool}, docked:bool}. Unreadable, missing or throwing
-// storage means everything open and docked: Foundry v13 shipped a sidebar collapsed by
-// default with no setting, and two modules exist only to reopen it on load.
+// {collapsed:{id:bool}, docked:bool}. Unreadable, missing or throwing storage means
+// everything open and the sheet shown: Foundry v13 shipped a sidebar collapsed by default
+// with no setting, and two modules exist only to reopen it on load. A record written by
+// the old column (it also held `open` for the four panels) reads the same: the unknown
+// ids are ignored.
 function readPanelLayout() {
-  const out = { open: {}, collapsed: {}, docked: true, chosen: {} };
-  for (const id of PANEL_IDS) { out.open[id] = true; out.collapsed[id] = false; }
+  const out = { collapsed: {}, docked: true, chosen: {} };
+  for (const id of PANEL_IDS) out.collapsed[id] = false;
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(PANELS_KEY) || "null"); } catch { saved = null; }
   if (!saved || typeof saved !== "object") return out;
   for (const id of PANEL_IDS) {
-    // Unknown ids in the saved record are ignored; a missing one keeps its default.
-    if (saved.open && typeof saved.open[id] === "boolean") out.open[id] = saved.open[id];
     if (saved.collapsed && typeof saved.collapsed[id] === "boolean") {
       out.collapsed[id] = saved.collapsed[id];
       out.chosen[id] = true;
@@ -82,12 +83,12 @@ function readPanelLayout() {
 const PANEL_LAYOUT = readPanelLayout();
 
 function savePanelLayout() {
-  const { open, collapsed, docked, chosen } = PANEL_LAYOUT;
-  // Only the collapses somebody chose are written, so a default stays a default.
+  const { collapsed, docked, chosen } = PANEL_LAYOUT;
+  // Only the folds somebody chose are written, so a default stays a default.
   const kept = {};
   for (const id of PANEL_IDS) if (chosen[id]) kept[id] = collapsed[id];
   try {
-    localStorage.setItem(PANELS_KEY, JSON.stringify({ open, collapsed: kept, docked }));
+    localStorage.setItem(PANELS_KEY, JSON.stringify({ collapsed: kept, docked }));
   } catch { /* private window, blocked storage: the layout simply is not remembered */ }
 }
 
@@ -96,121 +97,54 @@ const panelsAside = () => document.getElementById("panels");
 const panelSection = id => document.getElementById(`panel-${id}`);
 const panelBody = id => document.getElementById(`panel-${id}-body`);
 const panelToggle = id => { const s = panelSection(id); return s && s.querySelector(".paneltoggle"); };
-const panelBarButton = id => document.querySelector(`#panelbar .panelbtn[data-panel="${id}"]`);
 
-function isDrawerMode() { return document.body.classList.contains("drawer"); }
-function isDrawerOpen() { const a = panelsAside(); return !!(a && a.classList.contains("on")); }
+function sheetHidden() { return document.body.classList.contains("sheet-hidden"); }
 
 function paintPanels() {
   for (const id of PANEL_IDS) {
     const section = panelSection(id), body = panelBody(id), toggle = panelToggle(id);
     if (!section) continue;
-    const open = PANEL_LAYOUT.open[id], collapsed = PANEL_LAYOUT.collapsed[id];
-    section.hidden = !open;
+    const collapsed = PANEL_LAYOUT.collapsed[id];
     section.classList.toggle("collapsed", collapsed);
     if (body) body.hidden = collapsed;
     if (toggle) toggle.setAttribute("aria-expanded", String(!collapsed));
-    const btn = panelBarButton(id);
-    if (btn) btn.setAttribute("aria-pressed", String(open));
   }
-  const mode = document.getElementById("panelmode");
-  if (mode) {
-    mode.textContent = PANEL_LAYOUT.docked ? "Hide the column" : "Show the column";
-    mode.title = PANEL_LAYOUT.docked
-      ? "Give the story the full width. The panels open from tabs on the right edge."
-      : "Put the panels back beside the story.";
+  const toggle = document.getElementById("sheettoggle");
+  if (toggle) {
+    const hidden = sheetHidden();
+    toggle.textContent = hidden ? "Show sheet" : "Hide sheet";
+    toggle.setAttribute("aria-expanded", String(!hidden));
+    toggle.title = hidden
+      ? "Put your character and your numbers back beside the story."
+      : "Give the story the full width. The Sheet tab still has everything.";
   }
 }
 
-// The edge tabs, which exist only in drawer mode (CSS hides the group in column mode).
-// Sheet always; Scene while a fight is on. Map and the conversation keep their own
-// left-edge tabs.
-const EDGE_COUNT = { scene: 0, sheet: 0, map: 0, rolls: 0 };
-
-function paintEdgeTabs() {
-  const s = STATE || {};
-  const scene = s.scene || {};
-  const shown = {
-    sheet: true,
-    scene: !!scene.in_encounter || EDGE_COUNT.scene > 0,
-  };
-  const drawerOpen = isDrawerOpen();
-  document.querySelectorAll("#edgetabs .edgetab").forEach(tab => {
-    const id = tab.dataset.panel;
-    tab.hidden = !shown[id];
-    tab.setAttribute("aria-expanded", String(drawerOpen));
-    const n = EDGE_COUNT[id] || 0;
-    const count = tab.querySelector(".edgecount");
-    if (count) { count.textContent = n ? String(n) : ""; count.hidden = !n; }
-    const name = tab.dataset.name || id;
-    tab.setAttribute("aria-label", n ? `${name}, ${n} new` : name);
-  });
-}
-
-// --- modes -----------------------------------------------------------------------------
+// Hide sheet is a desktop's choice; under 760px the sheet is a tab of its own and the
+// choice waits for a wider window (the pre-paint script reads it the same way).
 function applyPanelMode() {
   const narrow = !!(PANELS_NARROW && PANELS_NARROW.matches);
-  const drawer = narrow || !PANEL_LAYOUT.docked;
-  document.body.classList.toggle("drawer", drawer);
-  const aside = panelsAside();
-  if (aside) {
-    if (!drawer) aside.classList.remove("on");
-    // An off-screen drawer is not in the Tab order. Before this, on a phone, Tab walked
-    // the whole invisible sheet before reaching anything on screen.
-    aside.inert = drawer && !aside.classList.contains("on");
-  }
+  document.body.classList.toggle("sheet-hidden", !narrow && !PANEL_LAYOUT.docked);
   paintPanels();
-  paintEdgeTabs();
-  const current = document.querySelector('#panelbar button[tabindex="0"]');
-  panelBarRove(current);
-}
-
-let DRAWER_OPENER = null;
-
-function openDrawer(from) {
-  const aside = panelsAside();
-  if (!aside || !isDrawerMode()) return;
-  if (!aside.classList.contains("on")) DRAWER_OPENER = from || null;
-  aside.classList.add("on");
-  aside.inert = false;
-  // Two slide-overs on one screen must never both be open: on a 375px phone the second
-  // lands on top of the first (the rule `showSheet` carried since the phone layout).
-  if (typeof showMap === "function") showMap(false);
-  paintEdgeTabs();
-}
-
-function closeDrawer() {
-  const aside = panelsAside();
-  if (!aside || !aside.classList.contains("on")) return;
-  const hadFocus = aside.contains(document.activeElement);
-  aside.classList.remove("on");
-  aside.inert = isDrawerMode();
-  const back = DRAWER_OPENER;
-  DRAWER_OPENER = null;
-  paintEdgeTabs();
-  // Focus goes back where it came from only when it was inside the drawer, which is now
-  // inert. A click outside that landed on the input keeps the input.
-  if (hadFocus) {
-    const to = (back && document.contains(back) && !back.hidden) ? back
-      : (document.getElementById("sheettab") || document.getElementById("input"));
-    if (to) to.focus({ preventScroll: true });
-  }
 }
 
 // `onlyIfHidden` for what the page brings forward by itself: a heading already in view
-// stays where the player is reading it rather than the column jumping to line it up.
+// stays where the player is reading it rather than the side jumping to line it up.
 function scrollToPanel(id, smooth, onlyIfHidden) {
   const aside = panelsAside(), section = panelSection(id);
   if (!aside || !section || section.hidden) return;
+  // At 1180px and below the two sides are one scrolled column, `.sheet`.
+  const box = aside.scrollHeight > aside.clientHeight ? aside
+    : (aside.closest(".sheet") || aside);
   const top = Math.max(0, section.offsetTop - 12);
   if (onlyIfHidden) {
     const head = section.querySelector(".panelhead");
     const h = head ? head.offsetHeight : 30;
-    if (section.offsetTop >= aside.scrollTop
-        && section.offsetTop + h <= aside.scrollTop + aside.clientHeight) return;
+    if (section.offsetTop >= box.scrollTop
+        && section.offsetTop + h <= box.scrollTop + box.clientHeight) return;
   }
   const still = PANELS_STILL && PANELS_STILL.matches;
-  aside.scrollTo({ top, behavior: smooth && !still ? "smooth" : "auto" });
+  if (box.scrollTo) box.scrollTo({ top, behavior: smooth && !still ? "smooth" : "auto" });
 }
 
 // A short fade on a body the viewer just opened, so the change reads as theirs. Opacity
@@ -225,40 +159,26 @@ function markArrived(id) {
 
 // --- the API ---------------------------------------------------------------------------
 const Panels = {
-  // Restore a panel, expand it and bring it into view. In drawer mode this also slides
-  // the drawer in; `from` is the control focus returns to when it closes.
-  open(id = "sheet", { from = null, focus = true } = {}) {
-    if (!PANEL_IDS.includes(id)) return;
-    const wasShut = !PANEL_LAYOUT.open[id] || PANEL_LAYOUT.collapsed[id];
-    PANEL_LAYOUT.open[id] = true;
-    if (PANEL_LAYOUT.collapsed[id]) { PANEL_LAYOUT.collapsed[id] = false; PANEL_LAYOUT.chosen[id] = true; }
-    savePanelLayout();
-    paintPanels();
-    if (wasShut) markArrived(id);
-    if (isDrawerMode()) {
-      EDGE_COUNT[id] = 0;
-      openDrawer(from);
-      scrollToPanel(id, false);
-    } else {
-      scrollToPanel(id, true);
+  // "scene" or "rolls": unfold it and bring it into view, showing the sheet first if it
+  // was hidden. "sheet" shows the sheet (on a phone, the Sheet tab); "map" is the Map tab.
+  open(id = "sheet", { focus = true } = {}) {
+    if (id === "map") { if (typeof showMap === "function") showMap(true); return; }
+    if (PANELS_NARROW && PANELS_NARROW.matches) {
+      if (typeof Shell === "object" && Shell) Shell.show("sheet");
+    } else if (sheetHidden()) {
+      Panels.mode("column");
     }
+    if (!PANEL_IDS.includes(id)) return;
+    if (PANEL_LAYOUT.collapsed[id]) { Panels.expand(id); }
+    scrollToPanel(id, true);
     const toggle = panelToggle(id);
     if (focus && toggle) toggle.focus({ preventScroll: true });
-    paintEdgeTabs();
   },
 
-  // With an id, take that panel off the column (its bar button reads unpressed). With
-  // none, close the drawer: the one "close" there is for the whole column.
-  close(id) {
-    if (id === undefined) { closeDrawer(); return; }
-    if (!PANEL_IDS.includes(id)) return;
-    const section = panelSection(id);
-    const hadFocus = section && section.contains(document.activeElement);
-    PANEL_LAYOUT.open[id] = false;
-    savePanelLayout();
-    paintPanels();
-    if (hadFocus) { const b = panelBarButton(id); if (b) b.focus({ preventScroll: true }); }
-  },
+  // There is no drawer to close and no panel to take off the side any more: the two
+  // disclosures fold (`collapse`). Kept, a harmless no-op, for the callers that close
+  // "whatever is sliding over the story" before opening something of their own.
+  close() {},
 
   collapse(id) {
     if (!PANEL_IDS.includes(id)) return;
@@ -278,34 +198,26 @@ const Panels = {
     if (was) markArrived(id);
   },
 
-  // Something started that this panel shows: a fight. Edge-triggered by
-  // the caller, and it never moves focus.
-  //   column: restore, expand, and scroll it into view inside the column;
-  //   drawer: do NOT open the drawer (it would cover the beat about to be read; G0 Q7).
-  //           The panel's edge tab shows instead, with `count` when one is given.
-  // A player who closes the panel mid-fight keeps it closed, because nothing
-  // calls this again until the next one starts.
-  forward(id, { count } = {}) {
+  // Something started that this panel shows: a fight. Edge-triggered by the caller, and
+  // it never moves focus: unfold "In the scene" and bring it into view in the side if
+  // the side is on screen. A hidden sheet stays hidden (the fight is on the desk, in the
+  // combat bar, and the player chose the width); a phone's sheet stays a tab.
+  forward(id) {
     if (!PANEL_IDS.includes(id)) return;
-    if (typeof count === "number" && count >= 0) EDGE_COUNT[id] = count;
-    if (isDrawerMode()) { paintEdgeTabs(); return; }
-    PANEL_LAYOUT.open[id] = true;
     PANEL_LAYOUT.collapsed[id] = false;
-    PANEL_LAYOUT.chosen[id] = true;
-    savePanelLayout();
     paintPanels();
-    scrollToPanel(id, true, true);
+    if (!sheetHidden()) scrollToPanel(id, true, true);
   },
 
-  // "column" or "drawer". Given one, it sets the desktop's choice ("Hide the column");
-  // under 760px the drawer is the only mode and the choice waits for a wider window.
+  // "column" (the sheet shown) or "drawer" (hidden), the old names kept for their
+  // callers. Given one, it sets the desktop's choice; it returns the one in force.
   mode(set) {
     if (set === "column" || set === "drawer") {
       PANEL_LAYOUT.docked = set === "column";
       savePanelLayout();
       applyPanelMode();
     }
-    return isDrawerMode() ? "drawer" : "column";
+    return sheetHidden() ? "drawer" : "column";
   },
 };
 
@@ -314,69 +226,22 @@ const Panels = {
 // A conversation starting is the conversation tray's to answer (08-conversation.js).
 onRender((s, prev) => {
   const scene = (s && s.scene) || {};
-  if (!prev) { paintEdgeTabs(); return; }
+  if (!prev) return;
   const before = (prev && prev.scene) || {};
   if (scene.in_encounter && !before.in_encounter) Panels.forward("scene");
-  paintEdgeTabs();
 });
 
 // --- controls --------------------------------------------------------------------------
 document.addEventListener("click", e => {
-  const btn = e.target.closest("#panelbar .panelbtn");
-  if (btn) {
-    const id = btn.dataset.panel;
-    if (PANEL_LAYOUT.open[id]) Panels.close(id);
-    else Panels.open(id, { focus: false });
-    return;
-  }
-  if (e.target.closest("#panelmode")) {
-    const hiding = PANEL_LAYOUT.docked;
-    Panels.mode(hiding ? "drawer" : "column");
-    // The button that was pressed has just slid off screen with the column; the Sheet
-    // edge tab is where the column is now reached from.
-    if (hiding) { const t = document.getElementById("sheettab"); if (t) t.focus({ preventScroll: true }); }
+  if (e.target.closest("#sheettoggle")) {
+    Panels.mode(sheetHidden() ? "column" : "drawer");
     return;
   }
   const toggle = e.target.closest(".paneltoggle");
   if (toggle) {
     const id = toggle.closest(".panel").dataset.panel;
     if (PANEL_LAYOUT.collapsed[id]) Panels.expand(id); else Panels.collapse(id);
-    return;
   }
-  const shut = e.target.closest(".panelclose");
-  if (shut) Panels.close(shut.closest(".panel").dataset.panel);
-});
-
-// The toolbar is one Tab stop with the arrow keys inside it (APG toolbar pattern).
-function panelBarItems() {
-  return [...document.querySelectorAll("#panelbar button")].filter(b => b.offsetParent !== null);
-}
-function panelBarRove(to) {
-  const items = panelBarItems();
-  // A stop that is no longer shown (the column button under 760px) hands its place to
-  // the first one, or the toolbar would drop out of the Tab order altogether.
-  if (!to || !items.includes(to)) to = items[0];
-  if (!to) return;
-  document.querySelectorAll("#panelbar button").forEach(b => { b.tabIndex = b === to ? 0 : -1; });
-}
-document.addEventListener("keydown", e => {
-  const here = e.target.closest && e.target.closest("#panelbar button");
-  if (!here) return;
-  const items = panelBarItems();
-  const i = items.indexOf(here);
-  let to = null;
-  if (e.key === "ArrowRight" || e.key === "ArrowDown") to = items[(i + 1) % items.length];
-  else if (e.key === "ArrowLeft" || e.key === "ArrowUp") to = items[(i - 1 + items.length) % items.length];
-  else if (e.key === "Home") to = items[0];
-  else if (e.key === "End") to = items[items.length - 1];
-  if (!to) return;
-  e.preventDefault();
-  panelBarRove(to);
-  to.focus();
-});
-document.addEventListener("focusin", e => {
-  const b = e.target.closest && e.target.closest("#panelbar button");
-  if (b) panelBarRove(b);
 });
 
 if (PANELS_NARROW) {

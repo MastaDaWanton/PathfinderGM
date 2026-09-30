@@ -88,7 +88,8 @@ def _rule(css: str, selector: str) -> str:
 def test_the_conversation_is_a_tray_out_of_the_column(page):
     """Owner, Q42: "It should be removed from the panel." Nothing in the column, its bar
     or its drawer tabs names the conversation any more; the log and the controls are in
-    `#talktray`, opened from `#talktab` on the left edge under MAP."""
+    `#talktray`, opened from `#talktab` (Talk in the top bar since the table rebuild; the
+    left-edge tab it was kept its id)."""
     html, els = page
     assert 'id="panel-conversation' not in html
     assert not [e for e in els if e["attrs"].get("data-panel") == "conversation"]
@@ -129,16 +130,34 @@ def _seconds(rule: str) -> float:
 def test_trays_and_the_drawer_open_in_150ms_or_less():
     """Owner, 2026-09-28: "i dont need reduced motion i just dont want the kind of motion
     that makes the pages or menus harder to use". The map tray and the drawer slid for
-    320ms, long enough to be clicked through while still moving."""
+    320ms, long enough to be clicked through while still moving.
+
+    Since the table rebuild the map tray and the drawer are gone (the Map and Sheet tabs,
+    docs/table-rebuild-inventory.md M5 and N14), and the conversation tray opens in its
+    column at once: no rule for it may slide, and none may take longer than 150ms."""
     css = _css()
-    for selector in ("#talktray", "#maptray", "body.drawer aside"):
-        assert _seconds(_rule(css, selector)) <= 0.15, selector
+    assert "#maptray {" not in css and "body.drawer aside {" not in css
+    tray = [m.group(0) for m in re.finditer(r"#talktray[^{}]*\{[^}]*\}", css)]
+    assert tray, "no rule draws the tray"
+    for rule in tray:
+        head = rule[:rule.index("{")]
+        if "prefers-reduced-motion" in head:
+            continue
+        assert "translateX" not in rule, rule
+        for dur, unit in re.findall(r"transition:[^;]*?([\d.]+)(m?s)", rule):
+            assert float(dur) / (1000 if unit == "ms" else 1) <= 0.15, rule
 
 
 def test_no_button_hops_under_the_pointer():
+    """The page's old button base is fenced off the rebuild's controls (`:where(...)`),
+    which wear the theme's cast iron; the suggestions are the desk's wax seals. None of
+    them lifts on hover."""
     css = _css()
-    for selector in ("button:hover:not(:disabled)", ".sugg:hover"):
+    fence = ":where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *))"
+    for selector in (f"button{fence}:hover:not(:disabled)", "#suggestions .sugg:hover"):
         assert "translateY" not in _rule(css, selector), selector
+    theme = (TABLE.parents[2] / "static" / "css" / "theme-v2.css").read_text(encoding="utf-8")
+    assert "translate" not in _rule(theme, ".v2-btn:hover")
 
 
 def test_the_existing_reduced_motion_fallbacks_are_kept_and_the_tray_has_one():

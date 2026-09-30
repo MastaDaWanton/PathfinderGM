@@ -3,8 +3,10 @@
 //
 // What was said, per person, in a tray of its own (docs/design-f-ui.md §4.2; owner Q42,
 // 2026-09-28: "it should be openable and closeable while the buttons to ignore or leave
-// conversation should be there as well. It should be removed from the panel."). The map
-// tray's idiom: a TALK tab on the left edge and a slide-over the player opens and closes.
+// conversation should be there as well. It should be removed from the panel."). Since the
+// table rebuild the tray takes the right side's column (its own column with the sheet
+// hidden, the whole stage on a phone), opened and closed by Talk in the top bar, which
+// keeps the id the old left-edge TALK tab had (#talktab) so this file reads it as before.
 //
 // - The log is `scene.conversation` (the last 80 entries round the people here) plus
 //   whatever `GET /api/conversation` has paged in; entries are keyed by their `n`, which
@@ -229,16 +231,20 @@ function paintTalkTab() {
   const n = talkIsOpen() ? 0 : convoUnread();
   const count = tab.querySelector(".edgecount");
   if (count) { count.textContent = n ? String(n) : ""; count.hidden = !n; }
-  tab.setAttribute("aria-label", n ? `Conversation, ${n} new` : "Conversation");
+  // The name starts with the word on the button, so a voice user saying "Talk" reaches
+  // it (WCAG 2.5.3); the old edge tab said "Conversation" and showed "TALK".
+  tab.setAttribute("aria-label", n ? `Talk, ${n} new` : "Talk");
   tab.setAttribute("aria-expanded", String(talkIsOpen()));
 }
 
 function openTalk({ focus = true } = {}) {
   const tray = talkTray();
   if (!tray) return;
-  // Two slide-overs never share the screen: the map tray and the drawer go first.
-  if (typeof showMap === "function" && $("#maptray").classList.contains("on")) showMap(false);
-  if (typeof Panels === "object" && Panels) Panels.close();
+  // The tray lives on the stage, so a tab that takes the whole page gives way to the
+  // Table first (the approved design's rule: Talk opens beside the story).
+  if (typeof Shell === "object" && Shell && !["table", "map", "sheet"].includes(Shell.mode())) {
+    Shell.show("table");
+  }
   tray.classList.add("on");
   tray.inert = false;
   document.body.classList.add("talkopen");
@@ -314,10 +320,10 @@ onRender(function conversationTray(s, prev) {
 // --- controls ---------------------------------------------------------------------------
 document.addEventListener("click", e => {
   const t = e.target;
-  if (t.closest("#talktab")) { openTalk(); return; }
+  // Talk opens the tray and closes it again: a button in the top bar that is pressed in
+  // while the tray is out, as the design has it.
+  if (t.closest("#talktab")) { if (talkIsOpen()) closeTalk(); else openTalk(); return; }
   if (t.closest("#talkclose")) { closeTalk(); return; }
-  // Another slide-over is being opened: this one gives way.
-  if (t.closest("#maptab, #mapopen, .edgetab")) { closeTalk(); return; }
   const pick = t.closest("[data-convo]");
   if (pick) { CONVO.pick = pick.dataset.convo; drawConvo(STATE, true); return; }
   const more = t.closest("[data-convo-more]");
@@ -345,8 +351,6 @@ document.addEventListener("keydown", e => {
     const a = document.activeElement;
     if (!a || a === document.body || talkTray().contains(a)) closeTalk();
   }
-  // The map's own shortcut opened the map over this tray's edge: give way.
-  if (e.key === "m" && talkIsOpen() && $("#maptray").classList.contains("on")) closeTalk();
 });
 
 (function watchConvoScroll() {

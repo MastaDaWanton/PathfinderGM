@@ -46,42 +46,27 @@ async function openRoster() {
 // starting somebody new — both matched `.pick`, so a click on a roster row fired both:
 // it switched campaigns *and* posted /api/character/new with an undefined source, and
 // "Never mind" quietly rolled a new character instead of closing the panel.
-// The map tray. `render` refills it while it is open, so a token that moves on the
-// turn you are watching moves here too rather than going stale behind the tab.
+// The map. It was a tray that slid in from a MAP tab on the left edge; since the table
+// rebuild (docs/table-rebuild-inventory.md, M5) it is a tab of its own, the board where
+// the book was, because the owner's approved design made it one (the mock README, "Map
+// is a tab, Talk is a tray": the side panel's copy was 18px a square, "legible only as
+// a shape"). `render` redraws it on every state, so a token that moves on the turn you
+// are watching moves on the board too. `Shell` is 12-shell.js, loaded later; a key press
+// can only come after it has.
 function showMap(on) {
-  $("#maptray").classList.toggle("on", on);
-  $("#maptab").style.display = on ? "none" : "";
-  if (on && STATE) renderMap(STATE);
+  if (typeof Shell !== "object" || !Shell) return;
+  Shell.show(on ? "map" : "table");
 }
-// The drawer. It was the sheet alone, under the phone breakpoint, through `showSheet`;
-// since the 2026-09-28 panel shell it is the whole column of panels, on a phone or on a
-// desktop after "Hide the column", and `Panels` (07-panels.js) owns it. `showSheet` was
-// removed rather than redefined there: a later classic script's function of the same
-// name silently wins, the JS form of what test_no_silent_shadowing guards in Python.
-// Two slide-overs on one screen must still never both be open: on a 375px phone the
-// second lands on top of the first, so the map closes the drawer and the drawer the map.
-document.addEventListener("click", e => {
-  if (e.target.closest("#maptab") || e.target.closest("#mapopen")) {
-    Panels.close();
-    showMap(true);
-  }
-  else if (e.target.closest("#mapclose")) showMap(false);
-  else if (e.target.closest(".edgetab")) {
-    const tab = e.target.closest(".edgetab");
-    Panels.open(tab.dataset.panel, { from: tab });
-  }
-  // Anywhere outside it, while it is open. A drawer with no way out but a tab it is
-  // currently covering is a trap, and the tabs are hidden precisely while it is open.
-  else if ($("aside").classList.contains("on") && !e.target.closest("aside")) {
-    Panels.close();
-  }
-});
+// The drawer, the edge tabs and the map tray went with the rebuild: the tabs on top are
+// the one way to a page, on a phone as on a desktop (the mock README, "Phone (375px)").
+// `showSheet` is still not declared anywhere: a later classic script's function of the
+// same name silently wins, the JS form of what test_no_silent_shadowing guards.
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && $("#maptray").classList.contains("on")) showMap(false);
-  if (e.key === "Escape" && $("aside").classList.contains("on")) Panels.close();
   // A map is worth a shortcut in a game where the whole question is where you stand.
-  if (e.key === "m" && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
-    showMap(!$("#maptray").classList.contains("on"));
+  const into = document.activeElement;
+  if (e.key === "m" && !e.ctrlKey && !e.metaKey && !e.altKey
+      && !/^(INPUT|TEXTAREA|SELECT)$/.test(into && into.tagName)) {
+    showMap(!(typeof Shell === "object" && Shell && Shell.mode() === "map"));
   }
 });
 

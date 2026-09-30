@@ -180,12 +180,18 @@ def test_on_a_desktop_the_chip_line_is_held_open_so_the_row_does_not_move():
     with the footer at the bottom, so the chip appearing in the say form lifted the row
     44px (704 to 660) and a second press meant to take it back landed on the Outside
     group. With the line held open while the row is shown, the same press measured 0px
-    for a Go chip and 1px for a Withdraw chip with its line, at 1722 and at 1024 wide."""
+    for a Go chip and 1px for a Withdraw chip with its line, at 1722 and at 1024 wide.
+
+    Since the table rebuild the row and the pen are both in the desk at the foot of the
+    stage, where growth goes upward just as it did in the footer; the rule is written
+    for the desk (`.desk:has(#exits:not([hidden]))`) instead of for the row's next
+    sibling."""
     page = (Path(__file__).resolve().parent.parent
             / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
-    block = page[page.index("@media (min-width: 761px) {\n    #exits:not([hidden]) + #sayform"):]
+    held = ".desk:has(#exits:not([hidden])) #sayform > #attachments"
+    block = page[page.index("@media (min-width: 761px) {\n    " + held):]
     block = block[:block.index("\n  }\n")]
-    assert "#exits:not([hidden]) + #sayform > #attachments {" in block
+    assert held + " {" in block
     assert "min-height: 42px" in block
     assert "#attachments[hidden] { visibility: hidden; }" in block
 

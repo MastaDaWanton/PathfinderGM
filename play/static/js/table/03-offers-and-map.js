@@ -37,7 +37,7 @@ function renderSuggestions(s) {
   // Hidden entirely while a roll is pending: the only thing to do then is answer it.
   if (!offered.length || s.awaiting) { box.innerHTML = ""; return; }
   box.innerHTML = offered.map(t =>
-    `<button type="button" class="sugg">${esc(t)}</button>`).join("");
+    `<button type="button" class="sugg v2-btn">${esc(t)}</button>`).join("");
 }
 
 document.addEventListener("click", e => {
@@ -69,14 +69,12 @@ let MAP_TURN = 0, MAP_3D = false;
 function renderMap(s) {
   const g = s.scene.grid;
   if (!g) {
+    // A blank board reads as broken, so the Map tab says why (its `.boardempty` line,
+    // shown while this is empty). Since 2026-09-19 the ground is laid when the party
+    // ARRIVES somewhere rather than when a fight starts (item 28), so this is now the
+    // rare case: a scene with nowhere in it yet, between worlds or before the party has
+    // been placed.
     $("#mapwrap").innerHTML = "";
-    // A blank tray reads as broken, so it says why. Since 2026-09-19 the ground is laid
-    // when the party ARRIVES somewhere rather than when a fight starts (item 28), so this
-    // is now the rare case — a scene with nowhere in it yet, between worlds or before the
-    // party has been placed.
-    $("#maptrayinner").innerHTML =
-      `<div class="empty">No ground is mapped yet. The map is drawn from wherever the
-       party is standing, as soon as they are standing somewhere.</div>`;
     return;
   }
 
@@ -218,41 +216,39 @@ function renderMap(s) {
          </pattern>
        </defs>${parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
+  // The controls sit in the board's head as the approved design lays them out (the mock's
+  // Map mode): Flat and 3D as one recessed pair, the turn beside them while it is in 3D,
+  // and the floors, each pressed in when it is the one being looked at. The same
+  // `data-mapview`, `data-mapturn` and `data-maplevel` the tray used, read by 04.
+  const pressed = on => `class="v2-btn" aria-pressed="${on ? "true" : "false"}"`;
+  const view = `<div class="v2-recess" role="group" aria-label="View">
+      <button type="button" data-mapview="flat" ${pressed(!MAP_3D)}>Flat</button>
+      <button type="button" data-mapview="3d" ${pressed(MAP_3D)}>3D</button></div>${MAP_3D
+      ? `<div class="v2-recess" role="group" aria-label="Turn the board">
+          <button type="button" class="v2-btn" data-mapturn="-1"
+                  aria-label="Turn the board left">Turn left</button>
+          <button type="button" class="v2-btn" data-mapturn="1"
+                  aria-label="Turn the board right">Turn right</button></div>` : ""}`;
   const picker = levels.length > 1
-    ? `<div class="levelpick"><span class="sub">Looking at</span>${levels.map(v =>
-        `<button data-maplevel="${v}" class="${v === MAP_LEVEL ? "on" : ""}">${
-          v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}${
-        g.ceiling ? `<span class="sub">ceiling ${g.ceiling * 5} ft</span>` : ""}</div>`
+    ? `<div class="v2-recess" role="group" aria-label="Looking at"><span class="seglabel">Looking at</span>${
+        levels.map(v => `<button type="button" data-maplevel="${v}" ${pressed(v === MAP_LEVEL)}>${
+          v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}</div>${
+        g.ceiling ? `<span class="seglabel">ceiling ${g.ceiling * 5} ft</span>` : ""}`
     : "";
-  const view = `<div class="levelpick"><button data-mapview="${MAP_3D ? "flat" : "3d"}">${
-      MAP_3D ? "Flat" : "3D"}</button>${MAP_3D
-      ? `<button data-mapturn="-1" title="Turn the board left">&#8630;</button>`
-        + `<button data-mapturn="1" title="Turn the board right">&#8631;</button>`
-      : ""}</div>`;
-  const legend = `${view}${picker}${g.speed ? `<div class="sub maplegend">${
-      reach.size} squares within ${g.speed} ft</div>` : ""}${
-      pools ? `<div class="sub maplegend">${pools} pool${
-        pools === 1 ? "" : "s"} of blood on the ground</div>` : ""}`;
+  const legend = `${g.speed ? `<p class="sub maplegend">${
+      reach.size} squares within ${g.speed} ft</p>` : ""}${
+      pools ? `<p class="sub maplegend">${pools} pool${
+        pools === 1 ? "" : "s"} of blood on the ground</p>` : ""}`;
   // The place is named, not just drawn. A correct map of the well, while the prose is
-  // describing a gate, is indistinguishable from a broken map unless the tray says which
-  // place it is — reported 2026-09-21. `about` is the shape's own line about what that
+  // describing a gate, is indistinguishable from a broken map unless the board says which
+  // place it is (reported 2026-09-21). `about` is the shape's own line about what that
   // kind of place is made of, which is also what the plan was built from.
   const whereHead = g.place ? `The ground · ${esc(g.place)}` : "The ground";
-  $("#mapwrap").innerHTML = `<h2>${whereHead} <button class="mapopen" id="mapopen"
-      title="Open the map">⤢</button></h2>${svg}${
-      g.about ? `<div class="sub maplegend">${esc(g.about)}</div>` : ""}${legend}`;
-
-  // The same SVG at a readable size. The side panel's copy is 18px to the square and
-  // legible only as a shape; a grid the player is meant to plan a move on has to be
-  // something they can actually look at.
-  if ($("#maptray").classList.contains("on")) {
-    $("#maptrayinner").innerHTML = svg
-      + (g.about ? `<div class="sub maplegend">${esc(g.about)}</div>` : "") + legend;
-    // The expanded tray names the place in its own bar, for the same reason the panel
-    // does: a map nobody can name is a map nobody can check.
-    const bar = document.querySelector("#maptray .traybar b");
-    if (bar) bar.textContent = g.place ? `The ground · ${g.place}` : "The ground";
-  }
+  $("#mapwrap").innerHTML = `<div class="boardhead"><h2>${whereHead}</h2>
+      <div class="boardctl">${view}${picker}</div></div>
+    <div class="boardview">${svg}</div>
+    <div class="boardfoot">${g.about ? `<p class="sub maplegend">${esc(g.about)}</p>` : ""}${
+      legend}</div>`;
 
   function cell(c, r, cls, inner = "") {
     return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${

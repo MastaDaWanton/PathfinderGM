@@ -103,8 +103,12 @@ def test_the_table_scripts_carry_a_content_stamp_and_are_not_trusted_from_cache(
     html = client.get("/play/").content.decode("utf-8")
     srcs = [s for s in _SRC.findall(html) if "/js/table/" in s]
     # Ten since the 2026-09-28 panel shell added 07-panels.js and Lane F's three stubs;
-    # eleven since I6's exits row (11-exits.js).
-    assert len(srcs) == 11 and all(re.search(r"\?v=[0-9a-f]{10}$", s) for s in srcs), srcs
+    # eleven since I6's exits row (11-exits.js); twenty-one since the table rebuild's
+    # shell (12-21: the tabs, the device, the sides, the book's head, one per tab). Every
+    # file in the folder, so a script added there and not loaded fails here too.
+    from pagesource import table_scripts
+    assert len(srcs) == 21 == len(table_scripts()), srcs
+    assert all(re.search(r"\?v=[0-9a-f]{10}$", s) for s in srcs), srcs
     r = client.get(srcs[0])
     assert r["Cache-Control"] == "no-cache"
     assert r["Content-Type"].startswith("text/javascript")

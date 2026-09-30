@@ -134,7 +134,7 @@ function renderExits(s) {
         const time = exitTime(e.time_words);
         const risky = fighting && !shut;
         const on = !shut && pressed === e.id;
-        return `<button type="button" class="exitbtn${shut ? " shut" : ""}${
+        return `<button type="button" class="exitbtn v2-btn${shut ? " shut" : ""}${
           risky ? " risky" : ""}${on ? " asking" : ""}" data-exit="${esc(e.id)}"${
           shut ? ` aria-disabled="true" data-why="${esc(e.blocked)}"`
                : ` aria-pressed="${on}"`}><span class="ex-name">${esc(e.name)}</span>${
