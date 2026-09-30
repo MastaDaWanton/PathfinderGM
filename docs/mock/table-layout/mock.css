@@ -116,7 +116,7 @@ body {
     radial-gradient(60% 45% at 52% 105%, rgba(var(--ember), .08), transparent 70%) fixed,
     linear-gradient(rgba(9, 7, 5, var(--room-dim-top)), rgba(6, 4, 3, var(--room-dim-foot))) fixed,
     url("textures/room-boiler.jpg") 22% 47% / cover no-repeat fixed #0d0b09;
-  --room-dim-top: .65; --room-dim-foot: .70; --room-vig-mid: .49; --room-vig-edge: .86;
+  --room-dim-top: .60; --room-dim-foot: .655; --room-vig-mid: .44; --room-vig-edge: .83;
 }
 
 /* The carried candle: the cursor is the candlestick, its hotspot on the flame tip (the
@@ -527,15 +527,10 @@ body.sheet-hidden .talk { grid-area: talk; }
    page curves down into the gutter and the light falls off. */
 .book {
   position: relative; min-height: 0; display: grid; border-radius: 3px;
-  background:
-    /* the gutter: the page dips into the spine on its left edge */
-    linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
-                    rgba(0, 0, 0, .08) 44px, transparent 90px),
-    /* the page's own curve catching the lamp, high and left */
-    radial-gradient(80% 60% at 35% 15%, rgba(240, 214, 158, .07), transparent 70%),
-    linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
-    url("textures/page-paper.jpg") #1d1710;
-  background-size: auto, auto, auto, 560px auto;
+  /* The page is painted by its inside (.bookin, the story's leaf, slightly see-through)
+     and its head (.bookhead, opaque), not here: a see-through leaf over an opaque book
+     would show the book, not the room. */
+  background: none;
   /* Its depth is the shadow it casts, down and right from the one lamp, onto the desk and
      the room. The leaves beneath it were drawn here as seven hard 1px offsets (the 3D pass),
      a 7px band outside the gilt ring on the right and the foot only; the owner, 2026-09-30:
@@ -592,12 +587,36 @@ body.sheet-hidden .talk { grid-area: talk; }
 /* Inside the book: the head stays, the story scrolls. On a phone the whole inside scrolls
    instead, and the frame and its clasps stay where they are, because they belong to the
    book and not to its text. */
+/* The story's leaf, slightly see-through (the owner, 2026-09-30: "make the text box
+   background slightly transparent"): the page's own colour, #110e0a, the median of the
+   paper as it was drawn, at --leaf-a, with the room behind it blurred so it reads as
+   depth and not as noise under the words. Only the fill is see-through: the text, the
+   gilt, the clasps and the head are not faded (never `opacity` on the element). Where
+   backdrop-filter is not supported the room shows through unblurred at the same strength,
+   which is still measured above 4.5:1 (README); the page's paper grain (its spread was 5
+   levels in 255) gives way to the room's own. */
 .bookin { position: relative; z-index: 1; min-height: 0; display: grid;
-          grid-template-rows: auto minmax(0, 1fr); }
+          grid-template-rows: auto minmax(0, 1fr); border-radius: inherit;
+          --leaf-a: .7;
+          background:
+            /* the gutter: the page dips into the spine on its left edge */
+            linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
+                            rgba(0, 0, 0, .08) 44px, transparent 90px),
+            /* the page's own curve catching the lamp, high and left */
+            radial-gradient(80% 60% at 35% 15%, rgba(240, 214, 158, .07), transparent 70%),
+            rgba(17, 14, 10, var(--leaf-a));
+          -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+/* The head stays opaque, the page as it was drawn: the paper under the app's dimming. */
 .bookhead { position: relative; padding: 24px 50px 10px 58px;
             border-bottom: 1px solid rgba(125, 104, 69, .45);
             box-shadow: 0 1px 0 rgba(255, 225, 170, .05);
-            display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; }
+            display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px;
+            border-radius: 3px 3px 0 0;
+            background:
+              linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
+                              rgba(0, 0, 0, .08) 44px, transparent 90px),
+              linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
+              url("textures/page-paper.jpg") 0 0 / 560px auto #1d1710; }
 .where { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
 .place { margin: 0; color: var(--gold); font: 400 25px/1.15 var(--display);
          letter-spacing: .04em; text-shadow: var(--engraved), 2px 4px 10px rgba(0, 0, 0, .85); }

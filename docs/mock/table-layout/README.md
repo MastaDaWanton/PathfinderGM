@@ -123,6 +123,37 @@ owner's notes that followed are answered point by point below.
   dim #93866e): 4.85 at 375x812, 4.77 at 1024x768, 4.73 at 1440x900, worst 2%. All hold
   4.5:1; the room costs about 0.4 of the desk's margin, the price of a picture with lamps.
 
+**Lifted again, and the story's leaf made see-through (2026-09-30).** The owner: "make the
+text box background slightly transparent. also the background needs to be lighter again
+only the background and not the UI".
+
+- The room: the wash from 65% / 70% to 60% / 65.5%, the vignette from 49% / 86% to 44% /
+  83%: **+16% mean luminance at 1440, +17% at 1024, +18% at 375** on top of the first
+  lift (the room alone, every child of `body` hidden). The same proof as before: the
+  computed styles of 32-109 UI elements per view identical, every changed pixel on the
+  open room. Text on the open room still holds with the scrims already there: the
+  Equipment reply line 4.78 at 1024 and 4.89 at 1440, "50 things" 4.87 and 5.06, worst 2%.
+- The text box, read as the narration box (the book's page under the story, what the
+  owner called "the narration box" the note before; the pen was left as it was): its fill
+  is the page's own colour at 70% (`--leaf-a: .7` on `.bookin`), over a 4px
+  `backdrop-filter` blur of the room. Only the fill: the text, the ring, the clasps and the
+  head are not faded; the head keeps its opaque paper, so the see-through starts under its
+  rule. The paper's grain (a spread of 5 levels in 255) gives way to the room's own. Where
+  `backdrop-filter` is unsupported the room shows through unblurred at the same strength,
+  measured too. Contrast of the story's colours over it, median / worst 2%, text removed,
+  embers held, the device hidden:
+
+| Width | story #d8cdb2 | player #8fb0c8 | dim #93866e | dim, no blur |
+|---|---|---|---|---|
+| 1792 | 11.97 / 10.81 | 8.29 / 7.49 | 5.29 / 4.78 | 5.29 / 4.74 |
+| 1440 | 11.97 / 10.82 | 8.29 / 7.50 | 5.29 / 4.78 | 5.29 / 4.76 |
+| 1024 | 11.97 / 11.01 | 8.30 / 7.63 | 5.29 / 4.87 | 5.29 / 4.83 |
+| 375 | 11.97 / 10.74 | 8.29 / 7.44 | 5.29 / 4.74 | 5.29 / 4.74 |
+
+  Opaque, the dim text measured 4.88 / 4.90 / 4.99 / 4.83. The floor is about 40%: the
+  dim text holds 4.50 at 1792 there, and falls to 4.41 at 30%. 85% was tried first and the
+  room did not show at all; 70% is where it shows, faintly, as the owner asked ("slightly").
+
 **Lifted, the room only (2026-09-29).** The owner: "brighten background a bit as well",
 then "i only want the background to be lighter not the UI". The room's own layers are the
 only thing that changed: the wash went from 71% / 75% black to 65% / 70%, and the vignette
