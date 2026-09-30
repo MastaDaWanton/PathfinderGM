@@ -64,21 +64,24 @@
 </header>
 
 <div class="stage" id="stage" role="tabpanel" aria-labelledby="tab-table">
+  <!-- The engine device (device.js): the owner's brass mechanism, bolted just below the
+       left side panel's top-right corner, on the gilt edge of whatever the centre column
+       holds (the book, the map, the sheet's pages). It belongs to the table's frame, not to
+       the book, so it lives here and shows on every tab that shows the left panel; on a
+       phone it lies on its side in the head bar (device.js moves it). Decorative to a
+       screen reader, which hears the story itself arrive (the story is a polite live log)
+       and the roll owed. -->
+  <div class="device" id="device" data-state="idle" aria-hidden="true">
+    <div class="dv-body">
+      <img class="dv-chamber" src="textures/device-chamber.png" alt="">
+      <img class="dv-lip" src="textures/device-lip.png" alt="">
+      <img class="dv-frame" src="textures/device-frame.png" alt="">
+    </div>
+    <div class="dv-smoke"></div>
+  </div>
   <!-- Table mode: the story, in a book. -->
   <section class="book" id="book" aria-labelledby="place-name">
     <i class="rim" aria-hidden="true"></i>
-    <!-- The engine device (device.js): the owner's brass mechanism, mounted on the book's
-         left gilt edge in the gutter beside the side panel (on a phone, laid on its side
-         in the head bar: device.js moves it). Decorative to a screen reader, which hears
-         the story itself arrive (the story is a polite live log) and the roll owed. -->
-    <div class="device" id="device" data-state="idle" aria-hidden="true">
-      <div class="dv-body">
-        <img class="dv-chamber" src="textures/device-chamber.png" alt="">
-        <img class="dv-lip" src="textures/device-lip.png" alt="">
-        <img class="dv-frame" src="textures/device-frame.png" alt="">
-      </div>
-      <div class="dv-smoke"></div>
-    </div>
     <div class="bookin" id="bookin">
       <div class="bookhead">
         <div class="where">

@@ -246,6 +246,31 @@ bolted over the clasp's arm that runs down the edge. It takes the place of the b
 boss (hidden where the device is). It is absolute: nothing in the layout moved, and the
 gutter was not widened.
 
+**On every tab with the left panel (2026-09-30).** It was a child of the book, so it
+existed only on the Table tab (measured 0x0 on Map, Sheet, Equipment, Trade and Journal),
+though Map keeps the pen and a turn can be taken there. It now belongs to the stage, the
+table's frame: device.js anchors it to the centre column's left edge and the left panel's
+top, so it hangs on the gilt edge of whatever the centre column holds. Measured on every
+tab:
+
+| Tab | 1440x900 | 1024x768 |
+|---|---|---|
+| Table | 267,157 84x242 (as before, to the pixel) | 291,161 60x173 (as before) |
+| Map (Flat, 3D, Places) | 267,157 84x242 | 291,161 60x173 |
+| Sheet | 267,157 84x242 | 291,161 60x173 |
+| Equipment, Trade, Journal | not shown: these tabs have no left panel and no pen | not shown |
+| Table or Map, sheet hidden | 245,157: on the centre column's own left edge, as before | 45,161, as before |
+
+On a phone it stays in the head bar on every tab. On Map and Sheet the content was moved
+clear of it: the Map frame's left padding is 58px (the book's own), where at 26px the
+device covered the first letter of "The ground"; at 1440 the Sheet's cards pad 48px on
+the left, where the device covered the start of "Combat", the initiative box and the
+weapons' names. At 1024 nothing was under it. The Map frame's left boss is hidden like the
+book's. A turn taken on Table and followed through Map, Sheet, Equipment, Journal and back
+ran as one sequence: the model's clock, the gears' angle and the steam carried across every
+switch (the device's log shows one running, one ready, one halt and one lever-up), and it
+is only drawn while its tab shows it.
+
 | Width | Device | Box (x, y) | Clear of, on its left | Clear of, on its right |
 |---|---|---|---|---|
 | 1440x900 | 84 x 243px | 267-351, 157-399 | the side panel's content (the portrait frame, 264) by 3px; the tab out reaches its gilt line | the title (360) by 9px |

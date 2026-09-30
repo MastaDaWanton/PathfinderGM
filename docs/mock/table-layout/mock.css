@@ -700,12 +700,18 @@ body.sheet-hidden .talk { grid-area: talk; }
    corner: just under the book's top-left clasp's corner piece, so the clasp's corner
    and its arm along the top still show and the device is bolted over the arm that runs
    down the edge. It covers where the book's left boss sat, and takes that fitting's
-   place. Absolute, so nothing in the layout knows it is there, and it passes the pointer
-   through. */
+   place, and the Map frame's the same way. Absolute, so nothing in the layout knows it is
+   there, and it passes the pointer through.
+   It is a child of the stage, not of the book, so it is on every tab that shows the left
+   panel (Table, Map, Sheet): device.js sets --dv-x and --dv-y to the centre column's left
+   edge and the panel's top, in the stage's coordinates, and this places it from them
+   exactly as it was placed inside the book. With the sheet hidden there is no panel and
+   the anchor is the centre column's own top-left corner. */
 .device { --dv-w: 84px; --dv-off: 4px; position: absolute; z-index: 4; pointer-events: none;
           width: var(--dv-w); height: calc(var(--dv-w) * 773 / 268);
-          left: calc(var(--ring) / 2 - var(--dv-w) / 2 + var(--dv-off)); top: 24px; }
-.book::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+          left: calc(var(--dv-x, 0px) + var(--ring) / 2 - var(--dv-w) / 2 + var(--dv-off));
+          top: calc(var(--dv-y, 0px) + 24px); }
+.book::after, .board::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                                  40px auto, 40px auto, 0 0, auto 40px; }
 .dv-body { position: absolute; inset: 0;
            /* Its shadow on the frame and the page falls the lamp's way, down and right. */
@@ -797,8 +803,11 @@ body.resolving .desk .exitbtn, body.resolving .desk .sugg { opacity: .55; }
 .framedcard.narrow { max-width: 620px; margin: 30px auto; }
 
 /* --- Map mode: the board -------------------------------------------------------------- */
+/* Its left padding clears the engine device, which hangs on this frame's left edge on the
+   Map tab as it does on the book's (58px, the book's own head padding): at 26px the device
+   covered the first letter of "The ground". */
 .board { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0;
-         gap: 10px; padding: 20px 26px 16px; }
+         gap: 10px; padding: 20px 26px 16px 58px; }
 .boardhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
              justify-content: space-between; }
 .board h2 { margin: 0; }
@@ -956,6 +965,13 @@ body.resolving .desk .exitbtn, body.resolving .desk .sugg { opacity: .55; }
 body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0;
                              padding: 14px 16px 24px; display: grid; gap: 34px;
                              align-content: start; }
+/* The engine device hangs at this column's left edge on the Sheet tab too: at 1440 it
+   covered the first 5px of "Combat", the initiative box and the weapons' names. The
+   cards' content starts clear of it; the cards scroll under it, so all of them. At 1024
+   and below the column sits further right and nothing is under it (measured). */
+@media (min-width: 1181px) {
+  body.mode-sheet .sheetmore .framedcard { padding-left: 48px; }
+}
 .statrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
            gap: 10px; margin-bottom: 18px; }
 .stat { padding: 9px 10px 8px; border-radius: 3px; text-align: center;
@@ -1295,7 +1311,7 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
              width: calc(var(--dv-w) * 773 / 268); height: var(--dv-w); --dv-w: 30px; }
   .dv-slot .device { --dv-w: 30px; left: 50%; top: 50%; --dv-sx: 3px; --dv-sy: -1.2px;
                      transform: translate(-50%, -50%) rotate(90deg); }
-  .book::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
+  .book::after, .board::after { background-size: 96px auto, 96px auto, 96px auto, 96px auto,
                                    40px auto, 40px auto, auto 40px, auto 40px; }
   body { font-size: 16px; }
   /* The phone's chrome is counted: the strip is one row of the switch and one line of
