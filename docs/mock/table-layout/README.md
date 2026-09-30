@@ -135,7 +135,8 @@ only the background and not the UI".
   Equipment reply line 4.78 at 1024 and 4.89 at 1440, "50 things" 4.87 and 5.06, worst 2%.
 - The text box, read as the narration box (the book's page under the story, what the
   owner called "the narration box" the note before; the pen was left as it was): its fill
-  is the page's own colour at 70% (`--leaf-a: .7` on `.bookin`), over a 4px
+  is the page's own colour at 50% (`--leaf-a: .5` on `.bookin`; the owner chose it from
+  the sweep, "50% is good", after 70% was first set), over a 4px
   `backdrop-filter` blur of the room. Only the fill: the text, the ring, the clasps and the
   head are not faded; the head keeps its opaque paper, so the see-through starts under its
   rule. The paper's grain (a spread of 5 levels in 255) gives way to the room's own. Where
@@ -143,16 +144,17 @@ only the background and not the UI".
   measured too. Contrast of the story's colours over it, median / worst 2%, text removed,
   embers held, the device hidden:
 
-| Width | story #d8cdb2 | player #8fb0c8 | dim #93866e | dim, no blur |
+| Width | story #d8cdb2 | player #8fb0c8 | dim #93866e | no blur: story / player / dim, worst 2% |
 |---|---|---|---|---|
-| 1792 | 11.97 / 10.81 | 8.29 / 7.49 | 5.29 / 4.78 | 5.29 / 4.74 |
-| 1440 | 11.97 / 10.82 | 8.29 / 7.50 | 5.29 / 4.78 | 5.29 / 4.76 |
-| 1024 | 11.97 / 11.01 | 8.30 / 7.63 | 5.29 / 4.87 | 5.29 / 4.83 |
-| 375 | 11.97 / 10.74 | 8.29 / 7.44 | 5.29 / 4.74 | 5.29 / 4.74 |
+| 1792 | 11.83 / 10.50 | 8.19 / 7.27 | 5.23 / 4.64 | 10.40 / 7.21 / 4.60 |
+| 1440 | 11.83 / 10.54 | 8.19 / 7.30 | 5.23 / 4.66 | 10.44 / 7.24 / 4.62 |
+| 1024 | 11.83 / 10.68 | 8.20 / 7.40 | 5.23 / 4.72 | 10.51 / 7.29 / 4.65 |
+| 375 | 11.85 / 10.50 | 8.21 / 7.28 | 5.23 / 4.64 | 10.36 / 7.18 / 4.58 |
 
   Opaque, the dim text measured 4.88 / 4.90 / 4.99 / 4.83. The floor is about 40%: the
   dim text holds 4.50 at 1792 there, and falls to 4.41 at 30%. 85% was tried first and the
-  room did not show at all; 70% is where it shows, faintly, as the owner asked ("slightly").
+  room did not show at all; 70% showed it faintly; at 50% the lamps, gauges and pipes read
+  through the page, and the dim text keeps 4.58 at its worst.
 
 **Lifted, the room only (2026-09-29).** The owner: "brighten background a bit as well",
 then "i only want the background to be lighter not the UI". The room's own layers are the

@@ -589,7 +589,7 @@ body.sheet-hidden .talk { grid-area: talk; }
    book and not to its text. */
 /* The story's leaf, slightly see-through (the owner, 2026-09-30: "make the text box
    background slightly transparent"): the page's own colour, #110e0a, the median of the
-   paper as it was drawn, at --leaf-a, with the room behind it blurred so it reads as
+   paper as it was drawn, at --leaf-a (50%, the owner's pick), with the room behind it blurred so it reads as
    depth and not as noise under the words. Only the fill is see-through: the text, the
    gilt, the clasps and the head are not faded (never `opacity` on the element). Where
    backdrop-filter is not supported the room shows through unblurred at the same strength,
@@ -597,7 +597,7 @@ body.sheet-hidden .talk { grid-area: talk; }
    levels in 255) gives way to the room's own. */
 .bookin { position: relative; z-index: 1; min-height: 0; display: grid;
           grid-template-rows: auto minmax(0, 1fr); border-radius: inherit;
-          --leaf-a: .7;
+          --leaf-a: .5;
           background:
             /* the gutter: the page dips into the spine on its left edge */
             linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
