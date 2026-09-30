@@ -122,14 +122,12 @@
        Theme v2: the tooled leather that replaced leather-tile.jpg in the table mockup
        (Fabric Leather 02 as grey grain, the seamless half, at the mock's 300px), through
        the same two browns and the same multiply: the theme's `.v2-tooled-leather`.
-       Tinted darker than it was (.04 / .16 of black), by measurement: this page's --dim
-       (#8e816a: "Only what I am carrying", "Nothing yet...", the preview's notes) held
-       3.92:1 median and 3.45 on the brightest 2% of the new grain at 375 (3.66 on the
-       old one), text removed. .30 / .42 gave 4.13, .46 / .56 4.50; .50 / .60 gives 4.82
-       / 4.63 at 375 and 4.95 / 4.70 at 1440. The mock instead lifts --dim inside its
-       tooled sides (#b3a488); here the texture was tinted and the token left alone. */
+       At the bench's own light tint (.04 / .16 of black). The text inside is brightened
+       instead, as the mockup does in its tooled sides (the owner, 2026-09-30: "brighten
+       the craft text"): see `.panel` text colours below. The first pass darkened the
+       leather to .50 / .60 to carry this page's --dim, and the bench went nearly black. */
     background:
-      linear-gradient(rgba(0, 0, 0, .50), rgba(0, 0, 0, .60)),
+      linear-gradient(rgba(0, 0, 0, .04), rgba(0, 0, 0, .16)),
       linear-gradient(#57432d, #4b3a27),
       var(--tex-side-leather) #241d15;
     background-blend-mode: normal, multiply, normal;
@@ -142,6 +140,16 @@
     display: flex; flex-direction: column; min-height: 0;
   }
   .panel { position: relative; }
+  /* The text on the tooled leather, brightened the way the mockup brightens its tooled
+     sides, not by darkening the leather. Measured on the new grain at .04 / .16, text
+     removed, worst 2%: this page's --dim (#8e816a) held 3.45:1 at 375, and the alarm red
+     the preview writes its saves in ("Belladonna DC 15 ...", #a8443a) 2.4. Inside the
+     panels only, so the header, tabs and footer keep the page's own values:
+     - --dim is the mockup's own tooled-leather dim, #b3a488, still well under --ink;
+     - a save is the mockup's refusal red, #d98a78 (its "shut why"), in place of the
+       alarm, with the alarm kept as the dotted rule under it. */
+  .panel { --dim: #b3a488; }
+  .panel .fx .save, .panel .ground .busy { color: #d98a78; }
   /* The world card's own frame, applied whole — the user's reference, "exactly".
      Bevel ring at z2, ironmongery at z3 bolting through it; both on .panel rather
      than .inner, so they hold still while the shelf scrolls inside.
