@@ -3595,7 +3595,24 @@ def full_sheet(actor: Actor) -> dict:
             "crit": (f"{w['crit_range']}-20" if w["crit_range"] < 20 else "20")
                     + f"/x{w['crit_mult']}",
             "type": w["type"],
+            # "P or S" for a dagger, where `type` names only the first.
+            "type_text": w.get("type_text") or w["type"],
             "sequence": len(actor.attack_sequence(key, full_attack=True)),
+            # Each swing of a full attack at its own bonus, asked of `attack_modifiers`
+            # at that iteration rather than counted down in fives by the page: a
+            # stat-block creature's printed "+11/+6" and anything that changes the
+            # sequence come out right only if the engine is asked each time. The Sheet
+            # tab's Combat card writes these out (the table rebuild, stage 2).
+            "swings": [sum(m.value for m in actor.attack_modifiers(key, iteration=i))
+                       for i in actor.attack_sequence(key, full_attack=True)],
+            # The weapon table's own facts for the same row, so the page shows what the
+            # engine knows and says "not known" where it holds None (a light crossbow's
+            # range and weight are None in the curated table, measured 2026-09-30).
+            "range_ft": w.get("range_ft"),
+            "light": bool(w.get("light")),
+            "finessable": bool(w.get("finessable")),
+            "traits": list(w.get("traits") or []),
+            "weight_lb": w.get("weight_lb"),
         })
 
     skills = []
@@ -3666,6 +3683,12 @@ def full_sheet(actor: Actor) -> dict:
             "effect": maneuver_text(m["effect"], "you", "the target", you="actor",
                                     **m.get("sheet", {})),
             "size_limit": m.get("size_limit"),
+            # Straight off the manoeuvre table. `provokes` is the table's word, and the
+            # Sheet says under the table that no attack of opportunity is rolled for a
+            # manoeuvre yet (only movement provokes: rules/reactions.py).
+            "key": key,
+            "provokes": bool(m.get("provokes")),
+            "two_hands": bool(m.get("needs_two_hands")),
         })
 
     armour = ARMOUR.get(actor.armour, ARMOUR["none"])
@@ -3781,6 +3804,13 @@ def full_sheet(actor: Actor) -> dict:
             "cmb": _terms(actor.cmb_modifiers()),
             "attacks": attacks,
             "maneuvers": maneuvers,
+            # Feint is not a manoeuvre here: rules/intents.py files "feint" as a Bluff
+            # check, and nothing makes the target lose its Dexterity to AC
+            # (rules/classfeatures.py says so). So all the sheet can give is the Bluff
+            # it rolls, the skill row's own total, or None where Bluff cannot be tried.
+            "feint": next(({"skill": k["name"], "total": k["total"], "usable": k["usable"]}
+                           for k in skills if k["name"] == "bluff"),
+                          {"skill": "bluff", "total": None, "usable": False}),
         },
         "skills": skills,
         "feats": feats,

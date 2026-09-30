@@ -1027,12 +1027,209 @@ def sheet(request):
     Fetched on demand rather than shipped with every turn: it is a few kilobytes of
     itemised modifiers that only matter when the player opens the sheet.
     """
-    from rules.sheet import full_sheet
-
     pc = campaign_mod.current().scene.pc()
     if pc is None:
         return JsonResponse({"error": "no character"}, status=404)
-    return JsonResponse(full_sheet(pc))
+    return JsonResponse(_sheet_payload(pc))
+
+
+def _sheet_payload(pc) -> dict:
+    """`full_sheet`, plus the Equipment tab's one list of everything carried.
+
+    Every door that hands the page a sheet back (`/api/sheet`, `/api/slots`, `/api/use`)
+    goes through here, so the Equipment tab never redraws from a sheet that lacks its
+    list: `/api/use` returning the bare `full_sheet` would have emptied the page the
+    moment a jar was drunk from it."""
+    from rules.sheet import full_sheet
+
+    out = full_sheet(pc)
+    out["equipment"]["carried"] = _carried(pc)
+    return out
+
+
+def _carried(pc) -> list[dict]:
+    """Everything the character carries, one row a thing, for the Equipment tab.
+
+    The table rebuild's stage 2 (the owner's approved design, docs/mock/table-layout/,
+    "What changed in the second pass", point 1): what you carry, filed on the trade
+    window's shelves (`SHELVES`, by `_shelf_of`'s rules, so a potion is a consumable in
+    the pack and at the counter alike), whether it is in hand or worn, which slot it
+    fits, and what can be done to it, each act naming the real door that does it. The
+    page adds nothing: an act is offered only where the door would take it.
+
+    The engine keeps a carried thing in five places, and this reads all five:
+    `weapons` (drawn with the engine's `wear` op), `goods` (armour and shields bought,
+    put on with the same op, and whatever the fiction handed over), `stock` (a counter's
+    bought gear and crafted jars: drunk, thrown or coated through `/api/use`, a made
+    cloak put on through `/api/wear`), the armour and shield worn (`armour`, `shield`),
+    and names written into a body slot (`/api/slots`).
+
+    What the engine cannot do is not offered: armour and a shield come off only by
+    putting another on (`_op_wear` swaps; nothing sets them back to none), and there is
+    no drop op at all. The page says so in words (docs/table-rebuild-inventory.md, H9).
+    """
+    from rules import goods, magicitem, weapons as weapons_mod
+    from rules.sheet import _stock_row
+    from rules.tables import ARMOUR, SHIELDS, SLOTS
+
+    magic = {e.name.strip().lower(): e for e in magicitem.catalogue().values()
+             if e.slot and e.slot in SLOTS}
+    # Every name written in a body slot, and which slot holds it.
+    worn: dict[str, str] = {}
+    for key, line in (pc.slots or {}).items():
+        for w in line or ():
+            if w:
+                worn[str(w).strip().lower()] = key
+
+    def free_line(slot: str) -> int | None:
+        line = pc.slot_list(slot)
+        return next((i for i, w in enumerate(line) if not w), None)
+
+    def by_name(name: str, slot: str) -> list[dict]:
+        """Wear a thing by writing its name in its slot: how a bought wondrous item goes
+        on, the catalogue joining the name to its effects (`magicitem.worn_specs`)."""
+        at = free_line(slot)
+        if at is None:
+            return []
+        return [{"label": "Wear", "api": "/api/slots",
+                 "body": {"action": "set", "slot": slot, "index": at, "item": name}}]
+
+    def slot_full(slot: str) -> str:
+        return (f"The {SLOTS[slot]['label'].lower()} slot is full; empty a line of it "
+                f"first.")
+
+    rows: list[dict] = []
+    seen: set[str] = set()
+
+    # Weapons: one row a kind, counted.
+    held = (pc.equipped or "").strip().lower()
+    counts: dict[str, int] = {}
+    for w in pc.weapons or ():
+        k = str(w or "").strip().lower()
+        if k and k != "unarmed":
+            counts[k] = counts.get(k, 0) + 1
+    if held and held != "unarmed" and held not in counts:
+        counts[held] = 1
+    for key, n in counts.items():
+        name = weapons_mod.get(key)["name"] if weapons_mod.has(key) else key
+        # `_op_wear` draws only what `goods.kind_of` files as a weapon, which is the
+        # curated table's twelve; anything else it refuses, so no button is offered.
+        can = goods.kind_of(key) == "weapon"
+        rows.append({
+            "id": f"weapon:{key}", "key": key, "name": name, "count": n, "unit": "",
+            "kind": "weapon", "shelf": "weapons", "fits": "hand",
+            "state": "in hand" if key == held else "",
+            "line": "", "known": weapons_mod.has(key),
+            "acts": ([{"label": "Wield", "api": "/api/wear",
+                       "body": {"item": key, "op": "wield"}}]
+                     if key != held and can else []),
+            "note": "" if can or key == held
+                    else "The rules cannot put this in hand by name yet.",
+        })
+
+    # Armour and shields: carried in `goods`, and the ones being worn.
+    for table, kind, attr, slot in ((ARMOUR, "armour", "armour", "armor"),
+                                    (SHIELDS, "shield", "shield", "shield")):
+        on = str(getattr(pc, attr, "none") or "none").strip().lower()
+        keys = [k.strip().lower() for k in (pc.goods or {}) if goods.kind_of(k) == kind]
+        if on != "none" and on not in keys:
+            keys.append(on)
+        for key in keys:
+            if key not in table or key == "none":
+                continue
+            e = table[key]
+            seen.add(key)
+            seen.add(str(e["name"]).lower())
+            rows.append({
+                "id": f"{kind}:{key}", "key": key, "name": e["name"],
+                "count": int((pc.goods or {}).get(key, 0) or 0) or 1, "unit": "",
+                "kind": kind, "shelf": "armour", "fits": slot,
+                "state": "worn" if key == on else "", "line": "", "known": True,
+                "armour": {"ac": e["ac"], "acp": e["acp"], "max_dex": e.get("max_dex"),
+                           "weight": e.get("weight", "")},
+                "acts": ([] if key == on else
+                         [{"label": "Wear", "api": "/api/wear",
+                           "body": {"item": key, "op": "wear"}}]),
+                "note": "",
+            })
+
+    # Whatever the fiction handed over: counted, described by the engine, and honest
+    # about which of them it has rules for.
+    for name, n in sorted((pc.goods or {}).items()):
+        low = str(name).strip().lower()
+        if low in seen or goods.kind_of(name) in ("armour", "shield"):
+            continue
+        seen.add(low)
+        item = magic.get(low)
+        slot = item.slot if item else ""
+        kind = goods.kind_of(name)
+        shelf = ("magic" if item else "weapons" if kind == "weapon"
+                 else "consumables" if kind == "consumable" or low in _food_names()
+                 else "valuables" if _VALUABLE.search(name) else "gear")
+        on = worn.get(low, "")
+        acts = by_name(name, slot) if slot and not on else []
+        rows.append({
+            "id": f"goods:{low}", "key": low, "name": name, "count": int(n or 0),
+            "unit": goods.unit_for(name), "kind": kind, "shelf": shelf, "fits": slot,
+            "state": "worn" if on else "", "line": goods.describe(name, int(n or 0)),
+            "known": goods.known_item(name) is not None or item is not None,
+            "acts": acts, "note": slot_full(slot) if slot and not on and not acts else "",
+        })
+
+    # A counter's bought gear and the bench's jars.
+    for _, s in sorted((pc.stock or {}).items(), key=lambda kv: kv[1].name.lower()):
+        d = _stock_row(s)
+        low = str(d["name"]).strip().lower()
+        seen.add(low)
+        item = magic.get(low) or magic.get(str(s.base).strip().lower())
+        on = worn.get(low, "")
+        slot = (d.get("slot") or "") if d.get("wearable") else (item.slot if item else "")
+        acts = []
+        # Drink, throw and coat only for a thing that is for that. `_stock_row` asks the
+        # consumables planner, which answers "ok" for any jar with nothing harmful in it,
+        # so a bought hooded lantern came up drinkable (measured 2026-09-30 on the
+        # Equipment tab: "Hooded lantern ... Drink"). A maker's stated `how`, real effect
+        # specs, or the consumables and magic shelves are what make a thing usable here.
+        shelf = _shelf_of(s)
+        usable = bool(d.get("how")) or bool(s.specs) or shelf in ("consumables", "magic")
+        for how, label in (("drink", "Drink"), ("throw", "Throw"), ("coat", "Coat")):
+            if usable and d.get(f"{how}able"):
+                acts.append({"label": label, "api": "/api/use",
+                             "body": {"item": d["id"], "how": how}})
+        if slot and not on:
+            if d.get("wearable"):
+                acts.append({"label": "Wear", "api": "/api/wear",
+                             "body": {"item": d["id"]}})
+            else:
+                acts += by_name(d["name"], slot)
+        effects = [str(x) for x in (d.get("effects") or []) if x]
+        rows.append({
+            "id": f"stock:{d['id']}", "key": d["id"], "name": d["name"],
+            "count": int(d.get("count") or 0), "unit": goods.unit_for(d["name"]),
+            "kind": "wearable" if slot else "consumable" if d.get("how") or any(
+                d.get(f"{h}able") for h in ("drink", "throw", "coat")) else "gear",
+            "shelf": "magic" if item and _shelf_of(s) == "gear" else _shelf_of(s),
+            "fits": slot, "state": "worn" if on else "",
+            "line": "; ".join(effects), "known": bool(effects) or bool(s.specs) or bool(item),
+            "poisons": bool(d.get("poisons")),
+            "acts": acts,
+            "note": slot_full(slot) if slot and not on and not any(
+                a["label"] == "Wear" for a in acts) else "",
+        })
+
+    # A name written in a slot that is none of the above: worn, and recorded.
+    for low, slot in worn.items():
+        if low in seen or slot in ("armor", "shield"):
+            continue
+        name = next(str(w) for w in pc.slot_list(slot) if w and str(w).strip().lower() == low)
+        item = magic.get(low)
+        rows.append({
+            "id": f"slot:{low}", "key": low, "name": name, "count": 1, "unit": "",
+            "kind": "slot", "shelf": "magic" if item else "gear", "fits": slot,
+            "state": "worn", "line": "", "known": item is not None,
+            "acts": [], "note": "",
+        })
+    return rows
 
 
 @require_POST
@@ -1042,7 +1239,7 @@ def slots(request):
     Editing the sheet is not a GM intent — nobody rolls for putting a ring on — so it
     goes straight to the character rather than through the engine.
     """
-    from rules.sheet import IllegalSheet, full_sheet
+    from rules.sheet import IllegalSheet
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -1070,7 +1267,7 @@ def slots(request):
         return JsonResponse({"error": str(exc)}, status=409)
 
     c.save()
-    return JsonResponse(full_sheet(pc))
+    return JsonResponse(_sheet_payload(pc))
 
 
 @require_GET
@@ -3360,6 +3557,9 @@ def wear_item(request):
 
     item_id = str(body.get("item", "")).strip().lower()
     off = bool(body.get("off"))
+    op = str(body.get("op", "")).strip().lower()
+    if op in ("wield", "wear"):
+        return _wear_by_the_engine(c, pc, item_id)
     held = pc.stock.get(item_id)
     if held is None:
         return JsonResponse({"error": f"you are not carrying {item_id!r}"}, status=400)
@@ -3385,6 +3585,46 @@ def wear_item(request):
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     c.save()
     return JsonResponse(_state(c))
+
+
+def _wear_by_the_engine(c, pc, item: str):
+    """Draw a carried weapon, or put on carried armour or a shield: the engine's own
+    `wear` op, run straight from the Equipment tab's Wield and Wear buttons.
+
+    The table rebuild, stage 2: the approved design answers Wield and Wear with the
+    engine's tell, word for word ("Kesst Vayr draws the sap.", "puts on the studded
+    leather. Armour class 16 to 17."). The op already existed and the GM reached it
+    through words; this is its door from the sheet, as `use_item` is `use_item`'s. A
+    refusal is the op's own sentence ("is not carrying", "is not something that can be
+    worn or wielded"), sent back as the 400 the button prints beside itself.
+
+    The same guards as every other action a player takes on their own: nobody downed
+    reaches for a sword, and nothing runs under a roll that is still owed.
+    """
+    refusal = _cannot_act(pc, "do that")
+    if refusal:
+        return refusal
+    if c.scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+    undo = c.scene.snapshot()
+    try:
+        engine = c.engine()
+        resolution = engine.run(engine.validate([{
+            "op": "wear", "actor": "pc", "because": f"{pc.name} sees to their gear",
+            "params": {"item": item},
+        }]))
+    except IntentError as exc:
+        c.scene.restore(undo)
+        return JsonResponse({"error": str(exc)}, status=400)
+    except Exception as exc:     # noqa: BLE001 — a sentence on the page, never a 500
+        c.scene.restore(undo)
+        return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
+    tell = " ".join(o.tell for o in resolution.outcomes if o.tell)
+    if not any(o.effects for o in resolution.outcomes):
+        return JsonResponse({"error": tell or "Nothing happened."}, status=400)
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    c.save()
+    return JsonResponse({**_state(c), "wear_tell": tell})
 
 
 @require_POST
@@ -3442,9 +3682,7 @@ def use_item(request):
         return JsonResponse({"error": tell or "Nothing happened."}, status=400)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     c.save()
-    from rules.sheet import full_sheet
-
-    return JsonResponse({"ok": True, "tell": tell, "sheet": full_sheet(pc)})
+    return JsonResponse({"ok": True, "tell": tell, "sheet": _sheet_payload(pc)})
 
 
 def _cannot_act(pc, doing: str):
