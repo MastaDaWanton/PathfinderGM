@@ -2111,7 +2111,13 @@
   .stage {
     display: grid; min-height: 0; gap: 16px 18px; padding: 20px 20px 16px;
     grid-template-columns: 264px minmax(0, 1fr) 264px;
-    grid-template-rows: minmax(45%, 1fr) minmax(0, auto);
+    /* The book keeps at least 45% of the stage's height (the mock README, "The story is
+       the centrepiece"); past that the desk's choices scroll and the pen stays. A row's
+       percentage is of the stage's content box, which leaves out its 36px of padding:
+       "45%" measured 319px of a 744px stage at 1792x805 (0.43), under a 373px desk of
+       eight exits and two offers. So the floor adds 45% of the padding back, and is 45%
+       of the stage as it stands on the screen. */
+    grid-template-rows: minmax(calc(45% + 16.2px), 1fr) minmax(0, auto);
     grid-template-areas: "who book numbers" "who desk numbers";
     position: relative;
     /* The clasps' box reaches 34px past the book. Unclipped, it widened a 375px phone
@@ -2308,6 +2314,9 @@
 
   /* The story: a readable measure with room either side. Palatino's zero is wide: 58ch
      at 18px measured inside the 62 to 72 characters a line the owner asked for. */
+  /* The browser's own scroll anchoring is off here: the story is rebuilt whole on every
+     state, and where a new beat opens is 15-book.js's to say (`storyLand`). */
+  #story, .bookin { overflow-anchor: none; }
   #story { position: relative; overflow-y: auto; min-height: 0;
            padding: 22px 50px 30px 58px; font-size: 18px; line-height: 1.7; }
   #story .beat { max-width: 58ch; margin: 0 auto 20px; }
@@ -2629,6 +2638,9 @@
     .stage, body.mode-map .stage {
       grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk";
       grid-template-rows: minmax(0, 1fr) minmax(0, auto); padding: 14px 14px 10px; gap: 12px; }
+    /* The book's floor holds on a phone too (45% of the stage, its 24px of padding
+       counted as above); the desk under it scrolls its choices and keeps the pen. */
+    .stage { grid-template-rows: minmax(calc(45% + 10.8px), 1fr) minmax(0, auto); }
     body:is(.mode-table, .mode-map) .sheet { display: none; }
     /* On a phone the tray takes the whole stage: laid over the book alone it left the
        log 30px at 375x812. Close is one tap back to the pen. */

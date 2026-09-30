@@ -224,7 +224,11 @@ function render(s, hold) {
       i >= seen ? " fresh" : ""}">${chips(b)}${said(b.text)}</p>`
   ).join("");
   window._beatsSeen = s.transcript.length;
-  $("#story").scrollTop = $("#story").scrollHeight;
+  // Where the page opens is the book's (15-book.js `storyLand`, a render hook): the new
+  // beat's first line at the top, and a reader rereading left alone. Sent to the foot
+  // here only before that script has loaded (the page's very first draw, which the hook
+  // then lands properly once the book's head is drawn).
+  if (typeof storyLand !== "function") $("#story").scrollTop = $("#story").scrollHeight;
 
   // The character's sheet in brief, which this block drew into the side column's #sheet,
   // is drawn by 14-sides.js into the two sides of the new stage (the table rebuild,
