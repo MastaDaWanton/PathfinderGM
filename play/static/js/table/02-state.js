@@ -178,7 +178,10 @@ async function post(url, body) {
   // a listener (the time-skip clock, 09-clock.js) can arm on it and fire from the render
   // hook that follows. Never on load, a resync or the other device's turn: none of those
   // pass through here. A listener that throws is reported, not raised into this turn.
-  document.dispatchEvent(new CustomEvent("table:posted", { detail: { url, clockBefore } }));
+  // `awaiting` says whether the answer owes a roll, for the engine device (13-device.js),
+  // which shows the engine waiting on the player rather than a turn done.
+  document.dispatchEvent(new CustomEvent("table:posted", {
+    detail: { url, clockBefore, awaiting: !!(data && data.awaiting) } }));
   return data;
 }
 
@@ -223,96 +226,13 @@ function render(s, hold) {
   window._beatsSeen = s.transcript.length;
   $("#story").scrollTop = $("#story").scrollHeight;
 
-  const pc = s.pc;
-  if (pc) {
-    // Temporary hit points scale against hp_max, so 6 temp on a 9 hp character reads as
-    // two thirds of a bar again — which is what they are worth.
-    const temp = pc.temp_hp || 0;
-    const pct = Math.max(0, Math.round(100 * pc.hp / pc.hp_max));
-    const tpct = Math.max(0, Math.round(100 * temp / pc.hp_max));
-    // Non-lethal is shown against its own threshold rather than against hp_max. The two
-    // are not the same line and for a Blood Bender they are rarely close: the class buys
-    // its abilities with non-lethal damage and counts temporary hit points before it
-    // drops, so the number that matters moves as their wards go up and down.
-    const nl = pc.nonlethal || 0;
-    const nlLimit = pc.nonlethal_threshold ?? pc.hp;
-    $("#sheet").innerHTML = `
-      <div class="name">${esc(pc.name)}</div>
-      <div class="sub">${esc(pc.heritage)} ${esc(pc.class)} · ${esc(pc.race)}</div>
-      ${(s.scene.where_label || s.scene.biome) ? `<div class="biome" title="${
-        esc(s.scene.what_it_is || s.scene.biome_describe || "")}">
-        ${s.scene.where_label
-          // Where you stand, in geography's words (docs/fix-interfaces.md §2.10), when the
-          // server sends them; the location, scale and biome line otherwise.
-          ? `${esc(s.scene.where_label)}${
-              s.scene.where_detail ? ` · ${esc(s.scene.where_detail)}` : ""}`
-          : `${esc(s.scene.location)}${s.scene.scale ? ` · ${esc(s.scene.scale)}` : ""} · ${
-              esc(s.scene.biome)}`} · ${fmtClock(s.scene.clock_minutes)}</div>` : ""}
-      <div class="bar"><i style="width:${pct}%"></i>${
-        temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
-      <div class="row"><span>Hit points</span><span>${pc.hp} / ${pc.hp_max}${
-        temp ? ` <small>+${temp} temp</small>` : ""}</span></div>
-      ${nl ? `<div class="row${nl >= nlLimit ? " danger" : ""}"><span>Non-lethal</span>
-        <span>${nl} <small>of ${nlLimit}</small></span></div>` : ""}
-      ${pc.xp ? `<div class="row"><span>Experience</span><span>${
-        pc.xp.have.toLocaleString()} <small>of ${pc.xp.next.toLocaleString()}</small>${
-        pc.xp.ready ? ` <small class="cd" title="Sleep to take the level">ready</small>`
-                    : ""}</span></div>` : ""}
-      ${(pc.needs || []).length ? `<h2>The body</h2>${pc.needs.map(n => `
-        <div class="row${n.danger ? " danger" : ""}" title="${esc(n.detail)}">
-          <span>${esc(n.label)}</span><span>${esc(n.state)}</span></div>`).join("")}` : ""}
-      ${(pc.dr && pc.dr.length)
-        ? `<div class="row"><span>Damage reduction</span><span>${
-             pc.dr.map(esc).join(", ")}</span></div>` : ""}
-      ${(pc.pools || []).map(p => `<div class="row"><span>${esc(title(p.id))}</span>
-        <span>${p.current} <small>of ${p.max}</small>${
-          p.ready ? "" : ` <small class="cd">${p.cooldown_left}r</small>`}</span></div>`).join("")}
-      <div class="row"><span>Armour class</span><span>${pc.ac}</span></div>
-      <h2>Abilities</h2>
-      <div class="grid">${Object.entries(pc.abilities).map(([k, v]) => {
-        // A 10 that used to be a 14 is not the same as a 10.
-        const hurt = (pc.ability_damage || {})[k] || 0;
-        return `<div class="cell${hurt ? " hurt" : ""}"><b>${k}</b><span>${v} <small>(${
-          sign(Math.floor((v-10)/2))})</small></span>${
-          hurt ? `<em>-${hurt}</em>` : ""}</div>`;
-      }).join("")}</div>
-      ${(pc.carrying && pc.carrying.length) || (s.coinage && purseTotal(pc.purse))
-        ? `<h2>Carrying</h2>${
-          purseTotal(pc.purse) ? `<div class="row"><span>Purse</span><span>${
-            esc(purseLine(pc.purse, s.coinage))}</span></div>` : ""}${
-          (pc.carrying || []).map(i => `<div class="row"><span>${esc(i.name)}</span>
-            <span>${i.count}</span></div>`).join("")}` : ""}
-      <!-- The satchel and the drink/throw/coat buttons used to live here. Raw material
-           belongs at the bench that consumes it, and using an item belongs in the
-           inventory panel where the player already goes for it: two places to do one
-           thing is clutter, and the side panel is the one thing on screen every turn. -->
-
-      ${(pc.world_classes && pc.world_classes.length) ? `<h2>World classes</h2>${
-        pc.world_classes.map(w => `
-          <div class="row"><span>${esc(w.name)} ${w.level}</span><span>${
-            w.missing ? "<small>unknown track</small>"
-            : w.to_next ? `<small>${w.to_next.need} to next</small>`
-            : "<small>mastered</small>"}</span></div>
-          ${w.missing ? "" : `<div class="sub" style="margin:-4px 0 8px">${
-            esc(w.max_tier)} · ${w.known} recipe${w.known === 1 ? "" : "s"}</div>`}
-        `).join("")}` : ""}
-      <h2>Saves</h2>
-      ${Object.entries(pc.saves).map(([k, v]) =>
-        `<div class="row"><span>${{fort:"Fortitude",ref:"Reflex",will:"Will"}[k]}</span><span>${sign(v)}</span></div>`
-      ).join("")}
-      <h2>Skills</h2>
-      ${Object.entries(pc.skills).map(([k, v]) =>
-        `<div class="row"><span>${title(k)}</span><span>${sign(v)}</span></div>`
-      ).join("")}
-      <h2>Feats</h2>
-      <div class="sub">${pc.feats.map(esc).join(", ")}</div>
-      <button class="opensheet" id="opensheet">Full character sheet</button>
-      <a class="opensheet" href="/craft/">Crafting bench</a>
-      <a class="opensheet" href="/">Worlds &amp; characters</a>
-      <button class="opensheet" id="openroster">Who is playing</button>`;
-    $("#opensheet").onclick = openSheet;
-    $("#openroster").onclick = openRoster;
-  }
+  // The character's sheet in brief, which this block drew into the side column's #sheet,
+  // is drawn by 14-sides.js into the two sides of the new stage (the table rebuild,
+  // docs/table-rebuild-inventory.md N1): who on the left, the numbers on the right, from
+  // the same fields of `s.pc`. Its place line (geography's `where_label` and
+  // `where_detail` before today's location, scale and biome) moved to the book's head
+  // (15-book.js). Both are render hooks, so the first draw below reaches them once 07
+  // has primed the hooks.
 
   // Turn order, only while a fight is on. Without it the player cannot tell whose turn
   // it is or who is still standing, which makes combat unplayable however correct the

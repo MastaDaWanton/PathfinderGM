@@ -428,8 +428,9 @@ document.addEventListener("click", e => {
   if (t.closest("#spellpop [data-spells-tab]")) {
     SPELLS.chose = true;
     closeSpellPicker();
-    SHEET_TAB = "spells";
-    openSheet();
+    // The Spells tab since the table rebuild; the sheet's Spells page before it.
+    if (typeof Shell === "object" && Shell) Shell.show("spells");
+    else { SHEET_TAB = "spells"; openSheet(); }
     return;
   }
   // The fallback has no light dismiss of its own.

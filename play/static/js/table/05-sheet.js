@@ -206,9 +206,16 @@ async function openSheet() {
   // nothing about a body. Silence is what produced the wrong one in the first place, so
   // an unstated character says so here rather than quietly taking the model's default.
   askGender(!SHEET.identity.gender);
-  $("#sheettabs").innerHTML = TABS.map(([k, label]) =>
+  // Only this tab's pages (the table rebuild: Sheet, Equipment, Spells and Journal each
+  // show the sheet panel on their own pages; 17-tab-sheet.js sets the scope), and the
+  // page asked for when it is one of them, else the first.
+  const shown = sheetTabsInScope();
+  if (!shown.some(t => t[0] === SHEET_TAB)) SHEET_TAB = shown[0][0];
+  $("#sheettabs").innerHTML = shown.map(([k, label]) =>
     `<button role="tab" data-tab="${k}" aria-selected="${k === SHEET_TAB}">${label}</button>`
   ).join("");
+  // A strip of one page is a label, not a choice; it is still there for its name.
+  $("#sheettabs").classList.toggle("single", shown.length < 2);
   $("#sheettabs").querySelectorAll("button").forEach(b => {
     b.onclick = () => { SHEET_TAB = b.dataset.tab; drawSheet(); };
   });
@@ -231,11 +238,26 @@ document.getElementById("sheettabs").addEventListener("scroll", sheetTabEdges,
                                                       { passive: true });
 window.addEventListener("resize", sheetTabEdges);
 
-function closeSheet() {
+// Which of the sheet's pages the open tab shows: every page when nothing has scoped it.
+function sheetTabsInScope() {
+  const scope = (typeof SHEET_SCOPE !== "undefined" && SHEET_SCOPE) || null;
+  const shown = scope ? TABS.filter(t => scope.includes(t[0])) : TABS;
+  return shown.length ? shown : TABS;
+}
+
+// The sheet is a tab of the table now, not a window over it (the table rebuild), so
+// closing it is going back to the Table tab. `sheetAway` is the part that only puts the
+// panel away, for the shell to call when another tab is chosen.
+function sheetAway() {
   // A spell's details lie over the sheet in the top layer; they go with it.
   if (typeof detailOpen === "function" && detailOpen()) closeDetail(false);
   $("#sheetpanel").classList.remove("on");
   $("#sheetpanel").setAttribute("aria-hidden", "true");
+}
+
+function closeSheet() {
+  if (typeof Shell === "object" && Shell && Shell.sheetBacked()) { Shell.show("table"); return; }
+  sheetAway();
 }
 
 function drawSheet() {
@@ -444,7 +466,11 @@ function tabInventory(s) {
       <h3>Carried</h3>
       ${(carried.length || (s.equipment.weapons || []).length) ? `<table class="sheet">
         <tr><th>Thing</th><th>How many</th><th>What the engine knows</th></tr>
-        ${(s.equipment.weapons || []).filter(w => w.name !== "unarmed").map(w => `<tr>
+        ${(s.equipment.weapons || []).map(w => (typeof w === "string" ? { name: w } : w))
+          // `equipment.weapons` is a list of names (rules/sheet.py `full_sheet`); read as
+          // objects, every weapon's row had a blank name (found in the table rebuild's
+          // Equipment tab: "1 · a weapon" twice, the rapier and the dagger unnamed).
+          .filter(w => w.name && w.name !== "unarmed").map(w => `<tr>
           <td><b>${esc(w.name)}</b></td><td>1</td>
           <td class="why">a weapon — ${w.equipped ? "drawn; " : ""}swing it from the
           combat panel</td></tr>`).join("")}
@@ -1656,7 +1682,7 @@ $("#sheetpanel").addEventListener("click", async e => {
     $("#sheeterr").textContent = err.message;
     return;
   }
-  closeSheet();
+  // Drawn again where it is: the sheet is a tab now, and closing it would leave the tab.
   openSheet();
 });
 

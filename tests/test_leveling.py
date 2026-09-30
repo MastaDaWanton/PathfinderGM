@@ -361,11 +361,16 @@ def test_the_map_has_a_tab_of_its_own():
     a shape and not as a grid anybody could plan a move on."""
     from pathlib import Path
 
+    # Since the table rebuild the map is a tab of its own (the approved design: "Map is a
+    # tab"), the board where the book was, at the size a tab gives it; the tray and its
+    # left-edge tab went with it (docs/table-rebuild-inventory.md, M5).
     page = table_source()
-    assert 'id="maptab"' in page and 'id="maptray"' in page
-    assert "function showMap(" in page
-    # It refills while open, so a token that moves during a turn moves here too.
-    assert '$("#maptray").classList.contains("on")' in page
+    assert 'id="tab-map" data-mode="map"' in page and 'id="mapwrap"' in page
+    assert "function showMap(" in page and 'Shell.show(on ? "map" : "table")' in page
+    # It is redrawn on every state, so a token that moves during a turn moves here too:
+    # `render` draws the map whether or not the tab is open.
+    render = page[page.index("function render(s, hold)"):page.index("function renderTalk(")]
+    assert "renderMap(s);" in render
 
 
 # --- blood on the ground ---------------------------------------------------------------

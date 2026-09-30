@@ -11,6 +11,13 @@ server): five panels collapse, close and restore and survive a reload; "Hide the
 gives the edge tabs; a conversation starting on a phone badges the Talk tab ("Talk, 3
 new") and leaves the drawer shut; Esc returns focus to the tab that opened it; page
 width stayed 375 at 375 (no sideways scroll). These tests hold what Python can hold.
+
+The table rebuild (2026-09-30, docs/table-rebuild-inventory.md) replaced the column with
+the owner's approved design: the stage's two sides and the tabs on top. What these tests
+proved carries over, moved to where the rebuild put each thing: every mount point is on
+the page once; every id the page had before is still there once, or is gone by a ruling
+the inventory cites (and is really gone); the renderers live where the design gives them;
+the one choice that must not flash (the sheet hidden) is made before the first paint.
 """
 from __future__ import annotations
 
@@ -24,15 +31,29 @@ from pagesource import TABLE, TABLE_SCRIPTS
 
 # The conversation was a fifth panel until the owner's ruling of 2026-09-28 (Q42): "It
 # should be removed from the panel." It is a tray of its own now, `#talktray` (Lane F).
-PANELS = ("sheet", "scene", "map", "rolls")
+# Since the table rebuild the sheet in brief is the stage's two sides and the map is a
+# tab; "In the scene" and "Rolls" are the two panels left, at the foot of the right side.
+PANELS = ("scene", "rolls")
 
 MOUNTS = (
-    ["panels", "panelbar"]
+    ["panels"]
     + [f"panel-{p}" for p in PANELS] + [f"panel-{p}-body" for p in PANELS]
     + ["talktab", "talktray", "talkclose"]
-    + ["convo", "convo-people", "convo-log", "convo-latest", "edgetabs", "clockpop",
+    + ["convo", "convo-people", "convo-log", "convo-latest", "clockpop",
        "clocksay", "spellbtn", "spellpop", "attachments", "saystatus"]
+    # The rebuild's own (12-21): the stage, its device, the two sides, the tabs' pages.
+    + ["stage", "device", "dv-slot", "book", "boardframe", "desk", "sheetmore", "sheet",
+       "side-who", "sheettoggle", "world-name", "glance", "place-name", "where-line",
+       "here-list", "face", "trade-none"]
+    + [f"tab-{m}" for m in ("table", "map", "sheet", "equipment", "spells", "trade", "journal")]
+    + [f"mode-{m}" for m in ("equipment", "spells", "trade", "journal")]
 )
+
+# Gone with the rebuild, each by the ruling docs/table-rebuild-inventory.md cites on its
+# row: the footer's duplicate Trade button (the Trade tab is the one door), the map tray
+# and its edge tab (Map is a tab), the phone drawer's Sheet edge tab (the Sheet is a tab).
+DROPPED = {"tradeaction": "P16", "maptab": "M5", "maptray": "M5", "mapclose": "M5",
+           "maptrayinner": "M5", "sheettab": "N15"}
 
 # Every id the template carried at `phase-1-base` (a5955ef), before the shell. Each one
 # has a renderer or a listener somewhere in static/js/table/ that finds it by id.
@@ -100,18 +121,28 @@ def test_every_mount_point_is_on_the_served_page_exactly_once(page):
 
 
 def test_every_id_the_page_had_before_the_shell_is_still_there_once(page):
-    """The renderers were moved into panel bodies, not re-invented: `#sheet`, `#mapwrap`,
-    `#board`, `#talk`, `#rolls` and the rest keep their ids, so `render()`,
-    `renderMap`, `renderTalk` and `renderRolls` needed no edits. `#sheettab` survives
-    as the Sheet edge tab, so the old drawer's way in is still the same button."""
+    """The renderers were moved into panel bodies, not re-invented: `#mapwrap`, `#board`,
+    `#talk`, `#rolls` and the rest keep their ids, so `renderMap`, `renderTalk` and
+    `renderRolls` needed no edits. Since the table rebuild an id is either still on the
+    page once, or gone by a ruling the inventory cites on its row, and then really gone:
+    a dropped control left in the markup is a button that does nothing."""
     _, els = page
-    bad = {i: len(_by_id(els, i)) for i in BEFORE if len(_by_id(els, i)) != 1}
+    kept = [i for i in BEFORE if i not in DROPPED]
+    bad = {i: len(_by_id(els, i)) for i in kept if len(_by_id(els, i)) != 1}
     assert not bad, bad
+    lingering = [i for i in DROPPED if _by_id(els, i)]
+    assert not lingering, f"dropped by a ruling but still on the page: {lingering}"
+    inventory = (TABLE.parents[3] / "docs" / "table-rebuild-inventory.md").read_text(encoding="utf-8")
+    for i, row in DROPPED.items():
+        line = next((ln for ln in inventory.splitlines() if ln.startswith(f"| {row} |")), "")
+        assert "| dropped |" in line and "README" in line, f"#{i}: row {row} cites no ruling"
 
 
 def test_each_panel_has_the_shape_the_register_names(page):
-    """`section.panel#panel-<id>` with `.panelhead > button.paneltoggle[aria-expanded] +
-    button.panelclose` and `.panelbody#panel-<id>-body`, and a bar button for each."""
+    """`section.panel#panel-<id>` with `.panelhead > button.paneltoggle[aria-expanded]`
+    and `.panelbody#panel-<id>-body`, inside the right side (#panels). The bar of toggles
+    and each panel's close went with the rebuild: the side shows its two disclosures
+    always, so there is nothing to take off it and nothing to bring back (inventory N12)."""
     _, els = page
     for p in PANELS:
         (section,) = _by_id(els, f"panel-{p}")
@@ -120,30 +151,32 @@ def test_each_panel_has_the_shape_the_register_names(page):
         heads = [e for e in inside if "panelhead" in _classes(e)]
         assert len(heads) == 1, p
         in_head = [e for e in inside if heads[0] in e["ancestors"] and e["tag"] == "button"]
-        assert [("paneltoggle" in _classes(b), "panelclose" in _classes(b)) for b in in_head] \
-            == [(True, False), (False, True)], p
+        assert [("paneltoggle" in _classes(b)) for b in in_head] == [True], p
         assert in_head[0]["attrs"].get("aria-expanded") in ("true", "false"), p
         assert in_head[0]["attrs"].get("aria-controls") == f"panel-{p}-body", p
-        assert in_head[1]["attrs"].get("aria-label"), f"{p}: the close button has no name"
         (body,) = _by_id(els, f"panel-{p}-body")
         assert section in body["ancestors"] and "panelbody" in _classes(body), p
-        bar = [e for e in els if e["tag"] == "button" and "panelbtn" in _classes(e)
-               and e["attrs"].get("data-panel") == p]
-        assert len(bar) == 1 and _by_id(els, "panelbar")[0] in bar[0]["ancestors"], p
-        assert bar[0]["attrs"].get("aria-pressed") in ("true", "false"), p
+        assert _by_id(els, "panels")[0] in section["ancestors"], p
+    assert not [e for e in els if "panelbtn" in _classes(e) or "panelclose" in _classes(e)]
 
 
 def test_the_renderers_live_in_the_panels_the_design_gives_them(page):
-    """docs/design-f-ui.md §4.1's table: Sheet holds #sheet; Scene #order, #board and
-    #gmview; Map #mapwrap; Rolls #rolls. The conversation, #convo above #talk, is in its
-    own tray and in no panel (owner, Q42)."""
+    """docs/design-f-ui.md §4.1's table, as the rebuild moved it: Scene holds #order,
+    #board and #gmview; Rolls #rolls; the map (#mapwrap) is the Map tab's board, where the
+    book was; the sheet in brief is the two sides, who (#side-who) and the numbers
+    (#panels). The conversation, #convo above #talk, is in its own tray and in no panel
+    (owner, Q42)."""
     _, els = page
-    where = {"sheet": ["sheet"], "scene": ["order", "board", "gmview"],
-             "map": ["mapwrap"], "rolls": ["rolls"]}
+    where = {"scene": ["order", "board", "gmview"], "rolls": ["rolls"]}
     for p, ids in where.items():
         (body,) = _by_id(els, f"panel-{p}-body")
         for i in ids:
             assert body in _by_id(els, i)[0]["ancestors"], f"#{i} is not in the {p} panel"
+    (frame,) = _by_id(els, "boardframe")
+    assert frame in _by_id(els, "mapwrap")[0]["ancestors"], "#mapwrap is not on the Map tab's board"
+    (sheet,) = _by_id(els, "sheet")
+    for i in ("side-who", "panels", "loadout", "medals", "life", "xp", "open-equipment"):
+        assert sheet in _by_id(els, i)[0]["ancestors"], f"#{i} is not in the sheet's two sides"
     (tray,) = _by_id(els, "talktray")
     (aside,) = _by_id(els, "panels")
     for i in ("convo", "talk"):
@@ -173,16 +206,18 @@ def test_the_mounts_outside_the_column_sit_where_lane_f_expects_them(page):
 
 
 def test_the_drawer_is_decided_before_first_paint_without_template_variables():
-    """The first thing in <body> is the script that sets `body.drawer`, so a phone never
-    flashes the desktop column. It may carry no `{{ }}` or `{% %}`: Django renders a
-    missing variable as "", and `x = ;` kills every script after it silently (the
-    PATHFINDER_BOOT lesson, table.html)."""
+    """The first thing in <body> is the script that decides the layout before the first
+    paint, so a desktop that hid the sheet never flashes it back. Since the rebuild the
+    choice is `body.sheet-hidden` (Hide sheet; a phone has the Sheet tab instead, so the
+    script leaves a narrow window alone). It may carry no `{{ }}` or `{% %}`: Django
+    renders a missing variable as "", and `x = ;` kills every script after it silently
+    (the PATHFINDER_BOOT lesson, table.html)."""
     src = TABLE.read_text(encoding="utf-8")
-    after = src[src.index("<body>") + len("<body>"):].lstrip()
+    after = src[src.index(">", src.index("<body")) + 1:].lstrip()
     assert after.startswith("<script>"), "the pre-paint script is not first in <body>"
     block = after[:after.index("</script>")]
     assert "{{" not in block and "{%" not in block
-    assert 'classList.add("drawer")' in block and "max-width: 760px" in block
+    assert 'classList.add("sheet-hidden")' in block and "max-width: 760px" in block
     assert '"pgm.table.panels.v1"' in block
     panels = (TABLE_SCRIPTS / "07-panels.js").read_text(encoding="utf-8")
     assert 'const PANELS_KEY = "pgm.table.panels.v1";' in panels, \
@@ -215,7 +250,12 @@ def test_the_four_state_hooks_are_in_02():
     # After every status check, so only a turn that was actually taken arms anything.
     assert post.index('"table:posted"') > post.index("if (!r.ok) throw")
     assert "b.attachments" in render
-    assert "s.scene.where_label" in render and "s.scene.where_detail" in render
+    # The place line prefers geography's words; since the rebuild it is the book's head
+    # (15-book.js), the old side column's biome line moved there.
+    book = (TABLE_SCRIPTS / "15-book.js").read_text(encoding="utf-8")
+    where = book[book.index("function bookWhere("):book.index("function bookStanding(")]
+    assert "sc.where_label" in where and "sc.where_detail" in where
+    assert where.index("sc.where_label") < where.index("sc.location")
 
 
 def test_the_first_draw_cannot_throw_on_a_hook_that_is_not_defined_yet():
@@ -255,8 +295,9 @@ def test_showsheet_was_replaced_not_shadowed():
                 dupes.append((name, seen[name], f.name))
             seen[name] = f.name
     assert not dupes, dupes
+    # Since the rebuild 01 reaches the map through the tabs (12-shell.js), not a drawer.
     core = (TABLE_SCRIPTS / "01-core.js").read_text(encoding="utf-8")
-    assert "Panels.close()" in core and "Panels.open(" in core
+    assert "Shell.show(" in core
 
 
 def test_nothing_opens_a_window():
@@ -277,14 +318,15 @@ def test_the_layout_is_read_and_written_only_inside_try():
             assert "try" in window, f"07-panels.js:{i + 1} touches storage outside a try"
 
 
-def test_the_drawer_is_one_set_of_rules_for_phone_and_hidden_column():
-    """The phone block's `aside` rules became `body.drawer aside` rules, written once,
-    so "Hide the column" on a desktop and the phone under 760px are the same drawer;
-    and the drawer's slide stands down for a viewer who asked motion to stop."""
+def test_the_sheet_hides_on_a_desktop_and_is_a_tab_on_a_phone():
+    """The drawer went with the rebuild (inventory N14): on a desktop Hide sheet gives the
+    story the width (`body.sheet-hidden`, the same stored choice the column's "Hide the
+    column" was), and on a phone the sheet is a tab of its own, so the toggle is not
+    offered there and the Table and Map tabs show no sides at all. The drawer's rules are
+    gone, not left to style nothing."""
     src = TABLE.read_text(encoding="utf-8")
-    assert "body.drawer aside {" in src and "body.drawer aside.on {" in src
-    phone = src[src.index("@media (max-width: 760px) {"):]
-    phone = phone[:phone.index("\n  }\n")]
-    assert "\n    aside {" not in phone, "the phone block still styles the aside itself"
-    assert re.search(r"prefers-reduced-motion: reduce\)\s*\{\s*body\.drawer aside "
-                     r"\{ transition: none; \}", src)
+    assert "body.drawer aside {" not in src and "#edgetabs" not in src
+    assert "body.sheet-hidden:is(.mode-table, .mode-map) .sheet { display: none; }" in src
+    shell = src[src.index("/* --- Phone: the story is the page; the sheet is a tab"):]
+    assert "#sheettoggle { display: none; }" in shell
+    assert "body:is(.mode-table, .mode-map) .sheet { display: none; }" in shell

@@ -161,7 +161,7 @@ function paintTradeIcons(root) {
       .then(text => {
         const svg = text.includes("<svg") ? text : "";
         TRADE_ICON_SVG.set(name, svg);
-        if (svg) document.querySelectorAll(`#tradepanel i.tgi[data-icon="${CSS.escape(name)}"]`)
+        if (svg) document.querySelectorAll(`i.tgi[data-icon="${CSS.escape(name)}"]`)
           .forEach(i => { if (!i.firstChild) i.innerHTML = svg; });
       })
       .catch(() => TRADE_ICON_SVG.set(name, ""));
@@ -177,6 +177,9 @@ function paintTradeIcons(root) {
 // left out, the server opens on the counter that sells what was wanted, else the one
 // the player is talking to, else the general store, never the market's master.
 async function openTrade(want, line) {
+  // The counter is the Trade tab now (the table rebuild): opening it, from the tab or
+  // from a purchase said in words, is going to that tab.
+  if (typeof Shell === "object" && Shell) Shell.enter("trade");
   $("#tradepanel").classList.add("on");
   $("#tradepanel").setAttribute("aria-hidden", "false");
   $("#trademsg").textContent = "";
@@ -207,11 +210,22 @@ async function openTrade(want, line) {
   }
 }
 
+// Close, and Esc, walk away from the counter and back to the Table tab. Choosing
+// another tab walks away too, without the second move (12-shell.js calls this).
 async function closeTrade() {
-  // The keyboard goes back to the button that opened the window, not to the top of the
+  if (typeof Shell === "object" && Shell && Shell.mode() === "trade") {
+    Shell.show("table");
+    return;
+  }
+  await leaveCounter();
+}
+
+async function leaveCounter() {
+  if (!$("#tradepanel").classList.contains("on")) return;
+  // The keyboard goes back to the tab that opened the counter, not to the top of the
   // page, which is where a hidden panel's lost focus lands.
-  if ($("#tradepanel").contains(document.activeElement) && !$("#tradeaction").disabled) {
-    $("#tradeaction").focus({ preventScroll: true });
+  if ($("#tradepanel").contains(document.activeElement) && $("#tab-trade")) {
+    $("#tab-trade").focus({ preventScroll: true });
   }
   $("#tradepanel").classList.remove("on");
   $("#tradepanel").setAttribute("aria-hidden", "true");
@@ -222,19 +236,17 @@ async function closeTrade() {
   render(await getState());
 }
 
-$("#tradeaction").onclick = () => openTrade();
-
-// The button follows the server's answer rather than keeping its own copy of the rule.
-// Disabled is deliberate over hidden: a player who wonders why sees the reason in the
-// title, instead of wondering where the button went.
+// The footer's Trade button went with the table rebuild: the Trade tab is the one door
+// (the mock README, "Also: the footer's duplicate Trade button is gone"). The tab follows
+// the server's answer rather than keeping its own copy of the rule, and where nobody
+// keeps a counter it says so on the page instead of opening onto nothing
+// (20-tab-trade.js shows this sentence).
+const NO_COUNTER = "Nobody here keeps a counter. Say what you sell or buy, or find a stall.";
 function reflectMerchant(s) {
-  const btn = $("#tradeaction");
-  if (!btn) return;
+  const tab = $("#tab-trade");
+  if (!tab) return;
   const who = (s && s.merchant) || "";
-  btn.disabled = !who;
-  btn.title = who ? `Trade with ${who}`
-                  : "Nobody here keeps a counter. Say what you sell or buy, "
-                    + "or find a stall.";
+  tab.title = who ? `Trade with ${who}` : NO_COUNTER;
 }
 
 // --- the basket ---------------------------------------------------------------------
@@ -664,6 +676,9 @@ function busy(on) {
   // server's lock had to refuse the second press with a 409 (2026-09-25). The lock is
   // still the authority; this stops the page offering what it would refuse.
   document.body.classList.toggle("resolving", on);
+  // The engine device (13-device.js) listens for this: running while a turn is, and
+  // its halt when the answer lands. It holds nothing back.
+  document.dispatchEvent(new CustomEvent("table:busy", { detail: { on: !!on } }));
 }
 // Money, in this world's words. The names arrive with the state rather than being
 // written here, because what a coin is called is the world's business — see

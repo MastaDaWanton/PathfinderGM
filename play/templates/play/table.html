@@ -5,53 +5,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pathfinder GM{% if world_name %} — {{ world_name }}{% endif %}</title>
+<!-- The shared theme first, so this page's own rules below win where both speak
+     (theme-v2.css, "HOW TO LINK IT"); `asset` stamps its URL with its content's hash. -->
+<link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- No icon of its own: said, so the browser does not ask the server for one and log a
+     404 on every load. -->
+<link rel="icon" href="data:,">
 <style>
+
   /* ==========================================================================
-     The grimoire. One design system, stated once:
+     The play table. Two layers, stated once (docs/table-rebuild-inventory.md):
 
-     - The window is carved dungeon stone, lit from below by candlelight and
-       from nowhere by a low blood-red ambience that only wakes when something
-       is wrong.
-     - The transcript is the book: a column of aged, darkened parchment with an
-       illuminated capital opening each of the GM's passages, and new passages
-       arriving as ink bleeding in rather than appearing.
-     - The sidebar and every overlay are obsidian glass: translucent, blurred,
-       edged in wrought iron and a gold hairline.
-     - Everything interactive is warm to the touch — an ember follows the
-       cursor inside buttons, runes glow when a field takes focus — and all of
-       it stands down under prefers-reduced-motion.
+     - The panels this stage of the rebuild carries as they were: the transcript's
+       beats, the sheet, the trade window, the spells page, the conversation tray's
+       insides, the dice popup, the death panel, the craft hub's insides and the combat
+       bar's pieces. Their rules follow, as they were written, with the page's old
+       `button` base fenced off the new shell's controls.
+     - The new shell (the owner's approved design, docs/mock/table-layout/), last, on
+       the shared theme's tokens and classes (theme-v2.css, linked above).
 
-     No asset is fetched. The fonts degrade to Palatino (see fonts/README.md),
-     the textures are gradients, the ornaments are inline SVG — the app has to
-     look right on a machine that has never been online, because that machine
-     is the point of it.
+     No asset is fetched from anywhere but this app: the fonts are local
+     (static/fonts), the textures are static/img/v2, and the ornaments are inline SVG.
      ========================================================================== */
-  @font-face {
-    font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
-    src: local("Cinzel"), url("{% static 'fonts/Cinzel-Regular.woff2' %}") format("woff2");
-  }
-  @font-face {
-    font-family: "Cinzel"; font-style: normal; font-weight: 600; font-display: swap;
-    src: local("Cinzel SemiBold"), url("{% static 'fonts/Cinzel-SemiBold.woff2' %}") format("woff2");
-  }
-
-  :root {
-    --display: "Cinzel", "Trajan Pro", "Palatino Linotype", Palatino, "Book Antiqua",
-               Georgia, serif;
-    --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-
-    /* Stone, iron, parchment. */
-    --bg: #0d0b09; --panel: #161210; --edge: #3a2f22; --sunk: #0b0908;
-    --ink: #e8ddc4; --dim: #93866e; --ash: #6d675e;
-    /* Candlelight. */
-    --accent: #cfa964; --gold: #ddc48e; --gold-dim: #7d6845;
-    --candle: #f0c070; --ember: 255, 176, 84;
-    /* Blood magic. */
-    --blood: #6e1f1f; --bloodglow: 168, 44, 40; --alarm: #b0483c;
-    --player: #8fb0c8;
-    /* Obsidian glass. */
-    --glass: rgba(16, 12, 9, .66); --glass-edge: rgba(221, 196, 142, .14);
-  }
   * { box-sizing: border-box; }
 
   /* Thin wrought-iron scrollbars, everywhere. */
@@ -63,54 +38,10 @@
   }
   *::-webkit-scrollbar-track { background: transparent; }
 
-  body {
-    margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
-    display: grid; grid-template-columns: 1fr 350px; height: 100vh;
-    overflow: hidden; position: relative;
-    /* Carved stone: big soft shadow-form first, then two interfering strata of
-       chisel marks, then mortar courses. All gradient, nothing fetched. */
-    /* The room is bound in the same leather as the book: the painted
-       stone gave way to a real texture, under a scrim just dark enough
-       that ink stays ink. Fixed, so the page scrolls over the binding. */
-    background:
-      linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
-      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
-  }
-  /* The candle. A fixed pool of warm light rising from the writing desk — the
-     input bar — that breathes very slowly. Light animates on opacity only. */
-  body::before {
-    content: ""; position: fixed; z-index: 0; pointer-events: none;
-    left: -10%; right: 20%; bottom: -30%; height: 90%;
-    background: radial-gradient(55% 60% at 38% 100%,
-                rgba(var(--ember), .10), rgba(var(--ember), .035) 45%, transparent 72%);
-    opacity: calc(.45 + .55 * var(--flick, .8));
-  }
-  /* And the vignette: the edges of the room fall away into the dark. */
-  body::after {
-    content: ""; position: fixed; inset: 0; z-index: 5; pointer-events: none;
-    box-shadow: inset 0 0 190px 40px rgba(0, 0, 0, .78);
-  }
-
-  main {
-    display: flex; flex-direction: column; min-width: 0; min-height: 0;
-    position: relative; z-index: 1;
-  }
-
   /* --- The book ----------------------------------------------------------- */
   /* The transcript is a column of aged parchment: barely lighter than the
      stone, warm, edged with a deckled shadow and a double hairline. It scrolls
      as one long page — the scroll *is* turning the book. */
-  #story {
-    flex: 1; min-height: 0; overflow-y: auto; padding: 44px 48px 34px;
-  }
-  #story::before {
-    /* The page under the ink, fixed to the pane rather than the text so it
-       does not scroll away: soft parchment light down the reading column. */
-    content: ""; position: absolute; inset: 0 0 auto 0; height: 100%;
-    pointer-events: none;
-    background: radial-gradient(72% 90% at 50% 30%,
-                rgba(240, 214, 158, .045), transparent 75%);
-  }
   .beat {
     margin: 0 auto 24px; max-width: 64ch; white-space: pre-wrap;
     position: relative;
@@ -166,17 +97,6 @@
     text-shadow: 0 0 18px rgba(var(--ember), .35), 0 2px 6px rgba(0,0,0,.8);
   }
 
-  /* --- The writing desk --------------------------------------------------- */
-  footer {
-    position: relative; z-index: 2;
-    border-top: 1px solid var(--gold-dim); padding: 16px 48px 24px;
-    background:
-      linear-gradient(rgba(16, 12, 8, .06), rgba(8, 6, 4, .24)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 400px auto;
-    box-shadow: 0 -1px 0 rgba(221,196,142,.10), 0 -18px 44px rgba(0,0,0,.45);
-  }
-  form { display: flex; gap: 10px; }
   input[type=text] {
     flex: 1; color: var(--ink); padding: 13px 16px; font: inherit; border-radius: 2px;
     background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
@@ -198,7 +118,7 @@
 
   /* Every button is cold iron with a gold face, and an ember that follows the
      cursor inside it — the JS feeds --mx/--my from one delegated listener. */
-  button {
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)) {
     background: linear-gradient(#2b2318, #191410); border: 1px solid var(--gold-dim);
     color: var(--gold); padding: 12px 24px; border-radius: 2px; cursor: pointer;
     font: 400 15px/1 var(--display); letter-spacing: .16em; font-variant: small-caps;
@@ -206,87 +126,30 @@
     transition: color .2s ease, border-color .2s ease, transform .16s ease,
                 box-shadow .25s ease;
   }
-  button::after, .sugg::after, .pick::after {
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *))::after, .pick::after {
     content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
     background: radial-gradient(130px circle at var(--mx, 50%) var(--my, 50%),
                 rgba(var(--ember), .17), transparent 65%);
     transition: opacity .3s ease;
   }
-  button:hover::after, .sugg:hover::after, .pick:hover::after { opacity: 1; }
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)):hover::after, .pick:hover::after { opacity: 1; }
   /* Lit, not lifted. The 1px hop on hover went (owner, 2026-09-28: no motion that makes
      the page harder to use): a row of buttons that jump under the pointer is harder to
      aim along, which the panel bar had already found. The glow and the ember stay. */
-  button:hover:not(:disabled) {
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)):hover:not(:disabled) {
     color: #f4e6c0; border-color: var(--accent);
     box-shadow: 0 4px 16px rgba(0,0,0,.5), 0 0 14px rgba(var(--ember), .10);
   }
-  button:active:not(:disabled) { transform: translateY(0); }
-  button:disabled { opacity: .35; cursor: default; }
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)):active:not(:disabled) { transform: translateY(0); }
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)):disabled { opacity: .35; cursor: default; }
   button.ghost { background: transparent; color: var(--dim); }
-  button:focus-visible, .sugg:focus-visible {
+  button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)):focus-visible {
     outline: none; border-color: var(--accent);
     box-shadow: 0 0 0 1px rgba(var(--ember), .35);
   }
 
-  /* --- The obsidian pane -------------------------------------------------- */
-  aside {
-    position: relative; z-index: 2;
-    border: 5px solid transparent;
-    border-image: linear-gradient(135deg,
-      #f0d9a0 0%, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #c9a86a 86%, #f4e3b2 100%) 1;
-    overflow-y: auto; padding: 22px;
-    min-height: 0; font: 14px/1.55 var(--body);
-    background:
-      linear-gradient(rgba(0, 0, 0, .04), rgba(0, 0, 0, .16)),
-      linear-gradient(#57432d, #4b3a27),
-      url("{% static 'img/leather-tile.jpg' %}") #241d15;
-    background-blend-mode: normal, multiply, normal;
-    background-repeat: no-repeat, no-repeat, repeat;
-    background-attachment: scroll, scroll, fixed;
-    background-size: auto, auto, 512px auto;
-    /* Same treatment as the craft panels; see there for why the page hide would not do. */
-    box-shadow: inset 1px 0 0 var(--glass-edge), -14px 0 40px rgba(0,0,0,.35);
-  }
-  aside h2 {
-    color: var(--gold); font: 400 16px/1 var(--display); letter-spacing: .13em;
-    font-variant: small-caps; margin: 24px 0 10px; padding-bottom: 5px;
-    border-bottom: 1px solid #2b2319;
-  }
-  aside h2:first-child { margin-top: 0; }
-  .name { color: var(--gold); font: 400 24px/1.15 var(--display);
-          letter-spacing: .04em; font-variant: small-caps;
-          text-shadow: 0 2px 10px rgba(0,0,0,.85); }
   .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
-  .biome {
-    margin: -6px 0 12px; padding: 5px 9px; border-radius: 2px; cursor: default;
-    background: rgba(111,207,143,.06); border: 1px solid #2f5f42; color: #a9d9bb;
-    font: 600 11px/1.4 system-ui, sans-serif; letter-spacing: .07em;
-    text-transform: uppercase;
-  }
 
-  /* Life as candlelight: the bar burns, and it gutters low. */
-  .bar { height: 7px; background: #221c14; border-radius: 2px; overflow: hidden;
-         margin: 8px 0 6px; box-shadow: inset 0 1px 3px rgba(0,0,0,.7);
-         display: flex; }
-  .bar > i { display: block; height: 100%; position: relative;
-             background: linear-gradient(90deg, #8a6f3e, var(--accent), #e8c47c);
-             transition: width .8s cubic-bezier(.3, .9, .3, 1);
-             box-shadow: 0 0 10px rgba(var(--ember), .25); }
-  .bar > i.temp { background: linear-gradient(90deg, #4a6b7a, #7fb0c4);
-                  box-shadow: none; }
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  .cell {
-    background: linear-gradient(#1d1811, #151109); border: 1px solid #2b2319;
-    border-radius: 2px; padding: 7px 9px; text-align: center;
-    transition: border-color .25s ease, box-shadow .25s ease;
-  }
-  .cell:hover { border-color: #43372a; box-shadow: 0 0 12px rgba(var(--ember), .06); }
-  .cell.hurt { border-color: #6d3a32;
-               box-shadow: inset 0 0 12px rgba(var(--bloodglow), .12); }
-  .cell.hurt > em { display: block; color: #c4736a; font: italic 11px/1.3 var(--body); }
-  .cell b { display: block; color: var(--dim); font: 400 12px/1.3 var(--display);
-            letter-spacing: .1em; font-variant: small-caps; }
-  .cell span { color: var(--gold); font: 400 19px/1.35 var(--display); }
   .row { display: flex; justify-content: space-between; padding: 3px 0; }
   .row span:last-child { color: var(--accent); font-variant-numeric: tabular-nums; }
   /* Blood magic wakes only when something is wrong. */
@@ -692,66 +555,6 @@
   .prereq { display: block; color: var(--dim); margin-left: 0; }
   .why a { color: var(--gold); }
 
-  /* The GM's offered actions: wax seals on the desk. One click fills the pen. */
-  #suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-  #suggestions:empty { display: none; }
-  .sugg { padding: 5px 12px; border-radius: 12px; cursor: pointer;
-          border: 1px solid var(--gold-dim); background: rgba(26,22,16,.82);
-          color: var(--gold); font: inherit; font-size: 13px; text-align: left;
-          position: relative; overflow: hidden;
-          transition: color .2s ease, border-color .2s ease, transform .16s ease,
-                      box-shadow .25s ease;
-          animation: inkbleed .7s cubic-bezier(.22,.8,.36,1) both; }
-  .sugg:hover { color: #f4e6c0; border-color: var(--accent);
-                box-shadow: 0 3px 12px rgba(0,0,0,.45), 0 0 12px rgba(var(--ember), .10); }
-  /* The ways on from here (I6, 11-exits.js). The suggestions are wax seals the GM
-     offers; these are the engine's own roads, so they are square-cut like the ability
-     row, in the body face at reading size, and they never animate (owner, 2026-09-28).
-     Each group is one line: its label, then its places, wrapping on a phone. */
-  #exits { display: grid; gap: 5px; margin-bottom: 8px; }
-  #exits[hidden] { display: none; }
-  #exits .ex-group { display: grid; grid-template-columns: 76px 1fr; gap: 6px;
-                     align-items: baseline; }
-  #exits .ex-list { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-  #exits .ex-label { font: 400 11px/1 var(--display); letter-spacing: .16em;
-                     font-variant: small-caps; color: var(--dim); }
-  /* A phone has no width for a label column: the label goes above its places. */
-  @media (max-width: 560px) {
-    #exits .ex-group { grid-template-columns: 1fr; gap: 4px; }
-  }
-  #exits .exitbtn { padding: 5px 11px; border-radius: 2px; letter-spacing: 0;
-                    font: 400 13.5px/1.25 var(--body); font-variant: normal;
-                    border: 1px solid rgba(125, 104, 69, .8);
-                    background: rgba(26, 22, 16, .82); color: var(--gold);
-                    text-align: left; transition: color .2s ease, border-color .2s ease; }
-  #exits .exitbtn .ex-time { color: var(--dim); }
-  #exits .exitbtn:hover:not(.shut) { color: #f4e6c0; border-color: var(--accent);
-                                     box-shadow: none; }
-  #exits .exitbtn:hover:not(.shut) .ex-time { color: var(--ink); }
-  #exits .exitbtn:focus-visible {
-    outline: 2px solid var(--candle); outline-offset: 2px; }
-  /* The way attached as the chip stays lit (`aria-pressed`), so the chip in the say form
-     has an owner in the row; pressing it again takes the chip back. */
-  #exits .exitbtn.asking { border-color: var(--accent); color: #f4e6c0; }
-  /* Shut, not gone: the reason is the line below while it is pointed at or focused.
-     `aria-disabled` rather than `disabled`, so the keyboard can still reach it. */
-  #exits .exitbtn.shut { border-style: dashed; border-color: rgba(125, 104, 69, .55);
-                         color: var(--ash); background: rgba(12, 9, 6, .55);
-                         cursor: not-allowed; }
-  #exits .exitbtn.shut .ex-time { color: var(--ash); }
-  #exits .exitbtn.shut::after { display: none; }
-  #exits .ex-why { font-size: 13.5px; line-height: 1.4; color: var(--ink);
-                   font-style: italic; }
-  #exits .ex-why:empty { display: none; }
-  /* In a fight every open way is a withdraw, and says so on the button in the combat bar's
-     own colours (its target's alarm border and #e8b0a8 text), so a player scanning the
-     row sees it is not a stroll before the chip's line says what it costs. #e8b0a8 on
-     the button's leather is about 9:1; the page's --alarm as text would be 3.3:1. */
-  #exits .exitbtn.risky { border-color: var(--alarm); }
-  #exits .exitbtn .ex-risk { margin-left: 8px; color: #e8b0a8;
-                             font: 400 13px/1 var(--display); letter-spacing: .06em;
-                             font-variant: small-caps; white-space: nowrap; }
-  body.resolving #exits button { pointer-events: none; opacity: .55; }
   /* The conversation panel: a bar per person for their regard, and the exits. */
   #talk { margin: 10px 0 4px; padding: 8px 10px; border: 1px solid var(--line, #6b5a3a);
           border-radius: 4px; }
@@ -901,10 +704,6 @@
   #busy, #err { font-family: var(--body); }
 
   /* --- The craft-action panel -------------------------------------------- */
-  #craftpanel {
-    margin-top: 8px; padding: 12px 14px; border: 1px solid var(--gold-dim);
-    border-radius: 3px; background: rgba(0, 0, 0, .38);
-  }
   #craftpanel .cp-ground b { color: var(--brew, #6fcf8f); font: 400 15px/1.2 var(--display);
     letter-spacing: .06em; font-variant: small-caps; }
   #craftpanel .cp-ground em { color: var(--dim); font-size: 12.5px; margin-left: 8px; }
@@ -1030,7 +829,6 @@
   /* The panel shell's edge tabs sit above every overlay (z-index 60), and over this one
      they covered a card's price at 375px. The window is modal; its own Close is the way
      back to them. */
-  body:has(#tradepanel.on) :is(#edgetabs, #talktab, #maptab) { visibility: hidden; }
   #trademsg { font: 13.5px/1.5 var(--body); color: var(--ink); margin-left: auto;
               max-width: 46%; }
   #trademsg:empty { display: none; }
@@ -1431,41 +1229,7 @@
   .abilitybtn.on { border-color: rgba(214,72,72,.95); color: #ffe7b4;
                    background: linear-gradient(rgba(140,30,24,.55), rgba(70,16,12,.6));
                    box-shadow: 0 0 12px rgba(190,50,40,.45); }
-  /* The map tray. Off-screen rather than hidden, so opening it slides rather than
-     appears — the same ink-bleed logic the rest of the page uses. */
-  #maptab {
-    position: fixed; left: 0; top: 46%; z-index: 60; cursor: pointer;
-    writing-mode: vertical-rl; text-orientation: mixed;
-    padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-left: 0;
-    border-radius: 0 3px 3px 0; background: linear-gradient(#241d15, #17120d);
-    color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
-    box-shadow: 3px 0 14px rgba(0,0,0,.6);
-  }
-  #maptab:hover { color: #ffe7b4; border-color: var(--gold); }
-  #maptray {
-    position: fixed; left: 0; top: 0; bottom: 0; width: min(560px, 72vw); z-index: 61;
-    /* 150ms, not the 320ms it slid in before: a tray opens and closes fast and never
-       holds up the next click (owner, 2026-09-28). */
-    transform: translateX(-102%); transition: transform .15s ease-out;
-    background: linear-gradient(rgba(14,10,7,.90), rgba(8,6,4,.95));
-    border-right: 1px solid rgba(201,168,106,.34);
-    box-shadow: 10px 0 40px rgba(0,0,0,.7);
-    display: flex; flex-direction: column; padding: 14px 18px 18px;
-  }
-  #maptray.on { transform: translateX(0); }
-  #maptray .traybar { display: flex; justify-content: space-between; align-items: center;
-                      margin-bottom: 10px; }
-  #maptray .traybar b { font: 400 16px/1 Cinzel, serif; color: var(--gold); }
-  #maptray button { background: none; border: 0; color: var(--dim); cursor: pointer;
-                    font-size: 17px; }
-  #maptray button:hover { color: var(--ink); }
-  #maptrayinner { overflow: auto; flex: 1; min-height: 0; }
-  #maptrayinner svg { width: 100%; height: auto; }
   .bloodpool { fill: rgba(150,26,26,.55); stroke: rgba(196,58,58,.75); stroke-width: 1; }
-  .mapopen { background: none; border: 0; color: var(--dim); cursor: pointer;
-             font-size: 13px; padding: 0 4px; }
-  .mapopen:hover { color: var(--gold); }
-  @media (prefers-reduced-motion: reduce) { #maptray { transition: none; } }
   .pathblock { border-left: 2px solid rgba(201,168,106,.22); padding: 2px 0 2px 14px;
                margin: 14px 0; }
   .pathblock.mine { border-left-color: var(--gold); }
@@ -1634,135 +1398,13 @@
     .figure { display: none; }
   }
 
-  /* --- The phone -----------------------------------------------------------
-   * Measured in a browser at 375x812 before this block existed: the desktop grid
-   * (`1fr 350px`) put the *character sheet* on screen and pushed the story, the
-   * suggestions and the input box off to the left. A player opening the table on a
-   * phone landed on a stat block with nothing to type into and no sign there was
-   * anything else — the page was not narrow, it was simply showing the wrong column.
-   *
-   * The sheet becomes a drawer rather than a column, reusing the map tray's idiom two
-   * hundred lines up — an edge tab and a slide-over — so there is one way this page
-   * shows a panel it has no room for rather than two.
-   *
-   * Since the 2026-09-28 panel shell the drawer is a MODE, `body.drawer`, not a
-   * breakpoint: the phone gets it from the pre-paint script under 760px, and a desktop
-   * gets it from "Hide the column". The rules are written once, below, for both.
-   */
-  body.drawer { grid-template-columns: 1fr; }
-  body.drawer aside {
-    position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
-    width: min(400px, 88vw);
-    /* Off-screen rather than hidden, so it slides rather than appears — same
-       reasoning as `#maptray`. */
-    transform: translateX(102%);
-    transition: transform .15s ease-out;
-    border-width: 0 0 0 4px;
-    box-shadow: -14px 0 40px rgba(0,0,0,.6);
-  }
-  body.drawer aside.on { transform: translateX(0); }
-
-  /* The edge tabs: the old SHEET tab, now one of up to three, stacked on the right edge
-     where it always sat. Only in drawer mode; hidden while the drawer they open is out,
-     because they would be a button under the thing it opens. */
-  #edgetabs { display: none; }
-  body.drawer #edgetabs {
-    display: flex; flex-direction: column; gap: 8px;
-    position: fixed; right: 0; top: 46%; z-index: 60;
-  }
-  body.drawer aside.on ~ #edgetabs { visibility: hidden; }
-  .edgetab {
-    cursor: pointer; writing-mode: vertical-rl; text-orientation: mixed;
-    padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-right: 0;
-    border-radius: 3px 0 0 3px; background: linear-gradient(#241d15, #17120d);
-    color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
-    font-variant: normal; box-shadow: -3px 0 14px rgba(0,0,0,.6);
-  }
-  .edgetab:hover:not(:disabled) { color: #ffe7b4; border-color: var(--gold);
-                                  transform: none; }
-  .edgetab:focus-visible { outline: 1px solid var(--accent); outline-offset: -3px; }
-  /* The count of new lines, upright in the vertical tab. A number, not a dot: it says
-     how many, which is the thing worth knowing. */
-  .edgecount {
-    display: block; margin-top: 7px; padding: 3px 0; letter-spacing: 0;
-    text-combine-upright: all; color: #f4e6c0;
-    border-top: 1px solid var(--gold-dim);
-  }
-
+  /* The carried panels on a phone: thumbs rather than a mouse. 44px is the minimum
+     target size both platforms' guidance agrees on; and exactly 16px in a text box,
+     because iOS Safari zooms the whole page in on a smaller one and does not zoom back. */
   @media (max-width: 760px) {
-    /* 100dvh, not 100vh. Mobile browsers count their own collapsing address bar in
-       `vh`, so a 100vh page is taller than the window and the bottom of it sits under
-       the chrome — which on this page is the input bar, the one control the game
-       cannot be played without. */
-    body { grid-template-columns: 1fr; height: 100dvh; }
-
-    /* A phone has no room for a column to come back to. */
-    #panelmode { display: none; }
-
-    /* 48px of horizontal padding is a quarter of a phone screen spent on margin. */
-    #story { padding: 20px 16px 22px; }
-    footer { padding: 12px 14px 16px; }
-    #busy, #err { padding: 0 16px 10px; }
-
-    /* The narration keeps a third of the screen, whatever the footer is doing.
-     *
-     * Reported from a real phone in a real fight: the story was a 90px strip showing two
-     * clipped lines while the footer had the rest. `main` is a flex column, `#story` is
-     * `flex: 1; min-height: 0`, and the footer is unbounded — so on a desktop's 900px
-     * there is room for everything and on a phone the footer simply takes it. In a
-     * round-5 combat the footer carries suggestions, the combat bar (nine buttons, a
-     * target row, a hint), the abilities list and the input row: about 620px of a 700px
-     * viewport. `min-height: 0` is what lets a flex item collapse below its content, and
-     * it is exactly right on a desktop and exactly wrong here.
-     *
-     * A floor on the story rather than a cap alone, because the failure is the story
-     * losing an argument it should never have been in. */
-    #story { min-height: 34dvh; }
-
-    /* And a ceiling on the footer, so what it cannot fit it scrolls instead of taking.
-     * `min-height: 0` here for the same reason it is wrong above: a flex item will not
-     * shrink below its content without it, and an overflow that never scrolls is just
-     * the same theft with extra steps. */
-    footer { max-height: 58dvh; overflow-y: auto; min-height: 0; }
-
-    /* The input row stays reachable while the rest of the footer scrolls under it. It is
-     * the one control the game cannot be played without, and it sits *after* the combat
-     * bar and the abilities list in the DOM — so in a fight it is the first thing pushed
-     * out of reach. Opaque, because sticky over scrolling content is unreadable
-     * otherwise. */
-    #sayform {
-      position: sticky; bottom: -16px; z-index: 3;
-      margin: 0 -14px -16px; padding: 10px 14px 16px;
-      background: linear-gradient(rgba(20, 15, 10, .86), rgba(12, 9, 6, .97));
-      box-shadow: 0 -10px 22px rgba(0, 0, 0, .55);
-    }
-
-    /* Thumbs rather than a mouse. 44px is the minimum target size both platforms'
-       guidance agrees on, and the buttons on this page are sized for a pointer. */
-    button, .sugg, .pick, .tab, .opensheet { min-height: 44px; }
-    button { padding: 12px 16px; letter-spacing: .1em; }
-
-    /* The input row wraps instead of squeezing. Measured at 375px before this rule:
-       the flex row wanted 384px inside 347px, so the four buttons collapsed to 34px
-       each and read "Sa", "Co", "Cr", "Tr" — and the overflow pushed the whole page
-       into sideways scroll. The box gets its own line and the buttons share the next,
-       which is also the only arrangement in which they reach a thumb-sized width. */
-    #sayform { gap: 8px; flex-wrap: wrap; }
-    #sayform input[type=text] { flex: 1 0 100%; }
-    #sayform button { flex: 1 1 auto; min-width: 0; padding: 12px 10px; }
-
-    /* Exactly 16px, and it is not a taste decision: iOS Safari zooms the whole page
-       in when a focused input's text is smaller than that, and does not zoom back
-       out afterwards — so one tap on the box leaves the player scrolled sideways
-       through a page they then have to pinch their way out of. */
+    button, .pick, .tab { min-height: 44px; }
+    button:where(:not(.v2-btn, .v2-tabs > *, .v2-recess > *)) { padding: 12px 16px; letter-spacing: .1em; }
     input[type=text] { font-size: 16px; }
-
-    /* The map tray shares the screen with nothing on a phone. */
-    #maptray { width: 92vw; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    body.drawer aside { transition: none; }
   }
 
   /* --- The panels -----------------------------------------------------------
@@ -1771,32 +1413,6 @@
    * its own iron-and-gold buttons, taken down a size, and nothing that moves unless the
    * player moved it. Radii follow the page's scale: 2px for controls, 3px for panels.
    */
-  #panelbar {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
-    margin: 0 0 18px; padding-bottom: 12px; border-bottom: 1px solid #2b2319;
-  }
-  #panelbar button {
-    padding: 6px 9px; font-size: 12px; letter-spacing: .08em; border-radius: 2px;
-  }
-  /* Pressed: the ordinary iron button, lit. Unpressed: an empty slot, dashed like the
-     combat bar's planned steps, still gold so it reads as something to press. */
-  #panelbar .panelbtn[aria-pressed="false"] {
-    background: transparent; border-style: dashed; color: var(--gold);
-  }
-  #panelbar .panelbtn[aria-pressed="true"] {
-    border-color: var(--accent); color: #f4e6c0;
-  }
-  #panelmode {
-    margin-left: auto; background: transparent; border-color: transparent;
-    color: var(--gold);
-  }
-  #panelmode:hover:not(:disabled) { border-color: var(--gold-dim); }
-  /* No lift on hover inside the column: these sit in rows, and a row of buttons that
-     jump under the pointer is harder to aim along. */
-  #panelbar button:hover:not(:disabled), .panelhead button:hover:not(:disabled) {
-    transform: none; box-shadow: none;
-  }
-
   .panel { margin: 0 0 22px; }
   .panel:last-of-type { margin-bottom: 0; }
   /* The heading is the old `aside h2` ("In the scene", "Rolls"), now a button that
@@ -1822,21 +1438,12 @@
   .paneltoggle:hover:not(:disabled) { color: #f4e6c0; }
   .paneltoggle:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px;
                                box-shadow: none; }
-  .panelclose {
-    flex: none; width: 26px; height: 26px; padding: 0; margin-bottom: 4px;
-    background: transparent; border-color: transparent; color: var(--gold);
-    font: 13px/1 var(--body); letter-spacing: 0;
-  }
-  .panelclose:hover:not(:disabled) { border-color: var(--gold-dim); color: #f4e6c0; }
   .panelbody.arrive { animation: panelarrive .14s ease-out both; }
   @keyframes panelarrive { from { opacity: 0; } }
 
   /* An empty panel says what will appear in it. Ink rather than the dim grey the
      older `.sub` lines use, which falls under 4.5:1 on the leather. */
   .panelempty { margin: 0; color: var(--ink); font: italic 13px/1.5 var(--body); }
-  #mapwrap:not(:empty) ~ .panelempty { display: none; }
-  #panelsnone { display: none; }
-  #panels:not(:has(.panel:not([hidden]))) #panelsnone { display: block; }
 
   /* Said to a screen reader, not shown: #clocksay and #saystatus. */
   .vh {
@@ -1859,31 +1466,6 @@
    * slide. Only faster: 140ms, so it never holds up the next click. Nothing inside it
    * moves on its own; new lines land at the foot and the log only follows them when
    * the reader was already there. */
-  #talktab {
-    position: fixed; left: 0; top: calc(46% + 84px); z-index: 60; cursor: pointer;
-    writing-mode: vertical-rl; text-orientation: mixed;
-    padding: 16px 5px; border: 1px solid rgba(201,168,106,.34); border-left: 0;
-    border-radius: 0 3px 3px 0; background: linear-gradient(#241d15, #17120d);
-    color: var(--gold); font: 400 11px/1 Cinzel, serif; letter-spacing: .22em;
-    font-variant: normal; box-shadow: 3px 0 14px rgba(0,0,0,.6);
-  }
-  #talktab:hover:not(:disabled) { color: #ffe7b4; border-color: var(--gold); }
-  #talktab:focus-visible, #maptab:focus-visible {
-    outline: 1px solid var(--accent); outline-offset: -3px;
-  }
-  /* The tab is under the tray while it is open, and two left-edge trays never share
-     the screen: the map's tab goes too. */
-  body.talkopen #talktab, body.talkopen #maptab { visibility: hidden; }
-  #talktray {
-    position: fixed; left: 0; top: 0; bottom: 0; width: min(400px, 88vw); z-index: 61;
-    transform: translateX(-102%); transition: transform .14s ease-out;
-    background: linear-gradient(rgba(14,10,7,.90), rgba(8,6,4,.95));
-    border-right: 1px solid rgba(201,168,106,.34);
-    box-shadow: 10px 0 40px rgba(0,0,0,.7);
-    display: flex; flex-direction: column; padding: 14px 16px 16px;
-    font: 14px/1.55 var(--body);
-  }
-  #talktray.on { transform: translateX(0); }
   #talktray .traybar {
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
     margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #2b2319;
@@ -2023,23 +1605,6 @@
               line-height: 1.4; }
   .chip.att.risky { border-color: var(--alarm); }
   .chip.att.risky ~ .att-note { border-left-color: var(--alarm); }
-  /* The owner's motion rule: nothing moves under the pointer. `main` is a flex column
-     with the footer at the bottom, so anything that grows in the footer grows UPWARD
-     and lifts everything above it: measured 2026-09-29 at 1722x855, attaching "the
-     market" lifted the row 44px (704 to 660), so a second press meant to take the chip
-     back landed on the Outside group instead. (The row's old confirm line, "below the
-     buttons", lifted it the same way.) While the row is shown on a desktop, the chip's
-     line is kept open, empty until a chip fills it, with a place's line beside the
-     chip rather than under it. A phone is left alone: its footer scrolls, and a taller
-     sticky form grows over the content rather than lifting it. */
-  @media (min-width: 761px) {
-    #exits:not([hidden]) + #sayform { flex-wrap: wrap; }
-    #exits:not([hidden]) + #sayform > #attachments {
-      display: flex; align-items: center; gap: 6px 10px; flex: 1 0 100%; min-height: 42px; }
-    #exits:not([hidden]) + #sayform > #attachments[hidden] { visibility: hidden; }
-    #exits:not([hidden]) + #sayform .att-note { flex: 1 1 320px; padding: 3px 10px;
-                                                font-size: 13.5px; line-height: 1.3; }
-  }
   #err .errfix { margin-left: 10px; padding: 6px 12px; font-size: 12px; }
 
   /* --- The time-skip clock (Lane F, 09-clock.js) -----------------------------
@@ -2069,22 +1634,6 @@
     #spellpop .sp-spell { min-height: 44px; }
   }
 
-  .opensheet {
-    width: 100%; margin-top: 14px; background: transparent; color: var(--accent);
-    border: 1px solid var(--edge); padding: 10px; border-radius: 3px; cursor: pointer;
-    font: 600 12px/1 system-ui, sans-serif; letter-spacing: .08em;
-    text-transform: uppercase;
-    display: block; text-align: center; text-decoration: none; box-sizing: border-box;
-  }
-  .opensheet:hover { border-color: var(--accent); }
-
-  #busy { color: var(--dim); font-style: italic; padding: 0 48px 12px;
-          display: none; position: relative; z-index: 2; }
-  #busy.on { display: block; animation: thinking 2.4s ease-in-out infinite; }
-  @keyframes thinking { 50% { opacity: .45; } }
-  #err { color: var(--alarm); padding: 0 48px 12px; max-width: 70ch;
-         position: relative; z-index: 2; }
-  #err.hint { color: var(--dim); font-style: italic; }
   details { margin-top: 8px; }
   summary { cursor: pointer; color: var(--dim); font-size: 12px; }
   pre { font: 11px/1.4 ui-monospace, monospace; color: var(--dim); overflow-x: auto;
@@ -2152,17 +1701,6 @@
   /* 5. The lift. The tilt that was here read as seasickness once the corner
      clasps gave the panels real weight — hardware does not flex. A straight
      rise and a deeper glow carry the same "this is an object" claim. */
-  .card:hover { transform: translateY(-4px); }
-  .cell { transition: transform .4s cubic-bezier(.25, .8, .25, 1),
-                      border-color .25s ease, box-shadow .25s ease; }
-  .cell:hover { transform: translateY(-3px);
-                box-shadow: 0 6px 18px rgba(0,0,0,.55),
-                            0 0 14px rgba(201,162,39,.10); }
-  /* 6b. The ability cells take the gothic notch — an octagon cut, not a box. */
-  .cell { clip-path: polygon(0 7px, 7px 0, calc(100% - 7px) 0, 100% 7px,
-                             100% calc(100% - 7px), calc(100% - 7px) 100%,
-                             7px 100%, 0 calc(100% - 7px)); }
-
   /* 3. Candleflame on the key numbers. Delays staggered so the six ability
      scores never breathe in unison — synchronised flicker reads as a bug. */
   @keyframes candleGlow {
@@ -2447,9 +1985,9 @@
      hotspot on the flame tip, so the pointer's point is the point of light —
      and the glow that follows the pointer blooms exactly from the flame.
      Text fields keep the beam: you cannot place a caret with a candle. */
-  body, a, button, select, label, summary,
-  .sugg, .pick, .tab, .card.pick, .prepbtn, .opensheet {
-    cursor: url("{% static 'img/cursor-candle.png' %}") 24 0, auto;
+  body, a, button, select, label, summary, [role="tab"],
+  .sugg, .exitbtn, .pick, .tab, .card.pick, .prepbtn {
+    cursor: var(--cursor-candle) 24 0, auto;
   }
   input[type=text], textarea, .dieface { cursor: text; }
 
@@ -2492,115 +2030,871 @@
       animation: none !important; transition: none !important;
     }
   }
+
+  /* ==========================================================================
+     The table, re-laid (the rebuild's stage 1, 2026-09-30). The owner's approved
+     design, docs/mock/table-layout/ (its README records every ruling and measurement
+     behind the numbers here), built on the shared theme (play/static/css/theme-v2.css,
+     linked above this block): its tokens, its backdrop and its classes (.v2-framed,
+     .v2-tooled-leather, .v2-card-leather, .v2-gilt-edge, .v2-btn, .v2-tabs,
+     .v2-recess, .v2-well, .v2-coin, .v2-plaque, .v2-count, .v2-groove). What is
+     written here is the table's own layout: the top bar, the stage and its three
+     columns, the book, the desk, the device, the pages of the other tabs, and the
+     phone. The panels this stage carries as they are (the sheet, the trade window, the
+     spells page, the tray's insides) keep their rules above; stages 2 and 3 restyle
+     them (docs/table-rebuild-inventory.md).
+
+     Motion, by the owner's rule: nothing lifts or slides on hover. A pressed control
+     sinks 3px into its lip (the theme's); the embers, the candle and the device are
+     the only things that move on their own, and all three pass the pointer through.
+     ========================================================================== */
+  :root { --col-max: 880px; color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
+    display: grid; grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh; overflow: hidden;
+  }
+  a { color: var(--gold); }
+  .skip { position: absolute; left: 12px; top: -60px; z-index: 50; padding: 8px 12px;
+          background: var(--panel); color: var(--gold); border: 1px solid var(--accent); }
+  .skip:focus { top: 8px; }
+  .modepage[hidden], .notice[hidden] { display: none; }
+
+  /* The shell's controls wear the theme's cast iron. The old page styles every
+     `button` for the panels carried above, and those rules are fenced off from these
+     (`:where(:not(.v2-btn, ...))` there), so here only the one focus ring is added: the
+     candle, offset so it never sits on the glyph. */
+  .v2-btn:focus-visible, .v2-tabs > button:focus-visible, .v2-recess > button:focus-visible {
+    outline: 2px solid var(--candle); outline-offset: 2px;
+  }
+  .v2-btn.is-small { letter-spacing: .06em; }
+
+  /* --- The top bar: the way out, the world, the tabs, Talk and the sheet toggle ---- */
+  .topbar {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center; gap: 12px; padding: 8px 16px 9px;
+    border-bottom: 1px solid var(--gold-dim);
+    background: linear-gradient(rgba(255, 225, 170, .05), rgba(0, 0, 0, 0) 30%, rgba(8, 6, 4, .40)),
+                var(--tex-card-leather) #241d15;
+    background-size: auto, 400px auto;
+    /* A board laid over the stage: it throws its shadow down onto what is below. */
+    box-shadow: inset 0 1px 0 rgba(255, 225, 170, .10), 0 4px 10px rgba(0, 0, 0, .55);
+    position: relative; z-index: 10;
+  }
+  .worldnav { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+  /* The way out to Worlds & characters: small and italic, read as where the world sits,
+     not a button competing with the tabs. */
+  .leave { color: var(--dim); font: italic 400 13px/1.1 var(--body); text-decoration: none;
+           border-bottom: 1px dotted rgba(147, 134, 110, .55); padding-bottom: 1px; }
+  .leave:hover, .leave:focus-visible { color: var(--ink); border-bottom-color: var(--ink); }
+  .world { margin: 0; font: 400 15px/1 var(--display); letter-spacing: .14em;
+           font-variant: small-caps; color: var(--dim); text-shadow: var(--engraved);
+           max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topend { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+  .modes { justify-self: center; }
+  /* The toggle keeps the width of its longer label, so nothing shifts when it flips, and
+     it keeps its place (hidden, not removed) in the tabs it does not apply to. */
+  #sheettoggle { min-width: 8.6em; }
+  body:not(.mode-table):not(.mode-map) #sheettoggle { visibility: hidden; }
+  .talkbtn { display: inline-flex; gap: 8px; align-items: center; }
+  .talkbtn[aria-expanded="true"] { color: #f4e6c0; border-color: var(--accent);
+    transform: translate(1px, 2px);
+    box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset -1px -1px 0 rgba(255, 225, 170, .08); }
+  .talkbtn .edgecount { margin: 0; border: 0; letter-spacing: 0; }
+
+  /* --- The stage: who | the story | the numbers -------------------------------------- */
+  /* One grid, two rows: the book (or the board) above, the desk below, the sheet's two
+     halves either side. `.sheet` is invisible to it on a wide screen, so its halves take
+     the outer tracks; the conversation tray takes the numbers' track and lies over it,
+     so the story and the pen are never under it. */
+  .stage {
+    display: grid; min-height: 0; gap: 16px 18px; padding: 20px 20px 16px;
+    grid-template-columns: 264px minmax(0, 1fr) 264px;
+    grid-template-rows: minmax(45%, 1fr) minmax(0, auto);
+    grid-template-areas: "who book numbers" "who desk numbers";
+    position: relative;
+    /* The clasps' box reaches 34px past the book. Unclipped, it widened a 375px phone
+       page to 395px (README, "How it was checked"). */
+    overflow-x: clip;
+  }
+  .sheet { display: contents; }
+  .side-who { grid-area: who; }
+  .side-numbers { grid-area: numbers; }
+  .book, .board { grid-area: book; }
+  .desk { grid-area: desk; }
+  .sheetmore { grid-column: 2; grid-row: 1 / -1; }
+  #talktray { grid-area: numbers; z-index: 4; }
+  .book, .board, .desk, .sheetmore { width: 100%; max-width: var(--col-max); justify-self: center; }
+  /* The tabs that are not this one. */
+  body:not(.mode-table) .book { display: none; }
+  body:not(.mode-map) .board { display: none; }
+  body:not(.mode-table):not(.mode-map) .desk { display: none; }
+  body:not(.mode-sheet) .sheetmore { display: none; }
+  body.mode-sheet .glanceonly { display: none; }
+  body:not(.mode-table):not(.mode-map):not(.mode-sheet) .stage { display: none; }
+  /* The board is for looking at, so it takes more of the height than the book does. */
+  body.mode-map .stage { grid-template-rows: minmax(64%, 1fr) minmax(0, auto); }
+
+  /* Hidden: the story takes the width; the measure stays the same, so it only centres. */
+  body.sheet-hidden:is(.mode-table, .mode-map) .stage {
+    grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk"; }
+  body.sheet-hidden:is(.mode-table, .mode-map) .sheet { display: none; }
+  /* With the sheet put away the tray takes a column of its own beside the book; laid over
+     the book it hid the right of the page and left the log four lines. */
+  body.sheet-hidden.talkopen:is(.mode-table, .mode-map) .stage {
+    grid-template-columns: minmax(0, 1fr) 340px; grid-template-areas: "book talk" "desk talk"; }
+  body.sheet-hidden:is(.mode-table, .mode-map) #talktray { grid-area: talk; }
+
+  /* --- The sides: tooled leather in a gilt edge, scrolled on their own ---------------- */
+  .side {
+    min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 18px;
+    font-size: 14px; line-height: 1.5; box-shadow: var(--emboss), var(--sh-2);
+    /* The app's --dim measured 3.0:1 against this leather at its lightest; one step
+       lighter in the same hue holds 4.4:1 there and 5.9:1 across its body (README). */
+    --dim: #b3a488;
+  }
+  .sidehead { margin: 18px 0 8px; color: var(--gold); font: 400 15px/1 var(--display);
+              letter-spacing: .12em; font-variant: small-caps; }
+  .sidehead.first { margin-top: 0; }
+  .side p { margin: 0; }
+
+  /* Who: the portrait's frame, the name, what is in hand and worn, the doors. */
+  .portrait { aspect-ratio: 4 / 5; position: relative; border-radius: 3px; overflow: hidden;
+              margin-bottom: 6px;
+              background: radial-gradient(80% 70% at 50% 35%, #2a2118, #120e0a);
+              border: 1px solid #1a140e;
+              box-shadow: 0 0 0 1px var(--gold-dim) inset, var(--sunken), var(--sh-1); }
+  .portrait-empty { position: absolute; inset: 0; display: grid; place-items: center;
+                    padding: 14px; text-align: center; color: var(--dim); font-style: italic;
+                    font-size: 14px; line-height: 1.45; margin: 10px !important;
+                    border: 1px dashed rgba(125, 104, 69, .7); border-radius: 3px; }
+  .portrait-note { margin: 0 0 12px !important; color: var(--dim); font-style: italic;
+                   font-size: 13px; }
+  .pcname { margin: 0; color: var(--gold); font: 400 24px/1.15 var(--display);
+            letter-spacing: .03em; text-shadow: var(--engraved); }
+  .pcline { margin: 4px 0 0 !important; color: var(--dim); font-style: italic; }
+  .pcstate { margin: 8px 0 0 !important; padding: 5px 9px; border: 1px solid var(--blood);
+             background: rgba(var(--bloodglow), .12); color: #e4b1a8; border-radius: 2px;
+             font-size: 13px; }
+  .loadout { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+  .loadout li { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 9px;
+                align-items: center; }
+  .loadout .where { display: block; color: var(--dim); font: 400 11.5px/1.1 var(--display);
+                    letter-spacing: .1em; font-variant: small-caps; }
+  .loadout .what { display: block; color: var(--ink); font-size: 14px; line-height: 1.25;
+                   overflow-wrap: anywhere; }
+  .loadout .what::first-letter { text-transform: uppercase; }
+  .purse { margin: 10px 0 0 !important; color: var(--ink); }
+  .purse b { color: var(--dim); font: 400 11.5px/1.1 var(--display); letter-spacing: .1em;
+             font-variant: small-caps; margin-right: 6px; }
+  .door { width: 100%; margin-top: 12px; display: flex; justify-content: space-between;
+          gap: 8px; align-items: center; font-size: 14px; }
+  a.door { display: flex; }
+  .door small { color: var(--dim); font: 400 13px/1 var(--body); letter-spacing: 0;
+                font-variant: normal; text-shadow: none; }
+  /* An icon on a tile: a small square of dark leather pressed into the page, the glyph
+     standing proud of it in gilt. */
+  .tile { display: grid; place-items: center; aspect-ratio: 1; border-radius: 3px;
+          color: var(--gold); border: 1px solid #2b2319;
+          background: radial-gradient(90% 90% at 30% 25%, #2a2118, #120e0a);
+          box-shadow: var(--sunken); }
+  .tile.inuse { color: #f4e6c0; border-color: var(--gold-dim);
+                background: linear-gradient(135deg, rgba(207, 169, 100, .30) 0 8px, transparent 8px),
+                            radial-gradient(90% 90% at 30% 25%, #2d2319, #120e0a); }
+  .tile .tgi { width: 64%; height: 64%; color: inherit;
+               filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, .8)); }
+  .tgi { display: inline-block; flex: none; }
+  .tgi svg { display: block; width: 100%; height: 100%; }
+
+  /* The numbers: life, the struck coins, the plaques. */
+  .lifebar { height: 9px; background: #1a150f; border-radius: 2px; overflow: hidden;
+             display: flex; box-shadow: var(--sunken); }
+  .lifebar > i { display: block; height: 100%;
+                 background: linear-gradient(#f0d9a0, #cfa964 45%, #8a6f3e);
+                 box-shadow: inset 0 1px 0 rgba(255, 240, 200, .5); }
+  .lifebar > i.temp { background: linear-gradient(#a9cfe0, #7fb0c4 45%, #4a6b7a); }
+  .lifesay { margin: 6px 0 2px !important; font-variant-numeric: tabular-nums; }
+  .lifesay b { color: var(--gold); font: 400 20px/1 var(--display); text-shadow: var(--engraved);
+               font-weight: 400; }
+  .side .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+  .side .row span:last-child { color: var(--gold); font-variant-numeric: tabular-nums;
+                               text-align: right; }
+  .side .row small { color: var(--dim); }
+  .side .row.danger span:last-child { color: #e4a39a; }
+  .side h4 { margin: 10px 0 4px; color: var(--dim); font: 400 12.5px/1.2 var(--display);
+             letter-spacing: .1em; font-variant: small-caps; }
+  .medals { list-style: none; margin: 0 0 6px; padding: 0; display: grid;
+            grid-template-columns: repeat(3, 1fr); gap: 16px 8px; justify-items: center; }
+  .medals .v2-coin.hurt > div { box-shadow: inset 3px 4px 6px rgba(0, 0, 0, .85),
+      inset 0 0 0 4px rgba(20, 14, 8, .55), inset 0 0 0 5px rgba(var(--bloodglow), .55),
+      0 0 0 1px rgba(58, 40, 18, .9); }
+  .medals .v2-coin .md.hurt { border-color: var(--blood); color: #e4b1a8; }
+  .plaques { margin: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 7px; }
+  .plaques > div { padding: 6px 4px; text-align: center; }
+  .plaques dt { color: var(--dim); font: 400 12px/1.2 var(--display); letter-spacing: .1em;
+                font-variant: small-caps; }
+  .plaques dd { margin: 2px 0 0; color: var(--gold); font: 400 19px/1.2 var(--display);
+                text-shadow: var(--engraved); }
+  .plaques dd small { display: block; color: var(--dim); font: 400 11px/1.2 var(--body); }
+  .side .note { margin: 6px 0 0 !important; color: var(--dim); font-style: italic;
+                font-size: 13px; }
+  .xp .ready { color: var(--gold); }
+
+  /* The two disclosures carried from the column (In the scene, Rolls): tooled into the
+     leather like the headings above them. */
+  .side .panel { margin: 22px 0 0; }
+  .side .panelhead { border-bottom: 1px solid #221b13; box-shadow: 0 1px 0 rgba(255, 225, 170, .10); }
+  .side .paneltoggle { color: var(--gold); font-size: 15px; letter-spacing: .12em;
+                       text-shadow: var(--engraved); }
+  .side h2 { color: var(--gold); font: 400 14px/1 var(--display); letter-spacing: .12em;
+             font-variant: small-caps; margin: 12px 0 6px; }
+  .side .who { border-bottom-color: rgba(34, 27, 19, .9); }
+
+  /* --- The book ---------------------------------------------------------------------- */
+  /* A right-hand page of an open book, bound in the theme's gilt ring and clasps
+     (.v2-framed). One border: its depth is the shadow it casts, down and right from the
+     one lamp (the owner, 2026-09-30: "there is some extra border or something on the
+     right and bottom of the narration box" was the page stack, gone). The left boss is
+     not drawn: the device takes its place on that edge. */
+  .book { min-height: 0; display: grid; background: none; box-shadow: var(--sh-3); }
+  .book.v2-framed::after, .board.v2-framed::after {
+    background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
+                     0 0, auto 40px; }
+  /* The story's leaf, see-through (the owner, 2026-09-30: "make the text box background
+     slightly transparent"; "50% is good"): the page's own colour at --leaf-a over a 4px
+     blur of the room. Only the fill: the text, the gilt, the clasps and the head are not
+     faded. Unblurred where backdrop-filter is missing, measured above 4.5:1 (README). */
+  .bookin { position: relative; z-index: 1; min-height: 0; display: grid;
+            grid-template-rows: auto minmax(0, 1fr); border-radius: inherit;
+            --leaf-a: .5;
+            background:
+              linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
+                              rgba(0, 0, 0, .08) 44px, transparent 90px),
+              radial-gradient(80% 60% at 35% 15%, rgba(240, 214, 158, .07), transparent 70%),
+              rgba(17, 14, 10, var(--leaf-a));
+            -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  /* The head stays opaque, the page as it was drawn: the paper under the page's dimming. */
+  .bookhead { position: relative; padding: 24px 50px 10px 58px;
+              border-bottom: 1px solid rgba(125, 104, 69, .45);
+              box-shadow: 0 1px 0 rgba(255, 225, 170, .05);
+              display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px;
+              border-radius: 3px 3px 0 0;
+              background:
+                linear-gradient(90deg, rgba(0, 0, 0, .62), rgba(0, 0, 0, .28) 14px,
+                                rgba(0, 0, 0, .08) 44px, transparent 90px),
+                linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
+                var(--tex-page-paper) 0 0 / 560px auto #1d1710; }
+  .where { min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+  .place { margin: 0; color: var(--gold); font: 400 25px/1.15 var(--display);
+           letter-spacing: .04em; text-shadow: var(--engraved), 2px 4px 10px rgba(0, 0, 0, .85); }
+  .place::first-letter { text-transform: uppercase; }
+  .whereline { margin: 0; color: var(--dim); font-style: italic; font-size: 15px; }
+  .glance { display: none; }
+  .here { display: flex; flex-wrap: wrap; align-items: baseline; margin-left: auto;
+          gap: 6px 10px; font-size: 15px; }
+  .here[hidden] { display: none; }
+  .herelabel { color: var(--dim); font: 400 13px/1 var(--display); letter-spacing: .12em;
+               font-variant: small-caps; }
+  .herelist { display: flex; flex-wrap: wrap; gap: 6px; }
+  .herelist .v2-btn { font: 400 15px/1.2 var(--body); letter-spacing: 0; font-variant: normal;
+                      padding: 4px 10px; min-height: 32px; color: var(--ink); text-shadow: none;
+                      border-color: rgba(125, 104, 69, .6);
+                      background: linear-gradient(rgba(40, 32, 22, .7), rgba(20, 16, 11, .7)); }
+  .herelist .v2-btn[aria-expanded="true"] { border-color: var(--accent); color: #f4e6c0; }
+  .face { flex-basis: 100%; margin: 2px 0 0; font-size: 15px; font-style: italic;
+          color: #d2c7ad; }
+  .face[hidden] { display: none; }
+
+  /* The story: a readable measure with room either side. Palatino's zero is wide: 58ch
+     at 18px measured inside the 62 to 72 characters a line the owner asked for. */
+  #story { position: relative; overflow-y: auto; min-height: 0;
+           padding: 22px 50px 30px 58px; font-size: 18px; line-height: 1.7; }
+  #story .beat { max-width: 58ch; margin: 0 auto 20px; }
+  .beat.setup { color: #d8cdb2; }
+  /* The drop cap: each of the GM's passages opens the way a grimoire page does, the
+     letter raised off the page with the lamp on its upper left. */
+  .beat.setup::first-letter {
+    float: left; font-family: var(--display); font-size: 3.35em; line-height: .8;
+    padding: .06em .1em 0 0; color: var(--candle);
+    text-shadow: -1px -1px 0 rgba(255, 240, 200, .35), 2px 3px 3px rgba(0, 0, 0, .85),
+                 0 0 18px rgba(var(--ember), .30);
+  }
+
+  /* --- The desk: a leather writing surface under the book --------------------------- */
+  .desk { position: relative; display: grid; gap: 10px; padding: 14px 16px 16px; min-height: 0;
+          grid-template-rows: minmax(0, 1fr) auto auto;
+          border: 1.5px solid #3a2f22; border-top-color: var(--gold-dim); border-radius: 3px;
+          box-shadow: var(--emboss), var(--sh-2); }
+  .choices { display: grid; gap: 10px; min-height: 0; overflow-y: auto; align-content: start; }
+  .choices > :empty, .choices > [hidden] { display: none; }
+  /* A grid item is as wide as its widest line unless told otherwise: on a phone the
+     combat bar's one sideways row of buttons made the bar wider than the desk, and its
+     hint line was cut off at "just type below fo" (measured at 375). */
+  .choices > * { min-width: 0; }
+  #err { font: 15px/1.45 var(--body); color: var(--alarm); max-width: 70ch; }
+  #err:empty { display: none; }
+  #err.hint { color: var(--ink); font-style: italic; }
+  #err .errtext { margin-right: 4px; }
+  /* While a turn resolves the controls that would take another are asleep (busy()). */
+  body.resolving .desk .exitbtn, body.resolving .desk .sugg { opacity: .55; }
+
+  /* The ways on: square-cut, in the body face, grouped, one line a group (I6). */
+  #exits { display: grid; gap: 7px; }
+  #exits[hidden] { display: none; }
+  #exits .ex-group { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px;
+                     align-items: baseline; }
+  #exits .ex-label { color: var(--dim); font: 400 13px/1.2 var(--display); letter-spacing: .12em;
+                     font-variant: small-caps; text-shadow: var(--engraved); }
+  #exits .ex-list { display: flex; flex-wrap: wrap; gap: 7px 6px; min-width: 0; }
+  #exits .exitbtn { padding: 6px 11px; min-height: 36px; letter-spacing: 0; font-variant: normal;
+                    font: 400 15px/1.2 var(--body); border: 1px solid rgba(125, 104, 69, .85);
+                    color: var(--gold); text-align: left; text-shadow: none; white-space: normal;
+                    background: linear-gradient(rgba(44, 35, 24, .95), rgba(24, 19, 13, .95)); }
+  #exits .exitbtn .ex-time { color: var(--dim); }
+  #exits .exitbtn:hover:not(.shut) { color: #f4e6c0; border-color: var(--accent); }
+  #exits .exitbtn:hover:not(.shut) .ex-time { color: var(--ink); }
+  /* The way attached as the chip stays lit (`aria-pressed`), so the chip in the say form
+     has an owner in the row; pressing it again takes the chip back. */
+  #exits .exitbtn.asking { border-color: var(--accent); color: #f4e6c0; }
+  /* Shut, not gone: dashed and sunk flush into the desk, no lip, nothing to press. The
+     reason is the line below while it is pointed at or focused. `aria-disabled` rather
+     than `disabled`, so the keyboard can still reach it. */
+  #exits .exitbtn.shut { border-style: dashed; border-color: rgba(125, 104, 69, .6);
+                         color: var(--dim); background: rgba(12, 9, 6, .6); box-shadow: var(--sunken);
+                         cursor: not-allowed; }
+  #exits .exitbtn.shut:active { transform: none; }
+  #exits .exitbtn.shut .ex-time { color: var(--dim); }
+  /* One line held open under the row whenever a way is shut, so the reason fills a
+     space that was already there. */
+  #exits .ex-why { min-height: 1.45em; padding-left: 92px; font-size: 14.5px; line-height: 1.45;
+                   color: var(--ink); font-style: italic; }
+  #exits:not(:has(.shut)) .ex-why:empty { display: none; }
+  /* In a fight every open way is a withdraw, and says so on the button in the combat bar's
+     own colours (its target's alarm border and #e8b0a8 text), so a player scanning the
+     row sees it is not a stroll before the chip's line says what it costs. #e8b0a8 on
+     the button's leather is about 9:1; the page's --alarm as text would be 3.3:1. */
+  #exits .exitbtn.risky { border-color: var(--alarm); }
+  #exits .exitbtn .ex-risk { margin-left: 8px; color: #e8b0a8;
+                             font: 400 13px/1 var(--display); letter-spacing: .06em;
+                             font-variant: small-caps; white-space: nowrap; }
+  body.resolving #exits button { pointer-events: none; opacity: .55; }
+
+  /* The GM's offers: wax seals, the 12px pill, pressed onto the desk. One click fills
+     the pen. */
+  #suggestions { display: flex; flex-wrap: wrap; gap: 7px 6px; }
+  #suggestions:empty { display: none; }
+  #suggestions .sugg { padding: 6px 13px; min-height: 34px; border-radius: 12px; letter-spacing: 0;
+          font: 400 14px/1.3 var(--body); font-variant: normal; white-space: normal;
+          text-align: left; text-shadow: none; color: var(--gold); animation: none;
+          background: radial-gradient(120% 140% at 30% 20%, rgba(58, 44, 28, .95), rgba(22, 17, 12, .95)); }
+  #suggestions .sugg:hover { color: #f4e6c0; border-color: var(--accent); }
+
+  /* The pen: the say line and the other actions share a line while there is room for
+     both, and the actions drop below the pen, never between its halves, when not. */
+  .pen { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; position: relative; }
+  .sayline { display: flex; gap: 8px; align-items: stretch; flex: 1 1 340px; min-width: 0; }
+  /* The pen's line is a trough cut into the desk (.v2-well). Two ids, because the page's
+     older `input[type=text]` rule is still what the carried panels' inputs wear. */
+  #sayform #input { flex: 1 1 220px; min-width: 0; padding: 11px 14px; font: inherit;
+                    font-size: 17px; min-height: 46px; animation: none;
+                    background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
+                    border-bottom-color: #4a3c28; border-right-color: #4a3c28;
+                    box-shadow: inset 2px 3px 7px rgba(0, 0, 0, .75), 0 1px 0 rgba(255, 225, 170, .06); }
+  #sayform #input:focus-visible { outline: 2px solid var(--candle); outline-offset: 1px;
+                                  border-color: var(--accent); }
+  #sayform #input::placeholder { color: #8a7d66; font-style: italic; }
+  #send { min-width: 88px; min-height: 46px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .actions .v2-btn { flex: 0 0 auto; min-height: 46px; }
+  #sayform #attachments:not([hidden]) { display: flex; flex-wrap: wrap; align-items: center;
+                                        gap: 6px 10px; flex: 1 0 100%; }
+  /* The owner's motion rule: nothing moves under the pointer. The desk sits at the foot
+     of the stage, so anything that grows in it grows UPWARD and lifts the row above:
+     measured 2026-09-29 at 1722x855, attaching "the market" lifted the row 44px (704 to
+     660), so a second press meant to take the chip back landed on the Outside group.
+     While the row is shown on a desktop, the chip's line is kept open, empty until a
+     chip fills it, with a place's line beside the chip rather than under it. */
+  @media (min-width: 761px) {
+    .desk:has(#exits:not([hidden])) #sayform > #attachments {
+      display: flex; align-items: center; gap: 6px 10px; flex: 1 0 100%; min-height: 42px; }
+    .desk:has(#exits:not([hidden])) #sayform > #attachments[hidden] { visibility: hidden; }
+    .desk:has(#exits:not([hidden])) #sayform .att-note { flex: 1 1 320px; padding: 3px 10px;
+                                                         font-size: 13.5px; line-height: 1.3; }
+  }
+
+  /* Popovers over the story's foot, anchored to the desk: nothing below reflows. */
+  .pop { position: absolute; left: 14px; right: 14px; bottom: calc(100% + 10px); z-index: 30;
+         max-width: 560px; padding: 14px 16px; display: grid; gap: 10px; font-size: 15px;
+         background: linear-gradient(#211a13, #15110c); border: 1px solid var(--gold-dim);
+         border-radius: 3px; box-shadow: var(--bevel), var(--sh-3); }
+  .pop[hidden] { display: none; }
+  .poprow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  /* Held to the book's height above the desk (the book keeps at least 45% of the stage)
+     and scrolled inside: with every craft's eighteen ways of getting material the hub
+     measured 584px and its top, the ground's name, ran 45px off the window at 1440x900. */
+  #craftpanel { margin: 0; max-height: calc(45dvh - 50px); overflow-y: auto; }
+
+  /* The combat bar: a fight is its own state, at the top of the desk, in the alarm's
+     border it has always worn. */
+  #combatbar { margin: 0; background: rgba(30, 12, 10, .55); box-shadow: var(--sunken); }
+  #combatbar .cb-acts .v2-btn { min-height: 34px; }
+  #combatbar .cb-acts .v2-btn[hidden] { display: none; }
+
+  /* The spell picker and the chip, in the desk's own materials. */
+  #spellpop { background: linear-gradient(#211a13, #15110c); box-shadow: var(--bevel), var(--sh-3); }
+
+  /* --- The engine device (13-device.js) ------------------------------------------------ */
+  /* The owner's brass mechanism, mounted on the centre column's left gilt edge in the
+     gutter, its top 24px below the side panel's top corner (placement accepted
+     2026-09-30, FI 3.4). It is a child of the stage and takes the centre column's grid
+     area as its containing block (an absolutely placed grid item does), the area the
+     book, the map and the sheet's pages fill, each at most --col-max wide and centred in
+     it: so it hangs on the gilt edge of whatever the column holds, at every width, with
+     nothing measured in script. (A version that measured in script kept a stale offset,
+     -35,137 at 1792, off the window's edge.) */
+  .device { --dv-w: 84px; --dv-off: 4px; position: absolute; z-index: 4; pointer-events: none;
+            grid-area: book; width: var(--dv-w); height: calc(var(--dv-w) * 773 / 268);
+            left: calc(max(0px, (100% - var(--col-max)) / 2) + var(--ring) / 2 - var(--dv-w) / 2
+                       + var(--dv-off));
+            top: 24px; }
+  body.mode-sheet .device { grid-area: 1 / 2 / 2 / 3; }
+  .dv-body { position: absolute; inset: 0;
+             /* Its shadow on the frame falls the lamp's way, down and right. */
+             filter: drop-shadow(var(--dv-sx, 2px) var(--dv-sy, 4px) 2px rgba(0, 0, 0, .7))
+                     drop-shadow(calc(var(--dv-sx, 2px) * 2) calc(var(--dv-sy, 4px) * 2) 8px rgba(0, 0, 0, .45)); }
+  .dv-body > img, .dv-body > svg { position: absolute; inset: 0; width: 100%; height: 100%;
+                                   display: block; }
+  .dv-body > svg { overflow: visible; }
+  /* The lamp's bloom is light, so it adds to the brass under it rather than covering it. */
+  .dv-bloom, .dv-tablit { mix-blend-mode: screen; }
+  .dv-halo { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+             mix-blend-mode: screen; opacity: 0; }
+  /* Steam: soft sprites, lit from the lamp's side, moved by transform and faded by
+     opacity only. Each puff is three soft lobes and a core. */
+  .dv-smoke { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+  .dv-smoke i { position: absolute; left: 0; top: 0; width: calc(var(--dv-w) * .56);
+                height: calc(var(--dv-w) * .56); opacity: 0;
+                background:
+                  radial-gradient(closest-side, rgba(250, 246, 237, 1), rgba(214, 206, 192, .78) 50%,
+                                  rgba(150, 142, 130, 0)) 18% 22% / 64% 64% no-repeat,
+                  radial-gradient(closest-side, rgba(236, 230, 218, .95), rgba(196, 188, 174, .66) 52%,
+                                  rgba(140, 132, 120, 0)) 88% 42% / 58% 58% no-repeat,
+                  radial-gradient(closest-side, rgba(220, 213, 200, .9), rgba(180, 172, 158, .6) 52%,
+                                  rgba(130, 122, 110, 0)) 40% 90% / 66% 66% no-repeat,
+                  radial-gradient(closest-side, rgba(226, 219, 206, .85), rgba(186, 178, 164, .5) 50%,
+                                  rgba(130, 122, 110, 0)) 50% 50% / 70% 70% no-repeat;
+                filter: blur(1.5px); will-change: transform, opacity; }
+  .dv-slot { display: none; }
+
+  /* --- Map: the board, where the book was -------------------------------------------- */
+  /* Its left padding clears the device, which hangs on this frame's left edge as it does
+     on the book's (58px, the book's own): at 26px it covered the first letter of the
+     heading. */
+  .board { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto;
+           padding: 20px 26px 16px 58px; box-shadow: var(--emboss), var(--sh-3); }
+  .board > #mapwrap { position: relative; z-index: 1; min-height: 0; display: grid;
+                      grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; }
+  .board > #mapwrap:empty { display: none; }
+  .board > .boardempty { position: relative; z-index: 1; }
+  #mapwrap:not(:empty) ~ .boardempty { display: none; }
+  .boardhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+               justify-content: space-between; }
+  .boardhead h2 { margin: 0; color: var(--gold); font: 400 17px/1.1 var(--display);
+                  letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .boardctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .boardctl .seglabel { padding: 0 6px 0 4px; color: var(--dim); font-size: 13px; font-style: italic; }
+  /* The board sits in a stone well sunk into the card. */
+  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
+               border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken); overflow: hidden; }
+  .boardview svg { width: 100%; height: 100%; max-height: 100%; display: block; }
+  .boardfoot { display: grid; gap: 2px; font-size: 14px; }
+  .boardfoot .sub { margin: 0; color: var(--dim); font-style: italic; }
+
+  /* --- Sheet: the sheet panel carried into the centre column ------------------------- */
+  body.mode-sheet .sheetmore { min-height: 0; display: grid; }
+  /* Clipped sideways as the stage is: a framed card's clasps reach 34px past it, and on
+     a 375px phone the Trade tab's notice widened the page to 397px (measured). */
+  .modepage { min-height: 0; display: flex; flex-direction: column; overflow-x: clip;
+              padding: 20px 20px 16px; gap: 12px; }
+  .modepage > * { width: 100%; max-width: 1320px; align-self: center; flex: none; }
+  .modepage > #sheetpanel.on, .modepage > #tradepanel.on { flex: 1 1 0; height: auto; }
+  .modenote { margin: 0; padding: 8px 14px; color: var(--ink); font-style: italic; font-size: 15px;
+              background: rgba(8, 6, 4, .55); border-radius: 3px; box-shadow: 0 0 16px 8px rgba(8, 6, 4, .32); }
+  /* In the frame the sheet and the counter are pages on the table, not windows over it:
+     a dark leather board, its own inside scrolled. */
+  .sheetmore > #sheetpanel, .modepage > #sheetpanel, .modepage > #tradepanel {
+    position: relative; inset: auto; z-index: auto; min-height: 0; height: 100%;
+    transform: none; opacity: 1; transition: none; border-radius: 3px; overflow: hidden;
+    border: 1px solid #3a2f22;
+    background: linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .88)),
+                var(--tex-card-leather) #1d1710;
+    background-size: auto, 420px auto;
+    box-shadow: var(--emboss), var(--sh-3);
+  }
+  .sheetmore > #sheetpanel .corner { display: none; }
+  /* The device hangs on this column's left edge on the Sheet tab too: at 1440 it covered
+     the sheet's sigil and the first letters of its tabs. The panel's content starts clear
+     of it (58px, the book's own left margin). At 1180 and below the column sits further
+     right and nothing is under it (the mock README measured the same). */
+  @media (min-width: 1181px) {
+    .sheetmore > #sheetpanel :is(.sheethead, .tabs, .sheetbody) { padding-left: 58px; }
+  }
+  .notice { max-width: 620px; margin: 30px auto; padding: 24px 28px; }
+  .notice > * { position: relative; }
+  .notice h2 { margin: 0 0 9px; color: var(--gold); font: 400 17px/1.1 var(--display);
+               letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .notice p { margin: 0 0 8px; }
+
+  /* --- The conversation tray, in the numbers' column --------------------------------- */
+  #talktray { display: flex; flex-direction: column; min-height: 0; padding: 16px 16px 14px;
+              font: 14.5px/1.55 var(--body); border: var(--gilt-edge) solid transparent;
+              background:
+                linear-gradient(rgba(14, 11, 8, .82), rgba(10, 8, 6, .9)),
+                var(--tex-card-leather),
+                var(--brass-grain), var(--gilt) #1d1710;
+              background-size: auto, 300px auto, 256px auto, auto;
+              background-blend-mode: normal, normal, soft-light, normal;
+              background-clip: padding-box, padding-box, border-box, border-box;
+              background-origin: padding-box, padding-box, border-box, border-box;
+              box-shadow: var(--emboss), var(--sh-3); --dim: #a99a80; }
+  #talktray:not(.on) { display: none; }
+
+  /* --- Narrower desktops: one sheet column, character over numbers -------------------- */
+  @media (max-width: 1180px) {
+    /* The book is shorter at 1024x768, so the device is 60px wide (173px tall), bounded
+       by the sheet column's content on its left and the book's title on its right. */
+    .device { --dv-w: 60px; --dv-off: 0px; }
+    .stage { grid-template-columns: 280px minmax(0, 1fr);
+             grid-template-areas: "sheet book" "sheet desk"; }
+    .sheet { grid-area: sheet; display: block; min-height: 0; overflow-y: auto;
+             overflow-x: hidden; border: var(--gilt-edge) solid transparent;
+             /* The gilt edge as the sides draw theirs; inside it the same tooled leather,
+                so any height the two halves leave shows leather, not the brass beneath. */
+             background:
+               linear-gradient(rgba(0, 0, 0, .16), rgba(0, 0, 0, .30)),
+               linear-gradient(#57432d, #4b3a27),
+               var(--tex-side-leather),
+               var(--brass-grain), var(--gilt) #241d15;
+             background-blend-mode: normal, multiply, normal, soft-light, normal;
+             background-size: auto, auto, 300px auto, 256px auto, auto;
+             background-clip: padding-box, padding-box, padding-box, border-box, border-box;
+             background-origin: padding-box, padding-box, padding-box, border-box, border-box;
+             box-shadow: var(--sh-2); }
+    .sheet .side { overflow: visible; border: 0; box-shadow: var(--emboss); background: none; }
+    .sheet .side-numbers { border-top: 1px solid var(--gold-dim); }
+    #talktray { grid-area: sheet; }
+    body.mode-sheet .sheetmore { grid-column: 2; }
+    body.mode-sheet .device { grid-area: 1 / 2 / 2 / 3; }
+    /* Seven tabs, Talk and the sheet toggle did not fit three equal columns at 1024px:
+       the right-hand group overran into the tabs. The world's name gives way instead. */
+    .topbar { gap: 8px; padding: 8px 12px 9px; grid-template-columns: auto minmax(0, 1fr) auto; }
+    .modes > button { padding: 8px 10px; letter-spacing: .05em; font-size: 14px; }
+    /* Measured at 1024x768: the book's head took 100px of a 270px book when "Here" fell
+       to a line of its own; a tighter head keeps it on one. */
+    .bookhead { padding: 20px 40px 8px 48px; gap: 4px 14px; }
+    .place { font-size: 22px; }
+    .whereline { font-size: 14px; }
+    #story { padding: 18px 40px 26px 48px; }
+  }
+
+  /* --- Phone: the story is the page; the sheet is a tab ------------------------------ */
+  @media (max-width: 760px) {
+    /* On a phone there is no gutter, so the device lies on its side in the head bar,
+       between the world's name and Talk (13-device.js moves it into .dv-slot): turned a
+       quarter clockwise, so the lamp and lever are at the right and its lit side is
+       still the top. The book gets its left boss back. */
+    .dv-slot { display: block; grid-area: dev; position: relative; justify-self: center;
+               width: calc(var(--dv-w) * 773 / 268); height: var(--dv-w); --dv-w: 30px; }
+    .dv-slot .device { --dv-w: 30px; left: 50%; top: 50%; --dv-sx: 3px; --dv-sy: -1.2px;
+                       transform: translate(-50%, -50%) rotate(90deg); }
+    .book.v2-framed::after, .board.v2-framed::after {
+      background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
+                       auto 40px, auto 40px; }
+    body { font-size: 16px; }
+    .topbar { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas:
+                "world dev end" "modes modes modes"; padding: 6px 12px 7px; gap: 6px 10px; }
+    .worldnav { grid-area: world; }
+    .topend { grid-area: end; }
+    /* The tabs keep their words and scroll sideways rather than shrink to initials.
+       min-width 0: as a grid item the row otherwise sizes to its seven tabs, and one
+       measured 479px, widening the whole page to 427px on a 375px phone. */
+    .modes { grid-area: modes; min-width: 0; justify-self: stretch; overflow-x: auto;
+             justify-content: flex-start; scrollbar-width: none; padding: 4px 4px 6px; }
+    .modes > button { flex: none; padding: 8px 12px; font-size: 13.5px; letter-spacing: .04em;
+                      min-height: 40px; }
+    #sheettoggle { display: none; }
+    .talkbtn { min-height: 36px; padding: 6px 12px; }
+
+    .stage, body.mode-map .stage {
+      grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk";
+      grid-template-rows: minmax(0, 1fr) minmax(0, auto); padding: 14px 14px 10px; gap: 12px; }
+    body:is(.mode-table, .mode-map) .sheet { display: none; }
+    /* On a phone the tray takes the whole stage: laid over the book alone it left the
+       log 30px at 375x812. Close is one tap back to the pen. */
+    #talktray, body.sheet-hidden:is(.mode-table, .mode-map) #talktray {
+      grid-area: auto; grid-column: 1; grid-row: 1 / -1; padding: 12px; }
+    body.sheet-hidden.talkopen:is(.mode-table, .mode-map) .stage {
+      grid-template-columns: minmax(0, 1fr); grid-template-areas: "book" "desk"; }
+    /* Under the tray the book's clasps, which reach 34px past it, showed at the tray's
+       top corners. What the tray covers is put out of sight while it is open. */
+    body.talkopen:is(.mode-table, .mode-map) :is(.book, .board, .desk) { visibility: hidden; }
+    /* The board keeps the height, and the desk keeps only the pen: the ways on are in
+       Table, and on a phone they had left the board 26px. */
+    body.mode-map .choices { display: none; }
+    /* Clear of the clasps' corner pieces, which sat over the heading's first letter. */
+    .board { padding: 22px 18px 12px 26px; }
+    .boardview { min-height: 200px; padding: 6px; }
+    .boardhead h2 { font-size: 15px; }
+    /* The sheet on a phone is a page of its own: the whole sheet in one column that
+       scrolls, who first, then the numbers, then the rest. */
+    body.mode-sheet .stage { display: flex; flex-direction: column; overflow-y: auto;
+                             overflow-x: hidden; }
+    body.mode-sheet .sheet { display: block; overflow: visible; flex: none; }
+    body.mode-sheet .sheetmore { display: block; overflow: visible; order: 2; flex: none;
+                                 min-height: 70dvh; }
+    body.mode-sheet .sheetmore > #sheetpanel { height: 70dvh; }
+    body.mode-sheet .sheet .side { padding: 14px; }
+    /* A full-width 4:5 portrait was 400px of an 812px screen: beside the name instead. */
+    .side-who { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 14px;
+                align-content: start; }
+    .side-who > * { grid-column: 1 / -1; }
+    .side-who > .portrait { grid-column: 1; grid-row: 1 / span 4; align-self: start; margin: 0; }
+    .side-who > .pcname { grid-column: 2; grid-row: 1; font-size: 21px; }
+    .side-who > .pcline { grid-column: 2; grid-row: 2; }
+    .side-who > .pcstate { grid-column: 2; grid-row: 3; }
+    .side-who > .portrait-note { grid-column: 2; grid-row: 4; margin: 6px 0 0 !important;
+                                 align-self: end; }
+    .portrait-empty { margin: 6px !important; font-size: 12px; padding: 6px; }
+
+    /* The book keeps its frame and clasps; its inside is what scrolls, head and all, so
+       reading gets the whole page. Measured at 375x812: a fixed head left the story 190px. */
+    .book { display: block; }
+    .bookin { display: block; height: 100%; overflow-y: auto; }
+    #story { overflow: visible; padding: 12px 20px 22px 26px; font-size: 17px; }
+    .bookhead { padding: 18px 18px 8px 26px; align-items: start; }
+    .place { font-size: 20px; }
+    .whereline { font-size: 14px; }
+    .where { flex: 1 1 60%; }
+    .here { margin-left: 0; flex-basis: 100%; margin-top: 4px; }
+    .glance { display: block; font: 400 13px/1.2 var(--body); white-space: normal;
+              letter-spacing: 0; font-variant: normal; padding: 6px 8px; min-height: 36px;
+              max-width: 9.5em; text-align: left; text-shadow: none; }
+    .desk { padding: 9px 9px 11px; gap: 7px; max-height: 58dvh; }
+    /* Each group is its label and one row that scrolls sideways, so the desk stays a few
+       short lines however many ways there are, and the story keeps the screen. */
+    #exits .ex-group { grid-template-columns: 70px minmax(0, 1fr); gap: 6px; align-items: center; }
+    #exits .ex-label { font-size: 12px; letter-spacing: .08em; }
+    #exits .ex-list { flex-wrap: nowrap; overflow-x: auto; padding: 0 4px 6px 0; }
+    #exits .exitbtn { flex: none; font-size: 14px; white-space: nowrap; }
+    #exits .ex-why { padding-left: 0; }
+    #suggestions { flex-wrap: nowrap; overflow-x: auto; padding: 0 4px 6px 0; }
+    #suggestions .sugg { flex: none; max-width: 78vw; }
+    #sayform #input { font-size: 16px; }
+    .actions .v2-btn { flex: 1 1 auto; padding: 8px 10px; font-size: 14px; }
+    #combatbar .cb-acts { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
+    #combatbar .cb-acts .v2-btn { flex: none; }
+    .modepage { padding: 14px 12px 10px; }
+    .modepage > .notice { width: auto; align-self: stretch; margin: 24px 12px; padding: 22px 20px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .v2-btn, .v2-tabs > button { transition: none; }
+  }
 </style>
 <script src="{% static 'js/dice3d.js' %}"></script>
 <script src="{% static 'js/scene3d.js' %}"></script>
 </head>
-<body>
+<body class="page-backdrop-room mode-table">
 <script>
-// Drawer or column, decided before the first paint, so a phone never flashes the desktop
-// column and a desktop that hid the column never flashes it back. First in <body>
-// because <head> has no body to mark. No template variables in here: a variable Django
-// renders as "" is a syntax error that takes the page down silently (PATHFINDER_BOOT
-// below says why). The key is 07-panels.js's PANELS_KEY; change both together.
+// The sheet hidden or shown, decided before the first paint, so a desktop that hid the
+// sheet never flashes it back. First in <body> because <head> has no body to mark. No
+// template variables in here: a variable Django renders as "" is a syntax error that
+// takes the page down silently (PATHFINDER_BOOT below says why). The key is
+// 07-panels.js's PANELS_KEY; change both together. A phone never hides the sheet this
+// way: under 760px the sheet is a tab of its own (the approved design's phone).
 (function () {
   var docked = true;
   try {
     var saved = JSON.parse(window.localStorage.getItem("pgm.table.panels.v1") || "null");
     if (saved && saved.docked === false) docked = false;
-  } catch (e) { /* unreadable storage: the column stays docked */ }
+  } catch (e) { /* unreadable storage: the sheet stays shown */ }
   var narrow = !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
-  if (narrow || !docked) document.body.classList.add("drawer");
+  if (!narrow && !docked) document.body.classList.add("sheet-hidden");
 })();
 </script>
 <div id="embers" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div id="cursorshade" aria-hidden="true"></div>
 <div id="cursorlight" aria-hidden="true"></div>
-<main>
-  <div id="story"></div>
-  <!-- The time-skip clock (Lane F, 09-clock.js): positioned inside main so it never
-       covers the column, and its one sentence for screen readers, in the DOM from load
-       because a live region added at the moment of speaking is not heard. -->
-  <div id="clockpop" aria-hidden="true" hidden></div>
-  <div id="clocksay" class="vh" role="status"></div>
-  <div id="busy">the GM is thinking…</div>
-  <div id="err"></div>
-  <footer>
-    <div id="suggestions"></div>
-    <!-- Combat as its own state: a turn is BUILT here — move, a standard action or a
-         full attack whose every swing can be an ability (Blood Bond's clause), a swift,
-         any frees — then committed once. The say box below stays live the whole time
-         for anything unconventional; a panel that closed the door on "I kick the
-         brazier into his face" would be the wrong kind of order. -->
-    <div id="combatbar" hidden>
-      <div class="cb-head">
-        <b id="cb-round"></b>
-        <span id="cb-turn"></span>
-      </div>
-      <div class="cb-row" id="cb-targets"></div>
-      <div class="cb-row" id="cb-plan"></div>
-      <div class="cb-row cb-acts">
-        <button type="button" id="cb-strike">Strike</button>
-        <button type="button" id="cb-fullatk">Full attack…</button>
-        <button type="button" id="cb-coup" hidden
-          title="Full round: no roll to hit, an automatic critical, and a Fortitude save or death">Coup de grâce</button>
-        <button type="button" id="cb-ability">Ability…</button>
-        <button type="button" id="cb-cast" aria-controls="spellpop" aria-haspopup="dialog"
-                aria-expanded="false">Cast…</button>
-        <button type="button" id="cb-swift">Swift…</button>
-        <button type="button" id="cb-free">Free…</button>
-        <button type="button" id="cb-clear" class="quiet">Clear</button>
-        <button type="button" id="cb-commit" class="go">Commit turn</button>
-        <button type="button" id="cb-end" class="quiet">End turn</button>
-      </div>
-      <div class="cb-menu" id="cb-menu" hidden></div>
-      <div class="sub" id="cb-hint">Pick a target, click a lit square to move, or just
-        type below for anything the buttons cannot say.</div>
+<a class="skip" href="#story">Skip to the story</a>
+
+<header class="topbar">
+  <!-- The way back to the landing page (the approved design's "doors out of the table"):
+       a quiet line above the world's name, as far as the bar allows from the tabs, the
+       pen and a fight's controls, so a hand reaching for any of them does not pass it. -->
+  <nav class="worldnav" aria-label="Where you are">
+    <a class="leave" href="/">Worlds &amp; characters</a>
+    <p class="world" id="world-name">{{ world_name }}</p>
+  </nav>
+  <!-- The tabs, each a word (12-shell.js). Spells is shown for a caster only, and Trade
+       is the one door to the counter: the footer's duplicate Trade button is gone. -->
+  <div class="modes v2-tabs" role="tablist" aria-label="The table">
+    <button type="button" role="tab" id="tab-table" data-mode="table" aria-selected="true"
+            aria-controls="stage">Table</button>
+    <button type="button" role="tab" id="tab-map" data-mode="map" aria-selected="false"
+            aria-controls="stage" tabindex="-1">Map</button>
+    <button type="button" role="tab" id="tab-sheet" data-mode="sheet" aria-selected="false"
+            aria-controls="stage" tabindex="-1">Sheet</button>
+    <button type="button" role="tab" id="tab-equipment" data-mode="equipment"
+            aria-selected="false" aria-controls="mode-equipment" tabindex="-1">Equipment</button>
+    <button type="button" role="tab" id="tab-spells" data-mode="spells" aria-selected="false"
+            aria-controls="mode-spells" tabindex="-1" hidden>Spells</button>
+    <button type="button" role="tab" id="tab-trade" data-mode="trade" aria-selected="false"
+            aria-controls="mode-trade" tabindex="-1">Trade</button>
+    <button type="button" role="tab" id="tab-journal" data-mode="journal" aria-selected="false"
+            aria-controls="mode-journal" tabindex="-1">Journal</button>
+  </div>
+  <!-- The device's place on a phone (13-device.js moves it here below 761px). -->
+  <div class="dv-slot" id="dv-slot" aria-hidden="true"></div>
+  <div class="topend">
+    <!-- The conversation is a tray, not a tab: it opens beside the story and never over
+         it (08-conversation.js). The count says how many new lines; it never opens the
+         tray by itself. -->
+    <button type="button" id="talktab" class="v2-btn talkbtn" aria-controls="talktray"
+            aria-expanded="false" title="The conversation">Talk<span class="edgecount v2-count"
+            hidden></span></button>
+    <button type="button" id="sheettoggle" class="v2-btn is-quiet" aria-expanded="true"
+            aria-controls="sheet">Hide sheet</button>
+  </div>
+</header>
+
+<main class="stage" id="stage" role="tabpanel" aria-labelledby="tab-table">
+  <!-- The engine device (13-device.js): the owner's brass mechanism, bolted just below the
+       left side panel's top-right corner, on the gilt edge of whatever the centre column
+       holds. It belongs to the table's frame, not to the book, so it shows on every tab
+       that shows the left panel; on a phone it lies on its side in the head bar.
+       Decorative to a screen reader, which hears the story arrive (a polite log) and the
+       busy line below. -->
+  <div class="device" id="device" data-state="idle" aria-hidden="true">
+    <div class="dv-body">
+      <img class="dv-chamber" src="{% static 'img/v2/device-chamber.png' %}" alt="">
+      <img class="dv-lip" src="{% static 'img/v2/device-lip.png' %}" alt="">
+      <img class="dv-frame" src="{% static 'img/v2/device-frame.png' %}" alt="">
     </div>
-  <div id="abilities"></div>
-    <!-- The ways on from here (I6, 11-exits.js): `scene.exits` from the engine's own
-         place graph, grouped, with the rules' reason on any way that is shut. -->
-    <nav id="exits" aria-label="From here" hidden></nav>
-    <form id="sayform" autocomplete="off">
-      <!-- A spell chip rides beside the words, never inside them (Lane F, 10-spells.js):
-           a contenteditable composer would break the real input that the iOS 16px rule,
-           the sticky phone form and player_input all depend on. -->
+    <div class="dv-smoke"></div>
+  </div>
+
+  <!-- Table: the story, in a book. -->
+  <section class="book v2-framed" id="book" aria-labelledby="place-name">
+    <i class="v2-rim" aria-hidden="true"></i>
+    <div class="bookin" id="bookin">
+      <div class="bookhead">
+        <div class="where">
+          <h1 class="place" id="place-name"></h1>
+          <p class="whereline" id="where-line"></p>
+        </div>
+        <button type="button" class="v2-btn glance" id="glance"></button>
+        <div class="here" id="here" hidden>
+          <span class="herelabel" id="here-label">Here</span>
+          <div class="herelist" id="here-list" role="group" aria-labelledby="here-label"></div>
+        </div>
+        <p class="face" id="face" aria-live="polite" hidden></p>
+      </div>
+      <div id="story" class="story" role="log" aria-live="polite" aria-label="The story"
+           tabindex="0"></div>
+    </div>
+  </section>
+
+  <!-- Map: the ground the engine plays on, where the book was (16-tab-map.js; 03's
+       renderMap draws it). The desk stays under it, because choosing a square feeds the
+       combat bar and the pen. -->
+  <section class="board v2-framed v2-card-leather" id="boardframe" aria-label="The map">
+    <i class="v2-rim" aria-hidden="true"></i>
+    <div id="mapwrap"></div>
+    <p class="panelempty boardempty">No ground is mapped yet. The map is drawn from wherever
+      the party is standing, as soon as they are standing somewhere.</p>
+  </section>
+
+  <!-- The desk: the fight, the ways on, the GM's offers, and the pen. -->
+  <section class="desk v2-card-leather" id="desk" aria-label="What you do">
+    <div class="choices">
+      <!-- Combat as its own state: a turn is BUILT here — move, a standard action or a
+           full attack whose every swing can be an ability (Blood Bond's clause), a swift,
+           any frees — then committed once. The say box below stays live the whole time
+           for anything unconventional; a panel that closed the door on "I kick the
+           brazier into his face" would be the wrong kind of order. -->
+      <div id="combatbar" hidden>
+        <div class="cb-head">
+          <b id="cb-round"></b>
+          <span id="cb-turn"></span>
+        </div>
+        <div class="cb-row" id="cb-targets"></div>
+        <div class="cb-row" id="cb-plan"></div>
+        <div class="cb-row cb-acts">
+          <button type="button" class="v2-btn is-small" id="cb-strike">Strike</button>
+          <button type="button" class="v2-btn is-small" id="cb-fullatk">Full attack…</button>
+          <button type="button" class="v2-btn is-small" id="cb-coup" hidden
+            title="Full round: no roll to hit, an automatic critical, and a Fortitude save or death">Coup de grâce</button>
+          <button type="button" class="v2-btn is-small" id="cb-ability">Ability…</button>
+          <button type="button" class="v2-btn is-small" id="cb-cast" aria-controls="spellpop"
+                  aria-haspopup="dialog" aria-expanded="false">Cast…</button>
+          <button type="button" class="v2-btn is-small" id="cb-swift">Swift…</button>
+          <button type="button" class="v2-btn is-small" id="cb-free">Free…</button>
+          <button type="button" class="v2-btn is-small is-quiet" id="cb-clear">Clear</button>
+          <button type="button" class="v2-btn is-small is-go" id="cb-commit">Commit turn</button>
+          <button type="button" class="v2-btn is-small is-quiet" id="cb-end">End turn</button>
+        </div>
+        <div class="cb-menu" id="cb-menu" hidden></div>
+        <div class="sub" id="cb-hint">Pick a target, click a lit square to move, or just
+          type below for anything the buttons cannot say.</div>
+      </div>
+      <!-- The ways on from here (I6, 11-exits.js): `scene.exits` from the engine's own
+           place graph, grouped, with the rules' reason on any way that is shut. -->
+      <nav id="exits" aria-label="From here" hidden></nav>
+      <div id="suggestions" role="group" aria-label="Suggested actions"></div>
+      <div id="abilities"></div>
+    </div>
+    <div id="err" aria-live="polite"></div>
+    <form id="sayform" class="pen" autocomplete="off">
+      <!-- A spell or a place rides beside the words, never inside them (Lane F,
+           10-spells.js): a contenteditable composer would break the real input that the
+           iOS 16px rule and player_input depend on. -->
       <div id="attachments" role="group" aria-label="Attached to this turn" hidden></div>
-      <!-- The out-of-character door is discoverable or it does not exist. `title` so
-           the hint is there on hover without taking a line of the page. -->
-      <input type="text" id="input" placeholder="What do you do?" autofocus
-             title="Type what your character does. Put speech in &quot;quotes&quot;.
+      <div class="sayline">
+        <label for="input" class="vh">What do you do?</label>
+        <!-- The out-of-character door is discoverable or it does not exist. `title` so
+             the hint is there on hover without taking a line of the page. -->
+        <input type="text" id="input" class="v2-well" placeholder="What do you do?" autofocus
+               title="Type what your character does. Put speech in &quot;quotes&quot;.
 /gm asks the engine a question out of character: /gm who is here, /gm what am I carrying, /gm quests.
 /cheat makes something true: /cheat I have 100 gold.">
-      <button type="submit" id="send">Say</button>
-      <!-- For the turn that stops mid-scene: your character asks a question and
-           nobody answers it, and there is nothing to type because you have already
-           done the thing. This asks the GM to carry on rather than making you invent
-           an action you did not want to take. -->
-      <button type="button" id="carryon" class="quiet"
-              title="Let the scene continue without acting">Continue</button>
-      <button type="button" id="craftaction" class="quiet"
-              title="Forage, prospect, skin, gather, buy — every way of getting material"
-              >Craft action</button>
-      <!-- Selling used to be a sentence you typed and hoped about. It is a counter
-           now: what you carry, what they have, and what their till can actually
-           raise. -->
-      <button type="button" id="tradeaction" class="quiet"
-              title="Buy and sell at the counter">Trade</button>
-      <!-- Shown by 10-spells.js when the character casts spells at all. Opened by script
-           rather than `popovertarget`, because the combat bar's Cast… opens the same
-           picker and one opener has to know where the other left it. -->
-      <button type="button" id="spellbtn" class="quiet" aria-controls="spellpop"
-              aria-haspopup="dialog" aria-expanded="false"
-              title="Choose a spell to cast this turn" hidden>Spells</button>
+        <button type="submit" id="send" class="v2-btn is-go">Say</button>
+      </div>
+      <div class="actions" role="group" aria-label="Other actions">
+        <!-- For the turn that stops mid-scene: your character keeps to what they were
+             doing and the world takes its beat (the owner's ruling on Continue). -->
+        <button type="button" id="carryon" class="v2-btn is-quiet"
+                title="You keep to what you were doing and the scene moves on">Continue</button>
+        <button type="button" id="craftaction" class="v2-btn is-quiet" aria-expanded="false"
+                aria-controls="craftpanel"
+                title="Forage, prospect, skin, gather, buy: every way of getting material"
+                >Craft action</button>
+        <!-- Shown by 10-spells.js when the character casts spells at all. Opened by script
+             rather than `popovertarget`, because the combat bar's Cast… opens the same
+             picker and one opener has to know where the other left it. -->
+        <button type="button" id="spellbtn" class="v2-btn is-quiet" aria-controls="spellpop"
+                aria-haspopup="dialog" aria-expanded="false"
+                title="Choose a spell to cast this turn" hidden>Spells</button>
+      </div>
     </form>
     <!-- The spell picker (Lane F). Popover, so Esc and a click outside close it. -->
     <div id="spellpop" popover="auto" role="dialog" aria-label="Spells"></div>
     <!-- What was attached or removed, said once for screen readers; present from load. -->
     <div id="saystatus" class="vh" role="status"></div>
-    <!-- The excursion panel. Foraging lived only on the bench page, where it was a
-         button and a table: no narration, no time, no way back into the fiction. -->
-    <div id="craftpanel" hidden>
+    <!-- The crafting hub, a popover over the story's foot anchored to the desk, so nothing
+         in the desk moves when it opens. Foraging lived only on the bench page, where it
+         was a button and a table: no narration, no time, no way back into the fiction. -->
+    <div id="craftpanel" class="pop" role="dialog" aria-label="Craft action" hidden>
       <div class="cp-ground"><b id="cp-biome">…</b> <em id="cp-desc"></em>
         <!-- The debug teleport moved here from the bench, where a workbench was
              claiming to be somewhere else. You forage where you stand; this is the
@@ -2620,160 +2914,137 @@
            the hub for mining, skinning, etc". Each declares its own; what is possible
            here is the scene's answer. -->
       <div id="cp-actions"></div>
-      <div class="cp-row">
-        <a class="cp-bench" href="/craft/">open the full bench →</a>
+      <!-- The app's own door out of the hub to the full bench. -->
+      <div class="poprow">
+        <a class="v2-btn is-quiet is-small" href="/craft/">Open the full bench</a>
+        <button type="button" class="v2-btn is-quiet is-small" id="craftclose">Close</button>
       </div>
     </div>
-  </footer>
+  </section>
+
+  <!-- The time-skip clock (Lane F, 09-clock.js): inside main so it never covers the
+       sides, and its one sentence for screen readers, in the DOM from load because a
+       live region added at the moment of speaking is not heard. -->
+  <div id="clockpop" aria-hidden="true" hidden></div>
+  <div id="clocksay" class="vh" role="status"></div>
+  <!-- The device is the visible sign of a turn running; this is its sentence. -->
+  <div id="busy" class="vh" role="status">The GM is thinking.</div>
+
+  <!-- Sheet: the full sheet in the centre column, between its two sides (17-tab-sheet.js
+       carries the sheet panel in here while the tab is open). -->
+  <section class="sheetmore" id="sheetmore" aria-label="The rest of the sheet"></section>
+
+  <!-- One sheet, split round the story: who the character is on the left, their numbers
+       on the right (14-sides.js). Below 1180px the two halves become one column; on a
+       phone the sheet is its own tab. -->
+  <div class="sheet" id="sheet">
+    <aside class="side side-who v2-tooled-leather v2-gilt-edge" id="side-who"
+           aria-label="Your character">
+      <!-- The design's portrait frame. The app stores no portrait, so the frame says so
+           and the reason sits under it, clear of the device's steam, which billows up
+           the gutter over this frame's right-hand edge. -->
+      <div class="portrait" id="portrait">
+        <p class="portrait-empty">No portrait yet</p>
+      </div>
+      <p class="portrait-note">Portraits are not kept yet.</p>
+      <h2 class="pcname" id="pc-name"></h2>
+      <p class="pcline" id="pc-line"></p>
+      <p class="pcstate" id="pc-state" hidden></p>
+
+      <h3 class="sidehead v2-groove">In hand and worn</h3>
+      <ul class="loadout" id="loadout"></ul>
+      <p class="purse" id="purse"></p>
+      <button type="button" class="v2-btn door" id="open-equipment">Equipment</button>
+      <!-- The bench, from the sheet as before (/craft/). -->
+      <a class="v2-btn door" href="/craft/">Crafting bench</a>
+      <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
+      <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
+    </aside>
+
+    <aside class="side side-numbers v2-tooled-leather v2-gilt-edge" id="panels"
+           aria-label="Your numbers and the scene">
+      <h3 class="sidehead v2-groove first">Life</h3>
+      <div class="life" id="life"></div>
+
+      <h3 class="sidehead v2-groove">Abilities</h3>
+      <ul class="medals" id="medals"></ul>
+
+      <h3 class="sidehead v2-groove glanceonly">Defence</h3>
+      <dl class="plaques glanceonly" id="defence"></dl>
+      <div class="glanceonly" id="defence-more"></div>
+
+      <h3 class="sidehead v2-groove glanceonly">Saves</h3>
+      <dl class="plaques glanceonly" id="saves"></dl>
+
+      <h3 class="sidehead v2-groove">Experience</h3>
+      <div class="xp" id="xp"></div>
+
+      <!-- The scene and the rolls, as the two disclosures the old column carried (07):
+           folded or open, remembered per viewer. -->
+      <section class="panel" id="panel-scene" data-panel="scene" aria-labelledby="panel-scene-title">
+        <div class="panelhead">
+          <button type="button" class="paneltoggle" id="panel-scene-title" aria-expanded="true"
+                  aria-controls="panel-scene-body">In the scene</button>
+        </div>
+        <div class="panelbody" id="panel-scene-body">
+          <!-- Turn order, only while a fight is on. -->
+          <div id="order"></div>
+          <div id="board"></div>
+          <!-- Filled only when the GM view house rule is on; the server decides, so the
+               seams cannot leak into an ordinary session through a front-end mistake. -->
+          <div id="gmview"></div>
+        </div>
+      </section>
+      <section class="panel" id="panel-rolls" data-panel="rolls" aria-labelledby="panel-rolls-title">
+        <div class="panelhead">
+          <button type="button" class="paneltoggle" id="panel-rolls-title" aria-expanded="true"
+                  aria-controls="panel-rolls-body">Rolls</button>
+        </div>
+        <div class="panelbody" id="panel-rolls-body">
+          <div id="rolls"></div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <!-- The conversation tray (Lane F, 08-conversation.js; owner Q42): what was said, per
+       person, and the live controls, Ignore and Take your leave, in #talk BELOW the log's
+       scroll region, never inside it: Disco Elysium's log held its live choices, and
+       scrolling back left players unable to reach them. It takes the numbers' column, so
+       it covers nothing of the book or the pen; with the sheet hidden it takes a column
+       of its own; on a phone, the whole stage. -->
+  <section id="talktray" class="talk" aria-labelledby="talktray-title" inert>
+    <div class="traybar">
+      <h2 id="talktray-title">Conversation</h2>
+      <button type="button" id="talkclose" class="quiet">Close</button>
+    </div>
+    <div id="convo" hidden>
+      <div id="convo-people" role="group" aria-label="Whose words to show"></div>
+      <div id="convo-log" role="log" aria-live="off" aria-labelledby="talktray-title"
+           tabindex="0"></div>
+      <button type="button" id="convo-latest" class="quiet" hidden>Go to the latest line</button>
+    </div>
+    <!-- The conversation, while there is one (2026-09-24): who is in it, how each of them
+         stands towards you, and the one button that ends it. Engine-held state; the button
+         posts straight to the engine with no model call, because an exit that has to be
+         noticed by a narrator is an exit that sometimes is not. -->
+    <div id="talk" hidden></div>
+    <p class="trayempty" id="convo-empty">Nobody has spoken with you yet. What people say to
+      you, and what you say back, is kept here.</p>
+  </section>
 </main>
 
-<!-- The column, as four panels (docs/design-f-ui.md §4.1; 07-panels.js drives it; the
-     conversation left it for a tray of its own, owner Q42).
-     Every id the renderers write into moved here unchanged, so none of them changed.
-     The order is fixed and never rearranged by the page: text that moves under a reader
-     is worse than text left where it was. Several panels show at once, so the bar is a
-     toolbar of toggles and each panel a disclosure, not a set of tabs. -->
-<aside id="panels" aria-label="Your character and the scene">
-  <div id="panelbar" role="toolbar" aria-label="Panels">
-    <button type="button" class="panelbtn" data-panel="sheet" aria-pressed="true"
-            aria-controls="panel-sheet">Sheet</button>
-    <button type="button" class="panelbtn" data-panel="scene" aria-pressed="true"
-            aria-controls="panel-scene">Scene</button>
-    <button type="button" class="panelbtn" data-panel="map" aria-pressed="true"
-            aria-controls="panel-map">Map</button>
-    <button type="button" class="panelbtn" data-panel="rolls" aria-pressed="true"
-            aria-controls="panel-rolls">Rolls</button>
-    <!-- Desktop only: the story takes the full width and the panels open from the
-         right edge, as on a phone. 07 writes its label. -->
-    <button type="button" id="panelmode" aria-controls="panels">Hide the column</button>
+<!-- The tabs that take the whole page. Each is one container; its script (16-21) fills it
+     or carries the panel it needs into it. -->
+<section class="modepage" id="mode-trade" role="tabpanel" aria-labelledby="tab-trade" hidden>
+  <!-- Nobody here keeps a counter: said, not hidden (20-tab-trade.js). -->
+  <div class="v2-framed v2-card-leather notice" id="trade-none" hidden>
+    <i class="v2-rim" aria-hidden="true"></i>
+    <h2>At the counter</h2>
+    <p id="trade-none-why"></p>
+    <p>Buy and sell here when a shop or a stall is open to you. What you buy goes into
+      your pack, and you put it on from Equipment.</p>
   </div>
-
-  <section class="panel" id="panel-sheet" data-panel="sheet" aria-labelledby="panel-sheet-title">
-    <div class="panelhead">
-      <button type="button" class="paneltoggle" id="panel-sheet-title" aria-expanded="true"
-              aria-controls="panel-sheet-body">Sheet</button>
-      <button type="button" class="panelclose" aria-label="Close the sheet panel"
-              title="Close the sheet panel">✕</button>
-    </div>
-    <div class="panelbody" id="panel-sheet-body">
-      <div id="sheet"></div>
-    </div>
-  </section>
-
-  <section class="panel" id="panel-scene" data-panel="scene" aria-labelledby="panel-scene-title">
-    <div class="panelhead">
-      <button type="button" class="paneltoggle" id="panel-scene-title" aria-expanded="true"
-              aria-controls="panel-scene-body">In the scene</button>
-      <button type="button" class="panelclose" aria-label="Close the scene panel"
-              title="Close the scene panel">✕</button>
-    </div>
-    <div class="panelbody" id="panel-scene-body">
-      <!-- Turn order, only while a fight is on. -->
-      <div id="order"></div>
-      <div id="board"></div>
-      <!-- Filled only when the GM view house rule is on; the server decides, so the seams
-           cannot leak into an ordinary session through a front-end mistake. -->
-      <div id="gmview"></div>
-    </div>
-  </section>
-
-  <!-- The conversation is not a panel (owner, Q42, 2026-09-28): "it should be openable
-       and closeable while the buttons to ignore or leave conversation should be there as
-       well. It should be removed from the panel." It is the tray after #maptray. -->
-
-  <section class="panel" id="panel-map" data-panel="map" aria-labelledby="panel-map-title">
-    <div class="panelhead">
-      <button type="button" class="paneltoggle" id="panel-map-title" aria-expanded="true"
-              aria-controls="panel-map-body">Map</button>
-      <button type="button" class="panelclose" aria-label="Close the map panel"
-              title="Close the map panel">✕</button>
-    </div>
-    <div class="panelbody" id="panel-map-body">
-      <div id="mapwrap"></div>
-      <p class="panelempty">No ground is mapped yet. The map is drawn from wherever you
-        are standing, as soon as you are standing somewhere.</p>
-    </div>
-  </section>
-
-  <section class="panel" id="panel-rolls" data-panel="rolls" aria-labelledby="panel-rolls-title">
-    <div class="panelhead">
-      <button type="button" class="paneltoggle" id="panel-rolls-title" aria-expanded="true"
-              aria-controls="panel-rolls-body">Rolls</button>
-      <button type="button" class="panelclose" aria-label="Close the rolls panel"
-              title="Close the rolls panel">✕</button>
-    </div>
-    <div class="panelbody" id="panel-rolls-body">
-      <div id="rolls"></div>
-    </div>
-  </section>
-
-  <p class="panelempty" id="panelsnone">Every panel is closed. Choose one in the bar
-    above to bring it back.</p>
-</aside>
-
-<!-- The map, big enough to read. A tab on the left edge rather than a button in the
-     panel, so it is reachable whether or not the ground is currently drawn there. -->
-<button id="maptab" title="The map">MAP</button>
-<!-- The drawer's way in: shown only in drawer mode (a phone, or a desktop that hid the
-     column). In column mode the panels are simply there, and a tab would be a button
-     that scrolls you to something already on screen. Sheet always; Scene while a fight
-     is on. The conversation has its own tab on the left, under the map's.
-     Upper-case to match the map's tab on the other edge. -->
-<div id="edgetabs" role="group" aria-label="Open a panel">
-  <button type="button" class="edgetab" id="sheettab" data-panel="sheet" data-name="Sheet"
-          aria-controls="panels" aria-expanded="false" title="Your character">SHEET</button>
-  <button type="button" class="edgetab" data-panel="scene" data-name="Scene"
-          aria-controls="panels" aria-expanded="false" title="In the scene"
-          hidden>SCENE</button>
-</div>
-<div id="maptray">
-  <div class="traybar"><b>The ground</b>
-    <button id="mapclose" title="Close">✕</button></div>
-  <div id="maptrayinner"></div>
-</div>
-
-<!-- The conversation tray (Lane F, 08-conversation.js; owner Q42). The map tray's idiom:
-     a tab on the left edge and a slide-over, open and closed by the player. It holds what
-     was said, per person, and the live controls, Ignore and Take your leave, in #talk
-     BELOW the log's scroll region, never inside it: Disco Elysium's log held its live
-     choices, and scrolling back left players unable to reach them. On a phone a
-     conversation starting counts on the tab and never opens the tray over the story. -->
-<button type="button" id="talktab" aria-controls="talktray" aria-expanded="false"
-        title="The conversation">TALK<span class="edgecount" hidden></span></button>
-<section id="talktray" aria-labelledby="talktray-title" inert>
-  <div class="traybar">
-    <h2 id="talktray-title">Conversation</h2>
-    <button type="button" id="talkclose" class="quiet">Close</button>
-  </div>
-  <div id="convo" hidden>
-    <div id="convo-people" role="group" aria-label="Whose words to show"></div>
-    <div id="convo-log" role="log" aria-live="off" aria-labelledby="talktray-title"
-         tabindex="0"></div>
-    <button type="button" id="convo-latest" class="quiet" hidden>Go to the latest line</button>
-  </div>
-  <!-- The conversation, while there is one (2026-09-24): who is in it, how each of them
-       stands towards you, and the one button that ends it. Engine-held state; the button
-       posts straight to the engine with no model call, because an exit that has to be
-       noticed by a narrator is an exit that sometimes is not. -->
-  <div id="talk" hidden></div>
-  <p class="trayempty" id="convo-empty">Nobody has spoken with you yet. What people say to
-    you, and what you say back, is kept here.</p>
-</section>
-
-<div id="veil"><div class="popup" id="popup"></div></div>
-
-<div id="deathveil">
-  <div class="deathpanel">
-    <h2 id="deathtitle">Dead</h2>
-    <p id="deathtext"></p>
-    <h3>Who plays next?</h3>
-    <div class="deathscroll">
-      <div id="deathchoices"></div>
-      <div id="deathroster"></div>
-    </div>
-  </div>
-</div>
-
 <div id="tradepanel" aria-hidden="true">
   <div class="sheethead">
     <h1 id="tradename">At the counter</h1>
@@ -2819,7 +3090,16 @@
     </section>
   </div>
 </div>
+</section>
 
+<section class="modepage" id="mode-equipment" role="tabpanel" aria-labelledby="tab-equipment"
+         hidden>
+  <!-- Equipment is the sheet's own Equipment and Inventory pages for now (18), with only
+       the actions they already had. Said plainly where the design expects more: the
+       engine has no op for taking armour off or for dropping a thing. -->
+  <p class="modenote" id="equipment-note">Use and wear what you carry here. New things are
+    bought at a counter, in Trade. There is no drop and no take off: the rules have
+    neither yet.</p>
 <div id="sheetpanel" aria-hidden="true">
   <svg class="corner tl" viewBox="0 0 74 74" fill="none" stroke="currentColor" aria-hidden="true">
     <path d="M2 2h70M2 2v70" stroke-width="1.4"/>
@@ -2854,6 +3134,28 @@
   <div class="tabs" id="sheettabs" role="tablist"></div>
   <div class="sheetbody" id="sheetbody"></div>
 </div>
+</section>
+
+<section class="modepage" id="mode-spells" role="tabpanel" aria-labelledby="tab-spells" hidden>
+</section>
+
+<section class="modepage" id="mode-journal" role="tabpanel" aria-labelledby="tab-journal"
+         hidden>
+</section>
+
+<div id="veil"><div class="popup" id="popup"></div></div>
+
+<div id="deathveil">
+  <div class="deathpanel">
+    <h2 id="deathtitle">Dead</h2>
+    <p id="deathtext"></p>
+    <h3>Who plays next?</h3>
+    <div class="deathscroll">
+      <div id="deathchoices"></div>
+      <div id="deathroster"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 // The two things the play table's scripts need from the server, handed over once.
@@ -2878,6 +3180,19 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/09-clock.js' %}"></script>
 <script src="{% asset 'js/table/10-spells.js' %}"></script>
 <script src="{% asset 'js/table/11-exits.js' %}"></script>
+<!-- The rebuild's shell (stage 1, docs/table-rebuild-inventory.md): the tabs, the device
+     and its measured points, the two sides, the book's head, then one script per tab. -->
+<script src="{% asset 'js/table/12-shell.js' %}"></script>
+<script src="{% asset 'img/v2/device-geometry.js' %}"></script>
+<script src="{% asset 'js/table/13-device.js' %}"></script>
+<script src="{% asset 'js/table/14-sides.js' %}"></script>
+<script src="{% asset 'js/table/15-book.js' %}"></script>
+<script src="{% asset 'js/table/16-tab-map.js' %}"></script>
+<script src="{% asset 'js/table/17-tab-sheet.js' %}"></script>
+<script src="{% asset 'js/table/18-tab-equipment.js' %}"></script>
+<script src="{% asset 'js/table/19-tab-spells.js' %}"></script>
+<script src="{% asset 'js/table/20-tab-trade.js' %}"></script>
+<script src="{% asset 'js/table/21-tab-journal.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>
