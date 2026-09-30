@@ -2426,7 +2426,10 @@
          border-radius: 3px; box-shadow: var(--bevel), var(--sh-3); }
   .pop[hidden] { display: none; }
   .poprow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  #craftpanel { margin: 0; }
+  /* Held to the book's height above the desk (the book keeps at least 45% of the stage)
+     and scrolled inside: with every craft's eighteen ways of getting material the hub
+     measured 584px and its top, the ground's name, ran 45px off the window at 1440x900. */
+  #craftpanel { margin: 0; max-height: calc(45dvh - 50px); overflow-y: auto; }
 
   /* The combat bar: a fight is its own state, at the top of the desk, in the alarm's
      border it has always worn. */
