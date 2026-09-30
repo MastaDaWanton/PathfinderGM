@@ -46,9 +46,14 @@ const talkIsOpen = () => { const t = talkTray(); return !!(t && t.classList.cont
 // player saw nothing at all.
 function flash(message) {
   const err = document.getElementById("err");
-  if (!err) return;
-  err.textContent = String(message || "");
-  err.className = "";
+  if (err) {
+    err.textContent = String(message || "");
+    err.className = "";
+  }
+  // And in the tray's own line above the two buttons, held open for it, where the player
+  // who pressed one is looking: on a phone the tray covers the desk and #err with it.
+  const line = document.getElementById("talksay");
+  if (line) line.textContent = String(message || "");
 }
 
 function convoGame(s) {
@@ -159,7 +164,7 @@ function drawConvoPeople(s, view) {
   if (!box) return;
   const here = CONVO.people.filter(p => p.talking || p.present);
   const away = CONVO.people.filter(p => !p.talking && !p.present);
-  const btn = (id, label, full) => `<button type="button" data-convo="${esc(id)}"
+  const btn = (id, label, full) => `<button type="button" class="v2-btn" data-convo="${esc(id)}"
       aria-pressed="${view === id}" title="${esc(full || label)}">${esc(label)}</button>`;
   let html = btn("all", "Everyone", "Everything said with the people here")
     + here.map(p => btn(p.ref, capFirst(p.name), p.name)).join("");
@@ -192,7 +197,7 @@ function drawConvoLog(view, toFoot) {
   const list = convoList(view);
   const first = list.length ? list[0].n : 0;
   const more = !CONVO.done.has(view) && (!list.length || first > 1);
-  const html = (more ? `<button type="button" class="quiet convo-more" data-convo-more="${
+  const html = (more ? `<button type="button" class="v2-btn is-quiet is-small convo-more" data-convo-more="${
     esc(view)}">Show earlier lines</button>` : "")
     + (list.length ? convoRows(list, view)
        : `<p class="trayempty">Nothing said with ${view === "all" ? "anybody here"
@@ -230,7 +235,9 @@ function paintTalkTab() {
   if (!tab) return;
   const n = talkIsOpen() ? 0 : convoUnread();
   const count = tab.querySelector(".edgecount");
-  if (count) { count.textContent = n ? String(n) : ""; count.hidden = !n; }
+  // "2 new", as the approved design words it (the mock README: "the Talk button counts
+  // new lines"), where a bare "2" beside Talk could be read as two people.
+  if (count) { count.textContent = n ? `${n} new` : ""; count.hidden = !n; }
   // The name starts with the word on the button, so a voice user saying "Talk" reaches
   // it (WCAG 2.5.3); the old edge tab said "Conversation" and showed "TALK".
   tab.setAttribute("aria-label", n ? `Talk, ${n} new` : "Talk");
@@ -303,6 +310,11 @@ onRender(function conversationTray(s, prev) {
   CONVO.seq = convo.seq || 0;
   CONVO.people = convo.people || [];
   convoMerge(convo.recent);
+  // A mark past the log's own counter was left by an earlier log under the same world and
+  // name (a character begun again): measured 2026-09-30, an earlier game's mark of 10 left
+  // this game's lines 2 to 5 uncounted, and would have kept every line up to the tenth from
+  // counting as new. It is no mark at all.
+  if (CONVO.seen !== null && CONVO.seen > CONVO.seq) CONVO.seen = null;
   // A viewer this page has never seen starts with the history read, not counted as new.
   if (CONVO.seen === null) { CONVO.seen = convoNewest(); convoWriteSeen(game, CONVO.seen); }
 

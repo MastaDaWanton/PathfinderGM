@@ -296,16 +296,25 @@ function renderTalk(s) {
   const talk = (s.scene && s.scene.talk) || [];
   box.hidden = !talk.length;
   if (!talk.length) { box.innerHTML = ""; return; }
-  box.innerHTML = `<div class="talkhead">In conversation</div>` + talk.map(t => {
-    const pct = Math.max(0, Math.min(100, Math.round(100 * t.regard / (t.regard_max || 100))));
+  // The tray's foot, as the approved design draws it (the mock's `.talkfoot`): a line held
+  // open for the answer to either button (08's `flash`), so one arriving never moves them;
+  // each person "In conversation with" and their Ignore; Take your leave last. The regard
+  // bar only while the state carries a regard (the mock's recording had none, and drew the
+  // row without it).
+  box.innerHTML = `<p class="talksay" id="talksay" aria-live="polite"></p>` + talk.map(t => {
+    const has = typeof t.regard === "number";
+    const max = t.regard_max || 100;
+    const pct = has ? Math.max(0, Math.min(100, Math.round(100 * t.regard / max))) : 0;
+    const how = [t.attitude || "", has ? `regard ${t.regard} of ${max}` : ""].filter(Boolean);
     return `<div class="talker">
-      <div class="talkwho"><b>${esc(t.name)}</b> <small>${esc(t.attitude)} · ${t.regard} of ${
-        t.regard_max || 100}</small></div>
-      <div class="regard"><i style="width:${pct}%"></i></div>
-      <button type="button" class="quiet talkignore" data-ignore="${esc(t.ref)}"
-              title="Do not answer them">Ignore</button>
+      <p class="talkwho">In conversation with <b>${esc(t.name)}</b>${
+        how.length ? ` <small>${esc(how.join(", "))}</small>` : ""}</p>
+      <button type="button" class="v2-btn is-quiet is-small talkignore" data-ignore="${esc(t.ref)}"
+              title="Do not answer them">Ignore</button>${has ? `
+      <div class="regard" role="img" aria-label="Regard ${t.regard} of ${max}"><i style="width:${
+        pct}%"></i></div>` : ""}
     </div>`;
-  }).join("") + `<button type="button" class="quiet" id="takeleave"
+  }).join("") + `<button type="button" class="v2-btn is-quiet" id="takeleave"
       title="End the conversation">Take your leave</button>`;
 }
 
