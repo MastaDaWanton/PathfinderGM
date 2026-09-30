@@ -556,3 +556,19 @@ def test_the_phone_is_the_designs_phone():
     # The tabs that take the whole page hold framed cards too: the Trade tab's notice
     # widened a 375px page to 397px until its page was clipped the same way (measured).
     assert "overflow-x: clip" in _rule(_css(), "  .modepage")
+    # The combat bar's one sideways row of buttons made the bar wider than the desk, and
+    # its hint was cut off at "just type below fo" (measured at 375).
+    assert ".choices > * { min-width: 0; }" in _css()
+
+
+def test_the_craft_hub_opens_over_the_story_and_stays_in_the_window():
+    """The hub is a popover anchored to the desk, so nothing in the desk moves when it
+    opens (the exits row measured 563px before and after); held to the book's height and
+    scrolled inside, because with every craft's ways listed it measured 584px and ran 45px
+    off the top of a 1440x900 window. Its door to the full bench is inside it."""
+    css = _css()
+    assert "bottom: calc(100% + 10px)" in _rule(css, "  .pop")
+    hub = _rule(css, "  #craftpanel")
+    assert "max-height: calc(45dvh - 50px)" in hub and "overflow-y: auto" in hub
+    html = Client().get("/play/").content.decode("utf-8")
+    assert 'id="craftpanel" class="pop"' in html and 'id="craftclose"' in html

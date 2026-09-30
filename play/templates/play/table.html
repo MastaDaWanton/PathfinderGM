@@ -2328,6 +2328,10 @@
           box-shadow: var(--emboss), var(--sh-2); }
   .choices { display: grid; gap: 10px; min-height: 0; overflow-y: auto; align-content: start; }
   .choices > :empty, .choices > [hidden] { display: none; }
+  /* A grid item is as wide as its widest line unless told otherwise: on a phone the
+     combat bar's one sideways row of buttons made the bar wider than the desk, and its
+     hint line was cut off at "just type below fo" (measured at 375). */
+  .choices > * { min-width: 0; }
   #err { font: 15px/1.45 var(--body); color: var(--alarm); max-width: 70ch; }
   #err:empty { display: none; }
   #err.hint { color: var(--ink); font-style: italic; }
