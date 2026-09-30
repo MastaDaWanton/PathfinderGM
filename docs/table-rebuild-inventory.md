@@ -131,12 +131,12 @@ The owner's rulings cited below are in `docs/mock/table-layout/README.md` (READM
 | D3 | The popup fallback veil | `#veil`, `#popup` | built | `id="veil"` |
 | D4 | The time-skip clock for an hour or more, on this page's own post | `#clockpop` inside `main`, 09-clock.js | built | `id="clockpop"` |
 | D5 | The clock's sentence for a screen reader | `#clocksay` | built | `id="clocksay"` |
-| T1 | The conversation tray, opened and closed by the player | `#talktray` in the numbers' column (its own column with the sheet hidden; the whole stage on a phone) | carried-3 | `id="talktray"` |
-| T2 | Whose words: Everyone, the people here, earlier conversations | `#convo-people` | carried-3 | `id="convo-people"` |
-| T3 | The log, paged back with "Show earlier lines" | `#convo-log` | carried-3 | `id="convo-log"` |
-| T4 | Go to the latest line | `#convo-latest` | carried-3 | `id="convo-latest"` |
-| T5 | Ignore and Take your leave, below the log | `#talk` (02's `renderTalk`) | carried-3 | `id="takeleave"` |
-| T6 | The regard bars | `.regard` | carried-3 | `class="regard"` |
+| T1 | The conversation tray, opened and closed by the player | `#talktray` in the numbers' column (its own column with the sheet hidden; the whole stage on a phone), in the design's gilt-edged leather (stage 3) | built | `id="talktray"` |
+| T2 | Whose words: Everyone, the people here, earlier conversations | `#convo-people`, pressed-in buttons and the earlier-conversations list | built | `id="convo-people"` |
+| T3 | The log, paged back with "Show earlier lines" | `#convo-log`, a sunk page of its own, dialogue only | built | `id="convo-log"` |
+| T4 | Go to the latest line | `#convo-latest`, floating over the log's foot | built | `id="convo-latest"` |
+| T5 | Ignore and Take your leave, below the log | `#talk` (02's `renderTalk`): "In conversation with" each person and their Ignore, then Take your leave, under a line held open for the answer (`#talksay`) | built | `id="takeleave"` `id="talksay"` |
+| T6 | The regard bars | `.regard`, drawn only when the state carries a regard | built | `class="regard"` |
 | T7 | The new-lines badge, never opening the tray by itself | `.edgecount` inside `#talktab` | built | `class="edgecount` |
 
 ## The panels
@@ -171,13 +171,13 @@ The owner's rulings cited below are in `docs/mock/table-layout/README.md` (READM
 
 | # | Item | Where it goes | Stage 1 | Anchor |
 |---|---|---|---|---|
-| M1 | The flat board (stone relief, reach wash, tokens by side, crowds, blood pools, spell areas) | the Map tab's board, `#mapwrap` (03's `renderMap`) | carried-3 | `id="mapwrap"` |
-| M2 | The 3D board, turned in quarter turns | Map tab, `Scene3D.render` | carried-3 | `data-mapturn` |
-| M3 | The floors ("the floor", "+10 ft") | Map tab head, `data-maplevel` | carried-3 | `data-maplevel` |
-| M4 | The place's name and what it is made of | Map tab head and foot | carried-3 | `The ground` |
+| M1 | The flat board (stone relief, reach wash, tokens by side, crowds, blood pools, spell areas) | the Map tab's board, `#mapwrap` (03's `renderMap`), filling the stone well | built | `id="mapwrap"` |
+| M2 | The 3D board, turned in quarter turns | Map tab, `Scene3D.render`, its turn in the head row's `#groundctl` | built | `data-mapturn` |
+| M3 | The floors ("the floor", "+10 ft") | Map tab head, `data-maplevel` in `#groundctl` ("Looking at") | built | `data-maplevel` |
+| M4 | The place's name and what it is made of | Map tab head (`#board-name`) and foot | built | `The ground` |
 | M5 | The map tray, its MAP edge tab and its close | removed: Map is a tab (README, "Map is a tab, Talk is a tray") | dropped | `id="maptray"` `id="maptab"` `id="mapclose"` `id="maptrayinner"` |
 | M6 | The map panel's small copy and its open button | removed with the tray: the tab replaces both (README, same section: 18px a square, "legible only as a shape") | dropped | `id="mapopen"` |
-| M7 | The Places chart under the fog | stage 3, reading `scene.places_found` (merged; `play/places_found.py`) | carried-3 | `places_found` |
+| M7 | The Places chart under the fog | the Map tab's Places button, left of Flat and 3D: 16-places-chart.js draws `scene.places_found`, 16-tab-map.js walks by it, a leg a turn through the place chip | built | `places_found` `id="placesbtn"` `Walk there` |
 
 ## The sheet, the spells page, the trade window, the journal
 
@@ -259,7 +259,11 @@ hidden, reason where a thing is absent":
   `Shell.tab(name, {...})`: `16-tab-map.js`, `17-tab-sheet.js`, `18-tab-equipment.js`,
   `19-tab-spells.js`, `20-tab-trade.js`, `21-tab-journal.js`. Stage 2 replaces 17's and
   18's bodies (the Sheet's combat block, the Equipment page); stage 3 replaces 16's
-  (the Places chart beside Flat and 3D) and restyles `#talktray`.
+  (the Places chart beside Flat and 3D) and restyles `#talktray`. Stage 3 is built: the
+  chart's drawing is its own script, `16-places-chart.js`, loaded before `16-tab-map.js`;
+  the head row (`#board-name`, `#placesbtn`, `#groundctl`) is the board's own markup now,
+  and 03's `renderMap` fills only `#groundctl` and `#mapwrap`
+  (`tests/test_table_places.py`).
 - **The sheet panel is one element, moved.** `#sheetpanel` is carried into whichever of
   Sheet, Equipment, Spells and Journal is open, and scoped with `SHEET_SCOPE` to that
   tab's pages. Stage 2 can drop the move and give each tab its own markup.
