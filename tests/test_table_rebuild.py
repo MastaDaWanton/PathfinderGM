@@ -299,16 +299,23 @@ def test_spells_is_a_casters_tab_by_the_same_rule_as_the_button():
 
 
 def test_equipment_offers_only_what_the_engine_can_do_and_says_so(page):
-    """Equipment carries today's Inventory and Equipment pages with their own actions and
-    nothing more: the engine has no op to take armour off or to drop a thing (the mock
-    README, "What the engine does not know"), so neither is offered, and the page says
-    so rather than leaving the player to look for them."""
+    """Equipment offers the engine's own acts and nothing more: the engine has no op to
+    take armour off or to drop a thing (the mock README, "What the engine does not
+    know"), so neither is offered, and the page says so rather than leaving the player
+    to look for them.
+
+    Stage 1 pinned the carried Inventory and Equipment pages here; stage 2 draws the
+    design's page instead, and its every button is an act the server named
+    (`_carried`'s `acts`), so the page cannot invent one."""
     html, els = page
     note = _one(els, "equipment-note")
     assert _one(els, "mode-equipment") in note["ancestors"]
     assert "There is no drop and no take off" in html
     sheet_tab = (TABLE_SCRIPTS / "17-tab-sheet.js").read_text(encoding="utf-8")
-    assert 'equipment: ["inventory", "equipment"]' in sheet_tab
+    assert 'equipment: "mode-equipment"' in sheet_tab
+    sheet = (TABLE_SCRIPTS / "05-sheet.js").read_text(encoding="utf-8")
+    page_fn = sheet[sheet.index("function pageEquipment("):sheet.index("function slotEditor(")]
+    assert "(r.acts || []).map(" in page_fn, "an Equipment button must be one the server named"
     code = _scripts_code()
     # No endpoint for either and no button offering either (a drag's drop zone on the
     # Spells page is another thing, "data-drop" there is where a spell lands).

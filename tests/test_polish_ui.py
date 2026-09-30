@@ -172,32 +172,36 @@ def test_the_fight_mark_is_styled_readably_and_without_dashes_or_motion():
         assert not any(bad in ln for ln in lines), bad
 
 
-# --- (6) the sheet header and tab strip at phone width ------------------------------------
+# --- (6) the sheet at phone width ----------------------------------------------------------
+# The sheet's own header (sigil, name, Close) and its strip of twelve pages went with the
+# table rebuild's stage 2: the design has no strip, each tab is its own page, and the name
+# is the left panel's (docs/table-rebuild-inventory.md, H4 and H18). What those tests held
+# that still applies is held here.
 
-def test_the_sheet_column_is_held_to_the_screen_and_its_tabs_do_not_shrink():
+def test_the_sheet_column_is_held_to_the_screen_and_its_strip_is_gone():
     """458px of `auto` column on a 375px screen, and tabs shrunk to two letters, were one
     defect seen twice: the column sized to its widest child, and the only thing that
-    could give was the tab labels. Both halves are held here."""
+    could give was the tab labels. The column is still held; the strip is gone, by the
+    ruling its inventory row cites, so it cannot shrink again."""
     page = _read(PAGE)
     assert "#sheetpanel { grid-template-columns: minmax(0, 1fr); }" in page
-    assert "#sheettabs button { flex: 0 0 auto; }" in page
+    assert 'id="sheettabs"' not in page
+    assert "function sheetTabEdges(" not in _read(TABLE / "05-sheet.js")
 
 
 def _phone_block() -> str:
     page = _read(PAGE)
     start = page.index("--- The sheet on a phone")
-    return page[start:page.index(".sheetbody { overflow-y: auto;", start)]
+    return page[start:page.index("  .cols {", start)]
 
 
-def test_the_sheet_header_wraps_on_a_phone_with_close_beside_the_name():
-    """Close was off the right edge at 375px. On a phone the header wraps: the name
-    takes what is left beside Close, and the identity line and anything the sheet has
-    to say (the gender prompt, an error) take their own full lines under them."""
+def test_the_sheet_note_gives_the_prompt_and_an_error_their_own_lines_on_a_phone():
+    """Close was off the right edge at 375px while the sheet had a header. What sat in it
+    and still has something to say (the gender prompt, a refusal) is the note line above
+    every sheet page now, and on a phone each takes a full line of its own."""
     block = _phone_block()
     assert "@media (max-width: 760px)" in block
-    assert re.search(r"#sheetpanel \.sheethead \{[^}]*flex-wrap: wrap", block)
-    assert re.search(r"#sheetpanel \.sheethead h1 \{[^}]*min-width: 0", block)
-    for full in (".meta", "#genderask", "#sheeterr"):
+    for full in ("#genderask", "#sheeterr"):
         assert re.search(re.escape(full) + r" \{[^}]*flex-basis: 100%", block), full
 
 
@@ -211,49 +215,16 @@ def test_the_gender_prompt_is_styled_in_the_stylesheet_not_inline():
     assert re.search(r"#genderask \{ flex: 1; display: flex;", _read(PAGE))
 
 
-def test_the_sigil_goes_in_the_sheets_own_header():
+def test_the_prompt_goes_in_the_sheets_own_note_not_the_counters_header():
     """Found measuring the phone header: the sheet's sigil was 0x0 because the bare
     `$(".sheethead")` matched the trade panel's header, which is earlier in the page, so
-    the counter wore the sheet's sigil. The same trap askGender already names."""
+    the counter wore the sheet's sigil. The sigil is gone; the prompt it sat beside is
+    scoped to the sheet panel the same way."""
     code = _read(TABLE / "05-sheet.js")
-    assert '$("#sheetpanel .sheethead").insertAdjacentHTML("afterbegin"' in code
-    assert '$(".sheethead").insertAdjacentHTML' not in code
-
-
-def test_the_tab_strip_scrolls_as_one_row_and_shows_it_has_more():
-    """One sideways row with a visible scrollbar and a fade on whichever edge has more
-    past it, rather than three or four wrapped rows (about 1285px of labels at 375px)."""
-    block = _phone_block()
-    assert "scrollbar-width: thin" in block
-    for edge in ("#sheettabs.more-right", "#sheettabs.more-left"):
-        assert edge in block and "mask-image" in block[block.index(edge):]
-    assert "#sheettabs button:focus-visible" in _read(PAGE), \
-        "the page's focus ring is a box-shadow the scroller clips; the tab draws its own"
-
-
-@needs_node
-def test_the_strip_fades_only_the_edges_that_have_more(tmp_path):
-    """Measured, not assumed: a strip that fits fades nothing; at the start only the
-    right edge; in the middle both; at the end only the left."""
-    code = _read(TABLE / "05-sheet.js")
-    fn = code[code.index("function sheetTabEdges()"):]
-    fn = fn[:fn.index("\n}\n") + 3]
-    cases = [(375, 375, 0), (1285, 375, 0), (1285, 375, 400), (1285, 375, 910)]
-    got = _node(tmp_path, r"""
-      const out = [];
-      let STRIP;
-      const document = { getElementById: () => STRIP };
-      """ + fn + f"""
-      for (const [sw, cw, left] of {json.dumps(cases)}) {{
-        const on = new Set();
-        STRIP = {{ scrollWidth: sw, clientWidth: cw, scrollLeft: left,
-                  classList: {{ toggle(c, v) {{ v ? on.add(c) : on.delete(c); }} }} }};
-        sheetTabEdges();
-        out.push([...on].sort());
-      }}
-      console.log(JSON.stringify(out));
-    """)
-    assert got == [[], ["more-right"], ["more-left", "more-right"], ["more-left"]]
+    ask = code[code.index("function askGender("):]
+    ask = ask[:ask.index("\n}\n")]
+    assert '$("#sheetpanel #sheetnote")' in ask
+    assert '$(".sheethead")' not in code
 
 
 # --- (8) the 3D map draws the spell areas --------------------------------------------------

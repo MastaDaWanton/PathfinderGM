@@ -53,7 +53,10 @@ MOUNTS = (
 # row: the footer's duplicate Trade button (the Trade tab is the one door), the map tray
 # and its edge tab (Map is a tab), the phone drawer's Sheet edge tab (the Sheet is a tab).
 DROPPED = {"tradeaction": "P16", "maptab": "M5", "maptray": "M5", "mapclose": "M5",
-           "maptrayinner": "M5", "sheettab": "N15"}
+           "maptrayinner": "M5", "sheettab": "N15",
+           # Stage 2: the sheet's own header and its strip of pages, which the design
+           # does not have (each tab is its own page; the name is the left panel's).
+           "sheetname": "H18", "sheetmeta": "H18", "closesheet": "H18", "sheettabs": "H4"}
 
 # Every id the template carried at `phase-1-base` (a5955ef), before the shell. Each one
 # has a renderer or a listener somewhere in static/js/table/ that finds it by id.

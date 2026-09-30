@@ -1,425 +1,210 @@
-// The play table, part 05 of 6 (sheet). Split out of
-// play/templates/play/table.html on 2026-09-25, in the order it ran; the six
-// files are classic scripts, loaded in that order, sharing one global scope.
-// A plain standing figure, drawn here rather than traced from anyone's artwork. It is
-// only a place to hang the slots, so it is deliberately anonymous — no gear, no weapon,
-// no gender, nothing that contradicts whoever the character actually is.
-// One glyph per body slot, drawn as line art. Deliberately simple: they read at 26px,
-// they cost nothing to ship, and they carry no licence. The reference mockup uses
-// rendered metal icons — see the note at the end of the Equipment tab about what
-// swapping these for real artwork would need.
-const SLOT_ICONS = {
-  head:      `<path d="M5 13a7 7 0 0 1 14 0v5l-3 3h-8l-3-3z"/><path d="M12 6v12M5 13h14"/>`,
-  eyes:      `<circle cx="7.5" cy="13" r="4"/><circle cx="16.5" cy="13" r="4"/>
-              <path d="M11.5 13h1M3.5 11 2 9M20.5 11 22 9"/>`,
-  shoulders: `<path d="M8 4h8l4 5-2 12H6L4 9z"/><path d="M8 4c0 3 1.7 5 4 5s4-2 4-5"/>`,
-  body:      `<path d="M9 3h6l4 4-2 3v11H7V10L5 7z"/><path d="M12 3v18"/>`,
-  armor:     `<path d="M12 3 5 6v6c0 5 3 8 7 9 4-1 7-4 7-9V6z"/><path d="M12 3v18M5 11h14"/>`,
-  wrists:    `<path d="M6 8h12v8H6z"/><path d="M6 11h12M6 13h12"/><path d="M9 8V6M15 8V6"/>`,
-  feet:      `<path d="M8 3h4v9l6 4v5H6V8z"/><path d="M8 12h4"/>`,
-  headband:  `<path d="M3 12h18"/><path d="M3 10h18v4H3z"/><path d="m12 10-2 4h4z"/>`,
-  neck:      `<path d="M5 4c2 7 5 9 7 9s5-2 7-9"/><circle cx="12" cy="17" r="4"/>
-              <circle cx="12" cy="17" r="1.4"/>`,
-  chest:     `<path d="M8 4h8l3 4v13H5V8z"/><path d="M12 4v17M9 9h1M14 9h1"/>`,
-  hands:     `<path d="M7 11V6a1.5 1.5 0 0 1 3 0v4M10 10V5a1.5 1.5 0 0 1 3 0v5M13 10V6a1.5 1.5 0 0 1 3 0v5"/>
-              <path d="M16 9a1.5 1.5 0 0 1 3 0v6a6 6 0 0 1-6 6h-2a5 5 0 0 1-4-2l-3-4"/>`,
-  ring:      `<circle cx="12" cy="14" r="6"/><path d="m9 7 3-4 3 4"/><path d="M12 3v4"/>`,
-  belt:      `<path d="M2 9h20v6H2z"/><rect x="9" y="7" width="6" height="10" rx="1"/>
-              <path d="M12 7v10"/>`,
-  shield:    `<path d="M12 2 4 5v7c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V5z"/>
-              <path d="M12 2v20M4 11h16"/>`,
-};
-
-const medallion = key => `<div class="medallion"><svg viewBox="0 0 24 24" fill="none"
-  stroke="currentColor" stroke-width="1.35" stroke-linecap="round"
-  stroke-linejoin="round" aria-hidden="true">${SLOT_ICONS[key] || ""}</svg></div>`;
-
-// The house mark in the header. A blade over a hanging banner — generic on purpose;
-// it is not anyone's heraldry until the campaign has some.
-const SIGIL_SVG = `
-<svg class="sigil" viewBox="0 0 46 62" fill="none" aria-hidden="true">
-  <path d="M6 2h34v40l-17 18L6 42z" fill="currentColor" opacity=".55"/>
-  <path d="M6 2h34v40l-17 18L6 42z" stroke="#8a6f3e" stroke-width="1.2"/>
-  <g stroke="#d9c08a" stroke-width="1.4" stroke-linecap="round">
-    <path d="M23 10v34"/><path d="M17 20h12"/><path d="m23 8-3 4h6z"/>
-  </g>
-</svg>`;
-
-const FIGURE_SVG = `
-<svg viewBox="0 0 200 460" role="img" aria-label="Body slot diagram">
-  <defs>
-    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
-      <stop offset="0%" stop-color="#3a2f1e" stop-opacity=".55"/>
-      <stop offset="100%" stop-color="#0f0d0b" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-  <rect width="200" height="460" fill="url(#glow)"/>
-  <!-- The ring and rays behind the figure: it gives the centre panel somewhere to sit
-       instead of floating in the dark. -->
-  <g stroke="#6b5836" fill="none" opacity=".55">
-    <circle cx="100" cy="196" r="96" stroke-width="1"/>
-    <circle cx="100" cy="196" r="88" stroke-width=".6" stroke-dasharray="2 6"/>
-    <circle cx="100" cy="196" r="66" stroke-width=".6"/>
-    <path d="M100 84 l7 12 -7 12 -7 -12z" stroke-width=".9"/>
-    <path d="M100 308 l7 -12 -7 -12 -7 12z" stroke-width=".9"/>
-    <path d="M4 196h28M196 196h-28" stroke-width=".9"/>
-    <path d="M100 420 q-46 0 -66 -10 M100 420 q46 0 66 -10" stroke-width=".8"/>
-  </g>
-  <g fill="none" stroke="currentColor" stroke-width="2.2"
-     stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="100" cy="42" r="26"/>
-    <path d="M100 68 v22"/>
-    <path d="M62 104 q38 -16 76 0"/>
-    <path d="M62 104 q-6 60 2 96 h72 q8 -36 2 -96"/>
-    <path d="M64 108 q-22 44 -26 92 q-2 14 6 22"/>
-    <path d="M136 108 q22 44 26 92 q2 14 -6 22"/>
-    <path d="M40 226 q-6 12 0 20 q8 8 16 2"/>
-    <path d="M160 226 q6 12 0 20 q-8 8 -16 2"/>
-    <path d="M66 200 q-4 60 2 108 q3 60 6 96"/>
-    <path d="M134 200 q4 60 -2 108 q-3 60 -6 96"/>
-    <path d="M74 404 h22 M126 404 h-22"/>
-    <path d="M68 428 q-10 6 -2 12 h30 q4 -8 -2 -12"/>
-    <path d="M132 428 q10 6 2 12 h-30 q-4 -8 2 -12"/>
-  </g>
-  <g fill="currentColor" opacity=".5">
-    <circle cx="100" cy="26" r="3"/><circle cx="100" cy="52" r="3"/>
-    <circle cx="100" cy="82" r="3"/><circle cx="100" cy="118" r="3"/>
-    <circle cx="100" cy="150" r="3"/><circle cx="100" cy="192" r="3"/>
-    <circle cx="46" cy="238" r="3"/><circle cx="154" cy="238" r="3"/>
-    <circle cx="100" cy="436" r="3"/>
-  </g>
-</svg>`;
-
-// The quest log: the tasks taken up, read off the situation cards of kind quest the
-// engine keeps. Objectives say what to do next; the facts under them say what has
-// happened — Baldur's Gate 3's journal keeps the two apart for the same reason.
-function tabQuests() {
-  const q = (STATE && STATE.quests) || { active: [], finished: [] };
-  const one = (k, done) => `<div class="framed" style="margin:10px 0;padding:10px 14px">
-      <h3 style="margin:0 0 4px">${esc(k.title)}${done ? ` <span class="why">— finished</span>` : ""}</h3>
-      ${k.giver ? `<div class="why">for ${esc(k.giver)}</div>` : ""}
-      <ul style="margin:6px 0 0 18px;padding:0">${k.objectives.map(o =>
-        `<li style="${o.done ? "color:var(--dim);text-decoration:line-through" : ""}">${esc(o.text)}</li>`).join("")}</ul>
-      ${k.reward ? `<div class="why" style="margin-top:6px">promised: ${esc(k.reward)}</div>` : ""}
-      ${k.facts.length ? `<div class="why" style="margin-top:6px">${k.facts.map(esc).join(" · ")}</div>` : ""}
-    </div>`;
-  return `<h3 style="margin-top:0">Underway</h3>
-    ${q.active.length ? q.active.map(k => one(k, false)).join("") : `<p class="why">Nothing taken on yet. When somebody gives you a task and you take it, it is kept here.</p>`}
-    ${q.finished.length ? `<h3 style="margin-top:22px">Finished</h3>${q.finished.map(k => one(k, true)).join("")}` : ""}`;
-}
+// The play table, part 05 (the sheet's pages). Split out of play/templates/play/table.html
+// on 2026-09-25; classic scripts, loaded in order, sharing one global scope.
+//
+// The table rebuild, stage 2 (docs/table-rebuild-inventory.md; the owner's approved
+// design, docs/mock/table-layout/, README in full): each of the Sheet, Equipment, Spells
+// and Journal tabs is one page of the sheet, drawn here into `#sheetbody`, which
+// 17-tab-sheet.js carries into whichever of those tabs is open. The old sheet's twelve
+// pages behind a strip of tabs are gone: the Sheet tab is one column of framed cards
+// (Combat first, then Defence, Skills, Feats, Class, Background), Equipment is the
+// design's shelves, list and Worn and wielded, Spells is the I5 page restyled, and
+// Journal is the matters in play and what people said.
+//
+// Every number drawn here is the engine's, read from `/api/sheet` (rules/sheet.py
+// `full_sheet`, plus play/views.py `_carried` for Equipment). Nothing is added up here:
+// where the engine has no number the page says "not known" (the mock README, "What the
+// engine does not know"), and tests/test_sheet_pages.py runs these functions in node to
+// hold them to it.
 
 const TABS = [
-  ["defense",   "Defense",   s => tabDefense(s)],
-  ["offense",   "Offense",   s => tabOffense(s)],
-  ["skills",    "Skills",    s => tabSkills(s)],
-  ["class",     "Class",     s => tabClass(s)],
-  ["feats",     "Feats & Traits", s => tabFeats(s)],
+  ["sheet",     "Sheet",     s => pageSheet(s)],
+  ["equipment", "Equipment", s => pageEquipment(s)],
   ["spells",    "Spells",    s => tabSpells(s)],
-  ["equipment", "Equipment", s => tabEquipment(s)],
-  ["inventory", "Inventory", s => tabInventory(s)],
-  ["companions","Companions",s => tabEmpty("No animal companion, familiar, cohort or mount.")],
-  ["background","Background",s => tabBackground(s)],
-  ["quests",    "Quests",    s => tabQuests(s)],
-  ["adventures","Adventures",s => tabEmpty("No adventure log yet. Sessions will be recorded here.")],
+  ["journal",   "Journal",   s => pageJournal(s)],
 ];
 
-// Using something you made, from the Inventory tab. Straight to the engine — nothing
-// in drinking your own tea for a model to decide. This handler was lost once already:
-// it lived in the slice a later rewrite replaced wholesale, and the buttons kept
-// rendering over nothing. It lives beside the sheet code it serves now, and
-// tests/test_page_wiring.py pins /api/use into the served page so the next
-// disappearance fails a test instead of a player.
-document.addEventListener("click", async e => {
-  const wearBtn = e.target.closest("[data-wear]");
-  if (wearBtn) {
-    busy(true);
-    try {
-      render(await post("/api/wear", { item: wearBtn.dataset.wear,
-                                       off: !!wearBtn.dataset.off }));
-      $("#sheeterr") && ($("#sheeterr").textContent = "");
-    } catch (err) {
-      // Beside the sheet, not behind it: slot refusals are the reason a click did
-      // nothing, and the full-screen sheet hides #err completely.
-      const box = $("#sheeterr") || $("#err");
-      if (box) box.textContent = err.message;
-    } finally { busy(false); }
-    return;
-  }
-  const btn = e.target.closest("[data-use]");
-  if (!btn) return;
-  btn.disabled = true;
-  const say = document.getElementById("sheeterr");
-  if (say) say.textContent = "";
-  try {
-    const r = await fetch("/api/use", {
-      method: "POST",
-      headers: { "Content-Type": "application/json",
-                 "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
-      body: JSON.stringify({ item: btn.dataset.use, how: btn.dataset.how }),
-    });
-    // Text first: a 500 returns an HTML page, and json() on that throws a parse error
-    // that says nothing — the exact shape of every silent button this app has had.
-    const raw = await r.text();
-    let d = {};
-    try { d = JSON.parse(raw); } catch { d = { error: `HTTP ${r.status}` }; }
-    if (!r.ok) { if (say) say.textContent = d.error || `HTTP ${r.status}`; return; }
-    SHEET = d.sheet;
-    $("#sheetbody").innerHTML = TABS.find(x => x[0] === SHEET_TAB)[2](SHEET);
-    if (say) say.textContent = "";
-    $("#err").innerHTML = `<span style="color:var(--gold)">${esc(d.tell)}</span>`;
-    render(await getState());
-  } catch (err) {
-    if (say) say.textContent = err.message;
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-async function openSheet() {
-  $("#sheetpanel").classList.add("on");
-  $("#sheetpanel").setAttribute("aria-hidden", "false");
-  $("#sheetbody").innerHTML = `<div class="empty">Reading the sheet…</div>`;
-  try {
-    const r = await fetch("/api/sheet");
-    SHEET = await readJSON(r);
-    if (!r.ok) throw new Error(SHEET.error || "could not read the sheet");
-  } catch (e) {
-    $("#sheetbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
-    return;
-  }
-  // Scoped to the sheet, as `askGender` is and for the same reason: the trade panel
-  // reuses `.sheethead` and sits earlier in the document, so the bare selector put the
-  // sheet's sigil in the COUNTER's header (found 2026-09-29 measuring the phone header:
-  // the sheet's sigil was 0x0, and the trade window wore it instead).
-  if (!$("#sheethead-sigil")) {
-    $("#sheetpanel .sheethead").insertAdjacentHTML("afterbegin",
-      `<span id="sheethead-sigil">${SIGIL_SVG}</span>`);
-  }
-  $("#sheetname").textContent = SHEET.identity.name;
-  $("#sheetmeta").textContent =
-    // Gender and pronouns on the sheet, because the narrator reads both and a player
-    // who is being described wrongly needs somewhere to look and see what it was told.
-    [SHEET.identity.heritage, SHEET.identity.race, SHEET.identity.class,
-     SHEET.identity.size, SHEET.identity.gender,
-     SHEET.identity.pronouns].filter(Boolean).join(" · ");
-  // Four characters on the roster predate the field and read they/them, which says
-  // nothing about a body. Silence is what produced the wrong one in the first place, so
-  // an unstated character says so here rather than quietly taking the model's default.
-  askGender(!SHEET.identity.gender);
-  // Only this tab's pages (the table rebuild: Sheet, Equipment, Spells and Journal each
-  // show the sheet panel on their own pages; 17-tab-sheet.js sets the scope), and the
-  // page asked for when it is one of them, else the first.
-  const shown = sheetTabsInScope();
-  if (!shown.some(t => t[0] === SHEET_TAB)) SHEET_TAB = shown[0][0];
-  $("#sheettabs").innerHTML = shown.map(([k, label]) =>
-    `<button role="tab" data-tab="${k}" aria-selected="${k === SHEET_TAB}">${label}</button>`
-  ).join("");
-  // A strip of one page is a label, not a choice; it is still there for its name.
-  $("#sheettabs").classList.toggle("single", shown.length < 2);
-  $("#sheettabs").querySelectorAll("button").forEach(b => {
-    b.onclick = () => { SHEET_TAB = b.dataset.tab; drawSheet(); };
-  });
-  drawSheet();
-  sheetTabEdges();
-}
-
-// On a phone the tab strip is one row that scrolls sideways (table.html, "The sheet on
-// a phone"). Which edges have more past them is read from the strip itself and set as
-// two classes the stylesheet fades, so the strip says "more this way" only when there
-// is. Measured, not assumed: a 1px slack keeps a strip that fits from fading its end.
-function sheetTabEdges() {
-  const strip = document.getElementById("sheettabs");
-  if (!strip) return;
-  const room = strip.scrollWidth - strip.clientWidth;
-  strip.classList.toggle("more-left", room > 1 && strip.scrollLeft > 1);
-  strip.classList.toggle("more-right", room > 1 && strip.scrollLeft < room - 1);
-}
-document.getElementById("sheettabs").addEventListener("scroll", sheetTabEdges,
-                                                      { passive: true });
-window.addEventListener("resize", sheetTabEdges);
-
-// Which of the sheet's pages the open tab shows: every page when nothing has scoped it.
-function sheetTabsInScope() {
-  const scope = (typeof SHEET_SCOPE !== "undefined" && SHEET_SCOPE) || null;
-  const shown = scope ? TABS.filter(t => scope.includes(t[0])) : TABS;
-  return shown.length ? shown : TABS;
-}
-
-// The sheet is a tab of the table now, not a window over it (the table rebuild), so
-// closing it is going back to the Table tab. `sheetAway` is the part that only puts the
-// panel away, for the shell to call when another tab is chosen.
-function sheetAway() {
-  // A spell's details lie over the sheet in the top layer; they go with it.
-  if (typeof detailOpen === "function" && detailOpen()) closeDetail(false);
-  $("#sheetpanel").classList.remove("on");
-  $("#sheetpanel").setAttribute("aria-hidden", "true");
-}
-
-function closeSheet() {
-  if (typeof Shell === "object" && Shell && Shell.sheetBacked()) { Shell.show("table"); return; }
-  sheetAway();
-}
-
-function drawSheet() {
-  $("#sheettabs").querySelectorAll("button").forEach(b =>
-    b.setAttribute("aria-selected", String(b.dataset.tab === SHEET_TAB)));
-  // The chosen tab in view on a strip that scrolls, without moving the page: `nearest`
-  // leaves a tab that is already showing where it is.
-  const chosen = $("#sheettabs").querySelector('[aria-selected="true"]');
-  if (chosen && chosen.scrollIntoView) chosen.scrollIntoView({ block: "nearest", inline: "nearest" });
-  const entry = TABS.find(t => t[0] === SHEET_TAB);
-  $("#sheetbody").innerHTML = entry ? entry[2](SHEET) : "";
-  $("#sheetbody").scrollTop = 0;
-}
-
-// --- shared bits ---
-const termList = t => `<div class="terms">${
-  (t.terms || []).map(m => `<div class="t"><span>${esc(m.source)}</span><b>${sign(m.value)}</b></div>`).join("")
-}</div>`;
-
-const statCard = (title, t, suffix = "") => `
-  <div class="card">
-    <h3>${esc(title)}</h3>
-    <div class="bignum">${sign(t.total)} ${suffix ? `<small>${esc(suffix)}</small>` : ""}</div>
-    ${termList(t)}
-  </div>`;
-
+// --- shared bits ---------------------------------------------------------------------
 const tabEmpty = msg => `<div class="empty">${esc(msg)}</div>`;
+const NOT_KNOWN = `<span class="unknown">not known</span>`;
+// "base 10, Dex +3": the 10 an AC and a CMD start from is a number, not a bonus; a term
+// worth nothing says nothing.
+const termLine = t => ((t && t.terms) || []).filter(m => m.value)
+  .map(m => `${m.source} ${m.source === "base" ? m.value : sign(m.value)}`).join(", ");
+const words = n => ["no", "one", "two", "three", "four", "five", "six"][n] || String(n);
+// A framed card: the theme's gilt ring, clasps and bosses on the card leather.
+const sheetCard = (id, title, body, cls = "") => `
+  <section class="v2-framed v2-card-leather sheetcard${cls ? " " + cls : ""}"
+           aria-labelledby="${id}"><i class="v2-rim" aria-hidden="true"></i>
+    <h2 id="${id}">${title}</h2>${body}
+  </section>`;
+// A number standing on its own plaque, with what it is made of beneath it.
+const stat = (dt, dd, why = "", small = "") => `<div class="stat v2-plaque"><dt>${dt}</dt>
+  <dd>${dd}${small ? ` <small>${small}</small>` : ""}</dd>${
+  why ? `<span class="why">${esc(why)}</span>` : ""}</div>`;
 
-// --- Defense ---
-function tabDefense(s) {
+// --- The Sheet tab --------------------------------------------------------------------
+// "Sheet mode now opens on a Combat card" (the mock README, point 4: "the sheet is
+// missing a ton of information from the available combat maneuvers and weapon attacks").
+function pageSheet(s) {
+  return `<div class="sheetcards">
+    ${combatCard(s)}
+    ${defenceCard(s)}
+    ${skillsCard(s)}
+    ${featsCard(s)}
+    ${classCard(s)}
+    ${backgroundCard(s)}
+  </div>`;
+}
+
+// Initiative, base attack, CMB, CMD and speed, each with its terms; every carried weapon,
+// each swing of a full attack at its own bonus; the full attack in a sentence; all ten
+// manoeuvres and feint.
+function combatCard(s) {
+  const o = s.offense, d = s.defense;
+  const speed = d.speed || {};
+  const attacks = (o.attacks || []).slice()
+    .sort((a, b) => (b.equipped ? 1 : 0) - (a.equipped ? 1 : 0));
+  const hands = a => (a.hands === 2 ? "two-handed" : a.light ? "light" : "one-handed");
+  const rows = attacks.map(a => {
+    const notes = [hands(a), a.finessable ? "finesse" : "", ...(a.traits || []),
+                   a.weight_lb != null ? `${a.weight_lb} lb` : ""].filter(Boolean);
+    const thrown = a.category === "melee" && a.range_ft;
+    const swings = (a.swings && a.swings.length ? a.swings : [a.attack.total]).map(sign);
+    // data-label: on a phone each row folds into a small card that says what each is.
+    return `<tr class="${a.equipped ? "inhand" : ""}">
+      <td class="lead"><b>${esc(a.name)}</b>${a.equipped ? `<span class="chip">in hand</span>` : ""}${
+        a.proficient ? "" : `<span class="chip warn">not proficient</span>`}</td>
+      <td class="n" data-label="To hit">${swings.join(" / ")}<span class="why">${
+        esc(termLine(a.attack)) || "no bonus"}</span></td>
+      <td class="n" data-label="Damage">${esc(a.damage_dice)}${a.damage.total ? sign(a.damage.total) : ""}<span
+        class="why">${esc(a.type_text || a.type)}</span></td>
+      <td class="n" data-label="Critical">${esc(a.crit)}</td>
+      <td data-label="Range">${a.range_ft ? `${a.range_ft} ft${thrown ? ", thrown" : ""}`
+        : a.category === "melee" ? `<span class="why">melee</span>` : NOT_KNOWN}${
+        thrown ? `<span class="why"><span class="unknown">thrown to-hit not known</span></span>` : ""}</td>
+      <td class="wide" data-label="Notes"><span class="why">${esc(notes.join(", "))}</span></td>
+    </tr>`;
+  }).join("");
+  const held = attacks.find(a => a.equipped);
+  const heldSwings = held && held.swings && held.swings.length ? held.swings : null;
+  const full = held && heldSwings
+    ? `Full attack with the ${esc(held.name)}: ${words(heldSwings.length)} swing${
+      heldSwings.length === 1 ? "" : "s"}, at ${heldSwings.map(sign).join(" then ")}.`
+    : "Full attack: nothing in hand.";
+  const man = (o.maneuvers || []).map(m => {
+    const limits = [m.size_limit != null ? "no more than one size larger" : "",
+                    m.two_hands ? "needs both hands free" : ""].filter(Boolean).join("; ");
+    return `<tr><td class="lead"><b>${esc(m.name)}</b></td>
+      <td class="n" data-label="Bonus">${sign(m.cmb.total)}</td>
+      <td data-label="Provokes">${m.provokes ? "Yes" : "No"}</td>
+      <td class="wide" data-label="On success">${esc(m.effect)}</td>
+      <td class="wide${limits ? "" : " none"}" data-label="Limits"><span class="why">${
+        esc(limits)}</span></td></tr>`;
+  }).join("");
+  const f = o.feint || {};
+  const feint = `<tr><td class="lead"><b>feint</b></td>
+    <td class="n" data-label="Bonus">${f.usable && f.total != null ? sign(f.total) : NOT_KNOWN}<span
+      class="why">Bluff</span></td>
+    <td data-label="Provokes">${NOT_KNOWN}</td>
+    <td class="wide" data-label="On success">Rolled as a Bluff check. The target losing its
+      Dexterity to AC is <span class="unknown">not in the rules yet</span>.</td>
+    <td class="wide none" data-label="Limits"></td></tr>`;
+  return sheetCard("sc-combat", "Combat", `
+    <dl class="statrow">
+      ${stat("Initiative", sign(o.initiative.total), termLine(o.initiative))}
+      ${stat("Base attack", sign(o.bab))}
+      ${stat("CMB", sign(o.cmb.total), termLine(o.cmb))}
+      ${stat("CMD", d.cmd.total, termLine(d.cmd), `flat-footed ${d.cmd_flat_footed.total}`)}
+      ${stat("Speed", speed.current != null ? `${speed.current} ft` : NOT_KNOWN,
+             speed.base != null && speed.base !== speed.current ? `base ${speed.base} ft` : "")}
+    </dl>
+    <div class="gridwrap"><table class="grid">
+      <caption class="vh">Attacks</caption>
+      <thead><tr><th scope="col">Weapon</th><th scope="col">To hit</th><th scope="col">Damage</th>
+        <th scope="col">Critical</th><th scope="col">Range</th><th scope="col">Notes</th></tr></thead>
+      <tbody>${rows || `<tr><td class="lead" colspan="6"><span class="why">No weapon carried.</span></td></tr>`}</tbody>
+    </table></div>
+    <p class="fullattack">${full}</p>
+    <h3 class="cardsub">Combat manoeuvres</h3>
+    <p class="why">Each is your bonus rolled against the target's CMD.</p>
+    <div class="gridwrap"><table class="grid">
+      <caption class="vh">Combat manoeuvres</caption>
+      <thead><tr><th scope="col">Manoeuvre</th><th scope="col">Bonus</th>
+        <th scope="col">Provokes</th><th scope="col">On success</th><th scope="col">Limits</th></tr></thead>
+      <tbody>${man}${feint}</tbody>
+    </table></div>
+    <p class="why">Provokes is read from the rules' manoeuvre table. No attack of opportunity
+      is rolled for a manoeuvre yet: only moving provokes one.</p>`);
+}
+
+// AC, touch and flat-footed, the saves with their terms, life's edges, and conditions.
+// The abilities and life are on the right-hand panel beside this column.
+function defenceCard(s) {
   const d = s.defense;
-  return `<div class="cols">
-    <!-- The six scores. The sheet has always *sent* them and only ever read Con, to
-         work out what number you die at — so the one thing every other number on this
-         page is derived from was the one thing it never showed. -->
-    <div class="card wide">
-      <h3>Abilities</h3>
-      <div class="abilities">${s.abilities.map(a => `
-        <div class="ab${a.damage || a.drain ? " hurt" : ""}">
-          <span class="abk">${esc(a.key.toUpperCase())}</span>
-          <b>${a.score}</b>
-          <span class="abm">${a.modifier >= 0 ? "+" : ""}${a.modifier}</span>
-          ${a.damage ? `<em>-${a.damage} damage</em>` : ""}
-          ${a.drain ? `<em>-${a.drain} drain</em>` : ""}
-        </div>`).join("")}</div>
-      ${(s.class_features && s.class_features.length) ? `<div class="terms">
-        ${s.class_features.map(f => `<div class="t"><span>${esc(f)}</span></div>`)
-          .join("")}</div>` : ""}
-    </div>
-    <div class="card">
-      <h3>Hit points</h3>
-      <div class="bignum">${d.hp.current} <small>of ${d.hp.max}</small></div>
-      <div class="terms">
-        ${d.hp.temp ? `<div class="t"><span>Temporary${
-            d.hp.temp_source ? ` — ${esc(d.hp.temp_source)}` : ""
-          }</span><b>+${d.hp.temp}</b></div>` : ""}
-        ${(d.dr || []).map(r => `<div class="t"><span>Reduction${
-            r.source ? ` — ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`).join("")}
-        ${d.hp.nonlethal ? `<div class="t"><span>Non-lethal</span><b>${
-            d.hp.nonlethal}</b></div>` : ""}
-        <div class="t"><span>Unconscious at</span><b>0</b></div>
-        <div class="t"><span>Dead at</span><b>-${s.abilities.find(a => a.key === "con").score}</b></div>
-        <div class="t"><span>Knocked out by non-lethal at</span><b>${
-            d.hp.nonlethal_threshold}</b></div>
+  const hp = d.hp || {};
+  const con = (s.abilities || []).find(a => a.key === "con");
+  const saves = (d.saves || []).map(sv => stat(sv.name, sign(sv.total), termLine(sv) || "no bonus")).join("");
+  const life = [
+    `<div class="t"><span>Hit points</span><b>${hp.current} of ${hp.max}</b></div>`,
+    hp.temp ? `<div class="t"><span>Temporary${hp.temp_source ? `, from ${esc(hp.temp_source)}` : ""}</span><b>${sign(hp.temp)}</b></div>` : "",
+    ...(d.dr || []).map(r => `<div class="t"><span>Damage reduction${r.source ? `, from ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`),
+    `<div class="t"><span>Unconscious at</span><b>0</b></div>`,
+    con ? `<div class="t"><span>Dead at</span><b>-${con.score}</b></div>` : "",
+    `<div class="t"><span>Non-lethal taken</span><b>${hp.nonlethal || 0}</b></div>`,
+    `<div class="t"><span>Knocked out by non-lethal at</span><b>${hp.nonlethal_threshold}</b></div>`,
+  ].join("");
+  const gear = (d.gear || []).length ? `<h3 class="cardsub">Damaged gear</h3>
+    <div class="terms">${d.gear.map(g => `<div class="t"><span>${esc(g.name)} <small>${
+      esc(g.material)}, hardness ${g.hardness}</small></span><b>${
+      g.state === "destroyed" ? "destroyed" : `${g.hp} of ${g.hp_max}${
+        g.state === "broken" ? ", broken" : ""}`}</b></div>`).join("")}</div>` : "";
+  return sheetCard("sc-defence", "Defence", `
+    <dl class="statrow">
+      ${stat("AC", d.ac.total, termLine(d.ac))}
+      ${stat("Touch", d.ac_touch.total, termLine(d.ac_touch))}
+      ${stat("Flat-footed", d.ac_flat_footed.total, termLine(d.ac_flat_footed))}
+      ${saves}
+    </dl>
+    <div class="twocol">
+      <div><h3 class="cardsub">Life</h3><div class="terms">${life}</div>${gear}</div>
+      <div><h3 class="cardsub">Conditions</h3>
+        ${(d.conditions || []).length ? `<ul class="plain conds">${d.conditions.map(c => `<li>
+          <b>${esc(c.name)}</b>${c.rounds_left ? ` <span class="chip">${c.rounds_left} rounds</span>` : ""}
+          ${c.note ? `<span class="why">${esc(c.note)}</span>` : ""}
+          ${c.source ? `<span class="why">from ${esc(c.source)}</span>` : ""}</li>`).join("")}</ul>`
+          : `<p>None.</p>`}
       </div>
-    </div>
-    <div class="card">
-      <h3>Armour class</h3>
-      <div class="bignum">${d.ac.total}</div>
-      ${termList(d.ac)}
-      <div class="terms" style="margin-top:10px">
-        <div class="t"><span>Touch</span><b>${d.ac_touch.total}</b></div>
-        <div class="t"><span>Flat-footed</span><b>${d.ac_flat_footed.total}</b></div>
-      </div>
-    </div>
-    ${(d.gear && d.gear.length) ? `<div class="card">
-      <h3>Damaged gear</h3>
-      <div class="terms">${d.gear.map(g => `<div class="t"><span>${esc(g.name)} <small>${
-          esc(g.material)}, hardness ${g.hardness}</small></span><b>${
-          g.state === "destroyed" ? "destroyed" : `${g.hp}/${g.hp_max}${
-            g.state === "broken" ? " broken" : ""}`}</b></div>`).join("")}</div>
-    </div>` : ""}
-    ${d.saves.map(sv => statCard(sv.name + " save", sv)).join("")}
-    <div class="card">
-      <h3>Combat Maneuver Defense</h3>
-      <div class="bignum">${d.cmd.total}</div>
-      ${termList(d.cmd)}
-      <div class="terms" style="margin-top:10px">
-        <div class="t"><span>Flat-footed (no Dex)</span><b>${d.cmd_flat_footed.total}</b></div>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Conditions</h3>
-      ${d.conditions.length ? d.conditions.map(c => `
-        <div style="margin-bottom:10px">
-          <b>${esc(c.name)}</b>${c.rounds_left ? ` <span class="pill">${c.rounds_left} rounds</span>` : ""}
-          <div class="why">${esc(c.note)}</div>
-          ${c.source ? `<div class="why">from: ${esc(c.source)}</div>` : ""}
-        </div>`).join("") : `<div class="empty">None.</div>`}
-    </div>
-  </div>`;
+    </div>`);
 }
 
-// --- Offense ---
-function tabOffense(s) {
-  const o = s.offense;
-  return `<div class="cols" style="margin-bottom:26px">
-      ${statCard("Base attack bonus", {total: o.bab, terms: []})}
-      ${statCard("Initiative", o.initiative)}
-      ${statCard("Combat Maneuver Bonus", o.cmb)}
-    </div>
-    <div class="card" style="margin-bottom:26px">
-      <h3>Attacks</h3>
-      <table class="sheet">
-        <tr><th>Weapon</th><th>Attack</th><th>Damage</th><th>Critical</th><th>Notes</th></tr>
-        ${o.attacks.map(a => `<tr>
-          <td><b>${esc(a.name)}</b>${a.equipped ? ' <span class="pill good">in hand</span>' : ""}
-              <div class="why">${esc(a.category)}, ${a.hands === 2 ? "two-handed" : "one-handed"}</div></td>
-          <td class="num">${sign(a.attack.total)}
-              <div class="why" style="font-weight:400">${a.attack.terms.map(m => `${sign(m.value)} ${esc(m.source)}`).join("<br>")}</div></td>
-          <td class="num">${esc(a.damage_dice)}${a.damage.total ? sign(a.damage.total) : ""}
-              <div class="why" style="font-weight:400">${esc(a.type)}</div></td>
-          <td class="num">${esc(a.crit)}</td>
-          <td>${a.proficient ? "" : '<span class="pill warn">not proficient (-4)</span>'}
-              ${a.sequence > 1 ? `<span class="pill">${a.sequence} attacks on a full attack</span>` : ""}</td>
-        </tr>`).join("")}
-      </table>
-    </div>
-    <div class="card">
-      <h3>Combat maneuvers — roll CMB against the target's CMD</h3>
-      <table class="sheet">
-        <tr><th>Maneuver</th><th>Your CMB</th><th>On success</th><th></th></tr>
-        ${o.maneuvers.map(m => `<tr>
-          <td><b>${esc(m.name)}</b></td>
-          <td class="num">${sign(m.cmb.total)}</td>
-          <td>${esc(m.effect)}</td>
-          <td>${m.size_limit != null ? '<span class="pill">max one size larger</span>' : ""}</td>
-        </tr>`).join("")}
-      </table>
-    </div>`;
+// Two columns of skills, each total the engine's. What each is made of is one press
+// away (the old Skills page showed it on every row, 35 rows of it).
+let SKILL_TERMS = false;
+function skillsCard(s) {
+  const trained = s.skills.filter(k => k.rank > 0).length;
+  return sheetCard("sc-skills", "Skills", `
+    <p class="cardline"><span class="why">${trained} trained. Untrained-only skills that
+      cannot be tried are greyed.</span>
+      <button type="button" class="v2-btn is-quiet is-small" id="skillterms"
+              aria-pressed="${SKILL_TERMS}">What each is made of</button></p>
+    <dl class="skills${SKILL_TERMS ? " showterms" : ""}" id="skilllist">${s.skills.map(k => `
+      <div class="${k.usable ? "" : "dim"}">
+        <dt>${esc(title(k.name))}${k.class_skill ? ` <small class="cls">class</small>` : ""}${
+          k.trained_only ? ` <small>trained only</small>` : ""}</dt>
+        <dd>${k.usable ? sign(k.total) : `<span title="Cannot be attempted untrained">untrained</span>`}</dd>
+        <span class="why terms-line">${esc(k.ability.toUpperCase())}${
+          k.armour_check ? ", armour check applies" : ""}${k.rank ? `, ${k.rank} ranks` : ""}${
+          k.usable && k.terms.length ? `: ${esc(k.terms.map(m => `${sign(m.value)} ${m.source}`).join(", "))}` : ""}</span>
+      </div>`).join("")}</dl>`);
 }
-
-// --- Skills ---
-function tabSkills(s) {
-  return `<div class="card">
-    <h3>Skills — ${s.skills.filter(k => k.rank > 0).length} trained</h3>
-    <table class="sheet">
-      <tr><th>Skill</th><th>Total</th><th>Ranks</th><th>Made up of</th></tr>
-      ${s.skills.map(k => `<tr class="${k.usable ? "" : "dim"}">
-        <td>${esc(title(k.name))}
-            ${k.class_skill ? '<span class="pill good">class</span>' : ""}
-            ${k.trained_only ? '<span class="pill">trained only</span>' : ""}
-            <div class="why">${esc(k.ability.toUpperCase())}${k.armour_check ? " · armour check applies" : ""}</div></td>
-        <td class="num">${k.usable ? sign(k.total) : "—"}</td>
-        <td class="num">${k.rank || ""}</td>
-        <td class="why">${k.usable
-          ? k.terms.map(m => `${sign(m.value)} ${esc(m.source)}`).join(", ")
-          : "cannot be attempted untrained"}</td>
-      </tr>`).join("")}
-    </table>
-  </div>`;
-}
+document.addEventListener("click", e => {
+  const b = e.target.closest("#skillterms");
+  if (!b) return;
+  SKILL_TERMS = !SKILL_TERMS;
+  b.setAttribute("aria-pressed", String(SKILL_TERMS));
+  const list = document.getElementById("skilllist");
+  if (list) list.classList.toggle("showterms", SKILL_TERMS);
+});
 
 // --- Feats ---
 // The browse pane's last result, so a redraw does not lose it and typing does not refetch
@@ -427,223 +212,43 @@ function tabSkills(s) {
 let FEAT_RESULTS = null;
 let FEAT_QUERY = "";
 
-function tabInventory(s) {
-  const d = s.defense || {};
-  const carried = d.carrying || [];
-  const purse = (d.purse || {}).coins || {};
-  const coins = STATE.coinage || [];
-  const any = carried.length || Object.keys(purse).length;
-  return `<div class="cols">
-    <div class="card">
-      <h3>Purse</h3>
-      <div class="bignum">${purseTotal(purse) ? esc(purseLine(purse, coins))
-        : "<small>empty</small>"}</div>
-      ${(d.purse || {}).copper ? `<div class="terms"><div class="t">
-        <span>In copper</span><b>${d.purse.copper}</b></div></div>` : ""}
-    </div>
-    <div class="card wide">
-      <h3>What you have made</h3>
-      ${(d.stock || []).length ? `<table class="sheet">
-        <tr><th>Preparation</th><th>How many</th><th>What it does</th><th></th></tr>
-        ${d.stock.map(j => `<tr>
-          <td><b>${esc(j.name)}</b>${j.poisons && j.poisons.length
-            ? ` <span class="poisonmark" title="This will poison whoever drinks it">☠</span>` : ""}</td>
-          <td>${j.count}</td>
-          <td class="why">${esc((j.effects || []).join(" · ") || "for show, no effect in play")}${
-            (j.drawbacks || []).length ? ` <em>${esc(j.drawbacks.join(" "))}</em>` : ""}</td>
-          <td class="useact">
-            ${j.drinkable ? `<button class="mini" data-use="${esc(j.id)}" data-how="drink"
-                >drink</button>` : ""}
-            ${j.throwable ? `<button class="mini" data-use="${esc(j.id)}" data-how="throw"
-                >throw</button>` : ""}
-            ${j.coatable ? `<button class="mini" data-use="${esc(j.id)}" data-how="coat"
-                >coat</button>` : ""}
-          </td></tr>`).join("")}</table>`
-        : `<div class="empty">Nothing crafted yet. The bench is under
-           <a href="/craft/">Crafting</a>.</div>`}
-    </div>
-    <div class="card wide">
-      <h3>Carried</h3>
-      ${(carried.length || (s.equipment.weapons || []).length) ? `<table class="sheet">
-        <tr><th>Thing</th><th>How many</th><th>What the engine knows</th></tr>
-        ${(s.equipment.weapons || []).map(w => (typeof w === "string" ? { name: w } : w))
-          // `equipment.weapons` is a list of names (rules/sheet.py `full_sheet`); read as
-          // objects, every weapon's row had a blank name (found in the table rebuild's
-          // Equipment tab: "1 · a weapon" twice, the rapier and the dagger unnamed).
-          .filter(w => w.name && w.name !== "unarmed").map(w => `<tr>
-          <td><b>${esc(w.name)}</b></td><td>1</td>
-          <td class="why">a weapon — ${w.equipped ? "drawn; " : ""}swing it from the
-          combat panel</td></tr>`).join("")}
-        ${carried.map(i => `<tr class="${i.known ? "" : "dim"}">
-          <td><b>${esc(i.name)}</b></td><td>${i.count}</td>
-          <td class="why">${esc(i.line)}</td></tr>`).join("")}</table>`
-        : `<div class="empty">Nothing but what you are wearing.</div>`}
-    </div>
-    <div class="card wide">
-      <h3>Satchel</h3>
-      ${(d.satchel || []).length ? `<table class="sheet">
-        <tr><th>Ingredient</th><th>How many</th></tr>
-        ${d.satchel.map(h => `<tr><td><b>${esc(h.name)}</b></td>
-          <td>${h.count}</td></tr>`).join("")}</table>`
-        : `<div class="empty">No raw material. Forage from the crafting bench.</div>`}
-    </div>
-    <div class="card">
-      <h3>In hand</h3>
-      <div class="terms">${(s.equipment.weapons || []).map(w => `
-        <div class="t"><span>${esc(w.name)}</span><b>${
-          w.equipped ? "drawn" : ""}</b></div>`).join("")
-        || `<div class="t"><span>unarmed</span><b></b></div>`}</div>
-    </div>
-  </div>`;
-}
-
-function tabClass(s) {
-  const p = s.progression;
-  if (!p || !p.rows) return tabEmpty("No class data for this character.");
-  // Every column the class prints on its own table, gathered from the rows rather
-  // than named here — a class with columns this app has never heard of still shows
-  // them, which is the whole point of the classes being data.
-  const cols = [...new Set(p.rows.flatMap(r => Object.keys(r.columns || {})))];
-  return `<div class="cols">
-    <div class="card wide">
-      <h3>${esc(p.class)}</h3>
-      <div class="why">${esc(p.summary || "")}</div>
-      <div class="terms">
-        <div class="t"><span>Hit die</span><b>${esc(String(p.hit_die))}</b></div>
-        <div class="t"><span>Base attack</span><b>${
-          esc(String(p.bab).replace(/_/g, " "))}</b></div>
-        <div class="t"><span>Good saves</span><b>${
-          esc((p.good_saves || []).join(", ") || "none")}</b></div>
-        <div class="t"><span>Skill ranks</span><b>${p.skill_ranks}+Int</b></div>
-      </div>
-      ${(p.paths_offered || []).length ? `
-        <h3 style="margin-top:20px">Paths</h3>
-        <div class="why">This class follows two paths, in order. Path A runs from 1st
-          level; Path B stays shut until its track opens at ${p.unlocks_b || 11}th.
-          ${p.paths_taken.length ? `You follow <b>${esc(p.paths_taken[0])}</b> as
-            Path A${p.paths_taken[1]
-              ? ` and <b>${esc(p.paths_taken[1])}</b> as Path B` : ""}.`
-            : "This character has none recorded."}</div>
-        <div class="terms">
-          <div class="t"><span>Path A — ${esc(p.paths_taken[0] || "not chosen")}</span>
-            <b>Control Blood ${(p.control_blood || {}).a || 0}</b></div>
-          <div class="t"><span>Path B — ${esc(p.paths_taken[1] || "not chosen")}</span>
-            <b>${(p.control_blood || {}).b
-              ? "Control Blood " + p.control_blood.b
-              : `opens at ${p.unlocks_b || 11}th`}</b></div>
-        </div>
-        ${p.paths_offered.map(x => {
-          const det = (p.path_detail || {})[x] || {};
-          const mine = p.paths_taken.includes(x);
-          return `<div class="pathblock ${mine ? "mine" : ""}">
-            <h4>${esc(det.name || x)}${det.role ? ` <small>${esc(det.role)}</small>` : ""}
-              ${mine ? `<span class="pill now">Path ${
-                p.paths_taken.indexOf(x) === 0 ? "A" : "B"}</span>` : ""}</h4>
-            ${det.summary ? `<div class="why">${esc(det.summary)}</div>` : ""}
-            ${det.global_rule ? `<div class="why"><b>Global rule.</b> ${
-              esc(det.global_rule)}</div>` : ""}
-            ${Object.entries(det.tiers || {}).map(([tier, names]) => `
-              <div class="tier"><b>Control Blood ${esc(tier)}</b>
-                ${names.map(n => {
-                  const key = (det.resolves || {})[n];
-                  const up = (det.upgrades || {})[n];
-                  const core = (det.core || []).includes(n);
-                  const text = key ? (det.abilities || {})[key] : "";
-                  return `<div class="ab-line"><span>${glossify(n)}</span>
-                    <em>${up ? `<b>${esc(up)}</b> — upgrade of ${esc(key)}: ${esc(text)}`
-                      : text ? esc(text)
-                      : core ? "a Core Rulebook ability; see the rules reference"
-                      : "named on the table; the source does not describe it"}</em>
-                  </div>`;
-                }).join("")}</div>`).join("")}
-          </div>`;
-        }).join("")}
-        <div class="why" style="margin-top:8px">Abilities are tiered by Control Blood
-          level, which is what <b>control blood 1a</b> through <b>5b</b> on the table
-          above means. The text is the class document's own; the engine does not
-          execute these yet — they are yours to invoke at the table.</div>` : ""}
-      ${p.next ? `
-        <h3 style="margin-top:20px">Next level</h3>
-        <div class="terms">
-          <div class="t"><span>Level</span><b>${p.next.level}</b></div>
-          ${p.next.bab ? `<div class="t"><span>Base attack</span><b>+${
-            p.next.bab}</b></div>` : ""}
-          ${Object.entries(p.next.saves || {}).map(([k, v]) =>
-            `<div class="t"><span>${esc(k)} save</span><b>+${v}</b></div>`).join("")}
-          ${(p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
-            p.next.grants.map(glossify).join(", ")}</b></div>` : ""}
-        </div>
-        <button class="go" id="levelup" style="margin-top:14px">Take level ${
-          p.next.level}</button>
-        <div id="levelerr" class="why"></div>` : `<div class="why"
-          style="margin-top:16px">Twentieth level. There is no more table.</div>`}
-    </div>
-    <div class="card wide">
-      <h3>The whole table</h3>
-      <table class="sheet">
-        <tr><th>Level</th>${cols.map(c => `<th>${esc(c)}</th>`).join("")}
-          <th>What it grants</th></tr>
-        ${p.rows.map(r => `<tr class="${r.reached ? "" : "dim"}">
-          <td><b>${r.level}</b>${r.level === p.level
-            ? ' <span class="pill now">here</span>' : ""}</td>
-          ${cols.map(c => `<td>${esc((r.columns || {})[c] ?? "")}</td>`).join("")}
-          <td class="why">${(r.grants || []).map(glossify).join(", ") || "—"}</td>
-        </tr>`).join("")}
-      </table>
-    </div>
-  </div>`;
+function featsCard(s) {
+  return sheetCard("sc-feats", "Feats and traits", tabFeats(s), "wide");
 }
 
 function tabFeats(s) {
-  return `<div class="cols">
-    <div class="card">
-      <h3>Feats</h3>
-      <table class="sheet">
-        <tr><th>Feat</th><th>What it does</th></tr>
-        ${s.feats.map(f => `<tr class="${f.applied ? "" : "dim"}">
-          <td><b>${esc(f.name)}</b>${
-            f.applied ? "" :
-            f.known ? ' <span class="pill">not computed</span>'
-                    : ' <span class="pill warn">unknown feat</span>'}
-            ${f.prerequisites ? `<small class="prereq">${esc(f.prerequisites)}</small>` : ""}</td>
-          <td class="why">${esc(f.effect)}</td>
-        </tr>`).join("") || `<tr><td colspan="2" class="empty">None.</td></tr>`}
-      </table>
-      <div class="why" style="margin-top:10px">
-        “Not computed” means the engine carries the feat and its text but applies no
-        number for it — sixteen feats have arithmetic the engine owns, and the rest are
-        yours to invoke.
-      </div>
-      ${(s.traits && s.traits.length) ? `
-        <h3 style="margin-top:22px">Racial traits</h3>
-        <table class="sheet">
-          <tr><th>Trait</th><th>From</th></tr>
-          ${s.traits.map(t => `<tr>
-            <td><b>${glossify(t.name)}</b></td>
-            <td class="why">${esc(t.source)}</td></tr>`).join("")}
-        </table>` : ""}
-      ${(s.body && (Object.keys(s.body.speeds || {}).length > 1 || (s.body.senses || []).length || (s.body.natural_weapons || []).length)) ? `
-        <h3 style="margin-top:22px">The body</h3>
-        <table class="sheet">
-          <tr><th>What</th><th>How</th></tr>
-          <tr><td><b>Moves</b></td><td class="why">${esc(Object.entries(s.body.speeds).map(([k, v]) => `${k} ${v} ft`).join(" · "))}</td></tr>
-          ${(s.body.senses || []).length ? `<tr><td><b>Senses</b></td><td class="why">${esc(s.body.senses.join(" · "))}</td></tr>` : ""}
-          ${(s.body.natural_weapons || []).map(w => `<tr><td><b>${esc(w.name)}</b></td>
-            <td class="why">${w.count > 1 ? `${w.count} × ` : ""}${esc(w.damage)} ${esc(w.type)}${w.secondary ? " · secondary" : ""}</td></tr>`).join("")}
-          ${(s.body.not_yet || []).map(n => `<tr><td><b>Not yet</b></td><td class="why">${esc(n)}</td></tr>`).join("")}
-        </table>` : ""}
-      ${(s.class_features && s.class_features.length) ? `
-        <h3 style="margin-top:22px">Class features</h3>
-        <table class="sheet">
-          <tr><th>Feature</th><th>From</th></tr>
-          ${s.class_features.map(f => `<tr>
-            <td><b>${glossify(f)}</b></td>
-            <td class="why">${esc(s.identity.class)}</td></tr>`).join("")}
-        </table>` : ""}
+  const feats = (s.feats || []).map(f => `<div class="${f.applied ? "" : "dim"}">
+      <dt>${esc(f.name)}${f.applied ? "" : f.known ? ` <span class="chip">not computed</span>`
+        : ` <span class="chip warn">unknown feat</span>`}${
+        f.prerequisites ? `<small class="prereq">${esc(f.prerequisites)}</small>` : ""}</dt>
+      <dd>${esc(f.effect)}</dd></div>`).join("");
+  const body = s.body || {};
+  const moves = Object.entries(body.speeds || {});
+  const showBody = moves.length > 1 || (body.senses || []).length || (body.natural_weapons || []).length;
+  return `<div class="twocol">
+    <div>
+      <dl class="feats">${feats || `<p>None.</p>`}</dl>
+      <p class="why">"Not computed" means the rules carry the feat and its text but apply no
+        number for it; those are yours to invoke at the table.</p>
+      ${(s.traits || []).length ? `<h3 class="cardsub">Racial traits</h3>
+        <dl class="feats">${s.traits.map(t => `<div><dt>${glossify(t.name)}</dt>
+          <dd>${esc(t.source)}</dd></div>`).join("")}</dl>` : ""}
+      ${showBody ? `<h3 class="cardsub">The body</h3><dl class="feats">
+        <div><dt>Moves</dt><dd>${esc(moves.map(([k, v]) => `${k} ${v} ft`).join(", "))}</dd></div>
+        ${(body.senses || []).length ? `<div><dt>Senses</dt><dd>${esc(body.senses.join(", "))}</dd></div>` : ""}
+        ${(body.natural_weapons || []).map(w => `<div><dt>${esc(w.name)}</dt><dd>${
+          w.count > 1 ? `${w.count} of them, ` : ""}${esc(w.damage)} ${esc(w.type)}${
+          w.secondary ? ", secondary" : ""}</dd></div>`).join("")}
+        ${(body.not_yet || []).map(n => `<div><dt>Not yet</dt><dd>${esc(n)}</dd></div>`).join("")}
+      </dl>` : ""}
+      ${(s.class_features || []).length ? `<h3 class="cardsub">Class features</h3>
+        <dl class="feats">${s.class_features.map(f => `<div><dt>${glossify(f)}</dt>
+          <dd>${esc(s.identity.class)}</dd></div>`).join("")}</dl>` : ""}
     </div>
-    <div class="card">
-      <h3>Browse</h3>
-      <input type="search" id="featq" placeholder="Search 1,474 feats…"
+    <div>
+      <h3 class="cardsub">Browse the feats</h3>
+      <label class="vh" for="featq">Search the feats</label>
+      <input type="search" id="featq" class="v2-well" placeholder="Search 1,474 feats"
              value="${esc(FEAT_QUERY)}" autocomplete="off">
       <div id="featresults">${featResults()}</div>
     </div>
@@ -665,7 +270,7 @@ function featResults() {
       : ["maybe", "ask your GM: " + f.unknown.join("; ")];
     return `<div class="featrow ${state[0]}">
       <div><b>${esc(f.name)}</b>
-        <small>${esc(f.types.join(", "))}${f.source ? " · " + esc(f.source) : ""}</small></div>
+        <small>${esc([f.types.join(", "), f.source].filter(Boolean).join(", "))}</small></div>
       <div class="why">${esc(f.benefit || f.description)}</div>
       <div class="verdict ${state[0]}">${esc(state[1])}</div>
     </div>`;
@@ -690,6 +295,205 @@ document.addEventListener("input", e => {
     if (box2) box2.innerHTML = featResults();
   }, 180);
 });
+
+// --- Class, and taking a level ---
+function classCard(s) {
+  return sheetCard("sc-class", "Class", tabClass(s), "wide");
+}
+
+function tabClass(s) {
+  const p = s.progression;
+  if (!p || !p.rows) return tabEmpty("No class data for this character.");
+  // Every column the class prints on its own table, gathered from the rows rather
+  // than named here: a class with columns this app has never heard of still shows
+  // them, which is the whole point of the classes being data.
+  const cols = [...new Set(p.rows.flatMap(r => Object.keys(r.columns || {})))];
+  return `<div class="twocol">
+    <div>
+      <h3 class="cardsub">${esc(p.class)}</h3>
+      ${p.summary ? `<p class="why">${esc(p.summary)}</p>` : ""}
+      <div class="terms">
+        <div class="t"><span>Hit die</span><b>${esc(String(p.hit_die))}</b></div>
+        <div class="t"><span>Base attack</span><b>${esc(String(p.bab).replace(/_/g, " "))}</b></div>
+        <div class="t"><span>Good saves</span><b>${esc((p.good_saves || []).join(", ") || "none")}</b></div>
+        <div class="t"><span>Skill ranks</span><b>${p.skill_ranks} plus Int</b></div>
+      </div>
+      ${(p.paths_offered || []).length ? `
+        <h3 class="cardsub">Paths</h3>
+        <p class="why">This class follows two paths, in order. Path A runs from 1st level;
+          Path B stays shut until its track opens at ${p.unlocks_b || 11}th.
+          ${p.paths_taken.length ? `You follow <b>${esc(p.paths_taken[0])}</b> as Path A${
+            p.paths_taken[1] ? ` and <b>${esc(p.paths_taken[1])}</b> as Path B` : ""}.`
+            : "This character has none recorded."}</p>
+        <div class="terms">
+          <div class="t"><span>Path A: ${esc(p.paths_taken[0] || "not chosen")}</span>
+            <b>Control Blood ${(p.control_blood || {}).a || 0}</b></div>
+          <div class="t"><span>Path B: ${esc(p.paths_taken[1] || "not chosen")}</span>
+            <b>${(p.control_blood || {}).b ? "Control Blood " + p.control_blood.b
+              : `opens at ${p.unlocks_b || 11}th`}</b></div>
+        </div>
+        ${p.paths_offered.map(x => {
+          const det = (p.path_detail || {})[x] || {};
+          const mine = p.paths_taken.includes(x);
+          return `<div class="pathblock ${mine ? "mine" : ""}">
+            <h4>${esc(det.name || x)}${det.role ? ` <small>${esc(det.role)}</small>` : ""}
+              ${mine ? `<span class="chip">Path ${p.paths_taken.indexOf(x) === 0 ? "A" : "B"}</span>` : ""}</h4>
+            ${det.summary ? `<div class="why">${esc(det.summary)}</div>` : ""}
+            ${det.global_rule ? `<div class="why"><b>Global rule.</b> ${esc(det.global_rule)}</div>` : ""}
+            ${Object.entries(det.tiers || {}).map(([tier, names]) => `
+              <div class="tier"><b>Control Blood ${esc(tier)}</b>
+                ${names.map(n => {
+                  const key = (det.resolves || {})[n];
+                  const up = (det.upgrades || {})[n];
+                  const core = (det.core || []).includes(n);
+                  const text = key ? (det.abilities || {})[key] : "";
+                  return `<div class="ab-line"><span>${glossify(n)}</span>
+                    <em>${up ? `<b>${esc(up)}</b>, the upgrade of ${esc(key)}: ${esc(text)}`
+                      : text ? esc(text)
+                      : core ? "a Core Rulebook ability; see the rules reference"
+                      : "named on the table; the source does not describe it"}</em>
+                  </div>`;
+                }).join("")}</div>`).join("")}
+          </div>`;
+        }).join("")}
+        <p class="why">Abilities are tiered by Control Blood level, which is what
+          <b>control blood 1a</b> through <b>5b</b> on the table means. The text is the
+          class document's own; the rules do not run these yet, so they are yours to
+          invoke at the table.</p>` : ""}
+      ${p.next ? `
+        <h3 class="cardsub">Next level</h3>
+        <div class="terms">
+          <div class="t"><span>Level</span><b>${p.next.level}</b></div>
+          ${p.next.bab ? `<div class="t"><span>Base attack</span><b>+${p.next.bab}</b></div>` : ""}
+          ${Object.entries(p.next.saves || {}).map(([k, v]) =>
+            `<div class="t"><span>${esc(k)} save</span><b>+${v}</b></div>`).join("")}
+          ${(p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
+            p.next.grants.map(glossify).join(", ")}</b></div>` : ""}
+        </div>
+        <button type="button" class="v2-btn is-go" id="levelup">Take level ${p.next.level}</button>
+        <div id="levelerr" class="why" role="status"></div>`
+        : `<p class="why">Twentieth level. There is no more table.</p>`}
+    </div>
+    <div>
+      <h3 class="cardsub">The whole table</h3>
+      <div class="gridwrap classtable"><table class="grid">
+        <caption class="vh">The class table, levels 1 to 20</caption>
+        <thead><tr><th scope="col">Level</th>${cols.map(c => `<th scope="col">${esc(c)}</th>`).join("")}
+          <th scope="col">What it grants</th></tr></thead>
+        <tbody>${p.rows.map(r => `<tr class="${r.reached ? "" : "dim"}${r.level === p.level ? " inhand" : ""}">
+          <td class="lead" data-label="Level"><b>${r.level}</b>${r.level === p.level
+            ? `<span class="chip">here</span>` : ""}</td>
+          ${cols.map(c => `<td class="n" data-label="${esc(c)}">${esc((r.columns || {})[c] ?? "")}</td>`).join("")}
+          <td class="wide" data-label="Grants"><span class="why">${
+            (r.grants || []).map(glossify).join(", ") || "nothing new"}</span></td>
+        </tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+  </div>`;
+}
+
+
+// Using something you made, from the Equipment tab. Straight to the engine: nothing in
+// drinking your own tea for a model to decide. This handler was lost once already: it
+// lived in the slice a later rewrite replaced wholesale, and the buttons kept rendering
+// over nothing. It lives beside the sheet code it serves now, and
+// tests/test_page_wiring.py pins /api/use into the served page so the next
+// disappearance fails a test instead of a player. The Equipment page's own buttons go
+// through `eqAct` (below), which reads the same doors; these two answer any `[data-use]`
+// or `[data-wear]` button drawn anywhere else.
+document.addEventListener("click", async e => {
+  const wearBtn = e.target.closest("[data-wear]");
+  if (wearBtn) {
+    busy(true);
+    try {
+      render(await post("/api/wear", { item: wearBtn.dataset.wear,
+                                       off: !!wearBtn.dataset.off }));
+      $("#sheeterr") && ($("#sheeterr").textContent = "");
+    } catch (err) {
+      // Beside the sheet, not behind it: slot refusals are the reason a click did
+      // nothing, and the sheet's tab hides #err completely.
+      const box = $("#sheeterr") || $("#err");
+      if (box) box.textContent = err.message;
+    } finally { busy(false); }
+    return;
+  }
+  const btn = e.target.closest("[data-use]");
+  if (!btn) return;
+  btn.disabled = true;
+  const say = document.getElementById("sheeterr");
+  if (say) say.textContent = "";
+  try {
+    const r = await fetch("/api/use", {
+      method: "POST",
+      headers: { "Content-Type": "application/json",
+                 "X-CSRFToken": document.cookie.match(/csrftoken=([^;]+)/)?.[1] || "" },
+      body: JSON.stringify({ item: btn.dataset.use, how: btn.dataset.how }),
+    });
+    // Text first: a 500 returns an HTML page, and json() on that throws a parse error
+    // that says nothing, the exact shape of every silent button this app has had.
+    const raw = await r.text();
+    let d = {};
+    try { d = JSON.parse(raw); } catch { d = { error: `HTTP ${r.status}` }; }
+    if (!r.ok) { if (say) say.textContent = d.error || `HTTP ${r.status}`; return; }
+    SHEET = d.sheet;
+    drawSheet();
+    if (say) say.textContent = "";
+    $("#err").innerHTML = `<span style="color:var(--gold)">${esc(d.tell)}</span>`;
+    render(await getState());
+  } catch (err) {
+    if (say) say.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function openSheet() {
+  $("#sheetpanel").classList.add("on");
+  $("#sheetpanel").setAttribute("aria-hidden", "false");
+  $("#sheetbody").innerHTML = `<div class="empty">Reading the sheet.</div>`;
+  try {
+    const r = await fetch("/api/sheet", { cache: "no-store" });
+    SHEET = await readJSON(r);
+    if (!r.ok) throw new Error(SHEET.error || "could not read the sheet");
+  } catch (e) {
+    $("#sheetbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+    return;
+  }
+  // Four characters on the roster predate the field and read they/them, which says
+  // nothing about a body. Silence is what produced the wrong one in the first place, so
+  // an unstated character says so here rather than quietly taking the model's default.
+  askGender(!SHEET.identity.gender);
+  // The page the open tab asked for (17-tab-sheet.js sets SHEET_TAB), else the first.
+  if (!TABS.some(t => t[0] === SHEET_TAB)) SHEET_TAB = TABS[0][0];
+  drawSheet();
+}
+
+// The sheet is a tab of the table, not a window over it (the table rebuild), so closing
+// it is going back to the Table tab. `sheetAway` is the part that only puts the panel
+// away, for the shell to call when another tab is chosen.
+function sheetAway() {
+  // A spell's details lie over the sheet in the top layer; they go with it.
+  if (typeof detailOpen === "function" && detailOpen()) closeDetail(false);
+  $("#sheetpanel").classList.remove("on");
+  $("#sheetpanel").setAttribute("aria-hidden", "true");
+}
+
+function closeSheet() {
+  if (typeof Shell === "object" && Shell && Shell.sheetBacked()) { Shell.show("table"); return; }
+  sheetAway();
+}
+
+// `keep`: a redraw after an act on the page keeps the reader where they were, so the
+// slot just edited does not jump away from under the pointer.
+function drawSheet(keep = false) {
+  const entry = TABS.find(t => t[0] === SHEET_TAB);
+  const top = $("#sheetbody").scrollTop;
+  $("#sheetbody").innerHTML = entry ? entry[2](SHEET) : "";
+  $("#sheetbody").scrollTop = keep ? top : 0;
+  if (SHEET_TAB === "equipment") drawEqNums();
+  if (SHEET_TAB === "journal") journalRead();
+}
+
 
 // --- Spells ---
 // Three columns, after the owner's mockup (Phase 3 task I5, 2026-09-29): what the caster
@@ -788,7 +592,13 @@ function paintSpellIcons(root) {
 }
 // Whoever draws the sheet (drawSheet, a level-up, the inventory's use button), the
 // pictures follow: one observer rather than a call at every place that sets innerHTML.
-new MutationObserver(() => { paintSpellIcons($("#sheetbody")); countGrimoire(); })
+// The Equipment page wears the trade window's item pictures (06's `paintTradeIcons`),
+// painted the same way.
+new MutationObserver(() => {
+  paintSpellIcons($("#sheetbody"));
+  if (typeof paintTradeIcons === "function") paintTradeIcons($("#sheetbody"));
+  countGrimoire();
+})
   .observe($("#sheetbody"), { childList: true, subtree: true });
 
 // --- plain words for the rules text ------------------------------------------------------
@@ -861,7 +671,8 @@ function casterStats(sp) {
       <div class="sock-count">${Math.min(heldCantrips, sl.max)} of ${sl.max} prepared, at will</div>`
       : `<div class="sock-count">At will</div>`}
     </li>` : slotSockets(sp, sl)).join("");
-  return `<section class="card sx-stats" aria-labelledby="sx-stats-h">
+  return `<section class="v2-framed v2-card-leather sx-card sx-stats" aria-labelledby="sx-stats-h">
+    <i class="v2-rim" aria-hidden="true"></i>
     <h3 id="sx-stats-h">Caster stats</h3>
     <div class="terms">
       <div class="t"><span>Caster level</span><b>${sp.caster_level}</b></div>
@@ -882,6 +693,8 @@ function casterStats(sp) {
         <div class="t"><span>${esc(d.name)}</span>
           <b>${d.spells.length} <small>spell${d.spells.length === 1 ? "" : "s"}</small></b>
         </div>`).join("")}</div>` : ""}
+    ${sp.kind === "prepared" ? `<p class="sx-note sx-house">Prepare whenever you like. A slot
+      spent today stays spent, and cannot be filled again until a long rest.</p>` : ""}
     ${sp.note ? `<p class="sx-note">${esc(sp.note)}</p>` : ""}
   </section>`;
 }
@@ -979,8 +792,10 @@ function preparedToday(sp) {
 
   const cantripRows = [...cantrips.values()].sort((a, b) => a.name.localeCompare(b.name));
   const heading = prepared ? "Prepared today" : "Known";
-  return `<section class="card sx-today" id="sx-today" data-drop="${prepared ? "prepare" : "learn"}"
+  return `<section class="v2-framed v2-card-leather sx-card sx-today" id="sx-today"
+      data-drop="${prepared ? "prepare" : "learn"}"
       aria-labelledby="sx-today-h" aria-describedby="sx-today-hint">
+    <i class="v2-rim" aria-hidden="true"></i>
     <h3 id="sx-today-h">${heading}</h3>
     <p class="sx-hint" id="sx-today-hint">${prepared
       ? "Drag a spell here from the grimoire, or press its Prepare button."
@@ -1069,7 +884,8 @@ function grimoireIndex(sp) {
   const groups = sp.choose_from || [];
   const schools = [...new Set(groups.flatMap(g => g.spells.map(s => schoolKey(s.school))))]
     .sort();
-  return `<section class="card sx-index" aria-labelledby="sx-index-h">
+  return `<section class="v2-framed v2-card-leather sx-card sx-index" aria-labelledby="sx-index-h">
+    <i class="v2-rim" aria-hidden="true"></i>
     <h3 id="sx-index-h">${prepared ? "Grimoire index" : "What can be learned"}</h3>
     ${groups.length ? `
     <div class="gx-tools">
@@ -1344,85 +1160,321 @@ function detailClosed() {
 }
 
 // --- Equipment ---
-// The body-slot page: a figure with the slots arranged down either side, roughly where
-// each thing is worn. Empty slots are drawn as blanks rather than hidden — showing what
-// is *not* filled is the whole reason for laying it out on a body.
-function slotBox(sl, side) {
-  const canAdd = sl.items.length < sl.max;
-  return `
-    <div class="slot ${side}" data-slot="${sl.key}">
-      ${medallion(sl.key)}
-      <div class="slothead">
-        <span>${esc(sl.label)}</span>
-        ${canAdd ? `<button class="addslot" data-slot="${sl.key}" title="Add another ${esc(sl.label.toLowerCase())} slot">+</button>` : ""}
-      </div>
-      ${sl.items.map(it => `
-        <div class="slotrow${it.empty ? " isempty" : ""}${it.beyond_rules ? " beyond" : ""}">
-          <input class="slotinput" data-slot="${sl.key}" data-index="${it.index}"
-                 value="${esc(it.item || "")}" placeholder="empty"
-                 ${sl.derived ? "disabled" : ""}>
-          ${sl.items.length > 1 && !sl.derived
-            ? `<button class="delslot" data-slot="${sl.key}" data-index="${it.index}" title="Remove this slot">×</button>`
-            : ""}
-        </div>`).join("")}
-      <div class="slotholds">${esc(sl.holds)}${
-        sl.max > sl.rules_limit ? ` · ${sl.rules_limit} work${sl.rules_limit === 1 ? "s" : ""} at once` : ""}</div>
-    </div>`;
+// The approved design's Equipment page (the mock README, "What changed in the second
+// pass", points 1 and 2): the shelves down the side in the trade window's own scheme and
+// order (06's TRADE_SHELVES), each with its count and only where something is on it;
+// everything carried, A to Z, each name always written beside its icon with its
+// quantity; and Worn and wielded, In hand and then every body slot the rules have, in
+// their own order and labels (rules/tables.py SLOTS, SLOT_ORDER_LEFT and _RIGHT, read
+// through `body_slots`). A slot pressed shows only what fits it.
+//
+// Every row and every act is the server's (play/views.py `_carried`): Wield and Wear run
+// the engine's `wear` op, a bought wondrous item goes into its slot through the sheet's
+// own `/api/slots`, a jar is drunk, thrown or coated through `/api/use`. The page offers
+// what those doors would take and nothing else, so there is no Take off on armour and no
+// Drop anywhere: the rules have neither, and the head of the page says so in words.
+let EQ_SHELF = "all";
+let EQ_FIT = null;          // a slot key ("hand", "ring", ...) while a slot is pressed
+let EQ_SAY = "";            // the last answer, written in the line kept for it
+let EQ_SAY_BAD = false;
+let EQ_BEFORE = null;       // the numbers before the last act, to mark what moved
+
+const eqRows = s => ((s.equipment || {}).carried || []);
+const eqShelf = r => (TRADE_SHELVES[r.shelf] ? r.shelf : "gear");
+const eqIcon = r => tradeIcon({ shelf: eqShelf(r), name: r.name });
+const eqQty = r => (r.unit ? `${r.count} ${r.unit}` : r.count > 1 ? `x${r.count}` : "");
+const EQ_INERT = "for show, no effect in play";
+// What goes in an empty slot, faded, so a blank says what it is waiting for (the mock's).
+const EQ_SLOT_ICON = { shoulders: "lucasms-cloak", ring: "delapouite-ring", belt: "lucasms-belt",
+                       wrists: "skoll-bracers", feet: "lorc-boots", neck: "lorc-gem-necklace",
+                       armor: "delapouite-leather-armor", shield: "willdabeast-round-shield",
+                       body: "delapouite-clothes" };
+const eqSlots = s => { const sl = (s.equipment || {}).slots || {}; return [...(sl.left || []), ...(sl.right || [])]; };
+const eqSlotLabel = (s, key) => (key === "hand" ? "hand"
+  : ((eqSlots(s).find(x => x.key === key) || {}).label || key).toLowerCase());
+
+// What the engine says about a thing, in the row's second line. A weapon's numbers are
+// its Combat row's; armour's are the armour table's; anything else is the engine's own
+// sentence (`goods.describe`, a jar's effects), or the owner's words for "no rules".
+function eqFacts(s, r) {
+  if (r.kind === "weapon") {
+    const a = (s.offense.attacks || []).find(x => x.key === r.key);
+    if (!a) return esc(EQ_INERT);
+    const bits = [`${a.damage_dice}${a.damage.total ? sign(a.damage.total) : ""} ${a.type_text || a.type}`,
+                  a.crit, `${(a.swings && a.swings.length ? a.swings : [a.attack.total]).map(sign).join("/")} to hit`];
+    if (a.range_ft) bits.push(`range ${a.range_ft} ft`);
+    else if (a.category !== "melee") bits.push("range not known");
+    if (a.weight_lb != null) bits.push(`${a.weight_lb} lb`);
+    if (!a.proficient) bits.push("not proficient");
+    return esc(bits.join(", "));
+  }
+  if (r.armour) {
+    const a = r.armour, bits = [`${sign(a.ac)} AC`];
+    if (r.kind === "armour" && a.max_dex != null && a.max_dex < 90) bits.push(`max Dex ${sign(a.max_dex)}`);
+    bits.push(a.acp ? `check penalty ${a.acp}` : "no check penalty");
+    if (a.weight) bits.push(`${a.weight} armour`);
+    return esc(bits.join(", "));
+  }
+  const tail = String(r.line || "").split(" — ").slice(1).join(" — ");
+  const said = r.line && !/no rules for it/.test(r.line) ? (tail || r.line) : "";
+  const where = r.fits && r.state === "worn" ? `worn at the ${eqSlotLabel(s, r.fits)}` : "";
+  const fits = r.fits && r.state !== "worn" ? `goes at the ${eqSlotLabel(s, r.fits)}` : "";
+  const bits = [said || (r.known ? "" : EQ_INERT), where || fits].filter(Boolean);
+  return esc(bits.join(", ")) + (r.poisons ? ` <span class="chip warn">poisons whoever drinks it</span>` : "");
 }
 
-function tabEquipment(s) {
-  const e = s.equipment, sl = e.slots;
-  return `
-    <div class="bodylayout">
-      <div class="slotcol">${sl.left.map(x => slotBox(x, "left")).join("")}</div>
-      <div class="figure">${FIGURE_SVG}
-        <div class="figcap">${sl.filled} of ${sl.total} slots filled</div>
-      </div>
-      <div class="slotcol">${sl.right.map(x => slotBox(x, "right")).join("")}</div>
-    </div>
+function eqFitsSlot(r, slot) {
+  if (slot === "hand") return r.kind === "weapon";
+  return r.fits === slot;
+}
 
-    <div class="cols" style="margin-top:26px">
-      <div class="card">
-        <h3>Armour and shield</h3>
-        <table class="sheet">
-          <tr><th>Item</th><th>AC</th><th>Max Dex</th><th>Check penalty</th></tr>
-          <tr><td>${esc(e.armour.name)}</td><td class="num">${sign(e.armour.ac)}</td>
-              <td class="num">${e.armour.max_dex > 90 ? "—" : sign(e.armour.max_dex)}</td>
-              <td class="num">${e.armour.acp || "—"}</td></tr>
-          <tr><td>${esc(e.shield.name)}</td><td class="num">${sign(e.shield.ac)}</td>
-              <td class="num">—</td><td class="num">${e.shield.acp || "—"}</td></tr>
-        </table>
-        <div class="why" style="margin-top:10px">
-          Total armour check penalty ${e.armour_check_penalty || 0}, applied to
-          Acrobatics, Climb, Disable Device, Escape Artist, Fly, Ride, Sleight of Hand,
-          Stealth and Swim. The armour and shield slots are filled from here, so there
-          is only one place that says what you are wearing.
-        </div>
-      </div>
-      <div class="card">
-        <h3>Carried weapons</h3>
-        ${e.weapons.length
-          ? `<ul style="margin:0;padding-left:18px">${e.weapons.map(w => `<li>${esc(w)}</li>`).join("")}</ul>`
-          : `<div class="empty">Nothing.</div>`}
-        <div class="why" style="margin-top:10px">
-          A worn magic item the catalogue knows — a ring of protection, a cloak of
-          resistance, a belt of giant strength — applies to your numbers while it sits
-          in a slot, with its bonus named in every dice popup. A name the catalogue
-          does not know is recorded and does nothing, and slots past the rules limit
-          are worn, not working. Encumbrance is not tracked.
-        </div>
-      </div>
-    </div>`;
+function pageEquipment(s) {
+  const rows = eqRows(s);
+  const counts = {};
+  for (const r of rows) counts[eqShelf(r)] = (counts[eqShelf(r)] || 0) + 1;
+  if (EQ_SHELF !== "all" && !counts[EQ_SHELF]) EQ_SHELF = "all";
+  const railBtn = (id, label, icon, n) => {
+    const on = !EQ_FIT && EQ_SHELF === id;
+    return `<button type="button" role="tab" class="v2-btn" data-eqshelf="${id}"
+      aria-selected="${on}" tabindex="${on || (EQ_FIT && id === "all") ? 0 : -1}"
+      aria-controls="eq-list" aria-label="${esc(label)}, ${n}">${tradeGlyph(icon)}<span>${
+      esc(label)}</span><small>${n}</small></button>`;
+  };
+  const fitWord = EQ_FIT ? eqSlotLabel(s, EQ_FIT) : "";
+  const rail = railBtn("all", "Everything", "lorc-knapsack", rows.length)
+    + Object.keys(TRADE_SHELVES).filter(k => counts[k])
+      .map(k => railBtn(k, TRADE_SHELVES[k].label, TRADE_SHELVES[k].icon, counts[k])).join("")
+    + (EQ_FIT ? `<div class="fitting">Showing what fits the ${esc(fitWord)}.
+        <button type="button" class="v2-btn is-quiet is-small" data-equnfit>Show everything</button></div>` : "");
+
+  // A to Z and nothing else. "In use first" was tried in the mock and moved the row just
+  // pressed to the top of the list, out from under the pointer, the one kind of motion
+  // the owner has ruled out; what is in use is marked where it stands instead.
+  const list = rows.filter(r => (EQ_FIT ? eqFitsSlot(r, EQ_FIT)
+    : EQ_SHELF === "all" || eqShelf(r) === EQ_SHELF))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const head = EQ_FIT ? `Fits the ${fitWord}`
+    : EQ_SHELF === "all" ? "Everything you carry" : TRADE_SHELVES[EQ_SHELF].label;
+  const items = list.map(r => {
+    const on = !!r.state;
+    return `<li class="eqrow${on ? " inuse" : ""}" data-eqid="${esc(r.id)}">
+      <span class="tile${on ? " inuse" : ""}">${tradeGlyph(eqIcon(r))}</span>
+      <span class="eqname"><b>${esc(r.name)}</b>${eqQty(r) ? `<span class="qty">${esc(eqQty(r))}</span>` : ""}${
+        on ? `<span class="chip">${esc(r.state)}</span>` : ""}
+        <span class="facts">${eqFacts(s, r)}</span>${
+        r.note ? `<span class="facts eqnote">${esc(r.note)}</span>` : ""}</span>
+      <span class="eqacts">${(r.acts || []).map((a, i) => `<button type="button"
+        class="v2-btn is-small${i === 0 ? " is-go" : ""}" data-eqact="${i}" data-eqid="${esc(r.id)}"
+        aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>`).join("")}</span>
+    </li>`;
+  }).join("");
+  const empty = EQ_FIT
+    ? `<li class="eqempty">Nothing you carry goes there. A counter may sell one:
+        <button type="button" class="v2-btn is-quiet is-small" data-eqtrade>Go to Trade</button></li>`
+    : `<li class="eqempty">Nothing of that kind in your pack.</li>`;
+
+  // Worn and wielded. The engine holds one weapon in hand (`Actor.equipped`) and the
+  // shield has a body slot of its own, so there is no off-hand weapon to show; the box
+  // says so rather than being an empty place to click.
+  const held = rows.find(r => r.kind === "weapon" && r.state === "in hand");
+  const slotBtn = (key, label, item, icon) => `<button type="button" class="v2-btn slotbtn${
+      item ? "" : " empty"}" data-eqslot="${key}" aria-pressed="${EQ_FIT === key}">
+      <span class="tile${item ? " inuse" : ""}">${icon ? tradeGlyph(icon) : ""}</span>
+      <span><span class="sl">${esc(label)}</span><span class="it">${esc(item || "empty")}</span></span></button>`;
+  const col = side => `<div class="slotcol">${(((s.equipment || {}).slots || {})[side] || []).map(sl => {
+    const names = sl.items.filter(it => !it.empty).map(it => it.item);
+    const worn = names.length && rows.find(r => r.state === "worn" && r.fits === sl.key);
+    return slotBtn(sl.key, sl.label, names.join(", "), worn ? eqIcon(worn) : EQ_SLOT_ICON[sl.key] || "");
+  }).join("")}</div>`;
+  const chosen = EQ_FIT && EQ_FIT !== "hand" ? eqSlots(s).find(x => x.key === EQ_FIT) : null;
+
+  return `<div class="eq">
+    <nav class="eqrail" id="eq-rail" role="tablist" aria-orientation="vertical"
+         aria-label="What you carry, by kind">${rail}</nav>
+    <section class="eqlist" id="eq-list" role="tabpanel" aria-labelledby="eq-listhead">
+      <div class="eqlisthead"><h2 id="eq-listhead">${esc(head)}</h2>
+        <p class="eqsort">${list.length} ${list.length === 1 ? "thing" : "things"}, A to Z</p></div>
+      <p class="eqsay${EQ_SAY_BAD ? " bad" : ""}" id="eq-say" role="status" tabindex="-1">${EQ_SAY ? esc(EQ_SAY)
+        : `<span class="why">Wield or wear something, and what the rules say back is written here.</span>`}</p>
+      <ul class="eqrows">${items || empty}</ul>
+      <p class="eqload"><b>Weight.</b> Only weapons carry a weight in the rules, written on
+        their rows. Load is <span class="unknown">not tracked</span>, so nothing here slows
+        ${esc(String(s.identity.name || "").split(" ")[0])} down.</p>
+      <p class="credit">Item icons by Lorc, Delapouite, Skoll, Sbed, Willdabeast, Carl Olsen,
+        Caro Asercion and Lucas from <a href="https://game-icons.net" target="_blank"
+        rel="noopener">game-icons.net</a>, <a href="https://creativecommons.org/licenses/by/3.0/"
+        target="_blank" rel="noopener">CC BY 3.0</a>, recoloured.</p>
+    </section>
+    <aside class="doll v2-tooled-leather v2-gilt-edge" aria-labelledby="doll-head">
+      <h2 id="doll-head">Worn and wielded</h2>
+      <div class="hands">${slotBtn("hand", "In hand", held ? held.name : "", held ? eqIcon(held) : "")}
+        <div class="slotbtn v2-btn empty offhand" role="note"
+             aria-label="Off hand: the rules hold one weapon at a time">
+          <span class="tile"></span><span><span class="sl">Off hand</span>
+          <span class="it">one weapon at a time</span></span></div></div>
+      <div class="slots">${col("left")}${col("right")}</div>
+      ${chosen ? slotEditor(chosen) : ""}
+      <p class="dollnote">Choose a slot to see what you carry that goes there.</p>
+    </aside>
+  </div>`;
+}
+
+// The chosen slot's own lines, as the old Equipment page had them: a name written in a
+// line is worn there (the catalogue joins a known magic item's effects to it), emptying
+// the line takes it off, and a slot the rules allow more of can take another line. The
+// armour and shield lines are the armour worn, and say so rather than being typed in.
+function slotEditor(sl) {
+  const canAdd = sl.items.length < sl.max;
+  return `<div class="slotedit" data-slot="${sl.key}">
+    <h3>${esc(sl.label)} <small>${esc(sl.holds)}${
+      sl.max > sl.rules_limit ? `; ${sl.rules_limit} work${sl.rules_limit === 1 ? "s" : ""} at once` : ""}</small></h3>
+    ${sl.items.map(it => `<div class="slotrow${it.empty ? " isempty" : ""}${it.beyond_rules ? " beyond" : ""}">
+      <label class="vh" for="slotin-${sl.key}-${it.index}">${esc(sl.label)}, line ${it.index + 1}</label>
+      <input class="slotinput v2-well" id="slotin-${sl.key}-${it.index}" data-slot="${sl.key}"
+             data-index="${it.index}" value="${esc(it.item || "")}" placeholder="empty"
+             ${sl.derived ? "disabled" : ""}>
+      ${!sl.derived && !it.empty ? `<button type="button" class="v2-btn is-quiet is-small emptyslot"
+        data-slot="${sl.key}" data-index="${it.index}"
+        aria-label="Empty ${esc(sl.label)} line ${it.index + 1}">Empty</button>` : ""}
+      ${sl.items.length > 1 && !sl.derived ? `<button type="button" class="v2-btn is-quiet is-small delslot"
+        data-slot="${sl.key}" data-index="${it.index}"
+        aria-label="Remove ${esc(sl.label)} line ${it.index + 1}">Remove line</button>` : ""}
+    </div>`).join("")}
+    ${canAdd && !sl.derived ? `<button type="button" class="v2-btn is-quiet is-small addslot"
+      data-slot="${sl.key}">Another ${esc(sl.label.toLowerCase())} line</button>` : ""}
+    ${sl.derived ? `<p class="why">What is worn here is the ${sl.key === "armor" ? "armour" : "shield"}
+      put on from the list.</p>` : ""}
+  </div>`;
+}
+
+// The numbers across the Equipment head: the engine's AC, touch, flat-footed and saves
+// from the sheet, marked where the last act moved them.
+function drawEqNums() {
+  const box = document.getElementById("eq-nums");
+  if (!box || !SHEET || !SHEET.defense) return;
+  const d = SHEET.defense;
+  const now = { AC: d.ac.total, Touch: d.ac_touch.total, Flat: d.ac_flat_footed.total };
+  for (const sv of d.saves || []) now[sv.name] = sv.total;
+  const signed = new Set((d.saves || []).map(sv => sv.name));
+  box.innerHTML = Object.entries(now).map(([k, v]) => `<div class="v2-plaque"><dt>${esc(
+    k === "Fortitude" ? "Fort" : k === "Reflex" ? "Ref" : k)}</dt><dd class="${
+    EQ_BEFORE && EQ_BEFORE[k] !== undefined && EQ_BEFORE[k] !== v ? "moved" : ""}">${
+    signed.has(k) ? sign(v) : v}</dd></div>`).join("");
+}
+const eqNumbers = () => {
+  if (!SHEET || !SHEET.defense) return null;
+  const d = SHEET.defense, out = { AC: d.ac.total, Touch: d.ac_touch.total, Flat: d.ac_flat_footed.total };
+  for (const sv of d.saves || []) out[sv.name] = sv.total;
+  return out;
+};
+
+function eqRedraw(focus) {
+  if (!SHEET || SHEET_TAB !== "equipment") return;
+  $("#sheetbody").innerHTML = pageEquipment(SHEET);
+  drawEqNums();
+  if (!focus) return;
+  const again = focus.id && (document.querySelector(`#sheetbody [data-eqid="${CSS.escape(focus.id)}"] button`)
+    || document.querySelector(`#sheetbody .eqrow[data-eqid="${CSS.escape(focus.id)}"]`));
+  // A button that went with the act (Wield, once the thing is in hand) hands the focus to
+  // the answer, so the keyboard is not dropped at the top of the page.
+  const to = focus.sel ? document.querySelector(focus.sel)
+    : (again && again.tagName === "BUTTON" ? again : document.getElementById("eq-say"));
+  if (to) to.focus({ preventScroll: true });
+}
+
+// An act on a row: the door the server named, the answer written where the page keeps a
+// line for it, the sheet read again, the sides and the story told (a state is drawn).
+async function eqAct(btn) {
+  const row = eqRows(SHEET).find(r => r.id === btn.dataset.eqid);
+  const act = row && (row.acts || [])[Number(btn.dataset.eqact)];
+  if (!act) return;
+  EQ_BEFORE = eqNumbers();
+  btn.disabled = true;
+  busy(true);
+  let said = "", bad = false;
+  try {
+    const d = await post(act.api, act.body);
+    if (act.api === "/api/use") {
+      said = d.tell || "";
+      if (d.sheet) SHEET = d.sheet;
+      render(await getState());
+    } else if (act.api === "/api/slots") {
+      if (d && d.equipment) SHEET = d;
+      said = `${row.name} is worn at the ${eqSlotLabel(SHEET, act.body.slot)} now.`;
+      render(await getState());
+    } else {
+      said = d.wear_tell || "";
+      render(d);
+    }
+    if (act.api !== "/api/use" && act.api !== "/api/slots") SHEET = await readJSON(await fetch("/api/sheet"));
+  } catch (err) {
+    said = err.message || String(err);
+    bad = true;
+  } finally { busy(false); }
+  EQ_SAY = said;
+  EQ_SAY_BAD = bad;
+  eqRedraw({ id: row.id });
 }
 
 async function slotAction(payload) {
+  EQ_BEFORE = eqNumbers();
   try {
     SHEET = await post("/api/slots", payload);
-    drawSheet();
+    EQ_SAY = "";
+    EQ_SAY_BAD = false;
+    drawSheet(true);
+    // The left panel's In hand and worn reads the state, which has moved too.
+    render(await getState());
   } catch (e) {
-    alert(e.message);
+    EQ_SAY = e.message || String(e);
+    EQ_SAY_BAD = true;
+    drawSheet(true);
   }
 }
+
+document.addEventListener("click", e => {
+  const act = e.target.closest("#sheetbody [data-eqact]");
+  if (act && !act.disabled) { eqAct(act); return; }
+  const shelf = e.target.closest("#sheetbody [data-eqshelf]");
+  if (shelf) {
+    EQ_SHELF = shelf.dataset.eqshelf;
+    EQ_FIT = null;
+    eqRedraw({ sel: `#sheetbody [data-eqshelf="${CSS.escape(EQ_SHELF)}"]` });
+    return;
+  }
+  const slot = e.target.closest("#sheetbody [data-eqslot]");
+  if (slot) {
+    EQ_FIT = EQ_FIT === slot.dataset.eqslot ? null : slot.dataset.eqslot;
+    eqRedraw({ sel: `#sheetbody [data-eqslot="${CSS.escape(slot.dataset.eqslot)}"]` });
+    return;
+  }
+  if (e.target.closest("#sheetbody [data-equnfit]")) {
+    EQ_FIT = null;
+    eqRedraw({ sel: `#sheetbody [data-eqshelf="${CSS.escape(EQ_SHELF)}"]` });
+    return;
+  }
+  if (e.target.closest("[data-eqtrade], #eq-trade")) { Shell.show("trade"); return; }
+});
+
+// The shelves are one tab stop, walked with the arrows (WAI-ARIA's tabs pattern,
+// vertical), as the trade window's are.
+document.addEventListener("keydown", e => {
+  const here = e.target.closest && e.target.closest("#sheetbody [data-eqshelf]");
+  if (!here) return;
+  const keys = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+  const tabs = [...document.querySelectorAll("#sheetbody [data-eqshelf]")];
+  const at = tabs.indexOf(here);
+  let to = null;
+  if (e.key in keys) to = (at + keys[e.key] + tabs.length) % tabs.length;
+  else if (e.key === "Home") to = 0;
+  else if (e.key === "End") to = tabs.length - 1;
+  if (to === null) return;
+  e.preventDefault();
+  EQ_SHELF = tabs[to].dataset.eqshelf;
+  EQ_FIT = null;
+  eqRedraw({ sel: `#sheetbody [data-eqshelf="${CSS.escape(EQ_SHELF)}"]` });
+});
+
 
 // Delegated so the handlers survive every redraw.
 document.addEventListener("click", e => {
@@ -1431,6 +1483,11 @@ document.addEventListener("click", e => {
   const del = e.target.closest(".delslot");
   if (del) return slotAction({action: "remove", slot: del.dataset.slot,
                               index: Number(del.dataset.index)});
+  // Emptying a line is taking off whatever was written in it: the sheet's own `set`
+  // with nothing, and the effects stop because `worn_items` asks the slots.
+  const clear = e.target.closest(".emptyslot");
+  if (clear) return slotAction({action: "set", slot: clear.dataset.slot,
+                                index: Number(clear.dataset.index), item: ""});
   // `data-action` is required, not implied. The Cast button carries `prepbtn` too (it is
   // how 02-state.js's attach handler and its tests find it), and the old `.prepbtn`
   // match sent it here with no action — which the server reads as "prepare". Measured
@@ -1600,77 +1657,157 @@ document.addEventListener("change", e => {
                          index: Number(input.dataset.index), item: input.value});
 });
 
-// --- Background ---
-function tabBackground(s) {
+// --- Background, notes, companions ---
+function backgroundCard(s) {
   const b = s.background, i = s.identity;
-  return `<div class="cols">
-    <div class="card">
-      <h3>In the world</h3>
+  // The identity line the old sheet's header carried, gender and pronouns included,
+  // "because the narrator reads both and a player who is being described wrongly needs
+  // somewhere to look and see what it was told".
+  const who = [i.heritage, i.race, i.class, i.size, i.gender, i.pronouns].filter(Boolean);
+  return sheetCard("sc-background", "Background and notes", `<div class="twocol">
+    <div>
+      <p class="idline">${esc(who.join(", "))}</p>
+      <h3 class="cardsub">In the world</h3>
       <div class="terms">
-        <div class="t"><span>People</span><b>${esc(b.heritage || "—")}</b></div>
-        <div class="t"><span>World Bible id</span><b>${esc(i.world_people_id || "—")}</b></div>
+        <div class="t"><span>People</span><b>${esc(b.heritage || "none named")}</b></div>
+        <div class="t"><span>World Bible id</span><b>${esc(i.world_people_id || "none")}</b></div>
       </div>
-      <div class="why" style="margin-top:10px">
-        The rules race and the world's people are different things, and the sheet
-        carries both. ${esc(i.heritage || "This people")} is who
-        ${esc(i.name)} is in the world; ${esc(i.race)} is what the rules use.
-      </div>
-
+      <p class="why">The rules race and the world's people are different things, and the
+        sheet carries both. ${esc(i.heritage || "This people")} is who ${esc(i.name)} is in
+        the world; ${esc(i.race)} is what the rules use.</p>
       ${b.past ? `
-      <h3 style="margin-top:16px">Before this</h3>
-      <div class="terms">
-        <div class="t"><span>Background</span><b>${esc(b.past.name)}</b></div>
-      </div>
-      ${b.past.line ? `<div class="why" style="margin-top:6px">${esc(b.past.line)}</div>` : ""}
-      ${b.past.ties.length
-        ? b.past.ties.map(t => `<div style="margin-top:10px">${esc(t)}</div>`).join("")
-        : `<div class="empty" style="margin-top:10px">Chosen, but this world has not
-             filled it in yet — the names arrive when the campaign begins.</div>`}
-      ` : ""}
+      <h3 class="cardsub">Before this</h3>
+      <div class="terms"><div class="t"><span>Background</span><b>${esc(b.past.name)}</b></div></div>
+      ${b.past.line ? `<p class="why">${esc(b.past.line)}</p>` : ""}
+      ${b.past.ties.length ? b.past.ties.map(t => `<p>${esc(t)}</p>`).join("")
+        : `<p class="why">Chosen, but this world has not filled it in yet: the names arrive
+             when the campaign begins.</p>`}` : ""}
+      <h3 class="cardsub">Companions</h3>
+      <p class="why" data-page="companions">No animal companion, familiar, cohort or mount.</p>
     </div>
-    <div class="card">
-      <h3>Notes</h3>
-      ${b.notes ? `<div style="white-space:pre-wrap">${esc(b.notes)}</div>`
-                : `<div class="empty">None.</div>`}
-      <h3 style="margin-top:16px">The manual</h3>
-      <div class="why">
-        How the app works, what it needs, and what the slash commands do —
-        <a href="/manual" target="_blank" rel="noopener">open the manual</a>.
-      </div>
-
-      <h3 style="margin-top:16px">Rules content</h3>
-      <div class="why">
-        The Pathfinder rules this app runs on — spells, creatures, feats, weapons and the
-        tables behind them — are Open Game Content under the
+    <div>
+      <h3 class="cardsub">Notes</h3>
+      ${b.notes ? `<p class="notes">${esc(b.notes)}</p>` : `<p class="why">None.</p>`}
+      <h3 class="cardsub">The manual</h3>
+      <p class="why">How the app works, what it needs, and what the slash commands do:
+        <a href="/manual" target="_blank" rel="noopener">open the manual</a>.</p>
+      <h3 class="cardsub">Rules content</h3>
+      <p class="why">The Pathfinder rules this app runs on (spells, creatures, feats, weapons
+        and the tables behind them) are Open Game Content under the
         <a href="/licence" target="_blank" rel="noopener">Open Game Licence v1.0a</a>,
         which section 10 requires travel with it. This project is not published by,
-        endorsed by, or affiliated with Paizo Inc.
-      </div>
-      <div class="why" style="margin-top:8px">${spellIconCredit()}</div>
+        endorsed by, or affiliated with Paizo Inc.</p>
+      <p class="why">${spellIconCredit()}</p>
     </div>
+  </div>`);
+}
+
+// --- The Journal tab ---
+// The matters in play (the quest cards the engine keeps), what people said (the
+// conversation log, read a person at a time from `/api/conversation`, which only reads),
+// and the places walked. What is said is answered in Talk; this is the record.
+function pageJournal(s) {
+  const nodes = ((((STATE || {}).scene || {}).places_found || {}).nodes || []);
+  const walked = nodes.filter(n => n.visited);
+  return `<div class="journal">
+    ${sheetCard("jr-matters", "Matters in play", tabQuests(s), "jr-matters")}
+    ${sheetCard("jr-said", "What people said", journalSaid(), "jr-said")}
+    ${sheetCard("jr-walked", "Where you have been", walked.length
+      ? `<ol class="plain walked">${walked.map(n => `<li>${esc(n.name)}${
+          n.current ? ` <span class="chip">here</span>` : ""}</li>`).join("")}</ol>
+        <p class="why">The Map tab draws these, and the ways between them.</p>`
+      : `<p class="why">Nowhere yet: the places you walk to are kept here.</p>`, "jr-walked")}
+    <p class="jr-log why">The adventure log, a record of each session, is not kept yet.</p>
   </div>`;
 }
 
+// The quest log: the tasks taken up, read off the situation cards of kind quest the
+// engine keeps. Objectives say what to do next; the facts under them say what has
+// happened (Baldur's Gate 3's journal keeps the two apart for the same reason).
+function tabQuests() {
+  const q = (STATE && STATE.quests) || { active: [], finished: [] };
+  const one = (k, done) => `<li class="matter${done ? " done" : ""}">
+      <h3>${esc(k.title)}${done ? ` <span class="chip">finished</span>` : ""}</h3>
+      ${k.giver ? `<p class="why">for ${esc(k.giver)}</p>` : ""}
+      ${k.objectives.length ? `<ul class="objectives">${k.objectives.map(o =>
+        `<li class="${o.done ? "done" : ""}">${esc(o.text)}${o.done ? `<span class="vh">, done</span>` : ""}</li>`).join("")}</ul>` : ""}
+      ${k.reward ? `<p class="why">Promised: ${esc(k.reward)}</p>` : ""}
+      ${k.facts.length ? `<p class="why">${k.facts.map(esc).join(" ")}</p>` : ""}
+    </li>`;
+  return `${q.active.length ? `<ul class="plain matters">${q.active.map(k => one(k, false)).join("")}</ul>`
+      : `<p class="why">Nothing taken on yet. When somebody gives you a task and you take it,
+          it is kept here.</p>`}
+    ${q.finished.length ? `<h3 class="cardsub">Finished</h3>
+      <ul class="plain matters">${q.finished.map(k => one(k, true)).join("")}</ul>` : ""}`;
+}
+
+let JOURNAL_WITH = "all";
+let JOURNAL_LOG = null;         // the entries last read, for the person shown
+function journalSaid() {
+  const people = ((((STATE || {}).scene || {}).conversation || {}).people || []);
+  const pick = people.length ? `<div class="v2-recess jr-people" role="group" aria-label="Whose words">
+      <button type="button" class="v2-btn" data-jrwith="all" aria-pressed="${JOURNAL_WITH === "all"}">Everyone</button>
+      ${people.map(p => `<button type="button" class="v2-btn" data-jrwith="${esc(p.ref)}"
+        aria-pressed="${JOURNAL_WITH === p.ref}">${esc(title(p.name))}</button>`).join("")}
+    </div>` : "";
+  return `${pick}<div class="jr-log-lines" id="jr-log" tabindex="0" role="log" aria-live="off"
+      aria-label="What was said">${journalLines()}</div>
+    <p class="why">To answer anybody, open Talk from the Table.</p>`;
+}
+function journalLines() {
+  if (JOURNAL_LOG === null) return `<p class="why">Reading what was said.</p>`;
+  if (!JOURNAL_LOG.length) return `<p class="why">Nobody has spoken with you yet. What people
+    say to you, and what you say back, is kept here.</p>`;
+  let out = "", group = null;
+  for (const e of JOURNAL_LOG) {
+    const key = `${e.who}|${e.beat}`;
+    if (key !== group) {
+      if (group !== null) out += `</div>`;
+      out += `<div class="jr-turn"><span class="jr-name">${esc(e.who === "you" ? "You" : title(e.name || e.who))}</span>`;
+      group = key;
+    }
+    out += `<p><q>${esc(e.text)}</q></p>`;
+  }
+  return out + (group !== null ? `</div>` : "");
+}
+async function journalRead() {
+  try {
+    const d = await readJSON(await fetch(`/api/conversation?with=${encodeURIComponent(JOURNAL_WITH)}&limit=200`,
+                                         { cache: "no-store" }));
+    JOURNAL_LOG = d.entries || [];
+  } catch (err) {
+    JOURNAL_LOG = [];
+  }
+  const box = document.getElementById("jr-log");
+  if (box) { box.innerHTML = journalLines(); box.scrollTop = box.scrollHeight; }
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("#sheetbody [data-jrwith]");
+  if (!b) return;
+  JOURNAL_WITH = b.dataset.jrwith;
+  document.querySelectorAll("#sheetbody [data-jrwith]").forEach(x =>
+    x.setAttribute("aria-pressed", String(x === b)));
+  journalRead();
+});
+
 /* An existing character with nothing said about what they are.
    The forge asks everyone made since the field existed, but the roster still holds four
-   who predate it and read they/them — which says nothing about a body, so nothing can be
+   who predate it and read they/them, which says nothing about a body, so nothing can be
    derived from it and guessing from a name is the thing the field exists to stop. */
 function askGender(missing) {
-  // Scoped to the sheet, not `$(".sheethead")`. The trade panel reuses that class and
-  // sits earlier in the document, so the bare selector returned *its* header — and
-  // `insertBefore` threw "the node before which the new node is to be inserted is not a
-  // child of this node", silently, with the prompt never appearing.
-  const head = $("#sheetpanel .sheethead");
+  // Into the sheet's own notice line above its page (scoped to the sheet panel: the
+  // trade panel once shared a class name and took a prompt meant for the sheet).
+  const note = $("#sheetpanel #sheetnote");
   let bar = $("#genderask");
   if (!missing) { if (bar) bar.remove(); return; }
-  if (bar) return;
+  if (bar || !note) return;
   bar = document.createElement("div");
   bar.id = "genderask";      // styled in table.html, so a phone can give it a line
   bar.innerHTML = `Nothing on this sheet says what they are, so the narration will
     pick for them.
-    <button class="quiet" data-setgender="woman">woman</button>
-    <button class="quiet" data-setgender="man">man</button>`;
-  head.insertBefore(bar, $("#closesheet"));
+    <button type="button" class="v2-btn is-quiet is-small" data-setgender="woman">woman</button>
+    <button type="button" class="v2-btn is-quiet is-small" data-setgender="man">man</button>`;
+  note.insertBefore(bar, $("#sheeterr"));
 }
 
 $("#sheetpanel").addEventListener("click", async e => {
@@ -1686,7 +1823,6 @@ $("#sheetpanel").addEventListener("click", async e => {
   openSheet();
 });
 
-$("#closesheet").onclick = closeSheet;
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   // One Esc, one layer: a spell's details close first and the sheet stays open behind
@@ -1696,5 +1832,6 @@ document.addEventListener("keydown", e => {
     closeDetail(true);
     return;
   }
+  // Then the page itself goes back to the Table, as Close did before the tabs.
   if ($("#sheetpanel").classList.contains("on")) closeSheet();
 });

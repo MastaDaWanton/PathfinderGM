@@ -7,8 +7,11 @@
 // never by `pc.castable`, which offers a prepared caster's whole book when nothing is
 // prepared.
 //
-// Stage 1 carries today's Spells page (05's `tabSpells`: the slots as gem sockets,
-// prepared today as cards, the grimoire index) into the tab as it is.
+// The page is the I5 Spells page (05's `tabSpells`), its behaviour kept and restyled onto
+// the design's framed cards: the slots as gem sockets by level, lit while unspent and red
+// once spent today (the owner, 2026-09-29), prepared spells as cards with Details,
+// cantrips at will, and Cast attaching the spell to the pen as a chip. The house rule is
+// said on the page: prepare whenever, but a spent slot stays spent until a long rest.
 
 Shell.tab("spells", {
   enter() { sheetInto("spells"); },
