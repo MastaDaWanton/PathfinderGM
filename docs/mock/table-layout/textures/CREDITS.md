@@ -43,7 +43,7 @@ Nothing of either is in the repository now.
 
 ## What was made, and what each replaces
 
-Sizes are as committed. 2,425,393 bytes in all, eighteen files.
+Sizes are as committed. 2,637,933 bytes in all, 19 files.
 
 | File | Made from | Dimensions | Bytes | Replaces (was `play/static/img/...`) |
 |---|---|---|---|---|
@@ -56,6 +56,7 @@ Sizes are as committed. 2,425,393 bytes in all, eighteen files.
 | `card-leather.jpg` | Brown Leather, toned to the old card leather and one step darker for the dim labels' contrast | 1024x1024 | 186,546 | `card-leather.jpg`: the top bar, the desk, framed cards, the Talk tray, the Equipment head |
 | `side-leather.jpg` | Fabric Leather 02, the seamless right half, as grey grain for the CSS's multiply | 600x1200 | 204,333 | `leather-tile.jpg`: the two sides, the Equipment figure, the one-column sheet |
 | `page-paper.jpg` | Paper 006, toned to the old page's dark | 1024x1024 | 217,819 | `card-leather.jpg` where it was the book's page |
+| `chart-paper.jpg` | Paper 006 again, left light: a warm parchment (mean #ccbd9c), its grain at 2.2 times the photograph's spread | 1024x1024 | 212,540 | nothing: new, the sheet the Places chart is inked on (Map mode) |
 | `brass-grain.jpg` | Metal 048 C colour and roughness, as grey grain around the middle | 512x512 | 54,096 | nothing: laid over the gilt gradient (rings, gilt edges, coin rims) in soft-light |
 | `clasp-tl.png`, `-tr`, `-bl`, `-br` | the old clasp's own alpha and relief; Metal 047 B for the plate, Metal 048 C for the gilt; lit by the page's lamp | 340x247 each | 141,579 / 140,931 / 140,750 / 141,966 | `clasp-*.png` (same size, same silhouette, so the same placement) |
 | `boss-top.png`, `-bottom`, `-left`, `-right` | the old boss's own alpha and relief, the same metals and lamp | 380x249, 249x380 | 185,780 / 186,068 / 187,525 / 188,711 | `boss-*.png` (same size, same silhouette) |
@@ -73,5 +74,7 @@ python docs/mock/table-layout/textures/prepare.py --src path/to/cc0 --owner path
 ```
 
 Run twice on 2026-09-29 (after the tab was added), it wrote the same bytes both times for
-all eighteen files; the twelve committed in the passes before (the leathers, paper, brass
-grain, clasps and bosses) came out unchanged from their commits.
+all eighteen files then made; the twelve committed in the passes before (the leathers,
+paper, brass grain, clasps and bosses) came out unchanged from their commits. Run again on
+2026-09-30 with the chart paper added, every earlier file came out byte for byte as
+committed.

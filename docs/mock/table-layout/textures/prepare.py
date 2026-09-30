@@ -126,6 +126,22 @@ def surfaces(src: Path) -> None:
     save_jpg(g.convert("RGB"), "brass-grain.jpg", 84)
 
 
+def chart(src: Path) -> None:
+    """The parchment the place chart is drawn on (Map mode, Places): the same Paper 006 as
+    the book's page, but left light, as a sheet of paper laid on the desk under the lamp
+    and inked on, the way the other mock (mock/table-free) draws the chart the owner
+    picked. Its mean is a warm parchment, #ccbd9c; its grain is the photograph's own at
+    2.2 times its spread, enough to read as paper at the drawn size and not so much that
+    the ink's thin lines break up. The ink labels on it measure 5-9:1 (README)."""
+    im = load(src / "Paper006_2K-JPG_Color.jpg").resize((1024, 1024), Image.LANCZOS)
+    a = ycc(im)
+    target = ycc(Image.new("RGB", (1, 1), (0xcc, 0xbd, 0x9c)))[0, 0]
+    out = np.empty_like(a)
+    for c, gain in ((0, 2.2), (1, 0.8), (2, 0.8)):
+        out[..., c] = (a[..., c] - a[..., c].mean()) * gain + target[c]
+    save_jpg(from_ycc(out), "chart-paper.jpg", 80)
+
+
 def room(owner: Path) -> None:
     """The room: the owner's own boiler room (18.webp), the page's backdrop.
 
@@ -389,6 +405,7 @@ if __name__ == "__main__":
                     help="folder holding the owner's own 18.webp and 19.jpg")
     args = ap.parse_args()
     surfaces(args.src)
+    chart(args.src)
     ornaments(args.src)
     room(args.owner)
     device(args.owner)

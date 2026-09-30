@@ -26,7 +26,7 @@ ways and their reasons. **Start again** goes back to the gate with the story and
 as they began.
 
 A link can open any state directly, for sending the owner straight to a thing:
-`#char=ysolde&mode=spells`, `#mode=map&view=3d&turn=1`, `#mode=equipment&fit=shoulders`,
+`#char=ysolde&mode=spells`, `#mode=map&view=3d&turn=1`, `#mode=map&view=places`, `#mode=equipment&fit=shoulders`,
 `#talk=1`, `#hide=1`, `#wanted=1`.
 
 ## The texture pass
@@ -397,6 +397,55 @@ feeds the combat bar and the pen: a map that hid them would make the player swit
 to act. The two traditions agree on size and disagree on the rest: Foundry makes the
 board the whole canvas, and Owlcat and Larian open a large map on a key (BG3 also keeps a
 minimap). Neither lets it cover the controls you act with.
+
+**Places: the town, under a fog of war (2026-09-29).** The owner, pointing at the empty
+space in the Map head row: "add another button that displays the map you built in your
+mock-up but with the fog of war only being able to see places conected to where you have
+been before. and instead of displaying the number of places the rules know you display the
+number of places found by the user."
+
+- **The button.** "Places" sits in that space as its own button, apart from Flat and 3D,
+  because it is a different map: the town, not the ground you stand on. Pressed, the board
+  becomes the chart; pressed again (or Flat or 3D), it is the ground again as it was left.
+  The ground's own controls keep their room but go out of use (hidden by visibility, not
+  removed), so nothing in the head row moves under the pointer that pressed Places.
+- **The drawing** is the other mock's (`mock/table-free`, `views.js`), the owner's
+  favourite piece, its code carried over as it was (`places.js`): the spring layout over
+  the exits alone, solid lines for next door and dashed for the ways outside the walls,
+  your place filled, the places one way from you ringed, a pressed place giving the way
+  there leg by leg with its time, "About N minutes on foot", and Walk there. It is inked on
+  a parchment sheet (`textures/chart-paper.jpg`, the same Paper 006 as the book's page,
+  left light) framed in the panels' gilt, with the pressed place's slip in the desk's
+  leather beside it. The layout is worked out once over the whole town, so a place never
+  moves as more is found; the sheet's frame closes in on what is found, and the ink (rings,
+  lines, names) is sized in screen pixels, so names stay 13.5px whatever the scale. A name
+  goes to the right of its place, or left, above or below where it would run into another
+  (at 1024 and on a phone "north crossing" ran over the warrens' ring before that rule).
+- **The fog**, by the owner's ruling: on the chart is every place visited this session and
+  every place one way from any of them, by name; nothing else is drawn, no place, line or
+  name. A place seen but not yet visited is written in italic in a paler ink with a paler
+  ring. A way out of a seen place, not yet known, is a short stroke that fades into the
+  paper, dashed if it leads outside the walls: the way is there, where it goes is not.
+  Lines are drawn only for ways out of places you have been. Walks go by known ways only.
+- **The visited set** starts at the gate, lives in memory and in `sessionStorage` (read and
+  written inside try/catch, so a private window keeps it in memory only), and grows with
+  every move: the exits row (`walk()`, the one place the mock moves you) and Walk there,
+  leg by leg. The mock has no place chips in the pen, so there is no third way in. Start
+  again sets it back to the gate.
+- **Wanted**: the ways the watch holds are drawn in rubric with a bar across them, a third
+  of the way out from the place they are shut from, and no walk goes through them.
+- **The header** says what was found: "9 places found, 1 of them visited" at the gate, "10
+  places found, 3 of them visited" after the market and the north crossing, "all of them
+  visited" when there is nothing seen and unvisited; then the other mock's own "Solid lines
+  are next door; dashed lead outside the walls." Both numbers, because a player reading
+  "10 found" wants to know how much of it they have walked.
+- **Contrast** on the parchment, median / darkest 2% of the paper (the worst case for dark
+  ink): visited names #2a2019 8.6 / 6.1; seen names #3d3024 6.9 / 4.9.
+- **In the real app** the chart needs two things the engine does not keep today: a
+  persisted visited-places field on the campaign (the mock's `sessionStorage` set stands in
+  for it), and the exits read live at each place, as `/api/state` already returns them for
+  the place you are in. New places the engine creates would then join the chart the first
+  time a way to them is seen from somewhere visited, with no change to the drawing.
 
 **Talk is a tray**, because it goes with the story rather than replacing it: the lines
 are read beside the beat that produced them and answered in the pen. The owner ruled it

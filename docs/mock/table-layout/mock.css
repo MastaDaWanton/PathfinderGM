@@ -830,6 +830,98 @@ body.resolving .desk .exitbtn, body.resolving .desk .sugg { opacity: .55; }
 .boardsay { min-height: 44px; }
 .boardsay .say-aside { display: block; padding: 5px 10px; }
 
+/* Places (places.js): the town's places as a chart inked on parchment, laid in the well
+   and framed in the same gilt as the panels. The drawing and its code are the other
+   mock's (mock/table-free), the owner's favourite piece; the ink colours are its own
+   (lapis for you and the ways from here, rubric for the one you pressed and for a way
+   the watch holds). What is added is the fog: a place only seen, not yet visited, is
+   written in italic in a paler ink with a paler ring; a way not yet known is a short
+   stroke fading into the paper. */
+.board.places .boardview { place-items: stretch; padding: 12px; }
+/* The chart's replies are written in its own slip, so the line held open under the ground
+   for its replies gives its height to the chart (44px: at 1024 the chart was 179px tall). */
+.board.places .boardsay { display: none; }
+.placemap { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 14px; min-height: 0;
+            height: 100%; }
+.chart { min-height: 0; overflow: hidden; border-radius: 2px;
+  border: var(--gilt-edge) solid transparent;
+  background:
+    /* the lamp on the sheet, high and left; the sheet's edges browned with handling */
+    radial-gradient(110% 90% at 28% 18%, rgba(255, 243, 212, .22), transparent 62%) padding-box,
+    radial-gradient(140% 120% at 50% 45%, transparent 58%, rgba(96, 62, 24, .38) 100%) padding-box,
+    url("textures/chart-paper.jpg") 40% 40% / 720px auto padding-box,
+    var(--brass-grain) border-box, var(--gilt) border-box;
+  background-size: auto, auto, 720px auto, 256px auto, auto;
+  background-blend-mode: normal, multiply, normal, soft-light, normal;
+  box-shadow: var(--sh-2), inset 0 0 28px rgba(80, 50, 20, .28); }
+.chart svg { display: block; width: 100%; height: 100%; }
+/* Sized in screen pixels: --k is the drawing's units per pixel (places.js measures it). */
+.chart .edge { stroke: rgba(60, 44, 30, .62); stroke-width: calc(1.3px * var(--k)); }
+.chart .edge.road, .chart .stub.road { stroke-dasharray: calc(5px * var(--k)) calc(4px * var(--k)); }
+.chart .edge.shut { stroke: #8e2317; }
+.chart .bar { stroke: #8e2317; stroke-width: calc(2.6px * var(--k)); stroke-linecap: round; }
+.chart .stub { stroke-width: calc(1.7px * var(--k)); stroke-linecap: round; }
+.chart .node { cursor: var(--candle-cursor); }
+.chart .node circle { fill: #f3ead6; stroke: #463a2d; stroke-width: calc(1.5px * var(--k)); }
+.chart .node text { font: 600 calc(13.5px * var(--k))/1 var(--body); fill: #2a2019; paint-order: stroke;
+                    stroke: rgba(226, 213, 184, .9); stroke-width: calc(3px * var(--k));
+                    stroke-linejoin: round; }
+.chart .node.seen circle { fill: rgba(243, 234, 214, .5); stroke: #7d6b55; }
+.chart .node.seen text { font-style: italic; font-weight: 400; fill: #3d3024; }
+.chart .node.near circle { stroke: #27406e; fill: #dde2ef; }
+.chart .node.out circle { stroke-dasharray: calc(3px * var(--k)) calc(2px * var(--k)); }
+.chart .node.here circle { fill: #27406e; stroke: #142457; }
+.chart .node.here text { font-weight: 700; }
+.chart .node:hover circle, .chart .node:focus-visible circle { stroke: #27406e;
+                                                                stroke-width: calc(2.5px * var(--k)); }
+.chart .node:focus { outline: none; }
+.chart .node:focus-visible text { text-decoration: underline; }
+.chart .node.sel circle { stroke: #8e2317; stroke-width: calc(3px * var(--k)); }
+.maprail { display: grid; gap: 10px; align-content: start; min-height: 0; overflow-y: auto; }
+/* The pressed place's slip: the desk's leather, raised. */
+.mapnote { padding: 12px 14px; border-radius: 3px; border: 1px solid #2e251a;
+  background: linear-gradient(rgba(0, 0, 0, .18), rgba(0, 0, 0, .3)),
+              url("textures/card-leather.jpg") 0 0 / 420px auto #241d15;
+  box-shadow: var(--bevel), var(--sh-1); font-size: 14px; line-height: 1.45; }
+.mapnote h3 { margin: 0 0 6px; color: var(--gold); font: 400 17px/1.2 var(--display);
+              letter-spacing: .05em; text-shadow: var(--engraved); }
+.mapnote h3 small { font: italic 400 13px/1 var(--body); color: var(--dim); letter-spacing: 0;
+                    margin-left: 6px; }
+.mapnote p { margin: 0 0 8px; color: var(--dim); }
+.mapnote p:last-child { margin-bottom: 0; }
+.mapnote .shutwhy { color: #d98a78; }
+.mapnote .go { min-height: 34px; padding: 6px 14px; font-size: 14px; }
+.route { list-style: none; margin: 4px 0 10px; padding: 0; counter-reset: leg; display: grid; gap: 3px; }
+.route li { counter-increment: leg; display: grid; grid-template-columns: 18px 1fr auto; gap: 8px;
+            color: var(--ink); }
+.route li::before { content: counter(leg); color: var(--dim); text-align: right; }
+.route li span { color: var(--dim); font-style: italic; }
+/* The chart's key, on the stone under the board. */
+.boardkey .pk { display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+                margin: 0 5px 0 12px; vertical-align: -1px; }
+.boardkey .pk:first-child { margin-left: 0; }
+.pk.here { background: #27406e; box-shadow: 0 0 0 1.5px #cdbe9e; }
+.pk.been { background: #f3ead6; box-shadow: 0 0 0 1.5px #463a2d; }
+.pk.seen { background: rgba(243, 234, 214, .35); box-shadow: 0 0 0 1.5px #9a8870; }
+.pk.fog { width: 20px; height: 2px; border-radius: 1px; vertical-align: 3px;
+          background: linear-gradient(90deg, #cdbe9e, transparent); }
+/* A phone: the chart over the slip, the chart as tall as a phone's width allows it to be
+   read at, the slip under it. */
+/* At 1024 the board is 390px tall: a 260px slip left the chart 330px wide, and the names
+   ran into each other. The slip narrows there. */
+@media (max-width: 1180px) {
+  .placemap { grid-template-columns: minmax(0, 1fr) 210px; gap: 10px; }
+  .mapnote { padding: 10px 12px; font-size: 13.5px; }
+}
+/* A phone: the chart fills the well and the slip is under it, a scroll away. (A fixed
+   320px chart in a 200px well was cut off at its foot.) */
+@media (max-width: 760px) {
+  .board.places .boardview { overflow-y: auto; container-type: size; }
+  .placemap { grid-template-columns: minmax(0, 1fr); grid-template-rows: 100cqh auto;
+              height: auto; }
+  .maprail { overflow: visible; }
+}
+
 /* The flat board: the app's own classes and colours (table.html "a stone relief"). */
 #map { width: 100%; height: 100%; display: block; background: #14110e;
        border: 1px solid #241d15; border-radius: 3px; }

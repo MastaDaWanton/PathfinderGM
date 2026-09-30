@@ -156,7 +156,7 @@ const S = {
   // The guard's two lines arrived on the last beat and have not been read yet.
   convoSeen: D.conversation.recent.filter(e => e.who !== "c9").slice(-1)[0]?.n ?? 0,
   talkSay: "",
-  board: { view: "flat", turn: 0, level: 0, picked: null },
+  board: { view: "flat", last: "flat", turn: 0, level: 0, picked: null },
 };
 const pc = () => D.chars[S.char];
 const eq = () => S.eq[S.char];
@@ -477,16 +477,30 @@ function say(player, aside) {
 // 3D board is scene3d.js itself, loaded from play/static and handed the same payload.
 function renderBoard() {
   const G = D.ground, g = G.grid, B = S.board;
-  $("#board-name").textContent = g.place ? `The ground · ${g.place}` : "The ground";
   $$("[data-view]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.view === B.view)));
-  $("#turnctl").hidden = B.view !== "3d";
+  // Places (places.js) is the town, not the ground: the controls for the ground keep their
+  // places but go out of use, hidden by visibility, so nothing in the head row moves under
+  // the pointer that pressed Places. Turn keeps whatever room it had (it shows in 3D).
+  const places = B.view === "places" && window.Places;
+  $("#turnctl").hidden = (places ? B.last : B.view) !== "3d";
+  $("#turnctl").style.visibility = places ? "hidden" : "";
+  $("#levelctl").style.visibility = places ? "hidden" : "";
   $("#board").classList.toggle("threed", B.view === "3d");
+  $("#board").classList.toggle("places", !!places);
   const levels = (g.levels && g.levels.length > 1) ? g.levels : [0];
   $("#levelctl").hidden = levels.length < 2;
+  if (places) { renderLevels(levels); window.Places.render(); return; }
+  $("#board-name").textContent = g.place ? `The ground · ${g.place}` : "The ground";
+  renderLevels(levels);
+  drawGround(G, g, B, levels);
+}
+function renderLevels(levels) {
+  const B = S.board;
   $("#levelctl").innerHTML = `<span class="seglabel">Looking at</span>` + levels.map(v =>
     `<button type="button" data-level="${v}" aria-pressed="${v === B.level}">${
       v ? `+${v * 5} ft` : "the floor"}</button>`).join("");
-
+}
+function drawGround(G, g, B, levels) {
   const CELL = 18, parts = [];
   const ground = new Map((g.floor || []).map(([c, r, v]) => [`${c},${r}`, v]));
   const cell = (c, r, cls, inner = "") => `<rect class="${cls}" x="${c * CELL}" y="${
@@ -1039,7 +1053,12 @@ document.addEventListener("click", e => {
   }
 
   // The board.
-  if (t.dataset.view) { S.board.view = t.dataset.view; S.board.say = ""; renderBoard();
+  if (t.dataset.view) {
+    // Places is its own button: pressed again, it goes back to the ground as it was left.
+    const B = S.board, v = t.dataset.view;
+    if (v === "places") B.view = B.view === "places" ? B.last : "places";
+    else { B.view = v; B.last = v; }
+    B.say = ""; renderBoard();
     $(`[data-view="${t.dataset.view}"]`).focus(); return; }
   if (t.dataset.turn) { S.board.turn = (S.board.turn + Number(t.dataset.turn) + 4) % 4;
     renderBoard(); $(`[data-turn="${t.dataset.turn}"]`).focus(); return; }
@@ -1092,6 +1111,9 @@ function walk(row) {
   }
   S.place = id;
   S.walked.push(name);
+  // Every move in the mock comes through here (the exits row) or through the chart's Walk
+  // there, so the chart's visited set is kept here. The mock has no place chips in the pen.
+  if (window.Places) window.Places.visit(id);
   say(`I go to ${name}.`, `Mock. The engine moves you from ${from} to ${name}, ${
     time}. The narrator's beat for the walk and the arrival would follow here. The ways on ` +
     `below are the engine's own for ${name}.`);
@@ -1190,6 +1212,7 @@ function setChar(id) {
 $("#mock-wanted").addEventListener("change", e => {
   S.wanted = e.target.checked; S.confirm = null; S.why = "";
   renderSheet(); renderScene();
+  if (S.mode === "map") renderBoard();   // the chart marks the ways the watch holds
 });
 
 function reset() {
@@ -1198,6 +1221,7 @@ function reset() {
   S.walked = [D.places[D.start].name];
   S.eq = Object.fromEntries(Object.entries(D.chars).map(([k, c]) => [k, freshEq(c)]));
   S.eqSay = ""; S.fit = null; S.talkSay = "";
+  if (window.Places) window.Places.reset();
   renderAttach(); renderScene(); renderStory(); renderSheet();
   setMode(S.mode);
 }
@@ -1239,7 +1263,8 @@ renderTalk();
   const q = new URLSearchParams(location.hash.slice(1));
   if (q.get("char") && D.chars[q.get("char")]) setChar(q.get("char"));
   if (q.get("wanted")) { $("#mock-wanted").checked = true; S.wanted = true; renderSheet(); renderScene(); }
-  if (q.get("view")) S.board.view = q.get("view") === "3d" ? "3d" : "flat";
+  if (q.get("view")) S.board.view = ["3d", "places"].includes(q.get("view")) ? q.get("view") : "flat";
+  if (S.board.view === "3d") S.board.last = "3d";
   if (q.get("turn")) S.board.turn = Number(q.get("turn")) & 3;
   if (q.get("shelf")) S.shelf = q.get("shelf");
   if (q.get("fit")) S.fit = q.get("fit");

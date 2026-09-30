@@ -102,6 +102,11 @@
     <div class="boardhead">
       <h2 id="board-name">The ground</h2>
       <div class="boardctl" role="group" aria-label="How to look at it">
+        <!-- The town's places, a third way to look (places.js). Its own button, apart from
+             Flat and 3D, because it is a different map: the town, not the ground here. -->
+        <div class="seg" role="group" aria-label="The town">
+          <button type="button" data-view="places" aria-pressed="false">Places</button>
+        </div>
         <div class="seg" role="group" aria-label="View">
           <button type="button" data-view="flat" aria-pressed="true">Flat</button>
           <button type="button" data-view="3d" aria-pressed="false">3D</button>
@@ -317,6 +322,7 @@
      sends and returns an SVG string, so it runs here on the recorded one. -->
 <script src="../../../play/static/js/scene3d.js"></script>
 <script src="mock.js"></script>
+<script src="places.js"></script>
 <script src="textures/device-geometry.js"></script>
 <script src="device.js"></script>
 </body>
