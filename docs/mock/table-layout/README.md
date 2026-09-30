@@ -330,6 +330,18 @@ from the top or foot and 29px in from the side of its box (`--clasp-in-y`,
 is one rule, so it holds on every framed surface (the book, the Map frame, the framed
 cards) at every width.
 
+**One border, not two (2026-09-30).** The owner: "there is some extra border or something
+on the right and bottom of the narration box". It was the page stack from the 3D pass:
+seven hard 1px offsets in the book's `box-shadow` (alternating #2e2519 and #574731-ish
+browns, 1px to 7px out), meant as the leaves beneath the page along the edges away from
+the lamp, which read as a second, 7px band outside the gilt ring on the right and the foot
+only. It is removed; the book's depth is its cast shadow alone (`--sh-3`, down and right
+from the one lamp, onto the desk and the room), and the ring is its outer edge on all four
+sides. It was on the book only: the Map frame and the framed cards never had it. Measured
+on 2x crops of the four corners at 1440 and 1024: the top-left is unchanged to the pixel,
+and in the other three every changed pixel lies in that 7px strip outside the book's box,
+none inside it, so the ring, the clasps and the bosses did not move.
+
 ### What the real app needs to adopt it
 
 The owner's ruling, 2026-09-29, on the two questions this section used to end with

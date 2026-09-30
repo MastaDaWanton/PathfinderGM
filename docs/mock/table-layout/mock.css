@@ -522,8 +522,8 @@ body.sheet-hidden .talk { grid-area: talk; }
 
 /* --- The book --------------------------------------------------------------------- */
 /* A right-hand page of an open book, bound in the app's gilt, clasped at its corners.
-   The leaves beneath it show as a stack along the edges away from the lamp (right and
-   foot), each one a hair's offset from the last; the binding is at the left, where the
+   It stands off the desk by its shadow alone (the stack of leaves once drawn along its
+   right and foot read as a second border, and is gone); the binding is at the left, where the
    page curves down into the gutter and the light falls off. */
 .book {
   position: relative; min-height: 0; display: grid; border-radius: 3px;
@@ -536,10 +536,12 @@ body.sheet-hidden .talk { grid-area: talk; }
     linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .86)),
     url("textures/page-paper.jpg") #1d1710;
   background-size: auto, auto, auto, 560px auto;
-  box-shadow:
-    1px 1px 0 #2e2519, 2px 2px 0 #574731, 3px 3px 0 #2e2519, 4px 4px 0 #4d3f2b,
-    5px 5px 0 #2a2117, 6px 6px 0 #453827, 7px 7px 0 #221b13,
-    var(--sh-3);
+  /* Its depth is the shadow it casts, down and right from the one lamp, onto the desk and
+     the room. The leaves beneath it were drawn here as seven hard 1px offsets (the 3D pass),
+     a 7px band outside the gilt ring on the right and the foot only; the owner, 2026-09-30:
+     "there is some extra border or something on the right and bottom of the narration box".
+     The frame is one border now, the ring its outer edge on all four sides. */
+  box-shadow: var(--sh-3);
 }
 /* The gilt ring. */
 .book::before, .framedcard::before {
