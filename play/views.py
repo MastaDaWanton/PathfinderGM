@@ -119,6 +119,21 @@ def _exits_state(c) -> list[dict]:
         return []
 
 
+def _places_found_state(c) -> dict:
+    """`scene.places_found`: the fog-of-war place chart (play/places_found.py), rebuilt
+    from the engine every state beside the exits row it is read from. {} when there is
+    nowhere to chart."""
+    from . import places_found
+
+    try:
+        return places_found.chart(c.engine(), c.world)
+    except Exception:      # noqa: BLE001 — a chart is never worth failing a turn
+        import logging
+
+        logging.getLogger("pathfindergm").exception("the places-found chart failed")
+        return {}
+
+
 def _spellcasting_state(pc) -> dict:
     """How the PC casts, for the Spells button (design F §4.4): shown on `kind`, not on
     `pc.castable`, which offers a prepared caster's whole book when nothing is prepared
@@ -584,6 +599,10 @@ def _state(c) -> dict:
             # The "From here" row (I6): every way on, from the engine's own graph, with
             # the ones the rules would refuse greyed in the rules' own words.
             "exits": _exits_state(c),
+            # The Places chart (owner, 2026-09-29): every place the player has stood in
+            # and every place one way from them, by name, with the ways between; the
+            # rest of the town stays under the fog.
+            "places_found": _places_found_state(c),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.

@@ -42,7 +42,9 @@ from rules.sheet import from_dict, load_pc, to_dict
 NEW_SCENE_KEYS = ("story_seed", "start", "spoken_for", "acquainted",
                   "conversation_log", "conversation_seq",
                   # G2 close-and-strike (2026-09-29): the round each combatant walked.
-                  "move_spent")
+                  "move_spent",
+                  # The fog-of-war chart's record of where the party has been (2026-09-30).
+                  "been")
 
 
 def _unplaced(scene) -> list[str]:

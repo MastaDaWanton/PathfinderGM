@@ -1077,6 +1077,9 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
         target = places_mod.find(engine.places(), spot.name)
         if target is not None and target.id != scene.at:
             engine.place_party(target.id)
+    # Where the player has been starts here, not at the way in the campaign was first
+    # stood at before its start was staged (the fog-of-war chart's record, `Scene.been`).
+    scene.begin_here()
     pc = scene.pc()
     slots: dict[str, str] = {}
     tells: list[str] = []

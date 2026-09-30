@@ -383,6 +383,32 @@ class Scene:
     # Entry keys this build does not know are kept, not dropped. Lane F.
     conversation_log: list[dict] = field(default_factory=list)
     conversation_seq: int = 0
+    # Every place id the party has stood in, in the order first stood in: the player's
+    # own knowledge of the map, which the fog-of-war place chart reads
+    # (play/places_found.py). The owner, 2026-09-29: "the fog of war only being able to
+    # see places conected to where you have been before". Until then nothing kept it;
+    # only a scheme's own `visited` list did, for that scheme.
+    #
+    # Written by `stand` and nothing else, in the same step as `at`, so the two cannot
+    # drift: every arrival — a walk, a journey, calling on a house, a start, a load — goes
+    # through `move` or `Engine.place_party`, and both stand the party through `stand`.
+    #
+    # Not an ActiveEffect and not a tag, against the three laws: the laws govern what
+    # changes a NUMBER, grants a STATE to an actor, or reaches the narrator. This does
+    # none of the three. No roll, DC or modifier reads it; it is not a condition of any
+    # creature (a companion who walked with you has not "been" anywhere in this sense —
+    # it is the player's map, not a body's history); and the narrator is never fed it.
+    # An effect would give it a duration and a removal, and forgetting the map is the
+    # one thing the traditions tried and took out (NetHack 3.7 dropped map amnesia:
+    # a player can always write the map down). So it only grows.
+    #
+    # Nor is it world data: World Bible still exports every place, and the places are
+    # still derived whole (`places.for_scene`). This is a view over them, never a filter
+    # on what exists.
+    #
+    # Saved only when it says more than `at` does: a save without it reads back as
+    # `[at]`, so every campaign written before it round-trips byte for byte.
+    been: list[str] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter. Written only
@@ -1541,6 +1567,42 @@ class Scene:
         self.sides = {side: [r for r in refs if r != ref]
                       for side, refs in self.sides.items()}
 
+    def stand(self, place_id: str) -> None:
+        """Stand the party in a place: `at`, and the record of where it has been.
+
+        The one writer of both (the load-failure floor in `Campaign._heal_places`, which
+        stands the party at "here" when no world loads, writes `at` alone on purpose: it
+        is not a place anybody stood in). `move` calls it when the PC moves and
+        `Engine.place_party` when the party is placed, so every arrival passes here —
+        the automapper's rule that the map is drawn from where the player actually went,
+        at the moment they went there, and not reconstructed afterwards from a log.
+        """
+        self.at = place_id
+        if place_id and place_id not in self.been:
+            self.been.append(place_id)
+
+    def begin_here(self) -> None:
+        """The story starts where the party stands: the record is that one place.
+
+        A new campaign is placed twice before its first word — at the way in
+        (`place_party()`, which every campaign gets), then at its start's own place
+        (`openings.stage`) — and the way in was never a place the player stood. Measured
+        on the first draft, 2026-09-30: 24 of 24 new campaigns (seeds 0–7 in each of the
+        three exports) began with the way in already on the chart as visited, beside the
+        market or guildhall they actually opened in. Asked by `stage` only, before play;
+        never in play, where the record only grows.
+        """
+        self.been = [self.at] if self.at else []
+
+    def places_been(self) -> list[str]:
+        """Every place id the party has stood in, first stood in first, where it stands
+        now included (a scene constructed with an `at` and never stood through `stand`,
+        as tests and old saves are, has still been there)."""
+        been = list(self.been)
+        if self.at and self.at not in been:
+            been.append(self.at)
+        return been
+
     def move(self, ref: str, place_id: str) -> Actor | None:
         """Put one creature in a place. The OTHER writer of `Actor.at`, and the only
         one that changes it.
@@ -1584,7 +1646,7 @@ class Scene:
         elif not actor.is_pc and ref not in self.came_along:
             self.came_along.append(ref)
         if actor.is_pc:
-            self.at = place_id
+            self.stand(place_id)
             self.cast = []
             # What was agreed here is a fact of this room; the next room starts clean.
             self.agreements = []
@@ -6949,7 +7011,7 @@ class Engine:
             # was is not one, or a reload would send the baker home mid-conversation.
             self.scene.arrived = self.scene.clock_minutes
             self.scene.moves += 1
-        self.scene.at = target.id
+        self.scene.stand(target.id)
         if pc is not None:
             pc.at = target.id
         for a in self.scene.people.values():
