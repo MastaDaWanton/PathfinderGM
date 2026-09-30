@@ -475,8 +475,13 @@ a.v2-btn { display: inline-flex; align-items: center; text-decoration: none; }
               inset 0 0 0 5px rgba(221, 196, 142, .22),
               0 0 0 1px rgba(58, 40, 18, .9);
 }
+/* The name sits bare on the coin's field. It clears the box model outright because the
+   table's older sheet styles its ability tiles as `.ab` (a bordered, tinted box), and that
+   rule reached the coin's label: the owner saw each name in its own square (2026-09-30,
+   "remove the squares holding the stat names"). Two classes outrank the page's one. */
 .v2-coin .ab { color: var(--dim); font: 400 11px/1 var(--display); letter-spacing: .12em;
-               font-variant: small-caps; }
+               font-variant: small-caps; border: 0; background: none; padding: 0;
+               border-radius: 0; display: block; }
 .v2-coin .sc { color: var(--gold); font: 400 22px/1 var(--display);
                text-shadow: -1px -1px 0 rgba(255, 238, 200, .25), 1px 2px 2px rgba(0, 0, 0, .9); }
 .v2-coin .md { position: absolute; left: 50%; bottom: -10px; translate: -50% 0;
