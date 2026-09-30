@@ -67,20 +67,95 @@ function renderBookHead(s) {
 
 onRender(function bookHead(s, prev) {
   renderBookHead(s);
-  // On a phone the book's whole inside scrolls, head and all (the design's phone: a
-  // fixed head left the story 190px), so 02's `#story` scroll to the newest beat moves
-  // nothing there; the leaf is what goes to the foot. Only when the story grew, so a
-  // resync that changed nothing leaves the reader where they are.
-  const leaf = document.getElementById("bookin");
-  const grew = !prev || ((s && s.transcript) || []).length !== ((prev.transcript) || []).length;
-  if (leaf && grew && leaf.scrollHeight > leaf.clientHeight + 1) leaf.scrollTop = leaf.scrollHeight;
+  storyLand(s, prev);
 });
 
-document.addEventListener("click", e => {
-  const b = e.target.closest && e.target.closest("#here-list [data-person]");
-  if (!b) return;
-  BOOK_PERSON = BOOK_PERSON === b.dataset.person ? null : b.dataset.person;
-  renderBookHead(STATE);
-  const again = document.querySelector(`#here-list [data-person="${CSS.escape(b.dataset.person)}"]`);
-  if (again) again.focus({ preventScroll: true });
-});
+// --- Where the story opens ---------------------------------------------------------------
+// A new beat lands with its first line at the top of the page, and a reader who has
+// scrolled back to reread is left where they are. The page used to be sent to its foot
+// (`scrollTop = scrollHeight`), which put a beat longer than the page with its opening
+// above the head: measured at 1792x805 on a reload, the fresh beat's top at 119 against
+// the story's top at 145, 26px under the head, its drop cap showing only its stem. And the
+// foot moved after it was sent there: the first draw runs before this head is filled in,
+// so the head then grew and the page's last 103px went under the desk (scrollTop 4390 +
+// 252 of 4745, measured the same way). So the landing is by the beat's own offset, made
+// once the head is drawn, and made again whenever the layout under it settles (the head,
+// the fonts, the width) until the reader moves the page themselves.
+//
+// Which page scrolls: `#story` on a desktop; on a phone the whole leaf (`#bookin`), head
+// and all (the design's phone: a fixed head left the story 190px).
+const STORY = { count: 0, beat: -1, landedAt: null, holding: false, watch: null };
+
+function storyScroller() {
+  const story = document.getElementById("story");
+  if (!story) return null;
+  return getComputedStyle(story).overflowY === "visible"
+    ? document.getElementById("bookin") : story;
+}
+
+// The scroll position that puts beat `i`'s first line at the top of the page: its offset
+// in the story (the story is `position: relative`, so that is its offsetParent), less the
+// story's own top padding, so it sits where the first beat of all would; on a phone the
+// story's offset in the leaf is added and the head is scrolled past with it.
+function storyTopOf(i) {
+  const story = document.getElementById("story"), scroller = storyScroller();
+  const beat = story && story.querySelectorAll(".beat")[i];
+  if (!beat || !scroller) return null;
+  const pad = parseFloat(getComputedStyle(story).paddingTop) || 0;
+  const within = scroller === story ? 0 : story.offsetTop;
+  return Math.max(0, within + beat.offsetTop - pad);
+}
+
+function storySettle() {
+  const scroller = storyScroller(), top = storyTopOf(STORY.beat);
+  if (!scroller || top === null) return;
+  scroller.scrollTop = top;
+  STORY.landedAt = scroller.scrollTop;          // what the browser allowed (the foot clamps)
+}
+
+function storyLand(s, prev) {
+  const n = ((s && s.transcript) || []).length;
+  const scroller = storyScroller();
+  if (!scroller || !n) { STORY.count = n; return; }
+  if (prev && n <= STORY.count) { STORY.count = n; return; }   // nothing new: stay put
+  // Scrolled back above where the last beat landed: they are rereading. Nothing moves.
+  const rereading = prev && STORY.landedAt !== null && scroller.scrollTop < STORY.landedAt - 24;
+  // The first new beat (the player's own line leads the answer), or on a fresh page, the
+  // newest beat of all.
+  STORY.beat = prev ? Math.min(STORY.count, n - 1) : n - 1;
+  STORY.count = n;
+  if (rereading) { STORY.holding = false; return; }
+  STORY.holding = true;
+  storySettle();
+  storyWatch();
+}
+
+// While a landing holds, a change of size under it (the head drawn, a font arriving, the
+// window resized) lands it again. The reader's own wheel, touch, key or press lets go.
+function storyObserve() {
+  if (!STORY.watch) return;
+  STORY.watch.disconnect();
+  const els = [document.getElementById("story"), document.getElementById("bookin"),
+               document.querySelector(".bookhead"), ...document.querySelectorAll("#story .beat")];
+  for (const el of els) if (el) STORY.watch.observe(el);
+}
+
+function storyWatch() {
+  if (STORY.watch || typeof ResizeObserver !== "function") { storyObserve(); return; }
+  const story = document.getElementById("story"), leaf = document.getElementById("bookin");
+  STORY.watch = new ResizeObserver(() => { if (STORY.holding) storySettle(); });
+  storyObserve();
+  const letGo = () => { STORY.holding = false; };
+  for (const el of [story, leaf]) {
+    if (!el) continue;
+    for (const type of ["wheel", "touchstart", "pointerdown", "keydown"]) {
+      el.addEventListener(type, letGo, { passive: true });
+    }
+  }
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => { if (STORY.holding) storySettle(); });
+  }
+}
+// The story's content changes height without its box changing (a beat's text reflowing
+// as the drop cap's face loads): the beats themselves are watched too, the fresh set on
+// each render (`storyObserve`, above).

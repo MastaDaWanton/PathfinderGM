@@ -572,3 +572,100 @@ def test_the_craft_hub_opens_over_the_story_and_stays_in_the_window():
     assert "max-height: calc(45dvh - 50px)" in hub and "overflow-y: auto" in hub
     html = Client().get("/play/").content.decode("utf-8")
     assert 'id="craftpanel" class="pop"' in html and 'id="craftclose"' in html
+
+
+# --- the Table tab's story and its share of the height (stage 1, second pass) --------------
+
+_STORY_STUB = r"""
+const HOOKS = [];
+function onRender(fn) { HOOKS.push(fn); }
+const $ = s => document.getElementById(s.replace(/^#/, ""));
+const esc = s => String(s);
+function beats(tops) { return tops.map(t => ({ offsetTop: t })); }
+const story = { id: "story", scrollTop: 0, scrollHeight: 6000, clientHeight: 255, offsetTop: 64,
+                _beats: [], querySelectorAll: () => story._beats, addEventListener() {},
+                style: { overflowY: "auto", paddingTop: "22px" } };
+const leaf = { id: "bookin", scrollTop: 0, scrollHeight: 6100, clientHeight: 700,
+               addEventListener() {}, style: { overflowY: "auto", paddingTop: "0px" } };
+const document = {
+  getElementById: id => ({ story, bookin: leaf })[id] || null,
+  querySelector: () => null, querySelectorAll: () => story._beats,
+  addEventListener() {}, fonts: null,
+};
+const getComputedStyle = el => el.style;
+class ResizeObserver { constructor(fn) { this.fn = fn; } observe() {} disconnect() {} }
+const window = {};
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on this machine")
+def test_a_new_beat_lands_with_its_first_line_at_the_top_and_a_rereader_stays(tmp_path):
+    """The story was sent to its foot on every state (`scrollTop = scrollHeight`). A beat
+    longer than the page then opened above the head: measured at 1792x805 on a reload, the
+    fresh beat's top at 119 against the story's top at 145, 26px under the book's head,
+    its drop cap showing only its stem (scrollTop 1942 of 2487, clientHeight 255). And
+    the foot itself moved, because the first draw runs before the head is filled in.
+    Now the newest beat (on a fresh page) or the first new one (after a turn) is put at
+    the top, by its own offset less the story's padding; a reader who scrolled back above
+    where the last beat landed is left where they are; on a phone the leaf scrolls, and
+    the story's own offset in it is counted."""
+    book = (TABLE_SCRIPTS / "15-book.js").read_text(encoding="utf-8")
+    src = _STORY_STUB + book + r"""
+    const out = {};
+    const T = n => ({ transcript: Array.from({ length: n }, (_, i) => ({ text: "b" + i })) });
+    story._beats = beats([22, 400, 1916]);
+    storyLand(T(3), null);                             // a fresh page: the newest beat
+    out.load = story.scrollTop;
+    story._beats = beats([22, 400, 1916, 2500, 2540]);
+    story.scrollTop = 2000;                            // read on, past where it landed
+    storyLand(T(5), T(3));                             // a turn: the first new beat
+    out.turn = story.scrollTop;
+    story._beats = beats([22, 400, 1916, 2500, 2540, 3100]);
+    story.scrollTop = 900;                             // scrolled back to reread
+    storyLand(T(6), T(5));
+    out.reread = story.scrollTop;
+    storyLand(T(6), T(6));                             // a resync, nothing new
+    out.resync = story.scrollTop;
+    story.style.overflowY = "visible";                 // a phone: the leaf scrolls
+    story._beats = beats([12, 380]);
+    storyLand(T(2), null);
+    out.phone = leaf.scrollTop;
+    console.log(JSON.stringify(out));"""
+    f = tmp_path / "story.js"
+    f.write_text(src, encoding="utf-8")
+    done = subprocess.run(["node", str(f)], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout.strip().splitlines()[-1])
+    assert got["load"] == 1916 - 22, "the newest beat's first line is not at the top"
+    assert got["turn"] == 2500 - 22, "the first new beat did not land at the top"
+    assert got["reread"] == 900 and got["resync"] == 900, "a rereader was moved"
+    assert got["phone"] == 64 + 380 - 22
+
+
+def test_the_story_is_landed_by_the_book_not_sent_to_its_foot():
+    """02 sends the page to its foot only before 15-book.js has loaded (the very first
+    draw); the landing is 15's, redone as the layout under it settles, and the browser's
+    own scroll anchoring is off where the page is rebuilt whole each state."""
+    state = (TABLE_SCRIPTS / "02-state.js").read_text(encoding="utf-8")
+    assert 'if (typeof storyLand !== "function") $("#story").scrollTop = $("#story").scrollHeight;' in state
+    book = (TABLE_SCRIPTS / "15-book.js").read_text(encoding="utf-8")
+    assert "new ResizeObserver" in book and "storySettle" in book
+    assert "#story, .bookin { overflow-anchor: none; }" in _css()
+
+
+def test_the_book_keeps_45_percent_of_the_stage_at_every_width():
+    """The mock README: the book keeps at least 45% of the height; past that the desk's
+    choices scroll and the pen stays. `minmax(45%, 1fr)` is 45% of the stage's content
+    box, not of the stage: measured 319px of a 744px stage at 1792x805 (0.43) under a
+    373px desk of eight exits and two offers. The floor counts the padding back in (45% of
+    36px on a desktop, of 24px on a phone), so it measured 0.45 at 1792x805, 1440x900,
+    1024x768 (six lines of story, where it had once been three) and 375x812, with eight
+    exits, the choices scrolling and the pen inside the desk every time."""
+    css = _css()
+    assert "grid-template-rows: minmax(calc(45% + 16.2px), 1fr) minmax(0, auto);" in _rule(css, "  .stage")
+    phone = css[css.index("/* --- Phone: the story is the page"):]
+    assert ".stage { grid-template-rows: minmax(calc(45% + 10.8px), 1fr) minmax(0, auto); }" in phone
+    desk = css[css.index("  .desk { position: relative"):]
+    desk = desk[:desk.index("}")]
+    assert "grid-template-rows: minmax(0, 1fr) auto auto" in desk and "min-height: 0" in desk
+    assert "overflow-y: auto" in _rule(css, "  .choices")
