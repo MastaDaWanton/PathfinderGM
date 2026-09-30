@@ -75,6 +75,9 @@ function renderMap(s) {
     // rare case: a scene with nowhere in it yet, between worlds or before the party has
     // been placed.
     $("#mapwrap").innerHTML = "";
+    $("#groundctl").innerHTML = "";
+    $("#boardframe").dataset.ground = "The ground";
+    if (typeof mapPaint === "function") mapPaint();
     return;
   }
 
@@ -219,8 +222,12 @@ function renderMap(s) {
   // The controls sit in the board's head as the approved design lays them out (the mock's
   // Map mode): Flat and 3D as one recessed pair, the turn beside them while it is in 3D,
   // and the floors, each pressed in when it is the one being looked at. The same
-  // `data-mapview`, `data-mapturn` and `data-maplevel` the tray used, read by 04.
-  const pressed = on => `class="v2-btn" aria-pressed="${on ? "true" : "false"}"`;
+  // `data-mapview`, `data-mapturn` and `data-maplevel` the tray used, read by 04. They go
+  // into `#groundctl`, the head row's room for the ground's own controls, right of the
+  // Places button (16-tab-map.js), which is a different map and is not drawn here.
+  // Flat and 3D are pressed only while the ground is what is shown.
+  const places = typeof mapShowingPlaces === "function" && mapShowingPlaces();
+  const pressed = on => `class="v2-btn" aria-pressed="${on && !places ? "true" : "false"}"`;
   const view = `<div class="v2-recess" role="group" aria-label="View">
       <button type="button" data-mapview="flat" ${pressed(!MAP_3D)}>Flat</button>
       <button type="button" data-mapview="3d" ${pressed(MAP_3D)}>3D</button></div>${MAP_3D
@@ -243,12 +250,14 @@ function renderMap(s) {
   // describing a gate, is indistinguishable from a broken map unless the board says which
   // place it is (reported 2026-09-21). `about` is the shape's own line about what that
   // kind of place is made of, which is also what the plan was built from.
-  const whereHead = g.place ? `The ground · ${esc(g.place)}` : "The ground";
-  $("#mapwrap").innerHTML = `<div class="boardhead"><h2>${whereHead}</h2>
-      <div class="boardctl">${view}${picker}</div></div>
-    <div class="boardview">${svg}</div>
+  // The heading is the board's own `#board-name`; 16-tab-map.js writes this into it while
+  // the ground is shown and the town's name while Places is.
+  $("#boardframe").dataset.ground = g.place ? `The ground · ${g.place}` : "The ground";
+  $("#groundctl").innerHTML = view + picker;
+  $("#mapwrap").innerHTML = `<div class="boardview">${svg}</div>
     <div class="boardfoot">${g.about ? `<p class="sub maplegend">${esc(g.about)}</p>` : ""}${
       legend}</div>`;
+  if (typeof mapPaint === "function") mapPaint();
 
   function cell(c, r, cls, inner = "") {
     return `<rect class="${cls}" x="${c * CELL}" y="${r * CELL}" width="${

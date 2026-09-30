@@ -2491,25 +2491,103 @@
   /* Its left padding clears the device, which hangs on this frame's left edge as it does
      on the book's (58px, the book's own): at 26px it covered the first letter of the
      heading. */
-  .board { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto;
-           padding: 20px 26px 16px 58px; box-shadow: var(--emboss), var(--sh-3); }
-  .board > #mapwrap { position: relative; z-index: 1; min-height: 0; display: grid;
-                      grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; }
-  .board > #mapwrap:empty { display: none; }
-  .board > .boardempty { position: relative; z-index: 1; }
-  #mapwrap:not(:empty) ~ .boardempty { display: none; }
+  /* One grid: the head row, then the ground (#mapwrap) or the town (#placeswrap), each a
+     well over a foot line; the line for "no ground yet" only while there is none. */
+  .board { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+           gap: 10px; padding: 20px 26px 16px 58px; box-shadow: var(--emboss), var(--sh-3); }
+  .board > :not(.v2-rim) { position: relative; z-index: 1; min-width: 0; }
+  .board > #mapwrap, .board > #placeswrap { min-height: 0; display: grid;
+                                            grid-template-rows: minmax(0, 1fr) auto; gap: 10px; }
+  .board > #mapwrap:empty, .board.places > #mapwrap, .board > #placeswrap[hidden] { display: none; }
+  #mapwrap:not(:empty) ~ .boardempty, .board.places > .boardempty { display: none; }
   .boardhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
                justify-content: space-between; }
   .boardhead h2 { margin: 0; color: var(--gold); font: 400 17px/1.1 var(--display);
                   letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
-  .boardctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .boardctl, .groundctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .boardctl .seglabel { padding: 0 6px 0 4px; color: var(--dim); font-size: 13px; font-style: italic; }
-  /* The board sits in a stone well sunk into the card. */
+  /* The board sits in a stone well sunk into the card. The old page's `#map` and `#view3d`
+     rules sized each board to its width (`height: auto`), which in a well of fixed height
+     let a tall room run off its foot: here they fill the well and keep their shape. */
   .boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
                border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken); overflow: hidden; }
-  .boardview svg { width: 100%; height: 100%; max-height: 100%; display: block; }
+  .boardview svg, .boardview > #map, .boardview > #view3d {
+    width: 100%; height: 100%; max-height: 100%; display: block; }
   .boardfoot { display: grid; gap: 2px; font-size: 14px; }
+  .boardfoot p { margin: 0; }
   .boardfoot .sub { margin: 0; color: var(--dim); font-style: italic; }
+  .boardabout { color: var(--dim); font-style: italic; }
+  .boardkey { color: var(--ink); }
+
+  /* Places (16-places-chart.js): the town's places as a chart inked on parchment, laid in
+     the well and framed in the panels' gilt (the theme's .v2-chart-paper). The drawing is
+     the approved mock's (places.js), the owner's favourite piece, and so are the inks:
+     lapis for you and the ways from here, rubric for the place pressed and for a way the
+     watch holds. A place only seen is written in italic in a paler ink with a paler ring;
+     a way not yet known is a short stroke fading into the paper. Every size is multiplied
+     by --k, the drawing's units per screen pixel, so names keep 13.5px at any scale. */
+  .placeswrap .panelempty { margin: 0; }
+  .placemap { display: grid; grid-template-columns: minmax(0, 1fr) 260px;
+              grid-template-rows: minmax(0, 1fr); gap: 14px; min-height: 0; }
+  .placemap .chart { min-height: 0; overflow: hidden; border-radius: 2px; }
+  .chart svg { display: block; width: 100%; height: 100%; }
+  .chart .edge { stroke: rgba(60, 44, 30, .62); stroke-width: calc(1.3px * var(--k)); }
+  .chart .edge.road, .chart .stub.road { stroke-dasharray: calc(5px * var(--k)) calc(4px * var(--k)); }
+  .chart .edge.shut { stroke: #8e2317; }
+  .chart .bar { stroke: #8e2317; stroke-width: calc(2.6px * var(--k)); stroke-linecap: round; }
+  .chart .stub { stroke-width: calc(1.7px * var(--k)); stroke-linecap: round; }
+  .chart .node { cursor: var(--cursor-candle) 24 0, pointer; }
+  .chart .node circle { fill: #f3ead6; stroke: #463a2d; stroke-width: calc(1.5px * var(--k)); }
+  .chart .node text { font: 600 calc(13.5px * var(--k))/1 var(--body); fill: #2a2019; paint-order: stroke;
+                      stroke: rgba(226, 213, 184, .9); stroke-width: calc(3px * var(--k));
+                      stroke-linejoin: round; }
+  .chart .node.seen circle { fill: rgba(243, 234, 214, .5); stroke: #7d6b55; }
+  .chart .node.seen text { font-style: italic; font-weight: 400; fill: #3d3024; }
+  .chart .node.near circle { stroke: #27406e; fill: #dde2ef; }
+  .chart .node.out circle { stroke-dasharray: calc(3px * var(--k)) calc(2px * var(--k)); }
+  .chart .node.here circle { fill: #27406e; stroke: #142457; }
+  .chart .node.here text { font-weight: 700; }
+  .chart .node:hover circle, .chart .node:focus-visible circle { stroke: #27406e;
+                                                                  stroke-width: calc(2.5px * var(--k)); }
+  .chart .node:focus { outline: none; }
+  .chart .node:focus-visible text { text-decoration: underline; }
+  .chart .node.sel circle { stroke: #8e2317; stroke-width: calc(3px * var(--k)); }
+  .maprail { display: grid; gap: 10px; align-content: start; min-height: 0; overflow-y: auto; }
+  /* The pressed place's slip: the desk's leather, raised. */
+  .mapnote { padding: 12px 14px; border-radius: 3px; border: 1px solid #2e251a;
+    background: linear-gradient(rgba(0, 0, 0, .18), rgba(0, 0, 0, .3)),
+                var(--tex-card-leather) 0 0 / 420px auto #241d15;
+    box-shadow: var(--bevel), var(--sh-1); font-size: 14px; line-height: 1.45; }
+  .mapnote h3 { margin: 0 0 6px; color: var(--gold); font: 400 17px/1.2 var(--display);
+                letter-spacing: .05em; text-shadow: var(--engraved); }
+  .mapnote h3 small { font: italic 400 13px/1 var(--body); color: var(--dim); letter-spacing: 0;
+                      margin-left: 6px; }
+  .mapnote p { margin: 0 0 8px; color: var(--dim); }
+  .mapnote p:last-child { margin-bottom: 0; }
+  .mapnote.said p { color: var(--ink); font-style: italic; }
+  .mapnote .shutwhy { color: #d98a78; }
+  .mapnote .walkthere { min-height: 34px; padding: 6px 14px; font-size: 14px; }
+  .route { list-style: none; margin: 4px 0 10px; padding: 0; counter-reset: leg; display: grid; gap: 3px; }
+  .route li { counter-increment: leg; display: grid; grid-template-columns: 18px 1fr auto; gap: 8px;
+              color: var(--ink); }
+  .route li::before { content: counter(leg); color: var(--dim); text-align: right; }
+  .route li span { color: var(--dim); font-style: italic; }
+  /* The chart's key, on the stone under the board. */
+  .boardkey .pk { display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+                  margin: 0 5px 0 12px; vertical-align: -1px; }
+  .boardkey .pk:first-child { margin-left: 0; }
+  .pk.here { background: #27406e; box-shadow: 0 0 0 1.5px #cdbe9e; }
+  .pk.been { background: #f3ead6; box-shadow: 0 0 0 1.5px #463a2d; }
+  .pk.seen { background: rgba(243, 234, 214, .35); box-shadow: 0 0 0 1.5px #9a8870; }
+  .pk.fog { width: 20px; height: 2px; border-radius: 1px; vertical-align: 3px;
+            background: linear-gradient(90deg, #cdbe9e, transparent); }
+  .pk.shut { width: 20px; height: 2px; border-radius: 1px; vertical-align: 3px; background: #c0503f; }
+  /* At 1024 the board is 390px tall: a 260px slip left the chart 330px wide, and the names
+     ran into each other (the mock). The slip narrows there. */
+  @media (max-width: 1180px) {
+    .placemap { grid-template-columns: minmax(0, 1fr) 210px; gap: 10px; }
+    .mapnote { padding: 10px 12px; font-size: 13.5px; }
+  }
 
   /* --- Sheet: the sheet panel carried into the centre column ------------------------- */
   body.mode-sheet .sheetmore { min-height: 0; display: grid; }
@@ -2645,7 +2723,19 @@
     /* Clear of the clasps' corner pieces, which sat over the heading's first letter. */
     .board { padding: 22px 18px 12px 26px; }
     .boardview { min-height: 200px; padding: 6px; }
+    .boardhead { gap: 6px; }
     .boardhead h2 { font-size: 15px; }
+    .boardctl .v2-recess > .v2-btn { min-height: 30px; padding: 4px 9px; }
+    .boardkey { font-size: 12.5px; line-height: 1.5; }
+    /* The chart fills the well and the slip is under it, a scroll away (the mock: a fixed
+       320px chart in a 200px well was cut off at its foot). */
+    /* Here the head row has wrapped, Places starts the second line, and the ground's
+       controls after it held 84px of nothing while the chart was shown (measured at
+       375x812). Taken out rather than hidden: nothing before them moves. */
+    .board.places #groundctl { display: none; }
+    .placemap { display: block; overflow-y: auto; container-type: size; }
+    .placemap .chart { height: 100cqh; }
+    .placemap .maprail { overflow: visible; margin-top: 10px; }
     /* The sheet on a phone is a page of its own: the whole sheet in one column that
        scrolls, who first, then the numbers, then the rest. */
     body.mode-sheet .stage { display: flex; flex-direction: column; overflow-y: auto;
@@ -2805,12 +2895,26 @@
     </div>
   </section>
 
-  <!-- Map: the ground the engine plays on, where the book was (16-tab-map.js; 03's
-       renderMap draws it). The desk stays under it, because choosing a square feeds the
-       combat bar and the pen. -->
-  <section class="board v2-framed v2-card-leather" id="boardframe" aria-label="The map">
+  <!-- Map: where the book was, the desk still under it, because choosing a square feeds
+       the combat bar and the pen (16-tab-map.js). The head row: the heading, then Places
+       (the town under its fog, 16-places-chart.js) as its own button in the space left of
+       the ground's own controls, Flat and 3D, the turn and the floors (03's renderMap
+       writes those into #groundctl). -->
+  <section class="board v2-framed v2-card-leather" id="boardframe" aria-labelledby="board-name">
     <i class="v2-rim" aria-hidden="true"></i>
+    <div class="boardhead">
+      <h2 id="board-name">The ground</h2>
+      <div class="boardctl" role="group" aria-label="How to look at it">
+        <div class="v2-recess" role="group" aria-label="The town">
+          <button type="button" class="v2-btn" id="placesbtn" aria-pressed="false"
+                  aria-controls="placeswrap"
+                  title="The places you have found, and the ways between them">Places</button>
+        </div>
+        <div class="groundctl" id="groundctl"></div>
+      </div>
+    </div>
     <div id="mapwrap"></div>
+    <div id="placeswrap" class="placeswrap" aria-live="off" hidden></div>
     <p class="panelempty boardempty">No ground is mapped yet. The map is drawn from wherever
       the party is standing, as soon as they are standing somewhere.</p>
   </section>
@@ -3187,6 +3291,7 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/13-device.js' %}"></script>
 <script src="{% asset 'js/table/14-sides.js' %}"></script>
 <script src="{% asset 'js/table/15-book.js' %}"></script>
+<script src="{% asset 'js/table/16-places-chart.js' %}"></script>
 <script src="{% asset 'js/table/16-tab-map.js' %}"></script>
 <script src="{% asset 'js/table/17-tab-sheet.js' %}"></script>
 <script src="{% asset 'js/table/18-tab-equipment.js' %}"></script>
