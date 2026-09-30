@@ -102,7 +102,7 @@ owner's notes that followed are answered point by point below.
 - `room-boiler.jpg` is the owner's picture at 1800x1800, cover-fitted and never tiled,
   `background-position: 22% 47%` so the door and the lamps stay in view on a wide window
   and on a phone. `fixed`, so it does not scroll with the page.
-- It is dimmed in CSS, not in the file: a wash from 71% black at the top to 75% at the
+- It is dimmed in CSS, not in the file: a wash from 65% black at the top to 70% at the
   foot, the vignette, and the embers' warm pool. The embers and the candle are as they were.
 - One tint in the file, a highlight roll-off above a luminance knee of 0.22: its lamps and
   white gauge faces glow instead of blowing through the dimming. Without it the dim labels
@@ -122,6 +122,37 @@ owner's notes that followed are answered point by point below.
   The whole visible ground at once (every pixel of room the panels leave, the dimmest text,
   dim #93866e): 4.85 at 375x812, 4.77 at 1024x768, 4.73 at 1440x900, worst 2%. All hold
   4.5:1; the room costs about 0.4 of the desk's margin, the price of a picture with lamps.
+
+**Lifted, the room only (2026-09-29).** The owner: "brighten background a bit as well",
+then "i only want the background to be lighter not the UI". The room's own layers are the
+only thing that changed: the wash went from 71% / 75% black to 65% / 70%, and the vignette
+from 55% / 90% to 49% / 86% (all four are now `--room-*` variables on `body`, the one
+element that paints the room). Measured with every child of `body` hidden, so the shot is
+the room alone: **+19% mean luminance at 1440 and 1024, +20% at 375** (+31-34% in mean
+L*). No overlay sat over both the room and the UI, so there was nothing to split: the
+embers, the candle's pool and shade are unchanged and draw over everything as before.
+
+The UI is unchanged: in the Table and Equipment views at all three widths, the old and new
+page were shot with animations held and every changed pixel was mapped. All of them lie on
+the open room (the gutters, the ground around the panels, the Equipment page's open
+ground); the handful counted inside element boxes are rounded corners and boxes clipped by
+a scrolled column, where the room shows through. The computed backgrounds, colours,
+shadows, filters, borders, opacity and text shadows of 32-109 UI elements per view are
+identical before and after.
+
+Text on the open room is the Equipment page's list head and its reply line, and nothing
+else at any of the three widths (a script walked every text node for a painted ancestor).
+Under the lifted room the reply line's dim words fell to 4.36:1 at 1024, worst 2%, so a
+local scrim now sits behind that head and the reply line only (`.eqlisthead`, `.eqsay`:
+32% dark, feathered by its own shadow); the room was not dimmed back.
+
+| Text on the open room | Before the lift | Lifted, no scrim | Lifted, with the scrim |
+|---|---|---|---|
+| Reply line, 1024 | 5.28 / 4.63 | 5.18 / **4.36** | 5.38 / 4.93 |
+| Reply line, 1440 | 5.31 / 4.80 | 5.23 / 4.58 | 5.42 / 5.02 |
+| "50 things, A to Z", 1440 | 5.39 / 4.76 | 5.32 / 4.54 | 5.49 / 4.99 |
+| "50 things, A to Z", 1024 | 5.22 / 4.89 | 5.10 / 4.70 | 5.36 / 5.16 |
+| "Everything you carry", 1440 | 11.12 / 9.96 | 10.93 / 9.47 | 11.37 / 10.67 |
 
 ### The device
 
@@ -237,11 +268,23 @@ bevels and shadows scaled with it, and the corner fittings re-aligned to the new
 | The book's ring and the framed cards' rings | 4px | 6px |
 | Gilt-edged panels (the sides, the sheet column, Talk, the Equipment figure) | 3px | 4.5px (Chrome paints 4px at 1x, 4.5px at 2x) |
 | The pen's (the desk's) edge | 1px | 1.5px |
-| Clasp inset / boss inset | 24px / 21px | 25px / 22px |
+| Clasp inset / boss inset | 24px / 21px | 25px / 22px, then registered on the ring (below) |
 
 On a phone the border-drawn edges stay 3px (at 4.5px a 375px screen lost 3px of every
 panel's content); the rings are drawn over their padding and cost no width, so they are
 6px there too.
+
+**The clasps registered on the ring (2026-09-29).** The owner marked the Map frame's
+top-left corner: a line along the ring's top edge, another down its left edge, and an
+arrow from the corner piece pointing down and in to the frame's inner corner. Read as:
+the clasp's arms should lie along the gilt ring, not ride above and outside it, with the
+corner piece over the frame's corner. Measured in the clasp image, the arms' centre lines
+(the top arm at row 31.5 of 247, the side arm at column 27.6 of 340, drawn 96px wide) sat
+3px above and 4.8px outside the ring's centre line; now both lie on it, the clasp 28px in
+from the top or foot and 29px in from the side of its box (`--clasp-in-y`,
+`--clasp-in-x`). The bosses were 2px out the same way and now centre on it too (24px). It
+is one rule, so it holds on every framed surface (the book, the Map frame, the framed
+cards) at every width.
 
 ### What the real app needs to adopt it
 

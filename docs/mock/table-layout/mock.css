@@ -72,9 +72,17 @@
   --engraved: 0 -1px 1px rgba(0, 0, 0, .92), 0 1px 0 rgba(255, 225, 175, .16);
   /* The frame's weight. The owner, 2026-09-29: "make the border 50% thicker". Every
      gilt edge is 1.5x what it was: the book's and the cards' ring 4px to 6px, the
-     gilt-edged panels 3px to 4.5px, the desk's (the pen's) edge 1px to 1.5px. The clasps
-     and bosses move in by half the ring's growth, to stay centred on it. */
-  --ring: 6px; --gilt-edge: 4.5px; --clasp-in: 25px; --boss-in: 22px;
+     gilt-edged panels 3px to 4.5px, the desk's (the pen's) edge 1px to 1.5px.
+     The clasps and bosses are registered on the ring (the owner, 2026-09-29, marking a
+     corner: a line along the ring and an arrow from the corner piece down and in). Each
+     clasp's arms are centred on the ring's centre line, 3px in from the frame's edge: the
+     arms' centres were measured in the clasp image (the top arm at row 31.5 of 247, the
+     side arm at column 27.6 of 340, drawn at 96px wide), so the clasp sits 28px in from
+     the top or foot and 29px in from the side of the box that reaches 34px past the frame.
+     At the 25px it had before, both arms rode 3-5px outside the ring, the corner piece
+     floating up and out beyond the gilt. The bosses were 2px out the same way, and now
+     centre on the same line at 24px. */
+  --ring: 6px; --gilt-edge: 4.5px; --clasp-in-x: 29px; --clasp-in-y: 28px; --boss-in: 24px;
   --candle-cursor: url("../../../play/static/img/cursor-candle.png") 24 0, auto;
   color-scheme: dark;
 }
@@ -100,12 +108,12 @@ body {
      the hanging lamps and the door's arch in view; on a phone it loses its sides, and
      22% keeps the door and the lamps instead of the boiler's flank. */
   background:
-    radial-gradient(125% 110% at 30% 30%, transparent 32%, rgba(4, 3, 2, .55) 72%,
-                    rgba(3, 2, 1, .9) 100%) fixed,
+    radial-gradient(125% 110% at 30% 30%, transparent 32%, rgba(4, 3, 2, var(--room-vig-mid)) 72%,
+                    rgba(3, 2, 1, var(--room-vig-edge)) 100%) fixed,
     radial-gradient(60% 45% at 52% 105%, rgba(var(--ember), .08), transparent 70%) fixed,
     linear-gradient(rgba(9, 7, 5, var(--room-dim-top)), rgba(6, 4, 3, var(--room-dim-foot))) fixed,
     url("textures/room-boiler.jpg") 22% 47% / cover no-repeat fixed #0d0b09;
-  --room-dim-top: .71; --room-dim-foot: .75;
+  --room-dim-top: .65; --room-dim-foot: .70; --room-vig-mid: .49; --room-vig-edge: .86;
 }
 
 /* The carried candle: the cursor is the candlestick, its hotspot on the flame tip (the
@@ -564,10 +572,9 @@ body.sheet-hidden .talk { grid-area: talk; }
     url("textures/clasp-bl.png"), url("textures/clasp-br.png"),
     url("textures/boss-top.png"), url("textures/boss-bottom.png"),
     url("textures/boss-left.png"), url("textures/boss-right.png");
-  /* 1px further in than the real table's 24px and 21px: the ring is 6px now, not 4px,
-     so its centre line is 1px further in, and each piece is kept centred on it. */
-  background-position: left var(--clasp-in) top var(--clasp-in), right var(--clasp-in) top var(--clasp-in),
-                       left var(--clasp-in) bottom var(--clasp-in), right var(--clasp-in) bottom var(--clasp-in),
+  /* Registered on the ring's centre line (the tokens say how it was measured). */
+  background-position: left var(--clasp-in-x) top var(--clasp-in-y), right var(--clasp-in-x) top var(--clasp-in-y),
+                       left var(--clasp-in-x) bottom var(--clasp-in-y), right var(--clasp-in-x) bottom var(--clasp-in-y),
                        center top var(--boss-in), center bottom var(--boss-in),
                        left var(--boss-in) center, right var(--boss-in) center;
   background-repeat: no-repeat;
@@ -1009,6 +1016,14 @@ body.mode-sheet .sheetmore { overflow-y: auto; overflow-x: hidden; min-height: 0
    (and the button just pressed) down. */
 .eqsay { margin: 0 0 10px; min-height: 62px; }
 .eqsay .say-aside { display: block; }
+/* The only text that sits straight on the room, so the only text the room's brightness can
+   reach. When the room was lifted by a fifth (the owner, 2026-09-29: "brighten background a
+   bit ... only the background ... not the UI"), the reply line's dim words fell to 4.36:1
+   over the lit pipes at 1024 (worst 2%). A local scrim, feathered by its own shadow so it
+   has no edge, sits behind this head and the reply line only; the room was not dimmed back.
+   It covers the reply line's reserved height, so a reply arriving does not change it. */
+.eqlisthead, .eqsay { background: rgba(8, 6, 4, .32); border-radius: 8px;
+                      box-shadow: 0 0 16px 8px rgba(8, 6, 4, .32); }
 .eqrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 /* A row is a slip of leather laid on the page: raised, its name always written out. */
 .eqrow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px;
