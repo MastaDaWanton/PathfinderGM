@@ -1,9 +1,10 @@
 // The play table, part 20 (the Trade tab). Classic script, sharing one global scope.
 //
 // The tab is the one door to the counter: the footer's Trade button went with the
-// rebuild (the mock README, "Also: the footer's duplicate Trade button is gone"). Stage
-// 1 carries today's trade window (06, I7's design: what you carry, the deal, their
-// wares) into the tab as it is. Where nobody keeps a counter the tab still opens, and
+// rebuild (the mock README, "Also: the footer's duplicate Trade button is gone"). The
+// trade window is I7's (06: what you carry filed on sorted shelves, the deal as a basket
+// with quantities, the price and the till's offer, their wares as cards), restyled in
+// stage 2 onto the design's framed card and leather. Where nobody keeps a counter the tab still opens, and
 // says why in the words the old button's greyed title used, rather than being a tab that
 // does nothing (the owner's rule: a visible reason where a thing is absent).
 //
@@ -24,6 +25,12 @@ Shell.tab("trade", {
     if (none) none.hidden = true;
     leaveCounter();
   },
+});
+
+// The other half of the owner's ruling, said where it is used: "Buy and sell here. What
+// you buy goes into your pack, and you put it on from Equipment." Its button goes there.
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-open-equipment]")) Shell.show("equipment");
 });
 
 document.addEventListener("keydown", e => {

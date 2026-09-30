@@ -361,7 +361,7 @@
       linear-gradient(color-mix(in srgb, var(--school) 30%, transparent),
                       color-mix(in srgb, var(--school) 8%, transparent)),
       linear-gradient(rgba(14,10,7,.35), rgba(8,6,4,.55)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
+      var(--tex-card-leather) #241d15;
     background-size: auto, auto, 340px auto;
   }
   .spcard-head .gi-lg {
@@ -781,31 +781,11 @@
     margin-bottom: 8px; }
   #glosscard p { margin: 0; font: 14px/1.5 var(--body); color: var(--ink); }
 
-  /* --- The full character sheet ------------------------------------------- */
-  #sheetpanel {
-    position: fixed; inset: 0; z-index: 30;
-    display: none; grid-template-rows: auto auto 1fr;
-    transform: translateX(1.5%) scale(.995); opacity: 0;
-    transition: transform .3s cubic-bezier(.2, .9, .3, 1), opacity .3s ease;
-    background:
-      linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
-      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
-  }
-  #sheetpanel.on { display: grid; transform: none; opacity: 1; }
-
   /* --- The counter -----------------------------------------------------------
      Yours on the left, theirs on the right, the deal in the middle. Asked for in
      those words, and the middle column is the part that matters: it is where a
      stall short of the asking price says so, which is the one thing four turns of
      narrated haggling never managed. */
-  #tradepanel {
-    position: fixed; inset: 0; z-index: 31;
-    display: none; grid-template-rows: auto auto 1fr;
-    background:
-      linear-gradient(rgba(10, 8, 6, .30), rgba(7, 5, 4, .46)),
-      url("{% static 'img/grimoire-leather.jpg' %}") center / cover no-repeat fixed #0d0b09;
-  }
-  #tradepanel.on { display: grid; }
   /* A market is its counters (I2): the general store, the armorer, the weaponsmith,
      the alchemist, the stalls and the horse lines, as the sheet's own tab strip — the
      same leather, the same small caps — so choosing a counter reads like choosing a page
@@ -1087,11 +1067,6 @@
     .tr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .tr-card { min-height: 150px; padding: 10px 8px 8px; }
   }
-  #sheetpanel::after {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    box-shadow: inset 0 0 220px 60px rgba(0,0,0,.72);
-  }
-
   .sheethead {
     display: flex; align-items: center; gap: 18px;
     padding: 20px 44px 16px; position: relative;
@@ -1102,10 +1077,6 @@
     background-size: auto, 340px auto;
     box-shadow: 0 1px 0 #0a0806, 0 2px 0 rgba(221,196,142,.10);
   }
-  .sigil { width: 46px; height: 62px; flex: none; color: var(--blood); }
-  #sheeterr { color: var(--alarm); font: 13px/1.4 var(--body); margin-left: auto;
-    margin-right: 16px; max-width: 40%; }
-
   .sheethead h1 {
     margin: 0; color: var(--gold); font: 400 38px/1.05 var(--display);
     letter-spacing: .045em; font-variant: small-caps;
@@ -1124,88 +1095,21 @@
   }
   .sheethead .close:hover { color: #f4e6c0; border-color: var(--accent); }
 
-  .tabs {
-    display: flex; gap: 4px; padding: 0 44px; overflow-x: auto;
-    border-bottom: 1px solid #241d15;
-  }
-  .tabs button {
-    background: transparent; border: 1px solid transparent; border-bottom: 0;
-    color: var(--dim); padding: 11px 20px 10px; cursor: pointer; white-space: nowrap;
-    font: 400 15px/1 var(--display);
-    letter-spacing: .14em; font-variant: small-caps; border-radius: 3px 3px 0 0;
-    position: relative; top: 1px; overflow: hidden;
-  }
-  .tabs button:hover { color: var(--ink); transform: none; box-shadow: none; }
-  .tabs button[aria-selected="true"] {
-    color: var(--gold); border-color: var(--gold-dim);
-    background:
-      linear-gradient(rgba(20, 15, 9, .05), rgba(12, 9, 6, .22)),
-      url("{% static 'img/card-leather.jpg' %}") #241d15;
-    background-size: auto, 340px auto;
-    box-shadow: inset 0 1px 0 rgba(221,196,142,.16);
-  }
-  /* Drawn inside the tab, because the strip scrolls sideways and a scroller clips
-     anything painted outside its box: the page's own focus (an accent border and a
-     shadow) was cut off on the strip's edge tabs. */
-  #sheettabs button:focus-visible { outline: 2px solid var(--candle); outline-offset: -3px; }
-
-  /* --- The sheet on a phone (G3 leftovers, 2026-09-29) ----------------------
-     Measured at 375x812 before this block: the panel's one grid column was `auto`, so it
-     sized to its widest child and came out 458px on a 375px screen. The header ran off
-     the right edge with the Close button, and the tab strip, whose buttons were allowed
-     to shrink, squeezed twelve labels into 636px of content until they read "De Of Sk
-     Cl Fe Spi Eq". The Spells tab's own fix (above) held its body to the screen and
-     left the header and the strip, noting that squeezing the column squeezed the tabs.
-
-     So the column is held to the screen and the tabs are not allowed to shrink. One row
-     that scrolls sideways, rather than wrapping: twelve labels in the sheet's small caps
-     need three or four rows at this width, a third of the screen before a single stat,
-     and a row keeps the tabs in reading order for the keyboard (a focused tab scrolls
-     itself into view). What is past either edge is shown by a fade on that edge, set by
-     05-sheet.js from the strip's scroll position, and a thin visible scrollbar under it,
-     so the strip says it has more. No snapping and no motion: a strip that moves on its
-     own is a strip that is harder to hit. */
+  /* --- The sheet on a phone (G3 leftovers, 2026-09-29; the header and the tab strip
+     went with the table rebuild's stage 2, which has no strip: each tab is its own page).
+     Measured at 375x812 before this: the panel's one grid column was `auto`, so it sized
+     to its widest child and came out 458px on a 375px screen. The column is held to the
+     screen. */
   #sheetpanel { grid-template-columns: minmax(0, 1fr); }
-  #sheettabs button { flex: 0 0 auto; }
   /* The "nothing says what they are" prompt, moved here from an inline style in
-     05-sheet.js, unchanged, so the phone rules below can put it on its own line (an
+     05-sheet.js, unchanged, so the phone rule below can put it on its own line (an
      inline `flex: 1` beats any stylesheet). */
   #genderask { flex: 1; display: flex; gap: 8px; align-items: center;
-               font: 13px/1.4 var(--body); color: var(--ink-dim); }
+               font: 13px/1.4 var(--body); color: var(--ink); }
   @media (max-width: 760px) {
-    #sheetpanel .sheethead {
-      flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 12px 16px 10px;
-    }
-    #sheetpanel .sheethead h1 { order: 1; flex: 1 1 0; min-width: 0; font-size: 26px;
-                                overflow-wrap: anywhere; }
-    #sheetpanel .sheethead .close { order: 2; margin-left: 0; padding: 10px 14px;
-                                    align-self: flex-start; }
-    #sheetpanel .sheethead .meta { order: 3; flex-basis: 100%; align-self: auto;
-                                   padding: 0; letter-spacing: .04em; }
-    #sheetpanel #genderask { order: 4; flex-basis: 100%; flex-wrap: wrap; }
-    #sheetpanel #sheeterr { order: 5; flex-basis: 100%; max-width: none; margin: 0; }
-    /* The gilt corners at half size: at 74px the top-left one sat over the first
-       letter of the name once the header's 44px margin became the phone's 16px. */
-    #sheetpanel .corner { width: 36px; height: 36px; }
-    #sheetpanel #sheethead-sigil { display: flex; }
-    #sheetpanel #sheethead-sigil svg { width: 30px; height: 40px; }
-    #sheettabs {
-      gap: 2px; padding: 0 16px; scrollbar-width: thin;
-      scrollbar-color: var(--gold-dim) transparent;
-    }
-    #sheettabs button { padding: 12px 14px 11px; letter-spacing: .1em; }
-    #sheettabs.more-right {
-      mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
-    #sheettabs.more-left {
-      mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
-    #sheettabs.more-left.more-right {
-      mask-image: linear-gradient(to right, transparent, #000 36px,
-                                  #000 calc(100% - 36px), transparent); }
-    /* The body at the page's phone gutter rather than the desktop's 44px, which left
-       287px for cards that ask for 310 once the column stopped overflowing. */
-    #sheetpanel .sheetbody { padding: 18px 16px 60px; }
+    #sheetpanel #genderask { flex-basis: 100%; flex-wrap: wrap; }
+    #sheetpanel #sheeterr { flex-basis: 100%; max-width: none; margin: 0; }
   }
-  .sheetbody { overflow-y: auto; padding: 26px 44px 70px; position: relative; z-index: 1; }
   .cols {
     display: grid; gap: 40px;
     grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
@@ -1242,16 +1146,6 @@
              padding: 3px 0; font-size: 13.5px; border-bottom: 1px solid rgba(201,168,106,.07); }
   .ab-line span { color: var(--ink); }
   .ab-line em { color: var(--dim); font-style: normal; }
-  .abilities { display: grid; gap: 10px;
-               grid-template-columns: repeat(auto-fit, minmax(94px, 1fr)); }
-  .ab { display: flex; flex-direction: column; align-items: center; gap: 1px;
-        padding: 9px 4px; border: 1px solid rgba(201,168,106,.16); border-radius: 2px;
-        background: rgba(201,168,106,.05); }
-  .ab.hurt { border-color: rgba(150,60,50,.5); }
-  .abk { font: 600 10.5px/1 Cinzel, serif; letter-spacing: .16em; color: var(--dim); }
-  .ab b { font: 400 25px/1.1 Cinzel, serif; color: var(--gold); }
-  .abm { font-size: 12.5px; color: var(--ink); }
-  .ab em { font-size: 11px; color: #d08a7c; font-style: normal; }
   .framed, .card, .slot {
     position: relative;
     background:
@@ -1324,79 +1218,6 @@
   .pill.good { color: var(--accent); border-color: var(--gold-dim); }
   .empty { color: var(--dim); font-style: italic;
            font-family: var(--display); }
-
-  .corner {
-    position: absolute; width: 74px; height: 74px; pointer-events: none;
-    color: var(--gold-dim); opacity: .85; z-index: 2;
-  }
-  .corner.tl { top: 6px; left: 6px; }
-  .corner.tr { top: 6px; right: 6px; transform: scaleX(-1); }
-  .corner.bl { bottom: 6px; left: 6px; transform: scaleY(-1); }
-  .corner.br { bottom: 6px; right: 6px; transform: scale(-1); }
-
-  .bodylayout {
-    display: grid; grid-template-columns: minmax(210px, 1fr) minmax(180px, 300px) minmax(210px, 1fr);
-    gap: 32px; align-items: start;
-  }
-  .slotcol { display: flex; flex-direction: column; gap: 18px; }
-  .figure { position: sticky; top: 0; text-align: center; }
-  .figure > svg { width: 100%; max-width: 300px; height: auto; color: #6a5a3c; }
-  .figcap {
-    display: inline-block; margin-top: 10px; padding: 5px 26px;
-    color: var(--gold); font: 400 14px/1 var(--display);
-    letter-spacing: .13em; font-variant: small-caps;
-    border-top: 1px solid var(--gold-dim); border-bottom: 1px solid var(--gold-dim);
-    background: linear-gradient(90deg, transparent, rgba(221,196,142,.06), transparent);
-  }
-  .slot { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 11px 13px; }
-  .slot.right { grid-template-columns: auto 1fr; }
-  .medallion {
-    grid-row: 1 / span 3; align-self: start; width: 46px; height: 46px; flex: none;
-    border-radius: 50%; display: grid; place-items: center; color: var(--accent);
-    background: radial-gradient(circle at 34% 28%, #3a3024, #171310 72%);
-    box-shadow: inset 0 0 0 1px rgba(221,196,142,.30),
-                inset 0 2px 6px rgba(0,0,0,.75), 0 1px 3px rgba(0,0,0,.6);
-  }
-  .medallion svg { width: 26px; height: 26px; }
-  .slothead {
-    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
-    color: var(--gold); font: 400 17px/1 var(--display);
-    letter-spacing: .1em; font-variant: small-caps; margin-bottom: 5px;
-  }
-  .slothead button {
-    background: transparent; border: 1px solid var(--gold-dim); color: var(--accent);
-    width: 21px; height: 21px; line-height: 1; border-radius: 2px; padding: 0;
-    cursor: pointer; font: 400 15px/1 Georgia, serif; flex: none; letter-spacing: 0;
-  }
-  .slothead button:hover { color: #f4e6c0; border-color: var(--accent);
-                           background: rgba(221,196,142,.10); }
-  .slotrow { display: flex; gap: 6px; margin-bottom: 5px; }
-  .slotinput {
-    flex: 1; min-width: 0; color: var(--ink); border-radius: 2px; padding: 7px 10px;
-    font: 15px/1.3 var(--body);
-    background: linear-gradient(var(--sunk), #131009);
-    border: 1px solid #2e251a;
-    box-shadow: inset 0 2px 5px rgba(0,0,0,.6);
-  }
-  .slotinput:focus { outline: none; border-color: var(--accent);
-                     box-shadow: inset 0 2px 5px rgba(0,0,0,.6), 0 0 0 1px rgba(201,168,106,.35); }
-  .slotinput:disabled { color: var(--gold); font-style: normal; opacity: .85; }
-  .slotinput::placeholder { color: #5d5240; font-style: italic; }
-  .slotrow.beyond .slotinput { border-left: 2px solid var(--alarm); }
-  .slotrow .delslot {
-    background: transparent; border: 1px solid #2e251a; color: var(--dim);
-    width: 26px; border-radius: 2px; cursor: pointer; padding: 0;
-    font: 15px/1 Georgia, serif; flex: none; letter-spacing: 0;
-  }
-  .slotrow .delslot:hover { color: var(--alarm); border-color: var(--alarm); }
-  .slotholds {
-    color: var(--dim); font: 12px/1.4 var(--body);
-    font-style: italic;
-  }
-  @media (max-width: 1000px) {
-    .bodylayout { grid-template-columns: 1fr 1fr; }
-    .figure { display: none; }
-  }
 
   /* The carried panels on a phone: thumbs rather than a mouse. 44px is the minimum
      target size both platforms' guidance agrees on; and exactly 16px in a text box,
@@ -2511,40 +2332,444 @@
   .boardfoot { display: grid; gap: 2px; font-size: 14px; }
   .boardfoot .sub { margin: 0; color: var(--dim); font-style: italic; }
 
-  /* --- Sheet: the sheet panel carried into the centre column ------------------------- */
+  /* --- Sheet: the sheet's page in the centre column, between its two sides ------------ */
   body.mode-sheet .sheetmore { min-height: 0; display: grid; }
   /* Clipped sideways as the stage is: a framed card's clasps reach 34px past it, and on
      a 375px phone the Trade tab's notice widened the page to 397px (measured). */
   .modepage { min-height: 0; display: flex; flex-direction: column; overflow-x: clip;
               padding: 20px 20px 16px; gap: 12px; }
   .modepage > * { width: 100%; max-width: 1320px; align-self: center; flex: none; }
-  .modepage > #sheetpanel.on, .modepage > #tradepanel.on { flex: 1 1 0; height: auto; }
-  .modenote { margin: 0; padding: 8px 14px; color: var(--ink); font-style: italic; font-size: 15px;
-              background: rgba(8, 6, 4, .55); border-radius: 3px; box-shadow: 0 0 16px 8px rgba(8, 6, 4, .32); }
-  /* In the frame the sheet and the counter are pages on the table, not windows over it:
-     a dark leather board, its own inside scrolled. */
-  .sheetmore > #sheetpanel, .modepage > #sheetpanel, .modepage > #tradepanel {
-    position: relative; inset: auto; z-index: auto; min-height: 0; height: 100%;
-    transform: none; opacity: 1; transition: none; border-radius: 3px; overflow: hidden;
-    border: 1px solid #3a2f22;
-    background: linear-gradient(rgba(14, 11, 8, .80), rgba(10, 8, 6, .88)),
-                var(--tex-card-leather) #1d1710;
-    background-size: auto, 420px auto;
-    box-shadow: var(--emboss), var(--sh-3);
-  }
-  .sheetmore > #sheetpanel .corner { display: none; }
-  /* The device hangs on this column's left edge on the Sheet tab too: at 1440 it covered
-     the sheet's sigil and the first letters of its tabs. The panel's content starts clear
-     of it (58px, the book's own left margin). At 1180 and below the column sits further
-     right and nothing is under it (the mock README measured the same). */
-  @media (min-width: 1181px) {
-    .sheetmore > #sheetpanel :is(.sheethead, .tabs, .sheetbody) { padding-left: 58px; }
-  }
   .notice { max-width: 620px; margin: 30px auto; padding: 24px 28px; }
   .notice > * { position: relative; }
   .notice h2 { margin: 0 0 9px; color: var(--gold); font: 400 17px/1.1 var(--display);
                letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
   .notice p { margin: 0 0 8px; }
+
+  /* ==========================================================================
+     Stage 2 of the rebuild (2026-09-30): the Sheet, Equipment, Spells, Trade and Journal
+     tabs in the approved design (docs/mock/table-layout/, mock.css "Sheet mode",
+     "Equipment", "Spells"), on the theme's framed card, leathers, plaques and iron
+     buttons. The pages are drawn by 05-sheet.js into the one sheet panel (17 carries it
+     into the open tab) and by 06 into the trade window. No new colour: gold for the
+     engine's numbers, the dim ink for what explains them, the school tints the Spells
+     page already had. Nothing moves on hover; a pressed control sinks into its lip.
+     ========================================================================== */
+
+  /* --- The sheet panel: a see-through holder whose body scrolls ---------------------- */
+  #sheetpanel { display: none; min-height: 0; position: relative;
+                grid-template-rows: auto minmax(0, 1fr); }
+  #sheetpanel.on { display: grid; }
+  .sheetmore > #sheetpanel { height: 100%; }
+  .modepage > #sheetpanel.on { flex: 1 1 0; }
+  /* The sheet's own line above its page: a refusal, or the prompt for a character nobody
+     has said the gender of. Empty, it takes no room. */
+  .sheetnote { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+               margin: 0 0 12px; padding: 8px 14px; border-radius: 3px; font: 14px/1.45 var(--body);
+               background: rgba(8, 6, 4, .62); box-shadow: 0 0 16px 8px rgba(8, 6, 4, .32); }
+  .sheetnote:not(:has(#genderask)):has(#sheeterr:empty) { display: none; }
+  #sheeterr { color: #e0897c; }
+  #sheeterr:empty { display: none; }
+  /* The body scrolls; the framed cards' clasps reach 10px past the ring, so it keeps a
+     gutter that holds them, and clips them sideways rather than scrolling for them. */
+  .sheetbody { min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px 16px 36px; }
+  .modepage .sheetbody { padding: 12px 16px 36px; }
+
+  /* --- The framed cards of the Sheet and the Journal ----------------------------------- */
+  .sheetcards { display: grid; gap: 34px; align-content: start; }
+  .sheetcard { padding: 24px 28px 22px; font: 15px/1.5 var(--body); }
+  .sheetcard > :not(.v2-rim) { position: relative; z-index: 1; }
+  .sheetcard > h2, .sx-card > h3 {
+    margin: 0 0 12px; color: var(--gold); font: 400 18px/1.1 var(--display); letter-spacing: .12em;
+    font-variant: small-caps; text-shadow: var(--engraved); }
+  .sheetcard p { margin: 0 0 8px; }
+  .cardsub { margin: 18px 0 8px; color: #cbb98f; font: 400 14.5px/1.2 var(--display);
+             letter-spacing: .1em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .cardline { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+              gap: 8px 14px; }
+  .twocol { display: grid; gap: 8px 34px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            align-items: start; }
+  .twocol > div > .cardsub:first-child { margin-top: 0; }
+  /* The device hangs on this column's left edge on the Sheet tab: at 1440 it covered the
+     first letters of "Combat", the initiative plaque and the weapons' names (the mock
+     README measured the same). The cards' content starts clear of it; at 1180 and below
+     the column sits further right and nothing is under it. */
+  @media (min-width: 1181px) {
+    body.mode-sheet .sheetmore .sheetcard { padding-left: 48px; }
+  }
+  .why { color: var(--dim); font: italic 13.5px/1.45 var(--body); }
+  .unknown { color: var(--dim); font-style: italic; }
+  .chip { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 10px;
+          font: 400 12px/1.4 var(--body); font-style: normal; color: #f4e6c0;
+          border: 1px solid var(--gold-dim); background: rgba(207, 169, 100, .12);
+          vertical-align: 1px; white-space: nowrap; }
+  .chip.warn { border-color: var(--blood); color: #e4b1a8; background: rgba(var(--bloodglow), .12); }
+  .plain { margin: 0; padding: 0; list-style: none; }
+  .sheetcard .terms .t { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0;
+                         font: 14px/1.4 var(--body); color: var(--ink);
+                         border-bottom: 1px solid rgba(58, 47, 34, .6); }
+  .sheetcard .terms .t b { color: var(--gold); font-weight: 400; text-align: right;
+                           font-variant-numeric: tabular-nums; }
+  .sheetcard .terms .t small { color: var(--dim); }
+
+  /* The numbers on plaques, what each is made of under it. */
+  .statrow { margin: 0 0 18px; display: grid; gap: 10px;
+             grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); }
+  .stat { padding: 9px 10px 8px; text-align: center; }
+  .stat dt { color: var(--dim); font: 400 12.5px/1.2 var(--display); letter-spacing: .1em;
+             font-variant: small-caps; }
+  .stat dd { margin: 3px 0 0; color: var(--gold); font: 400 24px/1.1 var(--display);
+             text-shadow: var(--engraved); font-variant-numeric: tabular-nums; }
+  .stat dd small { color: var(--dim); font: 400 13px/1.2 var(--body); }
+  .stat .why { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.3; font-style: normal; }
+
+  /* Tables of attacks and manoeuvres: rows cut into the card, one hairline between them. */
+  .gridwrap { overflow-x: auto; }
+  .grid { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.35; }
+  .grid th { text-align: left; color: var(--dim); font: 400 12.5px/1.2 var(--display);
+             letter-spacing: .1em; font-variant: small-caps; padding: 6px 8px;
+             border-bottom: 1px solid #221b13; box-shadow: 0 1px 0 rgba(255, 225, 170, .08); }
+  .grid td { padding: 8px; vertical-align: top; border-bottom: 1px solid rgba(58, 47, 34, .55); }
+  .grid tr:last-child td { border-bottom: 0; }
+  .grid td.n { font-variant-numeric: tabular-nums; color: var(--gold); white-space: nowrap; }
+  .grid td.n .why { white-space: normal; }
+  .grid td b { display: inline-block; color: var(--ink); font-weight: 400; }
+  .grid td b::first-letter { text-transform: uppercase; }
+  .grid .why { display: block; font-style: normal; }
+  .grid tr.inhand td { background: rgba(207, 169, 100, .06); }
+  .grid tr.dim td { color: var(--ash); }
+  .fullattack { margin: 12px 0 0 !important; }
+  .classtable { max-height: 520px; overflow: auto; }
+
+  .skills { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 26px; }
+  .skills > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; padding: 4px 0;
+                  border-bottom: 1px solid rgba(58, 47, 34, .6); }
+  .skills > div.dim dt, .skills > div.dim dd { color: var(--ash); }
+  .skills dt { color: var(--ink); }
+  .skills dt small { color: var(--dim); font-size: 12px; }
+  .skills dt small.cls { color: var(--accent); }
+  .skills dd { margin: 0; color: var(--gold); font-variant-numeric: tabular-nums; }
+  .skills .terms-line { grid-column: 1 / -1; display: none; font-size: 12.5px; }
+  .skills.showterms .terms-line { display: block; }
+  .feats { margin: 0; }
+  .feats > div { padding: 5px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+  .feats > div.dim dt { color: var(--dim); }
+  .feats dt { color: var(--ink); }
+  .feats dd { margin: 2px 0 0; color: var(--dim); font-size: 14px; }
+  .feats .prereq { display: block; color: var(--dim); font-size: 12.5px; font-style: italic; }
+  .conds li { padding: 4px 0; }
+  .conds .why { display: block; }
+  .idline { color: var(--ink); font-style: italic; }
+  .idline::first-letter { text-transform: uppercase; }
+  .notes { white-space: pre-wrap; }
+  #featq { width: 100%; padding: 9px 11px; margin: 0 0 10px; font: 15px/1.3 var(--body); }
+  #featresults { max-height: 46vh; overflow-y: auto; }
+  #levelup { margin-top: 14px; }
+  .pathblock h4 { font-family: var(--display); }
+
+  /* --- The Journal ----------------------------------------------------------------- */
+  .journal { max-width: 1180px; margin: 0 auto; display: grid; gap: 34px; align-items: start;
+             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+             grid-template-areas: "matters said" "walked said" "log said"; }
+  .jr-matters { grid-area: matters; } .jr-said { grid-area: said; }
+  .jr-walked { grid-area: walked; } .jr-log { grid-area: log; margin: 0; padding: 0 6px; }
+  .matters > li { padding: 8px 0; border-bottom: 1px solid rgba(58, 47, 34, .6); }
+  .matters > li:last-child { border-bottom: 0; }
+  .matter h3 { margin: 0 0 3px; color: var(--ink); font: 400 16px/1.3 var(--body); }
+  .matter.done h3 { color: var(--dim); }
+  .objectives { margin: 6px 0; padding-left: 20px; }
+  .objectives li.done { color: var(--dim); text-decoration: line-through; }
+  .walked li { padding: 4px 0; }
+  .walked li::first-letter { text-transform: uppercase; }
+  .jr-people { flex-wrap: wrap; margin: 0 0 12px; }
+  .jr-log-lines { max-height: 62vh; overflow-y: auto; padding: 6px 10px; border-radius: 3px;
+                  background: rgba(6, 5, 4, .4); box-shadow: var(--sunken); }
+  .jr-log-lines:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+  .jr-turn { padding: 7px 0; border-bottom: 1px solid rgba(58, 47, 34, .5); }
+  .jr-turn:last-child { border-bottom: 0; }
+  .jr-name { display: block; color: var(--gold); font: 400 13px/1.3 var(--display);
+             letter-spacing: .08em; font-variant: small-caps; }
+  .jr-turn p { margin: 2px 0 0; }
+  .jr-turn q { quotes: none; color: var(--saidink, #d8c9a3); }
+
+  /* --- Equipment -------------------------------------------------------------------- */
+  /* The head: what the page is for, what the rules cannot do, the numbers, the counter. */
+  .eqhead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px;
+            padding: 16px 20px; border-radius: 3px; border: 1px solid #3a2f22;
+            box-shadow: var(--emboss), var(--sh-2); }
+  .eqtitle { flex: 1 1 360px; min-width: 0; }
+  .eqtitle h1 { margin: 0; color: var(--gold); font: 400 26px/1.1 var(--display);
+                letter-spacing: .05em; text-shadow: var(--engraved); }
+  .eqtitle p { margin: 4px 0 0; color: var(--ink); }
+  .eqtitle .eqgap { color: var(--dim); font-style: italic; font-size: 14px; }
+  .eqnums { margin: 0; display: flex; gap: 7px; flex-wrap: wrap; }
+  .eqnums > div { min-width: 58px; padding: 5px 9px; text-align: center; }
+  .eqnums dt { color: var(--dim); font: 400 11.5px/1.2 var(--display); letter-spacing: .1em;
+               font-variant: small-caps; }
+  .eqnums dd { margin: 1px 0 0; color: var(--gold); font: 400 18px/1.15 var(--display);
+               text-shadow: var(--engraved); font-variant-numeric: tabular-nums; }
+  .eqnums dd.moved { color: #f4e6c0; text-decoration: underline; text-decoration-color: var(--accent);
+                     text-underline-offset: 3px; }
+
+  .eq { max-width: 1320px; margin: 0 auto; display: grid; gap: 22px;
+        grid-template-columns: 200px minmax(0, 1fr) 340px;
+        grid-template-areas: "rail list doll"; align-items: start; }
+  /* The shelves run down the side, the trade window's in its order, each with its count;
+     a shelf with nothing on it is not offered. */
+  .eqrail { grid-area: rail; display: grid; gap: 6px; position: sticky; top: 0; }
+  .eqrail .v2-btn { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 9px;
+                    align-items: center; text-align: left; padding: 8px 10px; min-height: 42px;
+                    font-size: 14px; letter-spacing: .06em; }
+  .eqrail .tgi { width: 20px; height: 20px; color: var(--gold); }
+  .eqrail small { color: var(--dim); font: 400 13px/1 var(--body); letter-spacing: 0;
+                  font-variant: normal; font-variant-numeric: tabular-nums; text-shadow: none; }
+  .eqrail .v2-btn[aria-selected="true"] { color: #f4e6c0; border-color: var(--gold-dim);
+    background: linear-gradient(#17120d, #221a12); transform: translate(1px, 2px);
+    box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 3px 0 0 var(--accent); }
+  .eqrail .fitting { margin: 6px 0 0; padding: 8px 10px; border: 1px dashed var(--gold-dim);
+                     border-radius: 3px; font-size: 13.5px; color: var(--ink);
+                     background: rgba(8, 6, 4, .55); }
+  .eqrail .fitting .v2-btn { display: inline-flex; margin-top: 6px; min-height: 30px; }
+
+  .eqlist { grid-area: list; min-width: 0; }
+  .eqlisthead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline;
+                gap: 4px 14px; margin-bottom: 8px; }
+  .eqlisthead h2 { margin: 0; color: var(--gold); font: 400 19px/1.1 var(--display);
+                   letter-spacing: .1em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .eqsort { margin: 0; color: var(--dim); font-size: 13.5px; font-style: italic; }
+  /* Held open at the height of a long reply, so one arriving never pushes the rows (and
+     the button just pressed) down. */
+  .eqsay { margin: 0 0 10px; min-height: 48px; color: var(--ink); font-size: 15px; }
+  .eqsay.bad { color: #e0897c; }
+  /* The only text that sits straight on the room: a local scrim behind it (the mock
+     README, "Lifted, the room only": 4.36:1 without it at 1024, 4.93 with it). */
+  .eqlisthead, .eqsay, .eqload, .eq .credit { background: rgba(8, 6, 4, .32); border-radius: 8px;
+                                               box-shadow: 0 0 16px 8px rgba(8, 6, 4, .32); }
+  .eqrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  /* A row is a slip of leather laid on the page: raised, its name always written out. */
+  .eqrow { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px;
+           align-items: center; padding: 5px 10px 5px 5px; border-radius: 3px; border: 1px solid #332a1e;
+           background: linear-gradient(rgba(44, 35, 25, .92), rgba(24, 19, 14, .92));
+           box-shadow: var(--bevel), var(--sh-1); }
+  .eqrow.inuse { border-color: var(--gold-dim);
+                 background: linear-gradient(rgba(62, 49, 32, .95), rgba(30, 24, 16, .95)); }
+  .eqrow .tile, .slotbtn .tile { width: 100%; }
+  .eqname { min-width: 0; }
+  .eqname b { display: inline-block; font-weight: 400; color: var(--ink); font-size: 16px; }
+  .eqname b::first-letter { text-transform: uppercase; }
+  .eqname .qty { color: var(--gold); margin-left: 6px; font-variant-numeric: tabular-nums; }
+  .eqname .facts { display: block; color: var(--dim); font-size: 13.5px; line-height: 1.35; }
+  .eqname .eqnote { font-style: italic; }
+  .eqacts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  .eqempty { padding: 10px 12px; color: var(--ink); background: rgba(8, 6, 4, .55); border-radius: 3px;
+             font-size: 15px; }
+  .eqsay:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+  .eqempty .v2-btn { margin-left: 6px; }
+  .eqload { margin: 16px 0 0; padding: 10px 12px; font-size: 14px; color: var(--ink); }
+  .eqload b { color: var(--gold); font-weight: 400; }
+  .eq .credit { margin: 12px 0 0; padding: 6px 10px; color: var(--dim); font: 12.5px/1.5 var(--body); }
+  .eq .credit a { color: var(--accent); }
+
+  /* Worn and wielded: In hand, then the body slots down either side, roughly where each
+     is worn (rules/tables.py SLOT_ORDER_LEFT and SLOT_ORDER_RIGHT). */
+  .doll { grid-area: doll; padding: 20px 18px 16px; border-radius: 3px; --dim: #b3a488;
+          box-shadow: var(--emboss), var(--sh-2); }
+  .doll h2 { margin: 0 0 12px; color: var(--gold); font: 400 17px/1.1 var(--display);
+             letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .hands { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .slots { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 8px; }
+  .doll .slotcol { display: grid; gap: 7px; align-content: start; }
+  .doll .slotbtn { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px;
+                   align-items: center; text-align: left; padding: 5px 7px 5px 5px; min-height: 46px;
+                   width: 100%; white-space: normal; font: 400 13.5px/1.2 var(--body); letter-spacing: 0;
+                   font-variant: normal; text-shadow: none; color: var(--ink); }
+  .doll .slotbtn .sl { display: block; color: var(--dim); font: 400 11px/1.1 var(--display);
+                       letter-spacing: .1em; font-variant: small-caps; }
+  .doll .slotbtn .it { display: block; overflow-wrap: anywhere; }
+  .doll .slotbtn .it::first-letter { text-transform: uppercase; }
+  .doll .slotbtn.empty { border-style: dashed; border-color: rgba(125, 104, 69, .55);
+                         background: rgba(12, 9, 6, .45); box-shadow: var(--sunken); }
+  .doll .slotbtn.empty .it { color: var(--dim); font-style: italic; }
+  .doll .slotbtn.empty .tile { opacity: .45; }
+  .doll .slotbtn[aria-pressed="true"] { border-color: var(--accent); border-style: solid;
+                                        box-shadow: inset 0 0 0 1px var(--accent); }
+  .doll .offhand:active { transform: none; }
+  .dollnote { margin: 12px 0 0; color: var(--dim); font-size: 13px; font-style: italic; }
+  /* The chosen slot's lines, as the old Equipment page had them. */
+  .slotedit { margin: 14px 0 0; padding: 12px; border-radius: 3px; background: rgba(8, 6, 4, .45);
+              box-shadow: var(--sunken); }
+  .slotedit h3 { margin: 0 0 8px; color: var(--gold); font: 400 14px/1.2 var(--display);
+                 letter-spacing: .1em; font-variant: small-caps; }
+  .slotedit h3 small { display: block; color: var(--dim); font: italic 12.5px/1.35 var(--body);
+                       letter-spacing: 0; font-variant: normal; }
+  .slotedit .slotrow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+  .slotedit .slotinput { flex: 1 1 140px; min-width: 0; padding: 7px 10px; font: 15px/1.3 var(--body); }
+  .slotedit .slotinput:disabled { color: var(--gold); opacity: .9; }
+  .slotedit .slotrow.beyond .slotinput { border-left: 2px solid var(--alarm); }
+
+  /* --- Spells: the I5 page on the design's framed cards ------------------------------ */
+  .spells3 { max-width: 1320px; margin: 0 auto; gap: 34px; }
+  .sx-card { padding: 22px 24px 20px; }
+  .sx-card > :not(.v2-rim) { position: relative; z-index: 1; }
+  .sx-card > h3 { margin-bottom: 10px; }
+  /* The sockets: a lit gem while the slot is unspent (brighter, with the candle's glow,
+     while a prepared spell waits in it), and red once spent today (the owner,
+     2026-09-29). An open slot, unspent with nothing in it yet, is a gem not yet lit by a
+     spell: the bronze without the glow. */
+  .gem { background: radial-gradient(circle at 35% 30%, #6a5634 0 8%, #4a3c24 30%, #2a2014 70%, #120d08);
+         box-shadow: inset 0 -2px 3px rgba(0, 0, 0, .7), 0 0 0 1px #7d6845,
+                     0 0 0 3px #16110c, 0 0 0 4px #3f3324; }
+  .sx-house { font-style: normal !important; color: var(--ink) !important; }
+  /* The spell buttons wear the theme's iron (theme-v2's .v2-btn), kept under their own
+     class names because 02-state.js and the Spells tests find Cast by `prepbtn castbtn`. */
+  .spells3 button:is(.castbtn, .spbtn:not(.sx-more)), #spelldetail .sd-close {
+    position: relative; min-height: 34px; padding: 6px 12px; border-radius: 2px;
+    background: linear-gradient(#33291c, #1d1711 55%, #16110c);
+    border: 1px solid var(--gold-dim); border-bottom-color: #4a3c28; border-right-color: #564630;
+    color: var(--gold); font: 400 13px/1 var(--display); letter-spacing: .08em; font-variant: small-caps;
+    text-shadow: var(--engraved);
+    box-shadow: inset 1px 1px 0 rgba(255, 232, 180, .22), inset -1px -1px 0 rgba(0, 0, 0, .55),
+                1px 2px 0 #3a2d1d, 1px 4px 0 #0e0a07, 3px 7px 10px rgba(0, 0, 0, .5);
+    transition: transform .06s ease-out, box-shadow .06s ease-out; }
+  .spells3 button:is(.castbtn, .spbtn:not(.sx-more))::after, #spelldetail .sd-close::after { display: none; }
+  .spells3 button.prepbtn.castbtn { border-color: var(--accent); color: #f4e6c0;
+                            background: linear-gradient(#4a3a22, #2a2016 55%, #1d1610); }
+  .spells3 button.spbtn.quiet { background: linear-gradient(rgba(38, 30, 21, .92), rgba(20, 16, 11, .92)); }
+  .spells3 button:is(.castbtn, .spbtn:not(.sx-more)):active:not(:disabled), #spelldetail .sd-close:active {
+    transform: translate(1px, 3px);
+    box-shadow: inset 1px 1px 0 rgba(255, 232, 180, .08), inset -1px -1px 0 rgba(0, 0, 0, .5),
+                0 1px 0 #0a0806, 1px 1px 2px rgba(0, 0, 0, .5); }
+  .spells3 button:is(.castbtn, .spbtn):disabled { opacity: .4; }
+  .spcard { border-color: #332a1e; background: linear-gradient(rgba(44, 35, 25, .92), rgba(24, 19, 14, .92));
+            box-shadow: var(--bevel), var(--sh-1); }
+  .gx-tools .findbox, .gx-tools select {
+    background: linear-gradient(var(--sunk), #131009); border: 1px solid #2e251a;
+    border-bottom-color: #4a3c28; border-right-color: #4a3c28;
+    box-shadow: inset 2px 3px 7px rgba(0, 0, 0, .75); }
+  /* Spell details and the glossary: the picker's obsidian, in a gilt edge, with the lamp's
+     shadow; the school's tint along the details' top as before. */
+  #spelldetail, #glosscard { border: 1px solid var(--gold-dim); box-shadow: var(--bevel), var(--sh-3);
+    background: linear-gradient(rgba(33, 26, 19, .98), rgba(15, 12, 8, .99)); }
+  #spelldetail { border-top: 3px solid var(--school, var(--gold-dim)); }
+  #glosscard h4, #spelldetail h4 { text-shadow: var(--engraved); }
+
+  /* --- Trade: I7's window in the design's framed card ---------------------------------- */
+  .modepage > #tradepanel { position: relative; display: none; min-height: 0; flex: 1 1 0;
+                            grid-template-rows: auto auto auto minmax(0, 1fr);
+                            padding: 18px 22px 16px; }
+  .modepage > #tradepanel.on { display: grid; }
+  #tradepanel > :not(.v2-rim) { position: relative; z-index: 1; }
+  #tradepanel .sheethead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+                           padding: 4px 26px 12px; background: none; box-shadow: none;
+                           border-bottom: 1px solid #221b13; }
+  #tradepanel .sheethead::after { content: none; }
+  .tr-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; min-width: 0; }
+  #tradepanel .sheethead h1 { font-size: 30px; text-shadow: var(--engraved), 0 2px 10px rgba(0, 0, 0, .9); }
+  #tradepanel .sheethead .meta { align-self: auto; padding: 0; }
+  .tr-intro { flex: 1 1 280px; margin: 0; color: var(--ink); font: italic 15px/1.45 var(--body); }
+  #tradepanel .sheethead .close { margin-left: 0; }
+  /* Narrower, the sentence takes a line of its own under the name, and the two buttons
+     stay together at the right of the name rather than Close falling to a line alone
+     (measured at 1024: Close sat under the counter's name on its own). */
+  @media (max-width: 1280px) {
+    .tr-intro { order: 3; flex-basis: 100%; }
+    #tradepanel .sheethead [data-open-equipment] { margin-left: auto; }
+  }
+  #trademsg { margin: 8px 26px 0; max-width: none; color: var(--ink); font: 14.5px/1.5 var(--body); }
+  #trademsg:empty { display: none; }
+  #tradelines { margin: 10px 26px 0; padding: 4px; overflow-x: auto; }
+  #tradelines[hidden] { display: none; }
+  .tradebody { padding: 16px 26px 10px; }
+  .tradecol > h2 { font: 400 16px/1 var(--display); letter-spacing: .12em; text-transform: none;
+                   font-variant: small-caps; text-shadow: var(--engraved);
+                   border-bottom: 1px solid #221b13; box-shadow: 0 1px 0 rgba(255, 225, 170, .08); }
+  /* The shelves: the rail of the Equipment page, iron tabs in a recessed well. */
+  .tr-shelves button { background: linear-gradient(#2a2118, #18130e); border: 1px solid #3b3022;
+                       border-radius: 2px; box-shadow: var(--bevel), 1px 2px 0 #090705;
+                       text-shadow: var(--engraved); }
+  .tr-shelves button[aria-selected="true"] {
+    color: #f4e6c0; border-color: var(--gold-dim); background: linear-gradient(#17120d, #221a12);
+    box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 3px 0 0 var(--accent); }
+  #tradmine { border-left: 1px solid #221b13; }
+  .traderow { background: linear-gradient(rgba(44, 35, 25, .7), rgba(24, 19, 14, .7));
+              border-color: #2b2319; box-shadow: var(--bevel); }
+  .traderow.on { border-color: var(--accent); }
+  .tradedeal { border-left-color: #221b13; border-right-color: #221b13; }
+  .tr-card { background: linear-gradient(rgba(44, 35, 25, .92), rgba(24, 19, 14, .92));
+             border-color: #332a1e; box-shadow: var(--bevel), var(--sh-1); }
+  .tr-card.in { background: linear-gradient(rgba(20, 15, 9, .10), rgba(12, 9, 6, .40)),
+                            var(--tex-card-leather) #241d15; background-size: auto, 340px auto; }
+  #tradepanel .tr-go.v2-btn { width: 100%; min-height: 48px; font-size: 16px; }
+  #tradepanel .tr-go.v2-btn::after { display: none; }
+  .tr-step { background: linear-gradient(var(--sunk), #131009); box-shadow: var(--sunken); }
+
+  /* --- Narrower desktops ----------------------------------------------------------- */
+  @media (max-width: 1180px) {
+    .eq { grid-template-columns: 158px minmax(0, 1fr) 286px; gap: 18px 16px; }
+    .eqrail .v2-btn { padding: 7px 8px; gap: 7px; font-size: 13px; letter-spacing: .03em; }
+    .doll { padding: 18px 14px 14px; }
+    .journal { grid-template-columns: minmax(0, 1fr); grid-template-areas: "matters" "said" "walked" "log"; }
+    .spells3 { gap: 30px; }
+  }
+  /* Between a phone and a small desktop the figure goes above the list, still in reach. */
+  @media (max-width: 960px) and (min-width: 761px) {
+    .eq { grid-template-columns: 158px minmax(0, 1fr); grid-template-areas: "rail doll" "rail list"; }
+  }
+  @media (max-width: 1000px) {
+    #tradepanel .sheethead { padding: 4px 8px 10px; }
+    #trademsg, #tradelines { margin-left: 8px; margin-right: 8px; }
+    .tradebody { padding: 14px 8px 0; }
+    .modepage > #tradepanel { padding: 16px 14px 10px; }
+  }
+
+  /* --- Phone ------------------------------------------------------------------------ */
+  @media (max-width: 760px) {
+    /* One scroll, the page's: the head, then the page. */
+    .modepage { overflow-y: auto; }
+    .modepage > #sheetpanel.on, .modepage > #tradepanel.on { flex: none; }
+    .modepage .sheetbody { overflow: visible; padding: 12px 6px 30px; }
+    body.mode-sheet .sheetmore > #sheetpanel { height: auto; }
+    body.mode-sheet .sheetmore .sheetbody { overflow: visible; padding: 12px 4px 24px; }
+    .sheetcard, .sx-card { padding: 20px 16px 18px; }
+    .twocol { grid-template-columns: minmax(0, 1fr); }
+    .skills { grid-template-columns: minmax(0, 1fr); }
+    .journal { grid-template-columns: minmax(0, 1fr); grid-template-areas: "matters" "said" "walked" "log"; }
+    .statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* The attack and manoeuvre tables fold into one small card a row: the name across the
+       top, the numbers in three labelled columns, the long text across the foot. As a
+       table at 375px the range and notes were off the right edge (the mock README). */
+    .grid, .grid tbody, .grid tr, .grid td { display: block; }
+    .grid thead { display: none; }
+    .grid tr { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px;
+               padding: 10px 6px; border-bottom: 1px solid rgba(58, 47, 34, .7); }
+    .grid tr:last-child { border-bottom: 0; }
+    .grid td, .grid tr.inhand td { padding: 0; border: 0; background: none; }
+    .grid tr.inhand { background: rgba(207, 169, 100, .06); }
+    .grid td.lead, .grid td.wide { grid-column: 1 / -1; }
+    .grid td.none { display: none; }
+    .grid td[data-label]::before { content: attr(data-label); display: block; color: var(--dim);
+      font: 400 11px/1.3 var(--display); letter-spacing: .08em; font-variant: small-caps; }
+    .grid { font-size: 14px; }
+    .classtable { max-height: none; }
+
+    .eqhead { padding: 14px; gap: 10px; }
+    .eqtitle h1 { font-size: 22px; }
+    .eqnums { flex-wrap: nowrap; gap: 5px; width: 100%; }
+    .eqnums > div { min-width: 0; flex: 1 1 0; padding: 4px 2px; }
+    .eqnums dt { font-size: 10.5px; letter-spacing: .04em; }
+    .eqnums dd { font-size: 16px; }
+    /* What is worn first, then the shelves and the list: after fifty rows the figure was
+       out of reach of the Wear buttons that fill it (the mock README). */
+    .eq { grid-template-columns: minmax(0, 1fr); gap: 16px; grid-template-areas: "doll" "rail" "list"; }
+    /* The shelves become one row that scrolls sideways above the list. */
+    .eqrail { position: static; display: flex; overflow-x: auto; gap: 6px; padding: 2px 4px 8px 0; }
+    .eqrail .v2-btn { flex: none; grid-template-columns: 20px auto auto; }
+    .eqrail .fitting { flex: none; margin: 0; }
+    .eqsay { min-height: 72px; }
+    .eqrow { grid-template-columns: 40px minmax(0, 1fr); }
+    .eqacts { grid-column: 1 / -1; justify-content: flex-start; }
+    .hands, .slots { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .tr-intro { flex-basis: 100%; }
+  }
 
   /* --- The conversation tray, in the numbers' column --------------------------------- */
   #talktray { display: flex; flex-direction: column; min-height: 0; padding: 16px 16px 14px;
@@ -3044,15 +3269,26 @@
     <p id="trade-none-why"></p>
     <p>Buy and sell here when a shop or a stall is open to you. What you buy goes into
       your pack, and you put it on from Equipment.</p>
+    <p><button type="button" class="v2-btn is-quiet" data-open-equipment>Open equipment</button></p>
   </div>
-<div id="tradepanel" aria-hidden="true">
+<!-- The trade window (I7's, 06-trade-and-page.js), in the design's framed card: the
+     counter's name and keeper, the owner's sentence for what this page is for beside the
+     door to Equipment, the market's counters, then what you carry, the deal and their
+     wares. -->
+<div id="tradepanel" class="v2-framed v2-card-leather" aria-hidden="true">
+  <i class="v2-rim" aria-hidden="true"></i>
   <div class="sheethead">
-    <h1 id="tradename">At the counter</h1>
-    <div class="meta" id="trademeta"></div>
-    <span id="trademsg" role="status" aria-live="polite"></span>
-    <button class="close" id="closetrade">Close  ·  Esc</button>
+    <div class="tr-title">
+      <h1 id="tradename">At the counter</h1>
+      <div class="meta" id="trademeta"></div>
+    </div>
+    <p class="tr-intro">Buy and sell here. What you buy goes into your pack, and you put it
+      on from Equipment.</p>
+    <button type="button" class="v2-btn is-quiet is-small" data-open-equipment>Open equipment</button>
+    <button type="button" class="v2-btn is-quiet is-small close" id="closetrade">Close</button>
   </div>
-  <nav class="tabs" id="tradelines" role="tablist" aria-label="Counters at this market"
+  <p id="trademsg" role="status" aria-live="polite"></p>
+  <nav class="tabs v2-tabs" id="tradelines" role="tablist" aria-label="Counters at this market"
        hidden></nav>
   <!-- I7, the owner's layout (2026-09-29): what you carry, filed under tabs down its
        side; the deal, a basket with one button; their wares, as cards. -->
@@ -3075,7 +3311,7 @@
              <b class="sum" id="tradesum"></b></div>
       </div>
       <p class="short" id="tradeshort"></p>
-      <button type="button" class="tr-go" id="tradego" disabled>Trade</button>
+      <button type="button" class="tr-go v2-btn is-go" id="tradego" disabled>Trade</button>
     </section>
     <section class="tradecol tr-wares" aria-labelledby="tr-wares-h">
       <h2 id="tr-wares-h">Their wares <span id="tradetill"></span></h2>
@@ -3094,44 +3330,26 @@
 
 <section class="modepage" id="mode-equipment" role="tabpanel" aria-labelledby="tab-equipment"
          hidden>
-  <!-- Equipment is the sheet's own Equipment and Inventory pages for now (18), with only
-       the actions they already had. Said plainly where the design expects more: the
-       engine has no op for taking armour off or for dropping a thing. -->
-  <p class="modenote" id="equipment-note">Use and wear what you carry here. New things are
-    bought at a counter, in Trade. There is no drop and no take off: the rules have
-    neither yet.</p>
+  <!-- The approved design's Equipment head (the mock README, point 1): what the page is
+       for, what the rules cannot do here, the numbers wearing moves, and the door to the
+       counter. The rest of the page is 05's `pageEquipment`, in the sheet panel carried
+       in below this by 18-tab-equipment.js. -->
+  <header class="eqhead v2-card-leather" id="eq-head">
+    <div class="eqtitle">
+      <h1>Equipment</h1>
+      <p>Wield and wear from what you carry. New things are bought at a counter.</p>
+      <p class="eqgap" id="equipment-note">There is no drop and no take off for armour or a
+        shield: the rules have neither yet. Anything written in another slot comes off by
+        emptying its line.</p>
+    </div>
+    <dl class="eqnums" id="eq-nums" aria-label="Your defences"></dl>
+    <button type="button" class="v2-btn is-quiet" id="eq-trade">Go to Trade</button>
+  </header>
+<!-- The sheet panel: one element, carried into whichever of Sheet, Equipment, Spells and
+     Journal is open (17-tab-sheet.js), its page drawn by 05-sheet.js. The line above the
+     page holds the sheet's own refusals and the prompt for a character with no gender. -->
 <div id="sheetpanel" aria-hidden="true">
-  <svg class="corner tl" viewBox="0 0 74 74" fill="none" stroke="currentColor" aria-hidden="true">
-    <path d="M2 2h70M2 2v70" stroke-width="1.4"/>
-    <path d="M7 7h40M7 7v40" stroke-width=".7"/>
-    <path d="M7 30c10 0 16-6 16-16M30 7c0 10-6 16-16 16" stroke-width=".8"/>
-    <circle cx="14" cy="14" r="2.6" stroke-width=".9"/>
-  </svg>
-  <svg class="corner tr" viewBox="0 0 74 74" fill="none" stroke="currentColor" aria-hidden="true">
-    <path d="M2 2h70M2 2v70" stroke-width="1.4"/>
-    <path d="M7 7h40M7 7v40" stroke-width=".7"/>
-    <path d="M7 30c10 0 16-6 16-16M30 7c0 10-6 16-16 16" stroke-width=".8"/>
-    <circle cx="14" cy="14" r="2.6" stroke-width=".9"/>
-  </svg>
-  <svg class="corner bl" viewBox="0 0 74 74" fill="none" stroke="currentColor" aria-hidden="true">
-    <path d="M2 2h70M2 2v70" stroke-width="1.4"/>
-    <path d="M7 7h40M7 7v40" stroke-width=".7"/>
-    <path d="M7 30c10 0 16-6 16-16M30 7c0 10-6 16-16 16" stroke-width=".8"/>
-    <circle cx="14" cy="14" r="2.6" stroke-width=".9"/>
-  </svg>
-  <svg class="corner br" viewBox="0 0 74 74" fill="none" stroke="currentColor" aria-hidden="true">
-    <path d="M2 2h70M2 2v70" stroke-width="1.4"/>
-    <path d="M7 7h40M7 7v40" stroke-width=".7"/>
-    <path d="M7 30c10 0 16-6 16-16M30 7c0 10-6 16-16 16" stroke-width=".8"/>
-    <circle cx="14" cy="14" r="2.6" stroke-width=".9"/>
-  </svg>
-  <div class="sheethead">
-    <h1 id="sheetname"></h1>
-    <div class="meta" id="sheetmeta"></div>
-    <span id="sheeterr"></span>
-    <button class="close" id="closesheet">Close  ·  Esc</button>
-  </div>
-  <div class="tabs" id="sheettabs" role="tablist"></div>
+  <div class="sheetnote" id="sheetnote"><span id="sheeterr" role="status" aria-live="polite"></span></div>
   <div class="sheetbody" id="sheetbody"></div>
 </div>
 </section>
