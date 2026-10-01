@@ -8724,6 +8724,14 @@ def embody_seen(scene, *, turn: int, world=None, beat: str = "") -> list[dict]:
         return rows
     at = getattr(scene, "at", None)
     bodies = getattr(scene, "people", {}) or {}
+    # Anybody heard of whose body now stands in the party's room has been seen: the rule
+    # `population.embody` keeps for a body made here, kept for one that was walked here.
+    # Replayed 2026-10-01: let into her house, the woman Gorm spoke of stood in the hall
+    # for three beats and her record still said she had never been seen.
+    for ref in (getattr(scene, "actors", {}) or {}):
+        theirs = population.of_ref(scene, ref)
+        if theirs is not None and theirs.get("seen") is False:
+            population.seen(scene, theirs)
     shown = [r for r in (getattr(scene, "population", None) or {}).values()
              if r.get("shown") == int(turn)]
     if not shown:

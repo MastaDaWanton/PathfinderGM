@@ -362,6 +362,9 @@ def test_the_figure_in_her_own_house_is_the_householder(veil):
     rows = judgement.embody_seen(scene, turn=104, world=WORLD, beat=FIGURE)
     assert len(scene.people) == count, rows
     assert any(r.get("same_as") == her.ref for r in rows)
+    # Standing in the hall with the party, she has been seen (replayed: three beats in her
+    # hall and her record still said never seen).
+    assert rec.get("seen") is not False
     # A figure who comes in is somebody arriving, not the householder.
     came = "A hooded figure enters from the street behind you and stands by the door."
     introduced = judgement.note_cast(scene, came, turn=108)
