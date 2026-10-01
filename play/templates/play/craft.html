@@ -462,13 +462,17 @@
      warm screen-blended pool at the flame; position from the pointer, intensity from
      noise. See home.html for the full account of why each number is what it is. */
   #cursorshade {
-    position: fixed; left: 0; top: 0; width: 6000px; height: 6000px;
-    margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 55;
+    /* Sized from the window: a fixed 6000px square showed its edge on a 3440px window
+       (2026-09-30). The same rule as the table's; see its comment. */
+    --shade: max(6000px, calc(200vmax + 400px));
+    position: fixed; left: 0; top: 0; width: var(--shade); height: var(--shade);
+    margin: calc(var(--shade) / -2) 0 0 calc(var(--shade) / -2);
+    pointer-events: none; z-index: 55;
     transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
                scale(calc(.94 + .10 * var(--flick, .8)));
     background: radial-gradient(circle,
       transparent 0 130px, rgba(4, 3, 2, .05) 240px,
-      rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 100%);
+      rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 4243px);
   }
   #cursorlight {
     position: fixed; left: 0; top: 0; width: 170px; height: 170px;

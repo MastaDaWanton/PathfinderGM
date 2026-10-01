@@ -1683,7 +1683,15 @@
      frame to --flick (and a sub-pixel --jx/--jy sway), because a step-curve
      keyframe is a strobe and real fire is noise. See the pointer block. */
   #cursorshade {
-    position: fixed; left: 0; top: 0; width: 6000px; height: 6000px;
+    /* Sized from the window, never smaller than the 6000px it was. Measured 2026-09-30
+       on a 3440x1440 window (the owner's ultrawide): the fixed 6000px square ended
+       2934-3138px from the pointer, left 356 columns undimmed, and showed as a ~10%
+       brightness step that followed the cursor and swayed 204px with the flicker. Half
+       the box must out-reach the window at the flicker's smallest scale (.978), so
+       200vmax + 400px; the gradient's last stop is pinned at 4243px (the old 100%, the
+       6000px box's corner) so the light itself is unchanged at every size. */
+    --shade: max(6000px, calc(200vmax + 400px));
+    position: fixed; left: 0; top: 0; width: var(--shade); height: var(--shade);
     /* Reported 2026-09-17: "every tooltip that has loaded has loaded partially
        covered by the cursor". The candle and its shade are *decoration*, and they were
        stacked at 55-60 — above the story, the footer, the side panel, the combat bar
@@ -1693,7 +1701,8 @@
        Now just above the vignette (5) and below every panel and popup. The page is lit
        exactly as before — main, footer and aside all sit at z-index 2 — and nothing the
        player is meant to read is under it any more. */
-    margin: -3000px 0 0 -3000px; pointer-events: none; z-index: 6;
+    margin: calc(var(--shade) / -2) 0 0 calc(var(--shade) / -2);
+    pointer-events: none; z-index: 6;
     transform: translate(var(--cx, -9000px), calc(var(--cy, -9000px) + 5px))
                scale(calc(.94 + .10 * var(--flick, .8)));
     /* Taken well down from the first cut (.13/.30/.34): the illusion of
@@ -1702,7 +1711,7 @@
        strain to read. Cool is not a reason to make somebody squint. */
     background: radial-gradient(circle,
       transparent 0 130px, rgba(4, 3, 2, .05) 240px,
-      rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 100%);
+      rgba(4, 3, 2, .11) 460px, rgba(4, 3, 2, .13) 4243px);
   }
   #cursorlight {
     position: fixed; left: 0; top: 0; width: 170px; height: 170px;
