@@ -1904,6 +1904,14 @@ class GMAgent:
         # rewritten to where they are — never kept as a new place.
         made: list[str] = []
         known = self._known_names() | (extra_known or set())
+        intimate = self._intimate_beat()
+        # Who is alive and unhurt is not judged in an intimate scene between adults.
+        # Measured live 2026-10-01 on the first briefed beat: "her body is tense but
+        # welcoming" read as Quin Nutmeg "down or dead" (`_FELLED` holds "body", for a
+        # corpse), and "cries out", "goes limp", "collapses against you" are the scene's
+        # words as much as a wound's. Nobody here is hostile (`intimate.partners`); a
+        # death the engine rolls still reaches the page through `press_the_death`.
+        bodies = None if intimate else self._body_count()
 
         def _review(t: str):
             return narration_mod.review(
@@ -1911,7 +1919,7 @@ class GMAgent:
                 known_names=known, earlier=earlier,
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
-                gender=self._pc_gender(), state=self._body_count(),
+                gender=self._pc_gender(), state=bodies,
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 fire_context=fire_context,
                 # The doors this turn forced or picked, and whether they gave.
@@ -1948,7 +1956,6 @@ class GMAgent:
         # owner's beat "we climax together…" went through this rewrite for a recurring
         # phrase (2026-09-30), on the PLANNER's model with a briefing that says nothing
         # about content — a model the table never picked for this, free to soften it.
-        intimate = self._intimate_beat()
         who = ((self.prose_model, self.prose_host, self.prose_provider, self.prose_key)
                if intimate else (self.model, self.host, self.provider, self.api_key))
 

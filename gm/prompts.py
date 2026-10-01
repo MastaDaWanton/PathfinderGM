@@ -1889,8 +1889,12 @@ def content_line(fade: bool = False) -> str:
 # leaves the string room to end on a sentence instead of being closed mid-word by the
 # sampler, which `trim_unfinished` then has to cut back (item 6, 2026-09-30). What held
 # the owner's beats to 665 and 709 characters was not a cap at all — it was the worked
-# examples, 13 of 14 under 822 characters, which this beat no longer shows.
-INTIMATE_LENGTH = 1700
+# examples, none of them over 822 characters, which this beat no longer shows.
+# 1,700 was the first figure, and the first live briefed beat (2026-10-01) ran straight
+# to the 1,800 ceiling and was closed mid-sentence, losing its hand-back with the cut;
+# models overshoot a stated length. 1,400 leaves the overshoot a margin. One sample —
+# re-measure on the owner's own passages, which set the length by example.
+INTIMATE_LENGTH = 1400
 
 # The prose briefing for ONE kind of beat: an intimate scene between adults at a table
 # whose content rule is "explicit", detected in code (gm/intimate.py). It replaces the

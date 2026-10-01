@@ -263,7 +263,10 @@ def test_the_ordinary_and_fade_prompts_carry_no_demonstration_and_no_note(monkey
 def test_the_length_asked_fits_under_the_grammar_ceiling():
     assert prompts.INTIMATE_LENGTH < prompts.GRAMMAR_MAXLENGTH_CEILING
     assert intimate.PASSAGE_CHARS == prompts.GRAMMAR_MAXLENGTH_CEILING
-    assert "1,700" in prompts.INTIMATE_BRIEFING
+    assert f"{prompts.INTIMATE_LENGTH:,}" in prompts.INTIMATE_BRIEFING
+    # The first live briefed beat, asked for 1,700, ran to the 1,800 ceiling and was cut
+    # mid-sentence: the ask keeps a margin for the overshoot.
+    assert prompts.GRAMMAR_MAXLENGTH_CEILING - prompts.INTIMATE_LENGTH >= 300
 
 
 # --- the owner's file ---------------------------------------------------------------------
@@ -369,6 +372,21 @@ def test_the_blow_detector_misreads_the_scene_so_it_is_not_asked(scene):
     src = inspect.getsource(agent_mod.GMAgent.narrate_turn)
     assert "if not self._intimate_beat():" in src
     assert src.index("if not self._intimate_beat():") < src.index("self._undeclared_blows(")
+
+
+def test_her_body_is_not_a_corpse_in_an_intimate_beat():
+    """Measured live 2026-10-01 on the first briefed beat: "her body is tense but
+    welcoming" read as Quin Nutmeg "down or dead" — `_FELLED` holds "body", for a corpse
+    — and went to the rewrite as a contradiction of the engine. The review is not handed
+    who is alive and unhurt on an intimate beat."""
+    state = {"Quin Nutmeg": {"alive": True, "hurt": False}}
+    assert narration.contradicts_state(
+        "Quin Nutmeg draws you close. Her body is tense but welcoming.", state)
+    from gm import agent as agent_mod
+
+    src = inspect.getsource(agent_mod.GMAgent.polish)
+    assert "bodies = None if intimate else self._body_count()" in src
+    assert "state=bodies" in src
 
 
 def test_a_rewrite_of_an_intimate_beat_keeps_its_register():
