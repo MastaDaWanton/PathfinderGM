@@ -1612,22 +1612,29 @@ def rearm_step(scene, ref: str) -> tuple[str, object] | None:
         return None                      # something is in the hand already
     from rules import goods, weapons as weapons_mod
 
+    # Not the arrows it loosed and missed (`loosed`, E3): a creature that shot is not a
+    # creature that was disarmed.
     mine = [r for r in getattr(scene, "props", ()) or ()
-            if r.get("owner") == ref and r.get("from_")
+            if r.get("owner") == ref and r.get("from_") and not r.get("loosed")
             and r.get("state") in ("intact", "broken")
             and r.get("held_by") != ref]
     if not mine:
         return None                      # never disarmed: its fists are its choice
+    # "Can it be put in hand" is `weapons.wieldable`, the one answer the `wear` op asks
+    # (E1). `goods.kind_of(...) == "weapon"` here was the curated twelve until 2026-09-30,
+    # so a disarmed creature's dropped bo staff or warhammer was never picked up again.
     for rec in mine:
         if (rec.get("at") == scene.at and not rec.get("held_by")
                 and not scene.within_reach(ref, rec)
-                and goods.kind_of(str(rec["from_"])) == "weapon"):
+                and goods.kind_of(str(rec["from_"])) == "weapon"
+                and weapons_mod.wieldable(str(rec["from_"]))[0]):
             return ("pick_up", rec)
     for key in actor.weapons:
         gear = actor.gear.get(str(key).lower())
         if gear is not None and gear.destroyed:
             continue
-        if weapons_mod.has(key) and str(key).lower() not in ("unarmed", "improvised"):
+        if weapons_mod.has(key) and str(key).lower() not in ("unarmed", "improvised") \
+                and weapons_mod.wieldable(key)[0]:
             return ("draw", str(key))
     return None
 
@@ -4608,7 +4615,82 @@ _DECLARERS = (
     ("venture", lambda raw, text, scene, world: inject_venture(raw, text, scene)),
     ("loot", lambda raw, text, scene, world: inject_loot(raw, text, scene)),
     ("fight", lambda raw, text, scene, world: inject_fight(raw, text, scene)),
+    ("take_off", lambda raw, text, scene, world: declare_take_off(raw, text, scene)),
 )
+
+
+# "take off my armour", "I unbuckle the breastplate", "strip off the chain shirt", "take
+# my shield off", "sheathe my sword", "put the bow away". The thing must be named — "I
+# take off down the street" is leaving, and it names no armour.
+_ARMOUR_WORDS = (r"armou?r|mail|plate|breastplate|chain\s*shirt|leathers?|padded|hide"
+                 r"(?:\s+armou?r)?|studded\s+leather|half-plate|buckler|shield")
+# Two shapes: a verb that means "off" by itself (unbuckle, remove, doff), and one that
+# needs the word "off" before or after the thing (take, pull, get, strip, shrug) — "I get
+# my shield" is picking it up, and "I take my shield" is not taking it off.
+_OFF_BY_ITSELF = (r"unbuckle|unbuckles|unbuckling|unstrap|unstraps|unstrapping|remove|"
+                  r"removes|removing|doff|doffs|doffing")
+_OFF_WITH_OFF = (r"take|takes|taking|took|pull|pulls|pulling|strip|strips|stripping|"
+                 r"shrug|shrugs|shrugging|get|gets|getting")
+_THE_THING = (r"(?:my|the|his|her|their)?\s*(?P<what>(?:[a-z-]+\s+){0,2}?(?:"
+              + _ARMOUR_WORDS + r"))\b")
+_TAKES_OFF = re.compile(
+    r"\b(?:(?:" + _OFF_BY_ITSELF + r")\s+" + _THE_THING.replace("what", "a")
+    + r"|(?:" + _OFF_WITH_OFF + r")\s+off\s+" + _THE_THING.replace("what", "b")
+    + r"|(?:" + _OFF_WITH_OFF + r")\s+" + _THE_THING.replace("what", "c") + r"\s+off\b)",
+    re.I)
+_PUTS_AWAY = re.compile(
+    r"\b(?:sheathe|sheathes|sheathing|holster|holsters|stow|stows|put|puts|putting)\s+"
+    r"(?:away\s+)?(?:my|the|his|her|their)\s+(?P<what>[a-z -]{2,30}?)"
+    r"(?:\s+away)?(?=[.,;!]|\s+and\b|$)", re.I)
+
+
+def declare_take_off(raw_intents, player_text: str, scene) -> list:
+    """"I take off my armour" reaches the engine as the `take_off` op (2026-09-30, E4).
+
+    There was no op to take anything off, so the sentence could only be narrated: the
+    prose said the armour came off and the sheet kept it on. The same shape as every
+    declarer here — detect the words mechanically, append the op the words declare, and
+    let `declared_ops` make the schema require it. Fires only for something the
+    character has on (the worn armour or shield, or the weapon in hand), so "I take off
+    down the street" and "should I take my shield off?" add nothing.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    if "?" in player_text or any(isinstance(r, dict) and str(r.get("op", "")).lower()
+                                 == "take_off" for r in raw_intents):
+        return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+    from rules import armour as armour_mod
+    from rules import weapons as weapons_mod
+
+    text = str(player_text)
+    m = _TAKES_OFF.search(text)
+    if m:
+        what = " ".join((m.group("a") or m.group("b") or m.group("c")).lower().split())
+        kind, key = armour_mod.key_for(what)
+        if not kind:
+            kind = "shield" if re.search(r"shield|buckler", what) else "armour"
+            key = str(getattr(pc, kind, "none") or "none")
+        if key != "none" and key == str(getattr(pc, kind, "none") or "none"):
+            return raw_intents + [{
+                "op": "take_off", "actor": pc.ref,
+                "because": "the player takes it off",
+                "params": {"item": key}}]
+        return raw_intents
+    m = _PUTS_AWAY.search(text)
+    if m:
+        held = weapons_mod.key_for(pc.equipped or "")
+        said = weapons_mod.key_for(m.group("what"))
+        generic = re.search(r"\b(?:weapon|sword|blade|bow|crossbow|axe|staff|club|"
+                            r"dagger|knife|mace|spear)s?\b", m.group("what"), re.I)
+        if held and held != "unarmed" and (said == held or (not said and generic)):
+            return raw_intents + [{
+                "op": "take_off", "actor": pc.ref,
+                "because": "the player puts it away",
+                "params": {"item": held}}]
+    return raw_intents
 
 
 def inject_say(raw_intents, player_text: str, scene) -> list:
