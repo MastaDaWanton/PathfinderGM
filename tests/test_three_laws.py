@@ -169,7 +169,9 @@ def test_a_vocabulary_addition_reaches_campaigns_already_on_disk():
 # against themselves. Copies drift: travel forgot `stable`, and only resurrection was
 # ever entitled to remove `dead`.
 _WAS_HAND_WRITTEN = {
-    "recovery.hit-points": ("dying", "stable", "unconscious", "disabled"),
+    # `broken` joined 2026-10-01, deliberately: the owner's house rule for a construct at
+    # 0 to -10, which a repair that lifts it above 0 ends through this same sweep.
+    "recovery.hit-points": ("dying", "stable", "unconscious", "disabled", "broken"),
     "recovery.rest": ("prone", "flat-footed", "shaken", "frightened", "panicked",
                       "dazzled", "entangled", "grappled", "pinned", "staggered",
                       "sickened", "nauseated", "dazed", "cowering", "fascinated"),

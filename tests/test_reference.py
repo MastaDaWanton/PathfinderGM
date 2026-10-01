@@ -120,8 +120,9 @@ def test_the_conditions_the_engine_does_not_implement_yet_are_named(conditions):
     book = {c["key"] for c in conditions["conditions"]}
     missing = sorted(book - set(CONDITIONS))
     assert missing == [
-        # An item condition, not a creature one; arrives with sunder and item hit points.
-        "broken",
+        # "broken" left this list 2026-10-01 — but only as the owner's HOUSE condition for
+        # a construct at 0 to -10 hp (rules/tables.py says so). The book's item condition
+        # (half hit points, -2) still arrives with sunder and item hit points.
         # Negative levels, which means recomputing a whole sheet downwards. There is now
         # a `negative_level` effect type that states and counts them honestly, and it is
         # declared `engine=False` for exactly this reason.

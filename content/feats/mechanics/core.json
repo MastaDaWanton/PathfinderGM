@@ -328,11 +328,6 @@
       "proficient.weapon.$target"
     ]
   },
-  "craft-construct": {
-    "tags": [
-      "craft.construct"
-    ]
-  },
   "light-armor-proficiency": {
     "tags": [
       "proficient.armour.light"

@@ -1,4 +1,4 @@
-"""Mending a construct: the rule a "fix it" cites, and what it may not do.
+"""Mending a construct, and making it yours: the owner's house rule and the book it departs from.
 
 The owner's report, 2026-10-01, playing Sam (a 1st-level wizard with Knowledge ranks): "I
 attempt to use my knowledge of engineering and my deft hands to fix the spy in a way that
@@ -8,39 +8,32 @@ nothing at all ("did not heal the clockwork spy when I fixed it"), and the next 
 printed "Clockwork Spy has bled out where they fell" beside "it now waits for your
 command". Both halves were the narrator's: no rule had been asked.
 
-WHAT THE BOOK SAYS, read 2026-10-01 (content/rules/repairs.json quotes each):
+WHAT THE BOOK SAYS, read 2026-10-01 (content/rules/repairs.json quotes each), and what the
+first fix built: a construct is "immediately destroyed when reduced to 0 hit points or
+less" (Bestiary); a damaged one is repaired with the Craft Construct feat, 100 gp per Hit
+Die, a crafting check at DC less 5, a day, 1d6 per Hit Die (Ultimate Magic p.113); and it
+obeys its maker, never its mender — taking one is control construct, a 7th-level spell.
+By the book the owner's spy was wreckage.
 
-  * Bestiary, Construct type: "Cannot heal damage on its own, but often can be repaired
-    ... through the use of the Craft Construct feat. Constructs can also be healed through
-    spells such as make whole." And "immediately destroyed when reduced to 0 hit points
-    or less" — so the spy at -1 was not a patient but wreckage.
-  * Ultimate Magic p.113, Repairing Constructs: the Craft Construct feat, 100 gp per Hit
-    Die, a skill check "as if he were crafting the construct" at 5 less than the crafting
-    DC, 1d6 hit points per Hit Die on a success, 1 day per 1,000 gp (minimum a day), and
-    only "while the construct is inanimate or nonfunctioning". "A construct that has been
-    completely destroyed cannot be repaired."
-  * Core Rulebook, Craft: "You can repair an item by making checks against the same DC
-    that it took to make the item in the first place. The cost of repairing an item is
-    one-fifth of the item's price." That is the OBJECT rule. A construct is a creature,
-    and the construct rule above is the more specific one, so the object rule is not used
-    here. Knowledge (engineering) and Disable Device repair nothing in 1e — no skill
-    besides the crafting check does — so the player's words choose the attempt and the
-    rule chooses the skill.
+THE OWNER RULED OTHERWISE, the same day — a HOUSE RULE, verbatim: "Broken, then fixable and
+claimable — House rule: a construct at 0 to -10 is broken, not destroyed (destroyed only
+past that). Anyone with the skill can mend it with a Craft or Knowledge (engineering)
+check, which heals it. A second, harder check rewrites its loyalty so it becomes yours: it
+follows you, obeys, and you can name it." So:
 
-So the order this module refuses in is the book's: not a construct (a living body is
-healed, not mended — first aid is `rules/firstaid.py`); destroyed (never, by any skill);
-undamaged; mid-fight or still working against you (a day's work on a thing at rest);
-no Craft Construct (the feat is the rule's own gate — make whole, a 2nd-level spell, is
-the other door and goes through `cast`); short of the coin. Only then is anything rolled.
+  * broken, not destroyed — `Actor.death_floor` reads `broken_floor` (-10) off the row and
+    `Actor.settle_broken` writes the `broken` condition between it and 0;
+  * the repair — no feat, no coin; the better of Craft and Knowledge (engineering); DC the
+    crafting DC less 5 (the book's arithmetic, kept); ten minutes; 1d6 per Hit Die through
+    the heal applicator, stamped `rule:repair-construct`; a broken machine mended above 0
+    rises, and nobody's yet (indifferent);
+  * the claim — the better of Knowledge (engineering) and Disable Device, at the repair
+    DC + 10, on a working construct that is not fighting you; a success grants
+    `bond.owned-by-you`, `bond.travels-with-you` and `devoted`, and a failure by 5 or more
+    turns it hostile.
 
-OWNERSHIP IS NOT A REPAIR'S TO GIVE. Craft Construct: "A construct recognizes its creator
-intuitively and obeys all commands issued to it by that individual" (d20pfsrd, the feat's
-page) — its maker, not whoever mends it. Taking one from its master is control construct
-(Ultimate Magic, sorcerer/wizard 7: "You wrest the control of a construct from its master.
-For as long as you concentrate..."), which nobody here casts at 1st level. No door in the
-engine grants a construct to the player, so the refusal says so whenever the words ask
-for it, and `gm/checks/repair_claimed.py` cuts prose that claims it anyway. A real door —
-building one with the feat, or the spell — is deferred, and said so in the report.
+Every number above is a row field marked HOUSE with the departure stated; this module only
+reads them. Ultimate Magic stays cited in the row as the thing departed from.
 """
 from __future__ import annotations
 
@@ -51,6 +44,7 @@ from . import states
 
 _ROWS: dict[str, dict] | None = None
 RULE = "repair-construct"
+CLAIM = "claim-construct"
 
 
 def rows() -> dict[str, dict]:
@@ -68,17 +62,32 @@ def row(rule: str = RULE) -> dict:
     return rows()[rule]
 
 
+def broken_floor() -> int:
+    """The total at which a construct is destroyed: one past the row's lowest broken total.
+    "0 to -10 is broken ... destroyed only past that", so -10 is still broken and -11 is
+    not — `Actor.death_floor`'s meaning is "dead at or below", hence the -1."""
+    return int(row(RULE)["broken_floor"]) - 1
+
+
 def is_construct(actor) -> bool:
     return bool(actor is not None and actor.has_state(states.CONSTRUCT))
 
 
 def destroyed(actor) -> bool:
-    """Dead, or at a hit point total the ladder says is dead. The second half is for a
-    construct saved "dying" before 2026-10-01 — the owner's own spy, at -1 with no `dead`
-    written — which the next round's tick destroys; a repair asked before that tick must
-    not find it merely damaged."""
+    """Dead, or at a hit point total the ladder says is dead."""
     return bool(actor is not None and (actor.has_state("state.down.dead")
                                        or actor.hp <= actor.death_floor()))
+
+
+def broken(actor) -> bool:
+    """Broken by the house rule — the condition, or a save's spy at 0 to -10 that has not
+    been settled onto it yet."""
+    return bool(actor is not None and not destroyed(actor) and is_construct(actor)
+                and (actor.has_state("state.down.broken") or actor.hp <= 0))
+
+
+def owned(actor) -> bool:
+    return bool(actor is not None and actor.has_state(states.OWNED_BY_YOU))
 
 
 def crafting_dc(subject, rule: dict) -> tuple[int, bool]:
@@ -97,15 +106,13 @@ def crafting_dc(subject, rule: dict) -> tuple[int, bool]:
     return int(rule["crafting_dc"]), True
 
 
-def cost_gp(subject, rule: dict) -> int:
-    return int(rule["cost_gp_per_hd"]) * max(1, int(subject.hit_dice))
+def repair_dc(subject) -> int:
+    rule = row(RULE)
+    return crafting_dc(subject, rule)[0] - int(rule["dc_less"])
 
 
-def minutes(subject, rule: dict) -> int:
-    """1 day per 1,000 gp spent, minimum a day — whole days, rounded up."""
-    gp = cost_gp(subject, rule)
-    days = max(1, -(-gp // 1000))
-    return max(int(rule["minimum_minutes"]), days * int(rule["minutes_per_1000_gp"]))
+def claim_dc(subject) -> int:
+    return repair_dc(subject) + int(row(CLAIM)["dc_over_repair"])
 
 
 def dice(subject, rule: dict) -> str:
@@ -113,35 +120,69 @@ def dice(subject, rule: dict) -> str:
     return f"{int(count) * max(1, int(subject.hit_dice))}d{int(sides)}"
 
 
-OWNERSHIP_SAID = (
-    "Mending a construct does not make it yours: it answers to its maker, and taking one "
-    "from its master is the seventh-level spell control construct, held only while the "
-    "caster concentrates.")
+def best_skill(actor, skills) -> tuple[str, list] | None:
+    """(skill, its modifiers) — the best of `skills` this character can attempt at all,
+    or None. A trained-only skill with no ranks is not attempted (`skill_modifiers`
+    refuses it), which is 1e's own rule and why Disable Device and Knowledge are asked
+    rather than assumed."""
+    from .sheet import IllegalSheet
+
+    best = None
+    for skill in skills:
+        try:
+            mods = actor.skill_modifiers(skill)
+        except (IllegalSheet, KeyError):
+            continue
+        total = sum(m.value for m in mods)
+        if best is None or total > best[0]:
+            best = (total, skill, mods)
+    return (best[1], best[2]) if best else None
 
 
-def refusal(scene, actor, subject, rule: dict) -> str:
-    """Why this repair does not happen at all — the book's reason — or "".
+def _working_against_you(subject) -> bool:
+    return (states.attitude_of(subject) in ("hostile",) and subject.can_act()
+            and not subject.is_down)
 
-    Each line is a fact the player could not have known from their own sheet, printed
-    at resolution (the `_refuse` door), never a validation error the plan retries."""
+
+def repair_refusal(scene, actor, subject) -> str:
+    """Why this repair does not happen at all, or "". Printed at resolution — each line
+    is a fact the player could not have seen from their own sheet."""
     name = subject.name
     if not is_construct(subject):
         return (f"{name} is not a construct, and there is nothing to mend: a living body "
                 f"is healed, not repaired.")
     if destroyed(subject):
-        return (f"{name} was destroyed when it was reduced to 0 hit points, and a "
-                f"construct that has been completely destroyed cannot be repaired "
-                f"(Ultimate Magic, Repairing Constructs). What is left is parts.")
+        return (f"{name} is destroyed — past the point a construct can be brought back "
+                f"from — and what is left is parts.")
     if subject.hp >= subject.hp_max:
         return f"{name} is undamaged; there is nothing to repair."
     if getattr(scene, "in_encounter", False):
-        return (f"A repair is a day's work on a construct at rest; it cannot be done "
-                f"in the middle of a fight.")
-    if states.attitude_of(subject) in ("hostile", "unfriendly") and subject.can_act():
-        return (f"{name} is still working, and not for you: a construct is repaired "
-                f"only while it is inanimate or nonfunctioning.")
-    if not actor.has_state(str(rule["requires_tag"])):
-        return (f"Repairing a construct takes {rule['requires_said']}, which "
-                f"{actor.name} does not have (Ultimate Magic, Repairing Constructs). "
-                f"Make whole, a second-level spell, mends one as well.")
+        return (f"A repair is ten minutes' work at the least; it cannot be done in the "
+                f"middle of a fight.")
+    if _working_against_you(subject):
+        return (f"{name} is still working, and not for you: it has to be stopped before "
+                f"it can be mended.")
+    if best_skill(actor, row(RULE)["skills"]) is None:
+        return (f"{actor.name} has neither Craft nor Knowledge (engineering) to mend it "
+                f"with.")
+    return ""
+
+
+def claim_refusal(scene, actor, subject) -> str:
+    """Why the loyalty cannot be rewritten now, or ""."""
+    name = subject.name
+    if not is_construct(subject):
+        return (f"{name} is not a construct; a mind is won by talking, not rewritten "
+                f"with tools.")
+    if destroyed(subject):
+        return f"{name} is destroyed; there is nothing left to answer to anybody."
+    if broken(subject) or subject.is_down:
+        return (f"{name} is broken and inert: it has to be mended and working before its "
+                f"loyalty can be rewritten.")
+    if getattr(scene, "in_encounter", False) or _working_against_you(subject):
+        return (f"{name} is fighting you; its loyalty cannot be rewritten while it is "
+                f"trying to stop you.")
+    if best_skill(actor, row(CLAIM)["skills"]) is None:
+        return (f"Rewriting a construct's loyalty takes training in Knowledge "
+                f"(engineering) or Disable Device, and {actor.name} has neither.")
     return ""

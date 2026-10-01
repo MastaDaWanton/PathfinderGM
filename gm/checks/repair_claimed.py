@@ -15,12 +15,14 @@ sentence about a construct in the scene (`_people.about`, carried on by "it", th
 `closing_claimed` reads a beast) that
 
   * says it is mended or working again — "repaired", "fixed", "whirs back to life", "its
-    gears begin to turn again", "stabilizes" — when no `repair` outcome resolved a
-    success on it this turn (kind `repair-claimed`); or
+    gears begin to turn again", "stabilizes" — while the engine holds it broken or
+    destroyed (kind `repair-claimed`); a repair that resolved this turn leaves it
+    working, and then the sentence is true; or
   * says it is the player's — "recognizes you", "its new master", "waits for your
-    command", "tamed", "obeys you", "loyal to you" — which nothing in the engine grants at
-    all (kind `ownership-claimed`; `rules/repair.py` says why: a construct obeys its
-    maker, and taking one from its master is control construct, a 7th-level spell).
+    command", "tamed", "obeys you", "loyal to you" — when it does not hold
+    `bond.owned-by-you` (kind `ownership-claimed`). Since the owner's house rule
+    (2026-10-01) the engine CAN grant that — the claim check in `Engine._op_repair` —
+    so the sentence is a defect only when the engine did not.
 
 An attempt, a denial or a conditional is not a claim ("you try to repair it", "it will
 never obey you", "past repair"), and a question never is. Bounded on purpose to
@@ -61,8 +63,10 @@ _OWNED = re.compile(
     r"|(?:your|its|a)\s+new\s+(?:master|mistress|owner|maker|lord|keeper|friend"
     r"|companion|servant|pet)"
     r"|(?:as|is|are)\s+(?:its|his|her)\s+(?:master|mistress|owner|maker)"
-    r"|(?:awaits?|awaiting|waits?|waiting)\s+(?:for\s+)?your\s+(?:command|commands|orders?"
-    r"|word|instructions?)"
+    # "waiting for your next command" — the house-rule replay's own words (2026-10-01),
+    # which the first cut missed for the adjective between.
+    r"|(?:awaits?|awaiting|waits?|waiting)\s+(?:for\s+)?your\s+(?:next\s+|new\s+|every\s+"
+    r"|first\s+)?(?:command|commands|orders?|word|instructions?)"
     r"|at\s+your\s+(?:command|service|disposal)"
     r"|(?:obeys?|obeying|serves?|serving|heeds?)\s+you"
     r"|(?:loyal|devoted|bound|bonded|attuned)\s+to\s+you"
@@ -76,6 +80,8 @@ _NOT_SO = re.compile(
     r"|beyond|past)\s+(?:[\w'’]+\s+){0,4}$", re.I)
 
 _IT = frozenset({"it", "its", "itself"})
+_MACHINE_WORDS = re.compile(
+    r"\b(?:construct|machine|automaton|clockwork|golem|contraption|mechanism)s?\b", re.I)
 
 
 def _claimed(pattern, narration: str) -> bool:
@@ -106,14 +112,12 @@ def _machines(scene) -> list:
             if not getattr(a, "is_pc", False) and repair_mod.is_construct(a)]
 
 
-def _mended_this_turn(ctx, ref: str) -> bool:
-    from ._page import effects, field
+def _not_working(actor) -> bool:
+    """Broken (the owner's house rule) or destroyed: a page that has it working is wrong.
+    A repair that resolved this turn has already lifted it, so its sentence is true."""
+    from rules import repair as repair_mod
 
-    for o in ctx.outcomes:
-        if field(o, "op") == "repair" and field(o, "verdict") == "success" \
-                and any(e.get("ref") == ref and e.get("kind") == "heal" for e in effects(o)):
-            return True
-    return False
+    return bool(repair_mod.destroyed(actor) or getattr(actor, "is_down", False))
 
 
 def _sentences_about(ctx, actor) -> list[tuple[str, str]]:
@@ -128,7 +132,12 @@ def _sentences_about(ctx, actor) -> list[tuple[str, str]]:
               if r != actor.ref and not getattr(a, "is_pc", False)]
     narr = [n for _, n in pairs]
     by_n = {n: w for w, n in pairs}
-    picked = linked(narr, lambda n: by_n.get(n, n) in theirs,
+    # "The construct sits before you ... waiting for your next command" (the house-rule
+    # replay, 2026-10-01): the page calls a machine by what it is far more often than by
+    # its stat block's name. With one construct here, those words mean it.
+    alone = len(_machines(ctx.scene)) == 1
+    picked = linked(narr, lambda n: by_n.get(n, n) in theirs
+                    or (alone and bool(_MACHINE_WORDS.search(n))),
                     lambda n: any(names_person(n, o) for o in others if o),
                     family=_IT | pronoun_words(getattr(actor, "pronouns", "")))
     return [pairs[i] for i in picked]
@@ -148,20 +157,25 @@ def _fact(actor, kinds) -> str:
     who = _the(actor)
     if repair_mod.destroyed(actor):
         line = f"{who} is wreckage: destroyed, and past any repair."
+    elif getattr(actor, "is_down", False):
+        line = f"{who} lies broken: inert, and not yet mended."
     else:
-        line = f"{who} is not mended."
+        line = ""
     if "ownership-claimed" in kinds:
-        line += " It answers to its maker, not to you."
-    return line
+        line += " It is nobody's yet, and does not answer to you."
+    return line.strip()
 
 
 def _flags(ctx, actor) -> tuple[list[str], list[str]]:
-    mended = _mended_this_turn(ctx, actor.ref)
+    from rules import repair as repair_mod
+
+    broken = _not_working(actor)
+    yours = repair_mod.owned(actor)
     claims_mend, claims_own = [], []
     for written, narration in _sentences_about(ctx, actor):
-        if not mended and mends(narration):
+        if broken and mends(narration):
             claims_mend.append(written)
-        if owns(narration):
+        if not yours and owns(narration):
             claims_own.append(written)
     return claims_mend, claims_own
 
@@ -177,21 +191,21 @@ def find(ctx) -> list:
         if claims_mend:
             out.append(Finding(
                 "repair-claimed",
-                f"the page mends {actor.name}, and no repair resolved: "
-                f"{claims_mend[0][:90]!r}",
+                f"the page has {actor.name} working, and the engine holds it "
+                f"{'destroyed' if dead else 'broken'}: {claims_mend[0][:90]!r}",
                 (f"{who} is destroyed and cannot be repaired: it is wreckage. "
-                 if dead else f"{who} was not repaired this turn. ")
+                 if dead else f"{who} is still broken: it was not mended. ")
                 + "Rewrite the sentence so it stays broken — it does not stir, whir, or "
                   "work again.",
                 weight=4, sentences=tuple(claims_mend)))
         if claims_own:
             out.append(Finding(
                 "ownership-claimed",
-                f"the page makes {actor.name} the player's, which nothing granted: "
+                f"the page makes {actor.name} the player's, and the engine did not: "
                 f"{claims_own[0][:90]!r}",
                 f"{who} is not the player's: it does not recognise them, obey them or "
-                f"wait for their command. A construct answers to its maker. Rewrite the "
-                f"sentence without that.",
+                f"wait for their command — its loyalty has not been rewritten. Rewrite "
+                f"the sentence without that.",
                 weight=4, sentences=tuple(claims_own)))
     return out
 

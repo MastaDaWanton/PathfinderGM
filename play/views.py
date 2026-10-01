@@ -3663,6 +3663,8 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 "dead": f"{name} stops moving.",
                 "stable": f"{name} is still down, but the bleeding has stopped.",
                 "dying": f"{name} is bleeding out.",
+                # A construct saved "dying" before the house rule, settled on its tick.
+                "broken": f"{name} is broken: inert, but not destroyed.",
             }[b["outcome"]]
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
         scene.bleeding = []

@@ -243,7 +243,9 @@ def pronouns_for_gender(gender: str) -> str:
 # overtakes them. Named once because it is written twice — by `apply_hp_state`'s own death
 # threshold and by a unit breaking up — and the three laws' ratchet counts literal condition
 # keys for exactly this reason: two copies of a ladder is how one of them goes stale.
-_DOWN_THE_LADDER = ("dying", "stable", "unconscious", "disabled")
+# `broken` is the house rule's construct rung (2026-10-01): a broken machine hit past -10
+# is destroyed, and a corpse that is also "broken: inert, but not destroyed" lies twice.
+_DOWN_THE_LADDER = ("dying", "stable", "unconscious", "disabled", "broken")
 
 
 @dataclass
@@ -2882,18 +2884,44 @@ class Actor:
     def death_floor(self) -> int:
         """The hit point total at which this body is dead (or destroyed).
 
-        -Con for a living body. Zero for a troop (it breaks up) and for a construct or an
-        undead creature, which the Bestiary destroys at 0 with no dying rung between — the
-        one reader of that threshold, so `apply_hp_state`, `bleed_out` and the off-screen
+        -Con for a living body. Zero for a troop (it breaks up) and for an undead
+        creature, which the Bestiary destroys at 0 with no dying rung between. A
+        construct's floor is the owner's HOUSE rule (2026-10-01): "a construct at 0 to -10
+        is broken, not destroyed (destroyed only past that)" — the row's `broken_floor`,
+        and between it and 0 the construct is `broken`, never dying. The one reader of the
+        threshold, so `apply_hp_state`, `bleed_out` and the off-screen
         `Engine._resolve_dying` cannot disagree. Measured 2026-10-01: a Clockwork Spy at
         -1 was "unconscious and dying", then "bled out where they fell", because a missing
-        Constitution reads as 10 and the floor was -10.
+        Constitution reads as 10.
         """
         from . import states as _states
 
         if self.troop is not None or _states.destroyed_at_zero(self):
             return 0
+        if _states.breaks_below_zero(self):
+            from . import repair as _repair
+
+            return _repair.broken_floor()
         return -self.ability_score("con")
+
+    def settle_broken(self) -> list[str]:
+        """A construct between 0 and its floor is `broken`: down, inert, not dying.
+
+        The house rule's rung, written here beside the ladder it sits on. It also mends a
+        save written before the rule — the owner's own spy is on disk at -1 carrying
+        `unconscious` and `dying` from the book's ladder — by lifting the hit-point rungs
+        through the `recovery.hit-points` sweep and writing `broken` in their place.
+        Returns what it wrote, as `apply_hp_state` does."""
+        from . import states as _states
+
+        if not _states.breaks_below_zero(self) or self.is_dead \
+                or not (self.death_floor() < self.hp <= 0):
+            return []
+        if self.has_state("state.down.broken"):
+            return []
+        self.clear_states("recovery.hit-points")
+        self.add_condition(_states.BROKEN_KEY, source="hit points")
+        return [_states.BROKEN_KEY]
 
     def noticed(self) -> list[str]:
         """What this character has noticed and still holds: the names of the `knows.*`
@@ -3294,6 +3322,12 @@ class Actor:
         if self.hp <= floor and not self.is_dead:
             self.die("hit points")
             changed.append("dead")
+        elif broken := self.settle_broken():
+            # A construct at 0 to -10, by the owner's house rule: broken, and none of the
+            # living body's rungs below — no unconscious, no dying, no disabled at 0.
+            changed.extend(broken)
+        elif self.has_state("state.down.broken"):
+            pass
         elif (self.hp < 0 or (self.hp == 0 and self.drown_failures)) \
                 and not self.has_condition("dead"):
             # Drowning enters here at exactly 0, which every other route to 0 does not.
@@ -3438,9 +3472,11 @@ class Actor:
         """
         if not self.has_condition("dying") or self.has_condition("dead"):
             return None
-        # `death_floor`, not -Con: a construct saved "dying" before 2026-10-01 is
-        # destroyed on its next tick rather than losing a "hit point of blood" and rolling
-        # a Constitution it does not have.
+        # A construct saved "dying" before 2026-10-01 is broken (the owner's house rule),
+        # not bleeding: it loses no "hit point of blood" and rolls no Constitution it does
+        # not have.
+        if self.settle_broken():
+            return {"ref": self.ref, "outcome": "broken", "hp": self.hp}
         if self.hp > self.death_floor():
             self.hp -= 1
         if self.hp <= self.death_floor():

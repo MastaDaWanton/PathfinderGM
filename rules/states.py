@@ -176,6 +176,15 @@ TAGS: dict[str, tuple[str, ...]] = {
     "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
     "petrified":   ("state.down.petrified", "state.unable", "state.helpless"),
+    # A construct at 0 to -10 hit points, by the owner's house rule (2026-10-01; see
+    # BROKEN_BELOW_ZERO below): down and helpless like the unconscious, but never dying
+    # and never bleeding. `recovery.hit-points`, so a repair that lifts it above 0 ends
+    # it through the same sweep a cure uses; NOT `state.down.fallen`, whose bodies
+    # resolve on their own — a broken machine lies there until somebody mends it.
+    # Appendix 2's own "broken" is an ITEM condition (half hit points, -2), which no
+    # creature here ever carries; this row is the creature's, and says it is the house's.
+    "broken":      ("state.down.broken", "state.unable", "state.helpless",
+                    "recovery.hit-points", "state.exposed"),
     # Helpless has always carried `can_act: False` in the condition row and no
     # `state.unable` tag, so the flag and the vocabulary disagreed about it: the tag
     # layer said a bound prisoner could act and the row said they could not.
@@ -311,18 +320,37 @@ CAUGHT_LYING = "belief.liar"
 #   Undead:    "Immediately destroyed when reduced to 0 hit points." "Not at risk of death
 #              from massive damage."
 #
-# So there is no dying rung for either type: the bottom of the ladder is 0, the same
-# threshold a troop has, through the same `Actor.death_floor`. Asked as a prefix question
-# (`has_state(CONSTRUCT)`) and never by matching a name or a `notes` line.
+# So there is no dying rung for either type. Undead keep the book: the bottom of their
+# ladder is 0, the same threshold a troop has, through the same `Actor.death_floor`.
 #
-# NOT read off a race document's `type`, on purpose: a PC of a world's construct people
-# destroyed outright at 0 would be a far larger ruling than this fix, and the Advanced
-# Race Guide's construct-type terms for a player race could not be confirmed here.
+# CONSTRUCTS DO NOT, by the owner's HOUSE RULE (2026-10-01, content/rules/repairs.json):
+# "Broken, then fixable and claimable — House rule: a construct at 0 to -10 is broken, not
+# destroyed (destroyed only past that). Anyone with the skill can mend it with a Craft or
+# Knowledge (engineering) check, which heals it. A second, harder check rewrites its
+# loyalty so it becomes yours: it follows you, obeys, and you can name it." So a
+# construct between 0 and the row's floor (-10) is `broken` — the condition below, under
+# `state.down` so it is out of the fight, helpless and inert, and under
+# `recovery.hit-points` so mending it above 0 lifts it — and is destroyed (`dead`) only
+# past the floor. No dying, no bleeding, no Constitution anywhere in it.
+#
+# Asked as a prefix question (`has_state(CONSTRUCT)`) and never by matching a name or a
+# `notes` line. NOT read off a race document's `type`, on purpose: a PC of a world's
+# construct people would be a far larger ruling, and the Advanced Race Guide's
+# construct-type terms for a player race could not be confirmed here.
 TYPE = "type"
 SUBTYPE = "subtype"
 CONSTRUCT = "type.construct"
 UNDEAD = "type.undead"
-DESTROYED_AT_ZERO: tuple[str, ...] = (CONSTRUCT, UNDEAD)
+DESTROYED_AT_ZERO: tuple[str, ...] = (UNDEAD,)
+BROKEN_BELOW_ZERO: tuple[str, ...] = (CONSTRUCT,)
+# The condition key the house rule writes, named once so its writers are not literals.
+BROKEN_KEY = "broken"
+# A construct whose loyalty the player rewrote (`Engine._op_repair`'s claim, the house
+# rule's "a second, harder check ... it becomes yours"). Granted through the one
+# applicator beside `bond.travels-with-you` and the `devoted` step of the attitude track,
+# source `claim:<ref>`; read by the `rename` op (only what is yours takes a name from you)
+# and by `gm/checks/repair_claimed.py` (the page may say it obeys you once this is held).
+OWNED_BY_YOU = "bond.owned-by-you"
 # The Bestiary's trait bundles name their type: a block that prints the bundle and no
 # `creature_type` still answers the type question.
 TRAIT_TYPES: dict[str, str] = {"construct traits": "construct", "undead traits": "undead"}
@@ -351,8 +379,14 @@ def type_tags(creature_type="", subtype="", immunities=()) -> tuple[str, ...]:
 
 
 def destroyed_at_zero(actor) -> bool:
-    """Whether this body is destroyed, not dying, at 0 hit points (constructs, undead)."""
+    """Whether this body is destroyed, not dying, at 0 hit points (undead)."""
     return bool(actor is not None and any(actor.has_state(t) for t in DESTROYED_AT_ZERO))
+
+
+def breaks_below_zero(actor) -> bool:
+    """Whether this body is broken, not dying, between 0 and its floor (constructs, by
+    the owner's house rule)."""
+    return bool(actor is not None and any(actor.has_state(t) for t in BROKEN_BELOW_ZERO))
 
 
 def believes_claim_tag(kind: str) -> str:

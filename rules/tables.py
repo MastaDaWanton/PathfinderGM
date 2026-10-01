@@ -296,6 +296,14 @@ CONDITIONS: dict[str, dict] = {
         "name": "Petrified", "helpless": True,
         "note": "turned to stone: unconscious and unaware",
     },
+    # HOUSE (owner's ruling 2026-10-01, content/rules/repairs.json): a construct at 0 to
+    # -10 hit points. The key is Appendix 2's, whose "broken" is an item's; on a creature
+    # this table carries only the house meaning, and the note says so.
+    "broken": {
+        "name": "Broken", "lose_dex_to_ac": True, "helpless": True,
+        "note": "a construct at 0 to -10 hp (house rule): inert and helpless, not dying; "
+                "mended above 0 by a Craft or Knowledge (engineering) check",
+    },
     "confused": {
         "name": "Confused",
         "note": "acts randomly each round; roll on the confusion table",
