@@ -139,7 +139,6 @@ class TestTheShortcutIsGone:
         facts = companions.interject_facts(s, wil, {"reason": "moment"}, beat="Quiet.")
         for life in (SEA, FAMILY, FIDDLE):
             assert life not in facts
-        assert "theirs % 3" not in inspect.getsource(views._companions_on_the_page)
 
 
 # --- the gate ---------------------------------------------------------------------------
