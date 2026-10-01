@@ -1762,10 +1762,17 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
         "says the way ran through are places they passed through, in order, and each "
         "is worth a clause; then where they are standing in this one and what is "
         "within reach of them; then what is going on around them — the work, the "
-        "trade, the noise and the smell of it. End on ONE particular thing one "
-        "particular person is doing, close enough to speak to. Only places and people "
-        "the brief names. They have ARRIVED — the walk is behind them, and the passage "
-        "must not leave them still on their way there." if arriving else "")
+        "trade, the noise and the smell of it. End on ONE particular thing close "
+        "enough to touch or speak to: somebody the brief names doing something, or, "
+        "when the brief names nobody here, something of the place itself. Only places "
+        "and people the brief names. They have ARRIVED — the walk is behind them, and "
+        "the passage must not leave them still on their way there." if arriving else "")
+    # "End on ONE particular thing one particular PERSON is doing" was this paragraph's
+    # last demand, made whatever the brief said — and at the crossroads, where the scene
+    # held only the PC, the model supplied the person: "a laborer… struggling with a
+    # heavy crate… looks up as you approach" (live, 2026-09-29; docs/fix-interfaces.md,
+    # deferred row). The shape of a prompt is the shape of its output; the demand now
+    # names its own way out, and `gm/checks/absent_person.py` holds the page to it.
     # The scene as the player last read it, in front of the model that continues it.
     # This call had NO history at all — `[]` at the call site, and the opening was
     # never in the history either — and on the player's own first turn, 2026-09-05,
@@ -1773,6 +1780,18 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
     # and it groans": worked example eleven, the nearest scene the model had been shown.
     # The narrator continues what is in front of it.
     stood = [b[-EARLIER_CHARS:] for b in (earlier or []) if b][-EARLIER_BEATS:]
+    # Not on an arrival. The block below calls the earlier beats "the scene as it stands,
+    # which you are continuing", and after a move that scene is the one the party LEFT.
+    # Measured in the 2026-09-29 caravan save (borin-achereth-3, beat 6): arriving at
+    # the outskirts, the passage put "a man… struggling with a heavy crate of timber…
+    # looks up as you approach" there — the crossroads' laborer, carried over word for
+    # word from the beat before (the deferred "continuity slip" row of
+    # docs/fix-interfaces.md). Inform's Standard Rules do the same on a move: the
+    # "describe room gone into rule" writes the new room afresh rather than continuing
+    # the old one. The places passed through are in the tells, which is all of the old
+    # scene an arrival owes.
+    if arriving:
+        stood = []
     scene = ("What you narrated just before this — the scene as it stands, which you "
              "are continuing, not restarting:\n\n" + "\n\n".join(stood) + "\n\n"
              if stood else "")
