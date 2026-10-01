@@ -140,7 +140,8 @@ def measure(tmp_path) -> dict:
                 here = agent._here_name()
                 if here:
                     firings["stands_elsewhere"] += len(narration.stands_elsewhere(
-                        text, here=here, places=agent._place_names()))
+                        text, here=here, places=agent._place_names(),
+                        **narration.site_words(agent.engine)))
                 firings["drafts with speech"] += int(speech.has_speech(text, 4))
                 # What a hand holds and a body suffers, against the scene and the turn's
                 # own effect records (gm/state_claims.py). 0 on this corpus when it
