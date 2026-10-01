@@ -2091,12 +2091,32 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     # satchel for nothing, and `inject_sale` then bowed out because a `give` was already
     # present. A declared sale paid the player zero gold for as long as the order was the
     # other way round, and the whole trade feature was invisible behind it.
-    if present & {"give", "sell", "buy"}:
+    if present & {"sell"}:
         return raw_intents
 
     pc = scene.pc()
     if pc is None:
         return raw_intents
+    # One acquisition per DIRECTION, not one per turn (item 13, 2026-09-30). "I pocket the
+    # coin and give them a piece of paper with my name on it" planned a give of the paper
+    # to the cage owner, and this door bowed out because a `give` was present — so the
+    # lead coin Sam pocketed was never recorded. A give TO the player (or a purchase)
+    # covers what comes in; a give FROM the player covers what goes out; each direction
+    # is filled only where the plan left it empty. A give with neither `to` nor `from_`
+    # is the player's, as `interpret.drop_unread_gifts` reads it.
+    # A purchase covers both: the thing comes in and the price goes out, and "I pay the
+    # merchant for the rope" is the purchase's coin, not a merchant handed over.
+    coming_in = going_out = "buy" in present
+    for r in raw_intents:
+        if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "give"):
+            continue
+        p = r.get("params") or {}
+        to = str(p.get("to") or "").strip().lower()
+        frm = str(p.get("from_") or p.get("from") or "").strip().lower()
+        if to in (pc.ref, "pc", "you", "player") or not (to or frm):
+            coming_in = True
+        else:
+            going_out = True
     # The reading's rule, at this door too. `interpret.drop_unread_gifts` takes the
     # plan's own give out when no act of the reading can leave the player holding
     # anything — and this ran after it and put one straight back: 2026-09-27, "I pick a
@@ -2107,8 +2127,11 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
 
     reads_no_gain = _interpret.gets_nothing(_interpret.reading_of(player_text))
 
+    added: list[dict] = []
     for pattern, gains in ((_ACQUIRES, True), (_HANDS_OVER, False)):
-        if gains and reads_no_gain:
+        if gains and (reads_no_gain or coming_in):
+            continue
+        if not gains and going_out:
             continue
         found = pattern.search(player_text)
         if not found:
@@ -2136,11 +2159,11 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
             params["to"] = pc.ref
         else:
             params["from_"] = pc.ref
-        return list(raw_intents) + [{
+        added.append({
             "op": "give", "params": params,
             "because": f"the player said they {'took' if gains else 'handed over'} it",
-        }]
-    return raw_intents
+        })
+    return list(raw_intents) + added if added else raw_intents
 
 
 # --- selling something -----------------------------------------------------------------
