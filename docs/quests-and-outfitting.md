@@ -47,7 +47,15 @@ content), armour and shields at the Core Rulebook's (`cost_gp` on the tables), a
 adventuring-gear list (`goods.GEAR`). A basket is bought all or nothing, with the
 shortfall named; bought armour is worn and the old suit goes to the pack; gear lands in
 `stock` the way anything the engine sells does. "Begin the sandbox" is the same door
-"Play as X" uses. The class kit is still free, as it was.
+"Play as X" uses. The class kit was still free when this was written, as it had been.
+
+**Kits removed 2026-09-19**, at the player's word: "remove the starting items from
+classes and give them extra starting gold, we have the outfitter now." Starting wealth
+was already rolled per class, so a character had been getting the book's full wealth
+*and* a free kit on top — a fighter's kit priced at 172 gp against an average roll of
+175. A new character now walks out with what the Core Rulebook grants, an outfit worth
+10 gp or less (`creation.OUTFITS`), their own hands and any natural weapons their race
+carries, and buys everything else here (`docs/kit-and-purse.md` has the record).
 
 Also fixed on the way: a new character began at the die plus Con while the loader added
 Toughness to the maximum afterwards — 40 of 44 on the first day. The forge sets hit

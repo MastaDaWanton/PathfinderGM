@@ -123,21 +123,29 @@ gate opens at the open price with nothing else touched.
 
 ## Open
 
-- **The narrated road pays the open price.** `Engine._op_buy` and `_op_sell` call
+The first three entries below were open when this was written and are closed now;
+each keeps what it said, with what closed it (checked against the code 2026-10-01).
+
+- ~~**The narrated road pays the open price.**~~ `Engine._op_buy` and `_op_sell` called
   `pricing.worth(found)` and `pricing.what_a_shop_pays(held)` without a buyer, so a
-  purchase made by *saying* it — the sell/buy injectors — is not marked up. The fix is
-  one keyword each: `pricing.worth(found, buyer=actor, town=place)` and
-  `pricing.what_a_shop_pays(held, seller=actor, town=place)`; those two ops were outside
-  this change's file ownership. Until then the counter panel is the reader that bites
-  and the narrated road is the leak.
-- **A GM-declared fight.** `_op_begin_encounter` names its own sides and is not
-  second-guessed; guards join only through the first-swing door. Calling `_law_joins()`
-  after `_lay_battlefield` there is the same one line.
-- **No granter yet.** Nothing in `content/schemes/` grants either tag; "A Small Favour"
-  (plan §3, §6.9) is the first author. `_grant` in `rules/schemes.py` already writes
-  `kind="situation"` effects from a `tags` list, so a scheme outcome carrying
-  `{"tags": ["state.wanted.<town>"]}` works today — but the town leaf must come from
-  `states.town_tag` of the scheme's settlement slot, not be spelled in the document.
+  purchase made by *saying* it — the sell/buy injectors — was not marked up.
+  **Closed:** both now pass the keyword the fix named,
+  `pricing.worth(found, buyer=actor, town=place)` and
+  `pricing.what_a_shop_pays(held, seller=actor, town=place)`, so the narrated road and
+  the counter panel price alike.
+- ~~**A GM-declared fight.**~~ `_op_begin_encounter` named its own sides and was not
+  second-guessed; guards joined only through the first-swing door. **Closed:** it calls
+  `_law_joins()` now, the same as that door.
+- ~~**No granter yet.**~~ Nothing in `content/schemes/` granted either tag. **Closed,
+  three ways.** A scheme: "A Small Favour" grants `state.wanted.$town` when it opens and
+  `state.suspected.$town` on its bad outcomes, with `$town` an implicit slot every scheme
+  has, filled from `states.town_tag` of the settlement it opened in
+  (`schemes.IMPLICIT_SLOTS`) — the document never spells the town. A rule: a break-in
+  somebody sees (`Engine._witnessed_break_in`) makes the character suspected the first
+  time and wanted the second, the warning before the warrant. And a provocation: insult
+  somebody orderly enough in town and they go to find the watch, which lands suspected
+  on a character the law had no opinion of yet (`rules/provocation.py`). All three
+  apply through the one applicator, with the rule or the scheme named as the origin.
 - **The town beyond gate, price and guards.** No innkeeper turns the wanted away, no
   card opens on the visible side ("the guards say ..."), the brief does not tell the
   narrator the character is wanted, and the watch does not come looking; time does not
