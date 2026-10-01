@@ -1360,7 +1360,8 @@ class GMAgent:
                facts: list[str] | None = None,
                acting: str = "",
                changes: list[dict] | None = None,
-               ctx: "BeatContext | None" = None) -> tuple[str, list[str], list[Attempt]]:
+               ctx: "BeatContext | None" = None,
+               outcomes: list | None = None) -> tuple[str, list[str], list[Attempt]]:
         """Every mechanical treatment a piece of GM prose gets, in one place.
 
         `acting` names the creature whose turn this prose is, on an NPC's turn; empty on
@@ -1558,6 +1559,22 @@ class GMAgent:
                     text, asked, player_input, brief)
                 repairs += answer_notes
                 attempts += answer_attempts
+        # Declared, and the beat picked up after it (owner, 2026-10-01): a deed the player
+        # wrote that is nowhere on the page is written, as it played out, where it
+        # happened. The same place as the answer and for the same reasons — after every
+        # cut, before the un-namer — and only on the player's own turn prose, the one
+        # caller that hands over the turn's `outcomes`.
+        if (rewrite and not acting and outcomes is not None and player_input
+                and player_input != prompts.CARRY_ON):
+            owed = self._deeds_owed(player_input, outcomes)
+            unshown = narration_mod.unshown_deeds(text, owed)
+            if unshown:
+                text, deed_notes, deed_attempts = self._show_declared(
+                    text, unshown, player_input, earlier=earlier, brief=brief,
+                    facts=facts, known=self._known_names() | extra,
+                    shown=[d for d in owed if d not in unshown])
+                repairs += deed_notes
+                attempts += deed_attempts
         # A band the ledger booked keeps the word it was booked under: soldiers do not
         # become raiders between one paragraph and the next (2026-09-19, item 30). Before
         # the un-namer, which works on names rather than roles.
@@ -2298,6 +2315,128 @@ class GMAgent:
         return (narration_mod.put_before_the_hand_back(text, answer),
                 [f"asked and not answered: {who.name} answers"], [attempt])
 
+    def _deeds_owed(self, player_input: str, outcomes) -> list[dict]:
+        """The deeds the player declared this turn that the beat must show
+        (`narration.owed_deeds`). Nothing in a fight — the combat formula and the blow
+        checks own that page — and nothing in an intimate beat, whose briefing, content
+        rule and exemptions this small call does not carry."""
+        reading = getattr(self, "reading", None)
+        if not isinstance(reading, dict) or reading.get("error"):
+            return []
+        if self.engine.scene.in_encounter:
+            return []
+        mode = str(getattr(getattr(self, "intimate", None), "mode", "") or "")
+        if self._intimate_beat() or mode in ("intimate", "fade"):
+            return []
+        return narration_mod.owed_deeds(reading, player_input, outcomes)
+
+    def _show_declared(self, text: str, unshown: list[dict], player_input: str, *,
+                       earlier: list[str] | None, brief: str, facts: list[str] | None,
+                       known: set[str], shown: list[dict] | None = None
+                       ) -> tuple[str, list[str], list[Attempt]]:
+        """The player declared deeds the beat never wrote (owner, 2026-10-01: "describing
+        the action as it plays out instead of picking up after the actions i described
+        are finished"). One small call for those deeds alone, in the player's order, put
+        where they happened — in front of the departure on a move turn, at the start
+        otherwise, before the hand-back for a deed done after arriving.
+
+        Kept only when it shows every deed it was asked for (the same cue words that
+        found them missing), hands nothing back, walks nobody anywhere, names nobody the
+        scene does not, and — for a blow the dice never rolled — hurts nobody. Otherwise
+        the beat stands as written and the repairs say so: the call is a backstop under
+        the prose, and a wrong backstop is worse than none."""
+        deeds = [str(d.get("span") or d.get("object") or d.get("act")) for d in unshown]
+        before = any(d.get("before_move") for d in unshown)
+        moved_first = not before and all(d.get("after_move") for d in unshown)
+        harmless = any(d.get("act") == "attack" for d in unshown)
+        # Where it happens: the scene the player last read, which on a move turn is the
+        # place they LEFT — the prose call is shown none of it on an arrival (`stood = []`
+        # in `call_prose_messages`), which is half of why the deeds were skipped.
+        where = (earlier or [])[-1] if earlier else str(brief or "")[:1400]
+        scene = self.engine.scene
+        lookup = " ".join([where, text, player_input, " ".join(facts or [])])
+        people = [str(a.name) for a in scene.actors.values()
+                  if not a.is_pc and a.name and any(
+                      re.search(rf"\b{re.escape(w)}\b", lookup)
+                      for w in str(a.name).split() if len(w) > 2 and w[:1].isupper())]
+        messages = prompts.deeds_messages(
+            deeds, player_input, text, where, people, before_move=before,
+            harmless=harmless,
+            already=[str(d.get("span") or d.get("act")) for d in shown or ()])
+        attempts: list[Attempt] = []
+        # Two tries, the second told what was wrong with the first: the shape every
+        # retry here has (`narrate_turn`'s re-introduction retry). Measured on the owner's
+        # turn: one replay in four wrote the smack again beside the thanks it was asked
+        # for, with "ALREADY WRITTEN" in front of it, and lost the repair to that.
+        for _try in range(2):
+            try:
+                reply = client.chat(
+                    messages, self.prose_model, self.prose_host, as_json=True,
+                    think=False, temperature=0.6, num_predict=prompts.DEEDS_NUM_PREDICT,
+                    provider=self.prose_provider, api_key=self.prose_key,
+                    schema=prompts.deeds_schema())
+                attempts.append(Attempt("deeds", reply.seconds, reply.model, reply.text,
+                                        note=f"unshown: {'; '.join(deeds)}"))
+                passage = " ".join(str((reply.json() or {}).get("passage") or "").split())
+            except Exception as exc:  # noqa: BLE001 — a failed repair must not lose the turn
+                return text, [f"declared and not shown: {'; '.join(deeds)} — the call "
+                              f"failed ({type(exc).__name__}); kept as written"], attempts
+            why = self._deeds_refusal(passage, unshown, known | set(people),
+                                      before_move=before, harmless=harmless, shown=shown)
+            if not why:
+                break
+            messages = messages + [
+                {"role": "assistant", "content": reply.text},
+                {"role": "user", "content": f"That passage {why}. Write it again: only "
+                                            f"{'; '.join(deeds)}, nothing else."}]
+        if why:
+            return text, [f"declared and not shown: {'; '.join(deeds)} — the passage did "
+                          f"not hold ({why}: {passage[:60]!r}); kept as written"], attempts
+        if moved_first:
+            fixed = narration_mod.put_before_the_hand_back(text, passage)
+        else:
+            fixed = narration_mod.put_the_deeds_in(text, passage, before_move=before)
+        return fixed, [f"declared and not shown: wrote {'; '.join(deeds)}"
+                       + (" before the departure" if before else "")], attempts
+
+    @staticmethod
+    def _deeds_refusal(passage: str, unshown: list[dict], known: set[str], *,
+                       before_move: bool, harmless: bool,
+                       shown: list[dict] | None = None) -> str:
+        """Why the deeds passage cannot go in, or "" when it can."""
+        if not passage:
+            return "empty"
+        if len(passage) > prompts.DEEDS_MAX_CHARS + 40:
+            return "too long"
+        missing = [d for d in unshown if not narration_mod.shows_deed(passage, d)]
+        if missing:
+            return "does not show " + ", ".join(str(d.get("span") or d["act"]) for d in missing)
+        # A deed the beat already wrote, written again: measured twice in four replays of
+        # the owner's turn before `already` named them (see `prompts.deeds_messages`).
+        again = [d for d in shown or () if narration_mod.shows_deed(passage, d)]
+        if again:
+            return "writes again " + ", ".join(str(d.get("span") or d["act"]) for d in again)
+        # The demonstration copied: the arrival block's own copy of it was written word
+        # for word as an opening ("You take his hand, thank him…", to a woman).
+        if narration_mod.build_echo_index(prompts.deeds_shape(before_move)) \
+                & narration_mod.build_echo_index(passage):
+            return "copies the example"
+        bare = speech_mod.unquoted(passage)
+        if "?" in bare or narration_mod.HAND_BACK.lower() in passage.lower():
+            return "hands the turn back"
+        if narration_mod.narrator_in_first_person(passage):
+            return "first person"
+        if before_move and re.search(r"\b(?:arriv\w*|you are (?:now )?(?:at|in)\b)",
+                                     bare, re.I):
+            return "walks them somewhere"
+        if harmless and re.search(r"\b(?:blood\w*|bleed\w*|wound\w*|gash\w*|injur\w*|"
+                                  r"bruis\w*|broken|dead|dies|kill\w*)\b", bare, re.I):
+            return "hurts somebody the dice did not"
+        invented = narration_mod.invented_names(passage, known)
+        if invented:
+            return "names " + ", ".join(invented)
+        return ""
+
     def _repair_misnamed(self, text: str, attribution) -> tuple[str, list[str], list[Attempt]]:
         """A name written on the wrong person: the words name one person here and the
         sentence is about another (gm/mentions.py `Mention.misnamed`). One targeted
@@ -2389,7 +2528,11 @@ class GMAgent:
             scene_now_block=scene_now, pull=str((pull or {}).get("text") or ""),
             claim=prompts.false_claim_block(claim) if claim else "",
             scene_mode=self.intimate.mode,
-            demonstrations=demos.examples if demos is not None else None)
+            demonstrations=demos.examples if demos is not None else None,
+            # What the player did before setting off, in their words: on an arrival it
+            # opens the block, so the beat starts where they were (owner, 2026-10-01).
+            before_leaving=[str(d.get("span")) for d in self._deeds_owed(
+                player_input, outcomes) if d.get("before_move") and d.get("span")])
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
             else narration_mod.MIN_SCENE_CHARS, max_chars=2200,
@@ -2575,7 +2718,8 @@ class GMAgent:
             cast=self._cast_from(outcomes), facts=tells,
             changes=self._changes_from(outcomes),
             ctx=self._beat_context("turn", player_input=player_input, brief=brief,
-                                   outcomes=outcomes, tells=tells, pull=pull))
+                                   outcomes=outcomes, tells=tells, pull=pull),
+            outcomes=list(outcomes or []))
         repairs = early + repairs
         attempts.extend(groom_attempts)
         # The backstop, after the rewrite has had its chance: an authored line chosen

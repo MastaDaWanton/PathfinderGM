@@ -643,6 +643,278 @@ def put_before_the_hand_back(text: str, line: str) -> str:
     return f"{text} {line}".strip()
 
 
+# --- declared, and the beat picked up after it ---------------------------------------------
+#
+# Owner, 2026-10-01: "when i tell the engine what i do It should give that back to me
+# describing the action as it plays out instead of picking up after the actions i described
+# are finished." The line was "i thank her smack her butt and then leave"; the engine
+# resolved the travel, and the beat opened "The door to the tavern swings shut behind you"
+# — the thanks and the smack were never on the page.
+#
+# Measured by hand over every turn whose interpreter reading holds two or more actions
+# (the owner's save sam.json, 24 turns, 58 declared actions; the Bobby playtest, 4 turns,
+# 8): 14 of the 58 were nowhere in the beat, in 10 of the 24 turns; 0 of Bobby's 8. And of
+# the 5 move turns where the player did something BEFORE setting off, 4 opened at the
+# departure or the arrival and 3 lost the earlier deeds entirely — the arrival block in
+# `prompts.call_prose_messages` began "Walk them in", and the beat began walking.
+#
+# Prior art says the same two things. AI Dungeon's Do mode never trusts the model to
+# write the player's action: it echoes "> You enter the throne room…" onto the page and
+# the model continues from after it (help.aidungeon.com/the-do-mode) — which is exactly
+# the shape that skips the action when nothing echoes it, as here. And Inform reports
+# each action of a command in the order it was carried out, an action the player did not
+# spell out included ("(first taking the lamp)"), before the room gone into is described.
+# So: detect in code which declared deeds the beat owes and does not show, and write only
+# those with one small call, placed before the departure (`GMAgent._show_declared`).
+
+# The acts whose doing is the player's deed on the page. Moves are the travel tell's
+# (`_op_travel`); looking, waiting, searching, buying and casting are written by what they
+# find or what the engine resolved; speech with words (`says`) is carried by the reply
+# (`answered`, the question lane). Talk WITHOUT words is a gesture — "I thank her", "I
+# give the guard a nod", "I wave goodbye" — and is owed like any other deed.
+DECLARED_DEEDS = frozenset({"take", "give", "use", "attack", "steal", "consume", "other",
+                            "talk", "insult"})
+_MOVE_ACTS = frozenset({"go", "journey", "leave", "follow", "call_on"})
+# Talk whose words are a question or a telling is speech even when the reading kept no
+# `says` ("ask for a way to get into The high road", Sam's turn 38): the reply carries it.
+_SPEECH_VERB = re.compile(r"\b(?:ask|asks|asking|tell|tells|say|says|question|inquire|"
+                          r"enquire|request|explain|offer|promise|order|beg|demand|call)\b",
+                          re.I)
+_MOVE_OPS = frozenset({"travel", "journey", "call_on"})
+# The engine ops each act is resolved by. When one of them was refused and none resolved,
+# the beat owes the refusal, not the deed (the herbs Sam was "not carrying", turn 4).
+_ACT_OPS = {"give": ("give",), "take": ("give", "take", "loot"), "attack": ("attack",),
+            "use": ("use_item", "use_ability"), "consume": ("use_item", "eat", "drink"),
+            "steal": ("steal",), "insult": ("provoke",)}
+_CUE_STOP = frozenset({
+    "i", "me", "my", "mine", "myself", "you", "your", "he", "him", "his", "she", "her",
+    "hers", "they", "them", "their", "it", "its", "we", "us", "our", "a", "an", "the",
+    "this", "that", "these", "those", "and", "then", "but", "or", "so", "to", "of", "in",
+    "on", "at", "for", "from", "with", "into", "onto", "over", "under", "up", "down",
+    "out", "off", "back", "away", "again", "as", "while", "just", "bit", "little", "some",
+    "once", "before", "after", "about", "around", "very", "too", "also", "try", "tries",
+    "is", "are", "be", "am", "was", "do", "does", "one", "s", "now", "still", "who",
+})
+# Verbs that say nothing about WHICH deed: "give" the guard a nod, "take" the key. Used as
+# a cue only when nothing better is left ("I help Sorva finish up").
+_CUE_GENERIC = frozenset({"give", "take", "use", "make", "get", "put", "have", "let",
+                          "help", "finish", "start", "begin", "go", "come", "keep", "set",
+                          "bring", "turn", "grab", "pick", "hand"})
+# A deed can be written in other words. Small and world-agnostic on purpose: a synonym
+# missed costs one redundant sentence, which the repair's own check still holds to the
+# player's words; a list grown to catch everything starts calling every beat complete.
+_CUE_SYNONYMS = {
+    "thank": ("thanks", "grateful", "gratitude"),
+    "smack": ("slap", "swat", "spank", "pat"),
+    "slap": ("smack", "swat"),
+    # Not "behind", "rear" or "bottom": "the door swings shut behind you" was read as the
+    # owner's smack being on the page.
+    "butt": ("backside", "rump", "arse", "buttock", "bum"),
+    "ass": ("backside", "rump", "arse", "buttock", "bum"),
+    "hug": ("embrace", "arms around"),
+    "rip": ("tear", "tore", "torn", "shred"),
+    "tear": ("rip", "tore", "torn", "shred"),
+    "pocket": ("stow", "tuck"),
+    "wave": ("farewell",),
+    "goodbye": ("farewell",),
+    "nod": ("dip your head", "incline"),
+    "bow": ("incline",),
+    "punch": ("fist",),
+    "undress": ("unlace", "laces", "buttons", "strip"),
+    "drink": ("swallow", "gulp", "sip"),
+    "eat": ("bite", "chew", "swallow"),
+}
+
+
+def _stem(word: str) -> str:
+    w = re.sub(r"['’]s$", "", str(word or "").lower().strip("'’"))
+    for suffix in ("ing", "ed", "es", "s"):
+        if suffix == "s" and w.endswith(("ss", "us", "is")):
+            continue
+        if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+            w = w[:-len(suffix)]
+            # nodded -> nod, ripping -> rip; never "butt" -> "but", which every beat has
+            if suffix in ("ing", "ed") and len(w) > 3 and w[-1] == w[-2] and w[-1] not in "ls":
+                w = w[:-1]
+            break
+    return w.rstrip("e") or w
+
+
+def _stems_in(text: str) -> set[str]:
+    return {_stem(w) for w in re.findall(r"[a-z][a-z'’]*", str(text or "").lower())}
+
+
+def _cue_found(cue: str, stems: set[str], low: str) -> bool:
+    """`cue` (or a synonym) is written in the text whose stems and lowercase are given."""
+    for form in (cue, *_CUE_SYNONYMS.get(cue, ())):
+        if " " in form:
+            if form in low:
+                return True
+            continue
+        s = _stem(form)
+        # One letter of slack either way ("tore"/"torn" are listed, not guessed): more
+        # and "butt" is found in "button".
+        if s in stems or (len(s) >= 4 and any(
+                abs(len(b) - len(s)) <= 1 and (b.startswith(s) or s.startswith(b))
+                for b in stems)):
+            return True
+    return False
+
+
+def _in_quotes(sentence: str, span: str) -> bool:
+    at = str(sentence or "").lower().find(str(span or "").lower())
+    return at >= 0 and any(s <= at < e for s, e in speech.spans(sentence))
+
+
+def declared_spans(reading: dict | None, sentence: str) -> list[dict]:
+    """The reading's actions, each with the player's own words for it (`span`) where the
+    interpreter's raw reply has them. `interpret.ground` keeps only the slots, and the
+    slots alone cannot say WHICH deed: "i thank her" reads as `talk` with target "her".
+    The raw reply's spans are aligned to the grounded actions in order, act for act, and
+    kept only when they are the player's own words — the same test `ground` holds every
+    slot to."""
+    import json as _json
+
+    actions = [dict(a) for a in (reading or {}).get("actions") or () if isinstance(a, dict)]
+    raw = (reading or {}).get("raw")
+    try:
+        parsed = _json.loads(raw) if isinstance(raw, str) and raw.strip() else {}
+    except ValueError:
+        parsed = {}
+    spans = [a for a in (parsed.get("actions") or []) if isinstance(a, dict)] \
+        if isinstance(parsed, dict) else []
+    j = 0
+    low = str(sentence or "").lower()
+    for a in actions:
+        if a.get("span"):
+            continue
+        while j < len(spans) and spans[j].get("act") != a.get("act"):
+            j += 1
+        if j < len(spans):
+            span = str(spans[j].get("span") or "").strip()
+            if span and span.lower() in low:
+                a["span"] = span
+            j += 1
+    return actions
+
+
+def deed_cues(action: dict) -> list[str]:
+    """The words that show a deed was written: the span's own verb and nouns, less the
+    pronouns, the person it is done to (whose name is on every page they are in) and,
+    unless nothing else is left, the verbs that do not say which deed it is."""
+    span = str(action.get("span") or "")
+    words = re.findall(r"[a-z][a-z'’]*", span.lower()) if span else \
+        re.findall(r"[a-z][a-z'’]*", str(action.get("object") or "").lower())
+    target = set(re.findall(r"[a-z][a-z'’]*", str(action.get("target") or "").lower()))
+    content = [re.sub(r"['’]s$", "", w) for w in words if w not in _CUE_STOP]
+    strong = [w for w in content if w not in _CUE_GENERIC and w not in target]
+    if strong:
+        return list(dict.fromkeys(strong))
+    return list(dict.fromkeys(w for w in content if w not in target))
+
+
+def _op_status(outcomes, ops) -> tuple[bool, bool]:
+    resolved = refused = False
+    for o in outcomes or ():
+        op = o.get("op") if isinstance(o, dict) else getattr(o, "op", "")
+        status = o.get("status") if isinstance(o, dict) else getattr(o, "status", "")
+        if op in ops:
+            resolved |= status == "resolved"
+            refused |= status == "refused"
+    return resolved, refused
+
+
+def owed_deeds(reading: dict | None, sentence: str, outcomes=(), *,
+               fighting: bool = False) -> list[dict]:
+    """The deeds the player declared that the beat owes the page, in the player's order.
+
+    Each is the reading's action with `span`, `cues`, `before_move` (True when the turn
+    moved the party and the player did this before setting off) and `after_move`. Bounded on purpose:
+    no reading, a question asked of the game, words inside the player's quotation marks
+    (a plan said aloud is speech, not a deed — Sam's turn 12), an act the engine refused,
+    an attack while a fight runs or one the dice rolled (the blow's own checks own those),
+    and a deed with no words to look for are all left alone."""
+    if not isinstance(reading, dict) or reading.get("error") or reading.get("question"):
+        return []
+    actions = declared_spans(reading, sentence)
+    moved, _ = _op_status(outcomes, _MOVE_OPS)
+    move_at = next((i for i, a in enumerate(actions) if a.get("act") in _MOVE_ACTS), None)
+    rolled_attack, _ = _op_status(outcomes, ("attack",))
+    owed = []
+    for i, a in enumerate(actions):
+        act = a.get("act")
+        if act not in DECLARED_DEEDS:
+            continue
+        if act in ("talk", "insult") and (a.get("says") or _SPEECH_VERB.search(
+                str(a.get("span") or ""))):
+            continue
+        # "other" is the reading's residue — "clear it", "shove it closed", "help the man
+        # finish his task" — and its words are the ones a beat most often writes in its
+        # own: those three were all on the page, in other words, in the owner's save. On a
+        # move turn the skip is structural (the beat opens walking), so there it is owed.
+        if act == "other" and not moved:
+            continue
+        if act == "attack" and (fighting or rolled_attack):
+            continue
+        if a.get("span") and _in_quotes(sentence, a["span"]):
+            continue
+        ops = _ACT_OPS.get(act)
+        if ops:
+            done, refused = _op_status(outcomes, ops)
+            if refused and not done:
+                continue
+        cues = deed_cues(a)
+        if not cues:
+            continue
+        owed.append({**a, "index": i, "cues": cues,
+                     "before_move": bool(moved and move_at is not None and i < move_at),
+                     "after_move": bool(moved and move_at is not None and i > move_at)})
+    return owed
+
+
+def shows_deed(text: str, deed: dict) -> bool:
+    """Whether the beat writes the deed: any of its cue words, or a synonym, in any form."""
+    low = str(text or "").lower()
+    stems = _stems_in(low)
+    return any(_cue_found(c, stems, low) for c in deed.get("cues") or ())
+
+
+def unshown_deeds(text: str, owed: list[dict]) -> list[dict]:
+    return [d for d in owed or () if not shows_deed(text, d)]
+
+
+# The sentence a move turn leaves in: the walk, the door, the arrival. The first one is
+# where the deeds done before setting off belong in front of.
+_DEPARTURE = re.compile(
+    r"\b(?:leav(?:e|es|ing)|left\b|walk(?:s|ing)? (?:out|away|off|back|on|toward|towards)|"
+    r"step(?:s|ping)? (?:out|through|into|outside)|head(?:s|ing)? (?:out|for|toward|towards|"
+    r"back)|make your way|set(?:ting)? off|behind you|out into|arriv\w*|you are (?:now )?at|"
+    r"through the door|swings? (?:shut|closed)|on your way|the way (?:there|back)|"
+    r"you (?:reach|come to|cross|pass)\b)", re.I)
+
+
+def departure_at(text: str) -> int:
+    """Where the first departure or arrival sentence starts in `text`, or -1."""
+    for m in _SENTENCE.finditer(str(text or "")):
+        if _DEPARTURE.search(m.group(0)):
+            return m.start() + (len(m.group(0)) - len(m.group(0).lstrip()))
+    return -1
+
+
+def put_the_deeds_in(text: str, passage: str, *, before_move: bool) -> str:
+    """`passage` placed where the deeds happened: in front of the departure on a move turn
+    (or the start, when the beat opens already walking), else at the start of the beat —
+    "describe the action as it plays out", and what follows is its result."""
+    text = str(text or "")
+    passage = " ".join(str(passage or "").split())
+    if not passage:
+        return text
+    at = departure_at(text) if before_move else 0
+    if at <= 0:
+        return f"{passage} {text.lstrip()}".strip()
+    return f"{text[:at]}{passage} {text[at:]}"
+
+
 def settle_introductions(text: str, expected: dict[str, str],
                          established: str = "") -> tuple[str, list[str]]:
     """The name a person gives is the one the world holds for them.

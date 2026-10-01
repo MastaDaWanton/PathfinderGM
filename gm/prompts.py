@@ -1586,6 +1586,68 @@ def answer_messages(name: str, player_line: str, beat: str, brief: str) -> list[
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
+# The deeds a beat skipped (`GMAgent._show_declared`, owner 2026-10-01): the player's own
+# words for what they did, played out, and nothing else. Small for the same reason the
+# answer call is: it writes two or three sentences and cannot lose the beat it goes into.
+DEEDS_MAX_CHARS = 480
+DEEDS_NUM_PREDICT = 240
+
+
+def deeds_schema() -> dict:
+    return {"type": "object",
+            "properties": {"passage": {"type": "string", "maxLength": DEEDS_MAX_CHARS}},
+            "required": ["passage"]}
+
+
+# One demonstration per placement, so it is the SHAPE that carries — the deed, the body,
+# the person it is done to — and never the furniture (this file's own lesson: the
+# examples' furniture gets copied). The move one stops at the turn away: the walk is
+# already on the page after it. It holds hands and a shoulder and NO place on purpose:
+# the first version thanked a smith at his anvil, and one replay of the owner's turn in
+# seven walked out "through the heavy oak entrance of the local smithy" of a tavern.
+_DEEDS_SHAPE_MOVE = ("You take his hand, thank him, and clap him once on the shoulder "
+                     "before you turn away.")
+_DEEDS_SHAPE_HERE = ("You tear the hem from your shirt in two long strips and bind his "
+                     "forearm tight, knotting it off with your teeth.")
+
+
+def deeds_shape(before_move: bool) -> str:
+    return _DEEDS_SHAPE_MOVE if before_move else _DEEDS_SHAPE_HERE
+
+
+def deeds_messages(deeds: list[str], player_line: str, beat: str, where: str,
+                   people: list[str], *, before_move: bool,
+                   harmless: bool = False, already: list[str] | None = None) -> list[dict]:
+    """Ask for the declared deeds the beat skipped, as they play out, in order.
+
+    `already` is what the beat DID write of the player's line. Measured on the owner's
+    turn replayed: twice in four the beat had the smack and not the thanks, and the
+    passage asked for the thanks wrote the smack again as well — the player's whole line
+    is in front of it. Named here, and refused in `GMAgent._deeds_refusal` if it is
+    written anyway."""
+    shape = deeds_shape(before_move)
+    system = (
+        "You write one short passage of a tabletop game narrated to the player as \"you\", "
+        "in the present tense. The player said what their character does, and the scene "
+        "as written skipped part of it. Write ONLY the part it skipped, as it happens, in "
+        "the player's order: one or two sentences, the hands and the body and the person "
+        f"it is done to, shaped like this: {shape} "
+        + ("It happens where they are now, before they set off: do not walk them anywhere "
+           "and do not describe where they arrive. " if before_move else "")
+        + ("It hurts nobody: no wound, no blood, no injury. " if harmless else "")
+        + "Name nobody the scene does not name. Do not invent what anyone says back, and "
+        "do not ask the player what they do.")
+    named = ", ".join(people) if people else "nobody by name"
+    user = (f"WHERE IT HAPPENS:\n{str(where or '')[-1400:]}\n\n"
+            f"PEOPLE THERE: {named}\n\n"
+            f"THE SCENE AS WRITTEN, WHICH SKIPPED IT:\n{str(beat or '')[:1600]}\n\n"
+            f"THE PLAYER SAID: {player_line}\n\n"
+            + ("ALREADY WRITTEN, DO NOT WRITE IT AGAIN:\n"
+               + "\n".join(f"- {d}" for d in already) + "\n\n" if already else "")
+            + "WRITE ONLY THIS, IN THIS ORDER:\n" + "\n".join(f"- {d}" for d in deeds))
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
 # Continue's own demonstrations, and they REPLACE the turn examples rather than extend
 # them — the same choice, for the same reason, that the combat set replaces them.
 #
@@ -1799,8 +1861,12 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
                         ledger: list[dict] | None = None,
                         scene_now_block: str = "", pull: str = "",
                         claim: str = "", scene_mode: str = "",
-                        demonstrations: list[dict] | None = None) -> list[dict]:
+                        demonstrations: list[dict] | None = None,
+                        before_leaving: list[str] | None = None) -> list[dict]:
     """Write the whole turn, after the dice.
+
+    `before_leaving` is the player's own words for each deed they declared before a move
+    this turn (`narration.owed_deeds`, `before_move`); on an arrival it opens the block.
 
     `scene_mode` is `intimate.decide`'s verdict for this beat: "intimate" swaps in the
     intimate scene's briefing, its note at the end, and `demonstrations` (the owner's
@@ -1840,6 +1906,29 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
         "when the brief names nobody here, something of the place itself. Only places "
         "and people the brief names. They have ARRIVED — the walk is behind them, and "
         "the passage must not leave them still on their way there." if arriving else "")
+    # And when the player did something BEFORE setting off, the block above was the whole
+    # of the problem the owner reported (2026-10-01): "i thank her smack her butt and then
+    # leave" opened "The door to the tavern swings shut behind you". A block whose first
+    # words are "Walk them in" gets a passage whose first words are the walk — measured
+    # on the owner's own turn replayed four times, three drafts opened at the departure
+    # or the arrival and none wrote the thanks. So the block's FIRST element is now the
+    # deeds, in the player's words and order, with one sentence of the shape (from far
+    # away, so it is the shape that carries); the walk-in follows them. The deeds come
+    # from the same reading `_show_declared` holds the finished beat to.
+    #
+    # No demonstration inside the block, measured: with one sentence of the shape here,
+    # two replays in eleven copied it — once its smithy as the place they walked out of,
+    # once the sentence word for word as the opening ("You take his hand, thank him, and
+    # clap him once on the shoulder", to a woman). Last in the prompt is the most copied
+    # place there is; the order of the block is the shape, and the player's own words are
+    # the only content in it.
+    if arriving and before_leaving:
+        deeds = "; then ".join(f'"{d}"' for d in before_leaving)
+        arrival = (
+            "THIS TURN THE PLAYER DID THINGS WHERE THEY WERE, AND THEN LEFT. Open where "
+            f"they were, with them doing it, in this order: {deeds} — played out there, "
+            "with the person it was done to, before anybody takes a step. Only then the "
+            "leaving. " + arrival)
     # "End on ONE particular thing one particular PERSON is doing" was this paragraph's
     # last demand, made whatever the brief said — and at the crossroads, where the scene
     # held only the PC, the model supplied the person: "a laborer… struggling with a
