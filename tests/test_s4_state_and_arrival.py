@@ -389,10 +389,28 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
     if added:
         orig["scene"].setdefault("population", {}).update(
             {p: now["scene"]["population"][p] for p in added})
+    # The second one (2026-09-30, tests/test_gear_usable.py): ammunition the smith used to
+    # deliver onto the WEAPONS list ("arrows-20" there, a quiver as a thing to swing) moves
+    # into `goods` as the rounds it is, once. Bobby's saves carry Arrows (20) and Barbed
+    # arrows (20) there; nothing else about them may move.
+    from rules import weapons as weapons_mod
+
+    migrated = False
+    for ref, was in (orig["scene"].get("people") or {}).items():
+        rounds = [w for w in was.get("weapons") or () if weapons_mod.is_ammunition(w)]
+        if not rounds:
+            continue
+        migrated = True
+        was["weapons"] = [w for w in was["weapons"] if w not in rounds]
+        goods_was = dict(was.get("goods") or {})
+        for w in rounds:
+            k = weapons_mod.key_for(w)
+            goods_was[k] = goods_was.get(k, 0) + weapons_mod.rounds_per(k)
+        was["goods"] = goods_was
     orig.pop("world_source", None)
     now.pop("world_source", None)
     assert now == orig
-    if not retired:
+    if not retired and not migrated:
         assert without_source(written) == without_source(original)
     else:
         with override_settings(CAMPAIGN_DIR=str(data_root / "campaigns")):

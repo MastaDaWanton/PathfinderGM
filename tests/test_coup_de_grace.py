@@ -53,6 +53,15 @@ def _swing(scene, seed=5, **params):
     pc = scene.actors["pc"]
     if weapon not in pc.weapons:
         pc.weapons.append(weapon)                 # handed a sling or a bow for the test
+    # And something for it to shoot: since 2026-09-30 a launcher spends a round a shot and
+    # refuses with none (tests/test_gear_usable.py).
+    from rules import goods, weapons as weapons_mod
+
+    for fam in weapons_mod.ammo_families(weapon)[:1]:
+        stock = {"arrows": "arrows-20", "sling bullets": "sling-bullets-10",
+                 "bolts": "crossbow-bolts-10"}.get(fam)
+        if stock and not goods.ammo_carried(pc, [fam]):
+            pc.goods[stock] = 10
     engine = Engine(scene, Dice(seed=seed))
     res = engine.run(engine.validate([
         {"op": "attack", "actor": "pc", "target": "c1", "because": "finish him",

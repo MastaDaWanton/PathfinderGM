@@ -300,9 +300,10 @@ def test_spells_is_a_casters_tab_by_the_same_rule_as_the_button():
 
 def test_equipment_offers_only_what_the_engine_can_do_and_says_so(page):
     """Equipment offers the engine's own acts and nothing more: the engine has no op to
-    take armour off or to drop a thing (the mock README, "What the engine does not
-    know"), so neither is offered, and the page says so rather than leaving the player
-    to look for them.
+    drop a thing (the mock README, "What the engine does not know"), so it is not offered,
+    and the page says so rather than leaving the player to look for it. Taking armour off
+    is an op since 2026-09-30 (`take_off`, tests/test_gear_usable.py), offered by the
+    server's own row acts and never by a button the page invents.
 
     Stage 1 pinned the carried Inventory and Equipment pages here; stage 2 draws the
     design's page instead, and its every button is an act the server named
@@ -310,7 +311,7 @@ def test_equipment_offers_only_what_the_engine_can_do_and_says_so(page):
     html, els = page
     note = _one(els, "equipment-note")
     assert _one(els, "mode-equipment") in note["ancestors"]
-    assert "There is no drop and no take off" in html
+    assert "There is no drop yet." in html
     sheet_tab = (TABLE_SCRIPTS / "17-tab-sheet.js").read_text(encoding="utf-8")
     assert 'equipment: "mode-equipment"' in sheet_tab
     sheet = (TABLE_SCRIPTS / "05-sheet.js").read_text(encoding="utf-8")

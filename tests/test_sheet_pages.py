@@ -164,10 +164,13 @@ def test_the_combat_card_writes_the_engines_numbers_and_every_swing(tmp_path):
     longsword = next(a for a in o["attacks"] if a["key"] == "longsword")
     assert len(longsword["swings"]) == 2, "a BAB 6 fighter swings twice on a full attack"
     assert f"two swings, at {sign(longsword['swings'][0])} then {sign(longsword['swings'][1])}" in out["html"]
-    # The light crossbow's range is None in the curated table: said, never guessed.
+    # The light crossbow's range was None in the curated table and the page said "not
+    # known". Since 2026-09-30 the curated row is merged into the weapon file's
+    # (tests/test_gear_usable.py), which prints 80 ft; "not known" is kept for a real
+    # launcher the table has no range for.
     xbow = by_name["light crossbow"]
     rng = next(c for c in els if xbow in c["ancestors"] and c["attrs"].get("data-label") == "Range")
-    assert "not known" in _text(rng)
+    assert _text(rng).startswith("80 ft")
 
 
 @needs_node
@@ -304,22 +307,25 @@ def test_every_carried_thing_is_one_row_on_the_trade_windows_shelves():
     assert re.findall(r"^\s+(\w+):\s+\{ label", block, re.M) == list(SHELVES)
 
 
-def test_every_act_is_a_real_door_and_there_is_no_take_off_or_drop():
+def test_every_act_is_a_real_door_and_there_is_no_drop():
     """Wield, Wear and Use answer to the engine's own doors (the `wear` op, `/api/slots`,
-    `/api/use`), and there is no op to take armour off or drop a thing, so no row offers
-    either. Measured 2026-09-30 on the Equipment tab: a bought hooded lantern offered
-    Drink, because the consumables planner answers "ok" for any jar with nothing harmful
-    in it; drinking is offered only for a thing that is for drinking now."""
+    `/api/use`), and there is no op to drop a thing, so no row offers it. Take off and
+    Put away arrived 2026-09-30 (the `take_off` op, and a wield of the fists;
+    tests/test_gear_usable.py). Measured 2026-09-30 on the Equipment tab: a bought hooded
+    lantern offered Drink, because the consumables planner answers "ok" for any jar with
+    nothing harmful in it; drinking is offered only for a thing that is for drinking now."""
     s = _carried_sheet()
     rows = {r["name"].lower(): r for r in s["equipment"]["carried"]}
     doors = {a["api"] for r in rows.values() for a in r["acts"]}
     assert doors <= {"/api/wear", "/api/slots", "/api/use"}
     labels = {a["label"] for r in rows.values() for a in r["acts"]}
-    assert labels <= {"Wield", "Wear", "Drink", "Throw", "Coat"}
+    assert labels <= {"Wield", "Wear", "Drink", "Throw", "Coat", "Take off", "Put away"}
     assert [a["label"] for a in rows["dagger"]["acts"]] == ["Wield"]
     assert rows["dagger"]["acts"][0]["body"] == {"item": "dagger", "op": "wield"}
-    assert rows["rapier"]["acts"] == []                       # already in hand
-    assert rows["leather armour"]["acts"] == []               # worn: nothing takes it off
+    assert [a["label"] for a in rows["rapier"]["acts"]] == ["Put away"]
+    assert rows["rapier"]["acts"][0]["body"] == {"item": "unarmed", "op": "wield"}
+    assert [a["label"] for a in rows["leather armour"]["acts"]] == ["Take off"]
+    assert rows["leather armour"]["acts"][0]["body"] == {"item": "leather", "op": "take_off"}
     assert rows["buckler"]["acts"][0]["body"] == {"item": "buckler", "op": "wear"}
     ring = rows["ring of protection +1"]["acts"][0]
     assert ring["api"] == "/api/slots" and ring["body"]["slot"] == "ring" and ring["body"]["index"] == 0
@@ -352,10 +358,10 @@ def test_a_slot_filters_the_list_to_what_fits_and_the_gap_is_said_in_words(tmp_p
     assert rows(out["head"]) == [] and "Nothing you carry goes there" in out["head"]
     assert "Fits the rings" in out["ring"] and "Showing what fits the rings" in out["ring"]
     for html in out.values():
-        for bad in (">Take off<", ">Drop<", ">take off<", ">drop<"):
+        for bad in (">Drop<", ">drop<"):
             assert bad not in html
     page = TABLE.read_text(encoding="utf-8")
-    assert "There is no drop and no take off for armour or a" in page
+    assert "There is no drop yet." in page
     assert "Wield and wear from what you carry. New things are bought at a counter." in page
     assert 'id="eq-trade"' in page and ">Go to Trade<" in page
 
@@ -406,7 +412,9 @@ def test_wield_and_wear_run_the_engines_own_op(tmp_path, settings):
     assert r.status_code == 200, r.content
     after = cm.current().scene.pc().ac()
     assert after == before + 1
-    assert r.json()["wear_tell"] == f"{pc.name} puts on the buckler. Armour class {before} to {after}."
+    # A shield is a move action (CRB Table 6-8), said since 2026-09-30.
+    assert r.json()["wear_tell"] == (f"{pc.name} puts on the buckler (a move action). "
+                                     f"Armour class {before} to {after}.")
     r = client.post("/api/wear", data=json.dumps({"item": "full plate", "op": "wear"}),
                     content_type="application/json")
     assert r.status_code == 400 and "is not carrying full plate" in r.json()["error"]

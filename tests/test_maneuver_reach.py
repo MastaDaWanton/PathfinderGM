@@ -31,7 +31,7 @@ import re
 import pytest
 
 from gm import judgement
-from rules import position, reactions
+from rules import position, reactions, weapons as weapons_mod
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -189,6 +189,9 @@ def _armed(scene, weapon):
     pc = scene.get("pc")
     pc.weapons = list(pc.weapons) + [weapon]
     pc.equipped = weapon
+    # A bow spends an arrow a shot and refuses with none (since 2026-09-30).
+    if "arrows" in weapons_mod.ammo_families(weapon):
+        pc.goods["arrows-20"] = 10
     return pc
 
 

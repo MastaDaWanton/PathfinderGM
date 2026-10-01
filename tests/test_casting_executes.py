@@ -40,7 +40,9 @@ from rules.sheet import from_dict, load_pc, to_dict
 def wizard(level=10, book=("fireball", "magic-missile", "teleport", "bless"),
            prepared=None, int_score=18):
     d = to_dict(load_pc("fixtures/pc-kesst.json"))
-    d.update({"class": "wizard", "level": level, "ranks": {}})
+    # Out of Kesst's leather: an arcane caster in armour rolls spell failure since
+    # 2026-09-30 (tests/test_gear_usable.py), and these tests are about what a cast does.
+    d.update({"class": "wizard", "level": level, "ranks": {}, "armour": "none"})
     d["abilities"]["int"] = int_score
     d["spellbook"] = list(book)
     d["prepared"] = dict({k: 3 for k in book} if prepared is None else prepared)
