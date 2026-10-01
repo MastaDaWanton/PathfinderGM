@@ -13118,15 +13118,35 @@ class Engine:
         or population record answers to every word (`population.find` does both)."""
         from . import population
 
+        from . import person_words
+
         found = population.find(self.scene, who, rings=(population.HERE,), log_miss=False)
         if found.scope == population.HERE:
             ref = found.people[0].get("ref")
             if ref and ref in self.scene.actors:
                 return self.scene.actors[ref]
+            # A glimpse here with no body is who the words mean, before any looser fit
+            # to somebody standing here: "the woman in the back", with "a human woman"
+            # promised here (F2), bound to the barkeep — an ungendered descriptor, "the
+            # one behind the bar", fits any gendered word (2026-09-30, building F2).
+            if not ref:
+                return None
         words = population._tokens(who)
-        fits = [a for a in self.scene.actors.values()
-                if not a.is_pc and words
-                and population._fits(words, set(population._tokens(a.name)))]
+        # A gendered word the person's own gender contradicts is not them: "the woman"
+        # never means a barkeep the page has made a man.
+        # And at least one word must actually be in their name: `_fits` lets a gendered
+        # word pass a name that says no gender, so "the woman in the back" (whose only
+        # word left after the stop list is "woman") fitted "the one behind the bar".
+        said = person_words.gender_of(person_words._words(who))
+        fits = []
+        for a in self.scene.actors.values():
+            if a.is_pc or not words:
+                continue
+            if said and str(getattr(a, "gender", "") or "") not in ("", said):
+                continue
+            bag = set(population._tokens(a.name))
+            if population._fits(words, bag) and bag & set(words):
+                fits.append(a)
         return fits[0] if len(fits) == 1 else None
 
     def _bring_in(self, template: str, count: int = 1, name: str | None = None,

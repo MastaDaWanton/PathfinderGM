@@ -526,6 +526,14 @@ class Campaign:
         except Exception:  # noqa: BLE001 — a world that will not load is reported elsewhere
             return
         keepers.retire_stale_masters(self.scene, world)
+        # Lane F, 2026-09-30: a keeper named on sight by an older build goes back to
+        # their descriptor unless the page has already used the name (F1), and everybody
+        # minted with a people's face and no people gets the one the face shows (item 10).
+        # Both are no-ops on a save that needs neither.
+        from rules import person_words
+
+        keepers.unname_on_sight(self.scene, world, self.transcript)
+        person_words.record_peoples(self.scene, world)
 
     def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
         """A save from before actors had a place, stood somewhere real.

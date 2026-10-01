@@ -1027,13 +1027,28 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
         speak_for(scene, eid)
         rec = population.note(scene, label, body=actor.appearance)
         rec["ref"] = actor.ref
+        # A world character's people is the one their own Identity names; their face is
+        # their own Appearance and is not touched (item 10, 2026-09-30).
+        from . import person_words
+
+        pid = person_words.resident_people(world, eid)
+        if pid:
+            actor.world_people_id = pid
+            actor.heritage = person_words.people_name(world, pid) or actor.heritage
     else:
+        from . import person_words
+
         got = npcs.choose(words, level) or {}
-        actor = instantiate(str(got.get("id") or "guildhand"), scene=scene, name=label)
+        template = str(got.get("id") or "guildhand")
+        actor = instantiate(template, scene=scene, name=label)
         rec = population.note(scene, label,
                               body=names_mod.appearance_for(world, scene.location_id, own=""))
         actor.appearance = names_mod.appearance_for(world, scene.location_id,
                                                     ref=actor.ref, own=rec["life"]["face"])
+        # The people the face was drawn from, recorded (item 10: 8 of 8 NPCs had none).
+        person_words.settle_people(scene, world, actor, words=label, template=template,
+                                   own=rec["life"]["face"], take_grant=False,
+                                   keep_name=True)
         scene.arrive(actor, zone=zone, source=f"start:{doc['id']}")
         rec["ref"] = actor.ref
     if look:

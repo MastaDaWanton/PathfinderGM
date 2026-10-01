@@ -138,9 +138,12 @@ def test_the_name_comes_out_of_the_world_and_not_out_of_nowhere():
     scene, _ = _table(MARKET)
     who = _keeper(scene, MARKET)
     given, families, _taken = keepers.name_stock(WORLD, TOWN)
-    first, last = who.name.split()[0], who.name.split()[-1]
-    assert first in given, (who.name, given[:8])
-    assert last in families, (who.name, families)
+    # The name behind the descriptor (owner ruling F1, 2026-09-30: keepers go by what they
+    # are until introduced, so the world's name is `true_name`, not the panel's).
+    first, last = who.true_name.split()[0], who.true_name.split()[-1]
+    assert first in given, (who.true_name, given[:8])
+    assert last in families, (who.true_name, families)
+    assert who.name == "the master of the market"
 
 
 def test_no_keeper_wears_a_name_the_world_already_gave_somebody():
@@ -150,7 +153,7 @@ def test_no_keeper_wears_a_name_the_world_already_gave_somebody():
     scene, engine = _table(MARKET)
     for place in engine.places():
         engine.place_party(place.id)
-    minted = [a.name.lower() for a in scene.people.values() if keepers.is_keeper(
+    minted = [a.true_name.lower() for a in scene.people.values() if keepers.is_keeper(
         getattr(a, "world_entity_id", "") or "")]
     assert minted, "nobody was staffed anywhere in the town"
     assert not (set(minted) & taken), set(minted) & taken
@@ -175,14 +178,14 @@ def test_the_same_shop_has_the_same_keeper_in_a_new_campaign():
     names = []
     for seed in (1, 2, 3):
         scene, _ = _table(MARKET, seed=seed)
-        names.append(_keeper(scene, MARKET).name)
+        names.append(_keeper(scene, MARKET).true_name)
     assert len(set(names)) == 1, names
 
 
 def test_two_shops_in_one_town_are_two_different_people():
     scene, engine = _table(MARKET)
     engine.place_party(GUILDHALL)
-    assert _keeper(scene, MARKET).name != _keeper(scene, GUILDHALL).name
+    assert _keeper(scene, MARKET).true_name != _keeper(scene, GUILDHALL).true_name
 
 
 def test_the_numbers_come_from_the_codex_and_are_remembered(tmp_path, settings):
@@ -203,7 +206,7 @@ def test_the_numbers_come_from_the_codex_and_are_remembered(tmp_path, settings):
     known = npcs.recall(wid)
     assert known is not None, "nothing was written to the codex"
     assert known["creature"] == who.from_template
-    assert known["name"] == who.name
+    assert known["name"] == who.true_name
 
 
 def test_a_keeper_is_never_stood_up_twice():
@@ -400,7 +403,7 @@ def test_two_keepers_of_one_family_know_they_are_one_family():
                 if keepers.is_keeper(getattr(a, "world_entity_id", "") or "")]
         families = {}
         for who in kept:
-            parts = str(who.name).split()
+            parts = str(who.true_name).split()
             if len(parts) > 1:
                 families.setdefault(parts[-1], []).append(who)
         shared = [group for group in families.values() if len(group) > 1]
@@ -414,7 +417,10 @@ def test_two_keepers_of_one_family_know_they_are_one_family():
         said = [a for a in group if "household" in (a.notes or "")]
         assert said, [a.notes for a in group]
         for who in said:
+            # By the name the player knows them by — the descriptor until they give theirs
+            # (F1): the family word itself is half of a name not yet given.
             assert any(other.name in who.notes for other in group if other is not who)
+            assert str(who.true_name).split()[-1] not in who.notes, who.notes
 
 
 def test_a_keeper_alone_in_their_name_claims_no_family():

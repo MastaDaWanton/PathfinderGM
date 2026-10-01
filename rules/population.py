@@ -183,10 +183,18 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
         taken += [a.name for a in scene.actors.values()]
         actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref, taken)
         # The face their population record rolled, when they have one — chosen to
-        # agree with their work (rules/lives.py).
-        actor.appearance = names_mod.appearance_for(
-            world, scene.location_id, ref=actor.ref,
-            own=(rec["life"]["face"] if rec else None))
+        # agree with their work (rules/lives.py) — and the people it is drawn from,
+        # recorded (`person_words.settle_people`). Until 2026-09-30 only the face text
+        # was kept: 8 of 8 NPCs in Sam's save were race "human" with a Ratfolk face and
+        # no people. The words first ("the elf at the bar"), then a grant here (F2:
+        # "any human women here?" — "There is one"), then the town's people.
+        own = ((rec.get("life") or {}).get("face") if rec else None)
+        person_words.settle_people(scene, world, actor,
+                                   words=(rec or {}).get("phrase") or phrase,
+                                   template=template, own=own, redraw_face=True, rec=rec)
+        if not actor.appearance and person_words.is_a_person(template):
+            actor.appearance = names_mod.appearance_for(world, scene.location_id,
+                                                        ref=actor.ref, own=own)
     if getattr(scene, "grid", None) is not None:
         scene.place_by_zone([actor.ref])
     return actor

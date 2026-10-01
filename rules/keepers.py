@@ -258,10 +258,15 @@ def kin_note(scene, actor, at: str = "") -> str:
     narrator's to play and the attitude track's to record — the engine states the
     relationship and does not invent the sentiment.
     """
-    mine = str(getattr(actor, "name", "") or "").split()
+    # The family is read off the TRUE name, and the note names nobody by a name not yet
+    # given (owner ruling F1, 2026-09-30): kin are "the one behind the bar", not "Gorm
+    # Vesper", until the player has been told. The family word itself is left out while
+    # the keeper's own name is kept back — it is half of it.
+    mine = str(getattr(actor, "true_name", "") or getattr(actor, "name", "") or "").split()
     if len(mine) < 2:
         return ""
     family = mine[-1]
+    introduced = str(getattr(actor, "name", "") or "") == " ".join(mine)
     # The place is passed in rather than read off the actor: `staff` writes this note
     # BEFORE `scene.add` stamps `actor.at`, so reading it here found an empty string and
     # the kinship never fired. Caught by driving a town with two Sootspars in it.
@@ -272,11 +277,16 @@ def kin_note(scene, actor, at: str = "") -> str:
             continue
         if places_mod.location_of(place_of(other.world_entity_id)) != here:
             continue
-        if str(other.name).split()[-1:] == [family]:
-            kin.append(other.name)
+        theirs = str(getattr(other, "true_name", "") or other.name).split()
+        if theirs[-1:] == [family]:
+            kin.append(str(other.name))
     if not kin:
         return ""
     who = _and_list(kin)
+    if not introduced:
+        return (f" Family to {who}: the same household keeps both, and they know it."
+                if len(kin) == 1 else
+                f" Family to {who} — one household, several counters.")
     return (f" One of the {family}s, and so is {who}: the same household keeps both, "
             f"and they know it.") if len(kin) == 1 else (
         f" One of the {family}s, along with {who} — one household, several counters.")
@@ -404,29 +414,98 @@ def stand_up(scene, world, market_id: str, counter, *, even_when_shut: bool = Fa
             else f"the stallholder at {counter.label}")
     return _mint(scene, world, market_id, wid, counter.title, counter.words,
                  seed_place=SimpleNamespace(id=key, name=counter.label),
-                 what=f"{what}, at the market")
+                 what=f"{what}, at the market", descriptor=what)
 
 
-def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, what: str):
+_PUBLIC = frozenset({"publicly", "public", "by name", "everyone", "widely", "true", "yes"})
+
+
+def publicly_known(world, place_id: str, wid: str = "") -> str:
+    """The keeper's name when the WORLD marks it as one everybody knows, else "".
+
+    Owner ruling F1 (2026-09-30): keepers go by their descriptor until introduced, "unless
+    the world marks them as publicly known" — the name over the shop. The marking is the
+    world's, never this app's guess, and no export ships it yet (docs/from-world-bible.md,
+    "Known gaps"). Read from either of two places the export already has a row for:
+
+      * the place's own row in `play.places[]` — ``"keeper": {"name": "Hal Dunmore",
+        "known": "publicly"}``;
+      * a `play.cast[]` member who keeps it — ``"keeps": "<place id>", "known":
+        "publicly"`` — so a world character who runs the smithy is that smithy's keeper.
+
+    A row with a name and no public marking is NOT public: the name is the world's, the
+    knowing of it is the player's to earn."""
+    if world is None or not place_id:
+        return ""
+    play = getattr(world, "play", None) or {}
+    if not isinstance(play, dict):
+        return ""
+
+    def _public(v) -> bool:
+        return str(v if not isinstance(v, bool) else str(v).lower()).strip().lower() in _PUBLIC
+
+    if counter_of(wid):
+        return ""                          # a stall's keeper is nobody's sign over a door
+    for row in play.get("places") or []:
+        if isinstance(row, dict) and str(row.get("id") or "") == place_id:
+            k = row.get("keeper")
+            if isinstance(k, dict) and str(k.get("name") or "").strip() \
+                    and _public(k.get("known")):
+                return " ".join(str(k["name"]).split())
+    for row in play.get("cast") or []:
+        if isinstance(row, dict) and str(row.get("keeps") or "") == place_id \
+                and str(row.get("name") or "").strip() and _public(row.get("known")):
+            return " ".join(str(row["name"]).split())
+    return ""
+
+
+def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, what: str,
+          descriptor: str = ""):
     """Build one keeper, name them out of the world, give them a face, and stand them at
-    `at` through the arrival door. None when the codex has no block for them."""
+    `at` through the arrival door. None when the codex has no block for them.
+
+    `descriptor` is what they go by until they give their name; the title when it is
+    not given ("the smith"). A market's stalls pass their own ("the stallholder at the
+    cloth stall"), because ten stallholders called "the stallholder" are one word for
+    ten people."""
     from . import npcs
     from .bestiary import instantiate
 
     pc = scene.pc()
     level = int(getattr(pc, "level", 1) or 1)
-    name = name_for(seed_place, world,
-                    taken={str(a.name) for a in scene.people.values()},
+    # Their name is drawn here and KEPT BACK (owner ruling F1, 2026-09-30): until it is
+    # given in play they go by what they are — "the one behind the bar", "the master of
+    # the market" — exactly like everybody else the scene makes. Measured on the playtest
+    # (item 7): 4 of 4 keepers were shown by full name before any introduction, and the
+    # page used "Gorm Vesper" and "Quin Nutmeg" unprompted ("Others, like Gorm Vesper,
+    # require a heavy purse", said BY Gorm). The brief's premise (gm/prompts.py, "The true
+    # name is NOT shown") had been true of everybody but keepers since 2026-09-19.
+    # Evennia's RP system is the precedent: a character is shown by its sdesc ("a tall
+    # man") until the viewer `recog`s them, and the name a viewer knows is learned, never
+    # read off the character. The exception is the world's to make (`publicly_known`).
+    taken = {str(a.name) for a in scene.people.values()} | {
+        str(getattr(a, "true_name", "") or "") for a in scene.people.values()} - {""}
+    name = name_for(seed_place, world, taken=taken,
                     salt=getattr(scene, "story_seed", 0) or None) or title
+    known = publicly_known(world, at, wid)
+    if known:
+        name = known
+    shown = name if known else (descriptor or title)
     # The codex, exactly as a scheme's cast member reaches it: a stat block by the
     # role's words near the party's level, remembered under this id in `homebrew/npcs/`
     # so the numbers are the same next session and one file on the bench corrects them.
     template = npcs.block_for(wid, list(words), level, name)
     try:
-        actor = instantiate(template, scene=scene, name=name, world_entity_id=wid)
+        actor = instantiate(template, scene=scene, name=shown, world_entity_id=wid)
     except Exception:
         # An unknown template is a content problem, not a reason for the turn to fail.
         return None
+    # The name behind the descriptor: what they answer when asked
+    # (`judgement.names_asked_for`), and what the panel takes when they give it
+    # (`judgement.apply_introductions`, `narration.settle_introductions`) — the same
+    # machinery every other person the scene makes has been named through since
+    # 2026-09-18. Stamped before the note, whose kinship reads the family off it.
+    actor.true_name = name
     # The note is what the narrator is told about them — `gm/prompts.py` prints the
     # first sentence of it beside the name — so it says what they are and where, and
     # nothing about what they sell, which is the market's business and not the prose's.
@@ -443,16 +522,22 @@ def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, wha
     # looks it up, finds no such resident and returns "". Drenn Ironvale therefore had no
     # appearance, no Looks clause in the brief, and nothing for the description check to
     # enforce even once it ran over everybody (2026-09-19, item 32). Their people's own
-    # body line is the right answer: they are a local, and the name they carry was drawn
-    # from the local stock already. Their name IS their name — they are not a stranger
-    # keeping it back — so `true_name` is stamped too, or `name_the_nameless` would draw
-    # a second one for somebody already introduced.
+    # body line is the right answer — and the people it is drawn from is RECORDED
+    # (`person_words.settle_people`; item 10 of 2026-09-30: 8 of 8 NPCs carried a Ratfolk
+    # face and no people). A grant at this place binds them (F2): Quin, the chamber's
+    # keeper, was promised as "a human woman" two turns before she was minted.
     from . import names as names_mod
+    from . import person_words
 
-    actor.true_name = name
+    person_words.settle_people(scene, world, actor, words=shown, template=template,
+                               place=at, keep_name=bool(known))
     if not actor.appearance:
         actor.appearance = names_mod.appearance_for(world, scene.location_id,
                                                    ref=actor.ref or wid)
+    if not known and actor.true_name != name:
+        # A grant drew them from another people's pool; the family the note reads is
+        # theirs, so it is written again.
+        actor.notes = head + kin_note(scene, actor, at)
     # Stood at the place itself, not the place the party happens to be: a counter wanted
     # from the market is the market's, and the arrival door records where they stand.
     if str(getattr(scene, "at", "") or "") == at:
@@ -460,6 +545,88 @@ def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, wha
     else:
         scene.arrive(actor, place_id=at)
     return actor
+
+
+def descriptor_of(scene, world, wid: str) -> str:
+    """What a keeper goes by until they give their name, read back off their id — the
+    same words `staff` and `stand_up` mint them under. "" when nothing says."""
+    place, cid = place_of(wid), counter_of(wid)
+    if not place:
+        return ""
+    if cid:
+        from . import market as market_mod
+
+        counter = market_mod.counter(_location(world, places_mod.location_of(place)), cid)
+        if counter is None:
+            return ""
+        return (counter.title if counter.sort != "stall"
+                else f"the stallholder at {counter.label}")
+    kind = ""
+    for f in getattr(scene, "founded", None) or ():
+        fid = f.get("id") if isinstance(f, dict) else getattr(f, "id", "")
+        if str(fid or "") == place:
+            kind = str((f.get("kind") if isinstance(f, dict) else getattr(f, "kind", ""))
+                       or "")
+            break
+    return places_mod.keeper_of(f"the {kind}" if kind else label_of(place))[0]
+
+
+def _on_the_page(name: str, transcript) -> bool:
+    """Whether the page or the player has used this name: the full name, or its given
+    name as a word, in any transcript entry."""
+    parts = str(name or "").split()
+    if not parts:
+        return False
+    import re
+
+    forms = {" ".join(parts), parts[0]} if len(parts[0]) >= 3 else {" ".join(parts)}
+    rx = re.compile(r"(?<![\w'’-])(?:" + "|".join(re.escape(f) for f in forms)
+                    + r")(?![\w-])")
+    for entry in transcript or ():
+        text = entry.get("text") if isinstance(entry, dict) else entry
+        if text and rx.search(str(text)):
+            return True
+    return False
+
+
+def unname_on_sight(scene, world, transcript) -> list[tuple[str, str]]:
+    """On load: a keeper an older build named on sight goes back to their descriptor,
+    unless the name has already reached the page. Returns [(ref, "restored"|"kept")].
+
+    Before owner ruling F1 (2026-09-30) every keeper was minted with `name = true_name`
+    (since 2026-09-19). Measured on Sam's save: 4 keepers — Oren Bramble (the master of
+    the market), Soren Moorcock (the general store), Gorm Vesper and Quin Nutmeg. Oren
+    and Soren never appeared in any of the 82 transcript entries; Gorm's and Quin's names
+    were on the page (the narrator used them unprompted, from the leaked brief). So:
+
+      * a name never on the page is taken back — the panel shows the descriptor, and the
+        name is still theirs to give when asked (2 of 4 on Sam's save);
+      * a name the page has already used is kept: the player has read it, and taking back
+        a name the story has said is a contradiction the player sees, which is worse than
+        the leak that put it there (2 of 4).
+
+    The page, not the player's own words alone, because the transcript is everything the
+    player has read. Nothing else on the actor changes, and a world-marked public name
+    (`publicly_known`) is left alone."""
+    out: list[tuple[str, str]] = []
+    for ref, actor in list((getattr(scene, "people", None) or {}).items()):
+        wid = str(getattr(actor, "world_entity_id", "") or "")
+        if getattr(actor, "is_pc", False) or not is_keeper(wid):
+            continue
+        name = str(getattr(actor, "name", "") or "")
+        if not name or name != str(getattr(actor, "true_name", "") or ""):
+            continue                       # already a descriptor, or renamed in play
+        if publicly_known(world, place_of(wid), wid):
+            continue
+        if _on_the_page(name, transcript):
+            out.append((ref, "kept"))
+            continue
+        shown = descriptor_of(scene, world, wid)
+        if not shown:
+            continue
+        actor.name = shown
+        out.append((ref, "restored"))
+    return out
 
 
 def retire_stale_masters(scene, world) -> list[str]:

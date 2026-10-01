@@ -278,6 +278,7 @@ not parse an id.
 | `footing` | `firm`, `broken`, `bad` |
 | `vertical` | `ledge`, `slope`, `scatter`, `none` — how the place is shaped upward |
 | `storeys` | `{up, down}`, counts of floors. Omit outdoors |
+| `keeper` | *optional* — `{"name": str, "known": "publicly"}` for a keeper everybody knows by name (the name over the shop). Without `known: "publicly"` the consumer keeps the name back until it is given in play, as it does for every keeper it mints (owner ruling F1, 2026-09-30; `keepers.publicly_known`). A `play.cast[]` row may say the same with `"keeps": "<place id>", "known": "publicly"` |
 
 All five of the tier-2 fields are **read** as of 2026-09-16 (`rules/floorplan.from_world`,
 `rules/places._authored`): the dimensions become the grid a fight is laid out on at five

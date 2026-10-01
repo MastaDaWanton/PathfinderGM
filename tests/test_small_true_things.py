@@ -295,9 +295,14 @@ def test_the_keeper_behind_the_counter_has_a_face_and_owns_their_name():
     who = keepers.keeper_in(scene, MARKET)
     assert who is not None
     assert who.appearance, "the keeper has a body line from their own people"
-    assert who.true_name == who.name, "their name is theirs; they are not keeping it back"
+    # Reversed by owner ruling F1 (2026-09-30): a keeper keeps their name back until it is
+    # given, like everybody else — 4 of 4 keepers shown by full name before any
+    # introduction was the defect. They hold a world name to give, and the brief never
+    # shows it.
+    assert who.true_name and who.true_name != who.name, (who.name, who.true_name)
     brief = prompts.scene_brief(WORLD, scene, WORLD.get(TOWN), [])
     assert "Looks (fact" in brief
+    assert who.true_name not in brief, "the brief leaked the name before it was given"
 
 
 def test_the_turn_path_settles_descriptions_over_everybody_present():

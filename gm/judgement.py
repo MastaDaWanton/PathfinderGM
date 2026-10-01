@@ -7387,6 +7387,15 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
         if not you.search(line):
             continue
         words = _name_words(outside)
+        # Half of a hyphenated noun is not that noun: "nodding at the lock-keeper" is not
+        # the keeper of the general store. Harmless while keepers carried proper names;
+        # since they go by their descriptor (owner ruling F1, 2026-09-30) the store's
+        # keeper took the apron man's hail in the G2 case below on the word "keeper".
+        compounds = re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)+", outside)
+        if compounds:
+            parts = {p.lower() for c in compounds for p in c.split("-")}
+            alone = _name_words(re.sub(r"[A-Za-z]+(?:-[A-Za-z]+)+", " ", outside))
+            words = words - (parts - alone)
         speaker = None
         # A named person first, by any word of their name, a descriptor by its head
         # noun (never "through" for the watchman waving traffic through); then by the
