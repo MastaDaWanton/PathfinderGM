@@ -821,7 +821,8 @@ function preparedToday(sp) {
             ${detailsButton(c, "sx-more")}</span>
           <span class="sx-cantrip-act" style="display: flex; gap: 6px; align-items: center">
           <button type="button" class="prepbtn castbtn" data-spell="${esc(c.id)}"
-                  data-name="${esc(c.name)}" aria-label="Cast ${esc(c.name)}">Cast</button>${
+                  data-name="${esc(c.name)}" data-range="${esc(c.range || "")}"
+                  aria-label="Cast ${esc(c.name)}">Cast</button>${
           prepared ? `
           <button type="button" class="spbtn quiet" data-spell="${esc(c.id)}"
                   data-action="unprepare" data-name="${esc(c.name)}"
@@ -862,7 +863,8 @@ function spellCard(k, off, prepared) {
     ${prepared ? `<p class="spcard-count"><b>${k.prepared}</b> prepared</p>` : ""}
     <div class="spcard-act">
       <button type="button" class="prepbtn castbtn" data-spell="${esc(k.id)}"
-              data-name="${esc(k.name)}" aria-label="Cast ${esc(k.name)}">Cast</button>
+              data-name="${esc(k.name)}" data-range="${esc(k.range || "")}"
+                  aria-label="Cast ${esc(k.name)}">Cast</button>
       ${prepared ? `
         <button type="button" class="spbtn" data-spell="${esc(k.id)}" data-action="prepare"
                 data-name="${esc(k.name)}" aria-label="Prepare another ${esc(k.name)}"${
@@ -944,7 +946,8 @@ function grimoireList(sp) {
     // spontaneous caster's known cantrips cast. A level not reachable yet is shown (so
     // the player sees what is coming) but offers nothing.
     const castIt = `<button type="button" class="prepbtn castbtn" data-spell="${esc(s.id)}"
-           data-name="${esc(s.name)}" aria-label="Cast ${esc(s.name)}">Cast</button>`;
+           data-name="${esc(s.name)}" data-range="${esc(s.range || "")}"
+                  aria-label="Cast ${esc(s.name)}">Cast</button>`;
     const cantripReady = s.level === 0 && (!prepared || s.prepared > 0);
     // No open slot at this level: Prepare stays in its place, disabled, with the short
     // reason under the name and the engine's whole sentence as its description. Until

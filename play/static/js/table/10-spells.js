@@ -22,8 +22,8 @@
 // - Shown by `spellcasting.kind` (owner Q49), never by `pc.castable`, which offers a
 //   prepared caster's whole book when nothing is prepared (fix-interfaces §1.7 F1).
 
-const SPELLS = { anchor: null, sheet: null, chips: [], armed: false, chose: false,
-                 downOpen: false };
+const SPELLS = { anchor: null, returnTo: null, sheet: null, chips: [], armed: false,
+                 chose: false, downOpen: false };
 const HAS_POPOVER = typeof HTMLElement !== "undefined"
   && typeof HTMLElement.prototype.showPopover === "function";
 const INPUT_PLACEHOLDER = ($("#input") && $("#input").placeholder) || "What do you do?";
@@ -153,9 +153,40 @@ function attachPlace(place) {
 // A stable door for other parts of the table (the Spells tab's cards, I5) to attach a
 // spell as a chip without knowing this file's internals. `aim` is optional and must be in
 // the server's grammar; anything else is dropped rather than sent to be refused.
-window.attachSpellChip = function attachSpellChip(id, name, aim) {
-  attachSpell({ id, name, aim });
+window.attachSpellChip = function attachSpellChip(id, name, aim, range) {
+  return chooseSpell({ id, name, aim, range });
 };
+
+// Every door that chooses a spell comes through here: the picker's rows, the Spells
+// tab's Cast (02-state.js) and `attachSpellChip`. In a fight the spell is a step of the
+// combat panel's turn (04's `stageCastInTurn`), committed with the move by Commit turn;
+// out of one it is the chip for Say, as before. Measured 2026-10-01, the owner in a
+// fight: both buttons attached the chip, the cast left through /api/say as a turn of its
+// own, "so i cannot move and cast in the same turn". Returns "turn" or "chip", so the
+// caller knows where the player's attention goes next.
+function inAFight() {
+  return !!(typeof STATE !== "undefined" && STATE && STATE.scene && STATE.scene.in_encounter);
+}
+
+function chooseSpell(spell) {
+  if (!spell || !spell.id) return "";
+  if (inAFight() && typeof stageCastInTurn === "function" && stageCastInTurn(spell)) {
+    // A chip attached before the fight began is not this turn's spell any more: the one
+    // just chosen is, and two spells in two places is the split this undoes.
+    if (SPELLS.chips.some(c => c.kind === "spell")) clearAttachments();
+    spellSay(`${spell.name || spell.id} is in this turn. Press Commit turn to cast it.`);
+    return "turn";
+  }
+  attachSpell(spell);
+  return "chip";
+}
+
+// Where focus goes once a spell is chosen: to Commit turn when it went into the turn,
+// to the box when it went to Say.
+function focusAfterChoosing(where) {
+  const to = where === "turn" ? document.getElementById("cb-commit") : $("#input");
+  if (to) to.focus();
+}
 
 function attachedChip() { return SPELLS.chips[0] || null; }
 
@@ -292,7 +323,8 @@ function spellRows(sp) {
     } else if (k.level > 0 && (!slot || slot.left <= 0)) {
       why = `no slot left at level ${k.level}`;
     }
-    rows.push({ id: k.id, name: k.name, level: k.level, line: k.line || "", why });
+    rows.push({ id: k.id, name: k.name, level: k.level, line: k.line || "", why,
+                range: k.range || "" });
   }
   return { rows, unprepared, slots };
 }
@@ -322,14 +354,18 @@ function spellPickerHtml(sheet) {
     return `<div class="sp-level" data-level="${lvl}">
       <div class="sp-levelhead"><span>${lvl === 0 ? "Cantrips" : `Level ${lvl}`}</span>${pips}</div>
       ${rows.filter(r => r.level === lvl).map(r => `<button type="button" class="sp-spell"
-          data-spell="${esc(r.id)}" data-name="${esc(r.name)}"${r.why ? " disabled" : ""}${
+          data-spell="${esc(r.id)}" data-name="${esc(r.name)}" data-range="${
+          esc(r.range)}"${r.why ? " disabled" : ""}${
           r.line ? ` title="${esc(r.line)}"` : ""}><span class="sp-name">${esc(r.name)}</span>${
           r.why ? `<span class="sp-why">${esc(r.why)}</span>` : ""}</button>`).join("")}
     </div>`;
   }).join("");
   const rest = unprepared ? `<p class="sp-note">${unprepared} more in your book ${
     unprepared === 1 ? "is" : "are"} not prepared today.</p>${openTab}` : "";
-  return `${head}${find}${body}${rest}`;
+  // Said before the list, in a fight, so the player knows the press does not cast yet.
+  const turn = inAFight() ? `<p class="sp-note">Chosen here, it joins this turn beside your
+    move. Commit turn casts it.</p>` : "";
+  return `${head}${turn}${find}${body}${rest}`;
 }
 
 async function fillSpellPicker() {
@@ -367,6 +403,7 @@ function openSpellPicker(anchor) {
   const p = spellPop();
   if (!p) return;
   SPELLS.anchor = anchor || document.getElementById("spellbtn");
+  SPELLS.returnTo = null;
   SPELLS.chose = false;
   if (HAS_POPOVER) { if (!p.matches(":popover-open")) p.showPopover(); }
   else p.classList.add("open");
@@ -388,7 +425,8 @@ function spellPickerClosed() {
   // in the box, where the player writes the rest) or the player has already moved on.
   if (!SPELLS.chose && p && (p.contains(document.activeElement)
                              || document.activeElement === document.body)) {
-    if (SPELLS.anchor && document.contains(SPELLS.anchor)) SPELLS.anchor.focus({ preventScroll: true });
+    const back = SPELLS.returnTo || SPELLS.anchor;
+    if (back && document.contains(back)) back.focus({ preventScroll: true });
   }
 }
 
@@ -414,15 +452,26 @@ document.addEventListener("click", e => {
   if (opener) {
     const wasOpen = SPELLS.downOpen || spellPickerOpen();
     SPELLS.downOpen = false;
-    if (wasOpen) closeSpellPicker(); else openSpellPicker(opener);
+    if (wasOpen) { closeSpellPicker(); return; }
+    // In a fight the Spells button is the panel's Cast… by another name: the picker
+    // opens against the panel, so the spell is seen to land in the turn being built
+    // there, and focus still comes back to the button that was pressed.
+    const cast = document.getElementById("cb-cast");
+    if (inAFight() && cast && cast.offsetParent !== null) {
+      openSpellPicker(cast);
+      SPELLS.returnTo = opener;
+    } else {
+      openSpellPicker(opener);
+    }
     return;
   }
   const pick = t.closest("#spellpop .sp-spell");
   if (pick && !pick.disabled) {
     SPELLS.chose = true;
-    attachSpell({ id: pick.dataset.spell, name: pick.dataset.name });
+    const went = chooseSpell({ id: pick.dataset.spell, name: pick.dataset.name,
+                               range: pick.dataset.range || "" });
     closeSpellPicker();
-    $("#input").focus();
+    focusAfterChoosing(went);
     return;
   }
   if (t.closest("#spellpop [data-spells-tab]")) {

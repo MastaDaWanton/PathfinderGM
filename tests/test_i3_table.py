@@ -61,7 +61,9 @@ def test_i3_burn_finds_burning_hands_and_not_magic_missile(tmp_path):
 def test_i3_a_stable_door_for_attaching_a_chip():
     """I5's spell cards attach through this one name, whatever this file does inside."""
     code = _js("10-spells.js")
-    assert "window.attachSpellChip = function attachSpellChip(id, name, aim)" in code
+    # `range` joined the arguments 2026-10-01, so a personal spell staged in a fight
+    # lands on the caster (tests/test_spells_in_the_turn.py).
+    assert "window.attachSpellChip = function attachSpellChip(id, name, aim" in code
     assert "AIM_RE.test" in code
 
 

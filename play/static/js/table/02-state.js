@@ -323,12 +323,14 @@ document.addEventListener("click", async e => {
   // did nothing because this button could only aim at a person and fired at once. Now the
   // spell lands before the input as a chip (10-spells.js) and the player writes where it
   // goes, which is the one route typed and attached casts share. The sheet closes so the
-  // box it went to is in view.
+  // box it went to is in view. In a fight it goes into the combat panel's turn instead,
+  // beside the move (`chooseSpell`, 10-spells.js; the owner, 2026-10-01).
   const cast = e.target.closest(".castbtn");
   if (cast) {
-    attachSpell({ id: cast.dataset.spell, name: cast.dataset.name });
+    const went = chooseSpell({ id: cast.dataset.spell, name: cast.dataset.name,
+                               range: cast.dataset.range || "" });
     if (typeof closeSheet === "function") closeSheet();
-    $("#input").focus();
+    focusAfterChoosing(went);
     return;
   }
   const ignore = e.target.closest("[data-ignore]");
