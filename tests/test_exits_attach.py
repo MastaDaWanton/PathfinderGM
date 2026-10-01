@@ -185,15 +185,33 @@ def test_on_a_desktop_the_chip_line_is_held_open_so_the_row_does_not_move():
     Since the table rebuild the row and the pen are both in the desk at the foot of the
     stage, where growth goes upward just as it did in the footer; the rule is written
     for the desk (`.desk:has(#exits:not([hidden]))`) instead of for the row's next
-    sibling."""
+    sibling.
+
+    The 42px band (deferred list, 2026-09-30): the held line sat empty above the pen on
+    every turn with no chip, 50px with its gap at 1440x900. Where the desk is 780px or
+    wider the chip now shares the pen's action line, held to the buttons' 46px, and the
+    say line takes the full width under it. Measured live on the owner's save
+    (lane-c, Ledgerwarren), attaching a Go, a Withdraw and a Journey chip and taking each
+    back: the row moved 0px at 1440x900 and at 1722x855 with no band (the box 333px ->
+    706px at 1440), and 0px at 1024x768, where the 652px desk keeps the band because the
+    slot beside the actions would have been 279px and read "Journey t..." ."""
     page = (Path(__file__).resolve().parent.parent
             / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
     held = ".desk:has(#exits:not([hidden])) #sayform > #attachments"
-    block = page[page.index("@media (min-width: 761px) {\n    " + held):]
-    block = block[:block.index("\n  }\n")]
-    assert held + " {" in block
-    assert "min-height: 42px" in block
-    assert "#attachments[hidden] { visibility: hidden; }" in block
+    assert "@media (min-width: 761px) {\n    .desk { container: desk / inline-size; }" in page
+    wide = page[page.index("@container desk (min-width: 780px) {"):]
+    wide = wide[:wide.index("\n  }\n")]
+    # The chip's slot is on the actions' line, the same height empty or full; nothing
+    # is held open when no chip is attached.
+    assert "#sayform > .sayline { order: 2; flex: 1 0 100%; }" in wide
+    assert "#sayform > .actions { order: 1; margin-left: auto; }" in wide
+    assert held + " {" in wide and "height: 46px; overflow: hidden;" in wide
+    assert "#attachments[hidden] { display: none; }" in wide
+    assert "-webkit-line-clamp: 2;" in wide, "the place's line is held to two lines"
+    narrow = page[page.index("@container desk (max-width: 779.98px) {"):]
+    narrow = narrow[:narrow.index("\n  }\n")]
+    assert "min-height: 42px" in narrow
+    assert "#attachments[hidden] { visibility: hidden; }" in narrow
 
 
 def test_nothing_sends_an_exit_straight_to_the_table_any_more():

@@ -38,10 +38,13 @@
 
 const EXIT_GROUPS = [["next_door", "Next door"], ["outside", "Outside"], ["road", "Roads"]];
 
-// What leaving the fight costs, in the words the confirm line used to say it.
-const WITHDRAW_LINE = "Leaving the fight is a withdraw: a foe beside you that you can see "
-  + "gets no swing, but one whose reach covers your way out still strikes, and so does "
-  + "one you cannot see.";
+// What leaving the fight costs. The strike comes first and the exemption last, because on
+// a wide desktop the chip's line sits beside the pen's actions and shows two lines of it
+// (table.html, the motion rule; the whole sentence is its title): cut there, it still
+// says the thing that hurts.
+const WITHDRAW_LINE = "Leaving the fight is a withdraw: a foe whose reach covers your way "
+  + "out still strikes, and so does one you cannot see; one beside you that you can see "
+  + "gets no swing.";
 
 // "a few minutes' walk" reads as "a few minutes" in a row that is all walking.
 function exitTime(words) {
@@ -216,5 +219,18 @@ document.addEventListener("focusout", e => {
   const to = e.relatedTarget;
   if (btn && !(to && to.closest && to.closest("#exits .exitbtn.shut"))) exitWhy(null);
 });
+
+// On a desktop the chip's line shares the pen's action line and is held to its height
+// (table.html, the motion rule), so a long place line is cut at two lines there. The
+// whole sentence stays on it as its title (and in the chip's description for a screen
+// reader, 10's `aria-describedby`); 10 draws the chip, so the title is added when it does.
+(function titleThePlaceLine() {
+  const box = document.getElementById("attachments");
+  if (!box || typeof MutationObserver === "undefined") return;
+  new MutationObserver(() => {
+    const note = document.getElementById("att-note");
+    if (note && note.title !== note.textContent) note.title = note.textContent;
+  }).observe(box, { childList: true });
+})();
 
 onRender(s => renderExits(s));
