@@ -1328,7 +1328,21 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     never cut, then the most recent few exchanges, then the worked examples, then older
     history newest-first. `report` is filled in with what happened so the caller can
     log it — a cut that nobody records is the failure this function exists to end.
+
+    The GM's private note is pinned ahead of the history and never cut. It rides in
+    `c.history` (planted first at campaign open, rewritten in place by the watcher), so
+    cutting oldest-first made it the FIRST thing to go: measured 2026-10-01, turn 32 of
+    a talk-only campaign, and the one message cut was the undercurrent
+    (tests/test_undercurrent_survives_packing.py). NovelAI's Memory and SillyTavern's
+    story string are the same answer: standing notes in their own slot, outside the
+    history that gets trimmed.
     """
+    from play.opening import NOTE_PREFIX
+
+    original = history
+    pinned = [m for m in history if str(m.get("content", "")).startswith(NOTE_PREFIX)]
+    if pinned:
+        history = [m for m in history if not str(m.get("content", "")).startswith(NOTE_PREFIX)]
     # The last `keep` EXCHANGES, counted from the player's lines. It was
     # `history[-(keep * 2):]`, but a turn writes three messages (the player's line, the
     # plan, the prose — play/views.py), so "three exchanges" kept two (2026-09-25).
@@ -1342,7 +1356,7 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     # Reserving the cap rather than the rendered size under-fills by whatever the
     # ledger did not use, which is the safe direction.
     reserve = ledger_mod.BUDGET_CHARS if ledger else 0
-    room = budget - _chars(head) - _chars(tail) - reserve
+    room = budget - _chars(head) - _chars(tail) - _chars(pinned) - reserve
     # The parts that are never cut already over the budget: the prompt goes anyway, since
     # there is nothing left to drop, but it is SAID — measured 2026-09-25, this sent an
     # over-budget prompt without a word in the report or the log, and Ollama then cuts
@@ -1379,11 +1393,14 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     kept_history = front + kept_recent
     dropped = len(history) - len(kept_history)
 
-    # Where the window's edge falls, in the same units the ledger stamps: how many
-    # history messages were cut from the front. When nothing at all is kept verbatim —
-    # which is every prose call, handed `[]` by design — the whole ledger is outside
-    # the window and all of it is fair game.
-    edge = dropped if kept_history else 10 ** 9
+    # Where the window's edge falls, in the same units the ledger stamps: the index in
+    # the campaign's own history of the first message still kept. That was `dropped`
+    # until the note was pinned; it is the same number whenever nothing is pinned, and
+    # counts a pinned note that sat before the edge as behind it. When nothing at all is
+    # kept verbatim — which is every prose call, handed `[]` by design — the whole
+    # ledger is outside the window and all of it is fair game.
+    edge = (next((i for i, m in enumerate(original) if m is kept_history[0]), dropped)
+            if kept_history else 10 ** 9)
     # Less the two characters of the "\n\n" it is joined on with below.
     remembered = (ledger_mod.block(ledger, before_hist=edge, budget=reserve - 2)
                   if ledger else "")
@@ -1401,7 +1418,8 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
             "remembered": remembered.count("  * "),
             "over_budget": over,
         })
-    return head + (examples if with_examples else []) + kept_history + tail
+    # Where it sat before when nothing was cut: after the examples, ahead of the history.
+    return head + (examples if with_examples else []) + pinned + kept_history + tail
 
 
 HAZARD_TOKEN = "{HAZARD RULES}"
