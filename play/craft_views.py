@@ -1607,7 +1607,9 @@ def craft_action(request):
         suggestions = ["Keep foraging", f"Head back toward {town}",
                        "Unpack the crafting bench"]
 
-    tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "Nothing gathered."
+    # No full stop of its own: the line below adds one, and "Nothing gathered.." was
+    # printed on the first live forage of 2026-09-30.
+    tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "nothing"
     c.transcript.append({"who": "gm", "kind": "consequence",
                          "text": f"{closing}\n\nGathered: {tally}. {tell}".strip()})
     # 4. What is there, when something is: one grounded scene call, checked, with a
