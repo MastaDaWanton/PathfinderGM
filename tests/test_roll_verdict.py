@@ -242,8 +242,10 @@ def test_send_roll_plays_the_servers_verdict_and_waits_for_nothing():
 _STUB = r"""
 const made = [];
 const fakeEl = tag => ({
-  tag, style: {}, className: "", textContent: "", attrs: {},
+  tag, className: "", textContent: "", attrs: {}, kids: [],
+  style: { setProperty(k, v) { this[k] = v; } },
   setAttribute(k, v) { this.attrs[k] = v; }, remove() { this.gone = true; },
+  appendChild(el) { this.kids.push(el); },
   getContext: () => ({ setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {},
     arc() {}, fill() {}, stroke() {}, moveTo() {}, lineTo() {}, save() {}, restore() {},
     translate() {}, rotate() {}, scale() {}, createRadialGradient: () => ({ addColorStop() {} }) }),
@@ -292,15 +294,18 @@ def test_the_verdict_alone_chooses_the_flourish(tmp_path):
       out.none = await showVerdict(null, Promise.resolve(1));
       out.noneMade = made.length; out.noneFrames = frames.length;
 
-      // A success off the mat: the plaque and the canvas, and a frame loop started.
+      // A success off the mat: the word and the canvas, and a frame loop started.
       const f1 = await showVerdict({ verdict: "success", natural: 14 }, Promise.resolve(3));
       out.offMat = [f1.kind, made.map(e => e.tag + "." + e.className + "#" + (e.id || "")),
                     frames.length > 0];
 
-      // On the mat: the word goes into the mat (mark), no plaque.
-      made.length = 0; MAT = { left: 10, top: 20, width: 100, height: 100 };
+      // On the mat: the sentence goes into the mat's line (mark), and the big word stands
+      // over the middle of the die the mat reports.
+      made.length = 0; MAT = { left: 400, top: 300, width: 200, height: 200 };
       await showVerdict({ verdict: "failure", natural: 1 }, Promise.resolve(4));
-      out.onMat = [MARKED, made.filter(e => /rv-seal/.test(e.className)).length];
+      const w = made.find(e => /rv-word/.test(e.className));
+      out.onMat = [MARKED, w.className, w.style.left, w.style.top,
+                   w.kids.map(k => k.className + ":" + k.textContent)];
       MAT = null;
 
       // Reduced motion: the still word, and no canvas made or drawn.
@@ -320,8 +325,33 @@ def test_the_verdict_alone_chooses_the_flourish(tmp_path):
     assert got["none"] is None and got["noneMade"] == 0 and got["noneFrames"] == 0
     kind, els, looping = got["offMat"]
     assert kind == "success" and looping
-    assert "div.rv-seal is-good#" in els and "canvas.#rv-layer" in els, els
-    assert got["onMat"] == [[4, "Failure on a natural 1"], 0]
+    assert "div.rv-word is-good#" in els and "canvas.#rv-layer" in els, els
+    assert got["onMat"] == [[4, "Failure on a natural 1"], "rv-word is-bad is-strong",
+                            "500px", "400px", ["rv-w:Failure", "rv-sub:natural 1"]]
     still, ms, classes, frames = got["still"]
     assert still is True and ms < 1500 and frames == 0
-    assert classes == ["rv-seal is-good"], "reduced motion made something besides the word"
+    assert classes == ["rv-word is-good is-strong"], \
+        "reduced motion made something besides the word"
+
+
+def test_the_roll_log_does_not_print_the_other_sides_secret_roll():
+    """Measured live 2026-10-01: an opposed Stealth check's line in the Rolls panel read
+    "25 vs 3", and 3 was the guard's hidden Perception roll, the number `dc_shown` keeps
+    off the popup. The log entry drops the target, and the margin that gives it back by
+    subtraction; a stated DC beside the same kind of entry still shows."""
+    from play.views import _player_visible_entry
+
+    mine = {"total": 25, "visibility": "player", "die": "1d20"}
+    theirs = {"total": 3, "visibility": "hidden", "die": "1d20"}
+    opposed = _player_visible_entry({"kind": "turn", "outcomes": [{
+        "op": "check", "verdict": "success", "margin": 22,
+        "dc": {"value": 3}, "rolls": [mine, theirs]}]})
+    got = opposed["outcomes"][0]
+    assert got["dc"] is None and got["margin"] is None
+    assert got["verdict"] == "success" and got["rolls"] == [mine]
+
+    stated = _player_visible_entry({"kind": "turn", "outcomes": [{
+        "op": "check", "verdict": "success", "margin": 10,
+        "dc": {"value": 15}, "rolls": [mine]}]})
+    assert stated["outcomes"][0]["dc"] == {"value": 15}
+    assert stated["outcomes"][0]["margin"] == 10

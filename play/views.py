@@ -662,12 +662,21 @@ def _player_visible_entry(entry: dict) -> dict:
             # Nothing of this outcome is the player's. Its tell reaches them through the
             # narration; it does not need a line in the roll log.
             continue
+        # On an opposed check the number to beat IS the other side's hidden roll, and the
+        # Rolls panel printed it: "Stealth check 25 vs 3", the guard's secret Perception,
+        # measured live 2026-10-01 building the verdict flourish. The popup has withheld it
+        # since `dc_shown`; the log has to as well, and the margin with it, which is the
+        # same number by subtraction. A target that is no hidden die's result still shows.
+        hidden = {r.get("total") for r in o.get("rolls", [])
+                  if r.get("visibility") != "player"}
+        dc = o.get("dc")
+        secret = isinstance(dc, dict) and dc.get("value") in hidden
         outcomes.append({
             "op": o.get("op"),
             "verdict": o.get("verdict"),
-            "margin": o.get("margin"),
+            "margin": None if secret else o.get("margin"),
             "because": o.get("because"),
-            "dc": o.get("dc"),
+            "dc": None if secret else dc,
             "rolls": rolls,
         })
     return {"kind": entry.get("kind"), "outcomes": outcomes}
