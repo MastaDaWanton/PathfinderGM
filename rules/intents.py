@@ -277,6 +277,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to",), "hidden"),
+    # Mending a construct, aimed by `target` (rules/repair.py, content/rules/repairs.json).
+    # Not an amount op: the plan names WHAT is mended and the rule supplies the skill,
+    # the DC, the coin, the day and the dice — a repaired machine's hit points are the
+    # row's, stamped `rule:repair-construct`. `own` is the player's words asking for the
+    # machine to be theirs, which no repair grants; the tell says so. Added 2026-10-01:
+    # "I ... fix the spy in a way that makes it recognize me as its owner" resolved as
+    # nothing, and the prose repaired and tamed it anyway.
+    "repair": ((), ("own",), "player"),
     # Damage reduction, immunity, energy resistance and vulnerability, granted with a
     # clock. Before this there was no op for any of them: `effectspec` offered all four
     # types, 123 spells and 13 magic items authored one, and `consumables` had no branch
@@ -732,7 +740,7 @@ def is_null(value) -> bool:
 
 # The params that are a yes or a no, wherever they appear.
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
-                         "thrown", "quoted"})
+                         "thrown", "quoted", "own"})
 
 
 def _flag(value) -> bool:
