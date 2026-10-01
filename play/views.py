@@ -240,6 +240,32 @@ def _conversation_state(c) -> dict:
     return {"people": people[:_CONVO_PEOPLE], "recent": recent, "seq": seq}
 
 
+def _confided_state(c) -> list[dict]:
+    """[{"name", "told": [{"label", "text"}], "hinted": bool}] for every person who has
+    confided anything, in the order they first did — whether or not they still travel
+    with the player: what you were told stays told. The text is their life row's own
+    words; nothing here was written by a model. Refs never reach the page."""
+    from rules import confiding
+
+    scene = c.scene
+    out = []
+    for rec in (getattr(scene, "population", None) or {}).values():
+        if not isinstance(rec, dict) or not rec.get("confided"):
+            continue
+        told = [{"label": confiding.LABEL[t], "text": x} for t, x in confiding.told(rec)]
+        hinted = any(confiding.stage(rec, t) == confiding.HINTED for t in confiding.TOPICS)
+        if not told and not hinted:
+            continue
+        actor = scene.actors.get(str(rec.get("ref") or ""))
+        name = str(getattr(actor, "name", "") or rec.get("phrase") or "").strip()
+        if not name:
+            continue
+        first = min(int(v.get("beat") or 0) for v in rec["confided"].values()
+                    if isinstance(v, dict))
+        out.append((first, {"name": name, "told": told, "hinted": hinted}))
+    return [d for _, d in sorted(out, key=lambda p: p[0])]
+
+
 def _after_the_beat(c, agent, stage: str, door: str, **fields) -> None:
     """One stage of the after-the-beat steps (play/aftermath, §2.3) over this beat, its
     rows into the turn log — only when there are any, so a turn with no step to run
@@ -608,6 +634,9 @@ def _state(c) -> dict:
             # The Journal's notes and maps, and whether there is ink and paper to write
             # more with (2026-10-01).
             "writings": _writings_state(c),
+            # What companions have told the player about their own lives (gm/confide.py),
+            # for the Journal: known to the player, so shown; a hint shown as a hint.
+            "confided": _confided_state(c),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -3226,7 +3255,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # A companion the player spoke TO answers before the prose is written, out of a fight
     # (in one, their own turn does): what they do is decided as themselves, resolved by
     # the engine, and handed to the prose as tells and a fact (gm/companions.py).
-    answered = _companions_answer(c, agent, player_text, resolution, plan)
+    # First, what the player's words do to a confidence a companion owes (gm/confide.py):
+    # asked for, it is their answer this beat; brushed off, it waits.
+    heard = _companions_heard(c, player_text, door)
+    answered = _companions_answer(c, agent, player_text, resolution, plan, heard=heard)
     outcomes = [o for o in resolution.outcomes if o.tell]
     if getattr(agent, "intents_first", False):
         # The experiment's other half: call 1 wrote no prose, so this call writes the
@@ -3436,7 +3468,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # How a companion did what they did in this beat, and their own remarks
             # (the owner's rulings of 2026-10-01; gm/companions.py).
             text, more_repairs, more_added = _companions_on_the_page(
-                c, agent, text, answered, plan, resolution)
+                c, agent, text, answered, plan, resolution, heard=heard,
+                player_text=player_text)
             repairs += more_repairs
             added += more_added
         if text:
@@ -3647,7 +3680,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                "tagged": len({(r["who"], r["to"], r["line"])
                                               for r in agent.last_said
                                               if r["who"] and r.get("from")
-                                              not in ("page", "interject")}),
+                                              not in ("page", "interject", "confide")}),
                                **({"read_off_page": read_off} if (read_off := sum(
                                    1 for r in agent.last_said
                                    if r.get("from") == "page")) else {}),
@@ -3735,7 +3768,25 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     return JsonResponse(_state(c))
 
 
-def _companions_answer(c, agent, player_text: str, resolution, plan) -> list[tuple]:
+def _companions_heard(c, player_text: str, door: str) -> dict:
+    """What the player's words this turn do to a confidence a companion owes
+    (`confide.heard`): {"invited", "brushed", "not_ready"} refs. Out of a fight and on a
+    typed turn only; a brush-off is logged, because "not now" leaving a share waiting is a
+    rule the player cannot see."""
+    from gm import confide as confide_mod
+
+    empty = {"invited": [], "brushed": [], "not_ready": []}
+    if c.scene.in_encounter or door != "turn":
+        return empty
+    got = confide_mod.heard(c.scene, c.transcript, player_text, len(c.transcript))
+    for ref in got["brushed"]:
+        c.turn_log.append(history_mod.stamp(c, {"kind": "companion-confide", "ref": ref,
+                                                "event": "brushed off"}))
+    return got
+
+
+def _companions_answer(c, agent, player_text: str, resolution, plan,
+                       heard: dict | None = None) -> list[tuple]:
     """Out of a fight, each companion the player's words were spoken TO answers, as
     themselves, before the prose is written. Returns (actor, their answer) pairs for the
     prose call's facts and its backstop; their resolved outcomes join `resolution` so the
@@ -3760,16 +3811,23 @@ def _companions_answer(c, agent, player_text: str, resolution, plan) -> list[tup
             or player_text == CARRY_ON:
         return []
     planned = {i.actor for i in (getattr(plan, "intents", None) or []) if i.actor}
+    heard = heard or {}
     lines: list[tuple] = []
     for ref in companions_mod.addressed(scene, player_text)[:2]:
         actor = scene.get(ref)
         if actor is None or ref in planned:
             continue
+        # Asked for what they said was on their mind: their answer this beat is the
+        # confidence itself (`_companions_on_the_page`), never an ordinary answer call,
+        # which is not told their life and would make one up.
+        if ref in (heard.get("invited") or ()):
+            continue
         agent.engine = c.engine()
         try:
             answer = agent.companion_answer(ref, player_text, location=c.location,
                                             recent_events=_recent_events(c.world,
-                                                                         c.location))
+                                                                         c.location),
+                                            not_ready=ref in (heard.get("not_ready") or ()))
         except (ModelUnavailable, IntentError) as exc:
             c.turn_log.append({"kind": "companion-answer", "ref": ref,
                                "error": str(exc)[:400]})
@@ -3808,7 +3866,8 @@ def _companions_answer(c, agent, player_text: str, resolution, plan) -> list[tup
     return lines
 
 
-def _companions_on_the_page(c, agent, text: str, answered, plan, resolution
+def _companions_on_the_page(c, agent, text: str, answered, plan, resolution, *,
+                            heard: dict | None = None, player_text: str = ""
                             ) -> tuple[str, list[str], list[str]]:
     """Out of a fight, after the beat is written: (1) a companion who acted in it — the
     one the player spoke to (`answered`), or one the plan acted for — does it in their
@@ -3852,44 +3911,99 @@ def _companions_on_the_page(c, agent, text: str, answered, plan, resolution
                     e.get("kind") == "biome" and e.get("place") != e.get("was_place")
                     for e in (o.effects or [])))
                 for o in resolution.outcomes)
+    # A companion's own life first (gm/confide.py): a confidence the player asked for, one
+    # owed, a reminder, or a lead-in. It takes the ordinary remark's place on its beat.
+    text, said_it = _companions_confide(c, agent, text, resolution, answered=answered,
+                                        moved=moved, heard=heard, player_text=player_text,
+                                        repairs=repairs, added=added)
+    if said_it:
+        return text, repairs, added
     due = companions_mod.interjection_due(
         scene, c.transcript, resolution.outcomes, answered=answered,
         talking=agent.engine.talking_to(), moved=moved)
     if not due:
         return text, repairs, added
     who = scene.actors[due["ref"]]
-    from rules import population as population_mod
-
-    life = ((population_mod.of_ref(scene, who.ref) or {}).get("life") or {})
-    # What they want, on one remark in three of theirs and never the brief's: the brief
-    # leaves wants out because a 12B model told a secret leaks it ~83% of the time
-    # (rules/population.py). A remark is where a companion's wants are LEARNED in play,
-    # and one in three keeps it from becoming every remark's subject.
-    theirs = sum(1 for e in scene.conversation_log or ()
-                 if isinstance(e, dict) and e.get("who") == who.ref
-                 and e.get("src") == "interject")
-    wants = str(life.get("wants") or "") if theirs % 3 == 2 else ""
+    # Never their wants: the shortcut that put them into one remark in three is gone
+    # (`companions.interject_facts`); they are confided, gated, after a warm-up.
     place = agent.engine.here() if due.get("reason") == "arrived" else None
-    facts = companions_mod.interject_facts(scene, who, due, place=place, beat=text,
-                                           wants=wants)
+    facts = companions_mod.interject_facts(scene, who, due, place=place, beat=text)
     line, attempts, rejections = agent.companion_interject(due["ref"], facts)
     c.turn_log.append(history_mod.stamp(c, {
         "kind": "companion-interject", "ref": due["ref"], "reason": due["reason"],
-        "line": line, "rejections": rejections, "wants": bool(wants),
+        "line": line, "rejections": rejections,
         "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1), "model": a.model}
                      for a in attempts]}))
     if not line:
         return text, repairs, added
+    text = _say_on_the_page(agent, text, due["ref"], line, "interject", added)
+    repairs.append(f"{who.name} spoke up ({due['reason']})")
+    return text, repairs, added
+
+
+def _say_on_the_page(agent, text: str, ref: str, line: str, src: str, added: list) -> str:
+    """A companion's unasked line on the page, before the closing question, booked as their
+    speech for the conversation log with its source (`interject`, `confide`)."""
     before = text
     text = narration_mod.put_before_the_hand_back(text, line)
     added += narration_mod.added_sentences(before, text)
     quoted = [line[s:e] for s, e in speech_mod.spans(line)]
     if getattr(agent, "last_said", None) is None:
         agent.last_said = []
-    agent.last_said.append({"who": due["ref"], "to": "", "from": "interject",
+    agent.last_said.append({"who": ref, "to": "", "from": src,
                             "line": " ".join(q.strip("\"“”'‘’ ") for q in quoted)})
-    repairs.append(f"{who.name} spoke up ({due['reason']})")
-    return text, repairs, added
+    return text
+
+
+def _companions_confide(c, agent, text: str, resolution, *, answered, moved: bool,
+                        heard: dict | None, player_text: str, repairs: list,
+                        added: list) -> tuple[str, bool]:
+    """At most one companion says something of their own life this beat, when
+    `confide.due` says so: the call writes it, `confide.refusal` holds it, and only a line
+    that held moves their disclosure track (`rules.confiding`) — a lead-in or hint marks
+    the topic hinted and the share owed; a share marks it told, for good. Returns (text,
+    whether anything was said)."""
+    from gm import confide as confide_mod
+    from rules import confiding, population as population_mod
+
+    scene = c.scene
+    place = agent.engine.here()
+    beat = len(c.transcript)
+    before = " ".join(str(b.get("text") or "") for b in c.transcript[-6:]
+                      if isinstance(b, dict) and b.get("who") == "gm")
+    plan = confide_mod.due(scene, c.transcript, resolution.outcomes,
+                           invited=(heard or {}).get("invited") or (), answered=answered,
+                           talking=agent.engine.talking_to(), moved=moved, place=place,
+                           beat_text=text, before=before)
+    if not plan:
+        return text, False
+    who = scene.actors[plan["ref"]]
+    rec = population_mod.of_ref(scene, who.ref)
+    if rec is None:
+        return text, False
+    pend = confiding.pending(rec) or {}
+    lead_in = str(pend.get("line") or "")
+    facts = confide_mod.facts(scene, who, plan, place=place, player_text=player_text,
+                              lead_in=lead_in)
+    line, attempts, rejections = agent.companion_confide(who.ref, facts, plan)
+    c.turn_log.append(history_mod.stamp(c, {
+        "kind": "companion-confide", "ref": who.ref, "event": plan["kind"],
+        "door": plan["door"], "topic": plan["topic"], "thing": plan.get("thing", ""),
+        "source": plan.get("source", ""), "gate": confiding.gate(who),
+        "line": line, "rejections": rejections,
+        "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1), "model": a.model}
+                     for a in attempts]}))
+    if not line:
+        return text, False
+    if plan["kind"] in (confide_mod.SHARE, confide_mod.BRIDGE):
+        confiding.tell(rec, plan["topic"], beat, plan["door"], plan.get("thing", ""))
+    else:
+        confiding.hint(rec, plan["topic"], beat, plan["door"], plan.get("thing", ""))
+        # The lead-in's own words, so the share can follow on from them.
+        rec["confide_pending"]["line"] = line
+    text = _say_on_the_page(agent, text, who.ref, line, "confide", added)
+    repairs.append(f"{who.name} confided ({plan['kind']}, {plan['door']})")
+    return text, True
 
 
 def _run_npc_turns(c, agent, limit: int = 12) -> None:

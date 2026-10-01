@@ -153,8 +153,10 @@ def step(ctx) -> list[dict]:
                          # A line the page attributed (`speaker_real`, no tag) says so;
                          # a companion's unasked remark too (`views._companions_on_the_
                          # page`), which is also the memory its cadence is read from
-                         # (`companions.interjection_due`).
-                         "src": (rec.get("from") if rec.get("from") in ("page", "interject")
+                         # (`companions.interjection_due`); and a companion confiding
+                         # their own life (gm/confide.py), whose cadence reads it too.
+                         "src": (rec.get("from")
+                                 if rec.get("from") in ("page", "interject", "confide")
                                  else "tag")}))
 
     for v in speech.vocalisations(text, said, people):

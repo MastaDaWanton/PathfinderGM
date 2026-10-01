@@ -1916,6 +1916,7 @@ function pageJournal(s) {
   return `<div class="journal">
     ${sheetCard("jr-matters", "Matters in play", tabQuests(s), "jr-matters")}
     ${sheetCard("jr-said", "What people said", journalSaid(), "jr-said")}
+    ${sheetCard("jr-confided", "What they have told you", journalConfided(), "jr-confided")}
     ${sheetCard("jr-walked", "Where you have been", walked.length
       ? `<ol class="plain walked">${walked.map(n => `<li>${esc(n.name)}${
           n.current ? ` <span class="chip">here</span>` : ""}</li>`).join("")}</ol>
@@ -1924,6 +1925,22 @@ function pageJournal(s) {
     ${sheetCard("jr-notes", "Notes and maps", journalNotes(), "jr-notes")}
     ${sheetCard("jr-history", "History", journalHistory(), "jr-history")}
   </div>`;
+}
+
+// What companions have confided about their own lives (owner, 2026-10-01: their wants
+// "locked behind their attitude toward you", told after a warm-up; gm/confide.py). The
+// words are their life's own, never a model's; a hint shows only that there is something.
+// The same list look as the matters in play.
+function journalConfided() {
+  const people = (((STATE || {}).scene || {}).confided) || [];
+  if (!people.length) return `<p class="why">Nobody has told you anything of their own yet.
+    Those who travel with you may, once they think well enough of you.</p>`;
+  return `<ul class="plain matters">${people.map(p => `<li class="matter">
+      <h3>${esc(title(p.name))}</h3>
+      ${(p.told || []).length ? `<ul class="objectives">${p.told.map(t =>
+        `<li>${esc(t.label)}: ${esc(t.text)}.</li>`).join("")}</ul>` : ""}
+      ${p.hinted ? `<p class="why">Has something on their mind they have not told you yet.</p>` : ""}
+    </li>`).join("")}</ul>`;
 }
 
 // Notes and maps written with ink and paper (owner, 2026-10-01: "ink and paper allow me
