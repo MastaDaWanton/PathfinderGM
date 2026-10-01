@@ -45,6 +45,10 @@ def catalogue() -> dict:
         # kits were built from exactly those (docs/playtest-2026-09-18.md item 24).
         if cost in (None, "") or w.get("prof") == "exotic" and float(cost) > 100:
             continue
+        # No siege engines, nothing "(Modern)" (owner's ruling E5) — the rule's one copy
+        # is `weapons.UNSOLD_SECTION`, shared with `goods.outfit_weapons`.
+        if weapons_mod.UNSOLD_SECTION.search(str(w.get("section") or "")):
+            continue
         arms.append({"key": key, "name": w.get("name", key), "cost_gp": round(float(cost), 2),
                      "damage": w.get("damage", ""), "type": w.get("type", ""),
                      "prof": w.get("prof", "simple"), "hands": w.get("hands", 1),
@@ -124,26 +128,24 @@ def apply(entry, buys: list[dict]) -> tuple[dict, list[str]]:
     actor.purse = purse
     for kind, key, count, item in lines:
         if kind == "weapon":
-            for _ in range(count):
-                actor.weapons.append(key)
-        elif kind == "armour":
-            # Worn at once: bought armour is armour to wear, and the old suit goes to
-            # the pack as stock so nothing bought is lost.
-            if actor.armour and actor.armour != "none" and actor.armour != key:
-                actor.add_stock(Stock(base=ARMOUR[actor.armour]["name"], tier="common",
-                                      potency=1.0, craft=""), 1)
-            actor.armour = key
+            # Through the one router: a weapon onto the list, and a bundle of ammunition
+            # into `goods` as the rounds it is (E3) — never a quiver to swing.
+            stowed, _ = goods.stow(actor, key, count)
+            if not stowed:
+                for _ in range(count):
+                    actor.weapons.append(key)
+        elif kind in ("armour", "shield"):
+            # Worn at once: bought armour is armour to wear. The suit (or shield) it
+            # replaces, and any spares, go into `goods` under their TABLE KEY, where
+            # `wear` and the Equipment tab read them. This filed the old suit in `stock`
+            # under its display name ("leather armour"), which nothing could put back on
+            # (measured 2026-09-30, docs/playtest-2026-09-30-findings.md item 2).
+            was = str(getattr(actor, kind) or "none")
+            if was != "none" and was != key:
+                actor.goods[was] = int(actor.goods.get(was, 0) or 0) + 1
+            setattr(actor, kind, key)
             if count > 1:
-                actor.add_stock(Stock(base=item["name"], tier="common", potency=1.0, craft=""),
-                                count - 1)
-        elif kind == "shield":
-            if actor.shield and actor.shield != "none" and actor.shield != key:
-                actor.add_stock(Stock(base=SHIELDS[actor.shield]["name"], tier="common",
-                                      potency=1.0, craft=""), 1)
-            actor.shield = key
-            if count > 1:
-                actor.add_stock(Stock(base=item["name"], tier="common", potency=1.0, craft=""),
-                                count - 1)
+                actor.goods[key] = int(actor.goods.get(key, 0) or 0) + count - 1
         else:
             actor.add_stock(Stock(base=item["name"], tier="common", potency=1.0, craft=""),
                             count * int(item.get("per", 1) or 1))

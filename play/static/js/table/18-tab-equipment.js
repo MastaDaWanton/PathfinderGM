@@ -4,11 +4,12 @@
 // pass", points 1 and 2), drawn by 05-sheet.js's `pageEquipment` from the server's one
 // list of what is carried (play/views.py `_carried`): the shelves down the side in the
 // trade window's scheme, the list A to Z with every name written out, Worn and wielded
-// with a slot that filters the list to what fits it. Wield, Wear and Use are answered by
-// the engine's own doors. Take off (for armour and a shield) and drop are not offered,
-// because the rules have neither; the head of the page says so in words
-// (docs/table-rebuild-inventory.md, H9), and "Go to Trade" beside it is where new things
-// come from (the owner's ruling: in play you buy at a counter and equip what you carry).
+// with a slot that filters the list to what fits it. Wield, Put away, Wear, Take off and
+// Use are answered by the engine's own doors (Take off and Put away since 2026-09-30, the
+// `take_off` op and a wield of the fists); a row the rules cannot act on says why in its
+// own note. Drop is not offered, because the rules do not have it yet, and "Go to Trade"
+// is where new things come from (the owner's ruling: in play you buy at a counter and
+// equip what you carry).
 
 Shell.tab("equipment", {
   enter() {
