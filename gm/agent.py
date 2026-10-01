@@ -527,6 +527,7 @@ class GMAgent:
                 # 1e's coup de grâce, declared from the words rather than hoped for.
                 raw = judgement.declare_coup_de_grace(raw, player_input,
                                                       self.engine.scene)
+                raw = judgement.declare_repair(raw, player_input, self.engine.scene)
                 # Before survival: a drunk potion is the jar door, not a waterskin
                 # sip, and never a number the model wrote.
                 raw = judgement.declare_use_item(raw, player_input, self.engine.scene)
