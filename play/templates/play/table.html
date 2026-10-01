@@ -423,6 +423,12 @@
   #sx-today.droppable { outline: 1px dashed var(--gold-dim); outline-offset: 9px; }
   #sx-today.dropping { outline: 2px solid var(--candle); outline-offset: 9px; }
 
+  /* Spells a level owes the book (05-sheet.js `learnCard`): across the top of the tab,
+     in the grimoire's own row and search styles, until they are chosen. */
+  .sx-learn { grid-column: 1 / -1; }
+  .sx-learn .gx-rows { max-height: min(46vh, 520px); }
+  .sx-learn .spcard-act { margin-top: 12px; }
+
   /* Right: the grimoire index. */
   .gx-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
   .gx-field { display: grid; gap: 3px; min-width: 0; }
