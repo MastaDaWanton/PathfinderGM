@@ -138,50 +138,16 @@ def _embody(ctx, rec: dict):
 
 # --- the lines nobody tagged ------------------------------------------------------------------
 
-# The verbs a speech clause is made of. Kept narrow: "he turns" beside a quote is not
-# saying it, and the third rule (the sentence before) catches the untagged rest.
-_VERBS = (r"(?:says|said|asks|asked|adds|added|calls|called|mutters|muttered|murmurs|"
-          r"murmured|replies|replied|answers|answered|continues|continued|grunts|grunted|"
-          r"offers|offered|remarks|remarked|observes|observed|whispers|whispered|shouts|"
-          r"shouted|growls|growled|drawls|drawled|notes|noted|tells|told|laughs|laughed|"
-          r"snaps|snapped|rasps|rasped|barks|barked|presses|pressed|ventures|ventured|"
-          r"chuckles|chuckled|sighs|sighed|grumbles|grumbled|demands|demanded|inquires|"
-          r"enquires|repeats|repeated|insists|insisted|explains|explained|agrees|agreed|"
-          r"admits|admitted|speaks|spoke|greets|greeted|puts\s+in|goes\s+on|went\s+on)")
-_PRONOUN = r"(?:he|she|they|He|She|They)"
-_DET = r"(?:the|a|an|this|that|The|A|An|This|That)"
-_SUBJECT = r"(?P<subj>" + _PRONOUN + r"|" + _DET + r"\s+[^,.;:!?\n]{1,80}?)"
-_ADVERB = r"(?:[a-z]+ly\s+)?"
-# "…,' he says" / "…,' the woman in the doorway adds"
-_AFTER = re.compile(r"^[\s,—–-]*" + _SUBJECT + r"\s+" + _ADVERB + _VERBS + r"\b")
-# "…,' says the carter"
-_AFTER_INVERTED = re.compile(r"^[\s,—–-]*" + _VERBS + r"\s+(?P<subj>" + _PRONOUN + r"|"
-                             + _DET + r"\s+[^,.;:!?\n]{1,80}?)(?=[,.;:!?\n]|\s+(?:as|and|"
-                             r"while|with|before|then)\b|$)")
-# "The carter turns to you and asks, '…"
-_BEFORE = re.compile(_SUBJECT + r"\s+(?:[a-z]+\s+){0,5}?" + _ADVERB + _VERBS
-                     + r"(?:\s+[a-z]+){0,3}\s*[,:]?\s*$")
+# The clause patterns live in `gm.checks._quotes`, shared with the sentence repair and the
+# cut-only backstops of keeper-forward and master-approaches (item 12, 2026-09-30): the
+# repair has to find the same "…,' he says" this attribution reads, or it cuts the quote
+# and leaves the clause claiming somebody said it.
+from gm.checks._quotes import clause as _shared_clause  # noqa: E402
 
 
 def _clause(blank: str, qa: int, qb: int) -> str:
     """The subject of the speech clause beside the quotation at [qa, qb), or ""."""
-    end = len(blank)
-    stop = re.search(r"[.!?\n]|\S", blank[qb:])
-    # After: up to the sentence's end — the blanked quotation keeps its closing mark, so
-    # a line ending its own sentence ("…to start?'") has no clause after it.
-    tail = blank[qb:end]
-    cut = re.search(r"[.!?\n]", tail)
-    tail = tail[:cut.start()] if cut else tail
-    if stop is not None:
-        for pattern in (_AFTER, _AFTER_INVERTED):
-            m = pattern.match(tail)
-            if m:
-                return m.group("subj")
-    # Before: from the start of the quotation's own sentence.
-    head = blank[:qa]
-    start = max(head.rfind("."), head.rfind("!"), head.rfind("?"), head.rfind("\n"))
-    m = _BEFORE.search(head[start + 1:])
-    return m.group("subj") if m else ""
+    return _shared_clause(blank, qa, qb)
 
 
 def _words_re(words) -> re.Pattern | None:

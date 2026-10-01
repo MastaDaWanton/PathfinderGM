@@ -178,12 +178,59 @@ def resolve_target(scene, world, target: str) -> str:
     return "?"
 
 
+# The words a talk's target opens on when the reader put what was SAID there.
+_NOT_A_TARGET = frozenset((
+    "how", "what", "where", "when", "why", "who", "whom", "which", "whether", "if",
+    "about", "for", "is", "are", "was", "do", "does", "did", "can", "could", "will",
+    "would", "any", "anyone", "anybody", "someone", "somebody", "everyone", "nobody"))
+
+
+def _untargeted_talk_to(scene, actor, reading) -> bool:
+    """Whether this turn's talk names nobody here, and this actor is the only keeper
+    present — so the words can only be to them.
+
+    Measured on the 2026-09-30 playtest (item 12, beat 53): "I ask how much for a woman"
+    was read as `talk` with the target "how much for a woman", which resolves to nobody.
+    Gorm Vesper, the Velvet Veil's keeper and the only person behind the counter, still
+    counted as "in the background", so his answer was flagged as speaking first and
+    rewritten into narration in quotes. A question asked into a room with one keeper in
+    it is asked of the keeper. Somebody else in conversation with the player, or a target
+    that names a person who is not here ("the watchman" with no watchman), keeps it from
+    turning to them.
+
+    `resolve_target` answers "?" for both a person elsewhere and words that are no person
+    at all, so the two are told apart by the target's first word: the reader put the
+    player's QUESTION in the target slot ("how much…", "what…", "whether…"), never a
+    person, when it opens on a question or function word."""
+    from . import keepers, states
+
+    talks = [a for a in (reading or {}).get("actions") or [] if a.get("act") == "talk"]
+    if not talks:
+        return False
+    for a in talks:
+        target = str(a.get("target") or "").strip()
+        if not target:
+            continue
+        first = (re.findall(r"[a-z']+", target.lower()) or [""])[0]
+        if resolve_target(scene, None, target) == "?" and first in _NOT_A_TARGET:
+            continue            # the words said, read as a target: nobody named
+        return False            # it names somebody: here (handled above) or elsewhere
+    present = [a for a in (getattr(scene, "actors", {}) or {}).values()
+               if not a.is_pc and not a.has_state("state.hidden") and a.hp > 0]
+    if any(a.has_state(states.TALKING) and a.ref != actor.ref for a in present):
+        return False
+    shop = [a for a in present if keepers.is_keeper(getattr(a, "world_entity_id", "") or "")]
+    return len(shop) == 1 and shop[0].ref == actor.ref
+
+
 def dealt_with(scene, actor, reading=None, player_text: str = "", buying: str = "") -> bool:
     """Whether the player is dealing, or has dealt, with this person (design D §4.4).
 
     Asked of existing state, never of a new flag (the second law): they hold
     `talk.with-you`, a recorded regard or any `bond.*`; or this turn's talk, seek or buy
-    turns to them; or a counter opens this turn (`buying`) at the place they keep."""
+    turns to them; or this turn's talk names nobody and they are the only keeper here
+    (`_untargeted_talk_to`); or a counter opens this turn (`buying`) at the place they
+    keep."""
     from . import states
 
     if actor is None:
@@ -193,6 +240,8 @@ def dealt_with(scene, actor, reading=None, player_text: str = "", buying: str = 
     for _act, target in targets(reading):
         if resolve_target(scene, None, target) == actor.ref:
             return True
+    if _untargeted_talk_to(scene, actor, reading):
+        return True
     if not reading and player_text:
         from . import scope as scope_mod
 

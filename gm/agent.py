@@ -1673,15 +1673,28 @@ class GMAgent:
 
         Heaviest finding first, and at most `_TRUTH_CALLS` model calls a beat — a local
         model's minute is the player's minute; the backstop under every member but
-        `face_kept` makes the rest free. Returns (text, notes, attempts)."""
+        `face_kept` makes the rest free. Returns (text, notes, attempts).
+
+        **A line of speech is repaired as a speech unit** (2026-09-30 playtest, item 12).
+        A flagged string that lies inside a quotation was spliced back with a string
+        replace INSIDE the quotation marks, and the rewrite was narration — five
+        narration sentences in Gorm Vesper's mouth across beats 51 and 53. So the target
+        widens to the quote plus its speech clause (`checks._quotes.unit`: PARC's source,
+        cue and content together), and a rewrite that leaves narration in quotes the
+        beat did not already have (`narration_in_quotes.quoted_narration`) is refused.
+        A member that sets `REWRITE = False` is never sent to the model at all: its
+        backstop is the repair."""
         from dataclasses import replace
 
-        from . import checks
+        from . import checks, speech
         from .checks._page import page_sentences
+        from .checks._quotes import unit
+        from .checks.narration_in_quotes import quoted_narration
 
         notes: list[str] = []
         attempts: list[Attempt] = []
         pc = self.engine.scene.pc()
+        actors = dict(self.engine.scene.actors)
         calls = 0
         order = sorted(range(len(findings)), key=lambda i: (-int(findings[i].weight or 0), i))
         members = []
@@ -1690,9 +1703,17 @@ class GMAgent:
             member = checks.owner_of(f.kind)
             if member is not None and member not in members:
                 members.append(member)
+            if member is not None and getattr(member, "REWRITE", True) is False:
+                continue            # cut-only: the backstop below is the repair
             for sentence in f.sentences:
                 if not sentence or sentence not in text:
                     continue
+                at = text.find(sentence)
+                inner = next(((qa, qb) for qa, qb in speech.spans(text)
+                              if qa < at and at + len(sentence) <= qb), None)
+                if inner is not None:
+                    ua, ub = unit(text, *inner)
+                    sentence = text[ua:ub]
                 fixed = ""
                 if calls < self._TRUTH_CALLS:
                     calls += 1
@@ -1718,6 +1739,13 @@ class GMAgent:
                 if not fixed:
                     continue
                 candidate = text.replace(sentence, fixed, 1)
+                had = {ln for ln, _ in quoted_narration(text, ctx.said, actors)}
+                gained = [ln for ln, _ in quoted_narration(candidate, ctx.said, actors)
+                          if ln not in had]
+                if gained:
+                    notes.append(f"{f.kind}: the rewrite put narration in quotes: "
+                                 f"{gained[0][:80]!r}")
+                    continue
                 still = []
                 if member is not None:
                     try:

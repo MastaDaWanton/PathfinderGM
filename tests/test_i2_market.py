@@ -289,7 +289,10 @@ def test_the_master_speaking_first_is_flagged(worlds):
     said = [{"who": master.ref, "to": "you", "line": "You there! What brings you here?"}]
 
     def ctx(player_text):
-        return BeatContext(door="turn", text="", player_text=player_text, engine=eng,
+        # The line stands on the page: since item 12 of 2026-09-30 the check counts only
+        # lines still there, so a cut is seen to have held.
+        return BeatContext(door="turn", text=f"'{said[0]['line']}'",
+                           player_text=player_text, engine=eng,
                            scene=s, world=worlds, location=worlds.get(s.location_id),
                            reading=None, outcomes=(), tells=(), said=tuple(said),
                            attribution=None, brief="", brief_facts={}, pull=None,
