@@ -4267,7 +4267,6 @@ def to_dict(actor: Actor) -> dict:
         "kit_pending": dict(actor.kit_pending),
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
-        "level_spells_taken": int(actor.level_spells_taken or 0),
         "temp_pools": [{"amount": p.amount, "source": p.source,
                         "rounds_left": p.rounds_left} for p in actor.temp_pools],
         "ability_damage": dict(actor.ability_damage),
@@ -4336,6 +4335,12 @@ def to_dict(actor: Actor) -> dict:
         d["described_as"] = [str(s) for s in actor.described_as]
     if actor.loadout:
         d["loadout"] = {str(k): int(v) for k, v in actor.loadout.items()}
+    # The free level-up spells taken (`casting.learning`). Only when some were: written
+    # always, every actor in every older save gained a key, and the owner's saves stopped
+    # round-tripping byte for byte. Absent reads as "infer it" (`from_dict`), which for a
+    # book with nothing taken infers nothing again.
+    if int(actor.level_spells_taken or 0):
+        d["level_spells_taken"] = int(actor.level_spells_taken)
     return d
 
 

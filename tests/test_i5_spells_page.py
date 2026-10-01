@@ -97,8 +97,10 @@ def _wizard_spells(owed: bool = False) -> dict:
                                               "invisibility": 1, "fireball": 1,
                                               "acid-splash": 1, "light": 1})
     casting.define_slots(pc)
-    if not owed:
-        pc.level_spells_taken = casting.learns_per_level(pc) * (pc.level - 1)
+    # Set outright either way: a sheet loaded with no count infers one from the book
+    # (`casting.infer_level_spells_taken`), and "none chosen" has to mean none.
+    pc.level_spells_taken = (0 if owed
+                             else casting.learns_per_level(pc) * (pc.level - 1))
     return full_sheet(pc)["spells"]
 
 

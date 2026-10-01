@@ -151,7 +151,9 @@ def test_a_save_from_before_the_count_is_offered_what_it_is_owed():
     already holds ten is owed none."""
     w = levelled(forge_wizard(), 2)
     d = to_dict(w)
-    d.pop("level_spells_taken")
+    # Absent at zero (written only when some were taken), which is exactly how a save
+    # from before the count looks.
+    d.pop("level_spells_taken", None)
     assert casting.learning(from_dict(dict(d), ref="pc"))["owed"] == 2
 
     d["spellbook"] = list(d["spellbook"]) + ids_at(1, 2, w)
