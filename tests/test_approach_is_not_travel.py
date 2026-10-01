@@ -172,6 +172,36 @@ def test_talking_to_somebody_here_is_not_walking_up_to_them(worlds):
                                       reading) == plan
 
 
+def test_approaching_a_creature_holding_its_ground_closes_on_it():
+    """Lane D's rule (merged as 8f4d29d): a creature met while foraging holds its ground
+    (`state.holding-ground`), and its reaction roll fires only when the player CLOSES on
+    it. Live on the owner's model, "I approach it" moved nothing and the roll never
+    fired. Here the reading's own `seek target: it` is declared as the move, and the
+    engine's batch answers it with the stance outcome — the reaction roll ran."""
+    from rules.engine import Engine as _Engine
+
+    if not hasattr(_Engine, "_holding_ground_settles"):
+        pytest.skip("Lane D's holding-ground rule is not on this branch yet (8f4d29d)")
+    import test_rewards_and_gathering as d
+
+    s, engine = d._room()
+    import pytest as _pytest
+
+    mp = _pytest.MonkeyPatch()
+    try:
+        _, _, ref = d._spy(mp, s, engine)
+        d._set_2d6(mp, engine, 7 - s.pc().ability_mod("cha"))
+        plan = judgement.declare_approach([{"op": "narrate_only"}], "I approach it", s,
+                                          {"actions": [{"act": "seek", "target": "it"}]})
+        assert plan[0]["op"] == "move", plan
+        res = engine.run(engine.validate(plan))
+        stance = [o for o in res.outcomes if o.op == "stance"]
+        assert stance and "does not give way as you come closer" in stance[0].tell, \
+            [o.tell for o in res.outcomes]
+    finally:
+        mp.undo()
+
+
 def test_in_a_fight_the_round_moves_bodies(worlds):
     s, e, spy = _with_the_spy(worlds)
     e._ensure_encounter("pc", spy.ref)
