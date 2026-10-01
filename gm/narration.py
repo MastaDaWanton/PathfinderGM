@@ -1165,7 +1165,9 @@ def ensure_hand_back(text: str) -> tuple[str, bool]:
     # Closing quote marks do not count as missing punctuation. A beat that ends on
     # "...but what it is remains unclear.'" already has its stop *inside* the speech, and
     # adding another produced ".'. What do you do?".
-    if said.rstrip("\"“”'‘’")[-1:] not in (".", "!", ""):
+    # A quoted question is a stop too: the live check of 2026-09-30 shipped `ask him,
+    # "How much for a drink?". What do you do?`.
+    if said.rstrip("\"“”'‘’")[-1:] not in (".", "!", "?", "…", ""):
         said += "."
     return f"{said} {HAND_BACK}", True
 
