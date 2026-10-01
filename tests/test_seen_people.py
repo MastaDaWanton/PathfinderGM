@@ -258,6 +258,29 @@ def test_a_figure_the_beat_shows_is_a_woman_with_a_body_and_a_square(veil):
     assert not [r for r in again if r.get("made")]
 
 
+def test_somebody_heard_of_and_then_shown_is_that_one_person_with_a_body(veil):
+    """Replayed 2026-10-01: "there is no sign of the woman" booked her as heard of; the
+    next beat's "You find the woman standing in the entryway" made nobody, because the
+    ledger read the definite "the woman" as somebody already booked and returned nothing.
+    And the call on "the human woman Grom spoke of" missed her because the roll had given
+    the unseen woman the town's Ratfolk face, which ruled out "human"."""
+    scene, engine, gorm = veil
+    scene.cast.clear()
+    _, recs, rows = _beat(scene, "You search the street, but there is no sign of the "
+                                 "woman, and the shutters stay closed.", 20)
+    heard = [r for r in recs if "woman" in r["phrase"]]
+    assert heard and heard[0].get("seen") is False and not rows
+    rec = heard[0]
+    rec["heard_from"] = gorm.ref
+    assert population.find(scene, "the human woman Grom spoke of",
+                           world=WORLD).people == [rec]
+    _, _, rows = _beat(scene, "You find the woman standing in the entryway, her hands "
+                              "clasped.", 22)
+    made = [r["made"] for r in rows if r.get("made")]
+    assert len(made) == 1 and rec["ref"] == made[0], rows
+    assert len([r for r in scene.population.values() if "woman" in r["phrase"]]) == 1
+
+
 def test_a_crowd_is_scenery_not_people(veil):
     """"a crowd of drinkers" is not N actors: a plural or a counted group is no one person
     with one life (`record_people`), and a group is the troop door's to make."""

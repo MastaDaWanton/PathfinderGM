@@ -8492,6 +8492,42 @@ def record_people(scene, introduced, *, turn: int = 0, world=None,
                 rec["shown"] = int(turn)
                 rec["said_as"] = said_as
         out.append(rec)
+    if beat:
+        out += _shown_again(scene, beat, set(introduced or []), turn=turn)
+    return out
+
+
+def _shown_again(scene, beat: str, introduced: set, *, turn: int) -> list[dict]:
+    """Somebody the ledger booked on an earlier beat, without a body, whom THIS beat shows
+    here: `note_cast` books a definite "the woman" as somebody already booked and returns
+    nothing for her, so the loop above never sees her. Replayed 2026-10-01 on the owner's
+    save: "there is no sign of the woman" booked her (heard of), and the next beat's "You
+    find the woman standing in the entryway" made nobody — the ruling's own case, a woman
+    the player can see, left as prose."""
+    from rules import population
+
+    out = []
+    bodies = getattr(scene, "people", {}) or {}
+    for e in list(getattr(scene, "cast", None) or []):
+        who = str(e.get("who") or "")
+        if (not who or who in introduced or (e.get("ref") and e["ref"] in bodies)
+                or int(e.get("count", 1) or 1) > 1 or _plural_role(who)):
+            continue
+        if seen_in_beat(beat, who) != SEEN:
+            continue
+        # The ledger keeps twelve turns; the transcript counts two entries a turn.
+        rec = population.heard_of_match(scene, who, turn=turn, within=24)
+        if rec is not None:
+            rec["spot"] = getattr(scene, "at", None)
+            population.seen(scene, rec)
+            rec["last_seen"] = int(getattr(scene, "clock_minutes", 0) or 0)
+        else:
+            rec = population.at_spot(scene, who) or population.here_as(scene, who)
+        if rec is None or (rec.get("ref") and rec["ref"] in bodies):
+            continue
+        rec["shown"] = int(turn)
+        rec["said_as"] = who
+        out.append(rec)
     return out
 
 

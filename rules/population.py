@@ -641,7 +641,12 @@ def _bag(rec: dict, scene) -> set[str]:
     """Everything a record answers to."""
     c = _canon()
     life = rec.get("life") or {}
-    said = [rec.get("phrase", ""), life.get("face", ""), life.get("work_name", "")]
+    # Somebody only heard of was never seen: the face the roll guessed for them is nothing
+    # the player knows, and it must not rule them out. Replayed 2026-10-01: the woman Gorm
+    # spoke of was rolled the town's Ratfolk face, so "the human woman Grom spoke of" did
+    # not fit her and the call found nobody.
+    face = "" if rec.get("seen") is False else life.get("face", "")
+    said = [rec.get("phrase", ""), face, life.get("work_name", "")]
     actor = (getattr(scene, "people", {}) or {}).get(rec.get("ref") or "")
     if actor is not None:
         said += [str(getattr(actor, "name", "") or "")]
@@ -660,15 +665,45 @@ def _bag(rec: dict, scene) -> set[str]:
     return bag
 
 
-def _fits(words: list[str], bag: set[str]) -> bool:
+def _fits(words: list[str], bag: set[str], peoples: frozenset = frozenset()) -> bool:
+    """Every word answers to the bag — except a gender, or a people (`peoples`: the
+    world's own, stemmed), that the record never stated one of: the prose's "someone
+    mending nets" is who "the woman mending nets" means, and a woman only heard of is who
+    "the human woman" means."""
     gendered = bool(bag & _GENDERED)
+    peopled = bool(bag & peoples)
     for w in words:
         if w in bag:
             continue
         if w in _GENDERED and not gendered:
             continue
+        if w in peoples and not peopled:
+            continue
         return False
     return True
+
+
+def _peoples(world) -> frozenset:
+    """The world's peoples as the finder's tokens ("human" always: the F2 grant asks for
+    one in any world)."""
+    key = id(world)
+    if key in _PEOPLES and _PEOPLES[key][0] is world:
+        return _PEOPLES[key][1]
+    out = {"human"}
+    if world is not None:
+        try:
+            from . import names as names_mod
+
+            for name in names_mod.peoples(world).values():
+                out.update(_tokens(str(name)))
+        except Exception:  # noqa: BLE001 — a world without peoples still has "human"
+            pass
+    got = frozenset(_canon()["canon"].get(_stem(w), _stem(w)) for w in out)
+    _PEOPLES[key] = (world, got)
+    return got
+
+
+_PEOPLES: dict = {}
 
 
 def where_now(rec: dict, scene, world=None):
@@ -913,20 +948,25 @@ def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
     words = _tokens(correct_names(scene, rest))
     if not words or scene is None:
         return Found(scope=NONE, ring="", people=[])
-    ringed = [(name, members) for name, members in _rings(scene, world)
-              if rings is None or name in rings]
+    peoples = _peoples(world)
+
+    def ringed():
+        # Lazily: a hit in the first ring never reckons where the rest of the town is.
+        return ((name, members) for name, members in _rings(scene, world)
+                if rings is None or name in rings)
+
     if speaker:
-        told = [(name, r) for name, members in ringed for r in members
+        told = [(name, r) for name, members in ringed() for r in members
                 if (r.get("heard_from") == speaker if speaker != ANYONE
                     else bool(r.get("heard_from")))
-                and _fits(words, _bag(r, scene))]
+                and _fits(words, _bag(r, scene), peoples)]
         if len(told) == 1:
             name, rec = told[0]
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=[rec])
         if told:
             return Found(scope=AMBIGUOUS, ring=told[0][0], people=[r for _n, r in told])
-    for name, members in ringed:
-        fits = [r for r in members if _fits(words, _bag(r, scene))]
+    for name, members in ringed():
+        fits = [r for r in members if _fits(words, _bag(r, scene), peoples)]
         if len(fits) == 1:
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=fits)
         if fits:
