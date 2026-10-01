@@ -4840,9 +4840,164 @@ _VENTURES = re.compile(
     r"(?=[.,;!]|\s+(?:and|to|for|with|in|of|on)\b|$)", re.I)
 
 
-def inject_found(raw_intents, player_text: str, scene) -> list:
+# --- where a new place goes ------------------------------------------------------------------
+#
+# Item 9, measured on the 2026-09-30 save (turn_log row 102): "I head toward the back
+# streets to find the Velvet Veil." The travel was refused with a hint to found it first —
+# a hint that taught leaving `parent` out — and the plan founded it with none, so the Veil
+# went "off the gate", where Sam stood, and not into the back streets the words named and
+# the guard had named a turn before ("a place tucked down in the back streets"). The
+# engine's `_parent_place("")` defaults to where the party stands, and no reader took the
+# parent from the words. Evidence, strongest first: the player's own words, then what a
+# person here just said about where it is, then where a place of that kind naturally
+# stands, then — the engine's own default — where the party stands.
+
+# "the Velvet Veil in the back streets", "the X, behind the Y", "the X off the market".
+_PLACE_RELATION = (r"\s*,?\s+(?:which\s+is\s+|that\s+is\s+|that's\s+)?"
+                   r"(?:in|behind|off|near|past|by|beside|on|at|round|around|down\s+in|"
+                   r"just\s+past|just\s+off|out\s+past|over\s+by|next\s+to)\s+")
+# Where a place said by somebody is WHERE something is: "down in the back streets",
+# "just past the tannery", "off the market".
+_WHERE_WORD = re.compile(r"\b(?:in|into|past|behind|near|by|off|at|toward|towards|through|"
+                         r"beyond|beside|round|around|across|along|down|up)\s+(?:the\s+)?$",
+                         re.I)
+# A place left is not the place gone to: "I leave the market to find …".
+_LEFT_FROM = re.compile(r"\b(?:leave|leaving|left|from|out\s+of|quit|quitting)\s+(?:the\s+)?$",
+                        re.I)
+# The street a kind of place naturally opens onto, by the settlement table's category
+# (`places.SETTLEMENT_PLACES`): an inn or a tavern on the square, a shop on the market,
+# a den in the back streets. The first of them this settlement has.
+_NATURAL_STREET = {
+    "trade": ("the market", "the merchants row", "the workshops"),
+    "leisure": ("the market", "the green"),
+    "hidden": ("the back streets", "the warrens", "the lane"),
+    "transport": ("the docks",),
+}
+
+
+def _place_said(text: str, known, *, skip=(), need_where: bool = False):
+    """The first place of `known` the text names (word-bounded, without its article),
+    skipping `skip` ids and a place being LEFT; with `need_where`, only a place said as
+    where something is ("down in the back streets")."""
+    best = None
+    for p in known or ():
+        if p.id in skip:
+            continue
+        core = re.sub(r"^the\s+", "", str(p.name or ""), flags=re.I).strip()
+        if len(core) < 3:
+            continue
+        for m in re.finditer(r"(?<![\w'])(?:the\s+)?" + re.escape(core) + r"(?![\w'])",
+                             text, re.I):
+            before = text[max(0, m.start() - 24):m.start()]
+            if _LEFT_FROM.search(before):
+                continue
+            if need_where and not _WHERE_WORD.search(before):
+                continue
+            if best is None or m.start() < best[0]:
+                best = (m.start(), p)
+            break
+    return best[1] if best else None
+
+
+def found_parent(name: str, player_text: str, scene, known, kind: str = ""):
+    """Where a new place named `name` goes, as a Place of `known`, or None for the
+    engine's default (where the party stands). The evidence, in order: the player's words
+    ("the X in Y", or a place they head for to find it); a recent line a person here said
+    naming where (the conversation log); the kind's natural street; nothing."""
+    from rules import places as places_mod
+
+    here = places_mod.find(known, getattr(scene, "at", "") or "")
+    skip = {here.id} if here is not None else set()
+    text = " ".join(str(player_text or "").split())
+    core = re.sub(r"^the\s+", "", " ".join(str(name or "").split()), flags=re.I).strip()
+    if core:
+        m = re.search(r"(?<![\w'])" + re.escape(core) + _PLACE_RELATION
+                      + r"((?:the\s+)?[\w'’ -]{3,40}?)(?=[.,;!?]|\s+(?:and|to|for|with|then|"
+                        r"where|which)\b|$)", text, re.I)
+        if m:
+            p = places_mod.find(known, m.group(1))
+            if p is not None:
+                return p
+        # The found place's own name is not its parent.
+        mine = places_mod.find(known, name)
+        if mine is not None:
+            skip.add(mine.id)
+    p = _place_said(text, known, skip=skip)
+    if p is not None:
+        return p
+    # What somebody here just said about where: the conversation log's lines from people,
+    # the latest first, a handful back.
+    lines = [r for r in (getattr(scene, "conversation_log", None) or [])
+             if isinstance(r, dict) and str(r.get("who") or "") not in ("", "you")]
+    for rec in reversed(lines[-8:]):
+        p = _place_said(str(rec.get("text") or ""), known, skip=skip, need_where=True)
+        if p is not None:
+            return p
+    category = next((row[3] for row in places_mod.SETTLEMENT_PLACES
+                     if row[0].removeprefix("the ") == str(kind or "").lower()
+                     .removeprefix("the ")), "")
+    for street in _NATURAL_STREET.get(category, ()):
+        p = places_mod.find(known, street)
+        if p is not None and p.id not in skip and not places_mod.is_indoors(p.id):
+            return p
+    return None
+
+
+def fill_found_parent(raw_intents, player_text: str, scene, world=None) -> list:
+    """A `found` with no parent takes the parent the evidence names (`found_parent`),
+    resolved with `places.find`. Left alone when the evidence points where the party
+    stands, which is the engine's own default."""
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    founds = [i for i, r in enumerate(raw_intents)
+              if isinstance(r, dict) and str(r.get("op", "")).lower() == "found"]
+    if not founds:
+        return raw_intents
+    from rules import places as places_mod
+
+    location = None
+    if world is not None and getattr(scene, "location_id", None):
+        try:
+            location = world.get(scene.location_id)
+        except Exception:  # noqa: BLE001 — the bare id still seeds the layout
+            location = None
+    try:
+        known = places_mod.for_scene(location or getattr(scene, "location_id", None),
+                                     getattr(scene, "at", ""),
+                                     founded=getattr(scene, "founded", None) or ())
+    except Exception:  # noqa: BLE001 — no places to read, nothing to fill
+        return raw_intents
+    out = list(raw_intents)
+    for i in founds:
+        params = dict(out[i].get("params") or {})
+        # A parent the plan named is the engine's to resolve: it knows the ring of
+        # places outside the walls, which this derivation leaves out, and refuses a
+        # nowhere with the places that would have worked. A placeholder copied whole
+        # from the engine's own hint ("<the place above …>") is no parent at all.
+        given = str(params.get("parent") or "").strip()
+        if given and not re.search(r"[<>]", given):
+            continue
+        p = found_parent(str(params.get("name") or ""), player_text, scene, known,
+                         kind=str(params.get("kind") or ""))
+        here = places_mod.find(known, getattr(scene, "at", "") or "")
+        if p is None or (here is not None and p.id == here.id):
+            params.pop("parent", None)
+        else:
+            params["parent"] = p.name
+        out[i] = dict(out[i], params=params)
+    return out
+
+
+def inject_found(raw_intents, player_text: str, scene, world=None) -> list:
     """The player's declaration of a base becomes `found`, with the owner named if the
-    place is somebody's ("Marra's house" → Marra, when Marra is here)."""
+    place is somebody's ("Marra's house" → Marra, when Marra is here) — and every
+    `found` in the plan, the model's or this one, under the parent the evidence names
+    (`fill_found_parent`, item 9)."""
+    return fill_found_parent(_inject_found(raw_intents, player_text, scene),
+                             player_text, scene, world)
+
+
+def _inject_found(raw_intents, player_text: str, scene) -> list:
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text:

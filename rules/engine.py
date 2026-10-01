@@ -2519,13 +2519,22 @@ class Engine:
             if known and not planned \
                     and places_mod.find(known, str(intent.params["place"])) is None \
                     and places_mod.find(outside, str(intent.params["place"])) is None:
+                # The found example names `parent`. It taught leaving it out until
+                # 2026-09-30 (item 9, turn_log row 102): "I head toward the back streets
+                # to find the Velvet Veil" founded the Veil with no parent, so it went
+                # off the gate where Sam stood. `judgement.fill_found_parent` fills a
+                # missing one from the words; the hint now asks for it outright.
                 raise IntentError(
                     f"travel: there is no {intent.params['place']!r} here. Name one of: "
                     f"{', '.join(p.name for p in known)} — or, if the scene goes somewhere "
                     f"new that a place like this would have, found it first in the same "
                     f"plan: {{\"op\": \"found\", \"params\": {{\"name\": "
-                    f"{intent.params['place']!r}, \"kind\": \"tavern\"}}}} (kind: what it "
-                    f"is), then travel to it.", "schema", code="no_such_place")
+                    f"{intent.params['place']!r}, \"kind\": \"tavern\", \"parent\": "
+                    f"\"<the place above it stands in or off>\"}}}} (kind: what it is; "
+                    f"parent: the place from that list it is in or off — where the "
+                    f"player's words or the people here put it; leave parent out only "
+                    f"when it opens off where the party stands), then travel to it.",
+                    "schema", code="no_such_place")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
             if trouble:
