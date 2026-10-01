@@ -1752,8 +1752,9 @@ def false_claim_block(claim: str) -> str:
             f"and that the world stayed exactly as it was: no light, no change, no "
             f"power. The people here saw somebody claim to be what they plainly are "
             f"not, and they react as people do. If the Bluff in the tells above "
-            f"SUCCEEDED, they take it for now — warily, a step back, a look exchanged, "
-            f"an uneasy quiet. If it FAILED, or there was no roll, nobody believes a "
+            f"SUCCEEDED, they take it for now, and they treat the player the way the "
+            f"tells say they now feel about them — warmer or colder, and why. If it "
+            f"FAILED, or there was no roll, nobody believes a "
             f"word: pity, a short laugh, an exchanged look, somebody finding something "
             f"else to look at, somebody saying so to their face. Never make the claim "
             f"true. Nobody kneels.")

@@ -4104,6 +4104,17 @@ class Engine:
             term = bluff_mod.modifier(lie)
             if term is not None:
                 mods = [*mods, term]
+        # A listener who has caught the player lying hears the next one at -10 (owner
+        # ruling 2026-10-01; Ultimate Intrigue p.182). On any Bluff they oppose with Sense
+        # Motive, the model's own as well as the claim's.
+        if skill == "bluff" and isinstance(opposed, dict) \
+                and str(opposed.get("skill", "")).strip().lower() == "sense motive":
+            hearer = self.scene.actors.get(str(opposed.get("ref", "")))
+            if hearer is not None and hearer.has_state(states.CAUGHT_LYING):
+                from . import bluff as bluff_mod
+
+                mods = [*mods, Modifier(bluff_mod.WARY_PENALTY,
+                                        f"{hearer.name} has caught you lying before")]
 
         # The opposing side is rolled first and kept in `partial`, so the player's prompt
         # is fully formed before we suspend and so a resume never re-rolls it.
@@ -4203,6 +4214,11 @@ class Engine:
             tell += self.reward_check(actor, skill, beaten)
 
         effects: list[dict] = []
+        if opposed and lie:
+            felt, effects = self._lie_lands(actor, self.scene.actors[opposed["ref"]],
+                                            str(opposed.get("claim") or ""),
+                                            verdict == "success", margin)
+            tell = f"{tell} {felt}".strip()
         if patient is not None:
             aided, effects = firstaid.settle(actor, patient, verdict == "success")
             tell += aided
@@ -4304,6 +4320,60 @@ class Engine:
         return (attitude_mod.said(target.name, was, now),
                 [{"ref": target.ref, "kind": "condition", "condition": now,
                   "rounds_left": cond.rounds_left}] + regard_effects)
+
+    def _lie_lands(self, liar, listener, kind: str, believed: bool, margin: int):
+        """What a lie about who the player is does to how the listener feels. Owner ruling
+        2026-10-01, a house rule (content/rules/claims.json's note says how it departs
+        from the book): believed, it moves them on the track by how they feel about what
+        was claimed — Diplomacy's steps from the margin, up or down — and holds until the
+        truth comes out; caught, it costs a little regard and leaves them wary.
+
+        Returns (the tell's words, the effect records). Only the player's lies move
+        anybody, as only the player's talk does (`_sway`): attitudes here are towards
+        the party."""
+        from . import attitude as attitude_mod
+        from . import bluff as bluff_mod
+
+        if not getattr(liar, "is_pc", False) or listener is None or listener.is_pc:
+            return "", []
+        if not believed:
+            before, after = attitude_mod.nudge_regard(
+                listener, -attitude_mod.REGARD_LOST_ON_FAILURE, "caught lying")
+            records = [{"kind": "regard", "ref": listener.ref, "from": before, "to": after}]
+            line = attitude_mod.regard_said(listener.name, before, after)
+            if not listener.has_state(states.CAUGHT_LYING):
+                listener.apply_effect(ActiveEffect(
+                    name="caught you lying", kind="bond", key="caught-lying",
+                    source="lie-caught", origin="rule:bluff-caught",
+                    duration="until-dismissed", tags=(states.CAUGHT_LYING,)))
+                records.append({"kind": "belief", "ref": listener.ref, "tag": states.CAUGHT_LYING})
+                line = (f"{line} {listener.name} will not take your word lightly "
+                        f"again.").strip()
+            return line, records
+        swing, why = bluff_mod.reaction(kind, listener, self.scene)
+        if not kind or listener.has_state(states.believes_claim_tag(kind)):
+            # A cover story claims no standing, and the same claim believed twice is
+            # believed once: it has already done whatever it was going to do.
+            return "", []
+        listener.apply_effect(ActiveEffect(
+            name=f"believes your claim ({kind})", kind="bond", key=f"believes-{kind}",
+            source=f"lie:{kind}", origin="rule:bluff-believed",
+            duration="until-dismissed", tags=(states.believes_claim_tag(kind),)))
+        records = [{"kind": "belief", "ref": listener.ref,
+                    "tag": states.believes_claim_tag(kind)}]
+        was = attitude_mod.of(listener)
+        now = attitude_mod.moved(was, swing * attitude_mod.steps_for(margin)) if swing else was
+        if now == was:
+            return (f"{listener.name} {why}, and is unmoved." if why
+                    else attitude_mod.said(listener.name, was, was)), records
+        # Until dismissed: "until they learn the truth" (owner's answer). The regard
+        # follows the step (`_set_attitude`), so a later Diplomacy shift clearing the tag
+        # does not undo what they believe of you.
+        cond = self._set_attitude(listener, now, None, f"lie:{kind}")
+        records.append({"ref": listener.ref, "kind": "condition", "condition": now,
+                        "rounds_left": cond.rounds_left})
+        said = attitude_mod.said(listener.name, was, now)
+        return (f"{listener.name} {why}. {said}" if why else said), records
 
     # save --------------------------------------------------------------------------------
 

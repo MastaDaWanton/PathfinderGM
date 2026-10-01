@@ -185,8 +185,10 @@ def test_the_claim_becomes_a_bluff_the_room_rolls_to_see_through(plain):
     assert check["params"]["skill"] == "bluff" and check["visibility"] == "player"
     # Owner ruling B1 (2026-09-30): opposed by a listener's Sense Motive, at the book's
     # believability — "I am a god" is the far end of a lie, impossible (-20, CRB p.90).
+    # And since 2026-10-01 what standing it claims, which decides how a believed lie
+    # moves the listener: a god is holy (tests/test_a_believed_lie_moves_them.py).
     assert check["params"]["opposed_by"] == {"ref": "c1", "skill": "sense motive",
-                                             "lie": "impossible"}
+                                             "lie": "impossible", "claim": "holy"}
     assert "dc" not in check["params"]
     # A Bluff the model already wrote is not doubled — it becomes this one — and an
     # ordinary line adds nothing.

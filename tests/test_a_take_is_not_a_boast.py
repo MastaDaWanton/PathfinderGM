@@ -248,8 +248,10 @@ def test_the_lie_is_opposed_by_the_listeners_sense_motive():
     assert out == [{"op": "check", "actor": "pc", "visibility": "player",
                     "because": "claiming to be what the sheet says they are not",
                     "params": {"skill": "bluff",
+                               # `claim` since 2026-10-01: the lost heir lays claim
+                               # to rank (tests/test_a_believed_lie_moves_them.py).
                                "opposed_by": {"ref": "c1", "skill": "sense motive",
-                                              "lie": "far_fetched"}}}]
+                                              "lie": "far_fetched", "claim": "rank"}}}]
 
 
 def test_the_person_spoken_to_is_the_one_who_judges_it():

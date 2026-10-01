@@ -191,11 +191,11 @@ def test_a_check_with_nobody_named_still_needs_a_dc():
                     origin="author:test")
 
 
-def test_bluff_is_not_wired_to_the_track_and_that_is_deliberate():
-    """The book does not put it there. A lie is an opposed check against Sense Motive,
-    which `check` has supported all along; wiring Bluff to the attitude track because it
-    appears in the same sentence as the other two would be inventing a rule and calling
-    it Pathfinder. Asserted so that the omission reads as a decision."""
+def test_bluff_is_not_an_influence_lever_and_a_bare_bluff_moves_nobody():
+    """Bluff is not an influence check: no DC off the table, no cooldown, not in LEVERS.
+    Since the owner's ruling of 2026-10-01 a believed lie about who you are DOES move the
+    listener, as a consequence of the lie (tests/test_a_believed_lie_moves_them.py) — but
+    a Bluff that claims nothing, with no `lie` on it, still moves nobody."""
     assert "bluff" not in attitude.LEVERS
     _scene, engine, who = _table()
     out = _talk(engine, who, 18, skill="bluff") if False else None

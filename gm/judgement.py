@@ -3728,15 +3728,22 @@ def listener_for(raw_intents, scene, reading=None) -> str:
     return max(pool, key=lambda r: _sense_motive(actors[r]))
 
 
+# The keys on `opposed_by` that only code writes: the believability row and, since
+# 2026-10-01, the kind of standing claimed (`rules/bluff.claim_kind`), which decides how
+# a believed lie moves the listener. A model writing either would be choosing an outcome.
+_CODE_WRITTEN_LIE_KEYS = ("lie", "claim")
+
+
 def _without_a_lie(r):
-    """A check with any `lie` on its `opposed_by` taken off, or `r` itself."""
+    """A check with any `lie` or `claim` on its `opposed_by` taken off, or `r` itself."""
     if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "check"):
         return r
     params = r.get("params") or {}
     ob = params.get("opposed_by") if isinstance(params, dict) else None
-    if not (isinstance(ob, dict) and "lie" in ob):
+    if not (isinstance(ob, dict) and any(k in ob for k in _CODE_WRITTEN_LIE_KEYS)):
         return r
-    return dict(r, params=dict(params, opposed_by={k: v for k, v in ob.items() if k != "lie"}))
+    return dict(r, params=dict(params, opposed_by={
+        k: v for k, v in ob.items() if k not in _CODE_WRITTEN_LIE_KEYS}))
 
 
 def inject_false_claim(raw_intents, player_text: str, scene, reading=None) -> list:
@@ -3781,11 +3788,16 @@ def inject_false_claim(raw_intents, player_text: str, scene, reading=None) -> li
     if not listener:
         return raw_intents
     pc = scene.pc()
+    from rules import bluff as bluff_mod
+
     check = {
         "op": "check", "actor": pc.ref if pc is not None else "pc",
         "params": {"skill": "bluff",
+                   # `claim`: what standing the lie lays claim to, so a believed one moves
+                   # the listener by how they feel about it (owner ruling 2026-10-01).
                    "opposed_by": {"ref": listener, "skill": "sense motive",
-                                  "lie": lie_of(claim)}},
+                                  "lie": lie_of(claim),
+                                  "claim": bluff_mod.claim_kind(claim)}},
         "because": "claiming to be what the sheet says they are not",
         "visibility": "player",
     }

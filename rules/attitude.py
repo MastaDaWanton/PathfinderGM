@@ -25,11 +25,17 @@ was the app describing a feature it did not have.
   Intimidate, Change Attitude — DC 10 + the target's Hit Dice + their Wisdom modifier,
   one minute of conversation. Success makes them act friendly for 1d6x10 minutes.
 
-**What Bluff is not.** Bluff moves nobody on this track and is not wired to it, because
-the book does not put it there: a lie is an opposed check against Sense Motive, which
-`check` has supported through `opposed_by` all along. Wiring Bluff to the attitude track
-because it appears in the same sentence as the other two would be inventing a rule and
-calling it Pathfinder. Said here rather than left for somebody to notice.
+**What Bluff is not — and, since 2026-10-01, a house rule that it is.** The book does
+not put Bluff on this track: a lie is an opposed check against Sense Motive, and even a
+believed one "doesn't determine the course of action the deceived person takes"
+(Ultimate Intrigue p.182). This module kept it off for that reason. The owner overruled
+it on 2026-10-01: a believed lie about who you are moves the listener by how they feel
+about what you claimed ("the king of a nation", to a man who hates the rich and powerful,
+cools him), and a caught lie is a small loss. That is not a lever here — Bluff is never
+an influence check, has no DC off this table and no cooldown — it is a consequence of a
+lie the engine already rolls: `Engine._lie_lands`, with the direction read from
+content/rules/claims.json and the size from `steps_for` below. Said here so the old
+paragraph is not read as still true.
 
 **The simplification, named.** After an intimidated creature's friendliness lapses, the
 book has them treat you as unfriendly and possibly report you. That is not implemented:
@@ -107,8 +113,9 @@ COOLDOWN_MINUTES = 24 * 60
 INTIMIDATE_BASE_DC = 10
 INTIMIDATE_DICE = "1d6"     # x10 minutes
 
-# The two skills that move the track, and how each does it. Bluff is deliberately absent;
-# the module docstring says why.
+# The two skills that move the track as influence checks, and how each does it. Bluff is
+# absent from THIS list — a believed lie moves the track as a consequence, not as an
+# influence check with a DC from the table; the module docstring says how.
 LEVERS = ("diplomacy", "intimidate")
 
 # Where on the track somebody will walk out of here with you (`Engine._op_company`). The

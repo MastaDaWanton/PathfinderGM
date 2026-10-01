@@ -33,7 +33,80 @@ ledger in the report names both.
 """
 from __future__ import annotations
 
+import json
+import re
+from pathlib import Path
+
 from .dice import Modifier
+
+# **And what a lie does to how they feel** (owner ruling, 2026-10-01; the house rule is
+# written out in content/rules/claims.json's note). A believed claim about who you are
+# moves the listener on the attitude track, up or down by how they feel about what you
+# claimed: a king to a man who hates the high-born cools him. A caught lie costs a little
+# regard and leaves them wary — Ultimate Intrigue's rule for a lie found out (p.182): a
+# later lie to them "takes a similar penalty as if she had failed to deceive the target
+# (either a -10 penalty ...)". The size of the swing is Diplomacy's (`attitude.steps_for`).
+WARY_PENALTY = -10
+_CLAIMS: list | None = None
+
+
+def _kinds() -> list:
+    """content/rules/claims.json, read once. Through `settings.BASE_DIR`, never
+    `__file__`, which points inside the bundle when frozen."""
+    global _CLAIMS
+    if _CLAIMS is None:
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "rules" / "claims.json"
+        _CLAIMS = json.loads(path.read_text(encoding="utf-8"))["kinds"]
+    return _CLAIMS
+
+
+def claim_kind(claim: str) -> str:
+    """Which kind of standing a claim lays claim to — "rank", "holy", "dread", "renown" —
+    or "" for a cover story that claims none. The first kind in the table whose words the
+    claim uses wins, so "the chosen heir" is rank before holy."""
+    words = set()
+    for w in re.findall(r"[a-z][a-z'’-]+", str(claim or "").lower()):
+        words.add(w)
+        words.update(p for p in w.split("-") if p)
+        if w.endswith("s"):
+            words.add(w[:-1])
+    for kind in _kinds():
+        if words & set(kind.get("words") or ()):
+            return str(kind["id"])
+    return ""
+
+
+def _disposition(scene, listener, axis: str) -> int:
+    """The listener's score on `axis`, 0-100, from the life rolled for them
+    (`rules/lives.py`); 50, the silent middle, for anybody with no life recorded — a
+    bestiary thug has no temperament to read, and the middle is what nobody-in-particular
+    feels."""
+    from . import lives, population
+
+    rec = population.of_ref(scene, getattr(listener, "ref", "")) if scene is not None else None
+    life = (rec or {}).get("life") or {}
+    if axis == "rank":
+        seed = (f"{rec.get('home')}|{rec['id']}" if rec
+                else f"actor|{getattr(listener, 'ref', '')}")
+        return lives.rank_score(seed, lives.work_class_of(str(life.get("work") or "")))
+    return int((life.get("axes") or {}).get(axis, 50))
+
+
+def reaction(kind: str, listener, scene) -> tuple[int, str]:
+    """(swing, why) for a believed claim of `kind`: +1 warms, -1 cools, 0 unmoved, and the
+    reason in words for the tell. (0, "") for a kind the table does not hold."""
+    row = next((k for k in _kinds() if k["id"] == kind), None)
+    if row is None:
+        return 0, ""
+    if not row.get("axis"):
+        pole = row.get("all") or {}
+    else:
+        score = _disposition(scene, listener, str(row["axis"]))
+        pole = row.get("low" if score < 40 else "high" if score > 60 else "middle") or {}
+    return int(pole.get("swing", 0)), str(pole.get("why", ""))
+
 
 # The believability rows of the table, by the word the check carries.
 LIES: dict[str, int] = {

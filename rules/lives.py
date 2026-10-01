@@ -61,9 +61,11 @@ def tables() -> dict:
 
         folder = Path(settings.BASE_DIR) / "content" / "people"
         read = lambda n: json.loads((folder / n).read_text(encoding="utf-8"))  # noqa: E731
+        personality = read("personality.json")
         _TABLES = {
             "occupations": read("occupations.json")["occupations"],
-            "personality": read("personality.json")["axes"],
+            "personality": personality["axes"],
+            "rank": personality["rank"],
             **{k: v for k, v in read("life.json").items() if k != "note"},
             **{k: v for k, v in read("quirks.json").items() if k != "note"},
             "synonyms": read("synonyms.json"),
@@ -213,6 +215,27 @@ def occupation_for(phrase: str) -> dict | None:
 
 _GENERIC_TRADE = frozenset({"seller", "vendor", "hawker", "trader", "dealer", "worker",
                             "workman"})
+
+
+def rank_score(seed: str, work_class: str = "") -> int:
+    """How this person feels about the rich and powerful, 0 (deferential) to 100
+    (resentful): the `rank` block of personality.json.
+
+    Its own seeded stream, never `roll`'s: an eleventh axis inside `roll` would re-roll
+    every trait, want and quirk drawn after it for everybody met from now on, and a person
+    met before today has no score stored. Asked of the same seed `roll` used, so the
+    answer is fixed for a person whenever it is first asked. The work class shifts the
+    bell curve (`bias`), which is the coherence `roll` gets from `excludes`."""
+    spec = tables()["rank"]
+    rng = _rng("rank", seed)
+    score = int(round((sum(rng.randint(1, 6) for _ in range(3)) - 3) / 15 * 100))
+    score += int((spec.get("bias") or {}).get(str(work_class or ""), 0))
+    return max(0, min(100, score))
+
+
+def work_class_of(work_id: str) -> str:
+    """The class of an occupation id (`occupations.json`), or ""."""
+    return next((o["class"] for o in tables()["occupations"] if o["id"] == work_id), "")
 
 
 def roll(seed: str, *, phrase: str = "", body: str = "", used_frames=()) -> Life:

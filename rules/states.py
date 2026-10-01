@@ -268,6 +268,19 @@ HOLDING_GROUND_KEY = "holding ground"
 # and the baseline the attitude track falls back to when no check or spell is holding
 # a step. Held as one effect (`attitude.set_regard`) whose `amount` is the score.
 REGARD = "bond.regard"
+# What a lie left behind in the listener (owner ruling 2026-10-01, `rules/bluff.py`).
+# `belief.claim.<kind>`: they believe the player is what the player claimed — held until
+# dismissed, source `lie:<kind>`, so the day the truth comes out removing it by source is
+# the whole undo. Read so the same claim believed twice moves them once. `belief.liar`:
+# they have caught the player lying, and a later lie to them is at -10 (Ultimate
+# Intrigue p.182). Not under `state.*` or `attitude.*`: neither stops an action or IS a
+# step of the track; both are facts about what somebody believes, and are READ.
+BELIEVES_CLAIM = "belief.claim"
+CAUGHT_LYING = "belief.liar"
+
+
+def believes_claim_tag(kind: str) -> str:
+    return f"{BELIEVES_CLAIM}.{kind}"
 
 
 def attitude_of(actor, default: str = "") -> str:

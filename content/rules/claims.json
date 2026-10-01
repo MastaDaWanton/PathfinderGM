@@ -1,0 +1,44 @@
+{
+ "note": "What a believed lie about who you are does to how the listener feels about you. Owner ruling 2026-10-01: 'if i bluff that i am the king of a nation ... that success would immediately change the way that person felt about me in the positive or perhaps negative if they hated the rich and powerful. and a failure should be a small negative because I've just lied to them.' A house rule: the Core Rulebook's Bluff only makes somebody believe a thing, and Ultimate Intrigue (p.182) says even the most successful lie 'doesn't determine the course of action the deceived person takes'; its attitude rule is for a lie DISCOVERED later (a step down, or unfriendly). The shape is Crusader Kings III's: opinion follows a trait the listener has, for or against. Each kind names the words that make a claim that kind (the most specific kind present wins, in the order listed), the listener's trait that decides the direction (`axis`: `rank` is personality.json's rank block, the rest are its ten axes; null means everybody alike), and for each pole (`low` under 40, `middle`, `high` over 60) the swing (+1 warms, -1 cools, 0 unmoved) and the reason in words for the tell. A claim of no listed kind (a merchant, a wizard, an elf) is a cover story, not a claim to standing, and moves nobody. The size of the swing is the engine's: Diplomacy's own steps from the margin (`attitude.steps_for`), never a number here.",
+ "kinds": [
+  {
+   "id": "dread",
+   "words": ["demon", "devil", "fiend", "vampire", "lich", "undead", "werewolf", "ghost",
+             "wraith", "necromancer", "assassin", "murderer", "cannibal"],
+   "axis": null,
+   "all": {"swing": -1, "why": "wants nothing to do with the likes of that"}
+  },
+  {
+   "id": "rank",
+   "words": ["king", "queen", "prince", "princess", "emperor", "empress", "heir", "heiress",
+             "lord", "lady", "noble", "nobleman", "noblewoman", "nobility", "royal",
+             "royalty", "duke", "duchess", "count", "countess", "baron", "baroness", "earl",
+             "marquis", "marquess", "viscount", "chieftain", "sultan", "khan", "monarch",
+             "ruler", "regent", "sovereign", "highness", "majesty", "aristocrat", "throne",
+             "crown", "magistrate", "governor"],
+   "axis": "rank",
+   "low": {"swing": 1, "why": "has always looked up to the high-born"},
+   "middle": {"swing": 1, "why": "is impressed despite themselves"},
+   "high": {"swing": -1, "why": "has no love for the high-born"}
+  },
+  {
+   "id": "holy",
+   "words": ["god", "goddess", "deity", "divine", "divinity", "demigod", "angel", "celestial",
+             "saint", "prophet", "prophesied", "messiah", "saviour", "savior", "herald",
+             "chosen", "blessed", "avatar", "incarnation"],
+   "axis": "piety",
+   "low": {"swing": -1, "why": "has no patience for holy talk"},
+   "middle": {"swing": 1, "why": "is shaken by it"},
+   "high": {"swing": 1, "why": "is struck with awe"}
+  },
+  {
+   "id": "renown",
+   "words": ["hero", "champion", "legend", "legendary", "master", "grandmaster", "archmage",
+             "knight", "general", "captain", "commander", "paladin", "warlord"],
+   "axis": "rank",
+   "low": {"swing": 1, "why": "is glad to meet somebody of name"},
+   "middle": {"swing": 1, "why": "is impressed"},
+   "high": {"swing": 0, "why": "is not one to be dazzled by a name"}
+  }
+ ]
+}

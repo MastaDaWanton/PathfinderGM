@@ -211,5 +211,21 @@
     "shows": "cannot pass somebody in trouble without stopping"
    }
   }
- ]
+ ],
+ "rank": {
+  "note": "How somebody feels about the rich and powerful. Owner ruling 2026-10-01: a lie about who you are that is believed moves the listener by how they feel about what you claimed, and somebody who hates the rich and powerful takes a claim of rank badly. Kept OUT of `axes` on purpose: those ten are rolled in order from one seeded stream, and an eleventh in the loop would re-roll every later trait, want and quirk for everybody met from now on. This one is rolled from its own seed (`lives.rank_score`), so it is the same for a person met yesterday as for one met tomorrow. Same bell curve and the same 40/60 poles as the ten; `bias` shifts it by the work class (`occupations.json` class), the way a priest cannot mock the gods: a noble's steward leans one way and a cutpurse the other. Not voiced as a trait word yet; it is read by `rules/bluff.py` and said through the tell.",
+  "id": "rank",
+  "low": {
+   "id": "deferential",
+   "words": ["respectful of rank", "deferential", "bows to anyone in silk"],
+   "shows": "straightens up and minds their words when somebody of standing is near"
+  },
+  "high": {
+   "id": "resentful",
+   "words": ["unimpressed by titles", "resentful of the powerful", "hates the high-born"],
+   "shows": "has a hard word for anyone who never worked for what they have"
+  },
+  "bias": {"gentry": -20, "law": -15, "service": -10, "faith": -5, "trade": 0, "learned": 0,
+           "craft": 0, "young": 0, "road": 5, "sea": 5, "farm": 5, "labour": 10, "rogue": 20}
+ }
 }
