@@ -135,6 +135,23 @@ from __future__ import annotations
 #                    the player walked to the green. Inform's Van Helsing (Recipe Book
 #                    7.13, Traveling Characters) is the same rule from the other side:
 #                    an every-turn rule that routes the follower to the player's room.
+#
+# What carried gear grants (content/rules/gear.json, rules/gear.py; the owner,
+# 2026-10-01), held through `Actor.standing_tags` while the thing is in the pack — the
+# pack is the store, as the feat list is for a feat's tags:
+#
+#   gear.bedding       something to sleep in: spares the sleeping-rough fatigue
+#                      (`Engine._op_rest`, the camp rule `sleeping-rough`)
+#   gear.shelter       a tent: the night's encounter chance is the row's `camp` scale,
+#                      and with gear.bedding or gear.warmth the sleeper counts as
+#                      protected from the cold (the camp rule `cold-ground`)
+#   gear.warmth        a blanket: the other half of that protection
+#   gear.writing       ink and paper: a note or a map can be written (`/api/write`)
+#   gear.fire-lighting flint and steel; nothing reads it yet (no fire in the engine)
+#   gear.rope          a rope; nothing reads it yet (no climb DC or bind op takes it)
+BEDDING = "gear.bedding"
+SHELTER = "gear.shelter"
+WRITING = "gear.writing"
 WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"

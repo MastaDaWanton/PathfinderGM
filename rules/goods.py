@@ -374,12 +374,19 @@ def describe(name: str, count: int = 1) -> str:
     plainly is the difference between "the engine has no rules for this" and the
     player assuming their lucite crystal does something.
     """
+    from . import gear as gear_mod
+
     entry = known_item(name)
     unit = unit_for(name)
     # Measured goods read as a quantity, not a tally: fifty feet of rope, never
     # "50 × rope", which is what the count alone said.
     head = (f"{name} — {measure(count, unit)}" if unit
             else f"{count} × {name}" if count != 1 else str(name))
+    # What a bedroll or a tent does is content/rules/gear.json's (2026-10-01): said in
+    # its words, not "no rules for it", the line the owner read as "no effect".
+    said = gear_mod.does(name)
+    if said and (entry is None or entry.get("table") == "gear"):
+        return f"{head} — {said}"
     if entry is None:
         return (head if unit else f"{head} — carried; "
                 f"the engine has no rules for it")
@@ -400,51 +407,54 @@ def describe(name: str, count: int = 1) -> str:
 # making your character we need a buy screen to spend starting gold" (2026-09-07).
 # Prices are the Core Rulebook's own, in gold; a thing measured rather than counted
 # says its unit. Bought gear lands in `stock` like anything else the engine sells.
+# `lb` is the Core Rulebook's weight for one purchase (`per` of the unit), added
+# 2026-10-01 so carrying capacity has something to count (`rules/gear.py:load`); what a
+# carried thing DOES is content/rules/gear.json's, never this table's.
 GEAR: dict[str, dict] = {
-    "backpack": {"name": "backpack", "cost_gp": 2.0},
-    "bedroll": {"name": "bedroll", "cost_gp": 0.1},
-    "blanket": {"name": "blanket", "cost_gp": 0.5},
-    "rope": {"name": "hemp rope", "cost_gp": 1.0, "unit": "ft", "per": 50},
-    "silk rope": {"name": "silk rope", "cost_gp": 10.0, "unit": "ft", "per": 50},
-    "torch": {"name": "torch", "cost_gp": 0.01},
-    "lantern": {"name": "hooded lantern", "cost_gp": 7.0},
-    "oil": {"name": "flask of oil", "cost_gp": 0.1},
-    "rations": {"name": "trail rations", "cost_gp": 0.5, "unit": "days", "per": 1},
-    "waterskin": {"name": "waterskin", "cost_gp": 1.0},
-    "flint and steel": {"name": "flint and steel", "cost_gp": 1.0},
-    "healer's kit": {"name": "healer's kit", "cost_gp": 50.0},
-    "grappling hook": {"name": "grappling hook", "cost_gp": 1.0},
-    "crowbar": {"name": "crowbar", "cost_gp": 2.0},
-    "chalk": {"name": "chalk", "cost_gp": 0.01},
-    "sack": {"name": "sack", "cost_gp": 0.1},
-    "whetstone": {"name": "whetstone", "cost_gp": 0.02},
-    "tent": {"name": "tent", "cost_gp": 10.0},
-    "antitoxin": {"name": "antitoxin", "cost_gp": 50.0},
-    "shovel": {"name": "shovel", "cost_gp": 2.0},
-    "hammer": {"name": "hammer", "cost_gp": 0.5},
-    "pitons": {"name": "pitons", "cost_gp": 0.1},
-    "mirror": {"name": "small steel mirror", "cost_gp": 10.0},
-    "thieves' tools": {"name": "thieves' tools", "cost_gp": 30.0},
-    "spell component pouch": {"name": "spell component pouch", "cost_gp": 5.0},
-    "holy symbol": {"name": "wooden holy symbol", "cost_gp": 1.0},
-    "manacles": {"name": "manacles", "cost_gp": 15.0},
-    "candle": {"name": "candle", "cost_gp": 0.01, "unit": "hours", "per": 1},
-    "ink and paper": {"name": "ink and paper", "cost_gp": 8.4},
-    "signal whistle": {"name": "signal whistle", "cost_gp": 0.8},
-    "fishing net": {"name": "fishing net", "cost_gp": 4.0},
-    "cold-weather outfit": {"name": "cold-weather outfit", "cost_gp": 8.0},
-    "traveler's outfit": {"name": "traveler's outfit", "cost_gp": 1.0},
-    "climber's kit": {"name": "climber's kit", "cost_gp": 80.0},
-    "caltrops": {"name": "caltrops", "cost_gp": 1.0},
-    "sunrod": {"name": "sunrod", "cost_gp": 2.0},
-    "alchemist's fire": {"name": "alchemist's fire", "cost_gp": 20.0},
+    "backpack": {"name": "backpack", "cost_gp": 2.0, "lb": 2},
+    "bedroll": {"name": "bedroll", "cost_gp": 0.1, "lb": 5},
+    "blanket": {"name": "blanket", "cost_gp": 0.5, "lb": 3},
+    "rope": {"name": "hemp rope", "cost_gp": 1.0, "unit": "ft", "per": 50, "lb": 10},
+    "silk rope": {"name": "silk rope", "cost_gp": 10.0, "unit": "ft", "per": 50, "lb": 5},
+    "torch": {"name": "torch", "cost_gp": 0.01, "lb": 1},
+    "lantern": {"name": "hooded lantern", "cost_gp": 7.0, "lb": 2},
+    "oil": {"name": "flask of oil", "cost_gp": 0.1, "lb": 1},
+    "rations": {"name": "trail rations", "cost_gp": 0.5, "unit": "days", "per": 1, "lb": 1},
+    "waterskin": {"name": "waterskin", "cost_gp": 1.0, "lb": 4},
+    "flint and steel": {"name": "flint and steel", "cost_gp": 1.0, "lb": 0},
+    "healer's kit": {"name": "healer's kit", "cost_gp": 50.0, "lb": 1},
+    "grappling hook": {"name": "grappling hook", "cost_gp": 1.0, "lb": 4},
+    "crowbar": {"name": "crowbar", "cost_gp": 2.0, "lb": 5},
+    "chalk": {"name": "chalk", "cost_gp": 0.01, "lb": 0},
+    "sack": {"name": "sack", "cost_gp": 0.1, "lb": 0.5},
+    "whetstone": {"name": "whetstone", "cost_gp": 0.02, "lb": 1},
+    "tent": {"name": "tent", "cost_gp": 10.0, "lb": 20},
+    "antitoxin": {"name": "antitoxin", "cost_gp": 50.0, "lb": 0},
+    "shovel": {"name": "shovel", "cost_gp": 2.0, "lb": 8},
+    "hammer": {"name": "hammer", "cost_gp": 0.5, "lb": 2},
+    "pitons": {"name": "pitons", "cost_gp": 0.1, "lb": 0.5},
+    "mirror": {"name": "small steel mirror", "cost_gp": 10.0, "lb": 0.5},
+    "thieves' tools": {"name": "thieves' tools", "cost_gp": 30.0, "lb": 1},
+    "spell component pouch": {"name": "spell component pouch", "cost_gp": 5.0, "lb": 2},
+    "holy symbol": {"name": "wooden holy symbol", "cost_gp": 1.0, "lb": 0},
+    "manacles": {"name": "manacles", "cost_gp": 15.0, "lb": 2},
+    "candle": {"name": "candle", "cost_gp": 0.01, "unit": "hours", "per": 1, "lb": 0},
+    "ink and paper": {"name": "ink and paper", "cost_gp": 8.4, "lb": 0},
+    "signal whistle": {"name": "signal whistle", "cost_gp": 0.8, "lb": 0},
+    "fishing net": {"name": "fishing net", "cost_gp": 4.0, "lb": 5},
+    "cold-weather outfit": {"name": "cold-weather outfit", "cost_gp": 8.0, "lb": 7},
+    "traveler's outfit": {"name": "traveler's outfit", "cost_gp": 1.0, "lb": 5},
+    "climber's kit": {"name": "climber's kit", "cost_gp": 80.0, "lb": 5},
+    "caltrops": {"name": "caltrops", "cost_gp": 1.0, "lb": 2},
+    "sunrod": {"name": "sunrod", "cost_gp": 2.0, "lb": 1},
+    "alchemist's fire": {"name": "alchemist's fire", "cost_gp": 20.0, "lb": 1},
     # Food and drink, Core Rulebook Table 6-9 ("Food, Drink, and Lodging"), read from the
     # PRD's own table 2026-09-27 (legacy.aonprd.com/coreRulebook/equipment.html). Open
     # Game Content; the book is in OGL-NOTICE.md's section 15. Provisions a market sells
     # too; drink and meals are a tavern's. Lodging and banquets are services, not goods.
-    "bread": {"name": "loaf of bread", "cost_gp": 0.02, "category": "provisions"},
-    "cheese": {"name": "hunk of cheese", "cost_gp": 0.1, "category": "provisions"},
-    "meat": {"name": "chunk of meat", "cost_gp": 0.3, "category": "provisions"},
+    "bread": {"name": "loaf of bread", "cost_gp": 0.02, "category": "provisions", "lb": 0.5},
+    "cheese": {"name": "hunk of cheese", "cost_gp": 0.1, "category": "provisions", "lb": 0.5},
+    "meat": {"name": "chunk of meat", "cost_gp": 0.3, "category": "provisions", "lb": 0.5},
     "ale": {"name": "mug of ale", "cost_gp": 0.04, "category": "food"},
     "ale gallon": {"name": "gallon of ale", "cost_gp": 0.2, "category": "food"},
     "wine": {"name": "pitcher of common wine", "cost_gp": 0.2, "category": "food"},
