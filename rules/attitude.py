@@ -130,6 +130,14 @@ LEVERS = ("diplomacy", "intimidate")
 # CONDITION keys and an attitude word is not one.
 COMES_ALONG = "friendly"
 
+# Where a companion's own life opens to the player (the owner, 2026-10-01: "Their wants
+# should appear naturally locked behind their attitude toward you"; gm/confide.py). The
+# book's words again: friendly "will chat, advise, offer limited help" — so at most a hint
+# that something is on their mind; helpful "will take risks to help you" — so the thing
+# itself. Named here for the reason COMES_ALONG is.
+CONFIDES_A_HINT = "friendly"
+CONFIDES = "helpful"
+
 # The bottom of the track: somebody who will act against you. Named HERE, like the step
 # above, so no reader anywhere spells an attitude — the three-laws ratchet counts literal
 # keys per file and caught the first cut of the watch's recognition doing exactly that.

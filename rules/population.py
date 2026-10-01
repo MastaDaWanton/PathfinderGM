@@ -217,7 +217,10 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
 #     state like Valve's `respeakdelay` — a small model cannot count "now and then";
 #   * wants, goal and hobby never: at 12B a secret the model is told leaks thematically
 #     about 83% of the time, and "don't reveal" helped only frontier models (Holtzman &
-#     West 2026). What it is not told it cannot tell.
+#     West 2026). What it is not told it cannot tell. A COMPANION's may reach the page,
+#     only by confiding them, gated by their attitude and warmed up (gm/confide.py,
+#     rules/confiding.py); once told they are the player's knowledge, and the brief
+#     carries a told one on a beat something touches it.
 
 QUIRK_EVERY = 5
 

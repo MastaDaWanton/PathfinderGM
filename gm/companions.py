@@ -185,16 +185,28 @@ def addressed(scene, text: str) -> list[str]:
     return out
 
 
-def answer_facts(scene, actor, said: str) -> str:
+def answer_facts(scene, actor, said: str, *, not_ready: bool = False) -> str:
     """What a companion's out-of-fight answer is told: who they are, who else is here by
-    ref, and the player's words to them this turn."""
+    ref, and the player's words to them this turn.
+
+    And what they have already told the player about their own life (gm/confide.py) —
+    known to both, so nothing leaks — and, `not_ready`, that something personal is on
+    their mind they will not say yet: asked "what is it?" after a hint, an answer told
+    nothing would invent a want of its own."""
+    from . import confide
+
     name = actor.name
     here = [f"{r} ({a.name})" for r, a in scene.actors.items()
             if r != actor.ref and not a.is_pc and scene.conscious(r)]
     pc = scene.pc()
+    told = confide.told_line(scene, actor)
     return "\n".join([
         f"{name} ({actor.ref}) TRAVELS WITH the player. Who {name} is (fact): "
         f"{who_they_are(scene, actor)}",
+        *([told] if told else []),
+        *([f"{name} has something personal on their mind and is not ready to tell the "
+           f"player what it is yet: they do not say what it is, and do not make "
+           f"something up."] if not_ready else []),
         f"Here besides: {', '.join(here) if here else 'nobody'}"
         + (f"; the player is {pc.ref}." if pc is not None else "."),
         f"What the player just said: {' '.join(str(said or '').split())}",
@@ -809,8 +821,11 @@ _ADVICE = re.compile(
 
 
 def _interjections(scene) -> list[dict]:
+    """Every unasked line a companion has spoken: their remarks, and their confidings
+    (gm/confide.py), which hold the remark's gap too — a confession and an opinion on the
+    weather back to back is two remarks too close."""
     return [e for e in (getattr(scene, "conversation_log", None) or [])
-            if isinstance(e, dict) and e.get("src") == "interject"]
+            if isinstance(e, dict) and e.get("src") in ("interject", "confide")]
 
 
 def _turns_since(transcript, beat) -> int:
@@ -912,19 +927,21 @@ def interjection_due(scene, transcript, outcomes, *, answered=(), talking=(),
             "about": event, "arrived": arrived}
 
 
-def interject_facts(scene, actor, due: dict, *, place=None, beat: str = "",
-                    wants: str = "") -> str:
+def interject_facts(scene, actor, due: dict, *, place=None, beat: str = "") -> str:
     """What the remark's call is told: who speaks (in words), what it is about — the place
     by its real name and the world's own line about it, the turn's tell, or the beat's
-    last sentences — and who is here by name. Never a number, never a ref."""
+    last sentences — and who is here by name. Never a number, never a ref.
+
+    Never their wants, goal or hobby. The companions-manner lane put the want into one
+    remark in three; the owner overruled it on 2026-10-01 ("they shouldnt just blurt out
+    personal feelings without some kind of warm up"), and a companion's own life now
+    reaches the page only through gm/confide.py, gated by their attitude."""
     from . import narration as narration_mod
 
     name = actor.name
     who = manner_line(scene, actor, ordered=False).split(": ", 1)[-1].rstrip(".")
     # "nobody told them to" is about deeds; a remark needs only who they are.
     who = re.sub(r";\s*nobody told .*$", "", who)
-    if wants:
-        who += f"; something they want for themselves: {wants}"
     about_place = str(getattr(place, "about", "") or "").strip()
     if due.get("reason") == "arrived" and place is not None:
         about = (f"the party has just arrived at {place.name}"
@@ -942,15 +959,16 @@ def interject_facts(scene, actor, due: dict, *, place=None, beat: str = "",
             f"People here: {', '.join(here) or name}.")
 
 
-def interjection_refusal(line: str, actor, known: set[str]) -> str:
-    """Why a remark cannot go on the page, or "" when it can."""
+def interjection_refusal(line: str, actor, known: set[str], *, limit: int = 0) -> str:
+    """Why a remark cannot go on the page, or "" when it can. `limit`: the longest it
+    may run (the remark's own by default; a confiding share is allowed more)."""
     from . import narration as narration_mod
     from . import speech
     from .prompts import INTERJECT_MAX_CHARS
 
     if not line:
         return "is empty"
-    if len(line) > INTERJECT_MAX_CHARS:
+    if len(line) > (limit or INTERJECT_MAX_CHARS):
         return "is too long"
     if not speech.spans(line):
         return "has no words of theirs in quotation marks"

@@ -1197,7 +1197,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # How they carry themselves, from the life the population rolled for them:
             # behaviour, two traits at most, the quirk only when it is due — and never
             # their wants, goal or hobby, which are learned in play and which a 12B model
-            # told them leaks (rules/population.py, "what the narrator is told").
+            # told them leaks (rules/population.py, "what the narrator is told"), unless a
+            # companion has CONFIDED one (below).
             from rules import population as _population
 
             rec = _population.of_ref(scene, ref)
@@ -1207,6 +1208,22 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # the narrator cannot keep a rule about a child it was never told is one.
             if rec and "minor" in ((rec.get("life") or {}).get("tags") or []):
                 manner += f" {actor.name} IS A CHILD (fact)."
+            # What a companion has CONFIDED is the player's knowledge now, so it cannot
+            # leak (gm/confide.py) — but only on a beat something touches it (the place,
+            # the last beats, the player's words), decided in code: in the brief every
+            # beat it would become their one subject, the tic the quirk's cadence exists
+            # to prevent.
+            if rec and actor.has_state(states.TRAVELS_WITH_YOU):
+                from . import confide as _confide
+
+                touch = " ".join([str(getattr(here, "name", "") or ""),
+                                  str(getattr(here, "about", "") or ""),
+                                  " ".join(str(x) for x in (recent or [])[-2:]),
+                                  str(player_text or "")])
+                topics = _confide.relevant_told(scene, actor, touch)
+                told = _confide.told_line(scene, actor, only=topics) if topics else ""
+                if told:
+                    manner += f" {told}"
             lines.append(f"  {ref} — {actor.name}. {note}.{names_it}{looks}{feels}{bond}"
                          f"{manner}{_states_of(actor)}")
     # Who the player is talking to, as a fact with a rule attached. The step is the
@@ -2873,6 +2890,137 @@ def interject_messages(facts: str) -> list[dict]:
 def interject_schema() -> dict:
     return {"type": "object", "properties": {"line": {"type": "string"}},
             "required": ["line"]}
+
+
+# --- a companion confides ----------------------------------------------------------------
+#
+# The owner, 2026-10-01: "Their wants should appear naturally locked behind their attitude
+# toward you. but they shouldnt just blurt out personal feelings without some kind of warm
+# up." WHEN, and how much, is gm/confide.py's: a lead-in or a hint (they are NOT told the
+# content, so it cannot leak), the share itself, or a bridge from something in the world.
+# WHAT is the model's, from facts holding their own life row's words, checked in code.
+#
+# Two demonstrations per kind, and only the asked-for kind is shown: the shape of a prompt
+# becomes the shape of the output (CLAUDE.md), and a lead-in shown beside a share learns
+# to share. The life texts here are invented for the examples and are NOT rows of
+# content/people/life.json, so a companion who holds a shipped row cannot copy an
+# example's confession word for word; no example names anybody the facts did not give.
+CONFIDE_BRIEFING = """Somebody who travels with the player says something about their
+own life. Write it: a small gesture of theirs and their words in quotation marks, in
+their own voice, coloured by who they are.
+
+Say only what the facts give you. When the facts say they do not say what it is, they do
+not — only that there is something. When the facts give what they tell, they say that,
+in their own words, and invent nothing else about their past: no names, no places, no
+numbers.
+
+Never advice, never a question about what the player will do next.
+
+Reply with a JSON object: {"line": "..."}."""
+
+_PELL = ("Who speaks: Pell (fact): by nature cautious and quiet — keeps a door at their back; "
+         "Pell is a carter by trade; Pell is {feels} towards the player.")
+_MARA = ("Who speaks: Mara (fact): by nature short-fused and plain-spoken — flares fast, cools "
+         "fast; Mara is a tanner by trade; Mara is {feels} towards the player.")
+_OSSIN = ("Who speaks: Ossin (fact): by nature reserved and steady — speaks when there is "
+          "something to say and not otherwise; Ossin is a ferryman by trade; Ossin is {feels} "
+          "towards the player.")
+_TAMSA = ("Who speaks: Tamsa (fact): by nature warm and talkative — fills a silence before it "
+          "settles; Tamsa is a baker by trade; Tamsa is {feels} towards the player.")
+
+CONFIDE_EXAMPLES = {
+    "lead-in": [
+        {"user": _PELL.format(feels="helpful") + "\nWhat this is: Pell tells the player there "
+                 "is something they have wanted to get off their chest — and does NOT say "
+                 "what. They will say it later, when the player is listening.\n"
+                 "People here: Pell, the tollkeeper.",
+         "line": "Pell falls into step beside you and clears his throat twice before he gets "
+                 "it out. \"There's a thing I've been meaning to tell you. Not here. When "
+                 "it's quieter.\""},
+        {"user": _MARA.format(feels="helpful") + "\nWhat this is: Mara tells the player there "
+                 "is something they have wanted to get off their chest — and does NOT say "
+                 "what. They will say it later, when the player is listening.\n"
+                 "People here: Mara.",
+         "line": "Mara kicks a stone off the path and doesn't look at you. \"Been carrying "
+                 "something around I ought to get off my chest. Later.\""},
+    ],
+    "hint": [
+        {"user": _OSSIN.format(feels="friendly") + "\nWhat this is: something is on Ossin's "
+                 "mind, and Ossin is not ready to say it to the player yet. They let slip "
+                 "that there is something, and do NOT say what.\nPeople here: Ossin.",
+         "line": "Ossin's eyes stay on the water a long moment. \"Something on my mind. "
+                 "Not yours to carry yet.\""},
+        {"user": _TAMSA.format(feels="friendly") + "\nWhat this is: something is on Tamsa's "
+                 "mind, and Tamsa is not ready to say it to the player yet. They let slip "
+                 "that there is something, and do NOT say what.\n"
+                 "People here: Tamsa, the miller.",
+         "line": "Tamsa starts to say something, laughs it off and shakes her head. "
+                 "\"Another time. It's nothing, really.\""},
+    ],
+    "bridge-hint": [
+        {"user": _PELL.format(feels="friendly") + "\nWhat this is: the kennel put Pell in "
+                 "mind of something of their own. They say the kennel reminds them of "
+                 "something, and do NOT say what — not yet.\nPeople here: Pell, the "
+                 "houndsman.",
+         "line": "Pell slows by the kennel and watches the dogs a moment too long. \"Kennel "
+                 "like that reminds me of something. Another time.\""},
+        {"user": _MARA.format(feels="friendly") + "\nWhat this is: the shrine put Mara in "
+                 "mind of something of their own. They say the shrine reminds them of "
+                 "something, and do NOT say what — not yet.\nPeople here: Mara.",
+         "line": "Mara stops short of the shrine and her jaw works. \"Places like this "
+                 "remind me of something. Not now.\""},
+    ],
+    "share": [
+        {"user": _PELL.format(feels="helpful") + "\nWhat Pell tells the player (fact, "
+                 "something they want, now, for themselves, from their own life — say THIS, "
+                 "in their own words, and nothing else about their past): to win back the "
+                 "cart horse they sold the winter the money ran out\n"
+                 "The player has just asked: Go on, Pell. What is it?\n"
+                 "Earlier Pell said: \"There's a thing I've been meaning to tell you.\"\n"
+                 "People here: Pell.",
+         "line": "Pell rubs the back of his neck. \"Sold my old cart horse the winter the "
+                 "money ran out. Been putting coin by to buy her back ever since. Daft, I "
+                 "know.\""},
+        {"user": _MARA.format(feels="helpful") + "\nWhat Mara tells the player (fact, "
+                 "something they hope for, one day, from their own life — say THIS, in their "
+                 "own words, and nothing else about their past): to see the tannery they "
+                 "learned in kept honest when its old master is gone\n"
+                 "Earlier Mara said: \"Been carrying something around I ought to get off my "
+                 "chest.\" — now, in a quiet moment, they say it.\nPeople here: Mara.",
+         "line": "Mara scrubs at a stain on her apron that isn't coming out. \"The tannery "
+                 "I learned in. The old master won't last the year, and whoever gets it "
+                 "will cut corners. I want it kept honest, that's all.\""},
+    ],
+    "bridge": [
+        {"user": _OSSIN.format(feels="helpful") + "\nWhat Ossin tells the player (fact, "
+                 "something they hope for, one day, from their own life — say THIS, in their "
+                 "own words, and nothing else about their past): to make one blade fine "
+                 "enough to hang over a door\nWhat brought it up: the forge, here. They start "
+                 "from the forge and say what it reminds them of.\n"
+                 "People here: Ossin, the smith.",
+         "line": "Ossin stops at the forge's open side and watches the sparks. \"My father "
+                 "kept one like this. I always meant to make one blade fine enough to hang "
+                 "over the door.\""},
+        {"user": _TAMSA.format(feels="helpful") + "\nWhat Tamsa tells the player (fact, "
+                 "something they hope for, one day, from their own life — say THIS, in their "
+                 "own words, and nothing else about their past): a family of their own, and a "
+                 "table loud enough to need two benches\nWhat brought it up: the children, "
+                 "here. They start from the children and say what it reminds them of.\n"
+                 "People here: Tamsa, the children.",
+         "line": "Tamsa watches the children chase each other round the well and smiles. "
+                 "\"I want that, you know. A family of my own, a table so loud we need two "
+                 "benches.\""},
+    ],
+}
+
+
+def confide_messages(facts: str, kind: str) -> list[dict]:
+    messages = [{"role": "system", "content": CONFIDE_BRIEFING}]
+    for ex in CONFIDE_EXAMPLES.get(kind) or CONFIDE_EXAMPLES["share"]:
+        messages.append({"role": "user", "content": ex["user"]})
+        messages.append({"role": "assistant", "content": json.dumps({"line": ex["line"]})})
+    messages.append({"role": "user", "content": facts})
+    return messages
 
 
 REPAIR_BRIEFING = """Rewrite the sentence you are given so that it no longer states how a

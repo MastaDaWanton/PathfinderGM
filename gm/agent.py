@@ -1110,7 +1110,7 @@ class GMAgent:
     COMPANION_ANSWER_OPS = ("narrate_only", "say", "check", "move", "attack")
 
     def companion_answer(self, ref: str, said: str, location=None, recent_events=None,
-                         max_attempts: int = 2) -> TurnPlan:
+                         max_attempts: int = 2, not_ready: bool = False) -> TurnPlan:
         """A companion answers the player's words to them, out of a fight: the targeted
         call `companions.addressed` triggers (owner's ruling, 2026-10-01 — they take
         spoken orders "as their character dictates they would or would not").
@@ -1133,7 +1133,8 @@ class GMAgent:
                   and not companions.is_companion(a)]
         pc = scene.pc()
         base = prompts.companion_answer_messages(
-            brief, ref, actor, companions.answer_facts(scene, actor, said),
+            brief, ref, actor, companions.answer_facts(scene, actor, said,
+                                                       not_ready=not_ready),
             other=others[0] if others else None, pc_ref=pc.ref if pc else "pc")
         messages = base
         attempts: list[Attempt] = []
@@ -1286,6 +1287,55 @@ class GMAgent:
             if not why:
                 return line, attempts, rejections
             rejections.append(f"attempt {n + 1}: {why}: {line[:120]!r}")
+            messages = messages + [
+                {"role": "assistant", "content": reply.text},
+                {"role": "user", "content": f"That line {why}. Write it again."}]
+        return "", attempts, rejections
+
+    def companion_confide(self, ref: str, facts: str, plan: dict, *,
+                          known: set[str] | None = None,
+                          max_attempts: int = 2) -> tuple[str, list[Attempt], list[str]]:
+        """A companion says something of their own life: a lead-in, a hint, the share, or
+        a bridge from something in the world (the owner's ruling of 2026-10-01; WHEN and
+        which is `confide.due`'s). Shown only the asked-for kind's demonstrations; held by
+        `confide.refusal` — a lead-in that says what it is, a share that says something
+        else, a bridge that forgets what brought it up, a number, an invented name. One
+        targeted repair naming what was wrong; a line that never holds is not said, and
+        whatever was owed stays owed.
+
+        Returns (line, attempts, rejections); line is "" when nothing held."""
+        from . import companions as companions_mod, confide
+        from rules import population
+
+        actor = self.engine.scene.actors[ref]
+        rec = population.of_ref(self.engine.scene, ref)
+        known = set(known or ()) | self._known_names()
+        messages = prompts.confide_messages(facts, plan["kind"])
+        attempts: list[Attempt] = []
+        rejections: list[str] = []
+        for n in range(max_attempts):
+            try:
+                reply = client.chat(
+                    messages, self.prose_model, self.prose_host, as_json=True,
+                    think=False, temperature=0.8, num_predict=240,
+                    provider=self.prose_provider, api_key=self.prose_key,
+                    schema=prompts.interject_schema())
+            except Exception as exc:  # noqa: BLE001 — an unsaid confidence costs nothing
+                rejections.append(f"attempt {n + 1}: the call failed ({type(exc).__name__})")
+                break
+            attempts.append(Attempt("confide", reply.seconds, reply.model, reply.text,
+                                    note=f"confide: {actor.name} ({plan['kind']})"))
+            try:
+                line = " ".join(str((reply.json() or {}).get("line") or "").split())
+            except ValueError:
+                line = ""
+            line = judgement.name_refs(line, self.engine.scene) if line else ""
+            why = confide.refusal(line, actor, known, plan, rec,
+                                  others=[a for a in self.engine.scene.actors.values()
+                                          if a is not actor and companions_mod.is_companion(a)])
+            if not why:
+                return line, attempts, rejections
+            rejections.append(f"attempt {n + 1}: {why}: {line[:160]!r}")
             messages = messages + [
                 {"role": "assistant", "content": reply.text},
                 {"role": "user", "content": f"That line {why}. Write it again."}]
