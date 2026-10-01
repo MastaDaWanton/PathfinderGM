@@ -297,6 +297,22 @@ class TestTheirOwnTurn:
             assert companions.attack_against_its_reason("{Self}", ex["reply"]["intents"]) \
                 == "", ex["reply"]
 
+    def test_running_for_help_is_not_a_walk_at_the_foe(self):
+        """Measured: "Drover, run and fetch the watch!" came back `move` at the thug
+        "because they are fleeing the immediate danger to fetch the watch", and the engine
+        closed the drover on the thug."""
+        from gm import companions
+
+        s, e, pc = _party()
+        drover, thug = _friend(s, e, name="Wil"), _thug(s)
+        e._ensure_encounter(pc.ref, thug.ref)
+        raw = [{"op": "move", "actor": drover.ref, "target": thug.ref,
+                "because": "they are told to fetch the watch, and they are fleeing the "
+                           "immediate danger to do so"}]
+        assert "narrate_only" in companions.move_against_its_reason(s, drover.ref, raw)
+        ok = [dict(raw[0], because="told to keep him off you; they close on him")]
+        assert companions.move_against_its_reason(s, drover.ref, ok) == ""
+
     def test_a_blow_at_an_onlooker_is_sent_back_unless_ordered(self):
         """Measured: told "keep the crowd off me", the drover went for the merchant
         watching from the side."""

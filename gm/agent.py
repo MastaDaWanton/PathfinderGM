@@ -1053,7 +1053,9 @@ class GMAgent:
                               if friend else "")
                           or (companions.attack_on_a_bystander(
                               self.engine.scene, ref, raw, list(orders or ()))
-                              if friend else ""))
+                              if friend else "")
+                          or (companions.move_against_its_reason(
+                              self.engine.scene, ref, raw) if friend else ""))
                 if turned:
                     raise IntentError(turned, "legality")
                 intents = self.engine.validate(raw, origin=origin,

@@ -326,6 +326,42 @@ _NOT_FIGHTING = re.compile(
     r"(?:their|a|his|her|its)\s+(?:safe\s+)?distance)\b", re.I)
 
 
+# A reason that says the companion is getting AWAY: "fleeing the immediate danger to fetch
+# the watch", "bolts for the door", "backs off".
+_GETTING_AWAY = re.compile(
+    r"\b(?:flee|flees|fleeing|fled|run(?:s|ning)?\s+(?:off|away|for|to)|bolt(?:s|ing|ed)?|"
+    r"escap(?:e|es|ing|ed)|retreat(?:s|ing|ed)?|back(?:s|ing|ed)?\s+(?:off|away)|"
+    r"get(?:s|ting)?\s+away|fetch(?:es|ing)?|for\s+the\s+(?:door|exit)|"
+    r"toward(?:s)?\s+the\s+(?:door|exit)|away\s+from)\b", re.I)
+
+
+def move_against_its_reason(scene, ref: str, raw) -> str:
+    """The refusal for a companion's `move` at a FOE whose own reason says they are getting
+    away, or "".
+
+    Measured on the companions replay, 2026-10-01: "Drover, run and fetch the watch!"
+    came back `move` with the thug as its target "because they are fleeing the immediate
+    danger to fetch the watch" — a move at somebody walks TOWARD them, and the engine
+    closed the drover on the thug while the wind-up had him bolt for the exit."""
+    if not isinstance(raw, list):
+        return ""
+    foes = {r for r, _ in foes_of(scene, ref)}
+    for r in raw:
+        if not isinstance(r, dict) or str(r.get("op", "")).lower() != "move":
+            continue
+        if (r.get("actor") or ref) != ref:
+            continue
+        params = r.get("params") if isinstance(r.get("params"), dict) else {}
+        at = r.get("target") or params.get("toward")
+        if at in foes and _GETTING_AWAY.search(str(r.get("because") or "")):
+            name = scene.actors[at].name
+            return (f"move: a move at {at} walks toward {name}, and the reason given — "
+                    f"{str(r.get('because'))!r} — is getting away. Leaving the fight is "
+                    f'{{"op": "narrate_only"}} saying so; a step back is a move with '
+                    f'{{"zone": "far"}} and no target.')
+    return ""
+
+
 def attack_against_its_reason(ref: str, raw) -> str:
     """The refusal for a companion's `attack` whose own `because` says they are not
     fighting, or "".
