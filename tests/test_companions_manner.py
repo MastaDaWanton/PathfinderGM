@@ -257,6 +257,11 @@ class TestTheActIsKept:
                                    list(s.actors.values()))          # the swing lost
         assert companions.act_kept(old, "Wil and the PC swing at the thug, shaking.",
                                    wil, list(s.actors.values()))     # somebody added
+        # Measured on the replay: a kind drover's repair wrote "pull the blow" over a
+        # lethal swing. Whether a blow is pulled is the `lethality` rule's.
+        assert "pulls a blow" in companions.act_kept(
+            old, "Wil winces and swings at the thug, pulling the blow.", wil,
+            list(s.actors.values()))
 
 
 def _fake(monkeypatch, replies):

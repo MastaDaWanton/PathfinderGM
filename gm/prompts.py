@@ -2756,7 +2756,9 @@ MANNER_HINTS = {
     "bold": "no hesitation, a grin, straight in, eagerness, a laugh, going in first",
     "hot_tempered": "a curse, a snarl, teeth gritted, fury, a yell",
     "placid": "calm, unhurried, steady, deliberate, as if it were a chore",
-    "kind": "a wince, a muttered apology, pulling the blow, looking away, gently",
+    # Not "pulling the blow": whether a blow is pulled is the `lethality` rule's, and a
+    # repair offered it wrote "pull the blow" over a lethal swing (replay, 2026-10-01).
+    "kind": "a wince, a muttered apology, looking away, a grimace, regret",
     "hard": "coldly, flatly, without a flicker, efficient, grim",
     "reserved": "silently, without a word, a single nod, quietly",
     "gregarious": "talking all the while, calling out, a joke, a cheer",

@@ -710,13 +710,16 @@ def reluctant(pole: str, op: str) -> bool:
 
 
 # What the deed IS on the page: how a blow went and who it touched. A manner rewrite may
-# change how a thing is done and never these.
+# change how a thing is done and never these. HOW they get there — steps forward, lunges,
+# edges in, charges — is the manner itself and may change: the first cut held those too,
+# and 4 of 5 repairs of a kind drover's ordered swing were thrown away for turning
+# "steps forward" into "edges forward" (replay, 2026-10-01).
 _ACT_WORDS = re.compile(
-    r"\b(?:hit|hits|strike|strikes|struck|swing|swings|swung|lunge\w*|stab\w*|slash\w*|"
-    r"miss|misses|missed|block\w*|parr\w*|dodg\w*|duck\w*|fall|falls|fell|drop\w*|"
-    r"grab\w*|throw\w*|threw|shove\w*|trip\w*|disarm\w*|run|runs|ran|flee\w*|fled|"
-    r"charg\w*|kill\w*|dead|dies|wound\w*|blood\w*|lands|landed|connect\w*|glanc\w* off|"
-    r"crack\w*|knock\w*|stagger\w*|crumpl\w*|retreat\w*|step\w*|clos(?:e|es|ed|ing))\b",
+    r"\b(?:hit|hits|strike|strikes|struck|swing|swings|swung|stab\w*|slash\w*|"
+    r"miss|misses|missed|block\w*|parr\w*|fall|falls|fell|drop\w*|"
+    r"grab\w*|throw\w*|threw|shove\w*|trip\w*|disarm\w*|flee\w*|fled|"
+    r"kill\w*|dead|dies|wound\w*|blood\w*|lands|landed|connect\w*|glanc\w* off|"
+    r"crack\w*|knock\w*|stagger\w*|crumpl\w*|retreat\w*|run(?:s|ning)? away|ran away)\b",
     re.I)
 _LANDING = re.compile(
     r"\b(?:hits|struck|lands|landed|connect\w*|wound\w*|blood\w*|kill\w*|dead|dies|"
@@ -750,7 +753,15 @@ def act_kept(old: str, new: str, actor, people=()) -> str:
     landed = _stems(_LANDING.findall(new)) - _stems(_LANDING.findall(old))
     if landed:
         return "lands what the old one did not (" + ", ".join(sorted(landed)) + ")"
+    # A pulled blow is the `lethality` rule's to decide, not a manner: measured on the
+    # replay, a repair wrote "pull the blow" over a lethal swing.
+    if _PULLED.search(new) and not _PULLED.search(old):
+        return "pulls a blow the engine did not"
     return ""
+
+
+_PULLED = re.compile(r"\b(?:pull\w* (?:the|his|her|their|a) (?:blow|punch|swing|stroke)|"
+                     r"flat of|non-?lethal|to knock (?:him|her|them) (?:down|out))\b", re.I)
 
 
 # --- speaking up, unasked ----------------------------------------------------------------
