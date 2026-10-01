@@ -8555,6 +8555,13 @@ def seen_in_beat(beat: str, phrase: str) -> str:
             return SEEN
     if not plain_about or not present_in_scene(beat, phrase):
         return HEARD
+    # Only ever the object of a question or a search: "the question you posed — concerning
+    # the woman three streets over — hangs in the air" (replayed 2026-10-01) is talk of her,
+    # and recorded her where the party stood, on the outskirts.
+    if all(_OBJECT_OF.search(s[:m.start()][-70:])
+           for s in plain_about
+           for m in re.finditer(rf"\b{re.escape(head)}s?\b", s, re.I)):
+        return HEARD
     return ""
 
 
@@ -8578,7 +8585,8 @@ def _cue() -> re.Pattern:
 _LOOKED_AT = re.compile(
     r"(?:\byou\s+(?:see|notice|spot|glimpse|make\s+out)|\bthere\s+(?:is|stands|sits|waits)|"
     r"^\W*(?:at|in|on|behind|beside|by|near|across)\s+[^,]{1,40},)\s*(?:\w+\s+){0,4}$", re.I)
-_OBJECT_OF = re.compile(r"\b(?:for|of|about|after|from|like|than)\s+(?:the|a|an|that|this)"
+_OBJECT_OF = re.compile(r"\b(?:for|of|about|after|from|like|than|concerning|regarding)\s+"
+                        r"(?:the|a|an|that|this)"
                         r"\s+(?:\w+\s+){0,2}$", re.I)
 
 

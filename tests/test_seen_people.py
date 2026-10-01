@@ -357,6 +357,10 @@ def test_seen_and_heard_are_read_from_the_sentence():
              "desperate. You are still standing before him, and the search for the woman "
              "has just become a search for why the lie persists.")
     assert judgement.seen_in_beat(ghost, "woman") != judgement.SEEN
+    # And talk of her is not her: recorded with no place, not where the party stands.
+    asked = ("The question you posed, concerning the woman three streets over, hangs in "
+             "the air.")
+    assert judgement.seen_in_beat(asked, "woman") == judgement.HEARD
     assert judgement.seen_in_beat("You see a woman by the well, mending a net.",
                                   "woman") == judgement.SEEN
     assert judgement.seen_in_beat("A man who stands in the doorway eyes your purse.",
