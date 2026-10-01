@@ -18,6 +18,7 @@ from rules.intents import (Intent, IntentError, claims_the_engine_backs,
                           cut_outcome_claims, find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
+from . import intimate as intimate_mod
 from . import mentions as mentions_mod
 from . import speech as speech_mod
 
@@ -109,6 +110,10 @@ class GMAgent:
         # (`speech.lift`, docs/declared-not-guessed.md). Read by `views._finish` for the
         # hails and the names; reset when a turn is planned.
         self.last_said: list[dict] = []
+        # This beat's verdict on the content rule (gm/intimate.py `decide`): set by
+        # `narrate_turn`, read by the checks that must not mangle an intimate beat and by
+        # the view's turn-log row. Reset when a turn is planned.
+        self.intimate = None
         # Who each person-mention in the last groomed beat means (gm/mentions.py,
         # docs/who-the-prose-means.md), and one log row per groomed beat, drained into
         # the turn log by the view.
@@ -281,6 +286,7 @@ class GMAgent:
         rather than fresh.
         """
         self.last_said = []
+        self.intimate = None
         # Where the party stood when the turn began, and the settlement, for the narrator
         # checks (gm/checks, `BeatContext.was_at`): a refused move is judged against the
         # place the turn started from, whatever the engine did afterwards.
@@ -1898,6 +1904,14 @@ class GMAgent:
         # rewritten to where they are — never kept as a new place.
         made: list[str] = []
         known = self._known_names() | (extra_known or set())
+        intimate = self._intimate_beat()
+        # Who is alive and unhurt is not judged in an intimate scene between adults.
+        # Measured live 2026-10-01 on the first briefed beat: "her body is tense but
+        # welcoming" read as Quin Nutmeg "down or dead" (`_FELLED` holds "body", for a
+        # corpse), and "cries out", "goes limp", "collapses against you" are the scene's
+        # words as much as a wound's. Nobody here is hostile (`intimate.partners`); a
+        # death the engine rolls still reaches the page through `press_the_death`.
+        bodies = None if intimate else self._body_count()
 
         def _review(t: str):
             return narration_mod.review(
@@ -1905,7 +1919,7 @@ class GMAgent:
                 known_names=known, earlier=earlier,
                 min_chars=min_chars, max_chars=max_chars, alone=self._alone(),
                 pronouns=self._pc_pronouns(), others=self._other_names(),
-                gender=self._pc_gender(), state=self._body_count(),
+                gender=self._pc_gender(), state=bodies,
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 fire_context=fire_context,
                 # The doors this turn forced or picked, and whether they gave.
@@ -1937,12 +1951,25 @@ class GMAgent:
             return text, made + [f"kept at its own length: {', '.join(sorted(kinds))} only, "
                           f"and the draft carries its events"], []
 
+        # An intimate beat at an explicit table is rewritten by the model the table chose
+        # to write prose, told to keep the passage exactly as explicit as it is. The
+        # owner's beat "we climax together…" went through this rewrite for a recurring
+        # phrase (2026-09-30), on the PLANNER's model with a briefing that says nothing
+        # about content — a model the table never picked for this, free to soften it.
+        who = ((self.prose_model, self.prose_host, self.prose_provider, self.prose_key)
+               if intimate else (self.model, self.host, self.provider, self.api_key))
+
         def _rewrite(complaint: str, note: str):
             reply = client.chat(
                 prompts.narration_repair_messages(
-                    text, complaint, player_input, scene_brief, facts=facts),
-                self.model, self.host, as_json=True, think=False, provider=self.provider,
-                api_key=self.api_key, temperature=0.6, num_predict=900,
+                    text, complaint, player_input, scene_brief, facts=facts,
+                    keep=prompts.INTIMATE_KEEP if intimate else ""),
+                who[0], who[1], as_json=True, think=False, provider=who[2],
+                api_key=who[3], temperature=0.6,
+                # An intimate beat runs to 3,000 characters: its rewrite gets the same
+                # budget and no grammar ceiling, or a mended phrase would come back cut
+                # to 1,800 and lose the end of the scene.
+                num_predict=prompts.INTIMATE_NUM_PREDICT if intimate else 900,
                 # Structural insurance, not a truncation cure: `as_json` already puts a
                 # JSON grammar at the sampler, and the live "Unterminated string" failure
                 # was the token budget dying mid-string — which no grammar prevents and
@@ -1953,7 +1980,8 @@ class GMAgent:
                 # 1,600 — lower than the draft it rewrites — and on 2026-09-30 (item 6)
                 # Ollama closed the string at exactly 1,600 characters, mid-word, and
                 # the cut rewrite shipped as "…They'. What do you do?".
-                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING),
+                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING,
+                                            unbounded=intimate),
             )
             # Cut back to its last whole sentence, as the prose call's reply is.
             fixed, _gone = narration_mod.trim_unfinished(
@@ -2009,6 +2037,11 @@ class GMAgent:
                                         note=f"retry failed: {str(exc)[:100]}"))
 
         return text, made + [f"unrepaired: {', '.join(review.as_log())}"], attempts
+
+    def _intimate_beat(self) -> bool:
+        """Whether this beat is an intimate scene between adults that the content rule
+        briefed explicitly (`intimate.decide`). Read by the checks exempted for it."""
+        return bool(getattr(self, "intimate", None) is not None and self.intimate.fired)
 
     def _pc_name(self) -> str:
         pc = self.engine.scene.pc()
@@ -2092,7 +2125,9 @@ class GMAgent:
         from .state_claims import state_claims
 
         scene = self.engine.scene
-        found = state_claims(text, scene, changes)
+        # The body's conditions are not judged in an intimate scene (see state_claims).
+        bodies = not self._intimate_beat()
+        found = state_claims(text, scene, changes, conditions=bodies)
         if not found:
             return text, [], []
         pc = scene.pc()
@@ -2120,7 +2155,7 @@ class GMAgent:
                     attempts.append(Attempt("repair", 0.0, self.prose_model,
                                             note=f"state claim: failed: {exc}"))
                     fixed = ""
-            if fixed and not state_claims(fixed, scene, changes):
+            if fixed and not state_claims(fixed, scene, changes, conditions=bodies):
                 text = text.replace(sentence, fixed, 1)
                 repairs.append(f"state claim: {why}: {sentence!r} -> {fixed!r}")
             else:
@@ -2230,7 +2265,8 @@ class GMAgent:
                      scene_now: str = "",
                      pull: dict | None = None,
                      claim: str = "",
-                     shown: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+                     shown: list[str] | None = None,
+                     beat: int = 0) -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
 
         The other half of `intents_first`. Here the prose call is the only one there is,
@@ -2249,6 +2285,14 @@ class GMAgent:
         fighting = self.engine.scene.in_encounter
         tells = [o.tell for o in outcomes if getattr(o, "tell", "")]
         self.last_suggestions: list[str] = []
+        # The content rule for THIS beat, decided in code (gm/intimate.py): an intimate
+        # scene between adults at an explicit table gets its own briefing and the
+        # owner's passages; a child present or named forces the fade; everything else is
+        # the ordinary turn. Read from the plain beats, which every check reads.
+        # `beat` turns the owner's passages over from one beat to the next.
+        self.intimate = intimate_mod.decide(player_input, earlier, self.engine.scene,
+                                            beat=beat)
+        demos = self.intimate.demonstrations
         # This call is handed NO history at all — `[]` — so the ledger is the only
         # thing standing between it and a campaign with no past. It is cheap and it is
         # numberless, and the prose call is the one that actually writes the page.
@@ -2262,10 +2306,17 @@ class GMAgent:
             # open matter nearest to hand (docs/narrator-guards.md D6, D7), and the
             # claim the engine holds false, when the player made one.
             scene_now_block=scene_now, pull=str((pull or {}).get("text") or ""),
-            claim=prompts.false_claim_block(claim) if claim else "")
+            claim=prompts.false_claim_block(claim) if claim else "",
+            scene_mode=self.intimate.mode,
+            demonstrations=demos.examples if demos is not None else None)
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
-            else narration_mod.MIN_SCENE_CHARS, max_chars=2200)
+            else narration_mod.MIN_SCENE_CHARS, max_chars=2200,
+            # The intimate beat is asked for 3,000 characters (the owner's figure), which
+            # the grammar cannot hold (GRAMMAR_MAXLENGTH_CEILING): no `maxLength`, and the
+            # token budget bounds it instead. Every other beat is clamped as before.
+            unbounded=self._intimate_beat())
+        budget = prompts.INTIMATE_NUM_PREDICT if self._intimate_beat() else 1400
 
         # Prose gets the second model call 1 has always had. It never did, and the
         # gap was invisible until the beat a model declines to write: one call,
@@ -2300,7 +2351,7 @@ class GMAgent:
                 # close a string it is given the tokens to close.
                 reply = client.chat(
                     messages, model, host, as_json=True, think=False,
-                    temperature=0.8, num_predict=1400, provider=provider,
+                    temperature=0.8, num_predict=budget, provider=provider,
                     api_key=key, schema=schema,
                     timeout=(PRIMARY_TIMEOUT if model == self.prose_model
                              else FALLBACK_TIMEOUT))
@@ -2319,10 +2370,21 @@ class GMAgent:
                 # existed" — and this path still dropped both, so a live prose
                 # failure logged `0.0s` and an empty string. The malformed JSON of
                 # 2026-09-04 could only be read by reproducing it.
+                # An intimate beat has no `maxLength`, so the budget can end it inside
+                # the string: the narration is salvaged and trimmed to a whole sentence
+                # below, rather than the beat lost to "Unterminated string".
+                salvaged = (intimate_mod.narration_from_cut_reply(reply.text)
+                            if reply is not None and self._intimate_beat() else "")
                 attempts.append(Attempt(
                     "prose", getattr(reply, "seconds", 0.0), model,
-                    getattr(reply, "text", "") or "", note=str(exc)[:120]))
-                continue
+                    getattr(reply, "text", "") or "",
+                    note=str(exc)[:120] + (" — budget death, narration salvaged"
+                                           if salvaged else "")))
+                if not salvaged:
+                    continue
+                text = self._lift(salvaged)
+                self.last_suggestions = []
+                break
             declined = narration_mod.reads_as_a_refusal(text)
             # A deflection is a refusal that reads as prose: rather than saying
             # no, the model writes a different scene and re-introduces somebody
@@ -2357,7 +2419,7 @@ class GMAgent:
                         messages + [{"role": "assistant", "content": reply.text},
                                     {"role": "user", "content": correction}],
                         model, host, as_json=True, think=False, temperature=0.7,
-                        num_predict=1400, provider=provider, api_key=key,
+                        num_predict=budget, provider=provider, api_key=key,
                         schema=schema, timeout=FALLBACK_TIMEOUT)
                     data2 = again.json()
                     text2 = self._lift(str(data2.get("narration", "")).strip())
@@ -2397,11 +2459,17 @@ class GMAgent:
         if gone:
             early.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")
         # A blow at the player that nobody declared (docs/declared-not-guessed.md, the
-        # blows door): a check now, not a door into a fight.
-        text, note, struck_attempts = self._undeclared_blows(text, messages, schema)
-        attempts.extend(struck_attempts)
-        if note:
-            early.append(note)
+        # blows door): a check now, not a door into a fight. Not in an intimate scene
+        # between adults, where nobody here is hostile (`intimate.partners`) and the
+        # detector's verbs are the scene's own: probed 2026-10-01, "Mira grabs your hair
+        # and pulls you down to her" and "she drives her hips against you" both read as
+        # undeclared blows, and the repair asks for the beat again "threatening,
+        # squaring up or reaching" — an intimate scene rewritten as a menace, or cut.
+        if not self._intimate_beat():
+            text, note, struck_attempts = self._undeclared_blows(text, messages, schema)
+            attempts.extend(struck_attempts)
+            if note:
+                early.append(note)
         # And, in a fight, anybody the prose brings in that nobody declared.
         text, note, arrival_attempts = self._undeclared_arrivals(text, messages, schema)
         attempts.extend(arrival_attempts)

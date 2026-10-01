@@ -1432,7 +1432,8 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
                       report: dict | None = None,
                       extra_briefing: str = "",
                       player_message: dict | None = None,
-                      ledger: list[dict] | None = None) -> list[dict]:
+                      ledger: list[dict] | None = None,
+                      briefing: str | None = None) -> list[dict]:
     """The turn prompt, in one of two modes.
 
     Out of a fight the model is shown long examples and asked to build a scene. In one it
@@ -1442,8 +1443,12 @@ def call_one_messages(briefing_scene: str, history: list[dict], player_input: st
     The combat examples *replace* rather than extend, deliberately. Showing both sets in a
     fight would put nine hundred characters of cellar-and-weather in front of a model
     being asked for three sentences, and demonstration volume is what wins.
+
+    `briefing` replaces the turn briefing for a prose call that is not writing an
+    ordinary turn — the intimate scene's (`INTIMATE_BRIEFING`, gm/intimate.py).
     """
-    briefing = with_hazard_rules(BRIEFING) + (COMBAT_BRIEFING_EXTRA if in_combat else "")
+    if briefing is None:
+        briefing = with_hazard_rules(BRIEFING) + (COMBAT_BRIEFING_EXTRA if in_combat else "")
     # An explicit set replaces both — Continue is the caller that passes one, and its
     # examples have to be the only scene-shaped thing the model can see.
     if examples is None:
@@ -1595,6 +1600,15 @@ CARRY_ON_EXAMPLES: list[dict] = [
 ]
 
 
+# The speaker tags, one copy for both prose briefings — the turn's (`PROSE_AFTER_EXTRA`)
+# and the intimate scene's (`INTIMATE_BRIEFING`). CLAUDE.md: a rule with two copies is a
+# rule that drifts.
+SAY_TAGS = """
+When somebody from WHO IS HERE speaks, wrap their words in a tag with their ref, and
+to=you when they say it to the player: <say who=c2 to=you>'Two days,'</say> he says.
+The tags are taken out before anyone reads the page. The player's own words get no tag.
+"""
+
 PROSE_AFTER_EXTRA = """
 THIS TURN: the engine has already resolved it, and what it decided is below. Write the
 turn as prose — the scene, the people in it, what just happened — and put nothing in the
@@ -1608,11 +1622,7 @@ Write bodies, not summaries. Say what moves, where it goes and what it does: the
 blade, the step, the fall. When a blow lands, show the wound in plain physical words —
 where it opened, what broke, the blood and where it runs — never "the violence", "the
 chaos" or "the struggle".
-
-When somebody from WHO IS HERE speaks, wrap their words in a tag with their ref, and
-to=you when they say it to the player: <say who=c2 to=you>'Two days,'</say> he says.
-The tags are taken out before anyone reads the page. The player's own words get no tag.
-"""
+""" + SAY_TAGS
 
 
 # How much of the scene as it stands the prose call is shown, and how much of each beat.
@@ -1737,8 +1747,14 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
                         earlier: list[str] | None = None,
                         ledger: list[dict] | None = None,
                         scene_now_block: str = "", pull: str = "",
-                        claim: str = "") -> list[dict]:
+                        claim: str = "", scene_mode: str = "",
+                        demonstrations: list[dict] | None = None) -> list[dict]:
     """Write the whole turn, after the dice.
+
+    `scene_mode` is `intimate.decide`'s verdict for this beat: "intimate" swaps in the
+    intimate scene's briefing, its note at the end, and `demonstrations` (the owner's
+    passages as example turns, possibly none) for the worked examples; "fade" forces the
+    fade line because a child is present or named; "" is the ordinary turn.
 
     The *call-one* briefing and examples, not the consequence ones, because this is being
     asked for a scene rather than for two sentences about a blow — the consequence prompt
@@ -1820,23 +1836,40 @@ def call_prose_messages(briefing_scene: str, history: list[dict], player_input: 
                     + (f"\n\n{pull}" if pull else "")
                     + (f"\n\n{claim}" if claim else "")),
     }
+    if scene_mode == "intimate":
+        # The Author's-Note slot: the very end of the last message, after the tells and
+        # the scene as it stands (gm/intimate.py has the sources). The restrained worked
+        # examples are replaced, not joined, by the owner's passages — the combat and
+        # Continue sets replace them for the same reason — and with no passages on file
+        # the model is shown no scene-shaped reply at all rather than the wrong one.
+        final = {"role": "user",
+                 "content": final["content"] + "\n\n" + intimate_note(bool(demonstrations))}
+        return call_one_messages(
+            briefing_scene, history, player_input, in_combat=False, enemy=enemy,
+            examples=list(demonstrations or []),
+            extra_briefing=SAY_TAGS, player_message=final, ledger=ledger,
+            briefing=INTIMATE_BRIEFING)
     return call_one_messages(
         briefing_scene, history, player_input, in_combat=in_combat, enemy=enemy,
         examples=(CARRY_ON_EXAMPLES if player_input == CARRY_ON else None),
-        extra_briefing=PROSE_AFTER_EXTRA + content_line(), player_message=final,
-        ledger=ledger)
+        extra_briefing=PROSE_AFTER_EXTRA + content_line(fade=scene_mode == "fade"),
+        player_message=final, ledger=ledger)
 
 
-def content_line() -> str:
+def content_line(fade: bool = False) -> str:
     """The table's content setting as one line of the prose briefing (item 22).
 
     The app had taken no position, so whether a paid encounter happened was whatever
     the guards did by accident. Now it is the table's: "fade" is a designed transition —
     time passes, the scene resumes after — and "explicit" writes the scene. Read live,
-    so a change on the shelf page holds from the next beat."""
+    so a change on the shelf page holds from the next beat.
+
+    `fade` forces the fade line at an explicit table: a child is present or named in the
+    scene (`intimate.decide`), and adults-only is enforced in code, not left to the
+    sentence below asking for it."""
     from rules import houserules
 
-    if houserules.content() == "explicit":
+    if houserules.content() == "explicit" and not fade:
         # Asked for 2026-09-25: the narrator "shies away ... by being metaphorical"; the
         # table wants intimate scenes written as vividly as the fights, in the body.
         # Adults only, without exception — the population holds children now
@@ -1849,6 +1882,100 @@ def content_line() -> str:
     return ("\nWhen a scene turns to intimacy, fade to black: say in one sentence that "
             "time passes, then pick the scene up afterwards — never stall it, never "
             "replace what the people were doing with the room's weather.\n")
+
+
+# How long the intimate passage is asked to run: 3,000 characters, the owner's figure
+# (2026-10-01, "can we raise the limit for the text generation to 3000"). What held the
+# owner's original beats to 665 and 709 characters was not a cap at all — it was the
+# worked examples, none of them over 822 characters, which this beat no longer shows.
+#
+# 3,000 cannot go through the grammar: `maxLength` stops compiling between 2,000 and
+# 2,100 on both models measured (GRAMMAR_MAXLENGTH_CEILING). So this beat's schema has
+# no `maxLength` (`prose_schema(unbounded=True)`) and is bounded by the token budget
+# instead, `INTIMATE_NUM_PREDICT`: 3,000 characters is about 800 tokens at the measured
+# 3.8 characters a token, and the JSON object around it and the suggestions take the
+# rest. A reply the budget does cut off is salvaged and trimmed to its last whole
+# sentence (`intimate.narration_from_cut_reply`, `narration.trim_unfinished`).
+#
+# History, so the number is not re-learned: 1,700 was asked first under the 1,800
+# grammar ceiling, and the first live briefed beat ran straight to the ceiling and was
+# closed mid-sentence, losing its hand-back; 1,400 followed, before the owner raised it.
+INTIMATE_LENGTH = 3000
+INTIMATE_NUM_PREDICT = 1100
+
+# The prose briefing for ONE kind of beat: an intimate scene between adults at a table
+# whose content rule is "explicit", detected in code (gm/intimate.py). It replaces the
+# turn briefing for that beat rather than adding to it, because the measured failure was
+# a 350-character line losing to everything around it (13,103 characters of briefing,
+# 13,634 of restrained worked examples). What it keeps is the game's laws: the engine's
+# decisions stand and carry no number, names come from the brief, the hand-back. What it
+# drops is what fights "plainly, in the body": the four moves (whose PUSH is "the weather
+# turns, a door closes" — the room's fire written in place of the people), the shapes,
+# the wound-and-blow language, and the op reference this call never uses.
+#
+# And one law it relaxes, by the owner's ruling of 2026-10-01 ("yes it can speak for the
+# character"): in this scene, and only here, the narrator may write what the player's
+# character does and says beyond the player's own line. Everywhere else the turn
+# briefing's "The player says only what their character does" stands. Measured the same
+# day: no check in the pipeline catches the narrator speaking for the player on ANY beat
+# — that rule has only ever been the prompt's — so the relaxation is this paragraph, and
+# the beat's turn-log row records it (`intimate.EXEMPTIONS`).
+#
+# Deliberately quotes none of the soft phrases it is written against: the shape of a
+# prompt becomes the shape of the output, and a phrase put in front of the model, even
+# as a thing to avoid, is a phrase it has been shown.
+INTIMATE_BRIEFING = f"""You are the Game Master of a Pathfinder 1st Edition game, \
+narrating to one adult player at a table that has asked for adult content written \
+explicitly. You narrate and you voice everyone in the scene.
+
+THIS BEAT IS AN INTIMATE SCENE BETWEEN ADULTS. Write it explicitly and in the body. \
+Describe the bodies and what they do plainly and directly: name the parts of the body in \
+plain words, say what touches what and how, what it feels like, the breath and the sounds, \
+and the words the two of them say to each other. Write the act itself. Do not put a \
+metaphor, a euphemism or a comparison where the act should be; do not cut away, summarise \
+or skip ahead; do not turn from the people to the room, the light or the fire.
+
+In this scene you may write what the player's character does and says, carrying on from \
+the player's line in the direction it points: their hands, their body, their words. The \
+other person has wants of their own and acts on them, in their own body and their own \
+words.
+
+What the engine decided is what happened. Do not contradict it, do not add a roll, and \
+never write a number.
+
+Write to the player as "you". Name only the people and places listed below; if you need \
+someone new, describe them without a name. Everyone in this scene is an adult. Never \
+anyone who is a child, in any way.
+
+This passage may run long: up to about {INTIMATE_LENGTH:,} characters. Then hand it \
+back: end by asking what they DO, and offer two or three things they might do next, each \
+written as the PLAYER'S OWN LINE in the first person, the way they would type it.
+
+Reply with a JSON object:
+{{"narration": "...", "suggestions": ["...", "..."], "intents": []}}.
+The intents list is always empty in this reply.
+"""
+
+
+# What a rewrite of an intimate beat is told to leave alone (`Agent.polish`). The rewrite
+# exists to mend one named fault — a recurring phrase, a name — and a softened scene is a
+# second change nobody asked for.
+INTIMATE_KEEP = ("This passage is an intimate scene between adults, written explicitly "
+                 "because this table asked for it. Keep it exactly as explicit and as "
+                 "plain as it is: change only what the problem names.")
+
+
+def intimate_note(shown: bool) -> str:
+    """The note that goes LAST in the intimate beat's prompt — the Author's-Note slot
+    (gm/intimate.py). `shown`: whether the owner's passages are in front of it."""
+    like = (" the way the passages you wrote earlier in this conversation are written —"
+            if shown else "")
+    return (f"THIS BEAT: an intimate scene between adults, which this table writes "
+            f"explicitly. Write it plainly and in the body,{like} the act itself and not "
+            f"a figure of speech for it, carrying on from the player's line — you may "
+            f"write what their character does and says. Carry on what happened before, "
+            f"not the way it was worded. Up to about {INTIMATE_LENGTH:,} characters, "
+            f"then ask what they do.")
 
 
 CONSEQUENCE_BRIEFING = """You are the Game Master, narrating what just happened.
@@ -2156,8 +2283,16 @@ NARRATION_REPAIR_EXAMPLE = {
 }
 
 
-def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
+def prose_schema(min_chars: int = 0, max_chars: int = 0, *,
+                 unbounded: bool = False) -> dict:
     """The one-field schema for every call that only writes prose.
+
+    `unbounded=True` puts NO `maxLength` in the grammar, whatever `max_chars` says — the
+    one way past GRAMMAR_MAXLENGTH_CEILING, and an explicit flag so that nobody reaches it
+    by passing a big number: `max_chars` is still clamped to the ceiling everywhere.
+    Used by the intimate scene's beat alone (the owner asked for 3,000 characters,
+    2026-10-01), which bounds its reply by `num_predict` instead and salvages a reply
+    the budget cut off (`intimate.narration_from_cut_reply`).
 
     Honest about what it buys, because the first version of this docstring overclaimed
     and the call-site audit corrected it. `as_json=True` already puts a JSON grammar at
@@ -2185,7 +2320,7 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
     # in four; `cut_schema_bleed` trimmed each back to 703-791 characters, under the
     # floor it was meant to guarantee. The floor is `narration.review`'s to report
     # and the repair call's to fix, which lengthened all three to 1,469-1,579.
-    if max_chars:
+    if max_chars and not unbounded:
         narration["maxLength"] = min(int(max_chars), GRAMMAR_MAXLENGTH_CEILING)
     # `suggestions` and `intents` are admitted and never read, because the prose call
     # is shown the TURN prompt — twelve worked examples, every one of them a three-key
@@ -2230,7 +2365,8 @@ GRAMMAR_MAXLENGTH_CEILING = 1800
 
 def narration_repair_messages(text: str, complaint: str, player_input: str = "",
                               scene_brief: str = "",
-                              facts: list[str] | None = None) -> list[dict]:
+                              facts: list[str] | None = None,
+                              keep: str = "") -> list[dict]:
     """The rewrite call, given something to write *about*.
 
     It used to be handed the passage and the complaint and nothing else. Asked to rewrite
@@ -2238,6 +2374,9 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
     model had nothing to replace them with — and returned "..." and ". ..", three
     characters long, which then scored better than the plagiarism it replaced. Measured on
     all three turns of a live run.
+
+    `keep` is one more thing the rewrite must not change, onto the system message — the
+    intimate scene's register (`INTIMATE_KEEP`).
     """
     body = complaint + "\n\nThe passage:\n" + text
     if player_input:
@@ -2251,7 +2390,8 @@ def narration_repair_messages(text: str, complaint: str, player_input: str = "",
         body += ("\n\nWhat the engine decided. Every one of these stays true in your "
                  "rewrite:\n" + "\n".join(f"- {f}" for f in facts))
     return [
-        {"role": "system", "content": NARRATION_REPAIR_BRIEFING},
+        {"role": "system", "content": NARRATION_REPAIR_BRIEFING
+         + (f"\n\n{keep}" if keep else "")},
         {"role": "user", "content": NARRATION_REPAIR_EXAMPLE["user"]},
         {"role": "assistant", "content": NARRATION_REPAIR_EXAMPLE["assistant"]},
         {"role": "user", "content": body},

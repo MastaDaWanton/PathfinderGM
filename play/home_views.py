@@ -529,12 +529,17 @@ def house_rules(request):
         rules, problems = houserules.set_active(body)
         if problems:
             return JsonResponse({"rules": rules, "problems": problems}, status=400)
+    from gm import intimate
     from rules import races as races_mod
 
     return JsonResponse({"rules": houserules.active(),
                          "tiers": houserules.POINT_BUY_TIERS,
                          "caps": houserules.ABILITY_CAPS,
-                         "race_tiers": list(races_mod.TIERS)})
+                         "race_tiers": list(races_mod.TIERS),
+                         # Where the table writes its intimate-scene passages, shown on
+                         # the content card. Named, not created: the file is made the
+                         # first time a scene needs it (gm/intimate.py).
+                         "intimate_examples": str(intimate.demonstrations_path())})
 
 
 @require_POST
