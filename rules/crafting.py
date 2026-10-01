@@ -470,6 +470,27 @@ def _in_the_pot(items, used) -> list[tuple[str, str, dict]]:
     return out
 
 
+def _at_strength(line: str, spec: dict, potency: float) -> str:
+    """A benefit's card line at the strength the brew delivers it.
+
+    Only the flat bonuses `consumables.scaled_bonus` raises, asked through that one
+    function so the card and the drink cannot disagree; the authored number stays in the
+    line so the player can see where the rest came from — "+26 Strength (permanent;
+    +20 at 130%)". Dice lines are left as written: potency is stated once beside them.
+    """
+    if not spec or str(spec.get("type", "")) not in con.SCALED_BONUSES:
+        return line
+    authored = con.scaled_bonus(spec.get("amount", 0), 1.0)
+    landed = con.scaled_bonus(spec.get("amount", 0), potency)
+    if landed == authored:
+        return line
+    shown = effectspec.render({**spec, "amount": landed})
+    note = f"{authored:+d} at {round(potency * 100)}%"
+    if shown.endswith(")"):
+        return f"{shown[:-1]}; {note})"
+    return f"{shown} ({note})"
+
+
 @dataclass
 class Sifted:
     """What is in the pot, sorted into what it does for you and what it does to you.
@@ -490,7 +511,7 @@ class Sifted:
     benefits: list[dict] = field(default_factory=list)
 
 
-def sift(items, used) -> Sifted:
+def sift(items, used, potency: float = 1.0) -> Sifted:
     """The card's two lists: what each component does for you, and what it does to you.
 
     Sifted out of the descriptions rather than printed whole. The source is written for a
@@ -501,13 +522,17 @@ def sift(items, used) -> Sifted:
 
     The chain's potency multiplier is *not* stamped on every line. It is one property of
     the result and is stated once, beside the rarity and the DC; repeating it on each
-    effect was noise on every card in the app.
+    effect was noise on every card in the app. But a flat bonus the potency RAISES is
+    printed at the strength it lands with (`_at_strength`): the brewed Power leaf's card
+    said "+20 Strength" and drinking it gave +26 (playtest 2026-09-30), because the card
+    and the drink read the same spec through two different rules.
     """
     triples = _in_the_pot(items, used)
     specs = [spec for _, _, spec in triples if spec]
     sorted_out = con.sort_harm(specs)
 
-    effects = [f"{source}: {line}" for source, line, spec in triples
+    effects = [f"{source}: {_at_strength(line, spec, potency)}"
+               for source, line, spec in triples
                if not spec or any(spec is b for b in sorted_out.benefits)]
     drawbacks = [p.line for p in sorted_out.poisons]
     # Penalties are drawbacks but not poisons: a -2 to all actions hurts whoever drinks it
@@ -676,7 +701,7 @@ def preview(track_id: str, level: int, chain: Chain,
     risky = (any(i.risky for i in items) or any(h.drawbacks for h, _ in used)) \
         and not cleansed
 
-    sifted = sift(items, used)
+    sifted = sift(items, used, potency)
     effects, drawbacks = list(sifted.effects), list(sifted.drawbacks)
     poisoned = [p.as_dict() for p in sifted.poisons]
     specs = sifted.specs
