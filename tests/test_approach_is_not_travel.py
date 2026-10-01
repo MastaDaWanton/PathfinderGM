@@ -155,13 +155,38 @@ def test_on_a_map_the_approach_walks_to_a_square_beside_them(worlds):
 
 
 @pytest.mark.parametrize("plan", [
-    [{"op": "move", "actor": "pc", "params": {"zone": "near"}}],
+    [{"op": "move", "actor": "pc", "params": {"who": "SPY", "zone": "engaged"}}],
     [{"op": "attack", "actor": "pc", "target": "SPY"}],
 ])
 def test_a_plan_that_already_closes_is_left_alone(worlds, plan):
     s, e, spy = _with_the_spy(worlds)
-    plan = [dict(r, target=spy.ref) if r.get("target") == "SPY" else dict(r) for r in plan]
+    s.zones[spy.ref] = "far"
+    s.positions.pop(spy.ref, None)
+    plan = [dict(r, target=spy.ref) if r.get("target") == "SPY" else
+            dict(r, params={"who": spy.ref, "zone": "engaged"}) if r["op"] == "move" else
+            dict(r) for r in plan]
     assert judgement.declare_approach(plan, ROW_82, s, dict(READ_82)) == plan
+
+
+def test_a_move_that_does_not_end_beside_them_is_replaced(worlds):
+    """Measured on this lane's live check (2026-09-30): "I walk over to the guard." — the
+    refusal named the square beside him; the retry wrote `move square [0, 0]`, 25 ft the
+    other way, and the guard went from near to far while the prose closed the distance."""
+    s, e, spy = _with_the_spy(worlds)
+    if not s.has_grid or spy.ref not in s.positions or "pc" not in s.positions:
+        pytest.skip("this world's market places nobody on a map")
+    from rules.grid import distance_between
+
+    there = tuple(s.positions[spy.ref])
+    far = max(((x, y) for x in range(s.grid.width) for y in range(s.grid.height)),
+              key=lambda q: distance_between(q, "medium", there, spy.size))
+    wrong = [{"op": "move", "actor": "pc", "params": {"square": list(far)}}]
+    out = judgement.declare_approach([dict(r) for r in wrong], ROW_82, s, dict(READ_82))
+    assert out != wrong
+    if out:
+        assert out[0]["op"] == "move" and out[0]["params"]["square"] != list(far)
+        e.run(e.validate(out))
+        assert s.zones[spy.ref] == "engaged"
 
 
 def test_talking_to_somebody_here_is_not_walking_up_to_them(worlds):

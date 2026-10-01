@@ -4238,20 +4238,59 @@ def declare_approach(raw_intents, player_text: str, scene, reading=None) -> list
     if not sought:
         return raw_intents
     pc = scene.pc()
+    who = scene.actors[sought[0]]
+    wrong: list = []
     for r in raw_intents:
         if not isinstance(r, dict):
             continue
         op = str(r.get("op", "")).lower()
-        if op in ("move", "travel", "journey") and str(r.get("actor") or pc.ref) == pc.ref:
+        mine = str(r.get("actor") or pc.ref) == pc.ref
+        if op in ("travel", "journey") and mine:
             return raw_intents
+        if op == "move" and mine:
+            if _closes_on(scene, r, who):
+                return raw_intents
+            wrong.append(r)
         if op in ("attack", "manoeuvre") and str(r.get("target") or "") in sought:
             return raw_intents
-    move = _approach_move(scene, scene.actors[sought[0]])
+    move = _approach_move(scene, who)
     if move is None:
-        return raw_intents
+        return [r for r in raw_intents if not any(r is w for w in wrong)] \
+            if wrong else raw_intents
     kept = [r for r in raw_intents
-            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")]
+            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")
+            and not any(r is w for w in wrong)]
     return [move, *kept]
+
+
+def _closes_on(scene, raw: dict, who) -> bool:
+    """Whether the plan's own move of the player's character ends within reach of `who`.
+
+    Measured on this lane's live check (2026-09-30): "I walk over to the guard." — the
+    refusal named the square beside him, [4, 4]; the retry wrote `move square [0, 0]`,
+    25 ft the OTHER way, and the guard went from near to far while the prose said Sam
+    closed the distance. The square is checked, not trusted: a move that does not end
+    beside them is replaced by the one that does."""
+    params = raw.get("params") or {}
+    square = params.get("square")
+    pc = scene.pc()
+    positions = getattr(scene, "positions", None) or {}
+    if square is not None and who.ref in positions:
+        try:
+            from rules.grid import distance_between
+
+            there = tuple(positions[who.ref])
+            start = tuple(positions.get(pc.ref) or ())
+            level = start[2:3] if len(start) > 2 else ()
+            feet = distance_between(tuple(square)[:2] + tuple(level), pc.size, there,
+                                    who.size)
+            return feet <= 5
+        except Exception:  # noqa: BLE001 — a square that cannot be measured is not trusted
+            return False
+    if str(params.get("who") or "") == who.ref:
+        return _CLOSENESS.get(str(params.get("zone") or ""), -1) > _CLOSENESS.get(
+            str((getattr(scene, "zones", {}) or {}).get(who.ref) or "near"), 1)
+    return False
 
 
 def _goes_somewhere(player_text: str, reading=None, scene=None) -> bool:
