@@ -2238,8 +2238,10 @@ def _take_the_exit(c, chip: dict, text: str):
     else:
         op = {"op": "travel", "actor": pc.ref, "params": {"place": chip["id"]},
               "because": "the player chose it from the ways on"}
+    # The manner of the going, rolled where 1e rolls it (`judgement.manner_checks`): "I
+    # slip out quietly" is Stealth against whoever might notice, before the walk.
     try:
-        intents = engine.validate([op])
+        intents = engine.validate([*judgement.manner_checks(text, c.scene), op])
     except IntentError as exc:
         c.transcript.pop()
         if getattr(exc, "fixable_by", "") == "player":

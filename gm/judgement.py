@@ -2765,12 +2765,57 @@ def inject_checks(raw_intents, player_text: str, scene) -> list:
 
     for skill, verbs in _CHECK_VERBS:
         if _re.search(_DECLARES + r"(?:" + verbs + r")", player_text, _re.I):
+            params: dict = {"skill": skill}
+            if skill == "stealth":
+                # 1e's own terms (CRB p.106): Stealth "is opposed by the Perception
+                # check of anyone who might notice you" — so it is rolled against the
+                # sharpest eye here, and with nobody here to notice there is nothing
+                # to roll (`stealth_opposed`). A flat band was never the rule.
+                opposed = stealth_opposed(scene)
+                if opposed is None:
+                    continue
+                params["opposed_by"] = opposed
             return list(raw_intents) + [{
                 "op": "check", "actor": pc.ref,
                 "because": "the player declared it; the dice decide it",
-                "params": {"skill": skill},
+                "params": params,
             }]
     return raw_intents
+
+
+def _perception(actor) -> int:
+    try:
+        return sum(int(m.value) for m in actor.skill_modifiers("perception"))
+    except Exception:  # noqa: BLE001 — a body with no sheet notices nothing extra
+        return 0
+
+
+def stealth_opposed(scene) -> dict | None:
+    """`opposed_by` for a Stealth check: the Perception of whoever here is likeliest to
+    notice — one roll against the sharpest, as `listener_for` does for a lie, where the
+    CRB rolls each watcher — or None when nobody is here to notice at all."""
+    actors = getattr(scene, "actors", {}) or {}
+    pool = [r for r, a in actors.items()
+            if not getattr(a, "is_pc", False) and not getattr(a, "is_down", False)]
+    if not pool:
+        return None
+    return {"ref": max(pool, key=lambda r: _perception(actors[r])), "skill": "perception"}
+
+
+def manner_checks(player_text: str, scene) -> list[dict]:
+    """The check the MANNER of a move declares, for the door that moves the party with no
+    planner (`play/views.py` `_take_the_exit`): "I slip out quietly" beside a place chip
+    is the move and a Stealth check, rolled where 1e calls for one — opposed by anyone
+    who might notice (`stealth_opposed`), and not at all with nobody here.
+
+    The register's deferred row (2026-09-29): those words were read as a Stealth check
+    (`declared_ops` gave ['check'] in all three exports), counted as manner so the move
+    took the engine's own door — and the check was then never rolled. Only Stealth: any
+    other check is not manner, and the clause goes to the planner as it always did."""
+    if scene is None or not str(player_text or "").strip():
+        return []
+    return [r for r in inject_checks([], player_text, scene) or ()
+            if str((r.get("params") or {}).get("skill", "")).lower() == "stealth"]
 
 
 # "I use Blood Nova on the merchant": a capitalised name after a using verb, up to a
