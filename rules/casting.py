@@ -214,6 +214,10 @@ CASTERS: dict[str, dict] = {
         # literal in the forge, so a homebrew class that grants its own cantrips says so
         # in the same place it says everything else about how it casts.
         "grants_levels": [0],
+        # "Each time a character attains a new wizard level, he gains two spells of his
+        # choice to add to his spellbook. The two free spells must be of spell levels he
+        # can cast." (CRB, Wizard.) Read by `learning`, never by class name.
+        "learns_per_level": 2,
         "note": "A wizard prepares from the book they carry; losing it is losing the spells.",
     },
     "cleric": {
@@ -291,6 +295,12 @@ def highest_spell_level(actor) -> int:
     Bonus slots are deliberately excluded: 1e grants them for levels you already have
     access to, and a high Intelligence does not let a 1st-level wizard cast fireball.
     """
+    return highest_spell_level_at(actor, int(actor.level or 0))
+
+
+def highest_spell_level_at(actor, class_level: int) -> int:
+    """`highest_spell_level` as it stood at some class level — the level-up picks ask it
+    of the level each pick was earned at, not only of today's."""
     data = caster_data(actor)
     # `data.get("progression", "full")` on an empty dict answers "full", which handed the
     # wizard's whole table to every rogue and fighter in the game. The default is only a
@@ -298,9 +308,9 @@ def highest_spell_level(actor) -> int:
     if not data:
         return 0
     table = PROGRESSIONS.get(data.get("progression", "full"))
-    if not table or actor.level < 1:
+    if not table or int(class_level or 0) < 1:
         return 0
-    row = table[min(int(actor.level), len(table)) - 1]
+    row = table[min(int(class_level), len(table)) - 1]
     return max((i for i, n in enumerate(row) if n > 0), default=0)
 
 
@@ -477,6 +487,253 @@ def known_spells(actor, up_to: int | None = None) -> dict[int, list]:
     for lvl in out:
         out[lvl].sort(key=lambda s: str(s.name).lower())
     return dict(sorted(out.items()))
+
+
+# --- spells owed for levels gained --------------------------------------------------------
+#
+# The owner, 2026-10-01: "leveled up as a wizard and did not choose new spells". The Core
+# Rulebook: "Each time a character attains a new wizard level, he gains two spells of his
+# choice to add to his spellbook. The two free spells must be of spell levels he can
+# cast." Nothing in the level-up path asked, so a wizard's book never grew past the forge.
+#
+# Two shapes, both read off the casting block and neither off a class name:
+#
+#   book    `learns_per_level: N` — N free spells at every level after the first, each of
+#           a spell level castable AT THE LEVEL IT WAS EARNED. A free pick is a different
+#           thing from a spell copied out of a scroll, and the book alone cannot tell them
+#           apart, so the free picks taken are COUNTED on the actor
+#           (`Actor.level_spells_taken`) rather than inferred from the book's length.
+#           Hero Lab met exactly this and planned the same split — one table for the
+#           per-level free allotment, "categorized for the spell levels you would have
+#           had access to at the time", a second for spells bought and copied
+#           (forums.wolflair.com, t=50834). D&D Beyond enforces nothing, and its forum
+#           has the bug report that follows: a wizard who added every 1st-level spell.
+#   known   a Spells Known table (`casting.known`) — the repertoire may hold that many at
+#           each spell level; what is owed is the table less what is held. No counter is
+#           needed, because the table states the total outright.
+#
+# Picks are owed until chosen, and survive a save, so a level taken in the night (the
+# rest path in rules/engine.py) or before this existed is offered the same as one taken
+# from the Class card.
+
+
+def learns_per_level(actor) -> int:
+    """Free spells a book caster writes in at each level after the first. 0 for the rest."""
+    try:
+        return max(0, int(caster_data(actor).get("learns_per_level") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _castable_at(actor, class_level: int) -> int:
+    """The best spell level castable at a class level, Intelligence-gated as today."""
+    top = highest_spell_level_at(actor, class_level)
+    return max((lvl for lvl in range(top + 1) if can_cast_level(actor, lvl)), default=0)
+
+
+def infer_level_spells_taken(actor) -> int:
+    """How many free level-up spells an older save had already been given.
+
+    A save written before `level_spells_taken` existed cannot say, and Hero Lab warned
+    of the same migration: validation added after the fact makes every existing caster
+    report an error at once (forums.wolflair.com, t=50834). So it is worked out ONCE, at
+    load (`sheet.from_dict`), and written from then on:
+
+        taken = chosen spells in the book - the creation allowance
+
+    clamped to what the levels gained could have given. "Chosen" leaves out the levels
+    the class grants whole (a wizard's cantrips). The allowance is the forge's own
+    (`creation.allowance`), read against today's Intelligence.
+
+    Where it can err, and which way: an Intelligence raised since creation makes the
+    allowance larger, so fewer picks read as taken and more are offered — the player's
+    favour. A spell copied into the book from a scroll reads as a pick already taken —
+    against the player. Neither is detectable from the save; the second is why the
+    counter, not the book, is the record from here on.
+    """
+    per = learns_per_level(actor)
+    if not per or int(getattr(actor, "level", 1) or 1) < 2:
+        return 0
+    from . import creation, spells as spells_mod
+    from .tables import ability_modifier
+
+    data = caster_data(actor)
+    granted = {int(x) for x in (data.get("grants_levels") or ())}
+    every = spells_mod.all_spells()
+    chosen = 0
+    for sid in getattr(actor, "spellbook", None) or []:
+        sp = every.get(sid)
+        lvl = level_on_list(sp, data.get("list", "")) if sp is not None else None
+        if lvl is not None and lvl not in granted:
+            chosen += 1
+    ability = data.get("ability", "int")
+    mod = ability_modifier(int((getattr(actor, "abilities", {}) or {}).get(ability, 10)))
+    allowance = creation.allowance(str(actor.char_class or ""), 1, mod)
+    opening = sum(n for lvl, n in allowance.items() if lvl not in granted)
+    owed_ever = per * (int(actor.level) - 1)
+    return max(0, min(owed_ever, chosen - opening))
+
+
+def learning(actor) -> dict:
+    """What this caster is owed in new spells right now, and the rule each pick obeys.
+
+    `{"kind": "book"|"known"|"", "owed": n, "picks": [...], "by_level": {...},
+    "list": <spell list>}`. For a book, `picks` is one row per spell still owed, oldest
+    first: `{"for_level": the class level that earned it, "max_level": the highest
+    spell level castable then}`. For a repertoire, `by_level` is how many more it may
+    hold at each spell level. `owed` is 0 for everyone with nothing to choose.
+    """
+    data = caster_data(actor)
+    out = {"kind": "", "owed": 0, "picks": [], "by_level": {},
+           "list": str(data.get("list") or "")}
+    if not data:
+        return out
+    level = int(getattr(actor, "level", 1) or 1)
+    per = learns_per_level(actor)
+    if per and data.get("prepare_from") == "spellbook":
+        out["kind"] = "book"
+        taken = int(getattr(actor, "level_spells_taken", 0) or 0)
+        picks = [{"for_level": 2 + j // per,
+                  "max_level": _castable_at(actor, 2 + j // per)}
+                 for j in range(taken, per * max(0, level - 1))]
+        out["picks"], out["owed"] = picks, len(picks)
+        return out
+    table = known_row(data, level)
+    if table and data.get("prepare_from") == "known":
+        out["kind"] = "known"
+        have: dict[int, int] = {}
+        from . import spells as spells_mod
+
+        every = spells_mod.all_spells()
+        for sid in getattr(actor, "spellbook", None) or []:
+            lvl = level_on_list(every.get(sid), data.get("list", ""))
+            if lvl is not None:
+                have[lvl] = have.get(lvl, 0) + 1
+        out["by_level"] = {lvl: n - have.get(lvl, 0) for lvl, n in sorted(table.items())
+                           if n > have.get(lvl, 0) and can_cast_level(actor, lvl)}
+        out["owed"] = sum(out["by_level"].values())
+    return out
+
+
+def learnable(actor) -> list:
+    """Every spell this caster could write in for what is owed, lowest level first.
+
+    Off the class list, not in the book already, at a level some owed pick allows. The
+    page shows these and the server re-checks every one (`learn_problems`): the list is
+    a convenience, the refusal is the rule.
+    """
+    owed = learning(actor)
+    if not owed["owed"]:
+        return []
+    from . import spells as spells_mod
+
+    if owed["kind"] == "book":
+        allowed = set(range(max(p["max_level"] for p in owed["picks"]) + 1))
+    else:
+        allowed = set(owed["by_level"])
+    book = set(getattr(actor, "spellbook", None) or [])
+    found = []
+    for spell in spells_mod.all_spells().values():
+        lvl = level_on_list(spell, owed["list"])
+        if lvl is None or lvl not in allowed or spell.id in book:
+            continue
+        if not can_cast_level(actor, lvl):
+            continue
+        found.append((lvl, spell))
+    found.sort(key=lambda p: (p[0], str(p[1].name).lower()))
+    return found
+
+
+def learn_problems(actor, spell_ids) -> list[str]:
+    """Every reason these spells cannot all go into the book now, with the fix named.
+
+    Empty means `learn` may write them. All at once, like the forge's refusals, so a
+    player who chose badly twice reads both reasons the first time.
+    """
+    from . import spells as spells_mod
+
+    owed = learning(actor)
+    name = str(getattr(actor, "name", "") or "This character")
+    ids = [str(s).strip().lower() for s in (spell_ids or []) if str(s).strip()]
+    if not owed["kind"]:
+        return [f"{name} adds no spells for gaining a level."]
+    if not ids:
+        return ["Choose at least one spell."]
+    if not owed["owed"]:
+        return [f"{name} has no spells owed for the levels gained. Spells beyond those "
+                f"are copied into the book from a scroll or another book."]
+    problems: list[str] = []
+    if len(set(ids)) != len(ids):
+        problems.append("The same spell was chosen twice; choose a different one.")
+    if len(ids) > owed["owed"]:
+        problems.append(f"That is {len(ids)} spells against {owed['owed']} owed. "
+                        f"Choose {owed['owed']}.")
+    book = set(getattr(actor, "spellbook", None) or [])
+    chosen = []
+    for sid in dict.fromkeys(ids):
+        try:
+            spell = spells_mod.get(sid)
+        except KeyError:
+            problems.append(f"No spell called {sid!r}.")
+            continue
+        lvl = level_on_list(spell, owed["list"])
+        if lvl is None:
+            problems.append(f"{spell.name} is not on the {owed['list']} list.")
+            continue
+        if spell.id in book:
+            problems.append(f"{spell.name} is already in the book; choose another.")
+            continue
+        if not can_cast_level(actor, lvl):
+            ability = casting_ability(actor)
+            problems.append(f"{spell.name} is level {lvl}, and a level {lvl} spell needs "
+                            f"{ability.title()} {10 + lvl}.")
+            continue
+        chosen.append((lvl, spell))
+    if problems:
+        return problems
+    if owed["kind"] == "book":
+        # The picks are filled oldest first, and each holds a spell no higher than its
+        # own level allowed. Pairing the chosen spells, lowest first, with the oldest
+        # picks is the best assignment there is — if this fails, every assignment does.
+        for (lvl, spell), pick in zip(sorted(chosen, key=lambda p: p[0]), owed["picks"]):
+            if lvl > pick["max_level"]:
+                problems.append(
+                    f"{spell.name} is a level {lvl} spell; the spell owed for reaching "
+                    f"level {pick['for_level']} must be level {pick['max_level']} or "
+                    f"lower.")
+    else:
+        counted: dict[int, list] = {}
+        for lvl, spell in chosen:
+            counted.setdefault(lvl, []).append(spell.name)
+        for lvl, names in sorted(counted.items()):
+            room = int(owed["by_level"].get(lvl, 0))
+            if len(names) > room:
+                what = "cantrips" if lvl == 0 else f"level {lvl} spells"
+                problems.append(
+                    f"{', '.join(names)}: the repertoire already holds every {what[:-1]} "
+                    f"it may at this level." if not room else
+                    f"{', '.join(names)}: room for {room} more {what}; choose {room}.")
+    return problems
+
+
+def learn(actor, spell_ids) -> tuple[list[str], list[str]]:
+    """Write owed spells into the book. `(added ids, [])`, or `([], problems)` and
+    nothing written."""
+    problems = learn_problems(actor, spell_ids)
+    if problems:
+        return [], problems
+    from . import spells as spells_mod
+
+    kind = learning(actor)["kind"]
+    added = []
+    for sid in dict.fromkeys(str(s).strip().lower() for s in spell_ids if str(s).strip()):
+        spell = spells_mod.get(sid)
+        actor.spellbook.append(spell.id)
+        added.append(spell.id)
+    if kind == "book":
+        actor.level_spells_taken = int(getattr(actor, "level_spells_taken", 0) or 0) \
+            + len(added)
+    return added, []
 
 
 # The spells a divine caster may reach for without having prepared them. The Core

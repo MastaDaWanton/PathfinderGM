@@ -382,6 +382,11 @@ class Actor:
     # Spell id -> how many copies are prepared. A prepared caster may hold the same spell
     # in several slots, which is why this counts rather than being a set.
     prepared: dict[str, int] = field(default_factory=dict)
+    # How many free level-up spells have been written into the book so far (a wizard's
+    # two a level: `casting.learning`). A count, not a list, and not the book's length:
+    # a spell copied from a scroll is in the book too, and only this says which were the
+    # free ones. Settled once for an older save at load (`casting.infer_level_spells_taken`).
+    level_spells_taken: int = 0
     # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
     # misspelled override fails loudly instead of silently never applying.
     overrides: dict[str, bool] = field(default_factory=dict)
@@ -4095,6 +4100,10 @@ def _spell_sheet(actor: Actor) -> dict | None:
         # castable part is 179 spells: the page folds it and searches it rather than
         # printing all of it, and `total` is what the fold says it is hiding.
         "choose_from": _choosable(actor),
+        # Spells owed for levels gained — a wizard's two a level (`casting.learning`).
+        # The summary only; the candidates come from /api/spells/learnable when the
+        # picker opens, because at high level they run to hundreds.
+        "to_learn": casting.learning(actor),
     }
 
 
@@ -4258,6 +4267,7 @@ def to_dict(actor: Actor) -> dict:
         "kit_pending": dict(actor.kit_pending),
         "spellbook": list(actor.spellbook),
         "prepared": {k: int(v) for k, v in actor.prepared.items() if int(v) > 0},
+        "level_spells_taken": int(actor.level_spells_taken or 0),
         "temp_pools": [{"amount": p.amount, "source": p.source,
                         "rounds_left": p.rounds_left} for p in actor.temp_pools],
         "ability_damage": dict(actor.ability_damage),
@@ -4787,6 +4797,16 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     from . import classes
 
     classes.apply(a)
+    # The free level-up spells already given. Absent is not zero: a save from before the
+    # count existed is worked out once from its book and written from then on, so a
+    # wizard who levelled before this shipped is still offered the two spells a level
+    # the Core Rulebook owes them (the owner, 2026-10-01).
+    if "level_spells_taken" in data:
+        a.level_spells_taken = max(0, int(data.get("level_spells_taken") or 0))
+    else:
+        from . import casting as casting_mod
+
+        a.level_spells_taken = casting_mod.infer_level_spells_taken(a)
     # And the hit points last of all, because everything the derivation reads has
     # to be settled first. `classes.apply` is what sets `hit_dice_per_level`, and
     # Blood Bending has two — so computing the base before it ran measured
