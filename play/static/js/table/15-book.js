@@ -23,7 +23,12 @@ function bookWhere(s) {
   // The place you stand in, when the ground is laid ("the gate", "the market"): the
   // design's head names it, with the settlement on the line under it. Measured live: a
   // walk from the market to the gate left the head reading "Torvathys · town" throughout.
-  const local = (sc.grid && sc.grid.place) || "";
+  // Its NAME, from the place chart's current node. The grid's `place` is the id's path,
+  // which for a place founded inside another reads "the gate/the velvet veil/the
+  // chamber" (seen 2026-10-01 on the owner's save); its last part is the fallback.
+  const here = ((sc.places_found && sc.places_found.nodes) || []).find(n => n.current);
+  const local = (here && here.name)
+    || String((sc.grid && sc.grid.place) || "").split("/").pop().trim();
   const place = local || town;
   const parts = [];
   if (local && town) parts.push(town);

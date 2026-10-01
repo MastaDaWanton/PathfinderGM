@@ -607,6 +607,32 @@ const window = {};
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not on this machine")
+def test_the_book_head_names_the_place_not_its_path(tmp_path):
+    """Seen 2026-10-01 on the owner's save, standing in a chamber founded inside the
+    Velvet Veil, itself founded off the gate: the head read "THE GATE/THE VELVET VEIL/THE
+    CHAMBER". It printed the grid's `place`, which is the place id's path. It now reads
+    the place chart's current node (its name), and with no chart, the path's last part."""
+    book = (TABLE_SCRIPTS / "15-book.js").read_text(encoding="utf-8")
+    src = _STORY_STUB + "const sidesUp = s => s;\n" + book + r"""
+    const scene = { where_label: "Ledgerwarren, town", grid: {
+        place: "the gate/the velvet veil/the chamber" } };
+    const out = {};
+    out.chart = bookWhere({ scene: { ...scene, places_found: { nodes: [
+        { name: "the market", current: false }, { name: "the chamber", current: true }] } }
+    }).place;
+    out.bare = bookWhere({ scene }).place;
+    out.town = bookWhere({ scene: { where_label: "Ledgerwarren, town" } }).place;
+    console.log(JSON.stringify(out));"""
+    f = tmp_path / "head.js"
+    f.write_text(src, encoding="utf-8")
+    done = subprocess.run(["node", str(f)], capture_output=True, text=True, timeout=30)
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout.strip().splitlines()[-1])
+    assert got == {"chart": "the chamber", "bare": "the chamber",
+                   "town": "Ledgerwarren, town"}, got
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on this machine")
 def test_a_new_beat_lands_with_its_first_line_at_the_top_and_a_rereader_stays(tmp_path):
     """The story was sent to its foot on every state (`scrollTop = scrollHeight`). A beat
     longer than the page then opened above the head: measured at 1792x805 on a reload, the
