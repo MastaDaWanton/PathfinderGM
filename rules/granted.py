@@ -156,18 +156,52 @@ def detect(player_text: str, said, world, scene, text: str = "") -> list[dict]:
         if affirms(str(rec.get("line") or "")):
             return [dict(asked, by=who, line=str(rec.get("line") or "").strip())]
     if not text:
+        if asked.get("elsewhere"):
+            for rec in said or []:
+                who = str(rec.get("who") or "")
+                if who in people and not getattr(people[who], "is_pc", False) and \
+                        _speaks_of(str(rec.get("line") or ""), asked):
+                    return [dict(asked, by=who, line=str(rec.get("line") or "").strip())]
         return []
     from gm import speech
 
     who = _the_one_asked(scene, player_text)
     if who is None:
         return []
-    for line in speech.lines(text):
-        if speech.speaker(said or [], line) is not None:
-            continue                       # a tagged line was decided above
+    lines = [ln for ln in speech.lines(text) if speech.speaker(said or [], ln) is None]
+    for line in lines:
         if affirms(line):
             return [dict(asked, by=who, line=line.strip())]
+    if asked.get("elsewhere"):
+        # Asked about somebody who lives elsewhere, the answer need not open with a yes to
+        # be about her. Replayed 2026-10-01 on the owner's save: "it is a human woman who
+        # lives in the house 3 streets over, right?" — Gorm: "'Three streets over … The
+        # house with the blue shutters … A woman alone in a house like that doesn't take
+        # kindly to strangers'". Nothing recorded her, and the call on "the human woman
+        # Grom spoke of" found nobody. A heard-of record binds no body in the room, so the
+        # looser reading costs nothing a strict one protects.
+        for rec in said or []:
+            if str(rec.get("who") or "") == who and _speaks_of(str(rec.get("line") or ""),
+                                                                asked):
+                return [dict(asked, by=who, line=str(rec.get("line") or "").strip())]
+        for line in lines:
+            if _speaks_of(line, asked):
+                return [dict(asked, by=who, line=line.strip())]
     return []
+
+
+def _speaks_of(line: str, asked: dict) -> bool:
+    """Whether a reply is about the person asked after: it names them by the asked-for
+    noun or a pronoun of theirs, and does not open by saying no."""
+    if _NEGATES.search(_opening_clause(line)):
+        return False
+    gender = asked.get("gender") or ""
+    words = {"woman": r"woman|she|her|lady|lass", "man": r"man|he|him|fellow|lad"}.get(
+        gender, r"one|someone|somebody|they")
+    kind = str(asked.get("kind") or "").lower()
+    if kind:
+        words += "|" + re.escape(kind)
+    return bool(re.search(rf"(?<![\w-])(?:{words})(?![\w-])", str(line or ""), re.I))
 
 
 def _the_one_asked(scene, player_text: str) -> str | None:

@@ -111,6 +111,30 @@ def test_the_asked_for_words_given_back_with_a_yes_are_a_yes():
     assert not granted.affirms("A woman, no.")
 
 
+def test_an_answer_about_somebody_elsewhere_records_her_without_a_yes(veil):
+    """Replayed 2026-10-01: asked "it is a human woman who lives in the house 3 streets
+    over, right?", Gorm answered with the house's blue shutters and "a woman alone in a
+    house like that" — no opening yes, so nothing recorded her, and the call on "the human
+    woman Grom spoke of" next turn found nobody. About somebody elsewhere, an answer that
+    speaks of her is enough; a "no" still is not."""
+    scene, engine, gorm = veil
+    asked = "I ask Gorm: it is a human woman who lives in the house 3 streets over, right?"
+    beat = ("Gorm grips the counter. 'Three streets over. The house with the blue "
+            "shutters. A woman alone in a house like that does not take kindly to "
+            "strangers.' He looks back at your hands.")
+    found = granted.detect(asked, [], WORLD, scene, text=beat)
+    assert found and found[0]["by"] == gorm.ref and found[0]["elsewhere"]
+    rec = granted.grant(scene, found[0], turn=12)
+    assert rec["spot"] == "" and rec["heard_from"] == gorm.ref
+    assert population.find(scene, "the human woman Grom spoke of",
+                           world=WORLD).people == [rec]
+    assert not granted.detect(asked, [], WORLD, scene,
+                              text="'No woman lives there,' Gorm says. 'Not for years.'")
+    # Somebody asked about HERE still needs a yes: that grant binds the next body made.
+    assert not granted.detect("any human women here?", [], WORLD, scene,
+                              text="'A woman alone in a place like this,' Gorm mutters.")
+
+
 def test_a_person_only_spoken_of_in_the_narration_is_no_body_and_has_no_place(veil):
     """The prose door used to record everybody at the party's spot: the elder of another
     quarter, spoken of, stood in the tavern as a record."""
