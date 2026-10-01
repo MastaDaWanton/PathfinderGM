@@ -105,10 +105,11 @@ def test_the_table_scripts_carry_a_content_stamp_and_are_not_trusted_from_cache(
     # Ten since the 2026-09-28 panel shell added 07-panels.js and Lane F's three stubs;
     # eleven since I6's exits row (11-exits.js); twenty-one since the table rebuild's
     # shell (12-21: the tabs, the device, the sides, the book's head, one per tab);
-    # twenty-two since stage 3's Places chart (16-places-chart.js). Every file in the
+    # twenty-two since stage 3's Places chart (16-places-chart.js); twenty-three since the
+    # roll's verdict (22-roll-verdict.js, 2026-10-01). Every file in the
     # folder, so a script added there and not loaded fails here too.
     from pagesource import table_scripts
-    assert len(srcs) == 22 == len(table_scripts()), srcs
+    assert len(srcs) == 23 == len(table_scripts()), srcs
     assert all(re.search(r"\?v=[0-9a-f]{10}$", s) for s in srcs), srcs
     r = client.get(srcs[0])
     assert r["Cache-Control"] == "no-cache"

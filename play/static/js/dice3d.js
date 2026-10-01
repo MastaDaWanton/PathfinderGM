@@ -957,9 +957,44 @@
     });
   }
 
+  /* Which throw the mat is showing, and when it has come to rest. `land` resolves only
+     when the player closes the mat, which can be never; the verdict flourish
+     (table/22-roll-verdict.js) has to wait for the die to stop, not for the player, so
+     it asks `settled()` instead. The number is how it tells "the mat still shows my
+     roll" from "the player closed it and the next roll's mat is up". */
+  var throwSeq = 0, settling = Promise.resolve();
+
+  // The throw is the one current when this is ASKED, so call it straight after `land`.
+  function settled() {
+    var id = throwSeq;
+    return settling.then(function () { return id; }, function () { return id; });
+  }
+
+  /* Write the server's verdict into the open mat, if the mat is still showing throw
+     `id`. Returns where the die sits, for the flourish to start from, or null when the
+     mat has moved on: closed, or holding a later roll this verdict is not about. */
+  function mark(id, verdict) {
+    if (!mat || id !== throwSeq || !mat.classList.contains("on")) return null;
+    var v = mat.querySelector("#d3d-verdict");
+    v.textContent = verdict.text;
+    v.className = verdict.good ? "good" : "bad";
+    // The die element itself measures 0 by 0: its faces are positioned out from its
+    // centre. The box round the faces as drawn is the die as the player sees it.
+    var l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+    Array.prototype.forEach.call(die.querySelectorAll(".f"), function (f) {
+      var x = f.getBoundingClientRect();
+      if (!x.width) return;
+      l = Math.min(l, x.left); t = Math.min(t, x.top);
+      r = Math.max(r, x.right); b = Math.max(b, x.bottom);
+    });
+    if (l === Infinity) return die.getBoundingClientRect();
+    return { left: l, top: t, width: r - l, height: b - t };
+  }
+
   /* Roll and settle on `result`. Resolves when the mat is closed. */
   function land(opts) {
     build();
+    throwSeq += 1;
     var reqSides = opts.sides || 20;
     if (reqSides === 100) return landPercentile(opts);
     var lo = opts.lo != null ? opts.lo : 1;
@@ -969,8 +1004,10 @@
     resetMat(opts, "d" + reqSides);
 
     var landing = labelFaces(els, sides, lo, hi, opts.result);
+    var thrown = tumble(die, faceToFront(sides, landing), false, sh1);
+    settling = thrown;
     return (async function () {
-      await tumble(die, faceToFront(sides, landing), false, sh1);
+      await thrown;
       els[landing].classList.add("land");
       if (reqSides === 20 && opts.result === 20) els[landing].classList.add("crit");
       if (reqSides === 20 && opts.result === 1) els[landing].classList.add("fumble");
@@ -981,6 +1018,7 @@
 
   /* The percentile pair: tens and ones, both true d10s, settling a beat apart. */
   function landPercentile(opts) {
+    throwSeq += 1;
     var result = Math.max(1, Math.min(100, opts.result | 0));
     var tens = Math.floor((result % 100) / 10);
     var ones = result % 10;
@@ -1001,11 +1039,13 @@
       if (s.numbers[i] === tens) landA = i;
       if (s.numbers[i] === ones) landB = i;
     }
+    var thrown = Promise.all([
+      tumble(die, faceToFront(10, landA), false, sh1),
+      tumble(die2, faceToFront(10, landB), true, sh2),
+    ]);
+    settling = thrown;
     return (async function () {
-      await Promise.all([
-        tumble(die, faceToFront(10, landA), false, sh1),
-        tumble(die2, faceToFront(10, landB), true, sh2),
-      ]);
+      await thrown;
       elsA[landA].classList.add("land");
       elsB[landB].classList.add("land");
       mat.querySelector("#d3d-terms").innerHTML =
@@ -1130,6 +1170,8 @@
     land: land,
     ask: ask,
     close: closeMat,
+    settled: settled,
+    mark: mark,
     // Exposed for probes: the d20's numbering and geometry, plus every shape by sides.
     faces: shape(20).faces.length,
     numbers: shape(20).numbers.slice(),

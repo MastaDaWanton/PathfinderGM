@@ -3079,6 +3079,52 @@
   @media (prefers-reduced-motion: reduce) {
     .v2-btn, .v2-tabs > button { transition: none; }
   }
+
+  /* The roll's verdict (js/table/22-roll-verdict.js). Both are fixed and take no
+     pointer, so neither covers a control a click needs nor moves anything on the page.
+     z-index 65: over the dice mat (60), under the popovers that answer a click (70). */
+  #rv-layer { position: fixed; inset: 0; width: 100%; height: 100%; display: none;
+              pointer-events: none; z-index: 65; }
+  /* The word, cast like the die (the owner: "big and bold and pop up over top of the die",
+     "like a 3d object"). Two layers from one string: the element's own glyphs are the
+     extrusion, eight stacked shadows stepping down and half as far right (the one lamp,
+     theme-v2.css), darkening into the metal; `::after` is the lit face, the die's own
+     brass ramp clipped to the letters. Over the die and never over the mat's buttons. */
+  .rv-word { position: fixed; z-index: 66; pointer-events: none; white-space: nowrap;
+             transform: translate(-50%, -50%); text-align: center; --rv-size: 64px;
+             isolation: isolate; }
+  /* A pool of shadow behind the letters. Without it the word, off the mat, sat over the
+     book's cream text and the lines read through between its letters (screenshot,
+     2026-10-01); on the mat it lifts the word off the brass die it stands on. */
+  .rv-word::before { content: ""; position: absolute; inset: -38% -16%; z-index: -1;
+                     background: radial-gradient(closest-side, rgba(12,8,4,.8),
+                                                 rgba(12,8,4,.5) 58%, rgba(12,8,4,0)); }
+  .rv-w { position: relative; display: inline-block;
+          font: 600 var(--rv-size)/1.05 var(--display); letter-spacing: .03em;
+          font-variant: small-caps; color: #5c441a; padding: 0 .06em .08em;
+          text-shadow: .5px 1px 0 #9c7a38, 1px 2px 0 #87682c, 1.5px 3px 0 #75591f,
+                       2px 4px 0 #634a1a, 2.5px 5px 0 #4f3a14, 3px 6px 0 #3e2d0f,
+                       3.5px 7px 0 #2e210a, 4px 8px 0 #221806,
+                       6px 14px 16px rgba(0,0,0,.65), 0 0 28px rgba(255,214,140,.22); }
+  .rv-w::after { content: attr(data-text); position: absolute; inset: 0; padding: inherit;
+                 text-shadow: none; color: transparent;
+                 background: linear-gradient(172deg, #fff4d2 6%, #f0d494 30%, #d8ae57 48%,
+                                             #a8822f 60%, #e3c485 82%, #f6e2b0 96%);
+                 -webkit-background-clip: text; background-clip: text; }
+  .rv-sub { display: block; margin-top: .25em; font: 400 calc(var(--rv-size) * .3)/1 var(--display);
+            letter-spacing: .14em; font-variant: small-caps; color: #f0dcae;
+            text-shadow: 0 1px 0 #3a2a0d, 0 2px 6px rgba(0,0,0,.8); }
+  /* Failure: the die's fumble red over soot, heavier and darker in the metal. */
+  .rv-word.is-bad .rv-w { color: #3a120c;
+          text-shadow: .5px 1px 0 #6b2a1e, 1px 2px 0 #5a2218, 1.5px 3px 0 #4a1b13,
+                       2px 4px 0 #3c150f, 2.5px 5px 0 #30100b, 3px 6px 0 #250c08,
+                       3.5px 7px 0 #1c0906, 4px 8px 0 #140604,
+                       6px 14px 18px rgba(0,0,0,.75); }
+  .rv-word.is-bad .rv-w::after {
+    background: linear-gradient(172deg, #f0b3a2 4%, #e79a86 26%, #c46c58 46%,
+                                #7d3527 62%, #b55a47 84%, #d98c78 96%);
+    -webkit-background-clip: text; background-clip: text; }
+  .rv-word.is-bad .rv-sub { color: #e7b2a2; }
 </style>
 <script src="{% static 'js/dice3d.js' %}"></script>
 <script src="{% static 'js/scene3d.js' %}"></script>
@@ -3579,6 +3625,8 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/19-tab-spells.js' %}"></script>
 <script src="{% asset 'js/table/20-tab-trade.js' %}"></script>
 <script src="{% asset 'js/table/21-tab-journal.js' %}"></script>
+<!-- The roll's verdict, shown: success or failure as the engine judged the face. -->
+<script src="{% asset 'js/table/22-roll-verdict.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>

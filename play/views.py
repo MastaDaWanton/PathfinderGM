@@ -662,12 +662,21 @@ def _player_visible_entry(entry: dict) -> dict:
             # Nothing of this outcome is the player's. Its tell reaches them through the
             # narration; it does not need a line in the roll log.
             continue
+        # On an opposed check the number to beat IS the other side's hidden roll, and the
+        # Rolls panel printed it: "Stealth check 25 vs 3", the guard's secret Perception,
+        # measured live 2026-10-01 building the verdict flourish. The popup has withheld it
+        # since `dc_shown`; the log has to as well, and the margin with it, which is the
+        # same number by subtraction. A target that is no hidden die's result still shows.
+        hidden = {r.get("total") for r in o.get("rolls", [])
+                  if r.get("visibility") != "player"}
+        dc = o.get("dc")
+        secret = isinstance(dc, dict) and dc.get("value") in hidden
         outcomes.append({
             "op": o.get("op"),
             "verdict": o.get("verdict"),
-            "margin": o.get("margin"),
+            "margin": None if secret else o.get("margin"),
             "because": o.get("because"),
-            "dc": o.get("dc"),
+            "dc": None if secret else dc,
             "rolls": rolls,
         })
     return {"kind": entry.get("kind"), "outcomes": outcomes}
@@ -2365,7 +2374,14 @@ def roll(request):
     # the number in a table. Reported from the table, 2026-09-09 — "the dice don't land
     # with the number facing the user" — and that is why. The whole roller lands on a
     # result the server decided, and this is the server saying which.
-    return _with(resp, {"rolled": face})
+    #
+    # `verdict` is the engine's own judgement of that face (`Engine._judge`): success or
+    # failure and the natural, or None for a die nobody calls a success — damage,
+    # initiative, a forage run. The page plays its flourish from this and from nothing
+    # else (22-roll-verdict.js). Asked for 2026-10-01; computing it in the browser would
+    # need the number to beat, which on an opposed check is the other side's secret die
+    # and is deliberately never sent (`dc_shown`).
+    return _with(resp, {"rolled": face, "verdict": engine.judged})
 
 
 def _with(response, extra: dict):
