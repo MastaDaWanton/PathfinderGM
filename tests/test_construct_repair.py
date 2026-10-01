@@ -360,6 +360,18 @@ def test_the_owners_tamed_sentence_is_flagged_while_the_spy_is_nobodys():
     assert "broken" in text and "does not answer to you" in text
 
 
+def test_the_house_rule_replays_waiting_sentence_is_flagged():
+    """Replayed 2026-10-01 under the house rule: "I greet my new friend and I name him
+    Bob" on a spy mended but NOT claimed, and the page ended "The construct sits before
+    you, a hunk of repaired brass and steel, waiting for your next command." The first
+    cut of the pattern read "your command" and missed "your next command"."""
+    _scene, engine, _pc, spy = _risen_table()
+    _rolled(engine, _repair(engine, spy.ref), 20)
+    beat = ("The construct sits before you, a hunk of repaired brass and steel, waiting "
+            "for your next command.")
+    assert [f.kind for f in repair_claimed.find(_ctx(engine, beat))] == ["ownership-claimed"]
+
+
 def test_the_same_sentence_is_true_once_the_engine_granted_it():
     """Since the house rule the engine CAN make it the player's; then the page may say so."""
     _scene, engine, _spy = _owned_spy()

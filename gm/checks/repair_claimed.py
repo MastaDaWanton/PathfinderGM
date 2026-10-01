@@ -63,8 +63,10 @@ _OWNED = re.compile(
     r"|(?:your|its|a)\s+new\s+(?:master|mistress|owner|maker|lord|keeper|friend"
     r"|companion|servant|pet)"
     r"|(?:as|is|are)\s+(?:its|his|her)\s+(?:master|mistress|owner|maker)"
-    r"|(?:awaits?|awaiting|waits?|waiting)\s+(?:for\s+)?your\s+(?:command|commands|orders?"
-    r"|word|instructions?)"
+    # "waiting for your next command" — the house-rule replay's own words (2026-10-01),
+    # which the first cut missed for the adjective between.
+    r"|(?:awaits?|awaiting|waits?|waiting)\s+(?:for\s+)?your\s+(?:next\s+|new\s+|every\s+"
+    r"|first\s+)?(?:command|commands|orders?|word|instructions?)"
     r"|at\s+your\s+(?:command|service|disposal)"
     r"|(?:obeys?|obeying|serves?|serving|heeds?)\s+you"
     r"|(?:loyal|devoted|bound|bonded|attuned)\s+to\s+you"
@@ -78,6 +80,8 @@ _NOT_SO = re.compile(
     r"|beyond|past)\s+(?:[\w'’]+\s+){0,4}$", re.I)
 
 _IT = frozenset({"it", "its", "itself"})
+_MACHINE_WORDS = re.compile(
+    r"\b(?:construct|machine|automaton|clockwork|golem|contraption|mechanism)s?\b", re.I)
 
 
 def _claimed(pattern, narration: str) -> bool:
@@ -128,7 +132,12 @@ def _sentences_about(ctx, actor) -> list[tuple[str, str]]:
               if r != actor.ref and not getattr(a, "is_pc", False)]
     narr = [n for _, n in pairs]
     by_n = {n: w for w, n in pairs}
-    picked = linked(narr, lambda n: by_n.get(n, n) in theirs,
+    # "The construct sits before you ... waiting for your next command" (the house-rule
+    # replay, 2026-10-01): the page calls a machine by what it is far more often than by
+    # its stat block's name. With one construct here, those words mean it.
+    alone = len(_machines(ctx.scene)) == 1
+    picked = linked(narr, lambda n: by_n.get(n, n) in theirs
+                    or (alone and bool(_MACHINE_WORDS.search(n))),
                     lambda n: any(names_person(n, o) for o in others if o),
                     family=_IT | pronoun_words(getattr(actor, "pronouns", "")))
     return [pairs[i] for i in picked]
