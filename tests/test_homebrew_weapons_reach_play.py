@@ -110,6 +110,21 @@ def test_every_row_on_the_weapon_bench_opens(mine):
         assert r.status_code == 200, row
 
 
+def test_a_shipped_weapon_opens_as_the_table_has_it(mine):
+    """Found verifying this fix in the running app, 2026-10-01: once the bench pointed at
+    `weapons`, the registry also read the SHIPPED `content/weapons/` raw, where
+    `weapons_rules.json` carries a nameless overlay row per launcher. The shortbow opened
+    with no name (a save from it was refused "It needs a name"), and every curated weapon
+    opened with the bulk import's values rather than the curated ones — so a save would
+    have written the import's numbers over the curated row. What ships is the weapon
+    table's answer and nothing else."""
+    for key in ("shortbow", "rapier", "short-sword", "glaive"):
+        d = Client().get(f"/api/bench/items/open/{key}").json()
+        row = weapons.all_weapons()[key]
+        assert d["source"] == "shipped" and d["name"] == row["name"], key
+        assert d["crit_range"] == row["crit_range"] and d["damage"] == row["damage"], key
+
+
 def test_the_bench_saves_where_the_weapon_table_reads():
     """One folder, named once: the registry's declaration and the weapon loader agree."""
     assert registry.get("items").folder == "weapons"

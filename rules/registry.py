@@ -72,6 +72,13 @@ class Kind:
     # silently in play (a save called "fortitude" nothing reads) never reaches disk.
     validate: str = ""
     id_field: str = "id"
+    # False when what ships must be read through `shipped_loader` only, never raw from
+    # `content/<folder>`. The weapon bench saves to `homebrew/weapons/`, and the shipped
+    # `content/weapons/` beside it is an import plus a nameless rules overlay that the
+    # loader merges with the hand-written eleven; read raw, the shortbow opened with no
+    # name and the curated weapons with the import's numbers
+    # (tests/test_homebrew_weapons_reach_play.py).
+    raw_content: bool = True
 
     def as_dict(self) -> dict:
         return {"id": self.id, "label": self.label, "folder": self.folder,
@@ -200,7 +207,7 @@ KINDS: dict[str, Kind] = {
     # "items" because the page's routes are keyed by it.
     "items": Kind(
         id="items", label="Weapons", folder="weapons", key="weapons",
-        shipped_loader="rules.weapons:all_weapons",
+        shipped_loader="rules.weapons:all_weapons", raw_content=False,
         fields=_named() + [
             Field("category", "Category", type="choice", choices=("melee", "ranged")),
             Field("damage", "Damage"),
@@ -415,7 +422,8 @@ def load_raw(kind_id: str) -> dict[str, dict]:
     """
     kind = get(kind_id)
     out: dict[str, dict] = {}
-    for folder in (content_dir(kind_id), homebrew_dir(kind_id)):
+    folders = ([content_dir(kind_id)] if kind.raw_content else []) + [homebrew_dir(kind_id)]
+    for folder in folders:
         for key, entry in read_folder(folder, kind.key).items():
             out.setdefault(key, {}).update(entry)
     return out
