@@ -77,10 +77,13 @@ function startBackend() {
       windowsHide: true,
     });
 
+    // The number is read off the constant: when the timeout went from 60s to 180s the
+    // sentence kept saying 60, and a player who had waited three minutes was told one.
     const failFast = setTimeout(() => {
       reject(new Error(
-        'The game server did not start within 60 seconds. This usually means the ' +
-        'data folder is not writable, or an antivirus is holding the unpack.'
+        `The game server did not start within ${STARTUP_TIMEOUT_MS / 1000} seconds. ` +
+        'This usually means the data folder is not writable, or an antivirus is ' +
+        'holding the unpack.'
       ));
     }, STARTUP_TIMEOUT_MS);
 
