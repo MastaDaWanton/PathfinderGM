@@ -61,7 +61,7 @@ def veil():
 
 def _beat(scene, player_text, said, turn=22):
     ctx = SimpleNamespace(player_text=player_text, said=said, world=WORLD, scene=scene,
-                          turn=turn)
+                          turn=turn, text="")
     return people_granted.step(ctx)
 
 
@@ -146,6 +146,32 @@ def test_no_yes_or_no_people_asked_after_grants_nothing(veil, player, line):
                                   "We've two upstairs.", "There's a few, aye."])
 def test_the_yes_forms(line):
     assert granted.affirms(line)
+
+
+GORM_LIVE = ("Gorm doesn't look up. 'Human women? They're mostly in the inner wards or the "
+             "pleasure houses by the canal,' he says. 'But if you're looking for a particular "
+             "kind of company, there's a group of sisters from the coastal reaches staying in "
+             "the chamber just down the hall. They're known for their... hospitality.'")
+
+
+def test_the_live_answer_untagged_and_mid_line_still_grants(veil):
+    """Live, 2026-09-30, on a copy of Sam's save: asked "Any human women here tonight?",
+    Gorm's answer came back with no speech tags at all, and the yes was its third clause —
+    "there's a group of sisters … staying in the chamber". 0 grants were recorded. The
+    page's own quotations now count as the asked person's when the player named them."""
+    scene, _, gorm = veil
+    gorm.name = gorm.true_name            # the player knows him, as Sam does
+    ctx = SimpleNamespace(player_text=f'I lean on the bar and ask {gorm.name.split()[0]}, '
+                                      f'"Any human women here tonight?"',
+                          said=[], world=WORLD, scene=scene, turn=40, text=GORM_LIVE)
+    rows = people_granted.step(ctx)
+    assert [r["people"] for r in rows] == [HUMAN] and rows[0]["by"] == gorm.ref
+
+
+@pytest.mark.parametrize("line", ["No, but there's a dwarf upstairs.",
+                                  "They're mostly in the inner wards."])
+def test_a_no_or_an_elsewhere_is_not_a_yes(line):
+    assert not granted.affirms(line)
 
 
 def test_the_player_cannot_grant_it_to_themselves(veil):

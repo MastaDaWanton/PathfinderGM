@@ -59,15 +59,42 @@ _NEGATES = re.compile(r"\b(?:no|none|not|never|nobody|no one|isn't|aren't|ain't|
 _HUMAN = re.compile(r"(?<![\w-])humans?(?![\w-])", re.I)
 
 
+# Somebody is THERE, said anywhere in the line: "there's a group of sisters … staying in the
+# chamber" (live, 2026-09-30, after "They're mostly in the inner wards"). A clause, not the
+# line: it must itself begin with the existential and carry no negation.
+_THERE_IS = re.compile(
+    r"^\W*(?:but\s+|and\s+|still\s+|though\s+)?(?:(?:if|when)\s+[^,]*,\s*)?"
+    r"there(?:'s|’s| is| are| be)\s+(?:one|a|an|some|two|three|a\s+few|a\s+couple|"
+    r"a\s+group|a\s+pair|several)\b", re.I)
+
+
 def _opening_clause(line: str) -> str:
     return re.split(r"[,.;:!?—–]", str(line or ""), maxsplit=1)[0]
 
 
 def affirms(line: str) -> bool:
-    """Whether an NPC's line opens by saying somebody is there. Its opening clause only:
-    "There is one, but she isn't looking for company" is a yes (the playtest's line)."""
+    """Whether an NPC's line says somebody is there.
+
+    Its opening clause first: "There is one, but she isn't looking for company" is a yes
+    (the playtest's line), and an opening "No" or "None" is a no whatever follows — "No,
+    but there's a dwarf upstairs" answers a different question. Otherwise any sentence of
+    the line that is itself "there is/are <somebody>", un-negated: Gorm's live answer put
+    the yes in its third clause."""
+    line = str(line or "")
     first = _opening_clause(line)
-    return bool(_AFFIRMS.match(str(line or ""))) and not _NEGATES.search(first)
+    if _NEGATES.search(first):
+        return False
+    if _AFFIRMS.match(line):
+        return True
+    for sentence in re.split(r"(?<=[.!?;])\s+", line):
+        if _THERE_IS.match(sentence) and not _NEGATES.search(sentence):
+            return True
+        # "But if you're looking for company, there's a group of sisters …": the
+        # existential after a leading condition.
+        m = re.search(r",\s*(there(?:'s|’s| is| are)\s.*)$", sentence, re.I)
+        if m and _THERE_IS.match(m.group(1)) and not _NEGATES.search(m.group(1)):
+            return True
+    return False
 
 
 def asked_for(player_text: str, world) -> dict | None:
@@ -95,9 +122,14 @@ def asked_for(player_text: str, world) -> dict | None:
             "phrase": f"{kind.lower()} {noun}".strip()}
 
 
-def detect(player_text: str, said, world, scene) -> list[dict]:
+def detect(player_text: str, said, world, scene, text: str = "") -> list[dict]:
     """The grants this beat made: the player asked after a people, and an NPC here said
-    yes. Each is ``asked_for``'s dict plus ``by`` (the NPC's ref) and ``line``."""
+    yes. Each is ``asked_for``'s dict plus ``by`` (the NPC's ref) and ``line``.
+
+    The tagged lines first. Then, when the prose call tagged nothing (live, 2026-09-30:
+    Gorm's answer came back with `said` empty), the page's own quotations, as spoken by
+    the one person the player asked — named in the player's words, else the one person
+    in conversation, else the only person here. Never a guess between two."""
     asked = asked_for(player_text, world)
     if asked is None:
         return []
@@ -109,7 +141,36 @@ def detect(player_text: str, said, world, scene) -> list[dict]:
             continue
         if affirms(str(rec.get("line") or "")):
             return [dict(asked, by=who, line=str(rec.get("line") or "").strip())]
+    if not text:
+        return []
+    from gm import speech
+
+    who = _the_one_asked(scene, player_text)
+    if who is None:
+        return []
+    for line in speech.lines(text):
+        if speech.speaker(said or [], line) is not None:
+            continue                       # a tagged line was decided above
+        if affirms(line):
+            return [dict(asked, by=who, line=line.strip())]
     return []
+
+
+def _the_one_asked(scene, player_text: str) -> str | None:
+    """Who the player put the question to, when it can be told without guessing."""
+    from . import states
+
+    actors = [(r, a) for r, a in (getattr(scene, "actors", {}) or {}).items()
+              if not getattr(a, "is_pc", False)]
+    words = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", str(player_text or ""))}
+    named = [r for r, a in actors
+             if words & {w.lower() for w in re.findall(r"[A-Z][a-z]{2,}", str(a.name))}]
+    if len(named) == 1:
+        return named[0]
+    talking = [r for r, a in actors if a.has_state(states.TALKING)]
+    if len(talking) == 1:
+        return talking[0]
+    return actors[0][0] if len(actors) == 1 else None
 
 
 def grant(scene, found: dict, *, turn: int = 0) -> dict | None:

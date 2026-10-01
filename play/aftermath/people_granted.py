@@ -21,7 +21,7 @@ DOORS = frozenset({"turn"})
 def step(ctx) -> list[dict]:
     from rules import granted
 
-    found = granted.detect(ctx.player_text, ctx.said, ctx.world, ctx.scene)
+    found = granted.detect(ctx.player_text, ctx.said, ctx.world, ctx.scene, text=ctx.text)
     rows = []
     for g in found:
         rec = granted.grant(ctx.scene, g, turn=int(ctx.turn or 0))
