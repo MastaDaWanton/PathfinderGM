@@ -9484,6 +9484,11 @@ _CALLS_ON = (
     re.compile(r"\bknock\s+(?:on|at)\s+(?:the\s+)?(?P<who>[a-z][a-z' -]{1,50}?)(?:'s|s')\s+"
                r"door\b", re.I),
     re.compile(r"\bknock\s+(?:on|at)\s+(?P<who>her|his|their)\s+door\b", re.I),
+    # "I go to the house of the human woman Grom spoke of", "I enter the house of the
+    # baker": the owner's own words on 2026-10-01, which no pattern above read.
+    re.compile(r"\b(?:go|goes|walk|head|make\s+my\s+way|return|come|run|enter|visit)\s+"
+               r"(?:back\s+)?(?:(?:to|towards?|into)\s+)?the\s+" + _HOUSE + r"\s+of\s+"
+               r"(?:the\s+)?(?P<who>[a-z][a-z' -]{1,60}?)(?=[,.!?;]|\s+and\b|$)", re.I),
     re.compile(r"\b(?:call\s+on|visit|drop\s+in\s+on|look\s+in\s+on)\s+(?:the\s+)?"
                r"(?P<who>[a-z][a-z' -]{1,50}?)(?=\s+at\s+(?:her|his|their)\s+home|\s+at\s+home"
                r"|[,.!?;]|\s+and\b|$)", re.I),
@@ -9526,7 +9531,8 @@ def inject_call_on(raw_intents, player_text: str, scene) -> list:
     if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "break_in"
            for r in raw_intents):
         return raw_intents
-    raw_intents = _call_on_keeps_who_told(raw_intents, player_text)
+    raw_intents = _call_on_keeps_who_told(_call_on_names_somebody(raw_intents, player_text,
+                                                                  scene), player_text)
     theirs = [r for r in raw_intents if isinstance(r, dict)
               and str(r.get("op", "")).lower() == "call_on"]
     if theirs:
@@ -9555,6 +9561,26 @@ def inject_call_on(raw_intents, player_text: str, scene) -> list:
     return _call_on_keeps_who_told(
         kept + [{"op": "call_on", "because": "the player went to their home",
                  "params": {"who": who, "visit": goes}}], player_text)
+
+
+def _call_on_names_somebody(raw_intents, player_text: str, scene) -> list:
+    """A `call_on` whose `who` is the introduce placeholder ("new2") or a ref nobody holds
+    is given the player's own words for whom they went to. Replayed 2026-10-01 on the
+    owner's save: "I go to the house of the human woman Grom spoke of" was planned
+    `call_on who="new2"` and refused "Nobody the party has met answers to 'new2'"."""
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "call_on":
+            who = str((r.get("params") or {}).get("who") or "")
+            if re.fullmatch(r"[a-z]{1,4}\d+", who) and who not in (
+                    getattr(scene, "people", {}) or {}):
+                said, _goes = called_on(player_text)
+                if said:
+                    r = dict(r, params=dict(r.get("params") or {}, who=said))
+        out.append(r)
+    return out
 
 
 def _call_on_keeps_who_told(raw_intents, player_text: str) -> list:

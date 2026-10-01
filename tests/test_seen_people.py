@@ -190,6 +190,14 @@ def test_the_call_on_keeps_who_told_the_player(veil):
     callee = engine._callee(who)
     assert not isinstance(callee, str), callee
     assert callee["key"] == told["id"]
+    # Replayed 2026-10-01: the plan wrote who="new2", the introduce placeholder, and the
+    # call was refused "Nobody the party has met answers to 'new2'". The player's words
+    # name her, so they are used.
+    plan = [{"op": "call_on", "params": {"who": "new2", "visit": True}}]
+    out = judgement.inject_call_on(plan, "I go to the house of the human woman Grom "
+                                         "spoke of.", scene)
+    who = out[0]["params"]["who"]
+    assert who.startswith("human woman") and engine._callee(who)["key"] == told["id"]
     # A pronoun or a ref is left as it was.
     plan = [{"op": "call_on", "params": {"who": "her", "visit": True}}]
     assert judgement.inject_call_on(plan, "I go to the house Gorm spoke of", scene)[0][
