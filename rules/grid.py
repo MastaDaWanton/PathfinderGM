@@ -228,6 +228,25 @@ def is_adjacent(a: Point, a_size: str, b: Point, b_size: str) -> bool:
     return distance_between(a, a_size, b, b_size) <= SQUARE_FT
 
 
+def enters_occupied(size: str = "medium") -> bool:
+    """Whether a creature this size may end its move in a square somebody else holds.
+
+    1e, "Moving Through a Square" (aonprd.com/Rules.aspx?ID=176): "A Fine, Diminutive,
+    or Tiny creature can move into or through an occupied square. The creature provokes
+    attacks of opportunity when doing so." And "Big and Little Creatures in Combat"
+    (ID=179): such a creature has "a natural reach of 0 feet ... They must enter an
+    opponent's square to attack in melee." Read off the space column — under one square
+    across — rather than a list of three size words, so the table stays the one source.
+
+    Measured 2026-10-01: a Clockwork Spy (Tiny, reach 0) forty feet from the player was
+    refused its slam with "There is no open square in reach of Sam that Clockwork Spy can
+    get to" — the only square in a reach of 0 is the player's own, and every occupancy
+    check in the engine counted it taken.
+    """
+    row = SPACE_AND_REACH.get(str(size or "medium").lower(), SPACE_AND_REACH["medium"])
+    return float(row["space"]) < SQUARE_FT
+
+
 @dataclass
 class Grid:
     """The map: how big it is, and which squares are awkward or solid.
@@ -720,7 +739,8 @@ def size_squares(size: str) -> int:
 
 __all__ = [
     "Cell", "Grid", "Point", "SQUARE_FT", "DIRECTIONS", "burst", "cone", "cylinder",
-    "distance", "distance_between", "flanking", "footprint", "height_ft",
+    "distance", "distance_between", "enters_occupied", "flanking", "footprint",
+    "height_ft",
     "height_squares", "is_adjacent", "line", "natural_reach", "size_squares",
     "threatened_squares", "volume", "zone_between",
 ]
