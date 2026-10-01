@@ -79,8 +79,12 @@ let SHEET = null, STATE = null;
 """
 
 
-def _wizard_spells() -> dict:
-    """A level 5 wizard's own `/api/sheet` spells block, built the way the view builds it."""
+def _wizard_spells(owed: bool = False) -> dict:
+    """A level 5 wizard's own `/api/sheet` spells block, built the way the view builds it.
+
+    With every level-up spell already chosen unless `owed`: the card that asks for them
+    (2026-10-01, tests/test_level_up_spells.py) leads the tab only while some are owed,
+    and these tests are about the three columns under it."""
     from rules import casting
     from rules.sheet import full_sheet
     from test_casting_executes import wizard
@@ -93,6 +97,8 @@ def _wizard_spells() -> dict:
                                               "invisibility": 1, "fireball": 1,
                                               "acid-splash": 1, "light": 1})
     casting.define_slots(pc)
+    if not owed:
+        pc.level_spells_taken = casting.learns_per_level(pc) * (pc.level - 1)
     return full_sheet(pc)["spells"]
 
 
@@ -159,6 +165,23 @@ def test_the_three_columns_are_there_in_the_mockups_order(spells, tmp_path):
     # The drop target is the middle column, and it prepares.
     today = sections[1]
     assert today["attrs"]["id"] == "sx-today" and today["attrs"]["data-drop"] == "prepare"
+
+
+def test_spells_a_level_owes_lead_the_tab_until_chosen(tmp_path):
+    """The owner, 2026-10-01: "leveled up as a wizard and did not choose new spells".
+    A wizard 5 with none of the eight level-up spells chosen gets a fourth card ahead of
+    the three columns, saying how many and of what level, with the button that opens
+    the picker; it is not there once they are chosen (the test above)."""
+    els = _tree(_render(_wizard_spells(owed=True), tmp_path)["html"])
+    sections = [e for e in els if e["tag"] == "section"]
+    assert sections[0]["attrs"]["id"] == "sx-learn"
+    assert [s["attrs"]["class"].split()[-1] for s in sections[1:]] == [
+        "sx-stats", "sx-today", "sx-index"]
+    text = " ".join(sections[0]["text"].split())
+    assert "8 to choose" in text
+    assert "Reaching level 2: 2 spells, spell level 1 or lower." in text
+    assert "Reaching level 5: 2 spells, spell level 3 or lower." in text
+    assert any(e["attrs"].get("id") == "learn-open" for e in els)
 
 
 def test_the_slots_are_gem_sockets_lit_while_they_last(spells, tmp_path):
