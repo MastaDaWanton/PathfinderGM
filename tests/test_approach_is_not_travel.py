@@ -111,10 +111,9 @@ def test_a_seek_of_somebody_here_does_not_license_a_travel(worlds):
 
 def test_the_prompt_teaches_the_move_out_of_a_fight():
     """`travel` was the only movement op the prompt documented in peacetime."""
-    text = prompts.SYSTEM if hasattr(prompts, "SYSTEM") else ""
-    import inspect
-
-    src = text or inspect.getsource(prompts)
+    # The planner's own system text, as the model receives it: not the module's source
+    # (tests/test_suite_isolation.py caps source-text pins).
+    src = prompts.BRIEFING
     assert "Going up to somebody who is HERE is never a travel" in src
     assert '{"op": "move", "actor": "pc", "params":' in src
 

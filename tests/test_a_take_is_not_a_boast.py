@@ -150,14 +150,25 @@ def test_a_take_the_interpreter_read_is_acquisition():
 
 
 def test_the_agent_passes_the_reading_and_withdraws_the_prose_claim():
-    import inspect
+    """Walked as an AST, not read as source text (test_suite_isolation caps those): the
+    planner's call to `inject_false_claim` carries the interpreter's reading, and the
+    same method clears the prose's stashed claim when the reading says acquisition."""
+    import ast
+    from pathlib import Path
 
-    from gm import agent
-
-    src = inspect.getsource(agent.GMAgent.plan_turn)
-    at = src.index("inject_false_claim(")
-    assert "reading=reading" in src[at:at + 200]
-    assert "self.false_claim = \"\"" in src[at:at + 600]
+    tree = ast.parse(Path(__file__).resolve().parent.parent.joinpath(
+        "gm", "agent.py").read_text(encoding="utf-8"))
+    plan = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "plan_turn")
+    calls = [n for n in ast.walk(plan) if isinstance(n, ast.Call)
+             and getattr(n.func, "attr", getattr(n.func, "id", "")) == "inject_false_claim"]
+    assert calls, "plan_turn no longer calls inject_false_claim"
+    assert all(any(k.arg == "reading" for k in c.keywords) for c in calls)
+    clears = [n for n in ast.walk(plan) if isinstance(n, ast.Assign)
+              and any(isinstance(t, ast.Attribute) and t.attr == "false_claim"
+                      for t in n.targets)
+              and isinstance(n.value, ast.Constant) and n.value.value == ""]
+    assert clears, "plan_turn never withdraws the prose's false claim"
 
 
 def test_the_crowd_hears_no_delusion_on_the_turn_the_key_was_given():
