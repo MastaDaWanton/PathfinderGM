@@ -696,6 +696,9 @@ though the ground has not changed — it is what leaves the people of the old ro
 and without it they follow the party around. Somebody who comes along is named in
 "with", by ref: {"op": "travel", "params": {"place": "the gate", "with": ["c2"]}}.
 Everyone not named stays where they are.
+Going up to somebody who is HERE is never a travel — a travel leaves them behind. Out of a
+fight as in one, close the distance with {"op": "move", "actor": "pc", "params":
+{"square": [x, y]}} (a square beside them), or narrate the approach with no move at all.
 ONE travel a turn. Name where the party ENDS UP, never the route they walk to get there:
 the engine finds the way itself and walks every place between, in this one turn, and a
 plan carrying a second travel has the second one refused. The tell says which places the

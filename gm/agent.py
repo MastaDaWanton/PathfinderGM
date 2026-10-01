@@ -596,7 +596,9 @@ class GMAgent:
                 # A departure that names the room the party is in is asked again with
                 # the rooms that would have worked; raises into the correction path.
                 raw = judgement.refuse_leaving_in_place(raw, player_input,
-                                                        self.engine.scene, self.world)
+                                                        self.engine.scene, self.world,
+                                                        reading=reading,
+                                                        attached=getattr(self, "attachments", ()))
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)

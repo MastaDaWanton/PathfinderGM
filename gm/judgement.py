@@ -4053,7 +4053,110 @@ def declare_use_item(raw_intents, player_text: str, scene) -> list:
                         "the player reached for a jar")
 
 
-def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None) -> list:
+# Walking up to somebody, in the player's own words, for the turns with no reading.
+_APPROACHES = re.compile(
+    # "aprouch" is the measured line's own spelling.
+    r"\b(?:approach(?:es|ing)?|aproach|aprouch|walk\s+(?:up|over)\s+to|go\s+(?:up|over)\s+to|"
+    r"head\s+over\s+to|step\s+(?:up|over)\s+to|move\s+(?:up\s+|over\s+|closer\s+)?to(?:ward|wards)?|"
+    r"draw\s+(?:near|close)\s+to|sidle\s+up\s+to|edge\s+(?:closer\s+)?toward)\s+"
+    r"((?:the|a|an|that|this)\s+[^.,;!?]{2,40}|[A-Z][\w'-]+(?:\s+[A-Z][\w'-]+)?)", re.I)
+
+
+def _sought_here(player_text: str, scene, reading=None) -> list[str]:
+    """The refs here the player's words go to: the reading's `seek`/`talk`/`follow`
+    target, or with no reading an approach in their own words, each found by
+    `scope.in_the_room`."""
+    from rules import scope as scope_mod
+
+    phrases: list[str] = []
+    if isinstance(reading, dict) and not reading.get("error"):
+        for a in reading.get("actions") or ():
+            if isinstance(a, dict) and a.get("act") in ("seek", "talk", "follow") \
+                    and str(a.get("target") or "").strip():
+                phrases.append(str(a["target"]))
+    else:
+        phrases += [m.group(1) for m in _APPROACHES.finditer(redact_speech(player_text))]
+    refs: list[str] = []
+    for ph in phrases:
+        ref = scope_mod.in_the_room(scene, ph)
+        a = (getattr(scene, "actors", {}) or {}).get(ref)
+        if a is not None and not getattr(a, "is_pc", False) and ref not in refs:
+            refs.append(ref)
+    return refs
+
+
+def _goes_somewhere(player_text: str, reading=None) -> bool:
+    """Whether the words also take the party somewhere: the reading's go/leave/journey,
+    or with no reading a departure in the words (`player_departs`)."""
+    if isinstance(reading, dict) and not reading.get("error"):
+        return any(isinstance(a, dict) and a.get("act") in ("go", "leave", "journey")
+                   for a in reading.get("actions") or ())
+    return player_departs(player_text)
+
+
+def refuse_leaving_the_sought(raw_intents, player_text: str, scene, reading=None) -> list:
+    """A walk that leaves behind the very person the player went to is refused, with the
+    fix named: a `move` of the player's character to beside them, or the approach
+    narrated where everyone already stands.
+
+    Item 8, measured on the 2026-09-30 save (turn_log row 82): "I aprouch the clockwork
+    Spy" — the Spy in the scene, at the outskirts, a turn after the forage met it — was
+    read as `seek target: the clockwork Spy`, and the plan was one `travel` to the gate.
+    The tell said "Left behind: Clockwork Spy", and the prose, written at the gate, said
+    it did not exist. `travel` was the only movement op the prompt taught out of a fight.
+
+    The tradition agrees on the line drawn: Inform's GO TO (Emily Short's *Approaches*)
+    is understood only for "[any visited room]" — a person is never a destination — and
+    answers "already in" for the room you stand in. Approaching somebody here is not
+    going anywhere. Raised, not rewritten, the way `refuse_leaving_in_place` is: the
+    planner's correction path asks again with the move in front of it. A walk the words
+    themselves ask for ("I approach the spy, then head back to the gate") stands, and so
+    does one that takes the sought person along (`with`)."""
+    from rules.intents import IntentError
+
+    if not isinstance(raw_intents, list) or scene is None or "?" in str(player_text or ""):
+        return raw_intents
+    travels = [r for r in raw_intents
+               if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel"]
+    if not travels or _goes_somewhere(player_text, reading):
+        return raw_intents
+    sought = _sought_here(player_text, scene, reading)
+    if not sought:
+        return raw_intents
+    actors = scene.actors
+    for t in travels:
+        taken = {str(w) for w in ((t.get("params") or {}).get("with") or [])}
+        left = [ref for ref in sought if ref not in taken and actors[ref].name not in taken]
+        if not left:
+            continue
+        who = actors[left[0]]
+        raise IntentError(
+            f"travel: {who.name} ({who.ref}) is HERE, and the player went to them — this "
+            f"travel would leave {who.name} behind. Drop the travel. "
+            + _approach_fix(scene, who), "legality")
+    return raw_intents
+
+
+def _approach_fix(scene, who) -> str:
+    """The fix, said with the square when there is a map: a `move` to beside them."""
+    pc = scene.pc()
+    try:
+        from rules import position as position_mod
+
+        found = position_mod.square_in_reach(scene, pc, who, 5) if pc is not None else None
+    except Exception:  # noqa: BLE001 — no map, no square: the narrated approach
+        found = None
+    if found is not None and found[1] > 0:
+        (x, y), _feet = found
+        return (f"To walk up to them: {{\"op\": \"move\", \"actor\": \"{pc.ref}\", "
+                f"\"params\": {{\"square\": [{x}, {y}]}}}} — or narrate the approach "
+                f"with no movement op.")
+    return ("They are within reach already: narrate the approach, with no movement op "
+            "({\"op\": \"narrate_only\"}).")
+
+
+def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
+                            reading=None, attached=()) -> list:
     """Told to leave, the model may not name the room the party is standing in.
 
     Measured live on 2026-09-01, twice in one probe: "I leave the merchant and head
@@ -4074,6 +4177,11 @@ def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None) ->
 
     if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
+    # Its sibling first: a travel that leaves behind the person the player went to (item
+    # 8, 2026-09-30). Asked here so the one call site in the plan's chain covers both. A
+    # place chip is the player choosing the walk, and is never second-guessed.
+    if _attached_place(attached) is None:
+        raw_intents = refuse_leaving_the_sought(raw_intents, player_text, scene, reading)
     if not player_departs(player_text):
         return raw_intents
     travels = [r for r in raw_intents
