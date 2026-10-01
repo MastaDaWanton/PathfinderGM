@@ -286,8 +286,9 @@ def test_the_file_is_created_holding_only_a_header(data):
     lines = path.read_text(encoding="utf-8").splitlines()
     assert lines and all(ln.startswith("#") or not ln.strip() for ln in lines)
     header = path.read_text(encoding="utf-8")
-    for said in ("up to 3 passages", "1,800 characters", "read fresh on every beat",
-                 "Explicit", "an adult"):
+    for said in ("Up to 3 are shown", "No names", "Keep the setting neutral",
+                 "under about 1,500 characters", 'beginning "> "', "act for the player",
+                 "read fresh on every beat", "Explicit", "an adult", "1.)", "---"):
         assert said in header
 
 
@@ -319,19 +320,72 @@ def test_the_file_is_read_live(data):
                               for e in again.examples)
 
 
-def test_the_file_is_capped(data):
-    """Three passages, 1,800 characters each — the grammar's own ceiling, cut back to a
-    whole sentence — and 5,400 in all."""
-    long = "DEMO-PASSAGE-LONG: a placeholder sentence. " * 60      # ~2,600 characters
-    passages = [long] + [f"DEMO-PASSAGE-{n}: a placeholder line." for n in range(2, 6)]
-    intimate.ensure_file().write_text(intimate.HEADER + "\n---\n".join(passages),
+def _file(*parts: str) -> None:
+    """Write the examples file: the header, then `parts` one per line."""
+    intimate.ensure_file().write_text(intimate.HEADER + "\n".join(parts) + "\n",
                                       encoding="utf-8")
-    d = intimate.read_demonstrations()
-    assert len(d.examples) == intimate.MAX_PASSAGES == 3
-    cut = d.examples[0]["reply"]["narration"]
-    assert len(cut) <= intimate.PASSAGE_CHARS and cut.endswith(".")
+
+
+def test_the_budget_takes_whole_passages_and_turns_them_over(data):
+    """Up to three passages and 5,400 characters a beat, never one cut part-way, and
+    which ones turns over with the beat so a long file is all used across a scene."""
+    parts = []
+    for n in range(1, 6):
+        parts += ([] if n == 1 else ["---"]) + [f"> I go on {n}.",
+                                                f"DEMO-PASSAGE-{n}: a placeholder line."]
+    _file(*parts)
+    shown = {}
+    for beat in range(5):
+        d = intimate.read_demonstrations(beat)
+        assert len(d.examples) == intimate.MAX_PASSAGES == 3 and d.on_file == 5
+        shown[beat] = [e["reply"]["narration"][:14] for e in d.examples]
+    assert shown[0] == ["DEMO-PASSAGE-1", "DEMO-PASSAGE-2", "DEMO-PASSAGE-3"]
+    assert shown[3] == ["DEMO-PASSAGE-4", "DEMO-PASSAGE-5", "DEMO-PASSAGE-1"]
+    assert intimate.read_demonstrations(7).examples == intimate.read_demonstrations(2).examples
+    assert {x for v in shown.values() for x in v} == {f"DEMO-PASSAGE-{n}" for n in range(1, 6)}
+
+
+def test_a_long_passage_is_flagged_and_never_cut(data):
+    long = ("DEMO-PASSAGE-LONG: a placeholder sentence. " * 50).strip()   # 2,149 characters
+    # Two long ones fit the 5,400; the third would not, and is passed over WHOLE for the
+    # short one after it — never cut down to fit.
+    _file(long, "---", long, "---", long, "---", "DEMO-PASSAGE-TWO: a placeholder line.")
+    d = intimate.read_demonstrations(0)
+    assert d.examples and all(
+        e["reply"]["narration"] in (long, "DEMO-PASSAGE-TWO: a placeholder line.")
+        for e in d.examples)
     assert d.chars <= intimate.TOTAL_CHARS
-    assert any("past the first 3" in s for s in d.skipped)
+    assert any("over the 5,400 total" in s for s in d.skipped)
+    assert sum("over the 1,800 the narrator can write" in w for w in d.warnings) == 3
+
+
+def test_numbered_headers_separate_passages_too(data):
+    """The owner's draft numbers its passages ("1.)", "2.)"); dashes work as well, and a
+    numbered or dashed line inside a comment separates nothing."""
+    _file("# 9.)", "1.)", "> I stay.", "DEMO-PASSAGE-ONE: a placeholder line.",
+          "2.)", "DEMO-PASSAGE-TWO: another.", "3)", "DEMO-PASSAGE-THREE: a third.",
+          "-----", "DEMO-PASSAGE-FOUR: a fourth.")
+    passages, dropped = intimate.parse(
+        intimate.demonstrations_path().read_text(encoding="utf-8"))
+    assert [(p.n, p.player, p.narration.split(":")[0]) for p in passages] == [
+        (1, "I stay.", "DEMO-PASSAGE-ONE"),
+        (2, intimate.DEFAULT_PLAYER_LINE, "DEMO-PASSAGE-TWO"),
+        (3, intimate.DEFAULT_PLAYER_LINE, "DEMO-PASSAGE-THREE"),
+        (4, intimate.DEFAULT_PLAYER_LINE, "DEMO-PASSAGE-FOUR")]
+    assert dropped == []
+
+
+def test_a_name_recurring_across_passages_is_flagged(data):
+    """A name shown to the model in two passages comes back in play as a person who
+    does not exist (`invented-name`): noted in the turn log, never blocking."""
+    _file("> I stay.", "DEMO-PASSAGE-ONE: you and Selka stay.", "---",
+          "DEMO-PASSAGE-TWO: Selka laughs. You stay too.", "---",
+          "DEMO-PASSAGE-THREE: you wait while Orren sleeps.")
+    d = intimate.read_demonstrations(0)
+    assert len(d.examples) == 3
+    names = [w for w in d.warnings if w.startswith("names recurring")]
+    assert names and "Selka" in names[0] and "Orren" not in names[0]
+    assert "You" not in names[0]
 
 
 def test_a_passage_naming_a_child_is_never_shown(data):

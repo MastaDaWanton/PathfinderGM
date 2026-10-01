@@ -2260,7 +2260,8 @@ class GMAgent:
                      scene_now: str = "",
                      pull: dict | None = None,
                      claim: str = "",
-                     shown: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+                     shown: list[str] | None = None,
+                     beat: int = 0) -> tuple[str, list[str], list[Attempt]]:
         """The whole turn as prose, written after the engine has decided it.
 
         The other half of `intents_first`. Here the prose call is the only one there is,
@@ -2283,7 +2284,9 @@ class GMAgent:
         # scene between adults at an explicit table gets its own briefing and the
         # owner's passages; a child present or named forces the fade; everything else is
         # the ordinary turn. Read from the plain beats, which every check reads.
-        self.intimate = intimate_mod.decide(player_input, earlier, self.engine.scene)
+        # `beat` turns the owner's passages over from one beat to the next.
+        self.intimate = intimate_mod.decide(player_input, earlier, self.engine.scene,
+                                            beat=beat)
         demos = self.intimate.demonstrations
         # This call is handed NO history at all — `[]` — so the ledger is the only
         # thing standing between it and a campaign with no past. It is cheap and it is

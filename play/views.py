@@ -3061,7 +3061,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                               else "")),
                 pull=pull,
                 claim=str(getattr(agent, "false_claim", "") or ""),
-                shown=narration_mod.own_prose(c.transcript, tagged=True))
+                shown=narration_mod.own_prose(c.transcript, tagged=True),
+                # How far in this beat is: which of the table's intimate-scene passages
+                # are shown turns over with it (gm/intimate.py `select`).
+                beat=len(c.transcript))
         except ModelUnavailable:
             text, repairs, prose_attempts = "", [], []
         # The prose call's suggestions win when it made any: under intents-first

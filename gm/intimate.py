@@ -76,17 +76,26 @@ from django.conf import settings
 
 # --- the owner's file -------------------------------------------------------------------
 
-# How many of the owner's passages are shown, and how long each may be. 1,800 is the
-# grammar's own ceiling on the narration string (`prompts.GRAMMAR_MAXLENGTH_CEILING`): a
-# demonstration longer than the model is allowed to write teaches a length the sampler
-# then cuts mid-word (item 6, 2026-09-30). Three because one passage is copied and three
-# varied ones are a register (`CARRY_ON_EXAMPLES` shows three for the same reason). The
-# total, 5,400, is under half the 13,634 characters of worked examples it replaces, so
-# `prompts.pack` never has to drop the scene's history to make room for it.
+# How many of the owner's passages are shown in one beat, and how much in all. Three
+# because one passage is copied and three varied ones are a register
+# (`CARRY_ON_EXAMPLES` shows three for the same reason). The total, 5,400, is under half
+# the 13,634 characters of worked examples it replaces, so `prompts.pack` never has to
+# drop the scene's history to make room for it. A file holding more than fits is not
+# cut: whole passages are chosen, and the choice ROTATES with the beat (`select`), so
+# every passage the owner wrote is shown over a scene and no one passage is the only
+# one the model ever learns from.
 MAX_PASSAGES = 3
+TOTAL_CHARS = 5400
+# The grammar's ceiling on the narration string (`prompts.GRAMMAR_MAXLENGTH_CEILING`). A
+# demonstration longer than the model is allowed to write teaches a length the sampler
+# then cuts mid-word (item 6, 2026-09-30), so a longer passage is flagged in the turn
+# log — and still shown whole: a passage cut in the middle would teach a scene that
+# stops in the middle.
 PASSAGE_CHARS = 1800
-TOTAL_CHARS = MAX_PASSAGES * PASSAGE_CHARS
-# What a passage is shown answering when the owner gave no "> " line of their own.
+# What a passage is shown answering when the owner gave no "> " line of their own. A
+# generic continuation, deliberately: it names no act and nobody, so it can neither
+# teach the model a particular move nor put words in the player's mouth, and it reads
+# the same as the beats a passage without one is most like — the middle of a scene.
 DEFAULT_PLAYER_LINE = "I go on with what we are doing."
 
 HEADER = """\
@@ -96,13 +105,26 @@ HEADER = """\
 # scene: the register, how plainly, how long. The narrator is shown them as replies
 # it wrote earlier, which steers it far harder than any instruction can.
 #
-# How many and how long: up to 3 passages, each up to 1,800 characters (about 300
-# words). A longer one is cut back to its last full sentence; passages past the
-# third are not used. Separate passages with a line holding only ---
-# A passage may start with a line beginning "> ": the player's line it answers,
-# for example "> I take their hand and lead them to the bed". Without one, it is
-# shown answering "I go on with what we are doing."
-# Write them as the game narrates: to the player, as "you".
+# The format. Separate passages with a numbered line on its own ("1.)", "2.)") or a
+# line of three or more dashes (---). Start each passage with a line beginning "> ":
+# the player's line it answers, for example
+#   > I take their hand and lead them to the bed
+# and write the narrator's reply below it. A passage with no "> " line is shown as
+# the answer to "I go on with what we are doing."
+#
+# Writing them well:
+# - No names. A name in here leaks into play, and the game will flag it as a person
+#   who does not exist. Write "she", "he", "they", "you".
+# - Keep the setting neutral: no particular room, town or weather to copy.
+# - Keep each passage under about 1,500 characters (about 250 words). The narrator
+#   can write at most 1,800; a longer example teaches a length it will be cut at.
+# - Write it as the game narrates, to the player as "you" -- but let the narrator
+#   describe and the OTHER person speak and act. A passage where the narrator speaks
+#   or decides for "you" teaches it to act for the player.
+#
+# How many: as many as you like. Up to 3 are shown on any one beat, about 5,400
+# characters in all, and which ones turns over from beat to beat so they all get used.
+# Problems (a passage too long, a name that recurs) are noted in the game's turn log.
 #
 # When it is used: only with the house rule "When a scene turns to intimacy" set to
 # Explicit, only on a beat the game has detected as an intimate scene, and only
@@ -127,7 +149,9 @@ def demonstrations_path() -> Path:
 
 
 def ensure_file() -> Path:
-    """The file, created holding only the header the first time it is needed."""
+    """The file, created holding only the header when it is missing — and only then.
+    The owner may write it before any build reads it: an existing file is never
+    overwritten or prepended to. The `style` folder is made as needed."""
     path = demonstrations_path()
     if not path.exists():
         from pathfindergm import files
@@ -136,68 +160,138 @@ def ensure_file() -> Path:
     return path
 
 
-_SENTENCE_END = re.compile(r"[.!?][\"'”’)]*(?=\s|$)")
+# Where one passage ends and the next begins: a numbered line on its own ("1.)", "2.",
+# "3))") or a line of three or more dashes. Both, because the owner's own draft numbers
+# them and the header shows dashes.
+_SEPARATOR = re.compile(r"(?m)^\s*(?:\d+[.)]+|-{3,})\s*$")
+# A capitalised word not at the start of a sentence: a name, most likely. Shown to the
+# model, a name becomes "a person who does not exist" in play (`invented-name`).
+_CAPITAL = re.compile(r"(?<![.!?]\s)(?<![.!?][\"'”’]\s)(?<!^)\b([A-Z][a-z]{2,})\b")
+_NOT_NAMES = {"You", "Your", "Yours", "She", "Her", "Hers", "He", "His", "Him", "They",
+              "Their", "Them", "The", "And", "But", "Then", "When", "What", "Yes", "Not",
+              "God", "Gods", "Oh"}
 
 
-def _cap(text: str, limit: int) -> str:
-    """Cut back to the last whole sentence that fits, else hard at the limit."""
-    if len(text) <= limit:
-        return text
-    head = text[:limit]
-    ends = list(_SENTENCE_END.finditer(head))
-    return head[:ends[-1].end()].rstrip() if ends else head.rstrip()
+@dataclass
+class Passage:
+    n: int
+    player: str
+    narration: str
+
+    @property
+    def size(self) -> int:
+        return len(self.player) + len(self.narration)
 
 
 @dataclass
 class Demonstrations:
-    """What the file gave this beat: the passages as example turns, and the counts the
-    turn log records. Never the text itself in the log."""
+    """What the file gave this beat: the passages chosen, as example turns, and the
+    counts and warnings the turn log records. Never the passages' text in the log."""
     examples: list[dict] = field(default_factory=list)
     chars: int = 0
+    on_file: int = 0
     skipped: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
-def read_demonstrations() -> Demonstrations:
-    """The owner's passages, read fresh — no cache, the `houserules` reasoning: a cached
-    copy of a file the owner just saved is a change that silently is not in effect.
-
-    Each passage becomes one example turn in the shape `call_one_messages` takes:
-    `{"player": <their line>, "reply": {"narration": <the passage>}}`."""
+def parse(raw: str) -> tuple[list[Passage], list[str]]:
+    """Every passage in the file, in order, and why any was left out. Comment lines go
+    first, so a numbered or dashed line inside a comment separates nothing."""
     from . import judgement
 
+    body = "\n".join(ln for ln in str(raw or "").splitlines()
+                     if not ln.lstrip().startswith("#"))
+    out: list[Passage] = []
+    dropped: list[str] = []
+    n = 0
+    for chunk in _SEPARATOR.split(body):
+        lines = [ln for ln in chunk.strip().splitlines() if ln.strip()]
+        if not lines:
+            continue
+        n += 1
+        player = DEFAULT_PLAYER_LINE
+        if lines[0].lstrip().startswith(">"):
+            player = " ".join(lines[0].lstrip()[1:].split()) or DEFAULT_PLAYER_LINE
+            lines = lines[1:]
+        narration = " ".join(" ".join(lines).split())
+        if not narration:
+            dropped.append(f"passage {n}: a player's line and no reply")
+            continue
+        # Adults only, on the owner's own words too: a passage naming a child is never
+        # shown, whatever the rest of it says.
+        if judgement.a_child_in(None, f"{player} {narration}"):
+            dropped.append(f"passage {n}: names a child, never shown")
+            continue
+        out.append(Passage(n, player, narration))
+    return out, dropped
+
+
+def warnings_for(passages: list[Passage]) -> list[str]:
+    """What the owner should know about the file, for the turn log — never blocking.
+    A passage longer than the narrator may write; a capitalised name that recurs
+    across passages, which the model would carry into play."""
+    out = [f"passage {p.n}: {len(p.narration):,} characters, over the "
+           f"{PASSAGE_CHARS:,} the narrator can write — it teaches a length that gets cut"
+           for p in passages if len(p.narration) > PASSAGE_CHARS]
+    seen: dict[str, set[int]] = {}
+    for p in passages:
+        for line in (p.player, p.narration):
+            for m in _CAPITAL.finditer(line):
+                word = m.group(1)
+                if word not in _NOT_NAMES:
+                    seen.setdefault(word, set()).add(p.n)
+    recurring = sorted(w for w, ns in seen.items() if len(ns) >= 2)
+    if recurring:
+        out.append(f"names recurring across passages: {', '.join(recurring)} — they "
+                   f"would leak into play as people who do not exist")
+    return out
+
+
+def select(passages: list[Passage], beat: int = 0) -> tuple[list[Passage], list[str]]:
+    """Whole passages for this beat, within `MAX_PASSAGES` and `TOTAL_CHARS`, starting
+    at `beat` modulo how many there are and going round — deterministic, so a replay
+    shows the same ones, and turning over, so a long file is all used across a scene.
+    Never a passage cut part-way."""
+    if not passages:
+        return [], []
+    start = int(beat or 0) % len(passages)
+    order = passages[start:] + passages[:start]
+    chosen: list[Passage] = []
+    total = 0
+    left: list[str] = []
+    for p in order:
+        if len(chosen) >= MAX_PASSAGES:
+            left.append(f"passage {p.n}: not this beat ({MAX_PASSAGES} shown)")
+            continue
+        if total + p.size > TOTAL_CHARS:
+            left.append(f"passage {p.n}: not this beat (over the {TOTAL_CHARS:,} total)")
+            continue
+        chosen.append(p)
+        total += p.size
+    return chosen, left
+
+
+def read_demonstrations(beat: int = 0) -> Demonstrations:
+    """The owner's passages for this beat, read fresh — no cache, the `houserules`
+    reasoning: a cached copy of a file the owner just saved is a change that silently
+    is not in effect.
+
+    Each chosen passage becomes one example exchange in the shape `call_one_messages`
+    takes: `{"player": <their "> " line>, "reply": {"narration": <the reply>}}`."""
     out = Demonstrations()
     try:
         raw = ensure_file().read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         out.skipped.append(f"unreadable: {exc}")
         return out
-    body = "\n".join(line for line in raw.splitlines() if not line.lstrip().startswith("#"))
-    chunks = re.split(r"(?m)^\s*---\s*$", body)
-    for n, chunk in enumerate(chunks, 1):
-        lines = [ln for ln in chunk.strip().splitlines()]
-        if not lines:
-            continue
-        player = DEFAULT_PLAYER_LINE
-        if lines[0].lstrip().startswith(">"):
-            player = " ".join(lines[0].lstrip()[1:].split()) or DEFAULT_PLAYER_LINE
-            lines = lines[1:]
-        passage = " ".join(" ".join(lines).split())
-        if not passage:
-            continue
-        # Adults only, on the owner's own words too: a passage naming a child is never
-        # shown, whatever the rest of it says.
-        if judgement.a_child_in(None, f"{player} {passage}"):
-            out.skipped.append(f"passage {n}: names a child, never shown")
-            continue
-        if len(out.examples) >= MAX_PASSAGES:
-            out.skipped.append(f"passage {n}: past the first {MAX_PASSAGES}")
-            continue
-        passage = _cap(passage, PASSAGE_CHARS)
-        if out.chars + len(passage) + len(player) > TOTAL_CHARS:
-            out.skipped.append(f"passage {n}: over the {TOTAL_CHARS}-character total")
-            continue
-        out.examples.append({"player": player, "reply": {"narration": passage}})
-        out.chars += len(passage) + len(player)
+    passages, out.skipped = parse(raw)
+    out.on_file = len(passages)
+    out.warnings = warnings_for(passages)
+    chosen, left = select(passages, beat)
+    out.skipped += left
+    for p in chosen:
+        out.examples.append({"player": p.player, "reply": {"narration": p.narration}})
+        out.chars += p.size
     return out
 
 
@@ -344,10 +438,13 @@ class Decision:
         return {"fired": self.fired, "mode": self.mode or "default", "why": self.why,
                 "demos": len(demo.examples) if demo else 0,
                 "demo_chars": demo.chars if demo else 0,
-                **({"skipped": list(demo.skipped)} if demo and demo.skipped else {})}
+                **({"on_file": demo.on_file} if demo else {}),
+                **({"skipped": list(demo.skipped)} if demo and demo.skipped else {}),
+                **({"warnings": list(demo.warnings)} if demo and demo.warnings else {})}
 
 
-def decide(player_input: str, earlier, scene, content: str | None = None) -> Decision:
+def decide(player_input: str, earlier, scene, content: str | None = None,
+           beat: int = 0) -> Decision:
     """The one place the content rule, the detection and the adults-only rule meet.
 
       * "fade" at the table: exactly today's prompt, nothing read, nothing changed;
@@ -357,6 +454,9 @@ def decide(player_input: str, earlier, scene, content: str | None = None) -> Dec
       * "explicit", detected, adults only: the dedicated briefing and the owner's
         passages;
       * "explicit", not detected: today's prompt.
+
+    `beat` is how far into the campaign this beat is (the transcript's length), which
+    turns the owner's passages over (`select`).
     """
     if content is None:
         from rules import houserules
@@ -369,4 +469,4 @@ def decide(player_input: str, earlier, scene, content: str | None = None) -> Dec
     hit, why = reads_intimate(player_input, earlier, scene)
     if not hit:
         return Decision(why=why)
-    return Decision(mode="intimate", why=why, demonstrations=read_demonstrations())
+    return Decision(mode="intimate", why=why, demonstrations=read_demonstrations(beat))
