@@ -1,6 +1,6 @@
 """Feats, and whether a character actually qualifies for one.
 
-`content/feats/feats.json` holds all 1,478 as data — names, types, prose, sources and, most
+`content/feats/feats.json` holds all 1,474 as data — names, types, prose, sources and, most
 of the point, **typed prerequisites**. `content/feats/mechanics/*.json` holds, for the feats
 the engine computes with, a *document* in the class `grants` vocabulary (stage 8): "what
 does this feat do to my attack roll?" is `document()`, read live by the sheet the way worn

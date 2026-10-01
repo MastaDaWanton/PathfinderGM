@@ -41,8 +41,12 @@ purpose:
 - All sixteen carry a well-formed `strengths[]` / `weakness` array.
 
 Both carry `play.places[]` as of schema 1.3 — the places inside each settlement, with
-`exits[]` as adjacency and no distances anywhere. Pangrella has 112 across 12 settlements,
-Aurvantis 509 across 64. This replaces door one (the implied-spot table); doors two
+`exits[]` as adjacency and no distances anywhere. In the JSON as it stands (counted
+2026-10-01), Pangrella has 192 across 12 settlements and Aurvantis 739 across 64. This
+line used to say 112 and 509, which match neither the 1.3 exports (72 and 384) nor these,
+and what they counted could not be recovered. **Aurvantis's `.sqlite3` was not refreshed
+with its JSON:** it still says schema 1.3 and holds 384 places, so count from the JSON,
+which is the one this app reads. This replaces door one (the implied-spot table); doors two
 (founded) and three (ventured) are untouched, and anything World Bible writes says
 `origin: "world"` so the two authors never get confused.
 

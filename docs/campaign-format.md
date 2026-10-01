@@ -1,6 +1,6 @@
 # Campaign export format
 
-**Schema version 1.4.** Read this before writing anything that consumes a World Bible
+**Schema version 1.5.** Read this before writing anything that consumes a World Bible
 world.
 
 World Bible writes a reference work for a person to read. This export is the same
