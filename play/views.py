@@ -3702,8 +3702,15 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
 
         engine = c.engine()
         agent.engine = engine
+        # A companion hears what the player said to them (owner's ruling, 2026-10-01):
+        # read off the transcript and the conversation log, never guessed (gm/companions).
+        from gm import companions as companions_mod
+
+        orders = (companions_mod.orders_for(scene, ref, c.transcript)
+                  if companions_mod.is_companion(actor) else None)
         try:
-            plan = agent.npc_turn(ref, location=location, recent_events=events)
+            plan = agent.npc_turn(ref, location=location, recent_events=events,
+                                  orders=orders)
         except (ModelUnavailable, IntentError) as exc:
             # A creature the GM could not speak for still acts. It used to "hesitate",
             # which reads as a bug even when it is a fallback: the player was attacked by

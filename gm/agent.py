@@ -500,6 +500,13 @@ class GMAgent:
                 raw = judgement.bind_placeholders(raw, player_input, self.engine.scene)
                 # The player's own cast, jar or power with no actor written is theirs.
                 raw = judgement.fill_missing_actor(raw, player_input, self.engine.scene)
+                # In a fight a companion's turn is their own: an order the player gave
+                # them reaches it there (gm/companions.py), never as their act on the
+                # player's turn. Noted with the turn's other plan repairs.
+                from . import companions as companions_mod
+
+                raw = companions_mod.on_their_own_turn(raw, self.engine.scene,
+                                                       notes=own_words)
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 # A thing thrown or swung is an improvised-weapon attack that names
@@ -970,23 +977,35 @@ class GMAgent:
                                  "standing action holds and the world moves a beat"])
 
     def npc_turn(self, ref: str, location=None, recent_events=None,
-                 max_attempts: int = 3) -> TurnPlan:
+                 max_attempts: int = 3, orders: list[str] | None = None) -> TurnPlan:
         """Act for one creature on its own initiative.
 
         Same validation as a player turn, so an NPC cannot be talked into a mechanic
         either. Fewer attempts than a player turn: a stalled NPC costs the fight far less
         than a stalled player turn costs the scene, and the caller falls back to the
         creature simply holding its ground.
+
+        A companion's turn (`gm/companions.py`) is told who they are and `orders` — what
+        the player has lately said to them — and decides in character what to do with it
+        (the owner's ruling, 2026-10-01). Its one mechanical refusal: striking the player
+        or the player's side, sent back with the fix named.
         """
+        from . import companions
+
         actor = self.engine.scene.actors[ref]
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places(),
                                     reading=getattr(self, "reading", None), player_text="")
+        friend = companions.is_companion(actor)
+        facts = (companions.turn_facts(self.engine.scene, actor, list(orders or []))
+                 if friend else "")
+        foes = companions.foes_of(self.engine.scene, ref) if friend else []
         # A disarmed creature re-arms first, by the engine's hand (`judgement.rearm`);
         # the prompt is told so as a fact, or the wind-up raises the fists the tells
         # are about to put a sap in.
         base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round,
-                                         first=judgement.rearm_note(self.engine.scene, ref))
+                                         first=judgement.rearm_note(self.engine.scene, ref),
+                                         companion=facts, foe=foes[0] if foes else None)
         # Stage 8's one named exception. A bestiary creature has no path, spellbook
         # or satchel, and its bite's poison lives in a stat block no locator reads
         # yet, so on its turn `damage` and `ability_damage` stay and the origin is
@@ -1018,6 +1037,9 @@ class GMAgent:
             try:
                 data = reply.json()
                 raw, rearmed = judgement.rearm(self.engine.scene, ref, data.get("intents"))
+                turned = companions.turning_on_the_party(self.engine.scene, ref, raw)
+                if turned:
+                    raise IntentError(turned, "legality")
                 intents = self.engine.validate(raw, origin=origin,
                                                origin_name=actor.name if origin else "")
             except (ValueError, IntentError) as exc:
@@ -1103,6 +1125,11 @@ class GMAgent:
                   for e in prompts.EXAMPLES],
                 *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
                   for e in prompts.NPC_EXAMPLES],
+            # The companion examples too: a companion's turn is shown them in place of
+            # the creature ones, and a copied line is as much a defect there.
+            *[prompts.fill_companion(e["reply"]["narration"], self_ref="c1",
+                                     name="stranger", foe_ref="c2", foe="stranger")
+              for e in prompts.COMPANION_EXAMPLES],
                 prompts.CONSEQUENCE_EXAMPLE["assistant"],
             )
         return self._echoes
