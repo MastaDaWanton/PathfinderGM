@@ -3660,8 +3660,13 @@ def added_sentences(before: str, after: str) -> list[str]:
 # words count alone; the softer ones only in pairs, so a parent's kiss on a forehead is not
 # read as a scene. A false positive costs one beat replaced by the holding line — the
 # right direction to be wrong in.
+# The anatomical words from "vulva" on were missing until 2026-10-01: the owner's own line
+# "I test her vulva…" read as nothing at all, so a beat written in those words with a child
+# in it would have passed the adults-only guard below.
 _SEXUAL = re.compile(
-    r"\b(?:naked|nude|nudity|genitals?|breasts?|nipples?|penis|cock|vagina|cunt|"
+    r"\b(?:vulva|clitoris|clit|labia|testicles|scrotum|semen|ejaculat\w*|lovemaking|"
+    r"foreplay|"
+    r"naked|nude|nudity|genitals?|breasts?|nipples?|penis|cock|vagina|cunt|"
     r"erection|aroused|arousal|orgasm\w*|climax(?:es|ed|ing)?|intercourse|sex|sexual\w*|"
     r"make love|making love|made love|fuck\w*|thrust(?:s|ing)? into|straddl\w*)\b", re.I)
 _SENSUAL = re.compile(
