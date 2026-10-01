@@ -2087,6 +2087,17 @@ class Engine:
 
             _residency.use_world(world)
         self._let_in: set = set()
+        # The player's own d20, as the engine judged it (`_judge`). `_given` is the one
+        # Roll built from the face the popup sent, held by identity so that nobody
+        # else's die — an NPC's save against the PC's spell, the next swing's attack —
+        # can be mistaken for it; `judged` is what the engine decided about that roll,
+        # {"verdict": "success"|"failure", "natural": n}, or None when it decided
+        # nothing a person would call success or failure (a damage die, a forage run).
+        # Read by play/views.py `roll`, which hands it to the page for the success /
+        # failure flourish (2026-10-01): the page must never work it out for itself,
+        # because on an opposed check the number to beat is somebody else's secret die.
+        self._given = None
+        self.judged: dict | None = None
         # Whether a fight began inside the current batch of intents. Read by the
         # attack op: a swing riding the same GM turn that opened the battle is
         # deferred to the player's own first combat turn, never resolved in prose.
@@ -2983,7 +2994,31 @@ class Engine:
         self.scene.pending_intents = []
         self.scene.pending_outcomes = []
         self.scene.pending_partial = {}
+        self._given = None
+        self.judged = None
         return self._tick_schemes(self._drive(remaining, done, partial))
+
+    # The verdicts a resolved outcome may carry that answer "did the player's die do it".
+    # An attack's own outcome says "hit" if ANY swing hit, which is not this roll's answer
+    # on a full attack — so the attack stages judge their d20s themselves, and this map is
+    # only read for an outcome whose deciding roll was the player's (`_drive`).
+    _VERDICT_OF = {"success": "success", "hit": "success",
+                   "failure": "failure", "miss": "failure"}
+
+    def _judge(self, roll: Roll, made: bool) -> None:
+        """Record the engine's own judgement of the player's d20, once.
+
+        Only the roll built from the face the player sent counts (`_given`, by identity),
+        and only the first judgement of it: the attack stage judges its to-hit before the
+        intent's outcome exists, and the outcome's coarser verdict must not overwrite it.
+        Presentation only — nothing reads this to change a number or a state.
+        """
+        if roll is None or roll is not self._given or self.judged is not None:
+            return
+        if roll.natural is None:
+            return
+        self.judged = {"verdict": "success" if made else "failure",
+                       "natural": roll.natural}
 
     def _drive(self, remaining: list[dict], done: list[dict], partial: dict) -> Resolution:
         outcomes = [_rehydrate(o) for o in done]
@@ -3049,6 +3084,12 @@ class Engine:
             queue.pop(0)
             partial = {}
             outcomes.append(outcome)
+            # A single-roll check, save or manoeuvre decided on the player's own d20:
+            # its outcome's verdict IS that roll's answer. Anything that judged the roll
+            # at its own stage already has (`_judge` keeps the first).
+            if self._given is not None and outcome.verdict in self._VERDICT_OF \
+                    and any(r is self._given for r in (outcome.rolls or [])):
+                self._judge(self._given, self._VERDICT_OF[outcome.verdict] == "success")
             # A Tiny body that came into somebody's square is swung at once it is
             # there (`reactions.provoked_by_entering`) — after the move, not before it,
             # so the swing is measured where it landed. Next in the queue, ahead of the
@@ -4981,6 +5022,7 @@ class Engine:
                 state["rolls"].append(atk.as_dict())
                 natural = atk.natural
                 if natural == 1:
+                    self._judge(atk, False)
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
@@ -4992,6 +5034,7 @@ class Engine:
                     state["i"] += 1
                     continue
                 if not d20_succeeds(atk, swing_ac):
+                    self._judge(atk, False)
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} misses "
                         f"{defender.name} ({atk.total} against {swing_note}).")
@@ -5016,6 +5059,9 @@ class Engine:
                                           visibility="hidden")
                     state["rolls"].append(miss.as_dict())
                     if miss.total <= chance:
+                        # The die beat the AC and the blow still found nothing: to the
+                        # player that is a miss, whatever the face said.
+                        self._judge(atk, False)
                         state["tells"].append(
                             f"{actor.name} finds nothing there — {why}, {chance}% miss "
                             f"chance ({miss.total}).")
@@ -5024,6 +5070,7 @@ class Engine:
                         state["i"] += 1
                         continue
                 state["hit_total"] = atk.total
+                self._judge(atk, True)
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
                 threat = natural is not None and natural >= weapon["crit_range"]
@@ -5037,6 +5084,7 @@ class Engine:
                 )
                 state["rolls"].append(confirm.as_dict())
                 state["crit"] = confirm.total >= swing_ac
+                self._judge(confirm, state["crit"])
                 state["stage"] = "damage"
 
             if state["stage"] == "damage" and printed.get("ability"):
@@ -5678,6 +5726,7 @@ class Engine:
                 verdict, margin = "success", max(margin, 0)
             else:
                 verdict, margin = "failure", min(margin, -1)
+            self._judge(roll, verdict == "success")
 
         effects: list[dict] = []
         bits: list[str] = []
@@ -6814,6 +6863,7 @@ class Engine:
                 parked("repair"), "1d20", state_key="repair_state")
             rolls.append(roll)
             margin = roll.total - dc
+            self._judge(roll, margin >= 0)
             bad = margin <= -int(rule["bad_failure_by"])
             minutes = int(rule["bad_failure_minutes"] if bad else rule["minutes"])
             self.scene.advance(minutes)
@@ -6872,6 +6922,7 @@ class Engine:
             parked("claim"), "1d20", state_key="repair_state")
         rolls.append(roll)
         margin = roll.total - dc
+        self._judge(roll, margin >= 0)
         self.scene.advance(int(rule["minutes"]))
         last = {"dc": dc, "verdict": "success" if margin >= 0 else "failure",
                 "margin": margin}
@@ -11363,6 +11414,7 @@ class Engine:
                 )
                 state["rolls"].append(save_roll.as_dict())
                 saved = d20_succeeds(save_roll, dc)
+                self._judge(save_roll, saved)
                 # Half from full without parsing a tell: the saved flag only. The DC and
                 # total live on the save's Roll, under its own visibility (§1.6 E12).
                 state["effects"].append({"kind": "save", "ref": target.ref,
@@ -14842,7 +14894,7 @@ class Engine:
         if intent.visibility == "player" and actor.is_pc:
             if "player_face" in partial:
                 face = partial.pop("player_face")
-                return self.dice.given_total(face, notation, mods, label=label)
+                return self._took(self.dice.given_total(face, notation, mods, label=label))
             count, faces, _ = self.dice.parse(notation)
             raise _NeedsPlayerRoll(
                 {
@@ -14861,6 +14913,14 @@ class Engine:
             )
         return self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
 
+    def _took(self, roll: Roll) -> Roll:
+        """The Roll built from the player's face — the first one, which `_judge` answers
+        for. Held by identity: it is the only way to tell the player's die from every
+        other die the same resumed list goes on to roll."""
+        if self._given is None:
+            self._given = roll
+        return roll
+
     def _roll_or_suspend(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int, partial: dict, extra_partial: dict | None = None,
@@ -14873,7 +14933,7 @@ class Engine:
         """
         if intent.visibility == "player" and actor.is_pc:
             if "player_face" in partial:
-                return self.dice.given(partial["player_face"], mods, label=label)
+                return self._took(self.dice.given(partial["player_face"], mods, label=label))
             prompt = {
                 "label": label,
                 "die": "1d20",
