@@ -605,6 +605,9 @@ def _state(c) -> dict:
             # and every place one way from them, by name, with the ways between; the
             # rest of the town stays under the fog.
             "places_found": _places_found_state(c),
+            # The Journal's notes and maps, and whether there is ink and paper to write
+            # more with (2026-10-01).
+            "writings": _writings_state(c),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -1054,10 +1057,15 @@ def _sheet_payload(pc) -> dict:
     goes through here, so the Equipment tab never redraws from a sheet that lacks its
     list: `/api/use` returning the bare `full_sheet` would have emptied the page the
     moment a jar was drunk from it."""
+    from rules import gear as gear_mod
     from rules.sheet import full_sheet
 
     out = full_sheet(pc)
     out["equipment"]["carried"] = _carried(pc)
+    # What is carried against what can be (CRB Table 7-4), with the backpack's +1 Str
+    # (content/rules/gear.json). Shown, not enforced: encumbrance is the owner's later
+    # batch (E9), and the Equipment tab says so in words.
+    out["equipment"]["load"] = gear_mod.load(pc)
     return out
 
 
@@ -1088,6 +1096,7 @@ def _carried(pc) -> list[dict]:
     no drop op (a later batch, owner's ruling E6).
     """
     from rules import armour as armour_mod
+    from rules import gear as gear_mod
     from rules import goods, magicitem, weapons as weapons_mod
     from rules.sheet import _stock_row
     from rules.tables import ARMOUR, SHIELDS, SLOTS
@@ -1262,12 +1271,15 @@ def _carried(pc) -> list[dict]:
                  else "valuables" if _VALUABLE.search(name) else "gear")
         on = worn.get(low, "")
         acts = by_name(name, slot) if slot and not on else []
+        _, row = gear_mod.row_for(name)
+        acts += _gear_acts(row, name)
         rows.append({
             "id": f"goods:{low}", "key": low, "name": name, "count": int(n or 0),
             "unit": goods.unit_for(name), "kind": kind, "shelf": shelf, "fits": slot,
             "state": "worn" if on else "", "line": goods.describe(name, int(n or 0)),
-            "known": goods.known_item(name) is not None or item is not None,
-            "acts": acts, "note": slot_full(slot) if slot and not on and not acts else "",
+            "known": goods.known_item(name) is not None or item is not None or bool(row),
+            "acts": acts, "note": (slot_full(slot) if slot and not on and not acts
+                                   else _gear_note(row)),
         })
 
     # A counter's bought gear and the bench's jars.
@@ -1297,6 +1309,19 @@ def _carried(pc) -> list[dict]:
             else:
                 acts += by_name(d["name"], slot)
         effects = [str(x) for x in (d.get("effects") or []) if x]
+        # What a bought bedroll or tent does, from its gear row (content/rules/gear.json):
+        # a counter's goods land here as jars with no specs, and every one of the owner's
+        # nine read "for show, no effect in play" until 2026-10-01.
+        _, row = gear_mod.row_for(s.base)
+        if row and not effects:
+            effects = [str(row.get("does") or "")]
+        if row:
+            # A thing with a gear row is used the way its row says, never drunk: trail
+            # rations are on the consumables shelf (the name says "rations") and
+            # `consumables.plan` answers "ok" to drinking any jar with nothing harmful in
+            # it, so they came up with a Drink button.
+            acts = [a for a in acts if a["label"] not in ("Drink", "Throw", "Coat")]
+        acts += _gear_acts(row, d["id"])
         rows.append({
             "id": f"stock:{d['id']}", "key": d["id"], "name": d["name"],
             "count": int(d.get("count") or 0), "unit": goods.unit_for(d["name"]),
@@ -1304,11 +1329,12 @@ def _carried(pc) -> list[dict]:
                 d.get(f"{h}able") for h in ("drink", "throw", "coat")) else "gear",
             "shelf": "magic" if item and _shelf_of(s) == "gear" else _shelf_of(s),
             "fits": slot, "state": "worn" if on else "",
-            "line": "; ".join(effects), "known": bool(effects) or bool(s.specs) or bool(item),
+            "line": "; ".join(effects),
+            "known": bool(effects) or bool(s.specs) or bool(item) or bool(row),
             "poisons": bool(d.get("poisons")),
             "acts": acts,
             "note": slot_full(slot) if slot and not on and not any(
-                a["label"] == "Wear" for a in acts) else "",
+                a["label"] == "Wear" for a in acts) else _gear_note(row),
         })
 
     # A name written in a slot that is none of the above: worn, and recorded.
@@ -1324,6 +1350,112 @@ def _carried(pc) -> list[dict]:
             "acts": [], "note": "",
         })
     return rows
+
+
+WRITING_MAX_CHARS = 4000
+
+
+def _writings_state(c) -> dict:
+    """`scene.writings`: what has been written, newest last, and whether the pack holds
+    what writing takes (`gear.can_write`), with the reason when it does not."""
+    from rules import gear as gear_mod
+
+    pc = c.scene.pc()
+    can, why = gear_mod.can_write(pc) if pc is not None else (False, "")
+    return {"pages": [dict(w) for w in c.scene.writings], "can_write": can, "why": why}
+
+
+def _map_lines(c) -> tuple[str, list[str]]:
+    """A drawn map, in words: the places stood in and the ways out of each, as the
+    fog-of-war chart knows them right now (`places_found.chart`) — the engine's own
+    graph, never the model's. (title, lines)."""
+    from . import places_found
+
+    chart = places_found.chart(c.engine(), c.world) or {}
+    names = {n["id"]: n["name"] for n in chart.get("nodes") or ()}
+    lines = []
+    for n in chart.get("nodes") or ():
+        if not n.get("visited"):
+            continue
+        ways = []
+        for e in chart.get("edges") or ():
+            if e["from"] == n["id"] and e["to"] in names:
+                ways.append(f"{names[e['to']]} ({e['time_words']})" if e.get("time_words")
+                            else names[e["to"]])
+        for r in chart.get("roads") or ():
+            if r["from"] == n["id"]:
+                ways.append(f"the road to {r['name']}")
+        lines.append(f"{n['name']}{' (here)' if n.get('current') else ''}: "
+                     + (", ".join(ways) if ways else "no way out known"))
+    where = str(chart.get("where") or "") or "where you have been"
+    return f"Map of {where}", lines
+
+
+@require_POST
+def write(request):
+    """Write a note or draw a map, with ink and paper (the owner, 2026-10-01: "ink and
+    paper allow me to write notes or draw maps using ink and paper").
+
+    A player action on their own property, so straight to the scene like `/api/slots`:
+    nothing for a model to decide. Refused, with the reason, when the pack holds no ink
+    and paper (`gear.can_write`, the gear row's `writes`). A note is the player's words,
+    kept as written; a map is the engine's chart of the places stood in and the ways
+    between, as they are known at the moment it is drawn. Neither reaches the narrator.
+    """
+    from rules import gear as gear_mod
+
+    body = read_body(request)
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    refusal = _cannot_act(pc, "write")
+    if refusal:
+        return refusal
+    can, why = gear_mod.can_write(pc)
+    if not can:
+        return JsonResponse({"error": why}, status=400)
+    kind = str(body.get("kind") or "note").strip().lower()
+    page = {"kind": kind, "clock": int(c.scene.clock_minutes or 0), "at": str(c.scene.at or "")}
+    if kind == "map":
+        title, lines = _map_lines(c)
+        if not lines:
+            return JsonResponse({"error": "There is nothing to draw yet: no place has been "
+                                          "stood in."}, status=400)
+        page.update(title=str(body.get("title") or "").strip()[:120] or title, lines=lines)
+    elif kind == "note":
+        text = str(body.get("text") or "").strip()
+        if not text:
+            return JsonResponse({"error": "Write something first."}, status=400)
+        page.update(title=str(body.get("title") or "").strip()[:120],
+                    text=text[:WRITING_MAX_CHARS])
+    else:
+        return JsonResponse({"error": "A page is a note or a map."}, status=400)
+    try:
+        page["where"] = c.engine().here().name
+    except Exception:
+        page["where"] = ""
+    c.scene.writings.append(page)
+    c.save()
+    return JsonResponse({"ok": True, "writings": _writings_state(c)})
+
+
+def _gear_acts(row: dict | None, item_id: str) -> list[dict]:
+    """The Equipment row's buttons a gear row earns: Eat, for food (the `eat` op with the
+    item named, through `/api/use`). Nothing else a row says is a button: a bedroll and a
+    tent do their work when you sleep, a backpack while you carry it."""
+    if row and row.get("eat"):
+        return [{"label": "Eat", "api": "/api/use", "body": {"item": item_id, "how": "eat"}}]
+    return []
+
+
+def _gear_note(row: dict | None) -> str:
+    """Where a gear row's effect happens, when it is not a button on this row."""
+    if not row:
+        return ""
+    if row.get("writes"):
+        return "Write a note or draw a map from the Journal tab."
+    if row.get("camp") or "gear.bedding" in (row.get("tags") or ()):
+        return "Works when you sleep out on the ground."
+    return ""
 
 
 @require_POST
@@ -3915,13 +4047,16 @@ def use_item(request):
     # op, so a raise part-way can still leave the drink half-drunk: consumed off
     # the sheet, and no healing.
     undo = c.scene.snapshot()
+    # Eating out of the pack is the `eat` op with the item named (2026-10-01, "trail
+    # rations reset my hunger"): it spends one and resets hunger through
+    # rules/survival.py. A jar is drunk, thrown or coated by `use_item`, as before.
+    raw = ({"op": "eat", "actor": "pc", "because": f"{pc.name} eats",
+            "params": {"item": item}} if how == "eat" else
+           {"op": "use_item", "actor": "pc", "because": f"{pc.name} reaches for it",
+            "params": {"item": item, "how": how, "to": target}})
     try:
         engine = c.engine()
-        resolution = engine.run(engine.validate([{
-            "op": "use_item", "actor": "pc",
-            "because": f"{pc.name} reaches for it",
-            "params": {"item": item, "how": how, "to": target},
-        }]))
+        resolution = engine.run(engine.validate([raw]))
     except IntentError as exc:
         c.scene.restore(undo)
         return JsonResponse({"error": str(exc)}, status=400)
@@ -4277,6 +4412,7 @@ def _stall_of(c, counter=None) -> tuple[str, str, int]:
 
 
 def _row(item, price: float, count: int = 1) -> dict:
+    from rules import gear as gear_mod
     from rules import pricing
 
     return {"id": str(getattr(item, "id", "")),
@@ -4287,7 +4423,10 @@ def _row(item, price: float, count: int = 1) -> dict:
             # when the answer is nothing — worth showing beside the number. A weapon, a
             # suit of armour and a horse are all things the engine runs (I2).
             "does_something": bool(getattr(item, "specs", None))
-            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount"),
+            or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")
+            # A bedroll, a tent, rations: what they do is their gear row's (2026-10-01).
+            or bool(gear_mod.row_for(getattr(item, "base", "")
+                                     or getattr(item, "name", ""))[1]),
             # I7, the trade window: which side tab and card mark the row is filed under,
             # and whether the counter can sell more than one. The rows said neither — a
             # carried jar's id is "willow-bark-tea#1" and a bench material's is bare, so

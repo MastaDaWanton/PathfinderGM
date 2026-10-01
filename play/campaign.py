@@ -339,6 +339,8 @@ class Campaign:
             # campaign that has not moved since the update is written exactly as before.
             "been": (self.scene.places_been(),
                      [self.scene.at] if self.scene.at else []),
+            # Notes and maps written with ink and paper (2026-10-01).
+            "writings": ([dict(w) for w in self.scene.writings], []),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -469,6 +471,7 @@ class Campaign:
             # place named in the transcript) would draw places onto the player's map
             # that they only heard of.
             been=[str(x) for x in (s.get("been") or ([s["at"]] if s.get("at") else []))],
+            writings=[dict(w) for w in (s.get("writings") or []) if isinstance(w, dict)],
         )
         # `people` from a version-2 save, `actors` from a version-1 one. Straight into
         # the store rather than through `add`, because `add` stamps the party's place

@@ -73,6 +73,7 @@ urlpatterns = [
     path("api/roll/face", views.roll_face, name="roll_face"),
     path("api/combat/act", views.combat_act, name="combat_act"),
     path("api/use", views.use_item, name="use_item"),
+    path("api/write", views.write, name="write"),
     path("api/character/gender", views.set_gender, name="set_gender"),
     path("api/trade", views.trade, name="trade"),
     path("api/trade/do", views.trade_do, name="trade_do"),
