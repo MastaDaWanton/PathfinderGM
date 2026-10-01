@@ -3554,8 +3554,10 @@ class Engine:
         if callee["body"] is not None:
             return callee["body"]
         if callee["kind"] == "person":
+            # Not seen here: she is made to be walked to her own door, not met in the
+            # party's room (`population.embody`'s `seen_here`).
             body = population.embody(self.scene, callee["rec"]["phrase"], "guildhand",
-                                     world=self.world, rec=callee["rec"])
+                                     world=self.world, rec=callee["rec"], seen_here=False)
         else:
             e = self.world.get(callee["entity"]) if self.world is not None else None
             role = scope_mod._role_of(e) if e is not None else ""

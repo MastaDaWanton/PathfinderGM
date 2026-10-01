@@ -3243,10 +3243,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # thug named "weapon"), and a body is what a misread turned into a phantom in
             # a fight. Bodies come from the plan (`introduce`) or from the player engaging
             # somebody (`judgement.embody_sought`); a misread now leaves a stray record.
+            # Overturned in part by the owner on 2026-10-01: somebody the beat SHOWS here
+            # is a full person at once. The beat goes along so each person is read as seen
+            # or only heard of; the bodies are made in the "people" stage below
+            # (play/aftermath/seen_people.py), after a speaker has been made real.
             from rules import population
 
             judgement.record_people(c.scene, introduced, turn=len(c.transcript),
-                                    world=c.world)
+                                    world=c.world, beat=text)
             # Every search for somebody that found nobody this turn, so the synonym table
             # (content/people/synonyms.json) grows from what real play missed.
             c.turn_log.extend(population.drain_misses())

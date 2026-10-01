@@ -8427,7 +8427,8 @@ def a_child_in(scene, beat: str) -> bool:
     return bool(_CHILD_WORDS.search(str(beat or "")))
 
 
-def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]:
+def record_people(scene, introduced, *, turn: int = 0, world=None,
+                  beat: str = "") -> list[dict]:
     """Everyone a beat introduced goes into the population, located, with a life rolled —
     before promotion, so a promoted person wears the face their record rolled and one who
     is not is still somebody the player can find later (the user's question of
@@ -8437,6 +8438,21 @@ def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]
     2026-09-25: "neighboring merchants" was rolled a work, a face and a quirk of its own.
     `promote_cast` already treats a bare plural as scenery; a group's members are recorded
     when the prose singles one of them out.
+
+    With the beat in hand (`beat`), each person is read for HOW the beat has them
+    (`seen_in_beat`), after the owner's ruling of 2026-10-01 — "show described people in
+    the scene. if i can see them they should be in the scene as a fully made person ready
+    to be interacted with and saved if not already existing":
+
+      * **seen** here, now: recorded at the party's place and marked `shown` with this
+        turn, which `embody_seen` (the "people" stage, `play/aftermath/seen_people.py`)
+        reads to give them a body;
+      * **heard** of only (the narration reports somebody's words about them): recorded
+        with NO place (`spot=""`), heard from the one person the player is talking with —
+        never at the place the talk happened. Measured on the owner's save: the woman
+        Gorm said lives "three streets over" was recorded twice, both in the tavern;
+      * either way, somebody heard of in the last beat or two whom these words describe
+        is that same person, not a second record (`population.heard_of_match`).
     """
     from rules import names as names_mod
     from rules import population
@@ -8448,8 +8464,295 @@ def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]
     for phrase in introduced or []:
         if _plural_role(phrase) or counts.get(phrase, 1) > 1:
             continue
-        out.append(population.note(scene, phrase, turn=turn, body=body))
+        how = seen_in_beat(beat, phrase) if beat else ""
+        said_as = phrase
+        if how == SEEN:
+            phrase = _gendered(beat, phrase)
+        heard = population.heard_of_match(scene, phrase, turn=turn)
+        if heard is not None:
+            if how == SEEN:
+                # Heard of a moment ago and now standing here: the same person, seen.
+                heard["spot"] = getattr(scene, "at", None)
+                population.seen(scene, heard)
+                heard["last_seen"] = int(getattr(scene, "clock_minutes", 0) or 0)
+                heard["shown"] = int(turn)
+                heard["said_as"] = said_as
+            out.append(heard)
+            continue
+        if how == HEARD:
+            rec = population.note(scene, phrase, turn=turn, body=body, spot="",
+                                  heard_from=_the_one_talking(scene))
+            if _said_to_live(beat, phrase) and isinstance(rec.get("life"), dict):
+                # "a woman lives there": a resident, whatever the roll said of roads.
+                rec["life"]["mobility"] = "resident"
+                rec.pop("anchor", None)
+        else:
+            rec = population.note(scene, phrase, turn=turn, body=body)
+            if how == SEEN:
+                rec["shown"] = int(turn)
+                rec["said_as"] = said_as
+        out.append(rec)
     return out
+
+
+# --- seen, or only heard of -----------------------------------------------------------
+#
+# The owner's ruling of 2026-10-01 overturns the 2026-09-27 one ("the prose records people;
+# engagement or the plan makes them actors"): a person the player can SEE is in the scene
+# as a full person at once. The ruling turns on seeing, so the test is whether the beat
+# shows them here and now — not whether it names them. Interactive fiction's rule is the
+# same one: "if an object is mentioned in the room description, it should probably be
+# implemented" (the Inform 7 Handbook, "Scenery"), because a player who reads a thing in
+# the room will try to touch it; the owner's "/cheat the woman … pounces on me" was that,
+# refused as "unknown ref 'woman'" because she was prose and nothing else. And the same
+# tradition keeps the opposite case apart: somebody merely spoken of is *familiar*, not
+# *seen* (Eric Eve's Epistemology, Inform Recipe Book §5.5) — a woman a barkeep says lives
+# across town is a record, not a body in the tavern.
+#
+# Seen needs positive evidence, because a body is what a misread turns into a phantom in a
+# fight (the 2026-09-27 hand check: 11 of 30 prose-booked people wrong). A sentence about
+# the person that places or acts them here, and that is no report of somebody's words.
+
+SEEN = "seen"
+HEARD = "heard"
+
+# The person is the object of telling: "he had told you that a woman lives there",
+# "the elder Gorm spoke of". Not a bare "says": the man who says something is here.
+_HEARSAY = re.compile(
+    r"\b(?:told|tells\s+you|tell\s+you|spoke\s+(?:of|about)|speaks\s+(?:of|about)|"
+    r"spoken\s+(?:of|about)|mention\w*|rumou?r\w*|heard\s+(?:of|about|that|tell)|"
+    r"word\s+is|according\s+to|talk(?:ed|s)?\s+(?:of|about)|lives?\s+(?:there|in|at|over|"
+    r"across|on|by|near|out|beyond|up|down)|who\s+lives|resides?|dwells?)\b", re.I)
+_IF = re.compile(r"^\W*(?:if|unless|should|perhaps|maybe|when(?:ever)?)\b", re.I)
+# What the eye does, beside `_PLACES_THEM_HERE`'s being-here verbs.
+_SEEN_HERE = re.compile(
+    r"\b(?:you\s+(?:see|notice|spot|glimpse|make\s+out)|catch\s+sight|silhouett\w*|"
+    r"visible|framed|perched|seated|lounging|hunched|loom(?:s|ing)|hovers?|hovering|"
+    r"behind\s+the\s+(?:counter|bar|desk|stall)|at\s+the\s+top\s+of|at\s+the\s+foot\s+of|"
+    r"polish\w*|wip(?:es|ing)|tend(?:s|ing)|look(?:s|ing)\s+(?:at|up|over|down)|stares?|"
+    r"staring|glances?|nods?|smiles?|frowns?|shrugs?|gestures?|beckons?|waves?)\b", re.I)
+
+
+def seen_in_beat(beat: str, phrase: str) -> str:
+    """SEEN, HEARD or "" — how this beat has the person: shown here and now, only spoken
+    of, or neither clearly (recorded where the party is, as before, and given no body)."""
+    from .narration import _sentences, action_sentences, unquoted
+
+    if not beat or not phrase:
+        return ""
+    plain = unquoted(beat)
+    head = _role_head(phrase)
+    if not head:
+        return ""
+    about = [s for s in _sentences(plain)
+             if re.search(rf"\b{re.escape(head)}s?\b", s, re.I)]
+    if not about:
+        return HEARD                       # only ever inside somebody's speech
+    told = [s for s in about if _HEARSAY.search(s) or _IF.match(s)]
+    plain_about = [s for s in about if s not in told]
+    acted = {" ".join(s.split()) for s in action_sentences(plain, [phrase])}
+    for s in plain_about:
+        if (_PLACES_THEM_HERE.search(s) or _SEEN_HERE.search(s)
+                or " ".join(s.split()) in acted):
+            return SEEN
+    if not plain_about or not present_in_scene(beat, phrase):
+        return HEARD
+    return ""
+
+
+# A head that says nothing of who: the prose's word for somebody not yet made out.
+_VAGUE_HEADS = frozenset({"figure", "shape", "silhouette", "form", "person"})
+
+
+def _gendered(beat: str, phrase: str) -> str:
+    """"figure" → "woman" when the beat goes on to say so ("a figure is silhouetted … It
+    is a woman"): the owner's next words were "the woman", and every "her" after it went to
+    the only woman the engine held (Quin Nutmeg, in another room). Only a vague head, and
+    only an explicit "it is a woman" within the next two sentences — a pronoun guess would
+    hand the figure somebody else's "she"."""
+    from .narration import _sentences, unquoted
+
+    head = _role_head(phrase)
+    if head not in _VAGUE_HEADS:
+        return phrase
+    sentences = _sentences(unquoted(beat))
+    for i, s in enumerate(sentences):
+        if not re.search(rf"\b{re.escape(head)}\b", s, re.I):
+            continue
+        window = " ".join(sentences[i:i + 3])
+        m = re.search(rf"\b(?:it|they|the\s+(?:\w+\s+)?{re.escape(head)})\s+(?:is|was|turns\s+"
+                      rf"out\s+to\s+be|proves\s+to\s+be)\s+(?:a|an)\s+(?:[a-z]+\s+){{0,2}}?"
+                      rf"(woman|man|girl|boy)\b", window, re.I)
+        if m:
+            return re.sub(rf"\b{re.escape(head)}\b", m.group(1).lower(), phrase, count=1,
+                          flags=re.I)
+        break
+    return phrase
+
+
+def _said_to_live(beat: str, phrase: str) -> bool:
+    """Whether the beat says this person lives somewhere: "a human woman lives there"."""
+    from .narration import _sentences, unquoted
+
+    head = _role_head(phrase)
+    return bool(head) and any(
+        re.search(rf"\b{re.escape(head)}\b.*\b(?:lives?|dwells?|resides?)\b", s, re.I)
+        or re.search(rf"\bwho\s+lives\b.*\b{re.escape(head)}\b", s, re.I)
+        for s in _sentences(unquoted(beat or "")))
+
+
+def _the_one_talking(scene) -> str:
+    """The ref of the one person in conversation with the player, or "" — who the beat's
+    report of somebody's words is about. Two talking is a guess, and is not made."""
+    from rules import states
+
+    talking = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
+               if not a.is_pc and a.has_state(states.TALKING)]
+    return talking[0] if len(talking) == 1 else ""
+
+
+# At most this many new bodies from one beat. The ruling is about what the player can see,
+# and a beat that puts five strangers in front of them is rare; a beat whose regex read
+# found five is more likely a misread. `promote_cast` capped standing civilians at four
+# for the same reason (2026-09-18: "a crowd scene does not flood the panel").
+SEEN_CAP = 3
+
+
+def embody_seen(scene, *, turn: int, world=None, beat: str = "") -> list[dict]:
+    """Every person this beat showed here (`record_people` marked them `shown`) gets a
+    body through the one door (`embody` → `population.embody` → `Scene.add`, a square with
+    it — people keep their square, the ruling of 2026-09-28), wearing the face and life
+    their record rolled, and goes on the ledger with their ref. Returns turn-log rows.
+
+    Never a duplicate, in three ways:
+      * a record that already has a body is that body;
+      * somebody the campaign already holds elsewhere in this town, named by every word
+        the prose used ("the cage owner"), walks in rather than being made twice;
+      * in somebody's own house with them in it, a vague figure there ("a figure at the
+        top of the stairs") is the householder, unless the beat has the figure come in or
+        says otherwise of their sex.
+    Out of a fight only: in one the prose makes nobody (`GMAgent._undeclared_arrivals`)."""
+    from rules import population
+
+    rows: list[dict] = []
+    if scene is None:
+        return rows
+    at = getattr(scene, "at", None)
+    bodies = getattr(scene, "people", {}) or {}
+    shown = [r for r in (getattr(scene, "population", None) or {}).values()
+             if r.get("shown") == int(turn)]
+    if not shown:
+        return rows
+    shown.sort(key=lambda r: int(re.sub(r"\D", "", str(r.get("id"))) or 0))
+    fighting = bool(getattr(scene, "in_encounter", False))
+    made = 0
+    for rec in shown:
+        rec.pop("shown", None)
+        said_as = rec.pop("said_as", "") or rec.get("phrase", "")
+        if rec.get("ref") and rec["ref"] in bodies:
+            continue
+        if rec.get("spot") != at:
+            continue
+        if fighting:
+            rows.append({"kind": "seen-people", "made": "", "record": rec["id"],
+                         "why": "in a fight the prose brings nobody in"})
+            continue
+        known = _householder(scene, rec, said_as, beat) or _held_elsewhere(scene, said_as)
+        if known is not None:
+            if known.at != at:
+                scene.move(known.ref, at)
+            theirs = population.of_ref(scene, known.ref)
+            if theirs is not None:
+                population.seen(scene, theirs)
+            if not rec.get("ref") and population.of_ref(scene, known.ref) is None:
+                rec["ref"] = known.ref
+            elif rec.get("ref") != known.ref:
+                # A second record of somebody who has one: the beat's words were them.
+                (getattr(scene, "population", {}) or {}).pop(rec["id"], None)
+            rows.append({"kind": "seen-people", "made": "", "same_as": known.ref,
+                         "record": rec["id"], "phrase": said_as})
+            continue
+        if made >= SEEN_CAP:
+            rows.append({"kind": "seen-people", "made": "", "record": rec["id"],
+                         "why": f"more than {SEEN_CAP} new people in one beat"})
+            continue
+        zone = next((str(e.get("zone") or "near") for e in scene.cast
+                     if str(e.get("who") or "") == said_as), "near")
+        actor = embody(scene, rec["phrase"], zone=zone, world=world, rec=rec)
+        for e in scene.cast:
+            if str(e.get("who") or "") == said_as and not e.get("ref"):
+                e["ref"] = actor.ref
+                break
+        else:
+            if not any(e.get("ref") == actor.ref for e in scene.cast):
+                scene.cast.append({"who": rec["phrase"], "turn": int(turn), "ref": actor.ref})
+        made += 1
+        rows.append({"kind": "seen-people", "made": actor.ref, "record": rec["id"],
+                     "phrase": rec["phrase"],
+                     "square": list(scene.positions.get(actor.ref) or [])
+                     if getattr(scene, "positions", None) else []})
+    return rows
+
+
+def _held_elsewhere(scene, phrase: str):
+    """The one body in this town (not here) whose whole name is these words — "the cage
+    owner" for the cage owner — or None. A bare head ("guard") is too thin to move a
+    particular person on, and a keeper stays at their counter."""
+    from rules import keepers
+    from rules import places as places_mod
+    from rules import population
+
+    want = population._norm(population._ARTICLE.sub("", phrase))
+    if not want or population.is_bare(phrase):
+        return None
+    loc = getattr(scene, "location_id", None)
+    hits = []
+    for a in (getattr(scene, "people", {}) or {}).values():
+        if a.is_pc or a.at == getattr(scene, "at", None):
+            continue
+        if places_mod.location_of(str(a.at or "")) != loc:
+            continue
+        if keepers.is_keeper(str(getattr(a, "world_entity_id", "") or "")):
+            continue
+        if getattr(a, "is_down", False):
+            continue
+        names = {population._norm(population._ARTICLE.sub("", str(n or "")))
+                 for n in (a.name, getattr(a, "true_name", ""))}
+        if want in names:
+            hits.append(a)
+    return hits[0] if len(hits) == 1 else None
+
+
+def _householder(scene, rec: dict, said_as: str, beat: str = ""):
+    """In somebody's own house, with them in it, the beat's vague word for who stands there
+    ("a figure at the top of the stairs") is them — or None. Not when the beat has the
+    figure come in: a figure who enters is somebody else arriving.
+
+    Read off the engine's places (`scene.founded`: the house and its owner), never off the
+    turn's outcomes — the narrator side reads mechanics only through tells (law 3,
+    `tests/test_three_laws.py`), and whose house it is is a fact of the place."""
+    from rules import person_words
+
+    if _role_head(said_as) not in _VAGUE_HEADS:
+        return None
+    if beat and re.search(rf"\b{re.escape(_role_head(said_as))}\b[^.!?]*\b(?:enters?|comes?\s+"
+                          rf"in|arrives?|steps?\s+in|walks?\s+in|bursts?\s+in)\b",
+                          beat, re.I):
+        return None
+    at = getattr(scene, "at", None)
+    house = next((p for p in (getattr(scene, "founded", None) or [])
+                  if p.get("id") == at and p.get("origin") == "home"), None)
+    if house is None:
+        return None
+    owner = (getattr(scene, "people", {}) or {}).get(str(house.get("owner") or ""))
+    if owner is None or owner.is_pc:
+        return None
+    said = person_words.gender_of(person_words._words(rec.get("phrase", "")))
+    theirs = person_words.gender_of(person_words._words(
+        " ".join([str(owner.name), str(getattr(owner, "pronouns", "") or "")])))
+    if said and theirs and said != theirs:
+        return None
+    return owner
 
 
 def fill_introduce_templates(raw_intents, scene) -> list:
@@ -9182,6 +9485,7 @@ def inject_call_on(raw_intents, player_text: str, scene) -> list:
     if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "break_in"
            for r in raw_intents):
         return raw_intents
+    raw_intents = _call_on_keeps_who_told(raw_intents, player_text)
     theirs = [r for r in raw_intents if isinstance(r, dict)
               and str(r.get("op", "")).lower() == "call_on"]
     if theirs:
@@ -9207,8 +9511,38 @@ def inject_call_on(raw_intents, player_text: str, scene) -> list:
 
     kept = [r for r in raw_intents if not aimed_at_the_house(r) and not (
         goes and isinstance(r, dict) and str(r.get("op", "")).lower() == "travel")]
-    return kept + [{"op": "call_on", "because": "the player went to their home",
-                    "params": {"who": who, "visit": goes}}]
+    return _call_on_keeps_who_told(
+        kept + [{"op": "call_on", "because": "the player went to their home",
+                 "params": {"who": who, "visit": goes}}], player_text)
+
+
+def _call_on_keeps_who_told(raw_intents, player_text: str) -> list:
+    """A `call_on` whose `who` dropped the player's "Gorm spoke of" gets it back, so the
+    engine's finder can choose the person heard of from Gorm (`population.find`).
+
+    Measured on the owner's save (2026-10-01): "I enter the house of the human woman Grom
+    spoke of" was planned `call_on who="human woman"`, and with two human women recorded
+    the call was refused "There is more than one — which human woman do you mean?" — the
+    words that said which had been left in the player's sentence."""
+    from rules import population
+
+    clause = population.heard_words(player_text)
+    if not clause or not isinstance(raw_intents, list):
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "call_on":
+            params = dict(r.get("params") or {})
+            who = str(params.get("who") or "")
+            first = (who.lower().split() or [""])[0]
+            if (who and first not in ("her", "him", "them", "his", "their", "she", "he",
+                                      "they")
+                    and not re.fullmatch(r"[a-z]{1,3}\d+", who)
+                    and not population.heard_clause(who)[1]):
+                params["who"] = f"{who} {clause}"
+                r = dict(r, params=params)
+        out.append(r)
+    return out
 
 
 # --- a purchase opens the counter ---------------------------------------------------------

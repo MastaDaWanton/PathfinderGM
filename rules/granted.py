@@ -52,7 +52,10 @@ _AFFIRMS = re.compile(
     r"there(?:'s|’s| is| are| be)\s+(?:one|a\s+few|some|two|three|a\s+couple|a\s+girl|"
     r"a\s+woman|a\s+man|a\s+lad|a\s+lass)|"
     r"we(?:'ve|’ve| have| got)\s+(?:one|some|a\s+few|two|three|a\s+couple)|"
-    r"one(?:'s|’s| is)\s+(?:here|in|behind|upstairs|downstairs|out|back|through))\b",
+    r"one(?:'s|’s| is)\s+(?:here|in|behind|upstairs|downstairs|out|back|through)|"
+    # The asked-for words given back, then the yes: "A woman, aye," — Gorm's answer in
+    # the 2026-10-01 replay, which the opening-yes pattern missed, so nothing recorded her.
+    r"(?:a|an|one)\s+(?:[a-z'’-]+\s+){0,2}?[a-z'’-]+\s*,\s*(?:aye|yes|yeah|indeed|sure))\b",
     re.I)
 _NEGATES = re.compile(r"\b(?:no|none|not|never|nobody|no one|isn't|aren't|ain't|"
                       r"isn’t|aren’t|ain’t|neither|nay)\b", re.I)
@@ -119,7 +122,18 @@ def asked_for(player_text: str, world) -> dict | None:
     gender = person_words.gender_of(person_words._words(text))
     noun = gender or "person"
     return {"people_id": pid, "kind": kind, "gender": gender,
-            "phrase": f"{kind.lower()} {noun}".strip()}
+            "phrase": f"{kind.lower()} {noun}".strip(),
+            "elsewhere": bool(_ELSEWHERE.search(text))}
+
+
+# The question places them somewhere else: "it is a human woman who LIVES THERE right?"
+# (the owner's save, 2026-10-01, of the house "three streets over"). A yes to that is not a
+# promise of somebody HERE, and binding the next person minted in the tavern to it would
+# hand the tavern's next stranger the people of a woman who lives across town.
+_ELSEWHERE = re.compile(
+    r"\b(?:lives?|living|stays?|staying|works?|sleeps?)\s+(?:there|over|in|at|on|by|near|"
+    r"across|down|up|out)\b|\bover\s+there\b|\bacross\s+town\b|\bstreets?\s+(?:over|away|"
+    r"down|from)\b|\bdown\s+the\s+(?:road|street|lane)\b", re.I)
 
 
 def detect(player_text: str, said, world, scene, text: str = "") -> list[dict]:
@@ -182,24 +196,57 @@ def grant(scene, found: dict, *, turn: int = 0) -> dict | None:
     at = str(getattr(scene, "at", "") or "")
     if not at:
         return None
+    # Asked about somebody who lives elsewhere: heard of, with no place — the place the
+    # talk happened is not where she is (`asked_for`'s `elsewhere`).
+    place = "" if found.get("elsewhere") else at
     for rec in open_grants(scene):
         g = rec["granted"]
-        if (g.get("place") == at and g.get("people_id") == found.get("people_id")
+        if (g.get("place") == place and g.get("people_id") == found.get("people_id")
                 and g.get("kind") == found.get("kind")
                 and g.get("gender") == found.get("gender")):
             return rec
-    rec = population.note(scene, found["phrase"], turn=turn, fresh=True)
-    # Heard of, here: Gorm said she is here, nobody has seen her.
+    # The beat's own narration may already have recorded her a moment ago ("he had told
+    # you a human woman lives there" booked p16, then this grant made p17 — the owner's
+    # save, 2026-10-01): one person, so that record becomes the grant.
+    rec = _recorded_this_beat(scene, found["phrase"], turn)
+    if rec is None:
+        rec = population.note(scene, found["phrase"], turn=turn, fresh=True,
+                              **({"spot": ""} if not place else {}))
+    elif not place:
+        rec["spot"] = ""
+        rec["seen_at"] = ""
+        rec["last_seen"] = None
+    if not place and isinstance(rec.get("life"), dict):
+        # Asked about as somebody who lives there: a resident, whatever the roll said of
+        # travelling — a merchant rolled for her would have the call on her house refused
+        # with "They keep no house in this town".
+        rec["life"]["mobility"] = "resident"
+        rec.pop("anchor", None)
+    # Heard of: Gorm said she is there, nobody has seen her.
     rec["seen"] = False
     rec["heard_from"] = str(found.get("by") or "")
     rec["heard_at"] = int(getattr(scene, "clock_minutes", 0) or 0)
     rec["granted"] = {
         "people_id": str(found.get("people_id") or ""), "kind": str(found.get("kind") or ""),
-        "gender": str(found.get("gender") or ""), "place": at,
+        "gender": str(found.get("gender") or ""), "place": place,
         "by": str(found.get("by") or ""), "line": str(found.get("line") or "")[:200],
         "turn": int(turn), "claimed_by": "",
     }
     return rec
+
+
+def _recorded_this_beat(scene, phrase: str, turn: int) -> dict | None:
+    """The one record this beat's prose made (no body, no grant) that the granted phrase
+    describes, or None. Unseen-or-not does not matter: the beat wrote her a moment ago."""
+    from . import population
+
+    words = population._tokens(phrase)
+    bodies = getattr(scene, "people", {}) or {}
+    fits = [r for r in (getattr(scene, "population", None) or {}).values()
+            if r.get("turn") is not None and int(r["turn"]) == int(turn) and not isinstance(r.get("granted"), dict)
+            and not (r.get("ref") and r["ref"] in bodies)
+            and words and population._fits(words, population._bag(r, scene))]
+    return fits[0] if len(fits) == 1 else None
 
 
 def open_grants(scene) -> list[dict]:

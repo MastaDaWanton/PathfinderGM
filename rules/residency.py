@@ -261,6 +261,12 @@ def resolve(activity: str, rec: dict, location_id: str, world, founded) -> str:
     if activity == HOME:
         return home
     if activity == WORK:
+        # Somebody only heard of, with no place said (`population.note(spot="")`), is not
+        # put at the settlement's first place by default — that was where the party stood
+        # in the owner's save (2026-10-01), so the woman Gorm said lives "three streets
+        # over" would have been reckoned into the tavern. Unseen and unplaced is at home.
+        if not own_spot and rec.get("seen") is False:
+            return home
         return own_spot or (places[0].id if places else home)
     p = _kind_place(places, activity)
     if p is not None:
