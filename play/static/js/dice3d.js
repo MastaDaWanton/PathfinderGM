@@ -978,7 +978,17 @@
     var v = mat.querySelector("#d3d-verdict");
     v.textContent = verdict.text;
     v.className = verdict.good ? "good" : "bad";
-    return die.getBoundingClientRect();
+    // The die element itself measures 0 by 0: its faces are positioned out from its
+    // centre. The box round the faces as drawn is the die as the player sees it.
+    var l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+    Array.prototype.forEach.call(die.querySelectorAll(".f"), function (f) {
+      var x = f.getBoundingClientRect();
+      if (!x.width) return;
+      l = Math.min(l, x.left); t = Math.min(t, x.top);
+      r = Math.max(r, x.right); b = Math.max(b, x.bottom);
+    });
+    if (l === Infinity) return die.getBoundingClientRect();
+    return { left: l, top: t, width: r - l, height: b - t };
   }
 
   /* Roll and settle on `result`. Resolves when the mat is closed. */
