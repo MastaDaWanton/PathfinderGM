@@ -198,7 +198,9 @@ class GMAgent:
         people into bodies. Ruled 2026-09-27, the prose makes no bodies — so a newcomer
         in a fight's prose is a claim nothing backs, and gets the standing repair: one
         rewrite naming the fix. Arrivals are the plan's or an NPC turn's `spawn`. Out of
-        a fight the prose's people are records, and stay (the user's ruling).
+        a fight, since the owner's ruling of 2026-10-01 ("if i can see them they should
+        be in the scene as a fully made person"), the people a beat shows are given
+        bodies after it (play/aftermath/seen_people.py); in a fight they still are not.
 
         Returns (text, repair note or "", attempts).
         """
@@ -303,8 +305,9 @@ class GMAgent:
         if player_input == prompts.CARRY_ON:
             return self._continue_plan()
         # Somebody the prose described and the player now turns to walks on with a body
-        # first, so the plan can address them by ref (ruled 2026-09-27: the prose
-        # records people; engagement or the plan makes them actors).
+        # first, so the plan can address them by ref. Since 2026-10-01 most of them
+        # already have one — people a beat shows are embodied after it — so this is the
+        # backstop for the ones it could not (a fight, a heard-of person met at last).
         # The player's sentence, read once into a checked frame (gm/interpret.py,
         # docs/the-interpreter.md): the readers below consult it before their regex, and
         # the planner is shown it. A reading that fails costs nothing but the reading —

@@ -8722,7 +8722,7 @@ def _the_one_talking(scene) -> str:
 SEEN_CAP = 3
 
 
-def embody_seen(scene, *, turn: int, world=None, beat: str = "") -> list[dict]:
+def embody_seen(scene, *, turn: int, world=None, beat: str = "", engine=None) -> list[dict]:
     """Every person this beat showed here (`record_people` marked them `shown`) gets a
     body through the one door (`embody` → `population.embody` → `Scene.add`, a square with
     it — people keep their square, the ruling of 2026-09-28), wearing the face and life
@@ -8771,8 +8771,10 @@ def embody_seen(scene, *, turn: int, world=None, beat: str = "") -> list[dict]:
             continue
         known = _householder(scene, rec, said_as, beat) or _held_elsewhere(scene, said_as)
         if known is not None:
-            if known.at != at:
-                scene.move(known.ref, at)
+            # Through the engine's door, never `Scene.move` from here (the one-spatial-
+            # authority ratchet): `engine` is None only for a caller with no campaign.
+            if known.at != at and engine is not None:
+                engine.walk_in(known.ref)
             theirs = population.of_ref(scene, known.ref)
             if theirs is not None:
                 population.seen(scene, theirs)

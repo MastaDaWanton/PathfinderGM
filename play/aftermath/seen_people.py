@@ -29,4 +29,4 @@ def step(ctx) -> list[dict]:
     from gm import judgement
 
     return judgement.embody_seen(ctx.scene, turn=int(ctx.turn or 0), world=ctx.world,
-                                 beat=ctx.text)
+                                 beat=ctx.text, engine=ctx.campaign.engine())

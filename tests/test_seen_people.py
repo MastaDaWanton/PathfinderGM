@@ -60,12 +60,17 @@ def veil():
     return scene, engine, gorm
 
 
-def _beat(scene, text, turn, world=WORLD):
+def _beat(scene, text, turn, world=WORLD, engine=None):
     """The prose door as `views._finish` runs it: the ledger, the records, then the
-    "people" stage's bodies."""
+    "people" stage's bodies — with the engine, whose door walks a known person in (the
+    one-spatial-authority ratchet: nothing in gm/ moves people itself)."""
+    from rules.dice import Dice
+    from rules.engine import Engine
+
+    engine = engine or Engine(scene, Dice(seed=1), world=world)
     introduced = judgement.note_cast(scene, text, turn=turn)
     recs = judgement.record_people(scene, introduced, turn=turn, world=world, beat=text)
-    rows = judgement.embody_seen(scene, turn=turn, world=world, beat=text)
+    rows = judgement.embody_seen(scene, turn=turn, world=world, beat=text, engine=engine)
     return introduced, recs, rows
 
 

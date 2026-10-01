@@ -3638,6 +3638,19 @@ class Engine:
                 return p
         return None
 
+    def walk_in(self, ref: str) -> bool:
+        """Somebody the campaign already holds comes to where the party stands — the
+        place the engine itself put the party, so there is no id to validate. The door
+        for the prose's people (`judgement.embody_seen`): the cage owner the beat shows
+        in the room is the cage owner held across town, walked in, never a second body
+        (owner's ruling 2026-10-01, people you can see are in the scene). True if moved."""
+        who = self.scene.people.get(ref) if hasattr(self.scene, "people") else None
+        at = str(getattr(self.scene, "at", "") or "")
+        if who is None or not at or who.at == at:
+            return False
+        self.scene.move(ref, at)
+        return True
+
     def _home_of(self, callee):
         """Their house, founded the first time anybody calls: the Place."""
         from . import places as places_mod
