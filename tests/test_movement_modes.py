@@ -186,6 +186,22 @@ def test_a_climber_may_take_to_the_wall_and_a_man_may_not():
     assert "no way up" in " ".join(o.tell for o in res.outcomes).lower()
 
 
+def test_a_move_along_a_raised_level_is_routed_in_a_fight():
+    """Every move to a square above the ground was refused in a fight: the map writes the
+    level into the square, (5, 8, 1), and the route table is flat, (x, y), so the lookup
+    never matched — "no route from (4, 7, 1) to (5, 8, 1) that Bobby fits through", 0 of
+    25 squares accepted on a raised floor and 23 of 25 without the level (the spells
+    lane's live check, 2026-10-01). The owner's "move and cast in the same turn" stood on
+    exactly such a map."""
+    s, e, man, spider = _scene_with_a_map()
+    _move(e, spider.ref, (6, 5, 4))
+    s.initiative = [(spider.ref, 12), (man.ref, 5)]
+    s.turn = 0
+    assert s.in_encounter
+    res = _move(e, spider.ref, (7, 6, 4))
+    assert s.positions[spider.ref] == (7, 6, 4), [o.tell for o in res.outcomes]
+
+
 def test_coming_down_needs_no_permission():
     """Everybody can fall. A refusal to descend would strand anything that lost its
     flight, and there is no rule anywhere that says you may not go down."""

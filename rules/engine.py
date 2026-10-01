@@ -6842,7 +6842,9 @@ class Engine:
             raise IntentError(f"move: no such actor {ref!r}", "reference", index)
 
         grid = self.scene.grid
-        occupied = self.scene.occupied(ignore=ref)
+        # The bodies on the level it is going to, as `_move_cost` asks: somebody on the
+        # floor below a gallery does not hold the gallery's squares.
+        occupied = self.scene.occupied(ignore=ref, level=target[2] if len(target) > 2 else 0)
         # A Fine, Diminutive or Tiny body "can move into ... an occupied square"
         # (aonprd.com/Rules.aspx?ID=176) — and with a reach of 0 it must, to strike
         # (ID=179). So the squares it is going TO are not taken for it; the squares on
@@ -6871,15 +6873,25 @@ class Engine:
             return
 
         budget = actor.speed_feet
-        routes = grid.reachable(start, budget, size=actor.size, occupied=occupied)
-        if target in routes:
+        # The route is found on the floor plan, (x, y); a square on a raised level is
+        # (x, y, z) — the map writes the level into every square above the ground — and
+        # looking that up in the flat table refused EVERY move on a map with a raised
+        # floor ("no route from (4, 7, 1) to (5, 8, 1)"; 0 of 25 squares accepted, 23 of
+        # 25 without the level — the spells lane's live check, 2026-10-01).
+        flat, origin = tuple(target[:2]), tuple(start[:2])
+        if flat == origin:
+            # Straight up or down its own column: no floor to cross (`_move_cost` costs
+            # the climb), and `reachable` omits the square you stand on.
+            return
+        routes = grid.reachable(origin, budget, size=actor.size, occupied=occupied)
+        if flat in routes:
             return
         # Distinguish "too far" from "no way through". They lead to different next moves:
         # one wants a double move, the other wants a different route.
-        anywhere = grid.reachable(start, 10_000, size=actor.size, occupied=occupied)
-        if target in anywhere:
+        anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied)
+        if flat in anywhere:
             raise IntentError(
-                f"move: {target} is {anywhere[target]} ft away by the shortest open route "
+                f"move: {target} is {anywhere[flat]} ft away by the shortest open route "
                 f"and {actor.name} has {budget} ft of movement.", "legality", index,
             )
         raise IntentError(
