@@ -581,6 +581,68 @@ def give_the_name(text: str, offers: list[tuple[str, str]]) -> tuple[str, list[s
     return text, added
 
 
+# --- asked, and the beat stopped before the answer -----------------------------------------
+#
+# Owner, 2026-10-01, with a screenshot: "I thank him and ask if he has anything to get me
+# into such a place" came back as Gorm's tail twitching, Gorm leaning in, Gorm glancing at
+# the door, "his voice barely a rasp" — and "What do you do?". "this is an incomplete turn,
+# better than a bad turn but if we can detect a turn like this and make it better before
+# the user sees it that would be best. If not then they can just hit continue."
+#
+# A question makes an answer due (conversation analysis's "conditional relevance",
+# Schegloff 1968), and its absence is noticeable — a refusal or a shrug discharges it, a
+# beat that simply stops does not. Measured over the committed recordings (111 beats): 2
+# of 32 questions put to somebody got no speech from anyone, both ending "What do you
+# do?", and in both the answer was lost by our own grooming, not the prose call's budget
+# (one cut by `drop_repeated_beats`, one a rewrite that wrote it and lost on length). The
+# owner's exact shape — a speech cue, then nothing — was 0 of 111. Rare, and cheap to
+# repair: `GMAgent._answer_the_question`, one small call for the spoken answer alone.
+
+# The player wants an answer: a question mark, an "ask", a wh-word, "tell me", "anything".
+# "I thank him" alone carries none of them and is not a question.
+_WANTS_ANSWER = re.compile(
+    r"\?|\bask(?:s|ed|ing)?\b|\binquire|\benquire|\b(?:what|who|whom|whose|where|when|why|"
+    r"how|which|whether)\b|\btell me\b|\bany(?:thing|one|body|where|more|work)\b", re.I)
+# The beat answered without a quotation: a gesture that is an answer, a refusal, silence
+# shown on purpose, or the answer reported ("he tells you the gate shuts at dusk").
+_ANSWERED_WITHOUT_QUOTES = re.compile(
+    r"\b(?:nods?|nodded|nodding|shakes? (?:his|her|their|its) head|shook (?:his|her|their|"
+    r"its) head|shrugs?|shrugged|refuses?|refused|says? nothing|said nothing|won'?t say|"
+    r"will not say|does(?:n'?t| not) answer|no answer|ignores? (?:you|the question)|"
+    r"answers?|answered|repl(?:y|ies|ied)|tells? you|told you|explains?|explained|"
+    r"admits?|admitted|points? (?:you|toward|towards|to)|says? that|said that)\b", re.I)
+
+
+def wants_an_answer(player_text: str) -> bool:
+    return bool(_WANTS_ANSWER.search(str(player_text or "")))
+
+
+def answered(text: str, ref: str, said, player_text: str = "") -> bool:
+    """Whether the beat answers: a speech record from `ref`, a quotation that is not the
+    player's own words echoed back, or an answer given without one."""
+    if any(str((r or {}).get("who") or "") == ref for r in said or ()):
+        return True
+    mine = {w for w in re.findall(r"[a-z']{4,}", str(player_text or "").lower())}
+    for start, end in speech.spans(text):
+        words = re.findall(r"[a-z']{4,}", text[start:end].lower())
+        if words and sum(w in mine for w in words) / len(words) < 0.5:
+            return True
+    return bool(_ANSWERED_WITHOUT_QUOTES.search(str(text or "")))
+
+
+def put_before_the_hand_back(text: str, line: str) -> str:
+    """`line` added before the beat's closing question, or after its last sentence: the
+    place `give_the_name` puts a name, for the same reason."""
+    sentences = _sentences(str(text or "").rstrip())
+    if sentences and sentences[-1].rstrip().endswith("?"):
+        sentences.insert(len(sentences) - 1, line)
+        return " ".join(sentences)
+    text = str(text or "").rstrip()
+    if text and text[-1] not in ".!?\"'”’":
+        text += "."
+    return f"{text} {line}".strip()
+
+
 def settle_introductions(text: str, expected: dict[str, str],
                          established: str = "") -> tuple[str, list[str]]:
     """The name a person gives is the one the world holds for them.

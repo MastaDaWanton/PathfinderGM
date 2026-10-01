@@ -1554,6 +1554,38 @@ CARRY_ON = ("I take no action. Carry the scene on from where it stopped: if I as
             "somebody something, let them answer in their own words, and let the people "
             "and the place here go on doing what they were doing.")
 
+# The answer a beat owed and did not give (`GMAgent._answer_the_question`, owner
+# 2026-10-01). One person's spoken reply and nothing else, so the call is small: a few
+# hundred tokens against a whole beat's rewrite, and it cannot lose the beat it is added to.
+ANSWER_MAX_CHARS = 420
+ANSWER_NUM_PREDICT = 220
+
+
+def answer_schema() -> dict:
+    return {"type": "object",
+            "properties": {"answer": {"type": "string", "maxLength": ANSWER_MAX_CHARS}},
+            "required": ["answer"]}
+
+
+def answer_messages(name: str, player_line: str, beat: str, brief: str) -> list[dict]:
+    """Ask for `name`'s spoken answer to the player's line, grounded in the brief."""
+    system = (
+        f"You write one line of dialogue in a tabletop game narrated to the player as "
+        f"\"you\". The player asked {name} something, and the scene stopped before "
+        f"{name} answered. Write ONLY {name}'s spoken answer: one to three sentences of "
+        f"speech inside double quotation marks, with at most a short tag naming "
+        f"{name}, in the present tense, shaped like this: \"The cook owes me a favour,\" "
+        f"{name} says. \"Ask for her at the back.\" Answer what was asked. Use only what the scene brief says {name} "
+        f"knows; if {name} does not know, they say so, or hedge, or name a price. Name "
+        f"no person and no place the brief does not name. Do not narrate the player, do "
+        f"not decide what the player does, and do not ask the player what they do.")
+    user = (f"SCENE BRIEF:\n{str(brief or '')[:6000]}\n\n"
+            f"THE SCENE SO FAR:\n{beat}\n\n"
+            f"THE PLAYER:\n{player_line}\n\n"
+            f"Write {name}'s answer.")
+    return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
 # Continue's own demonstrations, and they REPLACE the turn examples rather than extend
 # them — the same choice, for the same reason, that the combat set replaces them.
 #

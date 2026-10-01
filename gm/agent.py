@@ -1544,6 +1544,19 @@ class GMAgent:
         text, told = narration_mod.give_the_name(text, offers)
         if told:
             repairs.append(f"asked and not answered: {', '.join(told)} gives their name")
+        # Asked something, and the beat stopped before the answer (owner, 2026-10-01):
+        # one small call for the spoken answer alone. After every cut above — in both
+        # measured cases our own grooming lost the answer — and before the un-namer, so
+        # a name the answer invents is held to the world like any other. Player turns
+        # only, and only where a rewrite is allowed at all.
+        if rewrite and not acting and player_input and player_input != prompts.CARRY_ON:
+            asked = self._who_was_asked(player_input)
+            if asked is not None and not narration_mod.answered(
+                    text, asked.ref, self.last_said, player_input):
+                text, answer_notes, answer_attempts = self._answer_the_question(
+                    text, asked, player_input, brief)
+                repairs += answer_notes
+                attempts += answer_attempts
         # A band the ledger booked keeps the word it was booked under: soldiers do not
         # become raiders between one paragraph and the next (2026-09-19, item 30). Before
         # the un-namer, which works on names rather than roles.
@@ -2216,6 +2229,69 @@ class GMAgent:
                                               named=named)
         return kept, [f"wrong actor: {why} — the rewrite failed; cut {len(cut)} "
                       f"sentence(s), the tells stand"], attempts
+
+    def _who_was_asked(self, player_input: str):
+        """The person the player's line asks something of, when the beat owes them an
+        answer: named by the interpreter's reading, else the one person in conversation.
+        None out of a fight's way, when nobody or several could be meant, when they are
+        down, when their attitude would refuse a name (`attitude.tells_their_name` — an
+        unwilling person's silence is their answer), or when the party moved."""
+        from rules import attitude as attitude_mod
+        from rules import scope as scope_mod
+
+        scene = self.engine.scene
+        if scene.in_encounter or not narration_mod.wants_an_answer(player_input):
+            return None
+        who = None
+        reading = getattr(self, "reading", None)
+        if isinstance(reading, dict) and not reading.get("error"):
+            for a in reading.get("actions") or ():
+                if isinstance(a, dict) and a.get("act") == "talk" \
+                        and str(a.get("target") or "").strip():
+                    ref = scope_mod.in_the_room(scene, str(a["target"]))
+                    who = scene.actors.get(ref) if ref else None
+                    break
+        if who is None:
+            talking = self.engine.talking_to()
+            who = talking[0] if len(talking) == 1 else None
+        if who is None or who.is_pc or not scene.conscious(who.ref):
+            return None
+        if not attitude_mod.tells_their_name(who):
+            return None
+        was = getattr(self, "_was_at", "")
+        if was and was != str(getattr(scene, "at", "") or ""):
+            return None
+        return who
+
+    def _answer_the_question(self, text: str, who, player_input: str,
+                             brief: str) -> tuple[str, list[str], list[Attempt]]:
+        """`who` was asked something and the beat gave no answer: one small call for
+        their spoken answer alone, put before the hand-back. Kept only if it is speech —
+        a quotation — and does not hand the turn back itself; otherwise the beat is left
+        as written, which the owner accepts: "If not then they can just hit continue",
+        and Continue's own words already ask for the answer (`prompts.CARRY_ON`)."""
+        try:
+            reply = client.chat(
+                prompts.answer_messages(str(who.name), player_input, text, brief),
+                self.prose_model, self.prose_host, as_json=True, think=False,
+                temperature=0.6, num_predict=prompts.ANSWER_NUM_PREDICT,
+                provider=self.prose_provider, api_key=self.prose_key,
+                schema=prompts.answer_schema())
+            attempt = Attempt("answer", reply.seconds, reply.model, reply.text,
+                              note=f"unanswered: {who.name}")
+            answer = " ".join(str((reply.json() or {}).get("answer") or "").split())
+        except Exception as exc:  # noqa: BLE001 — a failed repair must not lose the turn
+            return text, [f"unanswered: {who.name} — the call failed "
+                          f"({type(exc).__name__}); kept, Continue carries it"], []
+        quoted = [answer[s:e] for s, e in speech_mod.spans(answer)]
+        if not quoted or narration_mod.HAND_BACK.lower() in answer.lower() \
+                or len(answer) > prompts.ANSWER_MAX_CHARS + 40:
+            return text, [f"unanswered: {who.name} — the answer did not hold "
+                          f"({answer[:60]!r}); kept, Continue carries it"], [attempt]
+        self.last_said.append({"who": who.ref, "to": "you",
+                               "line": " ".join(q.strip("\"“”'‘’ ") for q in quoted)})
+        return (narration_mod.put_before_the_hand_back(text, answer),
+                [f"asked and not answered: {who.name} answers"], [attempt])
 
     def _repair_misnamed(self, text: str, attribution) -> tuple[str, list[str], list[Attempt]]:
         """A name written on the wrong person: the words name one person here and the
