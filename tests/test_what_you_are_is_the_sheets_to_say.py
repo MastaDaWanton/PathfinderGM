@@ -183,10 +183,17 @@ def test_the_claim_becomes_a_bluff_the_room_rolls_to_see_through(plain):
     assert [r["op"] for r in out] == ["check"], out
     check = out[0]
     assert check["params"]["skill"] == "bluff" and check["visibility"] == "player"
-    assert check["params"]["dc"]["band"] == "heroic", "I am a god is the far end of a lie"
-    # A Bluff the model already wrote is not doubled, and an ordinary line adds nothing.
+    # Owner ruling B1 (2026-09-30): opposed by a listener's Sense Motive, at the book's
+    # believability — "I am a god" is the far end of a lie, impossible (-20, CRB p.90).
+    assert check["params"]["opposed_by"] == {"ref": "c1", "skill": "sense motive",
+                                             "lie": "impossible"}
+    assert "dc" not in check["params"]
+    # A Bluff the model already wrote is not doubled — it becomes this one — and an
+    # ordinary line adds nothing.
     already = [{"op": "check", "actor": "pc", "params": {"skill": "bluff", "dc": {"band": "tough"}}}]
-    assert judgement.inject_false_claim(already, REPORTED, plain) is already
+    redone = judgement.inject_false_claim(already, REPORTED, plain)
+    assert [r["op"] for r in redone] == ["check"]
+    assert redone[0]["params"]["opposed_by"]["lie"] == "impossible"
     plain_line = [{"op": "narrate_only", "actor": "pc"}]
     assert judgement.inject_false_claim(plain_line, "I look around.", plain) is plain_line
 

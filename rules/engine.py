@@ -2527,13 +2527,22 @@ class Engine:
             if known and not planned \
                     and places_mod.find(known, str(intent.params["place"])) is None \
                     and places_mod.find(outside, str(intent.params["place"])) is None:
+                # The found example names `parent`. It taught leaving it out until
+                # 2026-09-30 (item 9, turn_log row 102): "I head toward the back streets
+                # to find the Velvet Veil" founded the Veil with no parent, so it went
+                # off the gate where Sam stood. `judgement.fill_found_parent` fills a
+                # missing one from the words; the hint now asks for it outright.
                 raise IntentError(
                     f"travel: there is no {intent.params['place']!r} here. Name one of: "
                     f"{', '.join(p.name for p in known)} — or, if the scene goes somewhere "
                     f"new that a place like this would have, found it first in the same "
                     f"plan: {{\"op\": \"found\", \"params\": {{\"name\": "
-                    f"{intent.params['place']!r}, \"kind\": \"tavern\"}}}} (kind: what it "
-                    f"is), then travel to it.", "schema", code="no_such_place")
+                    f"{intent.params['place']!r}, \"kind\": \"tavern\", \"parent\": "
+                    f"\"<the place above it stands in or off>\"}}}} (kind: what it is; "
+                    f"parent: the place from that list it is in or off — where the "
+                    f"player's words or the people here put it; leave parent out only "
+                    f"when it opens off where the party stands), then travel to it.",
+                    "schema", code="no_such_place")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
             if trouble:
@@ -3971,6 +3980,18 @@ class Engine:
                 intent_id=intent.id, op="check", effects=[],
                 tell=f"{exc}. Nothing is rolled.", because=intent.because)
         opposed = intent.params.get("opposed_by")
+        # A lie told to somebody (owner ruling B1, 2026-09-30): Bluff against their Sense
+        # Motive, with the book's believability on the liar's roll (`rules/bluff.py`, CRB
+        # p.90). The category is written by code (`judgement.lie_of`) on `opposed_by`;
+        # the number is the table's, through the same modifier list the roll reads.
+        lie = (str(opposed.get("lie") or "") if isinstance(opposed, dict)
+               and skill == "bluff" else "")
+        if lie:
+            from . import bluff as bluff_mod
+
+            term = bluff_mod.modifier(lie)
+            if term is not None:
+                mods = [*mods, term]
 
         # The opposing side is rolled first and kept in `partial`, so the player's prompt
         # is fully formed before we suspend and so a resume never re-rolls it.
@@ -4038,7 +4059,19 @@ class Engine:
         verdict = "success" if margin >= 0 else "failure"
         rolls = [roll] + ([opposing_roll] if opposing_roll else [])
 
-        if opposed:
+        if opposed and lie:
+            # Said as what the listener now believes, with the skills named: the prose
+            # block for a false claim reads "If the Bluff in the tells above SUCCEEDED",
+            # and `note_heat` looks for the Bluff by name.
+            other = self.scene.actors[opposed["ref"]]
+            tell = (
+                f"{actor.name}'s Bluff beats {other.name}'s sense motive by {margin}: "
+                f"{other.name} believes it, for now."
+                if verdict == "success" else
+                f"{other.name}'s sense motive beats {actor.name}'s Bluff by {-margin}: "
+                f"{other.name} sees through it."
+            )
+        elif opposed:
             other = self.scene.actors[opposed["ref"]]
             tell = (
                 f"{actor.name} beats {other.name}'s {opposed['skill']} by {margin}."
@@ -11585,11 +11618,28 @@ class Engine:
         # square, when there is one, re-derives the zone below anyway, and a zone word
         # the fiction never contains is not worth a rejected turn.
         zone = str(intent.params.get("zone") or was).strip().lower()
+        # The player's character walking up to somebody with no map to walk on: a zone
+        # is the distance between the two of them, so it is set on the person `who`
+        # names — but it is the player who walks, who must be able to, and whom the tell
+        # names (2026-09-30, item 8: `judgement.declare_approach`). Told as "Sam moves
+        # from far to engaged" it read as the other one coming over.
+        mover = self.scene.actors.get(intent.actor or "")
+        walker = mover if (mover is not None and mover.is_pc and ref != mover.ref
+                           and square is None) else None
 
         # An attack of opportunity has already resolved by the time we get here — it was
         # spliced in front of this intent precisely so it could land before the move did.
         # If it dropped them, they do not arrive: the whole reason for that ordering.
-        if not actor.can_act():
+        if walker is not None and not walker.can_act():
+            return Outcome(
+                intent_id=intent.id, op="move", status="prevented",
+                effects=[{"ref": walker.ref, "kind": "move_stopped",
+                          "why": walker.blocking_condition().lower()}],
+                tell=f"{walker.name} is {walker.blocking_condition().lower()} and does not "
+                     f"get there.",
+                because=intent.because,
+            )
+        if walker is None and not actor.can_act():
             return Outcome(
                 intent_id=intent.id, op="move", status="prevented",
                 effects=[{"ref": ref, "kind": "move_stopped",
@@ -11637,10 +11687,17 @@ class Engine:
             )
 
         self.scene.zones[ref] = zone
+        tell = f"{actor.name} moves from {was} to {zone}."
+        if walker is not None:
+            order = {"far": 0, "near": 1, "engaged": 2}
+            closer = order.get(zone, 1) - order.get(was, 1)
+            tell = (f"{walker.name} closes on {actor.name}." if closer > 0 else
+                    f"{walker.name} draws back from {actor.name}." if closer < 0 else
+                    f"{walker.name} stays where they are, {zone} of {actor.name}.")
         return Outcome(
             intent_id=intent.id, op="move",
             effects=[{"ref": ref, "kind": "zone", "from": was, "to": zone}],
-            tell=f"{actor.name} moves from {was} to {zone}.",
+            tell=tell,
             because=intent.because,
         )
 

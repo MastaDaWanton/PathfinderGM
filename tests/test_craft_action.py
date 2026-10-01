@@ -307,7 +307,14 @@ def _scene():
     ("I search the room for the ledger", "perception"),
 ])
 def test_a_declared_risky_action_earns_its_check(said, skill):
-    out = judgement.inject_checks([{"op": "narrate_only"}], said, _scene())
+    # Somebody in the tavern: since 2026-09-30 Stealth is opposed by "anyone who might
+    # notice you" (CRB p.106) and is not rolled with nobody there
+    # (tests/test_slipping_out_rolls_stealth.py).
+    from rules.bestiary import instantiate
+
+    s = _scene()
+    s.add(instantiate("thug", scene=s, name="the innkeeper"))
+    out = judgement.inject_checks([{"op": "narrate_only"}], said, s)
     checks = [i for i in out if i.get("op") == "check"]
     assert checks and checks[0]["params"]["skill"] == skill
 

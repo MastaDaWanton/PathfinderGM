@@ -557,7 +557,15 @@ class GMAgent:
                 # a divine being" is a Bluff the room rolls to see through. Before the
                 # check injector, whose broad verbs would otherwise read it as
                 # something else or nothing.
-                raw = judgement.inject_false_claim(raw, player_input, self.engine.scene)
+                # With the reading (item 5, 2026-09-30): a take, a pick-up or a plan's give
+                # of the thing is acquisition, and the claim the prose was handed before
+                # any reading existed is withdrawn when the reading says so.
+                reading = self.reading if isinstance(self.reading, dict) else None
+                raw = judgement.inject_false_claim(raw, player_input, self.engine.scene,
+                                                   reading=reading)
+                if getattr(self, "false_claim", "") and not judgement.false_claim(
+                        player_input, self.engine.scene, reading=reading, plan=raw):
+                    self.false_claim = ""
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.
@@ -588,12 +596,14 @@ class GMAgent:
                 # A departure that names the room the party is in is asked again with
                 # the rooms that would have worked; raises into the correction path.
                 raw = judgement.refuse_leaving_in_place(raw, player_input,
-                                                        self.engine.scene, self.world)
+                                                        self.engine.scene, self.world,
+                                                        reading=reading,
+                                                        attached=getattr(self, "attachments", ()))
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
                 raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
-                raw = judgement.inject_found(raw, player_input, self.engine.scene)
+                raw = judgement.inject_found(raw, player_input, self.engine.scene, self.world)
                 raw = judgement.inject_venture(raw, player_input, self.engine.scene)
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
                 raw = judgement.bulk_give_is_a_loot(raw, self.engine.scene)
