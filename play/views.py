@@ -1726,7 +1726,15 @@ def prepare_spells(request):
                 {"error": f"a level {level} spell needs {ability.title()} "
                           f"{10 + level}"}, status=400)
 
-    if action == "learn":
+    if action == "learn" and casting.learning(pc)["kind"] == "known":
+        # A repertoire is bounded by its Spells Known table, and the tab's Learn button
+        # took any castable spell with no count at all — D&D Beyond's "I was able to add
+        # every first level spell" bug. Through the same check the level-up picker uses.
+        added, problems = casting.learn(pc, [spell.id])
+        if problems:
+            return JsonResponse({"error": " ".join(problems), "problems": problems,
+                                 "spell": spell.id}, status=400)
+    elif action == "learn":
         if spell.id not in pc.spellbook:
             pc.spellbook.append(spell.id)
     elif action == "forget":
@@ -1759,6 +1767,65 @@ def prepare_spells(request):
 
     c.save()
     return JsonResponse(full_sheet(pc))
+
+
+@require_GET
+def learnable_spells(request):
+    """The spells this caster may write in for the levels they have gained.
+
+    The owner, 2026-10-01: "leveled up as a wizard and did not choose new spells". The
+    sheet carries only the count (`spells.to_learn`); the candidates come here when the
+    picker opens, because a wizard's whole castable list runs to hundreds.
+    """
+    from rules import casting
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    return JsonResponse({
+        "to_learn": casting.learning(pc),
+        "spells": [{"id": sp.id, "name": sp.name, "level": lvl, "school": sp.school,
+                    "range": sp.range, "duration": sp.duration,
+                    "save": sp.saving_throw, "line": sp.line}
+                   for lvl, sp in casting.learnable(pc)],
+    })
+
+
+@require_POST
+def learn_spells(request):
+    """Write the chosen owed spells into the book: `{"spells": [ids]}`.
+
+    The server is the rule: class list, a level castable when the pick was earned, not
+    already in the book, no more than owed — every reason refused at once, with the fix
+    named, and nothing written unless all of them pass.
+    """
+    from rules import casting
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    wanted = body.get("spells")
+    if not isinstance(wanted, list):
+        return JsonResponse({"error": "send the chosen spells as a list of ids"},
+                            status=400)
+    added, problems = casting.learn(pc, wanted)
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    from rules import spells as spells_mod
+
+    names = [spells_mod.get(sid).name for sid in added]
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{pc.name} writes {', '.join(names)} into the "
+                                 f"spellbook."})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({**full_sheet(pc), "learned": added})
 
 
 # What the Continue button sends. Written as an instruction to the GM rather than as
