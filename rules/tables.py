@@ -515,18 +515,62 @@ def is_physical(dtype: str | None) -> bool:
 # `weight` is the armour category, which is what decides the speed penalty: medium and
 # heavy armour drop a 30-foot speed to 20 and a 20-foot speed to 15. Absent until the grid
 # arrived, because nothing measured movement in feet before there were squares to cross.
+#
+# The whole of Core Rulebook Table 6-6 since 2026-09-30 (docs/playtest-2026-09-30-findings.md
+# item 2, part D): the table had 7 of the book's 12 armours and 3 of its 6 shields, with no
+# weights and no arcane spell failure, so a looted hide or a bought tower shield had no row
+# to be worn by and a wizard in a breastplate cast as freely as one in a robe. Read from
+# the PRD's own table (legacy.aonprd.com/coreRulebook/equipment.html, "Table 6-6: Armor and
+# Shields"), Open Game Content under OGL-NOTICE.md's section 15:
+#   `lb`   the Weight column (pounds; a Medium creature's suit)
+#   `asf`  Arcane Spell Failure Chance, in percent (`rules/armour.py:spell_failure` reads it)
+#   `don`  which row of Table 6-8 "Donning Armor" the suit is timed by (`DONNING` below)
+# The keys of the seven that were here are kept as they were, because every save written
+# before this holds them ("chain shirt", "chainmail", "full plate").
 ARMOUR: dict[str, dict] = {
-    "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0, "weight": "light"},
-    "padded": {"name": "padded armour", "cost_gp": 5, "ac": 1, "max_dex": 8, "acp": 0, "weight": "light"},
-    "leather": {"name": "leather armour", "cost_gp": 10, "ac": 2, "max_dex": 6, "acp": 0, "weight": "light"},
-    "studded leather": {"name": "studded leather", "cost_gp": 25, "ac": 3, "max_dex": 5, "acp": -1,
-                        "weight": "light"},
+    "none": {"name": "no armour", "ac": 0, "max_dex": 99, "acp": 0, "weight": "light",
+             "lb": 0, "asf": 0},
+    "padded": {"name": "padded armour", "cost_gp": 5, "ac": 1, "max_dex": 8, "acp": 0,
+               "weight": "light", "lb": 10, "asf": 5, "don": "light"},
+    "leather": {"name": "leather armour", "cost_gp": 10, "ac": 2, "max_dex": 6, "acp": 0,
+                "weight": "light", "lb": 15, "asf": 10, "don": "light"},
+    "studded leather": {"name": "studded leather", "cost_gp": 25, "ac": 3, "max_dex": 5,
+                        "acp": -1, "weight": "light", "lb": 20, "asf": 15, "don": "light"},
     "chain shirt": {"name": "chain shirt", "cost_gp": 100, "ac": 4, "max_dex": 4, "acp": -2,
-                    "weight": "light"},
+                    "weight": "light", "lb": 25, "asf": 20, "don": "light"},
+    # Keyed "hide armour", not "hide": a tanner's raw hide is a goods line of its own, and
+    # a bare "hide" key would have made every one of them a suit to wear.
+    "hide armour": {"name": "hide armour", "cost_gp": 15, "ac": 4, "max_dex": 4, "acp": -3,
+             "weight": "medium", "lb": 25, "asf": 20, "don": "light"},
+    "scale mail": {"name": "scale mail", "cost_gp": 50, "ac": 5, "max_dex": 3, "acp": -4,
+                   "weight": "medium", "lb": 30, "asf": 25, "don": "medium"},
     "breastplate": {"name": "breastplate", "cost_gp": 200, "ac": 6, "max_dex": 3, "acp": -4,
-                    "weight": "medium"},
-    "chainmail": {"name": "chainmail", "cost_gp": 150, "ac": 6, "max_dex": 2, "acp": -5, "weight": "medium"},
-    "full plate": {"name": "full plate", "cost_gp": 1500, "ac": 9, "max_dex": 1, "acp": -6, "weight": "heavy"},
+                    "weight": "medium", "lb": 30, "asf": 25, "don": "medium"},
+    "chainmail": {"name": "chainmail", "cost_gp": 150, "ac": 6, "max_dex": 2, "acp": -5,
+                  "weight": "medium", "lb": 40, "asf": 30, "don": "medium"},
+    "splint mail": {"name": "splint mail", "cost_gp": 200, "ac": 7, "max_dex": 0, "acp": -7,
+                    "weight": "heavy", "lb": 45, "asf": 40, "don": "medium"},
+    "banded mail": {"name": "banded mail", "cost_gp": 250, "ac": 7, "max_dex": 1, "acp": -6,
+                    "weight": "heavy", "lb": 35, "asf": 35, "don": "medium"},
+    "half-plate": {"name": "half-plate", "cost_gp": 600, "ac": 8, "max_dex": 0, "acp": -7,
+                   "weight": "heavy", "lb": 50, "asf": 40, "don": "plate"},
+    "full plate": {"name": "full plate", "cost_gp": 1500, "ac": 9, "max_dex": 1, "acp": -6,
+                   "weight": "heavy", "lb": 50, "asf": 35, "don": "plate"},
+}
+
+# Core Rulebook Table 6-8, "Donning Armor", by its own three armour rows (hide is timed with
+# the light suits there, and banded and splint mail with the breastplate, which is the
+# book's grouping and not the light/medium/heavy one). Minutes; `remove` is dice where the
+# book prints dice. `alone` is the footnote on the plate row: "The wearer must have help to
+# don this armor. Without help, it can be donned only hastily" — so a character dressing
+# themselves takes the hasty time. Halved "if the character has help" (the other footnote);
+# nobody helps yet, so no time here is halved, and the tell says the help-free number.
+# A shield is a move action each way (the table's first row), which is why only a shield
+# can change in a fight (owner's ruling E2, 2026-09-30).
+DONNING: dict[str, dict] = {
+    "light": {"don": 1, "hasty_rounds": 5, "remove": "1"},
+    "medium": {"don": 4, "hasty_rounds": 10, "remove": "1"},
+    "plate": {"don": 4, "hasty_rounds": 40, "remove": "1d4+1", "alone": "hasty"},
 }
 
 # Core Rulebook table 7-6. A creature slowed by armour keeps the reduced speed until it
@@ -586,11 +630,27 @@ SLOT_RULES_LIMIT = {"ring": 2}
 SLOT_ORDER_LEFT = ("head", "eyes", "shoulders", "body", "armor", "wrists", "feet")
 SLOT_ORDER_RIGHT = ("headband", "neck", "chest", "hands", "ring", "belt", "shield")
 
+# The shields of Table 6-6, same source and fields as ARMOUR above. "light shield" and
+# "heavy shield" were the steel ones by their price (9 gp and 20 gp) and keep those keys;
+# the wooden pair and the tower shield are new. `max_dex` only where the book prints one
+# (the tower shield's +2), `attack` the tower shield's "–2 penalty on attack rolls because
+# of the shield's encumbrance" (CRB "Shield, tower"), and `bow_ok` the buckler's "You can
+# use a bow or crossbow without penalty while carrying it" — the one shield a two-handed
+# launcher may go with (owner's ruling E4).
 SHIELDS: dict[str, dict] = {
-    "none": {"name": "no shield", "ac": 0, "acp": 0},
-    "buckler": {"name": "buckler", "cost_gp": 5, "ac": 1, "acp": -1},
-    "light shield": {"name": "light shield", "cost_gp": 9, "ac": 1, "acp": -1},
-    "heavy shield": {"name": "heavy shield", "cost_gp": 20, "ac": 2, "acp": -2},
+    "none": {"name": "no shield", "ac": 0, "acp": 0, "lb": 0, "asf": 0},
+    "buckler": {"name": "buckler", "cost_gp": 5, "ac": 1, "acp": -1, "lb": 5, "asf": 5,
+                "bow_ok": True},
+    "light wooden shield": {"name": "light wooden shield", "cost_gp": 3, "ac": 1, "acp": -1,
+                            "lb": 5, "asf": 5},
+    "light shield": {"name": "light steel shield", "cost_gp": 9, "ac": 1, "acp": -1,
+                     "lb": 6, "asf": 5},
+    "heavy wooden shield": {"name": "heavy wooden shield", "cost_gp": 7, "ac": 2, "acp": -2,
+                            "lb": 10, "asf": 15},
+    "heavy shield": {"name": "heavy steel shield", "cost_gp": 20, "ac": 2, "acp": -2,
+                     "lb": 15, "asf": 15},
+    "tower shield": {"name": "tower shield", "cost_gp": 30, "ac": 4, "acp": -10, "lb": 45,
+                     "asf": 50, "max_dex": 2, "attack": -2, "tower": True},
 }
 
 # --- Combat manoeuvres ------------------------------------------------------------

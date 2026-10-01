@@ -6,7 +6,7 @@
   "good_saves": ["ref"],
   "skill_ranks": 8,
   "starting_wealth": "4d6 x 10 gp",
-  "proficiencies": ["simple", "hand crossbow", "rapier", "sap", "shortbow", "short sword",
+  "proficiencies": ["simple", "hand-crossbow", "rapier", "sap", "shortbow", "short-sword",
                     "light armor"],
   "class_skills": [
     "acrobatics", "appraise", "bluff", "climb", "craft", "diplomacy",

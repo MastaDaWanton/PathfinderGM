@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .tables import ARMOUR, SHIELDS, WEAPONS
+from .tables import ARMOUR, SHIELDS
 
 # Core Rulebook Table 6-1, in copper. The ids are the ones the price tables use.
 DENOMINATIONS: tuple[tuple[str, int], ...] = (
@@ -219,13 +219,41 @@ def purse_line(purse: dict, coins: list[Coin] | None = None) -> str:
 
 
 def known_item(name: str) -> dict | None:
-    """The Core-table entry for this thing, if the tables have one."""
-    key = " ".join(str(name or "").split()).lower()
-    for table in (WEAPONS, ARMOUR, SHIELDS):
-        if key in table:
-            return dict(table[key], table=table is WEAPONS and "weapon"
-                        or table is ARMOUR and "armour" or "shield")
+    """The Core-table entry for this thing, if the tables have one, with `table` saying
+    which (weapon, ammunition, armour or shield) and `key` its one key.
+
+    Read through the two resolvers (`armour.key_for`, `weapons.key_for`) since 2026-09-30.
+    This used to look only in the curated twelve-row `tables.WEAPONS`, so of the 356
+    weapons the smith sold, 348 were "gear" here — and `wear`, the Equipment tab and the
+    shelves all asked this. Armour first: "light shield" is a shield to wear before it is
+    the shield-bash row of the same name. A thing the general store sells under exactly
+    this name is that gear, not a weapon that shares a word with it (the import has a
+    "Grappling hook" weapon and a siege "Alchemist's fire"; the store sells both as gear).
+    """
+    from . import armour as armour_mod
+    from . import weapons as weapons_mod
+
+    low = " ".join(str(name or "").split()).lower()
+    if not low or low in GEAR or low in _GEAR_NAMES:
+        return None
+    kind, key = armour_mod.key_for(low)
+    if kind:
+        return dict(ARMOUR[key] if kind == "armour" else SHIELDS[key], table=kind, key=key)
+    key = weapons_mod.key_for(low)
+    if key:
+        row = weapons_mod.all_weapons()[key]
+        kind = "ammunition" if weapons_mod.is_ammunition(key) else (
+            "gear" if row.get("not_ammo") else "weapon")
+        return dict(row, table=kind, key=key)
     return None
+
+
+def canonical(name: str) -> str:
+    """The one key a weapon, a round, a suit or a shield is stored under, else the name
+    itself, lowered. What `wear`, `deliver` and the loot write, so a save never again holds
+    "chain-shirt" where the table says "chain shirt"."""
+    found = known_item(name)
+    return str(found["key"]) if found else " ".join(str(name or "").split()).lower()
 
 
 # Things you drink, eat or smear on a blade. Matched on the head noun, because the
@@ -244,17 +272,90 @@ MEASURED = {"rope": "ft", "chain": "ft", "cord": "ft", "twine": "ft", "silk": "f
 
 
 def kind_of(name: str) -> str:
-    """Which shelf this thing belongs on: weapon, armour, shield, consumable or gear.
+    """Which shelf this thing belongs on: weapon, ammunition, armour, shield, consumable
+    or gear.
 
     Routing by what a thing *is* rather than dropping everything in one bag is the
     difference between an inventory and a list of nouns. A bought longsword should be
     swingable, a bought chain shirt wearable, and a bought potion drinkable through the
-    machinery that already exists for all three.
+    machinery that already exists for all three. Ammunition is its own shelf since
+    2026-09-30: a quiver of arrows is spent by the bow, never held (E3).
     """
     entry = known_item(name)
     if entry:
         return entry["table"]
     return "consumable" if _CONSUMABLE.search(str(name or "")) else "gear"
+
+
+def stow(actor, name: str, count: int = 1) -> tuple[str, int]:
+    """Put `count` of a thing where the sheet reads it, by what it is: (key, how many).
+
+    The one router for a weapon, a round, a suit and a shield, so `deliver`, the loot
+    and a handover cannot file one thing three ways. A weapon goes on the weapons list
+    (that is what the attack op and `wear` read); ammunition goes into `goods` as single
+    rounds — "Arrows (20)" bought three times is 60 arrows, which is what a shot spends
+    one of (E3); armour and a shield into `goods` by their table key, to be put on with
+    `wear`. Anything else is not this function's: the callers keep their own paths for
+    gear, jars and herbs. ("", 0) when it is none of the four."""
+    from . import weapons as weapons_mod
+
+    entry = known_item(name)
+    count = max(0, int(count or 0))
+    if not entry or entry["table"] not in ("weapon", "ammunition", "armour", "shield"):
+        return "", 0
+    key = str(entry["key"])
+    if entry["table"] == "weapon":
+        for _ in range(count):
+            actor.weapons.append(key)
+        return key, count
+    if entry["table"] == "ammunition":
+        # A bundle's name says how many it is; a single key ("arrows-20") named once is
+        # the bundle, so twenty. A count already in rounds is the caller's to pass as
+        # `count` with a name that has no bundle in it.
+        n = count * weapons_mod.rounds_per(key)
+        actor.goods[key] = int(actor.goods.get(key, 0) or 0) + n
+        return key, n
+    actor.goods[key] = int(actor.goods.get(key, 0) or 0) + count
+    return key, count
+
+
+def ammo_carried(actor, families) -> list[dict]:
+    """The rounds this actor carries of any of these families, most plentiful first:
+    [{"key": "arrows-20", "name": "arrows", "count": 58, "family": "arrows"}]. Rounds
+    live in `goods` under the bundle's key, counted singly (`stow`)."""
+    from . import weapons as weapons_mod
+
+    want = {str(f) for f in families or ()}
+    out = []
+    for name, n in (getattr(actor, "goods", None) or {}).items():
+        if int(n or 0) <= 0 or not weapons_mod.is_ammunition(name):
+            continue
+        fam = weapons_mod.family_of(name)
+        if fam in want:
+            key = weapons_mod.key_for(name)
+            out.append({"key": key, "stored": name, "family": fam, "count": int(n),
+                        "name": weapons_mod.round_name(key, int(n))})
+    out.sort(key=lambda r: (-r["count"], r["key"]))
+    return out
+
+
+def spend_round(actor, families, prefer: str = "") -> dict | None:
+    """Take one round of these families out of `goods` for a shot: the one asked for if
+    it is carried, else the most plentiful. Returns {"key", "family", "left"} — left is
+    every round of the families still carried — or None when there is none to spend."""
+    have = ammo_carried(actor, families)
+    if not have:
+        return None
+    from . import weapons as weapons_mod
+
+    want = weapons_mod.key_for(prefer) if prefer else ""
+    pick = next((r for r in have if r["key"] == want), have[0])
+    stored = pick["stored"]
+    actor.goods[stored] = int(actor.goods[stored]) - 1
+    if actor.goods[stored] <= 0:
+        del actor.goods[stored]
+    left = sum(r["count"] for r in have) - 1
+    return {"key": pick["key"], "family": pick["family"], "left": left}
 
 
 def unit_for(name: str) -> str:
@@ -284,6 +385,13 @@ def describe(name: str, count: int = 1) -> str:
                 f"the engine has no rules for it")
     if entry.get("table") == "weapon":
         return f"{head} — {entry['damage']} {entry['type']}, ×{entry['crit_mult']}"
+    if entry.get("table") == "ammunition":
+        from . import weapons as weapons_mod
+
+        word = weapons_mod.round_name(entry["key"], count)
+        return f"{count} {word} — ammunition, spent one a shot"
+    if entry.get("table") == "gear":
+        return f"{head} — carried; the engine has no rules for it"
     return f"{head} — +{entry.get('ac', 0)} AC"
 
 
@@ -345,6 +453,9 @@ GEAR: dict[str, dict] = {
     "common meal": {"name": "common meal", "cost_gp": 0.3, "category": "food"},
     "poor meal": {"name": "poor meal", "cost_gp": 0.1, "category": "food"},
 }
+# The general store's own names, which `known_item` hands back as gear before it asks the
+# weapon table: "grappling hook" and "alchemist's fire" are rows there too.
+_GEAR_NAMES = frozenset(str(v["name"]).lower() for v in GEAR.values())
 
 
 # --- goods on a counter ---------------------------------------------------------------------
@@ -474,11 +585,19 @@ def outfit_weapons() -> dict[str, dict]:
         cost = w.get("cost_gp")
         if cost in (None, "") or w.get("prof") == "exotic" and float(cost) > 100:
             continue
+        # Owner's ruling E5 (2026-09-30): no siege engines and nothing "(Modern)" on a
+        # weaponsmith's shelf. The rule is `weapons.UNSOLD_SECTION`, the one copy.
+        if weapons_mod.UNSOLD_SECTION.search(str(w.get("section") or "")):
+            continue
         out[key] = w
     return out
 
 
 def weapon_good(key: str, w: dict | None = None) -> Good | None:
+    """A row of the weapon table as a good, on the weaponsmith's shelf. What the row IS — a
+    weapon, a bundle of ammunition, a shield (the shield-bash rows resolve to the shield
+    to wear), a firearm's kit — is `deliver`'s to read off the key through `stow`, so the
+    shelf stays the smith's and the purchase still lands where it can be used."""
     w = w if w is not None else outfit_weapons().get(key)
     if not w:
         return None
@@ -562,14 +681,18 @@ def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
     count = max(1, int(count or 1))
     kind = str(getattr(found, "kind", "") or "gear")
     key = str(getattr(found, "key", "") or getattr(found, "name", ""))
-    if kind == "weapon":
-        for _ in range(count):
-            actor.weapons.append(key)
-        return [], ""
-    if kind in ("armour", "shield"):
-        # Carried, to be put on with `wear`, which reads exactly this.
-        actor.goods[key] = int(actor.goods.get(key, 0) or 0) + count
-        return [], ""
+    if kind in ("weapon", "armour", "shield"):
+        # Through the one router (`stow`): a weapon on the weapons list, a suit or a
+        # shield carried to be put on with `wear`, and ammunition as single rounds —
+        # "Arrows (20)" bought three times is 60 arrows, not three of a thing (E3).
+        # What `stow` does not take (a firearm's kit off the smith's shelf) falls through
+        # to the pack below, as gear.
+        stowed, _ = stow(actor, key, count)
+        if stowed:
+            return [], ""
+        if kind in ("armour", "shield"):
+            actor.goods[key] = int(actor.goods.get(key, 0) or 0) + count
+            return [], ""
     if kind == "mount" and getattr(found, "template", ""):
         from . import states
         from .activeeffect import ActiveEffect

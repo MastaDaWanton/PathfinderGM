@@ -1,0 +1,1085 @@
+{
+ "about": "2026-09-30 (docs/playtest-2026-09-30-findings.md item 2): what the workbook import could not know, kept apart so tools/build_weapons.py cannot erase it. Launchers' ammunition (`ammo`), rounds' families (`ammo_of`), rows that cannot be held and why (`unwieldable`), two-handed bows and crossbows (`hands`), the battle poi's damage. Sources: CRB Equipment 'Ammunition' (legacy.aonprd.com/coreRulebook/equipment.html) and each weapon's AoN page (aonprd.com/EquipmentWeaponsDisplay.aspx?ItemName=<name>). Inferred, not stated: the thorn bow, horse bow, orc hornbow and reflex bow fire arrows; the gastraphetes fires bolts; 'Thorns (20)' are arrows; 'Bullet, screaming' and 'Bullet, adamantine' are firearm rounds. Not found: a range for the crystal chakram or the spear-sling, so neither is invented.",
+ "weapons": [
+  {
+   "id": "aasen-mortar",
+   "ammo": [
+    "siege shot"
+   ],
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "air-repeater",
+   "ammo": [
+    "air shots"
+   ]
+  },
+  {
+   "id": "air-reservoir",
+   "ammo_of": "air shots",
+   "prof": "",
+   "per": 6
+  },
+  {
+   "id": "alchemical-cartridge-dragon-s-breath",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-entangling-shot",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-flare",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-gray-dust",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-gray-dust-shot",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-molten-shot",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-paper-bullet-or-pellet",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-repellent",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-salt-shot",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-smoke-cartridge",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemical-cartridge-toxin",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "alchemist-s-fire",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "arrow-iron-tipped-distance-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "arrows-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "atlatl",
+   "ammo": [
+    "atlatl darts"
+   ]
+  },
+  {
+   "id": "atlatl-dart",
+   "ammo_of": "atlatl darts",
+   "prof": ""
+  },
+  {
+   "id": "axe-musket",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "ballista-gate-breaker",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ballista-heavy",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ballista-light",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ballista-net",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "bamboo-shaft-arrows",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "barbed-arrow-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "battle-poi",
+   "damage": "1d4",
+   "damage_small": "1d3",
+   "type": "fire",
+   "types": [
+    "fire"
+   ],
+   "type_text": "fire"
+  },
+  {
+   "id": "black-powder-dose",
+   "not_ammo": true,
+   "prof": "",
+   "unwieldable": "A firearm's kit, not a weapon: carried, and the rules do not spend powder yet."
+  },
+  {
+   "id": "black-powder-keg",
+   "not_ammo": true,
+   "prof": "",
+   "unwieldable": "A firearm's kit, not a weapon: carried, and the rules do not spend powder yet."
+  },
+  {
+   "id": "blast-shot",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "blowgun",
+   "ammo": [
+    "blowgun darts",
+    "featherweight darts"
+   ]
+  },
+  {
+   "id": "blowgun-darts-10",
+   "ammo_of": "blowgun darts",
+   "prof": ""
+  },
+  {
+   "id": "blunderbuss",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "blunt-arrows-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "bolas-bolts",
+   "ammo_of": "bolas bolts",
+   "prof": ""
+  },
+  {
+   "id": "bolt-acid",
+   "ammo_of": "bolts",
+   "prof": ""
+  },
+  {
+   "id": "bolt-drow-poison",
+   "ammo_of": "bolts",
+   "prof": ""
+  },
+  {
+   "id": "bolt-fire",
+   "ammo_of": "bolts",
+   "prof": ""
+  },
+  {
+   "id": "bolts-heartstake-5",
+   "ammo_of": "bolts",
+   "prof": ""
+  },
+  {
+   "id": "bomb",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "bombard-heavy",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "bombard-light",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "bombard-standard",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "breech-loader",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "bridge-assault-colossal",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "bridge-assault-gargantuan",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "bridge-assault-huge",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "bridge-assault-large",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "buckler-gun",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "bullet-adamantine",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "bullet-screaming",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "bullets-groaning-10",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "cannon",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "cannon-fiend-s-mouth",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "catapult-heavy",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "catapult-light",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "catapult-standard",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "chain-shot",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "coat-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "composite-longbow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "composite-shortbow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "corvus",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "crossbow-bolts-10",
+   "ammo_of": "bolts",
+   "prof": ""
+  },
+  {
+   "id": "crushing-wheel",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "culverin",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "cylinder-rifle",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "dagger-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "defoliant-shot",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "double-barreled-musket",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "double-barreled-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "double-barreled-shotgun",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "double-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "double-hackbut",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "dragon-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "dragoon-cartridge",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "dragoon-musket",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "dragoon-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "earthmaul",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "entangling-bolt",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "featherweight-dart",
+   "ammo_of": "featherweight darts",
+   "prof": ""
+  },
+  {
+   "id": "fire-lance",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "firearm-bullet-1",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "firearm-bullet-30",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "firearm-bullet-silver",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "firedrake",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "firewyrm",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "flak",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "flask-thrower",
+   "ammo": [
+    "splash weapons"
+   ],
+   "unwieldable": "It throws splash weapons and alchemical flasks, and the rules cannot load one into it yet."
+  },
+  {
+   "id": "flechette-bolt",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "flight-arrows-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "gallery-colossal",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "gallery-gargantuan",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "gallery-huge",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "gallery-large",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "gastraphetes",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "gunsmith-s-kit",
+   "not_ammo": true,
+   "prof": "",
+   "unwieldable": "A firearm's kit, not a weapon: carried, and the rules do not spend powder yet."
+  },
+  {
+   "id": "halfling-double-sling",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "halfling-little-starstones-10",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "halfling-sharpstones-10",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "halfling-sling-staff",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "halfling-softstones-10",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "halfling-spongestones-10",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "hand-crossbow",
+   "ammo": [
+    "bolts"
+   ]
+  },
+  {
+   "id": "handwraps",
+   "unwieldable": "Handwraps are worn on the fists: the blow is your unarmed strike, so put away what is in hand and fight unarmed."
+  },
+  {
+   "id": "harvester",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "heavy-crank-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "heavy-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "heavy-shield",
+   "unwieldable": "A shield bash needs the shield worn and an off hand to strike with, and the rules hold one weapon at a time; wear the shield (the armourer sells it)."
+  },
+  {
+   "id": "heavy-slaver-s-crossbow",
+   "ammo": [
+    "bolas bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "heavy-wrist-launcher",
+   "ammo": [
+    "bolts"
+   ]
+  },
+  {
+   "id": "hornbow-orc",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "horse-bow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "hotchkiss-6-pounder",
+   "ammo": [
+    "siege shot"
+   ],
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "incendiary-arrow-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "kestros",
+   "ammo": [
+    "kestros darts"
+   ]
+  },
+  {
+   "id": "kestros-dart-10",
+   "ammo_of": "kestros darts",
+   "prof": ""
+  },
+  {
+   "id": "ladder-escalade-colossal",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ladder-escalade-gargantuan",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ladder-escalade-huge",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ladder-escalade-large",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "lasso",
+   "unwieldable": "A lasso entangles rather than wounds, and the rules have no lasso attack yet."
+  },
+  {
+   "id": "launching-crossbow",
+   "ammo": [
+    "splash weapons"
+   ],
+   "unwieldable": "It launches splash weapons, and the rules cannot load a flask into it yet."
+  },
+  {
+   "id": "lawrence-1917-flamethrower",
+   "ammo": [
+    "flamethrower fuel"
+   ],
+   "unwieldable": "Its fuel and spray are in its text, which the rules do not carry."
+  },
+  {
+   "id": "lawrence-1917-flamethrower-fuel-tank",
+   "ammo_of": "flamethrower fuel",
+   "prof": ""
+  },
+  {
+   "id": "light-crank-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "light-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "light-shield",
+   "unwieldable": "A shield bash needs the shield worn and an off hand to strike with, and the rules hold one weapon at a time; wear the shield (the armourer sells it)."
+  },
+  {
+   "id": "light-slaver-s-crossbow",
+   "ammo": [
+    "bolas bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "liquid-ice",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "lizard-king-war-trident",
+   "unwieldable": "Its damage is printed as 'see text' and the text is not in the tables, so there is nothing to roll."
+  },
+  {
+   "id": "longbow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "madsen-light-machine-gun",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "manticore-s-tail",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "maxim-m1910-machine-gun",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "metal-cartridge",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "mosin-nagant-m1891-rifle",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "musket",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "nagant-m1895-revolver",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "net",
+   "unwieldable": "A net entangles rather than wounds, and the rules have no net attack yet."
+  },
+  {
+   "id": "paddle-foot-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "pelletbow-dwarven-heavy",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "pelletbow-dwarven-light",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "pellets-30-handfuls",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "pellets-handful",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "pepperbox",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "pepperbox-rifle",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "pitted-bullet",
+   "ammo_of": "firearm rounds",
+   "prof": ""
+  },
+  {
+   "id": "plague-bundle",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "poisoned-sand-tube",
+   "unwieldable": "A puff of poisoned sand, not a blow: its effect is in its text, which the rules do not carry yet."
+  },
+  {
+   "id": "powder-horn",
+   "not_ammo": true,
+   "prof": "",
+   "unwieldable": "A firearm's kit, not a weapon: carried, and the rules do not spend powder yet."
+  },
+  {
+   "id": "pronged-arrow-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "radium-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "radium-rifle",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "ram-colossal",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ram-gargantuan",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ram-huge",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "ram-large",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "reflex-bow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "repeating-crossbow-bolts-5",
+   "ammo_of": "bolts",
+   "prof": ""
+  },
+  {
+   "id": "repeating-hand-crossbow",
+   "ammo": [
+    "bolts"
+   ]
+  },
+  {
+   "id": "repeating-heavy-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "repeating-light-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "revolver",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "rifle",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "rockwasp-bomb",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "shortbow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "shotgun",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "siege-tower-colossal",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "siege-tower-gargantuan",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "siege-tower-huge",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "siege-tower-large",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "sling",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "sling-bullets-10",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "sling-glove",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "smoke-arrow",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "smoke-bullet",
+   "ammo_of": "sling bullets",
+   "prof": ""
+  },
+  {
+   "id": "smoke-shot",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "snag-net",
+   "unwieldable": "A net entangles rather than wounds, and the rules have no net attack yet."
+  },
+  {
+   "id": "spear-sling",
+   "ammo": [
+    "spears"
+   ],
+   "unwieldable": "It launches a spear or javelin you carry, and the rules cannot load one into it yet."
+  },
+  {
+   "id": "spiked-armor",
+   "unwieldable": "Armour spikes are fitted to a suit of armour, and the rules do not fit them to one yet."
+  },
+  {
+   "id": "spiked-heavy-shield",
+   "unwieldable": "A shield bash needs the shield worn and an off hand to strike with, and the rules hold one weapon at a time; wear the shield (the armourer sells it)."
+  },
+  {
+   "id": "spiked-light-shield",
+   "unwieldable": "A shield bash needs the shield worn and an off hand to strike with, and the rules hold one weapon at a time; wear the shield (the armourer sells it)."
+  },
+  {
+   "id": "springal-arrow",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "springal-rocket",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "stonebow",
+   "ammo": [
+    "sling bullets"
+   ]
+  },
+  {
+   "id": "sword-cane-pistol",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "thark-rifle",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "thistle-arrow",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "thorn-bow",
+   "ammo": [
+    "arrows"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "thorns-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "throwing-arrow",
+   "ammo_of": "throwing arrows",
+   "prof": ""
+  },
+  {
+   "id": "throwing-arrow-cord",
+   "ammo": [
+    "throwing arrows"
+   ]
+  },
+  {
+   "id": "trebuchet-heavy",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "trebuchet-light",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "trebuchet-standard",
+   "unwieldable": "An engine of war, crewed and emplaced: not something one person holds."
+  },
+  {
+   "id": "tube-arrow-shooter",
+   "ammo": [
+    "tube arrow shafts"
+   ],
+   "unwieldable": "It fires its own spring-loaded bamboo shafts, which no table sells, so it has nothing to shoot."
+  },
+  {
+   "id": "underwater-heavy-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "underwater-light-crossbow",
+   "ammo": [
+    "bolts"
+   ],
+   "hands": 2
+  },
+  {
+   "id": "war-shield-dwarven",
+   "unwieldable": "A shield bash needs the shield worn and an off hand to strike with, and the rules hold one weapon at a time; wear the shield (the armourer sells it)."
+  },
+  {
+   "id": "warhammer-musket",
+   "ammo": [
+    "firearm rounds"
+   ]
+  },
+  {
+   "id": "weighted-bolt",
+   "ammo_of": "siege shot",
+   "prof": ""
+  },
+  {
+   "id": "whistling-arrows-20",
+   "ammo_of": "arrows",
+   "prof": ""
+  },
+  {
+   "id": "wrist-launcher",
+   "ammo": [
+    "featherweight darts"
+   ],
+   "unwieldable": "It fires featherweight darts, whose damage the tables do not carry, so there is nothing to roll."
+  }
+ ]
+}
