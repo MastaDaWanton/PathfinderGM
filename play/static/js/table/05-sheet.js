@@ -492,7 +492,7 @@ function drawSheet(keep = false) {
   $("#sheetbody").innerHTML = entry ? entry[2](SHEET) : "";
   $("#sheetbody").scrollTop = keep ? top : 0;
   if (SHEET_TAB === "equipment") drawEqNums();
-  if (SHEET_TAB === "journal") journalRead();
+  if (SHEET_TAB === "journal") { journalRead(); historyRead(); }
 }
 
 
@@ -1729,8 +1729,43 @@ function pageJournal(s) {
           n.current ? ` <span class="chip">here</span>` : ""}</li>`).join("")}</ol>
         <p class="why">The Map tab draws these, and the ways between them.</p>`
       : `<p class="why">Nowhere yet: the places you walk to are kept here.</p>`, "jr-walked")}
-    <p class="jr-log why">The adventure log, a record of each session, is not kept yet.</p>
+    ${sheetCard("jr-history", "History", journalHistory(), "jr-history")}
   </div>`;
+}
+
+// The character's history (owner, 2026-10-01): how it began, then one line per thing
+// that happened, by day where the log kept the clock. Read from `/api/history`, which
+// builds it from the engine's own record of each turn (play/history.py) — never from
+// the narrator's prose — and only reads.
+let JOURNAL_HISTORY = null;
+function journalHistory() {
+  return `<div class="jr-log-lines jr-history-lines" id="jr-history-log" tabindex="0" role="log"
+      aria-live="off" aria-label="The history of this character">${historyLines()}</div>`;
+}
+function historyLines() {
+  const h = JOURNAL_HISTORY;
+  if (h === null) return `<p class="why">Reading the history.</p>`;
+  const days = h.days || [];
+  if (!h.began && !days.length) return `<p class="why">Nothing has happened yet. Where you
+    go, who you meet, what you take on and what changes hands is kept here.</p>`;
+  let out = h.began ? `<p class="jr-began">${esc(h.began)}</p>` : "";
+  for (const d of days) {
+    if (d.day !== null && d.day !== undefined) out += `<h3 class="cardsub">Day ${esc(String(d.day))}</h3>`;
+    out += `<ul class="plain jr-events">${d.lines.map(l => `<li>${esc(l.text)}</li>`).join("")}</ul>`;
+  }
+  return out + (h.ended ? `<p class="jr-began">${esc(h.ended)}</p>` : "");
+}
+async function historyRead() {
+  try {
+    JOURNAL_HISTORY = await readJSON(await fetch("/api/history", { cache: "no-store" }));
+  } catch (err) {
+    JOURNAL_HISTORY = { began: "", days: [], ended: "" };
+  }
+  // Not "jr-history": that is the card's own id (`sheetCard`), and the first cut of this
+  // replaced the whole card, title and all, leaving "Reading the history." inside it.
+  const box = document.getElementById("jr-history-log");
+  // The newest at the bottom, in view, as the conversation log does.
+  if (box) { box.innerHTML = historyLines(); box.scrollTop = box.scrollHeight; }
 }
 
 // The quest log: the tasks taken up, read off the situation cards of kind quest the

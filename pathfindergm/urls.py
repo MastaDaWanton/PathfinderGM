@@ -38,6 +38,7 @@ urlpatterns = [
     # The conversation log a page at a time, for the panel's "Earlier…" (fix-interfaces
     # §2.10); `/api/state` carries only the latest entries.
     path("api/conversation", views.conversation, name="conversation"),
+    path("api/history", views.history, name="history"),
     # The heartbeat every page sends so the process can tell an open window from a
     # closed one. See `pathfindergm/liveness.py` for the four hours of orphaned server
     # that made it necessary.

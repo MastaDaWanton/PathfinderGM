@@ -465,10 +465,15 @@ def objective_done(scene, card_id: str, index: int, note: str = "", turn: int = 
 
 def quest_log(scene) -> dict:
     """What the table page shows: the quests underway, then the ones finished."""
-    actors = getattr(scene, "actors", {}) or {}
+    # The whole store, not `actors` (who is here): a giver left behind in the back streets
+    # printed as "for c1" in the Journal, a ref on the page (ruling 2026-09-28), measured
+    # on the scratch Sam campaign 2026-10-01. A giver with no name anywhere is left out.
+    people = {**(getattr(scene, "people", {}) or {}), **(getattr(scene, "actors", {}) or {})}
 
     def row(c: Card) -> dict:
-        giver = actors[c.giver].name if c.giver in actors else c.giver
+        who = people.get(c.giver)
+        giver = (who.name if who is not None else
+                 "" if re.fullmatch(r"c\d+|pc|[0-9a-f]{12}", str(c.giver or "")) else c.giver)
         return {"id": c.id, "title": c.title, "stage": c.stage, "giver": giver,
                 "reward": c.reward, "objectives": [dict(o) for o in c.objectives],
                 "facts": list(c.facts), "done": sum(1 for o in c.objectives if o.get("done")),

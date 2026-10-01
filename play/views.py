@@ -27,6 +27,7 @@ from . import campaign as campaign_mod
 from . import concurrency
 from .apiutil import read_body, read_int
 from . import downed, gm_answers, player_input, roster
+from . import history as history_mod
 
 
 def _recent_events(world, location, limit=4):
@@ -1000,6 +1001,14 @@ def state(request):
 
 
 @require_GET
+def history(request):
+    """The character's history for the Journal (`play/history.py`): how it began, then
+    one line per thing that happened, by day where the log can say. Reads only, like
+    `conversation`."""
+    return JsonResponse(history_mod.history(campaign_mod.current()))
+
+
+@require_GET
 def conversation(request):
     """One person's conversation log, or everybody's, a page at a time (§2.10).
 
@@ -1487,6 +1496,11 @@ def level_up(request):
     if result["grants"]:
         bits.append("Gains: " + ", ".join(result["grants"]) + ".")
     c.transcript.append({"who": "gm", "text": " ".join(bits), "kind": "consequence"})
+    # The row the docstring above has always promised and nothing wrote until 2026-10-01:
+    # the level, the roll and what it granted — and the Journal's history reads it.
+    c.turn_log.append(history_mod.stamp(c, {
+        "kind": "level-up", "level": int(result["level"]), "rolled": result.get("rolled"),
+        "hp": result.get("hp"), "grants": list(result.get("grants") or [])}))
     if c.character_id:
         roster.record(c.character_id, pc)
     c.save()
@@ -3439,8 +3453,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     if plan is not None:
         _log_turn(c, plan, resolution, replace=True)
     else:
-        c.turn_log.append({"kind": "resolution",
-                           "outcomes": [o.as_dict() for o in resolution.outcomes]})
+        c.turn_log.append(history_mod.stamp(c, {
+            "kind": "resolution", "outcomes": [o.as_dict() for o in resolution.outcomes]}))
 
     # A battle that just JOINED is not a turn that just ENDED. The deferred first
     # swing left the player holding the action they declared; running the NPC loop
@@ -3573,6 +3587,13 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 if o.tell:
                     c.transcript.append({"who": "gm", "kind": "consequence",
                                          "text": _plain_tells(c, [o])})
+            # What the fallback did, logged like any creature's turn: it wrote nothing
+            # but the error row above, so a fight with the model down left a creature's
+            # blows — and who fell to them — out of the record (and the Journal).
+            c.turn_log.append(history_mod.stamp(c, {
+                "kind": "npc-turn", "ref": ref, "fallback": True,
+                "intents": [i.as_dict() for i in intents],
+                "outcomes": [o.as_dict() for o in resolution.outcomes]}))
             continue
 
         undo = scene.snapshot()
@@ -3616,7 +3637,7 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                  # "you" or a creature noun turned into the player's name could only
                  # be found by replaying the recording through `_groom` by hand.
                  "repairs": list(plan.repairs or [])}
-        c.turn_log.append(entry)
+        c.turn_log.append(history_mod.stamp(c, entry))
         if plan.narration:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 
@@ -3757,9 +3778,14 @@ def _log_turn(c, plan, resolution, replace: bool = False):
     if replace:
         for i in range(len(c.turn_log) - 1, -1, -1):
             if c.turn_log[i].get("kind") == "turn":
-                c.turn_log[i] = entry
+                # When and where, from the row being replaced: the turn happened then.
+                for key in ("clock", "at"):
+                    if key in c.turn_log[i]:
+                        entry[key] = c.turn_log[i][key]
+                c.turn_log[i] = history_mod.stamp(c, entry)
                 return
-    c.turn_log.append(entry)
+    # The clock and the place, for the Journal's history (play/history.py).
+    c.turn_log.append(history_mod.stamp(c, entry))
 
 
 @require_POST

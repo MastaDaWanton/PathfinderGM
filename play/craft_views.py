@@ -1637,7 +1637,9 @@ def craft_action(request):
              "outcomes": [o.as_dict() for o in resolution.outcomes]}
     if scene_notes:
         entry["repairs"] = scene_notes
-    c.turn_log.append(entry)
+    from play import history as history_mod
+
+    c.turn_log.append(history_mod.stamp(c, entry))
     try:
         from play.views import _remember
 
