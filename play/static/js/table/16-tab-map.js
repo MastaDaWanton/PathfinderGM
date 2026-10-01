@@ -14,26 +14,26 @@
 // The ground's own controls keep their room but go out of use (hidden by visibility, not
 // removed), so nothing in the head row moves under the pointer that pressed Places.
 //
-// WALK THERE goes by the real movement path, one leg at a time, each leg a real turn the
-// player sends. It attaches the first leg as the exits row does (11's `exitChip` into 10's
-// `attachPlace`, the one chip slot), and Say sends it through `/api/say`'s place chip
-// (play/views.py `_read_place`, `_take_the_exit`). When the party arrives at the end of
-// that leg, the next is attached the same way, and so on to the place pressed. Never sent
-// by the page: the owner ruled that a way on "should attach like a spell does and then
-// apply when you send", and a walk of four legs is four ways on.
+// WALK THERE attaches the DESTINATION as one place chip (11's `exitChip` into 10's
+// `attachPlace`, the one chip slot), and one Say walks the whole way: `/api/say` takes a
+// far place the chart can walk to (play/views.py `_read_place`, `places_found.walk_to`)
+// and the engine walks every hop of it in one turn, rolling once for each place and
+// asking the watch at each way out (`Engine._op_travel`). Never sent by the page: the
+// owner ruled that a way on "should attach like a spell does and then apply when you
+// send".
 //
-// Chosen over sending the legs as consecutive turns on one press, which would put
-// several model turns (tens of seconds each on the local model) in flight with nobody
-// having pressed Say, and would need its own rules for stopping when a fight starts or a
-// die is owed half way. This is zMUD's "slow walking" rather than its speedwalk (Zuggsoft,
-// "Speedwalking and Slow Walking": a step at a time "with the ability to abort", the next
-// step sent only once the last one is confirmed, because "once your commands have been
-// sent to the MUD, there is no way to cancel them"); Mudlet's mappers grew a pause and a
-// stop for their speedwalks for the same reason (Mudlet issue #5608). Here the
-// confirmation is the engine's: `places_found.here` is the leg's far end. Anything else
-// (a fight, a roll owed, the chip taken back, the party somewhere the leg did not lead,
-// the next way shut) ends the walk and the slip says why; Walk there again picks it up
-// from wherever the party stands, on the engine's own route from there.
+// Stage 3 attached one leg a turn — zMUD's "slow walking" rather than its speedwalk
+// (Zuggsoft, "Speedwalking and Slow Walking": a step at a time "with the ability to
+// abort", because "once your commands have been sent to the MUD, there is no way to
+// cancel them"), chosen so no turn went out unpressed. The owner overruled it after the
+// 0.2.0 playtest (2026-09-30): "I should not be forced to play a whole turn for each
+// connecting point." What made the slow walk necessary in a MUD is not true here: the
+// whole walk is one engine op, and the engine is the thing that stops it — a meeting that
+// stops you, the watch at a gate, a fight — and says so in the tell, the roguelike's
+// interrupted travel (Angband, DCSS). This is Inform's *Approaches*: GO TO a known place,
+// one command, the route walked through visited rooms. So the abort a slow walk gave the
+// player is the engine's to give now, and Walk there again goes on from wherever the walk
+// was stopped, on the chart's route from there.
 
 const MAPV = {
   places: false,  // the chart is shown instead of the ground
@@ -129,69 +129,57 @@ function mapWalkSay(line) {
   if (typeof spellSay === "function") spellSay(line);
 }
 
-// Attach the first leg of the engine's route to `id` as the exits row would attach it.
-// Returns the chip's leg, or null with the reason said.
-function mapAttachLeg(s, dest) {
+// Attach the place pressed as the turn's one place chip: the exits row's own way when it
+// is next door, else the far way the chart walks to (11's `farWay`), the same rule the say
+// door takes it by. Returns the node and its legs, or the reason it cannot be attached.
+function mapAttachWalk(s, dest) {
   const scene = (s && s.scene) || {};
   const pf = mapPlacesData(s);
   const node = pf && pf.nodes.find(n => n.id === dest);
-  const leg = node && node.walk && node.walk.legs && node.walk.legs[0];
-  if (!leg) return { why: (node && node.why) || "No way there by the ways you know." };
-  const way = (scene.exits || []).find(x => x.id === leg.to);
-  if (!way || way.blocked) {
-    return { why: way ? way.blocked : `${upFirst(leg.name)} is not a way on from here now.` };
+  const legs = (node && node.walk && node.walk.legs) || [];
+  if (!legs.length) return { why: (node && node.why) || "No way there by the ways you know." };
+  const first = (scene.exits || []).find(x => x.id === legs[0].to);
+  if (!first || first.blocked) {
+    return { why: first ? first.blocked : `${upFirst(legs[0].name)} is not a way on from here now.` };
   }
+  const way = (scene.exits || []).find(x => x.id === dest) || farWay(s, dest);
   attachPlace(exitChip(way, !!scene.in_encounter));
-  return { leg, node };
+  return { node, legs };
 }
 
 function walkThere(dest) {
-  const got = mapAttachLeg(STATE, dest);
-  if (!got.leg) { MAPV.walk = null; mapWalkSay(got.why); renderPlaces(STATE); return; }
-  const legs = got.node.walk.legs.length;
-  MAPV.walk = { to: dest, name: got.node.name, leg: got.leg };
-  mapWalkSay(legs > 1
-    ? `${upFirst(got.leg.name)} is attached to your turn, the first of ${legs} legs. Press Say to walk it; the next leg is attached when you arrive.`
-    : `${upFirst(got.leg.name)} is attached to your turn. Press Say to go.`);
+  const got = mapAttachWalk(STATE, dest);
+  if (!got.legs) { MAPV.walk = null; mapWalkSay(got.why); renderPlaces(STATE); return; }
+  const n = got.legs.length;
+  MAPV.walk = { to: dest, name: got.node.name, from: (mapPlacesData(STATE) || {}).here };
+  mapWalkSay(n > 1
+    ? `${upFirst(got.node.name)} is attached to your turn: the whole way, ${n} legs by the ways you know, in one turn. Press Say to go.`
+    : `${upFirst(got.node.name)} is attached to your turn. Press Say to go.`);
   renderPlaces(STATE);
 }
 
-// After each state: the leg walked, the next attached; anything else ends the walk.
+// After each state: arrived, stopped on the way (the engine's tell says by what), or not
+// gone yet. The engine walked the whole way or stopped it; the page only says which.
 onRender(function walkOn(s) {
   const w = MAPV.walk;
   if (!w) return;
   const pf = mapPlacesData(s);
   const here = pf && pf.here;
   const stop = line => { MAPV.walk = null; mapWalkSay(line); };
-  if (here === w.leg.from) {
+  if (here === w.from) {
     // Not gone yet. A refusal or a busy table keeps the chip (04's `takeTurn`); a chip
     // the player took back, or swapped for a spell, is the walk set aside.
     const c = typeof attachedChip === "function" ? attachedChip() : null;
-    if (!c || c.kind !== "place" || c.id !== w.leg.to) {
+    if (!c || c.kind !== "place" || c.id !== w.to) {
       stop(`The walk to ${w.name} is set aside. Walk there again to pick it up.`);
     }
     return;
   }
-  if (here !== w.leg.to) { stop(`The walk to ${w.name} stopped: you are not where the way led.`); return; }
   if (here === w.to) { MAPV.walk = null; MAPV.sel = null; mapWalkSay(`You are at ${w.name}.`); return; }
-  const at = (pf.nodes.find(n => n.current) || {}).name || "here";
-  if (s.ended || s.awaiting || (s.scene && s.scene.in_encounter)) {
-    stop(`The walk to ${w.name} stopped at ${at}: ${s.awaiting ? "a roll is owed"
-      : s.ended ? "the story has ended" : "there is a fight"}. Walk there again when you are ready.`);
-    return;
-  }
-  // 04's `takeTurn` draws the state and only then clears the chip the turn spent, so the
-  // next leg is attached after it has finished, not before.
-  setTimeout(() => {
-    if (MAPV.walk !== w) return;
-    const got = mapAttachLeg(STATE, w.to);
-    if (!got.leg) { stop(`The walk to ${w.name} stopped at ${at}: ${got.why}`); renderPlaces(STATE); return; }
-    w.leg = got.leg;
-    const left = got.node.walk.legs.length;
-    mapWalkSay(`You are at ${at}. ${upFirst(got.leg.name)} is attached, ${left === 1
-      ? "the last leg" : `${left} legs to go`}. Press Say to walk on.`);
-    renderPlaces(STATE);
-  }, 0);
+  const at = (pf && (pf.nodes.find(n => n.current) || {}).name) || "here";
+  stop(`The walk to ${w.name} stopped at ${at}${s.awaiting ? ": a roll is owed"
+    : s.ended ? ": the story has ended" : (s.scene && s.scene.in_encounter) ? ": there is a fight"
+    : ""}. Walk there again to go on from here.`);
 });
 
 onRender(function placesChart(s) {

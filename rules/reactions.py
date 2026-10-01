@@ -45,7 +45,30 @@ TRIGGERS = {
         "A creature in a square this one threatens takes an action the rules say "
         "provokes — picking an item up off the ground."
     ),
+    # "Unless otherwise noted, performing a combat maneuver provokes an attack of
+    # opportunity from the target of the maneuver" (Core Rulebook, Combat Maneuvers,
+    # aonprd.com/Rules.aspx?ID=188); each Improved feat says "you do not provoke an attack
+    # of opportunity when performing" its manoeuvre, and the APG four say the same ("If
+    # you do not have the Improved Dirty Trick feat or a similar ability, attempting a
+    # dirty trick provokes an attack of opportunity from the target of your maneuver").
+    "maneuver": (
+        "A creature this one threatens attempts a combat manoeuvre against it without "
+        "the Improved feat that waives the provocation. Only the TARGET swings."
+    ),
 }
+
+# The tag a feat document grants to say its manoeuvre does not provoke:
+# `maneuver.unprovoking.<manoeuvre, hyphenated>` — `improved-trip` holds
+# `maneuver.unprovoking.trip` (content/feats/mechanics/core.json). A tag rather than a
+# feat name, for the reason `budget_for` gives (stage 8 measured a name match answering
+# for "mythic combat reflexes"), and so a homebrew ability or a monster's racial trait
+# that waives it is a document line, not an engine change.
+UNPROVOKING = "maneuver.unprovoking"
+
+
+def unprovoking_tag(maneuver: str) -> str:
+    """The tag that waives the attack of opportunity for this manoeuvre."""
+    return f"{UNPROVOKING}.{'-'.join(str(maneuver or '').lower().split())}"
 
 
 @dataclass
@@ -76,7 +99,7 @@ def attack_of_opportunity(actor) -> Reaction:
     return Reaction(
         id="attack_of_opportunity",
         trigger="leaves_threatened_square",
-        also=("provoking_action",),
+        also=("provoking_action", "maneuver"),
         op="attack",
         source="attack of opportunity",
         because="they moved out of reach",
@@ -324,6 +347,49 @@ def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
     return out
 
 
+def provoked_by_maneuver(scene, actor_ref: str, target_ref: str,
+                         maneuver: str) -> list[tuple[str, Reaction]]:
+    """Who gets an attack of opportunity because this creature tries a combat manoeuvre.
+
+    The TARGET, and nobody else: "performing a combat maneuver provokes an attack of
+    opportunity from the target of the maneuver" (Core Rulebook, aonprd.com/Rules.aspx?
+    ID=188). Not the thug beside it — a manoeuvre is not one of Table 7-2's actions that
+    provoke from everyone who threatens you; it is a provocation of the one you lay hands
+    on. And only when:
+
+    - the manoeuvre's row says it provokes (`tables.MANEUVERS[...]["provokes"]` — every
+      row does; the key was written with the table and read by nothing until this);
+    - the attacker does not hold the waiver (`unprovoking_tag`, an Improved feat's
+      document tag);
+    - the target threatens a square the attacker fills — the same `threatens` every
+      reaction asks, so a trip made with a glaive from ten feet draws nothing from a
+      foe with a five-foot reach, and a disarmed, empty-handed target draws nothing;
+    - they are not on one side, as `provoked_by_move` skips allies.
+
+    A bystander is NOT skipped here, as `provoked_by_move` skips one: the target is the
+    one being grabbed, and the swing is theirs to take. Nothing on a scene with no map,
+    for the reason `threatens` gives.
+    """
+    from .tables import MANEUVERS
+
+    row = MANEUVERS.get(str(maneuver or ""))
+    if not row or not row.get("provokes") or not scene.has_grid:
+        return []
+    actor = scene.actors.get(actor_ref)
+    target = scene.actors.get(target_ref)
+    anchor = scene.positions.get(actor_ref)
+    if actor is None or target is None or anchor is None or actor_ref == target_ref:
+        return []
+    if actor.has_state(unprovoking_tag(row.get("name") or maneuver)):
+        return []
+    if _allied(scene, target_ref, actor_ref):
+        return []
+    zone = threatened_by(scene, target_ref)
+    if not any(sq in zone for sq in gridmod.footprint((anchor[0], anchor[1]), actor.size)):
+        return []
+    return [(target_ref, r) for r in reactions_for(target) if r.fires_on("maneuver")]
+
+
 # The most watchers the way-out search weighs every combination of. The search tries
 # each set of attackers of opportunity from the smallest up, so it is 2^n walks of the
 # board: six is 64 walks and covers any fight this app has run. Past it, see
@@ -331,8 +397,15 @@ def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
 _MOST_TO_WEIGH = 6
 
 
-def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
+def provoked_by_withdraw(scene, mover_ref: str,
+                         party=()) -> list[tuple[str, Reaction]]:
     """Who gets an attack of opportunity because this creature walks out of the fight.
+
+    `party` is everyone leaving together — the player and whoever walks out with them
+    (`Engine._leaving_the_fight` asks this once for each). They are one side for this
+    question whatever `scene.sides` says: a companion is often on no declared side at all,
+    and without this the player would be counted among the foes owed a swing at their own
+    companion's back, and the companion's body would block the player's way out.
 
     Leaving a fight for somewhere else — a `travel` or a `journey` begun mid-encounter —
     is the WITHDRAW action (CRB p.188, aonprd.com/Rules.aspx?Name=Withdraw&Category=
@@ -371,12 +444,13 @@ def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
     if mover is None or at is None:
         return []
     start = (at[0], at[1])
+    party = set(party or ()) | {mover_ref}
 
     from . import states
 
     watchers: dict[str, tuple[list[Reaction], set]] = {}
     for ref, watcher in scene.actors.items():
-        if ref == mover_ref or _allied(scene, ref, mover_ref):
+        if ref in party or _allied(scene, ref, mover_ref):
             continue
         if watcher.has_state(states.BYSTANDER):
             continue
@@ -403,7 +477,7 @@ def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
     else:
         seen = {r for r in at_start if _seen_by(scene, mover_ref, r)}
     owed_refs = (at_start - seen) | _owed_on_the_way_out(scene, mover_ref, start, threat,
-                                                         set(watchers), at_start)
+                                                         set(watchers), at_start, party)
 
     out: list[tuple[str, Reaction]] = []
     for ref in scene.actors:                  # the scene's order, so the swings are stable
@@ -433,7 +507,7 @@ def _seen_by(scene, viewer_ref: str, ref: str) -> bool:
 
 
 def _owed_on_the_way_out(scene, mover_ref: str, start, threat, candidates: set,
-                         at_start: frozenset) -> set:
+                         at_start: frozenset, party=frozenset()) -> set:
     """The fewest foes whose threatened squares the withdrawer must leave after the first.
 
     A breadth-first walk of the board from the start square, stepping only where the
@@ -457,7 +531,8 @@ def _owed_on_the_way_out(scene, mover_ref: str, start, threat, candidates: set,
     bodies: set = set()
     for ref, anchor in scene.positions.items():
         other = scene.actors.get(ref)
-        if ref == mover_ref or other is None or _allied(scene, ref, mover_ref):
+        if ref == mover_ref or ref in party or other is None \
+                or _allied(scene, ref, mover_ref):
             continue
         # "You can move through a square occupied by a helpless opponent without
         # penalty" (CRB p.193, Moving Through a Square) — the dead included.
@@ -508,6 +583,7 @@ def _allied(scene, a: str, b: str) -> bool:
     return False
 
 
-__all__ = ["Reaction", "TRIGGERS", "budget_for", "disarmed_and_empty_handed",
-           "provoked_by_action", "provoked_by_move", "provoked_by_withdraw", "reach_with",
-           "reactions_for", "threatened_by", "threatens"]
+__all__ = ["Reaction", "TRIGGERS", "UNPROVOKING", "budget_for",
+           "disarmed_and_empty_handed", "provoked_by_action", "provoked_by_maneuver",
+           "provoked_by_move", "provoked_by_withdraw", "reach_with", "reactions_for",
+           "threatened_by", "threatens", "unprovoking_tag"]

@@ -357,8 +357,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a bull rush attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.bull-rush"
     ]
   },
   "greater-bull-rush": {
@@ -404,8 +404,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a disarm attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.disarm"
     ]
   },
   "greater-disarm": {
@@ -451,8 +451,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a grapple attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.grapple"
     ]
   },
   "greater-grapple": {
@@ -498,8 +498,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a overrun attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.overrun"
     ]
   },
   "greater-overrun": {
@@ -545,8 +545,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a sunder attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.sunder"
     ]
   },
   "greater-sunder": {
@@ -592,8 +592,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a trip attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.trip"
     ]
   },
   "greater-trip": {
@@ -639,8 +639,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a reposition attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.reposition"
     ]
   },
   "greater-reposition": {
@@ -686,8 +686,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a dirty trick attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.dirty-trick"
     ]
   },
   "greater-dirty-trick": {
@@ -733,8 +733,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a steal attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.steal"
     ]
   },
   "greater-steal": {
@@ -780,8 +780,8 @@
         }
       }
     ],
-    "not_yet": [
-      "a drag attempt does not provoke an attack of opportunity"
+    "tags": [
+      "maneuver.unprovoking.drag"
     ]
   },
   "greater-drag": {

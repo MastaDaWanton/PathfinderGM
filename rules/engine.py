@@ -1589,6 +1589,23 @@ class Scene:
         if place_id and place_id not in self.been:
             self.been.append(place_id)
 
+    def pass_through(self, place_id: str) -> None:
+        """A place the party walked through on its way somewhere else: the record of where
+        it has been, and not `at` — nobody stands there now.
+
+        `_op_travel` walks the whole route in one turn (`places.route`, hop by hop), and
+        until 2026-09-30 only the end of it reached the record: walking gate → market →
+        back streets → the Velvet Veil put the Veil on the chart and left the market and
+        the back streets under fog, though the tell had just said the way ran through
+        them (docs/playtest-2026-09-30-findings.md, item 9 (f)). The automapper's rule
+        is the one `stand` keeps — the map is drawn from where the player actually went —
+        and Inform's GO TO walks the player through each room, so every room on the way
+        is `visited` there too. Called by `_op_travel` for each place passed, before the
+        party is stood at the end of the walk, so the record keeps the order walked.
+        """
+        if place_id and place_id not in self.been:
+            self.been.append(place_id)
+
     def begin_here(self) -> None:
         """The story starts where the party stands: the record is that one place.
 
@@ -3018,9 +3035,11 @@ class Engine:
         roll without a single line of special handling.
 
         Movement provokes, and so does picking a thing up off the ground (1e Table 7-2,
-        "Pick up an item": a move action, attack of opportunity yes). The shape is a
-        dispatch rather than an `if` because the next triggers (casting in a threatened
-        square, standing up from prone) are the same machinery with a different question.
+        "Pick up an item": a move action, attack of opportunity yes), and since
+        2026-09-30 a combat manoeuvre tried without its Improved feat, from its target
+        (`_provoked_by_maneuver`). The shape is a dispatch rather than an `if` because the
+        next triggers (casting in a threatened square, standing up from prone) are the
+        same machinery with a different question.
 
         Walking out of the fight — a `travel` or `journey` begun mid-encounter — is the
         one trigger this dispatch cannot answer in advance, and does not: the op asks at
@@ -3034,6 +3053,8 @@ class Engine:
             return self._provoked_by_pick_up(raw)
         if raw.get("op") in ("travel", "journey"):
             return []                   # asked by the op itself: `_leaving_the_fight`
+        if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
+            return self._provoked_by_maneuver(raw)
         if raw.get("op") != "move":
             return []
 
@@ -3060,6 +3081,59 @@ class Engine:
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
+
+    def _provoked_by_maneuver(self, raw: dict) -> list[dict]:
+        """The attack of opportunity a combat manoeuvre owes its target, unless the
+        attacker holds the Improved feat (`reactions.provoked_by_maneuver` says who).
+
+        Found by the table mocks (docs/fix-interfaces.md, "Engine gaps the table mocks
+        exposed", (1)): every row of `MANEUVERS` carried `"provokes": True` and nothing
+        read it, so a trip, a grapple or a disarm was the one thing in a fight that cost
+        nothing to try — the safest choice at the table was the riskiest in the book.
+
+        The swing goes in front of the manoeuvre through `_drive` like every other
+        reaction, off the target's one allowance (`_spend_reaction`), and a blow that
+        drops the attacker stops the manoeuvre as it stops any attack ("never swings").
+        And the book's second clause: "If you are hit by the target, you take the damage
+        normally and apply that amount as a penalty to the attack roll to perform the
+        maneuver" (aonprd.com/Rules.aspx?ID=188). What the attacker had before the swing
+        is written into the manoeuvre's params, engine-side (`struck_from`, never a param
+        the model may write: spliced raw intents do not go back through `validate`), and
+        `_resolve_maneuver` takes the difference off the check. A manoeuvre made AS an
+        attack of opportunity (`reaction`) provokes nothing.
+        """
+        params = raw.get("params") or {}
+        if params.get("reaction"):
+            return []
+        actor_ref = raw.get("actor")
+        target = raw.get("target")
+        target_ref = (target[0] if target else None) if isinstance(target, list) else target
+        actor = self.scene.actors.get(actor_ref or "")
+        if actor is None or not target_ref:
+            return []
+        out: list[dict] = []
+        for watcher, reaction in reactions.provoked_by_maneuver(
+                self.scene, actor_ref, target_ref, str(params["manoeuvre"])):
+            if not self._spend_reaction(watcher, reaction.budget):
+                continue
+            out.append({
+                "op": reaction.op, "actor": watcher, "target": actor_ref,
+                "because": f"{actor.name} tried to {params['manoeuvre']} them without "
+                           f"the training to do it safely",
+                "params": {"full_attack": False, "reaction": reaction.id},
+                "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+            })
+        if out:
+            raw["params"] = dict(params, struck_from=self._wounds_left(actor))
+        return out
+
+    @staticmethod
+    def _wounds_left(actor) -> int:
+        """What a blow has to get through: hit points and temporary hit points, less the
+        non-lethal already taken. The difference across a swing is the damage it dealt,
+        lethal or not, wherever it landed — what a manoeuvre's provoked blow takes off the
+        manoeuvre's check."""
+        return int(actor.hp or 0) + int(actor.temp_hp or 0) - int(actor.nonlethal or 0)
 
     def _provoked_by_pick_up(self, raw: dict) -> list[dict]:
         """The attacks of opportunity a pick-up from the ground is owed.
@@ -3094,7 +3168,7 @@ class Engine:
             })
         return out
 
-    def _leaving_the_fight(self, intent: Intent, pc) -> "Outcome | None":
+    def _leaving_the_fight(self, intent: Intent, pc, escorts=()) -> "Outcome | None":
         """Walking out of a fight, asked by `_op_travel` and `_op_journey` at the point
         they commit to going: the attacks of opportunity first, and no walk for a body
         they dropped.
@@ -3113,26 +3187,43 @@ class Engine:
         `_op_move` makes ("does not get there") and `_op_attack` makes ("never swings").
         None when the party may go.
 
-        Only the PC withdraws. Escorts leave with the party without ever being moved on
-        the board, so they have no square to be struck leaving; in 1e every creature
-        that moves out provokes, and modelling theirs waits on companions walking out as
-        movement (docs/fix-interfaces.md).
+        Everyone who leaves withdraws (`escorts`: whoever `_op_travel` takes along — a
+        named escort, a companion, a mount). "Only the PC withdraws" was the first cut
+        (docs/fix-interfaces.md, "what the withdraw fix left", (1)): escorts walked out of
+        reach of a foe for free, though in 1e every creature that moves out of a
+        threatened square provokes, and each one leaving is spending its round on it as
+        the player is. Each is asked `provoked_by_withdraw` from its own square, with the
+        whole party as one side (no member swings at another, nor blocks another's way
+        out), the PC first; every foe still has one allowance a round
+        (`_spend_reaction`), so a thug who swung at the player as they turned has nothing
+        left for the companion behind them unless Combat Reflexes gives it more. An
+        escort without a square (a scene with no map, somebody never placed) owes
+        nothing, the rule `threatens` keeps. An escort the swings drop does not come:
+        `_op_travel` already leaves the down where they fell, and says so.
         """
         if pc is None or not self.scene.in_encounter:
             return None
         struck_by = intent.params.get("withdrew")
         if struck_by is None:
             owed: list[dict] = []
-            for watcher, reaction in reactions.provoked_by_withdraw(self.scene, pc.ref):
-                if not self._spend_reaction(watcher, reaction.budget):
-                    continue
-                owed.append({
-                    "op": reaction.op, "actor": watcher, "target": pc.ref,
-                    "because": f"{pc.name} turned to leave the fight",
-                    # A single swing, never the attacker's iteratives (`_reactions_before`).
-                    "params": {"full_attack": False, "reaction": reaction.id},
-                    "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
-                })
+            party = [pc.ref] + [r for r in escorts or () if r in self.scene.actors]
+            for mover in party:
+                who = self.scene.actors[mover]
+                if mover != pc.ref and who.is_down:
+                    continue                 # the fallen stay where they fell
+                for watcher, reaction in reactions.provoked_by_withdraw(
+                        self.scene, mover, party=party):
+                    if not self._spend_reaction(watcher, reaction.budget):
+                        continue
+                    owed.append({
+                        "op": reaction.op, "actor": watcher, "target": mover,
+                        "because": f"{who.name} turned to leave the fight",
+                        # A single swing, never the attacker's iteratives
+                        # (`_reactions_before`).
+                        "params": {"full_attack": False, "reaction": reaction.id},
+                        "visibility": ("player" if self.scene.actors[watcher].is_pc
+                                       else "hidden"),
+                    })
             if owed:
                 raise _ReactionsOwed(owed, [o["actor"] for o in owed])
             return None
@@ -5204,6 +5295,14 @@ class Engine:
         self._ensure_encounter(intent.actor, intent.target)
 
         mods = list(actor.cmb_modifiers(key))
+        # Struck by the target while trying it: "apply that amount as a penalty to the
+        # attack roll to perform the maneuver" (CRB, aonprd.com/Rules.aspx?ID=188). The
+        # wounds before the provoked swing were written by `_provoked_by_maneuver`.
+        before = intent.params.get("struck_from")
+        if before is not None:
+            taken = int(before) - self._wounds_left(actor)
+            if taken > 0:
+                mods.append(Modifier(-taken, "struck while trying it"))
 
         # Attempting to disarm while unarmed is -4; so is grappling without two hands.
         if m.get("unarmed_penalty") and weapon_key == "unarmed":
@@ -7590,7 +7689,9 @@ class Engine:
             because=intent.because,
         )
 
-    def watch_at_the_way_out(self, pc, was_place: str, going_to, known) -> tuple[str, str]:
+    def watch_at_the_way_out(self, pc, was_place: str, going_to, known, *,
+                             through: bool = False, crossing: bool = True
+                             ) -> tuple[str, str]:
         """(refusal, line) for walking from `was_place` to `going_to` past the watch.
 
         The gate's reading of the warrant, as `_op_travel` has always applied it — moved
@@ -7599,6 +7700,24 @@ class Engine:
         ways out look open. `refusal` is the sentence a wanted character is refused with;
         `line` is the suspected character's look-twice. Both "" when the watch has
         nothing to say. Reads nothing that a walk changes, so asking is free.
+
+        Asked of EVERY hop of a walk since 2026-09-30, not of where the walk ended: a
+        wanted character walking outskirts → market went past the gate in 32 of 40 runs
+        (docs/playtest-2026-09-30-findings.md, item 9 (e)), because the gate was a place
+        passed through and only the market was asked about. `through` is that case — a
+        gate on the way, not the end of it — and it changes one thing: a way past the
+        watch somebody showed you (`knows.way-past-gate`) goes round the arch, so a gate
+        merely passed is not where they take you. Walking TO the gate is still walking
+        into the watch.
+
+        `crossing` is whether the walk the hop belongs to goes through the walls at all —
+        from inside to outside or back. In most towns the gate is also a square of the
+        town (Zhilgoroth's joins the market, the green, the graveyard, the stables and the
+        north crossing), so the walk from the market to the temple can be routed through
+        it; asked as though it were the arch, the per-hop watch refused the wanted their
+        own temple — "wanted is not house arrest" (`test_moving_inside_the_walls_is_not_
+        watched`) — the moment it was built. A gate passed through on a walk that stays
+        inside is a square, not the way out.
         """
         from . import places as places_mod
 
@@ -7626,6 +7745,8 @@ class Engine:
         # smuggler's door — is a tag the player holds (`knows.way-past-gate`), and
         # the road is open to them by it; the gate itself stays shut.
         has_way = pc.has_state("knows.way-past-gate")
+        if at_gate and through and (has_way or not crossing):
+            at_gate = False
         if not (at_gate or (open_road and not has_way)):
             return "", ""
         found = self.world.get(self.scene.location_id) if self.world else None
@@ -7919,11 +8040,45 @@ class Engine:
                       f"is bought at the stables, and comes along like anybody who "
                       f"travels with you.")
             mount_refs = mount_refs[:riders]
+        # THE ROUTE, worked out before anything is spent: `places.route` is the
+        # breadth-first walk, and a destination out past the outskirts is reached through
+        # them. Pure — it reads the graph and changes nothing — so a travel run twice (the
+        # withdraw's swings go first) finds the same way both times.
+        hops: tuple = ()
+        if moved:
+            hops = places_mod.route(known, was_place, going_to.id)
+            if not hops and places_mod.find(known, going_to.id) is None:
+                # Open ground is out past the outskirts: the walk goes through the way
+                # out, the way the player would, and is checked and timed on each step.
+                out = next((p for p in known if p.name == outskirts_mod.OUTSKIRTS
+                            and places_mod.is_ring(p.id)), None)
+                if out is not None and (places_mod.setting_of(was_place) != "outside"
+                                        or places_mod.is_ring(was_place)):
+                    lead = () if out.id == was_place else places_mod.route(
+                        known, was_place, out.id)
+                    if lead or out.id == was_place:
+                        hops = tuple(lead) + (going_to.id,)
+            # The watch at the first way out, before the withdraw: a wanted character who
+            # cannot get past the first gate never leaves, so nobody is owed a swing for
+            # it (docs/fix-interfaces.md, "what the withdraw fix left", (4): the refusal
+            # used to come after the walk, and after the swings). The ways out further
+            # along are asked hop by hop below, where the walk reaches them.
+            # Whether the walk goes through the walls at all: a gate on a walk that stays
+            # inside is one of the town's squares (`watch_at_the_way_out`, `crossing`).
+            crossing = (places_mod.setting_of(was_place) == "outside") \
+                != (places_mod.setting_of(going_to.id) == "outside")
+            if pc is not None:
+                first = places_mod.find(known, (hops or (going_to.id,))[0]) or going_to
+                refused, _line = self.watch_at_the_way_out(
+                    pc, was_place, first, known, through=first.id != going_to.id,
+                    crossing=crossing)
+                if refused:
+                    return self._refuse(intent, refused)
         # Out of a fight, the walk starts with a withdraw — here, after every refusal
         # that can be known before the walk and before anything has changed
         # (`_leaving_the_fight`). A PC the swings drop stays where they stood.
         if moved:
-            stopped = self._leaving_the_fight(intent, pc)
+            stopped = self._leaving_the_fight(intent, pc, escorts)
             if stopped is not None:
                 return stopped
         for r, a in falling:
@@ -7944,10 +8099,11 @@ class Engine:
         # that i have to spend four turns to get to the market").
         #
         # And every hop is checked (`rules/ontheway.py`), on the table for the ground
-        # that hop crosses, stopping at the first thing that happens — which is the
-        # request, and is also what the roguelikes do with a computed path: Angband and
-        # DCSS walk it until something disturbs you and then hand the keyboard back.
-        # The party stops where it was stopped, so the destination shrinks to that hop.
+        # that hop crosses, stopping at the first thing that STOPS you (since C1, below,
+        # most meetings are walked past) — which is what the roguelikes do with a computed
+        # path: Angband and DCSS walk it until something disturbs you and then hand the
+        # keyboard back. The party stops where it was stopped, so the destination shrinks
+        # to that hop.
         # A route that comes back empty — 40 of Aurvantis's 10,792 pairs, and any
         # minted place the exits have not been wired for — falls back to the single
         # step this door has always taken, checked once.
@@ -7988,24 +8144,43 @@ class Engine:
         far_on_foot = far_hours
         if far_hours and mount_refs:
             far_hours, far_hurt = journey_mod.mounted_hours(far_hours, pace)
+        # PASSING AND STOPPING (owner's ruling C1, 2026-09-30: "encounters should roll once
+        # for each place and a low chance of encounters stopping the travel"). Every place
+        # still rolls once, at the measured rate; a meeting `ontheway.stops` says passes is
+        # told in that hop's line and left behind, and the walk goes on rolling for the
+        # places after it. Only a stopping one ends the walk, as every meeting used to.
+        #
+        # And THE WATCH AT EVERY WAY OUT (item 9 (e)). The warrant was read once, against
+        # the place the walk ended: a wanted character walking outskirts → market went
+        # past the gate in 32 of 40 runs, because the gate was only passed through. Each
+        # hop now asks `watch_at_the_way_out` of the step it is about to take; a refusal
+        # stops the walk at the last place it could legally reach, with the rule's own
+        # sentence in the tell (the first step was asked above, before the withdraw, and a
+        # refusal there still refuses the whole travel).
+        passing_said: list[str] = []
+        passing_met: list[dict] = []
+        watch_stop = ""
+        law_line = ""
         if moved:
             level = int(getattr(pc, "level", 1) or 1) if pc is not None else 1
             passed: list = []
-            hops = places_mod.route(known, was_place, going_to.id)
-            if not hops and places_mod.find(known, going_to.id) is None:
-                # Open ground is out past the outskirts: the walk goes through the way
-                # out, the way the player would, and is checked and timed on each step.
-                out = next((p for p in known if p.name == outskirts_mod.OUTSKIRTS
-                            and places_mod.is_ring(p.id)), None)
-                if out is not None and (places_mod.setting_of(was_place) != "outside"
-                                        or places_mod.is_ring(was_place)):
-                    lead = () if out.id == was_place else places_mod.route(
-                        known, was_place, out.id)
-                    if lead or out.id == was_place:
-                        hops = tuple(lead) + (going_to.id,)
+            meant_id = going_to.id
             prev = here
             for hop_id in (hops or (going_to.id,)):
                 hop = places_mod.find(known, hop_id) or going_to
+                if pc is not None:
+                    refused, line = self.watch_at_the_way_out(
+                        pc, prev.id, hop, known, through=hop.id != meant_id,
+                        crossing=crossing)
+                    if refused and prev.id != was_place:
+                        # Stopped at the last legal hop, which the walk has already
+                        # reached: it is the destination now, as a meeting's place is.
+                        watch_stop = refused
+                        going_to = prev
+                        break
+                    if refused:
+                        return self._refuse(intent, refused)
+                    law_line = law_line or line
                 underway = hop.id in self._hours_underway
                 if underway:
                     # A venture's way in (two hours to a cave) is `_op_venture`'s to
@@ -8032,6 +8207,14 @@ class Engine:
                     met = ontheway.road(self.dice, step_hours or 1, hop.terrain, level,
                                         **({} if step_hours else {"minutes": step}))
                 minutes += step
+                if met is not None and pc is not None:
+                    law_here = states.standing_with_the_law(
+                        pc, places_mod.location_of(hop.id) or self.scene.location_id)
+                    if not ontheway.stops(met, law_here):
+                        # Told in this hop's line and left behind: nobody is brought in.
+                        passing_said.append(ontheway.passing(met, hop.name, law_here))
+                        passing_met.append({"at": hop.name, "kind": met.kind})
+                        met = None
                 if step_hours and not underway:
                     # Only the part walked before the meeting, for a march of hours.
                     far_walked = ontheway.hours_walked(met, step_hours) \
@@ -8042,38 +8225,26 @@ class Engine:
                 passed.append(hop)
                 prev = hop
             # The last hop of a quiet walk is the destination, and the tell names that
-            # separately. An interrupted walk stops somewhere that is now the
-            # destination, so everything in hand is a place passed through.
+            # separately — and so is the last hop of a walk the watch stopped, which
+            # ended where it stood. A walk a meeting interrupted stops at the meeting's
+            # place, so everything in hand is a place passed through.
             kept = passed if met is not None else passed[:-1]
             went_by = tuple(p.name for p in kept)
             went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about]
 
-        # Read AFTER the walk, against the place the party actually reached. Until
-        # 2026-09-23 this block ran first, against the place the plan named, so a
-        # suspected character stopped one hop short of the gate by a hawker was told
-        # "the guards at the gate look twice, and let you through" about a gate they
-        # never got to. A wanted one stopped short is now simply stopped short: the
-        # refusal is for reaching the arch, and they did not.
-        #
-        # The gate reads the warrant (docs/wanted.md, reader one). The town is the one
-        # whose ground the party is standing on — read off the place id, and off the
-        # scene's location only when the id cannot say — so a warrant from the last
-        # town does not shut this one's gate. Two ways out are watched: the gate
-        # itself, by name, and the open road, which is a travel by BIOME off urban
-        # ground. A travel by place to somewhere already made outside the walls — the
-        # cave the party ventured into yesterday — is not watched; nor is `venture`,
-        # which has its own op. That is the "another way" the refusal names, and the
-        # only reason the refusal can be honest about a way out existing.
-        #
-        # A refusal, printed: the player may not know the warrant reached the gate,
-        # and the fix is named — the founded and ventured ground, or clear the name.
-        # Suspected is a line in the tell, never a refusal: the watch looks twice and
-        # lets you through, which is the difference between the two states.
-        law_line = ""
-        if moved and pc is not None:
-            refused, law_line = self.watch_at_the_way_out(pc, was_place, going_to, known)
-            if refused:
-                return self._refuse(intent, refused)
+        # The gate reads the warrant (docs/wanted.md, reader one), now hop by hop in the
+        # walk above, against the step actually taken — so a suspected character stopped
+        # one hop short of the gate by a meeting is never told "the guards at the gate look
+        # twice" about a gate they did not reach (the 2026-09-23 fix this keeps). The town
+        # is the one whose ground the step is on — read off the place id, and off the
+        # scene's location only when the id cannot say — so a warrant from the last town
+        # does not shut this one's gate. Two ways out are watched: the gate itself, by
+        # name, and the open road off urban ground. A travel by place to somewhere already
+        # made outside the walls — the cave the party ventured into yesterday — is not
+        # watched; nor is `venture`, which has its own op. That is the "another way" the
+        # refusal names, and the only reason the refusal can be honest about a way out
+        # existing. Suspected is a line in the tell, never a refusal: the watch looks twice
+        # and lets you through, which is the difference between the two states.
 
         left: list[str] = []
         walked_back = 0
@@ -8116,6 +8287,11 @@ class Engine:
                     if keepers.place_of(getattr(a, "world_entity_id", "") or "") == a.at:
                         continue
                     left.append(a.name)
+            # The places walked through join the record before the place walked to, so
+            # the chart lifts the fog off the way the tell has just said was taken
+            # (item 9 (f); `Scene.pass_through`).
+            for p in kept:
+                self.scene.pass_through(p.id)
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
                 # The walk's minutes, charged once (the hop sum above). This was an hour
@@ -8230,9 +8406,13 @@ class Engine:
             # A stop names who and why (Lane B, item 16.3): "the watch comes down the
             # road … You get no further" became background prose — "the watchmen are
             # making their rounds" — because the tell never said who had stopped you.
+            # A meeting on the last hop happened where the walk was going: it is said,
+            # and "You get no further" is not (24 of 71 stops in the item-9 replay fell
+            # there, and every one told the player they had not arrived).
             met_tell = ontheway.describe(
                 met, going_to.name, law=law_now,
-                who=[self.scene.actors[r].name for r in met_refs if r in self.scene.actors])
+                who=[self.scene.actors[r].name for r in met_refs if r in self.scene.actors],
+                arrived=going_to.id == meant_id)
             if met.kind == "weather":
                 # The one band that is nobody. It costs what it costs on the road
                 # between towns — hours, off the clock — and here it costs the same,
@@ -8304,6 +8484,10 @@ class Engine:
                       for row in went_by_about}
             said_route = [f"{n} ({abouts[n]})" if abouts.get(n) else n for n in went_by]
             bits.append(f"The way there ran through {_and_then(tuple(said_route))}.")
+        # What was met and walked past, a sentence a place, each naming where (C1). The
+        # engine's own words: nobody was brought in, and "you walk on" is said so the
+        # prose cannot make a stop of it.
+        bits.extend(s for s in passing_said if s)
         if moved:
             bits.append(f"You are at {going_to.name} now.")
         if moved and direction == "out" and found_loc is not None:
@@ -8331,7 +8515,10 @@ class Engine:
                             f"the first hour, a mount is hurt by it and tires.")
         if met_tell:
             bits.append(met_tell)
-        if met is not None and meant_for != going_to.name:
+        if watch_stop:
+            # The rule's own sentence, about the way out the walk did not take.
+            bits.append(watch_stop)
+        if (met is not None or watch_stop) and meant_for != going_to.name:
             # Said plainly, because the player asked for somewhere else and needs to
             # know they did not get there — the roguelike's "you were interrupted", and
             # the thing that makes the next turn's repeat of the command make sense.
@@ -8359,9 +8546,12 @@ class Engine:
                  "went_by_about": went_by_about,
                  "setting": setting, "was_setting": was_setting,
                  "direction": direction,
-                 "stopped_short": bool(met is not None and meant_for != going_to.name),
-                 "meant_for": meant_for if met is not None and meant_for != going_to.name
-                 else "",
+                 "stopped_short": bool((met is not None or watch_stop)
+                                       and meant_for != going_to.name),
+                 "meant_for": meant_for if (met is not None or watch_stop)
+                 and meant_for != going_to.name else "",
+                 "passed_meetings": passing_met,
+                 "watch_stopped": bool(watch_stop),
                  "met_refs": met_refs, "grounded": grounded_as,
                  "road_to": self._road_to(going_to.id) if moved else ""}
         if moved and mount_refs and (ridden_minutes or far_hours):

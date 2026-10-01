@@ -317,7 +317,10 @@ def test_a_manoeuvre_closes_the_same_way():
     the ruling: a trip made in place of a melee attack is a standard action too."""
     scene, engine = _fight()
     res = _finish(engine, engine.run(engine.validate([_attack({"manoeuvre": "trip"})])))
-    assert [o.op for o in res.outcomes] == ["move", "attack"]
+    # The step, then — since 2026-09-30, a trip without Improved Trip provoking its
+    # target (tests/test_reactions.py) — the thug's swing, then the trip.
+    assert [o.op for o in res.outcomes] == ["move", "attack", "attack"]
+    assert res.outcomes[1].tell.startswith("the thug"), res.outcomes[1].tell
     assert res.outcomes[-1].status != "refused", res.outcomes[-1].tell
 
 

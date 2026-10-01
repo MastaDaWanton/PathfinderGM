@@ -209,6 +209,95 @@ def test_moving_inside_the_walls_is_not_watched():
         assert not _refused(out), out.tell
 
 
+def _outskirts(e):
+    from rules import places as places_mod
+
+    return next(p for p in e.places() if p.name == "the outskirts" and places_mod.is_ring(p.id))
+
+
+@pytest.fixture
+def quiet_streets(monkeypatch):
+    """Nothing met on the way, so the walk measured is the watch's and not a hawker's."""
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "street", lambda dice, level=1: None)
+    monkeypatch.setattr(ontheway, "road", lambda *a, **k: None)
+
+
+def test_a_gate_passed_through_is_a_gate_the_watch_stands_at(quiet_streets):
+    """Item 9 (e) of the 2026-09-30 playtest: the warrant was read once, against where the
+    walk ENDED, so a wanted character walking outskirts → market — through the gate, the
+    one place the watch stands — reached the market in 32 of 40 seeded runs on the owner's
+    save (the other 8 were stopped short by a meeting). Every hop asks the watch now, and
+    the first way out is asked before anything is spent: refused, with the rule's own
+    sentence, and still outside the walls."""
+    s, e, pc = _table()
+    e.place_party(_outskirts(e).id)
+    _want(pc)
+    for seed in range(40):
+        e.dice = Dice(seed=seed)
+        out = _run(e, "travel", {"place": "the market"})
+        assert _refused(out), out.tell
+        assert "the gate is where the watch stands" in out.tell
+        assert s.at == _outskirts(e).id
+
+
+def test_a_walk_the_watch_stops_half_way_ends_at_the_last_place_it_could_reach(quiet_streets):
+    """The other half of asking at every hop: a walk out of town from somewhere further in
+    than the gate is not refused outright any more — it is walked as far as the law lets
+    it, to the last place before the gate, and stopped there with the rule's sentence and
+    the "got no further" line the meetings use. Before, the whole walk was asked about at
+    its end and refused from where it began, as though the streets on the way did not
+    exist."""
+    from rules import places as places_mod
+
+    s, e, pc = _table()
+    out_id = _outskirts(e).id
+    known = e.places()
+
+    def first_way_out(hops):
+        """Where on the route the first entrance is (a gate, or a crossing of the walls:
+        `places.ENTRANCES`), or -1."""
+        names = [places_mod.find(known, h).name for h in hops]
+        return next((i for i, n in enumerate(names) if n in places_mod.ENTRANCES), -1)
+
+    start = next(p.id for p in known
+                 if places_mod.setting_of(p.id) == "in"
+                 and first_way_out(places_mod.route(known, p.id, out_id)) >= 1)
+    hops = places_mod.route(known, start, out_id)
+    names = [places_mod.find(known, h).name for h in hops]
+    gate_at = first_way_out(hops)
+    e.place_party(start)
+    _want(pc)
+    out = _run(e, "travel", {"place": "the outskirts"})
+    assert not _refused(out), out.tell
+    assert s.at == hops[gate_at - 1], (names, s.at)
+    assert "the gate is where the watch stands" in out.tell
+    assert f"got no further than {names[gate_at - 1]}" in out.tell
+    eff = out.effects[0]
+    assert eff["stopped_short"] and eff["watch_stopped"] and eff["meant_for"] == "the outskirts"
+    # The streets walked are on the record; the gate it never reached is not.
+    assert set(hops[:gate_at]) <= set(s.places_been())
+    assert hops[gate_at] not in s.places_been()
+
+
+def test_a_way_past_the_gate_goes_round_the_arch_it_only_passes(quiet_streets):
+    """`knows.way-past-gate` (a scheme's witness, a smuggler's door) always opened the open
+    road and never the gate itself. Asked hop by hop, the gate on the way out to the
+    grassland would have refused the very character the tag was granted to; a gate only
+    passed through is gone round, and walking TO it is still walking into the watch."""
+    s, e, pc = _table()
+    _want(pc)
+    pc.apply_effect(ActiveEffect(name="a way out", kind="situation", key="test:way",
+                                 source="test", origin="test", duration="until-dismissed",
+                                 tags=("knows.way-past-gate",)))
+    out = _run(e, "travel", {"biome": "grassland"})
+    assert not _refused(out), out.tell
+    assert s.at != MARKET
+    e.place_party(MARKET)
+    assert _refused(_run(e, "travel", {"place": "the gate"}))
+
+
 # --- reader two: prices and the counter -----------------------------------------------------
 
 def test_the_wanted_pay_half_again_and_are_paid_less():

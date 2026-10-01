@@ -185,15 +185,33 @@ def test_on_a_desktop_the_chip_line_is_held_open_so_the_row_does_not_move():
     Since the table rebuild the row and the pen are both in the desk at the foot of the
     stage, where growth goes upward just as it did in the footer; the rule is written
     for the desk (`.desk:has(#exits:not([hidden]))`) instead of for the row's next
-    sibling."""
+    sibling.
+
+    The 42px band (deferred list, 2026-09-30): the held line sat empty above the pen on
+    every turn with no chip, 50px with its gap at 1440x900. Where the desk is 780px or
+    wider the chip now shares the pen's action line, held to the buttons' 46px, and the
+    say line takes the full width under it. Measured live on the owner's save
+    (lane-c, Ledgerwarren), attaching a Go, a Withdraw and a Journey chip and taking each
+    back: the row moved 0px at 1440x900 and at 1722x855 with no band (the box 333px ->
+    706px at 1440), and 0px at 1024x768, where the 652px desk keeps the band because the
+    slot beside the actions would have been 279px and read "Journey t..." ."""
     page = (Path(__file__).resolve().parent.parent
             / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
     held = ".desk:has(#exits:not([hidden])) #sayform > #attachments"
-    block = page[page.index("@media (min-width: 761px) {\n    " + held):]
-    block = block[:block.index("\n  }\n")]
-    assert held + " {" in block
-    assert "min-height: 42px" in block
-    assert "#attachments[hidden] { visibility: hidden; }" in block
+    assert "@media (min-width: 761px) {\n    .desk { container: desk / inline-size; }" in page
+    wide = page[page.index("@container desk (min-width: 780px) {"):]
+    wide = wide[:wide.index("\n  }\n")]
+    # The chip's slot is on the actions' line, the same height empty or full; nothing
+    # is held open when no chip is attached.
+    assert "#sayform > .sayline { order: 2; flex: 1 0 100%; }" in wide
+    assert "#sayform > .actions { order: 1; margin-left: auto; }" in wide
+    assert held + " {" in wide and "height: 46px; overflow: hidden;" in wide
+    assert "#attachments[hidden] { display: none; }" in wide
+    assert "-webkit-line-clamp: 2;" in wide, "the place's line is held to two lines"
+    narrow = page[page.index("@container desk (max-width: 779.98px) {"):]
+    narrow = narrow[:narrow.index("\n  }\n")]
+    assert "min-height: 42px" in narrow
+    assert "#attachments[hidden] { visibility: hidden; }" in narrow
 
 
 def test_nothing_sends_an_exit_straight_to_the_table_any_more():
@@ -625,6 +643,70 @@ def test_a_move_the_engine_refused_comes_back_with_the_chip(worlds, desk, monkey
     assert left["keep_chip"] is True
     assert left["text"] == f"I head to {way['name']}."
     assert left["why"] == "The watch turns you back at the gate."
+
+
+def _quiet_ways(monkeypatch):
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "street", lambda dice, level=1: None)
+    monkeypatch.setattr(ontheway, "road", lambda *a, **k: None)
+
+
+def _walk(c, place_id):
+    e = c.engine()
+    e.run(e.validate([{"op": "travel", "actor": c.scene.pc().ref, "because": "t",
+                       "params": {"place": place_id}}], origin="author:test"))
+    c.save()
+
+
+def test_a_far_chip_walks_the_whole_way_in_one_turn(worlds, desk, monkeypatch):
+    """Item 9 (b) of the 2026-09-30 playtest: a place chip had to be one of the ways on
+    from here, so the Map tab's Walk there attached one leg a turn — and the owner ruled
+    "I should not be forced to play a whole turn for each connecting point." A place the
+    chart can walk to through places the party has been (ruling C2) is a chip now, and
+    one Say walks every hop of it, through the engine's own door with no planner asked:
+    one player beat, the party at the far end, the places between on the tell's route."""
+    from play import places_found
+
+    _quiet_ways(monkeypatch)
+    c = desk["c"]
+    start = c.scene.at
+    near = _way(c)
+    _walk(c, near["id"])           # stood in once, so the places beyond it are charted
+    _walk(c, start)
+    chart = places_found.chart(c.engine(), c.world)
+    far = next((n for n in chart["nodes"]
+                if n["walk"] and len(n["walk"]["legs"]) >= 2), None)
+    if far is None:
+        pytest.skip("nothing two ways off by the ways known, in this town")
+    assert far["id"] not in {x["id"] for x in exits_mod.exits(c.engine(), c.world)}
+    beats = len(_players(c))
+    r = _say("", far)
+    assert r.status_code == 200, r.content[:300]
+    assert c.scene.at == far["id"], "the far chip did not take the party the whole way"
+    assert len(_players(c)) == beats + 1, "one Say, one turn"
+    assert desk["calls"]["plans"] == []
+    walked = next(o for o in reversed(c.scene.log) if o.get("op") == "travel")
+    assert walked["effects"][0]["went_by"], "the places between are on the route"
+
+
+def test_a_chip_for_a_place_under_the_fog_is_refused_without_naming_it(worlds, desk):
+    """Far, but not anywhere: a place the party has not reached by the ways it knows is
+    refused at the door (`_read_place`), the party does not move, and the refusal does not
+    name the place — a name in a refusal would lift the fog the chart keeps."""
+    from play import places_found
+
+    c = desk["c"]
+    start = c.scene.at
+    chart = places_found.chart(c.engine(), c.world)
+    found = {n["id"] for n in chart["nodes"]}
+    hidden = next((p for p in c.engine().places() if p.id not in found), None)
+    if hidden is None:
+        pytest.skip("everything is charted from here")
+    r = _say("", {"id": hidden.id, "name": hidden.name})
+    assert r.status_code != 200 or r.json().get("unfinished")
+    assert c.scene.at == start
+    assert hidden.name not in r.content.decode("utf-8")
 
 
 def test_the_ratchet_no_place_turn_ends_without_its_move_or_a_word_about_it(

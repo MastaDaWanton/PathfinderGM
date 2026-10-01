@@ -2215,8 +2215,19 @@ def _read_place(c, item: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
     went straight to `_take_the_exit` and words beside a move were silently ignored.
     The owner then asked for the chip to attach like a spell's, and for the words to say
     WHEN the move happens ("where in the described action the move should take place");
-    `_the_way_there` cuts the line at the move and runs each half where it belongs."""
+    `_the_way_there` cuts the line at the move and runs each half where it belongs.
+
+    FAR CHIPS (item 9, 2026-09-30). A place that is not a way on from here is taken when
+    the chart can walk to it — through places the party has been, never by a shut way,
+    never by a journey (`places_found.walk_to`, Inform's *Approaches* default; the owner's
+    ruling C2) — and the engine walks the whole way in one turn, every hop rolled and
+    watched (`Engine._op_travel`). Until then a chip had to be one step, so the Map tab's
+    Walk there attached one leg a turn; the owner: "I should not be forced to play a whole
+    turn for each connecting point." A journey is still only ever its own chip, from the
+    head of its road, with its confirmation; and a far walk begun mid-fight is still a
+    withdraw, because the travel op asks `_leaving_the_fight` however far it goes."""
     from . import exits as exits_mod
+    from . import places_found
 
     if carry_on:
         return (), "A place cannot be attached to Continue. Choose where to go, or continue."
@@ -2229,9 +2240,20 @@ def _read_place(c, item: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
         found = []
     exit_ = exits_mod.find(found, place_id)
     if exit_ is None:
+        try:
+            far, legs, why = places_found.walk_to(c.engine(), c.world, place_id)
+        except Exception:  # noqa: BLE001 — as above: no graph, no far way either
+            far, legs, why = None, [], ""
+        if far is not None and legs:
+            return ({"kind": "place", "id": far["id"], "name": far["name"],
+                     "journey": False},), ""
+        # The rule's own sentence when the way is shut; otherwise the ways on from here.
+        # Never the place's name: a place under the fog is not to be named by a refusal.
+        if far is not None and why and why != "No way there by the ways you know.":
+            return (), why
         names = ", ".join(e["name"] for e in found)
-        return (), (f"There is no way from here to {place_id or 'there'}."
-                    + (f" From here you can go to {names}." if names else ""))
+        return (), (f"There is no way from here to {place_id or 'there'} by the ways you "
+                    f"know." + (f" From here you can go to {names}." if names else ""))
     if exit_["blocked"]:
         return (), exit_["blocked"]
     if exit_["journey"] and item.get("confirmed") is not True:

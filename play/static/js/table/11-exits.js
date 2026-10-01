@@ -38,10 +38,13 @@
 
 const EXIT_GROUPS = [["next_door", "Next door"], ["outside", "Outside"], ["road", "Roads"]];
 
-// What leaving the fight costs, in the words the confirm line used to say it.
-const WITHDRAW_LINE = "Leaving the fight is a withdraw: a foe beside you that you can see "
-  + "gets no swing, but one whose reach covers your way out still strikes, and so does "
-  + "one you cannot see.";
+// What leaving the fight costs. The strike comes first and the exemption last, because on
+// a wide desktop the chip's line sits beside the pen's actions and shows two lines of it
+// (table.html, the motion rule; the whole sentence is its title): cut there, it still
+// says the thing that hurts.
+const WITHDRAW_LINE = "Leaving the fight is a withdraw: a foe whose reach covers your way "
+  + "out still strikes, and so does one you cannot see; one beside you that you can see "
+  + "gets no swing.";
 
 // "a few minutes' walk" reads as "a few minutes" in a row that is all walking.
 function exitTime(words) {
@@ -91,14 +94,30 @@ function dropDuplicateSuggestions(exits) {
   if (!box.querySelector(".sugg")) box.innerHTML = "";
 }
 
+// A far place (item 9, 2026-09-30): not a way on from here, but one the chart walks to
+// through places you have been (`scene.places_found`, the node's `walk`), whose first
+// leg is an open way on. Map's Walk there attaches it as ONE chip and the engine walks
+// every hop in one turn (play/views.py `_read_place` takes it by the same rule,
+// `places_found.walk_to`). Returned as a way the chip can be made from, or null.
+function farWay(s, id) {
+  const scene = (s && s.scene) || {};
+  const pf = scene.places_found;
+  const node = pf && Array.isArray(pf.nodes) ? pf.nodes.find(n => n.id === id) : null;
+  const legs = node && node.walk && node.walk.legs;
+  if (!legs || !legs.length) return null;
+  const first = (scene.exits || []).find(x => x.id === legs[0].to);
+  if (!first || first.blocked) return null;
+  return { id: node.id, name: node.name, journey: false, time_words: "", legs: legs.length };
+}
+
 // A place chip follows the state it was attached in: a fight that began makes it a
 // Withdraw chip, one that ended makes it a walk again, and a way that shut or is no
 // longer a way from here takes the chip off with a sentence saying so. Only while the
 // row is shown: a roll owed hides the row and says nothing about the ways.
-function refreshPlaceChip(exits, fighting) {
+function refreshPlaceChip(exits, fighting, s) {
   const c = typeof attachedChip === "function" ? attachedChip() : null;
   if (!c || c.kind !== "place") return;
-  const e = exits.find(x => x.id === c.id);
+  const e = exits.find(x => x.id === c.id) || (s ? farWay(s, c.id) : null);
   if (!e || e.blocked) {
     removeAttachment({ announce: false });
     spellSay(e ? `${c.name} is shut: ${e.blocked}` : `${c.name} is no longer a way on from here.`);
@@ -122,7 +141,7 @@ function renderExits(s) {
     box.hidden = true; box.innerHTML = "";
     return;
   }
-  refreshPlaceChip(exits, fighting);
+  refreshPlaceChip(exits, fighting, s);
   const pressed = attachedExitId();
   box.classList.toggle("fighting", fighting);
   const groups = EXIT_GROUPS.map(([key, label]) => {
@@ -200,5 +219,18 @@ document.addEventListener("focusout", e => {
   const to = e.relatedTarget;
   if (btn && !(to && to.closest && to.closest("#exits .exitbtn.shut"))) exitWhy(null);
 });
+
+// On a desktop the chip's line shares the pen's action line and is held to its height
+// (table.html, the motion rule), so a long place line is cut at two lines there. The
+// whole sentence stays on it as its title (and in the chip's description for a screen
+// reader, 10's `aria-describedby`); 10 draws the chip, so the title is added when it does.
+(function titleThePlaceLine() {
+  const box = document.getElementById("attachments");
+  if (!box || typeof MutationObserver === "undefined") return;
+  new MutationObserver(() => {
+    const note = document.getElementById("att-note");
+    if (note && note.title !== note.textContent) note.title = note.textContent;
+  }).observe(box, { childList: true });
+})();
 
 onRender(s => renderExits(s));

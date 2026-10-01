@@ -15,6 +15,8 @@ what they answer.
 """
 from __future__ import annotations
 
+import re
+
 from rules import journey as journey_mod, ontheway, places as places_mod
 from rules.bestiary import instantiate
 from rules.dice import Dice
@@ -372,7 +374,10 @@ class TestGoingIntoGround:
         s, e, pc = _party()
         e.dice = _Certain(e.dice, band=70)      # the road's travellers band
         tell = " ".join(o.tell for o in self._venture(e, pc).outcomes)
-        assert "There are others" in tell or "not empty" in tell, tell
+        # Travellers pass by since the owner's ruling C1 (2026-09-30): told in the hop's
+        # line ("At the sewers, there are others on the road; you pass them") rather than
+        # stopping the walk — still checked, still said.
+        assert re.search(r"there are others|not empty", tell, re.I), tell
 
     def test_a_quiet_way_in_says_nothing_extra(self):
         s, e, pc = _party()
