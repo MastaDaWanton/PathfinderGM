@@ -1584,6 +1584,58 @@ def kinds_said() -> str:
     return (f"{', '.join(sorted({*KINDS, *DWELLINGS}))}; and out on the road: "
             f"{', '.join(sorted(OUTSIDE_KINDS))}")
 
+
+def _said_as(place) -> list[str]:
+    """The words one place is called by: its name, and for a founded place its kind and
+    every word people say for that kind ("tavern", "pub", "alehouse", "bar")."""
+    out = [" ".join(str(getattr(place, "name", "") or "").split()).lower()
+           .removeprefix("the ").strip()]
+    kind = kind_named(getattr(place, "kind", "") or "")
+    if kind:
+        out.append(kind)
+        out.extend(w for w, k in KIND_WORDS.items() if k == kind)
+    return [w for w in out if w]
+
+
+def words_for_here(place, known=(), outside: bool = True) -> tuple[str, ...]:
+    """Every word that names where somebody standing in `place` is, lower-case and
+    without its article: its own name and kind, then the same for each place it stands
+    in, up the `parent` chain — the chamber is in the Velvet Veil, which is a tavern,
+    which opens off the gate.
+
+    Measured on the owner's save of 2026-10-01: 13 of the 17 `stands-elsewhere` findings
+    were "there is no tavern in this place at all" while the party stood in the Velvet
+    Veil — a place founded with `kind="tavern"` — or in its chamber. The prose naming
+    the tavern was naming where they were. `parent` is followed only through places in
+    `known`; a generated room's parent is the world entity, which is not a place.
+
+    `outside=False` stops at the first parent that is a settlement room rather than a
+    founded building: in the Velvet Veil you are in the tavern, but standing "before the
+    gate" it opens off is having walked out of it — which is what the refused-move
+    check needs to tell apart. The first word is always the place's own name.
+    """
+    by_id = {getattr(p, "id", ""): p for p in known or ()}
+    out: list[str] = []
+    seen: set[str] = set()
+    at = place
+    while at is not None and getattr(at, "id", "") not in seen:
+        seen.add(getattr(at, "id", ""))
+        out.extend(w for w in _said_as(at) if w not in out)
+        at = by_id.get(getattr(at, "parent", "") or "")
+        if at is not None and not outside and not getattr(at, "kind", ""):
+            break
+    return tuple(out)
+
+
+def kinds_of(known) -> tuple[str, ...]:
+    """The kinds of the founded places in `known`, with the words said for each: a town
+    with the Velvet Veil in it has a tavern, though no place in it is NAMED the tavern."""
+    out: list[str] = []
+    for p in known or ():
+        if getattr(p, "kind", ""):
+            out.extend(w for w in _said_as(p)[1:] if w not in out)
+    return tuple(out)
+
 # Kinds that stand on water, and the words a settlement is described with when it has
 # some. The generator's own cues (`IMPLIED`) are read first; these are the words a
 # tide-and-stilt village gets described with instead — Vormoor's export says "coral and

@@ -1842,7 +1842,8 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
            claim: str = "", blows: list[dict] | None = None,
            fire_context: str | None = None,
            here: str = "", places: tuple = (), doors: list[dict] | None = None,
-           buying: str = "", acting: str = "") -> Review:
+           buying: str = "", acting: str = "",
+           here_is: tuple = (), kinds_here: tuple = ()) -> Review:
     out = Review(text=text or "")
     if not text:
         return out
@@ -2058,7 +2059,8 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
     # written, it is untrue, and every sentence after it inherits the error. Judged only
     # when the caller could say where the party actually is.
     if here:
-        elsewhere = stands_elsewhere(text, here=here, places=places)
+        elsewhere = stands_elsewhere(text, here=here, places=places,
+                                     here_is=here_is, kinds_here=kinds_here)
         if elsewhere:
             where, sentence = elsewhere[0]
             real = ", ".join(str(p) for p in places) or here
@@ -2067,7 +2069,7 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
             # nobody can go to, and the rewrite has to be told which it is or it
             # relocates the beat to a second invention.
             exists = where.lower().removeprefix("the ") in {
-                str(p).lower().removeprefix("the ") for p in places}
+                str(p).lower().removeprefix("the ") for p in places} | set(kinds_here)
             out.findings.append(Finding(
                 "stands-elsewhere",
                 f"the passage puts the player in {where}, and they are at {here}"
@@ -4452,7 +4454,26 @@ def _bare(where: str) -> str:
     return " ".join(str(where or "").split()).removeprefix("the ").strip()
 
 
-def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, str]]:
+def site_words(engine) -> dict:
+    """What the place the party stands in IS, and what kinds of place exist here, read
+    off the engine for `review` / `stands_elsewhere` (`here_is`, `kinds_here`).
+
+    A founded place carries its kind beside a name of its own — "the Velvet Veil" is a
+    `tavern` — and the prose calls it by the kind far more often than by the name. See
+    `rules.places.words_for_here`. Empty when the engine cannot say where the party is."""
+    from rules import places as places_mod
+
+    try:
+        known = tuple(engine.places())
+        here = engine.here()
+    except Exception:  # noqa: BLE001 — a scene with no location has no answer
+        return {"here_is": (), "kinds_here": ()}
+    return {"here_is": places_mod.words_for_here(here, known),
+            "kinds_here": places_mod.kinds_of(known)}
+
+
+def stands_elsewhere(text: str, here: str = "", places=(), here_is=(),
+                     kinds_here=()) -> list[tuple[str, str]]:
     """Sentences that put the party in a place the engine does not have them in.
 
     Item 45, reported 2026-09-21 with the map open: *"i am at a gate with wagons passing
@@ -4475,12 +4496,27 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
     right about what happens next. What this catches is the narrator using THE APP'S OWN
     place vocabulary for a place that is not here, which is every instance measured.
 
+    **What the place IS is where the player is.** `here_is` is every word for the place
+    the party stands in and the places it stands inside (`site_words`): its name, its
+    kind, its parents'. `kinds_here` is the kinds of the founded places of this
+    settlement. Measured on the owner's save of 2026-10-01 (sam.json): 17 findings, 13
+    of them "there is no tavern in this place at all" with the party in the Velvet Veil
+    — founded as a tavern — or in its chamber: "the roar of the tavern", "The tavern is
+    quiet around you", "Each street takes you further from the tavern". Every one was
+    the tavern they stood in (or were leaving); none was an invention. The other four
+    (the stables and the tannery walked past, a lane and an alley in the back streets)
+    are still found. Nothing here special-cases a word: the kind is the engine's.
+
     Returns `(place, sentence)` pairs.
     """
     if not text:
         return []
     known = {str(p).lower().removeprefix("the ").strip() for p in (places or ())}
+    known |= {str(k).lower().strip() for k in (kinds_here or ())}
     standing = str(here or "").lower().removeprefix("the ").strip()
+    # Where the party is, in every word that names it: here, its kind, what it is in.
+    standing_in = {standing} | {str(w).lower().removeprefix("the ").strip()
+                                for w in (here_is or ())}
     # Two sources, and the difference between them is the difference between the two
     # items. A REAL place of this settlement that is not the one the party is in is item
     # 38 — the prose walked somewhere the engine did not. A place from the app's own
@@ -4518,7 +4554,7 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
     # the tavern.", "the tavern's door" and "the tavern door" are all still claims.
     # Precision over recall, as above.
     absent = sorted((w for w in _place_words(wild=False)
-                     if w not in known and w != standing and w != "way in"),
+                     if w not in known and w not in standing_in and w != "way in"),
                     key=len, reverse=True)
     for sentence in _sentences(unquoted(text)):
         for word in absent:
@@ -4539,7 +4575,7 @@ def stands_elsewhere(text: str, here: str = "", places=()) -> list[tuple[str, st
             if not (re.search(_STANDS_IN + re.escape(word) + r"\b", sentence, re.I)
                     or re.search(_ARRIVES_AT + re.escape(word) + r"\b", sentence, re.I)):
                 continue
-            if word != standing:
+            if word not in standing_in:
                 out.append((f"the {word}", sentence.strip()))
             break                # the longest match in this sentence decides it
     return out
