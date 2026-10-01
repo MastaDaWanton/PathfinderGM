@@ -1943,6 +1943,10 @@ class GMAgent:
                 # Where the party actually is, and what places exist here, so a beat
                 # set in a gate this town does not have is caught (items 45 and 38).
                 here=self._here_name(), places=self._place_names(),
+                # And what this place IS — the Velvet Veil is a tavern — so "the roar of
+                # the tavern" said while standing in it is not elsewhere: 13 of 17
+                # stands-elsewhere findings in the owner's save were this (2026-10-01).
+                **narration_mod.site_words(self.engine),
                 # What the crowd just saw, out of fights only: in a fight the NPC
                 # turns are the reaction.
                 heat=(None if self.engine.scene.in_encounter
