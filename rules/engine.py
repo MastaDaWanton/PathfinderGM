@@ -14045,7 +14045,7 @@ class Engine:
         night, scale, by = None, 1.0, ""
         rule = gear_mod.camp_rule("night-check")
         if actor.is_pc and setting in (rule.get("applies_at") or ()) \
-                and not actor.has_condition("dead"):
+                and not actor.has_state("state.down.dead"):
             scale, by = gear_mod.night_scale(actor)
             night = ontheway.night(self.dice, hours, ground or "grassland",
                                    int(getattr(actor, "level", 1) or 1), scale=scale)
@@ -14133,7 +14133,7 @@ class Engine:
                     said.append(line)
         rough = gear_mod.camp_rule("sleeping-rough")
         if stiff and camp["setting"] in (rough.get("applies_at") or ()) and hours > 0 \
-                and not actor.has_condition("dead"):
+                and not actor.has_state("state.down.dead"):
             spared = str(rough.get("spared_by") or "")
             if spared and actor.has_state(spared):
                 what = next((c["name"] for c in gear_mod.carried(actor)
@@ -14195,9 +14195,12 @@ class Engine:
             # the overflow past the maximum landing as lethal.
             if target.is_down or int(target.nonlethal) >= int(target.hp):
                 break
-        if taken and row.get("fatigues") and not target.has_condition("fatigued"):
-            target.add_condition("fatigued", source=str(row.get("name", rule)))
-            effects.append({"ref": target.ref, "kind": "condition", "condition": "fatigued",
+        # The condition is the row's to name (`fatigues`), asked by tag, so this site adds
+        # no literal condition key to the engine (tests/test_three_laws.py).
+        cond = str(row.get("fatigues") or "")
+        if taken and cond and not any(target.has_state(t) for t in states.tags_for(cond)):
+            target.add_condition(cond, source=str(row.get("name", rule)))
+            effects.append({"ref": target.ref, "kind": "condition", "condition": cond,
                             "origin": f"rule:{rule}"})
         crossed = self._hp_state_effects(target)
         effects.extend(crossed)

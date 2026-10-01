@@ -64,7 +64,7 @@
     "type": "cold",
     "lethality": "nonlethal",
     "save": {"save": "fort", "dc": 15, "rises": 1},
-    "fatigues": true,
+    "fatigues": "fatigued",
     "save_note": "Added 2026-10-01 with carried gear (content/rules/gear.json): the source line always said 'on a failed Fortitude save' and the row rolled the damage with no save at all. 'Fortitude save each hour (DC 15, +1 per previous check)'; 'A character who takes any nonlethal damage from cold or exposure is beset by frostbite or hypothermia (treat her as fatigued).' The save reads the roll context {against: cold}, so a cold-weather bonus reaches it."
   },
   "heat": {
