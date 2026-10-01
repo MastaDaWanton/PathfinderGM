@@ -3598,8 +3598,18 @@ class Engine:
         if callee["body"] is not None:
             return callee["body"]
         if callee["kind"] == "person":
+            # Not seen here: she is made to be walked to her own door, not met in the
+            # party's room (`population.embody`'s `seen_here`).
             body = population.embody(self.scene, callee["rec"]["phrase"], "guildhand",
-                                     world=self.world, rec=callee["rec"])
+                                     world=self.world, rec=callee["rec"], seen_here=False)
+            # And out of the party's room: `population.embody` makes everybody here, and
+            # `_home_of` leaves alone anybody standing with the party. Replayed 2026-10-01:
+            # the woman a barkeep spoke of was made in his tavern, stayed there, and her
+            # own door went unanswered — "The human woman is at the Velvet Veil".
+            from . import residency
+
+            self.scene.move(body.ref, residency.offstage(
+                self.scene.location_id, f"home-{callee['rec']['id']}"))
         else:
             e = self.world.get(callee["entity"]) if self.world is not None else None
             role = scope_mod._role_of(e) if e is not None else ""

@@ -12,6 +12,11 @@ introduces them or the player turns to them.
 
 In a fight the prose brings nobody new in: item 30's raiders are the plan's `spawn`,
 and a newcomer only the prose describes is rewritten out.
+
+Overturned in part on 2026-10-01 by the owner: somebody the prose SHOWS here and now is a
+full person at once ("if i can see them they should be in the scene"). The misread risk
+above is why that door reads strictly (`judgement.seen_in_beat`) and caps a beat at three
+(tests/test_seen_people.py). Somebody only spoken of stays a record.
 """
 from __future__ import annotations
 
@@ -66,15 +71,20 @@ def _turn(cm, monkeypatch, beat, said="I look around."):
     return cm.current()
 
 
-def test_somebody_the_prose_describes_is_a_record_and_not_a_body(live, monkeypatch):
+def test_somebody_the_prose_shows_here_is_a_record_with_a_body(live, monkeypatch):
+    """Overturned 2026-10-01 by the owner — "if i can see them they should be in the scene
+    as a fully made person" — after the woman at the top of the stairs in Sam's save stayed
+    prose and "the woman" was refused as an unknown ref. Seen here and now, she is ONE
+    record and ONE body: the record holds her ref and her life, the body wears it
+    (tests/test_seen_people.py has the rest)."""
     beat = ("The square is busy with the noon trade. A woman watching from a doorway "
             "follows you with her eyes and does not look away when you notice. " * 3
             + "What do you do?")
     c = _turn(live, monkeypatch, beat)
     her = [r for r in c.scene.population.values() if "woman" in r["phrase"]]
-    assert her, [r["phrase"] for r in c.scene.population.values()]
-    assert not her[0]["ref"], "a record, never a body from the prose"
-    assert not any("woman" in a.name for a in c.scene.actors.values())
+    assert len(her) == 1, [r["phrase"] for r in c.scene.population.values()]
+    assert her[0]["ref"] in c.scene.actors
+    assert [a.ref for a in c.scene.actors.values() if "woman" in a.name] == [her[0]["ref"]]
 
 
 def test_turning_to_her_gives_her_a_body_before_the_plan():

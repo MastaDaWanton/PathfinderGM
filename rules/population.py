@@ -140,11 +140,16 @@ def described_here(scene, phrase: str) -> dict | None:
 
 
 def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
-           rec: dict | None = None):
+           rec: dict | None = None, seen_here: bool = True):
     """One person becomes an actor in the room: the one door the prose's people
     (`judgement.promote_cast`), the finder's repair and the planner's `introduce` all go
     through. `rec` is their population record, when they have one: the actor wears the
-    face it rolled and the record keeps the ref."""
+    face it rolled and the record keeps the ref.
+
+    `seen_here=False` for a body made only to be moved on at once — the call on somebody
+    heard of (`Engine._embody_callee`), who is not in the room the party stands in. Marking
+    her seen there put her day's work at the party's place: measured 2026-10-01, the woman
+    a barkeep spoke of was "at the gate at this hour" when the party knocked at her house."""
     from . import states
     from .bestiary import instantiate
 
@@ -164,7 +169,7 @@ def embody(scene, phrase: str, template: str, *, zone: str = "near", world=None,
     said = person_words.from_words((rec or {}).get("phrase") or phrase, world,
                                    getattr(scene, "location_id", "") or "")
     person_words.apply(actor, said)
-    if rec is not None and rec.get("seen") is False:
+    if rec is not None and rec.get("seen") is False and seen_here:
         # Heard of until now (`note(spot=...)`); a body in the room is seen.
         seen(scene, rec)
     # In the room, not in the fight. Law two: the fact travels as an effect whose
@@ -331,7 +336,9 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
     this settlement becomes a population record. Measured on the playtest: the watchman
     said "the girl in the market", nothing wrote her down, and at the market the finder
     missed her. `heard_from` is the speaker's ref; `hint` is the speaker's words about
-    them, read only for what they work at ("her stall").
+    them, read only for what they work at ("her stall"). `spot=""` is heard of with the
+    place unknown — never where the talk happened (owner's save, 2026-10-01: the woman who
+    lives "three streets over" was recorded in the tavern where Gorm spoke of her).
     """
     from . import person_words
 
@@ -359,7 +366,7 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
         rolled = f"{rolled} {work[0]}"
     used = used_frames(scene, home)
     life = None
-    if heard:
+    if heard and spot:
         # The speaker said they are THERE, now: their life must agree. A roll whose
         # routine has them elsewhere at this hour (a priest at the shrine at ten) is
         # rolled again, deterministically, until one keeps them at work — and where a
@@ -398,6 +405,26 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
         rec["anchor"] = {"loc": home, "place": rec["spot"], "t": clock}
     scene.population[pid] = rec
     return rec
+
+
+def heard_of_match(scene, phrase: str, *, turn: int, within: int = 2) -> dict | None:
+    """The one person HEARD OF in the last few beats (`seen` False, no body) whom this
+    phrase describes, or None — for two descriptions of one person to stay one record.
+
+    Measured on the owner's save (2026-10-01): Gorm said a human woman lives in "the house
+    three streets over", and the population recorded her twice in the same beat — p16 'human
+    woman' from the narration's own report of it, and p17 'human woman' heard from Gorm —
+    so "which human woman do you mean?" refused the call on her. `within` counts transcript
+    entries (a beat and its player line are two), so "the same or the next beat"."""
+    words = _tokens(phrase)
+    if not words:
+        return None
+    bodies = getattr(scene, "people", {}) or {}
+    fits = [r for r in (getattr(scene, "population", None) or {}).values()
+            if r.get("seen") is False and not (r.get("ref") and r["ref"] in bodies)
+            and int(turn) - int(r.get("turn") or 0) <= within
+            and _fits(words, _bag(r, scene))]
+    return fits[0] if len(fits) == 1 else None
 
 
 def keep_as_resident(scene, actor, place_id: str) -> dict:
@@ -614,7 +641,12 @@ def _bag(rec: dict, scene) -> set[str]:
     """Everything a record answers to."""
     c = _canon()
     life = rec.get("life") or {}
-    said = [rec.get("phrase", ""), life.get("face", ""), life.get("work_name", "")]
+    # Somebody only heard of was never seen: the face the roll guessed for them is nothing
+    # the player knows, and it must not rule them out. Replayed 2026-10-01: the woman Gorm
+    # spoke of was rolled the town's Ratfolk face, so "the human woman Grom spoke of" did
+    # not fit her and the call found nobody.
+    face = "" if rec.get("seen") is False else life.get("face", "")
+    said = [rec.get("phrase", ""), face, life.get("work_name", "")]
     actor = (getattr(scene, "people", {}) or {}).get(rec.get("ref") or "")
     if actor is not None:
         said += [str(getattr(actor, "name", "") or "")]
@@ -633,15 +665,45 @@ def _bag(rec: dict, scene) -> set[str]:
     return bag
 
 
-def _fits(words: list[str], bag: set[str]) -> bool:
+def _fits(words: list[str], bag: set[str], peoples: frozenset = frozenset()) -> bool:
+    """Every word answers to the bag — except a gender, or a people (`peoples`: the
+    world's own, stemmed), that the record never stated one of: the prose's "someone
+    mending nets" is who "the woman mending nets" means, and a woman only heard of is who
+    "the human woman" means."""
     gendered = bool(bag & _GENDERED)
+    peopled = bool(bag & peoples)
     for w in words:
         if w in bag:
             continue
         if w in _GENDERED and not gendered:
             continue
+        if w in peoples and not peopled:
+            continue
         return False
     return True
+
+
+def _peoples(world) -> frozenset:
+    """The world's peoples as the finder's tokens ("human" always: the F2 grant asks for
+    one in any world)."""
+    key = id(world)
+    if key in _PEOPLES and _PEOPLES[key][0] is world:
+        return _PEOPLES[key][1]
+    out = {"human"}
+    if world is not None:
+        try:
+            from . import names as names_mod
+
+            for name in names_mod.peoples(world).values():
+                out.update(_tokens(str(name)))
+        except Exception:  # noqa: BLE001 — a world without peoples still has "human"
+            pass
+    got = frozenset(_canon()["canon"].get(_stem(w), _stem(w)) for w in out)
+    _PEOPLES[key] = (world, got)
+    return got
+
+
+_PEOPLES: dict = {}
 
 
 def where_now(rec: dict, scene, world=None):
@@ -732,22 +794,186 @@ class Found(dict):
         return self["ring"]
 
 
+# --- "the woman Gorm spoke of": who told the player about them ----------------------------
+#
+# Measured on the owner's save, 2026-10-01: "I enter the house of the human woman Grom spoke
+# of" logged `population-miss` seven times with the words human, woman, grom, speak. Two
+# faults in one phrase. "Grom" is the player's slip for Gorm, the barkeep who had told them
+# about her; and "spoke of" is no part of who she is — it says WHERE the player learned of
+# her, which the record already holds as `heard_from`. Inform reaches out of scope for
+# exactly the asking-about case (Recipe Book §6.2) and Eric Eve's Epistemology keeps the
+# *familiar* flag for somebody known of and not seen (§5.5); a familiar person is the one a
+# player names by who told them. So the clause is read off the phrase, the speaker is
+# resolved to a ref, and among the people who fit the rest, the one heard of from that
+# speaker is chosen.
+#
+# The slip: Damerau's 1964 count was that about 80% of misspellings are one insertion,
+# deletion, substitution or transposition, and "Grom" for "Gorm" is one transposition.
+# Tolerated only against the names of people the campaign holds (never every word of the
+# phrase, where "man" is one letter from "men" and "map"), and only when one name is that
+# close — two names in reach is a guess, and is not made.
+
+_HEARD_VERBS = (r"(?:spoke\s+(?:of|about)|spoken\s+(?:of|about)|speaks\s+(?:of|about)|"
+                r"talked\s+(?:of|about)|was\s+talking\s+about|"
+                r"told\s+(?:me|us|you)\s+(?:of|about)|tells\s+(?:me|us|you)\s+(?:of|about)|"
+                r"mentioned|mentions|described|pointed\s+out|sent\s+me\s+to)")
+# Case matters for the name: "woman Grom" must not be read as a two-word name, so only the
+# verbs and connectives are case-blind.
+_HEARD = re.compile(
+    r"(?:\s+(?i:that|who|whom))?\s+(?P<who>(?i:he|she|they|someone|somebody)|"
+    r"(?i:the\s+)[a-z][\w'’-]+|[A-Z][\w'’-]+(?:\s+[A-Z][\w'’-]+)?)\s+"
+    r"(?i:(?:had\s+|has\s+|just\s+|once\s+)?" + _HEARD_VERBS + r")\b"
+    r"(?i:\s+(?:earlier|before|a\s+minute\s+ago|just\s+now|yesterday))?")
+_PRONOUN_SPEAKER = frozenset({"he", "she", "they", "someone", "somebody"})
+# Who the clause names, unresolved: anybody who told the player about somebody.
+ANYONE = "?"
+
+
+def _osa(a: str, b: str) -> int:
+    """Optimal-string-alignment distance: Levenshtein plus the swap of two neighbours."""
+    a, b = a.lower(), b.lower()
+    d = [[0] * (len(b) + 1) for _ in range(len(a) + 1)]
+    for i in range(len(a) + 1):
+        d[i][0] = i
+    for j in range(len(b) + 1):
+        d[0][j] = j
+    for i in range(1, len(a) + 1):
+        for j in range(1, len(b) + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[len(a)][len(b)]
+
+
+def _reach(word: str) -> int:
+    """How many edits a name of this length tolerates: one up to five letters, two past."""
+    return 1 if len(word) <= 5 else 2
+
+
+def _known_names(scene) -> dict[str, str]:
+    """{name word: ref} for the proper names of everybody the campaign holds a body for —
+    the names the player can know, and so the only words a slip is corrected towards."""
+    out: dict[str, str] = {}
+    for ref, a in (getattr(scene, "people", {}) or {}).items():
+        if getattr(a, "is_pc", False):
+            continue
+        for n in (getattr(a, "name", ""), getattr(a, "true_name", "")):
+            for w in re.findall(r"[A-Z][a-z]{2,}(?![a-z])", str(n or "")):
+                out.setdefault(w.lower(), ref)
+    return out
+
+
+def near_name(scene, word: str) -> tuple[str, str]:
+    """(the name word, its ref) a word means, exactly or by one slip; ("", "") for none or
+    for two names in reach."""
+    names = _known_names(scene)
+    w = str(word or "").lower()
+    if len(w) < 3:
+        return "", ""
+    if w in names:
+        return w, names[w]
+    close = {n: r for n, r in names.items()
+             if abs(len(n) - len(w)) <= _reach(n) and _osa(n, w) <= _reach(n)}
+    if len(close) == 1:
+        n, r = next(iter(close.items()))
+        return n, r
+    return "", ""
+
+
+def speaker_of(scene, who: str) -> str:
+    """The ref a hearsay clause's speaker names: by a proper name (a slip tolerated), or
+    by every word of a descriptor the body goes by ("the barkeep" of "the barkeep"). A
+    pronoun or nobody resolved is ANYONE: somebody told the player, it is not known who."""
+    who = " ".join(str(who or "").split())
+    if not who or who.lower() in _PRONOUN_SPEAKER:
+        return ANYONE
+    caps = re.findall(r"[A-Z][a-z]{2,}(?![a-z])", who)
+    if caps:
+        refs = {near_name(scene, w)[1] for w in caps} - {""}
+        return refs.pop() if len(refs) == 1 else ANYONE
+    want = set(_tokens(_ARTICLE.sub("", who)))
+    if want:
+        hits = [ref for ref, a in (getattr(scene, "people", {}) or {}).items()
+                if not getattr(a, "is_pc", False)
+                and want <= set(_tokens(str(getattr(a, "name", "") or "")))]
+        if len(hits) == 1:
+            return hits[0]
+    return ANYONE
+
+
+def heard_clause(phrase: str) -> tuple[str, str]:
+    """(the phrase without its hearsay clause, the clause's speaker words) — ("the human
+    woman", "Grom") from "the human woman Grom spoke of"; (phrase, "") with no clause."""
+    padded = " " + str(phrase or "")
+    m = _HEARD.search(padded)
+    if not m:
+        return str(phrase or ""), ""
+    rest = (padded[:m.start()] + padded[m.end():]).strip(" ,")
+    return " ".join(rest.split()), m.group("who").strip()
+
+
+def heard_words(text: str) -> str:
+    """The hearsay clause in a player's sentence as written ("Grom spoke of"), or ""."""
+    m = _HEARD.search(" " + str(text or ""))
+    if not m:
+        return ""
+    return " ".join(m.group(0).split())
+
+
+def correct_names(scene, phrase: str) -> str:
+    """The phrase with a near-miss proper name put right ("Grom's house" → "Gorm's
+    house"), against the names of people the campaign holds."""
+    def fix(m):
+        word = m.group(0)
+        n, _ref = near_name(scene, word)
+        return n[:1].upper() + n[1:] if n and n != word.lower() else word
+    # Letters only: "Grom's" is the name "Grom" and its possessive.
+    return re.sub(r"(?<![\w'’-])[A-Z][a-z]{2,}(?![a-z])", fix, str(phrase or ""))
+
+
 def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
          log_miss: bool = True, world=None) -> Found:
     """The person that phrase means, by scope. `rings` limits the search to those rings.
     `world` lets a traveller's roads be walked (`rules/residency.py`); without it they are
-    reckoned to stay where they were seen, and nothing reckoned so is stored."""
-    words = _tokens(phrase)
+    reckoned to stay where they were seen, and nothing reckoned so is stored.
+
+    A hearsay clause ("Gorm spoke of", "the barkeep told me about") is read off first: it
+    names who told the player about this person, and among those who fit the rest, the one
+    heard of from that speaker is the one meant — searched across every ring allowed,
+    because the woman Gorm spoke of is who was asked for even with another woman here."""
+    said = str(phrase or "")
+    rest, who = heard_clause(said)
+    speaker = speaker_of(scene, who) if who else ""
+    words = _tokens(correct_names(scene, rest))
     if not words or scene is None:
         return Found(scope=NONE, ring="", people=[])
-    for name, members in _rings(scene, world):
-        if rings is not None and name not in rings:
-            continue
-        fits = [r for r in members if _fits(words, _bag(r, scene))]
+    peoples = _peoples(world)
+
+    def ringed():
+        # Lazily: a hit in the first ring never reckons where the rest of the town is.
+        return ((name, members) for name, members in _rings(scene, world)
+                if rings is None or name in rings)
+
+    if speaker:
+        told = [(name, r) for name, members in ringed() for r in members
+                if (r.get("heard_from") == speaker if speaker != ANYONE
+                    else bool(r.get("heard_from")))
+                and _fits(words, _bag(r, scene), peoples)]
+        if len(told) == 1:
+            name, rec = told[0]
+            return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=[rec])
+        if told:
+            return Found(scope=AMBIGUOUS, ring=told[0][0], people=[r for _n, r in told])
+    for name, members in ringed():
+        fits = [r for r in members if _fits(words, _bag(r, scene), peoples)]
         if len(fits) == 1:
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=fits)
         if fits:
             return Found(scope=AMBIGUOUS, ring=name, people=fits)
+    # A clause naming somebody nobody heard of from them leaves the rest, which was still
+    # searched above: "the woman Gorm spoke of" of a woman the prose wrote is that woman.
+    phrase = rest
     # A description with a relative clause the record cannot answer to ("the woman who
     # waved at me" of a woman nobody saw wave) is still asking for the woman. "that" and
     # "whom" clauses too: measured on the 2026-09-28 playtest, "the girl that the
@@ -757,14 +983,24 @@ def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
     if len(head) == 2 and head[0].strip():
         return find(scene, head[0], rings=rings, log_miss=log_miss, world=world)
     if log_miss and getattr(scene, "population", None):
-        _MISSES.append({"kind": "population-miss", "phrase": " ".join(str(phrase).split()),
+        _MISSES.append({"kind": "population-miss", "phrase": " ".join(said.split()),
                         "words": words})
     return Found(scope=NONE, ring="", people=[])
 
 
 def drain_misses() -> list[dict]:
-    """The searches that found nobody since last asked, for the turn log."""
-    out = list(_MISSES)
+    """The searches that found nobody since last asked, for the turn log — each phrase
+    once. Measured on the owner's save (2026-10-01): one turn wrote seven identical
+    `population-miss` rows for "human woman Grom spoke of", because seven readers of the
+    player's words each asked the finder; the synonym table needs the miss, not its echo."""
+    out: list[dict] = []
+    seen_rows: set[str] = set()
+    for row in _MISSES:
+        key = row.get("phrase", "")
+        if key in seen_rows:
+            continue
+        seen_rows.add(key)
+        out.append(row)
     _MISSES.clear()
     return out
 
