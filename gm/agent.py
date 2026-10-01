@@ -1965,7 +1965,11 @@ class GMAgent:
                     text, complaint, player_input, scene_brief, facts=facts,
                     keep=prompts.INTIMATE_KEEP if intimate else ""),
                 who[0], who[1], as_json=True, think=False, provider=who[2],
-                api_key=who[3], temperature=0.6, num_predict=900,
+                api_key=who[3], temperature=0.6,
+                # An intimate beat runs to 3,000 characters: its rewrite gets the same
+                # budget and no grammar ceiling, or a mended phrase would come back cut
+                # to 1,800 and lose the end of the scene.
+                num_predict=prompts.INTIMATE_NUM_PREDICT if intimate else 900,
                 # Structural insurance, not a truncation cure: `as_json` already puts a
                 # JSON grammar at the sampler, and the live "Unterminated string" failure
                 # was the token budget dying mid-string — which no grammar prevents and
@@ -1976,7 +1980,8 @@ class GMAgent:
                 # 1,600 — lower than the draft it rewrites — and on 2026-09-30 (item 6)
                 # Ollama closed the string at exactly 1,600 characters, mid-word, and
                 # the cut rewrite shipped as "…They'. What do you do?".
-                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING),
+                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING,
+                                            unbounded=intimate),
             )
             # Cut back to its last whole sentence, as the prose call's reply is.
             fixed, _gone = narration_mod.trim_unfinished(
@@ -2306,7 +2311,12 @@ class GMAgent:
             demonstrations=demos.examples if demos is not None else None)
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
-            else narration_mod.MIN_SCENE_CHARS, max_chars=2200)
+            else narration_mod.MIN_SCENE_CHARS, max_chars=2200,
+            # The intimate beat is asked for 3,000 characters (the owner's figure), which
+            # the grammar cannot hold (GRAMMAR_MAXLENGTH_CEILING): no `maxLength`, and the
+            # token budget bounds it instead. Every other beat is clamped as before.
+            unbounded=self._intimate_beat())
+        budget = prompts.INTIMATE_NUM_PREDICT if self._intimate_beat() else 1400
 
         # Prose gets the second model call 1 has always had. It never did, and the
         # gap was invisible until the beat a model declines to write: one call,
@@ -2341,7 +2351,7 @@ class GMAgent:
                 # close a string it is given the tokens to close.
                 reply = client.chat(
                     messages, model, host, as_json=True, think=False,
-                    temperature=0.8, num_predict=1400, provider=provider,
+                    temperature=0.8, num_predict=budget, provider=provider,
                     api_key=key, schema=schema,
                     timeout=(PRIMARY_TIMEOUT if model == self.prose_model
                              else FALLBACK_TIMEOUT))
@@ -2360,10 +2370,21 @@ class GMAgent:
                 # existed" — and this path still dropped both, so a live prose
                 # failure logged `0.0s` and an empty string. The malformed JSON of
                 # 2026-09-04 could only be read by reproducing it.
+                # An intimate beat has no `maxLength`, so the budget can end it inside
+                # the string: the narration is salvaged and trimmed to a whole sentence
+                # below, rather than the beat lost to "Unterminated string".
+                salvaged = (intimate_mod.narration_from_cut_reply(reply.text)
+                            if reply is not None and self._intimate_beat() else "")
                 attempts.append(Attempt(
                     "prose", getattr(reply, "seconds", 0.0), model,
-                    getattr(reply, "text", "") or "", note=str(exc)[:120]))
-                continue
+                    getattr(reply, "text", "") or "",
+                    note=str(exc)[:120] + (" — budget death, narration salvaged"
+                                           if salvaged else "")))
+                if not salvaged:
+                    continue
+                text = self._lift(salvaged)
+                self.last_suggestions = []
+                break
             declined = narration_mod.reads_as_a_refusal(text)
             # A deflection is a refusal that reads as prose: rather than saying
             # no, the model writes a different scene and re-introduces somebody
@@ -2398,7 +2419,7 @@ class GMAgent:
                         messages + [{"role": "assistant", "content": reply.text},
                                     {"role": "user", "content": correction}],
                         model, host, as_json=True, think=False, temperature=0.7,
-                        num_predict=1400, provider=provider, api_key=key,
+                        num_predict=budget, provider=provider, api_key=key,
                         schema=schema, timeout=FALLBACK_TIMEOUT)
                     data2 = again.json()
                     text2 = self._lift(str(data2.get("narration", "")).strip())

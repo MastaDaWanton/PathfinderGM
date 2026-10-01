@@ -203,7 +203,9 @@ def test_the_intimate_briefing_replaces_the_turn_briefing_not_joins_it():
     """One 350-character line against the whole briefing; the owner's two beats came out
     metaphorical, unedited by the pipeline. So the beat's own briefing REPLACES the
     13,103-character turn briefing and the restrained worked examples — and keeps the
-    laws: no number, nothing for the player they did not say, the names, the hand-back."""
+    laws: no number, the names, the hand-back, adults only. The one law it relaxes is the
+    owner's ruling of 2026-10-01: here the narrator may act and speak for the player's
+    character."""
     msgs = _prose("intimate", DEMOS)
     system = msgs[0]["content"]
     assert system.startswith(prompts.INTIMATE_BRIEFING)
@@ -212,7 +214,8 @@ def test_the_intimate_briefing_replaces_the_turn_briefing_not_joins_it():
     assert prompts.SAY_TAGS.strip() in system
     flat = " ".join(prompts.INTIMATE_BRIEFING.split())
     for law in ("never write a number", "Name only the people and places",
-                "as far as the player took it, and no further", "asking what they DO",
+                "you may write what the player's character does and says",
+                "asking what they DO",
                 "Never anyone who is a child", '"intents": []'):
         assert law in flat
     shown = json.dumps(msgs)
@@ -259,13 +262,42 @@ def test_the_ordinary_and_fade_prompts_carry_no_demonstration_and_no_note(monkey
     assert "fade to black" in _prose("fade")[0]["content"]
 
 
-def test_the_length_asked_fits_under_the_grammar_ceiling():
-    assert prompts.INTIMATE_LENGTH < prompts.GRAMMAR_MAXLENGTH_CEILING
-    assert intimate.PASSAGE_CHARS == prompts.GRAMMAR_MAXLENGTH_CEILING
-    assert f"{prompts.INTIMATE_LENGTH:,}" in prompts.INTIMATE_BRIEFING
-    # The first live briefed beat, asked for 1,700, ran to the 1,800 ceiling and was cut
-    # mid-sentence: the ask keeps a margin for the overshoot.
-    assert prompts.GRAMMAR_MAXLENGTH_CEILING - prompts.INTIMATE_LENGTH >= 300
+def test_the_relaxation_is_the_intimate_beats_alone():
+    """The owner's ruling (2026-10-01): the narrator may speak for the player's character
+    in an explicit intimate scene ONLY. The turn briefing keeps its rule."""
+    assert "The player says only what their character does" in prompts.BRIEFING
+    assert "may write what their character does and says" in prompts.intimate_note(True)
+
+
+def test_the_grammar_ceiling_still_clamps_and_only_a_flag_lifts_it():
+    """The owner asked for 3,000 characters; `maxLength` stops compiling between 2,000
+    and 2,100 on both models measured (HTTP 500 on llama3.1, "failed to parse grammar" on
+    gemma-4 12B). So 3,000 never reaches the grammar: a big `max_chars` is still clamped,
+    and only the explicit `unbounded` flag leaves the ceiling out."""
+    clamped = prompts.prose_schema(max_chars=3000)["properties"]["narration"]
+    assert clamped["maxLength"] == prompts.GRAMMAR_MAXLENGTH_CEILING == 1800
+    free = prompts.prose_schema(800, max_chars=3000, unbounded=True)
+    assert "maxLength" not in free["properties"]["narration"]
+    assert "minLength" not in free["properties"]["narration"]
+    assert prompts.INTIMATE_LENGTH == 3000 and "3,000" in prompts.INTIMATE_BRIEFING
+    # ~3.8 characters a token (measured on gemma, prompts.CHARS_PER_TOKEN's note): the
+    # budget covers the ask and the JSON around it.
+    assert prompts.INTIMATE_NUM_PREDICT * 3.6 > prompts.INTIMATE_LENGTH + 600
+    assert intimate.PASSAGE_CHARS == prompts.INTIMATE_LENGTH
+
+
+def test_a_reply_the_budget_cut_off_is_salvaged():
+    """With no `maxLength`, the token budget can end the string: "Unterminated string"
+    lost 1,068 characters of good prose on 2026-09-04. The narration is read up to the
+    cut, escapes kept, and trimmed to its last whole sentence by the caller."""
+    cut = '{"narration": "DEMO-ONE: a line. She says \\"stay\\". DEMO-TWO is cu'
+    got = intimate.narration_from_cut_reply(cut)
+    assert got == 'DEMO-ONE: a line. She says "stay". DEMO-TWO is cu'
+    assert narration.trim_unfinished(got)[0] == 'DEMO-ONE: a line. She says "stay".'
+    whole = '{"narration": "DEMO-ONE.", "suggestions": ["I st'
+    assert intimate.narration_from_cut_reply(whole) == "DEMO-ONE."
+    assert intimate.narration_from_cut_reply('{"suggestions": []}') == ""
+    assert intimate.narration_from_cut_reply('{"narration": "DEMO \\') == "DEMO"
 
 
 # --- the owner's file ---------------------------------------------------------------------
@@ -287,7 +319,7 @@ def test_the_file_is_created_holding_only_a_header(data):
     assert lines and all(ln.startswith("#") or not ln.strip() for ln in lines)
     header = path.read_text(encoding="utf-8")
     for said in ("Up to 3 are shown", "No names", "Keep the setting neutral",
-                 "under about 1,500 characters", 'beginning "> "', "act for the player",
+                 "under about 3,000 characters", 'beginning "> "',
                  "read fresh on every beat", "Explicit", "an adult", "1.)", "---"):
         assert said in header
 
@@ -327,7 +359,7 @@ def _file(*parts: str) -> None:
 
 
 def test_the_budget_takes_whole_passages_and_turns_them_over(data):
-    """Up to three passages and 5,400 characters a beat, never one cut part-way, and
+    """Up to three passages and 9,000 characters a beat, never one cut part-way, and
     which ones turns over with the beat so a long file is all used across a scene."""
     parts = []
     for n in range(1, 6):
@@ -346,8 +378,8 @@ def test_the_budget_takes_whole_passages_and_turns_them_over(data):
 
 
 def test_a_long_passage_is_flagged_and_never_cut(data):
-    long = ("DEMO-PASSAGE-LONG: a placeholder sentence. " * 50).strip()   # 2,149 characters
-    # Two long ones fit the 5,400; the third would not, and is passed over WHOLE for the
+    long = ("DEMO-PASSAGE-LONG: a placeholder sentence. " * 75).strip()   # 3,224 characters
+    # Two long ones fit the 9,000; the third would not, and is passed over WHOLE for the
     # short one after it — never cut down to fit.
     _file(long, "---", long, "---", long, "---", "DEMO-PASSAGE-TWO: a placeholder line.")
     d = intimate.read_demonstrations(0)
@@ -355,8 +387,8 @@ def test_a_long_passage_is_flagged_and_never_cut(data):
         e["reply"]["narration"] in (long, "DEMO-PASSAGE-TWO: a placeholder line.")
         for e in d.examples)
     assert d.chars <= intimate.TOTAL_CHARS
-    assert any("over the 5,400 total" in s for s in d.skipped)
-    assert sum("over the 1,800 the narrator can write" in w for w in d.warnings) == 3
+    assert any("over the 9,000 total" in s for s in d.skipped)
+    assert sum("over the 3,000 the narrator can write" in w for w in d.warnings) == 3
 
 
 def test_numbered_headers_separate_passages_too(data):
@@ -462,7 +494,10 @@ def live(tmp_path, monkeypatch):
         cm._LIVE.clear()
 
 
-def _say(monkeypatch, beat, line):
+def _say(monkeypatch, beat, line, first_raw=None):
+    """One turn through /api/say with the plan stubbed and every model call answered
+    with `beat` — or, for the FIRST call (the prose), with `first_raw` verbatim. The
+    calls' keyword arguments are kept on `_say.kwargs`."""
     from gm import client as gm_client
     from gm.agent import TurnPlan
     from gm.client import Reply
@@ -475,9 +510,13 @@ def _say(monkeypatch, beat, line):
             [{"op": "narrate_only", "because": "t"}]))
 
     seen: list = []
+    _say.kwargs = []
 
     def chat(messages, *a, **k):
         seen.append(messages)
+        _say.kwargs.append(k)
+        if first_raw is not None and len(seen) == 1:
+            return Reply(first_raw, 0.1, "stub")
         return Reply(json.dumps({"narration": beat, "suggestions": ["I stay"]}), 0.1, "stub")
 
     monkeypatch.setattr(views.GMAgent, "plan_turn", plan)
@@ -584,3 +623,64 @@ def test_the_minors_guard_after_the_prose_still_runs_on_this_path(live, monkeypa
     shown = next(b for b in reversed(r.json()["transcript"]) if b.get("who") == "gm")
     assert "boy" not in shown["text"]
     assert any(row.get("kind") == "refused-beat" for row in cm.current().turn_log)
+
+
+def test_the_intimate_prose_call_has_no_ceiling_and_its_own_budget(live, monkeypatch):
+    """The owner's 3,000 characters on the briefed beat: no `maxLength` and a token budget
+    of 1,100 instead; the ordinary beat keeps the 1,800 clamp and its 1,400."""
+    cm, c = live
+    beat = SCENE_WORDS
+    _say(monkeypatch, beat, "We go all the way")
+    first = _say.kwargs[0]
+    assert "maxLength" not in first["schema"]["properties"]["narration"]
+    assert first["num_predict"] == prompts.INTIMATE_NUM_PREDICT == 1100
+    _say(monkeypatch, beat, "I pay for the room")
+    first = _say.kwargs[0]
+    assert first["schema"]["properties"]["narration"]["maxLength"] == 1800
+    assert first["num_predict"] == 1400
+
+
+def test_a_budget_death_on_an_intimate_beat_ships_its_whole_sentences(live, monkeypatch):
+    """Not the holding line: the narration is salvaged from the cut reply and trimmed
+    back to its last whole sentence, and the attempt says so."""
+    cm, c = live
+    cut = json.dumps({"narration": SCENE_WORDS.replace(" What do you do?", "")})
+    cut = cut[:cut.index("Neither of you") + len("Neither of you is in")]
+    r, seen = _say(monkeypatch, SCENE_WORDS, "We go all the way", first_raw=cut)
+    row = _prose_row(cm)
+    assert any("narration salvaged" in a["note"] for a in row["attempts"])
+    shown = next(b for b in reversed(r.json()["transcript"]) if b.get("who") == "gm")
+    assert "The candle on the sill has burned low" in shown["text"]
+    assert "Neither of you is in" not in shown["text"]
+    assert "The moment holds" not in shown["text"]
+
+
+PC_SPEECH = ("You pull her closer. \"Stay with me tonight,\" you whisper against her hair, "
+             "and you tell her you have wanted this since the market. You kiss her slowly. "
+             "She answers by drawing you down beside her, her hand at your hip. "
+             "The candle on the sill has burned low and the room is quiet. "
+             "Outside, a cart goes by on the wet street and is gone. "
+             "Neither of you is in any hurry now, and the night has a long way to run. "
+             "What do you do?")
+
+
+def test_the_narrator_may_speak_for_the_player_on_an_intimate_beat(live, monkeypatch):
+    """The owner's ruling (2026-10-01, "yes it can speak for the character"), for the
+    explicit intimate scene only. The line the narrator gives the player's character is
+    kept, and the beat's turn-log row records the exemption.
+
+    Measured the same day, and the reason there is no check to switch off: run through
+    the whole pipeline, this beat's "Stay with me tonight," you whisper reached the page
+    unchanged on an ORDINARY beat too. Nothing in gm/checks or narration catches the
+    narrator speaking for the player — that rule has only ever been the turn briefing's
+    sentence, which stands on every other beat (`test_the_relaxation_is_the_intimate_
+    beats_alone`)."""
+    cm, c = live
+    r, seen = _say(monkeypatch, PC_SPEECH, "We go all the way")
+    shown = next(b for b in reversed(r.json()["transcript"]) if b.get("who") == "gm")
+    assert '"Stay with me tonight," you whisper' in shown["text"]
+    row = _prose_row(cm)["intimate"]
+    assert any("speaks for the player's character" in e for e in row["exempt"])
+    r, seen = _say(monkeypatch, PC_SPEECH, "I pay for the room")
+    assert "exempt" not in _prose_row(cm)["intimate"]
+    assert seen[0][0]["content"].startswith(prompts.BRIEFING[:200])

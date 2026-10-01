@@ -18,11 +18,16 @@ the wording:
   * **detection, in code** (`decide`): the player's line, the narrator's last two beats
     and the people here. Never asked of a model.
   * **a dedicated briefing** (`prompts.INTIMATE_BRIEFING`) in place of the turn
-    briefing, which keeps the game's laws — the engine's tells, no numbers, nothing done
-    for the player that they did not say, the hand-back — and drops what fights "write
-    it plainly in the body": the four moves with their PUSH (the weather turns, a door
-    closes), the wound-and-blow language of `PROSE_AFTER_EXTRA`, the op reference.
-  * **a note at the end** of the last message (`prompts.INTIMATE_NOTE`).
+    briefing, which keeps the game's laws — the engine's tells, no numbers, the names,
+    the hand-back, adults only — and drops what fights "write it plainly in the body":
+    the four moves with their PUSH (the weather turns, a door closes), the
+    wound-and-blow language of `PROSE_AFTER_EXTRA`, the op reference. By the owner's
+    ruling of 2026-10-01 it lets the narrator act and speak for the player's character
+    in this scene alone; the beat's turn-log row records that (`EXEMPTIONS`).
+  * **3,000 characters** on this beat, the owner's figure: no grammar `maxLength`
+    (it cannot compile past ~2,000), a token budget instead, and a reply the budget
+    cuts off salvaged to its last whole sentence (`narration_from_cut_reply`).
+  * **a note at the end** of the last message (`prompts.intimate_note`).
   * **the table's own passages as example turns**, from ONE file in the data folder that
     the owner writes: `<data dir>/homebrew/style/intimate.txt` — on the owner's machine
     `C:\\Users\\natha\\AppData\\Local\\PathfinderGM\\homebrew\\style\\intimate.txt`
@@ -78,20 +83,27 @@ from django.conf import settings
 
 # How many of the owner's passages are shown in one beat, and how much in all. Three
 # because one passage is copied and three varied ones are a register
-# (`CARRY_ON_EXAMPLES` shows three for the same reason). The total, 5,400, is under half
-# the 13,634 characters of worked examples it replaces, so `prompts.pack` never has to
-# drop the scene's history to make room for it. A file holding more than fits is not
-# cut: whole passages are chosen, and the choice ROTATES with the beat (`select`), so
-# every passage the owner wrote is shown over a scene and no one passage is the only
-# one the model ever learns from.
+# (`CARRY_ON_EXAMPLES` shows three for the same reason). The total, 9,000 — three at the
+# beat's own length — is still under the 13,634 characters of worked examples it
+# replaces, and the intimate briefing is 1,700 characters where the turn briefing it
+# replaces is 13,103, so `prompts.pack` has more room for the scene's history on this
+# beat than on any other. A file holding more than fits is not cut: whole passages are
+# chosen, and the choice ROTATES with the beat (`select`), so every passage the owner
+# wrote is shown over a scene and no one passage is the only one the model learns from.
 MAX_PASSAGES = 3
-TOTAL_CHARS = 5400
-# The grammar's ceiling on the narration string (`prompts.GRAMMAR_MAXLENGTH_CEILING`). A
-# demonstration longer than the model is allowed to write teaches a length the sampler
-# then cuts mid-word (item 6, 2026-09-30), so a longer passage is flagged in the turn
-# log — and still shown whole: a passage cut in the middle would teach a scene that
-# stops in the middle.
-PASSAGE_CHARS = 1800
+TOTAL_CHARS = 9000
+# The most the narrator writes on this beat (`prompts.INTIMATE_LENGTH`, the owner's
+# 3,000). A demonstration longer than that teaches a length the token budget then cuts,
+# so a longer passage is flagged in the turn log — and still shown whole: a passage cut
+# in the middle would teach a scene that stops in the middle.
+PASSAGE_CHARS = 3000
+# What this beat is exempt from, recorded on its turn-log row: the owner's ruling of
+# 2026-10-01 that the narrator may act and speak for the player's character here (a rule
+# only the prompt ever held), and the three fight checks the 2026-10-01 audit measured
+# misreading the scene's own sentences.
+EXEMPTIONS = ("acts and speaks for the player's character (owner's ruling, 2026-10-01)",
+              "undeclared-blow check", "body-condition claims", "alive-and-unhurt review",
+              "grammar maxLength (bounded by the token budget instead)")
 # What a passage is shown answering when the owner gave no "> " line of their own. A
 # generic continuation, deliberately: it names no act and nobody, so it can neither
 # teach the model a particular move nor put words in the player's mouth, and it reads
@@ -116,13 +128,12 @@ HEADER = """\
 # - No names. A name in here leaks into play, and the game will flag it as a person
 #   who does not exist. Write "she", "he", "they", "you".
 # - Keep the setting neutral: no particular room, town or weather to copy.
-# - Keep each passage under about 1,500 characters (about 250 words). The narrator
-#   can write at most 1,800; a longer example teaches a length it will be cut at.
-# - Write it as the game narrates, to the player as "you" -- but let the narrator
-#   describe and the OTHER person speak and act. A passage where the narrator speaks
-#   or decides for "you" teaches it to act for the player.
+# - Keep each passage under about 3,000 characters (about 500 words): the most the
+#   narrator writes on one of these beats. A longer example teaches a length it
+#   will be cut at.
+# - Write it as the game narrates, to the player as "you".
 #
-# How many: as many as you like. Up to 3 are shown on any one beat, about 5,400
+# How many: as many as you like. Up to 3 are shown on any one beat, about 9,000
 # characters in all, and which ones turns over from beat to beat so they all get used.
 # Problems (a passage too long, a name that recurs) are noted in the game's turn log.
 #
@@ -295,6 +306,49 @@ def read_demonstrations(beat: int = 0) -> Demonstrations:
     return out
 
 
+# --- a reply the token budget cut off -------------------------------------------------------
+
+_NARRATION_KEY = re.compile(r'"narration"\s*:\s*"')
+
+
+def narration_from_cut_reply(raw: str) -> str:
+    """The narration out of a JSON reply the token budget ended mid-string — "" when
+    there is none to take.
+
+    Only the intimate beat needs this: its schema has no `maxLength`
+    (`prompts.prose_schema(unbounded=True)`), so the string can be open when
+    `num_predict` runs out, and `json.loads` then fails the whole reply — "Unterminated
+    string", which lost 1,068 characters of good prose on 2026-09-04 (`prose_schema`'s
+    docstring). The string is read up to its closing quote or the end of the reply,
+    escapes and all, and the caller trims it to its last whole sentence
+    (`narration.trim_unfinished`)."""
+    import json
+
+    m = _NARRATION_KEY.search(str(raw or ""))
+    if not m:
+        return ""
+    body = raw[m.end():]
+    out, i = [], 0
+    while i < len(body):
+        ch = body[i]
+        if ch == chr(92):                       # a backslash: an escape, kept whole
+            if i + 1 >= len(body):
+                break                           # cut between the backslash and its pair
+            if body[i + 1] == "u" and i + 6 > len(body):
+                break                           # cut inside a \\uXXXX
+            out.append(body[i:i + (6 if body[i + 1] == "u" else 2)])
+            i += 6 if body[i + 1] == "u" else 2
+            continue
+        if ch == '"':
+            break
+        out.append(ch)
+        i += 1
+    try:
+        return json.loads('"' + "".join(out) + '"').strip()
+    except ValueError:
+        return ""
+
+
 # --- detection ----------------------------------------------------------------------------
 
 # The player's line asking for intimacy, in words softer than `narration.intimate`'s.
@@ -439,6 +493,7 @@ class Decision:
                 "demos": len(demo.examples) if demo else 0,
                 "demo_chars": demo.chars if demo else 0,
                 **({"on_file": demo.on_file} if demo else {}),
+                **({"exempt": list(EXEMPTIONS)} if self.fired else {}),
                 **({"skipped": list(demo.skipped)} if demo and demo.skipped else {}),
                 **({"warnings": list(demo.warnings)} if demo and demo.warnings else {})}
 

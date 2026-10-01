@@ -1884,28 +1884,42 @@ def content_line(fade: bool = False) -> str:
             "replace what the people were doing with the room's weather.\n")
 
 
-# How long the intimate passage is asked to run. The grammar closes the narration string
-# at GRAMMAR_MAXLENGTH_CEILING (1,800) whatever is asked; asking for a little under it
-# leaves the string room to end on a sentence instead of being closed mid-word by the
-# sampler, which `trim_unfinished` then has to cut back (item 6, 2026-09-30). What held
-# the owner's beats to 665 and 709 characters was not a cap at all — it was the worked
-# examples, none of them over 822 characters, which this beat no longer shows.
-# 1,700 was the first figure, and the first live briefed beat (2026-10-01) ran straight
-# to the 1,800 ceiling and was closed mid-sentence, losing its hand-back with the cut;
-# models overshoot a stated length. 1,400 leaves the overshoot a margin. One sample —
-# re-measure on the owner's own passages, which set the length by example.
-INTIMATE_LENGTH = 1400
+# How long the intimate passage is asked to run: 3,000 characters, the owner's figure
+# (2026-10-01, "can we raise the limit for the text generation to 3000"). What held the
+# owner's original beats to 665 and 709 characters was not a cap at all — it was the
+# worked examples, none of them over 822 characters, which this beat no longer shows.
+#
+# 3,000 cannot go through the grammar: `maxLength` stops compiling between 2,000 and
+# 2,100 on both models measured (GRAMMAR_MAXLENGTH_CEILING). So this beat's schema has
+# no `maxLength` (`prose_schema(unbounded=True)`) and is bounded by the token budget
+# instead, `INTIMATE_NUM_PREDICT`: 3,000 characters is about 800 tokens at the measured
+# 3.8 characters a token, and the JSON object around it and the suggestions take the
+# rest. A reply the budget does cut off is salvaged and trimmed to its last whole
+# sentence (`intimate.narration_from_cut_reply`, `narration.trim_unfinished`).
+#
+# History, so the number is not re-learned: 1,700 was asked first under the 1,800
+# grammar ceiling, and the first live briefed beat ran straight to the ceiling and was
+# closed mid-sentence, losing its hand-back; 1,400 followed, before the owner raised it.
+INTIMATE_LENGTH = 3000
+INTIMATE_NUM_PREDICT = 1100
 
 # The prose briefing for ONE kind of beat: an intimate scene between adults at a table
 # whose content rule is "explicit", detected in code (gm/intimate.py). It replaces the
 # turn briefing for that beat rather than adding to it, because the measured failure was
 # a 350-character line losing to everything around it (13,103 characters of briefing,
 # 13,634 of restrained worked examples). What it keeps is the game's laws: the engine's
-# decisions stand and carry no number, nobody does what the player did not say, names
-# come from the brief, the hand-back. What it drops is what fights "plainly, in the
-# body": the four moves (whose PUSH is "the weather turns, a door closes" — the room's
-# fire written in place of the people), the shapes, the wound-and-blow language, and the
-# op reference this call never uses.
+# decisions stand and carry no number, names come from the brief, the hand-back. What it
+# drops is what fights "plainly, in the body": the four moves (whose PUSH is "the weather
+# turns, a door closes" — the room's fire written in place of the people), the shapes,
+# the wound-and-blow language, and the op reference this call never uses.
+#
+# And one law it relaxes, by the owner's ruling of 2026-10-01 ("yes it can speak for the
+# character"): in this scene, and only here, the narrator may write what the player's
+# character does and says beyond the player's own line. Everywhere else the turn
+# briefing's "The player says only what their character does" stands. Measured the same
+# day: no check in the pipeline catches the narrator speaking for the player on ANY beat
+# — that rule has only ever been the prompt's — so the relaxation is this paragraph, and
+# the beat's turn-log row records it (`intimate.EXEMPTIONS`).
 #
 # Deliberately quotes none of the soft phrases it is written against: the shape of a
 # prompt becomes the shape of the output, and a phrase put in front of the model, even
@@ -1921,10 +1935,10 @@ and the words the two of them say to each other. Write the act itself. Do not pu
 metaphor, a euphemism or a comparison where the act should be; do not cut away, summarise \
 or skip ahead; do not turn from the people to the room, the light or the fire.
 
-The player's character does what the player wrote, as far as the player took it, and no \
-further. Write how it happens and how the other person answers it — they have wants of \
-their own and act on them, in their own body and their own words. Never decide for the \
-player's character what the player did not say: a feeling, a word, a next step.
+In this scene you may write what the player's character does and says, carrying on from \
+the player's line in the direction it points: their hands, their body, their words. The \
+other person has wants of their own and acts on them, in their own body and their own \
+words.
 
 What the engine decided is what happened. Do not contradict it, do not add a roll, and \
 never write a number.
@@ -1958,9 +1972,10 @@ def intimate_note(shown: bool) -> str:
             if shown else "")
     return (f"THIS BEAT: an intimate scene between adults, which this table writes "
             f"explicitly. Write it plainly and in the body,{like} the act itself and not "
-            f"a figure of speech for it, as far as the player's line takes it and no "
-            f"further. Carry on what happened before, not the way it was worded. Up to "
-            f"about {INTIMATE_LENGTH:,} characters, then ask what they do.")
+            f"a figure of speech for it, carrying on from the player's line — you may "
+            f"write what their character does and says. Carry on what happened before, "
+            f"not the way it was worded. Up to about {INTIMATE_LENGTH:,} characters, "
+            f"then ask what they do.")
 
 
 CONSEQUENCE_BRIEFING = """You are the Game Master, narrating what just happened.
@@ -2268,8 +2283,16 @@ NARRATION_REPAIR_EXAMPLE = {
 }
 
 
-def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
+def prose_schema(min_chars: int = 0, max_chars: int = 0, *,
+                 unbounded: bool = False) -> dict:
     """The one-field schema for every call that only writes prose.
+
+    `unbounded=True` puts NO `maxLength` in the grammar, whatever `max_chars` says — the
+    one way past GRAMMAR_MAXLENGTH_CEILING, and an explicit flag so that nobody reaches it
+    by passing a big number: `max_chars` is still clamped to the ceiling everywhere.
+    Used by the intimate scene's beat alone (the owner asked for 3,000 characters,
+    2026-10-01), which bounds its reply by `num_predict` instead and salvages a reply
+    the budget cut off (`intimate.narration_from_cut_reply`).
 
     Honest about what it buys, because the first version of this docstring overclaimed
     and the call-site audit corrected it. `as_json=True` already puts a JSON grammar at
@@ -2297,7 +2320,7 @@ def prose_schema(min_chars: int = 0, max_chars: int = 0) -> dict:
     # in four; `cut_schema_bleed` trimmed each back to 703-791 characters, under the
     # floor it was meant to guarantee. The floor is `narration.review`'s to report
     # and the repair call's to fix, which lengthened all three to 1,469-1,579.
-    if max_chars:
+    if max_chars and not unbounded:
         narration["maxLength"] = min(int(max_chars), GRAMMAR_MAXLENGTH_CEILING)
     # `suggestions` and `intents` are admitted and never read, because the prose call
     # is shown the TURN prompt — twelve worked examples, every one of them a three-key
