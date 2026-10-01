@@ -3,7 +3,7 @@
     "Starts on the road outside a settlement (rules/openings.py; docs/design-c-starts.md 4.5; the owner's answer Q24, 2026-09-28: the caravan attack and the road-in are the first road set). The envelope is core.json's.",
     "where.at = road stands the party at one of the settlement's road heads, 'the road to X' where a route the world wrote leaves it (Lane B's ring, rules/outskirts.py), drawn from the story seed; a settlement with no road out cannot host one. The town is ahead of them, never around them.",
     "The owner's own example, 2026-09-28: 'walking toward a town and as i crest a hill i see a caravan under attack. this on the road scenario would be the best start and its simple.' The caravan hand draws it six times as often as anyone else (fits.backgrounds).",
-    "The caravan's attackers are what the ground holds (fight from: land): the bestiary by the road head's own biome and a CR window around the party, spent against the Core Rulebook's XP budget for an average encounter at the party's level; bandits from the codex where the book stocks nothing for that ground. $raiders in the edge is filled with what the engine staged ('two wolves'), because a document cannot know what the land will send.",
+    "The caravan's attackers are people (fight from: outlaws, 2026-09-30): bandits from the codex by the step's words, spent against the Core Rulebook's XP budget for an average encounter at the party's level, wearing the world's own outlaws' people where the world names one that raids (Pangrella's Nirkor), else the local people's. Until then they were what the ground held (from: land), and in Pangrella the land sent two ponies, side 'raiders', which the prose tried to put riders on. $raiders in the edge is filled with what the engine staged ('two raiders').",
     "The drovers are the caravan's own people: on the board, in no side, bystanders the fight is round."
   ],
   "starts": [
@@ -23,7 +23,7 @@
       "incident": [
         {"do": "bring", "slot": "drovers", "label": "the drover",
          "words": ["teamster", "drover", "carter", "commoner"], "count": "two", "zone": "near"},
-        {"do": "fight", "slot": "raiders", "label": "the raider", "from": "land",
+        {"do": "fight", "slot": "raiders", "label": "the raider", "from": "outlaws",
          "words": ["bandit", "raider", "brigand"], "count": "two", "zone": "near"}
       ],
       "hand_off": {"at": "fight",
