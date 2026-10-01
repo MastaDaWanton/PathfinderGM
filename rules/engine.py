@@ -7155,7 +7155,12 @@ class Engine:
 
     def _resolve_dying(self, a: Actor) -> list[str]:
         """One dying creature's story ends off-screen: stable, or gone."""
-        floor = -a.ability_score("con")
+        floor = a.death_floor()
+        if states.destroyed_at_zero(a):
+            # A construct or undead creature saved "dying" before 2026-10-01 does not
+            # bleed and does not stabilise: it was destroyed when it reached 0.
+            a.apply_hp_state()
+            return [f"{a.name} " + _DESTROYED_SAID + "."] if a.is_dead else []
         while a.hp > floor and a.has_condition("dying"):
             if self.dice.roll("1d100", label="stabilise",
                               visibility="hidden").total <= 10:
@@ -14578,6 +14583,11 @@ class Engine:
             if key == "disabled" and who is not None \
                     and who.has_state("state.down.unconscious"):
                 line = "{name} has no hit points left and lies unconscious."
+            # A construct or an undead creature is not "dead" in the Bestiary's words but
+            # "destroyed", and the difference is what the player can do next: there is no
+            # body to save and nothing to repair (Ultimate Magic p.113).
+            if key == "dead" and states.destroyed_at_zero(who):
+                line = "{name} " + _DESTROYED_SAID + "."
             said.append(line.format(name=who.name if who else "they"))
         return (" " + " ".join(said)) if said else ""
 
@@ -14764,6 +14774,8 @@ _STATE_SAID = {
     "unconscious": "{name} is unconscious",
     "disabled": "{name} is disabled: still standing, but any real effort now costs blood",
 }
+# The Bestiary's word for a construct or undead creature at 0 hit points.
+_DESTROYED_SAID = "is destroyed"
 
 
 def _ward_tell(scene: Scene, e: dict) -> str:
