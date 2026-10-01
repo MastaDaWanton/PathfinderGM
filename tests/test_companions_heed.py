@@ -23,6 +23,14 @@ So there is no order button. What was measured before this file:
   5. **The closing check read an ally as an attacker** (same replay): Bob "charges
      across the distance" at the thug, the check cut it as Bob reaching the player, and
      the beat ended "The Bob is still 15 feet from you."
+  6. **Out of a fight nobody decided.** "Drover, sneak up behind that thug and lift his
+     purse for me" was planned as the player's `say` and `narrate_only`, and the page had
+     the timid drover "move as if he were part of the shadows"; on a rerun the planner
+     wrote the drover's Stealth check itself and the page said "He doesn't hesitate".
+     Now the words spoken TO a companion get their own answer (a targeted call), which
+     on the replay refused, in character: "That's a one-way ticket to a broken nose."
+  7. **An answer handed to the prose as a fact never reached the page**: Bob's "moves to
+     the door, standing perfectly still" — the beat did not mention Bob at all.
 """
 from __future__ import annotations
 
@@ -381,3 +389,106 @@ class TestTheBriefAndTheProse:
 
         if s.has_grid and s.distance_between(thug.ref, pc.ref) is not None:
             assert closing_claimed._gap(Theirs) is not None
+
+
+# --- 6. out of a fight: the words spoken TO them get their own answer -----------------------
+
+class TestSpokenTo:
+    def test_who_the_words_are_spoken_to(self):
+        """Detected in code, never asked: a vocative, or a verb of telling before the
+        name. Words ABOUT them are the narrator's ordinary business."""
+        from gm import companions
+
+        s, e, pc = _party()
+        bob = _owned(s, e)
+        drover = _friend(s, e, name="a young drover")
+        stranger = instantiate("guildhand", scene=s, name="Hob")
+        s.add(stranger)
+        said = companions.addressed
+        assert said(s, "Bob, keep watch by the door.") == [bob.ref]
+        assert said(s, 'I shout: "Bob, attack the thug!"') == [bob.ref]
+        assert said(s, "I tell Bob to keep watch.") == [bob.ref]
+        assert said(s, '"Drover, sneak up behind that thug."') == [drover.ref]
+        assert said(s, "I look at Bob and sigh.") == []
+        assert said(s, "Hob, fetch me a drink.") == []      # a stranger is not ordered about
+        assert sorted(said(s, '"Bob, the door! Drover — stay close."')) == sorted(
+            [bob.ref, drover.ref])
+
+    def test_out_of_a_fight_the_plan_leaves_their_answer_to_them(self):
+        """Defect 6: the planner wrote the timid drover's Stealth check itself."""
+        from gm import companions
+
+        s, e, pc = _party()
+        drover = _friend(s, e, name="a young drover", timid=True)
+        notes = []
+        raw = [{"op": "check", "actor": drover.ref,
+                "params": {"skill": "stealth", "dc": {"band": "average"}}},
+               {"op": "say", "params": {"words": "Drover, lift his purse."}}]
+        kept = companions.on_their_own_turn(raw, s, notes=notes,
+                                            addressed_refs=[drover.ref])
+        assert [r["op"] for r in kept] == ["say"] and notes
+
+    def test_an_answer_left_off_the_page_is_put_back(self):
+        """Defect 7. Before the closing question, in the answer's own words; and not when
+        the beat already shows them — "the drover's eyes" names the drover."""
+        from gm import companions
+
+        s, e, pc = _party()
+        bob = _owned(s, e)
+        drover = _friend(s, e, name="a young drover")
+        beat = "The thug leans in, grinning. What do you do?"
+        text, put = companions.answers_on_the_page(
+            beat, [(bob, "Bob moves to the door and stands still.")])
+        assert put == ["Bob"]
+        assert text == ("The thug leans in, grinning. Bob moves to the door and stands "
+                        "still. What do you do?")
+        text, put = companions.answers_on_the_page(
+            "The young drover's eyes dart to the door.", [(drover, "They refuse.")])
+        assert put == []
+
+    def test_the_answer_examples_fill_with_real_people(self):
+        from gm import companions, prompts
+
+        s, e, pc = _party()
+        bob = _owned(s, e)
+        msgs = prompts.companion_answer_messages(
+            "BRIEF", bob.ref, bob, companions.answer_facts(s, bob, "Bob, keep watch."),
+            other=("c9", "merchant"), pc_ref=pc.ref)
+        joined = " ".join(m["content"] for m in msgs[1:])
+        for token in ("{Self}", "{Companion}", "{Other}", "{Other Ref}", "{Pc}"):
+            assert token not in joined, token
+        assert "Bob, keep watch." in msgs[-1]["content"]
+        replies = [json.loads(m["content"]) for m in msgs if m["role"] == "assistant"]
+        ops = [i["op"] for r in replies for i in r["intents"]]
+        assert {"narrate_only", "say", "check"} <= set(ops)
+        for r in replies:
+            for i in r["intents"]:
+                assert "dc" not in (i.get("params") or {})   # a try is opposed, never a DC
+
+    def test_the_answer_is_held_to_their_own_acts_and_no_dc(self, monkeypatch):
+        """The model decides; the engine holds the shape: a DC of the model's is sent back
+        with the fix named, and an act with no actor is theirs."""
+        from gm import agent as agent_mod, client
+
+        s, e, pc = _party()
+        drover = _friend(s, e, name="Wil", timid=True)
+        replies = iter([
+            {"narration": "Wil edges over.", "intents": [
+                {"op": "check", "actor": drover.ref,
+                 "params": {"skill": "stealth", "dc": 15}}]},
+            {"narration": "Wil does not move from the wall.", "intents": [
+                {"op": "say", "params": {"words": "Not a chance.", "to": pc.ref,
+                                         "quoted": True}}]},
+        ])
+
+        def chat(messages, model, *a, **kw):
+            return client.Reply(json.dumps(next(replies)), 0.1, model)
+
+        monkeypatch.setattr(agent_mod.client, "chat", chat)
+        gm = agent_mod.GMAgent(WORLD, e)
+        plan = gm.companion_answer(drover.ref, "Wil, lift his purse.",
+                                   location=WORLD.get(TOWN))
+        assert [(i.op, i.actor) for i in plan.intents] == [("say", drover.ref)]
+        assert any("never a DC" in r for r in plan.rejections)
+        out = e.run(plan.intents)
+        assert 'Wil says to PC: "Not a chance."' in out.outcomes[0].tell
