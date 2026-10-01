@@ -34,22 +34,72 @@ def scene():
     return s
 
 
-def test_a_first_swing_opens_the_battle_and_stops(scene):
-    """The attack finds no fight, so it makes one and goes no further: encounter
-    live, grid laid, initiator holding the turn, no roll asked for, nothing hurt."""
+def test_a_first_swing_opens_the_battle_and_asks_for_the_players_die(scene):
+    """The attack finds no fight, so it makes one — encounter live, grid laid, the
+    initiator holding the turn — and then the declared blow waits on the PLAYER's own d20.
+
+    It used to stop there, the swing deferred to the combat panel. Overturned by the
+    owner's play, 2026-10-01: "i shot an arrow and did not get a to hit roll or dmg roll,
+    the action was narrated and no dmg was dealt then combat starts". What 2026-08-27's
+    defect forbids still holds: no die is rolled for the player in secret, and nothing is
+    hurt before their roll."""
     engine = Engine(scene, Dice(seed=5))
     thug_hp = scene.actors["c1"].hp
+    scene.zones["c1"] = "engaged"           # within reach: the blow can land from here
     res = engine.run(engine.validate([
         {"op": "attack", "actor": "pc", "target": "c1", "because": "she swings"}]))
 
     assert scene.in_encounter and scene.grid is not None
     assert scene.current_ref() == "pc", "the initiator keeps the turn they declared"
-    assert not scene.awaiting, "no die was offered — the swing did not happen"
-    assert scene.actors["c1"].hp == thug_hp
+    assert scene.awaiting and scene.awaiting["label"].startswith("Attack with"), \
+        "the declared blow asks for the player's own die"
+    assert scene.actors["c1"].hp == thug_hp, "nothing is hurt before the player rolls"
     out = res.outcomes[0]
     assert out.op == "attack" and not out.rolls
     assert any(e.get("kind") == "battle_joined" for e in out.effects)
     assert "Battle is joined" in out.tell and "the thug" in out.tell
+
+
+def test_the_players_spell_damage_is_the_players_to_roll(scene):
+    """The owner's Magic Missile, 2026-10-01: "no damage dice user roll for the spell I
+    assume the engine rolled them but the user should be doing that". `cast` defaulted to
+    hidden, so a spell the planner proposed was rolled by the engine (the save shows the
+    roll labelled "Magic Missile — damage", visibility hidden). The player's cast is the
+    player's dice at every door it comes through: the plan (repaired here, whatever the
+    model wrote), the combat panel and the Spells tab (both now send `visibility:
+    player`). An NPC's cast is left alone; the engine's own doors keep their dice."""
+    from pathlib import Path
+
+    from gm import judgement
+    from rules.intents import parse
+
+    assert parse({"op": "cast", "actor": "pc", "params": {"spell": "magic-missile"}}
+                 ).visibility == "hidden", "the parser's default, which is the defect"
+    raw = [{"op": "cast", "actor": "pc", "visibility": "hidden",
+            "params": {"spell": "magic-missile", "at": "c1"}},
+           {"op": "cast", "params": {"spell": "magic-missile", "at": "c1"}},
+           {"op": "cast", "actor": "c1", "params": {"spell": "magic-missile", "at": "pc"}}]
+    out = judgement.the_players_spell_dice(raw, "I cast magic missile", scene)
+    assert [r.get("visibility") for r in out] == ["player", "player", None]
+    views = Path("play/views.py").read_text(encoding="utf-8")
+    assert views.count('"visibility": "player"') >= 2, "the panel and the Spells tab"
+
+
+def test_an_arrow_landing_before_any_roll_is_caught():
+    """The owner's beat, 2026-10-01, on a turn whose only blow was the battle joined: the
+    landing check knew swords and fists and not a missile, so the arrow "strikes the
+    small, twitching shape" and the spy "is knocked backward ... its brass casing
+    buckling" shipped with no die rolled."""
+    from gm import narration
+
+    beat = ("The arrow whistles through the dry air, a streak of gray against the pale "
+            "stone. It strikes the small, twitching shape with a sharp ping of metal on "
+            "metal. The spy is knocked backward into the crevice, its brass casing "
+            "buckling and sparking as it skitters across the rocks. The dirt of the "
+            "plateau kicks up in a small cloud.")
+    early = narration.premature_blows(beat, [{"joined": True}])
+    assert len(early) == 2 and "whistles" not in " ".join(early)
+    assert not narration.premature_blows(beat, [{"joined": True}, {"rolled": True}])
 
 
 def test_the_swing_riding_begin_encounter_is_deferred_too(scene):

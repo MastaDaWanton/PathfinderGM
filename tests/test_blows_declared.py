@@ -48,12 +48,23 @@ def test_a_blow_the_plan_declares_is_rolled_before_the_prose(table):
     assert res.outcomes[2].rolls and s.distance_between(thug.ref, "pc") == 5
 
 
-def test_the_players_own_first_swing_still_waits_for_their_dice(table):
+def test_the_players_own_first_swing_waits_for_their_dice_in_the_same_turn(table):
+    """Not deferred to the panel any more (owner, 2026-10-01: an arrow shot with "no to
+    hit roll or dmg roll"): the fight is joined, then the declared blow asks for the
+    player's d20 — rolled by them, never for them — and lands when they roll."""
     s, e, thug = table
+    from tests._board import face_to_face
+
+    face_to_face(s, "pc", thug.ref)         # within reach: the blow can land from here
     res = e.run(e.validate([{"op": "attack", "actor": "pc", "target": thug.ref,
                              "because": "t"}]))
-    assert [o.op for o in res.outcomes] == ["attack"]
-    assert "Battle is joined" in res.outcomes[0].tell
+    assert res.outcomes[0].op == "attack" and "Battle is joined" in res.outcomes[0].tell
+    assert res.awaiting and res.awaiting["label"].startswith("Attack with")
+    res = e.resume(20)
+    while res.awaiting:
+        res = e.resume(int(res.awaiting.get("max", 6)))
+    swung = [o for o in res.outcomes if o.op == "attack" and o.rolls]
+    assert len(swung) == 1, [o.tell for o in res.outcomes]
 
 
 def test_struck_first_is_one_blow_not_two(table):

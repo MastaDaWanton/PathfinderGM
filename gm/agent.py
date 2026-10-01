@@ -582,6 +582,7 @@ class GMAgent:
                 raw = judgement.aim_the_cast(
                     raw, player_input, self.engine.scene,
                     self.reading if isinstance(self.reading, dict) else None)
+                raw = judgement.the_players_spell_dice(raw, player_input, self.engine.scene)
                 raw = judgement.inject_checks(raw, player_input, self.engine.scene)
                 # After inject_checks so its product is covered too: a check with
                 # neither dc nor opposed_by is refused by validation, and the "engine

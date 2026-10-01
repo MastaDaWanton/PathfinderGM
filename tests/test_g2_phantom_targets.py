@@ -194,7 +194,12 @@ def test_the_plan_loop_retries_the_dangling_ref_and_the_real_one_lands(monkeypat
         plan.rejections[0]
     assert "Kaelith Dagmar" in asked[1][-1]["content"], "the retry is told who is here"
     assert plan.refusal is None
-    outs = e.run(plan.intents).outcomes
+    # The player's own spell asks for their damage dice since 2026-10-01 (the owner's
+    # Magic Missile, "the user should be doing that"), so the roll is answered first.
+    res = e.run(plan.intents)
+    while res.awaiting:
+        res = e.resume(int(res.awaiting.get("max", 4)))
+    outs = res.outcomes
     cast = next(x for o in outs if o.op == "cast" for x in o.effects
                 if x.get("kind") == "cast")
     assert kaelith in cast["caught"] and not cast.get("no_victim")

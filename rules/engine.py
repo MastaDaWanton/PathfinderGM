@@ -2878,7 +2878,15 @@ class Engine:
             return resolution
         ref, target = opened.get("ref"), opened.get("target")
         a = self.scene.actors.get(ref)
-        if a is None or a.is_pc or target not in self.scene.actors:
+        # The player's own blow too, since the owner's play of 2026-10-01: "i ready an
+        # arrow and shoot the clockwork spy" joined the battle and stopped — no to-hit,
+        # no damage — while the prose put the arrow into the spy. "i shot an arrow and did
+        # not get a to hit roll or dmg roll". Deferring it to the combat panel was the
+        # answer to 2026-08-27's war-in-a-paragraph (every die hidden, the fight decided
+        # in one turn); a single blow rolled on the PLAYER's own die, which `_drive`
+        # suspends for exactly as a panel strike does, is not that. The encounter still
+        # forms first and the initiator still holds the turn.
+        if a is None or target not in self.scene.actors:
             return resolution
         holding = (self.scene.initiative[self.scene.turn][0]
                    if self.scene.initiative and 0 <= self.scene.turn < len(self.scene.initiative)
@@ -2896,6 +2904,12 @@ class Engine:
             self.scene, a, self.scene.actors[target],
             params.get("weapon") or a.equipped or "unarmed")
         if closing is not None and not closing[1]:
+            return resolution
+        # The player is never walked anywhere they did not say: their blow rolls now only
+        # when what they hold already reaches — the bow at the spy, the fist at the jaw.
+        # Out of reach (a thrown dagger opened at ten feet while a rapier is in hand),
+        # the blow waits for the combat panel, as every player blow used to.
+        if a.is_pc and closing is not None:
             return resolution
         try:
             blow = self.validate(([closing[0]] if closing is not None else []) + [

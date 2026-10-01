@@ -707,13 +707,11 @@ def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
     res = engine.run(engine.validate(raw, origin="author:test"))
     assert scene.zones["c1"] == "engaged"
     assert scene.distance_between("pc", "c1") == 5, "not within reach of a punch"
-    # The swing itself is DEFERRED now, not rolled: a battle that begins and resolves
-    # inside one spoken paragraph was the 2026-08-27 playtest's finding (a spawned
-    # thug fought, killed and paid out without the combat panel ever appearing). The
-    # encounter stands, the tell announces it, and the first blow is the player's to
-    # declare at the panel.
+    # The swing asks for the player's own d20 in the same turn (owner, 2026-10-01: an
+    # arrow shot with "no to hit roll or dmg roll"). What the 2026-08-27 playtest forbade
+    # still holds: nothing is rolled for the player and nobody is hurt before they roll.
     assert scene.in_encounter and scene.grid is not None
-    assert not scene.awaiting
+    assert scene.awaiting and scene.awaiting["label"].startswith("Attack")
     assert any("Battle is joined" in (o.tell or "") for o in res.outcomes)
     assert all(e.get("kind") != "damage" for o in res.outcomes for e in o.effects)
 

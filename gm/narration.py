@@ -1793,7 +1793,14 @@ _BLOW_LANDS = re.compile(
     # against his heavy jaw … He staggers back".
     r"impact of your|your (?:fist|blow|strike|punch) (?:against|lands|connects|catches|"
     r"finds|meets)|as you strike|staggers? back|head snap\w* (?:back|to the side)|"
-    r"reels? (?:back|from))\b", re.I)
+    r"reels? (?:back|from)|"
+    # A missile's landing, which none of the above knew (owner's play, 2026-10-01): "The
+    # arrow ... strikes the small, twitching shape with a sharp ping of metal on metal.
+    # The spy is knocked backward ..., its brass casing buckling and sparking."
+    r"strikes (?:the|him|her|it|its|them|home)|hits (?:the|him|her|it|its|them|home)|"
+    r"finds its mark|pierces|punches through|buries itself|sinks into|thuds? into|"
+    r"embeds itself|(?:is|are) knocked|knocked (?:back|backward|down|off)|buckling)\b",
+    re.I)
 
 
 def premature_blows(text: str, blows: list[dict] | None) -> list[str]:

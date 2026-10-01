@@ -6004,6 +6004,25 @@ def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
     }]
 
 
+def the_players_spell_dice(raw_intents, player_text: str, scene) -> list:
+    """The player's own cast rolls on the player's dice, whatever the plan wrote.
+
+    `cast` defaults to hidden (rules/intents.py OPS), so a spell the planner proposed was
+    rolled by the engine: the owner's Magic Missile, 2026-10-01 — the save records its
+    damage as "Magic Missile — damage", visibility hidden — and "no damage dice user roll
+    for the spell I assume the engine rolled them but the user should be doing that". The
+    PC's casts here; the engine demotes anything a non-PC actor wrote."""
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    mine = {"", "pc", str(getattr(pc, "ref", "pc"))}
+    out = []
+    for r in raw_intents or []:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "cast" \
+                and str(r.get("actor") or "") in mine:
+            r = dict(r, visibility="player")
+        out.append(r)
+    return out
+
+
 def aim_the_cast(raw_intents, player_text: str, scene, reading=None) -> list:
     """The player's own cast that the plan left unaimed takes its aim from the player's
     words, through the reader a typed and an attached cast already share

@@ -357,7 +357,8 @@ def cast_act(request):
     try:
         resolution = engine.run(engine.validate(
             [{"op": "cast", "actor": pc.ref, "because": "the spells tab",
-              "params": params}]))
+              # The player's own dice, as at the panel (owner, 2026-10-01).
+              "visibility": "player", "params": params}]))
     except (IntentError, ValueError, KeyError) as exc:
         scene.restore(undo)
         c.transcript.pop()
@@ -2020,6 +2021,9 @@ def combat_act(request):
             "because": label or "the combat panel",
             "params": {k: v for k, v in (a.get("params") or {}).items()
                        if isinstance(k, str)},
+            # The player's spell is the player's dice: `cast` defaults to hidden, so a
+            # Magic Missile from the panel was rolled by the engine (owner, 2026-10-01).
+            **({"visibility": "player"} if op == "cast" else {}),
         })
 
     engine = c.engine()
