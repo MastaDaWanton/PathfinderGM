@@ -286,6 +286,14 @@ class TestWhatThePlayerSaysToIt:
         tr.append({"who": "player", "text": "Go on, I'm listening."})
         assert confide.heard(s, tr, "Go on, I'm listening.", len(tr))["invited"] == [wil.ref]
 
+    def test_a_question_to_nobody_in_particular_is_not_an_invitation(self):
+        from gm import confide
+
+        s, e, wil, tr = self._owed()
+        tr.append({"who": "player", "text": "Shall we find somewhere to eat?"})
+        heard = confide.heard(s, tr, "Shall we find somewhere to eat?", len(tr))
+        assert heard["invited"] == []
+
     def test_a_brush_off_postpones_it(self):
         """"not now", "later": the share waits POSTPONE turns, and is not lost."""
         from gm import confide

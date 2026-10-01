@@ -251,8 +251,12 @@ def heard(scene, transcript, player_text: str, beat: int) -> dict:
             out["brushed"].append(ref)
             continue
         # Asked, not merely addressed: "Wil, keep watch by the door" is an order, and
-        # their ordinary answer's (`views._companions_answer`); the share stays owed.
-        if _INVITE.search(text):
+        # their ordinary answer's (`views._companions_answer`); the share stays owed. A
+        # bare question counts only when it is put to them by name — "shall we eat?"
+        # straight after their lead-in is not "what is it?".
+        asked = _INVITE.search(text) if ref in called \
+            else _INVITE.search(text.replace("?", ""))
+        if asked:
             gate = confiding.gate(scene.actors[ref])
             if gate == confiding.SHARE:
                 out["invited"].append(ref)
