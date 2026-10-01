@@ -1686,7 +1686,40 @@ def say(request):
     c.transcript.append(beat)
     if place is not None:
         return _the_way_there(c, place, text, typed, acting, claim, beat)
-    return _plan_and_run(c, text, acting, claim, attached)
+    return _keep_the_spell(c, acting, _plan_and_run(c, text, acting, claim, attached))
+
+
+def _keep_the_spell(c, acting: tuple, resp):
+    """The spell chip stays when the turn did not cast it, with the engine's reason.
+
+    The register's deferred row ("a spell refused mid-turn is spent"): `_dry_cast`
+    answers what it can before any model call, but a cast the engine refuses while the
+    turn RUNS — no slot left after an earlier cast in the same list, a plan that never
+    carried it, a first harmful cast that opened a fight and is "still to be spoken"
+    (`Engine._cast_gate`) — came back 200, and the page cleared the chip as though the
+    spell had gone. The words did run, so they are not put back; the chip is, under the
+    same `unfinished` field a place chip's unfinished move uses, with the engine's own
+    sentence for why."""
+    chip = next((a for a in acting or () if isinstance(a, dict) and a.get("kind") == "spell"),
+                None)
+    if chip is None or getattr(resp, "status_code", 0) != 200 or c.ended \
+            or c.scene.awaiting:
+        return resp
+    turn = next((e for e in reversed(c.turn_log or []) if e.get("kind") == "turn"), None)
+    casts = [o for o in (turn or {}).get("outcomes") or [] if str(o.get("op", "")) == "cast"]
+
+    def cast_happened(o) -> bool:
+        return str(o.get("status") or "resolved") == "resolved" and not any(
+            isinstance(e, dict) and e.get("kind") == "battle_joined"
+            for e in o.get("effects") or [])
+
+    if any(cast_happened(o) for o in casts):
+        return resp
+    why = next((str(o.get("tell") or "") for o in casts if o.get("tell")), "")
+    name = str(chip.get("name") or chip.get("id") or "The spell")
+    return _with(resp, {"unfinished": {
+        "text": "", "keep_chip": True, "why": why,
+        "line": f"{name} was not cast; it is still attached."}})
 
 
 def _plan_and_run(c, text: str, acting: tuple, claim: str = "", attached=None):
