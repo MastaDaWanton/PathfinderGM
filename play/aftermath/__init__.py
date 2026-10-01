@@ -171,12 +171,19 @@ def _said_kept(before: list[dict], after, stage: str) -> str:
     with no tags at all has no record to fill, and "a man in a stained leather apron" who
     spoke twice to the player was left with nothing to carry his lines. Everything else is
     the page's record of who said which line, and a bookkeeping step does not get to
-    rewrite it."""
+    rewrite it.
+
+    And a third, after the 2026-09-30 playtest (item 1): ADDING a record for a line the
+    page attributes to somebody already on the board ("'…,' the cage owner says"), which
+    says so with `"from": "page"` and has no `"made"` — nobody was made. 6 of 43 real NPC
+    lines were missing from the log because the attribution found the speaker and had no
+    door to write the line through."""
     after = list(after or [])
     if stage == "people" and len(after) > len(before):
         extra = after[len(before):]
-        if all(isinstance(r, dict) and r.get("who") and r.get("made") == r.get("who")
-               and r.get("from") == "page" and str(r.get("line") or "").strip()
+        if all(isinstance(r, dict) and r.get("who") and r.get("from") == "page"
+               and r.get("made", r.get("who")) == r.get("who")
+               and str(r.get("line") or "").strip()
                for r in extra):
             after = after[:len(before)]
     if len(after) != len(before):
@@ -284,7 +291,22 @@ def after_opening(campaign) -> list[dict]:
     rows: list[dict] = []
     # The opening has no agent, so the "people" stage reads a copy of the beat's own
     # records as its live list, and what it fills in is written back onto the beat.
-    live = [dict(r) for r in (beat.get("said") or [])]
+    #
+    # And the records the written opening's own speaker tags made (`opening_prose.write`
+    # keeps them on the campaign): they were thrown away, so the opening's lines never
+    # reached the log (2026-09-30 playtest, item 1). Only the lines that still stand on
+    # the page — the opening is groomed after the tags are lifted.
+    from gm import speech
+
+    kept = list(beat.get("said") or [])
+    if not kept:
+        lines = speech.lines(text)
+        kept = [dict(r) for r in (getattr(campaign, "_opening_said", None) or [])
+                if isinstance(r, dict) and r.get("line")
+                and any(speech.speaker([r], ln) for ln in lines)]
+        if kept and at is not None:
+            transcript[at]["said"] = [dict(r) for r in kept]
+    live = [dict(r) for r in kept]
     rows += run("people", context("people", "opening", campaign, engine=engine, text=text,
                                   said=live))
     if at is not None and live != list(beat.get("said") or []):

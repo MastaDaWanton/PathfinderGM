@@ -5,7 +5,9 @@ as grunting or laughing". Every beat, after it is on the page, this step appends
 `Scene.conversation_log` (docs/fix-interfaces.md §2.4, the Entry of §2.10):
 
   * the NPC lines the prose call tagged and `_finish` kept on the beat (its `said`) — so a
-    line a groomer cut is never logged, because it was never kept;
+    line a groomer cut is never logged, because it was never kept — and the untagged
+    lines the page itself attributes to somebody on the board (`speaker_real`, "from":
+    "page"; 6 of 43 real lines were missing before them, 2026-09-30 item 1);
   * the player's own QUOTED words (`speech.lines(player_text)`). Owner, Q43: quoted words
     only — "I ask him about the girl" is an action, not a line. Continue carries no words,
     so it records nothing;
@@ -147,7 +149,9 @@ def step(ctx) -> list[dict]:
                   len(text))
         new.append((at, {"t": t, "beat": ctx.beat_index, "who": who, "name": name_of(who),
                          "to": str(rec.get("to") or ""), "kind": "line", "text": line,
-                         "among": list(among), "src": "tag"}))
+                         "among": list(among),
+                         # A line the page attributed (`speaker_real`, no tag) says so.
+                         "src": "page" if rec.get("from") == "page" else "tag"}))
 
     for v in speech.vocalisations(text, said, people):
         if not v.get("who"):

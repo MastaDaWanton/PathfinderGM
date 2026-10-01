@@ -59,6 +59,9 @@ PLACE_NOUNS = frozenset({
     "yard", "bazaar", "temple", "shrine", "tower", "keep", "crossing", "wharf", "dock",
     "docks", "quay", "stairs", "landing", "chapel", "abbey", "guildhall", "exchange",
     "cellars", "plaza", "arcade", "colonnade",
+    # 2026-09-30, item 11: "the Great Cathedral" (the 2026-09-25 recording) and "the
+    # Velvet Veil" (Sam's save) were each half un-named. Neither word is a surname.
+    "cathedral", "veil",
 })
 
 _NOT_A_NAME = {
@@ -388,8 +391,28 @@ _STRANGER_WORDS = ("the stranger", "the onlooker", "the passer-by")
 # NOT to/at/from/in — those precede people constantly ("she glances at Vorgath", "he
 # confides in Kaida"), and the first version cut a perfectly repairable glance because
 # "at" was on the list.
-_PLACE_BEFORE = re.compile(r"\b(?:of|into|near|toward|towards)\s+$", re.I)
+#
+# An article and capitals may stand between the preposition and the name — "the air of the
+# Velvet Veil", "toward the Great Cathedral" (2026-09-30, item 11): the first version
+# needed the preposition directly before the name, so "of the Velvet" was not a place and
+# "the Velvet" became "the stranger".
+_PLACE_BEFORE = re.compile(
+    r"\b(?:of|into|near|toward|towards)\s+(?:(?:the|a|an)\s+)?"
+    r"(?:[A-Z][a-zA-Z'’-]*\s+)*$", re.I)
 _CAP_TOKEN_BEFORE = re.compile(r"([A-Z][a-zA-Z'’-]{2,})\s+$")
+_CAP_TOKEN_AFTER = re.compile(r"\s+([A-Z][a-zA-Z'’-]{2,})")
+# The capitalised words a person's name is led by. "Captain Vorgath" is one invented
+# person, and the whole of it goes, never "Captain the stranger".
+_TITLES = frozenset({
+    "captain", "lord", "lady", "sir", "dame", "master", "mistress", "elder", "brother",
+    "sister", "father", "mother", "old", "young", "sergeant", "commander", "magister",
+    "reeve", "warden", "king", "queen", "prince", "princess", "baron", "baroness"})
+
+
+def _opens_sentence(text: str, at: int) -> bool:
+    """Whether the word at `at` is the first of its sentence or of a line of speech."""
+    head = text[:at]
+    return not head.strip() or bool(re.search(r"[.!?][\"'”’]?\s*$|[\"“‘']\s*$", head))
 
 
 # --- names given in play, faces owed on arrival, the player never a beast --------------
@@ -828,6 +851,8 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
             if (token.lower() in known_words or stem in known_words
                     or token.lower() in _NOT_A_NAME or stem in _NOT_A_NAME):
                 break
+            if _opens_sentence(text, lead.start(1)) and token.lower() not in _TITLES:
+                break               # "Yesterday Vorgath came": not one name
             start = lead.start(1)
         spans.append((start, m.end(), text[start:m.end()], m.group(1) or ""))
 
@@ -842,6 +867,45 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
             if lo <= pos < hi:
                 return lo, hi
         return pos, pos
+
+    def _not_a_name(token: str) -> bool:
+        low = token.lower()
+        stem = re.sub(r"['’]s$", "", low)
+        return low in _NOT_A_NAME or stem in _NOT_A_NAME or \
+            re.split(r"['’]", low)[0] in _NOT_A_NAME
+
+    # Never substitute INSIDE a capitalised noun phrase (2026-09-30, item 11). "the Great
+    # Cathedral" with only "Cathedral" flagged shipped as "the Great the stranger" — six
+    # copies in the 2026-09-25 recording — and "the Velvet Veil" with only "Velvet"
+    # flagged as "the stranger Veil", twice in Sam's save. The phrase is read whole: led
+    # by an article it is a named thing — a building, an inn, an order — and is left as
+    # written; led by a title or another name it is one person, and all of it goes.
+    phrased: list[tuple[int, int, str, str]] = []
+    for start, end, matched, poss in spans:
+        lo_p, hi_p = start, end
+        while True:
+            lead = _CAP_TOKEN_BEFORE.search(text[:lo_p])
+            if not lead or _not_a_name(lead.group(1)):
+                break
+            # A sentence's first word is capitalised whatever it is ("Yesterday Vorgath
+            # came") — part of the phrase only when it is a title.
+            if _opens_sentence(text, lead.start(1)) and lead.group(1).lower() not in _TITLES:
+                break
+            lo_p = lead.start(1)
+        while True:
+            tail = _CAP_TOKEN_AFTER.match(text, hi_p)
+            if not tail or _not_a_name(tail.group(1)):
+                break
+            hi_p = tail.end(1)
+        if (lo_p, hi_p) != (start, end) or len(text[lo_p:hi_p].split()) >= 2:
+            if re.search(r"\b(?:the|an?)\s+$", text[:lo_p], re.I):
+                continue           # "the Great Cathedral": a named thing, left be
+            start, end = lo_p, hi_p
+            matched = text[start:end]
+            tail = re.search(r"(['’]s)$", matched)
+            poss = tail.group(1) if tail else ""
+        phrased.append((start, end, matched, poss))
+    spans = phrased
 
     cut: list[tuple[int, int]] = []
     keep: list[tuple[int, int, str, str]] = []
@@ -1006,6 +1070,71 @@ def second_person_narrator(text: str) -> tuple[str, list[str]]:
 HAND_BACK = "What do you do?"
 
 
+# Where a sentence may end: terminal punctuation, then any closing quotes or brackets.
+_SENTENCE_END = re.compile(r"(?:[.!?…]+)[\"'”’)\]]*(?=\s|$)")
+_CLOSERS = {"\"": "\"", "“": "”", "‟": "”", "'": "'", "‘": "’"}
+
+
+def ends_unfinished(text: str) -> bool:
+    """Whether a beat stops mid-sentence: it does not end on terminal punctuation (closing
+    quotes and brackets allowed after it), nor on the close of a quotation."""
+    said = str(text or "").rstrip()
+    if not said:
+        return False
+    if re.search(r"[.!?…][\"'”’)\]]*$", said):
+        return False
+    spans = speech.spans(said)
+    if spans and spans[-1][1] == len(said) and said[-1] in "\"'”’":
+        return False            # it ends on a closed quotation: "…'Go home,'" is whole
+    return True
+
+
+def trim_unfinished(text: str) -> tuple[str, str]:
+    """(the beat cut back to its last complete sentence, what was cut) — ("", "") cut
+    when it was finished, or when no complete sentence would be left.
+
+    Measured on the 2026-09-30 playtest (item 6): the rewrite ran with a 1,600-character
+    grammar ceiling and Ollama closed the string at exactly 1,600 characters, mid-word —
+    "…They don't wait for you to pick it up. They'" — and `ensure_hand_back` added
+    ". What do you do?" to the fragment. A grammar's `maxLength` closes the JSON cleanly,
+    so the reply parses and says nothing about having been cut: the finish reason a
+    hosted API would report is not there to read, and the structural check is the only
+    one left (the standard advice for truncated structured output when the finish
+    metadata cannot tell: check the content's own completeness before trusting it).
+
+    A cut that lands inside a quotation keeps the line's words up to its last full stop
+    and closes the quotation with the mark that opened it, so no quote is left open."""
+    raw = str(text or "")
+    said = raw.rstrip()
+    if not ends_unfinished(said):
+        return raw, ""
+    ends = [m.end() for m in _SENTENCE_END.finditer(said)]
+    if not ends:
+        return raw, ""
+    at = ends[-1]
+    kept, gone = said[:at], said[at:].strip()
+    # Inside a quotation that the cut leaves open: close it with its own mark.
+    opener = None
+    for a, b in speech.spans(said):
+        if a < at < b:
+            opener = said[a]
+            break
+    if opener is None:
+        # A single quote whose close the truncation took is not a span at all: find an
+        # opener in the last sentence's stretch with no close after it.
+        last = max(kept.rfind("\n\n"), 0)
+        tail = kept[last:]
+        mark = None
+        for m in re.finditer(r"(?:^|(?<=[\s(\[—–-]))(['‘\"“])(?=\S)", tail):
+            mark = m
+        if mark is not None and not any(a <= last + mark.start() < b
+                                        for a, b in speech.spans(kept)):
+            opener = mark.group(1)
+    if opener is not None:
+        kept += _CLOSERS.get(opener, opener)
+    return kept, gone
+
+
 def ensure_hand_back(text: str) -> tuple[str, bool]:
     """Give the turn back to the player when it has forgotten to.
 
@@ -1025,13 +1154,20 @@ def ensure_hand_back(text: str) -> tuple[str, bool]:
     said = (text or "").rstrip()
     if not said or said.endswith("?"):
         return text, False
-    # A turn that trails off mid-sentence gets its full stop as well; "almost. alive"
-    # and friends are what the model does when it runs out of budget.
+    # A turn that trails off mid-sentence is cut back to its last whole sentence, and
+    # only when there is none does the fragment get a full stop. "almost. alive" and
+    # friends are what the model does when it runs out of budget, and the full stop
+    # this used to add made "…pick it up. They'. What do you do?" (2026-09-30, item 6).
+    trimmed, gone = trim_unfinished(said)
+    if gone:
+        said = trimmed.rstrip()
     #
     # Closing quote marks do not count as missing punctuation. A beat that ends on
     # "...but what it is remains unclear.'" already has its stop *inside* the speech, and
     # adding another produced ".'. What do you do?".
-    if said.rstrip("\"“”'‘’")[-1:] not in (".", "!", ""):
+    # A quoted question is a stop too: the live check of 2026-09-30 shipped `ask him,
+    # "How much for a drink?". What do you do?`.
+    if said.rstrip("\"“”'‘’")[-1:] not in (".", "!", "?", "…", ""):
         said += "."
     return f"{said} {HAND_BACK}", True
 

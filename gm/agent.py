@@ -1157,6 +1157,45 @@ class GMAgent:
             for sid in (list(getattr(actor, "spellbook", []) or [])
                         + list(getattr(actor, "prepared", {}) or {})):
                 names.add(str(sid).replace("-", " "))
+        names |= self._engine_place_names()
+        return {n for n in names if n}
+
+    def _engine_place_names(self) -> set[str]:
+        """The places the engine itself made or offers, by name.
+
+        Measured on the 2026-09-30 playtest (item 11): the Velvet Veil was a place the
+        player founded (`scene.founded`), and none of the engine's own places were on the
+        known list — only the world's entities were — so "Velvet" read as an invented name
+        and the un-namer printed "the stranger Veil" twice. The places are the brief's
+        own (`engine.places()`, which carries the founded and ventured ground), every
+        founded place in any settlement, the exits row's destinations
+        (`play.exits.ways_from`, the roads' far ends) and the counters' labels at this
+        settlement's market. Each source is read on its own: one that fails costs only
+        its names."""
+        import logging
+
+        log = logging.getLogger("pathfindergm")
+        scene = self.engine.scene
+        names: set[str] = set(self._place_names())
+        for p in getattr(scene, "founded", None) or []:
+            if isinstance(p, dict) and p.get("name"):
+                names.add(str(p["name"]))
+        try:
+            from play.exits import ways_from
+
+            for rows in ways_from(self.engine, self.world, [scene.at]).values():
+                names |= {str(r.get("name") or "") for r in rows}
+        except Exception:  # noqa: BLE001 — a missing exits row is a missing name, no more
+            log.debug("known names: the exits row could not be read", exc_info=True)
+        try:
+            from rules import market
+
+            location = self.world.get(scene.location_id) if self.world else None
+            if location is not None:
+                for counter in market.counters(location):
+                    names |= {str(counter.label or ""), str(counter.title or "")}
+        except Exception:  # noqa: BLE001
+            log.debug("known names: the counters could not be read", exc_info=True)
         return {n for n in names if n}
 
     _VOCAB: dict[int, set[str]] = {}
@@ -1673,15 +1712,28 @@ class GMAgent:
 
         Heaviest finding first, and at most `_TRUTH_CALLS` model calls a beat — a local
         model's minute is the player's minute; the backstop under every member but
-        `face_kept` makes the rest free. Returns (text, notes, attempts)."""
+        `face_kept` makes the rest free. Returns (text, notes, attempts).
+
+        **A line of speech is repaired as a speech unit** (2026-09-30 playtest, item 12).
+        A flagged string that lies inside a quotation was spliced back with a string
+        replace INSIDE the quotation marks, and the rewrite was narration — five
+        narration sentences in Gorm Vesper's mouth across beats 51 and 53. So the target
+        widens to the quote plus its speech clause (`checks._quotes.unit`: PARC's source,
+        cue and content together), and a rewrite that leaves narration in quotes the
+        beat did not already have (`narration_in_quotes.quoted_narration`) is refused.
+        A member that sets `REWRITE = False` is never sent to the model at all: its
+        backstop is the repair."""
         from dataclasses import replace
 
-        from . import checks
+        from . import checks, speech
         from .checks._page import page_sentences
+        from .checks._quotes import unit
+        from .checks.narration_in_quotes import quoted_narration
 
         notes: list[str] = []
         attempts: list[Attempt] = []
         pc = self.engine.scene.pc()
+        actors = dict(self.engine.scene.actors)
         calls = 0
         order = sorted(range(len(findings)), key=lambda i: (-int(findings[i].weight or 0), i))
         members = []
@@ -1690,9 +1742,17 @@ class GMAgent:
             member = checks.owner_of(f.kind)
             if member is not None and member not in members:
                 members.append(member)
+            if member is not None and getattr(member, "REWRITE", True) is False:
+                continue            # cut-only: the backstop below is the repair
             for sentence in f.sentences:
                 if not sentence or sentence not in text:
                     continue
+                at = text.find(sentence)
+                inner = next(((qa, qb) for qa, qb in speech.spans(text)
+                              if qa < at and at + len(sentence) <= qb), None)
+                if inner is not None:
+                    ua, ub = unit(text, *inner)
+                    sentence = text[ua:ub]
                 fixed = ""
                 if calls < self._TRUTH_CALLS:
                     calls += 1
@@ -1718,6 +1778,13 @@ class GMAgent:
                 if not fixed:
                     continue
                 candidate = text.replace(sentence, fixed, 1)
+                had = {ln for ln, _ in quoted_narration(text, ctx.said, actors)}
+                gained = [ln for ln, _ in quoted_narration(candidate, ctx.said, actors)
+                          if ln not in had]
+                if gained:
+                    notes.append(f"{f.kind}: the rewrite put narration in quotes: "
+                                 f"{gained[0][:80]!r}")
+                    continue
                 still = []
                 if member is not None:
                     try:
@@ -1871,9 +1938,17 @@ class GMAgent:
                 # was the token budget dying mid-string — which no grammar prevents and
                 # the except below still catches. What the schema adds is the required
                 # key and a length ceiling the budget can actually afford.
-                schema=prompts.prose_schema(max_chars=1600),
+                #
+                # 1,800, the grammar ceiling the prose call itself writes under. It was
+                # 1,600 — lower than the draft it rewrites — and on 2026-09-30 (item 6)
+                # Ollama closed the string at exactly 1,600 characters, mid-word, and
+                # the cut rewrite shipped as "…They'. What do you do?".
+                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING),
             )
-            return (self._lift(str(reply.json().get("narration", "")).strip()),
+            # Cut back to its last whole sentence, as the prose call's reply is.
+            fixed, _gone = narration_mod.trim_unfinished(
+                self._lift(str(reply.json().get("narration", "")).strip()))
+            return (fixed,
                     Attempt("polish", reply.seconds, reply.model, reply.text, note=note))
 
         attempts: list[Attempt] = []
@@ -1899,7 +1974,10 @@ class GMAgent:
             # And it must keep the events of the draft: a rewrite that scored better
             # by replacing what people DID with what the air smelled of is the one
             # measured in the brothel, and it is refused here whatever its score.
-            return bool(candidate) and after.score < review.score \
+            # Nor may it stop mid-sentence: a rewrite the grammar closed mid-word is
+            # never better than the draft it was asked to mend (item 6, 2026-09-30).
+            return bool(candidate) and not narration_mod.ends_unfinished(candidate) \
+                and after.score < review.score \
                 and not ({f.kind for f in after.findings} - was) \
                 and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6
 
@@ -2302,6 +2380,12 @@ class GMAgent:
                          f"{', '.join(made or lost)} the one already here")
         if not text:
             return "", ["prose failed on every model"], attempts
+        # A beat the grammar closed mid-word (`maxLength` ends the string cleanly, so the
+        # reply parses): cut back to its last whole sentence before anything reads it.
+        # 2026-09-30, item 6: "…pick it up. They'" shipped as "They'. What do you do?".
+        text, gone = narration_mod.trim_unfinished(text)
+        if gone:
+            early.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")
         # A blow at the player that nobody declared (docs/declared-not-guessed.md, the
         # blows door): a check now, not a door into a fight.
         text, note, struck_attempts = self._undeclared_blows(text, messages, schema)

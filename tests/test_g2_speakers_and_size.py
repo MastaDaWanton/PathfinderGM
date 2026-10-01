@@ -143,8 +143,11 @@ def test_a_pronoun_alone_embodies_nobody():
 
 def test_a_speaker_already_on_the_board_is_attributed_not_duplicated():
     """The man with the apron is already an actor (the plan introduced him): the line is
-    his, and that is attribution — `hailed_by` and the tags' business — not a body. No
-    second man walks on, and the row says who the line was read to."""
+    his, and that is attribution, not a body. No second man walks on.
+
+    Since the 2026-09-30 playtest (item 1) the lines are BOOKED as his — a record with
+    `"from": "page"` and no `"made"` — where they used to write only a miss row, and 6 of
+    43 real NPC lines never reached the conversation log that way."""
     engine, scene, campaign = _halhollow([("man in a stained leather apron", "guildhand")])
     ref = next(r for r, a in scene.actors.items() if a.name.startswith("man in"))
     _book(scene, APRON)
@@ -153,8 +156,10 @@ def test_a_speaker_already_on_the_board_is_attributed_not_duplicated():
     rows = speaker_real.step(aftermath.context("people", "turn", campaign, engine=engine,
                                                text=APRON, said=said))
     assert set(scene.actors) == before
-    assert said == [] and all(not r.get("made") for r in rows)
-    assert any(ref in r.get("why", "") and "on the board" in r["why"] for r in rows), rows
+    assert all(not r.get("made") for r in rows)
+    assert [r["line"] for r in said] == speech.lines(APRON)
+    assert all(r["who"] == ref and r["from"] == "page" and "made" not in r for r in said)
+    assert any(r.get("booked") == ref and "on the board" in r["why"] for r in rows), rows
 
 
 def test_a_line_not_to_the_player_makes_nobody():
@@ -200,6 +205,13 @@ def test_the_people_stage_may_add_a_made_record_and_only_that():
     assert _said_kept(before, ok, "people") == ""
     assert _said_kept(before, before + [{"who": "c5", "to": "you", "line": "x"}], "people")
     assert _said_kept(before, ok, "beat")
+    # And (2026-09-30, item 1) a line the page gives somebody already on the board: from
+    # the page, with no `made`, because nobody was made.
+    board = before + [{"who": "c2", "to": "", "line": "Went down in the second.",
+                       "from": "page"}]
+    assert _said_kept(before, board, "people") == ""
+    assert _said_kept(before, before + [{"who": "c2", "to": "", "line": "x", "from": "page",
+                                         "made": "c9"}], "people")
 
 
 # --- defect 2: the village the page called a city --------------------------------------------

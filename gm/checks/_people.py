@@ -181,6 +181,19 @@ def pronoun_words(pronouns: str) -> frozenset[str]:
     return _THIRD.get(first, _ANY_THIRD)
 
 
+def pronoun_forms(pronouns: str) -> tuple[str, str, str]:
+    """(subject, object, possessive) for a person's pronouns: "he/him" -> ("he", "him",
+    "his"); unset or "they/them" -> ("they", "them", "their").
+
+    For the fix hints a check writes about a person. Measured on the 2026-09-30 playtest
+    (item 12): keeper-forward's hint said "their work … if the player turns to them" of
+    Gorm Vesper, whom the page called "he", and the repair's rewrite carried "until you
+    turn to them" into his mouth — wrong pronoun and all."""
+    first = str(pronouns or "").split("/")[0].strip().lower()
+    return {"he": ("he", "him", "his"), "she": ("she", "her", "her"),
+            "it": ("it", "it", "its")}.get(first, ("they", "them", "their"))
+
+
 def linked(sentences, is_it, is_other, family=_ANY_THIRD) -> list[int]:
     """Indexes of the sentences about one person: those `is_it` accepts, and the pronoun
     continuation after them. `is_other(sentence)` says a sentence names somebody else,

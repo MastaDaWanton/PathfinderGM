@@ -49,6 +49,9 @@ def small(tmp_path):
     with override_settings(CAMPAIGN_DIR=str(tmp_path / "campaigns")):
         cm._LIVE.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # Since 2026-09-30 (item 1) the opening's own lines are logged — the start's lead
+        # speaks in it — so these tests start the log from their own beats.
+        c.scene.conversation_log, c.scene.conversation_seq = [], 0
         drenn = c.scene.add(instantiate("guildhand", scene=c.scene, name="Drenn Ironvale"))
         watch = c.scene.add(instantiate("guildhand", scene=c.scene,
                                         name="the watchman waving traffic through"))

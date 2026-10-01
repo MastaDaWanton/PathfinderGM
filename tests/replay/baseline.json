@@ -3,7 +3,7 @@
  "plans": 143,
  "bad_plan_json": 0,
  "faults": {
-  "invented-name": 5,
+  "invented-name": 4,
   "third-person-pc": 4
  },
  "firings": {
@@ -20,6 +20,6 @@
   "stands_elsewhere": 12,
   "state claims flagged": 0,
   "tags naming nobody here": 31,
-  "unname_strangers struck": 7
+  "unname_strangers struck": 4
  }
 }

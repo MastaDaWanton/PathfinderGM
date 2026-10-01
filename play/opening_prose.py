@@ -695,7 +695,24 @@ def _crossed(text: str, start: dict) -> list[str]:
     return openings.crossed(text, start)
 
 
-def _ask(messages: list[dict], cfg: dict) -> tuple[str, list[str]]:
+def _roster(campaign) -> tuple[dict, dict]:
+    """(refs, names) the opening's speaker tags are read against: the people the scene
+    holds when the opening is written, and their names lower-cased — `GMAgent._lift`'s
+    reading, for the call that has no agent."""
+    people = {r: a for r, a in (getattr(campaign.scene, "actors", {}) or {}).items()
+              if not getattr(a, "is_pc", False)}
+    names: dict[str, str] = {}
+    for ref, a in people.items():
+        for n in (getattr(a, "name", ""), getattr(a, "true_name", "")):
+            n = str(n or "").strip().lower()
+            if n:
+                names.setdefault(n, ref)
+                names.setdefault(re.sub(r"^(?:the|a|an)\s+", "", n), ref)
+    return people, names
+
+
+def _ask(messages: list[dict], cfg: dict, roster: tuple[dict, dict] | None = None,
+         records: list | None = None) -> tuple[str, list[str]]:
     # `think=False` is load-bearing, as it is on every prose call in `gm/agent.py`:
     # measured here first, the 12B gemma spent the whole budget in its thinking
     # channel and returned content "" — the format grammar constrains only the
@@ -713,11 +730,17 @@ def _ask(messages: list[dict], cfg: dict) -> tuple[str, list[str]]:
     # A model that writes "\n" inside the JSON string hands back a literal backslash-n;
     # measured on the second live draft, "grain.\n\nThe room is still".
     text = str(text or "").replace("\\n", "\n").replace("\r", "")
-    # Speaker tags, should the model carry the habit over from the turn's examples: the
-    # opening has no roster to attribute them to, so they are only taken out.
+    # Speaker tags, should the model carry the habit over from the turn's examples. They
+    # were only taken out, and the records thrown away — so the opening's lines never
+    # reached the conversation log (2026-09-30 playtest, item 1: the cage owner's two
+    # opening lines). `said`, when given, is the caller's list for the records, read
+    # against the people the opening was written with (`_roster`).
     from gm import speech
 
-    text, _ = speech.lift(text)
+    refs, names = roster or ({}, {})
+    text, lifted = speech.lift(text, refs=refs, names=names)
+    if records is not None:
+        records[:] = lifted
     offered = [" ".join(str(s).split()) for s in (offered or []) if str(s).strip()]
     return text.strip(), offered
 
@@ -775,30 +798,41 @@ def write(campaign, situation, skeleton: str,
             draft = with_face(draft, lead[0], lead[1])
         return draft
 
+    # The speaker tags of the draft that ships, kept for the opening beat: read by
+    # the opening's after-the-beat pass (play/aftermath), which puts them on the beat.
+    roster = _roster(campaign)
+    heard: list[dict] = []
+
+    def keep(records) -> None:
+        campaign._opening_said = [dict(r) for r in records or []]
+
+    keep([])
     found: list[str] = []
-    best: tuple[str, list[str], list[str]] | None = None
+    best: tuple[str, list[str], list[str], list[dict]] | None = None
     try:
-        draft, offered = _ask(messages, cfg)
+        draft, offered = _ask(messages, cfg, roster, heard)
         draft, _ = repair_near_misses(draft, allowed, pc.name if pc is not None else "",
                                       place.name if place is not None else "")
         found = check(draft, offered)
         if draft and not found:
+            keep(heard)
             return shipped(draft), offered, []
         if draft and not hard_problems(found):
-            best = (draft, offered, found)
+            best = (draft, offered, found, list(heard))
         if draft:
             messages += [{"role": "assistant",
                           "content": json.dumps({"opening": draft, "suggestions": offered})},
                          {"role": "user", "content": "Rewrite it. What is wrong:\n"
                                                      + "\n".join(f"- {p}" for p in found)}]
-            draft, offered = _ask(messages, cfg)
+            draft, offered = _ask(messages, cfg, roster, heard)
             draft, _ = repair_near_misses(draft, allowed, pc.name if pc is not None else "",
                                           place.name if place is not None else "")
             found = check(draft, offered)
             if draft and not found:
+                keep(heard)
                 return shipped(draft), offered, []
             if draft and not hard_problems(found):
-                best = (draft, offered, found)
+                best = (draft, offered, found, list(heard))
     except Exception as exc:                       # noqa: BLE001 — the floor is the point
         found = [f"the prose model failed: {exc}"]
     # A draft that is merely less than was asked — a dozen words under the floor, not
@@ -807,7 +841,8 @@ def write(campaign, situation, skeleton: str,
     # WRONG. The soft problems are returned so the caller can record them; they
     # are not a reason to ship a third less text (see `hard_problems`).
     if best is not None and len(best[0].split()) >= len(skeleton.split()):
-        draft, offered, soft = best
+        draft, offered, soft, records = best
+        keep(records)
         clean = [s for s in offered if isinstance(s, str) and 3 <= len(s.split()) <= 16]
         return (shipped(draft),
                 clean[:4] if 2 <= len(clean) else list(fallback_suggestions or []),
