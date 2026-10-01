@@ -1157,6 +1157,45 @@ class GMAgent:
             for sid in (list(getattr(actor, "spellbook", []) or [])
                         + list(getattr(actor, "prepared", {}) or {})):
                 names.add(str(sid).replace("-", " "))
+        names |= self._engine_place_names()
+        return {n for n in names if n}
+
+    def _engine_place_names(self) -> set[str]:
+        """The places the engine itself made or offers, by name.
+
+        Measured on the 2026-09-30 playtest (item 11): the Velvet Veil was a place the
+        player founded (`scene.founded`), and none of the engine's own places were on the
+        known list — only the world's entities were — so "Velvet" read as an invented name
+        and the un-namer printed "the stranger Veil" twice. The places are the brief's
+        own (`engine.places()`, which carries the founded and ventured ground), every
+        founded place in any settlement, the exits row's destinations
+        (`play.exits.ways_from`, the roads' far ends) and the counters' labels at this
+        settlement's market. Each source is read on its own: one that fails costs only
+        its names."""
+        import logging
+
+        log = logging.getLogger("pathfindergm")
+        scene = self.engine.scene
+        names: set[str] = set(self._place_names())
+        for p in getattr(scene, "founded", None) or []:
+            if isinstance(p, dict) and p.get("name"):
+                names.add(str(p["name"]))
+        try:
+            from play.exits import ways_from
+
+            for rows in ways_from(self.engine, self.world, [scene.at]).values():
+                names |= {str(r.get("name") or "") for r in rows}
+        except Exception:  # noqa: BLE001 — a missing exits row is a missing name, no more
+            log.debug("known names: the exits row could not be read", exc_info=True)
+        try:
+            from rules import market
+
+            location = self.world.get(scene.location_id) if self.world else None
+            if location is not None:
+                for counter in market.counters(location):
+                    names |= {str(counter.label or ""), str(counter.title or "")}
+        except Exception:  # noqa: BLE001
+            log.debug("known names: the counters could not be read", exc_info=True)
         return {n for n in names if n}
 
     _VOCAB: dict[int, set[str]] = {}
