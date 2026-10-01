@@ -1152,8 +1152,12 @@ class Actor:
 
     @property
     def armour_check_penalty(self) -> int:
+        # Plus what an effect says about it: plate put on without help is "donned
+        # hastily", 1 worse (CRB "Don Hastily"), and that arrives as an ActiveEffect so
+        # taking the suit off takes it away (`Engine._op_wear`).
         return (ARMOUR.get(self.armour, ARMOUR["none"])["acp"]
-                + SHIELDS.get(self.shield, SHIELDS["none"])["acp"])
+                + SHIELDS.get(self.shield, SHIELDS["none"])["acp"]
+                + sum(m.value for m in self._buff_mods("combat_mod", "armour_check")))
 
     def can_act(self) -> bool:
         """Whether this creature can take any action at all.
@@ -1462,7 +1466,14 @@ class Actor:
         natural = self.natural_weapon(wanted)
         if natural is not None:
             return natural
-        return weapons_mod.get(wanted)
+        row = weapons_mod.get(wanted)
+        if "/" in str(row.get("damage") or ""):
+            # A double weapon: one end per swing (E2). The table's "1d6/1d6" raised
+            # `BadDice` the moment it was rolled — 16 rows the smith sold, the bo staff
+            # among them. Kept whole as `damage_text` for the sheet to show.
+            row = dict(row, damage=weapons_mod.first_end_damage(row["damage"]),
+                       damage_text=str(row["damage"]))
+        return row
 
     def wielded_key(self) -> str:
         """What this body swings when nobody names a weapon.
@@ -1681,6 +1692,11 @@ class Actor:
         granted = leveling.granted_weapon_named(self, key)
         if granted:
             key = str(granted["weapon"].get("proficiency_as") or "unarmed")
+        # The one key, however it was written: "light crossbow", "heavy-crossbow" and
+        # "Short sword" are each one row, and the class list's tags are written in the
+        # same keys (`standing_tags`). Measured 2026-09-30: the wizard's "heavy
+        # crossbow" and the rogue's "short sword" matched no row, so both were -4.
+        key = weapons_mod.key_for(key) or key
         w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
@@ -1787,6 +1803,14 @@ class Actor:
             if not self.is_proficient(key):
                 mods.append(Modifier(NON_PROFICIENT_PENALTY,
                                      f"not proficient with {w['name']}"))
+            # What is worn, on the swing (owner's ruling E3): an armour or shield the
+            # wearer is not trained in puts its check penalty on attack rolls, the two
+            # stacking, and a tower shield takes 2 off every attack. Penalties, so the
+            # funnel stacks them whatever their names; each says what it is.
+            from . import armour as armour_mod
+
+            for value, why in armour_mod.attack_penalties(self):
+                mods.append(Modifier(value, why))
 
             # Size only when the number was derived. A stat block's printed attack bonus
             # already includes the creature's size, and adding it again gave a small
@@ -1900,6 +1924,7 @@ class Actor:
         return stack(mods)
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
+        """The dice one swing rolls: a double weapon's first end (`weapon`, E2)."""
         if self.flat_damage and weapon_key is None:
             return self.flat_damage
         return self.weapon(weapon_key)["damage"]
@@ -1926,7 +1951,10 @@ class Actor:
                 mods.append(Modifier(self.natural_armour, "natural armour",
                                      "natural armour"))
 
-            dex = min(self.ability_mod("dex"), armour["max_dex"])
+            # A tower shield caps Dex as armour does (CRB Table 6-6: "+2"), and the lower
+            # cap is the one that holds.
+            dex = min(self.ability_mod("dex"), armour["max_dex"],
+                      int(shield.get("max_dex", 99)))
             if dex:
                 mods.append(Modifier(dex, "Dex"))
 
@@ -2776,14 +2804,27 @@ class Actor:
         parenthetical: the feat is one weapon per taking; the whole-category grant
         the old suffix match gave (`split()[0]`) was a bug, not a rule.
         """
+        from . import armour as armour_mod
         from . import feats as feats_mod
+        from . import weapons as weapons_mod
 
         out: list[str] = []
         for p in self.class_data.get("proficiencies", ()):
             p = str(p).strip().lower()
-            if p:
-                out.append(f"proficient.{p}" if p in ("simple", "martial", "exotic")
-                           else f"proficient.weapon.{p}")
+            if not p:
+                continue
+            if p in ("simple", "martial", "exotic"):
+                out.append(f"proficient.{p}")
+            elif armour_mod.is_armour_token(p):
+                # "light armour", "shields", "tower shields": the armour half of the
+                # list, read since 2026-09-30 (E3). Before, these became
+                # `proficient.weapon.light armour` — a weapon nobody can hold — and
+                # nothing asked whether a wizard could wear a breastplate.
+                out.extend(armour_mod.proficiency_tags(p))
+            else:
+                # Written in the weapon table's own key, so "heavy crossbow" and the
+                # row "heavy-crossbow" are one permission (E1).
+                out.append(f"proficient.weapon.{weapons_mod.key_for(p) or p}")
         for raw in self.feats:
             doc = feats_mod.document(raw)
             for tag in (doc or {}).get("tags") or ():
@@ -2791,7 +2832,10 @@ class Actor:
                 if "$target" in tag:
                     if not doc.get("target"):
                         continue                   # bound to nothing yet
-                    tag = tag.replace("$target", str(doc["target"]).strip().lower())
+                    target = str(doc["target"]).strip().lower()
+                    if tag.startswith("proficient.weapon."):
+                        target = weapons_mod.key_for(target) or target
+                    tag = tag.replace("$target", target)
                 out.append(tag)
         # The race's own tags — `race.<id>`, its senses, its immunities — from its
         # document (rules/races.py), so "is this an elf" and "can they see in the dark"
@@ -3578,20 +3622,38 @@ def full_sheet(actor: Actor) -> dict:
     from . import weapons as weapons_mod
 
     attacks = []
-    for key in dict.fromkeys(w.lower() for w in weapons if w):
+    held_key = weapons_mod.key_for(actor.equipped or "") or (actor.equipped or "").lower()
+    # One row a weapon however it was written ("bo staff" from a handover, "bo-staff"
+    # from the smith): the canonical key, else the word as it stands.
+    for key in dict.fromkeys(weapons_mod.key_for(w) or w.lower() for w in weapons if w):
         if not weapons_mod.has(key):
             continue
+        # Ammunition is spent by a launcher and never swung: no attack row. Before
+        # 2026-09-30 a quiver was a weapon here, "+20 to hit" with no damage (E3).
+        if weapons_mod.is_ammunition(key):
+            continue
         w = weapons_mod.get(key)
+        families = weapons_mod.ammo_families(key)
         attacks.append({
             "key": key,
             "name": w["name"],
-            "equipped": key == (actor.equipped or "").lower(),
+            "equipped": (weapons_mod.key_for(key) or key) == held_key,
             "category": w["category"],
             "hands": w.get("hands", 1),
             "proficient": actor.is_proficient(key),
             "attack": _terms(actor.attack_modifiers(key)),
             "damage": _terms(actor.damage_modifiers(key)),
-            "damage_dice": actor.damage_dice(key),
+            # What the sheet prints: a double weapon shows both ends ("1d6/1d6") though
+            # a swing rolls the first.
+            "damage_dice": str(w.get("damage") or "") if "/" in str(w.get("damage") or "")
+                           else actor.damage_dice(key),
+            # A launcher, what it fires, and how many of those are carried: "Shortbow —
+            # 58 arrows" on the Equipment tab, and the reason a "range not known" is
+            # said only of a real launcher whose range the table lacks.
+            "launcher": bool(families),
+            "ammo": ({"families": families,
+                      "carried": goods.ammo_carried(actor, families)}
+                     if families else None),
             "crit": (f"{w['crit_range']}-20" if w["crit_range"] < 20 else "20")
                     + f"/x{w['crit_mult']}",
             "type": w["type"],
@@ -4600,6 +4662,22 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         a.resistances = resistances
         a.vulnerabilities = vulnerabilities
         a.reductions = [_reduction(r) for r in (data.get("reductions") or [])]
+    # Ammunition written onto the weapons list by a save from before 2026-09-30 (the smith
+    # delivered "Arrows (20)" as a weapon, and Sam carried `arrows-20` there): moved into
+    # `goods` as the rounds it is, once, so the bow can spend them and the sheet stops
+    # offering a quiver as a thing to swing (E3). Idempotent — a migrated save has none.
+    from . import weapons as weapons_mod
+
+    if any(weapons_mod.is_ammunition(w) for w in a.weapons if w):
+        kept = []
+        for w in a.weapons:
+            if w and weapons_mod.is_ammunition(w):
+                goods.stow(a, w, 1)
+            else:
+                kept.append(w)
+        a.weapons = kept
+        if a.equipped and weapons_mod.is_ammunition(a.equipped):
+            a.equipped = "unarmed"
     # After the effects, never before: a save written while a Constitution buff was
     # standing carries a maximum that already includes it, so the rolled base is the
     # saved total minus whatever Constitution contributes with everything loaded. Do it
@@ -4707,8 +4785,13 @@ def validate(actor: Actor) -> None:
         note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
         if note not in actor.notes:
             actor.notes += f"\n{note}"
+    # Armour and a shield are stored by their table key and nothing else: `wear` writes
+    # the key since 2026-09-30, and a display name or a hyphenated spelling here would be
+    # a suit that adds no AC with nothing on the sheet saying why.
     if actor.armour not in ARMOUR:
         raise IllegalSheet(f"{actor.name}: unknown armour {actor.armour!r}")
+    if actor.shield not in SHIELDS:
+        raise IllegalSheet(f"{actor.name}: unknown shield {actor.shield!r}")
     # A natural attack the body grants counts as a weapon here, because it is one
     # everywhere else: `Actor.weapon` already falls through to `natural_weapon`, and
     # `is_proficient` already answers yes for one. Only this check did not ask, so a race
@@ -4717,6 +4800,12 @@ def validate(actor: Actor) -> None:
     # carries them by name") and the character died at `validate` with "unknown weapon
     # 'bite'". Reported 2026-09-21 as "what happened to the asura race?", whose bench
     # document is the only one on the shelf and grants exactly that.
+    # Any row of the weapon table, by any spelling the resolver takes. This asked the
+    # curated twelve, so a character who drew a bo staff (wieldable since 2026-09-30)
+    # would have been refused by their own save on the next load.
+    from . import weapons as weapons_mod
+
     if actor.equipped and actor.equipped.lower() not in WEAPONS \
+            and not weapons_mod.has(actor.equipped) \
             and actor.natural_weapon(actor.equipped) is None:
         raise IllegalSheet(f"{actor.name}: unknown weapon {actor.equipped!r}")

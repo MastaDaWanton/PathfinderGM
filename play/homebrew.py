@@ -23,6 +23,7 @@ from rules import ingredients, registry, spells, worldclass
 from rules import npcs as npcs_mod
 from rules import races as races_mod
 from rules import schemes as schemes_mod
+from rules import weapons as weapons_mod
 from rules import bestiary
 from rules.bestiary import TEMPLATES
 from rules.tables import ARMOUR, CLASSES, SHIELDS, WEAPONS
@@ -377,7 +378,11 @@ def rows_for(bench_id: str) -> list[dict]:
                                  key=lambda x: x.name)]
     elif bench_id == "items":
         rows += (
-            [{"name": v["name"], "kind": "weapon", "mine": False, "id": k,
+            # By the weapon table's key: "shortsword" and "light crossbow" are aliases of
+            # the file's "short-sword" and "light-crossbow" since 2026-09-30, and the
+            # bench opens a row by its key.
+            [{"name": v["name"], "kind": "weapon", "mine": False,
+              "id": weapons_mod.ALIASES.get(k, k),
               "note": f"{v['damage']} {v['type']} · x{v['crit_mult']}"}
              for k, v in WEAPONS.items()]
             + [{"name": v["name"], "kind": "armour", "mine": False, "id": k,

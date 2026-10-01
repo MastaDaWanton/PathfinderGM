@@ -11,10 +11,27 @@ silently changing the rapier's crit range would be a real regression discovered 
 Everything the file adds beyond them is new, so nothing it says can break anything.
 
 Homebrew layers last, as it does everywhere else.
+
+**One name, one row (2026-09-30).** There were two weapon tables and two answers to "is
+this a weapon": `goods.kind_of` asked the curated twelve, the attack op and the shops asked
+the 456. So the weaponsmith sold 356 weapons and `wear` refused 348 of them ("bo-staff is
+not something that can be worn or wielded"), and the curated "shortsword" and "light
+crossbow" were second rows beside the file's "short-sword" and "light-crossbow" — the same
+sword at two keys, one with a price and one without. Now the curated entries merge INTO
+the file's row (`ALIASES`), every name a player, a GM or a save can write resolves through
+`key_for` to the one key, and `wieldable` is the one answer both the `wear` op and the
+Equipment tab's button ask (docs/playtest-2026-09-30-findings.md item 2, E1).
+
+`weapons_rules.json` beside the imported file carries what the import could not know —
+which ammunition a launcher fires, the rows that are ammunition and not weapons, why a row
+cannot be wielded — as a separate overlay, because `tools/build_weapons.py` rewrites
+`weapons.json` from the workbook and an edit made there would be lost on the next import.
+It sorts after `weapons.json`, so it layers on top.
 """
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from .tables import WEAPONS as SHIPPED
@@ -22,6 +39,34 @@ from pathfindergm import files
 
 _ALL: dict[str, dict] | None = None
 _META: dict = {}
+_INDEX: tuple[int, dict[str, str]] | None = None
+
+# Curated keys whose row in the imported file has another id. The curated entry merges
+# onto that row and its key answers as an alias, so the 3 tests and the fixture written
+# against "shortsword" and "light crossbow" keep working and the shop sells one sword.
+# The other ten curated keys already ARE the file's ids.
+ALIASES: dict[str, str] = {
+    "shortsword": "short-sword",
+    "light crossbow": "light-crossbow",
+    # Ammunition by its plain English name: "arrows", "a quiver of arrows", "bolts".
+    "arrow": "arrows-20", "arrows": "arrows-20", "quiver of arrows": "arrows-20",
+    "bolt": "crossbow-bolts-10", "bolts": "crossbow-bolts-10",
+    "crossbow bolt": "crossbow-bolts-10", "crossbow bolts": "crossbow-bolts-10",
+    "sling bullet": "sling-bullets-10", "sling bullets": "sling-bullets-10",
+    "sling stones": "sling-bullets-10", "blowgun dart": "blowgun-darts-10",
+    "blowgun darts": "blowgun-darts-10", "firearm bullets": "firearm-bullet-1",
+    # The CRB monk's list says "crossbow (light or heavy)"; the bare word is the light one.
+    "crossbow": "light-crossbow",
+}
+
+# Sections the weaponsmith does not stock (owner's ruling E5, 2026-09-30): engines of war
+# are not shop goods, and the "(Modern)" rows are machine guns and grenades from another
+# century. Still in the table — a world may write a cannon — just never on a shelf.
+UNSOLD_SECTION = re.compile(r"siege|\(modern\)", re.I)
+# The sections whose rows are ammunition rather than weapons in hand (E3).
+AMMO_SECTIONS = ("Ammunition", "Firearm Ammunition / Gear", "Siege Weapon Ammunition",
+                 "Siege Engines (Ammunition)")
+_COUNT = re.compile(r"\s*\((\d+)(?:\s+[a-z]+)?\)\s*$")
 
 
 def _folders() -> list[Path]:
@@ -58,9 +103,12 @@ def all_weapons() -> dict[str, dict]:
                     out.setdefault(key, {}).update(e)
                     out[key].setdefault("name", e.get("name", key))
 
-        # The hand-written eleven win. See the module docstring.
+        # The hand-written eleven win. See the module docstring. A curated key the file
+        # spells differently lands on the file's row (`ALIASES`), never beside it.
         for key, entry in SHIPPED.items():
-            out.setdefault(key, {}).update(entry)
+            row = ALIASES.get(key, key)
+            out.setdefault(row, {}).update(entry)
+            out[row].setdefault("id", row)
 
         for entry in out.values():
             entry.setdefault("traits", [])
@@ -80,15 +128,165 @@ def meta() -> dict:
     return dict(_META)
 
 
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-")
+
+
+def _index() -> dict[str, str]:
+    """Every spelling that names a row -> the row's key. Built once per table."""
+    global _INDEX
+    table = all_weapons()
+    if _INDEX is not None and _INDEX[0] == id(table):
+        return _INDEX[1]
+    idx: dict[str, str] = {}
+
+    def add(spelling: str, key: str) -> None:
+        for s in (" ".join(str(spelling).lower().split()), _slug(spelling)):
+            if s and s not in idx:
+                idx[s] = key
+
+    for key in table:                      # the keys themselves first: they always win
+        add(key, key)
+    for key, row in table.items():         # then display names
+        add(str(row.get("name") or ""), key)
+    for key, row in table.items():         # then a bundle's name without its count
+        name = str(row.get("name") or "")
+        if _COUNT.search(name):
+            add(_COUNT.sub("", name), key)
+        bare = re.sub(r"-\d+$", "", key)
+        if bare != key:
+            add(bare, key)
+    for alias, key in ALIASES.items():
+        if key in table:
+            add(alias, key)
+    _INDEX = (id(table), idx)
+    return idx
+
+
+def key_for(text: str) -> str:
+    """The one key a weapon or a round of ammunition is stored under, or "".
+
+    Accepts whatever names it: the key ("bo-staff"), the display name ("Bo staff"), title
+    case, a hyphen or a space ("short sword", "light-crossbow"), a bundle's count ("Arrows
+    (20)", "arrows-20", "arrows"), and a curated alias ("shortsword"). A leading article
+    or "my" goes first ("my longbow"), and a plural last ("longbows"). Never a guess past
+    that: an unknown word is "", and the caller files it as gear rather than as the
+    nearest weapon (CLAUDE.md, "ground every name").
+    """
+    raw = " ".join(str(text or "").lower().split())
+    if not raw:
+        return ""
+    idx = _index()
+    raw = re.sub(r"^(?:a|an|the|my|his|her|their|some)\s+", "", raw)
+    for cand in (raw, _COUNT.sub("", raw), raw[:-1] if raw.endswith("s") else ""):
+        if not cand:
+            continue
+        for s in (cand, _slug(cand)):
+            if s in idx:
+                return idx[s]
+    return ""
+
+
 def get(key: str) -> dict:
-    found = all_weapons().get((key or "").strip().lower())
+    found = all_weapons().get(key_for(key))
     if found is None:
         raise KeyError(f"no such weapon {key!r}")
     return found
 
 
 def has(key: str) -> bool:
-    return (key or "").strip().lower() in all_weapons()
+    return bool(key_for(key))
+
+
+# --- what a row IS: a weapon to hold, ammunition to loose, or neither ------------------
+
+def is_ammunition(key: str) -> bool:
+    """A round to be loosed from a launcher, never held and never swung (E3).
+
+    The CRB's Ammunition rows and the later books' firearm and siege ammunition, by the
+    section the import filed them under — plus anything the overlay names a round of a
+    family (`ammo_of`). The import gave all 72 of them `prof: exotic` and a sheet attack
+    row, so a quiver of arrows was "+20 to hit, damage ''" on Sam's sheet."""
+    k = key_for(key)
+    if not k:
+        return False
+    row = all_weapons()[k]
+    if row.get("not_ammo"):
+        return False
+    return bool(row.get("ammo_of")) or str(row.get("section") or "") in AMMO_SECTIONS
+
+
+def ammo_families(key: str) -> list[str]:
+    """What this launcher fires — `["arrows"]` for a bow — or [] for anything that is not
+    a launcher. The overlay states it per row (`ammo`); see `weapons_rules.json`."""
+    k = key_for(key)
+    return [str(f) for f in (all_weapons()[k].get("ammo") or [])] if k else []
+
+
+def family_of(key: str) -> str:
+    """Which family a round belongs to ("arrows"), or ""."""
+    k = key_for(key)
+    return str(all_weapons()[k].get("ammo_of") or "") if k else ""
+
+
+def rounds_per(key: str) -> int:
+    """How many rounds one of this row is: "Arrows (20)" is twenty, a "Smoke arrow" one.
+
+    The overlay may say (`per`), else the count printed in the name, else one."""
+    k = key_for(key)
+    if not k:
+        return 1
+    row = all_weapons()[k]
+    if row.get("per"):
+        return max(1, int(row["per"]))
+    m = re.search(r"\((\d+)", str(row.get("name") or ""))
+    return max(1, int(m.group(1))) if m else 1
+
+
+def round_name(key: str, count: int = 1) -> str:
+    """"arrows" / "arrow", "crossbow bolts", for a tell: the family, never "Arrows (20)"."""
+    fam = family_of(key) or _COUNT.sub("", str(get(key)["name"])).lower()
+    if count == 1 and fam.endswith("s") and not fam.endswith("ss"):
+        return fam[:-1]
+    return fam
+
+
+def is_launcher(key: str) -> bool:
+    return bool(ammo_families(key))
+
+
+def wieldable(key: str) -> tuple[bool, str]:
+    """Can this be put in hand by the `wear` op: (True, "") or (False, why, in words).
+
+    The ONE answer, asked by `Engine._op_wear` and by the Equipment tab's row
+    (`play/views.py:_carried`), so a Wield button appears exactly when the op would take
+    it. Before 2026-09-30 the button asked `goods.kind_of` and the op asked it too, and
+    both said no to 348 of the 356 weapons the smith sold — while the attack op, which
+    asked `weapons.has`, would have swung any of them.
+    """
+    k = key_for(key)
+    if not k:
+        return False, "The rules have no weapon by that name."
+    row = all_weapons()[k]
+    if is_ammunition(k):
+        what = family_of(k)
+        return False, ("Ammunition" + (f" ({what})" if what else "") + ": loosed from a "
+                       "launcher, never held. Wield the launcher and it shoots these.")
+    if row.get("unwieldable"):
+        return False, str(row["unwieldable"])
+    return True, ""
+
+
+def first_end_damage(dice: str) -> str:
+    """A double weapon's damage as one die: "1d6/1d6" -> "1d6" (E2).
+
+    The table prints both ends, and `Dice.roll` raised `BadDice` on the slash: 16 of the
+    weapons the smith sold, the bo staff among them, could not deal a point. One end per
+    swing is what 1e means — the other end is the off hand's, which is two-weapon
+    fighting and a later batch (owner's ruling E6). The text stays "1d6/1d6" for the
+    sheet to show."""
+    text = str(dice or "").strip()
+    return text.split("/")[0].strip() if "/" in text else text
 
 
 def described(key: str) -> str:
@@ -175,4 +373,7 @@ def search(text: str = "", prof: str = "", category: str = "", trait: str = "",
     return out[:limit] if limit else out
 
 
-__all__ = ["all_weapons", "get", "has", "has_trait", "meta", "search"]
+__all__ = ["all_weapons", "get", "has", "has_trait", "key_for", "meta", "search",
+           "wieldable", "is_ammunition", "ammo_families", "family_of", "rounds_per",
+           "round_name", "is_launcher", "first_end_damage", "UNSOLD_SECTION",
+           "AMMO_SECTIONS"]

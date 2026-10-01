@@ -6,7 +6,7 @@
   "good_saves": ["will"],
   "skill_ranks": 2,
   "starting_wealth": "2d6 x 10 gp",
-  "proficiencies": ["club", "dagger", "heavy crossbow", "light crossbow", "quarterstaff"],
+  "proficiencies": ["club", "dagger", "heavy-crossbow", "light-crossbow", "quarterstaff"],
   "class_skills": [
     "appraise", "craft", "fly", "knowledge (arcana)", "knowledge (dungeoneering)",
     "knowledge (engineering)", "knowledge (geography)", "knowledge (history)",

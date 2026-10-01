@@ -1068,10 +1068,16 @@ def _carried(pc) -> list[dict]:
     cloak put on through `/api/wear`), the armour and shield worn (`armour`, `shield`),
     and names written into a body slot (`/api/slots`).
 
-    What the engine cannot do is not offered: armour and a shield come off only by
-    putting another on (`_op_wear` swaps; nothing sets them back to none), and there is
-    no drop op at all. The page says so in words (docs/table-rebuild-inventory.md, H9).
+    What the engine cannot do is not offered, and a row with no act says why in words
+    (2026-09-30, item 2 part U). A weapon's Wield asks `weapons.wieldable` — the same
+    function `_op_wear` asks — so the button is there exactly when the op would take it;
+    before, the button asked `goods.kind_of` and 348 of the 356 weapons the smith sold
+    came up "The rules cannot put this in hand by name yet". Armour and a shield worn have
+    Take off (the `take_off` op), the weapon in hand Put away (wield `unarmed`), and
+    ammunition is a counted row of its own that the launcher's row names. There is still
+    no drop op (a later batch, owner's ruling E6).
     """
+    from rules import armour as armour_mod
     from rules import goods, magicitem, weapons as weapons_mod
     from rules.sheet import _stock_row
     from rules.tables import ARMOUR, SHIELDS, SLOTS
@@ -1105,37 +1111,90 @@ def _carried(pc) -> list[dict]:
     rows: list[dict] = []
     seen: set[str] = set()
 
-    # Weapons: one row a kind, counted.
-    held = (pc.equipped or "").strip().lower()
+    # Weapons: one row a kind, counted, by the one key however the list spelled it.
+    held = weapons_mod.key_for(pc.equipped or "") or (pc.equipped or "").strip().lower()
     counts: dict[str, int] = {}
     for w in pc.weapons or ():
-        k = str(w or "").strip().lower()
-        if k and k != "unarmed":
+        k = weapons_mod.key_for(w) or str(w or "").strip().lower()
+        if k and k != "unarmed" and not weapons_mod.is_ammunition(k):
             counts[k] = counts.get(k, 0) + 1
     if held and held != "unarmed" and held not in counts:
         counts[held] = 1
+    # Whether a suit can change now (owner's ruling E2): only out of a fight. Asked of the
+    # running campaign, and only when this sheet IS its character — a roster preview has
+    # no fight around it.
+    # Read off the campaigns already in memory, never `current()`, which would load or
+    # even make one for a sheet that only wants drawing.
+    in_fight = any(getattr(c, "scene", None) is not None and c.scene.pc() is pc
+                   and c.scene.in_encounter
+                   for c in list(getattr(campaign_mod, "_LIVE", {}).values()))
     for key, n in counts.items():
         name = weapons_mod.get(key)["name"] if weapons_mod.has(key) else key
-        # `_op_wear` draws only what `goods.kind_of` files as a weapon, which is the
-        # curated table's twelve; anything else it refuses, so no button is offered.
-        can = goods.kind_of(key) == "weapon"
+        seen.add(key)
+        seen.add(str(name).lower())
+        # The op's own question, asked of the same function (`weapons.wieldable`), and
+        # then the one the op asks of the actor: a two-handed weapon with a shield on
+        # (owner's ruling E4).
+        can, why = weapons_mod.wieldable(key) if weapons_mod.has(key) else (
+            False, "The rules have no weapon by that name.")
+        if can and key != held:
+            why = armour_mod.hands_clash(pc, weapon_key=key)
+            can = not why
+        families = weapons_mod.ammo_families(key) if weapons_mod.has(key) else []
+        supply = goods.ammo_carried(pc, families) if families else []
+        line = ""
+        if families:
+            left = sum(r["count"] for r in supply)
+            line = (f"shoots {families[0]}: {left} carried" if left
+                    else f"shoots {families[0]}, and none are carried")
+        acts = []
+        if key == held:
+            acts = [{"label": "Put away", "api": "/api/wear",
+                     "body": {"item": "unarmed", "op": "wield"}}]
+        elif can:
+            acts = [{"label": "Wield", "api": "/api/wear",
+                     "body": {"item": key, "op": "wield"}}]
         rows.append({
             "id": f"weapon:{key}", "key": key, "name": name, "count": n, "unit": "",
             "kind": "weapon", "shelf": "weapons", "fits": "hand",
             "state": "in hand" if key == held else "",
-            "line": "", "known": weapons_mod.has(key),
-            "acts": ([{"label": "Wield", "api": "/api/wear",
-                       "body": {"item": key, "op": "wield"}}]
-                     if key != held and can else []),
-            "note": "" if can or key == held
-                    else "The rules cannot put this in hand by name yet.",
+            "line": line, "known": weapons_mod.has(key),
+            "launcher": bool(families),
+            "acts": acts,
+            "note": "" if acts else why,
+        })
+
+    # Ammunition: a counted row each, spent by the launcher that shoots it. Never in hand.
+    for name, n in sorted((pc.goods or {}).items()):
+        if int(n or 0) <= 0 or not weapons_mod.is_ammunition(name):
+            continue
+        key = weapons_mod.key_for(name)
+        fam = weapons_mod.family_of(key)
+        seen.add(str(name).strip().lower())
+        seen.add(key)
+        shooters = [k for k in counts if fam and fam in weapons_mod.ammo_families(k)]
+        rows.append({
+            "id": f"ammo:{key}", "key": key,
+            "name": re.sub(r"\s*\(\d+[^)]*\)\s*$", "", weapons_mod.get(key)["name"]),
+            "count": int(n), "unit": "", "kind": "ammunition", "shelf": "weapons",
+            "fits": "", "state": "", "known": True,
+            "line": (f"{int(n)} {weapons_mod.round_name(key, int(n))}, spent one a shot"
+                     + (f" from the {weapons_mod.get(shooters[0])['name'].lower()}"
+                        if shooters else "")),
+            "acts": [],
+            "note": ("Loosed from a launcher, never held: wield the "
+                     + (weapons_mod.get(shooters[0])["name"].lower() if shooters
+                        else f"launcher that shoots {fam or 'these'}")
+                     + " and every shot spends one."),
         })
 
     # Armour and shields: carried in `goods`, and the ones being worn.
     for table, kind, attr, slot in ((ARMOUR, "armour", "armour", "armor"),
                                     (SHIELDS, "shield", "shield", "shield")):
         on = str(getattr(pc, attr, "none") or "none").strip().lower()
-        keys = [k.strip().lower() for k in (pc.goods or {}) if goods.kind_of(k) == kind]
+        stored = {goods.canonical(k): k for k in (pc.goods or {})
+                  if goods.kind_of(k) == kind}
+        keys = list(stored)
         if on != "none" and on not in keys:
             keys.append(on)
         for key in keys:
@@ -1144,17 +1203,38 @@ def _carried(pc) -> list[dict]:
             e = table[key]
             seen.add(key)
             seen.add(str(e["name"]).lower())
+            seen.add(str(stored.get(key, key)).strip().lower())
+            cost = armour_mod.change_cost(kind, key, off=key == on)
+            acts, note = [], ""
+            if key == on:
+                if kind == "armour" and in_fight:
+                    note = (f"Taking it off takes {cost['said']}: not in the middle of a "
+                            f"fight. Only a shield comes off mid-fight.")
+                else:
+                    acts = [{"label": "Take off", "api": "/api/wear",
+                             "body": {"item": key, "op": "take_off"}}]
+            elif kind == "armour" and in_fight:
+                note = (f"Putting it on takes {cost['said']}: not in the middle of a "
+                        f"fight.")
+            else:
+                clash = armour_mod.hands_clash(pc, shield_key=key) if kind == "shield" else ""
+                if clash:
+                    note = clash
+                else:
+                    acts = [{"label": "Wear", "api": "/api/wear",
+                             "body": {"item": key, "op": "wear"}}]
             rows.append({
                 "id": f"{kind}:{key}", "key": key, "name": e["name"],
-                "count": int((pc.goods or {}).get(key, 0) or 0) or 1, "unit": "",
-                "kind": kind, "shelf": "armour", "fits": slot,
+                "count": int((pc.goods or {}).get(stored.get(key, key), 0) or 0) or 1,
+                "unit": "", "kind": kind, "shelf": "armour", "fits": slot,
                 "state": "worn" if key == on else "", "line": "", "known": True,
                 "armour": {"ac": e["ac"], "acp": e["acp"], "max_dex": e.get("max_dex"),
-                           "weight": e.get("weight", "")},
-                "acts": ([] if key == on else
-                         [{"label": "Wear", "api": "/api/wear",
-                           "body": {"item": key, "op": "wear"}}]),
-                "note": "",
+                           "weight": e.get("weight", ""), "asf": e.get("asf"),
+                           "lb": e.get("lb"),
+                           "proficient": armour_mod.proficient_with(pc, kind, key),
+                           "takes": cost.get("said", "")},
+                "acts": acts,
+                "note": note,
             })
 
     # Whatever the fiction handed over: counted, described by the engine, and honest
@@ -3667,6 +3747,9 @@ def wear_item(request):
     op = str(body.get("op", "")).strip().lower()
     if op in ("wield", "wear"):
         return _wear_by_the_engine(c, pc, item_id)
+    if op == "take_off":
+        # Armour or a shield off again: the engine's `take_off` op (2026-09-30, E4).
+        return _wear_by_the_engine(c, pc, item_id, op="take_off")
     held = pc.stock.get(item_id)
     if held is None:
         return JsonResponse({"error": f"you are not carrying {item_id!r}"}, status=400)
@@ -3694,7 +3777,7 @@ def wear_item(request):
     return JsonResponse(_state(c))
 
 
-def _wear_by_the_engine(c, pc, item: str):
+def _wear_by_the_engine(c, pc, item: str, op: str = "wear"):
     """Draw a carried weapon, or put on carried armour or a shield: the engine's own
     `wear` op, run straight from the Equipment tab's Wield and Wear buttons.
 
@@ -3717,7 +3800,7 @@ def _wear_by_the_engine(c, pc, item: str):
     try:
         engine = c.engine()
         resolution = engine.run(engine.validate([{
-            "op": "wear", "actor": "pc", "because": f"{pc.name} sees to their gear",
+            "op": op, "actor": "pc", "because": f"{pc.name} sees to their gear",
             "params": {"item": item},
         }]))
     except IntentError as exc:

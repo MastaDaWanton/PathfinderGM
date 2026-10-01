@@ -328,6 +328,31 @@
       "proficient.weapon.$target"
     ]
   },
+  "light-armor-proficiency": {
+    "tags": [
+      "proficient.armour.light"
+    ]
+  },
+  "medium-armor-proficiency": {
+    "tags": [
+      "proficient.armour.medium"
+    ]
+  },
+  "heavy-armor-proficiency": {
+    "tags": [
+      "proficient.armour.heavy"
+    ]
+  },
+  "shield-proficiency": {
+    "tags": [
+      "proficient.shield"
+    ]
+  },
+  "tower-shield-proficiency": {
+    "tags": [
+      "proficient.shield.tower"
+    ]
+  },
   "improved-unarmed-strike": {
     "tags": [
       "lethality.either.unarmed"

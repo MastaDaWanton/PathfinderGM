@@ -2662,6 +2662,18 @@ class Engine:
                 )
         if intent.op == "attack" and actor:
             key = intent.params.get("weapon") or actor.wielded_key()
+            # Named by another spelling of a weapon that IS carried ("light crossbow" for
+            # "light-crossbow", "Bo staff" for "bo-staff"): read as the carried entry, so
+            # every check below and the op itself see one name (E1). Nothing that is
+            # not carried is renamed — the refusals below still say what was asked for.
+            canon = weapons_mod.key_for(key)
+            if canon and actor.weapons and key not in actor.weapons:
+                same = next((w for w in actor.weapons if w and
+                             (weapons_mod.key_for(w) or str(w).lower()) == canon), None)
+                if same is not None:
+                    key = same
+                    if intent.params.get("weapon"):
+                        intent.params["weapon"] = same
             # A granted weapon is worn, not carried: it exists while its toggle holds
             # and nowhere else, so both the weapons-table check and the carried-list
             # check would refuse it for the wrong reason. Which grants exist — and
@@ -2704,6 +2716,15 @@ class Engine:
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index, code="no_such_weapon"
                 )
+            elif weapons_mod.is_ammunition(key):
+                # A quiver is not a weapon (E3): the attack names the launcher, and the
+                # launcher spends the round.
+                launchers = [w for w in actor.weapons if weapons_mod.family_of(key)
+                             in weapons_mod.ammo_families(w)]
+                raise IntentError(
+                    f"attack: {key} is ammunition, loosed from a launcher and never "
+                    f"swung." + (f" Attack with the {launchers[0]}." if launchers else ""),
+                    "legality", index, code="no_such_weapon")
             elif (key.lower() not in [w.lower() for w in actor.weapons]
                   and self.scene.out_of_hand(actor.ref, key)):
                 # Checked before the carried-list test, because that one is skipped
@@ -4453,6 +4474,24 @@ class Engine:
             return self._refuse(
                 intent, f"Which of them — {asked}? Say who, and the blow follows.")
         weapon_key = (intent.params.get("weapon") or actor.wielded_key()).lower()
+        # A launcher needs something to launch (E3, CRB Equipment "Ammunition"). Asked
+        # before anybody is drawn in, like the reach below: a bow with no arrows starts
+        # no fight. Counted for the player always, and for anybody else only once they
+        # carry rounds of their own — a stat block's archer is written with its quiver
+        # assumed, and refusing it would leave every bandit bowman standing idle.
+        ammo_families = ([] if intent.params.get("manoeuvre")
+                         else weapons_mod.ammo_families(weapon_key))
+        counts_ammo = bool(ammo_families) and (
+            actor.is_pc or bool(goods.ammo_carried(actor, ammo_families)))
+        no_ammo = (f"{actor.name} has no {ammo_families[0]}, so the "
+                   f"{weapons_mod.get(weapon_key)['name'].lower()} has nothing to shoot. "
+                   f"Nothing is rolled.") if ammo_families else ""
+        # A coup de grâce asks its own questions first (point-blank, helpless, immune):
+        # "the bow is too far" is the truer refusal than "no arrows", and it is asked below.
+        if (counts_ammo and partial.get("attack_state") is None
+                and not intent.params.get("coup_de_grace")
+                and not goods.ammo_carried(actor, ammo_families)):
+            return self._refuse(intent, no_ammo)
         # The floor under validate's reach check, for the lists it could not answer: a
         # move earlier in the list that fell short, a push that put the target out of
         # reach, an attack of opportunity that dropped the mover before they arrived.
@@ -4588,6 +4627,9 @@ class Engine:
                                    self._gap_ft(actor, defender))
             if why:
                 return self._refuse(intent, why)
+            if (counts_ammo and partial.get("attack_state") is None
+                    and not goods.ammo_carried(actor, ammo_families)):
+                return self._refuse(intent, no_ammo)
             # One blow is the whole full-round action: no iteratives, and no manoeuvre
             # riding it — a trip is not a way to finish somebody.
             full = False
@@ -4712,6 +4754,21 @@ class Engine:
                 state["tells"].append(
                     f"{defender.name} is already down; {actor.name} holds the blow.")
                 break
+            # One round a shot, iteratives included, spent as it is loosed — once per
+            # swing however many times the dice popup suspends it (`loosed_i`). The
+            # quiver running dry mid-volley ends the volley, said.
+            if counts_ammo and state.get("loosed_i", -1) < state["i"]:
+                shot = goods.spend_round(actor, ammo_families,
+                                         prefer=str(intent.params.get("ammo") or ""))
+                if shot is None:
+                    state["tells"].append(
+                        f"{actor.name} reaches for another and finds the "
+                        f"{ammo_families[0]} gone.")
+                    break
+                state["loosed_i"] = state["i"]
+                state["ammo_key"] = shot["key"]
+                state["ammo_left"] = shot["left"]
+                state["ammo_spent"] = int(state.get("ammo_spent", 0)) + 1
             swing_key, iteration = sequence[state["i"]]
             # Each swing its own weapon: the bite of a claw-claw-bite full attack rolls
             # the bite's printed bonus and dice, not the claw's. The named weapon keeps
@@ -4769,12 +4826,19 @@ class Engine:
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
+                    # A round that misses lies somewhere out there, to be looked for
+                    # when the fight is over (`_recover_ammunition`); one that hits is
+                    # spent ("destroyed or rendered useless", CRB "Ammunition").
+                    if counts_ammo:
+                        state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                     state["i"] += 1
                     continue
                 if not d20_succeeds(atk, swing_ac):
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} misses "
                         f"{defender.name} ({atk.total} against {swing_note}).")
+                    if counts_ammo:
+                        state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                     state["i"] += 1
                     continue
                 # Concealment: displacement, blur, entropic shield and invisibility all
@@ -4797,6 +4861,8 @@ class Engine:
                         state["tells"].append(
                             f"{actor.name} finds nothing there — {why}, {chance}% miss "
                             f"chance ({miss.total}).")
+                        if counts_ammo:
+                            state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                         state["i"] += 1
                         continue
                 state["hit_total"] = atk.total
@@ -5020,6 +5086,31 @@ class Engine:
                 state["i"] += 1
                 state["stage"] = "attack"
 
+        ammo_effects: list[dict] = []
+        if counts_ammo and state.get("ammo_spent"):
+            # The spend, as an effect and a tell (law 3): how many went, and how many
+            # are left — "Sam has 19 arrows left." — so neither the narrator nor the
+            # player has to count. The misses lie on the ground here as one record of
+            # the shooter's, counted, for `_recover_ammunition` at the fight's end
+            # (owner's ruling E1); a hit's round is gone.
+            spent = int(state["ammo_spent"])
+            missed = int(state.get("ammo_missed", 0))
+            left = int(state.get("ammo_left", 0))
+            key = str(state.get("ammo_key") or "")
+            fam = weapons_mod.family_of(key) or ammo_families[0]
+            if missed:
+                rec = self.scene.place_prop(
+                    f"{actor.name}'s spent {fam}", owner=actor.ref, from_=key,
+                    turn=int(self.scene.clock_minutes))
+                rec["loosed"] = True
+                rec["count"] = int(rec.get("count", 0) or 0) + missed
+            ammo_effects.append({"ref": actor.ref, "kind": "ammunition", "item": key,
+                                 "family": fam, "spent": spent, "missed": missed,
+                                 "left": left})
+            word = weapons_mod.round_name(key, left) if key else fam
+            state["tells"].append(
+                f"{actor.name} has {left} {word} left." if left
+                else f"{actor.name} has no {fam} left.")
         crossed = self._hp_state_effects(defender)
         coup_dc = None
         if coup and "dealt" in state and not defender.is_dead:
@@ -5066,7 +5157,7 @@ class Engine:
                         crossed.append({"ref": defender.ref, "kind": "condition",
                                         "condition": "dead", "from": "coup de grâce"})
         rolls = [_roll_from_dict(r) for r in state["rolls"]]
-        effects = list(state["effects"]) + crossed
+        effects = list(state["effects"]) + crossed + ammo_effects
         any_hit = any(e.get("kind") == "damage" for e in effects)
         # Harm moves how they feel (item 22.3; owner, Q37: the sword door obeys the rule
         # the spell door does). Damage, or a harmful condition landed by the blow.
@@ -5611,11 +5702,15 @@ class Engine:
 
         key = item.strip().lower()
         taker.goods[key] = taker.goods.get(key, 0) + 1
-        if goods.kind_of(key) == "weapon" or weapons_mod.has(key):
-            if key not in [w.lower() for w in taker.weapons]:
-                taker.weapons.append(key)
+        # Only what can be held goes on the weapons list and into the hand: a picked-up
+        # arrow is a round, not a weapon (`weapons.wieldable`, E1/E3). Compared by the one
+        # key, so a "bo staff" record does not add a second "bo-staff" weapon.
+        if goods.kind_of(key) == "weapon" and weapons_mod.wieldable(key)[0]:
+            canon = weapons_mod.key_for(key) or key
+            if canon not in [weapons_mod.key_for(w) or w.lower() for w in taker.weapons]:
+                taker.weapons.append(canon)
             if equip:
-                taker.equipped = key
+                taker.equipped = canon
 
     @staticmethod
     def _the(item: str) -> str:
@@ -8758,13 +8853,25 @@ class Engine:
         effects: list[dict] = []
         for w in list(body.weapons):
             if w and w != "unarmed":
-                looter.weapons.append(w)
-                taken.append(w)
+                # Through the one router: a weapon by its key, ammunition as rounds.
+                stowed, n = goods.stow(looter, w, 1)
+                if not stowed:
+                    looter.weapons.append(w)
+                taken.append(w if not stowed or n == 1 else f"{n} {w}")
         body.weapons = []
-        if body.armour and body.armour != "none":
-            looter.carry(body.armour.replace(" ", "-"), 1)
-            taken.append(body.armour)
-            body.armour = "none"
+        # Armour and a shield into `goods` by their table key, where `wear` and the
+        # Equipment tab both read them. Measured 2026-09-30: the watchman's chain shirt
+        # went into the ingredient SATCHEL as "chain-shirt" (`carry`, the herb store),
+        # where it could be neither seen as armour nor worn. The shield was not taken
+        # at all.
+        for attr in ("armour", "shield"):
+            worn = str(getattr(body, attr, "none") or "none")
+            if worn != "none":
+                stowed, _ = goods.stow(looter, worn, 1)
+                if not stowed:
+                    looter.goods[worn] = looter.goods.get(worn, 0) + 1
+                taken.append(worn)
+                setattr(body, attr, "none")
         for coin, n in dict(body.purse).items():
             looter.purse[coin] = looter.purse.get(coin, 0) + n
             taken.append(f"{n} {coin}")
@@ -10665,6 +10772,35 @@ class Engine:
                                      f"{spell.name} instead.")
             if converted:
                 state["tells"].append(converted)
+            # Arcane spell failure (owner's ruling E3; CRB "Arcane Spell Failure"): an
+            # arcane caster in armour or behind a shield rolls the table's percentage for
+            # a spell with a somatic component, and on a failure "the spell is lost" —
+            # after the slot is spent, which is the rule's whole bite. Rolled by the
+            # engine, once, on first entry, and said either way.
+            from . import armour as armour_mod
+
+            asf, fouled_by = armour_mod.spell_failure(actor, spell)
+            if asf:
+                roll = self.dice.roll("1d100", label=f"Arcane spell failure ({asf}%)",
+                                      visibility="hidden")
+                state["rolls"].append(roll.as_dict())
+                if roll.total <= asf:
+                    return Outcome(
+                        intent_id=intent.id, op="cast", rolls=[roll],
+                        effects=[{"ref": actor.ref, "kind": "spell_failure",
+                                  "spell": spell.id, "name": spell.name, "chance": asf,
+                                  "rolled": roll.total, "worn": fouled_by,
+                                  "slot": pool,
+                                  "slots_left": casting.slots_left(actor, level)}],
+                        tell=(f"{actor.name} begins {spell.name}, and the {fouled_by} "
+                              f"fouls the gestures: arcane spell failure, {roll.total} "
+                              f"against {asf}%. The spell is lost"
+                              + ("." if casting.at_will(level) else ", and its slot "
+                                 "with it.")),
+                        because=intent.because)
+                state["tells"].append(
+                    f"The {fouled_by} does not foul the casting (arcane spell failure "
+                    f"{asf}%, rolled {roll.total}).")
         pool = casting.slot_pool(level)
 
         targets = list(state.get("caught") or [])
@@ -11120,7 +11256,11 @@ class Engine:
             # Rolled once, here, with the engine's own seeded dice — see
             # `spells.roll_duration` on why the deterministic reader stayed deterministic.
             "rounds": spells_mod.roll_duration(spell, cl, self.dice),
-            "source": spell.name, "dc": dc,
+            "source": spell.name, "dc": dc, "origin": f"spell:{spell.id}",
+            # Whether a cast at nobody lands on the caster: a personal or touch spell
+            # (mage armor, shield) said without a target means the caster.
+            "self_ok": bool(re.match(r"\s*(personal|touch|you)\b",
+                                     str(spell.range or ""), re.I)),
             "save": plan.get("save", ""), "save_effect": plan.get("save_effect", ""),
             "square": tuple(square) if square else None,
             "chosen": intent.params.get("choose"),
@@ -11150,7 +11290,8 @@ class Engine:
 
     def _executes(self, spec: dict) -> bool:
         return (str(spec.get("type", "")) in self._EXECUTES
-                or str(spec.get("trigger") or "on_cast") != "on_cast")
+                or str(spec.get("trigger") or "on_cast") != "on_cast"
+                or _ac_grant(spec) is not None)
 
     def _run_specs(self, specs: list[dict], ctx: dict) -> tuple[list[dict], list[str]]:
         """Every spec in this list the engine can run, run. Returns effects and tells.
@@ -11187,7 +11328,68 @@ class Engine:
             return self._object_damage(spec, ctx)
         if kind == "attitude":
             return self._attitude(spec, ctx)
+        if _ac_grant(spec) is not None:
+            return self._grant_ac(spec, ctx)
         return self._stand_by(spec, ctx)
+
+    def _grant_ac(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell's bonus to armour class, landed as an ActiveEffect on whoever it was
+        cast on, for the spell's own duration (the deferred Mage Armor item, 2026-09-30).
+
+        Measured through the real model on 2026-09-30: Mage Armor was cast, spent its
+        slot and was narrated, and armour class stayed 13 — base, buckler and Dex — because
+        a cast's `combat_mod` was only ever RENDERED for the GM ("+4 Armour bonus to
+        AC.") and never reached `ac_modifiers`. The reason it was not applied, written on
+        `casting_plan`, was that a duration was "still prose"; `_cast_context` has rolled
+        it into rounds since, so the reason was gone and the rule was left standing.
+
+        Through the one applicator (`Actor.add_buff`, an ActiveEffect with a typed
+        modifier and `origin: spell:<id>`), so it stacks by 1e's types in `dice.stack` —
+        mage armor's +4 armour against a chain shirt's +4 is the better one, not +8 —
+        and it ends when its rounds run out, with nothing to subtract. Only what
+        `_ac_grant` can apply honestly: a flat or caster-level-scaled bonus with no
+        "only against" clause; the rest stays rendered for the GM, as before.
+        """
+        from . import effectspec as fx
+
+        grant = _ac_grant(spec)
+        rounds = ctx.get("rounds")
+        if grant is None or rounds is None:
+            return [], [fx.render(spec) + " — its duration is not a number of rounds, so "
+                                          "it is told rather than applied."]
+        cl = int(ctx.get("caster_level") or 1)
+        amount = grant(cl, ctx.get("vars") or {})
+        if not amount:
+            return [], []
+        targets = [str(r) for r in (ctx.get("targets") or [])]
+        if not targets and ctx.get("self_ok"):
+            # "I cast mage armor" with nobody named: a personal or touch spell cast at
+            # nobody is cast on the caster, which is what the words meant.
+            targets = [str(ctx.get("caster") or "")]
+        typed = str(spec.get("bonus_type") or "untyped")
+        source = str(ctx.get("source") or "a spell")
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in targets:
+            who = self.scene.actors.get(ref)
+            if who is None:
+                continue
+            before = who.ac()
+            who.add_buff("combat_mod", "ac", amount, source=source, rounds=int(rounds),
+                         note=str(spec.get("note") or ""), bonus_type=typed,
+                         origin=str(ctx.get("origin") or ""))
+            after = who.ac()
+            effects.append({"ref": who.ref, "kind": "buff", "target": "ac",
+                            "amount": amount, "bonus_type": typed,
+                            "rounds_left": int(rounds), "source": source,
+                            "origin": str(ctx.get("origin") or ""), "ac": after})
+            word = "armour" if typed == "armour" else typed
+            tells.append(
+                f"{who.name}'s armour class {before} to {after} ({source}: "
+                f"{amount:+d} {word}, for {int(rounds)} rounds)." if after != before else
+                f"{who.name}'s armour class stays {before}: {source}'s {amount:+d} {word} "
+                f"does not stack with the {word} bonus already held.")
+        return effects, tells
 
     def _attitude(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A spell that changes how somebody feels about you. Charm person, and 32 others.
@@ -12061,6 +12263,43 @@ class Engine:
             tell=tell, because=intent.because,
         )
 
+    def _recover_ammunition(self) -> str:
+        """Gather up what missed, now the fight is over (owner's ruling E1, 2026-09-30).
+
+        CRB Equipment, "Ammunition": "ammunition that misses has a 50% chance of being
+        destroyed or lost." The owner's ruling takes that chance at its expected value
+        and automatically: half of each shooter's misses come back, rounded down, and
+        the rest are gone. No die, because a die per arrow at the end of every fight is
+        bookkeeping the ruling chose not to have. Read off the props ledger, where the
+        attack op laid each shooter's misses as one counted record at this place
+        (`loosed`), so a fight walked away from by `journey` leaves its arrows lying
+        where they fell — which is where they are. Only somebody here and on their feet
+        gathers. Returns the sentence for the fight's closing tell, or "".
+        """
+        lines: list[str] = []
+        for rec in list(self.scene.props):
+            if not rec.get("loosed") or rec.get("at") != self.scene.at \
+                    or rec.get("held_by"):
+                continue
+            owner = self.scene.actors.get(str(rec.get("owner") or ""))
+            if owner is None or owner.is_down:
+                continue
+            missed = int(rec.get("count", 0) or 0)
+            back = missed // 2
+            key = str(rec.get("from_") or "")
+            if back and key:
+                owner.goods[key] = int(owner.goods.get(key, 0) or 0) + back
+            self.scene.props.remove(rec)
+            word = weapons_mod.round_name(key, missed) if key else "shots"
+            lost = missed - back
+            lines.append(f"{owner.name} gathers up {back} of the {missed} {word} that "
+                         f"missed; the other {lost} {'is' if lost == 1 else 'are'} "
+                         f"broken or lost."
+                         if back else
+                         f"The {word} {owner.name} loosed and missed "
+                         f"{'is' if missed == 1 else 'are'} broken or lost.")
+        return (" " + " ".join(lines)) if lines else ""
+
     def _settle_xp(self) -> str:
         """Award the fight's XP to the PC while the sides are still declared.
 
@@ -12078,7 +12317,7 @@ class Engine:
         # with a treasure column and no XP price — which is most of the bestiary, since
         # 6,355 of 7,136 entries never had either filled in — dropped its purse on the
         # floor and nobody picked it up.
-        coin = self._settle_treasure()
+        coin = self._settle_treasure() + self._recover_ammunition()
         total, names = xp_mod.award_for_fallen(self.scene, pc)
         # Paid once. The routed units' debt is remembered on the scene because they are gone
         # from it (`_rout`), and a second fight in the same room must not pay for the first
@@ -12678,9 +12917,15 @@ class Engine:
                                       moved, paid, denom)
 
                 kind = goods.kind_of(item)
-                taker.goods[item] = taker.goods.get(item, 0) + moved
-                key = item.lower()
-                if kind == "weapon" and key not in [w.lower() for w in taker.weapons]:
+                if kind == "ammunition":
+                    # Rounds, by the one router: "a quiver of arrows" handed over is
+                    # twenty arrows in `goods`, which a bow spends one a shot (E3).
+                    goods.stow(taker, item, moved)
+                else:
+                    taker.goods[item] = taker.goods.get(item, 0) + moved
+                key = goods.canonical(item) if kind == "weapon" else item.lower()
+                if kind == "weapon" and key not in [weapons_mod.key_for(w) or w.lower()
+                                                    for w in taker.weapons]:
                     taker.weapons.append(key)
                 if kind == "weapon" and from_ground:
                     taker.equipped = key
@@ -13140,6 +13385,9 @@ class Engine:
         Refused for anything not actually held: an inventory that can be worn without
         being owned is a sheet that claims protection nobody bought.
         """
+        from . import armour as armour_mod
+        from . import weapons as weapons_mod
+
         item = str(intent.params.get("item", "")).strip()
         ref = intent.params.get("actor") or intent.actor or (
             self.scene.pc().ref if self.scene.pc() else None)
@@ -13147,33 +13395,190 @@ class Engine:
         if actor is None:
             raise IntentError("wear: nobody here to wear it", "refs")
 
-        key = item.lower()
-        carried = {k.lower() for k in actor.goods} | {w.lower() for w in actor.weapons}
-        if key not in carried:
-            return Outcome(intent_id=intent.id, op="wear", effects=[],
-                           tell=f"{actor.name} is not carrying {item}.",
+        def no(why: str) -> Outcome:
+            return Outcome(intent_id=intent.id, op="wear", effects=[], tell=why,
                            because=intent.because)
 
-        kind = goods.kind_of(item)
+        # The one key, by the two resolvers (E1). Compared key to key, so "leather
+        # armour", "Chain Shirt" and "bo staff" find what the sheet holds as "leather",
+        # "chain shirt" and "bo-staff" — and what is put on is stored by its key.
+        found = goods.known_item(item)
+        kind = found["table"] if found else goods.kind_of(item)
+        key = str(found["key"]) if found else item.lower()
+        carried = ({goods.canonical(k) for k in actor.goods}
+                   | {weapons_mod.key_for(w) or w.lower() for w in actor.weapons}
+                   | {str(actor.armour), str(actor.shield)})
+        # Putting away what is in hand is drawing nothing: the fists are always there.
+        if key not in carried and key != "unarmed":
+            return no(f"{actor.name} is not carrying {item}.")
+
         before = actor.ac()
-        if kind == "armour":
-            actor.armour = key
-        elif kind == "shield":
-            actor.shield = key
-        elif kind == "weapon":
+        name = str((found or {}).get("name") or item)
+        cost: dict = {}
+        if kind == "weapon":
+            ok, why = weapons_mod.wieldable(key)
+            if not ok:
+                return no(why)
+            clash = armour_mod.hands_clash(actor, weapon_key=key)
+            if clash:
+                return no(clash)
+            held = weapons_mod.key_for(actor.equipped or "") or str(actor.equipped or "")
+            # The carried entry rewritten to the key it is, so the attack op's "is it
+            # carried" and the sheet's "is it in hand" compare like with like.
+            actor.weapons = [key if (weapons_mod.key_for(w) or w.lower()) == key else w
+                             for w in actor.weapons]
             actor.equipped = key
+            if key == "unarmed":
+                what = weapons_mod.get(held)["name"] if weapons_mod.has(held) else ""
+                tell = (f"{actor.name} puts the {what.lower()} away; their hands are "
+                        f"empty." if what and held != "unarmed"
+                        else f"{actor.name}'s hands are empty.")
+                return Outcome(
+                    intent_id=intent.id, op="wear",
+                    effects=[{"ref": actor.ref, "kind": "wear", "item": "unarmed",
+                              "put_away": held, "ac": actor.ac()}],
+                    tell=tell, because=intent.because)
+            name = weapons_mod.get(key)["name"].lower()
+        elif kind in ("armour", "shield"):
+            if kind == "shield":
+                clash = armour_mod.hands_clash(actor, shield_key=key)
+                if clash:
+                    return no(clash)
+            cost = armour_mod.change_cost(kind, key, off=False)
+            if kind == "armour" and self.scene.in_encounter:
+                # Owner's ruling E2: a suit takes minutes, and a fight is rounds.
+                return no(f"Putting on the {name} takes {cost['said']}, and there is a "
+                          f"fight on: only a shield changes mid-fight (a move action).")
+            was = str(getattr(actor, kind) or "none")
+            # A suit worn straight off the outfit page was never in `goods`; changing out
+            # of it must not make it vanish.
+            if was != "none" and was != key and not any(
+                    goods.canonical(k) == was for k in actor.goods):
+                actor.goods[was] = actor.goods.get(was, 0) + 1
+            actor.remove_effects(match=lambda e: str(e.source or "").startswith(
+                "donned hastily:"))
+            setattr(actor, kind, key)
+            if cost.get("minutes"):
+                self.scene.advance(minutes=int(cost["minutes"]))
+            if cost.get("hasty"):
+                # CRB Table 6-8's footnote, and its "Don Hastily" rule: alone, plate goes
+                # on only hastily, and then "the armor check penalty and armor bonus for
+                # hastily donned armor are each 1 point worse than normal". Through the
+                # one applicator, so taking it off takes the penalty with it.
+                actor.apply_effect(ActiveEffect(
+                    name="donned hastily", kind="buff", source=f"donned hastily:{key}",
+                    origin="rule:don-hastily", duration="until-dismissed",
+                    modifiers=[{"kind": "combat_mod", "target": "ac", "amount": -1,
+                                "bonus_type": "", "note": "armour donned hastily"},
+                               {"kind": "combat_mod", "target": "armour_check",
+                                "amount": -1, "bonus_type": "",
+                                "note": "armour donned hastily"}]))
+        elif kind == "ammunition":
+            return no(weapons_mod.wieldable(key)[1])
         else:
-            return Outcome(intent_id=intent.id, op="wear", effects=[],
-                           tell=f"{item} is not something that can be worn or wielded.",
-                           because=intent.because)
+            return no(f"{item} is not something that can be worn or wielded.")
 
         after = actor.ac()
         moved = f" Armour class {before} to {after}." if after != before else ""
+        took = ""
+        if cost.get("action") == "move":
+            took = " (a move action)"
+        elif cost.get("said"):
+            took = f" ({cost['said']}" + (", hastily: nobody is helping" if cost.get(
+                "hasty") else "") + ")"
         return Outcome(
             intent_id=intent.id, op="wear",
-            effects=[{"ref": actor.ref, "kind": "wear", "item": key, "ac": after}],
+            effects=[{"ref": actor.ref, "kind": "wear", "item": key, "ac": after,
+                      **({"minutes": int(cost["minutes"])} if cost.get("minutes") else {}),
+                      **({"hasty": True} if cost.get("hasty") else {})}],
             tell=(f"{actor.name} {'draws' if kind == 'weapon' else 'puts on'} "
-                  f"the {item}.{moved}"),
+                  f"the {name}{took}.{moved}"),
+            because=intent.because,
+        )
+
+    def _op_take_off(self, intent: Intent, partial: dict) -> Outcome:
+        """Take off armour or a shield, or put away what is in hand (E4).
+
+        "Armour and a shield come off only by putting another on (`_op_wear` swaps;
+        nothing sets them back to none)" was the Equipment tab's own note until
+        2026-09-30, and a wizard who had tried a breastplate on could never take it off
+        again. The suit goes back to `goods`, where it can be worn again; one worn
+        straight off the outfit page was never there and is put there now. The tell
+        carries the armour class, as `wear`'s does.
+
+        The time is Table 6-8's, as for putting it on (owner's ruling E2): out of a fight
+        the minutes pass through the one clock — 1d4+1 for plate, rolled — and in a fight
+        a suit is refused with its time named; a shield is a move action and comes off.
+        """
+        from . import armour as armour_mod
+        from . import weapons as weapons_mod
+
+        ref = intent.params.get("actor") or intent.actor or (
+            self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(ref) if ref else None
+        if actor is None:
+            # Printed, never raised: a resolution-time raise reaches the player as a 502
+            # with their line deleted (tests/test_stage7_refusals.py).
+            return self._refuse(intent, "There is nobody here to take anything off.")
+        said = " ".join(str(intent.params.get("item") or "").lower().split())
+
+        def no(why: str) -> Outcome:
+            return Outcome(intent_id=intent.id, op="take_off", effects=[], tell=why,
+                           because=intent.because)
+
+        # Which thing: the word for the slot ("armour", "my shield"), the thing's own
+        # name, or the weapon in hand.
+        bare = re.sub(r"^(?:my|the|his|her|their)\s+", "", said)
+        kind, key = armour_mod.key_for(bare)
+        held = weapons_mod.key_for(actor.equipped or "") or str(actor.equipped or "")
+        if not kind:
+            if bare in ("", "armour", "armor", "suit", "mail", "my armour"):
+                kind, key = "armour", str(actor.armour)
+            elif bare in ("shield", "buckler"):
+                kind, key = "shield", str(actor.shield)
+            elif bare in ("weapon", "sword", "blade", "bow") or (
+                    weapons_mod.key_for(bare) and weapons_mod.key_for(bare) == held):
+                if held in ("", "unarmed"):
+                    return no(f"{actor.name} has nothing in hand to put away.")
+                return self._op_wear(Intent(
+                    id=intent.id, op="wear", actor=actor.ref,
+                    params={"item": "unarmed"}, because=intent.because), partial)
+            else:
+                return no(f"{actor.name} is wearing nothing called {said or 'that'}.")
+        worn = str(getattr(actor, kind) or "none")
+        if worn == "none":
+            return no(f"{actor.name} is wearing no {kind}.")
+        if key and key != worn:
+            return no(f"{actor.name} is not wearing the {armour_mod.row(kind, key)['name']}; "
+                      f"they have on the {armour_mod.row(kind, worn)['name']}.")
+        name = armour_mod.row(kind, worn)["name"]
+        cost = armour_mod.change_cost(kind, worn, off=True)
+        if kind == "armour" and self.scene.in_encounter:
+            return no(f"Taking off the {name} takes {cost['said']}, and there is a fight "
+                      f"on: only a shield comes off mid-fight (a move action).")
+        before = actor.ac()
+        rolls = []
+        minutes = int(cost.get("minutes") or 0)
+        if cost.get("dice"):
+            roll = self.dice.roll(cost["dice"], label=f"Taking off the {name} (minutes)",
+                                  visibility="hidden")
+            rolls.append(roll)
+            minutes = max(1, roll.total)
+        setattr(actor, kind, "none")
+        actor.remove_effects(match=lambda e: str(e.source or "") == f"donned hastily:{worn}")
+        if not any(goods.canonical(k) == worn for k in actor.goods):
+            actor.goods[worn] = actor.goods.get(worn, 0) + 1
+        if minutes:
+            self.scene.advance(minutes=minutes)
+        after = actor.ac()
+        took = " (a move action)" if kind == "shield" else (
+            f" ({minutes} minute{'s' if minutes != 1 else ''})")
+        moved = f" Armour class {before} to {after}." if after != before else ""
+        return Outcome(
+            intent_id=intent.id, op="take_off", rolls=rolls,
+            effects=[{"ref": actor.ref, "kind": "take_off", "slot": kind, "item": worn,
+                      "ac": after, **({"minutes": minutes} if minutes else {})}],
+            tell=f"{actor.name} takes off the {name}{took}.{moved}",
             because=intent.because,
         )
 
@@ -14215,6 +14620,79 @@ def _damage_note(d: dict) -> str:
     if d.get("overflow"):
         bits.append(f"{d['overflow']} past the non-lethal limit, taken as lethal")
     return f"{d['rolled']}, " + ", ".join(bits) if bits else ""
+
+
+# A spell's AC note that makes the bonus conditional: "against attacks of opportunity
+# only", "only against the one opponent", "applies only to the first round", "lost
+# whenever you lose your Dexterity". Applied always, each would be a wrong number, so a
+# spec carrying one stays rendered for the GM (CLAUDE.md: prose beats a wrong number).
+_AC_CONDITIONAL = re.compile(
+    r"\bagainst\b|\bonly\b|\bwhen(?:ever)?\b|\bwhile\b|\bif\b|\bfirst round\b|"
+    r"\bexisting\b|\bthe animal|\bsame creatures\b|\bevery creature\b|\bstack|"
+    # Magic vestment's bonus is on the ARMOUR or shield it touches, not on the wearer;
+    # applied to AC it would armour a caster in a robe.
+    r"armou?r or shield", re.I)
+# "+1 more per three caster levels above 3rd, maximum +5" (barkskin), "+1 more per six
+# caster levels, maximum +5" (shield of faith), "+1 more for every 4 caster levels,
+# maximum +8" (armor of darkness): the scaling the corpus writes as a note, read into the
+# number rather than left at the 1st-level value.
+_AC_SCALING = re.compile(
+    r"\+1 (?:more )?(?:per|for every) (?P<step>\w+) caster levels?"
+    r"(?: above (?P<above>\d+))?\w*,? (?:to a )?maximum (?:of )?\+(?P<cap>\d+)", re.I)
+_NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+
+
+def _ac_grant(spec: dict):
+    """How to work out this spec's AC bonus at a caster level, or None when it is not one
+    the engine applies on casting.
+
+    A `combat_mod` aimed at `ac`, landing on the spell's own target when it is cast, with
+    a whole-number amount (or a formula `effectspec` evaluates) and either no note, a note
+    that only restates the type ("does not stack with worn armour" — the typed funnel
+    already says so), or a caster-level scaling `_AC_SCALING` reads. Measured over the
+    3,040 spells on 2026-09-30: 101 carry an AC `combat_mod`; see `tests/
+    test_lane_e_gear.py` for how many of them this applies and why the rest are told."""
+    if str(spec.get("type") or "") != "combat_mod" \
+            or str(spec.get("target") or "").lower() != "ac" \
+            or str(spec.get("trigger") or "on_cast") != "on_cast" \
+            or str(spec.get("recipient") or "target") not in ("target", "area"):
+        return None
+    note = str(spec.get("note") or "").strip()
+    raw = spec.get("amount")
+    if effectspec.is_formula(raw):
+        base_formula = raw
+    else:
+        try:
+            base_formula = int(raw)
+        except (TypeError, ValueError):
+            return None
+        # Bonuses only. A spell's AC PENALTY rides a spell whose other halves are not
+        # applied yet — rage's -2 AC beside its +2 Strength — and landing the penalty
+        # alone would make the spell a curse.
+        if base_formula <= 0:
+            return None
+    scaling = None
+    if note and note.lower() != "does not stack with worn armour":
+        m = _AC_SCALING.search(note)
+        # Anything the note says besides a scaling is a condition or a caveat the number
+        # cannot carry ("lost whenever you lose your Dexterity" rides one scaling note).
+        if m is None or _AC_CONDITIONAL.search(note):
+            return None
+        step = m.group("step").lower()
+        step = _NUMBER_WORDS.get(step) or (int(step) if step.isdigit() else 0)
+        if not step:
+            return None
+        scaling = (step, int(m.group("above") or 0), int(m.group("cap")))
+
+    def amount(cl: int, variables: dict) -> int:
+        base = (int(effectspec.evaluate(base_formula, variables))
+                if isinstance(base_formula, str) else int(base_formula))
+        if scaling is None:
+            return base
+        step, above, cap = scaling
+        return min(cap, base + max(0, cl - above) // step)
+
+    return amount
 
 
 def _multiply_dice(notation: str, mult: int) -> str:

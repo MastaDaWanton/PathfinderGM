@@ -80,7 +80,8 @@ function combatCard(s) {
         class="why">${esc(a.type_text || a.type)}</span></td>
       <td class="n" data-label="Critical">${esc(a.crit)}</td>
       <td data-label="Range">${a.range_ft ? `${a.range_ft} ft${thrown ? ", thrown" : ""}`
-        : a.category === "melee" ? `<span class="why">melee</span>` : NOT_KNOWN}${
+        : a.category === "melee" ? `<span class="why">melee</span>`
+        : a.launcher ? NOT_KNOWN : `<span class="why">not printed</span>`}${
         thrown ? `<span class="why"><span class="unknown">thrown to-hit not known</span></span>` : ""}</td>
       <td class="wide" data-label="Notes"><span class="why">${esc(notes.join(", "))}</span></td>
     </tr>`;
@@ -1168,11 +1169,12 @@ function detailClosed() {
 // their own order and labels (rules/tables.py SLOTS, SLOT_ORDER_LEFT and _RIGHT, read
 // through `body_slots`). A slot pressed shows only what fits it.
 //
-// Every row and every act is the server's (play/views.py `_carried`): Wield and Wear run
-// the engine's `wear` op, a bought wondrous item goes into its slot through the sheet's
-// own `/api/slots`, a jar is drunk, thrown or coated through `/api/use`. The page offers
-// what those doors would take and nothing else, so there is no Take off on armour and no
-// Drop anywhere: the rules have neither, and the head of the page says so in words.
+// Every row and every act is the server's (play/views.py `_carried`): Wield, Put away and
+// Wear run the engine's `wear` op, Take off its `take_off` op (2026-09-30), a bought
+// wondrous item goes into its slot through the sheet's own `/api/slots`, a jar is drunk,
+// thrown or coated through `/api/use`. The page offers what those doors would take and
+// nothing else, and a row with no act carries the server's reason in words (`note`).
+// There is no Drop: the rules do not have one yet.
 let EQ_SHELF = "all";
 let EQ_FIT = null;          // a slot key ("hand", "ring", ...) while a slot is pressed
 let EQ_SAY = "";            // the last answer, written in the line kept for it
@@ -1203,17 +1205,27 @@ function eqFacts(s, r) {
     const bits = [`${a.damage_dice}${a.damage.total ? sign(a.damage.total) : ""} ${a.type_text || a.type}`,
                   a.crit, `${(a.swings && a.swings.length ? a.swings : [a.attack.total]).map(sign).join("/")} to hit`];
     if (a.range_ft) bits.push(`range ${a.range_ft} ft`);
-    else if (a.category !== "melee") bits.push("range not known");
+    // "Range not known" only where it is a gap: a launcher whose range the table lacks.
+    else if (a.launcher) bits.push("range not known");
+    // A launcher names its supply: "58 arrows", or that there is none to shoot.
+    if (a.ammo) {
+      const left = (a.ammo.carried || []).reduce((n, x) => n + x.count, 0);
+      bits.push(left ? `${left} ${a.ammo.families[0]} carried` : `no ${a.ammo.families[0]} carried`);
+    }
     if (a.weight_lb != null) bits.push(`${a.weight_lb} lb`);
     if (!a.proficient) bits.push("not proficient");
     return esc(bits.join(", "));
   }
   if (r.armour) {
     const a = r.armour, bits = [`${sign(a.ac)} AC`];
-    if (r.kind === "armour" && a.max_dex != null && a.max_dex < 90) bits.push(`max Dex ${sign(a.max_dex)}`);
+    if (a.max_dex != null && a.max_dex < 90) bits.push(`max Dex ${sign(a.max_dex)}`);
     bits.push(a.acp ? `check penalty ${a.acp}` : "no check penalty");
+    if (a.asf) bits.push(`spell failure ${a.asf}%`);
     if (a.weight) bits.push(`${a.weight} armour`);
-    return esc(bits.join(", "));
+    if (a.lb) bits.push(`${a.lb} lb`);
+    if (a.takes) bits.push(`${r.state === "worn" ? "off" : "on"} in ${a.takes}`);
+    return esc(bits.join(", ")) + (a.proficient === false
+      ? ` <span class="chip warn">not proficient</span>` : "");
   }
   const tail = String(r.line || "").split(" — ").slice(1).join(" — ");
   const said = r.line && !/no rules for it/.test(r.line) ? (tail || r.line) : "";
@@ -1297,8 +1309,8 @@ function pageEquipment(s) {
       <p class="eqsay${EQ_SAY_BAD ? " bad" : ""}" id="eq-say" role="status" tabindex="-1">${EQ_SAY ? esc(EQ_SAY)
         : `<span class="why">Wield or wear something, and what the rules say back is written here.</span>`}</p>
       <ul class="eqrows">${items || empty}</ul>
-      <p class="eqload"><b>Weight.</b> Only weapons carry a weight in the rules, written on
-        their rows. Load is <span class="unknown">not tracked</span>, so nothing here slows
+      <p class="eqload"><b>Weight.</b> Weapons, armour and shields carry their weight in the
+        rules, written on their rows. Load is <span class="unknown">not tracked</span>, so nothing here slows
         ${esc(String(s.identity.name || "").split(" ")[0])} down.</p>
       <p class="credit">Item icons by Lorc, Delapouite, Skoll, Sbed, Willdabeast, Carl Olsen,
         Caro Asercion and Lucas from <a href="https://game-icons.net" target="_blank"

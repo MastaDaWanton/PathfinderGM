@@ -498,6 +498,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # computes; a weapon becomes the one in your hand. Refused for anything you do not
     # actually have, so the sheet can never claim protection nobody bought.
     "wear": (("item",), ("actor",), "hidden"),
+    # And off again (2026-09-30, E4). `item` is "armour", "shield", the thing's own name, or
+    # the weapon in hand (put away); absent means the armour. The engine charges the
+    # Table 6-8 minutes out of a fight and refuses a suit inside one, naming the time.
+    "take_off": ((), ("item", "actor"), "hidden"),
     # Blood on the ground. `blood_pool` puts one down — at a square when there is a
     # grid, beside the actor when there is not — and `spend_pools` is how every
     # ability that siphons, detonates or steps through them takes them back off.

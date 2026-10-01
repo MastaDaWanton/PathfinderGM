@@ -773,6 +773,9 @@ Selling something out of the satchel:
 "to": "<the buyer's ref, if they are in the scene>"}} — the engine prices it, checks what
 that stall can actually raise today and moves the coin. Never state a price or a sum of
 money in the narration: what the buyer can pay is not something you know.
+Taking armour or a shield off, or putting away what is in hand: {"op": "take_off",
+"actor": "pc", "params": {"item": "armour"}} ("shield", or the thing's name). The engine
+says how long it takes, and a suit does not come off in the middle of a fight.
 If the turn needs no mechanics at all, emit a single {"op": "narrate_only"} intent.
 """ % (", ".join(DC_BANDS), ", ".join(sorted(MANEUVERS)))
 

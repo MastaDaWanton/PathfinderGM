@@ -1222,10 +1222,19 @@ def validate_class(d: dict) -> list[str]:
                 f"'knowledge (religion)'.")
     for prof in (d.get("proficiencies") or ()):
         key = str(prof).strip().lower()
-        if key not in PROFICIENCY_GROUPS and key not in WEAPONS:
+        # Through the same two resolvers the sheet reads the list with (2026-09-30): any
+        # row of the 456-weapon table by any spelling ("heavy crossbow", "short-sword"),
+        # and the armour tokens ("light armour", "shields", "tower shields"), which this
+        # asked of the curated twelve weapons and so refused.
+        from . import armour as armour_mod
+        from . import weapons as weapons_mod
+
+        if key not in PROFICIENCY_GROUPS and key not in WEAPONS \
+                and not weapons_mod.has(key) and not armour_mod.is_armour_token(key):
             problems.append(
-                f"proficiencies: {prof!r} is neither a group ({', '.join(PROFICIENCY_GROUPS)}) "
-                f"nor a weapon the tables carry, so it grants proficiency in nothing.")
+                f"proficiencies: {prof!r} is neither a group ({', '.join(PROFICIENCY_GROUPS)}), "
+                f"an armour or shield proficiency, nor a weapon the tables carry, so it "
+                f"grants proficiency in nothing.")
 
     # --- the level table ----------------------------------------------------------
     columns, levels_seen = set(), {}

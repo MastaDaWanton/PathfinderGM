@@ -118,7 +118,9 @@ def test_the_players_own_natural_20_on_the_popup_saves_them():
 
 def _wizard_at(s):
     d = to_dict(load_pc("fixtures/pc-kesst.json"))
-    d.update({"class": "wizard", "level": 5, "ranks": {}})
+    # Out of Kesst's leather, which since 2026-09-30 makes an arcane caster roll spell
+    # failure first (tests/test_gear_usable.py); this test is about the save's natural.
+    d.update({"class": "wizard", "level": 5, "ranks": {}, "armour": "none"})
     d["abilities"]["int"] = 18
     d["spellbook"] = ["burning-hands"]
     d["prepared"] = {"burning-hands": 3}
