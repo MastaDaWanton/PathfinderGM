@@ -8536,7 +8536,7 @@ _SEEN_HERE = re.compile(
 def seen_in_beat(beat: str, phrase: str) -> str:
     """SEEN, HEARD or "" — how this beat has the person: shown here and now, only spoken
     of, or neither clearly (recorded where the party is, as before, and given no body)."""
-    from .narration import _sentences, action_sentences, unquoted
+    from .narration import _sentences, unquoted
 
     if not beat or not phrase:
         return ""
@@ -8550,14 +8550,55 @@ def seen_in_beat(beat: str, phrase: str) -> str:
         return HEARD                       # only ever inside somebody's speech
     told = [s for s in about if _HEARSAY.search(s) or _IF.match(s)]
     plain_about = [s for s in about if s not in told]
-    acted = {" ".join(s.split()) for s in action_sentences(plain, [phrase])}
     for s in plain_about:
-        if (_PLACES_THEM_HERE.search(s) or _SEEN_HERE.search(s)
-                or " ".join(s.split()) in acted):
+        if _shown_in(s, head):
             return SEEN
     if not plain_about or not present_in_scene(beat, phrase):
         return HEARD
     return ""
+
+
+# The cue must be THEIRS. Replayed 2026-10-01 on the owner's save: "You are still standing
+# before him, and the search for the woman has just become…" read as the woman standing
+# here (the player was), and `action_sentences` counted "a woman who exists in the stories
+# of the desperate" as somebody acting — a phantom woman walked on with a Ratfolk face.
+# So the verb must follow the person within a clause ("a figure IS SILHOUETTED", "a boy
+# STANDS in the doorway"), or the person must follow the eye ("you see a man …", "at the
+# top of the stairs, a figure").
+_CUE_RX: list = []
+
+
+def _cue() -> re.Pattern:
+    """Being here or being looked at, as one pattern (built late: `_PLACES_THEM_HERE` is
+    defined further down, beside `present_in_scene`)."""
+    if not _CUE_RX:
+        _CUE_RX.append(re.compile(r"(?:" + _PLACES_THEM_HERE.pattern + r")|(?:"
+                                  + _SEEN_HERE.pattern + r")", re.I))
+    return _CUE_RX[0]
+_LOOKED_AT = re.compile(
+    r"(?:\byou\s+(?:see|notice|spot|glimpse|make\s+out)|\bthere\s+(?:is|stands|sits|waits)|"
+    r"^\W*(?:at|in|on|behind|beside|by|near|across)\s+[^,]{1,40},)\s*(?:\w+\s+){0,4}$", re.I)
+_OBJECT_OF = re.compile(r"\b(?:for|of|about|after|from|like|than)\s+(?:the|a|an|that|this)"
+                        r"\s+(?:\w+\s+){0,2}$", re.I)
+
+
+def _shown_in(sentence: str, head: str) -> bool:
+    """Whether this sentence shows the person its `head` names here, by a cue of theirs."""
+    for m in re.finditer(rf"\b{re.escape(head)}s?\b", sentence, re.I):
+        before = sentence[max(0, m.start() - 70):m.start()]
+        if _OBJECT_OF.search(before):
+            continue                       # "the search for the woman", "the memory of a man"
+        after = sentence[m.end():m.end() + 70]
+        clause = re.split(r"[,;:—–]|\bwho\b|\bthat\b|\bwhich\b|\band\b", after, maxsplit=1)[0]
+        if _cue().search(" ".join(clause.split()[:6])):
+            return True
+        # "a man who stands in the doorway": the relative clause is still his.
+        rel = re.match(r"\s*,?\s*(?:who|that)\s+((?:\w+\s+){0,4})", after, re.I)
+        if rel and _cue().search(rel.group(1)):
+            return True
+        if _LOOKED_AT.search(before):
+            return True
+    return False
 
 
 # A head that says nothing of who: the prose's word for somebody not yet made out.

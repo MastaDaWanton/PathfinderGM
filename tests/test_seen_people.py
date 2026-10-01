@@ -343,5 +343,15 @@ def test_seen_and_heard_are_read_from_the_sentence():
     assert judgement.seen_in_beat("'There is a woman upstairs,' he says.", "woman") == \
         judgement.HEARD
     assert judgement.seen_in_beat("If a guard sees you, run.", "guard") == judgement.HEARD
+    # Replayed 2026-10-01: the player standing, and a woman who exists only in stories,
+    # were read as a woman here, and a phantom walked on with a face. The cue must be hers.
+    ghost = ("You have been chasing a ghost, a woman who exists in the stories of the "
+             "desperate. You are still standing before him, and the search for the woman "
+             "has just become a search for why the lie persists.")
+    assert judgement.seen_in_beat(ghost, "woman") != judgement.SEEN
+    assert judgement.seen_in_beat("You see a woman by the well, mending a net.",
+                                  "woman") == judgement.SEEN
+    assert judgement.seen_in_beat("A man who stands in the doorway eyes your purse.",
+                                  "man") == judgement.SEEN
     assert judgement._gendered(FIGURE, "figure") == "woman"
     assert judgement._gendered("A figure waits by the well.", "figure") == "figure"
