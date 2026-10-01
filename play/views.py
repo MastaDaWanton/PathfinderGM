@@ -15,7 +15,7 @@ from django.shortcuts import redirect, render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from gm import (client, judgement, ledger as ledger_mod,
+from gm import (client, intimate as intimate_mod, judgement, ledger as ledger_mod,
                 narration as narration_mod, prompts, speech as speech_mod, watcher)
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
@@ -3093,7 +3093,22 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                              if len(a.raw or "") > 300 else {}),
                           "raw_chars": len(a.raw or "")}
                          for a in prose_attempts],
+            # Whether the intimate scene's briefing fired this beat and how many
+            # characters of the owner's passages went in — counts only, never the text
+            # (gm/intimate.py). On every beat, so an audit can count the misfires.
+            "intimate": (agent.intimate.as_log()
+                         if getattr(agent, "intimate", None) is not None else
+                         {"fired": False, "mode": "default", "why": "", "demos": 0,
+                          "demo_chars": 0}),
         })
+        _intimate = getattr(agent, "intimate", None)
+        if _intimate is not None and _intimate.fired and not _intimate.as_log()["demos"]:
+            c.turn_log.append({"kind": "intimate",
+                               "note": "no demonstrations on file",
+                               "file": str(intimate_mod.demonstrations_path())})
+        elif _intimate is not None and _intimate.mode == "fade":
+            c.turn_log.append({"kind": "intimate",
+                               "note": "faded: a child is present or named"})
         if not text:
             # Raw tells name the PC — "Initiative: Kesst Vayr..." — and the
             # gemma4 fight audit showed them shipping third-person whenever the
@@ -3144,7 +3159,15 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
         # Adults only, without exception, whatever the table's content setting: a beat
         # that reads as sexual while a child is in the scene or in the beat is discarded
         # whole — never trimmed, never repaired — and the turn gets the holding line.
-        if text and narration_mod.intimate(text) and judgement.a_child_in(c.scene, text):
+        # A beat written under the intimate briefing counts as sexual whatever words it
+        # chose: `narration.intimate` is a vocabulary, and measured on the owner's own
+        # scene it read none of five intimate beats as sexual, because they were
+        # euphemistic. The briefing never fires with a child present or named
+        # (`intimate.decide`); this is the guard under it for a child the beat itself
+        # brings in.
+        briefed = bool(getattr(getattr(agent, "intimate", None), "fired", False))
+        if text and (briefed or narration_mod.intimate(text)) \
+                and judgement.a_child_in(c.scene, text):
             c.turn_log.append({"kind": "refused-beat",
                                "why": "sexual content with a child in the scene"})
             ours.clear()
