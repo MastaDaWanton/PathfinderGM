@@ -273,6 +273,80 @@ class TestTheirOwnTurn:
         assert companions.turning_on_the_party(
             s, thug.ref, [{"op": "attack", "actor": thug.ref, "target": pc.ref}]) == ""
 
+    def test_an_attack_whose_reason_says_not_fighting_is_sent_back(self):
+        """Measured: told "Drover, stay back and keep the crowd off me!", the drover's
+        turn was `attack` the thug "because they aren't fighting the thug, but are
+        physically interceding" — and the engine walked him onto the thug and struck."""
+        from gm import companions, prompts
+
+        bad = [{"op": "attack", "actor": "c2", "target": "c3",
+                "because": "they aren't fighting the thug, but are physically "
+                           "interceding to block the crowd's interference"}]
+        assert "narrate_only" in companions.attack_against_its_reason("c2", bad)
+        for why in ("cautious and timid; they prefer to keep a safe distance",
+                    "too timid to engage, but staying close to the player",
+                    "stays back by the door"):
+            assert companions.attack_against_its_reason(
+                "c2", [dict(bad[0], because=why)]), why
+        for why in ("ordered to hit him; they do it with a trembling hand",
+                    "wounded and cornered, it fights"):
+            assert companions.attack_against_its_reason(
+                "c2", [dict(bad[0], because=why)]) == "", why
+        # The worked examples never trip the gate they will be held to.
+        for ex in prompts.COMPANION_EXAMPLES + prompts.COMPANION_ANSWER_EXAMPLES:
+            assert companions.attack_against_its_reason("{Self}", ex["reply"]["intents"]) \
+                == "", ex["reply"]
+
+    def test_a_blow_at_an_onlooker_is_sent_back_unless_ordered(self):
+        """Measured: told "keep the crowd off me", the drover went for the merchant
+        watching from the side."""
+        from gm import companions
+
+        s, e, pc = _party()
+        drover, thug = _friend(s, e, name="Wil"), _thug(s)
+        merchant = instantiate("guildhand", scene=s, name="merchant")
+        s.add(merchant)
+        merchant.add_condition(states.BYSTANDER_KEY, None, source="test")
+        e._ensure_encounter(pc.ref, thug.ref)
+        raw = [{"op": "attack", "actor": drover.ref, "target": merchant.ref}]
+        why = companions.attack_on_a_bystander(s, drover.ref, raw,
+                                               ["Wil, keep the crowd off me!"])
+        assert "not in this fight" in why and thug.ref in why
+        assert companions.attack_on_a_bystander(
+            s, drover.ref, raw, ["Wil, knock that merchant down!"]) == ""
+        assert companions.attack_on_a_bystander(
+            s, drover.ref, [dict(raw[0], target=thug.ref)], []) == ""
+
+    def test_a_companion_may_decline_to_act(self, monkeypatch):
+        """The fight schema leaves `narrate_only` out (the player's punch narrated and
+        never proposed), so a companion's refusal was unsamplable: told to stay back, the
+        timid drover came back `attack` 4 of 5 times. A companion's turn may decline."""
+        from gm import agent as agent_mod, client
+
+        s, e, pc = _party()
+        drover, thug = _friend(s, e, name="Wil", timid=True), _thug(s)
+        e._ensure_encounter(pc.ref, thug.ref)
+        schemas = []
+
+        def chat(messages, model, *a, **kw):
+            schemas.append(kw.get("schema"))
+            return client.Reply(json.dumps({
+                "narration": "Wil stays behind you.",
+                "intents": [{"op": "narrate_only", "because": "no fighter"}]}), 0.1, model)
+
+        monkeypatch.setattr(agent_mod.client, "chat", chat)
+        gm = agent_mod.GMAgent(WORLD, e)
+        plan = gm.npc_turn(drover.ref, location=WORLD.get(TOWN))
+        assert [i.op for i in plan.intents] == ["narrate_only"]
+        assert '"narrate_only"' in json.dumps(schemas[0])
+        assert '"attack"' in json.dumps(schemas[0])
+        # A creature's turn keeps the fight schema as it was.
+        try:
+            gm.npc_turn(thug.ref, location=WORLD.get(TOWN))
+        except Exception:  # noqa: BLE001 — its reply is the companion's; only the schema matters
+            pass
+        assert '"narrate_only"' not in json.dumps(schemas[-1])
+
     def test_npc_turn_sends_a_turn_on_the_player_back(self, monkeypatch):
         """The model copies; the engine refuses. A first reply striking the player is
         corrected, and the second — at the thug — is what runs."""
@@ -389,6 +463,37 @@ class TestTheBriefAndTheProse:
 
         if s.has_grid and s.distance_between(thug.ref, pc.ref) is not None:
             assert closing_claimed._gap(Theirs) is not None
+
+    def _turn_ctx(self, e, text):
+        from gm.checks import BeatContext
+
+        return BeatContext(
+            door="turn", text=text, player_text="", engine=e, scene=e.scene, world=None,
+            location=None, reading=None, outcomes=(), tells=(), said=(),
+            attribution=None, brief="", brief_facts={}, pull=None, was_at="",
+            acting="", turn=0)
+
+    def test_a_companion_acting_on_the_players_beat_is_found_and_cut(self):
+        """The replay's player beat: "Bob is a blur of motion, diving into the gap"
+        before Bob's turn, and "the drover steps back" before the drover's. A reaction —
+        a flinch, a look — is theirs on any beat."""
+        from gm.checks import companion_off_turn as check
+
+        s, e, pc = _party()
+        bob, thug = _owned(s, e), _thug(s)
+        e._ensure_encounter(pc.ref, thug.ref)
+        acts = "Bob lunges at the thug, quick as a struck match."
+        looks = "Bob's head turns toward the thug at your shout."
+        found = check.find(self._turn_ctx(e, f"Your arrow flies wide. {acts} {looks}"))
+        assert len(found) == 1 and found[0].sentences == (acts,)
+        text, notes = check.backstop(
+            self._turn_ctx(e, f"Your arrow flies wide. {acts} {looks}"),
+            f"Your arrow flies wide. {acts} {looks}", found)
+        assert acts not in text and looks in text and notes
+        # Out of a fight there is no turn to wait for: nothing is read.
+        s2, e2, pc2 = _party()
+        _owned(s2, e2)
+        assert check.find(self._turn_ctx(e2, acts)) == []
 
 
 # --- 6. out of a fight: the words spoken TO them get their own answer -----------------------

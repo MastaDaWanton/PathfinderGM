@@ -315,6 +315,73 @@ def on_their_own_turn(raw, scene, notes: list | None = None, addressed_refs=()):
     return kept
 
 
+# A reason that says the companion is NOT fighting: "they aren't fighting the thug", "too
+# timid to engage", "stays back", "keeps their distance".
+_NOT_FIGHTING = re.compile(
+    r"(?:\b(?:not|never|without|instead\s+of|rather\s+than|too\s+\w+\s+to)|n[’']t)\s+"
+    r"(?:\w+\s+){0,2}?(?:fight|fighting|attack|attacking|strike|striking|engage|"
+    r"engaging|hit|hitting|close|closing)\b"
+    r"|\b(?:stay|stays|staying|hang|hangs|hanging|hold|holds|holding|keep|keeps|keeping)"
+    r"\s+(?:well\s+)?(?:back|clear|out\s+of\s+(?:it|reach|the\s+fight)|"
+    r"(?:their|a|his|her|its)\s+(?:safe\s+)?distance)\b", re.I)
+
+
+def attack_against_its_reason(ref: str, raw) -> str:
+    """The refusal for a companion's `attack` whose own `because` says they are not
+    fighting, or "".
+
+    Measured on the companions replay, 2026-10-01: told "Drover, stay back and keep the
+    crowd off me!", the drover's turn came back `attack` the thug "because they aren't
+    fighting the thug, but are physically interceding to block the crowd" — the engine
+    walked him onto the thug and struck. The reason is the companion's decision; the op
+    was a slip of the hand, so the turn is sent back with that said."""
+    if not isinstance(raw, list):
+        return ""
+    for r in raw:
+        if not isinstance(r, dict) or str(r.get("op", "")).lower() != "attack":
+            continue
+        if (r.get("actor") or ref) != ref:
+            continue
+        why = str(r.get("because") or "")
+        if _NOT_FIGHTING.search(why):
+            return (f"attack: the reason given — {why!r} — says they are not fighting, "
+                    f"and an attack is a blow. If they hold back, keep clear or stand "
+                    f'guard, that is {{"op": "narrate_only"}} (or a move); if they do '
+                    f"fight, say why they fight.")
+    return ""
+
+
+def attack_on_a_bystander(scene, ref: str, raw, orders=()) -> str:
+    """The refusal for a companion's blow, in a fight, at somebody who is in neither side
+    — unless the player's own words to them named that person — or "".
+
+    Measured on the companions replay, 2026-10-01: told "keep the crowd off me", the
+    drover's turn came back `attack` on the merchant watching from the side. Opening a
+    second fight with an onlooker is the player's to order, never the companion's slip."""
+    if not getattr(scene, "in_encounter", False) or not isinstance(raw, list):
+        return ""
+    sides = getattr(scene, "sides", None) or {}
+    fighting = {r for refs in sides.values() for r in refs}
+    actors = getattr(scene, "actors", {}) or {}
+    for r in raw:
+        if not isinstance(r, dict) or str(r.get("op", "")).lower() != "attack":
+            continue
+        if (r.get("actor") or ref) != ref:
+            continue
+        t = r.get("target")
+        who = actors.get(t) if isinstance(t, str) else None
+        if who is None or t in fighting or who.is_down:
+            continue
+        if any(names_them(o, who) for o in orders or ()):
+            continue
+        foes = foes_of(scene, ref)
+        return (f"attack: {who.name} is not in this fight, and nobody told "
+                f"{actors[ref].name} to go for them. The fight is against: "
+                + (", ".join(f"{fr} ({fn})" for fr, fn in foes) or "nobody standing")
+                + ". If they will not strike a foe, that is a narrate_only or a move.")
+    return ""
+
+
 def turning_on_the_party(scene, ref: str, raw) -> str:
     """The refusal for a companion's turn that strikes the player or their own side, or
     "" when it does not. Asked of the raw plan before it runs."""

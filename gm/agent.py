@@ -1020,6 +1020,13 @@ class GMAgent:
         template = str(getattr(actor, "from_template", "") or "")
         bestiary = bool(template) and not getattr(actor, "paths", None)
         ops = prompts._CREATURE_OPS if (bestiary and self.engine.scene.in_encounter) else ()
+        # A companion may decline to act at all. The fight schema leaves `narrate_only`
+        # out on purpose — the player's own turn narrated a punch and proposed nothing —
+        # and so a companion's refusal was unsamplable: told to stay back, a timid drover
+        # came back `attack` (4 of 5) or `move` (1 of 5), never the refusal the examples
+        # demonstrate (companions replay, 2026-10-01).
+        if friend and self.engine.scene.in_encounter:
+            ops = tuple(dict.fromkeys((*(ops or prompts._FIGHT_OPS), "narrate_only")))
         origin = f"creature:{template}" if bestiary else ""
         messages = base
         attempts: list[Attempt] = []
@@ -1041,7 +1048,12 @@ class GMAgent:
             try:
                 data = reply.json()
                 raw, rearmed = judgement.rearm(self.engine.scene, ref, data.get("intents"))
-                turned = companions.turning_on_the_party(self.engine.scene, ref, raw)
+                turned = (companions.turning_on_the_party(self.engine.scene, ref, raw)
+                          or (companions.attack_against_its_reason(ref, raw)
+                              if friend else "")
+                          or (companions.attack_on_a_bystander(
+                              self.engine.scene, ref, raw, list(orders or ()))
+                              if friend else ""))
                 if turned:
                     raise IntentError(turned, "legality")
                 intents = self.engine.validate(raw, origin=origin,
@@ -1137,7 +1149,8 @@ class GMAgent:
                             f"check: {actor.name}'s try names who could stop it "
                             f'("opposed_by": {{"ref": "<ref>", "skill": "<skill>"}}), '
                             f"never a DC.", "schema")
-                turned = companions.turning_on_the_party(scene, ref, raw)
+                turned = (companions.turning_on_the_party(scene, ref, raw)
+                          or companions.attack_against_its_reason(ref, raw))
                 if turned:
                     raise IntentError(turned, "legality")
                 intents = self.engine.validate(raw or [{"op": "narrate_only"}])

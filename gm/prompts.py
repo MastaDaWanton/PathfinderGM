@@ -59,6 +59,12 @@ def _definite(name: str) -> str:
         return "the stranger"
     if name[0].isupper() or name.lower().startswith("the "):
         return name
+    # A descriptor the introduce op wrote with its article ("a young drover") is "the
+    # young drover", never "the a young drover" — measured in a companion's own turn
+    # prose, 2026-10-01, copied from the filled example.
+    for article in ("a ", "an "):
+        if name.lower().startswith(article):
+            return f"the {name[len(article):]}"
     return f"the {name}"
 
 
@@ -2433,7 +2439,8 @@ COMPANION_EXAMPLES = [
             "narration": "{Companion} hears you, and swears, and comes anyway — nobody "
                          "puts a blade near a friend while they stand and watch.",
             "intents": [{"op": "attack", "actor": "{Self}", "target": "{Foe Ref}",
-                         "because": "told to stay back; too hot-tempered to do it"}],
+                         "because": "told to leave this one to you; too hot-tempered "
+                                    "to do as told"}],
         },
     },
     # And told nothing at all, which is most rounds. Added after the replay of
