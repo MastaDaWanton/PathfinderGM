@@ -1468,8 +1468,11 @@ class GMAgent:
             repairs += fixed
             attempts += fix_attempts
         attribution = self.attribution
+        # A broken construct (the owner's house rule, 2026-10-01) is as inert as a corpse:
+        # at exactly 0 hp the "hp < 0" test missed it, and a replay's broken spy tilted its
+        # head and glowed on the page.
         dead_refs = {r for r, a in self.engine.scene.actors.items()
-                     if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead"))}
+                     if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead") or a.has_state("state.down.broken"))}
 
         def _alive(sentence: str, words: str) -> bool:
             ref = attribution.who(sentence, words)
@@ -1485,14 +1488,14 @@ class GMAgent:
         # Constitution-drained corpse at full hit points, which `hp <= 0` cannot see,
         # and which went on acting in every paragraph for the rest of the session.
         dead = [a.name for r, a in self.engine.scene.actors.items()
-                if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead"))]
+                if not a.is_pc and (a.hp < 0 or a.has_state("state.down.dead") or a.has_state("state.down.broken"))]
         # Whoever died THIS turn keeps their killing sentence (see the function): the
         # cut used to delete "the sailor crumples to the deck" as a dead man acting,
         # which is how every one-punch kill ended in the same appended template.
         # And the living beside them: a name the dead share with somebody standing is not
         # a corpse acting (two "thug"s, one dead — the 2026-09-27 fight audit).
         living = [a.name for a in self.engine.scene.actors.values()
-                  if not a.is_pc and not (a.hp < 0 or a.has_state("state.down.dead"))]
+                  if not a.is_pc and not (a.hp < 0 or a.has_state("state.down.dead") or a.has_state("state.down.broken"))]
         text, risen = narration_mod.cut_dead_men_walking(
             text, dead, fresh=[str(d.get("name") or "") for d in (deaths or [])],
             living=living, spare=_alive)
