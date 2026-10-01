@@ -716,7 +716,18 @@ def _can_be_fought(actor) -> bool:
     # (`Engine.join_fight`, `Engine._op_attack` lift the tag); until then "I attack"
     # cannot mean them. The player naming one by name goes round this — the plan
     # then carries the ref and nothing here fills anything.
-    return not actor.has_state("role.bystander")
+    if actor.has_state("role.bystander"):
+        return False
+    # Nor anybody on the player's side. Measured 2026-10-01 (the companions lane's
+    # replay): "I shoot the thug again." got a second, code-injected attack — "because:
+    # the player said they attack" — at the player's own companion, the timid drover,
+    # who dropped to dying; the companion had joined the fight on the player's side and
+    # was the lowest ref standing. Somebody who travels with you, or is yours, is never
+    # the obvious reading of "I attack"; naming them still goes round this.
+    from rules import states as states_mod
+
+    return not (actor.has_state(states_mod.TRAVELS_WITH_YOU)
+                or actor.has_state(states_mod.OWNED_BY_YOU))
 
 
 # Ops whose subject is a person and whose unnamed subject is the player. `attack` is

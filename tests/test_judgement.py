@@ -685,6 +685,28 @@ def test_swinging_at_somebody_already_there_rolls_an_attack():
     assert hit["target"] == "c1" and hit["actor"] == "pc"
 
 
+def test_a_declared_attack_never_lands_on_the_players_own_companion():
+    """Measured 2026-10-01 on the companions lane's replay: "I shoot the thug again." got
+    a code-injected attack ("because: the player said they attack") at the player's own
+    companion, a timid drover who had joined the fight on the player's side — the lowest
+    ref standing — and he dropped to dying. A companion, or a creature the player owns,
+    is never the obvious reading of "I attack"."""
+    from rules.activeeffect import ActiveEffect
+    from rules import states
+    from rules.bestiary import instantiate
+
+    room = _empty_room()
+    drover = room.add(instantiate("guildhand", scene=room, name="the young drover"))
+    drover.apply_effect(ActiveEffect(
+        name="travels with you", kind="bond", key="company", source=f"company:{drover.ref}",
+        origin="test", duration="until-dismissed", tags=(states.TRAVELS_WITH_YOU,)))
+    thug = room.add(instantiate("thug", scene=room, name="the thug"))
+    assert drover.ref < thug.ref, "the premise: the companion is the lowest ref"
+    out = judgement.inject_fight([{"op": "narrate_only"}], "I shoot the thug again.", room)
+    hits = [i for i in out if i["op"] == "attack"]
+    assert hits and all(h["target"] == thug.ref for h in hits), hits
+
+
 def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
     """Reported from play: "thug is still 15ft away from you and no rolls have been
     tracked in the roll tracker".
