@@ -383,10 +383,15 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
 
 
 def spell_named(scene, words) -> object | None:
-    """The spell the player's caster can reach whose name the words hold, or None — the
-    longest name wins, so "cure light wounds" is not "cure". Asked of the book, the
-    prepared list and the class's own list, as `judgement.inject_cast` asks."""
+    """The spell the player's caster can reach whose name the words hold, or None — read
+    by `judgement.spell_in_words` against the whole catalogue, word-bounded and longest
+    first, so "cure light wounds" is Cure Light Wounds (and None for a wizard who cannot
+    reach it), never Light (item 4, 2026-09-30: the substring match here and in
+    `inject_cast` were the same rule twice). Asked of the book, the prepared list and the
+    class's own list, as `judgement.inject_cast` asks."""
     from rules import casting, spells as spells_mod
+
+    from . import judgement
 
     pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
     said = " ".join(str(words or "").lower().split())
@@ -395,16 +400,13 @@ def spell_named(scene, words) -> object | None:
     ids = [sp.id for lvl in casting.known_spells(
         pc, up_to=casting.highest_spell_level(pc)).values() for sp in lvl]
     ids += [s for s in (getattr(pc, "prepared", {}) or {}) if s not in ids]
-    best, found = "", None
-    for sid in ids:
-        try:
-            sp = spells_mod.get(sid)
-        except KeyError:
-            continue
-        name = " ".join(str(sp.name).lower().split())
-        if name and name in said and len(name) > len(best):
-            best, found = name, sp
-    return found
+    chosen = judgement._reachable_by_name(judgement.spell_in_words(said), ids)
+    if not chosen:
+        return None
+    try:
+        return spells_mod.get(chosen)
+    except KeyError:
+        return None
 
 
 def cast_aim(frame: dict | None, scene, action: dict | None = None,

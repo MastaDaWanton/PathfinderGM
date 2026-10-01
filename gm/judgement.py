@@ -2776,9 +2776,13 @@ def inject_checks(raw_intents, player_text: str, scene) -> list:
 # "I use Blood Nova on the merchant": a capitalised name after a using verb, up to a
 # preposition or the end. Capitalised on purpose — abilities are Title Case on every
 # sheet, and "I use the rope on the door" must not read as an ability called "the rope".
+#
+# A small word may join two capitalised ones: "Lay on Hands" is one name. Measured
+# 2026-09-30 (item 4): "I use Lay on Hands on the fighter" was read as an ability called
+# "Lay", and the refusal would have named a power nobody had said.
 _USES_A_NAMED_THING = re.compile(
     r"\bI\s+(?:use|activate|unleash|trigger|invoke|channel)\s+(?:my\s+)?"
-    r"((?:[A-Z][\w'-]*)(?:\s+[A-Z][\w'-]*){0,4})"
+    r"((?:[A-Z][\w'-]*)(?:\s+(?:(?:on|of|the|and|in|to)\s+)?[A-Z][\w'-]*){0,4})"
     r"(?=\s+(?:on|at|against|upon|toward|towards)\b|[.,!;]|\s*$)")
 
 
@@ -3291,6 +3295,38 @@ def _slot_words(pc) -> set[str]:
     return words
 
 
+def possession_vocabulary(scene, pc) -> set[str]:
+    """Every word the sheet can vouch for as a thing this character HAS: the sheet's own
+    vocabulary, what they hold and wear, the props they are holding, the goods ledger,
+    the satchel, and the generic word for a filled slot. One answer for the two readers
+    that ask — `false_possession` (a thing produced) and the suggestion check (a "my …"
+    offered, `play/aftermath/suggestion_sheet.py`)."""
+    vouched = _sheet_vocabulary(pc)
+    # What this character is holding by the props ledger, and what they have on: both are
+    # things the sheet vouches for and neither is in `carried()`.
+    for attr in ("equipped", "armour"):
+        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
+                                          str(getattr(pc, attr, "") or "").lower())}
+    for rec in (getattr(scene, "props", None) or []):
+        if isinstance(rec, dict) and rec.get("held_by") == pc.ref:
+            vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
+                                              str(rec.get("name") or "").lower())}
+    # `carried()` is "everything that could plausibly be damaged" — weapons, armour,
+    # worn slots — and a crown in the pack is not that. The goods ledger is what "am I
+    # carrying one" actually means, and it was the half this check could not see.
+    for name in (getattr(pc, "goods", None) or {}):
+        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}", str(name).lower())}
+    for iid, stock in (getattr(pc, "stock", None) or {}).items():
+        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
+                                          f"{iid} {getattr(stock, 'base', '')}".lower())}
+    # The generic word for a slot the sheet has something in (`_slot_words`).
+    vouched |= _slot_words(pc)
+    # And a purse with coin in it is a purse: "I hand over my purse" with 37 gp.
+    if any(int(n or 0) > 0 for n in (getattr(pc, "purse", None) or {}).values()):
+        vouched |= {"purse", "coin", "coins", "money"}
+    return vouched
+
+
 def false_possession(player_text: str, scene, reading=None, plan=None) -> str:
     """The thing the player says they produce that the sheet cannot account for, or "".
 
@@ -3337,30 +3373,7 @@ def false_possession(player_text: str, scene, reading=None, plan=None) -> str:
     # delusion beat for a character whose gear simply could not be read.
     if not hasattr(pc, "carried"):
         return ""
-    vouched = _sheet_vocabulary(pc)
-    # What this character is holding by the props ledger, and what they have on: both are
-    # things the sheet vouches for and neither is in `carried()`.
-    for attr in ("equipped", "armour"):
-        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
-                                          str(getattr(pc, attr, "") or "").lower())}
-    for rec in (getattr(scene, "props", None) or []):
-        if isinstance(rec, dict) and rec.get("held_by") == pc.ref:
-            vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
-                                              str(rec.get("name") or "").lower())}
-    # `carried()` is "everything that could plausibly be damaged" — weapons, armour,
-    # worn slots — and a crown in the pack is not that. The goods ledger is what "am I
-    # carrying one" actually means, and it was the half this check could not see.
-    for name in (getattr(pc, "goods", None) or {}):
-        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}", str(name).lower())}
-    for iid, stock in (getattr(pc, "stock", None) or {}).items():
-        vouched |= {w for w in re.findall(r"[a-z][a-z'’-]{2,}",
-                                          f"{iid} {getattr(stock, 'base', '')}".lower())}
-
-    # The generic word for a slot the sheet has something in. A character in a chain
-    # shirt who says "I put on my armour" is putting on the armour they own, and the
-    # sheet spells it "chain shirt" — a containment match cannot bridge that and should
-    # not try to.
-    vouched |= _slot_words(pc)
+    vouched = possession_vocabulary(scene, pc)
     # What this turn ACQUIRES is not a claim to have had it (item 5, turn 23: "I take the
     # key and walk toward the curtain" — the same plan gave Sam the key, and the room
     # still rolled a Bluff against him for "producing" it).
@@ -5261,6 +5274,66 @@ _ABOUT_A_SPELL = re.compile(
     r"learn|scribe|read)\b", re.I)
 
 
+# The whole spell catalogue, by the words of each name, for `spell_in_words`. Rebuilt when
+# the catalogue's size changes (a homebrew spell added in play).
+_SPELL_INDEX: dict = {"size": -1, "index": {}, "longest": 0}
+
+
+def _spell_words(text: str) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+(?:'[a-z]+)?",
+                            str(text or "").lower().replace("’", "'")))
+
+
+def spell_in_words(text: str):
+    """The spell the words name, read against the WHOLE catalogue, word-bounded, longest
+    name first; None when they name none.
+
+    Item 4, measured 2026-09-30: "I cast cure light wounds" resolved to **Light** for
+    Sam, a wizard. The resolver looked only at the spells he could reach and matched by
+    substring, and Light was the only reachable name inside the sentence. Against the
+    whole book, "cure light wounds" is Cure Light Wounds — which Sam cannot cast, and that
+    is the answer the caller then gives — and a name is matched only on whole words, so
+    "lightning" is never Light either."""
+    from rules import spells as spells_mod
+
+    catalogue = spells_mod.all_spells()
+    if _SPELL_INDEX["size"] != len(catalogue):
+        index: dict[tuple[str, ...], object] = {}
+        for sid in sorted(catalogue):
+            words = _spell_words(catalogue[sid].name)
+            if words:
+                index.setdefault(words, catalogue[sid])
+        _SPELL_INDEX.update(size=len(catalogue), index=index,
+                            longest=max((len(k) for k in index), default=0))
+    index, longest = _SPELL_INDEX["index"], _SPELL_INDEX["longest"]
+    said = _spell_words(text)
+    for n in range(min(longest, len(said)), 0, -1):
+        for i in range(len(said) - n + 1):
+            found = index.get(said[i:i + n])
+            if found is not None:
+                return found
+    return None
+
+
+def _reachable_by_name(named, reachable) -> str:
+    """The reachable spell id that IS the named spell — the same id, or one whose name is
+    the same words (a homebrew copy of a core spell) — or ""."""
+    if named is None:
+        return ""
+    if named.id in reachable:
+        return str(named.id)
+    from rules import spells as spells_mod
+
+    want = _spell_words(named.name)
+    for sid in reachable:
+        try:
+            if _spell_words(spells_mod.get(str(sid)).name) == want:
+                return str(sid)
+        except KeyError:
+            continue
+    return ""
+
+
 def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
     """Make a declared spell reach the engine.
 
@@ -5302,18 +5375,12 @@ def inject_cast(raw_intents, player_text: str, scene, *, attached=None) -> list:
     reachable = [sp.id for level in casting.known_spells(
         pc, up_to=casting.highest_spell_level(pc)).values() for sp in level]
     reachable += [s for s in (getattr(pc, "prepared", {}) or {}) if s not in reachable]
-    best = ""
-    for sid in reachable:
-        try:
-            spell = spells_mod.get(sid)
-        except KeyError:
-            continue
-        name = str(getattr(spell, "name", "")).lower()
-        # Longest name first, so "cure light wounds" is not beaten by "cure".
-        if name and name in said and len(name) > len(best):
-            best = name
-            chosen = sid
-    if not best:
+    # Named against the whole book, word-bounded, longest first (`spell_in_words`): a
+    # name they cannot reach is not quietly swapped for a shorter one they can — "cure
+    # light wounds" was cast as Light (item 4, 2026-09-30).
+    named = spell_in_words(player_text)
+    chosen = _reachable_by_name(named, reachable)
+    if not chosen:
         return raw_intents
 
     params = {"spell": chosen}
