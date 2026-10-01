@@ -222,6 +222,61 @@ def test_a_journey_stopped_by_the_swing_goes_nowhere():
     assert s.location_id == was and s.in_encounter
 
 
+# --- whoever leaves with you withdraws too ------------------------------------------------
+
+def _escort(s, at):
+    ana = instantiate("guildhand", scene=s, name="Ana")
+    s.add(ana, at=at)
+    ana.hp = 500
+    return ana
+
+
+def test_an_escort_who_walks_out_of_reach_is_struck_as_the_player_would_be():
+    """docs/fix-interfaces.md, "what the withdraw fix left", (1): only the PC withdrew, and
+    an escort walked out from beside a foe for free — in 1e every creature that moves out
+    of a threatened square provokes. Here the player stands well clear and Ana, leaving
+    with her, starts beside a Large thug whose ten-foot reach covers her first step: the
+    thug's swing is at Ana, and the walk goes on with her."""
+    s, e = board(pc_at=(15, 15))
+    s.actors["c1"].size = "large"
+    ana = _escort(s, (8, 5))
+    res = leave(e, **{"with": [ana.ref]})
+    assert ops(res) == ["attack", "travel"], [o.tell for o in res.outcomes]
+    assert "Ana" in res.outcomes[0].tell
+    assert s.reacted == {"c1:attack_of_opportunity": 1}
+    assert ana.at == s.at, "she came along"
+
+
+def test_a_foe_has_one_swing_for_the_whole_party():
+    """The allowance is the foe's, one a round (`_spend_reaction`): the Large thug whose
+    reach covers both the player's way out and Ana's swings at the player, who goes first,
+    and has nothing left for Ana."""
+    s, e = board()
+    sturdy(s)
+    s.actors["c1"].size = "large"
+    ana = _escort(s, (8, 5))
+    res = leave(e, **{"with": [ana.ref]})
+    assert ops(res) == ["attack", "travel"]
+    assert "Kesst" in res.outcomes[0].tell
+    assert s.reacted == {"c1:attack_of_opportunity": 1}
+
+
+def test_the_party_never_swings_at_its_own():
+    """A companion is often on no declared side. Asked of her as the mover, the player
+    beside her is not a foe owed a swing at her back, nor a body blocking her way."""
+    s, e = board(pc_at=(5, 5), thug_at=(15, 15))
+    sturdy(s)
+    ana = _escort(s, (4, 5))
+    # Blinded, so no square is exempt: asked without the party, the player beside her IS
+    # one of "everyone who threatens" — the bug the party argument is there for.
+    ana.add_condition("blinded", source="t")
+    assert [w for w, _ in reactions.provoked_by_withdraw(s, ana.ref)] == ["pc"]
+    assert not reactions.provoked_by_withdraw(s, ana.ref, party=["pc", ana.ref])
+    res = leave(e, **{"with": [ana.ref]})
+    assert ops(res) == ["travel"]
+    assert "pc:attack_of_opportunity" not in s.reacted
+
+
 # --- out of a fight, nothing changes ------------------------------------------------------
 
 def test_a_peaceful_travel_is_byte_identical(monkeypatch):
@@ -230,7 +285,8 @@ def test_a_peaceful_travel_is_byte_identical(monkeypatch):
     def walk(patch):
         s, e = board(fighting=False)
         if patch:
-            monkeypatch.setattr(Engine, "_leaving_the_fight", lambda self, i, pc: None)
+            monkeypatch.setattr(Engine, "_leaving_the_fight",
+                                lambda self, i, pc, escorts=(): None)
         res = leave(e)
         after = e.dice.roll("1d1000", label="probe").total
         monkeypatch.undo()

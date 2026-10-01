@@ -397,8 +397,15 @@ def provoked_by_maneuver(scene, actor_ref: str, target_ref: str,
 _MOST_TO_WEIGH = 6
 
 
-def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
+def provoked_by_withdraw(scene, mover_ref: str,
+                         party=()) -> list[tuple[str, Reaction]]:
     """Who gets an attack of opportunity because this creature walks out of the fight.
+
+    `party` is everyone leaving together — the player and whoever walks out with them
+    (`Engine._leaving_the_fight` asks this once for each). They are one side for this
+    question whatever `scene.sides` says: a companion is often on no declared side at all,
+    and without this the player would be counted among the foes owed a swing at their own
+    companion's back, and the companion's body would block the player's way out.
 
     Leaving a fight for somewhere else — a `travel` or a `journey` begun mid-encounter —
     is the WITHDRAW action (CRB p.188, aonprd.com/Rules.aspx?Name=Withdraw&Category=
@@ -437,12 +444,13 @@ def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
     if mover is None or at is None:
         return []
     start = (at[0], at[1])
+    party = set(party or ()) | {mover_ref}
 
     from . import states
 
     watchers: dict[str, tuple[list[Reaction], set]] = {}
     for ref, watcher in scene.actors.items():
-        if ref == mover_ref or _allied(scene, ref, mover_ref):
+        if ref in party or _allied(scene, ref, mover_ref):
             continue
         if watcher.has_state(states.BYSTANDER):
             continue
@@ -469,7 +477,7 @@ def provoked_by_withdraw(scene, mover_ref: str) -> list[tuple[str, Reaction]]:
     else:
         seen = {r for r in at_start if _seen_by(scene, mover_ref, r)}
     owed_refs = (at_start - seen) | _owed_on_the_way_out(scene, mover_ref, start, threat,
-                                                         set(watchers), at_start)
+                                                         set(watchers), at_start, party)
 
     out: list[tuple[str, Reaction]] = []
     for ref in scene.actors:                  # the scene's order, so the swings are stable
@@ -499,7 +507,7 @@ def _seen_by(scene, viewer_ref: str, ref: str) -> bool:
 
 
 def _owed_on_the_way_out(scene, mover_ref: str, start, threat, candidates: set,
-                         at_start: frozenset) -> set:
+                         at_start: frozenset, party=frozenset()) -> set:
     """The fewest foes whose threatened squares the withdrawer must leave after the first.
 
     A breadth-first walk of the board from the start square, stepping only where the
@@ -523,7 +531,8 @@ def _owed_on_the_way_out(scene, mover_ref: str, start, threat, candidates: set,
     bodies: set = set()
     for ref, anchor in scene.positions.items():
         other = scene.actors.get(ref)
-        if ref == mover_ref or other is None or _allied(scene, ref, mover_ref):
+        if ref == mover_ref or ref in party or other is None \
+                or _allied(scene, ref, mover_ref):
             continue
         # "You can move through a square occupied by a helpless opponent without
         # penalty" (CRB p.193, Moving Through a Square) — the dead included.

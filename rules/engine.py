@@ -3148,7 +3148,7 @@ class Engine:
             })
         return out
 
-    def _leaving_the_fight(self, intent: Intent, pc) -> "Outcome | None":
+    def _leaving_the_fight(self, intent: Intent, pc, escorts=()) -> "Outcome | None":
         """Walking out of a fight, asked by `_op_travel` and `_op_journey` at the point
         they commit to going: the attacks of opportunity first, and no walk for a body
         they dropped.
@@ -3167,26 +3167,43 @@ class Engine:
         `_op_move` makes ("does not get there") and `_op_attack` makes ("never swings").
         None when the party may go.
 
-        Only the PC withdraws. Escorts leave with the party without ever being moved on
-        the board, so they have no square to be struck leaving; in 1e every creature
-        that moves out provokes, and modelling theirs waits on companions walking out as
-        movement (docs/fix-interfaces.md).
+        Everyone who leaves withdraws (`escorts`: whoever `_op_travel` takes along — a
+        named escort, a companion, a mount). "Only the PC withdraws" was the first cut
+        (docs/fix-interfaces.md, "what the withdraw fix left", (1)): escorts walked out of
+        reach of a foe for free, though in 1e every creature that moves out of a
+        threatened square provokes, and each one leaving is spending its round on it as
+        the player is. Each is asked `provoked_by_withdraw` from its own square, with the
+        whole party as one side (no member swings at another, nor blocks another's way
+        out), the PC first; every foe still has one allowance a round
+        (`_spend_reaction`), so a thug who swung at the player as they turned has nothing
+        left for the companion behind them unless Combat Reflexes gives it more. An
+        escort without a square (a scene with no map, somebody never placed) owes
+        nothing, the rule `threatens` keeps. An escort the swings drop does not come:
+        `_op_travel` already leaves the down where they fell, and says so.
         """
         if pc is None or not self.scene.in_encounter:
             return None
         struck_by = intent.params.get("withdrew")
         if struck_by is None:
             owed: list[dict] = []
-            for watcher, reaction in reactions.provoked_by_withdraw(self.scene, pc.ref):
-                if not self._spend_reaction(watcher, reaction.budget):
-                    continue
-                owed.append({
-                    "op": reaction.op, "actor": watcher, "target": pc.ref,
-                    "because": f"{pc.name} turned to leave the fight",
-                    # A single swing, never the attacker's iteratives (`_reactions_before`).
-                    "params": {"full_attack": False, "reaction": reaction.id},
-                    "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
-                })
+            party = [pc.ref] + [r for r in escorts or () if r in self.scene.actors]
+            for mover in party:
+                who = self.scene.actors[mover]
+                if mover != pc.ref and who.is_down:
+                    continue                 # the fallen stay where they fell
+                for watcher, reaction in reactions.provoked_by_withdraw(
+                        self.scene, mover, party=party):
+                    if not self._spend_reaction(watcher, reaction.budget):
+                        continue
+                    owed.append({
+                        "op": reaction.op, "actor": watcher, "target": mover,
+                        "because": f"{who.name} turned to leave the fight",
+                        # A single swing, never the attacker's iteratives
+                        # (`_reactions_before`).
+                        "params": {"full_attack": False, "reaction": reaction.id},
+                        "visibility": ("player" if self.scene.actors[watcher].is_pc
+                                       else "hidden"),
+                    })
             if owed:
                 raise _ReactionsOwed(owed, [o["actor"] for o in owed])
             return None
@@ -8012,7 +8029,7 @@ class Engine:
         # that can be known before the walk and before anything has changed
         # (`_leaving_the_fight`). A PC the swings drop stays where they stood.
         if moved:
-            stopped = self._leaving_the_fight(intent, pc)
+            stopped = self._leaving_the_fight(intent, pc, escorts)
             if stopped is not None:
                 return stopped
         for r, a in falling:
