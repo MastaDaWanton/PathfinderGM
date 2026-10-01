@@ -189,6 +189,44 @@ def chart(engine, world) -> dict:
     }
 
 
+def walk_to(engine, world, place_id: str) -> tuple[dict | None, list[dict], str]:
+    """The chart's way from where the party stands to `place_id`, for the say door:
+    `(place, legs, "")` when there is one, `(place or None, [], why)` when not.
+
+    The FAR CHIP's check (item 9, owner's ruling C2, 2026-09-30: "Walk there only through
+    places you have visited? A spoken turn still routes anywhere."). `play/views.py`
+    `_read_place` took only a way one step from here, so the Map tab's Walk there had to
+    attach one leg a turn — stage 3's zMUD slow walk, which the owner then overruled: "I
+    should not be forced to play a whole turn for each connecting point." A place the
+    chart can walk to — `route` below: through places you have been, never by a shut way,
+    never by a journey — is a place the chip may name, and the engine walks it in one turn
+    (`Engine._op_travel` walks `places.route` hop by hop). This is Inform's *Approaches*
+    default ("the best route ... through visited rooms", Writing with Inform §6.14), the
+    same function the chart's slip shows its legs from, so the chip can never be refused
+    a way the slip offered.
+
+    `place` is `{"id", "name"}` for any place of the live graph, so a refusal can name it.
+    """
+    scene = engine.scene
+    if not str(scene.at or ""):
+        return None, [], "Nowhere is charted yet."
+    known = engine.places()
+    by_id = {p.id: p for p in known}
+    here = engine.here()
+    target = by_id.get(str(place_id or ""))
+    if target is None:
+        return None, [], ""
+    place = {"id": target.id, "name": target.name}
+    if target.id == here.id:
+        return place, [], f"You are already at {target.name}."
+    visited = [pid for pid in scene.places_been() if pid in by_id]
+    if here.id not in visited:
+        visited.append(here.id)
+    ways = exits_mod.ways_from(engine, world, visited)
+    legs, why = route(ways, set(visited), here.id, target.id)
+    return place, legs, why
+
+
 def route(ways: dict, been, start: str, to: str) -> tuple[list[dict], str]:
     """The walk from `start` to `to` by known ways: `(legs, "")`, or `([], why)`.
 

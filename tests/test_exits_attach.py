@@ -627,6 +627,70 @@ def test_a_move_the_engine_refused_comes_back_with_the_chip(worlds, desk, monkey
     assert left["why"] == "The watch turns you back at the gate."
 
 
+def _quiet_ways(monkeypatch):
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "street", lambda dice, level=1: None)
+    monkeypatch.setattr(ontheway, "road", lambda *a, **k: None)
+
+
+def _walk(c, place_id):
+    e = c.engine()
+    e.run(e.validate([{"op": "travel", "actor": c.scene.pc().ref, "because": "t",
+                       "params": {"place": place_id}}], origin="author:test"))
+    c.save()
+
+
+def test_a_far_chip_walks_the_whole_way_in_one_turn(worlds, desk, monkeypatch):
+    """Item 9 (b) of the 2026-09-30 playtest: a place chip had to be one of the ways on
+    from here, so the Map tab's Walk there attached one leg a turn — and the owner ruled
+    "I should not be forced to play a whole turn for each connecting point." A place the
+    chart can walk to through places the party has been (ruling C2) is a chip now, and
+    one Say walks every hop of it, through the engine's own door with no planner asked:
+    one player beat, the party at the far end, the places between on the tell's route."""
+    from play import places_found
+
+    _quiet_ways(monkeypatch)
+    c = desk["c"]
+    start = c.scene.at
+    near = _way(c)
+    _walk(c, near["id"])           # stood in once, so the places beyond it are charted
+    _walk(c, start)
+    chart = places_found.chart(c.engine(), c.world)
+    far = next((n for n in chart["nodes"]
+                if n["walk"] and len(n["walk"]["legs"]) >= 2), None)
+    if far is None:
+        pytest.skip("nothing two ways off by the ways known, in this town")
+    assert far["id"] not in {x["id"] for x in exits_mod.exits(c.engine(), c.world)}
+    beats = len(_players(c))
+    r = _say("", far)
+    assert r.status_code == 200, r.content[:300]
+    assert c.scene.at == far["id"], "the far chip did not take the party the whole way"
+    assert len(_players(c)) == beats + 1, "one Say, one turn"
+    assert desk["calls"]["plans"] == []
+    walked = next(o for o in reversed(c.scene.log) if o.get("op") == "travel")
+    assert walked["effects"][0]["went_by"], "the places between are on the route"
+
+
+def test_a_chip_for_a_place_under_the_fog_is_refused_without_naming_it(worlds, desk):
+    """Far, but not anywhere: a place the party has not reached by the ways it knows is
+    refused at the door (`_read_place`), the party does not move, and the refusal does not
+    name the place — a name in a refusal would lift the fog the chart keeps."""
+    from play import places_found
+
+    c = desk["c"]
+    start = c.scene.at
+    chart = places_found.chart(c.engine(), c.world)
+    found = {n["id"] for n in chart["nodes"]}
+    hidden = next((p for p in c.engine().places() if p.id not in found), None)
+    if hidden is None:
+        pytest.skip("everything is charted from here")
+    r = _say("", {"id": hidden.id, "name": hidden.name})
+    assert r.status_code != 200 or r.json().get("unfinished")
+    assert c.scene.at == start
+    assert hidden.name not in r.content.decode("utf-8")
+
+
 def test_the_ratchet_no_place_turn_ends_without_its_move_or_a_word_about_it(
         worlds, desk, monkeypatch):
     """The net under every path: a 200 for a place chip that did not move the party, owes

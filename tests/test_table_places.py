@@ -242,52 +242,50 @@ def _pf(here, dest_legs):
 
 
 @needs_node
-def test_walk_there_attaches_each_leg_as_the_exits_row_does_and_sends_nothing(tmp_path):
-    """The owner ruled that a way on "should attach like a spell does and then apply when
-    you send", and the chip is the exits row's own (11's `exitChip` into 10's
-    `attachPlace`), so Say posts `/api/say` with the place chip the server checks at the
-    door (play/views.py `_read_place`) and moves by `_take_the_exit`. A walk of two legs is
-    two turns: pressing Walk there attaches the first leg and sends nothing; arriving
-    attaches the next once 04 has cleared the spent chip (it draws the state first and
-    clears after, so a chip attached during the draw was wiped); arriving at the end
-    finishes the walk. A fight on the way stops it with the reason said, and attaches
-    nothing: the next leg would be a withdraw the player never chose."""
+def test_walk_there_attaches_the_destination_as_one_chip_and_sends_nothing(tmp_path):
+    """The owner's ruling after the 0.2.0 playtest (2026-09-30): "I should be able to go
+    anywhere ... I should not be forced to play a whole turn for each connecting point."
+    Stage 3 attached one leg a turn (a two-leg walk was two Says, the next leg attached
+    on arrival); the playtest's walk to the Velvet Veil was three. Now pressing Walk there
+    attaches the DESTINATION as the one place chip — the exits row's own (11's `exitChip`
+    into 10's `attachPlace`) — and still sends nothing, because a way on "should attach
+    like a spell does and then apply when you send". One Say, and the engine walks the
+    legs. Arriving finishes the walk; a walk the engine stopped short (a meeting that
+    stops, the watch, a fight) says where, and the next press goes on from there."""
     got = _walk_run(tmp_path, f"""
 const s1 = {json.dumps(_state(_pf("well", [_leg("well", "market"), _leg("market", "stables")]),
                               [_ex("market")]))};
-const s2 = {json.dumps(_state(_pf("market", [_leg("market", "stables")]), [_ex("well"), _ex("stables")]))};
 const s3 = {json.dumps(_state(dict(_pf("stables", []), here="stables"), [_ex("market")]))};
-const fight = {json.dumps(_state(_pf("market", [_leg("market", "stables")]),
+const short = {json.dumps(_state(_pf("market", [_leg("market", "stables")]),
                                  [_ex("well"), _ex("stables")], in_encounter=True))};
 const out = {{}};
 renderAll(s1);
 walkThere("stables");
 out.first = sayBody(); out.sentOnPress = SENT.length; out.said1 = MAPV.said;
-renderAll(s2); clearAttachments();
-setTimeout(() => {{
-  out.second = sayBody(); out.said2 = MAPV.said;
-  renderAll(s3); clearAttachments();
-  out.done = MAPV.walk; out.said3 = MAPV.said;
-  // The same walk, with a fight met at the market.
-  renderAll(s1); walkThere("stables"); renderAll(fight); clearAttachments();
-  setTimeout(() => {{ out.fightChip = sayBody(); out.fightSaid = MAPV.said; out.fightWalk = MAPV.walk;
-    out.sent = SENT.length; done(out); }}, 5);
-}}, 5);""")
-    assert got["first"] == {"text": "", "attachments": [{"kind": "place", "id": "market"}]}
+renderAll(s1);
+out.kept = sayBody();
+renderAll(s3); clearAttachments();
+out.done = MAPV.walk; out.said3 = MAPV.said;
+// The same walk, stopped by a fight at the market.
+renderAll(s1); walkThere("stables"); renderAll(short); clearAttachments();
+setTimeout(() => {{ out.shortChip = sayBody(); out.shortSaid = MAPV.said; out.shortWalk = MAPV.walk;
+  out.sent = SENT.length; done(out); }}, 5);""")
+    assert got["first"] == {"text": "", "attachments": [{"kind": "place", "id": "stables"}]}
     assert got["sentOnPress"] == 0 and got["sent"] == 0, "the page sent a turn by itself"
-    assert "first of 2 legs" in got["said1"] and "Press Say" in got["said1"]
-    assert got["second"] == {"text": "", "attachments": [{"kind": "place", "id": "stables"}]}
-    assert "the last leg" in got["said2"]
+    assert "the whole way, 2 legs" in got["said1"] and "in one turn" in got["said1"]
+    assert got["kept"] == got["first"], "a far chip the row does not list was taken off"
     assert got["done"] is None and got["said3"] == "You are at stables."
-    assert got["fightChip"] == {"text": ""} and got["fightWalk"] is None
-    assert "there is a fight" in got["fightSaid"]
+    assert got["shortChip"] == {"text": ""} and got["shortWalk"] is None
+    assert "stopped at" in got["shortSaid"] and "there is a fight" in got["shortSaid"]
 
 
-def test_the_first_leg_of_every_walk_is_a_way_the_server_takes(worlds):
-    """Walk there attaches `walk.legs[0]`, so that leg has to be a way the say door takes:
-    one of `scene.exits` as the engine builds them this moment, open, not a journey
-    (`_read_place` refuses anything else with "There is no way from here to ..."). Checked
-    for every place found, after a few walks, in each world."""
+def test_every_place_walk_there_offers_is_a_chip_the_server_takes(worlds):
+    """Walk there attaches the destination, so every place the chart gives a walk to has
+    to be a place chip the say door takes (`_read_place`, far chips by
+    `places_found.walk_to`, the same route): measured on the first draft against stage 3's
+    door, every node more than one leg away was refused with "There is no way from here
+    to ...". Checked for every place found, after a few walks, in each world; and a place
+    with no walk is refused, so the door is no wider than the chart."""
     from play.views import _read_place
 
     s, e, pc, pf = _walked_chart(worlds, steps=3)
@@ -304,8 +302,12 @@ def test_the_first_leg_of_every_walk_is_a_way_the_server_takes(worlds):
     for n in walks:
         first = n["walk"]["legs"][0]
         assert first["from"] == s.at and first["to"] in row and not row[first["to"]]["blocked"]
-        chip, err = _read_place(_C(), {"kind": "place", "id": first["to"]}, "", False)
-        assert not err and chip[0]["id"] == first["to"], (n["id"], err)
+        chip, err = _read_place(_C(), {"kind": "place", "id": n["id"]}, "", False)
+        assert not err and chip[0]["id"] == n["id"] and not chip[0]["journey"], (n["id"], err)
+    for n in pf["nodes"]:
+        if not n["walk"] and not n["current"]:
+            chip, err = _read_place(_C(), {"kind": "place", "id": n["id"]}, "", False)
+            assert err and not chip, n["id"]
 
 
 def test_walk_there_uses_the_exits_rows_own_chip_and_the_one_say_door():
@@ -313,7 +315,7 @@ def test_walk_there_uses_the_exits_rows_own_chip_and_the_one_say_door():
     11's `exitChip` and 10's `attachPlace`, and never posts; the turn goes out through
     04's Say like any other."""
     code = "\n".join(line.split("//", 1)[0] for line in _js("16-tab-map.js").splitlines())
-    body = code[code.index("function mapAttachLeg("):code.index("onRender(function walkOn")]
+    body = code[code.index("function mapAttachWalk("):code.index("onRender(function walkOn")]
     assert "attachPlace(exitChip(way, !!scene.in_encounter))" in body
     for sender in ("post(", "fetch(", "takeTurn(", "/api/"):
         assert sender not in code, sender

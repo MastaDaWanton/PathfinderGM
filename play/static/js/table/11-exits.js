@@ -91,14 +91,30 @@ function dropDuplicateSuggestions(exits) {
   if (!box.querySelector(".sugg")) box.innerHTML = "";
 }
 
+// A far place (item 9, 2026-09-30): not a way on from here, but one the chart walks to
+// through places you have been (`scene.places_found`, the node's `walk`), whose first
+// leg is an open way on. Map's Walk there attaches it as ONE chip and the engine walks
+// every hop in one turn (play/views.py `_read_place` takes it by the same rule,
+// `places_found.walk_to`). Returned as a way the chip can be made from, or null.
+function farWay(s, id) {
+  const scene = (s && s.scene) || {};
+  const pf = scene.places_found;
+  const node = pf && Array.isArray(pf.nodes) ? pf.nodes.find(n => n.id === id) : null;
+  const legs = node && node.walk && node.walk.legs;
+  if (!legs || !legs.length) return null;
+  const first = (scene.exits || []).find(x => x.id === legs[0].to);
+  if (!first || first.blocked) return null;
+  return { id: node.id, name: node.name, journey: false, time_words: "", legs: legs.length };
+}
+
 // A place chip follows the state it was attached in: a fight that began makes it a
 // Withdraw chip, one that ended makes it a walk again, and a way that shut or is no
 // longer a way from here takes the chip off with a sentence saying so. Only while the
 // row is shown: a roll owed hides the row and says nothing about the ways.
-function refreshPlaceChip(exits, fighting) {
+function refreshPlaceChip(exits, fighting, s) {
   const c = typeof attachedChip === "function" ? attachedChip() : null;
   if (!c || c.kind !== "place") return;
-  const e = exits.find(x => x.id === c.id);
+  const e = exits.find(x => x.id === c.id) || (s ? farWay(s, c.id) : null);
   if (!e || e.blocked) {
     removeAttachment({ announce: false });
     spellSay(e ? `${c.name} is shut: ${e.blocked}` : `${c.name} is no longer a way on from here.`);
@@ -122,7 +138,7 @@ function renderExits(s) {
     box.hidden = true; box.innerHTML = "";
     return;
   }
-  refreshPlaceChip(exits, fighting);
+  refreshPlaceChip(exits, fighting, s);
   const pressed = attachedExitId();
   box.classList.toggle("fighting", fighting);
   const groups = EXIT_GROUPS.map(([key, label]) => {
