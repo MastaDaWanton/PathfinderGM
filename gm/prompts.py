@@ -1197,7 +1197,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # How they carry themselves, from the life the population rolled for them:
             # behaviour, two traits at most, the quirk only when it is due — and never
             # their wants, goal or hobby, which are learned in play and which a 12B model
-            # told them leaks (rules/population.py, "what the narrator is told").
+            # told them leaks (rules/population.py, "what the narrator is told"), unless a
+            # companion has CONFIDED one (below).
             from rules import population as _population
 
             rec = _population.of_ref(scene, ref)
