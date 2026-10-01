@@ -2983,6 +2983,10 @@ class Engine:
         queue = list(remaining)
         while queue:
             raw = queue[0]
+            # A creature's move toward somebody, with no square named, is given the
+            # square its walk ends on before anything asks where it is going — the
+            # attacks of opportunity below need the square (`_toward_before`).
+            self._toward_before(raw)
             # Reactions are owed by the rules, not proposed by anyone, and they happen
             # *before* the action that provoked them completes: an attack of opportunity
             # lands as the creature leaves the square, so if it drops them they never
@@ -3038,6 +3042,12 @@ class Engine:
             queue.pop(0)
             partial = {}
             outcomes.append(outcome)
+            # A Tiny body that came into somebody's square is swung at once it is
+            # there (`reactions.provoked_by_entering`) — after the move, not before it,
+            # so the swing is measured where it landed. Next in the queue, ahead of the
+            # blow that brought it in.
+            if intent.op == "move" and outcome.status == "resolved":
+                queue[0:0] = self._reactions_on_arrival(outcome)
             # The plan's placeholders (new1…) become the refs just made, in everything
             # still queued — rewritten in the queue itself, so a turn that suspends for
             # the player's roll later on carries real refs into the save.
@@ -3111,9 +3121,14 @@ class Engine:
             return []
 
         start = self.scene.positions.get(ref)
+        return self._swings_at(ref, reactions.provoked_by_move(
+            self.scene, ref, start, tuple(square)))
+
+    def _swings_at(self, ref: str, fired) -> list[dict]:
+        """The reaction intents owed to `ref` by these (watcher, reaction) pairs, each
+        off its watcher's allowance (`_spend_reaction`)."""
         out: list[dict] = []
-        for watcher, reaction in reactions.provoked_by_move(
-                self.scene, ref, start, tuple(square)):
+        for watcher, reaction in fired:
             if not self._spend_reaction(watcher, reaction.budget):
                 continue
             out.append({
@@ -3128,6 +3143,21 @@ class Engine:
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
+
+    def _reactions_on_arrival(self, outcome: "Outcome") -> list[dict]:
+        """Swings owed because a move just ENDED somewhere — only a Tiny or smaller body
+        coming into an opponent's square (`reactions.provoked_by_entering`). Read off
+        the move's own position effect, so a move that went nowhere owes nothing."""
+        if not self.scene.in_encounter or not self.scene.has_grid:
+            return []
+        effect = next((e for e in (outcome.effects or [])
+                       if e.get("kind") == "position" and e.get("from") is not None
+                       and e.get("to") is not None), None)
+        if effect is None or tuple(effect["from"]) == tuple(effect["to"]):
+            return []
+        ref = str(effect.get("ref") or "")
+        return self._swings_at(ref, reactions.provoked_by_entering(
+            self.scene, ref, tuple(effect["from"]), tuple(effect["to"])))
 
     def _provoked_by_maneuver(self, raw: dict) -> list[dict]:
         """The attack of opportunity a combat manoeuvre owes its target, unless the
@@ -5471,6 +5501,65 @@ class Engine:
                 "because": f"closing on {defender.name}",
                 "params": {"square": [x, y], "closing_on": defender.ref}}
 
+    def _toward_before(self, raw: dict) -> None:
+        """A creature's `move` at somebody — a target, no square, no zone or `engaged` —
+        walked on the board: the square its move ends on is written into the intent, in
+        place, so `_reactions_before` and `_op_move` see an ordinary move to a square.
+
+        Measured 2026-10-01 on the owner's save: a Clockwork Spy forty feet off, its slam
+        refused for reach, retried `{"op": "move", "actor": "c7", "target": "pc",
+        "params": {}}` and resolved "Clockwork Spy moves from far to far." — the zone
+        branch of `_op_move` relabels a zone and moves nobody, so the spy stood where it
+        was while the prose had it "landing right before you".
+
+        The walk is `position.closing_move`, the one the engine already composes for a
+        creature that closes before it swings (`_their_first_blow`,
+        `judgement.default_npc_action`): the nearest square in reach if one move gets
+        there, else as far toward them as one move goes. That is ToEE's "approach"
+        tactic as TemplePlus repaired it — move toward the target, and stop once in reach
+        (github.com/GrognardsFromHell/TemplePlus/wiki/Changelog: the approach "checks for
+        proximity before executing", which ended its "endless zig zag till end of turn").
+        One move action at the creature's land speed (`speed_feet`); a double move or a
+        charge is a full-round action this engine does not compose. A fly speed is not
+        read: `_check_move` budgets every move by land speed, and a walk this composes
+        must be one that check would accept.
+
+        Never the player's character: the player's moves are declared and walked by
+        their own door (`judgement.declare_approach`, the refused-move check), and a
+        zone word other than `engaged` — `far` from somebody is a retreat — is left to
+        the zone branch. `toward` is written by code only; the move op's schema has no
+        such param, so a model that writes one is refused at the parser (unknown param),
+        as `closing_on` is.
+        """
+        if raw.get("op") != "move" or not self.scene.has_grid \
+                or not self.scene.in_encounter:
+            return
+        params = raw.get("params") or {}
+        if params.get("square") not in (None, "") or params.get("toward"):
+            return
+        if str(params.get("zone") or "").strip().lower() not in ("", "engaged"):
+            return
+        ref = str(raw.get("actor") or "")
+        if params.get("who") and params.get("who") != ref:
+            return
+        actor = self.scene.actors.get(ref)
+        targets = _intent_from_dict(raw).targets()
+        foe = self.scene.actors.get(targets[0]) if targets else None
+        if actor is None or actor.is_pc or foe is None or foe.ref == ref \
+                or ref not in self.scene.positions or foe.ref not in self.scene.positions:
+            return
+        from . import position as position_mod
+
+        params = dict(params, toward=foe.ref)
+        closing = position_mod.closing_move(self.scene, actor, foe, actor.wielded_key())
+        if closing is not None:
+            square = list(closing[0]["params"]["square"])
+            # Its own height kept: `closing_move` measured the walk at the level the
+            # creature stands on, and a flier's height is its own (`settle_levels`).
+            start = self.scene.positions[ref]
+            params["square"] = square + list(start[2:3])
+        raw["params"] = params
+
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
         """A combat manoeuvre: the same attack roll, with CMB instead of the attack
@@ -6754,6 +6843,12 @@ class Engine:
 
         grid = self.scene.grid
         occupied = self.scene.occupied(ignore=ref)
+        # A Fine, Diminutive or Tiny body "can move into ... an occupied square"
+        # (aonprd.com/Rules.aspx?ID=176) — and with a reach of 0 it must, to strike
+        # (ID=179). So the squares it is going TO are not taken for it; the squares on
+        # the way still are (`position.occupancy_toward` says why).
+        if gridmod.enters_occupied(actor.size):
+            occupied -= set(gridmod.footprint(target, actor.size))
         if not grid.inside(target):
             raise IntentError(
                 f"move: {target} is off the map, which is {grid.width} by {grid.height} "
@@ -12181,17 +12276,27 @@ class Engine:
             # narrator hears that the distance was closed before the swing it dresses.
             # `closing_on` is written by code only — the parser refuses it from a model.
             foe = self.scene.actors.get(str(intent.params.get("closing_on") or ""))
+            toward = self.scene.actors.get(str(intent.params.get("toward") or ""))
             if foe is not None:
                 effect["closing_on"] = foe.ref
                 tell = (f"{actor.name} closes {cost} ft on {foe.name} to strike."
                         if cost is not None else
                         f"{actor.name} closes on {foe.name} to strike.")
+            elif toward is not None:
+                tell = self._toward_tell(actor, toward, cost, effect)
             return Outcome(
                 intent_id=intent.id, op="move",
                 effects=[effect],
                 tell=tell,
                 because=intent.because,
             )
+
+        # A move at somebody that `_toward_before` found no square for: in reach
+        # already, or no open ground nearer. Told as that, never as "moves from far to
+        # far" — the sentence the narrator dressed as a creature crossing forty feet.
+        toward = self.scene.actors.get(str(intent.params.get("toward") or ""))
+        if toward is not None and self.scene.has_grid and ref in self.scene.positions:
+            return self._stood_toward(intent, actor, toward)
 
         self.scene.zones[ref] = zone
         tell = f"{actor.name} moves from {was} to {zone}."
@@ -12207,6 +12312,44 @@ class Engine:
             tell=tell,
             because=intent.because,
         )
+
+    def _toward_tell(self, actor: Actor, foe: Actor, cost: int | None,
+                     effect: dict) -> str:
+        """Where a creature's move toward `foe` left it, in feet — the tell the narrator
+        is fed, so a walk that stopped short is said to have stopped short. Writes the
+        gap onto `effect` (`toward`, `gap_ft`) for the prose checks
+        (gm/checks/closing_claimed.py) to read rather than re-measure."""
+        from . import position as position_mod
+
+        gap = self.scene.distance_between(actor.ref, foe.ref)
+        effect["toward"] = foe.ref
+        effect["gap_ft"] = gap
+        walked = f" {cost} ft" if cost is not None else ""
+        if gap == 0 and gridmod.enters_occupied(actor.size):
+            return f"{actor.name} moves{walked} into {foe.name}'s square."
+        if position_mod.out_of_reach(self.scene, actor, foe, actor.wielded_key()) is None:
+            return f"{actor.name} closes{walked} on {foe.name} and is within reach."
+        if gap is None:
+            return f"{actor.name} moves{walked} toward {foe.name}."
+        return f"{actor.name} moves{walked} toward {foe.name} and is still {gap} ft away."
+
+    def _stood_toward(self, intent: Intent, actor: Actor, foe: Actor) -> Outcome:
+        """A move toward `foe` that went nowhere: already in reach, or no open square
+        nearer within one move. Resolved without a step, and said which."""
+        from . import position as position_mod
+
+        here = self.scene.positions.get(actor.ref)
+        gap = self.scene.distance_between(actor.ref, foe.ref)
+        effect = {"ref": actor.ref, "kind": "position", "from": here, "to": here,
+                  "feet": 0, "zone": self.scene.zones.get(actor.ref),
+                  "toward": foe.ref, "gap_ft": gap}
+        if position_mod.out_of_reach(self.scene, actor, foe, actor.wielded_key()) is None:
+            tell = f"{actor.name} is already within reach of {foe.name}."
+        else:
+            far = f" and is still {gap} ft away" if gap is not None else ""
+            tell = (f"{actor.name} finds no open way nearer to {foe.name}{far}.")
+        return Outcome(intent_id=intent.id, op="move", effects=[effect], tell=tell,
+                       because=intent.because)
 
     def _not_by_the_stairs(self, here, going_to) -> str:
         """Why this floor cannot be reached from where the party is standing, or "".
@@ -12348,9 +12491,13 @@ class Engine:
             # as "there is no route" for a spider going up its own wall.
             flat = 0
         else:
-            reach = self.scene.grid.reachable(
-                here, 10_000, size=self.scene.actors[ref].size,
-                occupied=self.scene.occupied(ignore=ref, level=now))
+            size = self.scene.actors[ref].size
+            occupied = self.scene.occupied(ignore=ref, level=now)
+            # A Tiny body may end in somebody's square (`_check_move`); the walk there is
+            # still paid, so the square it stops in is not a wall to it.
+            if gridmod.enters_occupied(size):
+                occupied -= set(gridmod.footprint(there, size))
+            reach = self.scene.grid.reachable(here, 10_000, size=size, occupied=occupied)
             flat = reach.get(there)
             if flat is None:
                 return None

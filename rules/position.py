@@ -39,7 +39,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .dice import Modifier
-from .grid import SQUARE_FT, distance_between, flanking
+from .grid import SQUARE_FT, distance_between, enters_occupied, flanking, footprint
 
 # How far above a defender an attacker has to be before the ground counts as higher.
 # One square — five feet — because that is the smallest difference this engine can
@@ -308,6 +308,28 @@ def out_of_reach(scene, actor, defender, weapon_key: str | None,
     return miss
 
 
+def occupancy_toward(scene, actor, defender) -> set[tuple[int, int]]:
+    """The squares `actor` must route around on its way to `defender`.
+
+    Everybody's but its own — and, for a creature small enough to share a square
+    (`grid.enters_occupied`: Fine, Diminutive, Tiny), not its target's either: "They
+    must enter an opponent's square to attack in melee" (aonprd.com/Rules.aspx?ID=179).
+    Before this, a Tiny creature's reach of 0 named exactly one square to attack from,
+    the target's own, and this set always held it — so a Clockwork Spy forty feet off
+    was told "There is no open square in reach" and never moved (2026-10-01).
+
+    Only the target's squares open up, though the rule lets a Tiny creature through any
+    occupied square: passing through somebody provokes from them, and the engine knows
+    where a move ends, not the route it took (`reactions.provoked_by_move` says why it
+    will not invent one), so a route through a stranger would be a swing nobody owed.
+    """
+    taken = scene.occupied(ignore=actor.ref)
+    there = scene.positions.get(defender.ref) if defender is not None else None
+    if there is not None and enters_occupied(actor.size):
+        taken -= set(footprint(tuple(there[:2]), defender.size))
+    return taken
+
+
 def square_in_reach(scene, actor, defender, reach: int,
                     gap: bool = False) -> tuple[tuple[int, int], int] | None:
     """The cheapest open square from which `actor` reaches `defender`, and what the walk
@@ -317,7 +339,8 @@ def square_in_reach(scene, actor, defender, reach: int,
     so a square named here is one the move op will accept. Ties go to the square
     squarest-on to the target — the first cut named the diagonal [6, 9] for a thug
     straight ahead at [7, 10] — then the lower row and column, so the same board always
-    names the same square.
+    names the same square. For a creature with a reach of 0 the square is the target's
+    own (`occupancy_toward`).
     """
     grid = getattr(scene, "grid", None)
     start = scene.positions.get(actor.ref)
@@ -326,7 +349,7 @@ def square_in_reach(scene, actor, defender, reach: int,
         return None
     level = tuple(start[2:3])
     routes = grid.reachable(tuple(start[:2]), 10_000, size=actor.size,
-                            occupied=scene.occupied(ignore=actor.ref))
+                            occupied=occupancy_toward(scene, actor, defender))
     best = None
     for square, cost in routes.items():
         flat = tuple(square[:2])
@@ -374,7 +397,7 @@ def closing_move(scene, actor, defender,
             return None
         level = tuple(start[2:3])
         routes = grid.reachable(tuple(start[:2]), speed, size=actor.size,
-                                occupied=scene.occupied(ignore=actor.ref))
+                                occupied=occupancy_toward(scene, actor, defender))
         here = distance_between(tuple(start), actor.size, there, defender.size)
         nearer = [(distance_between(tuple(q[:2]) + level, actor.size, there,
                                     defender.size), cost, q[1], q[0])
@@ -391,5 +414,6 @@ def closing_move(scene, actor, defender,
 
 __all__ = ["attack_mods", "ac_mods", "cover_of", "reflex_mods", "explain",
            "OutOfReach", "out_of_reach", "square_in_reach", "closing_move",
+           "occupancy_toward",
            "FLANKING_BONUS", "HIGHER_GROUND_BONUS", "HIGHER_GROUND_SQUARES",
            "COVER_AC", "COVER_REFLEX", "SOFT_COVER_AC"]

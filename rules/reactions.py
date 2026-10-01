@@ -271,7 +271,8 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
     1e: leaving a threatened square provokes. *Entering* one does not, and neither does a
     five-foot step — "you can move 5 feet in any round when you don't perform any other
     kind of movement" is the whole point of it, and treating a step as a move would make
-    the safest option in the game the most dangerous one.
+    the safest option in the game the most dangerous one. The one exception, a Tiny or
+    smaller body entering an opponent's own square, is `provoked_by_entering`'s.
 
     A creature does not provoke from its allies, but the app has no side model for NPCs
     beyond `scene.sides`, so this asks that. Where sides are not declared, everybody who
@@ -315,6 +316,48 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
             continue
         for reaction in reactions_for(watcher):
             if reaction.fires_on("leaves_threatened_square"):
+                out.append((ref, reaction))
+    return out
+
+
+def provoked_by_entering(scene, mover_ref: str, start, end) -> list[tuple[str, Reaction]]:
+    """Who gets an attack of opportunity because this creature came into their square.
+
+    Only a Tiny or smaller body can (`grid.enters_occupied`), and when it does: "They
+    must enter an opponent's square to attack in melee. This provokes an attack of
+    opportunity from the opponent" (aonprd.com/Rules.aspx?ID=179). The sentence has no
+    five-foot-step exception, so none is read into it.
+
+    Asked AFTER the move lands, unlike `provoked_by_move`, which is asked before: a swing
+    at a creature leaving lands while it is still in reach, and a swing at one arriving
+    lands once it is there. Asked before, the swing was measured against the square the
+    creature had not yet left — "Kesst Vayr reaches 5 ft with the rapier and Clockwork
+    Spy is 10 ft away", refused, on the first run of this (2026-10-01).
+
+    Only the square it ENDS in: the engine knows where a move ends, not the route
+    (`provoked_by_move` says why it will not invent one). A watcher that cannot swing
+    (`threatened_by` empty) and a bystander take nothing, as they take nothing above.
+    """
+    if start is None or not scene.has_grid:
+        return []
+    mover = scene.actors.get(mover_ref)
+    if mover is None or not gridmod.enters_occupied(mover.size):
+        return []
+    left = set(gridmod.footprint(tuple(start[:2]), mover.size))
+    arrived = set(gridmod.footprint(tuple(end[:2]), mover.size))
+
+    from . import states
+
+    out: list[tuple[str, Reaction]] = []
+    for ref, watcher in scene.actors.items():
+        if ref == mover_ref or _allied(scene, ref, mover_ref) \
+                or watcher.has_state(states.BYSTANDER) or ref not in scene.positions:
+            continue
+        theirs = set(gridmod.footprint(tuple(scene.positions[ref][:2]), watcher.size))
+        if not (arrived & theirs) or (left & theirs) or not threatened_by(scene, ref):
+            continue
+        for reaction in reactions_for(watcher):
+            if reaction.fires_on("provoking_action"):
                 out.append((ref, reaction))
     return out
 
@@ -584,6 +627,6 @@ def _allied(scene, a: str, b: str) -> bool:
 
 
 __all__ = ["Reaction", "TRIGGERS", "UNPROVOKING", "budget_for",
-           "disarmed_and_empty_handed", "provoked_by_action", "provoked_by_maneuver",
-           "provoked_by_move", "provoked_by_withdraw", "reach_with", "reactions_for",
+           "disarmed_and_empty_handed", "provoked_by_action", "provoked_by_entering",
+           "provoked_by_maneuver", "provoked_by_move", "provoked_by_withdraw", "reach_with", "reactions_for",
            "threatened_by", "threatens", "unprovoking_tag"]
