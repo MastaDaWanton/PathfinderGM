@@ -1,4 +1,4 @@
-"""Mending a construct is a rule the engine resolves, and the page cannot claim it did.
+"""Mending a construct, and claiming it, are rules the engine resolves (house rule).
 
 The owner's report, 2026-10-01, playing Sam (a 1st-level wizard): after a Magic Missile
 left a Clockwork Spy "unconscious and dying", the player wrote
@@ -11,11 +11,12 @@ resolved nothing ("did not heal the clockwork spy when I fixed it"). The next tu
 greet my new friend and I name him Bob" — printed "Clockwork Spy has bled out where they
 fell." beside "You have tamed the heart of the spy, and it now waits for your command."
 
-The book: a construct is "immediately destroyed when reduced to 0 hit points or less"
-(Bestiary), "a construct that has been completely destroyed cannot be repaired", and a
-damaged one is repaired with the Craft Construct feat, 100 gp per Hit Die, a crafting
-check at DC less 5, a day, 1d6 per Hit Die back (Ultimate Magic p.113). Nothing in 1e
-makes a mended construct its mender's — it obeys its maker (`rules/repair.py`).
+The owner's HOUSE RULE for it, verbatim: "Broken, then fixable and claimable — House rule:
+a construct at 0 to -10 is broken, not destroyed (destroyed only past that). Anyone with
+the skill can mend it with a Craft or Knowledge (engineering) check, which heals it. A
+second, harder check rewrites its loyalty so it becomes yours: it follows you, obeys, and
+you can name it." Ultimate Magic p.113 (Craft Construct, 100 gp a Hit Die, a day) is what
+it departs from, and content/rules/repairs.json keeps both side by side.
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ import pytest
 
 from gm import judgement
 from gm.checks import BeatContext, registered, repair_claimed
-from rules import repair
+from rules import repair, states
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -33,29 +34,191 @@ from rules.sheet import load_pc
 
 OWNERS_LINE = ("I attempt to use my knowledge of engineering and my deft hands to fix the "
                "spy in a way that makes it recognize me as its owner.")
+OWNERS_NAMING = "I greet my new friend and I name him Bob"
 OWNERS_NEXT_BEAT = ("You have tamed the heart of the spy, and it now waits for your "
                     "command.")
 
 
-def _table(spy_hp: int = -1, *, feat: bool = False, gp: int = 300, seed: int = 1):
+def _table(spy_hp: int = -1, *, engineering: int = 1, seed: int = 1):
     scene = Scene(location_id=None)
     pc = scene.add(load_pc("fixtures/pc-thessaly.json"))
-    pc.purse = {"gp": gp}
-    if feat:
-        pc.feats = [*pc.feats, "Craft Construct"]
+    pc.purse = {"gp": 300}
+    if engineering:
+        pc.ranks = {**pc.ranks, "knowledge (engineering)": engineering}
     spy = scene.add(instantiate("clockwork-spy", scene=scene), zone="near")
     spy.hp = spy_hp
     spy.apply_hp_state()
     return scene, Engine(scene, Dice(seed)), pc, spy
 
 
-def _repair(engine, ref, *, own=False, visibility="hidden"):
+def _repair(engine, ref, *, own=False, visibility="player"):
     raw = {"op": "repair", "actor": "pc", "target": ref, "visibility": visibility,
            "because": "test", "params": {"own": True} if own else {}}
     return engine.run(engine.validate([raw]))
 
 
-# --- the words become the op ------------------------------------------------------------
+def _rolled(engine, res, *faces):
+    """Answer the player's popups with these faces, in order; the final Resolution."""
+    for face in faces:
+        assert res.awaiting, "the engine stopped asking for dice before the faces ran out"
+        res = engine.resume(face)
+    assert not res.awaiting
+    return [o for o in res.outcomes if o.op == "repair"][-1]
+
+
+def _risen_table():
+    """A table whose hidden heal roll lifts the spy from -1 past 0 — a 1 on the 1d6
+    mends it only to 0, which is still broken (the next test says so)."""
+    for seed in range(1, 40):
+        scene, engine, pc, spy = _table(-1, seed=seed)
+        probe = Engine(scene, Dice(seed)).dice.roll("1d6").total
+        if probe >= 2:
+            return _table(-1, seed=seed)
+    raise AssertionError("no seed in 1..39 rolls 2 or more on 1d6")
+
+
+def test_mended_only_to_zero_it_is_still_broken():
+    """"0 to -10 is broken": a made repair that rolls a 1 lifts the spy from -1 to 0, and
+    at 0 it is still broken — the tell says so and no claim can follow."""
+    for seed in range(1, 60):
+        _scene, engine, _pc, spy = _table(-1, seed=seed)
+        if Engine(_scene, Dice(seed)).dice.roll("1d6").total == 1:
+            break
+    else:
+        raise AssertionError("no seed rolls a 1")
+    out = _rolled(engine, _repair(engine, spy.ref), 20)
+    assert out.verdict == "success" and spy.hp == 0
+    assert spy.has_state("state.down.broken") and "still broken" in out.tell
+
+
+# --- broken, then fixable ---------------------------------------------------------------
+
+def test_the_owners_spy_at_minus_one_is_mended_by_a_knowledge_engineering_check():
+    """The owner's state: the spy at -1 is broken. Sam's Knowledge (engineering) — the
+    better of it and an untrained Craft — makes the check at DC 15 (the spy's crafting DC
+    20, less 5); 1d6 per Hit Die comes back through the heal applicator stamped
+    `rule:repair-construct`; ten minutes pass; no feat, no coin. Mended above 0 it is no
+    longer broken, and it is nobody's yet: indifferent, not the hostile it fought as."""
+    scene, engine, pc, spy = _risen_table()
+    engine._set_attitude(spy, "hostile", None, "the fight")
+    clock = scene.clock_minutes
+    res = _repair(engine, spy.ref)
+    assert res.awaiting["dc"] == 15 and "Knowledge (Engineering)" in res.awaiting["label"]
+    out = _rolled(engine, res, 20)
+    heals = [e for e in out.effects if e.get("kind") == "heal"]
+    assert out.verdict == "success" and heals
+    assert heals[0]["origin"] == f"rule:{repair.RULE}"
+    assert spy.hp > 0 and not spy.is_down and not spy.has_state("state.down.broken")
+    assert states.attitude_of(spy) == "indifferent"
+    assert not spy.has_state(states.OWNED_BY_YOU)
+    assert scene.clock_minutes - clock == 10 and pc.purse == {"gp": 300}
+    assert "working again, and it is nobody's yet" in out.tell
+
+
+def test_a_failure_by_five_or_more_costs_an_hour_and_mends_nothing():
+    """The row's HOUSE consequence: an hour gone, nothing else lost."""
+    scene, engine, _pc, spy = _table(-1)
+    clock = scene.clock_minutes
+    out = _rolled(engine, _repair(engine, spy.ref), 1)
+    assert out.verdict == "failure" and out.margin <= -5
+    assert scene.clock_minutes - clock == 60 and spy.hp == -1
+    assert spy.has_state("state.down.broken")
+    assert "an hour is gone" in out.tell
+
+
+def test_a_destroyed_construct_cannot_be_mended():
+    """"destroyed only past that": at -11 the spy is parts, and nothing is rolled."""
+    _scene, engine, _pc, spy = _table(-11)
+    assert spy.is_dead
+    (out,) = _repair(engine, spy.ref).outcomes
+    assert out.status == "refused" and out.rolls == [] and "destroyed" in out.tell
+
+
+def test_nobody_without_craft_or_knowledge_engineering_attempts_it_untrained_knowledge():
+    """Craft is usable untrained in 1e, so anybody can try; Knowledge is trained-only,
+    and a sheet with no engineering ranks falls back to Craft rather than being refused."""
+    _scene, engine, _pc, spy = _table(-1, engineering=0)
+    res = _repair(engine, spy.ref)
+    assert res.awaiting and res.awaiting["label"].startswith("Craft")
+
+
+def test_a_living_body_is_not_repaired():
+    scene, engine, _pc, _spy = _table(2)
+    thug = scene.add(instantiate("thug", scene=scene), zone="near")
+    thug.hp = 3
+    (out,) = _repair(engine, thug.ref).outcomes
+    assert out.status == "refused" and "not a construct" in out.tell
+
+
+def test_a_hostile_construct_still_working_is_not_repaired():
+    """It has to be stopped first: a machine swinging at you is not mended."""
+    _scene, engine, _pc, spy = _table(2)
+    engine._set_attitude(spy, "hostile", None, "test")
+    (out,) = _repair(engine, spy.ref).outcomes
+    assert out.status == "refused" and "not for you" in out.tell
+
+
+def test_the_player_rolls_and_nothing_moves_until_the_die_is_in():
+    scene, engine, _pc, spy = _table(-1)
+    clock = scene.clock_minutes
+    res = _repair(engine, spy.ref)
+    assert res.awaiting and scene.clock_minutes == clock and spy.hp == -1
+
+
+# --- then claimable ----------------------------------------------------------------------
+
+def test_the_owners_line_mends_and_then_claims_the_spy_in_one_turn():
+    """Both checks, both the player's dice: the repair at DC 15, then — because the line
+    asked for it and the spy is working by then — the claim at DC 25 (the repair DC +
+    10). A made claim grants `bond.owned-by-you`, the companion bond the `company` op
+    grants (source `company:<ref>`), and `devoted`, the top of the attitude track."""
+    scene, engine, _pc, spy = _table(-1)
+    res = _repair(engine, spy.ref, own=True)
+    assert res.awaiting["dc"] == 15
+    res = engine.resume(20)
+    assert res.awaiting and res.awaiting["dc"] == 25
+    assert "(claim)" in res.awaiting["label"]
+    out = _rolled(engine, res, 20)
+    assert out.verdict == "success"
+    assert spy.has_state(states.OWNED_BY_YOU)
+    assert spy.has_state(states.TRAVELS_WITH_YOU)
+    assert any(e.source == f"company:{spy.ref}" for e in spy.effects)
+    assert states.attitude_of(spy) == "devoted"
+    assert "it follows and obeys" in out.tell
+
+
+def test_a_failed_repair_leaves_the_claim_for_another_turn():
+    _scene, engine, _pc, spy = _table(-1)
+    out = _rolled(engine, _repair(engine, spy.ref, own=True), 2)
+    assert out.verdict == "failure" and not spy.has_state(states.OWNED_BY_YOU)
+    assert len(out.rolls) == 1
+
+
+def test_a_claim_failed_by_five_or_more_turns_the_machine_hostile():
+    """The row's HOUSE consequence for the claim."""
+    _scene, engine, _pc, spy = _table(2)
+    engine._set_attitude(spy, "indifferent", None, "test")
+    spy.hp = spy.hp_max
+    out = _rolled(engine, _repair(engine, spy.ref, own=True), 1)
+    assert out.verdict == "failure" and states.attitude_of(spy) == "hostile"
+    assert not spy.has_state(states.OWNED_BY_YOU)
+
+
+def test_a_broken_construct_cannot_be_claimed_before_it_is_mended():
+    _scene, engine, _pc, spy = _table(-1)
+    reason = repair.claim_refusal(engine.scene, engine.scene.pc(), spy)
+    assert "mended and working" in reason
+
+
+def test_a_claim_needs_training():
+    """Knowledge (engineering) and Disable Device are both trained-only in 1e."""
+    _scene, engine, _pc, spy = _table(2, engineering=0)
+    spy.hp = spy.hp_max
+    (out,) = _repair(engine, spy.ref, own=True).outcomes
+    assert out.status == "refused" and "training" in out.tell
+
+
+# --- the words become the ops -------------------------------------------------------------
 
 def test_the_owners_words_declare_a_repair_on_the_spy_and_ask_to_own_it():
     """The owner's line, with the check the model dressed it as: the dressing is dropped
@@ -90,129 +253,76 @@ def test_mending_words_at_the_only_machine_declare_a_repair(line):
     scene, _engine, _pc, spy = _table(2)
     out = judgement.declare_repair([], line, scene)
     assert [r["op"] for r in out] == ["repair"] and out[0]["target"] == spy.ref
+    assert not out[0]["params"].get("own")
 
 
 @pytest.mark.parametrize("line", [
-    "Can I fix the spy?",                         # a question
-    "I search the wreckage for something useful.",  # no mending verb
-    "\"I will fix you,\" I tell the spy.",        # speech, not action
+    "I rewrite its loyalty.",
+    "I make the spy mine.",
+    "I reprogram the spy.",
+])
+def test_claiming_words_alone_declare_the_claim(line):
+    scene, _engine, _pc, spy = _table(2)
+    out = judgement.declare_repair([], line, scene)
+    assert out[0]["op"] == "repair" and out[0]["params"] == {"own": True}
+
+
+@pytest.mark.parametrize("line", [
+    "Can I fix the spy?",
+    "I search the wreckage for something useful.",
+    "\"I will fix you,\" I tell the spy.",
 ])
 def test_questions_speech_and_other_acts_declare_nothing(line):
     scene, _engine, _pc, _spy = _table()
     assert judgement.declare_repair([], line, scene) == []
 
 
-def test_the_plan_chain_runs_the_declaration_beside_the_coup_de_grace():
-    """One line in gm/agent.py's chain; without it the injector exists and is never
+def test_the_plan_chain_runs_both_declarations():
+    """Two lines in gm/agent.py's chain; without them the injectors exist and are never
     asked — the dice rebuild's lesson (trace the real path first)."""
     src = (Path(__file__).resolve().parent.parent / "gm" / "agent.py").read_text(
         encoding="utf-8")
     assert "raw = judgement.declare_repair(raw, player_input, self.engine.scene)" in src
+    assert "raw = judgement.declare_name(raw, player_input, self.engine.scene)" in src
 
 
-# --- the engine decides ----------------------------------------------------------------
+# --- and you can name it -----------------------------------------------------------------
 
-def test_the_destroyed_spy_cannot_be_repaired_and_no_repair_makes_it_yours():
-    """The owner's exact state: the spy at -1 is destroyed (no dying rung), so the
-    repair is refused with the book's reason, nothing is rolled, charged or healed, and
-    the ownership the words asked for is refused in the same tell."""
-    scene, engine, pc, spy = _table(-1, feat=True)
-    clock = scene.clock_minutes
-    res = _repair(engine, spy.ref, own=True)
-    (out,) = res.outcomes
-    assert out.status == "refused" and out.rolls == []
-    assert "completely destroyed cannot be repaired" in out.tell
-    assert "does not make it yours" in out.tell
-    assert spy.hp == -1 and spy.is_dead
-    assert pc.purse == {"gp": 300} and scene.clock_minutes == clock
+def _owned_spy():
+    scene, engine, _pc, spy = _risen_table()
+    _rolled(engine, _repair(engine, spy.ref, own=True), 20, 20)
+    assert spy.has_state(states.OWNED_BY_YOU)
+    return scene, engine, spy
 
 
-def test_the_spy_as_the_owners_save_holds_it_is_destroyed_to_a_repair():
-    """The save on disk predates the floor fix: the spy is at -1 with `unconscious` and
-    `dying` written and no `dead`. A repair asked before its next tick must still find
-    wreckage, not a damaged machine: asked only `dead`, the first cut of the refusal let
-    this spy through every gate to the dice, because an unconscious machine is not
-    "still working" and the crafter here holds the feat."""
-    scene, engine, _pc, _ = _table(2, feat=True)
-    spy = scene.add(instantiate("clockwork-spy", scene=scene), zone="near")
-    spy.hp = -1
-    spy.add_condition("unconscious", source="hit points")
-    spy.add_condition("dying", source="hit points")
-    assert not spy.is_dead
-    (out,) = _repair(engine, spy.ref).outcomes
-    assert out.status == "refused" and "completely destroyed" in out.tell
+def test_the_owners_naming_line_names_the_claimed_spy_bob():
+    """"I greet my new friend and I name him Bob": on the replay the turn resolved to
+    narrate_only, the prose said "Bob", and the un-namer struck it and wrote "The name
+    'the stranger' hangs in the air". Now the name is declared from the line and written
+    by the engine to `name` and `true_name` — the fields `GMAgent._known_names` reads —
+    before any prose exists."""
+    scene, engine, spy = _owned_spy()
+    raw = judgement.declare_name([], OWNERS_NAMING, scene)
+    assert raw == [{"op": "rename", "target": spy.ref,
+                    "because": "the player names what is theirs",
+                    "params": {"name": "Bob"}}]
+    (out,) = engine.run(engine.validate(raw)).outcomes
+    assert spy.name == "Bob" and spy.true_name == "Bob"
+    assert "answers to Bob" in out.tell
 
 
-def test_without_craft_construct_a_wizard_cannot_mend_a_damaged_construct():
-    """Sam's sheet: Knowledge ranks, no Craft Construct. The feat is the rule's gate."""
-    _scene, engine, _pc, spy = _table(2)
-    (out,) = _repair(engine, spy.ref).outcomes
-    assert out.status == "refused" and "Craft Construct feat" in out.tell
-    assert spy.hp == 2
+def test_a_name_is_not_given_to_what_is_not_yours():
+    """"I call him a coward" is an insult, and a stranger's name is theirs to give."""
+    scene, engine, _pc, spy = _table(2)
+    assert judgement.declare_name([], "I name him Bob", scene) == []
+    (out,) = engine.run(engine.validate([{"op": "rename", "target": spy.ref,
+                                          "params": {"name": "Bob"}}])).outcomes
+    assert out.status == "refused" and spy.name == "Clockwork Spy"
+    scene2, _e2, spy2 = _owned_spy()
+    assert judgement.declare_name([], "I call him a coward", scene2) == []
 
 
-def test_a_living_body_is_not_repaired():
-    scene, engine, _pc, _spy = _table(2, feat=True)
-    thug = scene.add(instantiate("thug", scene=scene), zone="near")
-    thug.hp = 3
-    (out,) = _repair(engine, thug.ref).outcomes
-    assert out.status == "refused" and "not a construct" in out.tell
-
-
-def test_a_repair_is_refused_short_of_the_coin():
-    _scene, engine, pc, spy = _table(2, feat=True, gp=40)
-    (out,) = _repair(engine, spy.ref).outcomes
-    assert out.status == "refused" and "100 gp" in out.tell
-    assert pc.purse == {"gp": 40}
-
-
-def test_a_hostile_construct_still_working_is_not_repaired():
-    """"Only while the construct is inanimate or nonfunctioning.\""""
-    scene, engine, _pc, spy = _table(2, feat=True)
-    engine._set_attitude(spy, "hostile", None, "test")
-    (out,) = _repair(engine, spy.ref).outcomes
-    assert out.status == "refused" and "inanimate or nonfunctioning" in out.tell
-
-
-def test_a_made_repair_spends_the_day_and_the_coin_and_heals_by_the_rule():
-    """Over a range of seeds both answers occur. Always: 100 gp per Hit Die spent and a
-    day passed (the rule's order: spend, then check). On a success the hit points are
-    the row's 1d6 per Hit Die through the heal applicator, stamped
-    `rule:repair-construct`; on a failure nothing is healed."""
-    seen = set()
-    for seed in range(30):
-        scene, engine, pc, spy = _table(1, feat=True, seed=seed)
-        clock = scene.clock_minutes
-        (out,) = _repair(engine, spy.ref).outcomes
-        assert out.op == "repair" and out.dc["value"] == 15
-        assert pc.purse == {"gp": 200}
-        assert scene.clock_minutes - clock == 1440
-        heals = [e for e in out.effects if e.get("kind") == "heal"]
-        made = out.verdict == "success"
-        seen.add(made)
-        if made:
-            assert heals and heals[0]["origin"] == f"rule:{repair.RULE}"
-            assert 1 < spy.hp <= spy.hp_max
-            assert "from repairing a construct" in out.tell
-        else:
-            assert not heals and spy.hp == 1
-    assert seen == {True, False}
-
-
-def test_a_player_rolled_repair_charges_nothing_until_the_die_is_in():
-    """The player rolls their own Craft; while the engine waits for the die, no coin has
-    moved and no day has passed — so a resumed roll is not charged twice."""
-    scene, engine, pc, spy = _table(1, feat=True)
-    clock = scene.clock_minutes
-    res = _repair(engine, spy.ref, visibility="player")
-    assert res.awaiting and res.awaiting["dc"] == 15
-    assert pc.purse == {"gp": 300} and scene.clock_minutes == clock
-    res2 = engine.resume(20)
-    (out,) = [o for o in res2.outcomes if o.op == "repair"]
-    assert out.verdict == "success" and pc.purse == {"gp": 200}
-
-
-# --- the page cannot claim it ----------------------------------------------------------
+# --- the page cannot claim what the engine did not do ---------------------------------------
 
 def _ctx(engine, text, outcomes=(), door="turn"):
     return BeatContext(
@@ -226,41 +336,35 @@ def test_the_check_is_registered():
     assert repair_claimed in registered()
 
 
-def test_the_owners_tamed_sentence_is_flagged_and_cut():
-    """The owner's next beat. Nothing granted the spy to the player; the backstop cuts the
-    sentence and ends on the engine's fact."""
+def test_the_owners_tamed_sentence_is_flagged_while_the_spy_is_nobodys():
+    """The owner's next beat, on a turn where nothing was granted: the backstop cuts it
+    and ends on the engine's fact."""
     _scene, engine, _pc, _spy = _table(-1)
     (found,) = repair_claimed.find(_ctx(engine, OWNERS_NEXT_BEAT))
     assert found.kind == "ownership-claimed"
-    assert found.sentences == (OWNERS_NEXT_BEAT,)
     text, notes = repair_claimed.backstop(_ctx(engine, OWNERS_NEXT_BEAT),
                                           OWNERS_NEXT_BEAT, [found])
     assert "waits for your command" not in text and notes
-    assert "destroyed" in text and "answers to its maker" in text
+    assert "broken" in text and "does not answer to you" in text
 
 
-def test_a_repair_the_engine_did_not_resolve_is_flagged():
+def test_the_same_sentence_is_true_once_the_engine_granted_it():
+    """Since the house rule the engine CAN make it the player's; then the page may say so."""
+    _scene, engine, _spy = _owned_spy()
+    assert repair_claimed.find(_ctx(engine, OWNERS_NEXT_BEAT)) == []
+
+
+def test_a_broken_machine_written_as_working_is_flagged():
     _scene, engine, _pc, _spy = _table(-1)
-    beat = ("You work the bent spring loose and reseat the gears. The spy whirs back to "
-            "life, its lenses turning toward you.")
-    kinds = {f.kind for f in repair_claimed.find(_ctx(engine, beat))}
-    assert kinds == {"repair-claimed"}
+    beat = "The spy whirs back to life, its lenses turning toward you."
+    assert {f.kind for f in repair_claimed.find(_ctx(engine, beat))} == {"repair-claimed"}
 
 
-def test_a_repair_the_engine_resolved_may_be_told():
-    """After a made repair, "it whirs back to life" is the truth; the ownership half is
-    still nobody's to grant."""
-    scene, engine, _pc, spy = _table(1, feat=True, seed=3)
-    res = _repair(engine, spy.ref)
-    for seed in range(3, 40):
-        if res.outcomes[0].verdict == "success":
-            break
-        scene, engine, _pc, spy = _table(1, feat=True, seed=seed)
-        res = _repair(engine, spy.ref)
-    assert res.outcomes[0].verdict == "success"
-    beat = "The spy whirs back to life. It recognizes you as its new master."
-    kinds = [f.kind for f in repair_claimed.find(_ctx(engine, beat, res.outcomes))]
-    assert kinds == ["ownership-claimed"]
+def test_a_mended_machine_may_be_written_as_working():
+    _scene, engine, _pc, spy = _table(-1)
+    _rolled(engine, _repair(engine, spy.ref), 20)
+    beat = "The spy whirs back to life, its lenses turning toward you."
+    assert repair_claimed.find(_ctx(engine, beat)) == []
 
 
 @pytest.mark.parametrize("sentence", [

@@ -1025,10 +1025,18 @@ _OWN_WORDS = re.compile(
     r"|\bloyal\s+to\s+me\b|\bbind\s+(?:it|him|her)\s+to\s+me\b|\btam(?:e|es|ing)\b"
     r"|\bmake\s+(?:it|him|her)\s+mine\b|\bmy\s+(?:new\s+)?(?:servant|pet|minion)\b",
     re.I)
+# Taking the machine for your own without a word about mending it (the house rule's claim).
+_CLAIM_VERB = re.compile(
+    r"\b(?:rewrit(?:e|es|ing)\s+(?:its|his|her|the\s+[\w']+)\s+(?:loyalty|loyalties"
+    r"|commands?|orders?|programming|core|allegiance)"
+    r"|reprogram(?:s|med|ming)?|re-?key(?:s|ing)?|tam(?:e|es|ing)\s+(?:it|him|her|the\b)"
+    r"|claim(?:s|ing)?\s+(?:it|him|her|the\s+[\w']+)"
+    r"|make\s+(?:it|him|her|the\s+[\w']+)\s+(?:mine|my\s+own)"
+    r"|bind(?:s|ing)?\s+(?:it|him|her|the\s+[\w']+)\s+to\s+me)\b", re.I)
 # What a construct is called when it is not called by its name.
 _MACHINE_WORDS = re.compile(
     r"\b(?:construct|machine|automaton|clockwork|golem|contraption|mechanism|device"
-    r"|it|him|her)\b", re.I)
+    r"|it|its|him|his|her)\b", re.I)
 # The checks a model dresses a repair as. None of them mends anything in 1e; the repair
 # op's own check is the rule's (Craft, at the construct's DC less 5).
 _REPAIR_DRESSING = frozenset({"craft", "knowledge (engineering)", "knowledge (arcana)",
@@ -1075,7 +1083,9 @@ def declare_repair(raw_intents, player_text: str, scene):
     if "?" in player_text:
         return raw_intents
     text = redact_speech(player_text)
-    verb = _REPAIR_VERB.search(text)
+    # Mending, or — the owner's house rule's second check — the loyalty itself: "I
+    # rewrite its loyalty", "I make it mine" on a machine already working.
+    verb = _REPAIR_VERB.search(text) or _CLAIM_VERB.search(text)
     if verb is None or not re.search(r"\bI\b", text[:verb.start()], re.I):
         return raw_intents
     subject = _repair_subject(text, scene)
@@ -1084,7 +1094,7 @@ def declare_repair(raw_intents, player_text: str, scene):
     pc = scene.pc() if hasattr(scene, "pc") else None
     if pc is None:
         return raw_intents
-    own = bool(_OWN_WORDS.search(text))
+    own = bool(_OWN_WORDS.search(text) or _CLAIM_VERB.search(text))
     ref = subject.ref
 
     def aims_at_it(raw: dict) -> bool:
@@ -1119,6 +1129,62 @@ def declare_repair(raw_intents, player_text: str, scene):
                     "because": "the player mends it; the rule decides whether it can be",
                     "params": {"own": True} if own else {}})
     return out
+
+
+# "I name him Bob", "I call it Tick", "I dub the spy Gearwhistle". The name is the word(s)
+# after the creature; a determiner there ("I call him a coward") is an insult, not a name.
+_NAMES_IT = re.compile(
+    r"\b(?:name|names|naming|call|calls|calling|dub|dubs|dubbing|christen|christens)\s+"
+    r"(?:him|her|it|them|the\s+[\w'-]+(?:\s+[\w'-]+)?|my\s+(?:new\s+)?[\w'-]+)\s+"
+    r"(?!(?:a|an|the|my|your|his|her|its|their|that|this|by|after|for|to|over|out|back"
+    r"|up|in|on)\b)([A-Za-z][\w'-]*(?:\s+[A-Z][\w'-]*)?)", re.I)
+
+
+def declare_name(raw_intents, player_text: str, scene):
+    """"I name him Bob" on a creature the player owns becomes the `rename` op.
+
+    The owner's second line, 2026-10-01: "I greet my new friend and I name him Bob". The
+    turn resolved to `narrate_only`; the prose said "Bob", and the un-namer struck it as a
+    person from nowhere and wrote our own placeholder in its place — "The name 'the
+    stranger' hangs in the air". Nothing had ever made "Bob" a name. The house rule makes
+    a claimed construct the player's to name ("it follows you, obeys, and you can name
+    it"), so the word is read off the player's own line and the engine writes it; the
+    brief and `_known_names` then hold it before a word of prose is written.
+
+    Only when something here holds `bond.owned-by-you` (one of them, or the one the words
+    name) — "I call him a coward" at a stranger is speech, and a person's name is theirs
+    to give.
+    """
+    from rules import states as states_mod
+
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    text = redact_speech(player_text)
+    m = _NAMES_IT.search(text)
+    if m is None or not re.search(r"\bI\b", text[:m.start()], re.I):
+        return raw_intents
+    mine = [a for a in (getattr(scene, "actors", {}) or {}).values()
+            if not getattr(a, "is_pc", False) and a.has_state(states_mod.OWNED_BY_YOU)]
+    if not mine:
+        return raw_intents
+    said = set(re.findall(r"[a-z']+", m.group(0).lower()))
+    named = [a for a in mine if _name_words(a.name) & said]
+    who = named[0] if len(named) == 1 else (mine[0] if len(mine) == 1 else None)
+    if who is None:
+        return raw_intents
+    # A second word only when it is written as a name: the pattern is case-blind so "i
+    # name him bob" reads, which would otherwise take "Bob and" from "Bob and walk on".
+    words = m.group(1).split()
+    given = words[0] + (f" {words[1]}" if len(words) > 1 and words[1][:1].isupper() else "")
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "rename"
+           for r in raw_intents):
+        return raw_intents
+    return list(raw_intents) + [{
+        "op": "rename", "target": who.ref,
+        "because": "the player names what is theirs",
+        "params": {"name": given}}]
 
 
 def inject_fight(raw_intents, player_text: str, scene):

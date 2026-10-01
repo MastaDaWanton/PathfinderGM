@@ -279,12 +279,18 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "heal": (("amount",), ("to",), "hidden"),
     # Mending a construct, aimed by `target` (rules/repair.py, content/rules/repairs.json).
     # Not an amount op: the plan names WHAT is mended and the rule supplies the skill,
-    # the DC, the coin, the day and the dice — a repaired machine's hit points are the
-    # row's, stamped `rule:repair-construct`. `own` is the player's words asking for the
-    # machine to be theirs, which no repair grants; the tell says so. Added 2026-10-01:
-    # "I ... fix the spy in a way that makes it recognize me as its owner" resolved as
-    # nothing, and the prose repaired and tamed it anyway.
+    # the DC, the time and the dice — a repaired machine's hit points are the row's,
+    # stamped `rule:repair-construct`. `own` is the player's words asking for the machine
+    # to be theirs: by the owner's house rule a second, harder check (`claim-construct`)
+    # in the same op. Added 2026-10-01: "I ... fix the spy in a way that makes it
+    # recognize me as its owner" resolved as nothing, and the prose repaired and tamed it
+    # anyway.
     "repair": ((), ("own",), "player"),
+    # Naming a creature that is the player's (`bond.owned-by-you`) — the house rule's
+    # "you can name it". Aimed by `target`; `name` is the player's own word for it, never
+    # the plan's invention (`judgement.declare_name` reads it off the line). Refused for
+    # anybody not theirs: a person's name is theirs to give (`apply_introductions`).
+    "rename": (("name",), (), "hidden"),
     # Damage reduction, immunity, energy resistance and vulnerability, granted with a
     # clock. Before this there was no op for any of them: `effectspec` offered all four
     # types, 123 spells and 13 magic items authored one, and `consumables` had no branch

@@ -6750,73 +6750,202 @@ class Engine:
         )
 
     def _op_repair(self, intent: Intent, partial: dict) -> Outcome:
-        """Mend a construct by the book, or say why not (`rules/repair.py`).
+        """Mend a construct, and — when the words ask — rewrite its loyalty (`rules/repair.py`).
 
-        The gates are the rule's and print at resolution — every one is a fact the player
-        could not see from their own sheet. Past them: the coin is spent and the day
-        passes BEFORE the check, which is the rule's order ("its master spends 100 gp per
-        Hit Die ... and then makes a skill check"), and on a success the hit points come
-        through `_op_heal`, the one applicator a cure uses, stamped with the rule. Nothing
-        is charged until the roll is in hand, so a suspended player roll resumed is not
-        charged twice.
+        The owner's HOUSE RULE (2026-10-01), verbatim: "Broken, then fixable and claimable
+        — House rule: a construct at 0 to -10 is broken, not destroyed (destroyed only past
+        that). Anyone with the skill can mend it with a Craft or Knowledge (engineering)
+        check, which heals it. A second, harder check rewrites its loyalty so it becomes
+        yours: it follows you, obeys, and you can name it." Every number is a row's in
+        content/rules/repairs.json, marked HOUSE beside the book it departs from.
+
+        Two stages in one op, each the player's own die, parked across a suspension in
+        `repair_state` the way an attack parks its to-hit: the REPAIR (when the machine is
+        damaged or broken), then — only when the words asked to own it (`own`, written by
+        `judgement.declare_repair`) and the machine is working by then — the CLAIM. The
+        choice, made for the owner's own line ("fix the spy in a way that makes it
+        recognize me as its owner"): both resolve in the one turn when the repair lands; a
+        failed repair leaves the claim for a later turn. Nothing is applied before a die
+        is in hand, and a stage already applied is never applied again on resume.
         """
-        from . import goods
         from . import repair as repair_mod
+        from .activeeffect import ActiveEffect
 
         actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
-        own = bool(intent.params.get("own"))
-        tail = (" " + repair_mod.OWNERSHIP_SAID) if own else ""
         refs = [r for r in intent.targets() if r and r != getattr(actor, "ref", None)]
         subject = self.scene.actors.get(refs[0]) if refs else None
         if actor is None or subject is None:
-            return self._refuse(intent, "The repair names nothing here to mend." + tail)
-        rule = repair_mod.row()
-        why = repair_mod.refusal(self.scene, actor, subject, rule)
-        if why:
-            return self._refuse(intent, why + tail)
-        gp = repair_mod.cost_gp(subject, rule)
-        if goods.in_copper(actor.purse) < gp * 100:
-            return self._refuse(intent, (
-                f"Repairing {subject.name} costs {gp} gp in parts and materials "
-                f"(100 gp per Hit Die), and {actor.name} has "
-                f"{goods.in_copper(actor.purse) // 100} gp.") + tail)
+            return self._refuse(intent, "The repair names nothing here to mend.")
+        own = bool(intent.params.get("own"))
+        state = dict(partial.get("repair_state") or {})
+        rolls = [_roll_from_dict(r) for r in state.get("rolls", [])]
+        effects: list[dict] = list(state.get("effects", []))
+        said: list[str] = list(state.get("said", []))
+        last = dict(state.get("last") or {})
+        # A save written before the house rule holds its spy "dying" at -1; read it onto
+        # the house ladder first, and say so, so nothing below sees the book's rungs.
+        if repair_mod.is_construct(subject) and subject.settle_broken():
+            effects.append({"ref": subject.ref, "kind": "condition",
+                            "condition": states.BROKEN_KEY, "from": "hit points"})
 
-        crafting, house = repair_mod.crafting_dc(subject, rule)
-        dc = crafting - int(rule["dc_less"])
-        skill = str(rule["skill"])
-        mods = actor.skill_modifiers(skill)
-        roll = self._roll_or_suspend(intent, actor, mods,
-                                     label=f"{skill.title()} check (repair)",
-                                     dc=dc, partial=partial)
-        actor.purse, _paid = goods.spend(actor.purse, gp * 100)
-        spent = repair_mod.minutes(subject, rule)
-        self.scene.advance(spent)
+        def done() -> Outcome:
+            return Outcome(
+                intent_id=intent.id, op="repair", rolls=rolls,
+                dc=(dc_mod.ResolvedDC(value=last["dc"], band=None).as_dict()
+                    if last.get("dc") is not None else None),
+                verdict=last.get("verdict"), margin=last.get("margin"),
+                effects=effects, tell=" ".join(s for s in said if s),
+                because=intent.because)
+
+        def parked(stage: str) -> dict:
+            return {"stage": stage, "rolls": [r.as_dict() for r in rolls],
+                    "effects": effects, "said": said, "last": last}
+
+        if state.get("stage", "repair") == "repair" \
+                and (subject.hp < subject.hp_max or repair_mod.broken(subject) or not own):
+            why = repair_mod.repair_refusal(self.scene, actor, subject)
+            if why:
+                return self._refuse(intent, why)
+            rule = repair_mod.row(repair_mod.RULE)
+            skill, mods = repair_mod.best_skill(actor, rule["skills"])
+            dc = repair_mod.repair_dc(subject)
+            roll = self._roll_or_suspend_stage(
+                intent, actor, mods, f"{skill.title()} check (repair)", dc, partial,
+                parked("repair"), "1d20", state_key="repair_state")
+            rolls.append(roll)
+            margin = roll.total - dc
+            bad = margin <= -int(rule["bad_failure_by"])
+            minutes = int(rule["bad_failure_minutes"] if bad else rule["minutes"])
+            self.scene.advance(minutes)
+            effects.append({"ref": actor.ref, "kind": "time", "minutes": minutes,
+                            "origin": f"rule:{repair_mod.RULE}"})
+            last = {"dc": dc, "verdict": "success" if margin >= 0 else "failure",
+                    "margin": margin}
+            was_broken = repair_mod.broken(subject)
+            if margin >= 0:
+                mended = self._op_heal(Intent(
+                    op="heal", actor=actor.ref, target=subject.ref, id=intent.id,
+                    params={"amount": repair_mod.dice(subject, rule), "to": subject.ref},
+                    origin=f"rule:{repair_mod.RULE}", origin_name=str(rule["name"])), {})
+                rolls.extend(mended.rolls)
+                effects.extend(mended.effects)
+                said.append(f"{actor.name} works on {subject.name} for {minutes} minutes "
+                            f"and makes the {skill} check by {margin}. {mended.tell}")
+                if was_broken and not subject.is_down:
+                    # Risen, and nobody's yet: whatever it felt in the fight that broke it
+                    # is gone with the works that held it.
+                    self._set_attitude(subject, "indifferent", None,
+                                       f"rule:{repair_mod.RULE}")
+                    effects.append({"ref": subject.ref, "kind": "condition",
+                                    "condition": "indifferent"})
+                    said.append(f"{subject.name} is working again, and it is nobody's "
+                                f"yet.")
+                elif was_broken:
+                    # Mended to exactly 0, or not past it: the house rule's "0 to -10 is
+                    # broken" still holds, and a later attempt carries on from here.
+                    said.append(f"{subject.name} is still broken: the work holds, but "
+                                f"it is not running yet.")
+            else:
+                said.append(f"{actor.name} works on {subject.name} and misses the {skill} "
+                            f"check by {-margin}"
+                            + (": the work comes apart, and an hour is gone."
+                               if bad else f"; {subject.name} is not mended yet."))
+            if not (own and margin >= 0):
+                return done()
+
+        if not own:
+            return done()
+        why = repair_mod.claim_refusal(self.scene, actor, subject)
+        if why:
+            if not rolls:
+                return self._refuse(intent, why)
+            said.append(why)
+            return done()
+        if repair_mod.owned(subject):
+            said.append(f"{subject.name} is already yours.")
+            return done()
+        rule = repair_mod.row(repair_mod.CLAIM)
+        skill, mods = repair_mod.best_skill(actor, rule["skills"])
+        dc = repair_mod.claim_dc(subject)
+        roll = self._roll_or_suspend_stage(
+            intent, actor, mods, f"{skill.title()} check (claim)", dc, partial,
+            parked("claim"), "1d20", state_key="repair_state")
+        rolls.append(roll)
         margin = roll.total - dc
-        days = spent // 1440
-        took = f"{days} day{'s' if days != 1 else ''}"
-        effects: list[dict] = [{"ref": actor.ref, "kind": "spend", "gp": gp,
-                                "minutes": spent, "origin": f"rule:{repair_mod.RULE}"}]
-        tell = (f"{actor.name} spends {took} and {gp} gp of materials on {subject.name}. "
-                + (f"{actor.name} makes the craft check by {margin}."
-                   if margin >= 0 else f"{actor.name} misses the craft check by {-margin}: "
-                   f"the work does not hold, and the materials are spent."))
-        if house:
-            effects[0]["dc_house"] = True
+        self.scene.advance(int(rule["minutes"]))
+        last = {"dc": dc, "verdict": "success" if margin >= 0 else "failure",
+                "margin": margin}
+        origin = f"rule:{repair_mod.CLAIM}"
         if margin >= 0:
-            mended = self._op_heal(Intent(
-                op="heal", actor=actor.ref, target=subject.ref, id=intent.id,
-                params={"amount": repair_mod.dice(subject, rule), "to": subject.ref},
-                origin=f"rule:{repair_mod.RULE}", origin_name=str(rule["name"])), {})
-            effects.extend(mended.effects)
-            tell = f"{tell} {mended.tell}"
-            rolls = [roll, *mended.rolls]
+            subject.apply_effect(ActiveEffect(
+                name="yours", kind="bond", key=f"claim:{subject.ref}:owned",
+                source=f"claim:{subject.ref}", origin=origin, duration="until-dismissed",
+                tags=(states.OWNED_BY_YOU,)))
+            self._travels_with_you(subject)
+            self._set_attitude(subject, str(rule["attitude"]), None, origin)
+            effects.extend([
+                {"ref": subject.ref, "kind": "bond", "bond": states.OWNED_BY_YOU,
+                 "origin": origin},
+                {"ref": subject.ref, "kind": "company", "travels": True},
+                {"ref": subject.ref, "kind": "condition", "condition": rule["attitude"]}])
+            said.append(f"{actor.name} makes the {skill} check by {margin} and rewrites "
+                        f"{subject.name}'s loyalty: it is {actor.name}'s now — it follows "
+                        f"and obeys.")
+        elif margin <= -int(rule["bad_failure_by"]):
+            self._set_attitude(subject, str(rule["bad_failure_attitude"]), None, origin)
+            effects.append({"ref": subject.ref, "kind": "condition",
+                            "condition": rule["bad_failure_attitude"]})
+            said.append(f"{actor.name} misses the {skill} check by {-margin}, and "
+                        f"{subject.name} fights the rewrite: it turns hostile.")
         else:
-            rolls = [roll]
-        return Outcome(intent_id=intent.id, op="repair", rolls=rolls,
-                       dc=dc_mod.ResolvedDC(value=dc, band=None).as_dict(), verdict=(
-                           "success" if margin >= 0 else "failure"),
-                       margin=margin, effects=effects, tell=tell + tail,
-                       because=intent.because)
+            said.append(f"{actor.name} misses the {skill} check by {-margin}; "
+                        f"{subject.name}'s loyalty holds, and it is still nobody's.")
+        return done()
+
+    def _op_rename(self, intent: Intent, partial: dict) -> Outcome:
+        """The player names a creature that is theirs — the house rule's "you can name it".
+
+        Written to the two fields every other naming door writes (`apply_introductions`
+        sets the shown name and the true name a person gave): the panel's `name` and the
+        `true_name` behind it, so the brief, the panel and `GMAgent._known_names` all hold
+        it from this turn on — the owner's second line was "I greet my new friend and I
+        name him Bob", and the prose's "Bob" was struck as a person from nowhere because
+        nothing had ever made it a name. Refused for anybody not the player's: a person's
+        name is theirs to give, not the player's to hand out.
+        """
+        refs = [r for r in intent.targets() if r]
+        who = self.scene.actors.get(refs[0]) if refs else None
+        if who is None:
+            return self._refuse(intent, "The naming names nobody here.")
+        if not who.has_state(states.OWNED_BY_YOU):
+            return self._refuse(intent, (
+                f"{who.name} is not yours to name: a name is given by whoever it belongs "
+                f"to, and {who.name} belongs to nobody here."))
+        words = re.findall(r"[A-Za-z][A-Za-z'\-]*", str(intent.params.get("name") or ""))
+        given = " ".join(w[:1].upper() + w[1:] for w in words[:3])[:40].strip()
+        if not given:
+            return self._refuse(intent, "That is not a name.")
+        was = who.name
+        who.name = given
+        who.true_name = given
+        return Outcome(
+            intent_id=intent.id, op="rename",
+            effects=[{"ref": who.ref, "kind": "rename", "from": was, "to": given}],
+            tell=(f"{_the_creature(was) if getattr(who, 'from_template', '') else was} "
+                  f"answers to {given} now."),
+            because=intent.because)
+
+    def _travels_with_you(self, who) -> None:
+        """The companion bond, granted through the one applicator — the `company` op's
+        effect, source `company:<ref>`, shared with the house rule's claim so the two
+        cannot grant it two ways."""
+        from .activeeffect import ActiveEffect
+
+        source = f"company:{who.ref}"
+        who.apply_effect(ActiveEffect(
+            name="travels with you", kind="bond", key=f"{source}:travels",
+            source=source, origin=source, duration="until-dismissed",
+            tags=(states.TRAVELS_WITH_YOU,)))
 
     def _op_temp_hp(self, intent: Intent, partial: dict) -> Outcome:
         """Grant temporary hit points, which do not stack — the best source wins."""
@@ -7280,10 +7409,15 @@ class Engine:
         """One dying creature's story ends off-screen: stable, or gone."""
         floor = a.death_floor()
         if states.destroyed_at_zero(a):
-            # A construct or undead creature saved "dying" before 2026-10-01 does not
-            # bleed and does not stabilise: it was destroyed when it reached 0.
+            # An undead creature saved "dying" before 2026-10-01 does not bleed and does
+            # not stabilise: it was destroyed when it reached 0.
             a.apply_hp_state()
             return [f"{a.name} " + _DESTROYED_SAID + "."] if a.is_dead else []
+        if states.breaks_below_zero(a):
+            # A construct saved "dying" is broken by the owner's house rule: it lies
+            # there, inert, until somebody mends it — or it was past the floor already.
+            a.apply_hp_state()
+            return [f"{a.name} " + (_DESTROYED_SAID if a.is_dead else _BROKEN_SAID) + "."]
         while a.hp > floor and a.has_condition("dying"):
             if self.dice.roll("1d100", label="stabilise",
                               visibility="hidden").total <= 10:
@@ -10299,10 +10433,7 @@ class Engine:
                 intent, f"{who.name} is {mood} towards you and does not walk out of "
                         f"here at your word. Talk them round first — that is a "
                         f"Diplomacy check against them.")
-        who.apply_effect(ActiveEffect(
-            name="travels with you", kind="bond", key=f"{source}:travels",
-            source=source, origin=source, duration="until-dismissed",
-            tags=(states.TRAVELS_WITH_YOU,)))
+        self._travels_with_you(who)
         note = str(intent.params.get("note") or "").strip()
         return Outcome(
             intent_id=intent.id, op="company",
@@ -14955,8 +15086,10 @@ class Engine:
                 line = "{name} has no hit points left and lies unconscious."
             # A construct or an undead creature is not "dead" in the Bestiary's words but
             # "destroyed", and the difference is what the player can do next: there is no
-            # body to save and nothing to repair (Ultimate Magic p.113).
-            if key == "dead" and states.destroyed_at_zero(who):
+            # body to save and nothing to repair. A construct reaches `dead` only past the
+            # house rule's floor (-10), and is "destroyed" too.
+            if key == "dead" and (states.destroyed_at_zero(who)
+                                  or states.breaks_below_zero(who)):
                 line = "{name} " + _DESTROYED_SAID + "."
             said.append(line.format(name=who.name if who else "they"))
         return (" " + " ".join(said)) if said else ""
@@ -15143,9 +15276,13 @@ _STATE_SAID = {
     "dying": "{name} is dying",
     "unconscious": "{name} is unconscious",
     "disabled": "{name} is disabled: still standing, but any real effort now costs blood",
+    # The owner's house rule (2026-10-01): a construct at 0 to -10. The clause says the
+    # half the player can act on — it is not gone, and it can be mended.
+    "broken": "{name} is broken: inert, but not destroyed",
 }
-# The Bestiary's word for a construct or undead creature at 0 hit points.
+# The Bestiary's word for an undead creature at 0, and a construct past -10.
 _DESTROYED_SAID = "is destroyed"
+_BROKEN_SAID = "is broken: inert, but not destroyed"
 
 
 def _ward_tell(scene: Scene, e: dict) -> str:
