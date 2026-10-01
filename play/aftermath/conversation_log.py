@@ -150,8 +150,12 @@ def step(ctx) -> list[dict]:
         new.append((at, {"t": t, "beat": ctx.beat_index, "who": who, "name": name_of(who),
                          "to": str(rec.get("to") or ""), "kind": "line", "text": line,
                          "among": list(among),
-                         # A line the page attributed (`speaker_real`, no tag) says so.
-                         "src": "page" if rec.get("from") == "page" else "tag"}))
+                         # A line the page attributed (`speaker_real`, no tag) says so;
+                         # a companion's unasked remark too (`views._companions_on_the_
+                         # page`), which is also the memory its cadence is read from
+                         # (`companions.interjection_due`).
+                         "src": (rec.get("from") if rec.get("from") in ("page", "interject")
+                                 else "tag")}))
 
     for v in speech.vocalisations(text, said, people):
         if not v.get("who"):
