@@ -3811,23 +3811,44 @@ def _companions_answer(c, agent, player_text: str, resolution, plan,
             or player_text == CARRY_ON:
         return []
     planned = {i.actor for i in (getattr(plan, "intents", None) or []) if i.actor}
-    heard = heard or {}
+    heard = heard if heard is not None else {}
     lines: list[tuple] = []
+    # Asked what was on their mind, a companion's answer IS the confidence, written here,
+    # before the prose, so the beat carries it as their answer. Measured on the first live
+    # replay: written after the prose instead, the beat had already answered "Drover,
+    # what is it?" in the drover's voice with a story about a spooked girl in a cage, and
+    # the confidence followed it — two answers, one invented.
+    from gm import confide as confide_mod
+
+    for ref in (heard.get("invited") or ())[:1]:
+        due = confide_mod.due(scene, c.transcript, resolution.outcomes, invited=[ref])
+        actor = scene.get(ref)
+        if not due or actor is None:
+            continue
+        agent.engine = c.engine()
+        said = _confide_line(c, agent, due, place=agent.engine.here(),
+                             player_text=player_text)
+        if said:
+            heard["confided"] = (ref, said)
+            heard["confided_topic"] = due["topic"]
+            lines.append((actor, said))
     for ref in companions_mod.addressed(scene, player_text)[:2]:
         actor = scene.get(ref)
         if actor is None or ref in planned:
             continue
         # Asked for what they said was on their mind: their answer this beat is the
-        # confidence itself (`_companions_on_the_page`), never an ordinary answer call,
-        # which is not told their life and would make one up.
-        if ref in (heard.get("invited") or ()):
+        # confidence itself (above), never an ordinary answer call, which is not told
+        # their life and would make one up. When the confidence would not hold this beat,
+        # their ordinary answer is told they are not ready to say, for the same reason.
+        if (heard.get("confided") or ("",))[0] == ref:
             continue
         agent.engine = c.engine()
         try:
             answer = agent.companion_answer(ref, player_text, location=c.location,
                                             recent_events=_recent_events(c.world,
                                                                          c.location),
-                                            not_ready=ref in (heard.get("not_ready") or ()))
+                                            not_ready=ref in (heard.get("not_ready") or ())
+                                            or ref in (heard.get("invited") or ()))
         except (ModelUnavailable, IntentError) as exc:
             c.turn_log.append({"kind": "companion-answer", "ref": ref,
                                "error": str(exc)[:400]})
@@ -3967,22 +3988,51 @@ def _companions_confide(c, agent, text: str, resolution, *, answered, moved: boo
     from rules import confiding, population as population_mod
 
     scene = c.scene
+    asked = (heard or {}).get("confided")
+    if asked:
+        # The share the player asked for was written before the prose, as this
+        # companion's answer (`_companions_answer`): here it is only held to the page and
+        # booked as a confidence.
+        ref, line = asked
+        who = scene.actors.get(ref)
+        life = confiding.life_text(population_mod.of_ref(scene, ref),
+                                   (heard or {}).get("confided_topic") or "")
+        if who is not None and not confide_mod.says_it(text, life):
+            text = _say_on_the_page(agent, text, ref, line, "confide", added)
+            repairs.append(f"{who.name}'s confidence left off the page: put back")
+        else:
+            _book_confide(agent, ref, line, text, life)
+        return text, True
     place = agent.engine.here()
-    beat = len(c.transcript)
     before = " ".join(str(b.get("text") or "") for b in c.transcript[-6:]
                       if isinstance(b, dict) and b.get("who") == "gm")
-    plan = confide_mod.due(scene, c.transcript, resolution.outcomes,
-                           invited=(heard or {}).get("invited") or (), answered=answered,
+    plan = confide_mod.due(scene, c.transcript, resolution.outcomes, answered=answered,
                            talking=agent.engine.talking_to(), moved=moved, place=place,
                            beat_text=text, before=before)
     if not plan:
         return text, False
+    line = _confide_line(c, agent, plan, place=place, player_text=player_text)
+    if not line:
+        return text, False
+    text = _say_on_the_page(agent, text, plan["ref"], line, "confide", added)
+    repairs.append(f"{scene.actors[plan['ref']].name} confided ({plan['kind']}, "
+                   f"{plan['door']})")
+    return text, True
+
+
+def _confide_line(c, agent, plan: dict, *, place=None, player_text: str = "") -> str:
+    """The confiding call for `plan` (`confide.due`), logged; and, only when the line
+    held, the disclosure track moved — a lead-in or hint marks the topic hinted and the
+    share owed, a share marks it told for good. Returns the line, or ""."""
+    from gm import confide as confide_mod
+    from rules import confiding, population as population_mod
+
+    scene = c.scene
     who = scene.actors[plan["ref"]]
     rec = population_mod.of_ref(scene, who.ref)
     if rec is None:
-        return text, False
-    pend = confiding.pending(rec) or {}
-    lead_in = str(pend.get("line") or "")
+        return ""
+    lead_in = str((confiding.pending(rec) or {}).get("line") or "")
     facts = confide_mod.facts(scene, who, plan, place=place, player_text=player_text,
                               lead_in=lead_in)
     line, attempts, rejections = agent.companion_confide(who.ref, facts, plan)
@@ -3994,16 +4044,36 @@ def _companions_confide(c, agent, text: str, resolution, *, answered, moved: boo
         "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1), "model": a.model}
                      for a in attempts]}))
     if not line:
-        return text, False
+        return ""
+    beat = len(c.transcript)
     if plan["kind"] in (confide_mod.SHARE, confide_mod.BRIDGE):
         confiding.tell(rec, plan["topic"], beat, plan["door"], plan.get("thing", ""))
     else:
         confiding.hint(rec, plan["topic"], beat, plan["door"], plan.get("thing", ""))
         # The lead-in's own words, so the share can follow on from them.
         rec["confide_pending"]["line"] = line
-    text = _say_on_the_page(agent, text, who.ref, line, "confide", added)
-    repairs.append(f"{who.name} confided ({plan['kind']}, {plan['door']})")
-    return text, True
+    return line
+
+
+def _book_confide(agent, ref: str, line: str, text: str, life: str) -> None:
+    """A confidence the prose already carries in its own words: the speech tag the prose
+    call gave that line (theirs, saying the life row's words) is marked `confide`, or one
+    is added, so the conversation log books it once, as a confidence (its cadence reads
+    that)."""
+    from gm import confide as confide_mod
+
+    quoted = " ".join(q.strip("\"“”'‘’ ") for q in speech_mod.lines(line))
+    said = getattr(agent, "last_said", None)
+    if said is None:
+        said = agent.last_said = []
+    mine = [r for r in said if r.get("who") == ref
+            and confide_mod.says_it(str(r.get("line") or ""), life)]
+    if mine:
+        mine[-1]["from"] = "confide"
+        return
+    # Never words the page does not carry: the log books what was said, as said.
+    if quoted and quoted in text:
+        said.append({"who": ref, "to": "", "from": "confide", "line": quoted})
 
 
 def _run_npc_turns(c, agent, limit: int = 12) -> None:

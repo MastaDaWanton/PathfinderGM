@@ -594,6 +594,41 @@ class TestOnThePage:
         return SimpleNamespace(scene=s, transcript=transcript, turn_log=[], world=WORLD,
                                location=WORLD.get(TOWN), engine=lambda: e)
 
+    def test_asked_the_share_is_their_answer_before_the_prose(self, monkeypatch):
+        """Measured on the first live replay: to "Drover, what is it? I'm listening." the
+        share was written AFTER the prose, which had already answered in the drover's
+        voice with an invented story about a spooked girl in a cage — two answers. Now
+        the share is written first, handed to the prose as their answer, and no ordinary
+        answer call is made for them."""
+        from gm import agent as agent_mod, confide
+        from play import views
+
+        s, e, pc = _party()
+        wil = _friend(s, e)
+        tr = _turns(confide.CONFIDE_EVERY)
+        confiding.hint(_rec(s, wil), "wants", len(tr), "lead-in")
+        tr += [{"who": "gm", "text": "Wil clears his throat."},
+               {"who": "player", "text": "Wil, what is it? I'm listening."}]
+        seen = _fake(monkeypatch, [
+            {"line": 'Wil looks at his boots. "Never seen the sea. I want to, once, '
+                     'before I die."'}])
+        gm = agent_mod.GMAgent(WORLD, e)
+        c = self._c(s, e, tr)
+        heard = confide.heard(s, tr, "Wil, what is it? I'm listening.", len(tr))
+        res = SimpleNamespace(outcomes=[], awaiting=None)
+        got = views._companions_answer(c, gm, "Wil, what is it? I'm listening.", res,
+                                       None, heard=heard)
+        assert [(a.name, "sea" in said) for a, said in got] == [("Wil", True)]
+        assert len(seen) == 1                       # the confidence, and no answer call
+        assert confiding.stage(_rec(s, wil), "wants") == confiding.TOLD
+        # After the prose: a beat that dropped it gets it put back, once.
+        gm.last_said = []
+        text, said = views._companions_confide(
+            c, gm, "Wil shrugs. What do you do?", res, answered=got, moved=False,
+            heard=heard, player_text="", repairs=[], added=[])
+        assert said and "Never seen the sea" in text
+        assert [r["from"] for r in gm.last_said] == ["confide"]
+
     def test_a_lead_in_then_the_share_moves_the_track(self, monkeypatch):
         """Through the view's own step: the lead-in marks the want hinted and owed, the
         later share marks it told, both lines booked as their speech (`confide`), and a
