@@ -11,8 +11,14 @@ tavern the party was in. Every one of the 13 was a false positive: the detector 
 the page's "tavern" with the place's NAME, and a founded place's name is its own.
 
 The fix is not a special case for "tavern": the place's kind, and the kinds and names of
-the places it stands inside, are where the party is (`rules.places.what_it_is`), and the
-kinds of every founded place are places that exist here (`kinds_of`).
+the places it stands inside, are where the party is (`rules.places.words_for_here`), and
+the kinds of every founded place are places that exist here (`kinds_of`).
+
+The first cut of this fix named that function `what_it_is`, which `rules/places.py`
+already defines (a settlement's scale in words): the second definition shadowed the
+first and broke the opening's "a village of a few hundred people" — seven tests in
+test_who_you_are_with.py and test_c_opening_words.py. `test_the_scale_words_survive`
+below keeps the two apart.
 
 After, on the same 17 findings: the 13 tavern findings are gone (each named "the tavern",
 which is now the place they stand in); the four others — the stables and the tannery the
@@ -136,19 +142,22 @@ class TestTheTavernTheyStandIn:
 class TestWhatItIs:
     def test_its_name_its_kind_and_what_it_is_in(self):
         e, _ = _in_the_kettle(back_room=True)
-        words = places.what_it_is(e.here(), e.places())
+        words = places.words_for_here(e.here(), e.places())
         assert words[0] == "back room"
         assert {"tavern", "copper kettle", "way in"} <= set(words)
 
     def test_the_street_it_opens_off_is_not_inside_it(self):
         """`outside=False` stops at the settlement room a building opens off."""
         e, _ = _in_the_kettle(back_room=True)
-        words = places.what_it_is(e.here(), e.places(), outside=False)
+        words = places.words_for_here(e.here(), e.places(), outside=False)
         assert "copper kettle" in words and "way in" not in words
 
     def test_a_generated_room_is_its_own_name_only(self):
         e, _ = _engine()
-        assert places.what_it_is(e.here(), e.places()) == ("way in",)
+        assert places.words_for_here(e.here(), e.places()) == ("way in",)
+
+    def test_the_scale_words_survive(self):
+        assert places.what_it_is("hamlet") == "a hamlet"
 
     def test_the_review_reads_it_off_the_engine(self):
         e, _ = _in_the_kettle()

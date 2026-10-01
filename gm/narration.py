@@ -4453,7 +4453,7 @@ def site_words(engine) -> dict:
 
     A founded place carries its kind beside a name of its own — "the Velvet Veil" is a
     `tavern` — and the prose calls it by the kind far more often than by the name. See
-    `rules.places.what_it_is`. Empty when the engine cannot say where the party is."""
+    `rules.places.words_for_here`. Empty when the engine cannot say where the party is."""
     from rules import places as places_mod
 
     try:
@@ -4461,7 +4461,7 @@ def site_words(engine) -> dict:
         here = engine.here()
     except Exception:  # noqa: BLE001 — a scene with no location has no answer
         return {"here_is": (), "kinds_here": ()}
-    return {"here_is": places_mod.what_it_is(here, known),
+    return {"here_is": places_mod.words_for_here(here, known),
             "kinds_here": places_mod.kinds_of(known)}
 
 

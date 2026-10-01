@@ -1597,7 +1597,7 @@ def _said_as(place) -> list[str]:
     return [w for w in out if w]
 
 
-def what_it_is(place, known=(), outside: bool = True) -> tuple[str, ...]:
+def words_for_here(place, known=(), outside: bool = True) -> tuple[str, ...]:
     """Every word that names where somebody standing in `place` is, lower-case and
     without its article: its own name and kind, then the same for each place it stands
     in, up the `parent` chain — the chamber is in the Velvet Veil, which is a tavern,
