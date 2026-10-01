@@ -2769,6 +2769,27 @@ def _arm_cards(agent, c) -> None:
     agent.ledger = c.ledger
 
 
+def _realigned(records, kept, text: str) -> list[dict]:
+    """Records whose line a rewrite reworded, each moved onto the one untagged quotation
+    on the page that shares six in ten of its words (`"realigned": True`)."""
+    def words(s: str) -> set[str]:
+        return set(re.findall(r"[a-z']+", str(s or "").lower().replace("’", "'")))
+
+    lines = speech_mod.lines(text)
+    free = [ln for ln in lines if ln.strip() and not speech_mod.speaker(kept, ln)]
+    out: list[dict] = []
+    for r in records or []:
+        if not r.get("who") or r in kept or any(speech_mod.speaker([r], ln) for ln in lines):
+            continue
+        mine = words(r.get("line"))
+        near = [ln for ln in free if mine and len(mine & words(ln))
+                / max(1, len(mine | words(ln))) >= 0.6]
+        if len(near) == 1:
+            out.append({**r, "line": near[0].strip(), "realigned": True})
+            free.remove(near[0])
+    return out
+
+
 def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             player_text=None):
     """Narrate what the engine decided, then let the world answer.
@@ -3176,6 +3197,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 if r["who"] and r not in said and any(speech_mod.speaker([r], ln)
                                          for ln in speech_mod.lines(text)):
                     said.append(r)
+            # A tagged line a rewrite reworded is re-aligned to the one untagged quote
+            # that is mostly its words, rather than dropped: at beat 49 of the
+            # 2026-09-30 playtest a polish edited a tagged quote and the line lost its
+            # speaker (item 1, cause 4). Conservative on purpose — six in ten words
+            # shared, and exactly one candidate — because a wrong speaker is worse
+            # than none.
+            said += _realigned(getattr(agent, "last_said", None) or [], said, text)
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
                                  **({"added": added} if added else {}),
                                  **({"said": said} if said else {})})

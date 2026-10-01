@@ -281,54 +281,63 @@ def _speaker(room: _Room, blank: str, subj: str, qa: int) -> tuple[str, str]:
 
 
 def _from_the_page(ctx) -> list[dict]:
+    """The untagged lines, attributed by the three rules of the module docstring.
+
+    **A line attributed to somebody on the board is booked as theirs** (2026-09-30
+    playtest, item 1): 37 of 43 real NPC lines reached the conversation log, and of the 6
+    that did not, the page had already said who spoke — "'…,' the cage owner says" at the
+    opening, "They lean in slightly… 'He's still with us…'" at beat 3, the guard running
+    on after his tagged "A brothel, eh?" at beat 49. The rules found them, then wrote
+    only a miss row ("on the board: attribution, not a body") and no `said` record, and
+    returned early before reading any beat whose lines held no "you". So a ("board",
+    ref) answer appends `{"who": ref, "to": …, "line": …, "from": "page"}` — with no
+    "you" gate and in a fight too, because what somebody said is what they said. The Q5
+    limits stay on MAKING a body (owner's ruling A1): only a line to the player, out of
+    a fight, embodies a record.
+
+    Rule 2 now carries the speaker of a TAGGED line before as well (beat 49's run-on),
+    and rule 3 carries a sentence-initial He/She/They through `_speaker`'s nearest
+    mention (beat 3's "They lean in slightly"): Muzny et al. 2017's sieve order, where
+    the conversation-run and the pronoun-subject sieves come after the explicit clause."""
     from gm import speech
-    from gm.checks._people import spans_in_context
 
     scene = ctx.scene
     text = str(ctx.text or "")
     said = ctx.said if isinstance(ctx.said, list) else []
-    quotes = []
-    for qa, qb, _around in spans_in_context(text):
+    fighting = bool(getattr(scene, "in_encounter", False))
+    # Every quotation in order, the tagged ones included, so rule 2 can carry a tag on:
+    # (qa, qb, line, tagged ref or None).
+    every = []
+    for qa, qb in speech.spans(text):
         line = text[qa + 1:qb - 1] if qb - qa >= 2 else ""
-        if not line.strip() or speech.speaker(said, line) is not None:
-            continue            # a tagged line is decided by its tag
-        quotes.append((qa, qb, line))
-    if not any(_YOU.search(q[2]) for q in quotes):
+        if not line.strip():
+            continue
+        rec = speech.speaker(said, line)
+        every.append((qa, qb, line,
+                      str(rec.get("who") or "") if rec is not None else None))
+    quotes = [(qa, qb, line) for qa, qb, line, tag in every if tag is None]
+    if not quotes:
         return []
-    if getattr(scene, "in_encounter", False):
-        return [{"kind": "speaker-real", "made": "", "untagged": len(quotes),
-                 "why": "in a fight the prose brings nobody in"}]
     blank = speech.blanked(text)
     room = _Room(ctx, speech.unquoted(text))
-    # 1-3 of the docstring: each line's speaker, as ("record", id) | ("board", ref) |
-    # ("", why).
+    # 1-3 of the docstring: each untagged line's speaker, as ("record", id) |
+    # ("board", ref) | ("", why).
     whose: list[tuple[str, str]] = []
-    for i, (qa, qb, line) in enumerate(quotes):
-        subj = _clause(blank, qa, qb)
-        if subj:
-            whose.append(_speaker(room, blank, subj, qa))
+    prev: tuple[int, tuple[str, str]] | None = None     # (end of the line before, whose)
+    for qa, qb, line, tag in every:
+        if tag is not None:
+            prev = (qb, ("board", tag) if tag in room.board else ("", "tagged"))
             continue
-        prev = whose[-1] if whose else None
-        if prev and prev[0] and "\n\n" not in text[quotes[i - 1][1]:qa]:
-            whose.append(prev)
-            continue
-        # The sentence before, alone: exactly one person named in it.
-        head = blank[:qa].rstrip()
-        cut = max(head[:-1].rfind("."), head[:-1].rfind("!"), head[:-1].rfind("?"),
-                  head[:-1].rfind("\n"))
-        named = room.mentions(blank[cut + 1:qa])
-        settled = {room.settle(k, ident) for _a, _b, k, ident in named}
-        if len(settled) == 1 and next(iter(settled))[0]:
-            whose.append(next(iter(settled)))
-        else:
-            whose.append(("", "no speaker named beside the line"))
+        w = _whose(room, blank, text, qa, qb, prev)
+        whose.append(w)
+        prev = (qb, w)
     rows: list[dict] = []
     misses: dict[str, int] = {}
     made: dict[str, object] = {}
     for rid in dict.fromkeys(ident for kind, ident in whose if kind == "record"):
         mine = [q for q, w in zip(quotes, whose) if w == ("record", rid)]
-        if not any(_YOU.search(line) for _qa, _qb, line in mine):
-            continue            # spoke, but not to the player
+        if fighting or not any(_YOU.search(line) for _qa, _qb, line in mine):
+            continue            # the fight's rule; or spoke, but not to the player
         rec = next(r for r in room.records if r["id"] == rid)
         actor = _embody(ctx, rec)
         made[rid] = actor
@@ -339,13 +348,47 @@ def _from_the_page(ctx) -> list[dict]:
                      "record": rid, "lines": len(mine), "untagged": len(mine),
                      "square": list(scene.positions.get(actor.ref) or [])
                      if getattr(scene, "positions", None) else []})
+    booked: dict[str, int] = {}
     for (qa, qb, line), (kind, ident) in zip(quotes, whose):
+        if kind == "board":
+            said.append({"who": ident, "to": "you" if _YOU.search(line) else "",
+                         "line": line.strip(), "from": "page"})
+            booked[ident] = booked.get(ident, 0) + 1
+            continue
         if not _YOU.search(line) or (kind == "record" and ident in made):
             continue
-        why = (f"{ident} is on the board: attribution, not a body" if kind == "board"
+        why = ("in a fight the prose brings nobody in" if fighting and kind == "record"
                else ident if not kind else "")
         if why:
             misses[why] = misses.get(why, 0) + 1
+    rows += [{"kind": "speaker-real", "made": "", "booked": ref, "lines": n,
+              "why": "on the board: the line is theirs, attribution, not a body"}
+             for ref, n in booked.items()]
     rows += [{"kind": "speaker-real", "made": "", "untagged": n, "why": why}
              for why, n in misses.items()]
     return rows
+
+
+def _whose(room: _Room, blank: str, text: str, qa: int, qb: int,
+           prev: tuple[int, tuple[str, str]] | None) -> tuple[str, str]:
+    """One untagged line's speaker, by rules 1-3 of the module docstring."""
+    subj = _clause(blank, qa, qb)
+    if subj:
+        return _speaker(room, blank, subj, qa)
+    # 2: the line before in the same paragraph, tagged or not, when it had a speaker.
+    if prev is not None and prev[1][0] and "\n\n" not in text[prev[0]:qa]:
+        return prev[1]
+    # 3: the sentence before, alone — exactly one person named in it; or, naming nobody,
+    # opened by a He/She/They that carries the nearest person described before it.
+    head = blank[:qa].rstrip()
+    cut = max(head[:-1].rfind("."), head[:-1].rfind("!"), head[:-1].rfind("?"),
+              head[:-1].rfind("\n"))
+    sentence = blank[cut + 1:qa]
+    named = room.mentions(sentence)
+    settled = {room.settle(k, ident) for _a, _b, k, ident in named}
+    if len(settled) == 1 and next(iter(settled))[0]:
+        return next(iter(settled))
+    lead = re.match(r"\s*(He|She|They)\b", sentence)
+    if not named and lead:
+        return _speaker(room, blank, lead.group(1), cut + 1 + lead.start(1))
+    return "", "no speaker named beside the line"
