@@ -1104,8 +1104,12 @@ def declare_repair(raw_intents, player_text: str, scene):
             have = True
             raw = dict(raw, target=raw.get("target") or ref,
                        params={**params, **({"own": True} if own else {})})
-        elif op == "check" and str(params.get("skill", "")).lower() in _REPAIR_DRESSING \
-                and (aims_at_it(raw) or not raw.get("target")):
+        elif op == "check" and (aims_at_it(raw) or (
+                not raw.get("target")
+                and str(params.get("skill", "")).lower() in _REPAIR_DRESSING)):
+            # Any check at the machine is the repair dressed up — the owner's own replay
+            # (2026-10-01) came back first as `check skill=use` aimed at the spy, refused
+            # as no such skill, and cost a whole second plan before this op landed.
             continue
         elif op in ("heal", "condition", "company") and aims_at_it(raw):
             continue

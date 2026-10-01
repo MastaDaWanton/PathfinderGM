@@ -69,6 +69,17 @@ def test_the_owners_words_declare_a_repair_on_the_spy_and_ask_to_own_it():
                     "params": {"own": True}}]
 
 
+def test_any_check_aimed_at_the_machine_is_the_repair_dressed_up():
+    """The replay of the owner's line on a copy of the save (2026-10-01) came back first
+    as `check skill=use` aimed at the spy: refused as no such skill, a whole second plan
+    spent before the repair op landed."""
+    scene, _engine, _pc, spy = _table()
+    model = [{"op": "check", "actor": "pc", "target": spy.ref,
+              "params": {"skill": "use", "dc": {"band": "average"}}}]
+    out = judgement.declare_repair(model, OWNERS_LINE, scene)
+    assert [r["op"] for r in out] == ["repair"]
+
+
 @pytest.mark.parametrize("line", [
     "I repair the clockwork spy.",
     "i try to patch the spy back up",
