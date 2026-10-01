@@ -69,46 +69,84 @@ AMMO_SECTIONS = ("Ammunition", "Firearm Ammunition / Gear", "Siege Weapon Ammuni
 _COUNT = re.compile(r"\s*\((\d+)(?:\s+[a-z]+)?\)\s*$")
 
 
-def _folders() -> list[Path]:
+def _shipped_folder() -> Path:
     from django.conf import settings
 
-    return [Path(settings.BASE_DIR) / "content" / "weapons",
-            Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "weapons"]
+    return Path(settings.BASE_DIR) / "content" / "weapons"
+
+
+def _homebrew_folders() -> list[Path]:
+    """Where a table's own weapons live: `homebrew/weapons/`, which the weapon bench
+    saves to, and `homebrew/items/`, which the bench saved to until 2026-10-01 and no
+    code read — kept so an edit made before the move is not lost to it."""
+    from django.conf import settings
+
+    home = Path(settings.CAMPAIGN_DIR).parent / "homebrew"
+    return [home / "items", home / "weapons"]
+
+
+# What the old "Items, weapons & armour" bench could write that is not a weapon. Such a
+# file in `homebrew/items/` has no table to reach (armour and shields are hand-written in
+# `rules/tables.py` with no homebrew layer), and reading it as a weapon would be worse.
+_NOT_WEAPONS = frozenset({"armour", "armor", "shield", "gear"})
+
+
+def _read(folder: Path, *, homebrew: bool) -> list[dict]:
+    if not folder.is_dir():
+        return []
+    out: list[dict] = []
+    for path in sorted(folder.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            files.unreadable(path, exc)
+            continue
+        entries = data.get("weapons") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            entries = [data] if isinstance(data, dict) and data.get("id") else []
+        if isinstance(data, dict) and not homebrew:
+            _META.update({k: v for k, v in data.items() if k != "weapons"})
+        out += [e for e in entries if isinstance(e, dict)
+                and not (homebrew and str(e.get("kind", "")).lower() in _NOT_WEAPONS)]
+    return out
 
 
 def all_weapons() -> dict[str, dict]:
     global _ALL, _META
     if _ALL is None:
         out: dict[str, dict] = {}
-        for folder in _folders():
-            if not folder.is_dir():
-                continue
-            for path in sorted(folder.glob("*.json")):
-                try:
-                    data = json.loads(path.read_text(encoding="utf-8"))
-                except Exception as exc:
-                    files.unreadable(path, exc)
-                    continue
-                entries = data.get("weapons") if isinstance(data, dict) else None
-                if not isinstance(entries, list):
-                    entries = [data] if isinstance(data, dict) and data.get("id") else []
-                if isinstance(data, dict):
-                    _META.update({k: v for k, v in data.items() if k != "weapons"})
-                for e in entries:
-                    key = str(e.get("id") or e.get("name", "")).strip().lower()
-                    if not key:
-                        continue
-                    # Merged, not replaced: a homebrew edit touching one field must not
-                    # drop the twenty it never mentioned.
-                    out.setdefault(key, {}).update(e)
-                    out[key].setdefault("name", e.get("name", key))
 
-        # The hand-written eleven win. See the module docstring. A curated key the file
-        # spells differently lands on the file's row (`ALIASES`), never beside it.
+        def merge(entries: list[dict], *, homebrew: bool) -> None:
+            for e in entries:
+                key = str(e.get("id") or e.get("name", "")).strip().lower()
+                if not key:
+                    continue
+                # A homebrew file keyed the curated way ("shortsword") corrects the one
+                # row rather than standing beside it as a second sword.
+                if homebrew:
+                    key = ALIASES.get(key, key)
+                    e = {**e, "id": key}
+                # Merged, not replaced: a homebrew edit touching one field must not drop
+                # the twenty it never mentioned.
+                out.setdefault(key, {}).update(e)
+                out[key].setdefault("name", e.get("name", key))
+
+        merge(_read(_shipped_folder(), homebrew=False), homebrew=False)
+
+        # The hand-written eleven win over the import. See the module docstring. A
+        # curated key the file spells differently lands on the file's row (`ALIASES`),
+        # never beside it.
         for key, entry in SHIPPED.items():
             row = ALIASES.get(key, key)
             out.setdefault(row, {}).update(entry)
             out[row].setdefault("id", row)
+
+        # And homebrew over both, as the docstring always said. It ran before the eleven
+        # until 2026-10-01, so a homebrew rapier with a 15-20 threat came back 18-20 —
+        # an edit to any of the eleven silently overwritten
+        # (tests/test_homebrew_weapons_reach_play.py).
+        for folder in _homebrew_folders():
+            merge(_read(folder, homebrew=True), homebrew=True)
 
         for entry in out.values():
             entry.setdefault("traits", [])
@@ -121,6 +159,13 @@ def all_weapons() -> dict[str, dict]:
             entry.setdefault("finessable", False)
         _ALL = out
     return _ALL
+
+
+def forget() -> None:
+    """Drop the table so the next read sees a file the weapon bench just saved."""
+    global _ALL, _INDEX
+    _ALL = None
+    _INDEX = None
 
 
 def meta() -> dict:

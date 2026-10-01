@@ -455,6 +455,13 @@ def save_thing(request, bench_id: str):
                                 status=400)
 
     files.write_text(path, json.dumps(entry, indent=1, ensure_ascii=False))
+    # The weapon table is read once per process, so without this a weapon saved here
+    # changed nothing until the app restarted — the same silence as saving to a folder
+    # nothing reads, just shorter.
+    if bench_id == "items":
+        from rules import weapons as weapons_mod
+
+        weapons_mod.forget()
     return JsonResponse({"ok": True, "id": slug, "path": str(path),
                          "lines": [effectspec.render(sp) for sp in specs]})
 

@@ -289,7 +289,11 @@ def test_a_bench_lists_what_it_holds(client):
 
     items = client.get("/api/bench/items").json()
     assert any(r["kind"] == "weapon" for r in items["rows"])
-    assert any(r["kind"] == "armour" for r in items["rows"])
+    # No armour rows since 2026-10-01: they opened to a 404 and an edit had nowhere to
+    # reach; the bench says so in its `waiting` line
+    # (tests/test_homebrew_weapons_reach_play.py).
+    assert not any(r["kind"] in ("armour", "shield") for r in items["rows"])
+    assert "Armour" in items["bench"]["waiting"]
 
 
 def test_a_bench_with_nothing_behind_it_says_so(client):

@@ -193,10 +193,16 @@ KINDS: dict[str, Kind] = {
             Field("biomes", "Found in", type="list", choices=BIOME_CHOICES),
         ],
     ),
+    # Weapons only, saved where the weapon table reads. It was "Items, weapons & armour"
+    # saving to `homebrew/items/`, a folder nothing read; armour and shields are a
+    # hand-written table with no homebrew layer, so promising them here promised a save
+    # that reached nothing (tests/test_homebrew_weapons_reach_play.py). The id stays
+    # "items" because the page's routes are keyed by it.
     "items": Kind(
-        id="items", label="Items, weapons & armour", folder="items", key="items",
+        id="items", label="Weapons", folder="weapons", key="weapons",
         shipped_loader="rules.weapons:all_weapons",
-        fields=_named(kinds=("weapon", "armour", "shield", "gear")) + [
+        fields=_named() + [
+            Field("category", "Category", type="choice", choices=("melee", "ranged")),
             Field("damage", "Damage"),
             Field("crit_range", "Threat range", type="number"),
             Field("crit_mult", "Critical multiplier", type="number"),

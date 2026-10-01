@@ -26,7 +26,7 @@ from rules import schemes as schemes_mod
 from rules import weapons as weapons_mod
 from rules import bestiary
 from rules.bestiary import TEMPLATES
-from rules.tables import ARMOUR, CLASSES, SHIELDS, WEAPONS
+from rules.tables import CLASSES, WEAPONS
 from pathfindergm import files
 
 
@@ -158,11 +158,16 @@ def benches() -> list[Bench]:
                   "mechanics read out of its description.",
         ),
         Bench(
-            id="items", name="Items, weapons & armour", dir="items",
-            shipped=len(WEAPONS) + len(ARMOUR) + len(SHIELDS) - 2,
-            shipped_label="in the Core Rulebook tables",
-            blurb="Weapons, armour and shields. Hardness and hit points come from the "
-                  "material.",
+            # Saves where the weapon table reads. It was "Items, weapons & armour" in
+            # `homebrew/items/`, which nothing read, and its armour and shield rows did not
+            # open (tests/test_homebrew_weapons_reach_play.py).
+            id="items", name="Weapons", dir="weapons",
+            shipped=len(weapons_mod.all_weapons()), shipped_label="in the weapon table",
+            blurb="Damage, threat range and multiplier for any weapon in the table, or a "
+                  "new one. An edit layers over the shipped row field by field. "
+                  "Hardness and hit points come from the material.",
+            waiting="Armour and shields are not editable here yet: their table has no "
+                    "homebrew layer for an edit to reach.",
         ),
         Bench(
             id="creatures", name="Creatures", dir="creatures",
@@ -385,10 +390,8 @@ def rows_for(bench_id: str) -> list[dict]:
               "id": weapons_mod.ALIASES.get(k, k),
               "note": f"{v['damage']} {v['type']} · x{v['crit_mult']}"}
              for k, v in WEAPONS.items()]
-            + [{"name": v["name"], "kind": "armour", "mine": False, "id": k,
-                "note": f"+{v['ac']} AC"} for k, v in ARMOUR.items() if k != "none"]
-            + [{"name": v["name"], "kind": "shield", "mine": False, "id": k,
-                "note": f"+{v['ac']} AC"} for k, v in SHIELDS.items() if k != "none"]
+            # No armour or shield rows: they opened to a 404, and an edit to one had
+            # nowhere to go (see the bench's `waiting` line).
         )
     elif bench_id == "creatures":
         rows += [{"name": v.get("name", k), "kind": "hand-written", "mine": False,
