@@ -4059,30 +4059,122 @@ _APPROACHES = re.compile(
     r"\b(?:approach(?:es|ing)?|aproach|aprouch|walk\s+(?:up|over)\s+to|go\s+(?:up|over)\s+to|"
     r"head\s+over\s+to|step\s+(?:up|over)\s+to|move\s+(?:up\s+|over\s+|closer\s+)?to(?:ward|wards)?|"
     r"draw\s+(?:near|close)\s+to|sidle\s+up\s+to|edge\s+(?:closer\s+)?toward)\s+"
-    r"((?:the|a|an|that|this)\s+[^.,;!?]{2,40}|[A-Z][\w'-]+(?:\s+[A-Z][\w'-]+)?)", re.I)
+    r"((?:the|a|an|that|this)\s+[^.,;!?]{2,40}|[A-Z][\w'-]+(?:\s+[A-Z][\w'-]+)?|"
+    r"it|him|her|them)\b", re.I)
+_PRONOUN_TARGET = frozenset({"it", "him", "her", "them", "he", "she", "they"})
 
 
-def _sought_here(player_text: str, scene, reading=None) -> list[str]:
-    """The refs here the player's words go to: the reading's `seek`/`talk`/`follow`
-    target, or with no reading an approach in their own words, each found by
-    `scope.in_the_room`."""
+def _one_meant_by_a_pronoun(scene) -> str:
+    """The ref a bare "it"/"him" can only mean here: the one other body present, or the
+    one creature holding its ground (`state.holding-ground`), else ""."""
+    others = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
+              if not getattr(a, "is_pc", False) and not getattr(a, "is_down", False)]
+    if len(others) == 1:
+        return others[0]
+    holding = [r for r in others
+               if callable(getattr(scene.actors[r], "has_state", None))
+               and scene.actors[r].has_state("state.holding-ground")]
+    return holding[0] if len(holding) == 1 else ""
+
+
+def _sought_here(player_text: str, scene, reading=None,
+                 acts=("seek", "talk", "follow")) -> list[str]:
+    """The refs here the player's words go to: the reading's target for `acts`, or with
+    no reading an approach in their own words, each found by `scope.in_the_room` — and a
+    bare pronoun ("I approach it", Lane D's live check, 2026-09-30) by the only body it
+    can mean (`_one_meant_by_a_pronoun`)."""
     from rules import scope as scope_mod
 
     phrases: list[str] = []
     if isinstance(reading, dict) and not reading.get("error"):
         for a in reading.get("actions") or ():
-            if isinstance(a, dict) and a.get("act") in ("seek", "talk", "follow") \
+            if isinstance(a, dict) and a.get("act") in acts \
                     and str(a.get("target") or "").strip():
                 phrases.append(str(a["target"]))
     else:
         phrases += [m.group(1) for m in _APPROACHES.finditer(redact_speech(player_text))]
     refs: list[str] = []
     for ph in phrases:
-        ref = scope_mod.in_the_room(scene, ph)
+        if ph.strip().lower() in _PRONOUN_TARGET:
+            ref = _one_meant_by_a_pronoun(scene)
+        else:
+            ref = scope_mod.in_the_room(scene, ph)
         a = (getattr(scene, "actors", {}) or {}).get(ref)
         if a is not None and not getattr(a, "is_pc", False) and ref not in refs:
             refs.append(ref)
     return refs
+
+
+# How close each zone is (`intents.ZONES`, far to engaged).
+_CLOSENESS = {"far": 0, "near": 1, "engaged": 2}
+
+
+def _approach_move(scene, who) -> dict | None:
+    """The `move` that walks the player's character up to `who`, or None when they are
+    within reach already. On a map, the cheapest square beside them
+    (`position.square_in_reach`, the square the move op accepts), which re-derives the
+    zone from where people stand; with no map, or nobody placed on it, the zone between
+    them is closed to `engaged` — `who` named, the actor the player's character, the
+    shape the holding-ground rule reads as closing (`Engine._holding_ground_settles`)."""
+    pc = scene.pc()
+    if pc is None:
+        return None
+    positions = getattr(scene, "positions", None) or {}
+    if getattr(scene, "has_grid", False) and pc.ref in positions and who.ref in positions:
+        try:
+            from rules import position as position_mod
+
+            found = position_mod.square_in_reach(scene, pc, who, 5)
+        except Exception:  # noqa: BLE001 — a board that cannot answer: the zone below
+            found = None
+        if found is not None:
+            (x, y), feet = found
+            if not feet:
+                return None
+            return {"op": "move", "actor": pc.ref, "params": {"square": [x, y]},
+                    "because": f"the player walks up to {who.name}"}
+    if _CLOSENESS.get(str((getattr(scene, "zones", {}) or {}).get(who.ref) or "near"), 1) >= 2:
+        return None
+    return {"op": "move", "actor": pc.ref, "params": {"who": who.ref, "zone": "engaged"},
+            "because": f"the player walks up to {who.name}"}
+
+
+def declare_approach(raw_intents, player_text: str, scene, reading=None) -> list:
+    """"I approach the clockwork Spy", out of a fight, is a `move` of the player's
+    character to beside it — the peace-time move — so the engine sees the distance
+    close and anything that answers a body coming nearer can answer it.
+
+    Lane D's live check, 2026-09-30: with the Spy holding its ground (its reaction roll
+    fires only when the player CLOSES on it), "I approach it" was planned as
+    `narrate_only` on the owner's model — reading `seek target: it` — so nothing moved
+    and the roll never fired. Detected in code from the reading's `seek`/`follow` (or the
+    approach words, with no reading); added only when the plan moves nobody toward them
+    and strikes no blow at them (a blow closes on its own, `Engine._close_before`), and
+    never in a fight, whose own schema moves bodies by the round."""
+    if not isinstance(raw_intents, list) or scene is None \
+            or getattr(scene, "in_encounter", False) or "?" in str(player_text or ""):
+        return raw_intents
+    if isinstance(reading, dict) and not reading.get("error"):
+        sought = _sought_here(player_text, scene, reading, acts=("seek", "follow"))
+    else:
+        sought = _sought_here(player_text, scene, None)
+    if not sought:
+        return raw_intents
+    pc = scene.pc()
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            continue
+        op = str(r.get("op", "")).lower()
+        if op in ("move", "travel", "journey") and str(r.get("actor") or pc.ref) == pc.ref:
+            return raw_intents
+        if op in ("attack", "manoeuvre") and str(r.get("target") or "") in sought:
+            return raw_intents
+    move = _approach_move(scene, scene.actors[sought[0]])
+    if move is None:
+        return raw_intents
+    kept = [r for r in raw_intents
+            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")]
+    return [move, *kept]
 
 
 def _goes_somewhere(player_text: str, reading=None) -> bool:
@@ -4138,19 +4230,14 @@ def refuse_leaving_the_sought(raw_intents, player_text: str, scene, reading=None
 
 
 def _approach_fix(scene, who) -> str:
-    """The fix, said with the square when there is a map: a `move` to beside them."""
-    pc = scene.pc()
-    try:
-        from rules import position as position_mod
+    """The fix: the `move` that walks up to them (`_approach_move`), written out to copy,
+    or, within reach already, the approach narrated."""
+    import json
 
-        found = position_mod.square_in_reach(scene, pc, who, 5) if pc is not None else None
-    except Exception:  # noqa: BLE001 — no map, no square: the narrated approach
-        found = None
-    if found is not None and found[1] > 0:
-        (x, y), _feet = found
-        return (f"To walk up to them: {{\"op\": \"move\", \"actor\": \"{pc.ref}\", "
-                f"\"params\": {{\"square\": [{x}, {y}]}}}} — or narrate the approach "
-                f"with no movement op.")
+    move = _approach_move(scene, who)
+    if move is not None:
+        shown = {k: move[k] for k in ("op", "actor", "params")}
+        return f"To walk up to them: {json.dumps(shown)} — or narrate the approach."
     return ("They are within reach already: narrate the approach, with no movement op "
             "({\"op\": \"narrate_only\"}).")
 
@@ -4182,6 +4269,9 @@ def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
     # place chip is the player choosing the walk, and is never second-guessed.
     if _attached_place(attached) is None:
         raw_intents = refuse_leaving_the_sought(raw_intents, player_text, scene, reading)
+        # And with no travel to refuse, the approach itself is a move (Lane D's live
+        # check: "I approach it" planned as narration moved nobody).
+        raw_intents = declare_approach(raw_intents, player_text, scene, reading)
     if not player_departs(player_text):
         return raw_intents
     travels = [r for r in raw_intents
@@ -4496,11 +4586,32 @@ def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
 # "I pick up the sword" and "I gather my things" cannot fire; a false forage charges an
 # hour of world clock and a Survival toll to somebody who never asked to spend either.
 _FORAGES = re.compile(r"\bforag(?:e|es|ing)\b", re.I)
+# Plants, herbs, food and forage words, and nothing else. Food joined on 2026-09-30 ("I
+# search the area for food" is a forage); a search for TRACKS is not one, and is never
+# made one (`_TRACKING`, below).
 _GATHERS_PLANTS = re.compile(
-    r"\b(?:gather|pick|harvest|collect|look\s+for|search\s+for|hunt\s+for)\b"
+    r"\b(?:gather|pick|harvest|collect|look\s+for|search\s+for|hunt\s+for|"
+    r"search\s+(?:the\s+)?[\w'-]+(?:\s+[\w'-]+)?\s+for)\b"
     r"[^.!?]{0,30}?"
     r"\b(?:herbs?|plants?|mushrooms?|roots?|berries|flowers?|fungi|ingredients?|"
-    r"reagents?)\b", re.I)
+    r"reagents?|food|edibles?|fruits?|nuts|greens|tubers|something\s+to\s+eat)\b", re.I)
+# What a tracker looks for. "I search the crossroads for tracks, then head out" was
+# planned as a FORAGE on both live runs of 2026-09-29 and the agent's own run (the
+# register's row): herbs went into the pack on a tracking check. No detector declared it
+# — the plan did — so a forage the words do not declare, beside words about trail-signs,
+# is taken out of the plan (`inject_forage`). Survival is how tracks are followed (CRB
+# p.107, "Follow Tracks"), and that check stands.
+_TRACKING = re.compile(
+    r"\b(?:tracks?|footprints?|foot-prints?|prints|hoofprints?|pawprints?|trail|spoor|"
+    r"droppings|scent|(?:signs?|traces?|marks?)\s+of|tracking|track\s+(?:him|her|them|it))\b",
+    re.I)
+
+
+def declares_forage(player_text: str) -> bool:
+    """Whether the player's words declare a forage: the verb itself, or a gathering verb
+    with a plant, herb or food noun for its object."""
+    return bool(_FORAGES.search(str(player_text or ""))
+                or _GATHERS_PLANTS.search(str(player_text or "")))
 _FOR_HOURS = re.compile(r"\b(?:for\s+)?(\d{1,2})\s+hours?\b", re.I)
 
 
@@ -4609,8 +4720,15 @@ def inject_forage(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if "forage" in present:
+        # The plan's own forage, on words about trail-signs that declare none: a search
+        # for tracks is not a search for herbs (the register's row, 2026-09-29).
+        if not declares_forage(player_text) and _TRACKING.search(player_text):
+            kept = [r for r in raw_intents
+                    if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "forage")]
+            return kept or [{"op": "narrate_only",
+                             "because": "a search for tracks is not a forage"}]
         return raw_intents
-    if not (_FORAGES.search(player_text) or _GATHERS_PLANTS.search(player_text)):
+    if not declares_forage(player_text):
         return raw_intents
 
     pc = scene.pc()
@@ -5384,7 +5502,9 @@ _CLAUSE_OPS = (
     (re.compile(r"\b(?:drink|quaff|use|apply)\b", re.I), "use_item"),
     (re.compile(r"\b(?:give|hand|pay|toss)\b", re.I), "give"),
     (re.compile(r"\b(?:wait|linger)\b", re.I), "advance_time"),
-    (re.compile(r"\b(?:forage|gather)\b", re.I), "forage"),
+    # The forage word only: "gather" with a plant is `declares_forage`'s, asked through
+    # `declared_ops` above, and "I gather my things" is not a forage (2026-09-30).
+    (_FORAGES, "forage"),
 )
 _MOVE_OPS = ("travel", "journey")
 

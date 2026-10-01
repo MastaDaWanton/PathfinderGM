@@ -11455,11 +11455,28 @@ class Engine:
         # square, when there is one, re-derives the zone below anyway, and a zone word
         # the fiction never contains is not worth a rejected turn.
         zone = str(intent.params.get("zone") or was).strip().lower()
+        # The player's character walking up to somebody with no map to walk on: a zone
+        # is the distance between the two of them, so it is set on the person `who`
+        # names — but it is the player who walks, who must be able to, and whom the tell
+        # names (2026-09-30, item 8: `judgement.declare_approach`). Told as "Sam moves
+        # from far to engaged" it read as the other one coming over.
+        mover = self.scene.actors.get(intent.actor or "")
+        walker = mover if (mover is not None and mover.is_pc and ref != mover.ref
+                           and square is None) else None
 
         # An attack of opportunity has already resolved by the time we get here — it was
         # spliced in front of this intent precisely so it could land before the move did.
         # If it dropped them, they do not arrive: the whole reason for that ordering.
-        if not actor.can_act():
+        if walker is not None and not walker.can_act():
+            return Outcome(
+                intent_id=intent.id, op="move", status="prevented",
+                effects=[{"ref": walker.ref, "kind": "move_stopped",
+                          "why": walker.blocking_condition().lower()}],
+                tell=f"{walker.name} is {walker.blocking_condition().lower()} and does not "
+                     f"get there.",
+                because=intent.because,
+            )
+        if walker is None and not actor.can_act():
             return Outcome(
                 intent_id=intent.id, op="move", status="prevented",
                 effects=[{"ref": ref, "kind": "move_stopped",
@@ -11507,10 +11524,17 @@ class Engine:
             )
 
         self.scene.zones[ref] = zone
+        tell = f"{actor.name} moves from {was} to {zone}."
+        if walker is not None:
+            order = {"far": 0, "near": 1, "engaged": 2}
+            closer = order.get(zone, 1) - order.get(was, 1)
+            tell = (f"{walker.name} closes on {actor.name}." if closer > 0 else
+                    f"{walker.name} draws back from {actor.name}." if closer < 0 else
+                    f"{walker.name} stays where they are, {zone} of {actor.name}.")
         return Outcome(
             intent_id=intent.id, op="move",
             effects=[{"ref": ref, "kind": "zone", "from": was, "to": zone}],
-            tell=f"{actor.name} moves from {was} to {zone}.",
+            tell=tell,
             because=intent.because,
         )
 

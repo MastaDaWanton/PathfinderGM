@@ -117,3 +117,63 @@ def test_the_prompt_teaches_the_move_out_of_a_fight():
     src = text or inspect.getsource(prompts)
     assert "Going up to somebody who is HERE is never a travel" in src
     assert '{"op": "move", "actor": "pc", "params":' in src
+
+
+# --- the approach is a move ---------------------------------------------------------------
+
+
+def test_an_approach_planned_as_narration_becomes_a_move(worlds):
+    """Lane D's live check, 2026-09-30: "I approach it" (reading `seek target: it`) was
+    planned as `narrate_only` on the owner's model, so nothing moved and nothing that
+    answers a body coming closer could answer it. The approach is a `move` now."""
+    s, e, spy = _with_the_spy(worlds)
+    s.zones[spy.ref] = "far"
+    s.positions.pop(spy.ref, None)          # nobody placed: the zone is what closes
+    for ref in [r for r in s.people if r not in ("pc", spy.ref)]:
+        s.people.pop(ref)                   # "it" can mean only the Spy
+    out = judgement.refuse_leaving_in_place(
+        [{"op": "narrate_only"}], "I approach it", s,
+        reading={"actions": [{"act": "seek", "target": "it"}]})
+    assert out == [{"op": "move", "actor": "pc",
+                    "params": {"who": spy.ref, "zone": "engaged"},
+                    "because": "the player walks up to Clockwork Spy"}]
+    res = e.run(e.validate(out))
+    assert s.zones[spy.ref] == "engaged"
+    assert res.outcomes[0].tell == f"{s.pc().name} closes on Clockwork Spy."
+
+
+def test_on_a_map_the_approach_walks_to_a_square_beside_them(worlds):
+    s, e, spy = _with_the_spy(worlds)
+    if not s.has_grid or spy.ref not in s.positions or "pc" not in s.positions:
+        pytest.skip("this world's market places nobody on a map")
+    out = judgement.declare_approach([{"op": "narrate_only"}], ROW_82, s, dict(READ_82))
+    if out == [{"op": "narrate_only"}]:
+        return                                  # within reach already
+    assert out[0]["op"] == "move" and "square" in out[0]["params"]
+    e.run(e.validate(out))
+    assert s.zones[spy.ref] == "engaged"
+
+
+@pytest.mark.parametrize("plan", [
+    [{"op": "move", "actor": "pc", "params": {"zone": "near"}}],
+    [{"op": "attack", "actor": "pc", "target": "SPY"}],
+])
+def test_a_plan_that_already_closes_is_left_alone(worlds, plan):
+    s, e, spy = _with_the_spy(worlds)
+    plan = [dict(r, target=spy.ref) if r.get("target") == "SPY" else dict(r) for r in plan]
+    assert judgement.declare_approach(plan, ROW_82, s, dict(READ_82)) == plan
+
+
+def test_talking_to_somebody_here_is_not_walking_up_to_them(worlds):
+    s, e, spy = _with_the_spy(worlds)
+    reading = {"actions": [{"act": "talk", "target": "the clockwork Spy", "says": "hello"}]}
+    plan = [{"op": "say", "params": {"to": spy.ref, "words": "hello"}}]
+    assert judgement.declare_approach(list(plan), "I greet the clockwork Spy", s,
+                                      reading) == plan
+
+
+def test_in_a_fight_the_round_moves_bodies(worlds):
+    s, e, spy = _with_the_spy(worlds)
+    e._ensure_encounter("pc", spy.ref)
+    plan = [{"op": "narrate_only"}]
+    assert judgement.declare_approach(plan, ROW_82, s, dict(READ_82)) == plan
