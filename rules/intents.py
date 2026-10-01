@@ -521,7 +521,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Found in the 2026-08-22 playtest: "I eat from my rations and drink from my
     # waterskin" reached the engine as narrate_only, so the survival clocks built that
     # week could never actually be answered — only run out.
-    "eat": ((), ("actor",), "hidden"),
+    # `item`: what is eaten out of the pack — trail rations — which is then spent
+    # (content/rules/gear.json's `eat` rows; the Equipment tab's Eat, 2026-10-01). With no
+    # item the meal is the scene's, as it always was: a tavern's supper is not carried.
+    "eat": ((), ("actor", "item"), "hidden"),
     "drink": ((), ("actor",), "hidden"),
     # `not_here` is written by code, never by the model: the world's own answer for a
     # person the player looked for who is not here (`judgement.repair_unknown_refs`,

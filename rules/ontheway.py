@@ -262,6 +262,47 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
     return None
 
 
+def night(dice, hours: int, biome: str, level: int = 1, *,
+          scale: float = 1.0) -> Meeting | None:
+    """The camp's check, watch by watch over the hours slept: the road's own procedure
+    ("four times per day ... with a 20% chance of an encounter each time"), because a
+    night in the open is the sixteen hours this module's road check leaves to the camp.
+
+    Asked for 2026-10-01 — "a tent should decrease the chance of being attacked in my
+    sleep" — and until then there was nothing to decrease: `rest` rolled no check at all,
+    so a night on the open ground was as safe as one in the inn. `scale` is what the
+    camp's gear multiplies each watch's chance by (a tent's row in content/rules/
+    gear.json: one half), never below one in a hundred.
+
+    Only the creature band is drawn at night. Travellers, a toll and the weather are the
+    road's: nobody collects a toll at a sleeping camp, and what the weather does to a
+    sleeper is the cold rule's. A watch that hits on ground the bestiary does not stock
+    meets nothing — a quiet night, not travellers in the dark."""
+    from . import bestiary
+
+    full, rest = divmod(max(0, int(hours)), WATCH_HOURS)
+    shares = [ROAD_PERCENT] * full
+    if rest or not full:
+        shares.append(max(1, round(ROAD_PERCENT * (rest or int(hours)) / WATCH_HOURS)))
+    shares = [max(1, round(s * float(scale))) for s in shares]
+    for w, chance in enumerate(shares, start=1):
+        if dice.roll("1d100", label="the night", visibility="hidden").total > chance:
+            continue
+        low = max(1 / 3, int(level or 1) - BELOW)
+        high = max(1, int(level or 1) + ABOVE)
+        rows = [x for x in bestiary.search(biome=biome, cr_min=low, cr_max=high, limit=400)
+                if x.get("cr_value") is not None]
+        if not rows:
+            return None
+        pick = dice.roll(f"1d{len(rows)}", label="what lives out here",
+                         visibility="hidden").total
+        row = rows[pick - 1]
+        return Meeting(kind="creature", roll=chance, creature=row,
+                       template=str(row.get("id") or ""), count=1, after=w,
+                       aggressive=row.get("creature_type") in AGGRESSIVE)
+    return None
+
+
 def hours_walked(meeting: "Meeting | None", hours: int) -> int:
     """How far along the road the party got before it stopped.
 
