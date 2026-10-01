@@ -102,9 +102,27 @@ def people_named(phrase: str, world) -> str:
     low = " ".join(str(phrase).lower().split())
     for pid, name in sorted(named.items(), key=lambda kv: -len(kv[1])):
         n = " ".join(str(name).lower().split())
-        if n and re.search(rf"(?<![\w-]){re.escape(n)}(?![\w-])", low):
+        if n and re.search(rf"(?<![\w-])(?:{'|'.join(map(re.escape, _plurals(n)))})"
+                           rf"(?![\w-])", low):
             return str(pid)
     return ""
+
+
+def _plurals(name: str) -> list[str]:
+    """A people's name and its English plurals: "any elves here?", "two dwarves", "the
+    humans". The question the F2 grant answers is nearly always asked in the plural, and
+    the singular-only match read "any human women" and missed "any elves"."""
+    out = [name]
+    if name.endswith(("folk", "kin", "people")):
+        return out
+    out.append(name + "s")
+    if name.endswith(("s", "x", "z", "ch", "sh")):
+        out.append(name + "es")
+    if name.endswith("f"):
+        out.append(name[:-1] + "ves")
+    if name.endswith("man") and not name.endswith("human"):
+        out.append(name[:-3] + "men")
+    return out
 
 
 def people_drawn(world, location_id: str | None) -> str:
@@ -117,17 +135,9 @@ def people_drawn(world, location_id: str | None) -> str:
         return ""
     from . import names as names_mod
 
-    pid = names_mod.people_of(world, location_id)
-    play = getattr(world, "play", None) or {}
-    races = [r for r in ((play.get("races") if isinstance(play, dict) else None) or [])
-             if isinstance(r, dict)]
-    if pid and any(r.get("people_id") == pid for r in races):
-        return str(pid)
-    known = names_mod.peoples(world)
-    fallback = next((r for r in races if r.get("people_id") in known), None)
-    if fallback is not None:
-        return str(fallback.get("people_id") or "")
-    return str(pid or "")
+    # The one pick, shared with the face (`names.face_people`); this copy of it used to be
+    # written out here by hand, which is how two answers to one question begin.
+    return names_mod.face_people(world, location_id)[0]
 
 
 def people_name(world, people_id: str) -> str:
@@ -215,24 +225,212 @@ def honour_spawn(scene, world, made: list[dict], name: str) -> None:
             continue
         apply(actor, said)
         if world is not None and pid:
-            from . import lives, names as names_mod
+            from . import lives
 
-            actor.world_people_id = pid
-            actor.heritage = people_name(world, pid) or actor.heritage
-            if said["age"] or said["people_id"]:
-                life = lives.roll(f"{location}|{ref}|spawn", phrase=roll_phrase(name, said))
-                actor.appearance = names_mod.appearance_for(world, location, people_id=pid,
-                                                            ref=ref, own=life.face)
-            if said["people_id"]:
-                taken = [a.true_name for a in scene.actors.values()
-                         if getattr(a, "true_name", "") and a is not actor]
-                taken += [a.name for a in scene.actors.values() if a is not actor]
-                actor.true_name = names_mod.true_name(world, location, ref, taken,
-                                                      people_id=pid)
+            redraw = bool(said["age"] or said["people_id"])
+            own = (lives.roll(f"{location}|{ref}|spawn",
+                              phrase=roll_phrase(name, said)).face if redraw else None)
+            # The one door (`settle_people`), shared with the keeper, embody and
+            # speaker doors. A spawn takes no grant (F2): a spawn is a creature or a foe
+            # arriving, and a promise of "a human woman behind the curtain" is not
+            # kept by the bandits that come through the door.
+            settle_people(scene, world, actor, words=name, own=own, redraw_face=redraw,
+                          template=str(getattr(actor, "from_template", "") or ""),
+                          take_grant=False)
         if said["gender"]:
             row["pronouns"] = str(actor.pronouns)
         if said["gender"] or said["age"] or said["people_id"]:
             row["from_words"] = dict(said)
+
+
+def is_a_person(template: str) -> bool:
+    """Whether a stat block is somebody with a people: the engine's own answer
+    (`engine._a_person`: a humanoid, or a hand-made civilian block), asked here so every
+    minting door asks the same question. The Clockwork Spy of the 2026-09-30 playtest was a
+    construct carrying `race: "human"`; it gets no people at all."""
+    if not template:
+        return True
+    from .engine import _a_person
+
+    return _a_person(template)
+
+
+def settle_people(scene, world, actor, *, words: str = "", template: str = "",
+                  place: str | None = None, own: str | None = None,
+                  redraw_face: bool = False, rec: dict | None = None,
+                  take_grant: bool = True, keep_name: bool = False) -> str:
+    """Record which of the world's peoples a person just minted belongs to. Every minting
+    door comes through here: the keeper (`keepers._mint`), the body for a described
+    person (`population.embody`, behind introduce, the finder and the speaker made real)
+    and the named spawn (`honour_spawn`). Returns the people id, or "".
+
+    Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Sam's save were
+    `race: "human"` — the `Actor` default — with a Ratfolk face and no `world_people_id`,
+    because `names.appearance_for` chose the people and only its text was kept. Which
+    people, in order:
+
+      1. the one the person's own words name ("the elf at the bar");
+      2. a grant at this place (owner ruling F2, `rules/granted.py`): "any human women
+         here?" — "There is one" binds the next person minted there;
+      3. the one whose body the town's face is drawn from (`people_drawn`).
+
+    The rules `race` is left alone, on purpose: it is the stat block's rules term and the
+    world's people is `heritage` / `world_people_id`, the sheet's own split (memory: "the
+    world owns its own races" — a world's people is never checked against the rulebook
+    creature it shares a name with). A person who is not a person (`is_a_person`) gets no
+    people and nothing is written.
+
+    The face is drawn again when asked (`redraw_face`), when there is none, or when the
+    one held shows another people; the true name is drawn again from the people's own pool
+    when the people came from the words or a grant (the town's default needs no redraw),
+    unless `keep_name` — a keeper whose name the world marks as publicly known.
+    """
+    if world is None or actor is None or not is_a_person(template):
+        return ""
+    location = str(getattr(scene, "location_id", "") or "")
+    at = str(place if place is not None else (getattr(scene, "at", "") or ""))
+    said = from_words(words, world, location) if words else {
+        "gender": "", "pronouns": "", "age": "", "minor": False, "people_id": ""}
+    pid, kind, granted = said["people_id"], "", None
+    if not pid and take_grant and scene is not None:
+        from . import granted as granted_mod
+
+        granted = granted_mod.claim(scene, at, gender=said["gender"],
+                                    ref=str(getattr(actor, "ref", "") or ""), rec=rec)
+        if granted is not None:
+            pid = str(granted.get("people_id") or "")
+            kind = "" if pid else str(granted.get("kind") or "")
+            if granted.get("gender"):
+                apply(actor, {"gender": granted["gender"],
+                              "pronouns": PRONOUNS.get(granted["gender"], "")})
+    chosen = bool(pid or kind)
+    if not pid and not kind:
+        pid = people_drawn(world, location)
+    if not pid and not kind:
+        return ""
+    from . import faces as faces_mod, names as names_mod
+
+    ref = str(getattr(actor, "ref", "") or "")
+    actor.world_people_id = pid or None
+    heritage = people_name(world, pid) if pid else kind[:1].upper() + kind[1:]
+    actor.heritage = heritage or actor.heritage
+    shown = faces_mod.people_of(str(getattr(actor, "appearance", "") or ""))
+    if redraw_face or chosen or not getattr(actor, "appearance", "") \
+            or (shown and heritage and shown.lower() != heritage.lower()):
+        face = (names_mod.appearance_for(world, location, people_id=pid, ref=ref, own=own)
+                if pid else names_mod.appearance_of_kind(kind, ref, location, own=own))
+        if face:
+            actor.appearance = face
+    if chosen and pid and not keep_name:
+        everyone = list((getattr(scene, "people", None) or {}).values())
+        taken = [a.true_name for a in everyone
+                 if getattr(a, "true_name", "") and a is not actor]
+        taken += [a.name for a in everyone if a is not actor]
+        drawn = names_mod.true_name(world, location, ref, taken, people_id=pid)
+        if drawn:
+            actor.true_name = drawn
+    return pid or kind
+
+
+def resident_people(world, entity_id: str) -> str:
+    """The people a world CHARACTER's own Identity names ("… is a Half-Orc guildmaster"),
+    or "" — the same reading `names.people_of` makes of a town's residents."""
+    if world is None or not entity_id:
+        return ""
+    try:
+        ent = world.get(entity_id)
+    except Exception:  # noqa: BLE001 — a world that cannot answer names nobody
+        ent = None
+    if ent is None:
+        return ""
+    text = " ".join(str(p) for s in (getattr(ent, "sections", None) or [])
+                    for p in (s.get("paragraphs") or [])
+                    if str(s.get("title", "")).lower() == "identity")
+    return people_named(text, world)
+
+
+_REF_SHAPED = re.compile(r"[a-z]\d+|new[ _-]?\d+", re.I)
+# Stat blocks that say nothing about who somebody is: the hand-made civilian floor.
+_GENERIC_BLOCKS = frozenset({"guildhand", "commoner"})
+
+
+def heal_ref_names(scene) -> list[tuple[str, str, str]]:
+    """On load: a person an older build NAMED with a ref gets a descriptor back. Returns
+    [(ref, old name, new name)].
+
+    Measured on Sam's save (2026-09-30, item 7): `introduce {who: "c8"}` minted c9 named
+    "c8", and the Here list printed "c8" as a person — a ref on the page, which the owner
+    ruled the player never sees (2026-09-28). `Engine._op_introduce` stops new ones; this
+    repairs the ones already saved. The descriptor, first that holds:
+
+      1. their population record's own words, when those are not the ref too;
+      2. the work their record rolled ("a ratcatcher" — c9's);
+      3. their stat block's name, unless it is the generic civilian floor;
+      4. "a stranger".
+
+    The record's phrase is rewritten with them, so the finder answers to the new words."""
+    out: list[tuple[str, str, str]] = []
+    pop = getattr(scene, "population", None) or {}
+    for ref, actor in (getattr(scene, "people", None) or {}).items():
+        old = str(getattr(actor, "name", "") or "").strip()
+        if getattr(actor, "is_pc", False) or not _REF_SHAPED.fullmatch(old):
+            continue
+        rec = next((r for r in pop.values() if r.get("ref") == ref), None)
+        phrase = str((rec or {}).get("phrase") or "").strip()
+        work = str(((rec or {}).get("life") or {}).get("work_name") or "").strip()
+        block = str(getattr(actor, "from_template", "") or "").strip().lower()
+        if phrase and not _REF_SHAPED.fullmatch(phrase):
+            new = phrase
+        elif work:
+            new = ("an " if work[:1].lower() in "aeiou" else "a ") + work.lower()
+        elif block and block not in _GENERIC_BLOCKS:
+            noun = block.replace("-", " ")
+            new = ("an " if noun[:1] in "aeiou" else "a ") + noun
+        else:
+            new = "a stranger"
+        actor.name = new
+        if rec is not None and _REF_SHAPED.fullmatch(phrase or old):
+            rec["phrase"] = new
+        for entry in getattr(scene, "cast", None) or []:
+            if entry.get("ref") == ref and _REF_SHAPED.fullmatch(str(entry.get("who") or "")):
+                entry["who"] = new
+        out.append((ref, old, new))
+    return out
+
+
+def record_peoples(scene, world) -> list[str]:
+    """On load: everybody an older build minted with a people's face and no people gets
+    the people their face already shows. Returns the refs recorded.
+
+    The face is the evidence and nothing is redrawn: "Ratfolk: Small, rodent-featured…"
+    is what the player was shown, so the person IS Ratfolk and the record now says so.
+    Measured on Sam's save (2026-09-30): 8 of 8 NPCs carried such a face and no
+    `world_people_id`; the construct (the Clockwork Spy) has no face and gets nothing."""
+    if world is None:
+        return []
+    from . import faces as faces_mod, names as names_mod
+
+    by_name: dict[str, str] = {}
+    for pid, name in names_mod.peoples(world).items():
+        by_name.setdefault(str(name).lower(), str(pid))
+    play = getattr(world, "play", None) or {}
+    for r in (play.get("races") if isinstance(play, dict) else None) or []:
+        if isinstance(r, dict) and r.get("people_id") and r.get("name"):
+            by_name.setdefault(str(r["name"]).lower(), str(r["people_id"]))
+    done = []
+    for ref, actor in (getattr(scene, "people", None) or {}).items():
+        if getattr(actor, "is_pc", False) or getattr(actor, "world_people_id", None):
+            continue
+        if not is_a_person(str(getattr(actor, "from_template", "") or "")):
+            continue
+        shown = faces_mod.people_of(str(getattr(actor, "appearance", "") or ""))
+        pid = by_name.get(shown.lower()) if shown else None
+        if not pid:
+            continue
+        actor.world_people_id = pid
+        actor.heritage = people_name(world, pid) or shown
+        done.append(ref)
+    return done
 
 
 def apply(actor, said: dict) -> bool:

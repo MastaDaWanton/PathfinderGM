@@ -13450,6 +13450,40 @@ class Engine:
         from . import population
 
         who = intent.params["who"]
+        # A ref is not a description: it names one person, and introducing them binds to
+        # them. Measured on the 2026-09-30 playtest (item 7): `introduce {who: "c8"}`, the
+        # barkeep's own ref, minted c9 NAMED "c8", and the tells read "In the scene: the c8
+        # (c9)" and then "Left behind: the c8". A ref-shaped `who` that names nobody here is
+        # refused with both fixes named, never turned into a person called "c12".
+        m = re.fullmatch(r"\W*(pc|c\d+)\W*|.*?\((pc|c\d+)\)\W*", str(who or "").strip(),
+                         re.I)
+        if m:
+            ref = (m.group(1) or m.group(2)).lower()
+            actor = self.scene.actors.get(ref)
+            if actor is None or actor.is_pc:
+                away = self._elsewhere(ref)
+                here = ", ".join(f"{r} ({a.name})" for r, a in self.scene.actors.items()
+                                 if not a.is_pc) or "nobody"
+                return self._refuse(
+                    intent,
+                    f"introduce: {who!r} is a ref, and "
+                    + (away if away else
+                       ("it is the player's own." if actor is not None else
+                        f"nobody here is {ref}."))
+                    + f" Somebody already here is aimed at by their own ref, with no "
+                      f"introduce — here: {here}. Somebody new is introduced by the few "
+                      f"words the scene will call them: 'old woman mending nets'.")
+            bound = {}
+            placeholders = list(intent.params.get("placeholders") or [])
+            if placeholders:
+                bound[placeholders[0]] = actor.ref
+            return Outcome(
+                intent_id=intent.id, op="introduce",
+                effects=[{"kind": "introduce", "actors": [], "bound": bound,
+                          "who": actor.name, "how": "already_here"}],
+                tell=f"In the scene: {actor.name} ({actor.ref}).",
+                because=intent.because,
+            )
         # "I ask her name." came back as `introduce who="her name"` (live, 2026-09-27).
         if not population.names_a_person(who):
             return self._refuse(
@@ -13505,15 +13539,35 @@ class Engine:
         or population record answers to every word (`population.find` does both)."""
         from . import population
 
+        from . import person_words
+
         found = population.find(self.scene, who, rings=(population.HERE,), log_miss=False)
         if found.scope == population.HERE:
             ref = found.people[0].get("ref")
             if ref and ref in self.scene.actors:
                 return self.scene.actors[ref]
+            # A glimpse here with no body is who the words mean, before any looser fit
+            # to somebody standing here: "the woman in the back", with "a human woman"
+            # promised here (F2), bound to the barkeep — an ungendered descriptor, "the
+            # one behind the bar", fits any gendered word (2026-09-30, building F2).
+            if not ref:
+                return None
         words = population._tokens(who)
-        fits = [a for a in self.scene.actors.values()
-                if not a.is_pc and words
-                and population._fits(words, set(population._tokens(a.name)))]
+        # A gendered word the person's own gender contradicts is not them: "the woman"
+        # never means a barkeep the page has made a man.
+        # And at least one word must actually be in their name: `_fits` lets a gendered
+        # word pass a name that says no gender, so "the woman in the back" (whose only
+        # word left after the stop list is "woman") fitted "the one behind the bar".
+        said = person_words.gender_of(person_words._words(who))
+        fits = []
+        for a in self.scene.actors.values():
+            if a.is_pc or not words:
+                continue
+            if said and str(getattr(a, "gender", "") or "") not in ("", said):
+                continue
+            bag = set(population._tokens(a.name))
+            if population._fits(words, bag) and bag & set(words):
+                fits.append(a)
         return fits[0] if len(fits) == 1 else None
 
     def _bring_in(self, template: str, count: int = 1, name: str | None = None,

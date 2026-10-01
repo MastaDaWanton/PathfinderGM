@@ -83,8 +83,9 @@ def test_every_road_head_a_draw_can_reach_is_outside(worlds):
 @pytest.mark.parametrize("seed", [0, 1, 4, 7])
 def test_the_caravan_attack_is_a_real_encounter_near_the_party_level(worlds, tmp_path, seed):
     """The owner's caravan under attack is a fight the engine holds: the encounter open,
-    the attackers on their own side, every one from a stat block (the bestiary by the road
-    head's own biome, else bandits from the codex — never a number a model wrote), the
+    the attackers on their own side, every one from a stat block (bandits from the codex
+    since 2026-09-30; until then the bestiary by the road head's own biome — never a number
+    a model wrote), the
     encounter's CR within one of the party's level by the Core Rulebook's XP table, and
     the caravan's own people on the board as bystanders in no side. Measured on the first
     draws (2026-09-29): a giant solifugid, two vultures, two adolescent wolves, two
@@ -107,16 +108,13 @@ def test_the_caravan_attack_is_a_real_encounter_near_the_party_level(worlds, tmp
         assert foe.ref in scene.positions
     level = int(pc.level)
     assert level - 1 <= openings.encounter_cr(total) <= level + 1, (total, level)
-    ground = places.terrain_of(scene.at)
-    land = openings.foes_from_the_land(ground, level, 2,
-                                       openings.rng_for(scene.story_seed, "foes:raiders"))
-    if land is not None:
-        assert scene.people[foes[0]].from_template == land[0]["id"]
-        assert len(foes) == land[1]
-        # A beast is not a person: no given name and no people's face (the first draw's
-        # scorpion wore a Korvu's).
-        assert all(not scene.people[r].appearance and not scene.people[r].true_name
-                   for r in foes)
+    # The raiders are people since 2026-09-30 (`from: outlaws`): the land sent Pangrella's
+    # caravan two ponies as "raiders", and the prose put riders on them. Every raider is a
+    # humanoid stat block with a person's face (tests/test_road_raiders_are_people.py).
+    for ref in foes:
+        row = bestiary.raw_block(scene.people[ref].from_template) or {}
+        assert str(row.get("creature_type") or "humanoid") == "humanoid", row.get("id")
+        assert scene.people[ref].appearance
     in_sides = {r for refs in scene.sides.values() for r in refs}
     drovers = [a for a in scene.people.values() if a.name.endswith("drover")]
     assert len(drovers) == 2

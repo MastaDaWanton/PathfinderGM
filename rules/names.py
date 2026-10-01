@@ -137,22 +137,56 @@ def people_name(world, people_id: str | None) -> str:
     return peoples(world).get(people_id or "", "") if world is not None else ""
 
 
+def face_people(world, location_id: str | None,
+                people_id: str | None = None) -> tuple[str, dict | None]:
+    """(people id, `play.races` row) whose body a person made here is drawn with — the
+    ONE answer, read by `appearance_for` for the face and by `person_words.people_drawn`
+    for the record, so a body and its people cannot disagree.
+
+    Measured on the 2026-09-30 playtest (item 10): 8 of 8 NPCs in Sam's save carried a
+    Ratfolk face and `race: "human"` with no people at all, because this function's pick
+    was kept as text and thrown away. The people asked for when it has a body; else the
+    town's people; else the first body that belongs to a PEOPLE; ("", None) for none.
+    A people asked for by name that the world ships no body for is returned with no row:
+    its name is still who they are, and another people's body would be a lie about them.
+    """
+    if world is None:
+        return "", None
+    play = getattr(world, "play", None) or {}
+    races = [r for r in ((play.get("races") if isinstance(play, dict) else None) or [])
+             if isinstance(r, dict)]
+    if people_id:
+        row = next((r for r in races if r.get("people_id") == people_id), None)
+        return str(people_id), row
+    pid = people_of(world, location_id)
+    row = next((r for r in races if r.get("people_id") == pid), None) if pid else None
+    if row is None:
+        known = peoples(world)
+        row = next((r for r in races if r.get("people_id") in known), None)
+    if row is not None:
+        return str(row.get("people_id") or ""), row
+    return str(pid or ""), None
+
+
 def appearance_for(world, location_id: str | None, people_id: str | None = None,
                    ref: str = "", own: str | None = None) -> str:
     """What a stranger would see of a person of this people: the export's own body
-    sentences for the people, one or two of them, in the people's name."""
+    sentences for the people, one or two of them, in the people's name.
+
+    Which people is `face_people`'s answer. A people named outright that ships no body
+    (Pangrella's Nirkor) gets its name and the person's own details, never the first body
+    on the list — that fallback is what put a Korvu face on whoever it was asked about."""
     if world is None:
         return ""
-    pid = people_id or people_of(world, location_id)
-    play = getattr(world, "play", None) or {}
-    races = play.get("races") if isinstance(play, dict) else None
-    race = next((r for r in (races or []) if isinstance(r, dict)
-                 and r.get("people_id") == pid), None)
-    if race is None and races:
-        race = next((r for r in races if isinstance(r, dict)
-                     and r.get("people_id") in peoples(world)), None)
+    pid, race = face_people(world, location_id, people_id)
     if race is None:
-        return ""
+        named = people_name(world, pid) if pid else ""
+        if not named or not ref:
+            return ""
+        from . import faces as faces_mod
+
+        own = own if own is not None else faces_mod.details_for("", ref, location_id)
+        return f"{named}: {own}" if own else ""
     body = [str(b).strip() for b in (race.get("body") or []) if str(b).strip()]
     if not body:
         return ""
@@ -173,6 +207,20 @@ def appearance_for(world, location_id: str | None, people_id: str | None = None,
         lines.append(own)
     named = str(race.get("name") or people_name(world, pid) or "").strip()
     return (f"{named}: " if named else "") + " ".join(lines)
+
+
+def appearance_of_kind(word: str, ref: str, location_id: str | None = None,
+                       own: str | None = None) -> str:
+    """A face for a person of a kind the world ships no people for — "human" granted in a
+    world with no Human (F2): the kind's own word and the person's own details, and no
+    people's body borrowed for it."""
+    word = " ".join(str(word or "").split())
+    if not word or not ref:
+        return ""
+    from . import faces as faces_mod
+
+    own = own if own is not None else faces_mod.details_for("", ref, location_id)
+    return f"{word[:1].upper()}{word[1:]}: {own}" if own else ""
 
 
 def resident_appearance(world, entity_id: str | None) -> str:

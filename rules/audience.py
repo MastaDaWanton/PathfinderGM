@@ -119,7 +119,11 @@ def addressed(scene, master, player_text: str = "", reading=None) -> bool:
     text = str(player_text or "")
     if re.search(r"\b(?:master|clerk) of the market\b|\bmarket(?:'s)? master\b", text, re.I):
         return True
-    names = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", str(master.name or ""))}
+    # The words of their NAME, which is a proper name only once given: since owner ruling
+    # F1 (2026-09-30) the master goes by "the master of the market" until introduced, and
+    # every word of that — "the" among them — matched any sentence at all. The office is
+    # the regex above; this is the given name.
+    names = {w.lower() for w in re.findall(r"[A-Z][A-Za-z]{2,}", str(master.name or ""))}
     said = {w.lower() for w in re.findall(r"[A-Za-z]{3,}", text)}
     return bool(names and names & said)
 

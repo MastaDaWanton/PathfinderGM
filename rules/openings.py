@@ -84,7 +84,14 @@ COUNTS = {"one": 1, "two": 2, "three": 3, "a few": 3}
 # around the party, `ontheway.road`'s and `gathering.creature_for`'s door exactly — with
 # the words as the floor for ground the book stocks nothing for (design C §4.2: "or
 # `bestiary.search(biome, window)` on a road, as `ontheway.road` does").
-FOES_FROM = ("", "land")
+#
+# `outlaws` is people who rob the road: the codex by the step's words (bandits, brigands)
+# at the same budget as the land's draw, wearing the world's own outlaws' people when the
+# world has one (`outlaw_people`), else the local people's. Added 2026-09-30 for the
+# deferred playtest row: in Pangrella the caravan's "raiders" drawn `from: land` were two
+# PONIES (an animal, CR 1/2, steppe), side "raiders", and the prose tried to put riders on
+# them. A caravan is held up by people; the beasts of the land stay what `land` draws.
+FOES_FROM = ("", "land", "outlaws")
 
 # --- what comes at a caravan (a `fight` step `from: land`) ------------------------------------
 #
@@ -374,8 +381,10 @@ def validate(doc: dict) -> list[str]:
             if str(step.get("count") or "one") not in COUNTS:
                 p.append(f"{w}: count in words: {', '.join(COUNTS)}.")
             if verb == "fight" and str(step.get("from") or "") not in FOES_FROM:
-                p.append(f"{w}: from is empty (the words, through the codex) or `land` "
-                         f"(what the ground holds, from the bestiary).")
+                p.append(f"{w}: from is empty (the words, through the codex), `land` "
+                         f"(what the ground holds, from the bestiary) or `outlaws` (people "
+                         f"who rob the road: the codex by the words, the world's own "
+                         f"outlaws' people).")
             declared.add(slot)
         elif verb == "wound":
             if slot not in declared:
@@ -857,6 +866,32 @@ def foes_from_the_land(biome: str, level: int, most: int,
     return None
 
 
+_OUTLAW_WORDS = re.compile(
+    r"\b(?:raid(?:er|ers|ing|s)?|bandit(?:s|ry)?|brigand(?:s|age)?|outlaws?|outlawry|"
+    r"reavers?|marauders?|highway(?:man|men)|robbers?|cutthroats?)\b", re.I)
+
+
+def outlaw_people(world, rng: random.Random) -> str:
+    """The PEOPLE id of the world's own road-robbers, or "".
+
+    A people whose own facts say it raids — Pangrella's Nirkor, "Status: Nomadic
+    herders, occasional raiders" — is who holds up a caravan in that world. The world's
+    words, never this app's opinion of a people; and none (Aurvantis, the synthetic world
+    — measured 2026-09-30, 0 of 16 and 0 of 2 peoples) means the local people, as for
+    anybody else the start brings in. Seeded from the story, like the rest of the start."""
+    if world is None:
+        return ""
+    try:
+        ents = [e for e in world.entities.values()
+                if str(getattr(e, "kind", "")).upper() == "PEOPLE"]
+    except Exception:  # noqa: BLE001 — a world that cannot answer has no outlaws
+        return ""
+    found = sorted(str(e.id) for e in ents
+                   if any(_OUTLAW_WORDS.search(str(v))
+                          for v in (getattr(e, "facts", None) or {}).values()))
+    return found[rng.randrange(len(found))] if found else ""
+
+
 def _within_budget(template: str, count: int, level: int) -> int:
     """How many of a codex block the opening fight can hold: as many as the document
     asks while the encounter stays within one CR of the party's own (`encounter_cr`)."""
@@ -1027,13 +1062,28 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
         speak_for(scene, eid)
         rec = population.note(scene, label, body=actor.appearance)
         rec["ref"] = actor.ref
+        # A world character's people is the one their own Identity names; their face is
+        # their own Appearance and is not touched (item 10, 2026-09-30).
+        from . import person_words
+
+        pid = person_words.resident_people(world, eid)
+        if pid:
+            actor.world_people_id = pid
+            actor.heritage = person_words.people_name(world, pid) or actor.heritage
     else:
+        from . import person_words
+
         got = npcs.choose(words, level) or {}
-        actor = instantiate(str(got.get("id") or "guildhand"), scene=scene, name=label)
+        template = str(got.get("id") or "guildhand")
+        actor = instantiate(template, scene=scene, name=label)
         rec = population.note(scene, label,
                               body=names_mod.appearance_for(world, scene.location_id, own=""))
         actor.appearance = names_mod.appearance_for(world, scene.location_id,
                                                     ref=actor.ref, own=rec["life"]["face"])
+        # The people the face was drawn from, recorded (item 10: 8 of 8 NPCs had none).
+        person_words.settle_people(scene, world, actor, words=label, template=template,
+                                   own=rec["life"]["face"], take_grant=False,
+                                   keep_name=True)
         scene.arrive(actor, zone=zone, source=f"start:{doc['id']}")
         rec["ref"] = actor.ref
     if look:
@@ -1136,7 +1186,7 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
             if not template:
                 got = npcs.choose([str(w) for w in step.get("words") or ()], level) or {}
                 template = str(got.get("id") or "thug")
-                if str(step.get("from") or "") == "land":
+                if str(step.get("from") or "") in ("land", "outlaws"):
                     # The same budget holds for people as for beasts: the codex answers
                     # the words at CR level-1 (`npcs.target_cr`), so two of them are a
                     # CR level+1 fight — one more than the road's own and within the
@@ -1149,6 +1199,19 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                            "zone": str(step.get("zone") or "near")}}])
             refs = [a["ref"] for o in res.outcomes for e in (o.effects or [])
                     if e.get("kind") == "spawn" for a in e.get("actors") or []]
+            if refs and str(step.get("from") or "") == "outlaws":
+                # The world's own outlaws, when it names a people that raids: Pangrella's
+                # Nirkor ("Nomadic herders, occasional raiders"). Their people, their face
+                # and their pool's names; the codex keeps the numbers.
+                from . import person_words
+
+                outlaws = outlaw_people(world, rng_for(story_seed, f"outlaws:{slot}"))
+                if outlaws:
+                    who = person_words.people_name(world, outlaws)
+                    for r in refs:
+                        person_words.settle_people(
+                            scene, world, scene.people[r], words=f"{who} {label}",
+                            template=template, take_grant=False)
             if refs:
                 slots[slot] = refs[0]
                 foes.extend(refs)

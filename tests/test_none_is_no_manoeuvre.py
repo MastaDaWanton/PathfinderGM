@@ -133,6 +133,8 @@ def test_the_recorded_turn_stands_on_the_first_reply(n, tmp_path, monkeypatch):
     # `judgement.own_words_only`) such a say is dropped, not booked as the player's.
     assert [i.op for i in plan.intents] == ["attack", "provoke"]
     attack, _ = plan.intents
-    assert scene.actors["c2"].name == "Borin Lyraxys"
+    # The barkeep, by the name the world holds for him; the panel shows "the one behind
+    # the bar" until he gives it (owner ruling F1, 2026-09-30).
+    assert scene.actors["c2"].true_name == "Borin Lyraxys"
     assert attack.target == "c2"
     assert "weapon" not in attack.params and "manoeuvre" not in attack.params

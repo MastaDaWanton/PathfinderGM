@@ -168,5 +168,7 @@ def test_the_recorded_punch_makes_nobody_called_new(tmp_path, monkeypatch):
     assert all(op != "spawn" for op, _, _ in ops), ops
     attacks = [t for op, _, t in ops if op == "attack"]
     assert attacks == ["c2"], ops
-    assert scene.actors["c2"].name == "Borin Lyraxys"
+    # The barkeep, by the name the world holds for them; on the panel they are "the one
+    # behind the bar" until they give it (owner ruling F1, 2026-09-30).
+    assert scene.actors["c2"].true_name == "Borin Lyraxys"
     assert not any("repaired" in r for r in plan.rejections), plan.rejections
