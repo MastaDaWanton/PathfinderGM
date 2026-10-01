@@ -18,6 +18,8 @@ intent looked identical in every test except that one, and that one is the point
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from rules import reactions
@@ -289,6 +291,105 @@ def test_every_trigger_the_code_uses_is_a_declared_one():
     their ability never went off."""
     for reaction in reactions.reactions_for(load_pc("fixtures/pc-kesst.json")):
         assert reaction.trigger in reactions.TRIGGERS
+
+
+# --- combat manoeuvres (CRB, Combat Maneuvers: aonprd.com/Rules.aspx?ID=188) ---------------
+
+def run_maneuver(engine, actor="pc", target="c1", man="trip", seed=None):
+    if seed is not None:
+        engine.dice = Dice(seed=seed)
+    res = engine.run(engine.validate([
+        {"op": "attack", "actor": actor, "target": target, "because": "t",
+         "params": {"manoeuvre": man}, "visibility": "hidden"}]))
+    return finish(engine, res)
+
+
+def test_a_manoeuvre_without_its_improved_feat_provokes_from_its_target():
+    """"Unless otherwise noted, performing a combat maneuver provokes an attack of
+    opportunity from the target of the maneuver." Found by the table mocks
+    (docs/fix-interfaces.md, engine gaps (1)): all ten rows of `MANEUVERS` carried
+    `"provokes": True` and nothing read the key, so a trip was the one thing in a fight
+    that cost nothing to try. Now the thug swings first, off his one allowance, and the
+    trip is rolled after."""
+    s, e = board()
+    res = run_maneuver(e, seed=1)
+    assert [(o.op, o.status) for o in res.outcomes] == [("attack", "resolved")] * 2
+    assert "the thug" in res.outcomes[0].tell.split("Kesst")[0]
+    assert s.reacted == {"c1:attack_of_opportunity": 1}
+
+
+@pytest.mark.parametrize("man,feat", [("trip", "Improved Trip"), ("disarm", "Improved Disarm"),
+                                      ("bull rush", "Improved Bull Rush"),
+                                      ("dirty trick", "Improved Dirty Trick")])
+def test_the_improved_feat_waives_it(man, feat):
+    """"You do not provoke an attack of opportunity when performing a trip combat
+    maneuver" (Improved Trip), and its nine siblings. The waiver is a tag on the feat's
+    document (`maneuver.unprovoking.<manoeuvre>`, the `not_yet` line it replaces), asked
+    with `has_state`, never the feat's name."""
+    s, e = board()
+    pc = s.actors["pc"]
+    pc.feats = list(pc.feats) + [feat]
+    assert pc.has_state(reactions.unprovoking_tag(man))
+    res = run_maneuver(e, man=man, seed=1)
+    assert [o.op for o in res.outcomes] == ["attack"], [o.tell for o in res.outcomes]
+    assert s.reacted == {}
+
+
+def test_only_the_target_swings_not_everyone_who_threatens():
+    """A manoeuvre is not one of Table 7-2's actions that provoke from everyone in reach:
+    the rule names "the target of the maneuver". A second thug beside the player, who is
+    not being tripped, keeps his allowance."""
+    s, e = board()
+    s.add(instantiate("thug", scene=s, name="the other thug"), at=(4, 5))
+    s.sides["them"].append("c2")
+    s.initiative.append(("c2", 5))
+    res = run_maneuver(e, seed=1)
+    assert len(res.outcomes) == 2
+    assert s.reacted == {"c1:attack_of_opportunity": 1}
+
+
+def test_a_target_who_cannot_swing_takes_nothing():
+    s, e = board()
+    s.actors["c1"].add_condition("nauseated", source="bad meat")
+    res = run_maneuver(e, seed=1)
+    assert [o.op for o in res.outcomes] == ["attack"]
+
+
+def test_the_damage_of_the_provoked_blow_is_a_penalty_on_the_manoeuvre():
+    """"If you are hit by the target, you take the damage normally and apply that amount
+    as a penalty to the attack roll to perform the maneuver." Seed 0: the thug's sap
+    lands for 6, and the trip's CMB carries -6 "struck while trying it"; seed 1 misses
+    and the CMB carries nothing."""
+    s, e = board()
+    res = run_maneuver(e, seed=0)
+    blow = res.outcomes[0].tell
+    taken = int(re.search(r"for (\d+)", blow).group(1))
+    mods = [m for r in res.outcomes[1].as_dict()["rolls"] for m in r.get("modifiers") or []]
+    assert {"value": -taken, "source": "struck while trying it"} in mods, mods
+    s, e = board()
+    res = run_maneuver(e, seed=1)
+    mods = [m for r in res.outcomes[1].as_dict()["rolls"] for m in r.get("modifiers") or []]
+    assert not any(m["source"] == "struck while trying it" for m in mods)
+
+
+def test_a_provoked_blow_that_drops_the_attacker_stops_the_manoeuvre():
+    """The order the whole module turns on, for a manoeuvre: seed 5's critical puts the
+    player down before the trip, and the trip is never rolled."""
+    s, e = board()
+    res = run_maneuver(e, seed=5)
+    assert res.outcomes[1].status == "prevented"
+    assert "never swings" in res.outcomes[1].tell
+
+
+def test_a_model_cannot_write_the_penalty_baseline():
+    """`struck_from` is the engine's, written on the spliced intent; the parser refuses it
+    from a plan, so no model sets the number a manoeuvre is penalised from."""
+    from rules.intents import IntentError
+
+    s, e = board()
+    with pytest.raises(IntentError):
+        e.validate([{"op": "attack", "actor": "pc", "target": "c1", "because": "t",
+                     "params": {"manoeuvre": "trip", "struck_from": 99}}])
 
 
 def test_the_allowance_survives_a_save(tmp_path, settings):

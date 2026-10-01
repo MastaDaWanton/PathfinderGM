@@ -3015,9 +3015,11 @@ class Engine:
         roll without a single line of special handling.
 
         Movement provokes, and so does picking a thing up off the ground (1e Table 7-2,
-        "Pick up an item": a move action, attack of opportunity yes). The shape is a
-        dispatch rather than an `if` because the next triggers (casting in a threatened
-        square, standing up from prone) are the same machinery with a different question.
+        "Pick up an item": a move action, attack of opportunity yes), and since
+        2026-09-30 a combat manoeuvre tried without its Improved feat, from its target
+        (`_provoked_by_maneuver`). The shape is a dispatch rather than an `if` because the
+        next triggers (casting in a threatened square, standing up from prone) are the
+        same machinery with a different question.
 
         Walking out of the fight — a `travel` or `journey` begun mid-encounter — is the
         one trigger this dispatch cannot answer in advance, and does not: the op asks at
@@ -3031,6 +3033,8 @@ class Engine:
             return self._provoked_by_pick_up(raw)
         if raw.get("op") in ("travel", "journey"):
             return []                   # asked by the op itself: `_leaving_the_fight`
+        if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
+            return self._provoked_by_maneuver(raw)
         if raw.get("op") != "move":
             return []
 
@@ -3057,6 +3061,59 @@ class Engine:
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
+
+    def _provoked_by_maneuver(self, raw: dict) -> list[dict]:
+        """The attack of opportunity a combat manoeuvre owes its target, unless the
+        attacker holds the Improved feat (`reactions.provoked_by_maneuver` says who).
+
+        Found by the table mocks (docs/fix-interfaces.md, "Engine gaps the table mocks
+        exposed", (1)): every row of `MANEUVERS` carried `"provokes": True` and nothing
+        read it, so a trip, a grapple or a disarm was the one thing in a fight that cost
+        nothing to try — the safest choice at the table was the riskiest in the book.
+
+        The swing goes in front of the manoeuvre through `_drive` like every other
+        reaction, off the target's one allowance (`_spend_reaction`), and a blow that
+        drops the attacker stops the manoeuvre as it stops any attack ("never swings").
+        And the book's second clause: "If you are hit by the target, you take the damage
+        normally and apply that amount as a penalty to the attack roll to perform the
+        maneuver" (aonprd.com/Rules.aspx?ID=188). What the attacker had before the swing
+        is written into the manoeuvre's params, engine-side (`struck_from`, never a param
+        the model may write: spliced raw intents do not go back through `validate`), and
+        `_resolve_maneuver` takes the difference off the check. A manoeuvre made AS an
+        attack of opportunity (`reaction`) provokes nothing.
+        """
+        params = raw.get("params") or {}
+        if params.get("reaction"):
+            return []
+        actor_ref = raw.get("actor")
+        target = raw.get("target")
+        target_ref = (target[0] if target else None) if isinstance(target, list) else target
+        actor = self.scene.actors.get(actor_ref or "")
+        if actor is None or not target_ref:
+            return []
+        out: list[dict] = []
+        for watcher, reaction in reactions.provoked_by_maneuver(
+                self.scene, actor_ref, target_ref, str(params["manoeuvre"])):
+            if not self._spend_reaction(watcher, reaction.budget):
+                continue
+            out.append({
+                "op": reaction.op, "actor": watcher, "target": actor_ref,
+                "because": f"{actor.name} tried to {params['manoeuvre']} them without "
+                           f"the training to do it safely",
+                "params": {"full_attack": False, "reaction": reaction.id},
+                "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
+            })
+        if out:
+            raw["params"] = dict(params, struck_from=self._wounds_left(actor))
+        return out
+
+    @staticmethod
+    def _wounds_left(actor) -> int:
+        """What a blow has to get through: hit points and temporary hit points, less the
+        non-lethal already taken. The difference across a swing is the damage it dealt,
+        lethal or not, wherever it landed — what a manoeuvre's provoked blow takes off the
+        manoeuvre's check."""
+        return int(actor.hp or 0) + int(actor.temp_hp or 0) - int(actor.nonlethal or 0)
 
     def _provoked_by_pick_up(self, raw: dict) -> list[dict]:
         """The attacks of opportunity a pick-up from the ground is owed.
@@ -5172,6 +5229,14 @@ class Engine:
         self._ensure_encounter(intent.actor, intent.target)
 
         mods = list(actor.cmb_modifiers(key))
+        # Struck by the target while trying it: "apply that amount as a penalty to the
+        # attack roll to perform the maneuver" (CRB, aonprd.com/Rules.aspx?ID=188). The
+        # wounds before the provoked swing were written by `_provoked_by_maneuver`.
+        before = intent.params.get("struck_from")
+        if before is not None:
+            taken = int(before) - self._wounds_left(actor)
+            if taken > 0:
+                mods.append(Modifier(-taken, "struck while trying it"))
 
         # Attempting to disarm while unarmed is -4; so is grappling without two hands.
         if m.get("unarmed_penalty") and weapon_key == "unarmed":

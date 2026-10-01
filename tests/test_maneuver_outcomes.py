@@ -32,6 +32,17 @@ from rules.intents import IntentError
 from rules.sheet import load_pc
 from rules.tables import MANEUVERS
 
+
+@pytest.fixture(autouse=True)
+def _the_provoked_swing_waived(monkeypatch):
+    """Since 2026-09-30 a manoeuvre tried without its Improved feat provokes its target
+    (tests/test_reactions.py, `reactions.provoked_by_maneuver`). These tests measure what
+    a manoeuvre does to the state from scripted dice; the swing in front of it would spend
+    the script. Waived for this module, as the Improved feat waives it at a table."""
+    from rules import reactions as _reactions
+
+    monkeypatch.setattr(_reactions, "provoked_by_maneuver", lambda *a, **k: [])
+
 PC = "Kesst Vayr"
 THUG = "the thug"
 

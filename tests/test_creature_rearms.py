@@ -30,6 +30,16 @@ from rules.sheet import load_pc
 THUG = "the thug"
 
 
+@pytest.fixture(autouse=True)
+def _the_provoked_swing_waived(monkeypatch):
+    """Since 2026-09-30 a manoeuvre tried without its Improved feat provokes its target
+    (tests/test_reactions.py). The disarm that sets these tests up would spend the thug's
+    one attack of opportunity for the round, and the pick-up these tests measure would
+    then provoke nothing — right at a table, and not what these tests are about. Waived
+    for this module, as Improved Disarm waives it."""
+    monkeypatch.setattr(reactions, "provoked_by_maneuver", lambda *a, **k: [])
+
+
 class _AimedCMB(Dice):
     """Every CMB d20 lands on the face asked for; everything else rolls as usual."""
 

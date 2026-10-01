@@ -28,6 +28,16 @@ from tests._board import face_to_face
 
 
 @pytest.fixture
+def unprovoked(monkeypatch):
+    """A manoeuvre without its Improved feat provokes its target since 2026-09-30
+    (tests/test_reactions.py); the sunder tests below read the sunder's own dice, so the
+    swing in front of it is waived for them, as Improved Sunder waives it."""
+    from rules import reactions
+
+    monkeypatch.setattr(reactions, "provoked_by_maneuver", lambda *a, **k: [])
+
+
+@pytest.fixture
 def market():
     """The player, a bystander merchant, and nobody else — the ring before the man
     in the apron arrives."""
@@ -228,7 +238,7 @@ def test_two_live_foes_and_no_name_hands_the_question_back(market):
 
 # --- 13(a): sunder rolls damage against the item and the tell names its state ---------------
 
-def test_a_sunder_damages_the_item_through_hardness_and_says_what_became_of_it(market):
+def test_a_sunder_damages_the_item_through_hardness_and_says_what_became_of_it(market, unprovoked):
     """Core Rulebook, Sunder: "you deal damage to the item normally. Damage that exceeds
     the object's Hardness is subtracted from its hit points … equal to or less than
     half its total hit points remaining, it gains the broken condition … less than 0
@@ -263,7 +273,7 @@ def test_a_sunder_damages_the_item_through_hardness_and_says_what_became_of_it(m
     assert any(w in out.tell for w in ("unmarked", "dented", "broken", "destroyed"))
 
 
-def test_the_player_rolls_the_cmb_and_then_the_damage_and_neither_twice(market):
+def test_the_player_rolls_the_cmb_and_then_the_damage_and_neither_twice(market, unprovoked):
     thug = instantiate("thug", scene=market, name="the challenger")
     market.add(thug)
     engine = Engine(market, Dice(seed=5))

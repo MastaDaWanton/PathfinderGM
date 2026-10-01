@@ -15,6 +15,18 @@ from rules.sheet import from_dict, load_pc
 from tests._board import face_to_face
 
 
+@pytest.fixture(autouse=True)
+def _the_provoked_swing_waived(monkeypatch):
+    """Since 2026-09-30 a manoeuvre tried without its Improved feat provokes its target
+    (tests/test_reactions.py, `reactions.provoked_by_maneuver`). These tests measure the
+    manoeuvre's own outcome with scripted dice against a flat-footed target; the swing in
+    front of it would spend the script and the target's flat-footedness (the trip's CMD
+    read 15 for 14). Waived for this module, as the Improved feat waives it at a table."""
+    from rules import reactions as _reactions
+
+    monkeypatch.setattr(_reactions, "provoked_by_maneuver", lambda *a, **k: [])
+
+
 @pytest.fixture
 def scene():
     s = Scene(location_id="5bbd0c40345f")

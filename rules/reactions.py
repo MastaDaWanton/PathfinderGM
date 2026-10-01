@@ -45,7 +45,30 @@ TRIGGERS = {
         "A creature in a square this one threatens takes an action the rules say "
         "provokes — picking an item up off the ground."
     ),
+    # "Unless otherwise noted, performing a combat maneuver provokes an attack of
+    # opportunity from the target of the maneuver" (Core Rulebook, Combat Maneuvers,
+    # aonprd.com/Rules.aspx?ID=188); each Improved feat says "you do not provoke an attack
+    # of opportunity when performing" its manoeuvre, and the APG four say the same ("If
+    # you do not have the Improved Dirty Trick feat or a similar ability, attempting a
+    # dirty trick provokes an attack of opportunity from the target of your maneuver").
+    "maneuver": (
+        "A creature this one threatens attempts a combat manoeuvre against it without "
+        "the Improved feat that waives the provocation. Only the TARGET swings."
+    ),
 }
+
+# The tag a feat document grants to say its manoeuvre does not provoke:
+# `maneuver.unprovoking.<manoeuvre, hyphenated>` — `improved-trip` holds
+# `maneuver.unprovoking.trip` (content/feats/mechanics/core.json). A tag rather than a
+# feat name, for the reason `budget_for` gives (stage 8 measured a name match answering
+# for "mythic combat reflexes"), and so a homebrew ability or a monster's racial trait
+# that waives it is a document line, not an engine change.
+UNPROVOKING = "maneuver.unprovoking"
+
+
+def unprovoking_tag(maneuver: str) -> str:
+    """The tag that waives the attack of opportunity for this manoeuvre."""
+    return f"{UNPROVOKING}.{'-'.join(str(maneuver or '').lower().split())}"
 
 
 @dataclass
@@ -76,7 +99,7 @@ def attack_of_opportunity(actor) -> Reaction:
     return Reaction(
         id="attack_of_opportunity",
         trigger="leaves_threatened_square",
-        also=("provoking_action",),
+        also=("provoking_action", "maneuver"),
         op="attack",
         source="attack of opportunity",
         because="they moved out of reach",
@@ -324,6 +347,49 @@ def provoked_by_action(scene, actor_ref: str) -> list[tuple[str, Reaction]]:
     return out
 
 
+def provoked_by_maneuver(scene, actor_ref: str, target_ref: str,
+                         maneuver: str) -> list[tuple[str, Reaction]]:
+    """Who gets an attack of opportunity because this creature tries a combat manoeuvre.
+
+    The TARGET, and nobody else: "performing a combat maneuver provokes an attack of
+    opportunity from the target of the maneuver" (Core Rulebook, aonprd.com/Rules.aspx?
+    ID=188). Not the thug beside it — a manoeuvre is not one of Table 7-2's actions that
+    provoke from everyone who threatens you; it is a provocation of the one you lay hands
+    on. And only when:
+
+    - the manoeuvre's row says it provokes (`tables.MANEUVERS[...]["provokes"]` — every
+      row does; the key was written with the table and read by nothing until this);
+    - the attacker does not hold the waiver (`unprovoking_tag`, an Improved feat's
+      document tag);
+    - the target threatens a square the attacker fills — the same `threatens` every
+      reaction asks, so a trip made with a glaive from ten feet draws nothing from a
+      foe with a five-foot reach, and a disarmed, empty-handed target draws nothing;
+    - they are not on one side, as `provoked_by_move` skips allies.
+
+    A bystander is NOT skipped here, as `provoked_by_move` skips one: the target is the
+    one being grabbed, and the swing is theirs to take. Nothing on a scene with no map,
+    for the reason `threatens` gives.
+    """
+    from .tables import MANEUVERS
+
+    row = MANEUVERS.get(str(maneuver or ""))
+    if not row or not row.get("provokes") or not scene.has_grid:
+        return []
+    actor = scene.actors.get(actor_ref)
+    target = scene.actors.get(target_ref)
+    anchor = scene.positions.get(actor_ref)
+    if actor is None or target is None or anchor is None or actor_ref == target_ref:
+        return []
+    if actor.has_state(unprovoking_tag(row.get("name") or maneuver)):
+        return []
+    if _allied(scene, target_ref, actor_ref):
+        return []
+    zone = threatened_by(scene, target_ref)
+    if not any(sq in zone for sq in gridmod.footprint((anchor[0], anchor[1]), actor.size)):
+        return []
+    return [(target_ref, r) for r in reactions_for(target) if r.fires_on("maneuver")]
+
+
 # The most watchers the way-out search weighs every combination of. The search tries
 # each set of attackers of opportunity from the smallest up, so it is 2^n walks of the
 # board: six is 64 walks and covers any fight this app has run. Past it, see
@@ -508,6 +574,7 @@ def _allied(scene, a: str, b: str) -> bool:
     return False
 
 
-__all__ = ["Reaction", "TRIGGERS", "budget_for", "disarmed_and_empty_handed",
-           "provoked_by_action", "provoked_by_move", "provoked_by_withdraw", "reach_with",
-           "reactions_for", "threatened_by", "threatens"]
+__all__ = ["Reaction", "TRIGGERS", "UNPROVOKING", "budget_for",
+           "disarmed_and_empty_handed", "provoked_by_action", "provoked_by_maneuver",
+           "provoked_by_move", "provoked_by_withdraw", "reach_with", "reactions_for",
+           "threatened_by", "threatens", "unprovoking_tag"]
