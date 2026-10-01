@@ -243,6 +243,18 @@ def test_any_check_aimed_at_the_machine_is_the_repair_dressed_up():
     assert [r["op"] for r in out] == ["repair"]
 
 
+def test_a_skill_that_does_not_exist_beside_the_repair_is_the_dressing_too():
+    """The house-rule replay (2026-10-01) wrote `check skill=use` with NO target, and the
+    first plan was refused again for a skill that does not exist. A real skill with no
+    target that is not repair dressing (Perception, say) is left alone."""
+    scene, _engine, _pc, _spy = _table()
+    model = [{"op": "check", "actor": "pc", "params": {"skill": "use"}},
+             {"op": "check", "actor": "pc", "params": {"skill": "perception"}}]
+    out = judgement.declare_repair(model, OWNERS_LINE, scene)
+    assert [(r["op"], (r.get("params") or {}).get("skill")) for r in out] == [
+        ("check", "perception"), ("repair", None)]
+
+
 @pytest.mark.parametrize("line", [
     "I repair the clockwork spy.",
     "i try to patch the spy back up",

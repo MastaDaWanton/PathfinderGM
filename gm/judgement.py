@@ -1025,6 +1025,13 @@ _OWN_WORDS = re.compile(
     r"|\bloyal\s+to\s+me\b|\bbind\s+(?:it|him|her)\s+to\s+me\b|\btam(?:e|es|ing)\b"
     r"|\bmake\s+(?:it|him|her)\s+mine\b|\bmy\s+(?:new\s+)?(?:servant|pet|minion)\b",
     re.I)
+def _skill_names() -> frozenset:
+    from rules.tables import SKILLS
+
+    return frozenset(SKILLS)
+
+
+_SKILL_NAMES = _skill_names()
 # Taking the machine for your own without a word about mending it (the house rule's claim).
 _CLAIM_VERB = re.compile(
     r"\b(?:rewrit(?:e|es|ing)\s+(?:its|his|her|the\s+[\w']+)\s+(?:loyalty|loyalties"
@@ -1116,10 +1123,14 @@ def declare_repair(raw_intents, player_text: str, scene):
                        params={**params, **({"own": True} if own else {})})
         elif op == "check" and (aims_at_it(raw) or (
                 not raw.get("target")
-                and str(params.get("skill", "")).lower() in _REPAIR_DRESSING)):
+                and (str(params.get("skill", "")).lower() in _REPAIR_DRESSING
+                     or str(params.get("skill", "")).lower() not in _SKILL_NAMES))):
             # Any check at the machine is the repair dressed up — the owner's own replay
             # (2026-10-01) came back first as `check skill=use` aimed at the spy, refused
-            # as no such skill, and cost a whole second plan before this op landed.
+            # as no such skill, and cost a whole second plan before this op landed. The
+            # house-rule replay the same day wrote the same `skill=use` with NO target,
+            # and lost the plan again: a skill that does not exist, beside a declared
+            # repair, is the dressing too.
             continue
         elif op in ("heal", "condition", "company") and aims_at_it(raw):
             continue
