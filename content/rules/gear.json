@@ -1,0 +1,154 @@
+{
+  "_about": [
+    "What carried gear does, as documents the engine reads (rules/gear.py). Asked for by the",
+    "owner, 2026-10-01: 'I have items like hemp, flint and steel, tent, trail rations and so",
+    "on. They are listed as having no effect. but they should have effects'.",
+    "",
+    "Each item row: `names` (what a carried thing is called, matched lower-case against the",
+    "pack and the satchel), `does` (the Equipment tab's words), `source` (the book where it",
+    "has one), `house_rule` (where the number is this table's, said out loud), and any of:",
+    "  modifiers  the feat grammar (type, target, amount, bonus_type, when), read LIVE while",
+    "             the thing is carried, through Actor._buff_mods like a feat document: the",
+    "             pack is the store, nothing is copied onto the sheet, and selling the",
+    "             blanket takes its term away (rules/sheet.py:_gear_mods)",
+    "  tags       standing tags held while carried (gear.*), asked with has_state",
+    "  eat        eating one resets hunger through rules/survival.py (the `eat` op, item=)",
+    "  carry      {str: N}: Strength counts N higher for carrying capacity only",
+    "  camp       {night_check_scale: x}: the night's encounter chance is multiplied by x",
+    "  writes     writing a note or drawing a map needs it in the pack",
+    "  not_yet    what the book or the owner says it does that nothing reads yet",
+    "",
+    "The `camp` section holds the rule rows a night's rest reads (Engine._op_rest)."
+  ],
+  "items": {
+    "trail rations": {
+      "names": ["trail rations", "trail ration", "rations", "ration", "rations, trail"],
+      "does": "A day's food: eating one puts hunger back to nothing.",
+      "source": "CRB p.158 / UE p.75: 'The listed price is for a day's worth of food ... As long as it stays dry, it can go for months without spoiling.' CRB Environment, Starvation and Thirst: a character needs one pound of food a day.",
+      "eat": {"spends": 1}
+    },
+    "bread": {
+      "names": ["loaf of bread", "bread"],
+      "does": "Food: eating it puts hunger back to nothing.",
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
+      "eat": {"spends": 1}
+    },
+    "cheese": {
+      "names": ["hunk of cheese", "cheese"],
+      "does": "Food: eating it puts hunger back to nothing.",
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
+      "eat": {"spends": 1}
+    },
+    "meat": {
+      "names": ["chunk of meat", "meat"],
+      "does": "Food: eating it puts hunger back to nothing.",
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
+      "eat": {"spends": 1}
+    },
+    "meal": {
+      "names": ["good meal", "common meal", "poor meal"],
+      "does": "A meal: eating it puts hunger back to nothing.",
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging).",
+      "eat": {"spends": 1}
+    },
+    "bedroll": {
+      "names": ["bedroll"],
+      "does": "Sleeping rough in it, you do not wake fatigued; +2 on Fortitude saves against cold while you sleep.",
+      "source": "CRB p.158 / UE p.56: 'two woolen sheets sewn together ... to create a bag for sleeping in ... Most people use a blanket with the bedroll to stay warm or provide a ground cushion.'",
+      "house_rule": "The book gives a bedroll no mechanic. The owner, 2026-10-01: 'A bedroll should negate the negative of waking up fatigued after sleeping on the floor or ground and a degree of protection from the cold.' The +2 is the CRB's own unit for weather protection (Survival: '+2 bonus on all Fortitude saves against severe weather').",
+      "tags": ["gear.bedding"],
+      "modifiers": [
+        {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "circumstance",
+         "when": {"against": "cold", "resting": true}}
+      ]
+    },
+    "blanket": {
+      "names": ["blanket", "winter blanket", "blanket, winter"],
+      "does": "+2 on Fortitude saves against cold while you sleep.",
+      "source": "CRB p.158: 'This warm, woven blanket has straps so it can be rolled up and tied. Blankets are often used in conjunction with bedrolls to provide additional warmth or a ground cushion.'",
+      "house_rule": "The book gives a blanket no mechanic. The owner, 2026-10-01: 'a blanket is a degree of protection from the cold.' +2, the Survival skill's unit for weather.",
+      "tags": ["gear.warmth"],
+      "modifiers": [
+        {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "circumstance",
+         "when": {"against": "cold", "resting": true}}
+      ]
+    },
+    "tent": {
+      "names": ["tent", "small tent", "tent, small", "medium tent", "large tent", "pavilion"],
+      "does": "Pitched when you camp: halves the chance of being found in the night; +2 on Fortitude saves against cold while you sleep, and with a bedroll or blanket inside it the cold of frozen ground does not reach you at all.",
+      "source": "CRB p.158 (10 gp, 20 lb; no rules text). UE: 'A small tent holds one Medium creature and takes 20 minutes to assemble.'",
+      "house_rule": "The book gives a tent no mechanic. The owner, 2026-10-01: 'a tent should decrease the chance of being attacked in my sleep and protect me from the elements to a degree.' Halving follows Pathfinder: Kingmaker, whose camp lowers the chance of a rest encounter (Camp Camouflage) rather than removing it; +2 is the Survival skill's unit for weather.",
+      "tags": ["gear.shelter"],
+      "camp": {"night_check_scale": 0.5},
+      "modifiers": [
+        {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "circumstance",
+         "when": {"against": "cold", "resting": true}}
+      ],
+      "not_yet": ["the 20 minutes it takes to pitch is not charged to the clock"]
+    },
+    "cold-weather outfit": {
+      "names": ["cold-weather outfit", "cold weather outfit", "outfit, cold-weather"],
+      "does": "+5 on Fortitude saves against cold.",
+      "source": "CRB p.161: a cold weather outfit 'grants a +5 circumstance bonus on Fortitude saving throws against exposure to cold weather.'",
+      "modifiers": [
+        {"type": "save_mod", "target": "fort", "amount": 5, "bonus_type": "circumstance",
+         "when": {"against": "cold"}}
+      ],
+      "not_yet": ["worn clothes are not tracked, so carrying it counts as wearing it"]
+    },
+    "backpack": {
+      "names": ["backpack", "backpack (masterwork)", "masterwork backpack", "knapsack", "rucksack"],
+      "does": "Strength counts 1 higher for how much you can carry.",
+      "source": "UE p.56, masterwork backpack: 'When wearing a masterwork backpack, treat your Strength score as +1 higher than normal when calculating your carrying capacity.' A common backpack (CRB p.158) 'holds about 2 cubic feet of material' and has no number.",
+      "house_rule": "The masterwork backpack's +1 given to every backpack, on the owner's word, 2026-10-01: 'a backpack allows me to carry more than a couple of things / increases my carry weight'.",
+      "carry": {"str": 1},
+      "not_yet": ["load penalties (Table 7-5) are not applied: encumbrance is the later batch the owner ruled (E9), so carrying capacity is shown, not enforced"]
+    },
+    "ink and paper": {
+      "names": ["ink and paper", "ink", "paper", "parchment", "inkpen", "ink pen", "writing kit"],
+      "does": "Lets you write notes and draw maps, kept in the Journal.",
+      "source": "CRB p.158: ink (8 gp), inkpen (1 sp), paper (4 sp a sheet).",
+      "house_rule": "Sheets and ink are not counted: writing does not use the kit up.",
+      "tags": ["gear.writing"],
+      "writes": true
+    },
+    "flint and steel": {
+      "names": ["flint and steel", "tindertwig", "tinderbox"],
+      "does": "Lights a torch in a full round; any other fire takes at least as long.",
+      "source": "CRB p.158: 'Lighting a torch with a flint and steel is a full-round action. Lighting any other fire with them takes at least that long.'",
+      "tags": ["gear.fire-lighting"],
+      "not_yet": ["the engine has no fire or light to make: nothing asks for it yet, so its effect is these words"]
+    },
+    "hemp rope": {
+      "names": ["hemp rope", "rope", "rope, hemp"],
+      "does": "A rope makes a climb DC 5 (DC 0 knotted with a wall to brace against); bonds tied with it are escaped at DC 20 + the binder's CMB; it bursts at Strength DC 23.",
+      "source": "CRB p.158: 'The DC to escape hemp rope bonds is equal to 20 + the CMB of the creature that tied the bonds ... This rope has 2 hit points and can be burst with a DC 23 Strength check.' Climb DCs: 'A rope with a wall to brace against, or a knotted rope' DC 5.",
+      "tags": ["gear.rope"],
+      "not_yet": ["a Climb check's DC is the band the GM names, so the rope's DC is said, not set", "there is no bind or escape op for the bonds DC to be read by"]
+    }
+  },
+  "camp": {
+    "sleeping-rough": {
+      "name": "sleeping rough",
+      "applies_at": ["outside", "under"],
+      "spared_by": "gear.bedding",
+      "condition": "fatigued",
+      "hours": 2,
+      "source": "House rule, the owner's words, 2026-10-01: 'A bedroll should negate the negative of waking up fatigued after sleeping on the floor or ground'. The book has no such rule (CRB: only sleeping in medium or heavy armour fatigues). Two hours of stiffness is this table's number, so a night on the ground costs a morning, not a day.",
+      "said": "slept on the bare ground"
+    },
+    "night-check": {
+      "name": "the night's watch",
+      "applies_at": ["outside", "under"],
+      "source": "The road's own check (rules/ontheway.py): 'four times per day ... with a 20% chance of an encounter each time' (AoN, GM rules, Step 4: Create Random Encounter Tables), watch by watch over the hours slept. Only something that comes at you breaks the night; anything else passes the camp by."
+    },
+    "cold-ground": {
+      "name": "a night in the cold",
+      "grounds": ["tundra"],
+      "applies_at": ["outside", "under"],
+      "protected_by": {"all": ["gear.shelter"], "any": ["gear.bedding", "gear.warmth"]},
+      "source": "CRB Environment, Cold Dangers: 'An unprotected character in cold weather (below 40 F) must make a Fortitude save each hour (DC 15, +1 per previous check) or take 1d6 points of nonlethal damage.' Tundra is the one ground this app reads as always cold; there is no weather or season to read yet.",
+      "house_rule": "What counts as protected is this table's reading of the book's word 'unprotected': a pitched tent and something to sleep in or under (a bedroll or a blanket). Without both, the saves are rolled, each +2 the gear grants counting."
+    }
+  }
+}

@@ -1360,7 +1360,10 @@ class Actor:
 
     # --- saves ----------------------------------------------------------------------
 
-    def save_modifiers(self, save: str) -> list[Modifier]:
+    def save_modifiers(self, save: str, ctx: dict | None = None) -> list[Modifier]:
+        """`ctx` is the roll's context for a term with a `when`: a Fortitude save against
+        cold while resting is `{"against": "cold", "resting": True}`, which is what a
+        blanket's +2 asks for (content/rules/gear.json)."""
         save = save.strip().lower()
         if save not in SAVES:
             raise KeyError(f"no such save {save!r}")
@@ -1386,7 +1389,7 @@ class Actor:
                 mods.append(Modifier(am, SAVE_ABILITY[save].title()))
 
         mods.extend(self._condition_mods("saves"))
-        mods.extend(self._buff_mods("save_mod", save))
+        mods.extend(self._buff_mods("save_mod", save, ctx))
         return stack(mods)
 
     # --- initiative -------------------------------------------------------------------
@@ -2868,6 +2871,12 @@ class Actor:
         doc = self._creature_doc() or {}
         out.extend(_states.type_tags(doc.get("creature_type"), doc.get("subtype"),
                                      self.immunities))
+        # What carried gear grants (content/rules/gear.json, 2026-10-01): a bedroll is
+        # `gear.bedding`, a tent `gear.shelter`. Live-read from the pack like a feat
+        # from the feat list, so the bedroll sold is the bedding gone.
+        from . import gear as _gear
+
+        out.extend(_gear.tags(self))
         return tuple(out)
 
     def death_floor(self) -> int:
@@ -3040,6 +3049,29 @@ class Actor:
                                     _bonus_type(spec.get("bonus_type"))))
         return out
 
+    def _gear_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
+        """Modifiers from carried gear, read off content/rules/gear.json live.
+
+        The owner, 2026-10-01: "a blanket is a degree of protection from the cold." The
+        pack is the store, the way the feat list is for `_feat_mods`: nothing is copied
+        onto the sheet, and the term is named for the thing (the dice popup reads
+        "blanket +2"). Every gear modifier today carries a `when` — against cold, while
+        resting — so it lands only on a roll whose context says so (`_when_holds`), and
+        a roll with no context drops it, never applies it.
+        """
+        if self._flat_for(kind, target):
+            return []
+        from . import gear as gear_mod
+
+        out: list[Modifier] = []
+        for name, spec in gear_mod.modifier_specs(self, kind, target):
+            if not _when_holds(spec.get("when"), ctx):
+                continue
+            amount = int(spec.get("amount", 0) or 0)
+            if amount:
+                out.append(Modifier(amount, name, _bonus_type(spec.get("bonus_type"))))
+        return out
+
     def _roll_context(self, weapon_key: str | None = None, **extra) -> dict:
         """What a scoped or conditional feat term is evaluated against."""
         w = self.weapon(weapon_key)
@@ -3166,7 +3198,8 @@ class Actor:
                     out.append(Modifier(amount, e.source or e.name or "a preparation",
                                         _bonus_type(m.get("bonus_type"))))
         out += self._standing_mods(kind, target) + self._feat_mods(kind, target, ctx) \
-            + self._race_mods(kind, target, ctx) + self._background_mods(kind, target)
+            + self._race_mods(kind, target, ctx) + self._background_mods(kind, target) \
+            + self._gear_mods(kind, target, ctx)
         # 1e: a dodge bonus is lost whenever the Dexterity bonus to AC is lost. Twenty-
         # four shipped dodge feats had no reader for that clause, and nothing on the
         # sheet asked it of buffs either; one generic rule here, not one per feat.

@@ -417,6 +417,13 @@ class Scene:
     # Saved only when it says more than `at` does: a save without it reads back as
     # `[at]`, so every campaign written before it round-trips byte for byte.
     been: list[str] = field(default_factory=list)
+    # What the player has written down with ink and paper (the owner, 2026-10-01: "ink
+    # and paper allow me to write notes or draw maps"): `{"kind": "note" | "map",
+    # "title", "text", "lines", "clock", "at"}`, oldest first, shown on the Journal
+    # (`/api/write`, `play/views.py`). The player's own words, never fed to the narrator
+    # and never read by a roll — like `been`, outside the three laws' territory, and kept
+    # whole: a page written is not unwritten.
+    writings: list[dict] = field(default_factory=list)
     log: list[dict] = field(default_factory=list)
 
     # Whose turn it is: an index into `initiative`. -1 outside an encounter. Written only
@@ -6518,6 +6525,18 @@ class Engine:
         target = self.scene.actors[ref]
         plan = hazards.plan(str(intent.params["rule"]), intent.params)
         origin = f"rule:{plan['rule']}"
+        if (hazards.get(plan["rule"]) or {}).get("save"):
+            # A row the book gives a save to (cold: "a Fortitude save each hour (DC 15,
+            # +1 per previous check)") is rolled an hour at a time, the save in the roll
+            # context that names the danger — which is how a cold-weather bonus from
+            # carried gear reaches it (content/rules/gear.json).
+            rolls, effects, said = self._exposure(
+                target, plan["rule"], int(plan["value"]),
+                {"against": str(plan["type"]), "resting": bool(intent.params.get("resting"))})
+            tell = (f"{target.name} meets {plan['name']} ({plan['slot'].replace('_', ' ')} "
+                    f"{plan['value']}). {said}")
+            return Outcome(intent_id=intent.id, op="hazard", rolls=rolls, effects=effects,
+                           tell=" ".join(tell.split()), because=intent.because)
         rolls, effects, bits = [], [], []
         if plan.get("first_die_nonlethal"):
             roll = self.dice.roll(plan["first_die"], label=f"{plan['name']} (deliberate)",
@@ -14001,6 +14020,22 @@ class Engine:
         from . import leveling as leveling_mod
         from . import xp as xp_mod
 
+        # The camp (the owner, 2026-10-01: "a tent should decrease the chance of being
+        # attacked in my sleep and protect me from the elements to a degree. A bedroll
+        # should negate the negative of waking up fatigued after sleeping on the floor or
+        # ground"). Read off content/rules/gear.json's `camp` rows, and only where the
+        # sleeper is out on the ground (`places.setting_of`: outside, or under a town —
+        # the sewers, a crypt): a bed in the town is a bed.
+        camp = self._camp_for(actor, kind)
+        if camp["night"] is not None:
+            met = camp["night"]
+            if met.aggressive and met.after * ontheway.WATCH_HOURS < camp["hours"]:
+                # Something comes into the camp before the night is done: the night is
+                # broken, and 1e's natural healing is for "a full night's rest (8 hours
+                # of sleep or more)" — so none of it, and no spells back. The player can
+                # sleep again once it is dealt with.
+                return self._broken_night(intent, actor, camp, met)
+
         if kind == "night" and actor.is_pc and xp_mod.ready_to_level(actor):
             levelled = leveling_mod.level_up(actor, dice=self.dice)
 
@@ -14015,32 +14050,34 @@ class Engine:
         if casting.is_caster(actor):
             got = casting.ensure_prepared(actor, reason="rest")
             prep_said = casting.prepared_said(actor, got)
-        hours = result["hours"]
         # Everyone, not only the sleeper. Rest ticked the resting actor alone, so an
         # NPC standing in the same scene kept every timed buff through an eight-hour
         # night. `advance` also leaves the body alone: `Actor.rest` has already called
         # survival.sleep, and a night deliberately costs no food or water.
         # `charge_body=False`: `Actor.rest` has already called survival.sleep, and a
         # night deliberately costs no food or water — pinned by tests/test_survival.py.
-        # A night's sleep begun in the evening runs to the morning, not to a fixed eight
-        # hours. Measured live 2026-09-27: "I find somewhere to sleep until morning" at
-        # five in the afternoon woke the party at one in the morning, the prose wrote "the
-        # morning sun has just begun to bleed through", and the market it walked into
-        # next — shut until first light (rules/keepers.py) — was written trading. The
-        # rules' eight hours are the least a night is; the next dawn ends it when it is
-        # later than that and within sixteen.
-        minutes = hours * 60
-        if kind == "night":
-            now = self.scene.clock_minutes
-            dawn = (now // (24 * 60)) * 24 * 60 + 6 * 60
-            if dawn <= now:
-                dawn += 24 * 60
-            if now + minutes < dawn <= now + 16 * 60:
-                minutes = dawn - now
-                hours = round(minutes / 60)
+        # How long the night runs (to the dawn) is `_camp_for`'s, worked out before the
+        # rest so the night's check could be rolled over the same hours.
+        minutes, hours = (camp["minutes"], camp["hours"]) if result["hours"] else (0, 0)
         ended = self.scene.advance(minutes, charge_body=False)["ended"]
 
         bits = [f"{actor.name} rests for {hours} hours."]
+        # What the ground did to them, after the healing: the cold (a Fortitude save an
+        # hour, the blanket and the bedroll counting), then the stiffness of a night with
+        # nothing between them and the ground. Both through the one applicator.
+        camp_fx, camp_rolls, camp_said = self._camp_morning(actor, camp, hours) \
+            if result["hours"] else ([], [], [])
+        bits.extend(camp_said)
+        if camp["night"] is not None:
+            # The last watch's meeting, at first light; or one that let them be.
+            met = camp["night"]
+            made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
+            if made:
+                self._ensure_encounter(actor.ref, target=made[0]["ref"])
+                camp_fx.append({"kind": "night-check", "met": met.kind, "at_dawn": True,
+                                "met_refs": [m["ref"] for m in made],
+                                "origin": "rule:night-check"})
+            bits.append(self._night_said(met, made, at_dawn=True))
         if result["healed"]:
             bits.append(f"{actor.name} recovers {result['healed']} hit points "
                         f"({actor.hp}/{actor.hp_max}).")
@@ -14070,10 +14107,11 @@ class Engine:
                 bits.append(keep_note)
 
         return Outcome(
-            intent_id=intent.id, op="rest",
+            intent_id=intent.id, op="rest", rolls=camp_rolls,
             effects=[{"ref": actor.ref, "kind": "rest", "healed": result["healed"],
-                      "hours": hours, "hp_after": actor.hp, "origin": "rule:rest"}]
-            + keep_fx,
+                      "hours": hours, "hp_after": actor.hp, "origin": "rule:rest",
+                      "setting": camp["setting"]}]
+            + camp_fx + keep_fx,
             tell=" ".join(bits)
                  + (f" In the night, level {levelled['level']} settles: "
                     f"+{levelled['hp']} hp"
@@ -14081,6 +14119,208 @@ class Engine:
                     if levelled and levelled.get("ok") else ""),
             because=intent.because,
         )
+
+    def _camp_for(self, actor, kind: str) -> dict:
+        """The night ahead: how long it runs, where it is slept, and the camp's check.
+
+        Hours first, because the check is rolled over them. A night's sleep begun in the
+        evening runs to the morning, not to a fixed eight hours. Measured live
+        2026-09-27: "I find somewhere to sleep until morning" at five in the afternoon
+        woke the party at one in the morning, the prose wrote "the morning sun has just
+        begun to bleed through", and the market it walked into next — shut until first
+        light (rules/keepers.py) — was written trading. The rules' eight hours are the
+        least a night is; the next dawn ends it when it is later than that and within
+        sixteen.
+
+        The check (`ontheway.night`) is rolled only for the player character, only out on
+        the ground (`camp.night-check.applies_at`), and only once: the camp is the
+        party's, not each sleeper's. A tent's `camp.night_check_scale` multiplies it.
+        """
+        from . import gear as gear_mod
+        from . import places as places_mod
+
+        hours = 24 if kind == "bed rest" else 8
+        minutes = hours * 60
+        if kind == "night":
+            now = self.scene.clock_minutes
+            dawn = (now // (24 * 60)) * 24 * 60 + 6 * 60
+            if dawn <= now:
+                dawn += 24 * 60
+            if now + minutes < dawn <= now + 16 * 60:
+                minutes = dawn - now
+                hours = round(minutes / 60)
+        setting = places_mod.setting_of(self.scene.at) if self.scene.at else "in"
+        ground = places_mod.terrain_of(self.scene.at) if self.scene.at else ""
+        night, scale, by = None, 1.0, ""
+        rule = gear_mod.camp_rule("night-check")
+        if actor.is_pc and setting in (rule.get("applies_at") or ()) \
+                and not actor.has_state("state.down.dead"):
+            scale, by = gear_mod.night_scale(actor)
+            night = ontheway.night(self.dice, hours, ground or "grassland",
+                                   int(getattr(actor, "level", 1) or 1), scale=scale)
+        return {"hours": hours, "minutes": minutes, "setting": setting, "ground": ground,
+                "night": night, "scale": scale, "scaled_by": by}
+
+    def _night_said(self, met, made: list[dict], *, at_dawn: bool = False,
+                    hours: int = 0) -> str:
+        """The camp's check, in a sentence: who came, or what passed the camp by."""
+        name = str((met.creature or {}).get("name") or "something")
+        article = "an" if name[:1].lower() in "aeiou" else "a"
+        if not made:
+            return (f"In the night {article} {name} comes near the camp, and goes on "
+                    f"by.")
+        who = ", ".join(self.scene.actors[m["ref"]].name for m in made
+                        if m["ref"] in self.scene.actors) or name
+        if at_dawn:
+            return f"At first light {who} is at the edge of the camp, and has seen you."
+        return (f"{hours} hour{'s' if hours != 1 else ''} into the night, {who} comes into "
+                f"the camp. The night is broken: no healing and nothing recovered from it.")
+
+    def _broken_night(self, intent: Intent, actor, camp: dict, met) -> Outcome:
+        """Something came into the camp before the night was done.
+
+        The hours slept pass, on the clock and on the awake clock (six of them reset it,
+        `survival.sleep`), and the cold has its say over them; the healing, the pools and
+        the preparation of a full night do not happen, because 1e gives them to "a full
+        night's rest (8 hours of sleep or more)". The creature comes in by the road's own
+        door and the fight opens, as a road meeting's does."""
+        slept = min(camp["hours"], int(met.after) * ontheway.WATCH_HOURS)
+        survival.sleep(actor, slept)
+        self.scene.advance(slept * 60, charge_body=False)
+        fx, rolls, said = self._camp_morning(actor, camp, slept, stiff=False)
+        made = self._meet_on_the_way(met, zone="near")
+        if made:
+            self._ensure_encounter(actor.ref, target=made[0]["ref"])
+        bits = [self._night_said(met, made, hours=slept)] + said
+        if camp.get("scaled_by"):
+            bits.append(f"The {camp['scaled_by']} was no hiding place tonight.")
+        return Outcome(
+            intent_id=intent.id, op="rest", rolls=rolls,
+            effects=[{"ref": actor.ref, "kind": "rest", "healed": 0, "hours": slept,
+                      "hp_after": actor.hp, "origin": "rule:rest", "broken": True,
+                      "setting": camp["setting"]},
+                     {"kind": "night-check", "met": met.kind,
+                      "met_refs": [m["ref"] for m in made],
+                      "origin": "rule:night-check"}] + fx,
+            tell=" ".join(b for b in bits if b), because=intent.because)
+
+    def _camp_morning(self, actor, camp: dict, hours: int, *,
+                      stiff: bool = True) -> tuple[list[dict], list, list[str]]:
+        """What a night on the ground did: (effect records, rolls, sentences).
+
+        The cold, where the ground is one `camp.cold-ground.grounds` names: the Core
+        Rulebook's hourly Fortitude save for the hours slept, in the roll context
+        `{"against": "cold", "resting": True}` that a bedroll's, a blanket's and a tent's
+        +2 ask for (content/rules/gear.json). Then sleeping rough: with nothing that grants
+        `gear.bedding`, `fatigued` for the row's hours — the owner's house rule — and with
+        it, a line saying what spared them, so the bedroll is seen to do something."""
+        from . import gear as gear_mod
+
+        fx: list[dict] = []
+        rolls: list = []
+        said: list[str] = []
+        cold = gear_mod.camp_rule("cold-ground")
+        if camp["setting"] in (cold.get("applies_at") or ()) \
+                and camp["ground"] in (cold.get("grounds") or ()) and hours > 0:
+            # The book's check is for "an unprotected character". Protected, by the row:
+            # every tag in `protected_by.all` (a tent) and one of `protected_by.any`
+            # (something to sleep in or under). Measured before this clause: a level-1
+            # wizard with tent, bedroll and blanket still failed 5 of 8 saves on the
+            # tundra and went down — the +2s alone are no match for a DC that climbs
+            # to 22, and "protect me from the elements" meant something.
+            guard = cold.get("protected_by") or {}
+            if guard and all(actor.has_state(t) for t in guard.get("all") or ()) \
+                    and any(actor.has_state(t) for t in guard.get("any") or ()):
+                said.append(f"The cold is outside the tent: {actor.name} sleeps warm "
+                            f"through it.")
+            else:
+                r, f, line = self._exposure(actor, "cold", hours,
+                                            {"against": "cold", "resting": True})
+                rolls += r
+                fx += f
+                if line:
+                    said.append(line)
+        rough = gear_mod.camp_rule("sleeping-rough")
+        if stiff and camp["setting"] in (rough.get("applies_at") or ()) and hours > 0 \
+                and not actor.has_state("state.down.dead"):
+            spared = str(rough.get("spared_by") or "")
+            if spared and actor.has_state(spared):
+                what = next((c["name"] for c in gear_mod.carried(actor)
+                             if spared in (c["row"].get("tags") or ())), "bedding")
+                said.append(f"The {what} kept the ground off {actor.name}: no stiffness "
+                            f"this morning.")
+            else:
+                cond = str(rough.get("condition") or "fatigued")
+                lasts = int(rough.get("hours") or 2)
+                actor.add_condition(cond, rounds=lasts * 600, source="sleeping rough")
+                fx.append({"ref": actor.ref, "kind": "condition", "condition": cond,
+                           "rounds_left": lasts * 600, "origin": "rule:sleeping-rough"})
+                said.append(f"{actor.name} {rough.get('said', 'slept on the ground')} and "
+                            f"wakes stiff: {cond} for {lasts} hours. A bedroll would have "
+                            f"spared it.")
+        return fx, rolls, said
+
+    def _exposure(self, target, rule: str, hours: int,
+                  ctx: dict | None = None) -> tuple[list, list[dict], str]:
+        """The Core Rulebook's exposure, an hour at a time: (rolls, effects, a sentence).
+
+        "An unprotected character in cold weather (below 40° F) must make a Fortitude save
+        each hour (DC 15, +1 per previous check) or take 1d6 points of nonlethal damage"
+        and "A character who takes any nonlethal damage from cold or exposure is beset by
+        frostbite or hypothermia (treat her as fatigued)" (CRB, Environment, Cold Dangers).
+        The row is content/rules/hazards.json's, with its `save`; the save is read with
+        `ctx`, which is how the blanket's +2 reaches it. Stops at the hour the target goes
+        down: a sleeper knocked out by the cold is the moment the player must be told,
+        not an hour count to finish rolling."""
+        row = hazards.get(rule) or {}
+        save = row.get("save") or {}
+        rolls, effects = [], []
+        if not save:
+            return rolls, effects, ""
+        failed = taken = 0
+        made = 0
+        for i in range(max(0, int(hours))):
+            dc = int(save.get("dc", 15)) + i * int(save.get("rises", 1))
+            roll = self.dice.d20(target.save_modifiers(str(save.get("save", "fort")), ctx),
+                                 label=f"{row.get('name', rule)} (Fortitude, DC {dc})",
+                                 visibility="player")
+            rolls.append(roll)
+            made += 1
+            if d20_succeeds(roll, dc):
+                continue
+            failed += 1
+            hurt = self.dice.roll(str(row.get("dice_per_unit", "1d6")),
+                                  label=str(row.get("name", rule)), visibility="hidden")
+            rolls.append(hurt)
+            hit = self._apply_damage(target, hurt.total, str(row.get("type", "untyped")),
+                                     lethality=str(row.get("lethality", "lethal")))
+            hit["origin"] = f"rule:{rule}"
+            effects.append(hit)
+            taken += int(hit.get("amount", 0) or 0)
+            # Staggered once nonlethal damage reaches the hit points, unconscious past them
+            # (CRB, Nonlethal Damage): the night's cold stops there. Asked of the numbers,
+            # because the state is only written after the loop: `is_down` read False all
+            # night and a level-1 sleeper on the tundra took 18 nonlethal on 9 hit points,
+            # the overflow past the maximum landing as lethal.
+            if target.is_down or int(target.nonlethal) >= int(target.hp):
+                break
+        # The condition is the row's to name (`fatigues`), asked by tag, so this site adds
+        # no literal condition key to the engine (tests/test_three_laws.py).
+        cond = str(row.get("fatigues") or "")
+        if taken and cond and not any(target.has_state(t) for t in states.tags_for(cond)):
+            target.add_condition(cond, source=str(row.get("name", rule)))
+            effects.append({"ref": target.ref, "kind": "condition", "condition": cond,
+                            "origin": f"rule:{rule}"})
+        crossed = self._hp_state_effects(target)
+        effects.extend(crossed)
+        if not made:
+            return rolls, effects, ""
+        line = (f"{row.get('name', rule).capitalize()}: {made} Fortitude save"
+                f"{'s' if made != 1 else ''}, {failed} failed")
+        line += (f", {taken} nonlethal damage and frostbite (fatigued)." if taken
+                 else "; the cold did not get in.")
+        line += self._hp_state_tell(crossed)
+        return rolls, effects, line
 
     def _keep_the_mounts(self, days: int, *, stabled: bool = False) -> tuple[str, list[dict]]:
         """Charge the party's mounts their keep: (the tell, the effect records).
@@ -14128,7 +14368,33 @@ class Engine:
         """A meal. Resets the hunger clock and nothing else — food is not medicine."""
         from . import survival
 
+        from . import gear as gear_mod
+
         actor = self._eater(intent)
+        said = str(intent.params.get("item") or "").strip()
+        if said:
+            # Out of the pack (the owner, 2026-10-01: "trail rations reset my hunger").
+            # The thing must be carried and must be food by its gear row; one is spent.
+            c = gear_mod.food(actor, said)
+            if c is None:
+                eats = [x["name"] for x in gear_mod.carried(actor) if x["row"].get("eat")]
+                return self._refuse(
+                    intent, f"{actor.name} has no {said} to eat."
+                            + (f" In the pack: {', '.join(eats)}." if eats
+                               else " Nothing in the pack is food."))
+            n = int((c["row"].get("eat") or {}).get("spends", 1) or 1)
+            left = gear_mod.spend(actor, c, n)
+            was = int(getattr(actor, "fed_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
+            survival.eat(actor)
+            return Outcome(
+                intent_id=intent.id, op="eat",
+                effects=[{"ref": actor.ref, "kind": "eat", "item": c["name"], "spent": n,
+                          "left": left, "origin": f"item:{c['id']}"}],
+                tell=(f"{actor.name} eats from the {c['name']} ({left} left). "
+                      f"{was} hour{'s' if was != 1 else ''} since the last meal; hunger is "
+                      f"put back to nothing."),
+                because=intent.because,
+            )
         survival.eat(actor)
         return Outcome(
             intent_id=intent.id, op="eat",

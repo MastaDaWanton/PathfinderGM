@@ -1238,6 +1238,23 @@ function eqFacts(s, r) {
   return esc(bits.join(", ")) + (r.poisons ? ` <span class="chip warn">poisons whoever drinks it</span>` : "");
 }
 
+// What is carried against what can be (the server's `equipment.load`: CRB Table 7-4 by
+// Strength, the backpack's +1 Str from content/rules/gear.json, 2026-10-01). Shown and
+// not enforced: encumbrance is a later batch (E9), and the line says so.
+function eqLoad(s) {
+  const L = (s.equipment || {}).load;
+  const first = esc(String(s.identity.name || "").split(" ")[0]);
+  if (!L) return `<p class="eqload"><b>Weight.</b> Load is <span class="unknown">not tracked</span>.</p>`;
+  const str = L.str_bonus ? `Strength ${L.str} counts as ${L.str + L.str_bonus} for this, from the ${esc(L.str_bonus_from)}`
+    : `Strength ${L.str}`;
+  const band = { light: "a light load", medium: "a medium load", heavy: "a heavy load",
+                 over: "more than can be carried" }[L.band] || L.band;
+  return `<p class="eqload"><b>Weight.</b> ${esc(String(L.lb))} lb carried: ${band}. Light up to
+      ${L.light} lb, medium to ${L.medium}, heavy to ${L.heavy} (${str}).${L.unknown.length
+      ? ` Not weighed, the rules have no weight for: ${esc(L.unknown.join(", "))}.` : ""}
+      A heavier load does <span class="unknown">not yet slow</span> ${first} down.</p>`;
+}
+
 function eqFitsSlot(r, slot) {
   if (slot === "hand") return r.kind === "weapon";
   return r.fits === slot;
@@ -1312,9 +1329,7 @@ function pageEquipment(s) {
       <p class="eqsay${EQ_SAY_BAD ? " bad" : ""}" id="eq-say" role="status" tabindex="-1">${EQ_SAY ? esc(EQ_SAY)
         : `<span class="why">Wield or wear something, and what the rules say back is written here.</span>`}</p>
       <ul class="eqrows">${items || empty}</ul>
-      <p class="eqload"><b>Weight.</b> Weapons, armour and shields carry their weight in the
-        rules, written on their rows. Load is <span class="unknown">not tracked</span>, so nothing here slows
-        ${esc(String(s.identity.name || "").split(" ")[0])} down.</p>
+      ${eqLoad(s)}
       <p class="credit">Item icons by Lorc, Delapouite, Skoll, Sbed, Willdabeast, Carl Olsen,
         Caro Asercion and Lucas from <a href="https://game-icons.net" target="_blank"
         rel="noopener">game-icons.net</a>, <a href="https://creativecommons.org/licenses/by/3.0/"
@@ -1732,9 +1747,61 @@ function pageJournal(s) {
           n.current ? ` <span class="chip">here</span>` : ""}</li>`).join("")}</ol>
         <p class="why">The Map tab draws these, and the ways between them.</p>`
       : `<p class="why">Nowhere yet: the places you walk to are kept here.</p>`, "jr-walked")}
+    ${sheetCard("jr-notes", "Notes and maps", journalNotes(), "jr-notes")}
     ${sheetCard("jr-history", "History", journalHistory(), "jr-history")}
   </div>`;
 }
+
+// Notes and maps written with ink and paper (owner, 2026-10-01: "ink and paper allow me
+// to write notes or draw maps"). The pages are the scene's (`scene.writings`); writing
+// posts to `/api/write`, which refuses without ink and paper in the pack and says why.
+// A map is the engine's chart of the places stood in, in words, as it stands when drawn.
+let JR_WRITE_SAY = "", JR_WRITE_BAD = false;
+function journalNotes() {
+  const w = (((STATE || {}).scene || {}).writings) || { pages: [], can_write: false, why: "" };
+  const pages = (w.pages || []).map(p => `<li class="matter">
+      <h3>${esc(p.title || (p.kind === "map" ? "A map" : "A note"))}</h3>
+      <p class="why">${esc([p.kind === "map" ? "Drawn" : "Written", p.where ? `at ${p.where}` : ""]
+        .filter(Boolean).join(" "))}</p>
+      ${p.kind === "map" ? `<ul class="plain">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join("")}</ul>`
+        : `<p class="notes">${esc(p.text || "")}</p>`}
+    </li>`).join("");
+  const off = w.can_write ? "" : " disabled";
+  return `${pages ? `<ul class="plain matters">${pages}</ul>`
+      : `<p class="why">Nothing written yet.</p>`}
+    <div class="jr-write">
+      <label class="vh" for="jr-write-title">Title</label>
+      <input id="jr-write-title" class="v2-well" placeholder="Title (optional)" maxlength="120"${off}>
+      <label class="vh" for="jr-write-text">What to write</label>
+      <textarea id="jr-write-text" class="v2-well" rows="3" maxlength="4000"
+        placeholder="Write a note"${off}></textarea>
+      <div><button type="button" class="v2-btn is-small is-go" data-jrwrite="note"${off}>Write it down</button>
+        <button type="button" class="v2-btn is-small" data-jrwrite="map"${off}>Draw a map of where you have been</button></div>
+      <p class="why${JR_WRITE_BAD ? " bad" : ""}" role="status">${esc(JR_WRITE_SAY || (w.can_write ? "" : w.why))}</p>
+    </div>`;
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("#sheetbody [data-jrwrite]");
+  if (!b || b.disabled) return;
+  const kind = b.dataset.jrwrite;
+  const title = (document.getElementById("jr-write-title") || {}).value || "";
+  const text = (document.getElementById("jr-write-text") || {}).value || "";
+  b.disabled = true;
+  try {
+    const d = await post("/api/write", { kind, title, text });
+    if (STATE && STATE.scene) STATE.scene.writings = d.writings;
+    JR_WRITE_SAY = kind === "map" ? "The map is drawn." : "Written down.";
+    JR_WRITE_BAD = false;
+  } catch (err) {
+    JR_WRITE_SAY = err.message || String(err);
+    JR_WRITE_BAD = true;
+  }
+  // `jr-notes` is the card's heading (`sheetCard` puts the id on the h2), so the
+  // section around it is what is drawn again.
+  const card = (document.getElementById("jr-notes") || {}).closest
+    ? document.getElementById("jr-notes").closest("section") : null;
+  if (card) card.outerHTML = sheetCard("jr-notes", "Notes and maps", journalNotes(), "jr-notes");
+});
 
 // The character's history (owner, 2026-10-01): how it began, then one line per thing
 // that happened, by day where the log kept the clock. Read from `/api/history`, which
