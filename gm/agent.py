@@ -1304,7 +1304,7 @@ class GMAgent:
         whatever was owed stays owed.
 
         Returns (line, attempts, rejections); line is "" when nothing held."""
-        from . import confide
+        from . import companions as companions_mod, confide
         from rules import population
 
         actor = self.engine.scene.actors[ref]
@@ -1330,7 +1330,9 @@ class GMAgent:
             except ValueError:
                 line = ""
             line = judgement.name_refs(line, self.engine.scene) if line else ""
-            why = confide.refusal(line, actor, known, plan, rec)
+            why = confide.refusal(line, actor, known, plan, rec,
+                                  others=[a for a in self.engine.scene.actors.values()
+                                          if a is not actor and companions_mod.is_companion(a)])
             if not why:
                 return line, attempts, rejections
             rejections.append(f"attempt {n + 1}: {why}: {line[:160]!r}")

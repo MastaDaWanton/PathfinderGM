@@ -486,6 +486,26 @@ class TestWhatMayStand:
         plan = {"kind": kind, "topic": "wants", "thing": "harbour", "door": "quiet"}
         assert confide.refusal(line, wil, {"Wil"}, plan, rec) == ""
 
+    def test_the_share_in_another_companions_name_is_refused(self):
+        """Measured on the first live replay (2026-10-01): the drover's reminder came back
+        "Bob, a young drover, pulls his thin tunic closer as they pass the clothier's
+        stall" — the confession put in the claimed construct's mouth, and it passed
+        because "drover" was named too. And the facts now call him "the young drover"."""
+        from gm import confide
+
+        s, e, pc = _party()
+        drover = _friend(s, e, name="a young drover")
+        bob = _friend(s, e, name="Bob", wants="", goal="", hobby="")
+        rec = _rec(s, drover)
+        plan = {"kind": "bridge", "topic": "wants", "thing": "clothier", "door": "reminder"}
+        line = ("Bob, a young drover, pulls his thin tunic closer as they pass the "
+                "clothier's stall. \"I just want to see the sea, once, before I die.\"")
+        assert "Bob" in confide.refusal(line, drover, {"Bob"}, plan, rec, others=[bob])
+        fixed = line.replace("Bob, a young drover,", "The young drover")
+        assert confide.refusal(fixed, drover, {"Bob"}, plan, rec, others=[bob]) == ""
+        facts = confide.facts(s, drover, plan)
+        assert facts.startswith("Who speaks: the young drover (fact)")
+
     def test_every_demonstration_passes_its_own_check(self):
         """Demonstrations beat instructions; a demonstration the check would refuse
         teaches the refusal. Each example is scored as the page would be."""

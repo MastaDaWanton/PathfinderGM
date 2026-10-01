@@ -359,14 +359,24 @@ _WHAT = {"wants": "something they want, now, for themselves",
          "hobby": "something they do for their own pleasure"}
 
 
+def called(actor) -> str:
+    """How the facts name them: a descriptor with its article made definite — "a young
+    drover" is "the young drover", the one person meant. On the first live replay the
+    facts read "Who speaks: a young drover", and the line came back in Bob's name."""
+    name = " ".join(str(getattr(actor, "name", "") or "").split())
+    if name[:1].islower():
+        return "the " + re.sub(r"^(?:a|an|the)\s+", "", name)
+    return name
+
+
 def facts(scene, actor, plan: dict, *, place=None, player_text: str = "",
           lead_in: str = "") -> str:
     """The confiding call's facts. The lead-in and the hint are NOT told what it is —
     what a model is not told it cannot leak (rules/population.py, ~83% at 12B)."""
     rec = _record(scene, actor.ref) or {}
-    name = actor.name
+    name = called(actor)
     who = companions.manner_line(scene, actor, ordered=False).split(": ", 1)[-1].rstrip(".")
-    who = re.sub(r";\s*nobody told .*$", "", who)
+    who = re.sub(r";\s*nobody told .*$", "", who).replace(actor.name, name)
     kind = plan["kind"]
     thing = plan.get("thing") or ""
     lines = [f"Who speaks: {name} (fact): {who}."]
@@ -399,7 +409,7 @@ def facts(scene, actor, plan: dict, *, place=None, player_text: str = "",
                          f"say it.")
     if place is not None and kind in (BRIDGE, BRIDGE_HINT) and plan.get("source") == "place":
         lines.append(f"Where they are: {place.name}.")
-    here = [a.name for a in scene.actors.values() if not a.is_pc and scene.conscious(a.ref)]
+    here = [called(a) for a in scene.actors.values() if not a.is_pc and scene.conscious(a.ref)]
     lines.append(f"People here: {', '.join(here) or name}.")
     return "\n".join(lines)
 
@@ -430,8 +440,10 @@ def relevant_told(scene, actor, text: str) -> list[str]:
 
 # --- what may stand -------------------------------------------------------------------
 
-def refusal(line: str, actor, known: set[str], plan: dict, rec: dict | None) -> str:
-    """Why a confiding line cannot go on the page, or ""."""
+def refusal(line: str, actor, known: set[str], plan: dict, rec: dict | None,
+            others=()) -> str:
+    """Why a confiding line cannot go on the page, or "". `others`: the other companions,
+    none of whom may be the one the line says is speaking."""
     from . import speech
 
     kind = plan["kind"]
@@ -440,6 +452,14 @@ def refusal(line: str, actor, known: set[str], plan: dict, rec: dict | None) -> 
     if why:
         return why
     said = " ".join(speech.lines(line))
+    # Measured on the first live replay (2026-10-01): the drover's reminder came back
+    # "Bob, a young drover, pulls his thin tunic closer…" — the share given to the other
+    # companion, passed because "drover" was named too. Anybody else who travels with the
+    # player, named outside the quotation, is somebody else speaking.
+    bare = speech.unquoted(line)
+    for other in others or ():
+        if other is not actor and companions.names_them(bare, other):
+            return f"says it is {other.name} — it is {actor.name} who speaks"
     thing = str(plan.get("thing") or "")
     if kind in (BRIDGE, BRIDGE_HINT) and thing and not re.search(
             rf"\b{re.escape(thing[:max(4, len(thing) - 2)])}", line, re.I):
