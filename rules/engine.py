@@ -2456,6 +2456,18 @@ class Engine:
         # plan's mistake ("no_document", "no_such_place", "no_such_target"…) and the
         # loop retries them as it always has. Measured 2026-09-28 (item 21.3): with no
         # code at all, a refusal only the player could fix went round seven attempts.
+        # A kind of place nobody has heard of is the plan's word, not a fact about the
+        # world: refused here, with the vocabulary, so the plan gets its retry. It was
+        # refused at resolution until 2026-10-01, and "found kind=house" then "travel"
+        # lost the whole walk on its first try while the prose walked the player there.
+        if intent.op == "found" and str(intent.params.get("kind") or "").strip():
+            from . import places as places_mod
+
+            if not places_mod.known_kind(str(intent.params["kind"])):
+                raise IntentError(
+                    f"found: there is no kind of place called "
+                    f"{intent.params['kind']!r}. Use one of: {places_mod.kinds_said()} "
+                    f"— or leave kind out.", "schema", index, code="no_such_kind")
         if intent.op in AMOUNT_OPS and not intent.origin:
             raise IntentError(
                 f"{intent.op}: no document behind this number. Name what does it: "
@@ -3518,8 +3530,10 @@ class Engine:
     def _street_for_a_house(self):
         from . import places as places_mod
 
+        # With the place's own floor plan: a founded tavern read by its id alone is
+        # open sky, and a house could be put off it (2026-10-01).
         outdoor = [p for p in self.places()
-                   if not places_mod.is_indoors(p.id)
+                   if not places_mod.is_indoors(p.id, p.terrain, p.shape)
                    and places_mod.terrain_of(p.id) == places_mod.URBAN]
         roomy = [p for p in outdoor if len(places_mod.children_of(
             self.scene.founded, p.id)) < places_mod.MOST_CHILDREN]
@@ -9540,7 +9554,7 @@ class Engine:
         # What it IS, when the plan says: a kind the settlement table knows, and one
         # that makes sense here (`places.fits_here`). A name that is itself a kind —
         # "the docks" — needs no `kind` to say so.
-        kind = str(intent.params.get("kind") or "").strip().lower().removeprefix("the ")
+        kind = places_mod.kind_named(str(intent.params.get("kind") or ""))
         if not kind and name.lower().removeprefix("the ") in places_mod.KINDS:
             kind = name.lower().removeprefix("the ")
         # A building hangs off the street, not off the room the party is standing in.
@@ -9549,16 +9563,33 @@ class Engine:
         # the stables, the tavern) founded with no parent named goes off the nearest place
         # up the chain that is under the sky; a room (a cellar, a back room) still goes
         # off the room.
-        if kind in places_mod.KINDS and not str(intent.params.get("parent") or "").strip():
+        if (kind in places_mod.KINDS or kind in places_mod.DWELLINGS) \
+                and not str(intent.params.get("parent") or "").strip():
             seen = set()
-            while places_mod.is_indoors(parent.id) and parent.id not in seen:
+
+            def roofed(p) -> bool:
+                # Asked with the place's own floor plan: a FOUNDED tavern's plan is on
+                # the Place (minted from its kind), and its id alone reads as open sky.
+                return p is not None and places_mod.is_indoors(
+                    p.id, shape=getattr(p, "shape", None))
+
+            def inside(p) -> bool:
+                # And a room founded with no kind off a building is in that building,
+                # though it has no plan of its own. Measured on the scratch copy,
+                # 2026-10-01: from "the chamber" off the founded Velvet Veil, "the house
+                # 3 streets over" was founded off the chamber — a house inside a room.
+                return roofed(p) or (
+                    p.origin == "found" and not getattr(p, "kind", "") and bool(p.parent)
+                    and roofed(places_mod.find(known, p.parent)))
+
+            while inside(parent) and parent.id not in seen:
                 seen.add(parent.id)
                 up = places_mod.find(known, parent.parent) if parent.parent else None
                 if up is None:
                     # A building whose parent is the settlement itself (the guildhall):
                     # the street it opens onto — its first exit under the sky.
                     up = next((p for p in (places_mod.find(known, x) for x in parent.exits)
-                               if p is not None and not places_mod.is_indoors(p.id)), None)
+                               if p is not None and not roofed(p)), None)
                 if up is None:
                     break
                 parent = up

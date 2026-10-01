@@ -1541,6 +1541,49 @@ def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
 # it — the page is now allowed to be that something, through the one door.
 KINDS: dict[str, tuple] = {row[0].removeprefix("the "): row for row in SETTLEMENT_PLACES}
 
+# Kinds a place can be FOUNDED as but that a settlement is never drawn with: somebody's
+# house. Measured 2026-10-01, the owner's own turn and again on the scratch copy: "I take
+# the key and head to the house 3 streets over" planned `found kind=house` then `travel`,
+# and the engine answered "There is no such kind of place as 'house'" — the commonest
+# building in any town was the one kind the table did not have, so the walk was refused
+# and the prose walked the player there anyway. Not a SETTLEMENT_PLACES row: that table is
+# also what a town's rooms are drawn from, and a new row would re-draw every world's
+# towns. Any settlement has houses, so there is no scale to check.
+DWELLINGS: dict[str, str] = {
+    "house": "somebody's house, and whoever lives in it",
+}
+# The words a plan writes for a house, folded to the kind. The kind is the vocabulary;
+# these are how people say it.
+KIND_WORDS: dict[str, str] = {
+    "home": "house", "cottage": "house", "residence": "house", "dwelling": "house",
+    "townhouse": "house", "town house": "house", "hovel": "house", "shack": "house",
+    "hut": "house", "manor": "house", "manor house": "house", "mansion": "house",
+    "lodging": "house", "lodgings": "house", "apartment": "house", "flat": "house",
+    "rooms": "house", "pub": "tavern", "alehouse": "tavern", "bar": "tavern",
+    "alley": "lane", "alleyway": "lane", "shop": "workshops", "store": "workshops",
+    "chapel": "shrine", "church": "temple", "jail": "gaol", "prison": "gaol",
+    "stable": "stables", "warehouse": "warehouses", "dock": "docks", "harbour": "docks",
+    "harbor": "docks", "cemetery": "graveyard",
+}
+
+
+def kind_named(kind: str) -> str:
+    """The kind a plan's word names: "the cottage" → "house", "pub" → "tavern"."""
+    k = " ".join(str(kind or "").split()).lower().removeprefix("the ")
+    return KIND_WORDS.get(k, k)
+
+
+def known_kind(kind: str) -> bool:
+    """Whether a place can be founded as this kind anywhere at all."""
+    k = kind_named(kind)
+    return k in KINDS or k in DWELLINGS or k in OUTSIDE_KINDS
+
+
+def kinds_said() -> str:
+    """The vocabulary, for a refusal that names the fix."""
+    return (f"{', '.join(sorted({*KINDS, *DWELLINGS}))}; and out on the road: "
+            f"{', '.join(sorted(OUTSIDE_KINDS))}")
+
 # Kinds that stand on water, and the words a settlement is described with when it has
 # some. The generator's own cues (`IMPLIED`) are read first; these are the words a
 # tide-and-stilt village gets described with instead — Vormoor's export says "coral and
@@ -1565,8 +1608,13 @@ def fits_here(kind: str, location, parent=None) -> str:
     crossroads is not in a town (the owner's ruling Q11). A bridge off a town room is
     the settlement's bridge, as it always was.
     """
-    kind = " ".join(str(kind or "").split()).lower().removeprefix("the ")
+    kind = kind_named(kind)
     outside = parent is not None and setting_of(getattr(parent, "id", "") or "") == "outside"
+    if kind in DWELLINGS:
+        name = str(getattr(location, "name", "") or "this place")
+        if location is None or not _settled(location, ""):
+            return f"{name} is not a settlement, and a {kind} is a settlement's place."
+        return ""
     if kind in OUTSIDE_KINDS and (outside or kind not in KINDS):
         if not outside:
             where = str(getattr(parent, "name", "") or "the town") if parent is not None \
@@ -1586,9 +1634,7 @@ def fits_here(kind: str, location, parent=None) -> str:
         return ""
     row = KINDS.get(kind)
     if row is None:
-        return (f"There is no such kind of place as {kind!r}. The kinds are: "
-                f"{', '.join(sorted(KINDS))}; and out on the road: "
-                f"{', '.join(sorted(OUTSIDE_KINDS))}.")
+        return f"There is no such kind of place as {kind!r}. The kinds are: {kinds_said()}."
     name = str(getattr(location, "name", "") or "this place")
     if location is None or not _settled(location, ""):
         return f"{name} is not a settlement, and a {kind} is a settlement's place."

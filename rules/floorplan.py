@@ -195,6 +195,10 @@ BY_SPOT: dict[str, Shape] = {
     # drinking, watching, resting
     "the-inn": Shape(12, 10, LOW, clumps=6, clump_max=2,
                      about="tables, a hearth, and the stair to the rooms"),
+    # Somebody's house (`places.DWELLINGS`, 2026-10-01): founded, never drawn. Without a
+    # row it fell to OPEN — a house under the sky, with no ceiling and so no upstairs.
+    "the-house": Shape(10, 8, LOW, clumps=4, clump_max=2,
+                       about="a hall, a hearth, and the stair to the rooms above"),
     "the-green": Shape(18, 16, None, clumps=2, clump_max=2,
                        vertical="none", about="open ground the whole place uses"),
     "the-bathhouse": Shape(14, 12, HALL, clumps=5, clump_max=2, rough=8,

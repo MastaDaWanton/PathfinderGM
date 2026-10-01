@@ -5193,7 +5193,8 @@ def found_parent(name: str, player_text: str, scene, known, kind: str = ""):
                      .removeprefix("the ")), "")
     for street in _NATURAL_STREET.get(category, ()):
         p = places_mod.find(known, street)
-        if p is not None and p.id not in skip and not places_mod.is_indoors(p.id):
+        if p is not None and p.id not in skip \
+                and not places_mod.is_indoors(p.id, p.terrain, p.shape):
             return p
     return None
 
