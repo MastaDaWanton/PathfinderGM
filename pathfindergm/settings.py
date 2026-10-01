@@ -88,34 +88,46 @@ CAMPAIGN_DIR = user_data_root() / "campaigns"
 
 # Per-role model config, mirroring World Bible's generator/proofreader split. Local is the
 # default and must always be sufficient; hosted stays possible and is never required.
-# `narrator` plans the turn: JSON, refs, ops, a closed vocabulary. `prose` only writes the
-# consequence sentence, which has no schema to get wrong at all.
+# `narrator` plans the turn: JSON, refs, ops, a closed vocabulary. `prose` writes the
+# turn's prose after the engine has resolved it (intents first, `gm/agent.py`).
 #
-# They are split because the two jobs want opposite things from a model, and measured on
-# identical turns they get them from different ones. R4C3R/qwen3-8b-heretic is roughly
-# three times faster than llama3.1:8b and reads better line by line, and it lost half the
-# turns it was given — 5 of 10 against llama's 10 of 10 — because an 8B creative-writing
-# tune is poor at emitting constrained JSON. On call 2 there is no JSON, so none of that
-# applies and the speed and the prose are free.
-#
-# Anyone who prefers one model everywhere can set both to the same thing.
+# The roles were split (2026-08-22) because the two jobs wanted opposite things from a
+# model, and measured on identical turns they got them from different ones.
+# R4C3R/qwen3-8b-heretic was roughly three times faster than llama3.1:8b and read better
+# line by line, and it lost half the turns it was given — 5 of 10 against llama's 10 of
+# 10 — because an 8B creative-writing tune is poor at emitting constrained JSON. The
+# prose call had no JSON then, so the speed and the prose were free. It has a grammar now
+# (`prompts.prose_schema`, used by `GMAgent.narrate_turn`), and since 2026-08-30 both
+# seats hold the same model; the split stays so a player can still give the prose to
+# something else.
 MODELS = {
-    # llama3.1:8b, after a full playtest session on each (2026-08-22). The 4B abliterated
-    # qwen read well in seven-turn harnesses and failed a real session on every axis that
-    # matters: it proposed a wall-climb for "I look around", carried the stale intent into
-    # a social turn, narrated whole days on the player's behalf, recycled its own
-    # paragraphs verbatim across turns, and answered "I draw my dagger and attack" with a
-    # fight it resolved entirely in prose — no intent ever reached the engine. Speed is
-    # nothing when the model will not put the game in front of the rules.
+    # igorls/gemma-4-12B-it-heretic, measured in rather than argued in (2026-08-30): both
+    # narrator audit scripts came back 12/12 clean against stock gemma4:12b's 11/12 and
+    # 11/12, with no rejected intents — the schema adherence the decensoring was supposed
+    # to cost never moved — at 895 and 788 characters a beat against stock's 134 and 262.
+    # Stock gemma4:12b had taken the seat from llama3.1:8b two days earlier, and brought
+    # two lessons with it: Gemma 4 thinks by default and spent every budget in the think
+    # channel, so `think=False` rides every agent call; and its grammar compiler cannot
+    # express `maxLength`, so `gm/client.py` retries once with it stripped.
+    #
+    # Before that, llama3.1:8b, chosen after a full playtest session on each
+    # (2026-08-22). The 4B abliterated qwen read well in seven-turn harnesses and failed
+    # a real session on every axis that matters: it proposed a wall-climb for "I look
+    # around", carried the stale intent into a social turn, narrated whole days on the
+    # player's behalf, recycled its own paragraphs verbatim across turns, and answered "I
+    # draw my dagger and attack" with a fight it resolved entirely in prose — no intent
+    # ever reached the engine. Speed is nothing when the model will not put the game in
+    # front of the rules.
     "narrator": {"provider": "ollama", "model": "igorls/gemma-4-12B-it-heretic-GGUF:latest",
                  "host": "http://localhost:11434"},
     "prose": {"provider": "ollama", "model": "igorls/gemma-4-12B-it-heretic-GGUF:latest",
               "host": "http://localhost:11434"},
     # Second opinion, not second choice. When the narrator burns every attempt at a
-    # turn — llama3.1 will occasionally refuse a schema outright, or circle one wrong
-    # shape until the attempts are gone — the same turn is offered to this model before
-    # the player sees an error. The 4B qwen lost the narrator seat on a full session
-    # (see above), but "worse narrator than llama" and "useless" are different claims:
+    # turn — llama3.1 would occasionally refuse a schema outright, or circle one wrong
+    # shape until the attempts were gone, and any narrator can — the same turn is offered
+    # to this model before the player sees an error. The 4B qwen lost the narrator seat on
+    # a full session (see above), but "worse narrator than llama" and "useless" are
+    # different claims:
     # a rescued turn from a weaker model beats a red wall from a stronger one, and the
     # validators strip both models' output to the same checked facts either way.
     "fallback": {"provider": "ollama",
@@ -129,9 +141,14 @@ MODELS = {
     # faction clock of `docs/architecture.md` is still unbuilt; this is the first
     # thing the role has ever actually been called for.
     #
-    # deepseek-r1:8b by choice: a reasoning model suits a role that reads a log and
-    # decides what changed, the same split World Bible used it for (proofreader beside
-    # a generator).
+    # The narrator's model, since 2026-08-28: the watcher moved to gemma4:12b with the
+    # narrator and prose seats in one change, and to the heretic build with them on
+    # 2026-08-30. It was deepseek-r1:8b before that, by choice — a reasoning model suits
+    # a role that reads a log and decides what changed, the split World Bible used it for
+    # (proofreader beside a generator) — and that choice is still open to anyone who
+    # sets it here or on the settings page. Sharing the narrator's model keeps one model
+    # resident, which matters locally, where a second model's load rather than its
+    # inference is what a turn waits on.
     "watcher": {"provider": "ollama", "model": "igorls/gemma-4-12B-it-heretic-GGUF:latest",
                 "host": "http://localhost:11434"},
 }

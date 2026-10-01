@@ -159,13 +159,29 @@ immune to charm and wide open to domination.** The list is written once now and 
 into all four, which is CLAUDE.md's "grep for every copy of it" applied to the copy that
 had been wrong since the table was written.
 
-### Still open
+### What was still open, and is not any more
 
-An attitude can be moved by a spell, an ability, an item or a scheme, and it can no
-longer be moved by assertion. It cannot yet be moved by **talking to somebody**: the
-`check` op takes no target, and nothing converts a Diplomacy success into a step along
-the track — `rules/effectspec.py` has said so since the spell import ("no check in the
-app consults an attitude yet"). The refusal names Diplomacy, Intimidate and Bluff as the
-ordinary route because those checks are real and do roll; what does not exist is the
-rule row that turns one into an attitude step. That is the next piece of this, and it is
-a feature rather than a fix.
+As first written: an attitude could be moved by a spell, an ability, an item or a
+scheme, and no longer by assertion, but not yet by **talking to somebody** — the `check`
+op took no target, and nothing converted a Diplomacy success into a step along the track
+(`rules/effectspec.py` had said so since the spell import: "no check in the app consults
+an attitude yet"). The refusal named Diplomacy, Intimidate and Bluff as the ordinary
+route while the rule row behind two of them did not exist.
+
+**Closed 2026-09-16** (`docs/attitude.md`). A `check` with a `target` and a skill in
+`attitude.LEVERS` is now a social check: `Engine._sway_subject` takes the subject from
+the intent's own `target`, never a param; `attitude.influence_dc` / `intimidate_dc`
+supply the book's DC, so the plan cannot name one; `attitude.steps_for(margin)` turns the
+margin into steps (one, plus one per 5 over, two at most; a failure by 5 or more costs
+one); `COOLDOWN_MINUTES` is the book's once-a-day limit on Diplomacy; and
+`_set_attitude` is the one applicator, so the shift is an effect like any other and runs
+out after its 1d4 hours. The `attitude` effect type is `engine=True` and the old note is
+gone. Proved end to end 2026-09-22 by
+`test_talking_them_round_is_a_real_route_and_not_a_promise`: indifferent → the player's
+own Diplomacy roll → friendly → `company` accepts them.
+
+Two things this did **not** do, on purpose. Bluff moves nobody on the track, because the
+book does not put it there — a lie is an opposed check against Sense Motive — though the
+`mind_ungated` refusal still lists `check skill=bluff` beside the other two. And an
+intimidated creature does not turn unfriendly when its friendliness lapses, because the
+engine has no "when this effect ends" trigger; `docs/attitude.md` carries both.

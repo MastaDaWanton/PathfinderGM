@@ -183,6 +183,13 @@ on a 20-turn town script. What it would buy is structural — `_repair_outcome_c
 becomes unreachable rather than merely unnecessary — and that is worth revisiting once
 the intents call stops paying for examples it does not need.
 
+**Adopted two days later (2026-08-27), on the player's word rather than the clock:**
+"actors should be at least partially created before I even receive prose back." Intents
+first is the default (`GMAgent.intents_first`; `GM_INTENTS_FIRST=0` restores the old
+order), and `prompts.call_one_intents_only` strips the prose out of the examples, which
+was the next thing this section named. `docs/intent-protocol.md` §2 has the turn as it
+runs now.
+
 ## The baseline was measuring an empty string
 
 Everything above this line, including the 196/200, was scored on `""`.
@@ -266,9 +273,21 @@ Sampler schemas now cover every model call, with an honest note: `as_json` was a
 a grammar, the live "Unterminated string" was the token budget dying mid-string, and
 what the schemas add is required keys plus `maxLength` ceilings sized so strings close
 while budget remains. **Ollama's grammar compiler fails between 2,000 and 2,100
-characters of bounded repetition** (bisected live; the first shipped value of 2,200
-turned every call into a 503 for one whole audit run) — both schema builders clamp at
-2,000 and a test walks every schema.
+characters of bounded repetition** on llama3.1:8b (bisected live; the first shipped value
+of 2,200 turned every call into a 503 for one whole audit run). The clamp first went in
+at 2,000. Re-measured 2026-09-04 on gemma-4 12B, the model now in the seat, 2,000 itself
+fails ("failed to parse grammar", HTTP 400) and 1,800 compiles — and because the client
+stripped `maxLength` on that 400 and carried on, every gemma prose call had been running
+with no ceiling at all, ending only when the token budget did. So both schema builders
+clamp at **1,800** (`prompts.GRAMMAR_MAXLENGTH_CEILING`), the value that holds on both
+models measured, and a test walks every schema.
+
+The one beat allowed past it is an intimate scene at an explicit table
+(`gm/intimate.py`, 2026-10-01): it is asked for 3,000 characters, which no grammar
+ceiling here can hold, so its schema carries no `maxLength` at all
+(`prose_schema(unbounded=True)`) and is bounded by the token budget instead
+(`INTIMATE_NUM_PREDICT`, 1,100 tokens). A reply the budget cuts off mid-string is
+salvaged to its last whole sentence rather than failed.
 
 Measured, same script, same model, same machine, GPU otherwise quiet:
 

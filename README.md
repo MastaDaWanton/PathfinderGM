@@ -100,7 +100,12 @@ durable ids. A world-state watcher runs off-turn. Quest schemes, situation cards
 codex, and a per-town wanted state with gates, counters and guards that read it. The party
 can take the road to another settlement, which costs days on the clock — timed from the
 1e overland tables when the world states a distance and from its own containment tree when
-it does not, and reported in days rather than a mileage nobody wrote down.
+it does not, and reported in days rather than a mileage nobody wrote down. Talking to
+somebody moves them: a Diplomacy or Intimidate check aimed at a person steps them along
+1e's attitude track by the Core Rulebook's own tables, with the DC the engine's rather than
+the GM's and Diplomacy's once-a-day limit kept (`rules/attitude.py`). Bluff is not wired
+to the track, because the book does not put it there — a lie is an opposed check against
+Sense Motive.
 
 **The GM.** Per-turn schemas built from the situation, declaration detection, a grooming
 pipeline over every prose door, and a context ledger that decides what to drop rather than
@@ -119,8 +124,6 @@ installer.
   `speed`, `situational_mod` and others. Each says so in `rules/effectspec.py`, and
   `docs/compliance-plan.md` names this as the honest gap: the engine is lawful and much of
   the corpus is still inert.
-- **Moving an attitude by talking.** Diplomacy, Intimidate and Bluff roll, but nothing yet
-  converts a success into a step along the attitude track.
 - **Readied actions.** There is no readied-action step, which is why countering and
   absorbing a spell are handed to the GM rather than resolved — `rules/engine.py` says so
   where it happens instead of shrugging.

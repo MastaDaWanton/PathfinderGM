@@ -77,6 +77,65 @@ cannot invent +7 because there is nowhere to put a 7.
 
 ## 2. The turn cycle
 
+### As it runs now (intents first, the default since 2026-08-27)
+
+```
+  player types
+       │
+       ▼
+  ┌─────────────────────────────────────────┐
+  │ INTERPRET  ──►  a checked reading       │   gm/interpret.py, since 2026-09-27
+  └─────────────────────────────────────────┘
+       │
+       ▼
+  ┌─────────────────────────────────────────┐
+  │ PLAN  ──►  { intents[] }, no prose      │   prompts.call_one_intents_only
+  └─────────────────────────────────────────┘
+       │
+       ▼
+  VALIDATE (code, instant)  ──► reject / repair-call / accept
+       │
+       ▼
+  RESOLVE (code, instant) — spawns included
+       │
+       ├── needs a player roll? ──► suspend, raise dice popup, resume on input
+       │
+       ▼
+  outcomes[] — rolls itemised, verdicts, state deltas, one `tell` each
+       │
+       ▼
+  ┌─────────────────────────────────────────┐
+  │ PROSE  ──►  the whole turn, written     │   GMAgent.narrate_turn
+  │             knowing what the dice did   │
+  └─────────────────────────────────────────┘
+       │
+       ▼
+  review (code) ──► a targeted rewrite call only for what it found
+```
+
+**Three model calls on every turn, talk included**: the interpreter reads the player's
+sentence into a frame code can check (`interpret.ENABLED`, on in the app and off in the
+suite), the planner returns ops and nothing else, and the prose call writes the turn
+after the engine has resolved it. Repair calls come on top, and only when code has found
+something to repair. Continue is the one exception: it asks for no plan at all
+(`GMAgent._continue_plan`), so it costs the prose call alone. A creature the model plays
+in a fight is not part of this split — `GMAgent.npc_turn` still asks for narration and
+intents in one call, per creature turn.
+
+The order flipped at the player's word — "actors should be at least partially created
+before I even receive prose back" — so the people a turn spawns are on the board before
+a sentence names them. `GMAgent.intents_first` holds it, read per agent from
+`GM_INTENTS_FIRST`; `GM_INTENTS_FIRST=0` restores the order below. It was adopted
+knowing the cost: measured 2026-08-25 at the same correctness and about 60% more
+wall-clock (`docs/narrator-reliability.md`, "The experiment"). What it buys is
+structural — no prose is ever written before the dice, so call 1 has no landing to
+assert.
+
+### As first designed, kept as the record
+
+*Written before intents first was the default. The talk-only promise below no longer
+holds: the interpreter and the prose call run on every turn.*
+
 ```
   player types
        │
@@ -332,6 +391,13 @@ narrating a hit that actually missed" is not prevented by asking the model not t
 prevented by looking, in code, every single turn, and by a test that documents exactly
 which phrasings got through before the detector existed.
 
+*Since intents first became the default (§2), call 1 carries no narration to scan. The
+detector moved to the prose call rather than being switched off: being shown the outcome
+does not stop a model adding a mechanic the outcome never contained (2.2% of the beats
+read across twelve real campaigns carried one), so it runs there against what the engine
+backed — `rules.intents.claims_the_engine_backs` — and a claim the dice already made is
+reporting, not invention.*
+
 ---
 
 ## 6. Worked example
@@ -370,6 +436,10 @@ for the favourable circumstance.) Player rolls 13 → 22. Verdict `success`, mar
 
 **Call 2** is handed the `tell` — *"Kesst beats the guildhand's perception by 5"* — plus
 `because`, and writes two sentences of prose. It is never told the 19.
+
+*The example is in the first design's order. Under intents first the plan emits the same
+`intents` with `narration` asked empty (and discarded if it is not), and the lamp, the guildhand and the landing are all
+written by the one prose call after the 22 — still never told the 19.*
 
 ---
 
