@@ -23,6 +23,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -383,6 +384,33 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
         assert str(was.get("world_entity_id") or "").startswith("keeper:"), ref
         assert got.get("world_entity_id") is None and got["name"] == was["name"]
         was["world_entity_id"], was["notes"] = None, got["notes"]
+    # Lane F's load-time heals (2026-09-30), each the one change it is allowed to make:
+    # - every NPC's people is recorded where it was blank (`person_words.record_peoples`:
+    #   Bobby's eight NPCs wore an Orc face with `world_people_id` null and `heritage`
+    #   ""; the face's own people is written, never a different one, and a construct
+    #   gets none);
+    # - a keeper the page never named goes back to their descriptor, the name kept as
+    #   `true_name` (`keepers.unname_on_sight`, owner ruling F1);
+    # - an actor named like a ref ("c8") gets words back (`heal_ref_names`).
+    ref_shaped = re.compile(r"^(?:[a-z]\d+|new\d+)$")
+    healed = False
+    for ref, was in (orig["scene"].get("people") or {}).items():
+        got = now["scene"]["people"][ref]
+        for key in ("world_people_id", "heritage"):
+            if was.get(key) != got.get(key):
+                healed = True
+                assert not was.get(key), (ref, key, "a recorded people was overwritten")
+                assert got.get(key), (ref, key)
+                was[key] = got[key]
+        if was.get("name") != got.get("name"):
+            healed = True
+            unnamed = (got.get("true_name") == was.get("name")
+                       and got.get("true_name") and not was.get("true_name"))
+            assert unnamed or ref_shaped.match(str(was.get("name") or "")), (
+                ref, was.get("name"), got.get("name"))
+            was["name"] = got["name"]
+            if unnamed:
+                was["true_name"] = got["true_name"]
     added = set(now["scene"].get("population") or {}) - set(orig["scene"].get("population")
                                                             or {})
     assert {now["scene"]["population"][p]["ref"] for p in added} == set(retired)
@@ -392,7 +420,7 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
     orig.pop("world_source", None)
     now.pop("world_source", None)
     assert now == orig
-    if not retired:
+    if not retired and not healed:
         assert without_source(written) == without_source(original)
     else:
         with override_settings(CAMPAIGN_DIR=str(data_root / "campaigns")):
