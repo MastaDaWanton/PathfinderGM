@@ -3073,6 +3073,22 @@
   @media (prefers-reduced-motion: reduce) {
     .v2-btn, .v2-tabs > button { transition: none; }
   }
+
+  /* The roll's verdict (js/table/22-roll-verdict.js). Both are fixed and take no
+     pointer, so neither covers a control a click needs nor moves anything on the page.
+     z-index 65: over the dice mat (60), under the popovers that answer a click (70). */
+  #rv-layer { position: fixed; inset: 0; width: 100%; height: 100%; display: none;
+              pointer-events: none; z-index: 65; }
+  /* The word, when the mat is already closed: a small cast plaque in the mat's own
+     leather and brass edge, its letters cut like the die's numbers. */
+  .rv-seal { position: fixed; z-index: 65; pointer-events: none; white-space: nowrap;
+             transform: translate(-50%, -50%); padding: 7px 14px 8px; border-radius: 2px;
+             font: 400 17px/1 var(--display); letter-spacing: .08em; font-variant: small-caps;
+             background: linear-gradient(#2a2114, #1a140c); border: 1px solid #7a6543;
+             box-shadow: 0 6px 14px rgba(0,0,0,.45), inset 0 1px 0 rgba(240,220,174,.12);
+             text-shadow: 0 1px 0 rgba(0,0,0,.8); }
+  .rv-seal.is-good { color: #f0dcae; border-color: #c9a86a; }
+  .rv-seal.is-bad { color: #d9776b; border-color: #5a4030; }
 </style>
 <script src="{% static 'js/dice3d.js' %}"></script>
 <script src="{% static 'js/scene3d.js' %}"></script>
@@ -3573,6 +3589,8 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/19-tab-spells.js' %}"></script>
 <script src="{% asset 'js/table/20-tab-trade.js' %}"></script>
 <script src="{% asset 'js/table/21-tab-journal.js' %}"></script>
+<!-- The roll's verdict, shown: success or failure as the engine judged the face. -->
+<script src="{% asset 'js/table/22-roll-verdict.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>

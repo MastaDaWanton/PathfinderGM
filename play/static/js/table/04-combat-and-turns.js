@@ -334,13 +334,17 @@ async function sendRoll(face, shown) {
   // Not awaited. `land` resolves when the player closes the mat, and the point of this
   // change is that they may close it whenever they like — before the reply, after it,
   // or not at all. Without the landing we keep the old order and land at the end.
-  let closing = null;
+  let closing = null, rest = null;
   if (landed != null) {
     closing = Dice3D.land({
       title: shown.title, why: shown.why, die: shown.die,
       sides: shown.sides, lo: shown.lo, hi: shown.hi,
       result: landed, terms: shown.terms, note: shown.note,
     });
+    // When this die comes to rest, for the verdict flourish (22-roll-verdict.js),
+    // which must not play over a die still in the air. Taken now, while it is the
+    // mat's current throw.
+    rest = typeof Dice3D.settled === "function" ? Dice3D.settled() : null;
   }
 
   busy(true);
@@ -355,14 +359,22 @@ async function sendRoll(face, shown) {
   // land with the number facing the user", and they never did.
   if (closing == null) {
     if (state && state.rolled != null) {
-      await Dice3D.land({
+      const late = Dice3D.land({
         title: shown.title, why: shown.why, die: shown.die,
         sides: shown.sides, lo: shown.lo, hi: shown.hi,
         result: state.rolled, terms: shown.terms, note: shown.note,
       });
+      // The verdict is already in hand here; it still waits for this die to land.
+      if (typeof showVerdict === "function") showVerdict(state.verdict,
+        typeof Dice3D.settled === "function" ? Dice3D.settled() : null);
+      await late;
     } else {
       Dice3D.close();
     }
+  } else if (state && typeof showVerdict === "function") {
+    // The engine's verdict on the face, never worked out here: not awaited, so the
+    // flourish holds up nothing that follows it.
+    showVerdict(state.verdict, rest);
   }
   // Drawn behind the mat rather than after it. The mat is an overlay, so a player who
   // is still reading the terms loses nothing, and one who already closed it is looking
