@@ -4122,6 +4122,35 @@ def _one_meant_by_a_pronoun(scene) -> str:
     return holding[0] if len(holding) == 1 else ""
 
 
+def _person_gone_to(action, scene) -> str:
+    """The ref of the person here a `go` act's PLACE actually names, or "".
+
+    Measured live on the lane-B check, 2026-09-30: "I walk over to Quin." was read as
+    `go place: "to Quin"` — a person in the place slot — and the plan walked Sam out of
+    the Velvet Veil to the gate, leaving Quin mid-sentence. A place the town has is a
+    place, whoever shares a word with it; only a phrase no place answers to is asked of
+    the people here."""
+    if not isinstance(action, dict) or action.get("act") != "go" or not action.get("place"):
+        return ""
+    phrase = re.sub(r"^(?:to|toward|towards|over\s+to|up\s+to|across\s+to)\s+", "",
+                    " ".join(str(action["place"]).split()), flags=re.I)
+    if not phrase:
+        return ""
+    from rules import places as places_mod, scope as scope_mod
+
+    try:
+        known = places_mod.for_scene(getattr(scene, "location_id", None),
+                                     getattr(scene, "at", ""),
+                                     founded=getattr(scene, "founded", None) or ())
+    except Exception:  # noqa: BLE001 — with no places to ask, it is not a person
+        return ""
+    if places_mod.find(known, phrase) is not None:
+        return ""
+    ref = scope_mod.in_the_room(scene, phrase)
+    a = (getattr(scene, "actors", {}) or {}).get(ref)
+    return ref if a is not None and not getattr(a, "is_pc", False) else ""
+
+
 def _sought_here(player_text: str, scene, reading=None,
                  acts=("seek", "talk", "follow")) -> list[str]:
     """The refs here the player's words go to: the reading's target for `acts`, or with
@@ -4131,14 +4160,17 @@ def _sought_here(player_text: str, scene, reading=None,
     from rules import scope as scope_mod
 
     phrases: list[str] = []
+    refs: list[str] = []
     if isinstance(reading, dict) and not reading.get("error"):
         for a in reading.get("actions") or ():
             if isinstance(a, dict) and a.get("act") in acts \
                     and str(a.get("target") or "").strip():
                 phrases.append(str(a["target"]))
+            person = _person_gone_to(a, scene)
+            if person and person not in refs:
+                refs.append(person)
     else:
         phrases += [m.group(1) for m in _APPROACHES.finditer(redact_speech(player_text))]
-    refs: list[str] = []
     for ph in phrases:
         if ph.strip().lower() in _PRONOUN_TARGET:
             ref = _one_meant_by_a_pronoun(scene)
@@ -4222,11 +4254,13 @@ def declare_approach(raw_intents, player_text: str, scene, reading=None) -> list
     return [move, *kept]
 
 
-def _goes_somewhere(player_text: str, reading=None) -> bool:
-    """Whether the words also take the party somewhere: the reading's go/leave/journey,
-    or with no reading a departure in the words (`player_departs`)."""
+def _goes_somewhere(player_text: str, reading=None, scene=None) -> bool:
+    """Whether the words also take the party somewhere: the reading's go/leave/journey —
+    not a `go` whose place is a person here (`_person_gone_to`) — or with no reading a
+    departure in the words (`player_departs`)."""
     if isinstance(reading, dict) and not reading.get("error"):
         return any(isinstance(a, dict) and a.get("act") in ("go", "leave", "journey")
+                   and not (scene is not None and _person_gone_to(a, scene))
                    for a in reading.get("actions") or ())
     return player_departs(player_text)
 
@@ -4255,7 +4289,7 @@ def refuse_leaving_the_sought(raw_intents, player_text: str, scene, reading=None
         return raw_intents
     travels = [r for r in raw_intents
                if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel"]
-    if not travels or _goes_somewhere(player_text, reading):
+    if not travels or _goes_somewhere(player_text, reading, scene):
         return raw_intents
     sought = _sought_here(player_text, scene, reading)
     if not sought:

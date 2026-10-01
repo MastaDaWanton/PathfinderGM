@@ -172,6 +172,31 @@ def test_talking_to_somebody_here_is_not_walking_up_to_them(worlds):
                                       reading) == plan
 
 
+def test_a_person_read_into_the_place_slot_is_an_approach(worlds):
+    """Measured on this lane's live check, 2026-09-30, on the owner's save: "I walk over
+    to Quin." was read as `go place: "to Quin"`, and the plan was a travel to the gate —
+    "You leave Quin Nutmeg mid-sentence." A `go` whose place no place answers to and a
+    person here does is walking up to them."""
+    s, e = _market(worlds)
+    quin = instantiate("guildhand", scene=s, name="Quin Nutmeg")
+    s.add(quin)
+    reading = {"actions": [{"act": "go", "place": "to Quin"}]}
+    with pytest.raises(IntentError) as err:
+        judgement.refuse_leaving_in_place(
+            [{"op": "travel", "params": {"place": "the gate"}}], "I walk over to Quin.", s,
+            reading=reading)
+    assert "Quin Nutmeg" in str(err.value)
+    out = judgement.declare_approach([{"op": "narrate_only"}], "I walk over to Quin.", s,
+                                     reading)
+    assert out == [{"op": "narrate_only"}] or out[0]["op"] == "move"
+    # A real place in the same slot is a going, and is left alone.
+    gate = next(p for p in e.places() if p.id != s.at)
+    going = {"actions": [{"act": "go", "place": f"to {gate.name}"}]}
+    plan = [{"op": "travel", "params": {"place": gate.name}}]
+    assert judgement.refuse_leaving_in_place(list(plan), f"I go to {gate.name}", s,
+                                             reading=going) == plan
+
+
 def test_approaching_a_creature_holding_its_ground_closes_on_it():
     """Lane D's rule (merged as 8f4d29d): a creature met while foraging holds its ground
     (`state.holding-ground`), and its reaction roll fires only when the player CLOSES on
