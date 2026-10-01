@@ -2860,7 +2860,31 @@ class Actor:
 
             block = bestiary_mod.lookup(str(self.from_template)) or {}
             out.extend(str(t) for t in (block.get("tags") or ()) if str(t).strip())
+        # What the body IS — `type.construct`, `subtype.clockwork` — off the stat block's
+        # own words and its printed trait bundle (`states.type_tags`). The trimmed
+        # `lookup` above drops `creature_type`, so the raw document is asked.
+        from . import states as _states
+
+        doc = self._creature_doc() or {}
+        out.extend(_states.type_tags(doc.get("creature_type"), doc.get("subtype"),
+                                     self.immunities))
         return tuple(out)
+
+    def death_floor(self) -> int:
+        """The hit point total at which this body is dead (or destroyed).
+
+        -Con for a living body. Zero for a troop (it breaks up) and for a construct or an
+        undead creature, which the Bestiary destroys at 0 with no dying rung between — the
+        one reader of that threshold, so `apply_hp_state`, `bleed_out` and the off-screen
+        `Engine._resolve_dying` cannot disagree. Measured 2026-10-01: a Clockwork Spy at
+        -1 was "unconscious and dying", then "bled out where they fell", because a missing
+        Constitution reads as 10 and the floor was -10.
+        """
+        from . import states as _states
+
+        if self.troop is not None or _states.destroyed_at_zero(self):
+            return 0
+        return -self.ability_score("con")
 
     def noticed(self) -> list[str]:
         """What this character has noticed and still holds: the names of the `knows.*`
@@ -3230,8 +3254,10 @@ class Actor:
         # One threshold rather than a second death path, so the sentence that writes `dead`
         # is still written once. A parallel branch was the first version and the three laws'
         # ratchet caught it: two copies of a ladder is how one of them goes stale.
-        con = self.ability_score("con")
-        floor = 0 if self.troop is not None else -con
+        # A construct or an undead creature has the troop's floor for the Bestiary's own
+        # reason — "immediately destroyed when reduced to 0 hit points" — and the threshold
+        # is asked of `death_floor`, the one reader (2026-10-01, the Clockwork Spy).
+        floor = self.death_floor()
         if self.hp <= floor and not self.is_dead:
             self.die("hit points")
             changed.append("dead")
@@ -3379,9 +3405,12 @@ class Actor:
         """
         if not self.has_condition("dying") or self.has_condition("dead"):
             return None
-        self.hp -= 1
-        con = self.ability_score("con")
-        if self.hp <= -con:
+        # `death_floor`, not -Con: a construct saved "dying" before 2026-10-01 is
+        # destroyed on its next tick rather than losing a "hit point of blood" and rolling
+        # a Constitution it does not have.
+        if self.hp > self.death_floor():
+            self.hp -= 1
+        if self.hp <= self.death_floor():
             self.apply_hp_state()
             return {"ref": self.ref, "outcome": "dead", "hp": self.hp}
 

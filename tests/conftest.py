@@ -60,7 +60,8 @@ _CACHED = (
     "rules.classes",
     "rules.enchanter", "rules.feats", "rules.hazards", "rules.ingredients", "rules.lives",
     "rules.leatherworker",
-    "rules.magicitem", "rules.market", "rules.population", "rules.spells", "rules.weapons",
+    "rules.magicitem", "rules.market", "rules.population", "rules.repair", "rules.spells",
+    "rules.weapons",
     "rules.worldclass",
 )
 

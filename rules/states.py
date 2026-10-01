@@ -278,6 +278,65 @@ REGARD = "bond.regard"
 BELIEVES_CLAIM = "belief.claim"
 CAUGHT_LYING = "belief.liar"
 
+# What a body IS, in the Bestiary's own terms: `type.<creature type>` and
+# `subtype.<word>`, held through `Actor.standing_tags` off the stat block the creature was
+# made from (`creature_type`, `subtype`) and off the printed trait bundle — a homebrew
+# block that prints only "Immune construct traits" is a construct all the same.
+#
+# Added 2026-10-01 for the owner's Clockwork Spy. A Magic Missile left it at -1 hit points
+# and the engine said "unconscious and dying"; the next turn it "bled out where it fell" —
+# a machine bleeding — because `apply_hp_state` asked `-Con` of a body with no
+# Constitution, and a missing score reads as 10. The book (Bestiary, Creature Types,
+# read on d20pfsrd 2026-10-01):
+#
+#   Construct: "Immediately destroyed when reduced to 0 hit points or less." "Immunity to
+#   bleed ..." "A construct cannot be raised or resurrected."
+#   Undead:    "Immediately destroyed when reduced to 0 hit points." "Not at risk of death
+#              from massive damage."
+#
+# So there is no dying rung for either type: the bottom of the ladder is 0, the same
+# threshold a troop has, through the same `Actor.death_floor`. Asked as a prefix question
+# (`has_state(CONSTRUCT)`) and never by matching a name or a `notes` line.
+#
+# NOT read off a race document's `type`, on purpose: a PC of a world's construct people
+# destroyed outright at 0 would be a far larger ruling than this fix, and the Advanced
+# Race Guide's construct-type terms for a player race could not be confirmed here.
+TYPE = "type"
+SUBTYPE = "subtype"
+CONSTRUCT = "type.construct"
+UNDEAD = "type.undead"
+DESTROYED_AT_ZERO: tuple[str, ...] = (CONSTRUCT, UNDEAD)
+# The Bestiary's trait bundles name their type: a block that prints the bundle and no
+# `creature_type` still answers the type question.
+TRAIT_TYPES: dict[str, str] = {"construct traits": "construct", "undead traits": "undead"}
+
+
+def type_tags(creature_type="", subtype="", immunities=()) -> tuple[str, ...]:
+    """`type.<x>` / `subtype.<y>` for a stat block's own words — the one writer of the
+    tag text, so a reader and a writer cannot spell a type differently."""
+    import re as _re
+
+    def leaf(word) -> str:
+        return "-".join(_re.findall(r"[a-z0-9]+", str(word or "").lower()))
+
+    out: list[str] = []
+    kind = leaf(creature_type)
+    if kind:
+        out.append(f"{TYPE}.{kind}")
+    for word in _re.split(r"[,;]", str(subtype or "")):
+        if leaf(word):
+            out.append(f"{SUBTYPE}.{leaf(word)}")
+    for printed in immunities or ():
+        bundle = TRAIT_TYPES.get(str(printed or "").strip().lower())
+        if bundle and f"{TYPE}.{bundle}" not in out:
+            out.append(f"{TYPE}.{bundle}")
+    return tuple(out)
+
+
+def destroyed_at_zero(actor) -> bool:
+    """Whether this body is destroyed, not dying, at 0 hit points (constructs, undead)."""
+    return bool(actor is not None and any(actor.has_state(t) for t in DESTROYED_AT_ZERO))
+
 
 def believes_claim_tag(kind: str) -> str:
     return f"{BELIEVES_CLAIM}.{kind}"

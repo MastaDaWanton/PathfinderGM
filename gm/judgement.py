@@ -1007,6 +1007,120 @@ def declare_coup_de_grace(raw_intents, player_text: str, scene):
     return out
 
 
+# "Fix the spy", "repair it", "patch the golem up", "get it working again": mending, as a
+# verb the player's character does. Read off the redacted line (speech is not action).
+_REPAIR_VERB = re.compile(
+    r"\b(?:fix(?:es|ing)?|repair(?:s|ing)?|mend(?:s|ing)?|rebuild(?:s|ing)?"
+    r"|reassembl(?:e|es|ing)|rewir(?:e|es|ing)|tinker(?:s|ing)?\s+with"
+    r"|patch(?:es|ing)?\s+(?:[\w']+\s+){0,3}?up"
+    r"|put(?:s|ting)?\s+(?:it|him|her|them|the\s+[\w']+)\s+back\s+together"
+    r"|(?:get|gets|getting)\s+(?:it|him|her|the\s+[\w']+)\s+"
+    r"(?:working|running|going|moving|ticking)\s+again"
+    r"|restor(?:e|es|ing)\s+(?:it|him|her|the\s+[\w']+))\b", re.I)
+# The machine made the player's: no repair grants it (rules/repair.py), so these words
+# only add the rule's refusal to the tell — they never decide anything.
+_OWN_WORDS = re.compile(
+    r"\brecogni[sz]e\s+me\b|\b(?:its|his|her)\s+(?:new\s+)?(?:owner|master|mistress"
+    r"|creator|maker)\b|\bobeys?\s+me\b|\bserves?\s+me\b|\banswers?\s+to\s+me\b"
+    r"|\bloyal\s+to\s+me\b|\bbind\s+(?:it|him|her)\s+to\s+me\b|\btam(?:e|es|ing)\b"
+    r"|\bmake\s+(?:it|him|her)\s+mine\b|\bmy\s+(?:new\s+)?(?:servant|pet|minion)\b",
+    re.I)
+# What a construct is called when it is not called by its name.
+_MACHINE_WORDS = re.compile(
+    r"\b(?:construct|machine|automaton|clockwork|golem|contraption|mechanism|device"
+    r"|it|him|her)\b", re.I)
+# The checks a model dresses a repair as. None of them mends anything in 1e; the repair
+# op's own check is the rule's (Craft, at the construct's DC less 5).
+_REPAIR_DRESSING = frozenset({"craft", "knowledge (engineering)", "knowledge (arcana)",
+                              "disable device", "spellcraft", "heal"})
+
+
+def _repair_subject(text: str, scene):
+    """The construct the player's words mend: one named, else the only one here."""
+    from rules import repair as repair_mod
+
+    machines = [a for a in (getattr(scene, "actors", {}) or {}).values()
+                if not getattr(a, "is_pc", False) and repair_mod.is_construct(a)]
+    if not machines:
+        return None
+    said = set(re.findall(r"[a-z']+", text.lower()))
+    named = [a for a in machines if _name_words(a.name) & said]
+    if len(named) == 1:
+        return named[0]
+    if not named and len(machines) == 1 and _MACHINE_WORDS.search(text):
+        return machines[0]
+    return None
+
+
+def declare_repair(raw_intents, player_text: str, scene):
+    """Mending words aimed at a construct become the `repair` op; the model does not
+    have to.
+
+    The owner's turn, 2026-10-01: "I attempt to use my knowledge of engineering and my
+    deft hands to fix the spy in a way that makes it recognize me as its owner." The
+    Clockwork Spy lay wrecked; nothing in the plan asked a rule, the prose repaired and
+    tamed it, and the engine had done nothing ("did not heal the clockwork spy when I
+    fixed it"). Detected here, in code, the shape every declaration repair that held has
+    used: the verb and the machine are read off the player's own line, the op is written,
+    and the engine decides — including that a destroyed construct cannot be mended and
+    that no repair makes one yours (`rules/repair.py`).
+
+    A check the model dressed the repair as (Knowledge (engineering), Craft, Disable
+    Device) aimed at the machine or at nobody is dropped, and so is a `heal`, a
+    `condition` or a `company` aimed at it: each is the model deciding what the rule
+    decides. Only a declaration: "I" and the verb, never a question.
+    """
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    if "?" in player_text:
+        return raw_intents
+    text = redact_speech(player_text)
+    verb = _REPAIR_VERB.search(text)
+    if verb is None or not re.search(r"\bI\b", text[:verb.start()], re.I):
+        return raw_intents
+    subject = _repair_subject(text, scene)
+    if subject is None:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    own = bool(_OWN_WORDS.search(text))
+    ref = subject.ref
+
+    def aims_at_it(raw: dict) -> bool:
+        params = raw.get("params") or {}
+        aimed = {str(raw.get("target") or ""), str(params.get("to") or ""),
+                 str(params.get("who") or "")} - {""}
+        return ref in aimed
+
+    out, have = [], False
+    for raw in raw_intents:
+        if not isinstance(raw, dict):
+            out.append(raw)
+            continue
+        op = str(raw.get("op", "")).lower()
+        params = raw.get("params") or {}
+        if op == "repair":
+            have = True
+            raw = dict(raw, target=raw.get("target") or ref,
+                       params={**params, **({"own": True} if own else {})})
+        elif op == "check" and (aims_at_it(raw) or (
+                not raw.get("target")
+                and str(params.get("skill", "")).lower() in _REPAIR_DRESSING)):
+            # Any check at the machine is the repair dressed up — the owner's own replay
+            # (2026-10-01) came back first as `check skill=use` aimed at the spy, refused
+            # as no such skill, and cost a whole second plan before this op landed.
+            continue
+        elif op in ("heal", "condition", "company") and aims_at_it(raw):
+            continue
+        out.append(raw)
+    if not have:
+        out.append({"op": "repair", "actor": pc.ref, "target": ref,
+                    "because": "the player mends it; the rule decides whether it can be",
+                    "params": {"own": True} if own else {}})
+    return out
+
+
 def inject_fight(raw_intents, player_text: str, scene):
     """The player started a fight and there was nobody there to have it with.
 

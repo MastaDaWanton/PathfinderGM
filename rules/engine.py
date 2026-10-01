@@ -6730,6 +6730,75 @@ class Engine:
             because=intent.because,
         )
 
+    def _op_repair(self, intent: Intent, partial: dict) -> Outcome:
+        """Mend a construct by the book, or say why not (`rules/repair.py`).
+
+        The gates are the rule's and print at resolution — every one is a fact the player
+        could not see from their own sheet. Past them: the coin is spent and the day
+        passes BEFORE the check, which is the rule's order ("its master spends 100 gp per
+        Hit Die ... and then makes a skill check"), and on a success the hit points come
+        through `_op_heal`, the one applicator a cure uses, stamped with the rule. Nothing
+        is charged until the roll is in hand, so a suspended player roll resumed is not
+        charged twice.
+        """
+        from . import goods
+        from . import repair as repair_mod
+
+        actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        own = bool(intent.params.get("own"))
+        tail = (" " + repair_mod.OWNERSHIP_SAID) if own else ""
+        refs = [r for r in intent.targets() if r and r != getattr(actor, "ref", None)]
+        subject = self.scene.actors.get(refs[0]) if refs else None
+        if actor is None or subject is None:
+            return self._refuse(intent, "The repair names nothing here to mend." + tail)
+        rule = repair_mod.row()
+        why = repair_mod.refusal(self.scene, actor, subject, rule)
+        if why:
+            return self._refuse(intent, why + tail)
+        gp = repair_mod.cost_gp(subject, rule)
+        if goods.in_copper(actor.purse) < gp * 100:
+            return self._refuse(intent, (
+                f"Repairing {subject.name} costs {gp} gp in parts and materials "
+                f"(100 gp per Hit Die), and {actor.name} has "
+                f"{goods.in_copper(actor.purse) // 100} gp.") + tail)
+
+        crafting, house = repair_mod.crafting_dc(subject, rule)
+        dc = crafting - int(rule["dc_less"])
+        skill = str(rule["skill"])
+        mods = actor.skill_modifiers(skill)
+        roll = self._roll_or_suspend(intent, actor, mods,
+                                     label=f"{skill.title()} check (repair)",
+                                     dc=dc, partial=partial)
+        actor.purse, _paid = goods.spend(actor.purse, gp * 100)
+        spent = repair_mod.minutes(subject, rule)
+        self.scene.advance(spent)
+        margin = roll.total - dc
+        days = spent // 1440
+        took = f"{days} day{'s' if days != 1 else ''}"
+        effects: list[dict] = [{"ref": actor.ref, "kind": "spend", "gp": gp,
+                                "minutes": spent, "origin": f"rule:{repair_mod.RULE}"}]
+        tell = (f"{actor.name} spends {took} and {gp} gp of materials on {subject.name}. "
+                + (f"{actor.name} makes the craft check by {margin}."
+                   if margin >= 0 else f"{actor.name} misses the craft check by {-margin}: "
+                   f"the work does not hold, and the materials are spent."))
+        if house:
+            effects[0]["dc_house"] = True
+        if margin >= 0:
+            mended = self._op_heal(Intent(
+                op="heal", actor=actor.ref, target=subject.ref, id=intent.id,
+                params={"amount": repair_mod.dice(subject, rule), "to": subject.ref},
+                origin=f"rule:{repair_mod.RULE}", origin_name=str(rule["name"])), {})
+            effects.extend(mended.effects)
+            tell = f"{tell} {mended.tell}"
+            rolls = [roll, *mended.rolls]
+        else:
+            rolls = [roll]
+        return Outcome(intent_id=intent.id, op="repair", rolls=rolls,
+                       dc=dc_mod.ResolvedDC(value=dc, band=None).as_dict(), verdict=(
+                           "success" if margin >= 0 else "failure"),
+                       margin=margin, effects=effects, tell=tell + tail,
+                       because=intent.because)
+
     def _op_temp_hp(self, intent: Intent, partial: dict) -> Outcome:
         """Grant temporary hit points, which do not stack — the best source wins."""
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
@@ -7190,7 +7259,12 @@ class Engine:
 
     def _resolve_dying(self, a: Actor) -> list[str]:
         """One dying creature's story ends off-screen: stable, or gone."""
-        floor = -a.ability_score("con")
+        floor = a.death_floor()
+        if states.destroyed_at_zero(a):
+            # A construct or undead creature saved "dying" before 2026-10-01 does not
+            # bleed and does not stabilise: it was destroyed when it reached 0.
+            a.apply_hp_state()
+            return [f"{a.name} " + _DESTROYED_SAID + "."] if a.is_dead else []
         while a.hp > floor and a.has_condition("dying"):
             if self.dice.roll("1d100", label="stabilise",
                               visibility="hidden").total <= 10:
@@ -14613,6 +14687,11 @@ class Engine:
             if key == "disabled" and who is not None \
                     and who.has_state("state.down.unconscious"):
                 line = "{name} has no hit points left and lies unconscious."
+            # A construct or an undead creature is not "dead" in the Bestiary's words but
+            # "destroyed", and the difference is what the player can do next: there is no
+            # body to save and nothing to repair (Ultimate Magic p.113).
+            if key == "dead" and states.destroyed_at_zero(who):
+                line = "{name} " + _DESTROYED_SAID + "."
             said.append(line.format(name=who.name if who else "they"))
         return (" " + " ".join(said)) if said else ""
 
@@ -14799,6 +14878,8 @@ _STATE_SAID = {
     "unconscious": "{name} is unconscious",
     "disabled": "{name} is disabled: still standing, but any real effort now costs blood",
 }
+# The Bestiary's word for a construct or undead creature at 0 hit points.
+_DESTROYED_SAID = "is destroyed"
 
 
 def _ward_tell(scene: Scene, e: dict) -> str:

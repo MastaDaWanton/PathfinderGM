@@ -1,0 +1,24 @@
+{
+  "_about": [
+    "The rule document a repair cites (rules/repair.py). A construct cannot heal on its own",
+    "(Bestiary, Construct type: 'Cannot heal damage on its own, but often can be repaired",
+    "... through the use of the Craft Construct feat. Constructs can also be healed through",
+    "spells such as make whole.'), so the hit points a mended machine gets back are this",
+    "row's dice, rolled by the engine and stamped rule:<id> — never a number the plan wrote.",
+    "Every field is the book's except where a field says HOUSE."
+  ],
+  "repair-construct": {
+    "name": "repairing a construct",
+    "source": "Ultimate Magic p.113, Repairing Constructs (aonprd.com/Rules.aspx?ID=979): 'a crafter can repair a construct with the Craft Construct feat. When repairing a construct, its master spends 100 gp per Hit Die of the construct, and then makes a skill check as if he were crafting the construct with a DC of 5 less than the DC for crafting that construct. With a success, the construct regains 1d6 hit points per Hit Die of the construct. Completing a repair takes 1 day per 1,000 gp spent on the repair (minimum of 1 day). Repair in this way can only be performed while the construct is inanimate or nonfunctioning.' And: 'A construct that has been completely destroyed cannot be repaired, though at the GM's option some of the materials may be usable in the construction of a new construct.'",
+    "requires_tag": "craft.construct",
+    "requires_said": "the Craft Construct feat",
+    "skill": "craft",
+    "dc_less": 5,
+    "crafting_dc": 20,
+    "crafting_dc_house": "HOUSE, used only when the stat block prints no construction DC: the Core Rulebook's Craft table puts a 'complex or superior item (lock)' at DC 20. The Clockwork Spy's own printed construction line is Craft (clockwork) DC 20 (Bestiary 3), so for it this is the book's number.",
+    "dice_per_hd": "1d6",
+    "cost_gp_per_hd": 100,
+    "minutes_per_1000_gp": 1440,
+    "minimum_minutes": 1440
+  }
+}
