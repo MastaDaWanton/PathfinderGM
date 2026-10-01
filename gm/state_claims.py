@@ -204,10 +204,19 @@ def _changed(changes, kinds) -> list[dict]:
     return [c for c in (changes or []) if isinstance(c, dict) and c.get("kind") in kinds]
 
 
-def state_claims(text: str, scene, changes=None) -> list[tuple[str, str]]:
+def state_claims(text: str, scene, changes=None, *,
+                 conditions: bool = True) -> list[tuple[str, str]]:
     """Sentences that say a hand holds or loses something, or a body suffers something,
     that the state does not carry. Returns (sentence, why) pairs, the why naming the
-    fact the repair has to write to. Run on prose already in the second person."""
+    fact the repair has to write to. Run on prose already in the second person.
+
+    `conditions=False` skips the second question — a body said to suffer a condition —
+    for an intimate scene between adults (gm/intimate.py). Probed 2026-10-01 on the
+    sentences such a beat is made of: "Mira lies flat on her back on the bed" read as
+    prone, "you are left dazed and breathless" as dazed, "she is stunned by the force of
+    it" as stunned — three of nineteen, each a rewrite or a cut of the scene's own
+    sentence. Out of a fight none of the three has a mechanical meaning to protect. The
+    weapon and purse questions still run."""
     if not text or scene is None:
         return []
     cast = _Cast(scene)
@@ -291,7 +300,7 @@ def state_claims(text: str, scene, changes=None) -> list[tuple[str, str]]:
         # Every unheld condition in the sentence goes into ONE why: naming only the first
         # let the repair keep the second ("sprawling" stayed when "stunned" was fixed).
         said_of: dict[str, list[str]] = {}
-        for rx, key, tag in _CONDITION_WORDS:
+        for rx, key, tag in (_CONDITION_WORDS if conditions else ()):
             for m in rx.finditer(s):
                 if _hedged(s, m.start()):
                     continue
