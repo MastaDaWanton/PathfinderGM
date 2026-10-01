@@ -1,8 +1,9 @@
 """The event watcher, wired to something at last.
 
-The "watcher" model role has been configured since the roles existed — deepseek-r1:8b,
-chosen because a reasoning model suits reading a record and drawing a conclusion — and
-it had ZERO call sites. `settings.py` said so out loud: "a model that is never loaded
+The "watcher" model role has been configured since the roles existed — deepseek-r1:8b
+then, chosen because a reasoning model suits reading a record and drawing a conclusion,
+and the narrator's own model since 2026-08-28 (`settings.MODELS` says why) — and it had
+ZERO call sites. `settings.py` said so out loud: "a model that is never loaded
 and never called." Every campaign carried a live undercurrent from turn one (planted by
 `new_campaign`) and nothing ever moved it; every corpse carried exactly what its spawn
 kit rolled and nothing more personal than coin.
