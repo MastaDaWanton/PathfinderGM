@@ -91,6 +91,30 @@ def test_asked_their_name_a_keeper_gives_it_and_the_panel_learns_it():
     assert barkeep.name == given
 
 
+def test_a_name_asked_for_and_narrated_is_learned():
+    """Live, 2026-09-30, on a copy of Sam's save: "What's your name, sergeant?" — the page
+    wrote "The sergeant's name is Caspian Tidestone." in narration, and the panel kept
+    "the sergeant of the watch". The asked name on the page is learned however it is
+    carried (`play/aftermath/name_given.py`); not asked, it is not."""
+    from play.aftermath import name_given
+
+    scene, engine = _table(GATE)
+    _tavern(engine)
+    barkeep = next(a for a in _keepers(scene) if a.at == scene.at)
+    given = barkeep.true_name
+    beat = f"The barkeep's name is {given}. He goes back to his tankards."
+
+    def ctx(player_text):
+        return SimpleNamespace(scene=scene, text=beat, player_text=player_text)
+
+    assert name_given.step(ctx("I order an ale.")) == []
+    assert barkeep.name == "the one behind the bar"
+    rows = name_given.step(ctx("What's your name, barkeep?"))
+    assert rows == [{"kind": "name-given", "ref": barkeep.ref,
+                     "was": "the one behind the bar", "name": given}]
+    assert barkeep.name == given
+
+
 def test_a_keeper_the_world_marks_as_publicly_known_is_named_on_sight():
     """The exception F1 keeps: the name over the shop. Read from the world's own
     `play.places[]` row (``keeper: {name, known: "publicly"}``) or a cast member who
