@@ -230,9 +230,10 @@ def test_cast_attaches_and_never_prepares(spells, tmp_path):
     handler = _sheet_js()
     assert '#sheetbody [data-spell][data-action]' in handler
     assert 'e.target.closest(".prepbtn");' not in handler
-    # The attach itself stays where it is: 02-state.js, calling 10-spells.js's chip.
+    # The attach itself stays where it is: 02-state.js, calling 10-spells.js's door
+    # (`chooseSpell`: the chip out of a fight, the panel's turn in one, 2026-10-01).
     state = (TABLE_SCRIPTS / "02-state.js").read_text(encoding="utf-8")
-    assert "attachSpell({ id: cast.dataset.spell" in state
+    assert "chooseSpell({ id: cast.dataset.spell" in state
 
 
 def test_prepared_cantrips_are_at_will_and_the_rest_are_prepared_first(spells, tmp_path):

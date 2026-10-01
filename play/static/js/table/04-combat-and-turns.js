@@ -61,6 +61,60 @@ function targetName() {
   return f ? f.name : "the enemy";
 }
 
+// --- a spell in the turn ---------------------------------------------------------------
+// The owner, 2026-10-01, in a fight: "spells are mapped to the say button instead of the
+// commit turn so i cannot move and cast in the same turn." Both doors to the picker (the
+// Spells button under the panel and the panel's own Cast…) attached the spell to the Say
+// box, so a cast left through /api/say as a spoken turn of its own and the step staged
+// on the map never travelled with it. In a fight a chosen spell is now a step of THIS
+// turn, in the standard slot where a Strike goes — "a standard action and a move action"
+// is the round (Core Rulebook, "Action Types") — and Commit turn posts it with the move to
+// /api/combat/act, whose whitelist has carried `cast` since 2026-08-25.
+//
+// Aimed the way the panel aims everything, at the target chip. A spell whose range is
+// "personal" goes on the caster (`aim: self`) and never at the chip: Shield laid on the
+// thug is the wrong spell. Any other spell can be turned on yourself from the menu that
+// opens with it (a cure is touch, and so is Shocking Grasp — the range alone cannot
+// tell which way it points). Where an area goes beyond a person is still words, for Say
+// (owner Q46): the panel does not grow a square picker for spells.
+function castIsPersonal(spell) {
+  return /^\s*personal\b/i.test(String((spell && spell.range) || ""));
+}
+
+function castStep(spell, onSelf) {
+  const params = { spell: spell.id };
+  const self = onSelf || castIsPersonal(spell);
+  if (self) params.aim = "self";
+  const act = { op: "cast", params };
+  if (!self && COMBAT.target) act.target = COMBAT.target;
+  const at = self ? "on yourself" : COMBAT.target ? `at ${targetName()}` : "";
+  return { label: `Cast ${spell.name}${at ? " " + at : ""}`, actions: [act],
+           cast: { id: spell.id, name: spell.name, range: spell.range || "",
+                   self: !!onSelf } };
+}
+
+function castMenu(spell) {
+  const personal = castIsPersonal(spell);
+  const self = COMBAT.standard && COMBAT.standard.cast && COMBAT.standard.cast.self;
+  const turn = personal || !COMBAT.target ? "" : self
+    ? `<button type="button" data-castaim="target">At ${esc(targetName())} instead</button>`
+    : `<button type="button" data-castaim="self">On yourself instead</button>`;
+  combatMenu(`${turn}<span class="cb-note">${esc(spell.name)} is in this turn, with ${
+    COMBAT.move ? "your move" : "any move you click on the map"}. Commit turn casts it.</span>`);
+}
+
+// Called by 10-spells.js when a spell is chosen in a fight. Returns false when there is
+// no fight (or no panel), and the spell goes to the Say box as it always did.
+function stageCastInTurn(spell) {
+  if (!spell || !spell.id || !$("#combatbar")) return false;
+  if (!(STATE && STATE.scene && STATE.scene.in_encounter)) return false;
+  COMBAT.standard = castStep({ id: String(spell.id), name: String(spell.name || spell.id),
+                               range: spell.range || "" }, false);
+  renderPlan();
+  castMenu(COMBAT.standard.cast);
+  return true;
+}
+
 function combatMenu(html) {
   const m = $("#cb-menu");
   m.hidden = !html;
@@ -109,12 +163,28 @@ async function commitTurn(endOnly) {
 document.addEventListener("click", async e => {
   const t = e.target;
   const chip = t.closest(".cb-target");
-  if (chip) { COMBAT.target = chip.dataset.target; renderCombat(STATE); return; }
+  if (chip) {
+    COMBAT.target = chip.dataset.target;
+    // A staged cast follows the chip: a spell is often chosen before its target (the
+    // picker is one press away from the Spells button), and "Cast Magic Missile at the
+    // thug" must not stay aimed at the thug once the player has pointed at somebody else.
+    const cast = COMBAT.standard && COMBAT.standard.cast;
+    if (cast && !cast.self) COMBAT.standard = castStep(cast, false);
+    renderCombat(STATE);
+    if (cast) castMenu(COMBAT.standard.cast);
+    return;
+  }
+  const castAim = t.closest("[data-castaim]");
+  if (castAim && COMBAT.standard && COMBAT.standard.cast) {
+    COMBAT.standard = castStep(COMBAT.standard.cast, castAim.dataset.castaim === "self");
+    renderPlan(); castMenu(COMBAT.standard.cast); return;
+  }
   const un = t.closest("[data-unplan]");
   if (un) {
     const what = un.dataset.unplan;
     if (what === "move") COMBAT.move = null;
-    else if (what === "standard") COMBAT.standard = null;
+    // The cast's "On yourself instead" line goes with the cast it was about.
+    else if (what === "standard") { COMBAT.standard = null; combatMenu(""); }
     else if (what === "swift") COMBAT.swift = null;
     else if (what.startsWith("free:")) COMBAT.frees.splice(Number(what.slice(5)), 1);
     renderPlan(); return;
@@ -210,10 +280,10 @@ document.addEventListener("click", async e => {
       title="${esc((a.text || "").slice(0, 200))}">${esc(a.name)}</button>`).join(""));
   };
   // Casting in a fight goes through the one spell picker the footer uses (owner Q47,
-  // 10-spells.js): the spell is attached to the say box and the player says where it
-  // goes, "at the one by the door", "into the brush". The list this menu used to build
-  // read `pc.castable`, which offers a prepared caster's whole book when nothing is
-  // prepared (docs/fix-interfaces.md §1.7 F1), and it could only aim at the target chip.
+  // 10-spells.js), and since 2026-10-01 a spell chosen there in a fight is staged into
+  // this turn (`stageCastInTurn`, above) rather than attached to the say box. The list
+  // this menu used to build read `pc.castable`, which offers a prepared caster's whole
+  // book when nothing is prepared (docs/fix-interfaces.md §1.7 F1).
   if (t.closest("#cb-cast")) { castFromCombatBar(t.closest("#cb-cast")); return; }
   if (t.closest("#cb-ability")) { menuFor(["standard", "full-round", "move"], "standard"); return; }
   if (t.closest("#cb-swift")) { menuFor(["swift", "immediate"], "swift"); return; }

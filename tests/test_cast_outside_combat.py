@@ -44,7 +44,10 @@ class TestTheDoor:
         The picker is hidden (owner, Q46: no target picker); the route stays for E."""
         html = table_source()
         assert 'class="prepbtn castbtn"' in html
-        assert "attachSpell({ id: cast.dataset.spell" in html
+        # Through `chooseSpell` since 2026-10-01: in a fight it stages the cast in the
+        # combat panel's turn, out of one it attaches the chip
+        # (tests/test_spells_in_the_turn.py).
+        assert "chooseSpell({ id: cast.dataset.spell" in html
         # Sent with the turn, aim included since I3 (2026-09-29): `attachmentsForSay`.
         assert "body.attachments = typeof attachmentsForSay" in html
         assert "function attachmentsForSay()" in html

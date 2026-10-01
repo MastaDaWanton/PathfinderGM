@@ -210,7 +210,8 @@ def test_the_spells_tab_cast_attaches_rather_than_casts():
     state = _js("02-state.js")
     handler = state[state.index('const cast = e.target.closest(".castbtn");'):]
     handler = handler[:handler.index("return;")]
-    assert "attachSpell(" in handler and "/api/cast" not in handler
+    # `chooseSpell` since 2026-10-01: the chip out of a fight, the panel's turn in one.
+    assert "chooseSpell(" in handler and "/api/cast" not in handler
 
 
 def test_the_turn_sends_the_chip_and_clears_it_only_once_taken():
