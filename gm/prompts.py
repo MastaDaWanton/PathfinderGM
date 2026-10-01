@@ -1164,9 +1164,22 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                              f"and is devoted: told plainly, {actor.name} does it, as "
                              f"literally as it was said.")
                 else:
+                    # Their nature in words, for a companion only: it is what decides an
+                    # order (the manner line below shows it, which is subtler than the
+                    # decision needs). Measured on the companions replay: a drover rolled
+                    # timid, told to lift a thug's purse, "moves as if he were part of
+                    # the shadows" — shown only how timidity looks, the page had him do
+                    # the dangerous thing without a flicker of it.
+                    from rules import population as _pop
+
+                    nature = [t for t in (((_pop.of_ref(scene, ref) or {}).get("life")
+                                           or {}).get("traits") or []) if t][:3]
                     bond += (f" Told to do something, {actor.name} answers as "
                              f"themselves — does it, does it their own way, or says no; "
-                             f"a friend, not a servant.")
+                             f"a friend, not a servant."
+                             + (f" By nature {actor.name} is {', '.join(nature)}, and "
+                                f"that decides what they will and will not do when told."
+                                if nature else ""))
                 # In a fight their deeds are their own turn's. Measured on the companions
                 # replay (2026-10-01): to "Bob, attack the thug! Drover, get that cudgel
                 # off him!" the PLAYER's beat had the drover tackle the thug and Bob
@@ -2423,7 +2436,127 @@ COMPANION_EXAMPLES = [
                          "because": "told to stay back; too hot-tempered to do it"}],
         },
     },
+    # And told nothing at all, which is most rounds. Added after the replay of
+    # 2026-10-01: every example above carried an order, the real ask said "the player
+    # has told them nothing", and a drover rolled timid — whose own `because` read "they
+    # wait for the optimal opening" — attacked anyway. Their nature decides unprompted
+    # turns too.
+    {
+        "ask": "Round 1. It is {Self} ({Companion}) turn.\nThey are unhurt and their "
+               "conditions are: none.\n{Companion} TRAVELS WITH the player and came into "
+               "this fight on the player's side. Who {Companion} is (fact): {Companion} "
+               "is friendly towards the player — a friend who came along, not a servant, "
+               "and free to say no. {Companion} is quiet, easily frightened. in how they "
+               "act: speaks when there is something to say and not otherwise.\nThe fight "
+               "is against: {Foe Ref} ({Foe}).\nThe player has told {Companion} nothing "
+               "this fight; {Companion} does what they would do.\nWhat does {Self} do?",
+        "reply": {
+            "narration": "{Companion} gets behind you and stays there, close enough to "
+                         "grab your sleeve, watching {Foe} over your shoulder.",
+            "intents": [{"op": "narrate_only",
+                         "because": "nobody asked, and they are no fighter; they keep "
+                                    "near the one person they trust"}],
+        },
+    },
 ]
+
+
+COMPANION_ANSWER_BRIEFING = """The player has just spoken to somebody who travels with
+them. Answer for that companion: decide, as themselves, what they do about it, and say it
+as intent. Nobody else acts.
+
+Reply with a JSON object: {"narration": "...", "intents": [...]}. The narration is one or
+two sentences of what they do in answer; the engine decides whether anything they try
+works."""
+
+
+# Out of a fight there is no turn of theirs to wait for, so the companion answers on the
+# player's own beat: the targeted call `GMAgent.companion_answer` makes when the player's
+# words are spoken TO a companion (`companions.addressed`). Measured before it existed
+# (companions replay, 2026-10-01): "Drover, sneak up behind that thug and lift his purse"
+# came back `narrate_only` + the player's `say` — nobody decided anything, and the prose
+# had the timid drover slip into the shadows like a cutpurse. Three examples, the same
+# three answers as the fight's: done (a construct, literally), refused in their own words
+# (a timid friend, a `say`), and done their own way with what could fail rolled — a
+# check against whoever could stop them, never a number.
+COMPANION_ANSWER_EXAMPLES = [
+    {
+        "ask": "{Companion} ({Self}) TRAVELS WITH the player. Who {Companion} is (fact): "
+               "{Companion} belongs to the player, who claimed them, and is devoted to "
+               "them: told plainly, {Companion} does it, as literally as it was said.\n"
+               "Here besides: {Other Ref} ({Other}).\nWhat the player just said: "
+               "\"{Companion}, keep watch by the door.\"\nWhat does {Self} do about it, "
+               "as themselves?",
+        "reply": {
+            "narration": "{Companion} crosses to the door and turns to face it, and goes "
+                         "as still as the post beside it.",
+            "intents": [{"op": "narrate_only",
+                         "because": "told to keep watch; it keeps watch, exactly there"}],
+        },
+    },
+    {
+        "ask": "{Companion} ({Self}) TRAVELS WITH the player. Who {Companion} is (fact): "
+               "{Companion} is friendly towards the player — a friend who came along, not "
+               "a servant, and free to say no. {Companion} is cautious, timid. in how "
+               "they act: keeps a door at their back and a reason to leave ready.\n"
+               "Here besides: {Other Ref} ({Other}).\nWhat the player just said: "
+               "\"{Companion}, slip round behind {Other} and take the keys off his "
+               "belt.\"\nWhat does {Self} do about it, as themselves?",
+        "reply": {
+            "narration": "{Companion} looks at {Other}, then at you, and does not move "
+                         "from the wall.",
+            "intents": [{"op": "say", "actor": "{Self}", "target": "{Pc}",
+                         "params": {"words": "Me? Not a chance. Ask me for something "
+                                             "that won't get my hand broken.",
+                                    "to": "{Pc}", "quoted": True},
+                         "because": "too frightened to try it, and says so"}],
+        },
+    },
+    {
+        "ask": "{Companion} ({Self}) TRAVELS WITH the player. Who {Companion} is (fact): "
+               "{Companion} is helpful towards the player — a friend who came along, not "
+               "a servant, and free to say no. {Companion} is game for anything, blunt. "
+               "in how they act: steps forward before anyone else has decided to.\n"
+               "Here besides: {Other Ref} ({Other}).\nWhat the player just said: \"Keep "
+               "{Other} talking while I look round the back.\"\nWhat does {Self} do "
+               "about it, as themselves?",
+        "reply": {
+            "narration": "{Companion} plants an elbow on the counter in front of {Other} "
+                         "and starts in on a long complaint about the roads, loud enough "
+                         "to fill the room.",
+            "intents": [{"op": "check", "actor": "{Self}",
+                         "params": {"skill": "bluff",
+                                    "opposed_by": {"ref": "{Other Ref}",
+                                                   "skill": "sense motive"}},
+                         "because": "holding the man's eye with talk, their own loud way"}],
+        },
+    },
+]
+
+
+def companion_answer_messages(briefing_scene: str, ref: str, actor, facts: str,
+                              other: tuple[str, str] | None = None,
+                              pc_ref: str = "pc") -> list[dict]:
+    """The messages for a companion's answer to the player's words, out of a fight."""
+    other_ref, other_name = other or ("c9", "stranger")
+    fill = dict(self_ref=ref, name=actor.name, foe_ref=other_ref, foe=other_name)
+
+    def filled(value):
+        value = fill_companion(value, **fill)
+        if isinstance(value, str):
+            return (value.replace("{Other Ref}", other_ref)
+                    .replace("{Other}", _definite(other_name)).replace("{Pc}", pc_ref))
+        return json.loads(json.dumps(value).replace("{Other Ref}", other_ref)
+                          .replace("{Pc}", pc_ref)
+                          .replace("{Other}", _definite(other_name).replace('"', "'")))
+
+    messages = [{"role": "system",
+                 "content": COMPANION_ANSWER_BRIEFING + "\n\n" + briefing_scene}]
+    for ex in COMPANION_ANSWER_EXAMPLES:
+        messages.append({"role": "user", "content": filled(ex["ask"])})
+        messages.append({"role": "assistant", "content": json.dumps(filled(ex["reply"]))})
+    messages.append({"role": "user", "content": facts})
+    return messages
 
 
 def fill_companion(value, *, self_ref: str, name: str, foe_ref: str, foe: str):

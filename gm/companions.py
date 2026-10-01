@@ -88,7 +88,8 @@ def names_them(text: str, actor) -> bool:
     """Whether the player's line addresses or names this companion: every word of a
     one-word name ("Bob"), or the distinctive head of a descriptor ("the clockwork spy"
     is named by "spy")."""
-    words = set(re.findall(r"[a-z']+", str(text or "").lower()))
+    words = {w[:-2] if w.endswith("'s") else w.strip("'") for w in
+             re.findall(r"[a-z']+", str(text or "").lower().replace("’", "'"))}
     mine = _name_words(getattr(actor, "name", ""))
     if not mine or not words:
         return False
@@ -135,6 +136,87 @@ def orders_for(scene, ref: str, transcript=(), limit: int = MAX_ORDERS) -> list[
         if e.get("to") == ref or ref in (e.get("among") or []):
             add(f'"{e.get("text", "")}"')
     return out[:limit]
+
+
+# Words that put somebody to a task in reported speech: "I tell Bob to keep watch", "I ask
+# the drover to fetch water", "I have Bob carry it". Within three words of the name.
+_ORDERING = re.compile(
+    r"\b(?:tell|tells|told|ask|asks|asked|order|orders|ordered|command|commands|"
+    r"instruct|instructs|signal|signals|motion|motions|have|has|get|gets|send|sends|"
+    r"direct|directs|bid|bids|wave|waves|nod|nods|gesture|gestures|whisper|whispers|"
+    r"call|calls|shout|shouts|say|says)\b", re.I)
+
+
+def addressed(scene, text: str) -> list[str]:
+    """The companions the player's line speaks TO — never merely about.
+
+    Detected in code (CLAUDE.md: detect mechanically, repair with a targeted call), two
+    shapes: the name as a vocative inside the player's quoted words or opening their line
+    ("Bob, keep watch", "Drover — the door!"), or a verb of telling a few words before the
+    name in reported speech ("I tell Bob to keep watch"). "I look at Bob" is about Bob,
+    and his answer is the narrator's ordinary business."""
+    from gm import speech
+
+    out = []
+    raw = str(text or "")
+    quoted = " ".join(speech.lines(raw))
+    for ref, actor in (getattr(scene, "actors", {}) or {}).items():
+        if not is_companion(actor) or actor.is_down:
+            continue
+        words = sorted(_name_words(actor.name), key=len, reverse=True)
+        head = (re.findall(r"[a-z']+", str(actor.name).lower()) or [""])[-1]
+        calls = [w for w in dict.fromkeys([head, *words]) if w]
+        hit = False
+        for w in calls:
+            # At the start of the line, of a quotation, or of a sentence inside one:
+            # "Bob, the door! Drover — stay close." calls on both.
+            vocative = re.compile(rf"(?:^|[\"“'‘]\s*|[.!?]\s+)(?:hey\s+|oi\s+)?(?:the\s+)?"
+                                  rf"{re.escape(w)}\s*[,!:—–-]", re.I)
+            if vocative.search(raw.strip()) or vocative.search(quoted.strip()):
+                hit = True
+            for m in re.finditer(rf"\b{re.escape(w)}\b", raw, re.I):
+                before = raw[max(0, m.start() - 40):m.start()]
+                if _ORDERING.search(" ".join(before.split()[-4:])):
+                    hit = True
+            if hit:
+                break
+        if hit:
+            out.append(ref)
+    return out
+
+
+def answer_facts(scene, actor, said: str) -> str:
+    """What a companion's out-of-fight answer is told: who they are, who else is here by
+    ref, and the player's words to them this turn."""
+    name = actor.name
+    here = [f"{r} ({a.name})" for r, a in scene.actors.items()
+            if r != actor.ref and not a.is_pc and scene.conscious(r)]
+    pc = scene.pc()
+    return "\n".join([
+        f"{name} ({actor.ref}) TRAVELS WITH the player. Who {name} is (fact): "
+        f"{who_they_are(scene, actor)}",
+        f"Here besides: {', '.join(here) if here else 'nobody'}"
+        + (f"; the player is {pc.ref}." if pc is not None else "."),
+        f"What the player just said: {' '.join(str(said or '').split())}",
+        f"What does {actor.ref} do about it, as themselves?"])
+
+
+def answers_on_the_page(text: str, answered) -> tuple[str, list[str]]:
+    """Put back a companion's answer the beat left out: for each (actor, answer) whose
+    actor the beat never names, the answer's own sentences go in before the closing
+    question (or at the end). Returns (text, names put back)."""
+    put = []
+    for actor, said in answered or ():
+        said = " ".join(str(said or "").split())
+        if not said or names_them(text, actor):
+            continue
+        parts = re.split(r"(?<=[.!?])\s+", text.strip())
+        if parts and parts[-1].endswith("?"):
+            text = " ".join(parts[:-1] + [said, parts[-1]]).strip()
+        else:
+            text = f"{text.strip()} {said}".strip()
+        put.append(actor.name)
+    return text, put
 
 
 def who_they_are(scene, actor) -> str:
@@ -190,7 +272,7 @@ def turn_facts(scene, actor, orders: list[str]) -> str:
     return "\n".join(lines)
 
 
-def on_their_own_turn(raw, scene, notes: list | None = None):
+def on_their_own_turn(raw, scene, notes: list | None = None, addressed_refs=()):
     """In a fight, the PLAYER's plan does not act for a companion: their turn is their own.
 
     Measured on the companions replay, 2026-10-01: to "Bob, attack the thug! Drover, help
@@ -203,15 +285,27 @@ def on_their_own_turn(raw, scene, notes: list | None = None):
     turn. Out of a fight there is no turn of theirs to wait for, and the plan may act for
     a companion who would plausibly do it, as the brief's companion line asks.
 
-    Only a companion who holds a place in the initiative; anybody else is untouched."""
-    if not isinstance(raw, list) or not getattr(scene, "in_encounter", False):
+    Only a companion who holds a place in the initiative; anybody else is untouched.
+
+    And out of a fight, a companion the player's words were spoken TO (`addressed`): what
+    they do about it is their own answer's to decide (`GMAgent.companion_answer`), not the
+    planner's. Measured on the replay: "Drover, sneak up behind that thug and lift his
+    purse" was planned as the drover's Stealth check, and the page said "He doesn't
+    hesitate" of a companion rolled timid — the planner, asked to plan the whole turn,
+    decided for him without reading who he is."""
+    if not isinstance(raw, list):
         return raw
-    in_order = {r for r, _ in (getattr(scene, "initiative", None) or [])}
     actors = getattr(scene, "actors", {}) or {}
+    if getattr(scene, "in_encounter", False):
+        theirs = {r for r, _ in (getattr(scene, "initiative", None) or [])}
+    else:
+        theirs = set(addressed_refs or ())
+    if not theirs:
+        return raw
     kept = []
     for r in raw:
         ref = r.get("actor") if isinstance(r, dict) else None
-        if (isinstance(ref, str) and ref in in_order
+        if (isinstance(ref, str) and ref in theirs
                 and is_companion(actors.get(ref))):
             if notes is not None:
                 notes.append(f"companion acts on their own turn: dropped "
