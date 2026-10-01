@@ -237,6 +237,12 @@ CASTING_FIELDS = (
                consumer="rules/casting.py:knows",
                help="'spellbook' and 'known' both read the character's own spellbook; "
                     "'list' means the whole class list is available every morning."),
+    ClassField("learns_per_level", "Spells learned per level", type="number",
+               consumer="rules/casting.py:learning",
+               help="For a class that keeps a spellbook: how many spells of a level it "
+                    "can cast the character writes in free at each new level after the "
+                    "first. The wizard's is 2 (\"he gains two spells of his choice to "
+                    "add to his spellbook\"). Leave it out for none."),
     ClassField("note", "Note", type="textarea", consumer=""),
 )
 
@@ -1416,6 +1422,12 @@ def validate_class(d: dict) -> list[str]:
                 problems.append(
                     "casting.prepare_from: 'spellbook' (a wizard's book), 'list' (the "
                     "whole class list every morning) or 'known' (a sorcerer's repertoire).")
+            learns = casting.get("learns_per_level")
+            if learns not in (None, "") and (_int(learns) is None or _int(learns) < 0):
+                problems.append(
+                    f"casting.learns_per_level: {learns!r} is not a count. A whole number "
+                    f"of spells written into the book at each new level (the wizard's "
+                    f"is 2), or leave it out.")
             spell_list = str(casting.get("list", "")).strip().lower()
             if not spell_list:
                 problems.append(
@@ -1512,6 +1524,7 @@ def _spellcaster() -> dict:
             "progression": "full",
             "list": "wizard",
             "prepare_from": "spellbook",
+            "learns_per_level": 2,
             "note": "Prepares from the book they carry; losing it is losing the spells.",
         },
         "features": {

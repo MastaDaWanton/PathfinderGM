@@ -552,12 +552,23 @@ def level_up(actor, dice=None) -> dict:
     # every time anybody went looking for it.
     refreshed = actor.rebuild_pools()
 
+    # Spells the new level owes the book, said with everything else the level gave. The
+    # owner, 2026-10-01: "leveled up as a wizard and did not choose new spells". Not
+    # chosen here — the choice is the player's, on the Spells tab, and stays owed (and
+    # saved) until made — but said, so the level-up line and the journal both carry it.
+    from . import casting
+
+    owed = casting.learning(actor)["owed"]
+    if owed:
+        grown.append(f"{owed} new spell{'s' if owed != 1 else ''} to choose for the "
+                     f"spellbook (Spells tab)")
+
     return {
         "ok": True, "level": new_level, "rolled": rolled, "con": con, "hp": hp,
         "hp_max": actor.hp_max,
         "grants": gains["grants"] + grown, "bab": gains["bab"],
         "saves": gains["saves"], "skill_ranks": gains["skill_ranks"],
-        "pools": refreshed,
+        "pools": refreshed, "spells_owed": owed,
     }
 
 

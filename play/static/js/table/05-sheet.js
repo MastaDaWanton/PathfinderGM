@@ -298,6 +298,23 @@ document.addEventListener("input", e => {
 });
 
 // --- Class, and taking a level ---
+// Spells a level owes the book, said where the level was taken (the owner, 2026-10-01:
+// "leveled up as a wizard and did not choose new spells"). The choosing is the Spells
+// tab's card (`learnCard`); this line stays until it is done, so a level taken in the
+// night or in an older save is not missed either.
+function learnOwedLine(s) {
+  const due = s.spells && s.spells.to_learn;
+  if (!due || !due.owed) return "";
+  return `<h3 class="cardsub">Spellbook</h3>
+    <p class="why">${due.owed} new spell${due.owed === 1 ? "" : "s"} to choose. ${
+      esc(learnRule(due))}</p>
+    <button type="button" class="v2-btn" id="learn-goto">Choose on the Spells tab</button>`;
+}
+document.addEventListener("click", e => {
+  if (!e.target.closest("#learn-goto")) return;
+  if (typeof Shell === "object" && Shell) Shell.show("spells");
+});
+
 function classCard(s) {
   return sheetCard("sc-class", "Class", tabClass(s), "wide");
 }
@@ -361,6 +378,7 @@ function tabClass(s) {
           <b>control blood 1a</b> through <b>5b</b> on the table means. The text is the
           class document's own; the rules do not run these yet, so they are yours to
           invoke at the table.</p>` : ""}
+      ${learnOwedLine(s)}
       ${p.next ? `
         <h3 class="cardsub">Next level</h3>
         <div class="terms">
@@ -646,11 +664,167 @@ function tabSpells(s) {
     return tabEmpty(`${esc(s.identity.name)} does not cast spells.`);
   }
   return `<div class="spells3">
+    ${learnCard(sp)}
     ${casterStats(sp)}
     ${preparedToday(sp)}
     ${grimoireIndex(sp)}
   </div>`;
 }
+
+// --- spells a level owes the book ---------------------------------------------------------
+// The owner, 2026-10-01: "leveled up as a wizard and did not choose new spells". The Core
+// Rulebook: "Each time a character attains a new wizard level, he gains two spells of his
+// choice to add to his spellbook. The two free spells must be of spell levels he can
+// cast." The sheet says how many are owed (`spells.to_learn`, rules/casting.py
+// `learning`); this card asks for them, across the top of the tab, until they are chosen.
+// The candidates are fetched when the card opens (/api/spells/learnable), the choice is
+// sent whole (/api/spells/learn), and the server is the rule: this page only counts.
+// Rows carry `data-learn`, never `data-spell` + `data-action`, so the Prepare handler
+// below cannot take a Choose press for a prepare.
+let LEARN = { list: null, picked: [], find: "", busy: false };
+
+function learnRule(due) {
+  if (due.kind === "book") {
+    const by = new Map();
+    for (const p of due.picks || []) {
+      const k = `${p.for_level}|${p.max_level}`;
+      by.set(k, (by.get(k) || 0) + 1);
+    }
+    return [...by.entries()].map(([k, n]) => {
+      const [lvl, max] = k.split("|");
+      return `Reaching level ${lvl}: ${n} spell${n === 1 ? "" : "s"}, ${
+        max === "0" ? "cantrips only" : `spell level ${max} or lower`}.`;
+    }).join(" ");
+  }
+  return "Room for " + Object.entries(due.by_level || {}).map(([lvl, n]) =>
+    `${n} more ${lvl === "0" ? (n === 1 ? "cantrip" : "cantrips")
+      : `level ${lvl} spell${n === 1 ? "" : "s"}`}`).join(", ") + ".";
+}
+
+function learnCard(sp) {
+  const due = sp.to_learn || {};
+  if (!due.owed) { LEARN = { list: null, picked: [], find: "", busy: false }; return ""; }
+  const n = due.owed;
+  const book = due.kind === "book";
+  return `<section class="v2-framed v2-card-leather sx-card sx-learn" id="sx-learn"
+      aria-labelledby="sx-learn-h">
+    <i class="v2-rim" aria-hidden="true"></i>
+    <h3 id="sx-learn-h">${book ? "New spells for the book" : "New spells known"}
+      <small class="chip">${n} to choose</small></h3>
+    <p class="sx-hint">${esc(learnRule(due))} ${book
+      ? "Spells you could cast at that level, from your class list. They are free: "
+        + "copying from a scroll is another matter."
+      : "From your class list, at levels you can cast."}</p>
+    ${LEARN.list ? learnPicker(due) : `
+      <button type="button" class="v2-btn is-go" id="learn-open">Choose ${n} spell${
+        n === 1 ? "" : "s"}</button>`}
+    <p class="sx-say" id="learnsay" role="status" aria-live="polite"></p>
+  </section>`;
+}
+
+function learnPicker(due) {
+  const n = due.owed;
+  return `<div class="gx-tools">
+      <label class="gx-field gx-find"><span>Search</span>
+        <input id="learnfind" class="findbox" type="search" value="${esc(LEARN.find)}"
+               autocomplete="off" placeholder="Spell name"></label>
+    </div>
+    <p class="gx-count" id="learncount">${LEARN.picked.length} of ${n} chosen${
+      LEARN.picked.length ? ": " + LEARN.picked.map(id =>
+        esc((LEARN.list.find(s => s.id === id) || { name: id }).name)).join(", ") : ""}</p>
+    <div id="learn-list">${learnList()}</div>
+    <div class="spcard-act">
+      <button type="button" class="v2-btn is-go" id="learn-write"${
+        LEARN.picked.length && !LEARN.busy ? "" : " disabled"}>Write ${
+        LEARN.picked.length || ""} into the book</button>
+    </div>`;
+}
+
+function learnList() {
+  const find = LEARN.find.trim().toLowerCase();
+  const rows = (LEARN.list || []).filter(s => !find || s.name.toLowerCase().includes(find));
+  if (!rows.length) return `<div class="sx-empty">No spell matches.</div>`;
+  return `<ul class="gx-rows">${rows.map(s => {
+    const on = LEARN.picked.includes(s.id);
+    const school = schoolKey(s.school);
+    return `<li class="gx-row" style="--school: var(--sc-${school})">
+      <span class="gx-grip off" aria-hidden="true"></span>
+      ${glyph(spellIcon(s))}
+      <span class="gx-text"><b>${esc(s.name)}</b>
+        <small>${esc([SPELL_SCHOOLS[school].label, rangePhrase(s.range),
+                      plainMeasure(s.duration)].filter(Boolean).join(", "))}</small>
+        ${detailsButton(s, "sx-more")}</span>
+      <span class="gx-lvl" title="Spell level ${s.level}"><span class="sr">Level </span>${s.level}</span>
+      <button type="button" class="spbtn${on ? "" : " quiet"}" data-learn="${esc(s.id)}"
+              aria-pressed="${on}" aria-label="Choose ${esc(s.name)}">${
+        on ? "Chosen" : "Choose"}</button>
+    </li>`;
+  }).join("")}</ul>`;
+}
+
+function redrawLearn(say = "") {
+  const card = document.getElementById("sx-learn");
+  if (!card || !SHEET || !SHEET.spells) return;
+  const keep = document.querySelector("#learn-list .gx-rows");
+  const top = keep ? keep.scrollTop : 0;
+  card.outerHTML = learnCard(SHEET.spells);
+  const rows = document.querySelector("#learn-list .gx-rows");
+  if (rows) rows.scrollTop = top;
+  const out = document.getElementById("learnsay");
+  if (out && say) out.textContent = say;
+}
+
+document.addEventListener("click", async e => {
+  if (e.target.closest("#learn-open")) {
+    try {
+      const d = await readJSON(await fetch("/api/spells/learnable"));
+      LEARN.list = d.spells || [];
+      LEARN.picked = [];
+      redrawLearn();
+      const box = document.getElementById("learnfind");
+      if (box) box.focus({ preventScroll: true });
+    } catch (err) { redrawLearn(String(err.message || err)); }
+    return;
+  }
+  const pick = e.target.closest("#sheetbody [data-learn]");
+  if (pick) {
+    const id = pick.dataset.learn;
+    const owed = (SHEET.spells.to_learn || {}).owed || 0;
+    let say = "";
+    if (LEARN.picked.includes(id)) LEARN.picked = LEARN.picked.filter(x => x !== id);
+    else if (LEARN.picked.length >= owed) say = `${owed} chosen already; set one aside first.`;
+    else LEARN.picked.push(id);
+    redrawLearn(say);
+    const again = document.querySelector(`#sheetbody [data-learn="${CSS.escape(id)}"]`);
+    if (again) again.focus({ preventScroll: true });
+    return;
+  }
+  if (e.target.closest("#learn-write")) {
+    if (!LEARN.picked.length || LEARN.busy) return;
+    LEARN.busy = true;
+    const names = LEARN.picked.map(id => (LEARN.list.find(s => s.id === id) || { name: id }).name);
+    try {
+      SHEET = await post("/api/spells/learn", { spells: LEARN.picked });
+      LEARN = { list: null, picked: [], find: "", busy: false };
+      drawSheet(true);
+      spellsSay(`${names.join(", ")} written into the book.`);
+      if (SHEET.spells && SHEET.spells.to_learn && SHEET.spells.to_learn.owed) {
+        redrawLearn(`Written. ${SHEET.spells.to_learn.owed} still to choose.`);
+      }
+    } catch (err) {
+      LEARN.busy = false;
+      redrawLearn(String(err.message || err));
+    }
+  }
+});
+
+document.addEventListener("input", e => {
+  const box = e.target.closest("#learnfind");
+  if (!box) return;
+  LEARN.find = box.value;
+  const list = document.getElementById("learn-list");
+  if (list) list.innerHTML = learnList();
+});
 
 // The left column. Slots are gem sockets, lit while a prepared spell waits in one, red
 // once spent today, dark while open (`slotSockets`), so "how much have I got" is read at
