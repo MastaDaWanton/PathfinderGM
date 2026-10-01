@@ -3066,15 +3066,31 @@ def _sheet_vocabulary(pc) -> set[str]:
 # give and place turned "I offer him a drink" into a delusion beat, and `a`/`an` is
 # somebody naming a kind of thing rather than asserting they have a particular one.
 # A guard that fires on an innocuous line costs more than the one it catches.
+#
+# Two more narrowings, measured on the 2026-09-30 playtest (item 5): four Bluffs at DC 30
+# in one session, and the player had lied in none of them.
+#
+#   * **Bare take/takes is gone; "take out" stays.** "I take the herbs and use them on
+#     him" (turn 4), "I'll take my payment" (turn 5) and "I take the key" (turn 23) were
+#     all read as producing a thing the sheet did not hold. Taking is ACQUISITION — the
+#     goods door's business (`inject_goods`) — and only "take out" is producing.
+#   * **The verb is anchored**: to a subject ("I", "we", "I'll"), to a coordinated verb
+#     ("and", "then", "to"), or to the start of a clause, with at most one -ly adverb
+#     between. Replayed, "my hand on the hilt" and "Lay on Hands on the fighter" both
+#     read `hand`/`Hands` as the verb; a noun after "my" or "on" is never one.
 _PRODUCE = re.compile(
-    r"\b(?:i\s+)?(?:pull|pulls|take|takes|draw|draws|produce|produces|fish|fishes|"
+    r"(?:(?:^|(?<=[.;:!?,\"“”(]))\s*(?:(?:i|we)(?:'ll|’ll|\s+will|\s+would|'d|’d)?\s+)?"
+    r"|\b(?:i|we)(?:'ll|’ll|\s+will|\s+would|'d|’d)?\s+"
+    r"|\b(?:and|then|to)\s+)"
+    r"(?:\w+ly\s+)?"
+    r"(?:pull|pulls|takes?\s+out|draw|draws|produce|produces|fish|fishes|"
     r"show|shows|display|displays|present|presents|brandish|brandishes|flash|flashes|"
     r"unroll|unrolls|unfurl|unfurls|unwrap|unwraps|hand|hands|don|dons|wear|wears|"
     # `hold` and `lift` only with a particle: "I hold up the crown" is a display and
     # "I hold the rope" is a grip.
     r"put|puts|holds?\s+(?:up|out|aloft)|lifts?\s+up)\b"
     r"(?:\s+(?:out|up|over|down|forth|on|off|into|in|it|them|him|her|about))*"
-    r"\s+(?:to\s+\w+\s+|him\s+|her\s+|them\s+)?"
+    r"\s+(?:to\s+\w+\s+|him\s+|her\s+|them\s+|you\s+|us\s+)?"
     r"(?P<art>my|the|his|her|their|our)\s+"
     r"(?P<thing>[a-z][a-z'’-]*(?:\s+[a-z][a-z'’-]*){0,2})", re.I)
 
@@ -3185,7 +3201,74 @@ def _spell_names_masked(player_text: str, pc, reading=None) -> str:
     return text
 
 
-def false_possession(player_text: str, scene, reading=None) -> str:
+# The interpreter's acts under which the player comes away holding the thing named: a
+# take (the act "pick up" and "accept" read as), a purchase, a theft, a gathering.
+_ACQUIRING_ACTS = frozenset({"take", "buy", "steal", "gather"})
+
+
+def _acquired_words(reading=None, plan=None, pc_ref: str = "pc") -> set[str]:
+    """The words of everything this turn hands the player: the object of every acquiring
+    act the interpreter read, and the item of every `give` in the plan made TO them (a
+    give with no `to` and no `from_` is the player's, as `interpret.drop_unread_gifts`
+    reads it). "" words and articles are left out; the rest are matched by containment
+    the way the sheet is (`_vouched_for`)."""
+    phrases: list[str] = []
+    if isinstance(reading, dict) and not reading.get("error"):
+        for a in reading.get("actions") or []:
+            if isinstance(a, dict) and a.get("act") in _ACQUIRING_ACTS and a.get("object"):
+                phrases.append(str(a["object"]))
+    for r in plan or ():
+        if not isinstance(r, dict) or str(r.get("op", "")).lower() != "give":
+            continue
+        p = r.get("params") or {}
+        to = str(p.get("to") or "").strip().lower()
+        if to in (str(pc_ref).lower(), "pc", "you", "player") or not (to or p.get("from_")):
+            phrases.append(str(p.get("item") or "").replace("_", " "))
+    return {w for ph in phrases for w in re.findall(r"[a-z][a-z'’-]{2,}", ph.lower())
+            if w not in _CLAIM_STOP}
+
+
+# A weapon's generic words, by what the weapon is. "Blade" is said of a blade: the
+# first cut vouched "weapon", "blade" and "arms" for ANY equipped weapon, so Sam with a
+# shortbow in hand was offered "I keep my hand on the hilt of my blade" and nothing
+# objected (item 4, 2026-09-30). A bow is a weapon, and is not a blade.
+_BLADE_WORDS = frozenset({"sword", "blade", "dagger", "knife", "rapier", "scimitar", "sabre",
+                          "saber", "falchion", "kukri", "sickle", "katana", "cutlass",
+                          "machete", "glaive", "estoc", "gladius", "wakizashi", "dirk",
+                          "stiletto", "kopis", "khopesh", "shortsword", "longsword",
+                          "greatsword", "bastard", "axe", "scythe", "kama", "cleaver"})
+
+
+def _slot_words(pc) -> set[str]:
+    """The generic words for a slot the sheet has something in. A character in a chain
+    shirt who says "I put on my armour" is putting on the armour they own, and the sheet
+    spells it "chain shirt" — a containment match cannot bridge that and should not try
+    to. "Blade" only for a weapon that has one: read off the weapon's own record (its
+    `components.head` is a Blade — a longsword's is, a shortbow's limbs are not), else off
+    its name."""
+    words: set[str] = set()
+    if str(getattr(pc, "armour", "") or "").strip().lower() not in ("", "none"):
+        words |= {"armour", "armor"}
+    equipped = str(getattr(pc, "equipped", "") or "").strip()
+    if not equipped or equipped.lower() in ("none", "unarmed"):
+        return words
+    words |= {"weapon", "arms"}
+    bladed = bool(_BLADE_WORDS & set(re.findall(r"[a-z]+", equipped.lower())))
+    try:
+        from rules import weapons as weapons_mod
+
+        rec = weapons_mod.get(equipped.lower().replace(" ", "-")) \
+            if weapons_mod.has(equipped.lower().replace(" ", "-")) else None
+    except Exception:  # noqa: BLE001 — a weapon table that cannot answer adds nothing
+        rec = None
+    if rec:
+        bladed = bladed or "blade" in str((rec.get("components") or {}).get("head") or "").lower()
+    if bladed:
+        words.add("blade")
+    return words
+
+
+def false_possession(player_text: str, scene, reading=None, plan=None) -> str:
     """The thing the player says they produce that the sheet cannot account for, or "".
 
     Item 37, reported 2026-09-20 with a screenshot. The player typed *"I pull out my
@@ -3254,10 +3337,11 @@ def false_possession(player_text: str, scene, reading=None) -> str:
     # shirt who says "I put on my armour" is putting on the armour they own, and the
     # sheet spells it "chain shirt" — a containment match cannot bridge that and should
     # not try to.
-    if str(getattr(pc, "armour", "") or "").strip().lower() not in ("", "none"):
-        vouched |= {"armour", "armor"}
-    if str(getattr(pc, "equipped", "") or "").strip():
-        vouched |= {"weapon", "blade", "arms"}
+    vouched |= _slot_words(pc)
+    # What this turn ACQUIRES is not a claim to have had it (item 5, turn 23: "I take the
+    # key and walk toward the curtain" — the same plan gave Sam the key, and the room
+    # still rolled a Bluff against him for "producing" it).
+    acquired = _acquired_words(reading, plan, pc.ref)
 
     player_text = _spell_names_masked(player_text, pc, reading)
     for m in _PRODUCE.finditer(str(player_text)):
@@ -3290,6 +3374,10 @@ def false_possession(player_text: str, scene, reading=None) -> str:
             continue        # an action the engine has doors for, not a claim
         if any(_vouched_for(w, vouched) for w in words):
             continue
+        if acquired and any(w in acquired for w in words):
+            continue        # taken, picked up, accepted or given this turn
+        if acquired and any(_vouched_for(w, acquired) for w in words):
+            continue
         # Coin is its own question: the purse, not the pack.
         if re.search(r"\b(?:coin|coins|gold|silver|copper|purse|money)\b", phrase):
             if any(int(n) > 0 for n in (getattr(pc, "purse", None) or {}).values()):
@@ -3318,7 +3406,49 @@ def _as_they(claim: str) -> str:
     return s
 
 
-def false_claim(player_text: str, scene) -> str:
+# A hedge makes the predicate a matter of character, not identity: "I'm a bit of a free
+# spirit" is a man describing his temper. Measured 2026-09-30 (item 5, turn 12): the
+# line said to Sorva was read as a claim to BE a spirit, because `_IDENTITY_HEAD` matched
+# any word of the predicate and "spirit" is one of them. The room rolled a Bluff at DC 30.
+_HEDGE = re.compile(r"^(?:(?:a|an|the)\s+)?(?:(?:little|tiny|wee)\s+)?"
+                    r"(?:bit|touch|kind|sort|something|little|shade)\s+of\b", re.I)
+# What leads a predicate before its noun phrase starts: "I am", "what I truly am:".
+_PRED_LEAD = re.compile(r"^(?:i\s+am|i'm|i’m|myself\s+(?:as|to\s+be)|"
+                        r"what\s+i\s+(?:truly|really)\s+am\s*:?)\s+", re.I)
+# Where the noun phrase ends and the rest of the predicate begins: "the lost heir OF the
+# old kings", "my true form AS a divine being", "the power WITHIN me".
+_HEAD_STOPS = frozenset({
+    "of", "in", "on", "at", "who", "that", "which", "whose", "with", "from", "to", "for",
+    "and", "or", "but", "as", "by", "among", "than", "within", "inside", "beyond",
+    "over", "under", "into", "if", "when", "because", "so"})
+# Words after the head that are not it: "the greatest swordsman ALIVE".
+_POSTPOSITIVE = frozenset({
+    "alive", "incarnate", "reborn", "himself", "herself", "myself", "itself", "here",
+    "now", "today", "again", "too", "also", "indeed", "returned", "born", "made", "flesh",
+    "anyway", "really", "truly", "though"})
+# A head that stands in for the noun before it: "the chosen ONE".
+_PRO_FORMS = frozenset({"one", "ones", "thing", "type"})
+
+
+def _predicate_head(pred: str) -> str:
+    """The head noun of a claim's predicate, or "" — English puts it last in the noun
+    phrase, before any "of …", "who …" or "within me". The identity test is asked of this
+    word alone (item 5): "a bit of a free spirit" is about temper, and "the last in the
+    queue" is a place in a line, whatever other words ride along."""
+    text = _PRED_LEAD.sub("", " ".join(str(pred or "").split()))
+    words: list[str] = []
+    for w in re.findall(r"[a-z][a-z'’-]*", text.lower()):
+        if w in _HEAD_STOPS:
+            break
+        words.append(w)
+    while words and words[-1] in _POSTPOSITIVE:
+        words.pop()
+    if len(words) > 1 and words[-1] in _PRO_FORMS:
+        words.pop()
+    return words[-1] if words else ""
+
+
+def false_claim(player_text: str, scene, reading=None, plan=None) -> str:
     """The player's own words for what they claim to be, when the sheet says otherwise.
 
     "" when the line makes no such claim, is a question, or is something the sheet
@@ -3371,13 +3501,15 @@ def false_claim(player_text: str, scene) -> str:
         if not pred or re.match(r"^(?:no|not)\b", pred, re.I) and not re.match(
                 r"^no\s+mere\b", pred, re.I):
             continue                      # a denial is not a claim
-        if not _IDENTITY_HEAD.search(pred):
+        if _HEDGE.match(_PRED_LEAD.sub("", pred)):
+            continue                      # character, not identity
+        head = _predicate_head(pred)
+        if not head or not _IDENTITY_HEAD.search(head):
             continue                      # a state, not what one is
         words = {w for w in re.findall(r"[a-z][a-z'’-]{2,}", pred.lower())} - _CLAIM_STOP
-        heads = {w for w in words if _IDENTITY_HEAD.fullmatch(w)}
         # The sheet vouches when it holds the claim's head; a sheet with a form-granting
         # power behind it vouches for any talk of forms, shapes and turning into things.
-        if heads & vouched:
+        if head in vouched:
             continue
         if shapeshifter and (m.group("pred5") or re.search(
                 r"\b(?:form|shape|nature|self|aspect|guise|skin)s?\b", pred, re.I)):
@@ -3397,7 +3529,7 @@ def false_claim(player_text: str, scene) -> str:
         # what a man flourishing a crown he does not have needs, and a second door
         # would be a second copy of all of it. The item's own words: "The answer is
         # already built and already ratified by the player — it just has the wrong door."
-        return false_possession(text, scene)
+        return false_possession(text, scene, reading=reading, plan=plan)
     return _as_they(candidates[0].strip())
 
 
@@ -3406,31 +3538,183 @@ def claims_a_nature(player_text: str, scene) -> str:
     return false_claim(player_text, scene)
 
 
-def inject_false_claim(raw_intents, player_text: str, scene) -> list:
+# How believable a claim is, by the words of the claim itself — the rows of the Core
+# Rulebook's Bluff table (p.90, `rules/bluff.py`). Read in code from the claim, never
+# asked of a model; the most outlandish word present decides.
+#
+#   impossible  — to be a being the listener can see you are not (a god, a dragon, an
+#                 elf when you are plainly a human), a nature or a power with nothing
+#                 behind it, or to show a thing that is not in your hand at all;
+#   far-fetched — a rank, a lineage, a destiny (the lost heir, the chosen one);
+#   unlikely    — a calling the sheet does not hold (a wizard who is a fighter);
+#   believable  — anything else the sheet merely does not say (a merchant, a guard).
+_LIE_IMPOSSIBLE = frozenset({
+    "god", "gods", "goddess", "deity", "deities", "divine", "divinity", "demigod",
+    "immortal", "angel", "celestial", "demon", "devil", "fiend", "dragon", "wyrm", "lich",
+    "vampire", "werewolf", "spirit", "ghost", "titan", "giant", "elemental", "avatar",
+    "incarnation", "reincarnation", "undead", "form", "nature", "self", "power", "powers",
+    "might", "magic", "beast", "creature", "being", "elf", "dwarf", "orc", "halfling",
+    "gnome", "tiefling", "aasimar", "asura", "dragonborn", "human", "mortal"})
+_LIE_FAR_FETCHED = frozenset({
+    "king", "queen", "prince", "princess", "emperor", "empress", "heir", "heiress", "lord",
+    "lady", "noble", "nobleman", "noblewoman", "royal", "royalty", "chosen", "prophet",
+    "prophesied", "saint", "messiah", "saviour", "savior", "herald", "vessel", "champion",
+    "hero", "legend", "legendary", "master", "grandmaster", "archmage", "descendant",
+    "blessed", "cursed", "marked", "lineage", "heritage", "blood", "gift", "gifted"})
+_LIE_UNLIKELY = frozenset({
+    "wizard", "sorcerer", "sorceress", "witch", "warlock", "mage", "necromancer",
+    "assassin", "knight", "paladin", "general", "captain", "commander", "warrior",
+    "swordsman", "swordswoman", "fighter", "rogue", "thief", "cleric", "priest",
+    "priestess", "druid", "ranger", "monk", "bard", "barbarian", "oracle", "summoner",
+    "alchemist", "inquisitor", "magus", "slayer", "hunter", "shaman"})
+
+
+def lie_of(claim: str) -> str:
+    """The believability row a false claim falls in: "impossible", "far_fetched",
+    "unlikely" or "believable" (`rules/bluff.LIES`)."""
+    text = " ".join(str(claim or "").lower().split())
+    if not text:
+        return "believable"
+    if text.startswith("produce "):
+        return "impossible"       # a thing shown that is not in the hand
+    words = set()
+    for w in re.findall(r"[a-z][a-z'’-]+", text):
+        words.add(w)
+        words.update(p for p in w.split("-") if p)
+        if w.endswith("s"):
+            words.add(w[:-1])
+    if words & _LIE_IMPOSSIBLE:
+        return "impossible"
+    if words & _LIE_FAR_FETCHED:
+        return "far_fetched"
+    if words & _LIE_UNLIKELY:
+        return "unlikely"
+    return "believable"
+
+
+def _sense_motive(actor) -> int:
+    try:
+        return sum(int(m.value) for m in actor.skill_modifiers("sense motive"))
+    except Exception:  # noqa: BLE001 — a body with no sheet sees through nothing extra
+        return 0
+
+
+def listener_for(raw_intents, scene, reading=None) -> str:
+    """Who a lie is told to, as a ref here, or "" when nobody is listening.
+
+    In order: the person the plan's `say` is addressed to; the person the interpreter
+    read the words as aimed at (`talk`/`insult`, found by `scope.in_the_room`); the
+    person in conversation with the player; and with none of those, everyone who could
+    hear it. Where more than one could be fooled, the one with the sharpest Sense Motive
+    is the one rolled against — a crowd sees through a lie when its sharpest member
+    does. The CRB rolls each listener's Sense Motive separately; one roll against the
+    best is this app's simplification, so the player is handed one die, not six."""
+    actors = getattr(scene, "actors", {}) or {}
+
+    def here(ref) -> bool:
+        a = actors.get(str(ref or ""))
+        return a is not None and not getattr(a, "is_pc", False) \
+            and not getattr(a, "is_down", False)
+
+    for r in raw_intents or ():
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "say":
+            to = str((r.get("params") or {}).get("to") or "").strip()
+            if here(to):
+                return to
+    if isinstance(reading, dict) and not reading.get("error"):
+        from rules import scope as scope_mod
+
+        for a in reading.get("actions") or ():
+            if isinstance(a, dict) and a.get("act") in ("talk", "insult") \
+                    and str(a.get("target") or "").strip():
+                ref = scope_mod.in_the_room(scene, str(a["target"]))
+                if here(ref):
+                    return ref
+    from rules import states as states_mod
+
+    talking = [r for r, a in actors.items() if here(r)
+               and callable(getattr(a, "has_state", None)) and a.has_state(states_mod.TALKING)]
+    pool = talking or [r for r in actors if here(r)]
+    if not pool:
+        return ""
+    return max(pool, key=lambda r: _sense_motive(actors[r]))
+
+
+def _without_a_lie(r):
+    """A check with any `lie` on its `opposed_by` taken off, or `r` itself."""
+    if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "check"):
+        return r
+    params = r.get("params") or {}
+    ob = params.get("opposed_by") if isinstance(params, dict) else None
+    if not (isinstance(ob, dict) and "lie" in ob):
+        return r
+    return dict(r, params=dict(params, opposed_by={k: v for k, v in ob.items() if k != "lie"}))
+
+
+def inject_false_claim(raw_intents, player_text: str, scene, reading=None) -> list:
     """A claim about what you are is a Bluff, and the room rolls to see through it.
 
-    PF1e's own answer: convincing somebody of something untrue is Bluff against their
-    Sense Motive, and the more outlandish the lie the harder it is — "I am a god" is
-    at the far end. The check is the player's to roll, visibly; its verdict reaches the
-    prose as a tell, and the prose is told what each verdict looks like on the faces
-    around them (`prompts.false_claim_block`). Replaces a bare `narrate_only`, the
-    way every injector here does, and never doubles a Bluff the model already wrote.
+    PF1e's own answer, and since owner ruling B1 (2026-09-30) the book's own mechanism:
+    "Bluff is an opposed skill check against your opponent's Sense Motive skill" (CRB
+    p.90), modified by how believable the lie is — "I am a god" is impossible (-20), the
+    king's lost heir far-fetched (-10). The listener is `listener_for`; the believability
+    is `lie_of`, written on `opposed_by` as `lie` and turned into a number only by the
+    engine (`rules/bluff.py`). Until 2026-09-30 this was a flat DC 30, which Sam's Bluff
+    +6 could not reach: three rolls, three failures, on lines that were not lies.
+
+    **Nobody listening, no roll.** An opposed check with no opponent is not a check: the
+    CRB rolls Sense Motive for "your opponent", and there is none. The claim is still held
+    false — the prose is told so (`prompts.false_claim_block`, which already reads "or
+    there was no roll, nobody believes a word") — and nothing is rolled for it, as
+    nothing is rolled for a Stealth check with no one to notice.
+
+    `reading`: the interpreter's reading. A take, a purchase or a pick-up of the thing,
+    or a plan carrying a `give` of it to the player, is acquisition, never a claim
+    (item 5, turns 4, 5 and 23). The check is the player's to roll, visibly; its verdict
+    reaches the prose as a tell. Replaces a bare `narrate_only`, the way every injector
+    here does; a Bluff the model already wrote is turned into this one rather than
+    doubled, and an Intimidate is a threat, not a lie, and is left alone.
     """
-    if not isinstance(raw_intents, list) or not false_claim(player_text, scene):
+    if not isinstance(raw_intents, list):
         return raw_intents
-    for r in raw_intents:
-        if isinstance(r, dict) and str(r.get("op", "")).lower() == "check":
-            skill = str((r.get("params") or {}).get("skill", "")).lower()
-            if skill in ("bluff", "intimidate"):
-                return raw_intents
-    kept = [r for r in raw_intents
-            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")]
-    kept.append({
-        "op": "check", "actor": "pc",
-        "params": {"skill": "bluff", "dc": {"band": "heroic"}},
+    # The believability is code's to say. A `lie` on a check this function did not write
+    # is the model's, and is taken off rather than turned into a number.
+    scrubbed = [_without_a_lie(r) for r in raw_intents]
+    if any(a is not b for a, b in zip(scrubbed, raw_intents)):
+        raw_intents = scrubbed
+    claim = false_claim(player_text, scene, reading=reading, plan=raw_intents)
+    if not claim:
+        return raw_intents
+    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "check"
+           and str((r.get("params") or {}).get("skill", "")).lower() == "intimidate"
+           for r in raw_intents):
+        return raw_intents
+    listener = listener_for(raw_intents, scene, reading)
+    if not listener:
+        return raw_intents
+    pc = scene.pc()
+    check = {
+        "op": "check", "actor": pc.ref if pc is not None else "pc",
+        "params": {"skill": "bluff",
+                   "opposed_by": {"ref": listener, "skill": "sense motive",
+                                  "lie": lie_of(claim)}},
         "because": "claiming to be what the sheet says they are not",
         "visibility": "player",
-    })
+    }
+    out, placed = [], False
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "check" \
+                and str((r.get("params") or {}).get("skill", "")).lower() == "bluff":
+            if not placed:
+                out.append(check)
+                placed = True
+            continue
+        out.append(r)
+    if placed:
+        return out
+    kept = [r for r in out
+            if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only")]
+    kept.append(check)
     return kept
 
 
@@ -6136,7 +6420,17 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
     # A claim about what they are, made out loud, that the sheet holds false: the
     # crowd saw somebody announce they were a god and nothing happen. The Bluff's
     # verdict, when the engine rolled one, decides whether anybody half-believed it.
-    claim = false_claim(said, scene)
+    # What the turn handed the player is not a boast about having it (item 5: the crowd
+    # was told Sam "produced a key he did not have" on the turn he was given it).
+    # The gives that landed, as plan-shaped intents: a `give` effect names its taker as
+    # `ref` (world state read for world state, as the rest of this function does).
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    given = [{"op": "give", "params": {"item": str(e["item"]), "to": pc.ref}}
+             for o in (outcomes or ()) if pc is not None and str(getattr(o, "op", "")) == "give"
+             for e in (getattr(o, "effects", None) or ())
+             if isinstance(e, dict) and e.get("kind") == "give" and e.get("ref") == pc.ref
+             and e.get("item")]
+    claim = false_claim(said, scene, plan=given)
     if claim:
         bluff = next((o for o in (outcomes or [])
                       if str(getattr(o, "op", "")) == "check"

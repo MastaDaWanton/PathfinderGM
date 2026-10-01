@@ -557,7 +557,15 @@ class GMAgent:
                 # a divine being" is a Bluff the room rolls to see through. Before the
                 # check injector, whose broad verbs would otherwise read it as
                 # something else or nothing.
-                raw = judgement.inject_false_claim(raw, player_input, self.engine.scene)
+                # With the reading (item 5, 2026-09-30): a take, a pick-up or a plan's give
+                # of the thing is acquisition, and the claim the prose was handed before
+                # any reading existed is withdrawn when the reading says so.
+                reading = self.reading if isinstance(self.reading, dict) else None
+                raw = judgement.inject_false_claim(raw, player_input, self.engine.scene,
+                                                   reading=reading)
+                if getattr(self, "false_claim", "") and not judgement.false_claim(
+                        player_input, self.engine.scene, reading=reading, plan=raw):
+                    self.false_claim = ""
                 # Before `inject_checks`: "I cast charm person on the guard" is a spell,
                 # not a Diplomacy check, and the check injector's verbs are broad enough
                 # to claim it.

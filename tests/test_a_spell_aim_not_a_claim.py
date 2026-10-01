@@ -22,9 +22,11 @@ def _bobby():
 
 def test_the_tree_tops_are_no_longer_claimed():
     scene = _bobby()
-    # The shape that misread it is still there — "hands" is still a verb of handing
-    # over — and the spell's name is what is masked before it is read.
-    assert judgement._PRODUCE.search("I cast burning hands into the tree tops")
+    # Two defences now. Since 2026-09-30 (item 5) the verb is anchored to a subject or a
+    # clause start, so "burning hands" never reads as the verb `hands` at all; and the
+    # spell's name is still masked before the line is read (the second test below).
+    assert not judgement._PRODUCE.search("I cast burning hands into the tree tops")
+    assert judgement._PRODUCE.search("I cast it, then hands him the tree tops")
     assert judgement.false_possession("I cast burning hands into the tree tops", scene) == ""
     assert judgement.false_claim("I cast burning hands into the tree tops", scene) == ""
 

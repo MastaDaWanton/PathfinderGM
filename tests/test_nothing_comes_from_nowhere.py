@@ -130,7 +130,14 @@ class TestTheSheetIsAsked:
 class TestItTravelsTheDoorThatExists:
     def test_it_becomes_the_same_bluff_a_claim_about_yourself_does(self, scene):
         """No second door: everything a false claim already travels is what a false
-        possession needs, and a second copy of all of it is the drift CLAUDE.md names."""
+        possession needs, and a second copy of all of it is the drift CLAUDE.md names.
+
+        With somebody there to see it: since owner ruling B1 (2026-09-30) the Bluff is
+        opposed by a listener's Sense Motive, and a crown flourished to an empty yard is
+        rolled against nobody (tests/test_a_take_is_not_a_boast.py)."""
+        from rules.bestiary import instantiate
+
+        scene.add(instantiate("thug", scene=scene, name="the foreman"))
         raw = judgement.inject_false_claim(
             [{"op": "narrate_only", "because": "t"}],
             "I pull out my crown and display it for all to see", scene)

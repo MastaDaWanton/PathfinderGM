@@ -3955,6 +3955,18 @@ class Engine:
                 intent_id=intent.id, op="check", effects=[],
                 tell=f"{exc}. Nothing is rolled.", because=intent.because)
         opposed = intent.params.get("opposed_by")
+        # A lie told to somebody (owner ruling B1, 2026-09-30): Bluff against their Sense
+        # Motive, with the book's believability on the liar's roll (`rules/bluff.py`, CRB
+        # p.90). The category is written by code (`judgement.lie_of`) on `opposed_by`;
+        # the number is the table's, through the same modifier list the roll reads.
+        lie = (str(opposed.get("lie") or "") if isinstance(opposed, dict)
+               and skill == "bluff" else "")
+        if lie:
+            from . import bluff as bluff_mod
+
+            term = bluff_mod.modifier(lie)
+            if term is not None:
+                mods = [*mods, term]
 
         # The opposing side is rolled first and kept in `partial`, so the player's prompt
         # is fully formed before we suspend and so a resume never re-rolls it.
@@ -4022,7 +4034,19 @@ class Engine:
         verdict = "success" if margin >= 0 else "failure"
         rolls = [roll] + ([opposing_roll] if opposing_roll else [])
 
-        if opposed:
+        if opposed and lie:
+            # Said as what the listener now believes, with the skills named: the prose
+            # block for a false claim reads "If the Bluff in the tells above SUCCEEDED",
+            # and `note_heat` looks for the Bluff by name.
+            other = self.scene.actors[opposed["ref"]]
+            tell = (
+                f"{actor.name}'s Bluff beats {other.name}'s sense motive by {margin}: "
+                f"{other.name} believes it, for now."
+                if verdict == "success" else
+                f"{other.name}'s sense motive beats {actor.name}'s Bluff by {-margin}: "
+                f"{other.name} sees through it."
+            )
+        elif opposed:
             other = self.scene.actors[opposed["ref"]]
             tell = (
                 f"{actor.name} beats {other.name}'s {opposed['skill']} by {margin}."
