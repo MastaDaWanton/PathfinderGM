@@ -46,6 +46,43 @@ Nobody in either table is invented. The street's people are grounded through `np
 against the 7,133 loaded stat blocks, the same door `rules/roster.py` uses; the road's are
 drawn from the bestiary by the ground's own biome and a CR window around the party, which
 is `gathering.creature_for` exactly. A model is never asked who is in the way.
+
+PASSING AND STOPPING (owner's ruling C1, 2026-09-30). "I should be able to go anywhere but
+if it would take me through a place the journey through that place should be described and
+encounters should roll once for each place and a low chance of encounters stopping the
+travel." Until then every hit stopped the walk: replayed on the owner's own save, the
+gate → back streets → Velvet Veil walk met something in 23.7% of 300 walks, and every one
+of those was a stop. The chance of a meeting is unchanged — one roll per place, at the
+measured rate above — and what changed is what most meetings DO:
+
+  passing   told in the hop's line and left behind; nobody is brought into the scene and
+            the walk goes on, still rolling for the places after it. The hawker, the
+            beggar, the cart in the press, the watch going by a clean (or merely
+            suspected) name, travellers on the road, a creature that lets you be.
+  stopping  what the code always did: the walk ends at that place and whoever it was is
+            there. A squabble blocking the way, a cutpurse, trouble, the watch for a
+            WANTED name, a creature that comes at you, weather, and a toll (a toll is a
+            decision, pay or go round, and a toll that let you by would be no toll).
+
+Sources. Pathfinder 2e's hexploration rolls one check a day and, when it hits, rolls the
+kind: "Harmless" 1–5, "Hazard" 6–7, "Creature" 8–10 (Gamemastery Guide, Random Encounters,
+2e.aonprd.com/Rules.aspx?ID=3114) — half of everything met is harmless, which is the shape
+here. Necropraxis's "Overloading the encounter die" (necropraxis.com/2014/02/03/
+overloading-the-encounter-die/) rolls once per area entered and makes most faces something
+other than a fight — a percept, a spoor, a sign that something is near — which is what a
+passing meeting is: it happened, it is told, it does not take the turn. And Inform's
+*Approaches* (GO TO a known room, walked in one command, stopped only by the rules) is the
+walk this all happens on. The target the plan set was "about 8–10% stopping on a 3-hop
+walk"; `test_on_the_way.py` measures it over 300 seeded walks.
+
+To land there the street table moved five points from the press to the squabble (press
+1–17, squabble 18–42): with the squabble, the cutpurse and trouble stopping a clean name,
+39% of hits stop — 8% × 39% = 3.1% a hop, 1 − 0.969³ = 9.1% on three hops; a wanted name,
+whom the patrol also stops, 53% of hits and 12.0%. Measured over 300 seeded three-hop
+walks (seeds 0–299): 24 stopped, 8.0%, against 66 that met anything (22%); with the old
+bands and every meeting a stop, those 66 were all stops. The violence band (trouble, 4 in
+100) is untouched. (Over the same seeds the 2-point move gave 7.7% — the low edge of the
+plan's target — which is why it is five.)
 """
 from __future__ import annotations
 
@@ -66,7 +103,7 @@ STREET_PERCENT = 8
 # The bands, low to high, on a d100 rolled only once the check above has already hit.
 #   key, hi, who they are (words `npcs.choose` grounds against), how many
 STREET = (
-    ("press", 22, ("drover", "carter", "laborer"), 1),
+    ("press", 17, ("drover", "carter", "laborer"), 1),
     ("squabble", 42, ("commoner", "townsfolk"), 2),
     ("hawker", 58, ("peddler", "merchant", "trader"), 1),
     ("beggar", 72, ("beggar", "commoner"), 1),
@@ -262,17 +299,83 @@ def _names(who) -> str:
     return ", ".join(who[:-1]) + " and " + who[-1]
 
 
-def describe(meeting: Meeting, where: str = "", law: str = "", who=()) -> str:
+# The kinds that are told and left behind (owner's ruling C1; the module docstring says
+# why each side is where it is). The patrol and the creature are each one or the other by
+# what the engine knows: the warrant, and whether the creature is one that comes at you.
+PASSING = frozenset({"press", "hawker", "beggar", "travellers"})
+
+
+def stops(meeting: Meeting, law: str = "") -> bool:
+    """Does this meeting end the walk where it happened? `law` is the town's standing
+    with the walker (`states.standing_with_the_law`): only a WANTED name is stopped by
+    the watch; a suspected one is looked at twice and let by, as at the gate."""
+    if meeting.kind == "patrol":
+        return law == "wanted"
+    if meeting.kind == "creature":
+        return bool(meeting.aggressive)
+    return meeting.kind not in PASSING
+
+
+def passing(meeting: Meeting, where: str = "", law: str = "") -> str:
+    """The sentence for a meeting the walk goes on through, said as part of that hop.
+
+    In the engine's voice and naming nobody, like the stopping sentences: nobody is
+    brought into the scene for it, so there is nobody to name, and the narrator is told
+    in so many words that the walk went on — "you walk on" — so the prose cannot make it
+    the stop it is not."""
+    at = f"At {where}, " if where else ""
+    if meeting.kind == "press":
+        lead = "a cart is across the way and a drover is arguing with it"
+        tail = "you squeeze past it and walk on"
+    elif meeting.kind == "hawker":
+        lead = "somebody decides you are buying and walks beside you a while"
+        tail = "they give up, and you walk on"
+    elif meeting.kind == "beggar":
+        lead = "a hand comes out, and the mouth above it knows your face is new"
+        tail = "you are past it before the asking is done"
+    elif meeting.kind == "patrol":
+        lead = "the watch comes by, two of them, looking at faces"
+        tail = ("one of them looks at yours twice, and lets you go on"
+                if law == "suspected" else "they go on their way, and so do you")
+    elif meeting.kind == "travellers":
+        lead = "there are others on the road"
+        tail = "you pass them, and walk on"
+    elif meeting.kind == "creature" and meeting.creature:
+        name = str(meeting.creature.get("name") or "something")
+        article = "an" if name[:1].lower() in "aeiou" else "a"
+        lead = f"{article} {name} is near the way"
+        tail = "it lets you pass, and you walk on"
+    else:
+        return ""
+    sentence = f"{at}{lead}; {tail}."
+    return sentence[:1].upper() + sentence[1:]
+
+
+# The stop's last words, said only where the walk was cut short. A meeting on the LAST hop
+# happened at the destination, and "You get no further" there told the player they had
+# not arrived where they had: 24 of the 71 stops in the item-9 replay (300 walks to the
+# Velvet Veil) fell on that last hop.
+NO_FURTHER = " You get no further."
+
+
+def describe(meeting: Meeting, where: str = "", law: str = "", who=(),
+             arrived: bool = False) -> str:
     """The tell's clause: what stopped you, and — when the caller knows them — who.
 
     `who` is the names of the people the engine just brought in for this meeting. With
     them the tell ends "Stopped by Guard and second Guard: they are looking at faces", so
     a stop names who and why and cannot be read as background.
+
+    `arrived` is a meeting at the place the walk was going to: it is said, and who is
+    there is said, but nobody was stopped from getting anywhere.
     """
     said = _describe(meeting, where, law)
+    if arrived and said.endswith(NO_FURTHER):
+        said = said[:-len(NO_FURTHER)]
     names = _names(who)
     if said and names and meeting.kind in WHY:
-        said += f" Stopped by {names}: {WHY[meeting.kind]}."
+        said += (f" Met there by {names}: {WHY[meeting.kind]}." if arrived else
+                 f" Stopped by {names}: {WHY[meeting.kind]}.")
     return said
 
 

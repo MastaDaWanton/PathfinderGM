@@ -236,7 +236,11 @@ def test_a_wanted_character_cannot_walk_out_by_naming_a_place():
                                  source="t", origin="t", duration="until-dismissed",
                                  tags=(tag,)))
     out = _run(e, pc, "travel", place="the outskirts")[0]
-    assert out.status == "refused" and "wanted" in out.tell
+    # Refused outright when the first step is the way out; since the watch is asked at
+    # every hop (item 9 (e), 2026-09-30), a market further in than the way out is walked
+    # as far as the last street before it, and stopped there with the same sentence.
+    assert "wanted" in out.tell, out.tell
+    assert out.status == "refused" or out.effects[0].get("watch_stopped"), out.tell
     assert places.setting_of(s.at) == "in"
 
 

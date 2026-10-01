@@ -14,6 +14,8 @@ Two defects, both measured, both on 2026-09-21/22:
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from rules import ontheway, places as places_mod
@@ -252,3 +254,161 @@ class TestTheWatchReadsTheWarrant:
             plain = ontheway.describe(ontheway.Meeting(kind=kind, roll=1))
             wanted = ontheway.describe(ontheway.Meeting(kind=kind, roll=1), law="wanted")
             assert plain == wanted, kind
+
+
+# --- passing and stopping (owner's ruling C1, 2026-09-30) ---------------------------------
+
+class TestMostMeetingsPassBy:
+    """The owner, on the 0.2.0 playtest's walk to the Velvet Veil: "encounters should roll
+    once for each place and a low chance of encounters stopping the travel. I should not be
+    forced to play a whole turn for each connecting point." Replayed on the owner's own
+    save before this, the gate → market → back streets → Veil walk met something in 23.7%
+    of 300 walks and EVERY meeting stopped it (docs/playtest-2026-09-30-findings.md, item 9
+    (c)). Ruling C1: most meetings pass by, told in the walk's line; a few stop."""
+
+    def test_the_harmless_half_passes_and_the_named_few_stop(self):
+        """PF2e hexploration's split (Gamemastery Guide, Random Encounters: half of every
+        hit "Harmless") and the ruling's own list of stops: a blocked way, a cutpurse,
+        trouble, a patrol for the wanted, dangerous creatures. A toll stops because it is a
+        decision; weather stops because there is no walking through it."""
+        m = ontheway.Meeting
+        for kind in ("press", "hawker", "beggar", "travellers"):
+            assert not ontheway.stops(m(kind=kind, roll=1)), kind
+        for kind in ("squabble", "cutpurse", "trouble", "toll", "weather"):
+            assert ontheway.stops(m(kind=kind, roll=1)), kind
+        patrol = m(kind="patrol", roll=80)
+        assert not ontheway.stops(patrol, "") and not ontheway.stops(patrol, "suspected")
+        assert ontheway.stops(patrol, "wanted")
+        beast = {"name": "wolf", "cr_value": 1}
+        assert ontheway.stops(m(kind="creature", roll=1, creature=beast, aggressive=True))
+        assert not ontheway.stops(m(kind="creature", roll=1, creature=beast))
+
+    def test_stopping_on_a_three_hop_walk_is_about_eight_to_ten_percent(self):
+        """The plan's target, measured over 300 seeded three-hop walks (seeds 0–299), one
+        roll per place at the unchanged 8%: 66 walks met something (22%) and 24 of them
+        stopped (8.0%); the bands' arithmetic says 9.1%. Under the old table every one of
+        the 66 was a stop. A wanted name, whom the patrol also stops: 36 (12.0%)."""
+        def walk(seed, law):
+            dice = Dice(seed=seed)
+            met = False
+            for _ in range(3):
+                got = ontheway.street(dice)
+                if got is None:
+                    continue
+                met = True
+                if ontheway.stops(got, law):
+                    return True, True
+            return met, False
+
+        clean = [walk(i, "") for i in range(300)]
+        stopped = sum(s for _m, s in clean)
+        met = sum(m for m, _s in clean)
+        assert stopped == 24 and met == 66, (stopped, met)
+        assert 0.06 <= stopped / 300 <= 0.11
+        wanted = sum(walk(i, "wanted")[1] for i in range(300))
+        assert wanted == 36, wanted
+
+    @pytest.mark.parametrize("kind", ["press", "hawker", "beggar", "patrol", "travellers"])
+    def test_a_passing_meeting_is_told_where_it_happened_and_that_you_walked_on(self, kind):
+        """In the engine's voice, naming the place and nobody else, and saying in so many
+        words that the walk went on — the stop-not-shown check (gm/checks/stop_shown.py)
+        exists because prose made a stop into scenery; this is the other way round, and the
+        sentence leaves no room to make scenery into a stop."""
+        said = ontheway.passing(ontheway.Meeting(kind=kind, roll=1), "the great square")
+        assert said.startswith("At the great square, ") and said.endswith(".")
+        assert re.search(r"\b(walk on|go on|past it|so do you)\b", said), said
+        assert "no further" not in said
+
+    def test_a_meeting_where_you_were_going_does_not_say_you_got_no_further(self):
+        """24 of the 71 stops in the item-9 replay fell on the last hop — at the Veil
+        itself — and each said "You get no further" about the place they had reached."""
+        met = ontheway.Meeting(kind="squabble", roll=30)
+        assert "no further" in ontheway.describe(met, "the lane")
+        arrived = ontheway.describe(met, "the lane", who=["Ana", "Bo"], arrived=True)
+        assert "no further" not in arrived and "Stopped by" not in arrived
+        assert "Met there by Ana and Bo" in arrived
+
+
+WORLD_FILE = "fixtures/pangrella-campaign.json"
+ZHIL = "58b90a214ada"
+
+
+def _walker():
+    from rules.bestiary import instantiate
+    from rules.engine import Engine, Scene
+    from world import loader
+
+    world = loader.load_cached(WORLD_FILE)
+    s = Scene(location_id=ZHIL)
+    pc = instantiate("guildhand", scene=s, name="PC")
+    pc.kind = "pc"
+    pc.hp = pc.hp_base = 60
+    s.add(pc)
+    e = Engine(s, Dice(seed=3), world=world)
+    e.place_party(f"{ZHIL}~urban:the-market")
+    return s, e, pc
+
+
+def _go(e, pc, place):
+    out = e.run(e.validate([{"op": "travel", "actor": pc.ref, "because": "t",
+                             "params": {"place": place}}], origin="author:test"))
+    return out.outcomes[0]
+
+
+def _meetings(monkeypatch, *script):
+    """The street table answers the script hop by hop: None, or a meeting of that kind."""
+    queue = list(script)
+
+    def street(dice, level=1):
+        kind = queue.pop(0) if queue else None
+        if kind is None:
+            return None
+        return ontheway.Meeting(kind=kind, roll=50, words=("commoner",), count=1,
+                                template="guildhand")
+    monkeypatch.setattr(ontheway, "street", street)
+
+
+EAST = f"{ZHIL}~urban:the-east-crossing"      # market → north crossing → great square → here
+
+
+class TestTheWalkGoesOn:
+    def test_a_passing_meeting_is_told_in_its_hop_and_the_walk_arrives(self, monkeypatch):
+        """A hawker in the north crossing, the first of three places: before C1 the party
+        stopped there and the turn was spent; now it is said, nobody is brought in, and the
+        walk arrives at the east crossing in the same turn."""
+        s, e, pc = _walker()
+        _meetings(monkeypatch, "hawker", None, None)
+        before = set(s.people)
+        out = _go(e, pc, EAST)
+        eff = out.effects[0]
+        assert s.at == EAST, out.tell
+        assert eff["met"] == "" and not eff.get("stopped_short")
+        assert eff["passed_meetings"] == [{"at": "the north crossing", "kind": "hawker"}]
+        assert "At the north crossing, somebody decides you are buying" in out.tell
+        assert "no further" not in out.tell
+        assert set(s.people) <= before | {pc.ref}, "a passing meeting brought somebody in"
+
+    def test_each_place_still_rolls_after_a_meeting_passes(self, monkeypatch):
+        """"Roll once for each place": a passing meeting does not end the rolling, so a
+        stop can still come later on the same walk — here a squabble in the great square,
+        after a beggar in the north crossing."""
+        s, e, pc = _walker()
+        _meetings(monkeypatch, "beggar", "squabble", None)
+        out = _go(e, pc, EAST)
+        assert s.at == f"{ZHIL}~urban:the-great-square"
+        assert out.effects[0]["met"] == "squabble"
+        assert "You get no further" in out.tell
+        assert "got no further than the great square" in out.tell
+        assert "At the north crossing, a hand comes out" in out.tell
+
+    def test_a_stop_at_the_destination_is_not_told_as_falling_short(self, monkeypatch):
+        """24 of 71 stops in the item-9 replay fell on the last hop and said "You get no
+        further" at the very place they had reached."""
+        s, e, pc = _walker()
+        _meetings(monkeypatch, None, None, "squabble")
+        out = _go(e, pc, EAST)
+        eff = out.effects[0]
+        assert s.at == EAST and eff["met"] == "squabble"
+        assert not eff.get("stopped_short")
+        assert "no further" not in out.tell, out.tell
+        assert "Met there by" in out.tell

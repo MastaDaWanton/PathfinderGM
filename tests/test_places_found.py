@@ -118,6 +118,33 @@ def test_travel_adds_where_the_party_went_in_the_order_it_went(worlds):
     assert s.been == [start, one["id"], two["id"]]
 
 
+def test_the_places_a_walk_passes_through_join_the_record(worlds):
+    """Item 9 (f) of the 2026-09-30 playtest: the walk gate → market → back streets → the
+    Velvet Veil put only the Veil on the record, so the market and the back streets stayed
+    under fog on the chart while the tell had just said the way ran through them. Every
+    place passed now joins `been` (`Scene.pass_through`), in the order walked and before
+    the place walked to — and only the end of the walk is where the party stands."""
+    loc = _town(worlds)
+    s, e, pc = _party(worlds, loc.id)
+    start = s.at
+    known = e.places()
+    far = next((p for p in known
+                if len(places.route(known, start, p.id)) >= 3
+                and not any(x["id"] == p.id and x["blocked"]
+                            for x in exits_mod.exits(e, worlds))), None)
+    if far is None:
+        pytest.skip("nowhere three places away in this town")
+    hops = places.route(known, start, far.id)
+    out = _travel(e, pc, far.id)
+    assert out.status == "resolved", out.tell
+    assert s.at == far.id
+    assert s.been == [start, *hops], "the places passed through are not on the record"
+    assert out.effects[0]["went_by"] == [places.find(known, h).name for h in hops[:-1]]
+    chart = places_found.chart(e, worlds)
+    visited = {n["id"] for n in chart["nodes"] if n["visited"]}
+    assert set(hops) <= visited
+
+
 def test_a_refused_move_is_not_a_place_been(worlds):
     """A way the rules shut is not walked, so it is not on the record — the refusal's
     snapshot takes the scene back whole, the record with it."""
@@ -206,9 +233,12 @@ def test_a_new_campaign_has_been_only_where_its_story_begins(worlds, tmp_path):
 
 def test_only_stand_and_the_start_write_the_record():
     """`at` and `been` are written in one step (`Scene.stand`), so they cannot drift; the
-    one other writer is the start's `begin_here`. A third writer is a door an arrival
-    could go through without reaching the map."""
-    allowed = {("rules/engine.py", "stand"), ("rules/engine.py", "begin_here")}
+    other writers are the start's `begin_here`, and since item 9 (f) (2026-09-30)
+    `pass_through`, for the places a walk crossed on its way — the record only, never
+    `at`. A fourth writer is a door an arrival could go through without reaching the
+    map."""
+    allowed = {("rules/engine.py", "stand"), ("rules/engine.py", "begin_here"),
+               ("rules/engine.py", "pass_through")}
     found = set()
     for folder in ("rules", "gm", "play"):
         for path in Path(folder).rglob("*.py"):

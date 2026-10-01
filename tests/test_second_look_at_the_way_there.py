@@ -283,7 +283,9 @@ class TestTheWatchReadsWhereYouGot:
     def test_stopped_short_of_the_gate_nobody_looked_twice(self):
         s, e, pc, gate = self._away_from_the_gate()
         self._suspect(pc, ROAD_FROM)
-        e.dice = _Certain(e.dice.real, band=10)       # the first hop: a cart across it
+        # A squabble, which stops the walk: a cart across the way (band 10) is walked
+        # past since the owner's ruling C1, 2026-09-30, and would reach the gate.
+        e.dice = _Certain(e.dice.real, band=30)       # the first hop: a squabble
         tell = " ".join(o.tell for o in _travel(e, pc, gate.name).outcomes)
         assert "got no further" in tell
         assert "look twice" not in tell, tell
@@ -298,7 +300,7 @@ class TestTheWatchReadsWhereYouGot:
     def test_a_wanted_character_stopped_short_was_not_taken_at_an_arch_they_never_reached(self):
         s, e, pc, gate = self._away_from_the_gate()
         self._suspect(pc, ROAD_FROM, how="wanted")
-        e.dice = _Certain(e.dice.real, band=10)
+        e.dice = _Certain(e.dice.real, band=30)       # a squabble, which stops (C1)
         out = _travel(e, pc, gate.name).outcomes[-1]
         assert out.effects, "moved, not refused"
         assert "got no further" in out.tell
