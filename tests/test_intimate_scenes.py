@@ -16,7 +16,6 @@ caps without being what the owner will put there.
 """
 from __future__ import annotations
 
-import inspect
 import json
 from pathlib import Path
 
@@ -277,10 +276,7 @@ def test_the_path_is_the_data_folders_not_the_bundles(data):
     assert intimate.demonstrations_path() == (
         Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "style" / "intimate.txt")
     assert intimate.demonstrations_path().is_relative_to(data)
-    import ast
-
-    tree = ast.parse(inspect.getsource(intimate))
-    assert not [n for n in ast.walk(tree) if isinstance(n, ast.Name) and n.id == "__file__"]
+    assert not intimate.demonstrations_path().is_relative_to(Path(intimate.__file__).parent.parent)
 
 
 def test_the_file_is_created_holding_only_a_header(data):
@@ -363,30 +359,19 @@ def test_the_scenes_own_sentences_are_not_conditions(scene):
         state_claims.state_claims(held, scene)
 
 
-def test_the_blow_detector_misreads_the_scene_so_it_is_not_asked(scene):
-    """"Mira grabs your hair and pulls you down to her" reads as an undeclared blow, and
-    the repair asks for the beat again "threatening, squaring up or reaching"."""
-    assert judgement.attacked_by(scene, "Mira grabs your hair and pulls you down to her.")
-    from gm import agent as agent_mod
-
-    src = inspect.getsource(agent_mod.GMAgent.narrate_turn)
-    assert "if not self._intimate_beat():" in src
-    assert src.index("if not self._intimate_beat():") < src.index("self._undeclared_blows(")
-
-
-def test_her_body_is_not_a_corpse_in_an_intimate_beat():
-    """Measured live 2026-10-01 on the first briefed beat: "her body is tense but
-    welcoming" read as Quin Nutmeg "down or dead" — `_FELLED` holds "body", for a corpse
-    — and went to the rewrite as a contradiction of the engine. The review is not handed
-    who is alive and unhurt on an intimate beat."""
-    state = {"Quin Nutmeg": {"alive": True, "hurt": False}}
+def test_the_detectors_misread_the_scenes_own_sentences():
+    """The two misreads the exemptions below exist for, as the detectors stand.
+    "Mira grabs your hair and pulls you down to her" is an undeclared blow, and its repair
+    asks for the beat again "threatening, squaring up or reaching". And, measured live
+    2026-10-01 on the first briefed beat, "her body is tense but welcoming" read as Quin
+    Nutmeg "down or dead" — `_FELLED` holds "body", for a corpse."""
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.add(instantiate("guildhand", scene=s, name="Mira"), zone="near")
+    assert judgement.attacked_by(s, "Mira grabs your hair and pulls you down to her.")
     assert narration.contradicts_state(
-        "Quin Nutmeg draws you close. Her body is tense but welcoming.", state)
-    from gm import agent as agent_mod
-
-    src = inspect.getsource(agent_mod.GMAgent.polish)
-    assert "bodies = None if intimate else self._body_count()" in src
-    assert "state=bodies" in src
+        "Quin Nutmeg draws you close. Her body is tense but welcoming.",
+        {"Quin Nutmeg": {"alive": True, "hurt": False}})
 
 
 def test_a_rewrite_of_an_intimate_beat_keeps_its_register():
@@ -473,6 +458,44 @@ def test_an_intimate_beat_through_the_view_is_briefed_injected_and_logged(live, 
     assert "DEMO-PASSAGE" not in json.dumps(cm.current().turn_log)
 
 
+# Neutral sentences of the kinds an intimate beat is made of, each one a misread by a
+# check written for fights: an undeclared blow, a prone body, a body "down or dead".
+SCENE_WORDS = ("Mira grabs your hair and pulls you down to her. Her body is tense but "
+               "welcoming against yours. Mira lies flat on her back on the bed, laughing "
+               "under her breath. The candle on the sill has burned low and the room is "
+               "quiet except for the two of you. She says your name once, softly, and "
+               "does not look away. Outside, a cart goes by on the wet street and is gone. "
+               "Neither of you is in any hurry now, and the night has a long way to run. "
+               "She draws the blanket up over both of you and settles there. "
+               "What do you do?")
+
+
+def _misreads(repairs) -> list[str]:
+    return [x for x in repairs if "undeclared blow" in x or "state claim" in x
+            or "contradicts-the-engine" in x]
+
+
+def test_the_scenes_own_sentences_survive_the_checks_on_an_intimate_beat(live, monkeypatch):
+    """Through the view: on a briefed beat none of the three fight checks fires on the
+    scene's own sentences."""
+    cm, c = live
+    r, seen = _say(monkeypatch, SCENE_WORDS, "We go all the way")
+    row = _prose_row(cm)
+    assert row["intimate"]["fired"] is True
+    assert _misreads(row["repairs"]) == []
+
+
+def test_the_same_sentences_on_an_ordinary_beat_are_still_checked(live, monkeypatch):
+    """The exemption is the briefed beat's only: the same words after "I pay for the
+    room" still go to the fight checks, which is what makes the test above mean
+    anything."""
+    cm, c = live
+    r, seen = _say(monkeypatch, SCENE_WORDS, "I pay for the room")
+    row = _prose_row(cm)
+    assert row["intimate"]["fired"] is False
+    assert _misreads(row["repairs"])
+
+
 def test_an_ordinary_beat_through_the_view_injects_nothing(live, monkeypatch):
     cm, c = live
     intimate.ensure_file().write_text(
@@ -488,7 +511,7 @@ def test_an_empty_file_is_logged_and_the_briefing_still_fires(live, monkeypatch)
     cm, c = live
     beat = "Mira answers you without a word, and the two of you go on. " * 12 + "What?"
     r, seen = _say(monkeypatch, beat, "We go all the way")
-    assert seen[0][0]["content"].startswith(prompts.INTIMATE_BRIEFING),         (_prose_row(cm)["intimate"], [m[0]["content"][:60] for m in seen])
+    assert seen[0][0]["content"].startswith(prompts.INTIMATE_BRIEFING)
     assert any(row.get("kind") == "intimate" and row.get("note") ==
                "no demonstrations on file" for row in cm.current().turn_log)
 
