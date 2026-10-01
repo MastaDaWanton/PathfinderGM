@@ -1075,8 +1075,19 @@ class GMAgent:
             # ~10s polish call per NPC per round is a price a fight cannot pay.
             # `hand_back=False`: an NPC beat mid-round hands nothing back.
             self._location = location
+            windup = self._lift(str(data.get("narration", "")).strip())
+            # A companion's wind-up shows who they are in how they do it (the owner's
+            # second ruling, 2026-10-01) — detected, repaired by one targeted call when
+            # it reads as anybody's, and BEFORE the grooming, so every backstop below
+            # also reads the rewrite.
+            manner_notes: list[str] = []
+            if friend:
+                windup, manner_notes, more = self.manner_of(
+                    windup, actor, ordered=bool(orders),
+                    op=intents[0].op if intents else "", whole=True)
+                attempts.extend(more)
             narration, repairs, groom_attempts = self._groom(
-                self._lift(str(data.get("narration", "")).strip()),
+                windup,
                 earlier=None, min_chars=0,
                 max_chars=narration_mod.MAX_COMBAT_CHARS,
                 player_input="", brief=brief, hand_back=False, claims=True,
@@ -1085,7 +1096,8 @@ class GMAgent:
                                        location=location, acting=ref))
             attempts.extend(groom_attempts)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
-                            repairs=[*rearmed, *repairs], rejections=rejections)
+                            repairs=[*rearmed, *manner_notes, *repairs],
+                            rejections=rejections)
 
         raise IntentError(
             f"the GM could not act for {ref} in {max_attempts} attempts:\n"
@@ -1162,10 +1174,122 @@ class GMAgent:
                 continue
             narration = judgement.name_refs(
                 self._lift(str(data.get("narration", "")).strip()), scene)
+            # How they do it shows who they are (the owner's second ruling, 2026-10-01):
+            # detected, and repaired with one targeted call when the answer reads as if
+            # anybody could have given it.
+            narration, manner_notes, more = self.manner_of(
+                narration, actor, ordered=True,
+                op=intents[0].op if intents else "", whole=True)
+            attempts.extend(more)
             return TurnPlan(narration=narration, intents=intents, attempts=attempts,
-                            rejections=rejections)
+                            rejections=rejections, repairs=manner_notes)
         raise IntentError(f"{actor.name} could not answer in {max_attempts} attempts:\n"
                           + "\n".join(rejections))
+
+    def manner_of(self, text: str, actor, *, ordered: bool, op: str = "",
+                  whole: bool = False) -> tuple[str, list[str], list[Attempt]]:
+        """A companion's deed on the page carries their manner, or is repaired to.
+
+        The owner's second ruling (2026-10-01): "they can comply but it should be narrated
+        that they did so in a way that was timid and matched their background." Detected
+        mechanically (`companions.shows_manner`, a cue lexicon per temperament); when no
+        cue is there, ONE call rewrites only the companion's own sentences — the pattern
+        of `_answer_the_question` and `_show_declared`: a backstop under the prose, kept
+        only when it holds. Each rewritten sentence must leave the act as it was
+        (`companions.act_kept`: the same deed words, nobody added, no blow landed that was
+        not), and the result must carry a cue; otherwise the passage stands as written
+        and the note says so. A companion whose temper owes no deed-cue owes nothing.
+
+        `whole`: the passage is all theirs (their own fight turn or answer), so when no
+        sentence names them the first sentences are theirs anyway."""
+        from . import companions
+
+        scene = self.engine.scene
+        pole = companions.dominant_pole(scene, actor)
+        if not pole or not str(text or "").strip():
+            return text, [], []
+        if companions.shows_manner(text, actor, pole, whole=whole):
+            return text, [f"manner: {actor.name} ({pole}) shown"], []
+        mine = companions.their_sentences(text, actor)
+        if not mine and whole:
+            mine = narration_mod._sentences(text)[:2]
+        mine = mine[:3]
+        if not mine:
+            return text, [], []
+        line = companions.manner_line(scene, actor, ordered=ordered, op=op)
+        try:
+            reply = client.chat(
+                prompts.manner_repair_messages(mine, actor.name, line, pole),
+                self.prose_model, self.prose_host, as_json=True, think=False,
+                temperature=0.5, num_predict=120 + 90 * len(mine),
+                provider=self.prose_provider, api_key=self.prose_key,
+                schema=mentions_mod.repair_schema(len(mine)))
+            attempt = Attempt("manner", reply.seconds, reply.model, reply.text,
+                              note=f"manner: {actor.name} ({pole})")
+            got = reply.json() or {}
+        except Exception as exc:  # noqa: BLE001 — a failed repair must not lose the turn
+            return text, [f"manner: {actor.name} ({pole}) not shown — the call failed "
+                          f"({type(exc).__name__}); kept as written"], []
+        people = list(scene.actors.values())
+        fixed, why = text, []
+        for i, old in enumerate(mine, 1):
+            new = " ".join(str(got.get(f"s{i}") or "").split())
+            reason = companions.act_kept(old, new, actor, people)
+            if reason or old not in fixed:
+                why.append(reason or "sentence moved")
+                continue
+            fixed = fixed.replace(old, new, 1)
+        if fixed == text or not companions.shows_manner(fixed, actor, pole, whole=whole):
+            return text, [f"manner: {actor.name} ({pole}) not shown — the rewrite did not "
+                          f"hold ({'; '.join(why) or 'still no cue'}); kept as written"], \
+                [attempt]
+        return fixed, [f"manner: {actor.name} ({pole}) not shown — rewrote "
+                       f"{len(mine) - len(why)} sentence(s)"], [attempt]
+
+    def companion_interject(self, ref: str, facts: str, *, known: set[str] | None = None,
+                            max_attempts: int = 2) -> tuple[str, list[Attempt], list[str]]:
+        """A companion speaks up, unasked: one line in their voice about the moment or
+        the place (the owner, 2026-10-01: "they should also interject their opinions on
+        the things going on or the places we go"). WHEN is code's
+        (`companions.interjection_due`); this writes WHAT, from `facts` — who they are,
+        what it is about, who is here — and holds it mechanically to: their words in
+        quotation marks, their name on it, short, no number, no name the world does not
+        know, no question or advice that hands the player their next move. A second try is
+        told what was wrong with the first; a line that never holds is not spoken.
+
+        Returns (line, attempts, rejections); line is "" when nothing held."""
+        from . import companions
+
+        actor = self.engine.scene.actors[ref]
+        known = set(known or ()) | self._known_names()
+        messages = prompts.interject_messages(facts)
+        attempts: list[Attempt] = []
+        rejections: list[str] = []
+        for n in range(max_attempts):
+            try:
+                reply = client.chat(
+                    messages, self.prose_model, self.prose_host, as_json=True,
+                    think=False, temperature=0.8, num_predict=200,
+                    provider=self.prose_provider, api_key=self.prose_key,
+                    schema=prompts.interject_schema())
+            except Exception as exc:  # noqa: BLE001 — an unspoken remark costs nothing
+                rejections.append(f"attempt {n + 1}: the call failed ({type(exc).__name__})")
+                break
+            attempts.append(Attempt("interject", reply.seconds, reply.model, reply.text,
+                                    note=f"interject: {actor.name}"))
+            try:
+                line = " ".join(str((reply.json() or {}).get("line") or "").split())
+            except ValueError:
+                line = ""
+            line = judgement.name_refs(line, self.engine.scene) if line else ""
+            why = companions.interjection_refusal(line, actor, known)
+            if not why:
+                return line, attempts, rejections
+            rejections.append(f"attempt {n + 1}: {why}: {line[:120]!r}")
+            messages = messages + [
+                {"role": "assistant", "content": reply.text},
+                {"role": "user", "content": f"That line {why}. Write it again."}]
+        return "", attempts, rejections
 
     def _context_note(self) -> list[str]:
         """What the context budget left out this turn, for the log and the GM view.
@@ -3059,13 +3183,15 @@ class GMAgent:
         return out
 
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str,
-                        rewrite: bool = True, acting: str = "") -> tuple[str, Attempt]:
+                        rewrite: bool = True, acting: str = "",
+                        manner: str = "") -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
 
         Fed only `player_visible()` outcomes, so a hidden roll's number is not in the
         context and cannot be leaked. `acting` is the creature whose turn this was, on
         an NPC's turn: the call is framed as its turn and the prose checked for being
-        told the wrong way round (`narration.wrong_actor`).
+        told the wrong way round (`narration.wrong_actor`). `manner`: on a companion's
+        turn, how they do it as a fact (`companions.manner_line`).
         """
         tells = [o.tell for o in outcomes if o.tell]
         because = [o.because for o in outcomes if o.because]
@@ -3076,7 +3202,8 @@ class GMAgent:
         pc = self.engine.scene.pc()
         reply = client.chat(
             prompts.call_two_messages(narration, tells, because, player_input,
-                                      acting=acting, pc_name=pc.name if pc else ""),
+                                      acting=acting, pc_name=pc.name if pc else "",
+                                      manner=manner),
             # 700 rather than 250, and it is free. `num_predict` is a ceiling, not a
             # target: llama3.1 writes its two sentences and stops either way. A reasoning
             # model does not — measured on R4C3R/qwen3-8b-heretic, every consequence call

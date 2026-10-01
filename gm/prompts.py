@@ -2224,7 +2224,7 @@ CONSEQUENCE_NPC_EXAMPLE = {
 
 def call_two_messages(narration: str, tells: list[str], because: list[str],
                       player_input: str, *, acting: str = "",
-                      pc_name: str = "") -> list[dict]:
+                      pc_name: str = "", manner: str = "") -> list[dict]:
     """The consequence call. `acting` is set on a creature's own turn: then the call
     says whose turn it is instead of "The player said: <creature> acts", shows the
     tells with the player already as "you" (Inform's adaptive text does the same — one
@@ -2251,6 +2251,11 @@ def call_two_messages(narration: str, tells: list[str], because: list[str],
     )
     if why:
         content += f"\nWhy it was rolled:\n{why}\n"
+    # A companion's turn: how they do it, as a fact beside the tells (gm/companions.py
+    # `manner_line`; the owner's second ruling, 2026-10-01). Last, as the brief's
+    # standing facts are, and in words — never a number.
+    if manner:
+        content += f"\n{manner}\n"
     return [
         {"role": "system", "content": CONSEQUENCE_BRIEFING},
         {"role": "user", "content": example["user"]},
@@ -2369,7 +2374,9 @@ NPC_EXAMPLES = [
 COMPANION_TURN_BRIEFING = """This one travels with the player and fights on the player's
 side. What the player told them is theirs to weigh, as themselves: an ordinary order they
 simply do; a dangerous or hateful one they weigh against who they are — do it, do it their
-own way, or refuse. A refusal is said in what they do, with a single narrate_only."""
+own way, or refuse. A refusal is said in what they do, with a single narrate_only.
+Told nothing, they still act, as somebody like them would with a friend in a fight.
+However they act, the wind-up shows who they are in how they do it."""
 
 
 # A companion's turn (gm/companions.py) is shown these INSTEAD of NPC_EXAMPLES, whose
@@ -2401,26 +2408,32 @@ COMPANION_EXAMPLES = [
                          "because": "it was told to, and it does what it is told"}],
         },
     },
+    # The owner's second ruling (2026-10-01): "they can comply but it should be narrated
+    # that they did so in a way that was timid and matched their background." This
+    # example used to show the timid friend bending the order to holding the door —
+    # the only obeyed-timidly shape the model saw was a refusal. Now the order is done,
+    # and the manner is in the verbs (swallows, edges, half-shut eyes) and in their trade
+    # (a carter swings what a carter swings), never in the word "timid".
     {
         "ask": "Round 3. It is {Self} ({Companion}) turn.\nThey are unhurt and their "
                "conditions are: none.\n{Companion} TRAVELS WITH the player and came into "
                "this fight on the player's side. Who {Companion} is (fact): {Companion} "
                "is friendly towards the player — a friend who came along, not a servant, "
                "and free to say no. {Companion} is cautious, timid. in how they act: "
-               "keeps a door at their back and a reason to leave ready.\nThe fight is "
-               "against: {Foe Ref} ({Foe}).\nWhat the player has said to {Companion}, "
-               "newest first:\n  - \"Get round behind {Foe} and hit him while I keep "
-               "him busy!\"\n{Companion} decides what to do with that as themselves: do "
+               "keeps a door at their back and a reason to leave ready. {Companion} is a "
+               "drover by trade.\nThe fight is against: {Foe Ref} ({Foe}).\nWhat the "
+               "player has said to {Companion}, newest first:\n  - \"{Companion}, hit "
+               "him! Now!\"\n{Companion} decides what to do with that as themselves: do "
                "it, do it their own way, or refuse. The engine decides what lands.\nWhat "
                "does {Self} do?",
         "reply": {
-            "narration": "{Companion} looks at the space behind {Foe}, and at the door, "
-                         "and backs to the door instead — shaking their head at you, "
-                         "they will not go near him, but nobody else is getting out "
-                         "past them.",
-            "intents": [{"op": "narrate_only",
-                         "because": "too frightened to close with him; they hold the way "
-                                    "out, which is as far as their nerve goes"}],
+            "narration": "{Companion} swallows hard and edges in at your shoulder, one "
+                         "glance back at the way out, then swings at {Foe} the way you "
+                         "would swing at a kicking mule — both hands, eyes half shut, "
+                         "already flinching from the answer.",
+            "intents": [{"op": "attack", "actor": "{Self}", "target": "{Foe Ref}",
+                         "because": "told to, and does it, though every part of them "
+                                    "wants to be at the door"}],
         },
     },
     {
@@ -2436,33 +2449,81 @@ COMPANION_EXAMPLES = [
                "their own way, or refuse. The engine decides what lands.\nWhat does "
                "{Self} do?",
         "reply": {
-            "narration": "{Companion} hears you, and swears, and comes anyway — nobody "
-                         "puts a blade near a friend while they stand and watch.",
+            "narration": "{Companion} hears you, swears, and comes anyway, grinning like "
+                         "it is a fair-day brawl — nobody puts a blade near a friend "
+                         "while they stand and watch.",
             "intents": [{"op": "attack", "actor": "{Self}", "target": "{Foe Ref}",
                          "because": "told to leave this one to you; too hot-tempered "
                                     "to do as told"}],
         },
     },
-    # And told nothing at all, which is most rounds. Added after the replay of
-    # 2026-10-01: every example above carried an order, the real ask said "the player
-    # has told them nothing", and a drover rolled timid — whose own `because` read "they
-    # wait for the optimal opening" — attacked anyway. Their nature decides unprompted
-    # turns too.
+    # And told nothing at all, which is most rounds. Their nature decides unprompted
+    # turns too — and the owner's second ruling (2026-10-01) is that they DO something:
+    # "I do also want my companion to take action on their own if i dont direct them."
+    # This example used to show a frightened friend hiding behind the player with a
+    # narrate_only, and measured before the change (docs in tests/
+    # test_companions_manner.py) that was what undirected timid turns copied. Now two
+    # undirected friends act, each as themselves: the frightened one darts in from
+    # behind the player and straight back; the soft-hearted one pulls the blow — the
+    # `lethality` choice, a real rule (a club swung to knock down deals non-lethal at
+    # -4), not a flourish of the prose.
     {
         "ask": "Round 1. It is {Self} ({Companion}) turn.\nThey are unhurt and their "
                "conditions are: none.\n{Companion} TRAVELS WITH the player and came into "
                "this fight on the player's side. Who {Companion} is (fact): {Companion} "
                "is friendly towards the player — a friend who came along, not a servant, "
-               "and free to say no. {Companion} is quiet, easily frightened. in how they "
-               "act: speaks when there is something to say and not otherwise.\nThe fight "
+               "and free to say no. {Companion} is easily frightened, quiet. in how they "
+               "act: keeps a door at their back and a reason to leave ready.\nThe fight "
                "is against: {Foe Ref} ({Foe}).\nThe player has told {Companion} nothing "
                "this fight; {Companion} does what they would do.\nWhat does {Self} do?",
         "reply": {
-            "narration": "{Companion} gets behind you and stays there, close enough to "
-                         "grab your sleeve, watching {Foe} over your shoulder.",
+            "narration": "Nobody asks it of {Companion}. They hover white-faced at your "
+                         "back, then dart out past your elbow at {Foe} and skip straight "
+                         "back behind you, breath hitching.",
+            "intents": [{"op": "attack", "actor": "{Self}", "target": "{Foe Ref}",
+                         "because": "nobody told them to, but {Foe} is on their friend "
+                                    "and they will not only watch"}],
+        },
+    },
+    {
+        "ask": "Round 2. It is {Self} ({Companion}) turn.\nThey are unhurt and their "
+               "conditions are: none.\n{Companion} TRAVELS WITH the player and came into "
+               "this fight on the player's side. Who {Companion} is (fact): {Companion} "
+               "is helpful towards the player — a friend who came along, not a servant, "
+               "and free to say no. {Companion} is warm, kind. in how they act: cannot "
+               "pass somebody in trouble without stopping.\nThe fight is against: "
+               "{Foe Ref} ({Foe}).\nThe player has told {Companion} nothing this fight; "
+               "{Companion} does what they would do.\nWhat does {Self} do?",
+        "reply": {
+            "narration": "{Companion} goes in on their own, wincing, and turns the swing "
+                         "at {Foe} so it will knock him down rather than open him up.",
+            "intents": [{"op": "attack", "actor": "{Self}", "target": "{Foe Ref}",
+                         "params": {"lethality": "nonlethal"},
+                         "because": "will not stand by while you are hurt, and will not "
+                                    "kill to stop it"}],
+        },
+    },
+    # And "would not" (the first ruling: "as their character dictates they would or
+    # would not"): what a friend refuses is what goes against who they are, not merely
+    # what frightens them — the timid one above obeys, shaking. A soft-hearted friend
+    # told to finish a beaten man will not, and says so in what they do.
+    {
+        "ask": "Round 4. It is {Self} ({Companion}) turn.\nThey are unhurt and their "
+               "conditions are: none.\n{Companion} TRAVELS WITH the player and came into "
+               "this fight on the player's side. Who {Companion} is (fact): {Companion} "
+               "is friendly towards the player — a friend who came along, not a servant, "
+               "and free to say no. {Companion} is soft-hearted, quiet. in how they act: "
+               "cannot pass somebody in trouble without stopping.\nThe fight is against: "
+               "{Foe Ref} ({Foe}).\nWhat the player has said to {Companion}, newest "
+               "first:\n  - \"He's done — finish him!\"\n{Companion} decides what to do "
+               "with that as themselves: do it, do it their own way, or refuse. The "
+               "engine decides what lands.\nWhat does {Self} do?",
+        "reply": {
+            "narration": "{Companion} lifts the club, looks at {Foe}, and lowers it again, "
+                         "wincing — shaking their head at you without a word.",
             "intents": [{"op": "narrate_only",
-                         "because": "nobody asked, and they are no fighter; they keep "
-                                    "near the one person they trust"}],
+                         "because": "will fight beside you, but will not kill a beaten "
+                                    "man"}],
         },
     },
 ]
@@ -2536,6 +2597,25 @@ COMPANION_ANSWER_EXAMPLES = [
                                     "opposed_by": {"ref": "{Other Ref}",
                                                    "skill": "sense motive"}},
                          "because": "holding the man's eye with talk, their own loud way"}],
+        },
+    },
+    # Told, and done — timidly (the owner's second ruling, 2026-10-01: "they can comply
+    # but it should be narrated that they did so in a way that was timid"). The examples
+    # above showed a timid friend only refusing; obeying while afraid had no shape.
+    {
+        "ask": "{Companion} ({Self}) TRAVELS WITH the player. Who {Companion} is (fact): "
+               "{Companion} is friendly towards the player — a friend who came along, not "
+               "a servant, and free to say no. {Companion} is cautious, quiet. in how "
+               "they act: keeps a door at their back and a reason to leave ready.\n"
+               "Here besides: {Other Ref} ({Other}).\nWhat the player just said: "
+               "\"{Companion}, hold the lamp up so I can see.\"\nWhat does {Self} do "
+               "about it, as themselves?",
+        "reply": {
+            "narration": "{Companion} holds the lamp up at the full stretch of their arm, "
+                         "as far from {Other} as the arm allows, and it trembles enough "
+                         "to make the shadows jump.",
+            "intents": [{"op": "narrate_only",
+                         "because": "asked, and does it, nervous of who is watching"}],
         },
     },
 ]
@@ -2649,6 +2729,150 @@ def npc_turn_messages(briefing_scene: str, history: list[dict], ref: str,
         + (f"{companion}\n" if companion else "")
         + f"What does {ref} do?"})
     return messages
+
+
+# --- a companion's manner, repaired -----------------------------------------------------
+#
+# The targeted call under `companions.shows_manner` (the owner's second ruling,
+# 2026-10-01: "narrated that they did so in a way that was timid and matched their
+# background"). Only the companion's own sentences go in, and only when the page carried
+# no cue of their temper at all. The answer is kept only if the act is unchanged
+# (`companions.act_kept`): a manner rewrite that lands a blow, loses a deed or adds a
+# person is thrown away and the beat stands as written.
+MANNER_REPAIR_BRIEFING = """You narrated what somebody did, and it reads as if anybody
+could have done it. Rewrite each sentence you are given so that HOW they do it shows who
+they are — in the verbs and the small details, never by naming the trait. Keep exactly
+what they do, to whom, and how it turned out; add nobody; no numbers. About the same
+length, a few words longer at most.
+
+Reply with a JSON object: {"s1": "...", "s2": "..."} — one rewritten sentence per key."""
+
+# Ways each temper comes out in a deed, offered to the repair as a menu rather than a
+# rule — the model picks one that fits the sentence. Several per temper, because the shape
+# of a prompt becomes the shape of the output: one suggestion would be every repair.
+MANNER_HINTS = {
+    "timid": "a hesitation first, a swallow, a glance at the way out, hands that shake, "
+             "flinching, edging in, eyes half shut, darting back",
+    "bold": "no hesitation, a grin, straight in, eagerness, a laugh, going in first",
+    "hot_tempered": "a curse, a snarl, teeth gritted, fury, a yell",
+    "placid": "calm, unhurried, steady, deliberate, as if it were a chore",
+    # Not "pulling the blow": whether a blow is pulled is the `lethality` rule's, and a
+    # repair offered it wrote "pull the blow" over a lethal swing (replay, 2026-10-01).
+    "kind": "a wince, a muttered apology, looking away, a grimace, regret",
+    "hard": "coldly, flatly, without a flicker, efficient, grim",
+    "reserved": "silently, without a word, a single nod, quietly",
+    "gregarious": "talking all the while, calling out, a joke, a cheer",
+    "proud": "a flourish, chin up, making sure you saw",
+    "suspicious": "warily, watching the hands, a sidelong look, narrowed eyes",
+    "blunt": "flatly, plainly, without ceremony",
+    "orderly": "precisely, methodically, squaring up first, careful",
+    "devout": "a muttered prayer, a sign against harm, the gods' name",
+    "devoted": "without a sound, mechanically, exactly as told, a click of joints, "
+               "unhesitating, like a mechanism",
+}
+
+MANNER_REPAIR_EXAMPLE = {
+    "user": (
+        "Who does it: the ferry boy (fact): by nature cautious and quiet — keeps a door at "
+        "their back and a reason to leave ready; a ferry hand by trade; does this ONLY "
+        "because he was told to, against his own nerve.\n"
+        "Ways it could show: a hesitation first, a swallow, a glance at the way out, "
+        "hands that shake, flinching, edging in\n\n"
+        "s1: The ferry boy swings the oar at the smuggler and it cracks against his "
+        "shoulder."),
+    "assistant": json.dumps({
+        "s1": "The ferry boy swallows, edges closer, and swings the oar at the smuggler "
+              "with shaking hands; it cracks against his shoulder."}),
+}
+
+
+def manner_repair_messages(sentences: list[str], name: str, manner: str,
+                           pole: str) -> list[dict]:
+    asks = "\n".join(f"s{i}: {s}" for i, s in enumerate(sentences, 1))
+    return [
+        {"role": "system", "content": MANNER_REPAIR_BRIEFING},
+        {"role": "user", "content": MANNER_REPAIR_EXAMPLE["user"]},
+        {"role": "assistant", "content": MANNER_REPAIR_EXAMPLE["assistant"]},
+        {"role": "user", "content":
+            f"Who does it: {name} (fact): {manner}\n"
+            f"Ways it could show: {MANNER_HINTS.get(pole, '')}\n\n{asks}"},
+    ]
+
+
+# --- a companion speaks up, unasked ------------------------------------------------------
+#
+# The owner, 2026-10-01: "they should also interject their opinions on the things going on
+# or the places we go". WHEN is decided in code (`companions.interjection_due`): arriving
+# somewhere, something notable, else a cadence — the shape of Valve's response rules
+# (Ruskin, GDC 2012: criteria plus write-back memory with expiry) and of the quirk's
+# `quirk_due` here. WHAT is the model's, in their voice, fed only real names and the
+# turn's own facts, and checked in code before it goes on the page.
+#
+# Opinions, never instructions: Valve's Episode One commentary records that Alyx's
+# nagging and unsolicited hints made players "hate Alyx" within minutes and were cut,
+# while lines that stated a reaction and stepped aside were liked. So the briefing asks
+# for what they think or feel, and the line is refused if it hands the turn back.
+INTERJECT_BRIEFING = """Somebody who travels with the player speaks up, unasked, about
+what is happening or where they are. Write what they say: their own opinion or feeling,
+in their own voice, coloured by who they are and what their life has been. Never advice
+about what the player should do, never a question to the player about what to do next.
+
+One or two sentences: a small gesture of theirs and their words in quotation marks.
+Name only people and places you are given. No numbers.
+
+Reply with a JSON object: {"line": "..."}."""
+
+# Three, about three kinds of moment, nowhere near any shipped world so a copied line is
+# caught by the invented-name check: arriving somewhere (a timid carter), something that
+# just happened (a hot-tempered friend), and a quiet stretch (a claimed construct, whose
+# opinion is an observation).
+INTERJECT_EXAMPLES = [
+    {
+        "user": ("Who speaks: Pell (fact): by nature cautious and quiet — keeps a door at "
+                 "their back; a carter by trade; friendly towards the player.\n"
+                 "What it is about: the party has just arrived at the Saltmarsh Tollhouse, "
+                 "an inn. Pell has never been here before.\n"
+                 "People here: Pell, the tollkeeper."),
+        "assistant": json.dumps({
+            "line": "Pell lingers by the cart a moment longer than he needs to, eyeing the "
+                    "shuttered windows. \"Smells like a place where carts go missing.\""}),
+    },
+    {
+        "user": ("Who speaks: Mara (fact): by nature short-fused and plain-spoken — flares "
+                 "fast, cools fast; a tanner by trade; helpful towards the player.\n"
+                 "What it is about: what just happened — The smuggler is knocked out.\n"
+                 "People here: Mara, the smuggler."),
+        "assistant": json.dumps({
+            "line": "Mara wipes her knuckles on her apron and snorts. \"He'll think twice "
+                    "before he grabs a stranger's sleeve again.\""}),
+    },
+    {
+        "user": ("Who speaks: the brass hound (fact): it belongs to the player and is "
+                 "devoted; it does what it is told exactly, like a mechanism.\n"
+                 "What it is about: a quiet moment — You wait by the gate while the "
+                 "ferryman counts his rope.\n"
+                 "People here: the brass hound, the ferryman."),
+        "assistant": json.dumps({
+            "line": "The brass hound's head turns toward the ferryman with a small click. "
+                    "\"He has counted the same coil twice.\""}),
+    },
+]
+
+INTERJECT_MAX_CHARS = 320
+
+
+def interject_messages(facts: str) -> list[dict]:
+    messages = [{"role": "system", "content": INTERJECT_BRIEFING}]
+    for ex in INTERJECT_EXAMPLES:
+        messages.append({"role": "user", "content": ex["user"]})
+        messages.append({"role": "assistant", "content": ex["assistant"]})
+    messages.append({"role": "user", "content": facts})
+    return messages
+
+
+def interject_schema() -> dict:
+    return {"type": "object", "properties": {"line": {"type": "string"}},
+            "required": ["line"]}
 
 
 REPAIR_BRIEFING = """Rewrite the sentence you are given so that it no longer states how a

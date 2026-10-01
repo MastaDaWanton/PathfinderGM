@@ -3432,6 +3432,13 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 repairs.append(f"companion answer left off the page: put back for "
                                f"{', '.join(put)}")
                 added += narration_mod.added_sentences(before, text)
+        if text and not c.scene.in_encounter:
+            # How a companion did what they did in this beat, and their own remarks
+            # (the owner's rulings of 2026-10-01; gm/companions.py).
+            text, more_repairs, more_added = _companions_on_the_page(
+                c, agent, text, answered, plan, resolution)
+            repairs += more_repairs
+            added += more_added
         if text:
             before = text
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread,
@@ -3639,7 +3646,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                # tagging rate stays the model's (G2, 2026-09-29).
                                "tagged": len({(r["who"], r["to"], r["line"])
                                               for r in agent.last_said
-                                              if r["who"] and r.get("from") != "page"}),
+                                              if r["who"] and r.get("from")
+                                              not in ("page", "interject")}),
                                **({"read_off_page": read_off} if (read_off := sum(
                                    1 for r in agent.last_said
                                    if r.get("from") == "page")) else {}),
@@ -3798,6 +3806,90 @@ def _companions_answer(c, agent, player_text: str, resolution, plan) -> list[tup
         if answer.narration and not opened:
             lines.append((actor, answer.narration))
     return lines
+
+
+def _companions_on_the_page(c, agent, text: str, answered, plan, resolution
+                            ) -> tuple[str, list[str], list[str]]:
+    """Out of a fight, after the beat is written: (1) a companion who acted in it — the
+    one the player spoke to (`answered`), or one the plan acted for — does it in their
+    own manner on the page, repaired by one targeted call when the beat reads as if
+    anybody did it; (2) at most one companion speaks up unasked, when the code says a
+    remark is due (`companions.interjection_due`), put before the closing question and
+    booked in the conversation log as their speech (`src: "interject"`).
+
+    The owner's rulings, 2026-10-01: "they can comply but it should be narrated that they
+    did so in a way that was timid and matched their background" and "they should also
+    interject their opinions on the things going on or the places we go". Returns
+    (text, repairs, sentences that are ours)."""
+    from gm import companions as companions_mod
+
+    scene = c.scene
+    repairs: list[str] = []
+    added: list[str] = []
+    acted = [a for a, _ in answered or ()]
+    for i in getattr(plan, "intents", None) or ():
+        who = scene.actors.get(i.actor or "")
+        if (companions_mod.is_companion(who) and i.op != "narrate_only"
+                and who not in acted):
+            acted.append(who)
+    for who in acted[:2]:
+        pole = companions_mod.dominant_pole(scene, who)
+        if not pole or not companions_mod.their_sentences(text, who) \
+                or companions_mod.shows_manner(text, who, pole):
+            continue
+        op = next((i.op for i in getattr(plan, "intents", None) or ()
+                   if i.actor == who.ref), "")
+        before = text
+        text, notes, _ = agent.manner_of(text, who, ordered=True, op=op)
+        repairs += notes
+        added += narration_mod.added_sentences(before, text)
+
+    # Whether the party walked somewhere new this beat: the travel outcome's own record,
+    # read the way the `already_there` check below reads it (engine bookkeeping, kept out
+    # of gm/ by the third law's ratchet).
+    moved = any((o.op in ("journey", "call_on") and o.status != "refused")
+                or (o.op == "travel" and any(
+                    e.get("kind") == "biome" and e.get("place") != e.get("was_place")
+                    for e in (o.effects or [])))
+                for o in resolution.outcomes)
+    due = companions_mod.interjection_due(
+        scene, c.transcript, resolution.outcomes, answered=answered,
+        talking=agent.engine.talking_to(), moved=moved)
+    if not due:
+        return text, repairs, added
+    who = scene.actors[due["ref"]]
+    from rules import population as population_mod
+
+    life = ((population_mod.of_ref(scene, who.ref) or {}).get("life") or {})
+    # What they want, on one remark in three of theirs and never the brief's: the brief
+    # leaves wants out because a 12B model told a secret leaks it ~83% of the time
+    # (rules/population.py). A remark is where a companion's wants are LEARNED in play,
+    # and one in three keeps it from becoming every remark's subject.
+    theirs = sum(1 for e in scene.conversation_log or ()
+                 if isinstance(e, dict) and e.get("who") == who.ref
+                 and e.get("src") == "interject")
+    wants = str(life.get("wants") or "") if theirs % 3 == 2 else ""
+    place = agent.engine.here() if due.get("reason") == "arrived" else None
+    facts = companions_mod.interject_facts(scene, who, due, place=place, beat=text,
+                                           wants=wants)
+    line, attempts, rejections = agent.companion_interject(due["ref"], facts)
+    c.turn_log.append(history_mod.stamp(c, {
+        "kind": "companion-interject", "ref": due["ref"], "reason": due["reason"],
+        "line": line, "rejections": rejections, "wants": bool(wants),
+        "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1), "model": a.model}
+                     for a in attempts]}))
+    if not line:
+        return text, repairs, added
+    before = text
+    text = narration_mod.put_before_the_hand_back(text, line)
+    added += narration_mod.added_sentences(before, text)
+    quoted = [line[s:e] for s, e in speech_mod.spans(line)]
+    if getattr(agent, "last_said", None) is None:
+        agent.last_said = []
+    agent.last_said.append({"who": due["ref"], "to": "", "from": "interject",
+                            "line": " ".join(q.strip("\"“”'‘’ ") for q in quoted)})
+    repairs.append(f"{who.name} spoke up ({due['reason']})")
+    return text, repairs, added
 
 
 def _run_npc_turns(c, agent, limit: int = 12) -> None:
@@ -3977,6 +4069,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             c.transcript.append({"who": "gm", "text": plan.narration, "kind": "setup"})
 
         tells = [o for o in resolution.outcomes if o.tell]
+        # A companion's turn is told HOW they do it (the owner's second ruling,
+        # 2026-10-01: "narrated that they did so in a way that was timid and matched
+        # their background") — their nature, trade, feeling for the player, and whether
+        # it was an order against their grain — as a fact beside the tells.
+        friend = companions_mod.is_companion(actor)
+        manner = (companions_mod.manner_line(
+            scene, actor, ordered=bool(orders),
+            op=plan.intents[0].op if plan.intents else "") if friend else "")
         if tells:
             try:
                 # No polish rewrite on an NPC's turn — the same call `npc_turn` makes for
@@ -3986,9 +4086,21 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # for being told the wrong way round (narration.wrong_actor).
                 text, attempt = agent.narrate_outcome(plan.narration, tells,
                                                       f"{actor.name} acts",
-                                                      rewrite=False, acting=actor.name)
+                                                      rewrite=False, acting=actor.name,
+                                                      manner=manner)
                 if attempt is not None and attempt.note:
                     entry["repairs"] += [r for r in attempt.note.split("; ") if r]
+                # The wind-up was held to the manner in `npc_turn`; the turn on the page
+                # is the two together, and when neither carries it the consequence's
+                # sentences about them are repaired (one call, kept only if the act is
+                # unchanged).
+                if friend and text and not companions_mod.shows_manner(
+                        f"{plan.narration} {text}", actor,
+                        companions_mod.dominant_pole(scene, actor), whole=True):
+                    text, notes, _more = agent.manner_of(
+                        text, actor, ordered=bool(orders),
+                        op=plan.intents[0].op if plan.intents else "", whole=True)
+                    entry["repairs"] += notes
             except ModelUnavailable:
                 text = ""
             c.transcript.append({
