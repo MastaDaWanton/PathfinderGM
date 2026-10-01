@@ -687,3 +687,119 @@ hearts cannot express.
   and the party stayed where it was. Room-to-room travel is deliberately the model's to
   name (`inject_travel`'s documented refusal to guess a place), so this is the model's
   miss and was left.
+
+## Built: people you can see are in the scene (2026-10-01)
+
+The owner's ruling overturns the one of 2026-09-27 ("the prose records people; engagement or
+the plan makes them actors"): "show described people in the scene. if i can see them they
+should be in the scene as a fully made person ready to be interacted with and saved if not
+already existing."
+
+**Measured on the owner's save (Sam, 2026-10-01):**
+
+1. Gorm told the player a human woman lives in "the house three streets over". She was
+   recorded twice in one beat (p16 from the narration's report, p17 heard from Gorm), and
+   both at the Velvet Veil, where the talk happened.
+2. "I enter the house of the human woman Grom spoke of": the plan's `call_on "human woman"`
+   was refused "There is more than one — which human woman do you mean?", and the finder
+   logged `population-miss` seven times for the words human, woman, grom, speak.
+3. The beat then showed "a figure … It is a woman" at the top of the stairs. She was never
+   an actor: the next turn's condition on 'woman' was refused (unknown ref), and every "her"
+   after it went to Quin Nutmeg, the only woman the engine held, in another room.
+
+**Prior art.** The Inform 7 Handbook's scenery rule: "if an object is mentioned in the room
+description, it should probably be implemented" — a player who reads somebody in the room
+will try to address them. The same tradition keeps the opposite case apart: Eric Eve's
+Epistemology gives *seen* and *familiar* (known of, not found) as two flags (Inform Recipe
+Book §5.5), and somebody spoken of is familiar. Inform's Recipe Book §7.16 models a social
+group as individuals with collated descriptions; this repo already keeps a crowd as
+scenery or a troop, so a crowd stays that. For the name slip, Damerau (1964): about 80% of
+misspellings are one insertion, deletion, substitution or transposition; "Grom" for "Gorm"
+is one transposition. Ian Bicking's Intra notes (2025) were read for an LLM-narrator
+precedent: it lets "ungrounded" narration add colour without touching formal state, and
+offers no rule for people; nothing found describes an LLM game that embodies the people its
+narrator describes, so this is not claimed as precedent.
+
+**What was built:**
+
+- **Seen or heard, read from the sentence** (`judgement.seen_in_beat`). Seen needs positive
+  evidence that is THEIRS: a being-here or looked-at verb (`_PLACES_THEM_HERE`,
+  `_SEEN_HERE`) in the person's own clause ("a figure IS SILHOUETTED"), or the person after
+  the eye ("you see a man …", "at the top of the stairs, a figure"), in a sentence that is
+  no report of somebody's words. Heard: only in speech; every sentence about them hearsay
+  ("he told you a woman lives there", "if a guard sees you"); or only ever the object of a
+  search or a question ("the search for the woman"). A body is what a misread turns into a
+  phantom, which is why seen is the strict side. The first cut read any cue anywhere in the
+  sentence, plus `action_sentences`; the first live replay walked on a phantom woman from
+  "You are still standing before him, and the search for the woman …" and "a woman who
+  exists in the stories of the desperate", with a Ratfolk face appended to the beat.
+- **`record_people(beat=...)`**: a seen person is recorded where the party stands and
+  marked `shown`; a heard one is recorded with no place (`spot=""`), heard from the one
+  person in conversation, and a resident when the beat says they live somewhere. Somebody
+  heard of in the last beat or two whom the words describe is the same record
+  (`population.heard_of_match`). A vague head with a stated sex becomes it: "a figure …
+  It is a woman" is recorded as "woman".
+- **The bodies** (`judgement.embody_seen`, run by `play/aftermath/seen_people.py` in the
+  "people" stage after `speaker_real`): through the one door (`population.embody`), wearing
+  the rolled face and life, on a square, saved. Never a duplicate: a record with a body is
+  that body; somebody held elsewhere in town under every word the prose used walks in; in
+  somebody's own house with them in it, a vague figure there is the householder (unless
+  the figure "enters"). Read off `scene.founded`, never the turn's outcomes — law 3's
+  ratchet (`test_three_laws`) caught the first cut reading `effects`. At most three new
+  bodies a beat; plurals and counted groups make none; in a fight none. A heard-of person
+  whose body stands in the party's room is marked seen.
+- **The grant** (`rules/granted.py`): a question that places the person elsewhere ("who
+  lives there?") records a heard-of grant with no place, which binds nobody minted in the
+  room; and it merges with the record the same beat's narration made.
+- **The finder** (`population.find`): a hearsay clause ("Gorm spoke of", "the barkeep told
+  me about", "that Gorm mentioned") is read off the phrase; among those who fit the rest,
+  the one heard of from that speaker is chosen, across every ring. A proper name one slip
+  from exactly one name the campaign holds is that name. A miss is logged once per phrase.
+- **The yes** (`granted.affirms`) also reads the asked-for words given back first: "'A
+  woman, aye,' he rasps" was Gorm's live answer, and nothing recorded her.
+- **The call** takes the player's words when the plan wrote the introduce placeholder
+  (`call_on who="new2"`, live), reads "the house of X" as a call on X, and keeps the
+  player's clause (`judgement._call_on_keeps_who_told`), and a body
+  made only to be walked to its own door is not marked seen in the party's room
+  (`population.embody(seen_here=False)`); that had put the woman's day at the gate.
+- **Unseen and unplaced is at home** (`residency.resolve`), not at the settlement's first
+  place.
+
+**Live replays (2026-10-01, gemma-4-12B, in-process `/api/say` on a scratch copy of the
+owner's save, the defect's p16-p18 removed and the party put back in the Velvet Veil).**
+Ten runs; each of the first eight found something the unit tests had not, and each is now
+a test in `tests/test_seen_people.py`:
+
+1. The cue was not the person's (the phantom woman above).
+2. Gorm's "A woman, aye," is a yes the opening-yes reader missed, so nothing recorded her.
+3. An answer about her that never says yes ("a woman alone in a house like that") recorded
+   nobody. About somebody who lives elsewhere, an answer that speaks of her (by the noun or
+   her pronoun, not opening with a no) now records her heard of; a grant HERE still needs
+   the yes, because it binds the next body made.
+4. The plan wrote `call_on who="new2"`.
+5. The woman made to be called on was made in the tavern and stayed there: her own door
+   went unanswered with "The human woman is at the Velvet Veil".
+6. "The question you posed, concerning the woman three streets over" recorded her on the
+   outskirts.
+7. "there is no sign of the woman" booked her, and the next beat's "You find the woman
+   standing in the entryway" made nobody, because `note_cast` reads the definite as
+   somebody already booked (`_shown_again` now reads the ledger too).
+8. "the human woman Grom spoke of" missed her because the roll gave the unseen woman the
+   town's Ratfolk face. A face nobody saw is not in the finder's bag, and a people the
+   record never stated rules nobody out, as a gender already did.
+
+Run 9, the owner's sequence end to end: "it is a human woman who lives in the house 3
+streets over, right?" → one record, p16 'human woman', no place, heard from c8, resident,
+granted Human. "I go to the house of the human woman Grom spoke of." → `call_on` resolved:
+"4 hours of asking around finds out where they live. The human woman opens the door and
+lets you in." The party stood in the house with c11 'human woman', she/her, Human, one
+record. Run 10: "/cheat the woman is overcome with lust and pounces on me" planned
+`condition helpful` on c11 and resolved; in the save it had been refused as "unknown ref
+'woman'".
+
+Not settled by this work: the planner's own slips on these runs ("I go back to the Velvet
+Veil" planned `travel` with no place; "I walk back to Gorm at the bar" founded "the bar"
+and walked out of the tavern), and the narrator writing a house the engine had not moved
+the party to. The fallback when a hearsay clause names a speaker who told of nobody that
+fits is still the ordinary search, so it can ask "which do you mean" between people the
+speaker never mentioned.
