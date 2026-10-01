@@ -143,8 +143,10 @@ def _the(actor) -> str:
 
 def _fact(actor, kinds) -> str:
     """The engine's fact, as the backstop's closing sentence."""
+    from rules import repair as repair_mod
+
     who = _the(actor)
-    if actor.is_dead or actor.has_state("state.down.dead"):
+    if repair_mod.destroyed(actor):
         line = f"{who} is wreckage: destroyed, and past any repair."
     else:
         line = f"{who} is not mended."
@@ -165,11 +167,13 @@ def _flags(ctx, actor) -> tuple[list[str], list[str]]:
 
 
 def find(ctx) -> list:
+    from rules import repair as repair_mod
+
     out: list = []
     for actor in _machines(ctx.scene):
         claims_mend, claims_own = _flags(ctx, actor)
         who = _the(actor)
-        dead = actor.is_dead or actor.has_state("state.down.dead")
+        dead = repair_mod.destroyed(actor)
         if claims_mend:
             out.append(Finding(
                 "repair-claimed",

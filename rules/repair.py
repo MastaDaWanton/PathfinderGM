@@ -72,6 +72,15 @@ def is_construct(actor) -> bool:
     return bool(actor is not None and actor.has_state(states.CONSTRUCT))
 
 
+def destroyed(actor) -> bool:
+    """Dead, or at a hit point total the ladder says is dead. The second half is for a
+    construct saved "dying" before 2026-10-01 — the owner's own spy, at -1 with no `dead`
+    written — which the next round's tick destroys; a repair asked before that tick must
+    not find it merely damaged."""
+    return bool(actor is not None and (actor.has_state("state.down.dead")
+                                       or actor.hp <= actor.death_floor()))
+
+
 def crafting_dc(subject, rule: dict) -> tuple[int, bool]:
     """The DC to craft this construct, and whether it is the row's HOUSE default.
 
@@ -119,7 +128,7 @@ def refusal(scene, actor, subject, rule: dict) -> str:
     if not is_construct(subject):
         return (f"{name} is not a construct, and there is nothing to mend: a living body "
                 f"is healed, not repaired.")
-    if subject.is_dead or subject.has_state("state.down.dead"):
+    if destroyed(subject):
         return (f"{name} was destroyed when it was reduced to 0 hit points, and a "
                 f"construct that has been completely destroyed cannot be repaired "
                 f"(Ultimate Magic, Repairing Constructs). What is left is parts.")

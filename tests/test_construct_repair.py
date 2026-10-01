@@ -116,6 +116,22 @@ def test_the_destroyed_spy_cannot_be_repaired_and_no_repair_makes_it_yours():
     assert pc.purse == {"gp": 300} and scene.clock_minutes == clock
 
 
+def test_the_spy_as_the_owners_save_holds_it_is_destroyed_to_a_repair():
+    """The save on disk predates the floor fix: the spy is at -1 with `unconscious` and
+    `dying` written and no `dead`. A repair asked before its next tick must still find
+    wreckage, not a damaged machine: asked only `dead`, the first cut of the refusal let
+    this spy through every gate to the dice, because an unconscious machine is not
+    "still working" and the crafter here holds the feat."""
+    scene, engine, _pc, _ = _table(2, feat=True)
+    spy = scene.add(instantiate("clockwork-spy", scene=scene), zone="near")
+    spy.hp = -1
+    spy.add_condition("unconscious", source="hit points")
+    spy.add_condition("dying", source="hit points")
+    assert not spy.is_dead
+    (out,) = _repair(engine, spy.ref).outcomes
+    assert out.status == "refused" and "completely destroyed" in out.tell
+
+
 def test_without_craft_construct_a_wizard_cannot_mend_a_damaged_construct():
     """Sam's sheet: Knowledge ranks, no Craft Construct. The feat is the rule's gate."""
     _scene, engine, _pc, spy = _table(2)
