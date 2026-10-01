@@ -2924,9 +2924,16 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # it up (design D). Only when the pull says: every row before D reads the same.
             **{k: (pull or {})[k] for k in ("approach", "yielded") if k in (pull or {})},
             "repairs": list(repairs or []),
+            # The raw reply's tail as well as its head: a reply cut off mid-word shows
+            # only at its end, and the head alone could not show "…They'" (item 6,
+            # 2026-09-30, found only by reproducing the call). `raw_chars` says how long
+            # the whole reply was, which is how a grammar ceiling shows itself.
             "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1),
                           "model": a.model, "note": (a.note or "")[:300],
-                          "raw": (a.raw or "")[:300]}
+                          "raw": (a.raw or "")[:300],
+                          **({"raw_tail": (a.raw or "")[-300:]}
+                             if len(a.raw or "") > 300 else {}),
+                          "raw_chars": len(a.raw or "")}
                          for a in prose_attempts],
         })
         if not text:

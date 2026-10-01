@@ -1938,9 +1938,17 @@ class GMAgent:
                 # was the token budget dying mid-string — which no grammar prevents and
                 # the except below still catches. What the schema adds is the required
                 # key and a length ceiling the budget can actually afford.
-                schema=prompts.prose_schema(max_chars=1600),
+                #
+                # 1,800, the grammar ceiling the prose call itself writes under. It was
+                # 1,600 — lower than the draft it rewrites — and on 2026-09-30 (item 6)
+                # Ollama closed the string at exactly 1,600 characters, mid-word, and
+                # the cut rewrite shipped as "…They'. What do you do?".
+                schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING),
             )
-            return (self._lift(str(reply.json().get("narration", "")).strip()),
+            # Cut back to its last whole sentence, as the prose call's reply is.
+            fixed, _gone = narration_mod.trim_unfinished(
+                self._lift(str(reply.json().get("narration", "")).strip()))
+            return (fixed,
                     Attempt("polish", reply.seconds, reply.model, reply.text, note=note))
 
         attempts: list[Attempt] = []
@@ -1966,7 +1974,10 @@ class GMAgent:
             # And it must keep the events of the draft: a rewrite that scored better
             # by replacing what people DID with what the air smelled of is the one
             # measured in the brothel, and it is refused here whatever its score.
-            return bool(candidate) and after.score < review.score \
+            # Nor may it stop mid-sentence: a rewrite the grammar closed mid-word is
+            # never better than the draft it was asked to mend (item 6, 2026-09-30).
+            return bool(candidate) and not narration_mod.ends_unfinished(candidate) \
+                and after.score < review.score \
                 and not ({f.kind for f in after.findings} - was) \
                 and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6
 
@@ -2369,6 +2380,12 @@ class GMAgent:
                          f"{', '.join(made or lost)} the one already here")
         if not text:
             return "", ["prose failed on every model"], attempts
+        # A beat the grammar closed mid-word (`maxLength` ends the string cleanly, so the
+        # reply parses): cut back to its last whole sentence before anything reads it.
+        # 2026-09-30, item 6: "…pick it up. They'" shipped as "They'. What do you do?".
+        text, gone = narration_mod.trim_unfinished(text)
+        if gone:
+            early.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")
         # A blow at the player that nobody declared (docs/declared-not-guessed.md, the
         # blows door): a check now, not a door into a fight.
         text, note, struck_attempts = self._undeclared_blows(text, messages, schema)

@@ -1070,6 +1070,71 @@ def second_person_narrator(text: str) -> tuple[str, list[str]]:
 HAND_BACK = "What do you do?"
 
 
+# Where a sentence may end: terminal punctuation, then any closing quotes or brackets.
+_SENTENCE_END = re.compile(r"(?:[.!?…]+)[\"'”’)\]]*(?=\s|$)")
+_CLOSERS = {"\"": "\"", "“": "”", "‟": "”", "'": "'", "‘": "’"}
+
+
+def ends_unfinished(text: str) -> bool:
+    """Whether a beat stops mid-sentence: it does not end on terminal punctuation (closing
+    quotes and brackets allowed after it), nor on the close of a quotation."""
+    said = str(text or "").rstrip()
+    if not said:
+        return False
+    if re.search(r"[.!?…][\"'”’)\]]*$", said):
+        return False
+    spans = speech.spans(said)
+    if spans and spans[-1][1] == len(said) and said[-1] in "\"'”’":
+        return False            # it ends on a closed quotation: "…'Go home,'" is whole
+    return True
+
+
+def trim_unfinished(text: str) -> tuple[str, str]:
+    """(the beat cut back to its last complete sentence, what was cut) — ("", "") cut
+    when it was finished, or when no complete sentence would be left.
+
+    Measured on the 2026-09-30 playtest (item 6): the rewrite ran with a 1,600-character
+    grammar ceiling and Ollama closed the string at exactly 1,600 characters, mid-word —
+    "…They don't wait for you to pick it up. They'" — and `ensure_hand_back` added
+    ". What do you do?" to the fragment. A grammar's `maxLength` closes the JSON cleanly,
+    so the reply parses and says nothing about having been cut: the finish reason a
+    hosted API would report is not there to read, and the structural check is the only
+    one left (the standard advice for truncated structured output when the finish
+    metadata cannot tell: check the content's own completeness before trusting it).
+
+    A cut that lands inside a quotation keeps the line's words up to its last full stop
+    and closes the quotation with the mark that opened it, so no quote is left open."""
+    raw = str(text or "")
+    said = raw.rstrip()
+    if not ends_unfinished(said):
+        return raw, ""
+    ends = [m.end() for m in _SENTENCE_END.finditer(said)]
+    if not ends:
+        return raw, ""
+    at = ends[-1]
+    kept, gone = said[:at], said[at:].strip()
+    # Inside a quotation that the cut leaves open: close it with its own mark.
+    opener = None
+    for a, b in speech.spans(said):
+        if a < at < b:
+            opener = said[a]
+            break
+    if opener is None:
+        # A single quote whose close the truncation took is not a span at all: find an
+        # opener in the last sentence's stretch with no close after it.
+        last = max(kept.rfind("\n\n"), 0)
+        tail = kept[last:]
+        mark = None
+        for m in re.finditer(r"(?:^|(?<=[\s(\[—–-]))(['‘\"“])(?=\S)", tail):
+            mark = m
+        if mark is not None and not any(a <= last + mark.start() < b
+                                        for a, b in speech.spans(kept)):
+            opener = mark.group(1)
+    if opener is not None:
+        kept += _CLOSERS.get(opener, opener)
+    return kept, gone
+
+
 def ensure_hand_back(text: str) -> tuple[str, bool]:
     """Give the turn back to the player when it has forgotten to.
 
@@ -1089,8 +1154,13 @@ def ensure_hand_back(text: str) -> tuple[str, bool]:
     said = (text or "").rstrip()
     if not said or said.endswith("?"):
         return text, False
-    # A turn that trails off mid-sentence gets its full stop as well; "almost. alive"
-    # and friends are what the model does when it runs out of budget.
+    # A turn that trails off mid-sentence is cut back to its last whole sentence, and
+    # only when there is none does the fragment get a full stop. "almost. alive" and
+    # friends are what the model does when it runs out of budget, and the full stop
+    # this used to add made "…pick it up. They'. What do you do?" (2026-09-30, item 6).
+    trimmed, gone = trim_unfinished(said)
+    if gone:
+        said = trimmed.rstrip()
     #
     # Closing quote marks do not count as missing punctuation. A beat that ends on
     # "...but what it is remains unclear.'" already has its stop *inside* the speech, and
