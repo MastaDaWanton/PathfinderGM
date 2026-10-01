@@ -338,8 +338,10 @@ beats a paragraph; claiming to apply it would be worse than both.
   because a negative level moves eight numbers on the sheet at once and applying seven of
   them would be worse than applying none.
 * **`attitude`** (33 spells) — 1e's hostile/unfriendly/indifferent/friendly/helpful track.
-  Recorded on the creature. No check in the app consults an attitude yet: Diplomacy is rolled
-  against a DC the GM sets, not against a track.
+  Listed here when no check consulted an attitude and Diplomacy rolled against a DC the GM
+  set. **No longer declared-only (2026-09-16):** the type is `engine=True`, the spell lands
+  the attitude through `Engine._set_attitude`, and a Diplomacy or Intimidate check aimed at
+  somebody moves them along the same track by the book's tables (`docs/attitude.md`).
 * **`spell_resistance`** — recorded on the sheet. `_op_cast` rolls no check to overcome SR,
   because no creature in the app carries a rating to check against and half a check would be
   worse than none (`docs/spells.md` §5.1).
