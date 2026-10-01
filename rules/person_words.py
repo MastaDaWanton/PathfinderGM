@@ -349,6 +349,55 @@ def resident_people(world, entity_id: str) -> str:
     return people_named(text, world)
 
 
+_REF_SHAPED = re.compile(r"[a-z]\d+|new[ _-]?\d+", re.I)
+# Stat blocks that say nothing about who somebody is: the hand-made civilian floor.
+_GENERIC_BLOCKS = frozenset({"guildhand", "commoner"})
+
+
+def heal_ref_names(scene) -> list[tuple[str, str, str]]:
+    """On load: a person an older build NAMED with a ref gets a descriptor back. Returns
+    [(ref, old name, new name)].
+
+    Measured on Sam's save (2026-09-30, item 7): `introduce {who: "c8"}` minted c9 named
+    "c8", and the Here list printed "c8" as a person — a ref on the page, which the owner
+    ruled the player never sees (2026-09-28). `Engine._op_introduce` stops new ones; this
+    repairs the ones already saved. The descriptor, first that holds:
+
+      1. their population record's own words, when those are not the ref too;
+      2. the work their record rolled ("a ratcatcher" — c9's);
+      3. their stat block's name, unless it is the generic civilian floor;
+      4. "a stranger".
+
+    The record's phrase is rewritten with them, so the finder answers to the new words."""
+    out: list[tuple[str, str, str]] = []
+    pop = getattr(scene, "population", None) or {}
+    for ref, actor in (getattr(scene, "people", None) or {}).items():
+        old = str(getattr(actor, "name", "") or "").strip()
+        if getattr(actor, "is_pc", False) or not _REF_SHAPED.fullmatch(old):
+            continue
+        rec = next((r for r in pop.values() if r.get("ref") == ref), None)
+        phrase = str((rec or {}).get("phrase") or "").strip()
+        work = str(((rec or {}).get("life") or {}).get("work_name") or "").strip()
+        block = str(getattr(actor, "from_template", "") or "").strip().lower()
+        if phrase and not _REF_SHAPED.fullmatch(phrase):
+            new = phrase
+        elif work:
+            new = ("an " if work[:1].lower() in "aeiou" else "a ") + work.lower()
+        elif block and block not in _GENERIC_BLOCKS:
+            noun = block.replace("-", " ")
+            new = ("an " if noun[:1] in "aeiou" else "a ") + noun
+        else:
+            new = "a stranger"
+        actor.name = new
+        if rec is not None and _REF_SHAPED.fullmatch(phrase or old):
+            rec["phrase"] = new
+        for entry in getattr(scene, "cast", None) or []:
+            if entry.get("ref") == ref and _REF_SHAPED.fullmatch(str(entry.get("who") or "")):
+                entry["who"] = new
+        out.append((ref, old, new))
+    return out
+
+
 def record_peoples(scene, world) -> list[str]:
     """On load: everybody an older build minted with a people's face and no people gets
     the people their face already shows. Returns the refs recorded.

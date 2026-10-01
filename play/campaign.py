@@ -534,6 +534,8 @@ class Campaign:
 
         keepers.unname_on_sight(self.scene, world, self.transcript)
         person_words.record_peoples(self.scene, world)
+        # And a person an older build named with a ref ("c8", item 7) gets words back.
+        person_words.heal_ref_names(self.scene)
 
     def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
         """A save from before actors had a place, stood somewhere real.

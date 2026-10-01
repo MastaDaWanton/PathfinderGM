@@ -75,6 +75,33 @@ def test_a_ref_that_names_nobody_is_refused_with_the_fix_named(engine):
     assert "by their own ref" in out.tell and "few words" in out.tell
 
 
+def test_an_old_save_gives_a_ref_named_person_their_words_back(engine):
+    """The damage already saved: Sam's c9 is NAMED "c8" and the Here list printed it
+    (Lane A, live, 2026-09-30). On load it gets a descriptor: its record's words unless
+    they are the ref too, else the work its record rolled (c9's: "ratcatcher"), else its
+    block's name unless that is the civilian floor, else "a stranger"."""
+    from rules import person_words, population
+    from rules.sheet import Actor
+
+    s = engine.scene
+    c9 = Actor(ref="c9", name="c8", from_template="guildhand")
+    s.add(c9)
+    rec = population.note(s, "c8")
+    rec["ref"] = "c9"
+    rec["life"]["work_name"] = "ratcatcher"
+    s.cast.append({"who": "c8", "turn": 0, "ref": "c9"})
+    bare = Actor(ref="c12", name="new1", from_template="guildhand")
+    s.add(bare)
+    thug = Actor(ref="c13", name="c2", from_template="thug")
+    s.add(thug)
+    done = {r: (old, new) for r, old, new in person_words.heal_ref_names(s)}
+    assert done == {"c9": ("c8", "a ratcatcher"), "c12": ("new1", "a stranger"),
+                    "c13": ("c2", "a thug")}
+    assert rec["phrase"] == "a ratcatcher"
+    assert s.cast[-1]["who"] == "a ratcatcher"
+    assert person_words.heal_ref_names(s) == [], "a second load changes nothing"
+
+
 def test_the_players_own_ref_is_refused(engine):
     res = _run(engine, [_intro("pc")])
     assert "player's own" in res.outcomes[0].tell
