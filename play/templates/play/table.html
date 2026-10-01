@@ -2538,9 +2538,14 @@
   /* --- The Journal ----------------------------------------------------------------- */
   .journal { max-width: 1180px; margin: 0 auto; display: grid; gap: 34px; align-items: start;
              grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-             grid-template-areas: "matters said" "walked said" "history history"; }
+             grid-template-areas: "matters said" "walked said" "notes notes" "history history"; }
   .jr-matters { grid-area: matters; } .jr-said { grid-area: said; }
   .jr-walked { grid-area: walked; } .jr-history { grid-area: history; }
+  .jr-notes { grid-area: notes; }
+  /* Notes and maps (2026-10-01): the writing box under the pages, full width. */
+  .jr-write { display: grid; gap: 8px; margin-top: 12px; }
+  .jr-write input, .jr-write textarea { width: 100%; box-sizing: border-box; }
+  .jr-write .bad { color: #e0897c; }
   .jr-began { margin: 4px 0 8px; color: var(--ink); font-style: italic; }
   .jr-events li { padding: 3px 0; }
   .jr-history-lines .cardsub:first-child { margin-top: 0; }
@@ -2779,7 +2784,7 @@
     .eq { grid-template-columns: 158px minmax(0, 1fr) 286px; gap: 18px 16px; }
     .eqrail .v2-btn { padding: 7px 8px; gap: 7px; font-size: 13px; letter-spacing: .03em; }
     .doll { padding: 18px 14px 14px; }
-    .journal { grid-template-columns: minmax(0, 1fr); grid-template-areas: "matters" "said" "walked" "history"; }
+    .journal { grid-template-columns: minmax(0, 1fr); grid-template-areas: "matters" "said" "walked" "notes" "history"; }
     .spells3 { gap: 30px; }
   }
   /* Between a phone and a small desktop the figure goes above the list, still in reach. */
@@ -2804,7 +2809,7 @@
     .sheetcard, .sx-card { padding: 20px 16px 18px; }
     .twocol { grid-template-columns: minmax(0, 1fr); }
     .skills { grid-template-columns: minmax(0, 1fr); }
-    .journal { grid-template-columns: minmax(0, 1fr); grid-template-areas: "matters" "said" "walked" "history"; }
+    .journal { grid-template-columns: minmax(0, 1fr); grid-template-areas: "matters" "said" "walked" "notes" "history"; }
     .statrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     /* The attack and manoeuvre tables fold into one small card a row: the name across the
        top, the numbers in three labelled columns, the long text across the foot. As a
