@@ -3600,7 +3600,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         # With the rejections, as the player's turn has them: a creature's plan refused
         # for reach and repaired from the square the refusal named looked, in the log,
         # exactly like one that never needed a retry (live run, 2026-09-28).
+        # The seconds and the model ride here too: they were recorded only by a trailing
+        # `_log_turn` after the loop (removed 2026-10-01, tests/test_npc_loop_budget.py),
+        # which logged the LAST creature's plan as a player "turn", duplicating this row.
         entry = {"kind": "npc-turn", "ref": ref,
+                 "seconds": round(plan.seconds, 1),
+                 "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1),
+                               "note": a.note, "model": a.model}
+                              for a in plan.attempts],
                  "rejections": list(plan.rejections),
                  "intents": [i.as_dict() for i in plan.intents],
                  "outcomes": [o.as_dict() for o in resolution.outcomes],
@@ -3636,7 +3643,12 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         # An NPC's turn is not the player speaking, so the ledger gets no speech
         # from it — only whatever the engine decided on their behalf.
         _remember(c, resolution, "")
-    _log_turn(c, plan, resolution)
+    # No `_log_turn(c, plan, resolution)` here. It stood here from the first fight
+    # (2026-08-20) and outlived the per-creature rows written above: it logged the last
+    # creature's plan a second time, as a player "turn", and when every creature had
+    # fallen back to the code rule — the model down, or all of them holding back — `plan`
+    # had never been bound and the line raised UnboundLocalError, a 500 that dropped the
+    # live campaign (tests/test_npc_loop_budget.py).
 
     # The budget ran out with somebody else holding the turn. Whatever went wrong,
     # the player is not left staring at a panel where every button refuses: the
