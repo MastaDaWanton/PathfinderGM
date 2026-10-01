@@ -103,6 +103,17 @@ def _gap(ctx):
     if actor is None or pc is None or getattr(actor, "is_pc", False) \
             or not getattr(scene, "has_grid", False):
         return None
+    # A companion on the player's side closes on their FOE, never on the player.
+    # Measured on the companions replay, 2026-10-01: Bob, told to attack the thug, "charges
+    # across the distance" — the check read it as Bob reaching the player, cut the
+    # sentence, and ended the beat "The Bob is still 15 feet from you." Whether a
+    # companion's beat claims to reach the one it struck is not read here (deferred).
+    from rules import states
+
+    sides = getattr(scene, "sides", None) or {}
+    if actor.has_state(states.TRAVELS_WITH_YOU) or any(
+            ref in refs and pc.ref in refs for refs in sides.values()):
+        return None
     feet = scene.distance_between(ref, pc.ref)
     if feet is None:
         return None

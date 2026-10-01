@@ -6288,7 +6288,18 @@ class Engine:
         # off the initiative, and painted so — until they join it themselves (an
         # NPC that attacks is added to a side by `_op_attack`).
         pc_side = [r for r in standing if self.scene.actors[r].is_pc]
-        if initiator in self.scene.actors and not self.scene.actors[initiator].is_pc:
+        # A companion who swings first swings FOR the party (owner, 2026-10-01: they take
+        # spoken orders, "Bob, attack the thug"). Read as the struck-first door below, the
+        # fight would be drawn between the player and their own companion.
+        opener = self.scene.actors.get(initiator)
+        companion_opens = bool(opener is not None and not opener.is_pc
+                               and initiator in standing
+                               and opener.has_state(states.TRAVELS_WITH_YOU))
+        if companion_opens:
+            pc_side.append(initiator)
+            them = ([target] if target and target in self.scene.actors
+                    and target not in pc_side else [])
+        elif initiator in self.scene.actors and not self.scene.actors[initiator].is_pc:
             # Opened from THEIR side (`struck_first`): the fight is between the one
             # who swung and the player. Every other non-player in the room used to
             # land on "them" here — the whole market against the player because one
@@ -6324,6 +6335,8 @@ class Engine:
         self.scene.turn = next(
             (i for i, (ref, _) in enumerate(rolls) if ref == initiator), 0
         )
+        # Before the ground is drawn, so they are laid on the player's side of it.
+        self._companions_join(sides)
         # The battlefield goes with the fight, whichever door the fight came in by.
         # This path skipped the grid entirely: a swing that auto-started an encounter
         # played on a map that said no ground was mapped.
@@ -6435,6 +6448,42 @@ class Engine:
             same_kind = kind and b.from_template == kind
             if (same_name or same_kind) and self.join_fight(other, side):
                 joined.append(other)
+        return joined
+
+    def _companions_join(self, sides: dict | None = None) -> list[str]:
+        """Everyone travelling with the player comes into the fight on the player's side.
+
+        The owner's ruling, 2026-10-01: "I dont want control of companions they should
+        take spoken orders as their character dictates they would or would not and
+        interpret those orders according to their character as well." Before this a
+        companion was drawn as a BYSTANDER — off the initiative, no turn — so no order
+        could ever reach them in a fight: Bob the claimed construct stood beside the
+        player through every swing unless the prose happened to have him join.
+
+        In the ORDER, not in the fight by decree. A place in the initiative is a turn, and
+        what the turn is spent on is the companion's own decision, made on it by the model
+        from their character and what the player told them (`gm/companions.py`): a timid
+        friend may hang back or bolt, a devoted construct strikes. Ultimate Campaign's
+        "Controlling Companions" is the same shape: the companion gets their own actions,
+        and whether they are willing to do what the player wants is theirs (prior art in
+        gm/companions.py).
+
+        Through `join_fight`, the one door, so each arrives with an initiative roll and a
+        square like anybody else. A companion the player swung at is already on the other
+        side and is left there; one who is down does not rise for it.
+        """
+        sides = self.scene.sides if sides is None else sides
+        if not self.scene.in_encounter:
+            return []
+        pc_side = next((s for s, refs in sides.items()
+                        if any(getattr(self.scene.actors.get(r), "is_pc", False)
+                               for r in refs)), "pc")
+        joined = []
+        for ref, b in list(self.scene.actors.items()):
+            if b.is_pc or b.is_down or not b.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            if self.join_fight(ref, pc_side):
+                joined.append(ref)
         return joined
 
     def _law_joins(self) -> list[str]:
@@ -12960,6 +13009,15 @@ class Engine:
         # on whoever won initiative.
         self.scene.turn = -1
         self.scene.advance_turn()
+        # And the player's companions on the player's side, whatever sides the GM wrote:
+        # a declared fight is the same fight as one a swing opens (`_companions_join`).
+        # After the turn is pointed, not before: `join_fight` asks `in_encounter`, which
+        # is false while `turn` is -1, and a first cut here joined nobody. Then pointed
+        # again from the top: nobody has acted, and a companion who rolled highest goes
+        # first rather than sorting in above a turn that has already started.
+        if self._companions_join():
+            self.scene.turn = -1
+            self.scene.advance_turn()
         # An attack riding this same batch is deferred: the fight this op opened is
         # announced, and the first swing belongs to whoever wins the first turn.
         self._battle_joined = True

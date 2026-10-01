@@ -500,6 +500,17 @@ class GMAgent:
                 raw = judgement.bind_placeholders(raw, player_input, self.engine.scene)
                 # The player's own cast, jar or power with no actor written is theirs.
                 raw = judgement.fill_missing_actor(raw, player_input, self.engine.scene)
+                # In a fight a companion's turn is their own: an order the player gave
+                # them reaches it there (gm/companions.py), never as their act on the
+                # player's turn. Out of one, a companion the words are spoken TO answers
+                # for themselves after the plan resolves (`views._companions_answer`).
+                # Noted with the turn's other plan repairs.
+                from . import companions as companions_mod
+
+                raw = companions_mod.on_their_own_turn(
+                    raw, self.engine.scene, notes=own_words,
+                    addressed_refs=companions_mod.addressed(self.engine.scene,
+                                                            player_input))
                 raw = judgement.repair_bare_spawns(raw, player_input)
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
                 # A thing thrown or swung is an improvised-weapon attack that names
@@ -970,23 +981,35 @@ class GMAgent:
                                  "standing action holds and the world moves a beat"])
 
     def npc_turn(self, ref: str, location=None, recent_events=None,
-                 max_attempts: int = 3) -> TurnPlan:
+                 max_attempts: int = 3, orders: list[str] | None = None) -> TurnPlan:
         """Act for one creature on its own initiative.
 
         Same validation as a player turn, so an NPC cannot be talked into a mechanic
         either. Fewer attempts than a player turn: a stalled NPC costs the fight far less
         than a stalled player turn costs the scene, and the caller falls back to the
         creature simply holding its ground.
+
+        A companion's turn (`gm/companions.py`) is told who they are and `orders` — what
+        the player has lately said to them — and decides in character what to do with it
+        (the owner's ruling, 2026-10-01). Its one mechanical refusal: striking the player
+        or the player's side, sent back with the fix named.
         """
+        from . import companions
+
         actor = self.engine.scene.actors[ref]
         brief = prompts.scene_brief(self.world, self.engine.scene, location, recent_events,
                                     here=self.engine.here(), known=self.engine.places(),
                                     reading=getattr(self, "reading", None), player_text="")
+        friend = companions.is_companion(actor)
+        facts = (companions.turn_facts(self.engine.scene, actor, list(orders or []))
+                 if friend else "")
+        foes = companions.foes_of(self.engine.scene, ref) if friend else []
         # A disarmed creature re-arms first, by the engine's hand (`judgement.rearm`);
         # the prompt is told so as a fact, or the wind-up raises the fists the tells
         # are about to put a sap in.
         base = prompts.npc_turn_messages(brief, [], ref, actor, self.engine.scene.round,
-                                         first=judgement.rearm_note(self.engine.scene, ref))
+                                         first=judgement.rearm_note(self.engine.scene, ref),
+                                         companion=facts, foe=foes[0] if foes else None)
         # Stage 8's one named exception. A bestiary creature has no path, spellbook
         # or satchel, and its bite's poison lives in a stat block no locator reads
         # yet, so on its turn `damage` and `ability_damage` stay and the origin is
@@ -997,6 +1020,13 @@ class GMAgent:
         template = str(getattr(actor, "from_template", "") or "")
         bestiary = bool(template) and not getattr(actor, "paths", None)
         ops = prompts._CREATURE_OPS if (bestiary and self.engine.scene.in_encounter) else ()
+        # A companion may decline to act at all. The fight schema leaves `narrate_only`
+        # out on purpose — the player's own turn narrated a punch and proposed nothing —
+        # and so a companion's refusal was unsamplable: told to stay back, a timid drover
+        # came back `attack` (4 of 5) or `move` (1 of 5), never the refusal the examples
+        # demonstrate (companions replay, 2026-10-01).
+        if friend and self.engine.scene.in_encounter:
+            ops = tuple(dict.fromkeys((*(ops or prompts._FIGHT_OPS), "narrate_only")))
         origin = f"creature:{template}" if bestiary else ""
         messages = base
         attempts: list[Attempt] = []
@@ -1018,6 +1048,16 @@ class GMAgent:
             try:
                 data = reply.json()
                 raw, rearmed = judgement.rearm(self.engine.scene, ref, data.get("intents"))
+                turned = (companions.turning_on_the_party(self.engine.scene, ref, raw)
+                          or (companions.attack_against_its_reason(ref, raw)
+                              if friend else "")
+                          or (companions.attack_on_a_bystander(
+                              self.engine.scene, ref, raw, list(orders or ()))
+                              if friend else "")
+                          or (companions.move_against_its_reason(
+                              self.engine.scene, ref, raw) if friend else ""))
+                if turned:
+                    raise IntentError(turned, "legality")
                 intents = self.engine.validate(raw, origin=origin,
                                                origin_name=actor.name if origin else "")
             except (ValueError, IntentError) as exc:
@@ -1051,6 +1091,81 @@ class GMAgent:
             f"the GM could not act for {ref} in {max_attempts} attempts:\n"
             + "\n".join(rejections)
         )
+
+    # What a companion may do in answer, out of a fight: speak, try something the engine
+    # rolls, step somewhere, strike — never travel the party, spend its coin or end its
+    # company, which are the player's.
+    COMPANION_ANSWER_OPS = ("narrate_only", "say", "check", "move", "attack")
+
+    def companion_answer(self, ref: str, said: str, location=None, recent_events=None,
+                         max_attempts: int = 2) -> TurnPlan:
+        """A companion answers the player's words to them, out of a fight: the targeted
+        call `companions.addressed` triggers (owner's ruling, 2026-10-01 — they take
+        spoken orders "as their character dictates they would or would not").
+
+        The model decides, as the companion, from who they are and what was said; the
+        engine decides what lands. Held mechanically to: only their own acts (every
+        intent's actor is them), the ops in COMPANION_ANSWER_OPS, no DC of the model's
+        (a try is opposed by whoever could stop it), and never a blow at the player.
+        Raises IntentError when no attempt passes; the caller lets the prose answer.
+        """
+        from . import companions
+
+        scene = self.engine.scene
+        actor = scene.actors[ref]
+        brief = prompts.scene_brief(self.world, scene, location, recent_events,
+                                    here=self.engine.here(), known=self.engine.places(),
+                                    reading=None, player_text="")
+        others = [(r, a.name) for r, a in scene.actors.items()
+                  if r != ref and not a.is_pc and scene.conscious(r)
+                  and not companions.is_companion(a)]
+        pc = scene.pc()
+        base = prompts.companion_answer_messages(
+            brief, ref, actor, companions.answer_facts(scene, actor, said),
+            other=others[0] if others else None, pc_ref=pc.ref if pc else "pc")
+        messages = base
+        attempts: list[Attempt] = []
+        rejections: list[str] = []
+        for n in range(max_attempts):
+            reply = client.chat(messages, self.model, self.host, as_json=True, think=False,
+                                provider=self.provider, api_key=self.api_key,
+                                temperature=0.7, num_predict=400,
+                                schema=prompts.turn_schema(
+                                    fighting=False, refs=tuple(scene.actors),
+                                    ops=self.COMPANION_ANSWER_OPS))
+            attempts.append(Attempt("companion", reply.seconds, reply.model, reply.text))
+            try:
+                data = reply.json()
+                raw = [dict(r) for r in (data.get("intents") or []) if isinstance(r, dict)]
+                for r in raw:
+                    r.setdefault("actor", ref)
+                    if not r.get("actor"):
+                        r["actor"] = ref
+                    if r["actor"] != ref and r.get("op") != "narrate_only":
+                        raise IntentError(
+                            f"{r.get('op')}: only {actor.name} ({ref}) answers here; "
+                            f"write {ref} as the actor, or leave the act out.", "legality")
+                    params = r.get("params") if isinstance(r.get("params"), dict) else {}
+                    if r.get("op") == "check" and "dc" in params:
+                        raise IntentError(
+                            f"check: {actor.name}'s try names who could stop it "
+                            f'("opposed_by": {{"ref": "<ref>", "skill": "<skill>"}}), '
+                            f"never a DC.", "schema")
+                turned = (companions.turning_on_the_party(scene, ref, raw)
+                          or companions.attack_against_its_reason(ref, raw))
+                if turned:
+                    raise IntentError(turned, "legality")
+                intents = self.engine.validate(raw or [{"op": "narrate_only"}])
+            except (ValueError, IntentError) as exc:
+                rejections.append(f"attempt {n + 1}: {exc}")
+                messages = _with_correction(base, reply.text, str(exc))
+                continue
+            narration = judgement.name_refs(
+                self._lift(str(data.get("narration", "")).strip()), scene)
+            return TurnPlan(narration=narration, intents=intents, attempts=attempts,
+                            rejections=rejections)
+        raise IntentError(f"{actor.name} could not answer in {max_attempts} attempts:\n"
+                          + "\n".join(rejections))
 
     def _context_note(self) -> list[str]:
         """What the context budget left out this turn, for the log and the GM view.
@@ -1103,6 +1218,11 @@ class GMAgent:
                   for e in prompts.EXAMPLES],
                 *[speech_mod.lift(prompts.fill_enemy(e["reply"]["narration"], None))[0]
                   for e in prompts.NPC_EXAMPLES],
+            # The companion examples too: a companion's turn is shown them in place of
+            # the creature ones, and a copied line is as much a defect there.
+            *[prompts.fill_companion(e["reply"]["narration"], self_ref="c1",
+                                     name="stranger", foe_ref="c2", foe="stranger")
+              for e in prompts.COMPANION_EXAMPLES],
                 prompts.CONSEQUENCE_EXAMPLE["assistant"],
             )
         return self._echoes

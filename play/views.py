@@ -3140,6 +3140,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             c.transcript.append({"who": "gm", "text": " ".join(left),
                                  "kind": "consequence"})
 
+    # A companion the player spoke TO answers before the prose is written, out of a fight
+    # (in one, their own turn does): what they do is decided as themselves, resolved by
+    # the engine, and handed to the prose as tells and a fact (gm/companions.py).
+    answered = _companions_answer(c, agent, player_text, resolution, plan)
     outcomes = [o for o in resolution.outcomes if o.tell]
     if getattr(agent, "intents_first", False):
         # The experiment's other half: call 1 wrote no prose, so this call writes the
@@ -3208,7 +3212,12 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 scene_now=(prompts.scene_now(c.scene)
                            + (("\n\n" + judgement.standing_action(c.scene))
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
-                              else "")),
+                              else "")
+                           + (("\n\nWHAT A COMPANION DOES WITH WHAT YOU SAID (decided by "
+                               "them, as themselves; the beat shows it in their manner "
+                               "and does not change it):\n"
+                               + "\n".join(f"{a.name}: {said}" for a, said in answered))
+                              if answered else "")),
                 pull=pull,
                 claim=str(getattr(agent, "false_claim", "") or ""),
                 shown=narration_mod.own_prose(c.transcript, tagged=True),
@@ -3326,6 +3335,20 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             ours.clear()
             text = _floor("discarded: sexual content with a child in the scene")
         added = list(getattr(agent, "last_added", []) or [])
+        if text and answered:
+            # The companion's answer on the page, whatever the prose chose. Measured on
+            # the companions replay: Bob's answer was "Bob moves to the door, standing
+            # perfectly still", handed to the prose as a fact, and the beat never
+            # mentioned Bob at all. Detected (the beat does not name them) and put
+            # back in their own answer's words, before the closing question.
+            from gm import companions as companions_mod
+
+            before = text
+            text, put = companions_mod.answers_on_the_page(text, answered)
+            if put:
+                repairs.append(f"companion answer left off the page: put back for "
+                               f"{', '.join(put)}")
+                added += narration_mod.added_sentences(before, text)
         if text:
             before = text
             text, anchored = narration_mod.keep_the_thread(text, c.scene.thread,
@@ -3600,7 +3623,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # swing left the player holding the action they declared; running the NPC loop
     # here would hand the other side the first blow the announcement promised the
     # player. They act at the combat panel; the loop runs when that turn ends.
+    # Not a battle a COMPANION joined in answer to the player's words (`_companions_answer`):
+    # the companion holds the turn they declared, and the order carries on from them to
+    # the player — left un-run, the turn sat on Bob while the player typed (replay,
+    # 2026-10-01).
+    from gm import companions as companions_mod
+
     joined = any(e.get("kind") == "battle_joined"
+                 and not companions_mod.is_companion(c.scene.get(e.get("ref") or ""))
                  for o in resolution.outcomes for e in (o.effects or []))
     if hand_over and not joined:
         _run_npc_turns(c, agent)
@@ -3612,6 +3642,79 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # answer lands through `watcher.drain` on a later request, staleness-checked.
     watcher.kick(c)
     return JsonResponse(_state(c))
+
+
+def _companions_answer(c, agent, player_text: str, resolution, plan) -> list[tuple]:
+    """Out of a fight, each companion the player's words were spoken TO answers, as
+    themselves, before the prose is written. Returns (actor, their answer) pairs for the
+    prose call's facts and its backstop; their resolved outcomes join `resolution` so the
+    prose has the tells.
+
+    The owner's ruling (2026-10-01): companions "take spoken orders as their character
+    dictates they would or would not and interpret those orders according to their
+    character as well". Measured before this (companions replay): "Drover, sneak up
+    behind that thug and lift his purse for me" was planned as the player's `say` and a
+    `narrate_only` — nobody decided anything, and the prose had the timid drover melt
+    into the shadows like a cutpurse.
+
+    Detected in code (`companions.addressed`: a vocative, or a verb of telling before the
+    name), answered by one targeted call each (`GMAgent.companion_answer`), resolved by the
+    engine. A companion the plan already acts for is left to the plan; at most two answer
+    a line. Any failure costs only the answer — the prose then writes the moment as ever.
+    """
+    from gm import companions as companions_mod
+
+    scene = c.scene
+    if scene.in_encounter or not (player_text or "").strip() or resolution.awaiting \
+            or player_text == CARRY_ON:
+        return []
+    planned = {i.actor for i in (getattr(plan, "intents", None) or []) if i.actor}
+    lines: list[tuple] = []
+    for ref in companions_mod.addressed(scene, player_text)[:2]:
+        actor = scene.get(ref)
+        if actor is None or ref in planned:
+            continue
+        agent.engine = c.engine()
+        try:
+            answer = agent.companion_answer(ref, player_text, location=c.location,
+                                            recent_events=_recent_events(c.world,
+                                                                         c.location))
+        except (ModelUnavailable, IntentError) as exc:
+            c.turn_log.append({"kind": "companion-answer", "ref": ref,
+                               "error": str(exc)[:400]})
+            continue
+        undo = scene.snapshot()
+        try:
+            more = agent.engine.run(answer.intents)
+        except (IntentError, ValueError, KeyError) as exc:
+            scene.restore(undo)
+            c.turn_log.append({"kind": "companion-answer", "ref": ref,
+                               "error": f"resolution: {str(exc)[:400]}"})
+            continue
+        if more.awaiting:
+            # Only the player's own dice suspend; a companion's never should. Undone
+            # rather than left half-resolved if it ever does.
+            scene.restore(undo)
+            continue
+        resolution.outcomes.extend(more.outcomes)
+        # An answer that OPENED a fight is told by the engine ("Battle is joined: Bob
+        # squares off against the thug. Nothing has landed yet"); its wind-up handed to
+        # the prose as a fact ("strikes at the thug's midsection") had the page land
+        # the blow no die had rolled (replay, 2026-10-01). The tell carries it alone.
+        opened = any(e.get("kind") == "battle_joined"
+                     for o in more.outcomes for e in (o.effects or []))
+        c.turn_log.append(history_mod.stamp(c, {
+            "kind": "companion-answer", "ref": ref, "said": player_text[:400],
+            "seconds": round(answer.seconds, 1),
+            "attempts": [{"kind": a.kind, "seconds": round(a.seconds, 1),
+                          "model": a.model} for a in answer.attempts],
+            "rejections": list(answer.rejections),
+            "narration": answer.narration,
+            "intents": [i.as_dict() for i in answer.intents],
+            "outcomes": [o.as_dict() for o in more.outcomes]}))
+        if answer.narration and not opened:
+            lines.append((actor, answer.narration))
+    return lines
 
 
 def _run_npc_turns(c, agent, limit: int = 12) -> None:
@@ -3702,8 +3805,15 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
 
         engine = c.engine()
         agent.engine = engine
+        # A companion hears what the player said to them (owner's ruling, 2026-10-01):
+        # read off the transcript and the conversation log, never guessed (gm/companions).
+        from gm import companions as companions_mod
+
+        orders = (companions_mod.orders_for(scene, ref, c.transcript)
+                  if companions_mod.is_companion(actor) else None)
         try:
-            plan = agent.npc_turn(ref, location=location, recent_events=events)
+            plan = agent.npc_turn(ref, location=location, recent_events=events,
+                                  orders=orders)
         except (ModelUnavailable, IntentError) as exc:
             # A creature the GM could not speak for still acts. It used to "hesitate",
             # which reads as a bug even when it is a fallback: the player was attacked by

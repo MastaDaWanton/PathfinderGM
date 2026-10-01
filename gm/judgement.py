@@ -1736,6 +1736,15 @@ def default_npc_action(scene, ref: str) -> list[dict] | None:
     actor = scene.actors.get(ref)
     if actor is None or not actor.can_act() or actor.is_down:
         return None
+    # A companion who is not the player's own decides for themselves whether to fight
+    # (the owner's ruling, 2026-10-01): with no model to decide, the code does not decide
+    # FOR them, and they hold back. A claimed, devoted construct fights for its owner,
+    # which is what the house rule says it does.
+    from rules import states as states_mod
+
+    if (actor.has_state(states_mod.TRAVELS_WITH_YOU)
+            and not actor.has_state(states_mod.OWNED_BY_YOU)):
+        return None
 
     mine = next((side for side, refs in (scene.sides or {}).items() if ref in refs), None)
     enemies = [
