@@ -117,6 +117,170 @@ def test_a_refused_forage_says_so_in_the_fiction_and_costs_nothing(client):
     assert dict(c.scene.pc().inventory) == satchel
 
 
+def test_the_excursion_call_never_spends_its_budget_thinking(monkeypatch):
+    """`_narrate` was the one chat call in the app without `think=False`. Measured on the
+    owner's thinking model (gemma-4-12B): 140 of 140 tokens went to thinking, the content
+    came back empty, and 4 of 4 excursion narrations fell to their template floors."""
+    from gm import client as gm_client
+    from play import craft_views
+
+    seen = []
+
+    class _Reply:
+        text = "You set off."
+
+        def json(self):
+            return {"narration": "x"}
+
+    def chat(*a, **k):
+        seen.append(k)
+        return _Reply()
+
+    monkeypatch.setattr(gm_client, "chat", chat)
+    cfg = {"model": "m", "host": "h"}
+    craft_views._narrate([{"role": "user", "content": "x"}], cfg)
+    craft_views._narrate([{"role": "user", "content": "x"}], cfg, as_json=True)
+    craft_views._narrate([{"role": "user", "content": "x"}], cfg,
+                         schema=craft_views._SCENE_SCHEMA)
+    assert len(seen) == 3 and all(k.get("think") is False for k in seen), seen
+    assert seen[2]["schema"] == craft_views._SCENE_SCHEMA
+
+
+def test_the_opening_floor_names_where_the_party_stands_and_no_clock(client):
+    """The floor said "work away from Ledgerwarren" while the party stood at the
+    outskirts: it named the settlement, not the place. And the prompt was handed "day 1,
+    17 hours in" — a number, to a narrator that must never write one."""
+    from play import campaign as cm, craft_views
+
+    c = cm.current()
+    here = c.engine().here().name
+    place, when = craft_views._forage_scene(c)
+    assert place == here and not any(ch.isdigit() for ch in when), (place, when)
+    before = len(c.transcript)
+    _forage(client)
+    opening = cm.current().transcript[before]["text"]
+    assert here in opening and not any(ch.isdigit() for ch in opening), opening
+
+
+def test_the_excursion_reaches_history_and_the_turn_log(client):
+    """`craft_action` wrote only the transcript. Measured on the owner's save: history
+    jumped from the outskirts arrival straight to "I aprouch the clockwork Spy", so the
+    planner and narrator never knew a forage happened or that a creature was there."""
+    from play import campaign as cm
+
+    c = cm.current()
+    hist, log = len(c.history), len(c.turn_log)
+    assert _forage(client).status_code == 200
+    c = cm.current()
+    added = c.history[hist:]
+    assert [m["role"] for m in added] == ["user", "assistant"], added
+    assert "forages" in added[0]["content"] and added[1]["content"].strip()
+    rows = [r for r in c.turn_log[log:] if r.get("door") == "excursion"]
+    assert len(rows) == 1 and any(o["op"] == "forage" for o in rows[0]["outcomes"])
+
+
+def _spy_turns_up(monkeypatch):
+    from rules import bestiary, gathering
+
+    spy = bestiary.search(text="clockwork spy", limit=1)[0]
+    monkeypatch.setattr(gathering, "roll", lambda *a, **k: gathering.Encounter(
+        "creature", 80, creature=spy, aggressive=False))
+
+
+def test_a_creature_met_while_foraging_gets_its_scene_after_the_haul(client, monkeypatch):
+    """The owner asked for an encounter found while foraging to get a call that sets the
+    whole scene — a brass construct perched over the thicket, glass eye whirring, holding
+    its ground. One grounded call, schema {narration}; the scene lands between the haul
+    and the question, and the creature is in the history the planner reads."""
+    from play import campaign as cm, craft_views
+
+    _spy_turns_up(monkeypatch)
+    calls = []
+    good = ("Dusk settles over the slope, and the scree is going grey. Over the patch you "
+            "were making for crouches a Clockwork Spy, brass plates ticking as it cools, "
+            "its glass eye whirring as it settles on you. It does not come at you and it "
+            "does not give way.")
+
+    def narrate(messages, cfg, **k):
+        calls.append(k)
+        return {"narration": good} if k.get("schema") else None
+
+    monkeypatch.setattr(craft_views, "_narrate", narrate)
+    c = cm.current()
+    before, hist = len(c.transcript), len(c.history)
+    d = _forage(client).json()
+    book = cm.current().transcript[before:]
+    assert [b["text"] for b in book][-2:] == [good, "What do you do?"], book
+    assert sum(1 for k in calls if k.get("schema")) == 1, "one scene call, no repair"
+    assert d["scene"] == good
+    assert "Clockwork Spy" in cm.current().history[-1]["content"]
+    assert any("Approach" in s or "Spy" in s for s in d["suggestions"]), d["suggestions"]
+    spy = next(a for a in cm.current().scene.actors.values() if a.name == "Clockwork Spy")
+    assert spy.has_state("state.holding-ground")
+
+
+def test_a_scene_that_has_it_attack_is_repaired_once_then_floored(client, monkeypatch):
+    """Detect in code, repair with a targeted call: the creature as the subject of a blow
+    or a departure, an invented name and a number are each found by code and named in
+    the one repair; a second failure takes the floor, which says where it is and what it
+    is doing — unlike "has the ground you wanted, and has not moved off it", which the
+    owner could not parse."""
+    from play import campaign as cm, craft_views
+
+    _spy_turns_up(monkeypatch)
+    bad = ("Three paces off, the Clockwork Spy lunges at you while Captain Veyrith "
+           "watches from the rocks.")
+    asked = []
+
+    def narrate(messages, cfg, **k):
+        if k.get("schema"):
+            asked.append(messages[-1]["content"])
+            return {"narration": bad}
+        return None
+
+    monkeypatch.setattr(craft_views, "_narrate", narrate)
+    c = cm.current()
+    before = len(c.transcript)
+    d = _forage(client).json()
+    assert len(asked) == 2, "the scene call and exactly one repair"
+    assert "lunges" in asked[1] and "Veyrith" in asked[1] and "Three" in asked[1]
+    scene = d["scene"]
+    assert scene != bad and "has the ground you wanted" not in scene
+    assert "Clockwork Spy" in scene and "does not come at you" in scene
+    assert not any(ch.isdigit() for ch in scene)
+    log = cm.current().turn_log[-1]
+    assert log.get("door") == "excursion" and any("floor" in r for r in log["repairs"])
+
+
+@pytest.mark.parametrize("text,found", [
+    ("The Clockwork Spy lunges at you.", "lunges"),
+    ("It suddenly bolts for the ridge.", "bolts"),
+    ("The spy scuttles away into the scree.", "scuttles away"),
+    ("Captain Veyrith's construct waits on the rock.", "Veyrith"),
+    ("It has watched you for 3 hours.", "3"),
+])
+def test_the_scene_checks_find_each_defect(text, found):
+    from play import craft_views
+
+    row = {"creature_type": "construct", "subtype": "clockwork"}
+    got = craft_views.scene_defects("Dusk falls. " + text, name="Clockwork Spy", row=row,
+                                    known={"Clockwork Spy", "Sam"})
+    assert any(found in g for g in got), got
+
+
+def test_a_scene_that_keeps_it_still_passes_the_checks():
+    """The owner's own example passes untouched: "neither attacks nor flees" and "does
+    not come at you" are negations, not the creature acting."""
+    from play import craft_views
+
+    text = ("Over the thicket you were heading for perches a brass construct, a "
+            "Clockwork Spy, its glass eye whirring and focusing on you. It does not come "
+            "at you, and it neither attacks nor flees; it holds the thicket.")
+    assert craft_views.scene_defects(
+        text, name="Clockwork Spy", row={"creature_type": "construct"},
+        known={"Clockwork Spy"}) == []
+
+
 def test_the_bench_forage_is_untouched(client):
     """The bench keeps its own button: the excursion is an addition, not a move that
     breaks the shelf's forage-refresh loop."""
