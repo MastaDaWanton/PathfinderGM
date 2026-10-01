@@ -140,6 +140,157 @@ def test_an_animal_that_notices_you_starts_the_fight(monkeypatch):
     assert s.in_encounter and len(s.sides.get("them", [])) == 1
 
 
+# --- a creature that holds its ground (playtest 2026-09-30, item 8) -------------------------
+
+def _spy(monkeypatch, s, engine, found=None):
+    """The owner's encounter: a Clockwork Spy, not aggressive, met while foraging herbs."""
+    from rules import bestiary
+
+    from tests._places import stand_on
+
+    stand_on(s, "mountain")
+    spy = bestiary.search(text="clockwork spy", limit=1)[0]
+    monkeypatch.setattr(gathering, "roll", lambda *a, **k: gathering.Encounter(
+        "creature", 80, creature=spy, aggressive=False))
+    effects: list = []
+    clause = engine._gathering_encounter(
+        s.pc(), "mountain", 1, "herbs",
+        found={"bitterroot": 2} if found is None else found, effects=effects)
+    return clause, effects, effects[-1]["ref"]
+
+
+def _set_2d6(monkeypatch, engine, total):
+    """Make the reaction roll come up `total` before the Charisma modifier."""
+    real = engine.dice.roll
+
+    def roll(notation, *args, **kwargs):
+        label = kwargs.get("label") or (args[1] if len(args) > 1 else "")
+        if str(label).startswith("how "):
+            from rules.dice import Roll
+            return Roll(die="2d6", faces=[total], label=label)
+        return real(notation, *args, **kwargs)
+
+    monkeypatch.setattr(engine.dice, "roll", roll)
+
+
+def test_the_creature_in_the_way_holds_its_ground_as_an_effect_with_a_tell(monkeypatch):
+    """The playtest printed "a Clockwork Spy has the ground you wanted, and has not moved
+    off it." — the owner could not parse it, and nothing held the Spy there: no state, no
+    record, and "I approach the clockwork Spy" walked away from it. The stance is an
+    ActiveEffect now (`state.holding-ground`, source `gathering:<expedition>`), applied
+    through the one applicator, and its tell says where and what."""
+    from rules import states
+
+    s, engine = _room()
+    clause, effects, ref = _spy(monkeypatch, s, engine)
+    spy = s.actors[ref]
+    assert spy.has_state(states.HOLDING_GROUND)
+    held = [e for e in spy.effects if "state.holding-ground" in e.tags]
+    assert len(held) == 1 and held[0].source.startswith("gathering:herbs@")
+    assert "has the ground you wanted" not in clause
+    assert "holds the ground between you and the patch" in clause
+    assert "neither comes at you nor gives way" in clause
+    assert clause.count("The Clockwork Spy") >= 1, clause
+    assert effects[-1]["stance"] and effects[-1]["spot"] == "patch"
+    assert not s.in_encounter, "a creature holding its ground does not open a fight"
+
+
+def test_the_patch_it_holds_is_booked_once_and_paid_only_once_it_has_gone(monkeypatch):
+    """Owner ruling D1: the patch is a guarded find at x1, an engine record, paid when
+    the creature has gone — with a tell when it is claimed. And only HERE: `actors` is
+    who is in the party's place, so before `at` a party that walked off read the guard as
+    gone and would have been paid for a patch it had left behind."""
+    s, engine = _room()
+    clause, _, ref = _spy(monkeypatch, s, engine, found={"bitterroot": 2})
+    assert len(s.guarded_finds) == 1
+    book = s.guarded_finds[0]
+    assert book["found"] == {"bitterroot": 2}, "booked at x1, not the guardian's x3"
+    assert book["at"] == s.at and book["guard_name"] == "Clockwork Spy"
+    assert "yours once it has gone" in clause
+    # Still there: nothing pays.
+    assert engine._settle_guarded_finds() == ""
+    # The party elsewhere: the creature is out of view, and still nothing pays.
+    here = s.at
+    s.at = here + "/elsewhere"
+    s.pc().at = s.at
+    assert engine._settle_guarded_finds() == "" and len(s.guarded_finds) == 1
+    s.at = here
+    s.pc().at = here
+    before = s.pc().inventory.get("bitterroot", 0)
+    s.remove(ref)
+    line = engine._settle_guarded_finds()
+    assert "The patch the Clockwork Spy held is yours now" in line, line
+    assert s.pc().inventory.get("bitterroot", 0) == before + 2
+    assert s.guarded_finds == []
+
+
+def test_a_plan_that_has_it_attack_or_walk_off_is_refused_in_words(monkeypatch):
+    """The NPC neither attacks nor flees while it holds. A plan proposing either is
+    refused as a printable outcome — not an IntentError, which regenerates rather than
+    repairs — naming the two things that would move it."""
+    s, engine = _room()
+    _, _, ref = _spy(monkeypatch, s, engine)
+    for raw in ({"op": "attack", "actor": ref, "target": "pc", "because": "t",
+                 "params": {}},
+                {"op": "move", "actor": ref, "because": "t",
+                 "params": {"zone": "far"}}):
+        res = engine.run(engine.validate([raw], origin="author:test"))
+        out = res.outcomes[0]
+        assert out.status == "refused", out
+        assert "holding its ground" in out.tell and "strike it or close on it" in out.tell
+    assert not s.in_encounter and s.pc().hp == s.pc().hp_max
+
+
+@pytest.mark.parametrize("face,expect", [(2, "hostile"), (7, "holds"), (12, "gave way")])
+def test_closing_on_it_rolls_its_reaction_on_the_old_table(monkeypatch, face, expect):
+    """B/X's reaction table, collapsed to three answers because the stance already IS its
+    "uncertain" band: 5 or less it comes at you, 6-8 it keeps the ground, 9 or more it
+    gives way — and the patch is then the player's, said in the same batch."""
+    s, engine = _room()
+    _, _, ref = _spy(monkeypatch, s, engine)
+    cha = s.pc().ability_mod("cha")
+    _set_2d6(monkeypatch, engine, face - cha)
+    res = engine.run(engine.validate([{"op": "move", "actor": "pc", "because": "t",
+                                       "params": {"who": ref, "zone": "near"}}],
+                                     origin="author:test"))
+    stance = [o for o in res.outcomes if o.op == "stance" and o.effects[0].get("ref")]
+    assert len(stance) == 1, [o.tell for o in res.outcomes]
+    tell = stance[0].tell
+    if expect == "hostile":
+        assert "comes at you" in tell and s.in_encounter
+        assert not s.actors[ref].has_state("state.holding-ground")
+    elif expect == "holds":
+        assert "does not give way" in tell and not s.in_encounter
+        assert s.actors[ref].has_state("state.holding-ground")
+        # Closing no further rolls nothing more; closing again rolls again (Holmes).
+        res = engine.run(engine.validate([{"op": "check", "actor": "pc", "because": "t",
+                                           "params": {"skill": "perception", "dc": 5}}],
+                                         origin="author:test"))
+        if res.awaiting:
+            res = engine.resume(10)
+        assert not [o for o in res.outcomes if o.op == "stance"]
+    else:
+        assert "gives way" in tell and ref not in s.actors
+        claimed = [o.tell for o in res.outcomes if "is yours now" in o.tell]
+        assert claimed, [o.tell for o in res.outcomes]
+
+
+def test_striking_it_lifts_the_stance_with_a_tell(monkeypatch):
+    """Attacked, it is in the fight: the stance lifts at the end of the batch that drew
+    it in, said, so the NPC loop gives it a real turn."""
+    s, engine = _room()
+    _, _, ref = _spy(monkeypatch, s, engine)
+    res = engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": ref,
+                                       "because": "t", "params": {}}],
+                                     origin="author:test"))
+    while res.awaiting:
+        res = engine.resume(15)
+    assert s.in_encounter
+    assert not s.actors[ref].has_state("state.holding-ground") if ref in s.actors else True
+    assert any("stops holding its ground" in o.tell for o in res.outcomes), \
+        [o.tell for o in res.outcomes]
+
+
 # --- ore ------------------------------------------------------------------------------------
 
 def test_a_search_for_ore_reaches_the_engine_as_a_prospect():

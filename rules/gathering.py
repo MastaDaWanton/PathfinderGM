@@ -9,9 +9,13 @@ expedition, and it answers with one of four things:
   quiet     — the hours pass and the table said nothing more.
   rich      — a rich patch, a seam, a fallen trunk full of fungus: the yield doubles.
   creature  — something that lives here has noticed you. Animals and vermin come at
-              you; the expedition is a fight now. Anything cleverer is in the way.
+              you; the expedition is a fight now. Anything cleverer is in the way: it
+              holds the patch you were making for (`state.holding-ground`), and the
+              patch is booked at ×1 and yours once it has gone (owner ruling D1,
+              2026-09-30).
   guarded   — the best find of all, and something is sitting on it. The vein is real
               and it is booked; it is yours when whatever guards it is dead or gone.
+              The guard holds its ground the same way.
 
 The creature is never invented. It is drawn from the shipped bestiary by the biome the
 scene stands on and a CR window around the character's level (`bestiary.search`), so
@@ -100,7 +104,21 @@ def roll(biome: str, level: int, dice) -> Encounter:
                      yield_times=GUARDED_YIELD if kind == "guarded" else 1)
 
 
-def describe(enc: Encounter, what: str) -> str:
+def spot_for(what: str, biome: str = "") -> str:
+    """The piece of ground a creature can be sitting on: a seam of ore, a thicket where
+    there is cover for one, a patch everywhere else. One word, used by the tell, the
+    booked find and the excursion's scene call alike, so the three cannot disagree about
+    what the creature is holding."""
+    if what == "ore":
+        return "seam"
+    return "thicket" if str(biome or "") in THICKET_GROUND else "patch"
+
+
+# Ground where herbs grow under cover rather than in the open.
+THICKET_GROUND = frozenset({"forest", "jungle", "swamp", "hills"})
+
+
+def describe(enc: Encounter, what: str, biome: str = "") -> str:
     """The tell's clause for the encounter. `what` is what was being gathered —
     "herbs", "ore" — so the rich find reads as a patch or a seam."""
     if enc.kind == "rich":
@@ -109,11 +127,16 @@ def describe(enc: Encounter, what: str) -> str:
                 f"A rich patch of {what}, thick enough to double the haul.")
     if enc.kind == "creature" and enc.creature:
         name = enc.creature["name"]
+        # The second sentence used to be "Something is in the way: a Clockwork Spy has
+        # the ground you wanted, and has not moved off it." — which the owner could not
+        # parse (playtest 2026-09-30, item 8): what ground, wanted for what, after a haul
+        # was already in the satchel? It says where now, and the engine's stance tell
+        # (`Engine._hold_ground`) says what the creature is doing about it.
         return (f"Something has noticed the work: {_an(name)} comes out of the "
                 f"{'rock' if what == 'ore' else 'undergrowth'}, and it is coming for you."
                 if enc.aggressive else
-                f"Something is in the way: {_an(name)} has the ground you wanted, and "
-                f"has not moved off it.")
+                f"Making for one last {spot_for(what, biome)}, "
+                f"you find {_an(name)} there before you.")
     if enc.kind == "guarded" and enc.creature:
         name = enc.creature["name"]
         return (f"The find of a lifetime — {'a massive vein of' if what == 'ore' else 'a whole hollow of'} "

@@ -206,6 +206,18 @@ TAGS: dict[str, tuple[str, ...]] = {
     # The price of coming back: somebody paid the priests, and now the debt sits
     # on the character. Clockless — the world decides when it is called in.
     "life debt": ("state.obligation.life-debt",),
+    # A creature met while gathering that has the ground the player wanted and keeps it:
+    # it neither comes at them nor gives way (playtest 2026-09-30, item 8). The old
+    # games' reaction roll in its middle band — B/X's "uncertain", Holmes's "make
+    # another offer, roll again" — held as a state rather than re-rolled every turn, so
+    # the NPC loop, the intent gate and the brief all read one fact. Granted by
+    # `Engine._gathering_encounter` (source `gathering:<expedition>`), lifted by
+    # `Engine._holding_ground_settles` when the creature is drawn into a fight or the
+    # player closes on it and the reaction comes out otherwise. NOT under
+    # `state.unable`: it stops no action by incapacity, it is a choice the creature is
+    # making, so it lives outside BLOCKS and the gate that reads it says why in words.
+    # No `recovery.*`: a night's sleep does not move a creature off its ground.
+    "holding ground": ("state.holding-ground",),
     # 1e's attitude track, in the book's own order. `rules/effectspec.py` has offered
     # an `attitude` effect type since the spell import — thirty-three spells set one,
     # charm person among them — and it shipped `engine=False` with the note "no check
@@ -249,6 +261,9 @@ ATTITUDES: tuple[str, ...] = (
 # refusals, the brief, and the talk panel. A tag on the PERSON, not a flag on the
 # scene, so who is in the conversation is the same question as every other state.
 TALKING = "talk.with-you"
+# The forage encounter's stance (TAGS["holding ground"]), named once for its readers.
+HOLDING_GROUND = "state.holding-ground"
+HOLDING_GROUND_KEY = "holding ground"
 # How somebody stands towards the player over time — the number the talk panel shows
 # and the baseline the attitude track falls back to when no check or spell is holding
 # a step. Held as one effect (`attitude.set_regard`) whose `amount` is the score.
