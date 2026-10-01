@@ -324,6 +324,9 @@ def test_the_figure_in_her_own_house_is_the_householder(veil):
     call = out.outcomes[0]
     assert call.status == "resolved", call.tell
     her = scene.people[rec["ref"]]
+    # Replayed 2026-10-01: made in the tavern to be called on, she stayed in the tavern,
+    # and her own door went unanswered ("The human woman is at the Velvet Veil").
+    assert "Velvet Veil" not in call.tell and her.at != GATE + "/the-velvet-veil"
     if scene.at != call.effects[0]["house"]:
         # Not let in at this regard: make her friendly and knock again.
         attitude.set_regard(her, 80, "test")
