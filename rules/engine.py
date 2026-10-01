@@ -14153,7 +14153,10 @@ def _damage_note(d: dict) -> str:
 # spec carrying one stays rendered for the GM (CLAUDE.md: prose beats a wrong number).
 _AC_CONDITIONAL = re.compile(
     r"\bagainst\b|\bonly\b|\bwhen(?:ever)?\b|\bwhile\b|\bif\b|\bfirst round\b|"
-    r"\bexisting\b|\bthe animal|\bsame creatures\b|\bevery creature\b|\bstack", re.I)
+    r"\bexisting\b|\bthe animal|\bsame creatures\b|\bevery creature\b|\bstack|"
+    # Magic vestment's bonus is on the ARMOUR or shield it touches, not on the wearer;
+    # applied to AC it would armour a caster in a robe.
+    r"armou?r or shield", re.I)
 # "+1 more per three caster levels above 3rd, maximum +5" (barkskin), "+1 more per six
 # caster levels, maximum +5" (shield of faith), "+1 more for every 4 caster levels,
 # maximum +8" (armor of darkness): the scaling the corpus writes as a note, read into the
