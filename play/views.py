@@ -3334,6 +3334,17 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         actor = scene.get(ref)
         if actor is None or actor.is_pc:
             return                       # back to the player; stop and wait for input
+        # A creature holding its ground neither attacks nor flees while it holds
+        # (`state.holding-ground`, playtest 2026-09-30 item 8): its turn is that, said,
+        # and no model is asked to invent a reason it would do otherwise. The engine
+        # lifts the stance the moment the fight reaches it, so this is the guard for
+        # the creature that is in the order without being in the fight.
+        from rules.states import HOLDING_GROUND
+
+        if actor.has_state(HOLDING_GROUND):
+            c.transcript.append({"who": "gm", "kind": "consequence",
+                                 "text": f"The {actor.name} holds its ground."})
+            continue
 
         engine = c.engine()
         agent.engine = engine

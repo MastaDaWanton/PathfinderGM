@@ -70,6 +70,14 @@ def zone_for_feet(feet: int) -> str:
     return "far"
 
 
+def _the_creature(name: str) -> str:
+    """"The Clockwork Spy": a bestiary creature met in the wild is a kind of thing, not a
+    proper name, and `names.with_articles` leaves capitalised names alone — so the stance
+    tells put the article on themselves rather than print "Clockwork Spy holds…"."""
+    name = " ".join(str(name or "").split())
+    return name if re.match(r"(?i)(the|a|an)\b", name) else f"The {name}"
+
+
 def _sentence(name: str) -> str:
     """A name at the start of a sentence. Ships and keepers carry their article — "the
     Cold Widow" — and a tell that opens with a lower-case "the" reads as a typo."""
@@ -2854,6 +2862,9 @@ class Engine:
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
         resolution.outcomes.extend(self._articled(o) for o in self._settle_talk())
+        # A creature holding its ground answers what this batch did: struck, closed on,
+        # or gone — and a find it was sitting on is paid once it has gone.
+        resolution.outcomes.extend(self._holding_ground_settles())
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -3154,6 +3165,11 @@ class Engine:
         handler = getattr(self, f"_op_{intent.op}", None)
         if handler is None:
             raise IntentError(f"no handler for op {intent.op!r}", "schema")
+        # A creature holding its ground does not attack or walk off on a plan's say-so
+        # (`state.holding-ground`; playtest 2026-09-30, item 8).
+        held = self._holding_refusal(intent)
+        if held:
+            return self._articled(self._refuse(intent, held))
         return self._articled(handler(intent, partial))
 
     def _articled(self, outcome):
@@ -8704,7 +8720,7 @@ class Engine:
         enc = gathering.roll(biome, max(1, int(level)), self.dice)
         if enc.kind == "quiet":
             return ""
-        clause = " " + gathering.describe(enc, what)
+        clause = " " + gathering.describe(enc, what, biome)
         effects.append({"kind": "gathering", "encounter": enc.kind, "roll": enc.roll,
                         "creature": (enc.creature or {}).get("name", ""),
                         "aggressive": enc.aggressive})
@@ -8724,16 +8740,163 @@ class Engine:
         self.scene.positions.pop(ref, None)
         if self.scene.grid is not None and self.scene.positions:
             self.scene.place_by_zone([ref])
-        if enc.kind == "guarded":
+        # The ref travels with the record, so the excursion's scene call can find the
+        # creature it is setting without matching a name against the room.
+        effects[-1]["ref"] = ref
+        if enc.aggressive and enc.kind == "creature":
+            effects[-1]["stance"] = clause.strip()
+            if pc is not None and actor.ref == pc.ref:
+                self._ensure_encounter(pc.ref, target=ref)
+            return clause
+        # Everything else that turns up stays where it is: the guardian on its find, and
+        # (owner ruling D1, 2026-09-30) the creature that "has the ground you wanted" on
+        # the patch it was sitting on. Until this the second was a clause in a tell —
+        # "a Clockwork Spy has the ground you wanted, and has not moved off it", which
+        # the owner could not parse — and nothing anywhere held it there: the planner
+        # never heard of it and the patch was simply gone.
+        spot = gathering.spot_for(what, biome)
+        times = enc.yield_times if enc.kind == "guarded" else 1
+        booked_found = {iid: int(n) * times for iid, n in (found or {}).items() if int(n)}
+        booked_stock = [dict(s, count=int(s.get("count", 1)) * times)
+                        for s in (stock or []) if int(s.get("count", 1))]
+        stance = self._hold_ground(ref, spot, f"gathering:{what}@"
+                                          f"{self.scene.clock_minutes}")
+        clause += " " + stance
+        # What the excursion's scene call is grounded in, as the engine said it.
+        effects[-1].update(stance=stance, spot=spot)
+        if booked_found or booked_stock:
+            # The patch is booked as an engine record, paid by `_settle_guarded_finds`
+            # once the creature is dead or gone and the player is still HERE (`at`).
             self.scene.guarded_finds.append({
-                "guard": ref, "what": f"{what} find",
-                "found": {iid: int(n) * enc.yield_times for iid, n in (found or {}).items()},
-                "stock": [dict(s, count=int(s.get("count", 1)) * enc.yield_times)
-                          for s in (stock or [])],
+                "guard": ref, "guard_name": enc.creature["name"],
+                "what": f"{what} find" if enc.kind == "guarded" else spot,
+                "found": booked_found, "stock": booked_stock,
+                "at": self.scene.at,
             })
-        elif enc.aggressive and pc is not None and actor.ref == pc.ref:
-            self._ensure_encounter(pc.ref, target=ref)
+            if enc.kind == "creature":
+                clause += f" The {spot} it holds is yours once it has gone."
         return clause
+
+    def _hold_ground(self, ref: str, spot: str, source: str) -> str:
+        """Put a creature on the ground it holds, through the one applicator. Returns
+        the tell.
+
+        The stance is `state.holding-ground` (rules/states.py), carried as a condition
+        effect so the brief's "Conditions:" line, the sheet and the NPC loop all see it
+        without a line of their own. `payload.zone` is how close the player was when it
+        took the ground, so `_holding_ground_settles` can tell a player who has CLOSED
+        on it from one who has merely stayed put.
+        """
+        who = self.scene.actors.get(ref)
+        if who is None:
+            return ""
+        who.apply_effect(ActiveEffect(
+            name="Holding its ground", kind="condition", key=states.HOLDING_GROUND_KEY,
+            source=source, origin="rule:gathering", duration="until-dismissed",
+            tags=states.tags_for(states.HOLDING_GROUND_KEY),
+            payload={"spot": spot, "zone": self.scene.zones.get(ref, "far")}))
+        return (f"{_the_creature(who.name)} holds the ground between you and the {spot}; it neither "
+                f"comes at you nor gives way.")
+
+    # How close each zone is, for "has the player closed on it?" (intents.ZONES order).
+    _CLOSENESS = {"far": 0, "near": 1, "engaged": 2}
+
+    def _holding_refusal(self, intent: Intent) -> str:
+        """Why a creature holding its ground does not do this, or "".
+
+        The engine disposing: a plan that has the creature attack, or walk off, while it
+        holds is refused in words — a printable refusal, not an IntentError, because a
+        legality raise regenerates rather than repairs (the comment above the condition
+        guard in `_check_legality`). Only the creature's OWN act: the player moving it,
+        or anyone else's intent naming it, is not its choice.
+        """
+        if intent.op not in ("attack", "move", "travel"):
+            return ""
+        actor = self.scene.actors.get(intent.actor or "")
+        if actor is None or actor.is_pc or not actor.has_state(states.HOLDING_GROUND):
+            return ""
+        if intent.op == "move" and (intent.params.get("who") or intent.actor) != actor.ref:
+            return ""
+        return (f"{_the_creature(actor.name)} is holding its ground: it neither comes at you nor gives "
+                f"way unless you strike it or close on it.")
+
+    def _holding_ground_settles(self) -> list[Outcome]:
+        """After a batch: what becomes of every creature holding its ground here.
+
+        Two rules lift the stance, each with a tell:
+
+        * **Drawn into a fight.** On a side of an encounter — struck, or the fight came
+          to it — it is fighting, and the fight's own rules take over.
+        * **Closed on.** The player came nearer than they were when it took the ground,
+          and the creature answers with a reaction roll: 2d6 plus the player's Charisma
+          modifier, read on the old games' table (B/X Basic, Moldvay 1981: 2 immediate
+          attack, 3-5 hostile, 6-8 uncertain, 9-11 no attack — leaves or considers
+          offers, 12 friendly). Collapsed to three answers because the stance already IS
+          the uncertain band: 5 or less, it comes at you (the fight opens from its side);
+          6-8, it holds and watches (Holmes's "roll again" — the next step closer rolls
+          again); 9 or more, it gives way and leaves. 3e and Pathfinder dropped the roll
+          for attitudes and Diplomacy, which this keeps for anything the player says to
+          it; the roll answers only the body coming closer.
+
+        Then any booked find whose guard is dead or gone is paid, here and now, when
+        no fight is running (the fight's own end pays the rest).
+        """
+        out: list[Outcome] = []
+        pc = self.scene.pc()
+        if pc is None:
+            return out
+        for ref, who in list(self.scene.actors.items()):
+            if who.is_pc or not who.has_state(states.HOLDING_GROUND):
+                continue
+            held = next((e for e in who.effects
+                         if any(states.matches(t, states.HOLDING_GROUND) for t in e.tags)),
+                        None)
+            if held is None:
+                continue
+            fighting = any(ref in refs for refs in self.scene.sides.values())
+            if who.is_down or fighting:
+                who.remove_effects(match=lambda e: e is held)
+                if not who.is_down:
+                    out.append(Outcome(
+                        intent_id="", op="stance",
+                        effects=[{"ref": ref, "kind": "stance", "lifted": "fight"}],
+                        tell=f"{_the_creature(who.name)} stops holding its ground: it is in the fight now.",
+                        because="the fight reached it"))
+                continue
+            was = self._CLOSENESS.get(str(held.payload.get("zone") or "far"), 0)
+            now = self._CLOSENESS.get(str(self.scene.zones.get(ref) or "far"), 0)
+            if now <= was:
+                continue
+            held.payload = dict(held.payload, zone=self.scene.zones.get(ref))
+            roll = self.dice.roll("2d6", label=f"how {who.name} takes your coming",
+                                  visibility="hidden").total
+            total = roll + pc.ability_mod("cha")
+            spot = str(held.payload.get("spot") or "ground")
+            effect = {"ref": ref, "kind": "stance", "reaction": total, "roll": roll}
+            if total <= 5:
+                who.remove_effects(match=lambda e: e is held)
+                effect["lifted"] = "hostile"
+                self._ensure_encounter(ref, target=pc.ref)
+                tell = (f"{_the_creature(who.name)} stops holding its ground as you close, and comes "
+                        f"at you.")
+            elif total <= 8:
+                effect["lifted"] = ""
+                tell = (f"{_the_creature(who.name)} does not give way as you come closer; it keeps the "
+                        f"{spot} and watches you.")
+            else:
+                who.remove_effects(match=lambda e: e is held)
+                effect["lifted"] = "gave way"
+                tell = f"{_the_creature(who.name)} gives way as you close and leaves the {spot} to you."
+                self.scene.remove(ref)
+            out.append(Outcome(intent_id="", op="stance", effects=[effect], tell=tell,
+                               because="the player closed on it"))
+        if not self.scene.in_encounter:
+            line = self._settle_guarded_finds().strip()
+            if line:
+                out.append(Outcome(intent_id="", op="stance",
+                                   effects=[{"kind": "guarded_find", "claimed": True}],
+                                   tell=line, because="its guard is gone"))
+        return out
 
     def _op_prospect(self, intent: Intent, partial: dict) -> Outcome:
         """Search the ground here for what can be dug out of it.
@@ -12058,6 +12221,14 @@ class Engine:
             return ""
         kept, lines = [], []
         for g in self.scene.guarded_finds:
+            # Only where it is. `actors` is who is HERE, so a party that walked away
+            # read the guard as "gone" and was paid for a find a day's walk behind it —
+            # harmless while only the end of a fight asked, and not once
+            # `_holding_ground_settles` asks after every batch (2026-09-30). A booking
+            # written before `at` existed pays as it always did.
+            if g.get("at") and g.get("at") != self.scene.at:
+                kept.append(g)
+                continue
             guard = self.scene.actors.get(g.get("guard", ""))
             if guard is not None and not guard.is_down and guard.hp > 0:
                 kept.append(g)
@@ -12072,7 +12243,10 @@ class Engine:
                                             craft=s.get("craft", "smithing")),
                              int(s.get("count", 1)))
                 got.append(f"{s.get('count', 1)}× {s['base']}")
-            lines.append(f" The {g.get('what', 'find')} is yours now: {', '.join(got)}.")
+            held_by = str(g.get("guard_name") or "")
+            lines.append(f" The {g.get('what', 'find')}"
+                         + (f" the {held_by} held" if held_by else "")
+                         + f" is yours now: {', '.join(got)}.")
         self.scene.guarded_finds = kept
         return "".join(lines)
 

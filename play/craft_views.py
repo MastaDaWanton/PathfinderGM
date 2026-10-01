@@ -745,30 +745,325 @@ def _forage_blocked(c) -> str:
     return c.engine()._too_busy_to_forage(pc)
 
 
-def _narrate(messages, cfg, *, as_json=False, num_predict=220):
+def _narrate(messages, cfg, *, as_json=False, num_predict=220, schema=None):
     """One short narration call, or None. The craft action must survive the model being
     down — a forage that cannot happen because Ollama is not running would be the bench
-    breaking immersion in the opposite direction."""
+    breaking immersion in the opposite direction.
+
+    `think=False` is load-bearing, as on every prose call in `gm/agent.py`. This was the
+    one chat call in the app without it (playtest 2026-09-30, item 8): on the owner's
+    thinking model a 140-token opening spent 140 of 140 tokens thinking and came back
+    with empty content, and 4 of 4 excursion narrations fell to their template floors.
+    """
     from gm import client as gm_client
 
     try:
         reply = gm_client.chat(
-            messages, cfg["model"], host=cfg["host"], as_json=as_json,
+            messages, cfg["model"], host=cfg["host"], as_json=as_json or schema is not None,
             temperature=0.85, timeout=90, num_predict=num_predict,
-            provider=cfg.get("provider", "ollama"), api_key=cfg.get("api_key", ""))
+            provider=cfg.get("provider", "ollama"), api_key=cfg.get("api_key", ""),
+            schema=schema, think=False)
         # `chat` returns a Reply, not a string — the first live forage wrote
         # "Reply(text='You push aside…', model='llama3.1:8b')" into the book verbatim.
-        return reply.json() if as_json else reply.text
+        return reply.json() if (as_json or schema is not None) else reply.text
     except Exception:
         return None
 
 
 def _forage_scene(c):
-    """Where and when, for the narrator's benefit."""
-    place = c.location.name if c.location else "the open country"
-    minutes = c.scene.clock_minutes
-    day, rem = minutes // 1440 + 1, minutes % 1440
-    return place, f"day {day}, {rem // 60} hours in"
+    """Where and when, for the narrator's benefit — in words, never a clock face.
+
+    The place is where the party STANDS (`Engine.here`), not the settlement: the opening
+    floor said "work away from Ledgerwarren" while the party stood at the outskirts
+    (playtest 2026-09-30, item 8). And the time is the part of the day: "day 1, 17 hours
+    in" was a number handed to a narrator that must never write one.
+    """
+    from rules import residency
+
+    here = c.engine().here()
+    town = c.location.name if c.location else ""
+    place = (getattr(here, "name", "") or town or "the open country")
+    return place, residency.day_part(c.scene.clock_minutes)
+
+
+def _town(c) -> str:
+    """The settlement's name, for "head back toward" — the place you came out of."""
+    return c.location.name if getattr(c, "location", None) else ""
+
+
+# --- the encounter met while foraging ---------------------------------------------------
+#
+# The owner's ask (playtest 2026-09-30, item 8): "an encounter found while foraging gets a
+# model call that sets the whole scene", with an example — a brass construct perched over
+# the thicket you were heading for, its glass eye whirring and focusing on you, holding its
+# ground without attacking or fleeing. What it printed instead was the engine's tell
+# template, "a Clockwork Spy has the ground you wanted, and has not moved off it", which
+# the owner could not parse.
+#
+# The shape is the one every fix that held used here: the engine decides (the creature,
+# where it is, its stance as a tell), code detects that there IS a creature, one call
+# writes the scene from those facts only, and code checks the result for the three things
+# the scene must not do — name somebody who does not exist, have the creature attack or
+# leave (the engine says it does neither), or state a number. A defect earns one
+# targeted repair naming it; a second failure takes the floor, which is written from the
+# same facts.
+
+_SCENE_SCHEMA = {"type": "object", "properties": {"narration": {"type": "string"}},
+                 "required": ["narration"]}
+
+# What the creature must not be the subject of: a blow (no blow has been rolled) or a
+# departure (the engine has it holding its ground). An adverb may sit between ("it
+# suddenly lunges"); a negation may not, so "it does not attack" passes as it should.
+#
+# Three families. A blow that LANDS is never the scene's to write, whatever the creature
+# is doing: no attack has been rolled. Going for you (a lunge, a charge) is refused only
+# of a creature holding its ground; one the rules sent at you may close. Leaving is
+# refused of both — the engine has it here.
+_LANDS = (r"strik(?:e|es|ing)|struck|bit(?:e|es|ing)|claw(?:s|ed|ing)?|slam(?:s|med|ming)?|"
+          r"sting(?:s|ing)?|hit(?:s|ting)?|swip(?:e|es|ed)|rak(?:e|es|ed)")
+_GOES_FOR = (r"attack(?:s|ed|ing)?|lung(?:e|es|ed|ing)|charg(?:e|es|ed|ing)|"
+             r"pounc(?:e|es|ed|ing)|spr(?:ing|ings|ang) at|leap(?:s|t|ed)? at|"
+             r"comes? (?:at|for)|rush(?:es|ed)? (?:at|toward|towards)")
+_LEAVES = (r"fle(?:e|es|d|eing)|bolt(?:s|ed)?|retreat(?:s|ed|ing)?|withdr(?:aw|aws|ew)|"
+           r"(?:runs?|ran|scurr(?:y|ies|ied)|darts?|darted|scuttles?|scuttled|backs?|"
+           r"backed|flies|flew|slips?|slipped) (?:off|away|back)|vanish(?:es|ed)?|"
+           r"disappear(?:s|ed)?|takes? (?:flight|wing)|leav(?:e|es|ing)")
+_NUMBER_WORDS = (r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+                 r"twenty|thirty|forty|fifty|hundred|dozen)\b")
+
+
+def _creature_words(name: str, row: dict) -> list[str]:
+    """Every way the prose can name the creature as a sentence subject."""
+    words = {name.lower(), "it", "the creature", "the thing", "the beast"}
+    parts = name.lower().split()
+    if parts:
+        words.add(parts[-1])
+    for key in ("creature_type", "subtype"):
+        v = str(row.get(key) or "").strip().lower()
+        if v:
+            words.add(v)
+    return sorted(words, key=len, reverse=True)
+
+
+def scene_defects(text: str, *, name: str, row: dict, known: set[str],
+                  holding: bool = True) -> list[str]:
+    """What is wrong with an encounter scene, each as a fix a repair call can act on.
+
+    Detected in code, never asked of the model: an invented name, the creature as the
+    subject of a blow or a departure, a number. Empty when the scene may stand.
+    """
+    import re
+
+    from gm import narration as narration_mod
+
+    out: list[str] = []
+    text = str(text or "")
+    if not text.strip():
+        return ["the scene is empty"]
+    for bad in narration_mod.invented_names(text, known):
+        out.append(f"\"{bad}\" names somebody or somewhere that does not exist here: "
+                   f"remove the name")
+    subject = "|".join(re.escape(w) for w in _creature_words(name, row))
+    verbs = "|".join((_LANDS, _GOES_FOR, _LEAVES) if holding else (_LANDS, _LEAVES))
+    rx = re.compile(rf"\b(?:the\s+)?(?:{subject})\s+(?:\w+ly\s+)?(?:{verbs})\b", re.I)
+    for m in rx.finditer(text):
+        out.append(
+            f"\"{m.group(0)}\": the {name} neither attacks nor leaves — it holds its "
+            f"ground. Rewrite that so it stays where it is" if holding else
+            f"\"{m.group(0)}\": no blow has landed and the {name} is not leaving. "
+            f"Rewrite that so it is still coming, nothing more")
+    for m in re.finditer(rf"\d+|{_NUMBER_WORDS}", text, re.I):
+        out.append(f"\"{m.group(0)}\" is a number: say it without one")
+    return out
+
+
+def _senses_words(row: dict) -> str:
+    """The creature's senses, with every number taken out: "darkvision 60 ft.,
+    low-light vision; Perception +0" is "darkvision, low-light vision"."""
+    import re
+
+    raw = str(row.get("senses") or "").split(";")[0]
+    parts = [re.sub(r"[\d.+\-]+\s*(?:ft\.?|feet)?", "", p).strip(" .,")
+             for p in raw.split(",")]
+    return ", ".join(p for p in parts if p and not p.lower().startswith("perception"))
+
+
+def _moves_words(row: dict) -> str:
+    """How it gets about, in words: the speed's kinds, never its feet."""
+    from rules import bestiary
+
+    try:
+        kinds = [k for k, v in bestiary.speeds(row).items() if v]
+    except Exception:
+        kinds = []
+    said = {"land": "on foot", "fly": "flies", "swim": "swims", "climb": "climbs",
+            "burrow": "burrows"}
+    return ", ".join(said.get(k, k) for k in kinds) or "on foot"
+
+
+def encounter_facts(c, enc: dict, haul: list[dict], place: str, when: str) -> dict:
+    """Everything the scene call may use, from the engine and the world, and nothing
+    else. Also what the floor is written from, so the two cannot disagree."""
+    from rules import bestiary, biomes, geography
+
+    who = c.scene.actors.get(str(enc.get("ref") or ""))
+    name = (who.name if who is not None else "") or str(enc.get("creature") or "")
+    row = {}
+    template = getattr(who, "from_template", "") if who is not None else ""
+    for key in (template, name):
+        if key:
+            row = bestiary.details(str(key).lower().replace(" ", "-")) or {}
+            if row:
+                break
+    land_near: list[str] = []
+    try:
+        if c.location is not None:
+            land = geography.land_around(c.world, c.location)
+            land_near = list(land.near)
+    except Exception:
+        land_near = []
+    ground = biomes.describe(c.biome) if c.biome else ""
+    return {
+        "name": name, "row": row,
+        "size": str(row.get("size") or "").lower(),
+        "kind": " ".join(x for x in (str(row.get("subtype") or "").lower(),
+                                     str(row.get("creature_type") or "").lower()) if x),
+        "organization": str(row.get("organization") or "").lower(),
+        "senses": _senses_words(row),
+        "moves": _moves_words(row),
+        "place": place, "town": _town(c), "when": when,
+        "ground": ground, "near": land_near,
+        "carried": [h["name"] for h in haul],
+        "spot": str(enc.get("spot") or "patch"),
+        "stance": str(enc.get("stance") or ""),
+        "holding": bool(who is not None and who.has_state("state.holding-ground")),
+    }
+
+
+def floor_scene(f: dict) -> str:
+    """The scene when the model is down or keeps getting it wrong: the same facts,
+    plainly. Better than the line it replaces because it says WHERE the creature is and
+    WHAT it is doing about you, which "has the ground you wanted" never did."""
+    a = "an" if f["name"][:1].lower() in "aeiou" else "a"
+    looks = " ".join(x for x in (f["size"], f["kind"]) if x)
+    looks = (f" — {'an' if looks[:1].lower() in 'aeiou' else 'a'} {looks}"
+             if looks else "")
+    alone = " and alone" if f["organization"] == "solitary" else ""
+    carried = (f"With the {', '.join(n.lower() for n in f['carried'][:2])} heavy in your "
+               f"satchel, you" if f["carried"] else "You")
+    if not f["holding"]:
+        return (f"{carried} straighten up — it is {f['when']} now — and see it: "
+                f"{a} {f['name']}{looks}{alone}, and it is coming for you.")
+    return (f"{carried} straighten up — it is {f['when']} now — and look toward the "
+            f"{f['spot']} you were making for. {a.title()} {f['name']} is there before "
+            f"you{looks}{alone}, set squarely between you and the {f['spot']}. It does "
+            f"not come at you, and it does not give way.")
+
+
+def _scene_messages(f: dict) -> list[dict]:
+    """The one scene call. Facts first, then one demonstration of the register about a
+    DIFFERENT creature on different ground, so the shape it teaches is "light, ground,
+    the creature as it looks, what it is doing" and not a construct's whirring eye — the
+    owner's own example would have been copied onto every frog and wolf after it."""
+    lines = [f"Where: {f['place']}" + (f", just outside {f['town']}"
+                                        if f["town"] and f["town"] != f["place"] else "")
+             + "."]
+    if f["ground"]:
+        lines.append(f"Underfoot: {f['ground'].lower()}.")
+    if f["near"]:
+        lines.append(f"The land close by: {', '.join(f['near'])}.")
+    lines.append(f"Time of day: {f['when']}.")
+    if f["carried"]:
+        lines.append(f"Already in the satchel from the hours of work: "
+                     f"{', '.join(f['carried'])}.")
+    lines.append(f"Where they were heading next: a {f['spot']} of the same.")
+    body = ", ".join(x for x in (f["size"], f["kind"]) if x)
+    lines.append(f"What is there: a {f['name']}" + (f" ({body})" if body else "")
+                 + (f", {f['organization']}" if f["organization"] else "") + ".")
+    if f["senses"]:
+        lines.append(f"Its senses: {f['senses']}.")
+    lines.append(f"How it moves: {f['moves']}.")
+    lines.append(f"What it is doing (the rules decided this): {f['stance']}")
+    return [
+        {"role": "system", "content": (
+            "You narrate a solo Pathfinder game. Answer as JSON: {\"narration\": \"...\"}. "
+            "Three to five sentences, second person, present tense: the moment the "
+            "character looks up from the work and sees what is there. Use only the facts "
+            "given; invent no names, no people and no places. No numbers. Do not decide "
+            "anything the character does, and do not end with a question.\n\n"
+            "The register, shown with a different creature on different ground:\n"
+            "The reeds thin where the bank drops to black water, and the light over the "
+            "marsh has gone the colour of weak tea. On the hummock beyond the pool you "
+            "were wading toward squats a giant frog, mottled and slick, its throat "
+            "pulsing slowly, one gold eye turned on you. It does not croak and it does "
+            "not move; it simply keeps the hummock, and the cress growing round it, "
+            "between itself and you.")},
+        {"role": "user", "content": "\n".join(lines)},
+    ]
+
+
+def _repair_messages(f: dict, text: str, defects: list[str]) -> list[dict]:
+    """The targeted repair: the passage, and only what was found wrong with it."""
+    return [
+        {"role": "system", "content": (
+            "You correct a passage of game narration. Answer as JSON: "
+            "{\"narration\": \"...\"}. Change only what each numbered problem names; "
+            "keep every other sentence as it is.")},
+        {"role": "user", "content": (
+            f"The passage:\n{text}\n\nProblems:\n"
+            + "\n".join(f"{i}. {d}." for i, d in enumerate(defects, 1)))},
+    ]
+
+
+def _known_for_scene(c, f: dict) -> set[str]:
+    """Every name the scene may use: the GM's own list (the world, the room, the
+    satchel) plus this creature and this ground."""
+    known: set[str] = set()
+    try:
+        from gm.agent import GMAgent
+
+        known |= GMAgent(c.world, c.engine())._known_names()
+    except Exception:
+        pass
+    known |= {f["name"], f["place"], f["town"], *f["carried"]}
+    pc = c.scene.pc()
+    if pc is not None:
+        known.add(pc.name)
+    return {k for k in known if k}
+
+
+def encounter_scene(c, enc: dict, haul: list[dict], place: str, when: str,
+                    cfg) -> tuple[str, list[str]]:
+    """The scene, and what was repaired or why the floor was taken (for the turn log)."""
+    import re
+
+    f = encounter_facts(c, enc, haul, place, when)
+    if not f["name"]:
+        return "", ["no creature to set"]
+    known = _known_for_scene(c, f)
+    notes: list[str] = []
+
+    def ask(messages) -> str:
+        got = _narrate(messages, cfg, schema=_SCENE_SCHEMA, num_predict=420)
+        text = str((got or {}).get("narration") or "").strip() if isinstance(got, dict) \
+            else ""
+        # The question is the table's to ask, once, after the scene ("What do you do?").
+        return re.sub(r"\s*[^.!?]*\?\s*$", "", text).strip()
+
+    def check(text: str) -> list[str]:
+        return scene_defects(text, name=f["name"], row=f["row"], known=known,
+                             holding=f["holding"])
+
+    text = ask(_scene_messages(f))
+    defects = check(text)
+    if defects and text:
+        notes.append("repaired: " + "; ".join(defects))
+        text = ask(_repair_messages(f, text, defects))
+        defects = check(text)
+    if defects:
+        notes.append("floor: " + "; ".join(defects))
+        text = floor_scene(f)
+    return text, notes
 
 
 def _fallen(c) -> list[dict]:
@@ -1187,13 +1482,17 @@ def craft_action(request):
                          "places. Never ask a question. Stop before anything is found."},
             {"role": "user",
              "content": f"{pc.name} sets out to forage for herbs. Terrain: {c.biome}. "
-                         f"Near {place}, {when}. They mean to spend {hours} hour(s) "
-                         f"searching. Narrate them beginning the search."},
-        ], cfg, num_predict=140)
+                         f"At {place}. Time of day: {when}. They mean to spend "
+                         f"{'an hour' if hours == 1 else 'some hours'} searching. "
+                         f"Narrate them beginning the search."},
+        ], cfg, num_predict=160)
         if not opening or not str(opening).strip():
-            opening = (f"You shoulder your satchel and work away from {place}, eyes on "
-                       f"the ground, the {c.biome} closing in around you. {hours} hour"
-                       f"{'s' if hours != 1 else ''} of searching lie ahead.")
+            # Where they STAND: "work away from Ledgerwarren" was printed while the party
+            # stood at the outskirts (item 8) — the settlement is not the place.
+            opening = (f"You shoulder your satchel at {place} and start on the "
+                       f"{c.biome} ground, eyes down. It is {when}, and "
+                       f"{'an hour' if hours == 1 else 'hours'} of searching lie "
+                       f"ahead.")
         opening = str(opening).strip()
         c.transcript.append({"who": "gm", "text": opening})
 
@@ -1237,8 +1536,30 @@ def craft_action(request):
     haul = [{"id": iid, "name": names.get(iid, iid), "count": n}
             for iid, n in sorted(found.items())]
 
+    # Where and when the excursion ENDS: the hours have passed.
+    place, when = _forage_scene(c)
+    # The encounter, detected in code off the engine's own record — never inferred from
+    # the tell's wording. Only a creature the engine actually put here earns a scene.
+    enc = next((e for o in resolution.outcomes for e in (o.effects or [])
+                if e.get("kind") == "gathering" and e.get("ref")
+                and e.get("encounter") in ("creature", "guarded")
+                and e.get("ref") in c.scene.actors), None)
+
     # 3. The finding, told before the tally, ending in the question and three answers.
+    # The closing prompt used to know nothing of the encounter, and the tell glued on
+    # after it said the creature "has the ground you wanted" — under a haul already in
+    # the satchel (item 8). The engine rolls the encounter AFTER the haul is carried, so
+    # the order the fiction is told in is the same: the hours of work, then making for
+    # one last patch, where the creature is. The closing stops at the walk; the scene
+    # call below sets what is there.
     listed = ", ".join(f"{h['count']}x {h['name']}" for h in haul) or "nothing"
+    if enc is not None:
+        heading = (f" When the work is done they make for one last {enc.get('spot') or 'patch'} "
+                   f"— end the narration as they head for it, before they see what is "
+                   f"there. A {enc.get('creature')} is there; the suggestions are three "
+                   f"things to do about it.")
+    else:
+        heading = ""
     closing_json = _narrate([
         {"role": "system",
          "content": "You narrate a solo Pathfinder game. Answer as JSON: "
@@ -1249,10 +1570,10 @@ def craft_action(request):
                      "The suggestions are three short next actions a player might take, "
                      "each under eight words, imperative."},
         {"role": "user",
-         "content": f"{pc.name} spent {hours} hour(s) foraging the {c.biome} near "
-                     f"{place} and found: {listed}. Narrate the finding, then suggest "
-                     f"three next actions."},
-    ], cfg, as_json=True, num_predict=260)
+         "content": f"{pc.name} spent {'an hour' if hours == 1 else 'some hours'} "
+                     f"foraging the {c.biome} at {place} and found: {listed}.{heading} "
+                     f"Narrate the finding, then suggest three next actions."},
+    ], cfg, as_json=True, num_predict=300)
 
     closing, suggestions = "", []
     if isinstance(closing_json, dict):
@@ -1272,22 +1593,63 @@ def craft_action(request):
                    "The hours pass in stooping and sifting, and the ground gives "
                    "nothing back. ")
         if haul:
+            # A dash before the tail: "dawnpetal, power leaf earth still on the roots"
+            # read as a herb called "power leaf earth" (item 8's transcript).
             closing += ("Piece by piece the satchel takes on weight: " +
                         ", ".join(h["name"].lower() for h in haul[:4]) +
-                        ("," if len(haul) > 4 else "") + " earth still on the roots.")
+                        (" and more" if len(haul) > 4 else "") +
+                        " — earth still on the roots.")
+    town = _town(c) or place
+    if enc is not None and len(suggestions) != 3:
+        suggestions = [f"Approach the {enc.get('creature')}", "Wait and watch it",
+                       f"Head back toward {town}"]
     if len(suggestions) != 3:
-        suggestions = ["Keep foraging", f"Head back toward {place}",
+        suggestions = ["Keep foraging", f"Head back toward {town}",
                        "Unpack the crafting bench"]
 
-    tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "Nothing gathered."
+    # No full stop of its own: the line below adds one, and "Nothing gathered.." was
+    # printed on the first live forage of 2026-09-30.
+    tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "nothing"
     c.transcript.append({"who": "gm", "kind": "consequence",
                          "text": f"{closing}\n\nGathered: {tally}. {tell}".strip()})
+    # 4. What is there, when something is: one grounded scene call, checked, with a
+    # floor written from the same facts.
+    scene, scene_notes = "", []
+    if enc is not None:
+        scene, scene_notes = encounter_scene(c, enc, haul, place, when, cfg)
+        if scene:
+            c.transcript.append({"who": "gm", "kind": "setup", "text": scene})
     c.transcript.append({"who": "gm", "text": "What do you do?"})
     c.suggestions = suggestions
+
+    # 5. The excursion reaches the model's memory. It wrote only the transcript, so the
+    # planner and narrator never saw either forage or the creature: measured on the
+    # owner's save, history jumped from the outskirts arrival straight to "I aprouch the
+    # clockwork Spy" (item 8). Written the way `pending_free` writes a thing done off
+    # the spoken path — the player's act as a bracketed user line, the table's answer as
+    # the assistant's — and logged as a resolution row like any other turn.
+    c.history.append({"role": "user", "content": (
+        f"(From the craft panel: {pc.name} forages "
+        f"{'for an hour' if hours == 1 else f'for {hours} hours'} at {place}.)")})
+    c.history.append({"role": "assistant", "content": " ".join(
+        x for x in (opening, closing, scene) if x).strip()})
+    entry = {"kind": "resolution", "door": "excursion",
+             "outcomes": [o.as_dict() for o in resolution.outcomes]}
+    if scene_notes:
+        entry["repairs"] = scene_notes
+    c.turn_log.append(entry)
+    try:
+        from play.views import _remember
+
+        _remember(c, resolution, "")
+    except Exception:  # noqa: BLE001 — the ledger is a convenience, never the turn
+        import logging
+
+        logging.getLogger("pathfindergm").exception("the excursion's ledger note failed")
     c.save()
 
     return JsonResponse({
-        "opening": opening, "closing": closing, "tell": tell,
+        "opening": opening, "closing": closing, "tell": tell, "scene": scene,
         "found": haul, "rolls": rolls, "checks": checks, "hours": hours,
         "suggestions": suggestions,
         "clock_minutes": c.scene.clock_minutes,

@@ -311,6 +311,33 @@ def scale(dice: str, potency: float) -> str:
     return f"{count}d{sides}"
 
 
+# The bonus families a chain's potency raises (dice are `scale`'s).
+SCALED_BONUSES = ("save_mod", "skill_mod", "ability_mod", "combat_mod")
+
+
+def scaled_bonus(amount, potency: float) -> int:
+    """A flat bonus at the strength a brew of this potency delivers. The ONE reader.
+
+    Potency scales benefits the way it scales dice — the author's distill rule is about
+    the primary effect, not only the numbered ones — and rounds up, per the house
+    rounding. Penalties are left alone: a stronger brew is not a worse one.
+
+    One function because two readers disagreed (playtest 2026-09-30, the Power leaf
+    aside): the owner's homebrew leaf says +20 Str and +20 Con, the brewed tea's card
+    printed "+20 Strength", and drinking it landed +26 — a herbalist's brew is potency
+    1.30 (brew +25%, +5% per herbalist level) and this rule applied it, while the card
+    was rendered from the unscaled spec. The card now asks this function too
+    (`crafting.sift(potency=...)`), so the number on the jar is the number that lands.
+    """
+    try:
+        amount = int(str(amount if amount is not None else 0).strip() or 0)
+    except ValueError:
+        return 0
+    if amount > 0 and potency > 1.0:
+        amount = int(amount * potency + 0.999)
+    return amount
+
+
 def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> list[dict]:
     """One structured effect as engine intents, or [] if the engine cannot run it."""
     kind = str(spec.get("type", ""))
@@ -345,13 +372,8 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                                   "unit": duration.get("unit", "round")}
         return [{"op": "condition", "because": because, "params": params}]
 
-    if kind in ("save_mod", "skill_mod", "ability_mod", "combat_mod"):
-        amount = int(spec.get("amount", 0) or 0)
-        # Potency scales benefits the way it scales dice — the author's distill rule is
-        # about the primary effect, not only the numbered ones — and rounds up, per the
-        # house rounding. Penalties are left alone: a stronger brew is not a worse one.
-        if amount > 0 and potency > 1.0:
-            amount = int(amount * potency + 0.999)
+    if kind in SCALED_BONUSES:
+        amount = scaled_bonus(spec.get("amount", 0), potency)
         out = [{"op": "buff", "actor": target, "because": because,
                 "params": {"type": kind, "target": spec.get("target", ""),
                            "amount": amount, "to": target,
