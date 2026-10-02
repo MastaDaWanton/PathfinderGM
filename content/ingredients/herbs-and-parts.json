@@ -137,7 +137,7 @@
       "craft_dc": 15,
       "source": "",
       "harvesting": "",
-      "text": "A grape vine elven wizards bred to glow like a candle and to feed a traveller. A handful of the pale fruit is a meal's worth of strength: 1d6 temporary hit points for an hour, and the weariness of the road (fatigue) lifts. Wine and tea pressed from them carry the same virtue.",
+      "text": "A grape vine elven wizards bred to glow like a candle and to feed a traveller. A handful of the pale fruit is a meal's worth of strength: 1d6 temporary hit points and a +2 alchemical bonus on Fortitude saves against hunger, thirst and fatigue, for an hour. Wine and tea pressed from them carry the same virtue.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -157,8 +157,15 @@
           "route": "ingest"
         },
         {
-          "type": "remove_condition",
-          "target": "fatigued",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against hunger, thirst and fatigue",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -175,7 +182,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake. It ends fatigue at once. The jitters cost focus: a -2 penalty on Perception checks for 8 hours.",
+      "text": "A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake: a +2 alchemical bonus on Fortitude saves against fatigue and sleep for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -186,8 +193,15 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "fatigued",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against fatigue and sleep",
+          "duration": {
+            "amount": "8",
+            "unit": "hour"
+          },
           "route": "ingest"
         },
         {
@@ -248,7 +262,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Pressed fresh on a wound as a poultice, amaranth stops bleeding and heals 1d4 hit points. Dried, it keeps for the road.",
+      "text": "Pressed fresh on a wound as a poultice, amaranth closes it: it heals 1d4 hit points. Dried, it keeps for the road.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -261,11 +275,6 @@
         {
           "type": "heal",
           "dice": "1d4",
-          "route": "wound"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "wound"
         }
       ],
@@ -946,7 +955,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Leaves and flowers, pulped and boiled, make a draught for breaking fevers. It ends the sickened condition and gives a +2 alchemical bonus on Fortitude saves against illness and poison for an hour.",
+      "text": "Leaves and flowers, pulped and boiled, make a draught for breaking fevers. It heals 1d3 non-lethal damage and gives a +2 alchemical bonus on Fortitude saves against illness and poison for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -969,8 +978,9 @@
           "route": "ingest"
         },
         {
-          "type": "remove_condition",
-          "target": "sickened",
+          "type": "heal",
+          "dice": "1d3",
+          "lethality": "nonlethal",
           "route": "ingest"
         }
       ],
@@ -1519,7 +1529,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The flowers brew into a draught that loosens a paralysis and restores strength: it ends the paralyzed condition and gives a +1 alchemical bonus to Strength for an hour.",
+      "text": "The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -1530,8 +1540,15 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "paralyzed",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against paralysis",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         },
         {
@@ -1595,7 +1612,7 @@
       "craft_dc": 15,
       "source": "",
       "harvesting": "",
-      "text": "The root boils down into titan gum, a glue that holds two objects until a DC 20 Strength check parts them. Spread thin over a gash, the same gum seals it: it stops bleeding and heals 1d6 hit points.",
+      "text": "The root boils down into titan gum, a glue that holds two objects until a DC 20 Strength check parts them. Spread thin over a gash, the same gum seals it and heals 1d6 hit points.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -1609,11 +1626,6 @@
           "type": "narrative",
           "target": "Titan gum bonds two objects; a DC 20 Strength check parts them",
           "route": "external"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
-          "route": "wound"
         },
         {
           "type": "heal",
@@ -1634,7 +1646,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy: fatigue ends and Strength gains a +2 alchemical bonus for an hour. The restless mind takes a -1 penalty on Will saves for the hour.",
+      "text": "Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy: a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -1656,8 +1668,15 @@
           "route": "ingest"
         },
         {
-          "type": "remove_condition",
-          "target": "fatigued",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against fatigue",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         },
         {
@@ -1878,7 +1897,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A flower with a stench that fouls the air for sixty feet: a -2 penalty on everything while in it, for those who must stay (alchemy's use). Its sap, swallowed raw, gives +5 on saves against poison for 10 rounds, and a preserved pod is a purgative that ends the sickened condition. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea.",
+      "text": "A flower with a stench that fouls the air for sixty feet: a -2 penalty on everything while in it, for those who must stay (alchemy's use). Its sap, swallowed raw, gives +5 on saves against poison for 10 rounds, and a preserved pod is a purgative, a +2 alchemical bonus on Fortitude saves against ingested poison for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -1924,8 +1943,15 @@
           "route": "inhale"
         },
         {
-          "type": "remove_condition",
-          "target": "sickened",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against ingested poison",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -2029,7 +2055,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Cured orange petals steeped in hot water make a mild, fragrant tea for deep sleep. A cup before a rest ends fatigue and heals 1d4 non-lethal damage. One dose serves six.",
+      "text": "Cured orange petals steeped in hot water make a mild, fragrant tea for deep sleep. A cup before a rest heals 1d4 non-lethal damage and gives a +1 alchemical bonus on Fortitude saves against fatigue for 8 hours. One dose serves six.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2040,14 +2066,21 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "fatigued",
-          "route": "ingest"
-        },
-        {
           "type": "heal",
           "dice": "1d4",
           "lethality": "nonlethal",
+          "route": "ingest"
+        },
+        {
+          "type": "save_mod",
+          "amount": 1,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against fatigue",
+          "duration": {
+            "amount": "8",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -2105,7 +2138,7 @@
       "craft_dc": 25,
       "source": "",
       "harvesting": "",
-      "text": "The bark makes oakdeath, a liquid that raises a poison's DC by 2 if added in the hour before it is used (alchemy's use). Ground and packed into a wound, the astringent bark stops bleeding and heals 2d4 hit points; it is also a salve base.",
+      "text": "The bark makes oakdeath, a liquid that raises a poison's DC by 2 if added in the hour before it is used (alchemy's use). Ground and packed into a wound, the astringent bark heals 2d4 hit points; it is also a salve base.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -2126,11 +2159,6 @@
         {
           "type": "heal",
           "dice": "2d4",
-          "route": "wound"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "wound"
         }
       ],
@@ -2435,7 +2463,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Known only for its stink. Snap a dried section under someone's nose and the fumes shock them alert: it ends the dazed condition and gives 1d4 temporary hit points for a minute, enough to get them out of danger.",
+      "text": "Known only for its stink. Snap a dried section under someone's nose and the fumes shock them alert: 1d4 temporary hit points and a +2 alchemical bonus on Fortitude saves against being stunned or dazed, for a minute, long enough to get them out of danger.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2446,13 +2474,20 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "dazed",
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": "1",
+            "unit": "minute"
+          },
           "route": "inhale"
         },
         {
-          "type": "temp_hp",
-          "dice": "1d4",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against being stunned or dazed",
           "duration": {
             "amount": "1",
             "unit": "minute"
@@ -2568,7 +2603,7 @@
       "craft_dc": 20,
       "source": "",
       "harvesting": "",
-      "text": "A tropical mushroom for fevers, mixed with cool mud and pressed to the head. The compress ends the sickened condition and gives a +2 alchemical bonus on Fortitude saves against non-magical disease for a day.",
+      "text": "A tropical mushroom for fevers, mixed with cool mud and pressed to the head. The compress heals 1d4 non-lethal damage and gives a +2 alchemical bonus on Fortitude saves against non-magical disease for a day.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2590,8 +2625,9 @@
           "route": "skin"
         },
         {
-          "type": "remove_condition",
-          "target": "sickened",
+          "type": "heal",
+          "dice": "1d4",
+          "lethality": "nonlethal",
           "route": "skin"
         }
       ],
@@ -2608,7 +2644,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Eaten like lettuce or brewed for sleep. Five fresh leaves, chewed, calm a frightened heart: they end the shaken condition and give a +2 alchemical bonus on Will saves against fear for an hour.",
+      "text": "Eaten like lettuce or brewed for sleep. Five fresh leaves, chewed, calm a frightened heart: a +2 alchemical bonus on Will saves against fear for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2628,11 +2664,6 @@
             "amount": "1",
             "unit": "hour"
           },
-          "route": "ingest"
-        },
-        {
-          "type": "remove_condition",
-          "target": "shaken",
           "route": "ingest"
         }
       ],
@@ -2913,7 +2944,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The leaves of this creeper ooze an oil that raises red, itching splotches. Rubbed on deliberately, the sting drives weariness off: it ends fatigue, and the itch leaves the user sickened for a minute.",
+      "text": "The leaves of this creeper ooze an oil that raises red, itching splotches. Rubbed on deliberately, the sting keeps a sentry sharp: a +2 alchemical bonus on Perception checks for an hour, and sickened for the first minute.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2924,8 +2955,15 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "fatigued",
+          "type": "skill_mod",
+          "amount": 2,
+          "target": "perception",
+          "bonus_type": "alchemical",
+          "note": "while the itch lasts",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "skin"
         },
         {
@@ -3591,7 +3629,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Powdered and sprinkled on an object, the leaves ritually purify it (alchemy's use). Packed into a cut, the same powder stops bleeding.",
+      "text": "Powdered and sprinkled on an object, the leaves ritually purify it (alchemy's use). Packed into a cut, the same powder closes it, healing 1d3 hit points.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3614,8 +3652,8 @@
           "route": "external"
         },
         {
-          "type": "remove_condition",
-          "target": "bleed",
+          "type": "heal",
+          "dice": "1d3",
           "route": "wound"
         }
       ],
@@ -3781,7 +3819,7 @@
       "craft_dc": 35,
       "source": "",
       "harvesting": "",
-      "text": "The key to icewalker oil, which lets the wearer climb ice and snow like a spider for 10 minutes (alchemy's use). Steeped and drunk, the petals carry the cold away: resist cold 10 for an hour.",
+      "text": "The key to icewalker oil, which lets the wearer climb ice and snow like a spider, a climb speed of 20 feet for 10 minutes (alchemy's use). Steeped and drunk, the petals carry the cold away: resist cold 10 for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -4226,17 +4264,6 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "ability_mod",
-          "amount": 2,
-          "target": "str",
-          "bonus_type": "morale",
-          "duration": {
-            "amount": "1",
-            "unit": "minute"
-          },
-          "route": "ingest"
-        },
-        {
           "type": "save_gate",
           "dc": 18,
           "note": "the source names a DC without saying which save",
@@ -4255,6 +4282,17 @@
         {
           "type": "apply_condition",
           "target": "confused",
+          "route": "ingest"
+        },
+        {
+          "type": "ability_mod",
+          "amount": 2,
+          "target": "str",
+          "bonus_type": "morale",
+          "duration": {
+            "amount": "1",
+            "unit": "minute"
+          },
           "route": "ingest"
         }
       ],
@@ -4493,7 +4531,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A plant of the Elemental Plane of Earth that grows in rock-like rings over buried kings, held holy by commoners. An ounce of its sap, laid on a wound, stops bleeding and heals 1d6 hit points. What the ring does to the dead is not a herbalist's to command. The sap thickens a salve.",
+      "text": "A plant of the Elemental Plane of Earth that grows in rock-like rings over buried kings, held holy by commoners. An ounce of its sap, laid on a wound, closes it and heals 1d6 hit points. What the ring does to the dead is not a herbalist's to command. The sap thickens a salve.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -4509,11 +4547,6 @@
         {
           "type": "heal",
           "dice": "1d6",
-          "route": "wound"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "wound"
         },
         {
@@ -4800,7 +4833,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Lilies that reach into the Elemental Plane of Water and pour pure, sweet water from their blossoms, fifty gallons a day. A cup of that water heals 1d4 non-lethal damage and ends fatigue. A dead lotus kept in water is a blight, thrown like a grenade: a DC 12 Fortitude save or 2d6 Constitution damage (alchemy's use).",
+      "text": "Lilies that reach into the Elemental Plane of Water and pour pure, sweet water from their blossoms, fifty gallons a day. A cup of that water heals 1d4 non-lethal damage and gives a +2 alchemical bonus on Fortitude saves against heat and thirst for an hour. A dead lotus kept in water is a blight, thrown like a grenade: a DC 12 Fortitude save or 2d6 Constitution damage (alchemy's use).",
       "risky": true,
       "biomes_inferred": false,
       "biomes": [
@@ -4829,8 +4862,15 @@
           "route": "ingest"
         },
         {
-          "type": "remove_condition",
-          "target": "fatigued",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against heat and thirst",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -4914,7 +4954,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A thick stalk of temperate forests that weeps white sap when broken. Laid on an open wound, the sap stops bleeding and heals 1d4 hit points. It loses its strength within hours in the air; sealed in soft wax it keeps, and it thickens a salve.",
+      "text": "A thick stalk of temperate forests that weeps white sap when broken. Laid on an open wound, the sap closes it and heals 1d4 hit points. It loses its strength within hours in the air; sealed in soft wax it keeps, and it thickens a salve.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -4929,11 +4969,6 @@
         {
           "type": "heal",
           "dice": "1d4",
-          "route": "wound"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "wound"
         }
       ],
@@ -4993,7 +5028,7 @@
       "craft_dc": 20,
       "source": "",
       "harvesting": "",
-      "text": "Crushed and worked into a thick paste called gash glue (DC 20), carried by soldiers to seal a fallen friend's wounds. One application stops bleeding and heals 1d6 hit points, enough to bring the dying back.",
+      "text": "Crushed and worked into a thick paste called gash glue (DC 20), carried by soldiers to seal a fallen friend's wounds. One application heals 1d6 hit points, enough to bring most of the dying back.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -5002,11 +5037,6 @@
       "forageable": true,
       "hybrid": false,
       "effects": [
-        {
-          "type": "remove_condition",
-          "target": "bleed",
-          "route": "wound"
-        },
         {
           "type": "heal",
           "dice": "1d6",
@@ -5063,7 +5093,7 @@
       "craft_dc": 35,
       "source": "",
       "harvesting": "",
-      "text": "Pulped and mixed with a poison, orticusp makes night venom, which drops its victim into slumber (alchemy's use). In a cup by itself it is the deepest rest there is: it ends exhaustion and heals 2d6 non-lethal damage.",
+      "text": "Pulped and mixed with a poison, orticusp makes night venom, which drops its victim into slumber (alchemy's use). In a cup by itself it is the deepest rest there is: it heals 2d6 non-lethal damage and gives a +3 alchemical bonus on Fortitude saves against fatigue and exhaustion for 8 hours.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -5079,14 +5109,21 @@
           "route": "external"
         },
         {
-          "type": "remove_condition",
-          "target": "exhausted",
-          "route": "ingest"
-        },
-        {
           "type": "heal",
           "dice": "2d6",
           "lethality": "nonlethal",
+          "route": "ingest"
+        },
+        {
+          "type": "save_mod",
+          "amount": 3,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against fatigue and exhaustion",
+          "duration": {
+            "amount": "8",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -5103,7 +5140,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A pungent mint. Brewed weak, the leaves settle the stomach and end the sickened condition. Rubbed on the skin they keep vermin off: a +1 alchemical bonus on Fortitude saves against vermin and their bites for an hour.",
+      "text": "A pungent mint. Brewed weak, the leaves settle the stomach: a +2 alchemical bonus on Fortitude saves against nausea and stomach poisons for an hour. Rubbed on the skin they keep vermin off, +1 on Fortitude saves against vermin and their bites for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -5114,8 +5151,15 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "sickened",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against nausea and stomach poisons",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         },
         {
@@ -5535,7 +5579,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The body, powdered and brewed, makes a draught against venom: it ends the sickened condition and gives a +2 alchemical bonus on Fortitude saves against poison for an hour.",
+      "text": "The body, powdered and brewed, makes a draught against venom: a +2 alchemical bonus on Fortitude saves against poison for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -5555,11 +5599,6 @@
             "amount": "1",
             "unit": "hour"
           },
-          "route": "ingest"
-        },
-        {
-          "type": "remove_condition",
-          "target": "sickened",
           "route": "ingest"
         }
       ],
@@ -5704,7 +5743,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A small green plant of temperate lowlands. A dose ends the sickened condition and gives a +2 alchemical bonus on Fortitude saves against altitude sickness for 4 hours. Dried, it keeps for a year.",
+      "text": "A small green plant of temperate lowlands. A dose gives a +2 alchemical bonus on Fortitude saves against altitude sickness for 4 hours. Dried, it keeps for a year.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -5713,11 +5752,6 @@
       "forageable": true,
       "hybrid": false,
       "effects": [
-        {
-          "type": "remove_condition",
-          "target": "sickened",
-          "route": "ingest"
-        },
         {
           "type": "save_mod",
           "amount": 2,
@@ -5744,7 +5778,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Dangerous to touch: each part of the orchid carries its own contact poison, a DC 17 save or Intelligence and Constitution damage. Picked and handled fast, it becomes safe, and a measured taste of the neutral flesh hardens the body against toxins: a +2 alchemical bonus on Fortitude saves against poison for an hour.",
+      "text": "Dangerous to touch: each part of the orchid carries its own contact poison, a DC 17 save or 1d4 Intelligence and 1d4 Constitution damage from the leaves, and 2d6 Constitution damage from the seeds. Picked and handled fast, it becomes safe, and a measured taste of the neutral flesh hardens the body against toxins: a +2 alchemical bonus on Fortitude saves against poison for an hour.",
       "risky": true,
       "biomes_inferred": false,
       "biomes": [
@@ -5753,18 +5787,6 @@
       "forageable": true,
       "hybrid": false,
       "effects": [
-        {
-          "type": "save_mod",
-          "amount": 2,
-          "target": "fort",
-          "bonus_type": "alchemical",
-          "note": "against poison",
-          "duration": {
-            "amount": "1",
-            "unit": "hour"
-          },
-          "route": "ingest"
-        },
         {
           "type": "ability_damage",
           "target": "int",
@@ -5788,6 +5810,18 @@
           "dc": 17,
           "note": "the source names a DC without saying which save",
           "route": "skin"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against poison",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -5803,7 +5837,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Sterilized and dried, the moss makes a clean dressing. Bound on a wound it stops bleeding and heals 1d4 hit points; it must be changed every three days.",
+      "text": "Sterilized and dried, the moss makes a clean dressing. Bound on a wound it heals 1d4 hit points; it must be changed every three days.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -5816,11 +5850,6 @@
         {
           "type": "heal",
           "dice": "1d4",
-          "route": "wound"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "wound"
         }
       ],
@@ -5883,7 +5912,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A tree that grows up for half its life and then shrinks back into the ground. Its acorns make cheap potions of enlarging (alchemy's use). The bark, boiled into a tea, purges parasites: it ends the sickened condition and gives a +2 alchemical bonus on Fortitude saves against parasites and disease for an hour. Ground, the bark is a salve base.",
+      "text": "A tree that grows up for half its life and then shrinks back into the ground. Its acorns make cheap potions of enlarging (alchemy's use). The bark, boiled into a tea, purges parasites: a +2 alchemical bonus on Fortitude saves against parasites and disease for an hour. Ground, the bark is a salve base.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -5911,11 +5940,6 @@
             "amount": "1",
             "unit": "hour"
           },
-          "route": "ingest"
-        },
-        {
-          "type": "remove_condition",
-          "target": "sickened",
           "route": "ingest"
         }
       ],
@@ -6320,7 +6344,7 @@
       "craft_dc": null,
       "source": "trollheart",
       "harvesting": "The heart must be cut from a freshly slain troll and drained within 10 minutes, as it hardens rapidly; a sharp blade and heat-resistant gloves are essential.",
-      "text": "Cut from a freshly slain troll's heart and drained within ten minutes. Distilled into a tonic, it makes flesh knit at once: it stops bleeding and heals 2d4 hit points. The skin coarsens, a -2 penalty to Charisma for a day.",
+      "text": "Cut from a freshly slain troll's heart and drained within ten minutes. Distilled into a tonic, it makes flesh knit at once: it heals 2d4 hit points. The skin coarsens, a -2 penalty to Charisma for a day.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -6333,11 +6357,6 @@
         {
           "type": "heal",
           "dice": "2d4",
-          "route": "ingest"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "ingest"
         },
         {
@@ -6865,7 +6884,7 @@
       "craft_dc": 5,
       "source": "",
       "harvesting": "",
-      "text": "Makes journeyman serum (DC 5), drunk on the road: it ends fatigue and gives a +2 alchemical bonus on Fortitude saves against a forced march for an hour.",
+      "text": "Makes journeyman serum (DC 5), drunk on the road: a +2 alchemical bonus on Fortitude saves against the fatigue of a forced march for 8 hours.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -6876,18 +6895,13 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "remove_condition",
-          "target": "fatigued",
-          "route": "ingest"
-        },
-        {
           "type": "save_mod",
           "amount": 2,
           "target": "fort",
           "bonus_type": "alchemical",
           "note": "against a forced march",
           "duration": {
-            "amount": "1",
+            "amount": "8",
             "unit": "hour"
           },
           "route": "ingest"
@@ -6953,7 +6967,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A styptic for deep cuts. Laid on an injury within two rounds, it staunches the blood and heals 1d4 hit points.",
+      "text": "A styptic for deep cuts. Laid on an injury within two rounds, it heals 1d4 hit points and eases the bleeding.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -7096,7 +7110,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Yarrow. Leaves prepared in a poultice stop bleeding and heal 1d4 hit points bound on a wound.",
+      "text": "Yarrow. Leaves prepared in a poultice and bound on a wound heal 1d4 hit points.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -7110,11 +7124,6 @@
           "type": "heal",
           "dice": "1d4",
           "note": "unnumbered healing claim, read as the smallest die",
-          "route": "wound"
-        },
-        {
-          "type": "remove_condition",
-          "target": "bleed",
           "route": "wound"
         }
       ],
