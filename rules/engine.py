@@ -2137,6 +2137,10 @@ class Engine:
         for intent in intents:
             intent.origin = str(origin or "")
             intent.origin_name = str(origin_name or "")
+        if origin:
+            # Only on the trusted path, before anything reorders the list: a door's raw
+            # dicts pair one-for-one with what `parse_all` made of them here.
+            _link_gates(raw_intents, intents, str(origin))
         # A place the plan founds, then goes to: the founding first. Measured live
         # 2026-09-26, a plan wrote `travel` to "the tavern" BEFORE the `found` that made
         # it — the list resolves in order, so the walk went looking for a place that did
@@ -3083,6 +3087,13 @@ class Engine:
                 continue
             queue.pop(0)
             partial = {}
+            # A poison's save has just been decided: whatever it gates that belongs to
+            # the other verdict leaves the queue now. Here, in the loop, and not inside
+            # `_op_save`, because this is the one place that sees the verdict and the
+            # queue together — and the queue is what a suspension freezes, so a save
+            # resumed on the player's own d20 arrives here exactly as a hidden one does.
+            if intent.gate:
+                queue = self._settle_gate(intent, outcome, queue)
             outcomes.append(outcome)
             # A single-roll check, save or manoeuvre decided on the player's own d20:
             # its outcome's verdict IS that roll's answer. Anything that judged the roll
@@ -3129,6 +3140,43 @@ class Engine:
             if len(self.scene.log) > self.scene.LOG_KEPT:
                 del self.scene.log[:-self.scene.LOG_KEPT]
         return Resolution(outcomes=outcomes)
+
+    def _settle_gate(self, gate: Intent, outcome: Outcome, queue: list[dict]) -> list[dict]:
+        """Take off the queue what a poison's save just ruled out.
+
+        1e: "a successful saving throw negates the poison's effect" unless the poison
+        says otherwise — and the one that says otherwise is written as a body with
+        `gated_on: success`, which stays. A save that never reached a verdict (refused)
+        leaves the poison to land, which is what the jar did before this existed and
+        the safer of the two failures: an unrolled save that silently cancelled harm
+        would be a way to drink poison for free.
+
+        Measured 2026-10-02, the reason this exists: a natural 20 on Fortitude against
+        a dragon-flower tincture still took 5 Constitution and left the drinker
+        nauseated, because the save and its body went into one list side by side and
+        nothing read the one before running the other. The taste door had already
+        worked round it by rolling the gate itself (`_op_taste`); the jar and blade
+        doors had not.
+        """
+        held = "success" if outcome.verdict == "success" else "failure"
+        kept: list[dict] = []
+        dropped = 0
+        for raw in queue:
+            if raw.get("gated_by") == gate.gate \
+                    and str(raw.get("gated_on") or "failure") != held:
+                dropped += 1
+                continue
+            kept.append(raw)
+        still = any(raw.get("gated_by") == gate.gate for raw in kept)
+        if dropped and held == "success" and not still:
+            # Said, so the narrator is not left to guess what a made save meant: a tell
+            # is all it is fed (law 3), and "makes the save" over a poison invites the
+            # prose to sicken somebody anyway.
+            who = self.scene.actors.get(gate.actor or "")
+            what = gate.origin_name or "the poison"
+            outcome.tell = (f"{outcome.tell} {what} has no effect on "
+                            f"{who.name if who else 'them'}.").strip()
+        return kept
 
     # --- Reactions ---------------------------------------------------------------------
 
@@ -15497,6 +15545,48 @@ def _rename_refs(raw: dict, names: dict) -> dict:
     return raw
 
 
+def _link_gates(raw_intents: list, intents: list[Intent], origin: str) -> None:
+    """Tie a poison's save to the harm it gates, as the door that planned them said.
+
+    The door (`consumables.plan`, `consumables.coating_intents`) writes a local label on
+    the save (`gate`) and the same label on each body (`gated_by`, with `gated_on` for
+    the branch). Labels are only unique within the one list the door wrote, and the
+    queue `_drive` walks is not one list — reactions and closing steps are spliced in
+    from other `validate` calls, every one numbered from i1 — so the label becomes a
+    token here that nothing else in the queue can share. Intent ids were the obvious
+    link and were refused for exactly that collision.
+
+    Why a link and not the bodies nested inside the save's `on_failure`: `_op_save`'s
+    branches are a model-writable dict of `damage`/`condition` (stage 8 refuses dice in
+    them without an origin), not a list of intents, and nesting would put every body
+    behind a second, recursive validation. Linked, each body is validated flat, exactly
+    as it was, by the same checks as anything the GM proposes — immunity, the mind
+    gate, provenance — and runs through its own op; the only new thing is that the
+    save's verdict can take it off the queue (`Engine._settle_gate`).
+
+    A body ahead of its save, or naming a save the list does not hold, is the door's
+    bug and is refused rather than run ungated.
+    """
+    import uuid
+
+    tokens: dict[str, str] = {}
+    for i, (raw, intent) in enumerate(zip(raw_intents, intents)):
+        if not isinstance(raw, dict):
+            continue
+        label = str(raw.get("gate") or "")
+        if label and intent.op == "save":
+            tokens[label] = f"{origin}#{label}#{uuid.uuid4().hex[:8]}"
+            intent.gate = tokens[label]
+        by = str(raw.get("gated_by") or "")
+        if by:
+            if by not in tokens:
+                raise IntentError(
+                    f"{intent.op}: gated by {by!r}, which no save ahead of it in this "
+                    f"list opens.", "schema", i)
+            intent.gated_by = tokens[by]
+            intent.gated_on = "success" if raw.get("gated_on") == "success" else "failure"
+
+
 def _intent_from_dict(d: dict) -> Intent:
     return Intent(
         op=d["op"], actor=d.get("actor"), target=d.get("target"),
@@ -15506,6 +15596,12 @@ def _intent_from_dict(d: dict) -> Intent:
         # does; the first cut of stage 8 lost it here, and every op saw "".
         origin=str(d.get("origin", "") or ""),
         origin_name=str(d.get("origin_name", "") or ""),
+        # And the poison's link between its save and its harm, for the same reason: a
+        # jar whose save suspends for the player's d20 resumes with the bodies still
+        # queued behind it, and a link lost here would land them whatever the die said.
+        gate=str(d.get("gate", "") or ""),
+        gated_by=str(d.get("gated_by", "") or ""),
+        gated_on=str(d.get("gated_on", "") or ""),
     )
 
 

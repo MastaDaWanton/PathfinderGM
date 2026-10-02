@@ -706,6 +706,18 @@ class Intent:
     # applied it, because nothing could tell it from the potion's.
     origin: str = ""
     origin_name: str = ""
+    # A poison's save and the harm it gates, tied together (docs/states-effects-tells.md;
+    # `Engine._link_gates` stamps them, `Engine._settle_gate` reads them). `gate` is set
+    # on the `save`; `gated_by` on each body names that save's token, and `gated_on` says
+    # which verdict the body belongs to — "failure" for the poison proper, "success" for
+    # the rare poison that still does something to whoever resists it. Until 2026-10-02
+    # the jar listed the save and the body side by side and the body landed whatever the
+    # save said: a natural 20 on Fortitude against a dragon-flower tincture still took
+    # 5 Constitution and left the drinker nauseated. Engine-stamped like `origin`, never
+    # in params, and read from the raw list only on the trusted path.
+    gate: str = ""
+    gated_by: str = ""
+    gated_on: str = ""
 
     def targets(self) -> list[str]:
         if self.target is None:
@@ -718,6 +730,7 @@ class Intent:
             "because": self.because, "params": self.params, "visibility": self.visibility,
             "ignored_params": self.ignored_params,
             "origin": self.origin, "origin_name": self.origin_name,
+            "gate": self.gate, "gated_by": self.gated_by, "gated_on": self.gated_on,
         }
 
 
