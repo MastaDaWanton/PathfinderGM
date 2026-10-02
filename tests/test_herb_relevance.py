@@ -11,19 +11,22 @@ carries on a herbalist's route (`ingest`, `skin`, `eyes`, `wound`, `inhale`) bot
 the taker and is something the engine actually runs when the product is used.
 
 "Actually runs" is asked of `consumables._spec_to_intents`, the one function that turns a
-drunk or applied effect into engine intents, rather than of a list kept here. A
-`situational_mod`, a `narrative`, a `permission` or a `sense` is shown to the GM and
-rolls nothing, and `fast_healing` has no mapping there either: an herb whose only good
-was one of those was a card line and nothing else.
+drunk or applied effect into engine intents, and of `intents.parse`, which the engine
+refuses a malformed intent at, rather than of a list kept here. A `situational_mod`, a
+`narrative`, a `permission` or a `sense` is shown to the GM and rolls nothing, and
+`fast_healing` has no mapping there either: an herb whose only good was one of those was
+a card line and nothing else. `remove_condition` is worse than inert (see `runs`).
 
 Measured on ui/table-v2 before this pass (161 entries, 17 of them salve bases):
 
-- **72 of 161 irrelevant.** 33 had no effect on a herbal route at all (Cave Star, whose
+- **75 of 161 irrelevant.** 33 had no effect on a herbal route at all (Cave Star, whose
   one "effect" was its crafting DC, routed external; Mistveil Fern; every ward that
-  worked only strewn or worn). 31 carried only drawbacks or crafting DCs there (all
-  three poisons; Harpy Vocal Cord's -2 Diplomacy). 8 had a benefit that only the GM
-  could narrate (Chimera Horn's "+3 saves against chaotic magic", Dragon Flower's "+5
-  save vs poison").
+  worked only strewn or worn). 33 carried only drawbacks, crafting DCs or a condition
+  removal that cannot run there (all three poisons; Harpy Vocal Cord's -2 Diplomacy;
+  Cowslip). 9 had a benefit that only the GM could narrate (Chimera Horn's "+3 saves
+  against chaotic magic", Dragon Flower's "+5 save vs poison").
+- **5 effects broke the whole use**: every `remove_condition` (Allnight, Cowslip,
+  Dawnpetal, Sherpa's Friend, Skull Orchid) became an intent the engine refuses.
 - **39 of 63 hybrids** left the herbalist nothing that helps, among them the bark
   hybrids that count as relevant only because they are salve bases.
 - **41 bare save gates gated nothing**: the entry's own crafting DC restated at the end
@@ -47,7 +50,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from rules import consumables, effectspec
+from rules import consumables, effectspec, intents
 from rules import ingredients as ing
 
 CORPUS = Path("content/ingredients/herbs-and-parts.json")
@@ -77,8 +80,21 @@ def _raw() -> list[dict]:
 
 
 def runs(spec: dict) -> bool:
-    """Whether using a product that carries this effect makes the engine do anything."""
-    return bool(consumables._spec_to_intents(dict(spec), "pc", 1.0, "audit"))
+    """Whether using a product that carries this effect makes the engine do anything.
+
+    Two questions, because the first alone answered wrongly: `_spec_to_intents` must
+    produce intents, and every one of them must pass `intents.parse`, the schema the
+    engine refuses a bad intent at. `remove_condition` produces a `condition` intent
+    carrying `remove`, and the op takes `ends`, so every drink holding one raised
+    IntentError and the whole use failed: Cowslip, Sherpa's Friend, Allnight and
+    Dawnpetal, measured on the bench's own drink path in tests/test_consumables.py."""
+    made = consumables._spec_to_intents(dict(spec), "pc", 1.0, "audit")
+    try:
+        for raw in made:
+            intents.parse(dict(raw))
+    except intents.IntentError:
+        return False
+    return bool(made)
 
 
 def _amount(spec: dict) -> int:
@@ -176,7 +192,7 @@ def misparsed_conditions(entries: list[dict]) -> list[str]:
 # --- the ratchets -------------------------------------------------------------------------
 
 def test_every_ingredient_is_a_remedy_or_a_reagent():
-    """72 of 161 were irrelevant before this pass (see the module docstring): nothing on
+    """75 of 161 were irrelevant before this pass (see the module docstring): nothing on
     a herbal route that both helps and runs, and no base, solvent or neutralizer role.
     Cave Star's only effect was its crafting DC; Harpy Vocal Cord's only body effect was
     the -2 Diplomacy it charged for a charm the herbalist cannot make."""
@@ -207,6 +223,24 @@ def test_every_save_gate_gates_something():
     checks that are not saves (Darkroot's DC 20 Strength check to pull the glue apart,
     Orevine's Knowledge check) and are said in words."""
     assert gates_that_gate_nothing(_raw()) == []
+
+
+def test_no_effect_breaks_the_use_it_rides_in():
+    """One unparseable intent fails the whole drink, so an effect the engine refuses is
+    worse than a missing one: it takes every good effect in the jar down with it. 5
+    `remove_condition` effects did this before the pass (Dragon Flower, the fixture the
+    consumables tests drink and throw, would have joined them had this pass added the
+    "ends sickened" it first tried). If the drink path learns to send `ends`, this
+    passes for a removal again by itself."""
+    bad = []
+    for e in _raw():
+        for s in e.get("effects") or []:
+            for raw in consumables._spec_to_intents(dict(s), "pc", 1.0, "audit"):
+                try:
+                    intents.parse(dict(raw))
+                except intents.IntentError as exc:
+                    bad.append(f"{e['id']} {s['type']}: {exc}")
+    assert bad == []
 
 
 def test_every_effect_renders_and_validates():
