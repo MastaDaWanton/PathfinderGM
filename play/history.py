@@ -123,6 +123,14 @@ def _cap(text: str) -> str:
     return text[:1].upper() + text[1:] if text else text
 
 
+_HERB_LINES = {
+    "taste": "You tasted {herb}.",
+    "herb_studied": "You studied {herb}.",
+    "herb_taught": "{teacher} taught you about {herb}.",
+    "herb_looked_up": "You looked up {herb} at {place}.",
+}
+
+
 def _effect_lines(c, effect: dict, name, actor_of_intent: str) -> list[str]:
     """The sentence(s) one effect adds to the history, or [] for an effect that is not
     history. Second person, past tense: the Journal speaks to the player."""
@@ -218,6 +226,16 @@ def _effect_lines(c, effect: dict, name, actor_of_intent: str) -> list[str]:
         if giver == "you" and taker != "you":
             return [f"You gave {item} to {taker}."]
         return []
+    # Herb knowledge (docs/herbalism-revamp-plan.md §8): the taste is the engine's own op,
+    # the rest are the herb card's rows (play/herb_views.py `_log`). A herb is a common
+    # noun in a sentence, so "You tasted hemlock", not "Hemlock".
+    if kind in _HERB_LINES and name(effect.get("ref")) == "you" and effect.get("name"):
+        herb = str(effect["name"])
+        herb = herb[:1].lower() + herb[1:] if not herb[1:2].isupper() else herb
+        return [_cap(_HERB_LINES[kind].format(herb=herb, **{
+            k: str(effect.get(k) or "") for k in ("teacher", "place")}))]
+    if kind == "manual_read" and name(effect.get("ref")) == "you" and effect.get("manual"):
+        return [f"You read {effect['manual']}."]
     if kind == "xp" and name(effect.get("ref")) == "you" and effect.get("amount"):
         return [f"You earned {int(effect['amount']):,} experience."]
     if kind == "wanted":
