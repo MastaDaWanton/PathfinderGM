@@ -321,37 +321,37 @@
   });
 
   // --- the engine device (13-device.js): the brass status mechanism beside the story.
-  // The owner, 2026-10-02: "this needs sound as well, not too loud". It is heard on every
-  // turn, so every one of these sits well under a ui.click: a clock's escapement, not a
-  // factory. Ticks come from the large gear's own turning (the device paces them), the
+  // The owner, 2026-10-02: "this needs sound as well, not too loud", then "make the device
+  // sounds a bit louder" (every peak doubled). It is heard on every turn, so every peak
+  // still stays under a ui.click's. Ticks come from the large gear's own turning (the device paces them), the
   // puffs from its own steam, and the settle, sigh and lever from its own events.
   def("ui.device.tick", 4, function (c) {
     // One tooth of a cog meeting the next: a small, soft metallic click with a hint of
     // ring, not a clock's tick. Dense at speed (the device paces them off both gears), so
     // each one is quiet; the bed (machine(), below) carries the motion between them.
-    noise(c, { f: k(c, [3600, 3200, 4100, 3400]), q: 5, peak: 0.014, d: 0.006 });
+    noise(c, { f: k(c, [3600, 3200, 4100, 3400]), q: 5, peak: 0.028, d: 0.006 });
     return tone(c, { type: "sine", f: k(c, [2350, 2600, 2150, 2480]),
-                     peak: 0.004, a: 0.001, d: 0.03 });
+                     peak: 0.008, a: 0.001, d: 0.03 });
   });
   def("ui.device.puff", 3, function (c) {
     // A short breath of steam from the foot, soft and low in the mix.
     return noise(c, { src: "pink", type: "bandpass", f: k(c, [1400, 1250, 1550]), f2: 900,
-                      q: 0.9, peak: 0.016, a: 0.02, d: 0.16 });
+                      q: 0.9, peak: 0.03, a: 0.02, d: 0.16 });
   });
   def("ui.device.settle", 2, function (c) {
     // The gears coming to rest: a low wooden-brass thunk, felt more than heard.
-    return knock(c, { f: k(c, [180, 200]), peak: 0.03, lp: 600, d: 0.06 });
+    return knock(c, { f: k(c, [180, 200]), peak: 0.055, lp: 600, d: 0.06 });
   });
   def("ui.device.sigh", 2, function (c) {
     // The burst of steam as the machine stops on an answer: a longer, falling hiss.
     return noise(c, { src: "pink", type: "bandpass", f: 1800, f2: 700, q: 0.8,
-                      peak: 0.03, a: 0.05, d: 0.7 });
+                      peak: 0.055, a: 0.05, d: 0.7 });
   });
   def("ui.device.lever", 3, function (c) {
     // The lever popping up and the tab sliding out: a spring-loaded brass click and a
     // faint ring of the plate, the "your turn is ready" of the machine.
-    noise(c, { f: k(c, [3000, 3300, 2800]), q: 4, peak: 0.03, d: 0.012 });
-    return bell(c, { at: 0.015, f: k(c, [1320, 1400, 1250]), peak: 0.012, d: 0.35 });
+    noise(c, { f: k(c, [3000, 3300, 2800]), q: 4, peak: 0.055, d: 0.012 });
+    return bell(c, { at: 0.015, f: k(c, [1320, 1400, 1250]), peak: 0.022, d: 0.35 });
   });
 
   // --- dice: the rattle in the hand and the landing clack (dice3d.js's own clack,
@@ -889,7 +889,7 @@
           if (stopped) return;
           v = clamp(Number(v), 0, 1);
           var now = x.currentTime;
-          out.gain.setTargetAtTime(0.035 * v, now, 0.08);
+          out.gain.setTargetAtTime(0.07 * v, now, 0.08);
           lfo.frequency.setTargetAtTime(4 + 16 * v, now, 0.1);
           rb.frequency.setTargetAtTime(160 + 140 * v, now, 0.1);
           hum.frequency.setTargetAtTime(52 + 30 * v, now, 0.1);
