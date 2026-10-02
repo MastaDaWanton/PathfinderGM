@@ -2376,7 +2376,7 @@
       "craft_dc": 15,
       "source": "",
       "harvesting": "",
-      "text": "The effects of weather and wind are reduced around these trees; within the canopy the temperature never drops below 50 degrees or rises above 80, wind is lessened by 20 mph. Once per decade it produces cherries that will give an protection from evil effect for 5 minutes when eaten. The magic lasts for one day after picking but gentle repose cast on the fruit will extend it for its duration. DC: 15.",
+      "text": "Within the canopy of these fey trees the weather softens. Once a decade they fruit, and a cherry eaten within a day of picking wards the eater as protection from evil for 5 minutes: a +2 deflection bonus to AC and a +2 resistance bonus on Fortitude and Will saves against evil creatures.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2386,9 +2386,39 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 15,
-          "note": "the source names a DC without saying which save",
+          "type": "combat_mod",
+          "amount": 2,
+          "target": "ac",
+          "bonus_type": "deflection",
+          "note": "against evil creatures",
+          "duration": {
+            "amount": "5",
+            "unit": "minute"
+          },
+          "route": "ingest"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "will",
+          "bonus_type": "resistance",
+          "note": "against evil creatures",
+          "duration": {
+            "amount": "5",
+            "unit": "minute"
+          },
+          "route": "ingest"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "resistance",
+          "note": "against evil creatures",
+          "duration": {
+            "amount": "5",
+            "unit": "minute"
+          },
           "route": "ingest"
         }
       ],
@@ -2405,7 +2435,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Notable only for its strong odor, dried sections of this are often kept to revive an unconscious person. Snap the root under a person's nose to give them a temporary hit point for 1 minute to move them out of danger.",
+      "text": "Known only for its stink. Snap a dried section under someone's nose and the fumes shock them alert: it ends the dazed condition and gives 1d4 temporary hit points for a minute, enough to get them out of danger.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2416,8 +2446,17 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "apply_condition",
-          "target": "unconscious",
+          "type": "remove_condition",
+          "target": "dazed",
+          "route": "inhale"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": "1",
+            "unit": "minute"
+          },
           "route": "inhale"
         }
       ],
@@ -2434,7 +2473,7 @@
       "craft_dc": 15,
       "source": "",
       "harvesting": "",
-      "text": "A garliclike herb imbued with elemental fire energy. When a clove is boiled in salt water and crushed and blended into food, it keeps the food hot for 1d4 days. Adding a sprig from the plant into alchemist's fire during crafting, it will double the fire damage and causes it to burn twice as long. DC: 15.",
+      "text": "A garlic-like herb full of elemental fire. Boiled in salt water and crushed into food, it keeps the eater warm from inside: resist cold 5 for an hour. A sprig worked into alchemist's fire doubles its burn (alchemy's use).",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -2445,10 +2484,19 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 15,
-          "note": "the source names a DC without saying which save",
+          "type": "narrative",
+          "target": "A sprig added while crafting alchemist's fire doubles its fire damage and how long it burns",
           "route": "external"
+        },
+        {
+          "type": "resistance",
+          "target": "cold",
+          "amount": 5,
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -2464,7 +2512,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "These narrow, rust-colored leaves produce a mildly hallucinogenic smoke that also serves as powerful sedative. Users are immune to pain for 4 hours after smoking flayleaf, but during this time they take a –5 penalty on perception checks and saves against mind-altering effects.",
+      "text": "Narrow rust-coloured leaves smoked as a sedative. The smoker stops feeling pain, 1d4 temporary hit points for an hour, and drifts: a -2 penalty on Perception checks and on Will saves against mind-affecting effects for the hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2475,13 +2523,33 @@
       "hybrid": false,
       "effects": [
         {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "inhale"
+        },
+        {
           "type": "skill_mod",
-          "amount": -5,
+          "amount": -2,
           "target": "perception",
           "bonus_type": "untyped",
-          "note": "and against mind altering…",
           "duration": {
-            "amount": "4",
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "inhale"
+        },
+        {
+          "type": "save_mod",
+          "amount": -2,
+          "target": "will",
+          "bonus_type": "untyped",
+          "note": "against mind-affecting effects",
+          "duration": {
+            "amount": "1",
             "unit": "hour"
           },
           "route": "inhale"
@@ -2500,7 +2568,7 @@
       "craft_dc": 20,
       "source": "",
       "harvesting": "",
-      "text": "Mushroom used to combat fever in the tropics. Mix with cool mud and compress to head. Gives a +2 alchemical bonus to Fortitude saves made to resist non-magical diseases; lasts for one day. DC: 20.",
+      "text": "A tropical mushroom for fevers, mixed with cool mud and pressed to the head. The compress ends the sickened condition and gives a +2 alchemical bonus on Fortitude saves against non-magical disease for a day.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2514,13 +2582,16 @@
           "amount": 2,
           "target": "fort",
           "bonus_type": "alchemical",
-          "note": "made to resist non magical diseases",
+          "note": "to resist non-magical diseases",
+          "duration": {
+            "amount": "24",
+            "unit": "hour"
+          },
           "route": "skin"
         },
         {
-          "type": "save_gate",
-          "dc": 20,
-          "note": "the source names a DC without saying which save",
+          "type": "remove_condition",
+          "target": "sickened",
           "route": "skin"
         }
       ],
@@ -2537,7 +2608,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Commoners often eat this as a leafy snack like lettuce or infuse it in a tea to help them sleep. Chewing 5 fresh leaves provides a calming effect and allows a Will save to help end any fear or rage effects, including barbarian rages.",
+      "text": "Eaten like lettuce or brewed for sleep. Five fresh leaves, chewed, calm a frightened heart: they end the shaken condition and give a +2 alchemical bonus on Will saves against fear for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2548,20 +2619,20 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "permission",
-          "target": "another Will save",
-          "route": "ingest"
-        },
-        {
           "type": "save_mod",
           "amount": 2,
           "target": "will",
           "bonus_type": "alchemical",
-          "note": "vs fear; chew five fresh leaves",
+          "note": "against fear",
           "duration": {
-            "amount": 1,
+            "amount": "1",
             "unit": "hour"
           },
+          "route": "ingest"
+        },
+        {
+          "type": "remove_condition",
+          "target": "shaken",
           "route": "ingest"
         }
       ],
@@ -2578,7 +2649,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Tiny, ice-blue flowers that sparkle like frost and thrive in snowy tundras. When ground into a paste and applied to the skin, Frostbloom grants resistance to fire damage for 4 hours, reducing fire damage taken by 10 points. However, the user’s body temperature drops, causing a –3 penalty to dexterity-based checks.",
+      "text": "Tiny ice-blue flowers of the snowy tundra that sparkle like frost. Ground into a paste and rubbed on the skin, they give resist fire 10 for 4 hours. The body chills: a -3 penalty to Dexterity for as long.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2601,7 +2672,7 @@
         {
           "type": "resistance",
           "target": "fire",
-          "amount": 0,
+          "amount": 10,
           "duration": {
             "amount": "4",
             "unit": "hour"
@@ -2622,7 +2693,7 @@
       "craft_dc": null,
       "source": "frostgiant",
       "harvesting": "The marrow is extracted by cracking the giant’s femur with a heavy hammer and scooping it out with a bone or wooden tool, as metal freezes to it.",
-      "text": "When boiled into a broth and consumed, the marrow grants resistance to cold damage (10 points) for 12 hours, but the user’s body temperature drops, causing a –2 penalty to initiative rolls.",
+      "text": "Cracked from a frost giant's femur and boiled into a broth. Drunk, it gives resist cold 10 for 12 hours, and the cold settles in the limbs: a -2 penalty on initiative for as long.",
       "risky": true,
       "biomes_inferred": false,
       "biomes": [
@@ -2667,7 +2738,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Strong antiseptic, good for repelling insects (and vampires). Prevents infections when applied to wounds; wounded recover 2 hit points per day for the first three days of rest. Has a 50% chance of repelling attacking insects, giant or otherwise. Juice can restore one hit point per injury that was lost due to poisonous sting or bite.",
+      "text": "A strong antiseptic. Crushed on a wound it keeps infection out and heals 2 hit points; eaten, it gives a +2 alchemical bonus on Fortitude saves against disease for an hour. Insects (and vampires) dislike it.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -2681,6 +2752,18 @@
           "type": "heal",
           "dice": "2",
           "route": "wound"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against disease",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -2696,7 +2779,7 @@
       "craft_dc": null,
       "source": "gloomwraith",
       "harvesting": "Tendrils must be severed with a silver blade during the gloomwraith’s brief materialization, requiring precise timing to avoid its chilling touch.",
-      "text": "When boiled into a syrup and ingested, the tendrils grant the ability to see invisible creatures for 4 hours, but the user suffers a –3 penalty to saves against fear effects due to lingering dread.",
+      "text": "Severed with silver during a gloomwraith's brief solid moment and boiled into a syrup. Drunk, it opens the eyes to what hides: a +4 alchemical bonus on Perception checks against invisible or hidden creatures for 4 hours. A lingering dread comes with it, a -2 penalty on Will saves against fear.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -2707,10 +2790,11 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "situational_mod",
-          "amount": -3,
-          "target": "saves against fear effects due to lingering dread",
+          "type": "save_mod",
+          "amount": -2,
+          "target": "will",
           "bonus_type": "untyped",
+          "note": "against fear",
           "duration": {
             "amount": "4",
             "unit": "hour"
@@ -2722,9 +2806,9 @@
           "amount": 4,
           "target": "perception",
           "bonus_type": "alchemical",
-          "note": "against invisible or hidden creatures, while the syrup lasts",
+          "note": "against invisible or hidden creatures",
           "duration": {
-            "amount": 4,
+            "amount": "4",
             "unit": "hour"
           },
           "route": "ingest"
@@ -2743,7 +2827,7 @@
       "craft_dc": 20,
       "source": "",
       "harvesting": "",
-      "text": "The blossoms of this plant give off the same light as a torch during the night. Mages have cultivated varieties for many different climates. DC: 20.",
+      "text": "Mage-bred blossoms that shed torchlight through the night (alchemy's use). A wash of the petals over the eyes holds a little of that light: a +2 alchemical bonus on Perception checks in darkness for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2753,10 +2837,26 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 20,
-          "note": "the source names a DC without saying which save",
+          "type": "manifest",
+          "what": "torchlight shed by the blossoms through the night",
+          "terrain": "none",
+          "duration": {
+            "amount": "8",
+            "unit": "hour"
+          },
           "route": "external"
+        },
+        {
+          "type": "skill_mod",
+          "amount": 2,
+          "target": "perception",
+          "bonus_type": "alchemical",
+          "note": "in darkness",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "eyes"
         }
       ],
       "effects_converted": true
@@ -2769,10 +2869,10 @@
       "part": "berry",
       "tier": "common",
       "tier_inferred": true,
-      "craft_dc": null,
+      "craft_dc": 10,
       "source": "",
       "harvesting": "",
-      "text": "Juice of the berries can be used to make a waterproof ink that cannot be smeared or affected by the elements. DC 10.",
+      "text": "The berry juice makes a waterproof ink nothing can smear (DC 10 to make). Worked into a paste it is the rouge goblins are named for: painted on the face, a +2 alchemical bonus on Disguise checks for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2783,10 +2883,21 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 10,
-          "note": "the source names a DC without saying which save",
+          "type": "narrative",
+          "target": "A waterproof ink that cannot be smeared or weathered",
           "route": "external"
+        },
+        {
+          "type": "skill_mod",
+          "amount": 2,
+          "target": "disguise",
+          "bonus_type": "alchemical",
+          "note": "as face paint",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "skin"
         }
       ],
       "effects_converted": true
@@ -2802,7 +2913,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The leaves of this invasive creeper produce oil that irritates the skin, causing red, itchy splotches to cover the affected area.",
+      "text": "The leaves of this creeper ooze an oil that raises red, itching splotches. Rubbed on deliberately, the sting drives weariness off: it ends fatigue, and the itch leaves the user sickened for a minute.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2813,11 +2924,15 @@
       "hybrid": false,
       "effects": [
         {
+          "type": "remove_condition",
+          "target": "fatigued",
+          "route": "skin"
+        },
+        {
           "type": "apply_condition",
           "target": "sickened",
-          "note": "the oil blisters skin on contact",
           "duration": {
-            "amount": 1,
+            "amount": "1",
             "unit": "minute"
           },
           "route": "skin"
@@ -2836,7 +2951,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "(from the stem; Contact DC 22; primary damage 1 Con; secondary damage 1 Con per hour until death; cost 300 gp)",
+      "text": "A contact poison from the stem: on the skin, a DC 22 Fortitude save or 1 Constitution damage. In the smallest dose, on the tongue, it numbs all pain instead: 2d4 temporary hit points for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2847,9 +2962,24 @@
       "hybrid": false,
       "effects": [
         {
+          "type": "temp_hp",
+          "dice": "2d4",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
+        },
+        {
           "type": "save_gate",
+          "target": "fort",
           "dc": 22,
-          "note": "the source names a DC without saying which save",
+          "route": "skin"
+        },
+        {
+          "type": "ability_damage",
+          "target": "con",
+          "dice": "1",
           "route": "skin"
         }
       ],
@@ -2863,10 +2993,10 @@
       "part": "leaf",
       "tier": "uncommon",
       "tier_inferred": true,
-      "craft_dc": null,
+      "craft_dc": 15,
       "source": "",
       "harvesting": "",
-      "text": "These potent additives can only be culled from a rare maple tree known to grow exclusively in urban areas. These small, elaborately twisting trees are extremely slow to grow and mature—the leaves reach maturity only once every 3 years—and they are almost always grown and cultivated by half-elves. Additionally, half-elves are keenly aware of the effort put into the leaves’ growth and normally only sell the products of their labors to others of their kind. When the golden maple’s delicate, five-pointed leaves finally take on their namesake’s color, they can be cut, dried, and then ground into a fine powder, a process that requires a DC 15 Knowledge (nature) or Profession (herbalist) check. When used in conjunction with the Craft (alchemy) skill to create special substances and items like alchemical grease or tanglefoot bags, golden maple leaves reduce the Craft DC by 5 and add +1 to the DC of any save required by the alchemical item. A single dose of golden maple leaf powder is sufficient to augment the crafting of three alchemical items.",
+      "text": "Leaves of a slow urban maple that half-elves grow and sell only to their own. Dried and ground (DC 15), the golden powder makes alchemical grease and tanglefoot bags easier to craft and harder to resist (alchemy's use). Steeped and drunk, it sharpens the maker's hand: a +2 alchemical bonus on Craft checks for alchemical work for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2878,10 +3008,21 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 15,
-          "note": "the source names a DC without saying which save",
+          "type": "narrative",
+          "target": "Golden maple powder lowers the Craft DC of an alchemical item by 5 and raises its save DC by 1; one dose serves three items",
           "route": "external"
+        },
+        {
+          "type": "skill_mod",
+          "amount": 2,
+          "target": "craft",
+          "bonus_type": "alchemical",
+          "note": "for alchemical work",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -2897,7 +3038,7 @@
       "craft_dc": 25,
       "source": "",
       "harvesting": "",
-      "text": "Oily yellow moss that gives a euphoria that strengthens resolve, often used by natives before combat. When chewed for one minute it gives a +2 alchemical bonus on saves vs. fear and compulsion effects for 30 minutes. When in combat, the user must make a DC 10 Will save or suffer the confusion effect as the spell for the duration. DC: 25.",
+      "text": "Oily yellow moss chewed for a minute before battle. The euphoria strengthens resolve: a +3 alchemical bonus on Will saves against fear and compulsion for 30 minutes. It can tip over: a DC 10 Will save or confusion for 1d4 rounds.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -2908,21 +3049,30 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "situational_mod",
-          "amount": 2,
-          "target": "saves vs fear and compulsion effects for 30 minutes",
+          "type": "save_mod",
+          "amount": 3,
+          "target": "will",
           "bonus_type": "alchemical",
+          "note": "against fear and compulsion",
+          "duration": {
+            "amount": "30",
+            "unit": "minute"
+          },
           "route": "ingest"
         },
         {
           "type": "save_gate",
+          "target": "will",
           "dc": 10,
-          "note": "the source names a DC without saying which save",
           "route": "ingest"
         },
         {
           "type": "apply_condition",
           "target": "confused",
+          "duration": {
+            "amount": "1d4",
+            "unit": "round"
+          },
           "route": "ingest"
         }
       ],
@@ -2939,7 +3089,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Leaves mashed into a poultice to stop bleeding and cure poison.",
+      "text": "Leaves mashed into a poultice and bound on a wound heal 1d4 hit points and give a +2 alchemical bonus on Fortitude saves against poison for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -2981,7 +3131,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Small doses help fight disease and infection. Prepared by an herbalist, a consumed ounce of the mold will give a +3 Fortitude save bonus against all disease for 6 days. Grave mold growing on a corpse can produce a simulacrum due to its highly psionic nature; the simulacrum must stay within 120 feet of the generating corpse.",
+      "text": "Small doses fight disease and infection. An ounce of the mold, prepared and eaten, gives a +2 alchemical bonus on Fortitude saves against disease for a day. Growing on a corpse it is psionic and can raise a simulacrum, which is no herbalist's business.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2992,13 +3142,13 @@
       "effects": [
         {
           "type": "save_mod",
-          "amount": 3,
+          "amount": 2,
           "target": "fort",
           "bonus_type": "alchemical",
-          "note": "bonus against all disease",
+          "note": "against all disease",
           "duration": {
-            "amount": "6",
-            "unit": "day"
+            "amount": "24",
+            "unit": "hour"
           },
           "route": "ingest"
         }
@@ -3016,7 +3166,7 @@
       "craft_dc": null,
       "source": "griffon",
       "harvesting": "Talons must be severed with a heavy chisel and hammer after the griffon is subdued, requiring strength to avoid damaging the talon’s core.",
-      "text": "When ground into a powder and mixed with oil, the talon creates a salve that grants a +2 bonus to attack rolls with melee weapons for 2 hours, but the user’s grip stiffens, imposing a –2 penalty to dexterity-based skill checks.",
+      "text": "Ground and mixed with oil into a salve for the hands: a +2 alchemical bonus on melee attack rolls for 2 hours. The grip stiffens, a -2 penalty on Sleight of Hand checks for as long.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3037,6 +3187,17 @@
             "unit": "hour"
           },
           "route": "skin"
+        },
+        {
+          "type": "skill_mod",
+          "amount": -2,
+          "target": "sleight of hand",
+          "bonus_type": "untyped",
+          "duration": {
+            "amount": "2",
+            "unit": "hour"
+          },
+          "route": "skin"
         }
       ],
       "effects_converted": true
@@ -3052,7 +3213,7 @@
       "craft_dc": 5,
       "source": "",
       "harvesting": "",
-      "text": "Used to make shinewater, a rust remover and polisher. One dose will de-rust a medium sized metal weapon. DC: 5.",
+      "text": "Makes shinewater, a rust remover and polish (DC 5); a dose cleans a medium weapon. A tea of the thistle settles the liver: a +2 alchemical bonus on Fortitude saves against poison for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3063,10 +3224,21 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 5,
-          "note": "the source names a DC without saying which save",
+          "type": "narrative",
+          "target": "Shinewater: one dose takes the rust off a medium metal weapon",
           "route": "external"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against poison",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -3082,7 +3254,7 @@
       "craft_dc": null,
       "source": "harpy",
       "harvesting": "The cord is delicately cut with a sharp blade after the harpy’s death, requiring precision to avoid damaging its magical properties.",
-      "text": "When boiled into a tea and consumed, the cord grants the ability to cast a charm person spell (DC 15) once within 4 hours, but the user’s voice cracks, imposing a –2 penalty to diplomacy checks for 24 hours.",
+      "text": "Boiled into a tea, the cord lends the harpy's lure: once within 4 hours a charm person (Will DC 15; alchemy's use). The voice itself sings sweet, a +2 alchemical bonus on Perform checks for 4 hours, and cracks when it speaks: a -2 penalty on Diplomacy for as long.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3093,18 +3265,39 @@
       "hybrid": true,
       "effects": [
         {
+          "type": "save_gate",
+          "target": "will",
+          "dc": 15,
+          "on_failure": [
+            {
+              "type": "attitude",
+              "target": "friendly",
+              "towards": "caster"
+            }
+          ],
+          "route": "external"
+        },
+        {
+          "type": "skill_mod",
+          "amount": 2,
+          "target": "perform",
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": "4",
+            "unit": "hour"
+          },
+          "route": "ingest"
+        },
+        {
           "type": "skill_mod",
           "amount": -2,
           "target": "diplomacy",
           "bonus_type": "untyped",
-          "note": "for 24 hours",
+          "duration": {
+            "amount": "4",
+            "unit": "hour"
+          },
           "route": "ingest"
-        },
-        {
-          "type": "save_gate",
-          "dc": 15,
-          "note": "the source names a DC without saying which save",
-          "route": "external"
         }
       ],
       "effects_converted": true
@@ -3120,7 +3313,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "While lots of myths surround the use of the hawthorn tree's wood, there is one interesting use: sprinkling the pollen from its blossoms into the eyes allows anyone to see faeries and fey creatures, despite any invisibility on their part, for up to an hour.",
+      "text": "Pollen from the blossoms, sprinkled in the eyes, lets anyone see faeries through their glamour: a +2 alchemical bonus on Perception checks to notice fey for an hour. A tea of the berries steadies the heart, 1d4 temporary hit points for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -3130,21 +3323,25 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "narrative",
-          "target": "Pollen in the eyes reveals faeries and fey creatures",
-          "route": "eyes"
-        },
-        {
           "type": "skill_mod",
           "amount": 2,
           "target": "perception",
           "bonus_type": "alchemical",
           "note": "to notice fey",
           "duration": {
-            "amount": 1,
+            "amount": "1",
             "unit": "hour"
           },
           "route": "eyes"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": "authored 2026-08-23: benefits from the herb's own prose"
@@ -3160,7 +3357,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "(distilled from the seeds; Contact DC 20; primary damage 2d6 Con; secondary 1 permanent Con; cost 500 gp)",
+      "text": "Distilled from the seeds, a contact poison: a DC 20 Fortitude save or 2d6 Constitution damage. A single drop on the tongue sets the heart racing instead: a +3 alchemical bonus on initiative for 10 minutes.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3171,9 +3368,26 @@
       "hybrid": false,
       "effects": [
         {
+          "type": "combat_mod",
+          "amount": 3,
+          "target": "initiative",
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": "10",
+            "unit": "minute"
+          },
+          "route": "ingest"
+        },
+        {
           "type": "save_gate",
+          "target": "fort",
           "dc": 20,
-          "note": "the source names a DC without saying which save",
+          "route": "skin"
+        },
+        {
+          "type": "ability_damage",
+          "target": "con",
+          "dice": "2d6",
           "route": "skin"
         }
       ],
@@ -3190,7 +3404,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The seeds can be made into a soporific tincture. If injected, the affected creature must make a Fortitude DC 15 or sleep for three hours. This can be made into a tea that makes the sleep last for five hours. Sometimes this is used as an anesthetic during primitive surgery. Can be used topically against inflammations; grants a +1 Heal skill bonus when used to treat skin-affecting diseases and infections. In small doses hemlock can relax muscles, in large enough doses complete paralysis can result, resulting in asphyxiation when the lungs stop working. Those eating raw hemlock must make a DC 15 Fortitude save or become paralyzed, subsequent damage is determined by suffocation rules until cured with spells or counteracted by a healer using a stimulant.",
+      "text": "The seeds make a soporific. Laid on the skin against inflammation, a hemlock poultice relaxes the muscle and heals 1d4 non-lethal damage. Eaten raw it is poison: a DC 15 Fortitude save or paralysis for 1d6 minutes.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3201,6 +3415,12 @@
       "hybrid": false,
       "effects": [
         {
+          "type": "heal",
+          "dice": "1d4",
+          "lethality": "nonlethal",
+          "route": "skin"
+        },
+        {
           "type": "save_gate",
           "target": "fort",
           "dc": 15,
@@ -3209,6 +3429,10 @@
         {
           "type": "apply_condition",
           "target": "paralyzed",
+          "duration": {
+            "amount": "1d6",
+            "unit": "minute"
+          },
           "route": "ingest"
         }
       ],
@@ -3225,7 +3449,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Potent painkiller. Poisonous if taken internally. Boil leaves, seeds or roots in water and apply as a poultice. Will restore 1-6 hit points to a wounded character in a manner similar to Aaron's rod, but only 1-4 of those will \"wear off\" two hours later when the pain returns. So effective as a painkiller, if you fight while under the effects of henbane you will fight as though moderately intoxicated due to numbing. Can be used daily when recovering from a fever, returning one point of strength and constitution per day. Treat as poison if eaten or drunk, when boiling there is a 40% chance that inhaling will cause hallucinations.",
+      "text": "A potent painkiller. Boiled and laid on a wound as a poultice, it heals 1d2 hit points and numbs 1d4 more, temporary hit points that fade after 2 hours when the pain returns. Eaten or drunk it is poison: a DC 13 Fortitude save or nausea for 1d4 rounds.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3237,8 +3461,32 @@
       "effects": [
         {
           "type": "heal",
-          "dice": "1-6",
+          "dice": "1d2",
           "route": "wound"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": "2",
+            "unit": "hour"
+          },
+          "route": "wound"
+        },
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 13,
+          "route": "ingest"
+        },
+        {
+          "type": "apply_condition",
+          "target": "nauseated",
+          "duration": {
+            "amount": "1d4",
+            "unit": "round"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -3254,7 +3502,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Mostly used to make a pigment used in tattoos, it is magically reactive and can be used to make several of the magic concoctions and verdexes mentioned in the book.",
+      "text": "A pigment for tattoos, magically reactive and wanted for verdexes: a hand stained with it gives a +2 alchemical bonus on Craft checks for concoctions that call for it, for an hour. Spread as a cool paste on the skin, it gives +2 on Fortitude saves against heat for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3265,16 +3513,27 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "narrative",
-          "target": "Magically reactive pigment, fit for verdexes and tattoo-work",
-          "route": "skin"
-        },
-        {
           "type": "skill_mod",
           "amount": 2,
           "target": "craft",
           "bonus_type": "alchemical",
           "note": "preparing magical concoctions that call for it",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "skin"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against heat",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "skin"
         }
       ],
@@ -3291,7 +3550,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Antidote for poisons and an antiseptic. Eating three berries or making a tea from the leaves will add +2 save vs. poison, +3 for halflings or dwarves, if taken within two rounds of the suspected poisoning. As a wound wash it can be used once per injury to restore a single hit point.",
+      "text": "An antidote and antiseptic. Three berries, or a tea of the leaves, taken within two rounds of a poisoning give a +2 alchemical bonus on Fortitude saves against poison for an hour. As a wound wash it heals 1 hit point.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3306,8 +3565,17 @@
           "amount": 2,
           "target": "fort",
           "bonus_type": "alchemical",
-          "note": "vs poison",
+          "note": "against poison",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
+        },
+        {
+          "type": "heal",
+          "dice": "1",
+          "route": "wound"
         }
       ],
       "effects_converted": true
@@ -3323,7 +3591,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Leaves powdered and sprinkled on something to ritually purify it.",
+      "text": "Powdered and sprinkled on an object, the leaves ritually purify it (alchemy's use). Packed into a cut, the same powder stops bleeding.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3344,6 +3612,11 @@
             "unit": "hour"
           },
           "route": "external"
+        },
+        {
+          "type": "remove_condition",
+          "target": "bleed",
+          "route": "wound"
         }
       ],
       "effects_converted": "authored 2026-08-23: benefits from the herb's own prose"
@@ -3359,7 +3632,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "These small blue bell-shaped flowers grow in open fields with plenty of sun. Their properties are known only to a few, due to the specificity of their use. If a strand of Hrondis' Tears are wrapped around the hilt of a weapon, that weapon can be used to strike incorporeal undead as if it were a magic weapon. Hrondis' Tears can last for up to a week and still confer this property.",
+      "text": "Small blue bells of sunny fields, known to few. A strand wrapped round a weapon's hilt lets it strike incorporeal undead for a week (alchemy's use). Brewed and drunk, the flowers give a +2 alchemical bonus on Fortitude saves against the chill of undead for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -3370,7 +3643,7 @@
       "effects": [
         {
           "type": "narrative",
-          "target": "A flower of one rite, known to few",
+          "target": "A strand wrapped round a weapon's hilt lets it strike incorporeal undead as a magic weapon, for a week",
           "route": "external"
         },
         {
@@ -3380,10 +3653,22 @@
           "bonus_type": "alchemical",
           "note": "while its rite is observed",
           "duration": {
-            "amount": 1,
+            "amount": "1",
             "unit": "hour"
           },
           "route": "external"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against the chill of undead",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": "authored 2026-08-23: benefits from the herb's own prose"
@@ -3399,7 +3684,7 @@
       "craft_dc": null,
       "source": "hydra",
       "harvesting": "The gall bladder must be carefully excised with a silver scalpel after slaying the hydra, avoiding rupture to prevent acidic burns.",
-      "text": "When distilled and drunk, Hydra Gall allows the user to regrow minor wounds, healing 1d4 HP per round for 5 rounds, but causes nausea, imposing a –3 penalty to constitution-based checks for 1 hour.",
+      "text": "Excised whole with a silver scalpel and distilled. Drunk, the gall makes flesh regrow: it heals 4d4 hit points. The body revolts, nauseated for a round and a -3 penalty to Constitution for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3414,17 +3699,24 @@
           "amount": -3,
           "target": "con",
           "bonus_type": "untyped",
-          "note": "for 1 hour",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         },
         {
           "type": "heal",
-          "dice": "1d4",
+          "dice": "4d4",
           "route": "ingest"
         },
         {
           "type": "apply_condition",
           "target": "nauseated",
+          "duration": {
+            "amount": "1",
+            "unit": "round"
+          },
           "route": "ingest"
         }
       ],
@@ -3441,7 +3733,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Leaves and flowers crushed and powdered, sprinkled on a place or person to help with exorcisms and summonings.",
+      "text": "Leaves and flowers, crushed and powdered, are sprinkled on a place or a person in exorcisms and summonings (alchemy's use). Steeped and drunk, they give a +2 alchemical bonus on Will saves against possession for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3462,6 +3754,18 @@
             "unit": "hour"
           },
           "route": "external"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "will",
+          "bonus_type": "alchemical",
+          "note": "against possession",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": "authored 2026-08-23: benefits from the herb's own prose"
@@ -3477,7 +3781,7 @@
       "craft_dc": 35,
       "source": "",
       "harvesting": "",
-      "text": "Key ingredient in icewalker oil. The substance gives the equivalent to spider climb when walking on ice or snow. Lasts for 10 minutes. DC: 35.",
+      "text": "The key to icewalker oil, which lets the wearer climb ice and snow like a spider for 10 minutes (alchemy's use). Steeped and drunk, the petals carry the cold away: resist cold 10 for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -3487,10 +3791,24 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 35,
-          "note": "the source names a DC without saying which save",
+          "type": "speed",
+          "target": "climb",
+          "amount": 20,
+          "duration": {
+            "amount": "10",
+            "unit": "minute"
+          },
           "route": "external"
+        },
+        {
+          "type": "resistance",
+          "target": "cold",
+          "amount": 10,
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -3506,7 +3824,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The bark is used to relieve pain. Can be brewed into a bland tea that cures 4 points of subdual damage. Can also be prepared to relieve infection; giving a +7 Fortitude save bonus against skin disease for a number of days equal to the imbiber's Constitution score. Imperial willow heartwood enhances certain magical effects, such as granting a dryad the ability to teleport without error when they step into the tree. A druid casting a spell within 30 feet can make a DC 20 Will save in order to have their spell augmented with the Enlarge Spell feat. A bard within 10 feet can bolster a song or chant by making a DC 25 Will save; success gains a +4 Perform skill bonus for the song's duration.",
+      "text": "The bark relieves pain: brewed into a bland tea it heals 4 non-lethal damage and gives a +2 alchemical bonus on Fortitude saves against infection for an hour. The heartwood strengthens nearby magic (alchemy's use), and ground bark is a salve base.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -3525,9 +3843,20 @@
           "route": "ingest"
         },
         {
-          "type": "save_gate",
-          "dc": 20,
-          "note": "the source names a DC without saying which save",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against infection",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
+        },
+        {
+          "type": "narrative",
+          "target": "Heartwood lets a nearby druid's spell be enlarged (DC 20 Will) and a bard's song swell (DC 25 Will, +4 Perform)",
           "route": "external"
         }
       ],
@@ -3544,7 +3873,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A tough, gray-green moss that clings to ancient trees in primal forests, resembling cracked iron. When chewed, Ironbark Moss hardens the user’s skin, granting a +2 natural armor bonus for 2 hours. The stiffness of the effect reduces movement speed by 10 feet for the duration.",
+      "text": "Tough grey-green moss like cracked iron, clinging to ancient trees. Chewed, it hardens the skin: a +2 natural armour bonus to AC for an hour. The stiffness slows the chewer by 5 feet.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -3557,10 +3886,19 @@
           "type": "combat_mod",
           "amount": 2,
           "target": "ac",
-          "bonus_type": "alchemical",
-          "note": "natural armor bonus",
+          "bonus_type": "natural armour",
           "duration": {
-            "amount": "2",
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
+        },
+        {
+          "type": "speed",
+          "target": "land",
+          "amount": -5,
+          "duration": {
+            "amount": "1",
             "unit": "hour"
           },
           "route": "ingest"
@@ -3579,7 +3917,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Juniper berries are often prescribed as an immediate and sometimes helpful poison antidote (Fort save at +2 only against herbal poisons).",
+      "text": "Juniper berries are a quick, sometimes useful antidote: a +2 alchemical bonus on Fortitude saves against herbal poisons for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3594,7 +3932,11 @@
           "amount": 2,
           "target": "fort",
           "bonus_type": "alchemical",
-          "note": "only against herbal poisons",
+          "note": "against herbal poisons",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -3611,7 +3953,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Less effective poison curative than herb true-love. Also a stimulant for the injured, as eating two berries helps fight off shock. If unconscious with zero or fewer hit points, the berries will add 1-4 hit points possibly restoring the character to consciousness. Character restored in this manner cannot fight or exert himself until he has rested to regain as many hit points as the herb artificially returned to him . If eaten to counter poison, add +1 to save if eaten with two rounds of poisoning.",
+      "text": "A stimulant for the injured. Two berries help fight off shock: they heal 1d4 hit points, and give a +1 alchemical bonus on Fortitude saves against poison for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3622,8 +3964,20 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "apply_condition",
-          "target": "unconscious",
+          "type": "heal",
+          "dice": "1d4",
+          "route": "ingest"
+        },
+        {
+          "type": "save_mod",
+          "amount": 1,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against poison",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -3640,7 +3994,7 @@
       "craft_dc": null,
       "source": "kraken",
       "harvesting": "The sac must be carefully punctured and drained with a hollow needle after subduing the kraken, avoiding its acidic blood.",
-      "text": "When concentrated and used to inscribe runes, the ink allows the user to breathe underwater for 8 hours, but their skin takes on a faint inky hue, imposing a –2 penalty to charisma-based checks.",
+      "text": "Concentrated and used to inscribe runes on the skin, the ink lets the bearer breathe water for 8 hours (immune to drowning) and gives a swim speed of 30 feet. The skin takes on an inky hue, a -2 penalty to Charisma for as long.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3650,6 +4004,25 @@
       "forageable": false,
       "hybrid": true,
       "effects": [
+        {
+          "type": "immunity",
+          "target": "drowning",
+          "duration": {
+            "amount": "8",
+            "unit": "hour"
+          },
+          "route": "skin"
+        },
+        {
+          "type": "speed",
+          "target": "swim",
+          "amount": 30,
+          "duration": {
+            "amount": "8",
+            "unit": "hour"
+          },
+          "route": "skin"
+        },
         {
           "type": "ability_mod",
           "amount": -2,
@@ -3675,7 +4048,7 @@
       "craft_dc": 15,
       "source": "",
       "harvesting": "",
-      "text": "This parsleylike herb originated along the banks of the River Oceanus. When rubbed into meat, it prevents the meat from ever drying out even when overcooked. Using a sprig from the plant when casting gentle repose doubles the spell's duration (does not stack with the Extend feat). DC: 15.",
+      "text": "A parsley-like herb from the banks of the River Oceanus that holds water like nothing else. Rubbed into meat it keeps it moist, and a sprig doubles a gentle repose (alchemy's use). Chewed, it gives a +2 alchemical bonus on Fortitude saves against heat and thirst for an hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -3686,10 +4059,21 @@
       "hybrid": true,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 15,
-          "note": "the source names a DC without saying which save",
+          "type": "narrative",
+          "target": "Rubbed into meat, it never dries out; a sprig doubles gentle repose's duration",
           "route": "external"
+        },
+        {
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
+          "bonus_type": "alchemical",
+          "note": "against heat and thirst",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -3705,7 +4089,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "When dried and ground into a powder, the mottled red and gray bark of this shrub is a boon to healers. When applied to a wound, leechwort grants a +1 alchemical bonus on all Heal checks and a +2 alchemical bonus on Heal checks to staunch bleeding. One pound of leechwort is enough for 10 uses.",
+      "text": "Dried and ground, the mottled red and grey bark is a boon to healers. Applied to a wound, it gives a +1 alchemical bonus on Heal checks and +2 on Heal checks to staunch bleeding. One pound is ten uses, and the ground bark thickens a salve.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3747,7 +4131,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Leaves brewed into a \"love\" (lust) potion.",
+      "text": "Leaves brewed into a love potion. The drinker warms to whoever served it: a +2 alchemical bonus on Diplomacy toward them for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3783,7 +4167,7 @@
       "craft_dc": 10,
       "source": "",
       "harvesting": "",
-      "text": "Very nutritious, a handful can provide a day's sustenance. Vermin dislike the smell. For two hours after eating a nut (a full round action), the consumer emits the nut's odor, forcing attacking vermin to make a DC 11 Will save or become sickened for 2d4 round after touching the character. DC: 10.",
+      "text": "Very nutritious: a handful is a day's food, 1d4 temporary hit points for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 2d4 rounds.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3795,14 +4179,27 @@
       "effects": [
         {
           "type": "save_gate",
+          "target": "will",
           "dc": 11,
-          "note": "the source names a DC without saying which save",
           "route": "external"
         },
         {
           "type": "apply_condition",
           "target": "sickened",
+          "duration": {
+            "amount": "2d4",
+            "unit": "round"
+          },
           "route": "external"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "1d4",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
         }
       ],
       "effects_converted": true
@@ -3818,7 +4215,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "These red mushrooms are less poisonous than the death cap but they also produce a strong psychoactive effect which can lead someone to fall into a berserk rage, lashing out at anyone nearby. After the rage subsides, the poisoned person collapses in exhaustion then slips into a coma. These mushrooms are an ingested poison, DC 18 the immediate effects are fall under the effects of a rage spell like effect for 1d10 rounds. Anyone failing the save by 5 or more also suffer from the effects of a confusion spell for the same duration of the rage effect. A secondary effect occurs after the spell like effects wear off, this is unconsciousness.",
+      "text": "Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength for a minute. It is a poison: a DC 18 save or exhaustion, unconsciousness and confusion.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3828,6 +4225,17 @@
       "forageable": true,
       "hybrid": false,
       "effects": [
+        {
+          "type": "ability_mod",
+          "amount": 2,
+          "target": "str",
+          "bonus_type": "morale",
+          "duration": {
+            "amount": "1",
+            "unit": "minute"
+          },
+          "route": "ingest"
+        },
         {
           "type": "save_gate",
           "dc": 18,
@@ -3863,7 +4271,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Shoots brewed into an anti-love/lust potion.",
+      "text": "The shoots brew into an anti-love draught: a +2 alchemical bonus on Will saves against charm effects for an hour. Their slippery sap thickens a cream base.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -3872,20 +4280,18 @@
       ],
       "forageable": true,
       "hybrid": false,
+      "base_for": [
+        "cream"
+      ],
       "effects": [
-        {
-          "type": "narrative",
-          "target": "Undoes charm-born affection",
-          "route": "ingest"
-        },
         {
           "type": "save_mod",
           "amount": 2,
           "target": "will",
           "bonus_type": "alchemical",
-          "note": "vs charm effects, drunk as the anti-love draught",
+          "note": "against charm effects",
           "duration": {
-            "amount": 1,
+            "amount": "1",
             "unit": "hour"
           },
           "route": "ingest"
@@ -3904,7 +4310,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Has pain relieving properties. The root, boiled in a tea or a small bit chewed, acts as an anesthetic and removes pain by sedating the imbiber (Fort Save or sleep for 1d4 hours). An apothecary should prepare it for use, otherwise the treatment acts as a poison (DC 17; primary Unconsciousness and Sleep 1d8 hours; secondary 1d2 Con).////when the leaves are chewed or rubbed on the skin it heals 2 points of subdual damage, usable once per 12 hours. A stronger version may be prepared that will heal 4 points per 6 hour period. Mandrake can have a soporific effect, chewing more ounces than half your Con score will require a DC 25 Fortitude save to avoid experiencing delirium lasting 2d4 hours. Another valuable trait of the plant is that a tea concoction can be made from it that will induce sleep for 2 hours. Country doctors will use this to anesthetize patients before rudimentary surgeries. Finally, the strongest chemical in mandrake is its toxin. Taking too much, or giving a large dose, requires a DC 25 Fortitude save or the character will enter a permanent coma, typically leading to death.",
+      "text": "A pain-relieving root. A little chewed heals 1d4 non-lethal damage. It sedates as it soothes: a DC 17 Fortitude save or sleep for 1d4 hours, unless an apothecary has neutralised it.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3916,19 +4322,23 @@
       "effects": [
         {
           "type": "heal",
-          "dice": "2",
+          "dice": "1d4",
           "lethality": "nonlethal",
           "route": "ingest"
         },
         {
           "type": "save_gate",
+          "target": "fort",
           "dc": 17,
-          "note": "the source names a DC without saying which save",
           "route": "ingest"
         },
         {
           "type": "apply_condition",
           "target": "unconscious",
+          "duration": {
+            "amount": "1d4",
+            "unit": "hour"
+          },
           "route": "ingest"
         }
       ],
@@ -3945,7 +4355,7 @@
       "craft_dc": null,
       "source": "manticore",
       "harvesting": "Spines must be carefully extracted with thick leather gloves and a steel forceps within minutes of the manticore’s death to avoid venom degradation.",
-      "text": "When boiled into a tincture and applied to ammunition, the spines cause paralyzing pain, imposing a –4 penalty to attack rolls on struck targets for 1 minute, but the user risks a mild sting (DC 12 fortitude save) if mishandled, causing –2 dexterity for 1 hour.",
+      "text": "Boiled into a tincture for ammunition, the spines strike with paralyzing pain: a -4 penalty on attack rolls for a struck target for a minute (alchemy's use). Mishandled, a spine stings: a DC 12 Fortitude save or -2 Dexterity for an hour. Dilute, the same tincture laid on a wound numbs it, 2d4 temporary hit points for an hour.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -3969,9 +4379,30 @@
         },
         {
           "type": "save_gate",
+          "target": "fort",
           "dc": 12,
-          "note": "the source names a DC without saying which save",
+          "on_failure": [
+            {
+              "type": "ability_mod",
+              "amount": -2,
+              "target": "dex",
+              "bonus_type": "untyped",
+              "duration": {
+                "amount": "1",
+                "unit": "hour"
+              }
+            }
+          ],
           "route": "skin"
+        },
+        {
+          "type": "temp_hp",
+          "dice": "2d4",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "wound"
         }
       ],
       "effects_converted": true
@@ -3987,7 +4418,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Used to treat burns or help with recovery from blood loss. Root should be mashed, boiled in water, and bound to wound; this will give a character 2 hit points per day while recovering, for the first three days. Boiled remains of root can be drunk to counter the effects of blood loss; regaining 1-3 points per day instead of the usual one hit point.",
+      "text": "A remedy for burns and blood loss. Mashed, boiled and bound to a wound, the root heals 2 hit points; the boiled remains, drunk, heal 1d3 more. Its mucilage thickens a cream base.",
       "risky": true,
       "biomes_inferred": false,
       "biomes": [
@@ -3995,16 +4426,18 @@
       ],
       "forageable": true,
       "hybrid": false,
+      "base_for": [
+        "cream"
+      ],
       "effects": [
         {
           "type": "heal",
           "dice": "2",
-          "note": "bound to a burn or wound; repeats each day of rest while bound",
           "route": "wound"
         },
         {
-          "type": "narrative",
-          "target": "Aids recovery from blood loss",
+          "type": "heal",
+          "dice": "1d3",
           "route": "ingest"
         }
       ],
@@ -4021,7 +4454,7 @@
       "craft_dc": 20,
       "source": "",
       "harvesting": "",
-      "text": "Powered stem makes a substance called White Sanguine that prevents clotting; it is typically smeared along with a poison onto bladed weapons. If victim fails initial Fortitude save against the poison, the wound continues to bleed for one minute, inflicting 1 point of damage per round in blood loss. Bleeding can be stopped with a DC 15 Heal check. Can only be added to injury poisons. DC: 20.",
+      "text": "The powdered stem makes white sanguine, smeared with an injury poison on a blade: a victim who fails the poison's save bleeds 1 hit point a round for a minute (alchemy's use). Rubbed on a bruise, the powder disperses it and heals 1d6 non-lethal damage.",
       "risky": true,
       "biomes_inferred": false,
       "biomes": [
@@ -4031,10 +4464,20 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "save_gate",
-          "dc": 15,
-          "note": "the source names a DC without saying which save",
+          "type": "bleed",
+          "amount": 1,
+          "stopped_by": "DC 15 Heal check",
+          "duration": {
+            "amount": "1",
+            "unit": "minute"
+          },
           "route": "external"
+        },
+        {
+          "type": "heal",
+          "dice": "1d6",
+          "lethality": "nonlethal",
+          "route": "skin"
         }
       ],
       "effects_converted": true
@@ -4050,7 +4493,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Found naturally on the Elemental Plane of Earth, they can appear elsewhere in tall, rock-like rings where a king or queen has been interred in the ground. The plants are often guarded by a group of ghouls and wights; often they are non-aggressive, attacking only those who seek to harm the plants. Thought to be a gift from the gods, a menhirite ring is often considered holy ground by commoners, who will sometimes brave going near to place one of their dead within the ring. This is unpredictable, sometimes returning the person to life, sometimes raising them as an undead, but more commonly doing nothing (5% chance per month of resurrecting, after a year it rises as if create undead was cast on it.) Uses of the plant include promoting blood clotting, making wounds heal faster. An ounce of sap will instantly heal 6 hit points and stops bleeding as it closes the wound. Pieces of the plant, placed on a dead body, will slow the rate of decay by half.",
+      "text": "A plant of the Elemental Plane of Earth that grows in rock-like rings over buried kings, held holy by commoners. An ounce of its sap, laid on a wound, stops bleeding and heals 1d6 hit points. What the ring does to the dead is not a herbalist's to command. The sap thickens a salve.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -4065,12 +4508,17 @@
       "effects": [
         {
           "type": "heal",
-          "dice": "6",
+          "dice": "1d6",
           "route": "wound"
         },
         {
-          "type": "apply_condition",
-          "target": "dead",
+          "type": "remove_condition",
+          "target": "bleed",
+          "route": "wound"
+        },
+        {
+          "type": "narrative",
+          "target": "A body laid in a menhirite ring may rise: 5% a month to live again, and after a year as undead",
           "route": "external"
         }
       ],
@@ -4087,7 +4535,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "(from the leaves; Contact DC 20; primary damage 1d4 permanent Int; secondary damage 1d4 permanent Con; cost 150 gp)",
+      "text": "A contact poison from the leaves: on the skin, a DC 20 Fortitude save or 1d4 Intelligence drain. A single drop on the tongue drives every other influence out of the head: a +3 alchemical bonus on Will saves against confusion and charm for 10 minutes.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -4098,9 +4546,27 @@
       "hybrid": false,
       "effects": [
         {
+          "type": "save_mod",
+          "amount": 3,
+          "target": "will",
+          "bonus_type": "alchemical",
+          "note": "against confusion and charm",
+          "duration": {
+            "amount": "10",
+            "unit": "minute"
+          },
+          "route": "ingest"
+        },
+        {
           "type": "save_gate",
+          "target": "fort",
           "dc": 20,
-          "note": "the source names a DC without saying which save",
+          "route": "skin"
+        },
+        {
+          "type": "ability_drain",
+          "target": "int",
+          "dice": "1d4",
           "route": "skin"
         }
       ],
@@ -4117,7 +4583,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A parasitic bush that grows on trees, it is most famous for being revered by druids, due to it appearing to grow out of nowhere and never touching the ground. The berries stimulate the immune system in response to cancers and wild growths. Drinking an extract grants a +3 bonus to all saves against any transformation process, whether natural like cancers, or supernatural like polymorph other. This can be used once per day. Unless this trait is separated by a herbalist, using mistletoe in this manner subjects the user to a more hazardous trait: it can cause agitation and contractions in the abdominal region, including the uterus in women. In pregnant women, this can be fatal for both fetus and mother. If a female eats more than a few berries they must make a DC 19 Fortitude save or take 1d4 Constitution damage and 1d8 damage from bleeding. A successful save results in half damage. In either case, any pregnancy is aborted. Men affected by the toxin must make a DC 12 Fortitude save to avoid 1 point of Con damage due to spasms; a critical failure adds 1d4 damage from internal bleeding.",
+      "text": "The druids' plant. An extract of the berries gives a +2 alchemical bonus on Fortitude saves against any transformation, polymorph or wild growth, for an hour. Unseparated, the berries cramp the gut: a DC 19 Fortitude save or 1d4 Constitution damage.",
       "risky": true,
       "biomes_inferred": false,
       "biomes": [
@@ -4127,28 +4593,27 @@
       "hybrid": false,
       "effects": [
         {
-          "type": "situational_mod",
-          "amount": 3,
-          "target": "saves against any transformation process, whether…",
+          "type": "save_mod",
+          "amount": 2,
+          "target": "fort",
           "bonus_type": "alchemical",
+          "note": "against polymorph and transformation",
+          "duration": {
+            "amount": "1",
+            "unit": "hour"
+          },
+          "route": "ingest"
+        },
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 19,
           "route": "ingest"
         },
         {
           "type": "ability_damage",
           "target": "con",
           "dice": "1d4",
-          "route": "ingest"
-        },
-        {
-          "type": "ability_damage",
-          "target": "con",
-          "dice": "1",
-          "route": "ingest"
-        },
-        {
-          "type": "save_gate",
-          "dc": 19,
-          "note": "the source names a DC without saying which save",
           "route": "ingest"
         }
       ],
@@ -4165,7 +4630,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "This pale, translucent fern resembles wisps of fog and grows in damp, shadowy caves. Inhaling the spores of Mistveil Fern grants the ability to become partially incorporeal for 10 minutes, allowing the user to pass through thin barriers (up to 1 inch thick), but they take a –3 penalty to physical damage dealt due to their reduced solidity.",
+      "text": "A pale, translucent fern of damp caves. A deep breath of its spores makes the user partly incorporeal for 10 minutes (alchemy's use). A shallow one only loosens the body: a +2 alchemical bonus on Escape Artist checks for 10 minutes.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -4196,6 +4661,17 @@
             "unit": "minute"
           },
           "route": "external"
+        },
+        {
+          "type": "skill_mod",
+          "amount": 2,
+          "target": "escape artist",
+          "bonus_type": "alchemical",
+          "duration": {
+            "amount": "10",
+            "unit": "minute"
+          },
+          "route": "inhale"
         }
       ],
       "effects_converted": "authored 2026-08-23: benefits from the herb's own prose"
@@ -4211,7 +4687,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Juice smeared on a weapon as a poison.",
+      "text": "The juice is smeared on a weapon as a poison, 1d3 poison damage (alchemy's use). In a weak liniment rubbed on sore muscle it heals 1d3 non-lethal damage.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -4228,6 +4704,12 @@
           "note": "smeared on a weapon",
           "lethality": "lethal",
           "route": "external"
+        },
+        {
+          "type": "heal",
+          "dice": "1d3",
+          "lethality": "nonlethal",
+          "route": "skin"
         }
       ],
       "effects_converted": "authored 2026-08-23: benefits from the herb's own prose"
@@ -4243,7 +4725,7 @@
       "craft_dc": 10,
       "source": "",
       "harvesting": "",
-      "text": "Boiled leaves used to make a burn salve. Heals 1d6 points of fire damage if applied within two rounds of injury. DC: 10.",
+      "text": "Boiled leaves make a burn salve (DC 10). Spread on a burn within two rounds it heals 1d4 hit points and gives resist fire 2 for 10 minutes.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -4255,13 +4737,17 @@
       "effects": [
         {
           "type": "heal",
-          "dice": "1d6",
+          "dice": "1d4",
           "route": "skin"
         },
         {
-          "type": "save_gate",
-          "dc": 10,
-          "note": "the source names a DC without saying which save",
+          "type": "resistance",
+          "target": "fire",
+          "amount": 2,
+          "duration": {
+            "amount": "10",
+            "unit": "minute"
+          },
           "route": "skin"
         }
       ],
@@ -4278,7 +4764,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Leaves brewed into a love potion.",
+      "text": "Leaves brewed into a love potion. The drinker warms to whoever served it: a +2 alchemical bonus on Diplomacy toward them for an hour.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
