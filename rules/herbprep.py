@@ -34,6 +34,12 @@ ANIMAL_HOURS = 48
 PLANT_HOURS = 24 * 7
 
 # What each step does to potency, before the herbalist's own skill is added.
+#
+# THE RETIRED CHAIN BENCH'S NUMBERS. The table's step bench reads its multipliers from
+# content/rules/herbal-methods.json (grind x1.1, brew x1.0 with the decoction's x1.25 on
+# the product, plan §6), and the Herbalist level no longer scales potency: it raises the
+# quality ceiling and the check instead. These stay only for `crafting.preview`, the old
+# chain reader kept as a library; nothing a player clicks reaches them.
 GRIND_POTENCY = 0.25
 BREW_POTENCY = 0.25
 PRESERVE_POTENCY = -0.20
@@ -42,7 +48,10 @@ PRESERVE_POTENCY = -0.20
 # same leaf, which is what levelling a craft is for.
 PER_LEVEL = 0.05
 
-STATES = ("raw", "extracted", "neutralised", "ground", "preserved")
+# The ingredient states (docs/herbalism-contracts.md §2). "dried" is the step bench's
+# Dry; "preserved" left the list with the Preserve method — salting is a flag on the
+# satchel (`Actor.preserved`), not a state an ingredient is worked into.
+STATES = ("raw", "extracted", "neutralised", "ground", "dried")
 
 
 @dataclass(frozen=True)
@@ -140,7 +149,7 @@ def preserve_automatically(actor, prep: Prep) -> tuple[bool, float, str]:
     the whole condition; the potency it costs is the price, and it is charged once.
     """
     if not has_salt(actor):
-        return False, 0.0, ("no salt — this keeps for "
+        return False, 0.0, ("no salt: this keeps for "
                             f"{spoils_after(prep)} hours and then it is refuse")
     return True, potency_change("preserve"), "preserved with salt"
 
@@ -177,7 +186,15 @@ def can(step: str, prep: Prep, state: str = "raw") -> tuple[bool, str]:
         if state == "ground":
             return False, "it is already ground"
         if prep.volatile and state != "neutralised":
-            return False, "it is volatile — neutralise it before grinding"
+            # A colon, not a dash: this sentence is printed on the bench's tiles, and the
+            # bench's player-facing strings carry no em-dashes (UI plan §8).
+            return False, "it is volatile: neutralise it before grinding"
+        return True, ""
+
+    if step == "dry":
+        # The step bench's solid concentration (plan §5.3): anything solid that is out
+        # of its shell. Whether it is solid is the bench's question, not the
+        # ingredient's flags'.
         return True, ""
 
     if step == "mix":
@@ -191,7 +208,11 @@ def can(step: str, prep: Prep, state: str = "raw") -> tuple[bool, str]:
         return False, "it can only be brewed once it has been ground"
 
     if step == "preserve":
-        return True, ""
+        # Retired as a bench method on 2026-10-02 (plan §2). Salt in the satchel still
+        # cures a fresh thing as it is picked (`preserve_automatically`), which was never
+        # a step anyone took at the bench.
+        return False, ("preserving is not a bench step any more: salt in your pack "
+                       "cures a fresh thing as it is picked")
 
     return False, f"{step!r} is not something you can do to an ingredient"
 
@@ -213,7 +234,7 @@ def after(step: str, state: str = "raw") -> str:
     """The state a step leaves the ingredient in."""
     step, state = str(step).lower(), str(state or "raw").lower()
     return {"extract": "extracted", "neutralise": "neutralised",
-            "grind": "ground"}.get(step, state)
+            "grind": "ground", "dry": "dried"}.get(step, state)
 
 
 # --- infusions ----------------------------------------------------------------------

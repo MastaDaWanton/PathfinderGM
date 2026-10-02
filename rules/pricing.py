@@ -145,9 +145,25 @@ def _open_worth(item) -> float:
             pass
 
     potency = _as_float(_field(item, "potency"), 1.0)
+    # A step-bench thing carries `potency` 1.0, because its strength is baked into the
+    # effects the engine runs (rules/crafting.py, "THE STEP BENCH"); the strength itself
+    # rides in `mults`, and that is what it is worth.
+    mults = _field(item, "mults") or {}
+    if isinstance(mults, dict) and mults.get("potency"):
+        potency = _as_float(mults.get("potency"), potency)
     price = _tier_base(_field(item, "tier")) * (potency ** POTENCY_EXPONENT)
     if not _does_something(item):
         price *= INERT_FACTOR
+    # "Worth more" (plan §2): the quality ladder's price column, x0.5 Crude to x3
+    # Flawless and +0.5 a step beyond (content/rules/herbal-quality.json, §12).
+    quality = _field(item, "quality")
+    if quality is not None:
+        from . import crafting
+
+        try:
+            price *= crafting.quality_mult("price", int(quality))
+        except (TypeError, ValueError):
+            pass
     # Round to the copper. Fractions of a copper are not money.
     return round(price, 2)
 

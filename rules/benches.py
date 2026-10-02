@@ -134,7 +134,27 @@ def with_shape(body: dict) -> dict:
     return dict(body or {}, **{k: said for k in SHAPE_ALIASES})
 
 
+class MovedBench(UnknownBench):
+    """A craft whose chains are worked at another bench now. Herbalism moved to the
+    table's step bench on 2026-10-02 (play/bench_views.py); its old chain reader is kept
+    as a library, and this table refuses to route a chain to it rather than quietly
+    running the retired rules."""
+
+
+MOVED: dict[str, str] = {
+    "herbalist": ("Herbalism works one step at a time at the table's bench now. "
+                  "The chain bench no longer takes herbalism."),
+}
+
+
+def _not_moved(track_id: str, mode: str = "") -> None:
+    key = (track_id or "").strip().lower()
+    if not mode and key in MOVED:
+        raise MovedBench(MOVED[key])
+
+
 def chain_from_body(track_id: str, body: dict, mode: str = ""):
+    _not_moved(track_id, mode)
     mod = module_for(track_id, mode)
     if hasattr(mod, "chain_from_body"):
         return mod.chain_from_body(with_shape(body))
@@ -148,6 +168,7 @@ def preview(track_id: str, level: int, chain, mode: str = "", **kw):
     see the module docstring. `track_id` is passed positionally only to herbalism,
     whose signature predates the table and takes it first.
     """
+    _not_moved(track_id, mode)
     mod = module_for(track_id, mode)
     fn = mod.preview
     params = inspect.signature(fn).parameters
@@ -177,7 +198,10 @@ def glyphs() -> dict[str, dict[str, str]]:
     out: dict[str, dict[str, str]] = {
         # The original four, from the herb corpus.
         "herbalist": {"herb": "🌿", "fungus": "🍄", "monster part": "🦴",
-                      "poison": "☠️"},
+                      "poison": "☠️",
+                      # Oil, spirits, vinegar, beeswax and the neutralizers (Lane A,
+                      # content/materials, kind "reagent").
+                      "reagent": "🫗"},
     }
     for track in BENCHES:
         if track == "herbalist":
@@ -200,9 +224,15 @@ def glyphs() -> dict[str, dict[str, str]]:
 # wants to override declares its own `METHOD_GLYPH` and it wins.
 METHOD_GLYPHS: dict[str, dict[str, str]] = {
     "herbalist": {
-        "grind": "⚗️", "mix": "🥣", "brew": "🫖", "preserve": "🧊", "extract": "🔪",
-        "distill": "⚱️", "purify": "💧", "infuse": "✨", "neutralize": "🧪",
-        "refine": "💎", "catalyst crafting": "🌟",
+        "grind": "⚗️", "mix": "🥣", "brew": "🫖", "extract": "🔪",
+        "infuse": "✨", "neutralize": "🧪",
+        # The step bench's new methods (docs/herbalism-revamp-plan.md §6).
+        "dry": "🌾", "reduce": "♨️", "steep": "🍶",
+        # MERGE: drop these five once lane/herb-progress lands. The owner retired them
+        # (plan §2) and the Herbalist document loses them on that branch; until it does,
+        # the old page still lists them and every listed station owes an icon.
+        "preserve": "🧊", "distill": "⚱️", "purify": "💧", "refine": "💎",
+        "catalyst crafting": "🌟",
     },
     "blacksmith": {
         "smelt": "🔥", "forge": "🔨", "quench": "💧", "flux": "🧱", "rivet": "🔩",

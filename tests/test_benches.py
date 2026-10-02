@@ -377,3 +377,31 @@ def test_a_shape_the_bench_does_not_make_is_refused_by_name(client):
                     content_type="application/json")
     assert r.status_code == 400
     assert "satchel" in r.json()["error"], r.json()["error"]
+
+
+# --- herbalism moved to the table's step bench (2026-10-02) ---------------------------
+
+def test_the_routing_table_refuses_a_herbalism_chain_with_the_reason():
+    """The retired chain rules are kept as a library (`crafting.preview`), and a routing
+    table that still sent herbalism chains to them would run rules the owner retired. It
+    refuses instead, saying where the bench went; the four other crafts route as before."""
+    from rules.crafting import Chain
+
+    with pytest.raises(benches.MovedBench) as why:
+        benches.preview("herbalist", 1, Chain("herbalist", ["grind"], ["woundwort"]))
+    assert "at the table's bench" in str(why.value)
+    with pytest.raises(benches.MovedBench):
+        benches.chain_from_body("herbalist", {"methods": ["grind"]})
+    assert benches.chain_from_body("blacksmith", {"methods": ["smelt"]}) is not None
+
+
+def test_the_step_bench_methods_and_reagents_have_icons_of_their_own():
+    """Dry, Reduce and Steep are new stations, and reagents a new kind of material; each
+    owes the old page a glyph of its own rather than the fallback crate (the defect
+    `test_every_station_has_an_icon_of_its_own` records)."""
+    glyphs = benches.method_glyphs("herbalist")
+    for method in ("grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep",
+                   "neutralize"):
+        assert glyphs.get(method), method
+    assert len(set(glyphs.values())) == len(glyphs)
+    assert benches.glyphs()["herbalist"].get("reagent")

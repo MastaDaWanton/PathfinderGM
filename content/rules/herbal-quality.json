@@ -1,0 +1,10 @@
+{
+  "_note": "The quality ladder (docs/herbalism-revamp-plan.md §2, §4.3, §12). These are the owner-accepted starting values from 2026-10-02, tunable in play. The minigame score (0..1, from the player's hands) is spread evenly over the crafter's ladder up to their ceiling; the server, never the page, turns it into one of these indices. `potency` scales a product's benefits and `duration` how long they last ('stronger and longer'), `drawback` scales its harm ('softens drawbacks'), `price` its worth ('worth more'). Past Flawless the ladder runs on as Flawless +1, +2 and so on, by the `beyond` steps.",
+  "tiers": ["Crude", "Sound", "Fine", "Superior", "Flawless"],
+  "potency":  [0.8, 1.0, 1.15, 1.3, 1.5],
+  "duration": [0.8, 1.0, 1.15, 1.3, 1.5],
+  "drawback": [1.25, 1.0, 0.75, 0.5, 0.25],
+  "price":    [0.5, 1.0, 1.5, 2.0, 3.0],
+  "beyond": {"name": "Flawless +{n}", "potency_step": 0.1, "duration_step": 0.1,
+             "drawback": 0.25, "price_step": 0.5}
+}
