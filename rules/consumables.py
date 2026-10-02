@@ -175,6 +175,14 @@ class Poison:
             return ""
         return f"{SAVES.get(self.save, '')} DC {dc}".strip()
 
+    def branch_of(self, spec: dict) -> str:
+        """Which verdict of the save this body belongs to: "success" only for a body an
+        author wrote under the gate's `on_success` (the poison that still bites whoever
+        resists it); everything else, the extractor's bare-gate bodies included, is
+        what failing costs. By identity, as `poisons` collected them."""
+        return "success" if any(spec is s for s in (self.gate or {}).get("on_success")
+                                or []) else "failure"
+
     @property
     def lines(self) -> list[str]:
         return [effectspec.render(s) for s in self.effects]
@@ -438,7 +446,7 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
     return []
 
 
-def _gate_intent(poison: Poison, target: str, because: str) -> list[dict]:
+def _gate_intent(poison: Poison, target: str, because: str, label: str = "") -> list[dict]:
     """A poison's saving throw, emitted once before what it does.
 
     The extractor produces `save_gate` as its own effect — "Fortitude DC 25" sits beside
@@ -449,13 +457,30 @@ def _gate_intent(poison: Poison, target: str, because: str) -> list[dict]:
     Falls back to Fortitude when the source names a DC and no save, which is 55 of the
     corpus's 59 gates. Poison is a Fortitude affair in 1e, and rolling the wrong save is
     still better than the alternative here: not rolling at all.
+
+    `label` names this save to the bodies behind it (`_gated`), so the engine can take
+    them off the queue when the save is made (`Engine._link_gates`).
     """
     dc = poison.dc
     if dc is None:
         return []
     return [{"op": "save", "actor": target, "because": because,
              "params": {"save": poison.save or "fort", "dc": {"value": dc}},
-             "visibility": "player"}]
+             "visibility": "player", **({"gate": label} if label else {})}]
+
+
+def _gated(intents: list[dict], label: str, on: str) -> None:
+    """Mark a poison's body intents as its save's to decide. In place.
+
+    Rolling the save first was never enough: until 2026-10-02 the save and its body went
+    to the engine side by side and the body landed whatever the save said — a successful
+    Fortitude save against a jar of dragon flower still took the Constitution and the
+    nausea. Only called when a save was actually emitted; a body with no gate in front of
+    it is harm with no save, and lands.
+    """
+    for intent in intents:
+        intent["gated_by"] = label
+        intent["gated_on"] = on
 
 
 # Words that mean "a jar" and carry nothing about WHICH jar. "My healing potion" and a
@@ -636,10 +661,15 @@ def plan(stock, how: str = "drink", target: str = "pc",
     # saves; before, the second one's save was never rolled at all.
     found = poisons(specs, source=str(name))
     claimed = [s for p in found for s in p.effects] + [p.gate for p in found if p.gate]
-    for poison in found:
-        use.intents.extend(_gate_intent(poison, target, why))
+    for n, poison in enumerate(found):
+        label = f"poison-{n}"
+        gate = _gate_intent(poison, target, why, label)
+        use.intents.extend(gate)
         for spec in poison.effects:
+            start = len(use.intents)
             _resolve(spec, target, potency, why, use)
+            if gate:
+                _gated(use.intents[start:], label, poison.branch_of(spec))
     for spec in specs:
         if str(spec.get("type")) == "save_gate" or any(spec is c for c in claimed):
             continue
@@ -700,11 +730,16 @@ def coating_intents(coating: Coating, target: str) -> list[dict]:
     found = poisons(coating.specs, source=coating.item)
     claimed = [s for p in found for s in p.effects] + [p.gate for p in found if p.gate]
     out: list[dict] = []
-    for poison in found:
-        out.extend(_gate_intent(poison, target, why))
+    for n, poison in enumerate(found):
+        label = f"poison-{n}"
+        gate = _gate_intent(poison, target, why, label)
+        out.extend(gate)
         for spec in poison.effects:
             if effectspec.executable(spec):
-                out.extend(_spec_to_intents(spec, target, coating.potency, why))
+                made = _spec_to_intents(spec, target, coating.potency, why)
+                if gate:
+                    _gated(made, label, poison.branch_of(spec))
+                out.extend(made)
     for spec in coating.specs:
         if str(spec.get("type")) == "save_gate" or any(spec is c for c in claimed):
             continue
