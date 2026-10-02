@@ -445,6 +445,22 @@
     padding: 40px 26px; text-align: center; color: var(--dim); font-style: italic;
     grid-column: 1 / -1;
   }
+  /* Herbalism's tab since the bench moved to the table: one framed card, centred across
+     the three columns, and a way there. Its button is the gold of the theme, not the
+     retired --brew green (docs/herbalism-ui-plan.md §2). The footer's Craft, batch and
+     Save recipe have nothing to act on here, so they stand down. */
+  .moved-card { grid-column: 1 / -1; justify-self: center; align-self: start;
+                width: min(560px, 100%); margin-top: 40px; }
+  .moved-card .inner { padding: 18px 26px 26px; }
+  .moved-card p { margin: 0 0 18px; color: var(--ink); }
+  a.act { display: inline-block; text-decoration: none;
+          font: 400 16px/1 var(--display); letter-spacing: .09em; font-variant: small-caps;
+          padding: 13px 26px; border-radius: 2px; color: var(--gold);
+          background: linear-gradient(#2a2114, #1a140c); border: 1px solid var(--accent); }
+  a.act:hover { color: #f0dcae; border-color: var(--gold); }
+  a.act:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+  body.herb-moved #craft, body.herb-moved #batchwrap, body.herb-moved #save,
+  body.herb-moved .mastery { display: none; }
   .locked-note b { display: block; color: var(--gold); font-style: normal;
     font: 400 21px/1.3 var(--display); letter-spacing: .06em; font-variant: small-caps;
     margin-bottom: 8px; }
@@ -671,6 +687,11 @@ async function selectCraft(id, mode) {
   CHOSEN = []; USING = {}; CHAIN = []; PREVIEW = null;
   $("#err").textContent = "";
   tabs();
+  // Herbalism moved to the table (docs/herbalism-ui-plan.md §4.1): its tab here is one
+  // card and a way there, and the old shelf, chain and preview are never drawn for it.
+  // The other four crafts keep this bench exactly as it was until each is revamped.
+  document.body.classList.toggle("herb-moved", CRAFT === "herbalism");
+  if (CRAFT === "herbalism") { renderHerbalismMoved(); return; }
   const track = STATE.tracks[CRAFT] || {};
   if (!track.available) { renderLocked(); return; }
   const [r, ft] = await Promise.all([
@@ -691,6 +712,21 @@ async function selectCraft(id, mode) {
   adoptGlyphs(d.track);
   renderBench();
   refresh();
+}
+
+// The card that stands where the herbalism bench was. Its one button returns to the
+// table with the bench open (`/play/#bench`, which 30-bench-shell.js opens on load).
+function renderHerbalismMoved() {
+  $("#main").innerHTML = `<section class="panel moved-card" aria-labelledby="moved-title">
+      <h2 id="moved-title">Herbalism is at the table now</h2>
+      <div class="inner">
+        <p>Your satchel, the tools and the herbarium open over the table, where you stand,
+          and the time each step takes passes in the scene.</p>
+        <a class="act moved-go" href="/play/#bench">Open the herbalism bench</a>
+      </div>
+    </section>`;
+  $("#craft").disabled = true; $("#save").disabled = true;
+  $("#mastery").innerHTML = "";
 }
 
 function renderLocked() {
