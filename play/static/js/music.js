@@ -1,7 +1,7 @@
 /* Background music: `window.Music`. The owner's own tracks (2026-10-02, made with Suno as
  * djsolideo; docs/asset-licences.md), looped as two playlists:
  *
- *   ambient   eight calm pieces, under everything that is not a fight
+ *   ambient   nine calm pieces, under everything that is not a fight
  *   battle    five fight pieces, while the table's scene is in an encounter
  *
  *   Music.mode("ambient" | "battle")   crossfade to that playlist (no-op if already there)
@@ -40,7 +40,8 @@
 
   var LISTS = {
     ambient: ["ambient-1", "ambient-2", "ambient-3", "ambient-4", "ambient-5",
-              "alone-in-the-garden-1", "alone-in-the-garden-2", "alone-in-the-garden-3"],
+              "alone-in-the-garden-1", "alone-in-the-garden-2", "alone-in-the-garden-3",
+              "alone-in-the-garden-4"],
     battle: ["against-all-odds-1", "against-all-odds-2", "against-all-odds-3",
              "epic-sad-1", "epic-sad-2"],
   };

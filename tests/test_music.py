@@ -25,10 +25,10 @@ def _lists() -> dict[str, list[str]]:
 
 
 def test_every_track_the_player_names_is_in_the_folder_and_every_file_is_named():
-    """Eight calm and five battle tracks. A name with no file would be a silent gap in the
+    """Nine calm and five battle tracks. A name with no file would be a silent gap in the
     loop; a file with no name would ship 3 to 7 MB nobody ever hears."""
     lists = _lists()
-    assert len(lists["ambient"]) == 8 and len(lists["battle"]) == 5
+    assert len(lists["ambient"]) == 9 and len(lists["battle"]) == 5
     for name, ids in lists.items():
         on_disk = sorted(p.stem for p in (STATIC / "audio" / "music" / name).glob("*.mp3"))
         assert sorted(ids) == on_disk, name

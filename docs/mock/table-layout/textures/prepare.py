@@ -331,6 +331,44 @@ def device(owner: Path) -> None:
     print("device-geometry.js", len(js), "bytes")
 
 
+# The foot: the stem under the bottom plate, its own piece so it can bob with the steam
+# (the owner, 2026-10-02, circling it: "if we could make this go up and down a bit with the
+# smoke puffs that would be excellent"). In the saved frame's own pixels, because the cut is
+# made on device-frame.png after device() writes it: the plate ends at row 324, and rows 325
+# and 326 are its underside in shadow (325 is 43px wide, wider than the stem; 326 is the
+# dark line where the stem meets it), so both stay with the frame and read as the plate's
+# own shadow at any dip; the stem is every opaque row from 327 down. FOOT_LIFT copies of a row from inside
+# the stem (STEM_ROW) are stacked above it behind the plate, so the stem dipping that far
+# never opens a gap. The first cut repeated row 325 instead, and a dip showed its shadow as
+# a wide dark slab under the plate (seen in a composite at the clamp, 2026-10-02).
+# Eight, not the first five: at the table's drawn size (0.31 screen px per photo px) a bob
+# inside five rows measured 0.6 of a screen pixel, which reads as nothing at all.
+FOOT_ROW = 327
+STEM_ROW = 329
+FOOT_LIFT = 8
+
+
+def foot() -> None:
+    """Split device-frame.png into the frame without its foot and device-foot.png, the foot
+    alone on a transparent sheet the frame's size, drawn beneath the frame and moved by
+    13-device.js. Run after device(); idempotent on a frame already split."""
+    frame_path = OUT / "device-frame.png"
+    a = np.array(Image.open(frame_path).convert("RGBA"))
+    if a[FOOT_ROW:, :, 3].max() == 0:
+        print("device-foot.png        already split")
+        return
+    piece = np.zeros_like(a)
+    piece[FOOT_ROW:] = a[FOOT_ROW:]
+    stem = a[STEM_ROW].copy()
+    for r in range(FOOT_ROW - FOOT_LIFT, FOOT_ROW):
+        piece[r] = stem
+    a[FOOT_ROW:] = 0
+    Image.fromarray(piece, "RGBA").save(OUT / "device-foot.png", optimize=True)
+    Image.fromarray(a, "RGBA").save(frame_path, optimize=True)
+    print(f"device-foot.png        {piece.shape[1]}x{piece.shape[0]} "
+          f"{(OUT / 'device-foot.png').stat().st_size:>8d} bytes")
+
+
 def blur(a: np.ndarray, r: float) -> np.ndarray:
     im = Image.fromarray(np.clip(a * 255, 0, 255).astype(np.uint8))
     return np.asarray(im.filter(ImageFilter.GaussianBlur(r)), float) / 255
@@ -409,3 +447,4 @@ if __name__ == "__main__":
     ornaments(args.src)
     room(args.owner)
     device(args.owner)
+    foot()

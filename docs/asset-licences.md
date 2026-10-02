@@ -79,16 +79,19 @@ https://help.suno.com/en/categories/550145, read 2026-10-02):
   sources only; not confirmed on Suno's own pages).
 
 The five "Ambient background music" files are dated 2026-10-02 in their own tags; the
-three "alone in the garden" and all five battle files are dated 2026-04-03. Before any public
-release the owner confirms each was made, and downloaded, on a paid plan.
+four "alone in the garden" and all five battle files are dated 2026-04-03.
+
+**Confirmed by the owner, 2026-10-02:** "i have a subscription and they were not made on
+the free plan". Every track here was made on the owner's paid Suno plan, so it is theirs to
+ship in the installer.
 
 | File | Title in the file | Length |
 |---|---|---|
 | `play/static/audio/music/ambient/ambient-1.mp3` to `ambient-5.mp3` | Ambient background music | 4:40 to 4:58 |
-| `play/static/audio/music/ambient/alone-in-the-garden-1.mp3` to `-3.mp3` | alone in the garden | 2:32 to 3:26 |
+| `play/static/audio/music/ambient/alone-in-the-garden-1.mp3` to `-4.mp3` | alone in the garden | 2:32 to 3:26 |
 | `play/static/audio/music/battle/against-all-odds-1.mp3` to `-3.mp3` | against all odds | 2:18 to 3:02 |
 | `play/static/audio/music/battle/epic-sad-1.mp3`, `epic-sad-2.mp3` | Epic sad | 2:49 to 3:21 |
 
-Kept at the owner's own encoding (about 190 kbps MP3, 64 MB together), not re-encoded:
+Kept at the owner's own encoding (about 190 kbps MP3, 68 MB together), not re-encoded:
 quality of output beats size (CLAUDE.md).
 

@@ -320,6 +320,40 @@
     return noise(c, { at: 0.16, type: "lowpass", f: 1400, q: 0.6, peak: 0.035, d: 0.04 });
   });
 
+  // --- the engine device (13-device.js): the brass status mechanism beside the story.
+  // The owner, 2026-10-02: "this needs sound as well, not too loud". It is heard on every
+  // turn, so every one of these sits well under a ui.click: a clock's escapement, not a
+  // factory. Ticks come from the large gear's own turning (the device paces them), the
+  // puffs from its own steam, and the settle, sigh and lever from its own events.
+  def("ui.device.tick", 4, function (c) {
+    // One tooth of a cog meeting the next: a small, soft metallic click with a hint of
+    // ring, not a clock's tick. Dense at speed (the device paces them off both gears), so
+    // each one is quiet; the bed (machine(), below) carries the motion between them.
+    noise(c, { f: k(c, [3600, 3200, 4100, 3400]), q: 5, peak: 0.014, d: 0.006 });
+    return tone(c, { type: "sine", f: k(c, [2350, 2600, 2150, 2480]),
+                     peak: 0.004, a: 0.001, d: 0.03 });
+  });
+  def("ui.device.puff", 3, function (c) {
+    // A short breath of steam from the foot, soft and low in the mix.
+    return noise(c, { src: "pink", type: "bandpass", f: k(c, [1400, 1250, 1550]), f2: 900,
+                      q: 0.9, peak: 0.016, a: 0.02, d: 0.16 });
+  });
+  def("ui.device.settle", 2, function (c) {
+    // The gears coming to rest: a low wooden-brass thunk, felt more than heard.
+    return knock(c, { f: k(c, [180, 200]), peak: 0.03, lp: 600, d: 0.06 });
+  });
+  def("ui.device.sigh", 2, function (c) {
+    // The burst of steam as the machine stops on an answer: a longer, falling hiss.
+    return noise(c, { src: "pink", type: "bandpass", f: 1800, f2: 700, q: 0.8,
+                      peak: 0.03, a: 0.05, d: 0.7 });
+  });
+  def("ui.device.lever", 3, function (c) {
+    // The lever popping up and the tab sliding out: a spring-loaded brass click and a
+    // faint ring of the plate, the "your turn is ready" of the machine.
+    noise(c, { f: k(c, [3000, 3300, 2800]), q: 4, peak: 0.03, d: 0.012 });
+    return bell(c, { at: 0.015, f: k(c, [1320, 1400, 1250]), peak: 0.012, d: 0.35 });
+  });
+
   // --- dice: the rattle in the hand and the landing clack (dice3d.js's own clack,
   // moved here so it obeys the volume and the mute).
   function rattle(c, f, n, peak) {
@@ -801,6 +835,81 @@
 
   var SILENT_LOOP = { stop: function () {} };
 
+  // The engine device's running bed (13-device.js). The owner's reference, 2026-10-02, was
+  // "{ASMR} Gears Spinning Cog Machine": not a clock's discrete tick but cogs meshing
+  // continuously. Three quiet layers, all following the gears' speed (0 to 1), so the
+  // machine winds up when a turn starts and winds down as the gears ease to a stop:
+  //   a low rumble of bearings (brown noise, band-passed low),
+  //   the fine "zzz" of teeth meshing (pink noise, band-passed high, pulsed at the tooth
+  //   rate by a sine LFO, so it has the flutter of cogs rather than a hiss),
+  //   and a faint hum under both.
+  // On the ui bus, and kept under the ticks: it is a bed, never a drone.
+  var SILENT_MACHINE = { speed: function () {}, stop: function () {} };
+  function machine() {
+    try {
+      var x = ensure();
+      if (!x || !hasGesture() || masterLevel() <= 0) return SILENT_MACHINE;
+      var out = x.createGain();
+      out.gain.value = 0;
+      out.connect(buses.ui);
+      var nodes = [];
+      var src = function (kind) {
+        var s = x.createBufferSource();
+        s.buffer = buf(kind); s.loop = true;
+        s.playbackRate.value = 0.94 + Math.random() * 0.12;
+        nodes.push(s); return s;
+      };
+      var band = function (f, q) {
+        var b = x.createBiquadFilter(); b.type = "bandpass"; b.frequency.value = f; b.Q.value = q;
+        return b;
+      };
+      // Rumble.
+      var rumble = src("brown"), rb = band(240, 0.8), rg = x.createGain();
+      rg.gain.value = 0.55;
+      rumble.connect(rb); rb.connect(rg); rg.connect(out);
+      // Meshing teeth: a pulsed band of pink noise.
+      var mesh = src("pink"), mb = band(2600, 2.2), mg = x.createGain();
+      mg.gain.value = 0.18;
+      var lfo = x.createOscillator(), lfoAmt = x.createGain();
+      lfo.type = "sine"; lfo.frequency.value = 10; lfoAmt.gain.value = 0.16;
+      lfo.connect(lfoAmt); lfoAmt.connect(mg.gain);
+      mesh.connect(mb); mb.connect(mg); mg.connect(out);
+      nodes.push(lfo);
+      // Hum.
+      var hum = x.createOscillator(), hg = x.createGain();
+      hum.type = "triangle"; hum.frequency.value = 72; hg.gain.value = 0.12;
+      hum.connect(hg); hg.connect(out);
+      nodes.push(hum);
+      var t0 = x.currentTime + 0.01;
+      nodes.forEach(function (n) { try { n.start(t0); } catch (e) { /* */ } });
+      var stopped = false;
+      return {
+        // 0 to 1: the gears' speed. Loudness, the tooth rate and a little pitch follow it.
+        speed: function (v) {
+          if (stopped) return;
+          v = clamp(Number(v), 0, 1);
+          var now = x.currentTime;
+          out.gain.setTargetAtTime(0.035 * v, now, 0.08);
+          lfo.frequency.setTargetAtTime(4 + 16 * v, now, 0.1);
+          rb.frequency.setTargetAtTime(160 + 140 * v, now, 0.1);
+          hum.frequency.setTargetAtTime(52 + 30 * v, now, 0.1);
+        },
+        stop: function () {
+          if (stopped) return;
+          stopped = true;
+          var now = x.currentTime;
+          out.gain.setTargetAtTime(0, now, 0.12);
+          setTimeout(function () {
+            nodes.forEach(function (n) { try { n.stop(); } catch (e) { /* */ } });
+            try { out.disconnect(); } catch (e) { /* */ }
+          }, 900);
+        },
+      };
+    } catch (e) {
+      return SILENT_MACHINE;
+    }
+  }
+
   function loop(name) {
     try {
       var parts = String(name).split(".");
@@ -830,6 +939,7 @@
   window.Sound = {
     play: play,
     loop: loop,
+    machine: machine,
     unlock: unlock,
     names: names,
     has: function (name) {

@@ -160,6 +160,7 @@ const DEVICE_IMG_BASE = (() => {
     <circle cx="${kx}" cy="${ky}" r="${kr * 0.95}" fill="url(#dvball)" stroke="#2a1c0a" stroke-width="1.6"/>`;
   el.querySelector(".dv-frame").after(top);
   const lever = top.querySelector(".dv-lever"), bloom = top.querySelector(".dv-bloom");
+  const footEl = el.querySelector(".dv-foot");
 
   // The tab (the owner's "glowing bit that pops out green"): the photograph's own piece,
   // cut out by prepare.py, under the frame so that pulled in it is inside the body. Out, it
@@ -203,16 +204,64 @@ const DEVICE_IMG_BASE = (() => {
 
   // --- The model ---------------------------------------------------------------------
   const fresh = () => ({
-    t: 0, mode: "idle", omega: 0, aS: 0, largeTurns: 0, nextPuff: T.PUFF_EVERY,
+    t: 0, mode: "idle", omega: 0, aS: 0, largeTurns: 0, nextPuff: T.PUFF_EVERY, nextTick: 0,
     halt: null, stopAt: null, leverAt: null, readyAt: null,
     lever: LEVER_UP, leverV: 0, leverTarget: LEVER_UP,
     tab: 0, tabV: 0, tabTarget: 0,                       // 0 in, 1 out
     green: 1, lampLevel: 0.5, puffs: [], seq: 0, nextTrickle: 0, log: [],
+    foot: 0, footV: 0,                                   // photo px down from rest
   });
   const M = fresh();
 
   // Each event with the model's time and the wall clock (for the measured gap).
-  function event(name) { M.log.push([name, Math.round(M.t), Math.round(performance.now())]); }
+  function event(name) {
+    M.log.push([name, Math.round(M.t), Math.round(performance.now())]);
+    sound(EVENT_SOUND[name]);
+  }
+
+  // --- Its sound (the owner, 2026-10-02: "this needs sound as well, not too loud"). Each
+  // is one of the model's own moments, so the ear and the eye cannot disagree: a puff of
+  // steam is heard as it is drawn, the settle as the gears stop, the lever as it lifts.
+  // The ticks are the large gear's teeth passing, paced by its real speed, so they slow
+  // as it eases to a stop. All on the quiet ui bus (sound.js "ui.device.*").
+  const EVENT_SOUND = {
+    "puff": "ui.device.puff", "gears-stopped": "ui.device.settle",
+    "last-puff": "ui.device.sigh", "lever-up": "ui.device.lever",
+  };
+  // Tooth clicks (the owner's reference: a spinning cog machine, not a clock): one every
+  // eighth of a turn of the large gear, each at a slightly different pitch and spacing, so
+  // the stream reads as teeth meshing rather than a metronome.
+  const TICK_EVERY = 1 / 8;                            // turns of the large gear per click
+
+  // --- The foot (the owner, 2026-10-02: "if we could make this go up and down a bit with
+  // the smoke puffs that would be excellent"). The stem under the bottom plate is its own
+  // piece (device-foot.png, beneath the frame), kicked down by each puff as the puff
+  // appears, in proportion to its size, and brought back by a stiff spring with a slight
+  // bounce: a steady bob while the gears run, a deeper one with the burst at the stop.
+  // Clamped inside the stem's hidden extension under the plate (prepare.py FOOT_LIFT: eight
+  // rows of the 0.45-scale sheet, 17 photo px), so a dip never opens a gap. The kick was
+  // 130 at first and measured a 0.6-pixel bob at the table's size: there, but invisible.
+  const FOOT = { KICK: 650, K: 1100, C: 36, MAX: 15, MIN: -4 };
+  // A tab brought back from the background catches the model up in one frame's worth of
+  // steps; without this every tick and puff it missed would sound at once.
+  const lastSaid = {};
+  function sound(name, opts) {
+    if (!name || !window.Sound) return;
+    const now = performance.now();
+    if (now - (lastSaid[name] || -1e9) < (name === "ui.device.tick" ? 28 : 70)) return;
+    lastSaid[name] = now;
+    try { Sound.play(name, opts); } catch (err) { /* the machine works in silence too */ }
+  }
+  // The running bed: started when the gears begin to turn, its speed set from theirs every
+  // frame, stopped once they are still.
+  let bed = null;
+  function bedFollow() {
+    if (!window.Sound || typeof Sound.machine !== "function") return;
+    const v = Math.min(1, M.omega / OMEGA);
+    if (v > 0.01 && !bed) bed = Sound.machine();
+    if (!bed) return;
+    if (v <= 0.01) { bed.stop(); bed = null; } else bed.speed(v);
+  }
 
   function step(dt) {
     M.t += dt;
@@ -243,6 +292,11 @@ const DEVICE_IMG_BASE = (() => {
     }
     M.aS += M.omega * dt / 1000;
     M.largeTurns += M.omega * dt / 1000 / RATIO / 360;
+    if (M.omega > 1 && M.largeTurns >= M.nextTick) {
+      const v = Math.min(1, M.omega / OMEGA);
+      sound("ui.device.tick", { volume: 0.55 + 0.45 * v, rate: 0.9 + 0.2 * Math.random() });
+      M.nextTick = M.largeTurns + TICK_EVERY * (0.8 + 0.4 * Math.random());
+    }
     // (run() re-arms nextPuff from where the gear is: the halt turns it past the old mark,
     // and a test that the mark was crossed this step then never fired again. Measured:
     // turns three to five of a live run had no steam at all.)
@@ -277,6 +331,13 @@ const DEVICE_IMG_BASE = (() => {
     } else if (M.mode === "idle") {
       M.lampLevel += (0.5 - M.lampLevel) * (1 - Math.exp(-dt / 400));
     }
+    for (const p of M.puffs) {
+      if (!p.kicked && M.t >= p.t0) { p.kicked = true; M.footV += FOOT.KICK * p.size; }
+    }
+    const facc = -FOOT.K * M.foot - FOOT.C * M.footV;
+    M.footV += facc * dt / 1000; M.foot += M.footV * dt / 1000;
+    if (M.foot > FOOT.MAX) { M.foot = FOOT.MAX; M.footV = Math.min(0, M.footV); }
+    if (M.foot < FOOT.MIN) { M.foot = FOOT.MIN; M.footV = Math.max(0, M.footV); }
     M.puffs = M.puffs.filter(p => M.t - p.t0 < p.life);
   }
   function spawn(size, life, delay = 0, name = "puff") {
@@ -308,6 +369,8 @@ const DEVICE_IMG_BASE = (() => {
     gradS.setAttribute("gradientTransform", `rotate(${(-M.aS).toFixed(2)} ${sx} ${sy})`);
     gradL.setAttribute("gradientTransform", `rotate(${(-aL).toFixed(2)} ${lx} ${ly})`);
     lever.setAttribute("transform", `rotate(${M.lever.toFixed(2)} ${kx} ${ky})`);
+    if (footEl) footEl.style.transform = `translateY(${(M.foot * px()).toFixed(2)}px)`;
+    bedFollow();
     const green = M.leverTarget === LEVER_UP && M.mode !== "running" && M.mode !== "waiting";
     el.style.setProperty("--lamp", green ? "#8ef07e" : "#ffb23c");
     el.style.setProperty("--lamp-deep", green ? "#1e6a1a" : "#8a4a08");
@@ -358,7 +421,8 @@ const DEVICE_IMG_BASE = (() => {
     draw();
     const moving = M.mode !== "idle" || M.omega > 0.01 || M.puffs.length || M.halt
       || Math.abs(M.lever - M.leverTarget) > 0.05 || Math.abs(M.leverV) > 0.05
-      || Math.abs(M.tab - M.tabTarget) > 0.002 || Math.abs(M.tabV) > 0.002;
+      || Math.abs(M.tab - M.tabTarget) > 0.002 || Math.abs(M.tabV) > 0.002
+      || Math.abs(M.foot) > 0.02 || Math.abs(M.footV) > 0.05;
     raf = moving ? requestAnimationFrame(loop) : 0;
   }
   function wake() { if (!raf) { last = performance.now(); acc = 0; raf = requestAnimationFrame(loop); } }

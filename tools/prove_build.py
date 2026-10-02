@@ -664,13 +664,13 @@ def check_the_herbalism_bench_ships(http: Http, repo: Path) -> None:
 
 
 def check_the_soundtrack_ships(http: Http, repo: Path) -> None:
-    """The owner's thirteen tracks (play/static/audio/music), each fetched whole from the
+    """The owner's fourteen tracks (play/static/audio/music), each fetched whole from the
     frozen exe as audio. Like the bench's files, nothing else names them one by one, so a
     track that did not ship would only ever be a silent gap in the loop."""
     faults = []
     tracks = sorted((repo / "play" / "static" / "audio" / "music").rglob("*.mp3"))
-    if len(tracks) < 13:
-        faults.append(f"{len(tracks)} tracks in the repo; expected the owner's 13")
+    if len(tracks) < 14:
+        faults.append(f"{len(tracks)} tracks in the repo; expected the owner's 14")
     for t in tracks:
         rel = t.relative_to(repo / "play" / "static").as_posix()
         s, body = http.get(f"/static/{rel}")
