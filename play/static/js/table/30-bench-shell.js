@@ -349,14 +349,12 @@
   });
 
   // A game running while the player's attention is elsewhere would score time they were
-  // not there for (UI plan §7): it pauses on blur and carries on on focus (contracts §5.2).
+  // not there for (UI plan §7): it pauses on blur. It does NOT carry on by itself on
+  // focus: the UI plan's line is "Paused. Press Space to carry on.", and resuming the
+  // instant the window came back would start the clock before the player's hand was on
+  // the key (the games lane's note at merge). The frame waits for Space or a click.
   window.addEventListener("blur", function () {
     if (B.live && window.BenchGames && BenchGames.pause) { try { BenchGames.pause(); } catch (err) { /* */ } }
-  });
-  window.addEventListener("focus", function () {
-    if (B.live && window.BenchGames && BenchGames.resume && !stopAsking) {
-      try { BenchGames.resume(); } catch (err) { /* */ }
-    }
   });
 
   // --- the opener buttons and the #bench hash (UI plan §4.1) ----------------------------
