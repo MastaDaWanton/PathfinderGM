@@ -2643,6 +2643,17 @@
   .eqname .facts { display: block; color: var(--dim); font-size: 13.5px; line-height: 1.35; }
   .eqname .eqnote { font-style: italic; }
   .eqacts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+  /* The Use menu: where a jar goes, under its row (05-sheet.js eqUseMenu). The places
+     are buttons with what each does in words, never colour alone. */
+  .equse { grid-column: 1 / -1; display: grid; gap: 8px; padding: 8px 0 2px;
+           border-top: 1px solid var(--edge); }
+  .equse-to { display: flex; align-items: center; gap: 8px; color: var(--dim); font-size: 14px; }
+  .equse-to select { font: inherit; color: var(--ink); background: var(--sunk);
+                     border: 1px solid var(--gold-dim); border-radius: 3px; padding: 3px 6px; }
+  .equse-places { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+  .equse-place { display: grid; gap: 2px; text-align: left; padding: 6px 10px; }
+  .equse-place b { font-weight: 600; }
+  .equse-place span { color: var(--dim); font-size: 13px; line-height: 1.35; }
   .eqempty { padding: 10px 12px; color: var(--ink); background: rgba(8, 6, 4, .55); border-radius: 3px;
              font-size: 15px; }
   .eqsay:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
@@ -3752,8 +3763,10 @@ window.BENCH_ICON_URLS = {
 {% asset 'js/bench-games/infuse.js' as g_infuse %}{% if '?v=' in g_infuse %}<script src="{% asset 'js/bench-games/infuse.js' %}"></script>{% endif %}
 {% asset 'js/bench-games/steep.js' as g_steep %}{% if '?v=' in g_steep %}<script src="{% asset 'js/bench-games/steep.js' %}"></script>{% endif %}
 {% asset 'js/bench-games/neutralize.js' as g_neutralize %}{% if '?v=' in g_neutralize %}<script src="{% asset 'js/bench-games/neutralize.js' %}"></script>{% endif %}
-{# The stage's renderer (Lane F), in its own load order: maths, the GL layer, meshes, the
-   procedural grounds, particles, props, then the nine tools. 32 below is its API. #}
+{% comment %}The stage's renderer (Lane F), in its own load order: maths, the GL layer,
+meshes, the procedural grounds, particles, props, then the nine tools. 32 below is its
+API. A comment block, not {# #}: Django's hash comment is one line only, and the two-line
+one printed itself at the foot of the table (seen live, 2026-10-02).{% endcomment %}
 <script src="{% asset 'js/bench-stage/00-math.js' %}"></script>
 <script src="{% asset 'js/bench-stage/01-gl.js' %}"></script>
 <script src="{% asset 'js/bench-stage/02-meshes.js' %}"></script>

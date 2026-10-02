@@ -431,10 +431,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `targets: []` (item 22). `at` is still read, as `ref:<at>`.
     "cast": (("spell",), ("at", "level", "defensively", "square", "choose", "aim"),
              "hidden"),
-    # Crafted potions and tinctures doing something. `how` is drink, throw or coat, and
-    # the difference is real: a splash weapon is a ranged touch attack and a coated blade
-    # waits for the next hit. Before these an item was a paragraph in a satchel.
-    "use_item": (("item",), ("how", "to", "weapon"), "player"),
+    # Crafted potions and tinctures doing something. `how` is drink, apply, throw or coat,
+    # and the difference is real: a splash weapon is a ranged touch attack and a coated
+    # blade waits for the next hit. Before these an item was a paragraph in a satchel.
+    # `apply` puts a product where `route` says (eyes, wound, skin, inhale) and only that
+    # route's effects land (consumables.plan; the owner, 2026-10-02).
+    "use_item": (("item",), ("how", "to", "weapon", "route"), "player"),
     # Selling something. There was no op for this at all, and the absence was not
     # theoretical: a player asked a stallholder to price a satchel holding a
     # potency-1,335 draught, haggled her up from ten gold to twenty-two, shook her hand

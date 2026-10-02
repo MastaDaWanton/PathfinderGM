@@ -1107,6 +1107,46 @@ def _sheet_payload(pc) -> dict:
     return out
 
 
+def _use_menu(stock, item_id: str) -> list[dict]:
+    """The Use button's places for one jar: each route it works through, what it does
+    there in the engine's own words, and the body `/api/use` takes for it. Only places
+    with something that lands (`consumables.routes_of`), so a tincture offers "Drink it"
+    and nothing else, and an eye salve offers the eyes and a wound."""
+    from rules import consumables, effectspec
+    from rules.ingredients import route_of
+
+    out = []
+    for route in consumables.routes_of(stock):
+        label = consumables.ROUTE_USE[route][0]
+        lines = [effectspec.render(sp) for sp in (stock.specs or [])
+                 if route_of(sp) == route and str(sp.get("type")) != "save_gate"]
+        body = ({"item": item_id, "how": "drink"} if route == "ingest" else
+                {"item": item_id, "how": "apply", "route": route})
+        out.append({"route": route, "label": label, "line": "; ".join(lines),
+                    "body": body})
+    return out
+
+
+def _use_targets(pc) -> list[dict]:
+    """Who a jar can be put on: the character, then everybody here who would let them,
+    which is anybody not hostile and not dead. The downed are offered on purpose: a
+    poultice bound on an unconscious friend is the commonest use of one (plan §7)."""
+    from rules import states
+
+    out = [{"ref": "pc", "name": "Yourself"}]
+    try:
+        scene = campaign_mod.current().scene
+    except Exception:  # noqa: BLE001 — a sheet with no campaign still draws
+        return out
+    for ref, a in scene.actors.items():
+        if a is pc or getattr(a, "is_pc", False):
+            continue
+        if a.has_state("state.down.dead") or states.attitude_of(a) == "hostile":
+            continue
+        out.append({"ref": ref, "name": a.name})
+    return out
+
+
 def _carried(pc) -> list[dict]:
     """Everything the character carries, one row a thing, for the Equipment tab.
 
@@ -1336,7 +1376,22 @@ def _carried(pc) -> list[dict]:
         # specs, or the consumables and magic shelves are what make a thing usable here.
         shelf = _shelf_of(s)
         usable = bool(d.get("how")) or bool(s.specs) or shelf in ("consumables", "magic")
+        # Use: where it goes, chosen (the owner, 2026-10-02: "a use button for products
+        # that lets you choose based on the ingredient/products tagged places"). One
+        # button whose menu offers only the places this jar works and what it does in
+        # each, and who it can go on; it replaces Drink, which is its "Drink it" line.
+        menu = _use_menu(s, d["id"]) if usable and s.specs else []
+        # A jar that only goes down the throat keeps its plain Drink button: a menu
+        # whose one line is "Drink it" is a second click for nothing.
+        if menu and len(menu) == 1 and menu[0]["route"] == "ingest":
+            menu = []
+        if menu:
+            acts.append({"label": "Use", "api": "/api/use", "menu": menu,
+                         "targets": _use_targets(pc),
+                         "body": dict(menu[0]["body"])})
         for how, label in (("drink", "Drink"), ("throw", "Throw"), ("coat", "Coat")):
+            if menu and how == "drink":
+                continue
             if usable and d.get(f"{how}able"):
                 acts.append({"label": label, "api": "/api/use",
                              "body": {"item": d["id"], "how": how}})
@@ -4548,7 +4603,10 @@ def use_item(request):
     raw = ({"op": "eat", "actor": "pc", "because": f"{pc.name} eats",
             "params": {"item": item}} if how == "eat" else
            {"op": "use_item", "actor": "pc", "because": f"{pc.name} reaches for it",
-            "params": {"item": item, "how": how, "to": target}})
+            "params": {"item": item, "how": how, "to": target,
+                       # Where it goes (the Use menu): only `apply` takes one.
+                       **({"route": str(body.get("route") or "").strip().lower()}
+                          if how == "apply" else {})}})
     try:
         engine = c.engine()
         resolution = engine.run(engine.validate([raw]))

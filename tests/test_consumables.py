@@ -405,7 +405,9 @@ def test_the_coating_survives_a_save(board):
 
 def test_an_unknown_way_of_using_it_is_refused(board):
     scene, engine = board
-    with pytest.raises(IntentError, match="drink, throw or coat"):
+    # "apply" joined the list on 2026-10-02 (a product is put where its route says);
+    # "inhale" is a ROUTE of `apply`, not a way of using something on its own.
+    with pytest.raises(IntentError, match="drink, apply, throw or coat"):
         engine.run(engine.validate([
             {"op": "use_item", "actor": "pc",
              "params": {"item": "tincture#1", "how": "inhale"}}]))

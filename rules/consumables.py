@@ -51,7 +51,7 @@ _DICE = re.compile(r"^\s*(\d+)d(\d+)\s*(?:([+-])\s*(\d+))?\s*$", re.I)
 class Use:
     """One consumable being used, resolved into things the engine can do."""
     item: str
-    how: str                      # drink | throw | coat
+    how: str                      # drink | apply | throw | coat
     intents: list[dict] = field(default_factory=list)
     # Effects the engine cannot resolve, kept verbatim for the GM to narrate. Never
     # dropped: an item that quietly does less than its card says is worse than one that
@@ -516,19 +516,94 @@ def resolve_stock(stock: dict, said: str) -> tuple[str | None, list[str]]:
     return None, (sorted(stock) if not content else [])
 
 
+# --- where on the body a preparation goes (the owner, 2026-10-02: "a use button for
+# products that lets you choose based on the ingredient/products tagged places") ---------
+#
+# Every herbal effect carries a `route` (docs/herbalism-contracts.md §2): swallowed, on
+# the skin, in the eyes, on a wound, breathed in, or `external` (alchemy's, never a
+# remedy's). Using a product is choosing one of those, and only what works THERE lands:
+# an eye salve's sight is in the eyes, its wound-closing is on the wound. Project
+# Zomboid's health panel is the prior art: the treatment menu offers only what the item
+# and the place allow, and lets you treat somebody else close by.
+ROUTE_USE = {
+    # route: (menu label, verb for the tell, where it goes on the target)
+    "ingest": ("Drink it", "drinks", ""),
+    "eyes": ("On the eyes", "puts", "eyes"),
+    "wound": ("On a wound", "binds", "wound"),
+    "skin": ("On the skin", "rubs", "skin"),
+    "inhale": ("Breathe it in", "breathes in", ""),
+}
+
+
+def routes_of(stock) -> list[str]:
+    """The places this item can go, in a fixed order, each with something that works
+    there. A herbal product also has to be able to carry the route at all (its form's
+    `routes`: a tincture is drops on the tongue, never an eye salve), so the menu offers
+    a place only when the form allows it AND one of its effects lands there."""
+    from .ingredients import route_of
+
+    # Every effect counts, run or narrated: one the engine cannot execute is still told to
+    # the GM where it lands (`_resolve`), never dropped, so its place is still a place.
+    have = {route_of(s) for s in _specs(stock) if str(s.get("type")) != "save_gate"}
+    form = _field(stock, "form", None)
+    if form:
+        from .crafting import product_row
+
+        allowed = set((product_row(form) or {}).get("routes") or ())
+        if allowed:
+            have &= allowed
+    return [r for r in ROUTE_USE if r in have]
+
+
+def _on_route(specs: list[dict], route: str) -> list[dict]:
+    """The specs that work through `route`, a poison's save travelling with its body."""
+    from .ingredients import route_of
+
+    kept = [s for s in specs if route_of(s) == route]
+    for p in poisons(specs, source=""):
+        if p.gate is not None and any(any(b is k for k in kept) for b in p.effects) \
+                and not any(p.gate is k for k in kept):
+            kept.append(p.gate)
+    return kept
+
+
 def plan(stock, how: str = "drink", target: str = "pc",
-         because: str = "") -> Use:
-    """What using this item actually does, as intents the engine can validate."""
+         because: str = "", route: str = "") -> Use:
+    """What using this item actually does, as intents the engine can validate.
+
+    `apply` with a `route` puts it where the player chose (eyes, a wound, the skin,
+    breathed in) and only that route's effects land. `drink` is the swallowed route: a
+    salve drunk does none of what it does on the skin, and an eye-wash's sight does not
+    come from swallowing it. Effects with no route read as swallowed, so every jar made
+    before routes existed drinks exactly as it did."""
     how = (how or "drink").strip().lower()
+    route = (route or "").strip().lower()
     name = _field(stock, "name") or _field(stock, "base") or "the preparation"
     potency = float(_field(stock, "potency", 1.0) or 1.0)
     specs = _specs(stock)
     use = Use(item=str(name), how=how)
 
-    if how not in ("drink", "throw", "coat"):
+    if how not in ("drink", "throw", "coat", "apply"):
         use.problems.append(f"{how!r} is not a way to use something; "
-                            f"drink, throw or coat")
+                            f"drink, apply, throw or coat")
         return use
+    # A jar with no structured effects at all (a bought antitoxin, which the GM narrates)
+    # drinks as it always did: there is nothing to sort by place, and refusing it made the
+    # counter's potions undrinkable (caught by tests/test_sheet_pages.py at the change).
+    if how in ("drink", "apply") and (specs or how == "apply"):
+        route = "ingest" if how == "drink" else route
+        if route not in ROUTE_USE:
+            use.problems.append(f"say where it goes: {', '.join(ROUTE_USE)}")
+            return use
+        offered = routes_of(stock)
+        if route not in offered:
+            where = ROUTE_USE[route][0].lower()
+            use.problems.append(
+                f"nothing in {name} works {('when swallowed' if route == 'ingest' else where)}"
+                + (f"; it works {', '.join(ROUTE_USE[r][0].lower() for r in offered)}"
+                   if offered else ""))
+            return use
+        specs = _on_route(specs, route)
     # Throwing needs something to hurt whoever it lands on. Painting a blade does not:
     # a weapon oil that sharpens the edge or makes it count as magic is the whole
     # point of oils, and gating `coat` on harm refused four of the alchemist's own

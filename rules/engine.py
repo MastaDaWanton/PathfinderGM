@@ -2604,7 +2604,8 @@ class Engine:
                     how = str(intent.params.get("how", "drink")).strip().lower()
                     use = consumables.plan(held, how=how,
                                            target=intent.params.get("to") or intent.actor,
-                                           because=intent.because)
+                                           because=intent.because,
+                                           route=str(intent.params.get("route") or ""))
                     if not use.ok:
                         raise IntentError(f"use_item: {'; '.join(use.problems)}",
                                           "legality", index, code="item_use")
@@ -10978,7 +10979,9 @@ class Engine:
                 intent, f"The {held.base} is still steeping; it is ready in {days} "
                         f"day{'s' if days != 1 else ''}. Nothing is opened.")
 
-        use = consumables.plan(held, how=how, target=target, because=intent.because)
+        route = str(intent.params.get("route") or "").strip().lower()
+        use = consumables.plan(held, how=how, target=target, because=intent.because,
+                               route=route)
         if not use.ok:
             return self._refuse(intent, f"{use.item} cannot be used that way: "
                                         f"{'; '.join(use.problems)}.")
@@ -10990,7 +10993,8 @@ class Engine:
             actor.stock.pop(item_id, None)
 
         effects = [{"ref": actor.ref, "kind": "used_item", "item": use.item,
-                    "how": how, "left": max(0, held.count)}]
+                    "how": how, "left": max(0, held.count),
+                    **({"route": route, "to": target} if how == "apply" else {})}]
 
         if how == "coat":
             weapon = str(intent.params.get("weapon") or actor.equipped or "").lower()
@@ -11025,9 +11029,18 @@ class Engine:
             effects.extend(e for o in resolution.outcomes for e in o.effects)
 
         who = self.scene.actors[target].name
-        verb = "drinks" if how == "drink" else "throws"
-        at = "" if target == intent.actor else f" at {who}"
-        tell = f"{actor.name} {verb} {use.item}{at}."
+        if how == "apply":
+            # Where it went, said plainly, so the narrator writes a salve rubbed into a
+            # wound rather than a jar drunk: "Kesst binds Comfrey Salve on Bob's wound."
+            _, verb, part = consumables.ROUTE_USE.get(route, ("", "uses", ""))
+            whose = "their" if target == intent.actor else f"{who}'s"
+            tell = (f"{actor.name} {verb} {use.item} on {whose} {part}." if part else
+                    f"{actor.name} {verb} {use.item}"
+                    + ("" if target == intent.actor else f" for {who}") + ".")
+        else:
+            verb = "drinks" if how == "drink" else "throws"
+            at = "" if target == intent.actor else f" at {who}"
+            tell = f"{actor.name} {verb} {use.item}{at}."
         if resolution is not None:
             tell += " " + " ".join(o.tell for o in resolution.outcomes if o.tell)
         if use.narrate:

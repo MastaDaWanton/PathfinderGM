@@ -680,7 +680,9 @@ When the player sleeps or makes camp, use {"op": "rest", "params": {"kind": "nig
 You never write a number for what heals, wards, poisons or burns: the thing that does it
 carries its own. A potion or a poultice is used by its id from the CARRYING list:
 {"op": "use_item", "actor": "pc", "params": {"item": "<the jar's id>", "how": "drink"}}
-("throw" at a ref in "to", "coat" for a blade). A spell is cast by name:
+("throw" at a ref in "to", "coat" for a blade; a salve, poultice or eyewash put on
+somebody is "how": "apply" with "route": "wound", "skin", "eyes" or "inhale", and "to"
+for whoever it is put on). A spell is cast by name:
 {"op": "cast", "params": {"spell": "<the spell>", "at": "<ref>"}}. A class power is
 {"op": "use_ability", "params": {"ability": "<name>"}}. The engine reads the jar, the
 spell or the power and applies what it says. Never narrate a wound closing without one

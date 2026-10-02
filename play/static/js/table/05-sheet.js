@@ -1355,6 +1355,8 @@ function detailClosed() {
 let EQ_SHELF = "all";
 let EQ_FIT = null;          // a slot key ("hand", "ring", ...) while a slot is pressed
 let EQ_SAY = "";            // the last answer, written in the line kept for it
+let EQ_USE = null;          // the row whose Use menu is open (one at a time)
+let EQ_USE_TO = "pc";       // who the jar goes on, chosen in that menu
 let EQ_SAY_BAD = false;
 let EQ_BEFORE = null;       // the numbers before the last act, to mark what moved
 
@@ -1469,9 +1471,13 @@ function pageEquipment(s) {
         on ? `<span class="chip">${esc(r.state)}</span>` : ""}
         <span class="facts">${eqFacts(s, r)}</span>${
         r.note ? `<span class="facts eqnote">${esc(r.note)}</span>` : ""}</span>
-      <span class="eqacts">${(r.acts || []).map((a, i) => `<button type="button"
+      <span class="eqacts">${(r.acts || []).map((a, i) => a.menu ? `<button type="button"
+        class="v2-btn is-small${i === 0 ? " is-go" : ""}" data-equse="${i}" data-eqid="${esc(r.id)}"
+        aria-expanded="${EQ_USE === r.id}" aria-controls="equse-${esc(r.id)}"
+        aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>` : `<button type="button"
         class="v2-btn is-small${i === 0 ? " is-go" : ""}" data-eqact="${i}" data-eqid="${esc(r.id)}"
-        aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>`).join("")}</span>
+        aria-label="${esc(a.label)} ${esc(r.name)}">${esc(a.label)}</button>`).join("")}</span>${
+        EQ_USE === r.id ? eqUseMenu(r) : ""}
     </li>`;
   }).join("");
   const empty = EQ_FIT
@@ -1588,6 +1594,62 @@ function eqRedraw(focus) {
 
 // An act on a row: the door the server named, the answer written where the page keeps a
 // line for it, the sheet read again, the sides and the story told (a state is drawn).
+// The Use menu (the owner, 2026-10-02: "a use button for products that lets you choose
+// based on the ingredient/products tagged places"). The server sends only the places this
+// jar works and what it does in each (`views._use_menu`), and who it can go on
+// (`_use_targets`): Project Zomboid's health panel is the shape, the treatment menu
+// filtered to what the item and the place allow, and somebody else treatable too.
+function eqUseMenu(r) {
+  const act = (r.acts || []).find(a => a.menu);
+  if (!act) return "";
+  const targets = act.targets || [{ ref: "pc", name: "Yourself" }];
+  if (!targets.some(t => t.ref === EQ_USE_TO)) EQ_USE_TO = "pc";
+  const who = targets.length > 1 ? `<label class="equse-to">On
+      <select data-equseto>${targets.map(t => `<option value="${esc(t.ref)}"${
+        t.ref === EQ_USE_TO ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select></label>` : "";
+  return `<div class="equse" id="equse-${esc(r.id)}" role="group" aria-label="Where ${esc(r.name)} goes">
+    ${who}
+    <div class="equse-places">${act.menu.map((m, i) => `<button type="button" class="v2-btn equse-place"
+        data-equseroute="${i}" data-eqid="${esc(r.id)}">
+        <b>${esc(m.label)}</b><span>${esc(m.line || "")}</span></button>`).join("")}</div>
+  </div>`;
+}
+
+document.addEventListener("change", e => {
+  const to = e.target.closest("#sheetbody [data-equseto]");
+  if (to) EQ_USE_TO = to.value;
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || !EQ_USE) return;
+  if (!e.target.closest || !e.target.closest("#sheetbody .equse")) return;
+  const id = EQ_USE;
+  EQ_USE = null;
+  eqRedraw({ sel: `#sheetbody [data-equse][data-eqid="${CSS.escape(id)}"]` });
+});
+
+async function eqUse(rowId, index) {
+  const row = eqRows(SHEET).find(r => r.id === rowId);
+  const act = row && (row.acts || []).find(a => a.menu);
+  const m = act && act.menu[Number(index)];
+  if (!m) return;
+  EQ_BEFORE = eqNumbers();
+  busy(true);
+  let said = "", bad = false;
+  try {
+    const d = await post("/api/use", Object.assign({}, m.body, { to: EQ_USE_TO || "pc" }));
+    said = d.tell || "";
+    if (d.sheet) SHEET = d.sheet;
+    EQ_USE = null;
+    render(await getState());
+  } catch (err) {
+    said = err.message || String(err);
+    bad = true;
+  } finally { busy(false); }
+  EQ_SAY = said;
+  EQ_SAY_BAD = bad;
+  eqRedraw({ id: row.id });
+}
+
 async function eqAct(btn) {
   const row = eqRows(SHEET).find(r => r.id === btn.dataset.eqid);
   const act = row && (row.acts || [])[Number(btn.dataset.eqact)];
@@ -1639,6 +1701,15 @@ async function slotAction(payload) {
 document.addEventListener("click", e => {
   const act = e.target.closest("#sheetbody [data-eqact]");
   if (act && !act.disabled) { eqAct(act); return; }
+  const use = e.target.closest("#sheetbody [data-equse]");
+  if (use) {
+    EQ_USE = EQ_USE === use.dataset.eqid ? null : use.dataset.eqid;
+    eqRedraw({ sel: EQ_USE ? `#sheetbody [data-equseroute][data-eqid="${CSS.escape(EQ_USE)}"]`
+                           : `#sheetbody [data-equse][data-eqid="${CSS.escape(use.dataset.eqid)}"]` });
+    return;
+  }
+  const place = e.target.closest("#sheetbody [data-equseroute]");
+  if (place && !place.disabled) { eqUse(place.dataset.eqid, place.dataset.equseroute); return; }
   const shelf = e.target.closest("#sheetbody [data-eqshelf]");
   if (shelf) {
     EQ_SHELF = shelf.dataset.eqshelf;

@@ -319,7 +319,10 @@ def test_every_act_is_a_real_door_and_there_is_no_drop():
     doors = {a["api"] for r in rows.values() for a in r["acts"]}
     assert doors <= {"/api/wear", "/api/slots", "/api/use"}
     labels = {a["label"] for r in rows.values() for a in r["acts"]}
-    assert labels <= {"Wield", "Wear", "Drink", "Throw", "Coat", "Take off", "Put away"}
+    # "Use" since 2026-10-02: a jar that works in more than one place, or anywhere but
+    # swallowed, opens a menu of where it goes (tests/test_use_by_route.py).
+    assert labels <= {"Wield", "Wear", "Drink", "Use", "Throw", "Coat", "Take off",
+                      "Put away"}
     assert [a["label"] for a in rows["dagger"]["acts"]] == ["Wield"]
     assert rows["dagger"]["acts"][0]["body"] == {"item": "dagger", "op": "wield"}
     assert [a["label"] for a in rows["rapier"]["acts"]] == ["Put away"]
