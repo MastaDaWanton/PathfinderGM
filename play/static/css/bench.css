@@ -298,15 +298,18 @@
 @keyframes bench-dim { 0% { opacity: 0; } 25% { opacity: .3; } 100% { opacity: 0; } }
 
 /* The minigame strip rises from the stage's foot, 220ms, over the bottom of the stage
-   rather than pushing it (UI plan §6.4, §4.3). Lane E fills it. */
-.bench-game {
+   rather than pushing it (UI plan §6.4, §4.3). Lane E fills it.
+   Scoped to the id, never `.bench-game`: the games' frame names its own root that class,
+   and the mount's "hidden until raised" (opacity 0) fell through onto the game inside,
+   so the strip ran invisible (seen live at the merge, 2026-10-02). */
+#bench-game {
   position: absolute; left: 0; right: 0; bottom: 0; min-height: 120px; z-index: 4;
   padding: 12px 18px; border-top: 1px solid var(--bench-accent-deep);
   background: linear-gradient(rgba(16, 12, 9, .9), rgba(11, 9, 8, .96));
   transform: translateY(100%); opacity: 0; transition: transform .22s ease-out, opacity .22s ease-out;
 }
-.bench-game.is-up { transform: none; opacity: 1; }
-.bench-game[hidden] { display: none; }
+#bench-game.is-up { transform: none; opacity: 1; }
+#bench-game[hidden] { display: none; }
 .bench-devgame { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; min-height: 96px; }
 .bench-devgame p { margin: 0; color: var(--bench-quiet); }
 
