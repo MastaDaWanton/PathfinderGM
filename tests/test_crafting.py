@@ -29,6 +29,46 @@ def shelf():
     return ingredients.all_ingredients()
 
 
+# Fixture herbs, added 2026-10-02 when the relevance pass rewrote the corpus and four
+# tests here that pinned Woundwort, Comfrey and Dragon Flower failed with every rule still
+# working. Each is the real herb's specs as they were, under its own name, so the chain
+# reader and the benefit/harm sort are pinned to data no later edit can move.
+TESTWORT = {  # Woundwort as it was: a narrated bleed reduction and a heal
+    "id": "testwort", "name": "Testwort", "kind": "herb", "tier": "common",
+    "text": "A styptic for deep cuts.",
+    "effects": [{"type": "narrative", "target": "Bleeding damage 20% less", "route": "wound"},
+                {"type": "heal", "dice": "1d4",
+                 "note": "applied within two rounds; stops bleeding", "route": "wound"}]}
+TESTFREY = {  # Comfrey as it was: one heal, in the corpus's own range form
+    "id": "testfrey", "name": "Testfrey", "kind": "herb", "tier": "common",
+    "text": "Wonder weed.",
+    "effects": [{"type": "heal", "dice": "1-4", "route": "wound"}]}
+# Dragon Flower as it was: a penalty, a narrated bonus, and a gated poison of two bodies.
+OLD_FLOWER_SPECS = [
+    {"type": "situational_mod", "amount": -2, "target": "actions while in the area",
+     "bonus_type": "untyped", "duration": {"amount": "1d4", "unit": "week"},
+     "route": "external"},
+    {"type": "situational_mod", "amount": 5, "target": "save vs poison for 10 rounds",
+     "bonus_type": "untyped", "route": "ingest"},
+    {"type": "ability_damage", "target": "con", "dice": "1d6", "route": "ingest"},
+    {"type": "save_gate", "target": "fort", "dc": 25, "route": "ingest"},
+    {"type": "apply_condition", "target": "nauseated", "route": "inhale"},
+]
+TESTFLOWER = {"id": "testflower", "name": "Testflower", "kind": "herb", "tier": "common",
+              "text": "A flower with a stench.", "effects": OLD_FLOWER_SPECS}
+
+
+@pytest.fixture
+def fixture_herbs(monkeypatch):
+    """The fixture herbs on the shelf beside the corpus, for one test."""
+    shelf = dict(ingredients.all_ingredients())
+    for raw in (TESTWORT, TESTFREY, TESTFLOWER):
+        shelf[raw["id"]] = ingredients.from_dict(
+            {**raw, "effects": [dict(s) for s in raw["effects"]]})
+    monkeypatch.setattr(ingredients, "_ALL", shelf)
+    return shelf
+
+
 # --- the shelf ----------------------------------------------------------------------------
 
 def test_the_document_loaded(shelf):
@@ -70,44 +110,55 @@ def test_a_crafter_sees_only_their_own_tier_and_below(shelf):
 
 # --- chains -------------------------------------------------------------------------------
 
-def test_a_simple_chain_previews(shelf):
+def test_a_simple_chain_previews(fixture_herbs):
+    """Re-pinned 2026-10-02 because the herb data changed: Woundwort's bleed reduction
+    became a typed Heal bonus that potency scales, and Comfrey gained two more heals.
+    Testwort and Testfrey, fixtures of the two herbs as they were, keep the chain's card
+    pinned line for line."""
     r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["grind", "brew"], ["woundwort", "comfrey"]))
+                         Chain("herbalist", ["grind", "brew"], ["testwort", "testfrey"]))
     assert not r.problems
     assert r.stages == 2 and r.tier == "common"
     # The mechanic, not the paragraph: Woundwort's bleed reduction and now its authored
     # heal — "way too many useless herbs" gave every benefit-less herb a runnable one —
     # and Comfrey's healing.
-    assert r.effects == ["Woundwort: Bleeding damage 20% less",
-                         "Woundwort: Heals 1d4 hit points",
-                         "Comfrey: Heals 1-4 hit points"]
+    assert r.effects == ["Testwort: Bleeding damage 20% less",
+                         "Testwort: Heals 1d4 hit points",
+                         "Testfrey: Heals 1-4 hit points"]
     assert len(r.described) == 2
 
 
 # --- benefit, harm, and the line between them ------------------------------------------------
 
-def test_harm_is_a_drawback_rather_than_an_effect():
+def test_harm_is_a_drawback_rather_than_an_effect(fixture_herbs):
     """From the bench, before: Dragon Flower's Effects panel listed "-2 actions while in
     the area", "+5 save vs poison", "1d6 Constitution damage", "Fortitude DC 25" and
     "Causes nauseated" as five undifferentiated bullets, and Drawbacks said one boilerplate
-    sentence that named nothing. 99 of the corpus's 178 effects were filed that way."""
+    sentence that named nothing. 99 of the corpus's 178 effects were filed that way.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's bonuses are
+    typed and potency-scaled now and its nausea states its rounds. Testflower, a fixture
+    of its old five specs, keeps the sort pinned line for line."""
     r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["dragon-flower"]))
-    assert r.effects == ["Dragon Flower: +5 save vs poison for 10 rounds"]
+                         Chain("herbalist", ["grind"], ["testflower"]))
+    assert r.effects == ["Testflower: +5 save vs poison for 10 rounds"]
     assert r.drawbacks == [
-        "Dragon Flower: Fortitude DC 25 or 1d6 Constitution damage, causes nauseated",
-        "Dragon Flower: -2 actions while in the area for 1d4 weeks",
+        "Testflower: Fortitude DC 25 or 1d6 Constitution damage, causes nauseated",
+        "Testflower: -2 actions while in the area for 1d4 weeks",
     ]
 
 
-def test_the_save_reads_as_the_gate_for_the_harm_it_governs():
+def test_the_save_reads_as_the_gate_for_the_harm_it_governs(fixture_herbs):
     """"Fortitude DC 25" was its own bullet, so nothing on the card said which of the four
     other lines it applied to. Grouped by the ingredient the effects were read out of,
-    which is the only thing that ties them together."""
+    which is the only thing that ties them together.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's nausea now
+    states its rounds. Testflower, a fixture of its old specs, keeps the lines exact."""
     r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind"], ["dragon-flower"]))
+                         Chain("herbalist", ["grind"], ["testflower"]))
     assert len(r.poisons) == 1
-    assert r.poisons[0]["source"] == "Dragon Flower"
+    assert r.poisons[0]["source"] == "Testflower"
     assert r.poisons[0]["save_line"] == "Fortitude DC 25"
     assert r.poisons[0]["lines"] == ["1d6 Constitution damage", "Causes nauseated"]
 
@@ -247,13 +298,17 @@ def test_each_bench_serves_its_own_shelf(client):
 
 def test_the_shelf_marks_a_jar_that_will_poison_whoever_drinks_it(client):
     """A made poison and a made tea were the same green flask on the Made shelf, and the
-    only way to find out which was which was to drink one."""
+    only way to find out which was which was to drink one.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's nausea now
+    states its rounds, which lengthened the body line. The jar is filled with the
+    fixture of the flower's old specs, so the shelf's marking is what is pinned."""
     from play import campaign as cm
 
     c = cm.current()
     c.scene.pc().add_stock(crafting.Stock(
         base="Dragon Flower Tincture", craft="herbalist",
-        specs=[dict(s) for s in ingredients.get("dragon-flower").specs]), count=1)
+        specs=[dict(s) for s in OLD_FLOWER_SPECS]), count=1)
     c.save()
 
     d = client.get("/api/craft/ingredients?craft=herbalism").json()

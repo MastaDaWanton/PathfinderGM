@@ -299,11 +299,18 @@ def test_an_entry_with_no_effects_still_falls_back_to_the_parser():
 def test_a_bonus_qualifier_survives_conversion():
     """Leechwort's two bonuses both target the Heal skill; "to staunch bleeding" is the
     entire difference. Matching the skill and dropping the rest made them the same effect
-    twice."""
+    twice.
+
+    Re-pinned 2026-10-02 because the herb data changed: both bonuses now state an hour,
+    and Leechwort gained a heal of its own. Still read off the real Leechwort, because
+    this is about the converted corpus, and its two Heal bonuses still differ by exactly
+    that qualifier; only the two bonus lines are compared, so a third property added
+    later does not decide this test."""
     from rules import ingredients
 
-    assert ingredients.get("leechwort").lines == [
-        "+1 Heal", "+2 Heal to staunch bleeding"]
+    bonuses = [line for line, spec in ingredients.get("leechwort").pairs
+               if spec.get("type") == "skill_mod" and spec.get("target") == "heal"]
+    assert bonuses == ["+1 Heal for 1 hour", "+2 Heal to staunch bleeding for 1 hour"]
 
 
 def test_a_bare_dc_does_not_invent_a_save():

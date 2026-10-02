@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 
 from rules import consumables as con
+from rules import effectspec
 from rules import ingredients as ing_mod
 from rules.bestiary import instantiate
 from rules.crafting import Stock, _name_for, from_stock_dict
@@ -35,6 +36,29 @@ class Named:
 @pytest.fixture
 def poison_specs():
     return ing_mod.get("dragon-flower").specs
+
+
+# Dragon Flower's five specs as the extractor left them, kept as a fixture on 2026-10-02
+# when the relevance pass rewrote the real flower (typed bonuses, a stated nausea, no
+# narrated lines). The tests below that read it pin how harm and benefit are sorted, how
+# a bare gate joins its body, and what the engine narrates rather than runs; none of that
+# is about the flower, and the next data edit must not be able to break it.
+OLD_FLOWER = [
+    {"type": "situational_mod", "amount": -2, "target": "actions while in the area",
+     "bonus_type": "untyped", "duration": {"amount": "1d4", "unit": "week"},
+     "route": "external"},
+    {"type": "situational_mod", "amount": 5, "target": "save vs poison for 10 rounds",
+     "bonus_type": "untyped", "route": "ingest"},
+    {"type": "ability_damage", "target": "con", "dice": "1d6", "route": "ingest"},
+    {"type": "save_gate", "target": "fort", "dc": 25, "route": "ingest"},
+    {"type": "apply_condition", "target": "nauseated", "route": "inhale"},
+]
+
+
+@pytest.fixture
+def flower_specs():
+    """A fresh copy each test, because `poisons` groups specs by identity."""
+    return [dict(s) for s in OLD_FLOWER]
 
 
 @pytest.fixture
@@ -123,43 +147,57 @@ def test_harm_is_read_off_the_effects_not_the_name():
 
 # --- benefit and harm, told apart -----------------------------------------------------------
 
-def test_harm_does_not_read_as_a_benefit(poison_specs):
+def test_harm_does_not_read_as_a_benefit(flower_specs):
     """Measured across the shipped corpus: 99 of the 178 effects its 161 ingredients carry
     are harm, and every one of them was printed under "Effects" beside the bonuses. Dragon
     Flower's card listed "1d6 Constitution damage" three lines below "+5 save vs poison"
-    with nothing to tell them apart."""
-    harm = [s for s in poison_specs if con.hurts(s)]
+    with nothing to tell them apart.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's penalty is a
+    typed combat modifier now, and it gained a second bonus. `OLD_FLOWER`, the fixture of
+    its old specs, keeps the exact sort pinned."""
+    harm = [s for s in flower_specs if con.hurts(s)]
     assert [s["type"] for s in harm] == \
         ["situational_mod", "ability_damage", "apply_condition"]
     assert not con.hurts({"type": "heal", "dice": "1d8"})
 
 
-def test_a_bonus_stays_a_benefit(poison_specs):
+def test_a_bonus_stays_a_benefit(flower_specs):
     """"+5 bonus to save vs. poison for 10 rounds" is the good half of the same plant, and
     a split that swept the whole ingredient into Drawbacks would be no better than the
-    flat list it replaced."""
-    good = next(s for s in poison_specs
+    flat list it replaced.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's +5 became a
+    typed +2 Fortitude bonus. Read off `OLD_FLOWER`, the fixture of its old specs."""
+    good = next(s for s in flower_specs
                 if s["type"] == "situational_mod" and s["amount"] == 5)
     assert not con.hurts(good)
 
 
-def test_a_penalty_is_a_drawback_but_not_a_poison(poison_specs):
+def test_a_penalty_is_a_drawback_but_not_a_poison(flower_specs):
     """20 of the corpus's 178 effects are penalties. "-2 to all actions while in the area"
     is harm on a card, but it poisons nobody: it must not make a draught throwable, which
-    is the only question `HARMFUL` is asked."""
-    bad = next(s for s in poison_specs
+    is the only question `HARMFUL` is asked.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's penalty became
+    "-2 attack". Read off `OLD_FLOWER`, the fixture of its old specs."""
+    bad = next(s for s in flower_specs
                if s["type"] == "situational_mod" and s["amount"] == -2)
     assert con.hurts(bad)
     assert bad["type"] not in con.HARMFUL
     assert [p.source for p in con.poisons([bad], source="Dragon Flower")] == []
 
 
-def test_a_poison_is_one_thing_rather_than_three_loose_lines(poison_specs):
+def test_a_poison_is_one_thing_rather_than_three_loose_lines(flower_specs):
     """From the bench, before: "1d6 Constitution damage", "Fortitude DC 25" and "Causes
     nauseated" were three unrelated bullets, so the save that gates the damage read as an
     effect of its own. 1e writes a poison as one thing — a save, and what failing it
-    costs."""
-    found = con.poisons(poison_specs, source="Dragon Flower")
+    costs.
+
+    Re-pinned 2026-10-02 because the herb data changed: the real flower's nausea now
+    states its rounds, so its card line grew. `OLD_FLOWER`, the fixture of its old specs,
+    keeps the exact line."""
+    found = con.poisons(flower_specs, source="Dragon Flower")
     assert len(found) == 1
     p = found[0]
     assert p.source == "Dragon Flower"
@@ -173,8 +211,16 @@ def test_a_bare_dc_that_gates_nothing_is_not_a_poison():
     """41 of the corpus's 59 save gates carry nothing at all: they are the entry's own
     crafting DC, restated at the end of its description ("Cave Star ... DC: 10.") and
     swept up by the extractor's bare-DC fallback. Filing every gate under Drawbacks would
-    have invented 41 poisons that poison nobody."""
-    star = ing_mod.get("cave-star")
+    have invented 41 poisons that poison nobody.
+
+    Re-pinned 2026-10-02 because the herb data changed: the relevance pass moved every
+    crafting DC to `craft_dc`, so no shipped herb carries a bare gate any more (its
+    ratchet, `test_every_save_gate_gates_something`, keeps it that way). A homebrew herb
+    still can, so Cave Star as it was is built here as a fixture."""
+    star = ing_mod.from_dict({
+        "id": "cave-star", "name": "Cave Star", "kind": "herb", "tier": "common",
+        "effects": [{"type": "save_gate", "dc": 10, "route": "external",
+                     "note": "the source names a DC without saying which save"}]})
     assert [s["type"] for s in star.specs] == ["save_gate"]
     assert con.poisons(star.specs, source=star.name) == []
     assert not con.hurts(star.specs[0])
@@ -288,10 +334,17 @@ def test_you_cannot_throw_something_harmless(board):
              "params": {"item": "tea#1", "how": "throw", "to": "c1"}}]))
 
 
-def test_effects_the_engine_cannot_run_are_narrated_not_dropped(board):
+def test_effects_the_engine_cannot_run_are_narrated_not_dropped(board, flower_specs):
     """An item that quietly does less than its card says is worse than one that says so
-    and leaves the rest to the GM."""
+    and leaves the rest to the GM.
+
+    Re-pinned 2026-10-02 because the herb data changed: no shipped herb carries an effect
+    the engine cannot run any more (`test_every_effect_is_one_the_engine_runs`), but a
+    homebrew or an older crafted jar still can. The tincture is filled with `OLD_FLOWER`,
+    whose "-2 actions while in the area" is a `situational_mod` the engine only narrates."""
     scene, engine = board
+    assert not effectspec.executable(flower_specs[0])  # the premise
+    scene.pc().stock["tincture#1"].specs = flower_specs
     assert "-2 actions" in use(engine, how="throw", to="c1").outcomes[0].tell
 
 

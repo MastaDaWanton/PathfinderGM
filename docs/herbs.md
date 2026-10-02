@@ -33,9 +33,9 @@ A grape vine elven wizards bred to glow like a candle and to feed a traveller. A
 ## Allnight  
 `allnight` · herb · common · leaf
 
-A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake: a +2 alchemical bonus on Fortitude saves against fatigue and sleep, and +1 on initiative, for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.
+A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake, ending fatigue at once, then a +2 alchemical bonus on Fortitude saves against fatigue and sleep, and +1 on initiative, for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.
 
-**Effects.** +2 Fortitude against fatigue and sleep for 8 hours (ingest); -2 Perception for 8 hours (ingest); +1 Initiative for 8 hours (ingest)
+**Effects.** +2 Fortitude against fatigue and sleep for 8 hours (ingest); -2 Perception for 8 hours (ingest); +1 Initiative for 8 hours (ingest); Ends fatigued (ingest)
 
 ## Althaea  
 `althaea` · herb · common · root · base for cream
@@ -260,9 +260,9 @@ The sap is the base of purebalm, a clear salve poured over the skin of someone p
 ## Cowslip  
 `cowslip` · herb · common · flower
 
-The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour. The same tea eases headache and heals 1d3 non-lethal damage.
+The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour. The same tea eases headache and heals 1d3 non-lethal damage, and given to someone paralyzed it ends the paralysis.
 
-**Effects.** +2 Fortitude against paralysis for 1 hour (ingest); +1 Strength for 1 hour (ingest); Heals 1d3 non-lethal damage (ingest)
+**Effects.** +2 Fortitude against paralysis for 1 hour (ingest); +1 Strength for 1 hour (ingest); Heals 1d3 non-lethal damage (ingest); Ends paralyzed (ingest)
 
 ## Damiana  
 `damiana` · herb · common · leaf
@@ -281,9 +281,9 @@ The root boils down into titan gum, a glue that holds two objects until a DC 20 
 ## Dawnpetal  
 `dawnpetal` · herb · common · flower
 
-Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy: a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.
+Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy that ends fatigue at once, then a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.
 
-**Effects.** +2 Strength for 1 hour (ingest); +2 Fortitude against fatigue for 1 hour (ingest); -1 Will for 1 hour (ingest)
+**Effects.** +2 Strength for 1 hour (ingest); +2 Fortitude against fatigue for 1 hour (ingest); -1 Will for 1 hour (ingest); Ends fatigued (ingest)
 
 ## Dire Boar Tusk  
 `dire-boar-tusk` · monster part · uncommon · bone · hybrid

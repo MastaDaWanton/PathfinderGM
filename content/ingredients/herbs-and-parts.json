@@ -236,7 +236,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake: a +2 alchemical bonus on Fortitude saves against fatigue and sleep, and +1 on initiative, for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.",
+      "text": "A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake, ending fatigue at once, then a +2 alchemical bonus on Fortitude saves against fatigue and sleep, and +1 on initiative, for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -278,6 +278,11 @@
             "amount": 8,
             "unit": "hour"
           },
+          "route": "ingest"
+        },
+        {
+          "type": "remove_condition",
+          "target": "fatigued",
           "route": "ingest"
         }
       ],
@@ -1959,7 +1964,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour. The same tea eases headache and heals 1d3 non-lethal damage.",
+      "text": "The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour. The same tea eases headache and heals 1d3 non-lethal damage, and given to someone paralyzed it ends the paralysis.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -1996,6 +2001,11 @@
           "type": "heal",
           "dice": "1d3",
           "lethality": "nonlethal",
+          "route": "ingest"
+        },
+        {
+          "type": "remove_condition",
+          "target": "paralyzed",
           "route": "ingest"
         }
       ],
@@ -2118,7 +2128,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy: a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.",
+      "text": "Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy that ends fatigue at once, then a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.",
       "risky": false,
       "biomes_inferred": false,
       "biomes": [
@@ -2160,6 +2170,11 @@
             "amount": 1,
             "unit": "hour"
           },
+          "route": "ingest"
+        },
+        {
+          "type": "remove_condition",
+          "target": "fatigued",
           "route": "ingest"
         }
       ],
