@@ -387,6 +387,13 @@ class Actor:
     # a spell copied from a scroll is in the book too, and only this says which were the
     # free ones. Settled once for an older save at load (`casting.infer_level_spells_taken`).
     level_spells_taken: int = 0
+    # What this character has learned about herbs (docs/herbalism-revamp-plan.md §8): an
+    # ingredient id to {"keys": [property keys], "how": {key: "tasted, day 14"}}. Owned by
+    # `rules/herbknowledge.py`, which is the only thing that reads or writes it, so the
+    # narrator, the bench and the Journal cannot disagree about what is known.
+    herb_known: dict[str, dict] = field(default_factory=dict)
+    # Herbalism manuals read, by item id. A manual pays mastery once (§8.4).
+    manuals_read: list[str] = field(default_factory=list)
     # Named rules this actor does not play by. Validated against ACTOR_RULES, so a
     # misspelled override fails loudly instead of silently never applying.
     overrides: dict[str, bool] = field(default_factory=dict)
@@ -4285,9 +4292,7 @@ def to_dict(actor: Actor) -> dict:
         "goods": dict(actor.goods),
         "purse": dict(actor.purse),
         "pools": {k: v.as_dict() for k, v in actor.pools.items()},
-        "world_classes": {k: {"level": p.level, "mp": p.mp, "crafted": p.crafted,
-                              "mishaps": p.mishaps, "milestones": p.milestones}
-                          for k, p in actor.world_classes.items()},
+        "world_classes": {k: _progress_dict(p) for k, p in actor.world_classes.items()},
         "reductions": [{"amount": r.amount, "bypass": r.bypass, "source": r.source}
                        for r in actor.reductions],
         # Written even when empty. A save that omits an empty list cannot tell "this
@@ -4341,6 +4346,12 @@ def to_dict(actor: Actor) -> dict:
     # book with nothing taken infers nothing again.
     if int(actor.level_spells_taken or 0):
         d["level_spells_taken"] = int(actor.level_spells_taken)
+    # The herbalism revamp's two stores, on the same rule: only when there is something
+    # in them, so every save from before the revamp still round-trips byte for byte.
+    if actor.herb_known:
+        d["herb_known"] = {str(k): dict(v) for k, v in actor.herb_known.items()}
+    if actor.manuals_read:
+        d["manuals_read"] = [str(m) for m in actor.manuals_read]
     return d
 
 
@@ -4533,6 +4544,18 @@ def _stock(raw: dict):
     return {k: from_stock_dict(v) for k, v in raw.items()}
 
 
+def _progress_dict(p) -> dict:
+    d = {"level": p.level, "mp": p.mp, "crafted": p.crafted,
+         "mishaps": p.mishaps, "milestones": p.milestones}
+    # The endless levels' perk picks and the migration stamp (docs/herbalism-revamp-plan.md
+    # §4.2, §14). Only when set, so a save from before the revamp reads back unchanged.
+    if p.perks:
+        d["perks"] = {str(k): int(n) for k, n in p.perks.items() if int(n)}
+    if p.schema:
+        d["schema"] = int(p.schema)
+    return d
+
+
 def _progress(track_id: str, v: dict):
     from .worldclass import Progress
 
@@ -4541,6 +4564,8 @@ def _progress(track_id: str, v: dict):
         crafted={k: int(n) for k, n in (v.get("crafted") or {}).items()},
         mishaps={k: int(n) for k, n in (v.get("mishaps") or {}).items()},
         milestones=list(v.get("milestones") or []),
+        perks={str(k): int(n) for k, n in (v.get("perks") or {}).items()},
+        schema=int(v.get("schema") or 0),
     )
 
 
@@ -4806,6 +4831,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # count existed is worked out once from its book and written from then on, so a
     # wizard who levelled before this shipped is still offered the two spells a level
     # the Core Rulebook owes them (the owner, 2026-10-01).
+    a.herb_known = {str(k): dict(v) for k, v in (data.get("herb_known") or {}).items()
+                    if isinstance(v, dict)}
+    a.manuals_read = [str(m) for m in (data.get("manuals_read") or [])]
     if "level_spells_taken" in data:
         a.level_spells_taken = max(0, int(data.get("level_spells_taken") or 0))
     else:

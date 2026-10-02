@@ -29,7 +29,7 @@ def static_serve(request, path, **kwargs):
 from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
-                  craft_views, home_views, views)
+                  craft_views, home_views, views, bench_views, herb_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -127,6 +127,21 @@ urlpatterns = [
     path("api/craft/actions", craft_views.craft_actions, name="craft_actions"),
     path("api/craft/excursion", craft_views.craft_excursion, name="craft_excursion"),
     path("api/travel", craft_views.travel_to, name="travel_to"),
+    # The herbalism bench and herb knowledge (docs/herbalism-contracts.md §3, §4). All
+    # routes declared here at once, so the lanes that build them never edit this file.
+    path("api/bench/state", bench_views.bench_state, name="bench_state"),
+    path("api/bench/check", bench_views.bench_check, name="bench_check"),
+    path("api/bench/roll", bench_views.bench_roll, name="bench_roll"),
+    path("api/bench/finish", bench_views.bench_finish, name="bench_finish"),
+    path("api/bench/perks", bench_views.bench_perks, name="bench_perks"),
+    path("api/bench/recipe", bench_views.bench_recipe, name="bench_recipe"),
+    path("api/herbarium", herb_views.herbarium, name="herbarium"),
+    path("api/herb/study", herb_views.herb_study, name="herb_study"),
+    path("api/herb/taste", herb_views.herb_taste, name="herb_taste"),
+    path("api/herb/ask", herb_views.herb_ask, name="herb_ask"),
+    path("api/herb/library", herb_views.herb_library, name="herb_library"),
+    path("api/herb/manual", herb_views.herb_manual, name="herb_manual"),
+    path("api/herb/<str:herb_id>", herb_views.herb_card, name="herb_card"),
     # The class builder. A page rather than a bench tab because a class is not a flat
     # form: its level table and its paths are repeating structures, and the effect
     # builder's one-card-per-thing shape cannot hold either.

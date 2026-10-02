@@ -183,9 +183,51 @@ class Progress:
     crafted: dict[str, int] = field(default_factory=dict)
     mishaps: dict[str, int] = field(default_factory=dict)
     milestones: list[str] = field(default_factory=list)
+    # Endless-level perk picks, perk id -> times taken (docs/herbalism-revamp-plan.md
+    # §4.2). Read live by the bench; never stored as effects.
+    perks: dict[str, int] = field(default_factory=dict)
+    # Which version of the track's rules this progress was last settled under. 0 is
+    # "before the herbalism revamp"; the migration (§14) stamps it once.
+    schema: int = 0
 
     def knows(self, recipe_id: str) -> bool:
         return recipe_id in self.crafted
+
+
+# --- endless levels (herbalism revamp; contracts in docs/herbalism-contracts.md) -------
+#
+# Scaffolding with working first implementations so every lane can call them on day one.
+# The progression lane owns this block and may refine the bodies; the signatures are the
+# contract and do not change without the lead.
+
+PERKS = ("potency", "duration", "quality", "yield")
+UNLOCK_LEVELS = 3          # levels 1-3 unlock things; every level after picks perks
+PICKS_PER_LEVEL = 2
+# Quality ladder indices: 0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless, 5 Flawless +1 ...
+CEILING_BY_LEVEL = {1: 2, 2: 3, 3: 4}
+
+
+def perk_picks_banked(progress: Progress) -> int:
+    """Perk picks earned by endless levels and not yet spent."""
+    earned = max(0, int(progress.level) - UNLOCK_LEVELS) * PICKS_PER_LEVEL
+    return max(0, earned - sum(int(n) for n in progress.perks.values()))
+
+
+def ceiling_index(progress: Progress) -> int:
+    """The highest quality index this crafter's hands can reach (§4.3)."""
+    base = CEILING_BY_LEVEL.get(min(int(progress.level), UNLOCK_LEVELS), 2)
+    return base + int(progress.perks.get("quality", 0))
+
+
+def award_bonus(track: "Track", progress: Progress, *, why: str, mp: int) -> dict:
+    """Mastery that is not a craft: a first, a manual read, a quality bonus. Itemised the
+    way `award` is, and advances the track the same way."""
+    gained = max(0, int(mp))
+    progress.mp += gained
+    levelled = _advance(track, progress)
+    return {"track": track.id, "mp": gained, "reasons": [{"why": why, "mp": gained}],
+            "total": progress.mp, "level": progress.level, "levelled": levelled,
+            "to_next": _remaining(track, progress)}
 
 
 def award(track: Track, progress: Progress, *, recipe_id: str, tier: str,
