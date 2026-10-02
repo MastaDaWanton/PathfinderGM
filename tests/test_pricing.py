@@ -6,6 +6,8 @@ twenty-two.
 """
 from __future__ import annotations
 
+import pytest
+
 from rules import pricing
 
 
@@ -106,3 +108,25 @@ def test_the_whole_satchel_is_worth_far_more_than_twenty_two_gold():
     total = sum(pricing.worth(i) for i in satchel)
     assert total > 2000, f"the satchel came to {pricing.as_text(total)}"
     assert sum(pricing.what_a_shop_pays(i) for i in satchel) > 22
+
+
+def test_quality_is_worth_more():
+    """Plan §2 and §12: the ladder's price column, x0.5 Crude to x3 Flawless and +0.5 a
+    step past it. A Flawless remedy is six times a Crude one of the same strength, not
+    the same price because the price only read rarity and potency."""
+    remedy = dict(tier="common", potency=1.0, specs=[{"type": "heal"}])
+    sound = pricing.worth(jar(**remedy, quality=1))
+    assert pricing.worth(jar(**remedy, quality=0)) == pytest.approx(sound * 0.5, abs=0.01)
+    assert pricing.worth(jar(**remedy, quality=4)) == pytest.approx(sound * 3, abs=0.01)
+    assert pricing.worth(jar(**remedy, quality=6)) == pytest.approx(sound * 4, abs=0.01)
+    assert pricing.worth(jar(**remedy)) == sound      # no quality: priced as before
+
+
+def test_a_step_bench_remedy_is_priced_by_its_strength_not_its_potency_field():
+    """A step-bench remedy carries `potency` 1.0, because its strength is baked into the
+    effects the engine runs; read alone, a twice-dried tincture would sell for the price
+    of a raw leaf. Its strength is in `mults`."""
+    plain = pricing.worth(jar(specs=[{"type": "heal"}], quality=1))
+    strong = pricing.worth(jar(specs=[{"type": "heal"}], quality=1,
+                               mults={"potency": 3.375}))
+    assert strong == pytest.approx(plain * 3.375 ** pricing.POTENCY_EXPONENT, rel=0.01)

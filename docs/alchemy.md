@@ -37,9 +37,11 @@ star.
 
 ## The track
 
-Thresholds are the Herbalist's (25 / 65 / 50 / 100), because both tracks pay mastery from
-the same `MP_AWARDS` table and a chain here must be worth what a chain there is worth.
-The dip at level 4 is the Herbalist's measured dip; `herbalist.json` documents it.
+Thresholds are the Herbalist's as they stood before its revamp (25 / 65 / 50 / 100),
+because both tracks paid mastery from the same `MP_AWARDS` table and a chain here had to
+be worth what a chain there was worth. The dip at level 4 is the Herbalist's measured dip.
+Since 2026-10-02 the Herbalist pays per step, not per chain, and runs three unlock levels
+then endless ones (see "Next door" below); the Alchemist keeps its five-level table.
 
 Level 5 waits on a deed as well as points: **legendary-work**, any successful craft at
 legendary tier however it was reached. The deed is the *material*, not the method —
@@ -63,7 +65,10 @@ itself, which is the exact trap the Herbalist's deed already walked into and out
 The shape words deliberately never collide with herbalism's (`crafting.SHAPE_WORDS` —
 Powder, Tea, Tincture, Infusion, Elixir, Catalyst…), because herbalism reads shape words
 off jar names to answer questions like "is this a tincture", and a shared word would make
-an alchemist's product answer them.
+an alchemist's product answer them. Since the herbalism revamp (below) the step bench
+names its products by form (`herbal-products.json`) and records the form on the jar, so
+only pre-revamp herbal jars are still read by their words; the rule stays because those
+jars are still in saves.
 
 **Tools.** Level 1 travels (alchemy kit, iron crucible). Level 2 is glassware (alembic,
 filter frames). Levels 3–5 are furniture — laboratory, athanor, philosopher's bench —
@@ -411,6 +416,66 @@ Three volatiles (+6), a stated DC 30 base, six stages (+10): **DC 46**, itemised
 the mishap line reading like an obituary. Potency 1.25 × 1.25 × 1.5 ≈ ×2.34. Succeed and
 the deed `legendary-work` unlocks Alchemist 5 for whoever was still 4; the output is a
 sealed arcanum that hits like the falling star it politely used to be.
+
+## Next door: herbalism after the revamp (2026-10-02)
+
+The Herbalist this document keeps comparing against changed shape on 2026-10-02
+(`docs/herbalism-revamp-plan.md`, `docs/herbalism-contracts.md`). What an alchemist needs
+to know about the bench next door:
+
+**The boundary is a route.** Every herbal effect carries a `route`: `ingest`, `skin`,
+`eyes`, `wound`, `inhale`, or `external`. Herbalism carries only the first five, the ones
+that work on or in a body. An `external` effect (invisibility, a glow cast on the world,
+charming someone else) is **alchemy's**: the herbal bench drops it from every product and
+says so ("alchemy only"), and refuses outright a remedy whose every helpful effect was
+external, because only its harm would be left. Hybrid ingredients (Basilisk Eye, Phoenix
+Feather) sit on both shelves; the alchemist is the one who can bottle what reaches past
+the skin.
+
+**One method per step.** Herbalism stopped being a chain. Each method is its own roll and
+its own minigame, and what it makes goes back on the shelf:
+
+| Method | Level | Takes | Makes | Potency / duration |
+|---|---|---|---|---|
+| Grind | 1 | a solid | powder; bark, sap or resin make a salve base | x1.1 / x1.0 |
+| Mix | 1 | a ground herb (water binds it), or bases with infused oil or an infusion | poultice, salve base, salve, balm, cream | weighted mean of the parts |
+| Brew | 1 | leaf or flower; root, bark, berry and other hard parts | infusion; decoction (x1.25 / x1.25) | x1.0 |
+| Dry | 2 | two of a solid | one dried | x1.5 / x1.5 |
+| Reduce | 2 | two of a liquid | one | x1.5 / x1.5 |
+| Extract | 2 | a part in its shell, gland or pod | the part, whole | x1.0 |
+| Infuse | 2 | a dried herb and one oil a dose | infused oil | x1.25 / x1.5 |
+| Steep | 2 | a herb and one alcohol (tincture) or vinegar (acetum) a dose | a jar, ready in 2 weeks (tincture x1.5 / x2.0) or 1 week (acetum x1.25 / x1.75) | |
+| Neutralize | 3 | a volatile thing and one neutralizer a dose | the same thing with its harm taken out | x0.9 |
+
+Distill, Purify, Refine, Preserve and Catalyst crafting are retired. Jars they made stay
+usable and sellable under their old names, marked as made by an old method, and the new
+bench will not work them further. Every number above is a rule row in
+`content/rules/herbal-methods.json` and `herbal-products.json`, tunable in play.
+
+**Quality from the player's hands.** The d20 decides whether a step works; the minigame
+decides how well, as a score the server turns into Crude, Sound, Fine, Superior, Flawless
+and then Flawless +1 and on, spread evenly up to the crafter's ceiling (Fine at
+Herbalist 1, Superior at 2, Flawless at 3, +1 a Quality perk). Each tier scales potency
+and duration (x0.8 to x1.5, +0.1 a step past Flawless), drawbacks (x1.25 Crude to x0.25
+Flawless), and price (x0.5 to x3, +0.5 a step), from `herbal-quality.json`. The strength
+is baked into the effects the engine runs, so a herbal jar's `potency` is 1.0 and its
+card, its spec and its drink are one number.
+
+**Concentration, uncapped.** Dry and Reduce are the concentration steps. Step *n* of a
+line adds 2*n* to the DC (so *n*(*n*+1) over the line) and moves the result one rarity
+band rarer. The old x2 Concentrate at the still is gone. Nothing else limits depth.
+
+**No natural 20 at the herbal bench.** A herbal step is a skill check, and the CRB gives
+the d20's naturals to attacks and saves only, so herbalism's bench has neither an
+automatic 20 nor an automatic 1; past a DC the die cannot reach, it says "needs +N more
+to the check" and offers no roll. This bench (alchemy's chain bench) still clamps its
+shown chance to 5-95 and honours the naturals, as does every other chain bench; whether
+they follow is the owner's call, not this document's.
+
+**The book's failure rule.** A herbal step that misses by 4 or less loses the time and
+nothing else; by 5 or more, half the materials on the bench, rounded up across the whole
+batch. A miss on the minigame never takes materials. Batch size costs world time (per
+dose, no discount) and the whole batch shares one roll and one tier.
 
 ## Integration notes — wanted from the shared spine, deliberately not touched
 

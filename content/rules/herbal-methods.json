@@ -1,0 +1,107 @@
+{
+  "_note": "The herbalism bench's nine methods (docs/herbalism-revamp-plan.md §6). These are the owner-accepted starting values from 2026-10-02, tunable in play: change a number here and the bench, the card and the price all follow, because nothing in code repeats them. `potency` and `duration` multiply the line's strength at this step; a product row (herbal-products.json) multiplies again for the form it makes, so brew and steep are 1.0 here and the infusion/decoction and tincture/acetum split lives on the product. Mix is `mean`: the weighted mean of its parts, by dose. `minutes_per_dose` is world time per dose made, with no bulk discount (the owner's call: batch size costs time, not difficulty). `inputs_per_dose` is how many of the worked thing one dose takes: Dry and Reduce are the two concentration steps, two in and one out.",
+  "order": ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep", "neutralize"],
+  "methods": {
+    "grind": {
+      "name": "Grind", "level": 1,
+      "takes": "any grindable solid",
+      "makes": "powder; bark, sap or resin become salve base",
+      "potency": 1.1, "duration": 1.0,
+      "minutes_per_dose": 10, "inputs_per_dose": 1,
+      "tuning": {"seconds": 6, "beats": 8,
+                 "difficulty": {"default": 0.5, "leaf": 0.35, "flower": 0.3, "seed": 0.5,
+                                "berry": 0.4, "fungus": 0.45, "root": 0.7, "bark": 0.75,
+                                "resin": 0.65, "sap": 0.6, "bone": 0.8, "horn": 0.85,
+                                "shell": 0.8, "scale": 0.7, "mineral": 0.85}}
+    },
+    "mix": {
+      "name": "Mix", "level": 1,
+      "takes": "a ground herb (a poultice, water binds it), or salve bases with infused oil or an infusion",
+      "makes": "poultice, salve base, salve, balm or cream",
+      "potency": "mean", "duration": "mean",
+      "minutes_per_dose": 10, "inputs_per_dose": 1,
+      "tuning": {"seconds": 6, "beats": 6,
+                 "difficulty": {"default": 0.45, "leaf": 0.35, "flower": 0.35, "root": 0.55,
+                                "bark": 0.6, "wax": 0.55, "oil": 0.45}}
+    },
+    "brew": {
+      "name": "Brew", "level": 1,
+      "takes": "leaf or flower in water, or root, bark or berry in water",
+      "makes": "infusion (leaf, flower) or decoction (root, bark, berry and the other hard parts)",
+      "potency": 1.0, "duration": 1.0,
+      "minutes_per_dose": {"infusion": 30, "decoction": 120}, "inputs_per_dose": 1,
+      "tuning": {"seconds": 6, "beats": 6,
+                 "difficulty": {"default": 0.45, "leaf": 0.35, "flower": 0.35, "root": 0.6,
+                                "bark": 0.6, "berry": 0.5, "fungus": 0.5}}
+    },
+    "dry": {
+      "name": "Dry", "level": 2,
+      "takes": "two of a solid",
+      "makes": "one dried, stronger and longer lasting",
+      "potency": 1.5, "duration": 1.5,
+      "minutes_per_dose": 480, "inputs_per_dose": 2, "concentrates": true,
+      "tuning": {"seconds": 7, "beats": 4,
+                 "difficulty": {"default": 0.5, "leaf": 0.4, "flower": 0.45, "root": 0.6,
+                                "bark": 0.55, "organ": 0.7, "gland": 0.7}}
+    },
+    "reduce": {
+      "name": "Reduce", "level": 2,
+      "takes": "two of a liquid",
+      "makes": "one, simmered down to half",
+      "potency": 1.5, "duration": 1.5,
+      "minutes_per_dose": 60, "inputs_per_dose": 2, "concentrates": true,
+      "tuning": {"seconds": 6, "beats": 6,
+                 "difficulty": {"default": 0.5, "sap": 0.6, "liquid": 0.5}}
+    },
+    "extract": {
+      "name": "Extract", "level": 2,
+      "takes": "a part still in its shell, gland or pod",
+      "makes": "the usable part, whole",
+      "potency": 1.0, "duration": 1.0,
+      "minutes_per_dose": 30, "inputs_per_dose": 1,
+      "tuning": {"seconds": 6, "beats": 5,
+                 "difficulty": {"default": 0.55, "gland": 0.7, "organ": 0.65, "eye": 0.75,
+                                "seed": 0.45, "shell": 0.6}}
+    },
+    "infuse": {
+      "name": "Infuse", "level": 2,
+      "takes": "a dried herb and one oil for each dose",
+      "makes": "infused oil, for salves, balms and creams",
+      "potency": 1.25, "duration": 1.5,
+      "minutes_per_dose": 240, "inputs_per_dose": 1,
+      "tuning": {"seconds": 8, "beats": 6,
+                 "difficulty": {"default": 0.4, "leaf": 0.35, "flower": 0.35, "root": 0.5,
+                                "bark": 0.5}}
+    },
+    "steep": {
+      "name": "Steep", "level": 2,
+      "takes": "a herb and one alcohol (tincture) or one vinegar (acetum) for each dose",
+      "makes": "a sealed jar that is ready in two weeks (tincture) or one week (acetum)",
+      "potency": 1.0, "duration": 1.0,
+      "minutes_per_dose": 10, "inputs_per_dose": 1,
+      "ready_minutes": {"tincture": 20160, "acetum": 10080},
+      "tuning": {"seconds": 5, "beats": 4,
+                 "difficulty": {"default": 0.4, "root": 0.5, "bark": 0.5}}
+    },
+    "neutralize": {
+      "name": "Neutralize", "level": 3,
+      "takes": "a volatile thing and one neutralizer for each dose",
+      "makes": "the same thing, safe to handle: its harm is taken out",
+      "potency": 0.9, "duration": 1.0,
+      "minutes_per_dose": 20, "inputs_per_dose": 1,
+      "tuning": {"seconds": 6, "beats": 6,
+                 "difficulty": {"default": 0.6, "gland": 0.75, "organ": 0.7, "resin": 0.65}}
+    }
+  },
+  "_brew_note": "Brew turns leaf and flower into an infusion and the hard parts into a decoction (plan §6). Parts with no brew at all (oil, wax, mineral, liquid) are refused with the reason.",
+  "brew_product_by_part": {
+    "leaf": "infusion", "flower": "infusion", "feather": "infusion",
+    "root": "decoction", "bark": "decoction", "berry": "decoction", "seed": "decoction",
+    "fungus": "decoction", "sap": "decoction", "resin": "decoction", "gland": "decoction",
+    "organ": "decoction", "bone": "decoction", "horn": "decoction", "scale": "decoction",
+    "eye": "decoction", "shell": "decoction"
+  },
+  "salve_base_parts": ["bark", "sap", "resin"],
+  "_concentration_note": "Plan §5.3, owner ruling Q2 (cap nothing): each Dry or Reduce is concentration step n of its line, adds 2n to the DC (so n(n+1) in total over the line) and moves the result one rarity band rarer. Nothing else limits depth; the d20 does, because a bench check has no automatic natural 20.",
+  "concentration": {"dc_per_step": 2, "rarity_step": 1}
+}

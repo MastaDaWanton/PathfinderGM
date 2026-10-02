@@ -1,15 +1,19 @@
-"""Crafting chains, and the ingredient shelf behind them.
+"""The ingredient shelf, the card arithmetic, and the old chain reader behind them.
 
-A craft is an ordered list of methods applied to a set of ingredients, per the Herbalist
-document's own framing: "crafting is no longer limited to single-step recipes. Complex
-items require Crafting Chains—combining multiple methods across different tools."
+Herbalism's live bench is the step model (rules/crafting.py "THE STEP BENCH", driven
+through its API in tests/test_bench_api.py). What stays here is what the step bench is
+built on and still reads: the corpus, the benefit/harm sort, the check's terms, Stock and
+the sheet's use of it, and the retired chain reader `crafting.preview`, kept as a library.
 
-The workbench is assumed to fold out wherever the character is standing, per the design
-call, so nothing here gates on location.
+Tests that pinned rules the owner retired on 2026-10-02 (distill, purify, refine,
+preserve, the x2 concentrate, tincture infusions, the old bench's per-dose batch rolls and
+its natural 20 and 1) were deleted with the rules; the defects they recorded that still
+apply are re-pinned against the step bench in tests/test_bench_api.py.
 """
 from __future__ import annotations
 
 import json
+import re
 
 import pytest
 from django.test import Client, override_settings
@@ -80,29 +84,6 @@ def test_a_simple_chain_previews(shelf):
     assert len(r.described) == 2
 
 
-def test_mix_costs_potency_and_distil_returns_it():
-    """The author's percentages: mix keeps 80%, distil adds 25%, refine reaches 125%."""
-    mixed = crafting.preview("herbalist", 3,
-                             Chain("herbalist", ["mix"], ["woundwort"]))
-    assert mixed.potency == pytest.approx(0.80)
-
-    both = crafting.preview("herbalist", 3,
-                            Chain("herbalist", ["mix", "distill"], ["woundwort"]))
-    assert both.potency == pytest.approx(1.00)
-
-
-def test_purifying_removes_the_drawback():
-    """"Passing a dangerous ingredient through Purify or Neutralize completely removes
-    its negative side effects.\""""
-    raw = crafting.preview("herbalist", 3,
-                           Chain("herbalist", ["grind"], ["nightshade"]))
-    assert raw.risky and raw.drawbacks
-
-    clean = crafting.preview("herbalist", 3,
-                             Chain("herbalist", ["grind", "purify"], ["nightshade"]))
-    assert not clean.risky and not clean.drawbacks
-
-
 # --- benefit, harm, and the line between them ------------------------------------------------
 
 def test_harm_is_a_drawback_rather_than_an_effect():
@@ -150,49 +131,6 @@ def test_an_ingredient_that_is_only_dangerous_to_handle_is_named():
     assert any("Untreated hazardous components: Basilisk Eye." in d for d in r.drawbacks)
 
 
-def test_purify_says_which_poison_it_took_out():
-    """It used to append "Side effects and secondary toxicities removed by the chain." — a
-    sentence that named nothing, whether the chain had cleansed one poison or three."""
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["grind", "purify"],
-                               ["dragon-flower", "mad-cap"]))
-    assert r.removed[:2] == [
-        "Purify removed Dragon Flower's poison: Fortitude DC 25 or 1d6 Constitution "
-        "damage, causes nauseated.",
-        "Purify removed Mad Cap's poison: DC 18 or causes exhausted, causes unconscious, "
-        "causes confused.",
-    ]
-
-
-def test_purify_takes_the_poison_out_of_the_item_and_not_only_off_the_card():
-    """Measured: purifying set a `cleansed` flag and appended a sentence, and left every
-    harmful spec on the Stock. A "Purified Draught of Skull Orchid" still did all three of
-    its ability damages when somebody drank it, and could still be thrown at people — the
-    method the author says "completely removes its negative side effects" removed nothing
-    whatsoever."""
-    from rules import consumables as con
-
-    raw = crafting.preview("herbalist", 3,
-                           Chain("herbalist", ["grind"], ["skull-orchid"]))
-    assert con.is_harmful(crafting.from_stock_dict(raw.output))
-
-    clean = crafting.preview("herbalist", 3,
-                             Chain("herbalist", ["grind", "purify"], ["skull-orchid"]))
-    made = crafting.from_stock_dict(clean.output)
-    assert not con.is_harmful(made)
-    assert not any(s["type"] == "ability_damage" for s in made.specs)
-
-
-def test_a_purified_poison_survives_into_inventory_still_purified():
-    """The removal has to be a property of the jar, not of the preview that made it —
-    otherwise the card is honest and the thing in the satchel is not."""
-    clean = crafting.preview("herbalist", 3,
-                             Chain("herbalist", ["grind", "purify"], ["skull-orchid"]))
-    back = crafting.from_stock_dict(crafting.from_stock_dict(clean.output).as_dict())
-    assert not back.drawbacks
-    assert any("Purify removed Skull Orchid's poison" in e for e in back.effects)
-
-
 def test_a_crafting_dc_restated_in_the_prose_does_not_become_a_poison():
     """41 of the corpus's 59 save gates gate nothing: they are the entry's own crafting DC,
     written at the end of its description ("Cave Star ... DC: 10.") and picked up by the
@@ -214,9 +152,11 @@ def test_a_card_line_and_its_mechanic_come_from_one_walk(shelf):
 
 
 def test_a_method_you_have_not_learned_is_named_with_the_level_that_grants_it():
+    """Re-pinned 2026-10-02 on Neutralize: the test used Distill, which the owner retired.
+    The defect is the same: a locked method must say which level opens it."""
     r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["distill"], ["woundwort"]))
-    assert any("Herbalist 3" in p for p in r.problems)
+                         Chain("herbalist", ["neutralize"], ["woundwort"]))
+    assert any(re.search(r"Neutralize is learned at Herbalist \d", p) for p in r.problems)
 
 
 def test_material_above_your_tier_is_refused_by_name():
@@ -248,14 +188,6 @@ def test_an_empty_pot_says_so_rather_than_erroring():
     assert r.chance == 0
 
 
-def test_a_longer_chain_is_harder():
-    short = crafting.preview("herbalist", 3, Chain("herbalist", ["grind"], ["woundwort"]))
-    long = crafting.preview("herbalist", 3,
-                            Chain("herbalist", ["grind", "mix", "purify", "brew"],
-                                  ["woundwort"]))
-    assert long.dc > short.dc
-
-
 def test_an_authored_dc_beats_a_derived_one():
     """31 ingredients carry their own crafting DC. An authored number beats a tier
     lookup every time."""
@@ -282,17 +214,6 @@ def client(tmp_path):
         cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         yield Client()
         cm._LIVE.clear()
-
-
-def _carry(ids):
-    """Put raw material in the satchel. Crafting spends what the character is carrying,
-    so a bench test has to forage — or be handed the herbs — before it can brew."""
-    from play import campaign as cm
-
-    c = cm.current()
-    for i in ids:
-        c.scene.pc().carry(i, 1)
-    c.save()
 
 
 def test_the_bench_opens(client):
@@ -324,57 +245,6 @@ def test_each_bench_serves_its_own_shelf(client):
     assert "woundwort" in {m["id"] for m in herbs["ingredients"]}
 
 
-def test_crafting_advances_the_track(client):
-    _carry(["woundwort", "comfrey"])
-    r = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort", "comfrey"],
-        "methods": ["grind", "brew"]}), content_type="application/json")
-    assert r.status_code == 200
-    d = r.json()
-    assert d["track"]["mp"] > 0
-    assert 1 <= d["roll"] <= 20
-
-
-def test_a_chain_that_cannot_be_made_is_refused_before_it_is_scored(client):
-    """Scoring it would let a track level itself on work the character has neither the
-    tools nor the methods to attempt."""
-    r = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["phoenix-feather"],
-        "methods": ["grind"]}), content_type="application/json")
-    assert r.status_code == 400
-
-    after = client.get("/api/craft/ingredients?craft=herbalism").json()
-    assert after["track"]["mp"] == 0
-
-
-def test_a_recipe_can_be_kept_and_corrected(client):
-    body = {"craft": "herbalism", "name": "Wound Wash",
-            "ingredients": ["woundwort"], "methods": ["grind"]}
-    d = client.post("/api/craft/recipes", data=json.dumps(body),
-                    content_type="application/json").json()
-    assert len(d["recipes"]) == 1
-
-    body["ingredients"] = ["woundwort", "comfrey"]
-    d = client.post("/api/craft/recipes", data=json.dumps(body),
-                    content_type="application/json").json()
-    # Saved under a name that exists replaces it. A bench where the second save silently
-    # makes a duplicate is a bench nobody can correct a recipe at.
-    assert len(d["recipes"]) == 1
-    assert d["recipes"][0]["ingredients"] == ["woundwort", "comfrey"]
-
-
-def test_the_bench_is_sent_the_poisons_grouped(client):
-    """The page cannot group them itself: it receives lines, and the type that says
-    whether a line is a benefit is only on the server. Sending the grouping is what lets
-    the Drawbacks panel print the save in front of the harm it gates."""
-    d = client.post("/api/craft/preview", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["dragon-flower"],
-        "methods": ["grind"]}), content_type="application/json").json()
-    assert d["effects"] == ["Dragon Flower: +5 save vs poison for 10 rounds"]
-    assert d["poisons"][0]["save_line"] == "Fortitude DC 25"
-    assert d["poisons"][0]["harm"] == "1d6 Constitution damage, causes nauseated"
-
-
 def test_the_shelf_marks_a_jar_that_will_poison_whoever_drinks_it(client):
     """A made poison and a made tea were the same green flask on the Made shelf, and the
     only way to find out which was which was to drink one."""
@@ -392,89 +262,12 @@ def test_the_shelf_marks_a_jar_that_will_poison_whoever_drinks_it(client):
         "Fortitude DC 25 or 1d6 Constitution damage, causes nauseated"
 
 
-def test_a_nameless_recipe_is_refused(client):
-    r = client.post("/api/craft/recipes",
-                    data=json.dumps({"ingredients": ["woundwort"]}),
-                    content_type="application/json")
-    assert r.status_code == 400
-
-
 # --- crafted output as an ingredient -------------------------------------------------------
 
 def _tea(concentration=1, tier="common", potency=1.0, count=1):
     return crafting.Stock(base="Woundwort Tea", concentration=concentration, tier=tier,
                           potency=potency, count=count, craft="herbalist",
                           effects=["stops bleeding"])
-
-
-def test_two_doses_make_one_of_twice_the_strength():
-    """The trade is quantity for density, not a gain: nothing is created, and the pair is
-    spent."""
-    made = crafting.concentrate(_tea())
-    assert made.concentration == 2
-    assert made.potency == 2.0
-    assert made.count == 1
-    assert made.name == "Woundwort Tea (Tier 2)"
-
-
-def test_concentrating_again_compounds():
-    once = crafting.concentrate(_tea())
-    twice = crafting.concentrate(once)
-    assert twice.name == "Woundwort Tea (Tier 3)"
-    assert twice.potency == 4.0
-
-
-def test_each_step_is_a_band_rarer():
-    """What makes it a ladder rather than a loop: Tier 3 is rare material, and working
-    rare material is Herbalist 3."""
-    assert crafting.concentrate(_tea()).tier == "uncommon"
-    assert crafting.concentrate(crafting.concentrate(_tea())).tier == "rare"
-
-
-def test_concentration_spends_the_pair():
-    stock = {"woundwort-tea#1": _tea(count=4)}
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 2}),
-                         stock=stock)
-    assert r.concentrating and not r.problems
-    assert r.consumes == {"woundwort-tea#1": 2}
-    assert r.output["name"] == "Woundwort Tea (Tier 2)"
-
-
-def test_concentrating_needs_the_still():
-    """Concentrating is distilling. Requiring the method keeps the ladder behind the
-    track rather than available to anyone holding two jars."""
-    stock = {"woundwort-tea#1": _tea(count=2)}
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", [], [], stock_used={"woundwort-tea#1": 2}),
-                         stock=stock)
-    assert any("still" in p for p in r.problems)
-
-
-def test_a_first_level_herbalist_cannot_concentrate():
-    stock = {"woundwort-tea#1": _tea(count=2)}
-    r = crafting.preview("herbalist", 1,
-                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 2}),
-                         stock=stock)
-    assert any("Herbalist 3" in p for p in r.problems)
-
-
-def test_one_dose_is_not_a_concentration():
-    """A single jar with the still in the chain is an ordinary distillation, not a step
-    up the ladder."""
-    stock = {"woundwort-tea#1": _tea(count=3)}
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 1}),
-                         stock=stock)
-    assert not r.concentrating
-
-
-def test_you_cannot_spend_what_you_do_not_have():
-    stock = {"woundwort-tea#1": _tea(count=1)}
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["distill"], [], stock_used={"woundwort-tea#1": 2}),
-                         stock=stock)
-    assert any("you have 1" in p for p in r.problems)
 
 
 def test_a_crafted_input_brings_its_potency_into_a_new_compound():
@@ -508,146 +301,6 @@ def test_an_emptied_jar_leaves_the_shelf():
     pc.add_stock(_tea(), count=2)
     assert pc.take_stock("woundwort-tea#1", 2) == 2
     assert "woundwort-tea#1" not in pc.stock
-
-
-# --- the ladder, through the page ----------------------------------------------------------
-
-def test_a_craft_lands_on_the_shelf(client):
-    _carry(["woundwort"])
-    d = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"],
-        "name": "Woundwort Tea"}), content_type="application/json").json()
-    if not d["succeeded"]:
-        return                                  # the dice decide; the path is the point
-    shelf = client.get("/api/craft/ingredients?craft=herbalism").json()
-    assert any(s["base"] == "Woundwort Tea" for s in shelf["stock"])
-
-
-def test_the_shelf_says_what_concentrating_would_make(client, tmp_path):
-    from play import campaign as cm
-
-    c = cm.current()
-    c.scene.pc().add_stock(_tea(), count=2)
-    c.save()
-
-    d = client.get("/api/craft/ingredients?craft=herbalism").json()
-    tea = next(s for s in d["stock"] if s["base"] == "Woundwort Tea")
-    assert tea["count"] == 2
-    assert tea["can_concentrate"]
-    assert tea["concentrates_to"]["name"] == "Woundwort Tea (Tier 2)"
-
-
-def test_a_spoiled_batch_still_spends_the_doses(client):
-    """"Rare ingredients spoil" is the author's own note, and a failure that hands them
-    back would make failing free."""
-    from play import campaign as cm
-
-    c = cm.current()
-    pc = c.scene.pc()
-    pc.track("herbalist").level = 3
-    pc.add_stock(_tea(), count=2)
-    c.save()
-
-    d = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "methods": ["distill"], "ingredients": [],
-        "stock": {"woundwort-tea#1": 2}}), content_type="application/json").json()
-    assert d["spent"] == {"woundwort-tea#1": 2}
-    assert "woundwort-tea#1" not in cm.current().scene.pc().stock
-    if d["succeeded"]:
-        assert cm.current().scene.pc().stock["woundwort-tea#2"].count == 1
-
-
-def test_one_dose_is_not_a_free_concentration():
-    """Found by driving the bench: `spend` rounds down, so a single dose gave
-    `(1 // 2) * 2 = 0`. The pair was never taken, the output was still made, and a lone
-    jar became a rarer jar at no cost — the opposite of the two-for-one trade."""
-    from rules import crafting, worldclass
-
-    track = worldclass.tracks()["herbalist"]
-    held = crafting.Stock(base="Ice Lotus", concentration=1, tier="uncommon", count=1)
-    chain = crafting.Chain(track="herbalist", methods=["distill"])
-    got = crafting._concentration(track, 5, chain, (held, 1), ceiling=99)
-    assert any("takes 2 doses" in p for p in got.problems)
-
-
-# --- infusions carry into the tincture ------------------------------------------------
-#
-# "Infusions should be the only way to combine tinctures with other things" — and the
-# thing that comes out is the tincture, enriched. Before this, infusing a Tier 3 Mad Cap
-# Tincture with woundwort produced "Woundwort Infusion" at concentration 1: the tincture's
-# identity gone, and the two doses that bought the concentration silently thrown away.
-
-def _tincture(base="Mad Cap Tincture", concentration=1, count=3):
-    return crafting.Stock(
-        base=base, concentration=concentration, tier="uncommon", count=count,
-        potency=1.25, craft="herbalist", effects=["Heals 2d8 hit points"],
-        specs=[{"type": "heal", "dice": "2d8", "from": "Mad Cap"}])
-
-
-def _infuse(jar, ingredient_id, level=5):
-    chain = Chain(track="herbalist", methods=["infuse"], ingredient_ids=[ingredient_id],
-                  stock_used={jar.id: 1})
-    return crafting.preview("herbalist", level, chain, stock={jar.id: jar},
-                            satchel={ingredient_id: 5})
-
-
-def test_an_infusion_keeps_the_tinctures_own_effects():
-    """The base jar's `heal 2d8` has to survive the pour.
-
-    Both sides end up on the result: the tincture's heal and the herb's line, rather than
-    the herb's line alone.
-    """
-    result = _infuse(_tincture(), "woundwort")
-    joined = " | ".join(result.effects)
-    assert "Heals 2d8" in joined, result.effects
-    assert "Woundwort" in joined, result.effects
-    assert [s for s in result.as_dict()["output"]["specs"] if s.get("type") == "heal"]
-
-
-def test_an_infusion_is_still_the_tincture_it_was_poured_into():
-    """It came out named "Woundwort Infusion" — named after the herb, not the jar."""
-    result = _infuse(_tincture(), "woundwort")
-    assert result.as_dict()["output"]["base"].startswith("Mad Cap Tincture"), result.name
-
-
-def test_an_infusion_does_not_throw_away_the_concentration():
-    """A Tier 3 tincture infused came back at concentration 1.
-
-    Four doses bought that Tier 3 (two per step); infusing a herb into it is not a reason
-    to hand back one dose of the base strength.
-    """
-    result = _infuse(_tincture(concentration=3), "woundwort")
-    assert result.as_dict()["output"]["concentration"] == 3
-
-
-def test_two_differently_infused_jars_of_one_tincture_do_not_stack():
-    """Stock is held per base name, so identical names merge into one count.
-
-    A Mad Cap Tincture infused with woundwort and one infused with dragon flower are not
-    interchangeable, and would have become a count of two of whichever was crafted first.
-    """
-    first = _infuse(_tincture(), "woundwort").as_dict()["output"]
-    second = _infuse(_tincture(), "mad-cap").as_dict()["output"]
-    assert first["id"] != second["id"], first["id"]
-
-
-def test_infusing_twice_keeps_the_first_infusion_on_the_label():
-    """Stripping the parenthetical to avoid "Tincture Tincture Tincture" compounding
-    would otherwise erase woundwort from a jar that still contains it."""
-    once = _infuse(_tincture(), "woundwort").as_dict()["output"]
-    twice = _infuse(_tincture(base=once["base"]), "mad-cap").as_dict()["output"]
-    assert "Woundwort" in twice["base"] and "Mad Cap" in twice["base"], twice["base"]
-
-
-def test_a_chain_with_no_infuse_is_still_named_for_its_ingredients():
-    """The tincture-keeping rule is scoped to infusions. A plain brew of woundwort is a
-    new thing and should not inherit a name from whatever jar was in the pot."""
-    jar = _tincture()
-    chain = Chain(track="herbalist", methods=["brew"], ingredient_ids=["woundwort"],
-                  stock_used={jar.id: 1})
-    result = crafting.preview("herbalist", 5, chain, stock={jar.id: jar},
-                              satchel={"woundwort": 5})
-    assert "Mad Cap Tincture" not in result.name, result.name
 
 
 # --- the shelf says which jars the chain will take -----------------------------------
@@ -710,279 +363,6 @@ def test_the_reason_carries_no_name_prefix():
     assert not crafting.prep_problem(horn, ["brew"]).startswith(horn.name)
 
 
-# --- the same answer, through the bench ------------------------------------------------
-
-@pytest.fixture
-def tagged(monkeypatch):
-    """A shelf of three herbs with known flags, standing in for the whole corpus."""
-    shelf = {h.id: h for h in [
-        _herb("chimera-horn", brew_raw=False, volatile=False, needs_extraction=False),
-        _herb("dragon-flower", volatile=True, needs_extraction=False),
-        _herb("woundwort", volatile=False, needs_extraction=False, brew_raw=True),
-    ]}
-    monkeypatch.setattr(ingredients, "all_ingredients", lambda: shelf)
-    return shelf
-
-
-def _refusals(client, methods, pot=()):
-    return client.post("/api/craft/preview", data=json.dumps({
-        "craft": "herbalism", "ingredients": list(pot), "methods": list(methods)}),
-        content_type="application/json").json().get("refused") or {}
-
-
-def test_the_bench_sends_a_reason_for_every_jar_the_chain_refuses(client, tagged):
-    """Sent with the preview rather than worked out in the page, so there is one copy of
-    the preparation rules and the shelf cannot drift from what Craft will accept."""
-    refused = _refusals(client, ["brew"])
-    assert "chimera-horn" in refused and "ground" in refused["chimera-horn"]
-    assert "woundwort" not in refused
-
-
-def test_an_empty_pot_still_gets_the_refusals(client, tagged):
-    """The page returned early on an empty pot, so picking a method first — the order most
-    people work in — greyed nothing at all. The refusals must not depend on the pot."""
-    assert _refusals(client, ["brew"], pot=[]) == _refusals(client, ["brew"],
-                                                            pot=["woundwort"])
-
-
-def test_no_chain_refuses_nothing(client, tagged):
-    """Before a method is chosen there is no rule to break, and a shelf that came up all
-    crossed out would be worse than one that says nothing."""
-    assert _refusals(client, []) == {}
-
-
-def test_the_shelf_and_the_craft_button_agree(client, tagged):
-    """Both answers come from one walk, so a jar marked refused must also produce a
-    problem when it is actually put in the pot — and one left unmarked must not."""
-    refused = _refusals(client, ["brew"])
-    for iid in tagged:
-        problems = client.post("/api/craft/preview", data=json.dumps({
-            "craft": "herbalism", "ingredients": [iid], "methods": ["brew"]}),
-            content_type="application/json").json()["problems"]
-        named = [p for p in problems if p.startswith(tagged[iid].name)]
-        assert bool(named) == (iid in refused), (iid, problems, refused)
-
-
-# --- distilling needs a liquid; purifying needs something to purify --------------------
-#
-# Reported from play: "i can still distill anything — how can i distill a dry leaf or a
-# mushroom", and "to purify it needs to have a negative effect to purify". Both methods
-# ran on anything at all: `distill` was not in the preparation walk at all, and `purify`
-# had already worked out that it would find nothing, written "found nothing harmful to
-# remove" on the jar as a note, and gone ahead — spending the ingredients, advancing the
-# track and producing a Purified Draught of a thing that was never impure.
-
-def _problems(iids, methods, level=5, stock=None):
-    stock = {s.id: s for s in (stock or [])}
-    chain = Chain(track="herbalist", methods=list(methods), ingredient_ids=list(iids),
-                  stock_used={sid: 1 for sid in stock})
-    return crafting.preview("herbalist", level, chain, stock=stock,
-                            satchel={i: 5 for i in iids}).problems
-
-
-def test_a_dry_leaf_cannot_be_distilled():
-    """The report, exactly. There is no liquid in a handful of leaves to boil off."""
-    assert any("liquid" in p for p in _problems(["woundwort"], ["distill"]))
-
-
-def test_a_mushroom_cannot_be_distilled():
-    assert any("liquid" in p for p in _problems(["mad-cap"], ["distill"]))
-
-
-def test_something_that_already_pours_can_be_distilled():
-    """Nine ingredients in the corpus arrive as liquid — saps, galls, essences, tears.
-    Refusing those would have traded one wrong answer for another."""
-    sap = ingredients.all_ingredients()["trollheart-sap"]
-    assert herbprep.Prep.of(sap).liquid
-    assert not _problems(["trollheart-sap"], ["distill"])
-
-
-def test_a_tea_off_the_shelf_can_be_distilled():
-    """The ordinary route to a tincture: brew a tea in one chain, distil it in the next.
-    Brewing finishes a chain, so this has to work across two of them or not at all."""
-    tea = crafting.Stock(base="Woundwort Tea", tier="common", count=3, potency=1.25,
-                         craft="herbalist", effects=["Stops bleeding"])
-    assert not _problems([], ["distill"], stock=[tea])
-
-
-def test_grinding_takes_the_liquid_back_out_of_the_pot():
-    """Order is the whole point: `grind → distill` and `brew → distill` are the same two
-    methods, and only one of them is a thing you can do. A check against the ingredients
-    alone, ignoring the order, would pass both."""
-    problems = _problems(["trollheart-sap"], ["grind", "distill"])
-    assert any("liquid" in p for p in problems), problems
-
-
-def test_the_shelf_marks_a_leaf_when_distil_is_chosen():
-    """The cue has to cover distillation too. `prep_problem` only walked the preparation
-    steps, and `distill` is not one of them — so choosing it greyed nothing."""
-    leaf = ingredients.all_ingredients()["woundwort"]
-    assert "pour" in crafting.prep_problem(leaf, ["distill"])
-    assert crafting.prep_problem(leaf, ["brew", "distill"]) == ""
-
-
-def test_the_refusal_is_not_reported_twice():
-    """`_preparation_problems` and `_distillation_problems` both ask the same question of
-    the same pot. Both answering meant every dry leaf was refused twice over."""
-    problems = _problems(["woundwort"], ["distill"])
-    assert len([p for p in problems if "liquid" in p or "pour" in p]) == 1, problems
-
-
-def test_purify_needs_something_harmful_to_remove():
-    """Woundwort stops bleeding and does nothing else. There is nothing in it to strip."""
-    problems = _problems(["woundwort"], ["purify"])
-    assert any("nothing to remove" in p for p in problems), problems
-
-
-def test_purify_is_allowed_when_the_pot_is_actually_poisonous():
-    assert not _problems(["mad-cap"], ["purify"])
-
-
-def test_purify_is_allowed_when_the_pot_is_merely_hazardous_to_handle():
-    """`risky` ingredients carry no poison spec — the danger is in the harvesting — and
-    purify has always claimed to remove those handling risks. It still may."""
-    risky = next(i.id for i in ingredients.all_ingredients().values() if i.risky)
-    assert not _problems([risky], ["purify"])
-
-
-def test_neutralise_is_not_held_to_the_purify_rule(monkeypatch):
-    """Neutralise has a second job: making a volatile herb safe to grind. It shares the
-    CLEANSING list with purify, so a rule written against the list rather than against
-    the method would have broken every volatile chain.
-
-    The herb is made here: the shipped corpus tags nothing volatile — those tags live in
-    the homebrew overlay in the player's own data directory.
-    """
-    volatile = _herb("woundwort", volatile=True)
-    monkeypatch.setattr(ingredients, "all_ingredients", lambda: {volatile.id: volatile})
-    assert not _problems([volatile.id], ["neutralize", "grind"])
-
-
-# --- crafting in a batch ----------------------------------------------------------------
-#
-# "if i have 100 acacia powder and i want to make 100 acacia powder tea i should not need
-# to click the craft button 100 times." A batch is N separate attempts rather than one
-# attempt for N doses: its own d20 each time, its own success, its own mastery. That is
-# what pressing the button N times did, and automating the pressing must not quietly
-# become a change to the rule — one roll for a hundred doses would mean a single 1
-# spoiling the lot.
-
-def _stocked(client, ingredient="woundwort", count=100):
-    from play import campaign as cm
-
-    pc = cm.current().scene.pc()
-    pc.inventory[ingredient] = count
-    return pc
-
-
-def _brew(client, batch=1, ingredient="woundwort"):
-    return client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": [ingredient], "methods": ["brew"],
-        "batch": batch}), content_type="application/json")
-
-
-def test_a_batch_makes_many_jars_from_one_press(client):
-    _stocked(client)
-    d = _brew(client, batch=20).json()
-    assert d["batch"]["attempted"] == 20
-    assert d["batch"]["made"] + d["batch"]["spoiled"] == 20
-
-
-def test_every_dose_in_a_batch_gets_its_own_roll(client):
-    """Not one roll for the lot. A single 1 must cost one jar, not twenty."""
-    _stocked(client)
-    rolls = _brew(client, batch=20).json()["batch"]["rolls"]
-    assert len(rolls) == 20
-    assert len(set(rolls)) > 1, rolls
-
-
-def test_a_batch_spends_the_materials_for_every_dose(client):
-    """Twenty teas cost twenty herbs, made or spoiled. The inputs are spent either way —
-    a spoiled batch that handed them back would make failure free."""
-    from play import campaign as cm
-
-    pc = _stocked(client, count=100)
-    _brew(client, batch=20)
-    assert cm.current().scene.pc().inventory.get("woundwort", 0) == 80
-
-
-def test_a_batch_stops_when_the_materials_run_out_and_keeps_what_it_made(client):
-    """Asked for more than the shelf can supply. The doses already made are real work and
-    are kept; the reason is reported rather than the batch being rolled back."""
-    _stocked(client, count=5)
-    d = _brew(client, batch=50).json()
-    assert d["batch"]["asked"] == 50
-    assert d["batch"]["attempted"] == 5
-    assert d["batch"]["stopped"]
-
-
-def test_a_batch_of_one_is_the_single_craft_it_always_was(client):
-    """The old response shape is kept intact, so anything reading this endpoint — the
-    page included — goes on working unchanged."""
-    _stocked(client)
-    d = _brew(client, batch=1).json()
-    assert set(["succeeded", "roll", "chance", "result", "made", "spent"]) <= set(d)
-    assert d["batch"]["attempted"] == 1
-
-
-def test_no_batch_field_at_all_still_crafts_once(client):
-    _stocked(client)
-    d = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-        content_type="application/json").json()
-    assert d["batch"]["attempted"] == 1
-
-
-def test_a_batch_writes_one_line_to_the_transcript_not_a_hundred(client):
-    """A hundred crafts is one afternoon at the bench, not a hundred things that happened
-    to the party."""
-    from play import campaign as cm
-
-    _stocked(client)
-    before = len(cm.current().transcript)
-    _brew(client, batch=30)
-    assert len(cm.current().transcript) == before + 1
-
-
-def test_a_batch_advances_the_track_once_per_dose(client):
-    """Batching must be worth exactly what the clicking was worth. Mastery per attempt,
-    not per press — otherwise the button is either a nerf or a shortcut."""
-    from play import campaign as cm
-
-    _stocked(client)
-    one = _brew(client, batch=1).json()["track"]
-    many = _brew(client, batch=10).json()["track"]
-    assert (many["level"], many["mp"]) != (one["level"], one["mp"])
-
-
-def test_an_absurd_batch_is_capped_rather_than_rolling_forever(client):
-    """Without a ceiling a hand-written request for a million would roll a million d20s
-    before the response ever went out."""
-    _stocked(client, count=100)
-    d = _brew(client, batch=10_000_000).json()
-    assert d["batch"]["asked"] <= craft_views.MAX_BATCH
-
-
-def test_a_chain_that_cannot_be_made_is_refused_before_any_of_the_batch_runs(client):
-    """The first attempt is checked like any single craft: nothing is spent and the error
-    is the chain's own, not "stopped after 0"."""
-    r = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["distill"],
-        "batch": 10}), content_type="application/json")
-    assert r.status_code == 400
-    assert "liquid" in r.json()["error"]
-
-
-def test_the_bench_says_how_many_the_materials_allow(client):
-    """So the page can offer "all 47" rather than making the player count it out and then
-    discover halfway through that they were three short."""
-    _stocked(client, count=47)
-    d = client.post("/api/craft/preview", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-        content_type="application/json").json()
-    assert d["batch_max"] == 47
-
-
 # --- the craft is a check, rolled where you can see it ---------------------------------
 #
 # "instead of a percentage chance and a blind roll just roll a d100 on screen or even
@@ -1040,68 +420,6 @@ def test_the_preview_carries_the_check_to_the_bench():
 def test_the_chance_is_derived_from_the_check_rather_than_being_the_mechanic():
     """It is a label now. d20+11 against DC 20 needs a 9: twelve faces of twenty, 60%."""
     assert crafting._chance(20, 11) == 60
-
-
-def test_a_craft_reports_the_whole_check_not_a_verdict(client):
-    """The roll used to come back as `succeeded` and a d20 face against a percentage,
-    which a player could not check. The die, the terms, the total and the DC all travel."""
-    from play import campaign as cm
-
-    cm.current().scene.pc().inventory["woundwort"] = 5
-    d = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-        content_type="application/json").json()
-    assert 1 <= d["roll"] <= 20
-    assert d["total"] == d["roll"] + d["bonus"]
-    assert d["dc"] > 0 and d["terms"]
-
-
-def test_the_die_and_the_dc_decide_it_not_the_percentage(client, monkeypatch):
-    """The whole point of the change: the outcome follows from `roll + bonus >= dc`."""
-    from play import campaign as cm
-    from rules import dice as dice_mod
-
-    pc = cm.current().scene.pc()
-    pc.inventory["woundwort"] = 40
-    seen = []
-    for face in (2, 19):
-        monkeypatch.setattr(dice_mod.Dice, "d20",
-                            lambda self, *a, **k: _face(face))
-        d = client.post("/api/craft/do", data=json.dumps({
-            "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-            content_type="application/json").json()
-        seen.append((d["roll"], d["total"] >= d["dc"], d["succeeded"]))
-    for roll, makes_dc, succeeded in seen:
-        assert succeeded == makes_dc, seen
-
-
-def _face(n):
-    from rules.dice import Roll
-
-    return Roll(die="d20", faces=[n], label="craft", visibility="player")
-
-
-def test_a_natural_one_still_fails_whatever_the_bonus(client, monkeypatch):
-    """A master with +30 against DC 5 still ruins one batch in twenty. No craft is safe,
-    which is why the odds label is clamped at 95 rather than reaching certainty."""
-    from play import campaign as cm
-    from rules import dice as dice_mod
-
-    pc = cm.current().scene.pc()
-    pc.inventory["woundwort"] = 5
-    # A crafter whose arithmetic clears the DC on its own, or the natural 1 proves
-    # nothing: the first cut of this used the fixture's +1 and failed for the ordinary
-    # reason, which would have passed the assertion for the wrong cause.
-    pc.level = 12
-    pc.abilities["wis"] = 20
-    pc.track("herbalist").level = 5
-    cm.current().save()
-    monkeypatch.setattr(dice_mod.Dice, "d20", lambda self, *a, **k: _face(1))
-    d = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-        content_type="application/json").json()
-    assert d["roll"] == 1 and not d["succeeded"]
-    assert d["total"] >= d["dc"], "the arithmetic made it; the natural 1 overrode it"
 
 
 # --- what you made is in your inventory, and you can use it ----------------------------
@@ -1207,3 +525,98 @@ def test_using_a_jar_hands_back_the_fresh_sheet(client):
                     content_type="application/json").json()
     row = next(j for j in d["sheet"]["defense"]["stock"] if j["id"] == item.id)
     assert row["count"] == 2
+
+
+# --- the step bench's arithmetic -----------------------------------------------------------
+#
+# The rules the API tests drive end to end (tests/test_bench_api.py), pinned here where a
+# failure names the function rather than an endpoint.
+
+def test_benefits_round_up_and_harm_rounds_down():
+    """The module's own rounding rule, now applied to harm as well as help: a Fine
+    remedy's heal rounds in the drinker's favour, and so does its poison. 1d6 harm at
+    x0.75 is 1d6-1 (0.875 down), never 1d6 (up); 1d4 help at x1.1 is 1d4+1 (0.25 up)."""
+    help_, harm = crafting.bake(
+        [{"type": "heal", "dice": "1d4"},
+         {"type": "damage", "dice": "1d6", "duration": {"amount": 1, "unit": "round"}}],
+        1.1, 1.0, 0.75)
+    assert help_["dice"] == "1d4+1"
+    assert harm["dice"] == "1d6-1"
+    # Never shortened to 0: a duration of 0 reads as no duration at all.
+    assert harm["duration"]["amount"] == 1
+
+
+def test_a_flat_bonus_and_its_duration_scale_with_the_strength():
+    """"Stronger and longer" (plan §2): +2 for 1 hour at x1.5 is +3 for 2 hours, rounded
+    up as benefits are, and a string amount from the corpus scales the same as a number."""
+    got, = crafting.bake([{"type": "save_mod", "amount": "2",
+                           "duration": {"amount": "1", "unit": "hour"}}], 1.5, 1.5, 1.0)
+    assert got["amount"] == 3 and got["duration"]["amount"] == 2
+
+
+def test_the_ladder_runs_on_past_flawless():
+    """Plan §2: Crude, Sound, Fine, Superior, Flawless, then Flawless +1 and on, with
+    potency +0.1 a step, price +0.5 a step and the drawback held at 0.25."""
+    assert [crafting.quality_name(i) for i in range(7)] == [
+        "Crude", "Sound", "Fine", "Superior", "Flawless", "Flawless +1", "Flawless +2"]
+    assert crafting.quality_mult("potency", 6) == pytest.approx(1.7)
+    assert crafting.quality_mult("price", 5) == pytest.approx(3.5)
+    assert crafting.quality_mult("drawback", 9) == pytest.approx(0.25)
+
+
+@pytest.mark.parametrize("score,ceiling,tier", [
+    (0.0, 2, 0), (0.33, 2, 0), (0.34, 2, 1), (0.71, 3, 2), (1.0, 2, 2), (1.0, 4, 4),
+    (5, 2, 2), (-1, 4, 0), ("x", 4, 0), (None, 4, 0), (float("nan"), 4, 0),
+    (float("inf"), 3, 3)])
+def test_the_score_is_spread_evenly_under_the_ceiling_and_clamped(score, ceiling, tier):
+    """Plan §4.3: a perfect run lands exactly on the ceiling and the bands below share
+    the range. The page's number is never trusted past that: anything outside 0..1, or
+    not a number, is clamped before it is read."""
+    assert crafting.tier_from_score(score, ceiling)[0] == tier
+
+
+def test_the_failure_rule_ruins_exactly_half_rounded_up():
+    """Miss by 5 or more: half the stack, rounded up, shared across its materials by
+    their share. 7 and 2 is 9 units, so 5 ruined: never 4 (half rounded down) and never
+    4 + 1 + 1 (each share rounded up on its own)."""
+    a = crafting.Material(key="ing:a", name="A", ingredient_id="a", kind="herb",
+                          part="leaf", tier="common", count=7)
+    b = crafting.Material(key="ing:b", name="B", ingredient_id="b", kind="reagent",
+                          part="oil", tier="common", count=2)
+    plan = crafting.StepPlan(method="steep", consumes=[(a, 7), (b, 2)])
+    assert crafting.failure_losses(plan, 4) == []
+    lost = dict((m.key, n) for m, n in crafting.failure_losses(plan, 5))
+    assert sum(lost.values()) == 5
+    assert lost["ing:a"] <= 7 and lost.get("ing:b", 0) <= 2
+
+
+def test_the_check_has_no_natural_twenty():
+    """CRB p.180: a skill check has no automatic success. Beyond 20 the bench says how
+    far, instead of offering a 5% roll that the old bench honoured on a 20."""
+    assert crafting.check_odds(32, 10) == (None, "needs +2 more to the check")
+    assert crafting.check_odds(30, 10) == (20, "")
+    assert crafting.check_odds(5, 10) == (1, "")
+
+
+def test_an_old_jar_saves_back_exactly_as_it_was():
+    """Every new Stock field is written only when set: a pre-revamp jar's dict comes back
+    with no new key at all, so an old save is not rewritten into a different file the
+    first time it saves. The retired method is detected on read and not written."""
+    old = {"base": "Woundwort Purified Draught", "concentration": 1, "tier": "common",
+           "potency": 1.25, "count": 2, "craft": "herbalist", "specs": []}
+    jar = crafting.from_stock_dict(old)
+    assert jar.old_method == "purify" and jar.id == "woundwort-purified-draught#1"
+    d = jar.as_dict()
+    for key in ("form", "state", "quality", "ready_minute", "spoils_minute",
+                "old_method", "base_specs", "mults", "worked"):
+        assert key not in d, key
+
+
+def test_a_forge_blades_quality_word_is_not_a_quality_index():
+    """Measured while building the step bench: the forge's output says
+    `"quality": "plain"`, and reading every `quality` as a ladder index turned every forge
+    craft into a 500. The step fields are herbalism's alone."""
+    blade = crafting.from_stock_dict({"base": "Longsword", "craft": "blacksmith",
+                                      "quality": "plain", "form": "blade"})
+    assert blade.quality is None and blade.form is None and not blade.stepped
+    assert blade.id == "longsword#1"

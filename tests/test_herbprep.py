@@ -442,13 +442,6 @@ def _pot(methods, stock_names=(), raw=(), level=5):
                             satchel={i: 9 for i in raw})
 
 
-def test_a_tincture_alone_can_still_be_distilled():
-    """"you can solo distill and concentrate" — the rule is about combining, and a
-    tincture worked on its own is not combined with anything."""
-    got = _pot(["distill"], stock_names=["Mad Cap Tincture"])
-    assert not any("infusion" in p for p in got.problems), got.problems
-
-
 def test_a_tincture_will_not_take_a_herb_without_an_infusion():
     """"Infusions should be the only way to combine tinctures with other things.\""""
     got = _pot(["mix"], stock_names=["Mad Cap Tincture"], raw=["acacia"])
@@ -463,20 +456,6 @@ def test_two_tinctures_will_not_combine_without_one_either():
 def test_infusing_is_what_makes_it_legal():
     got = _pot(["infuse"], stock_names=["Mad Cap Tincture"], raw=["acacia"])
     assert not any("infusion" in p for p in got.problems), got.problems
-
-
-def test_the_restriction_lifts_itself_when_the_method_is_learned():
-    """`infuse` is Herbalist 4, so below it the chain is refused for not knowing the
-    method — which is the same wall arriving by a different route, and correct."""
-    from rules import worldclass as wc
-
-    track = wc.tracks()["herbalist"]
-    assert "infuse" in track.unlocked_methods(4)
-    assert "infuse" not in track.unlocked_methods(3)
-    assert "distill" in track.unlocked_methods(3)
-
-    low = _pot(["infuse"], stock_names=["Mad Cap Tincture"], raw=["acacia"], level=3)
-    assert any("learned at" in p for p in low.problems), low.problems
 
 
 def test_a_jar_that_is_not_a_tincture_is_not_restricted():
@@ -590,3 +569,38 @@ def test_the_matcher_has_no_stray_control_characters():
     source = Path("rules/ingredients.py").read_text(encoding="utf-8")
     assert not any(chr(c) in source for c in range(1, 9)), \
         "a control character is in the source"
+
+
+# --- the step bench's states (herbalism revamp, 2026-10-02) ------------------------------
+
+def test_the_states_are_the_contracts_five():
+    """docs/herbalism-contracts.md §2 fixes the vocabulary the page and the bench share:
+    raw, extracted, neutralised, ground, dried. "preserved" left with the Preserve method;
+    salting is a satchel flag, not a state a thing is worked into."""
+    assert H.STATES == ("raw", "extracted", "neutralised", "ground", "dried")
+
+
+def test_drying_is_a_step_and_leaves_it_dried():
+    """Dry is the step bench's solid concentration (plan §5.3). Something still in its
+    shell is opened first, as for every other step."""
+    assert H.can("dry", prep()) == (True, "")
+    assert H.after("dry", "raw") == "dried"
+    ok, why = H.can("dry", prep(needs_extraction=True))
+    assert not ok and "extracted" in why
+
+
+def test_preserving_is_not_a_bench_step_any_more_and_says_what_replaced_it():
+    """The owner retired Preserve (plan §2). A refusal that named no way through would
+    read like a bug; this one names the salt that still does the job on pick-up."""
+    ok, why = H.can("preserve", prep())
+    assert not ok and "salt" in why
+
+
+def test_the_reasons_the_bench_prints_carry_no_em_dash():
+    """UI plan §8: no em-dashes in new player-facing bench strings. These reasons are
+    printed on the step bench's tiles verbatim."""
+    reasons = [H.can("grind", prep(volatile=True))[1],
+               H.can("preserve", prep())[1],
+               H.preserve_automatically(type("Bare", (), {"goods": {}, "inventory": {}})(),
+                                        prep(animal=True))[2]]
+    assert all(r and "—" not in r for r in reasons), reasons
