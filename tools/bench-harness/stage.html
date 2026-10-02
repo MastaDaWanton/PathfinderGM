@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bench stage harness</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Lane F's harness for window.BenchStage (contracts §5.1). Serve the repository root,
+  e.g. `python -m http.server 8763`, and open /tools/bench-harness/stage.html.
+  It loads the stage exactly as table.html will: bench-stage/*.js in number order, then
+  table/32-bench-stage.js. A fake window.Sound logs every sound name the stage plays.
+-->
+<link rel="stylesheet" href="../../play/static/css/theme-v2.css">
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: var(--bg, #0d0b09); color: var(--ink, #e8ddc4);
+    font: 14px/1.4 var(--body, Palatino, "Palatino Linotype", serif); cursor: auto; }
+  .wrap { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+  aside { overflow-y: auto; padding: 12px 14px; border-right: 1px solid var(--edge, #3a2f22);
+    background: var(--panel, #161210); }
+  h1 { font: 600 17px var(--display, Cinzel, serif); font-variant: small-caps; margin: 0 0 8px; color: var(--gold, #ddc48e); }
+  h2 { font: 600 13px var(--display, Cinzel, serif); font-variant: small-caps; margin: 14px 0 6px; color: var(--dim, #93866e); }
+  button { font: inherit; font-size: 13px; color: var(--ink, #e8ddc4); background: #241d15; border: 1px solid var(--gold-dim, #7d6845);
+    border-radius: 3px; padding: 3px 8px; margin: 0 4px 4px 0; cursor: pointer; }
+  button.on { background: var(--gold-dim, #7d6845); color: #fff7e4; }
+  label { display: block; margin: 4px 0; font-size: 13px; }
+  label.inline { display: inline-block; margin-right: 10px; }
+  input[type=range] { width: 100%; }
+  select { font: inherit; background: #241d15; color: var(--ink, #e8ddc4); border: 1px solid var(--edge, #3a2f22); border-radius: 3px; }
+  .main { position: relative; display: grid; place-items: center; overflow: hidden; }
+  .scaler { transform-origin: center center; }
+  #stage { position: relative; background: var(--bg, #0d0b09); outline: 1px dashed #3a2f2288; }
+  #stats { white-space: pre; font: 11px/1.35 ui-monospace, Consolas, monospace; color: var(--dim, #93866e); }
+  #sounds { font: 11px/1.35 ui-monospace, Consolas, monospace; color: var(--dim, #93866e); min-height: 4em; }
+  #prect { position: fixed; border: 2px solid #ddc48e; pointer-events: none; display: none; z-index: 5; }
+  .row { display: flex; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <h1>Bench stage</h1>
+    <div id="avail"></div>
+    <h2>Tool</h2>
+    <div class="row" id="tools"></div>
+    <h2>Ground</h2>
+    <label>Biome
+      <select id="biome">
+        <option value="forest">forest</option><option value="swamp">swamp</option>
+        <option value="tundra">tundra</option><option value="desert">desert</option>
+        <option value="mountain">mountain</option><option value="grassland">grassland</option>
+        <option value="road">road</option><option value="tavern">tavern</option>
+      </select></label>
+    <label class="inline"><input type="checkbox" id="roofed"> roofed</label>
+    <label>Time of day <span id="tod"></span><input type="range" id="minute" min="0" max="1439" value="840"></label>
+    <h2>Aspect</h2>
+    <div class="row" id="aspects"></div>
+    <h2>Flourish</h2>
+    <div class="row">
+      <button data-fl="tierUp">tierUp</button><button data-fl="flawless">flawless</button>
+      <button data-fl="fail">fail</button><button data-fl="land">land</button>
+    </div>
+    <label class="inline"><input type="checkbox" id="reduced"> reduced motion</label>
+    <label class="inline"><input type="checkbox" id="drag"> drag over</label>
+    <h2>Ingredients</h2>
+    <div class="row" id="parts"></div>
+    <button id="clear">clear</button>
+    <h2>Game: <span id="gname"></span></h2>
+    <div id="game"></div>
+    <div class="row">
+      <button id="hit">hit</button><button id="miss">miss</button><button id="end">end</button>
+      <button id="auto">auto-play 4s</button>
+    </div>
+    <h2>Context</h2>
+    <button id="lose">lose context</button><button id="restore">restore</button>
+    <button id="unmount">unmount</button><button id="remount">mount</button>
+    <h2>Stats</h2>
+    <button id="refresh">refresh</button><button id="reset">reset counters</button>
+    <div id="stats"></div>
+    <h2>Sounds</h2>
+    <div id="sounds"></div>
+  </aside>
+  <div class="main" id="main"><div class="scaler" id="scaler"><div id="stage"></div></div></div>
+</div>
+<div id="prect"></div>
+
+<script>
+  // A stand-in for lane G's window.Sound: it only records the names.
+  window.__sounds = [];
+  window.Sound = { play: function (name) {
+    window.__sounds.push(name);
+    var el = document.getElementById("sounds");
+    if (el) el.textContent = window.__sounds.slice(-8).join("\n");
+  }, loop: function () { return { stop: function () {} }; }, unlock: function () {} };
+</script>
+<script src="../../play/static/js/bench-stage/00-math.js"></script>
+<script src="../../play/static/js/bench-stage/01-gl.js"></script>
+<script src="../../play/static/js/bench-stage/02-meshes.js"></script>
+<script src="../../play/static/js/bench-stage/03-ground.js"></script>
+<script src="../../play/static/js/bench-stage/04-particles.js"></script>
+<script src="../../play/static/js/bench-stage/05-props.js"></script>
+<script src="../../play/static/js/bench-stage/06-tools.js"></script>
+<script src="../../play/static/js/table/32-bench-stage.js"></script>
+<script>
+(function () {
+  "use strict";
+  var B = window.BenchStage, $ = function (id) { return document.getElementById(id); };
+  var METHODS = ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep", "neutralize"];
+  var stage = $("stage"), method = "grind", view = null;
+  $("avail").textContent = "available(): " + B.available();
+
+  /* --- aspect ------------------------------------------------------------------------ */
+  var ASPECT = {
+    "16:9": function (W, H) { var w = Math.min(W - 24, (H - 24) * 16 / 9); return [w, w * 9 / 16, 1]; },
+    "21:9": function (W, H) { var w = Math.min(W - 24, (H - 24) * 21 / 9); return [w, w * 9 / 21, 1]; },
+    "narrow": function (W, H) { var h = Math.min(H - 24, 760); return [Math.min(W - 24, h * 0.55), h, 1]; },
+    // The owner's 3440x1440, less the satchel, tag, strip and footer (UI plan §4.2): the
+    // stage itself is about 2820x1340, laid out at that size and scaled down to be seen.
+    "3440x1440": function (W, H) { var w = 2820, h = 1340; return [w, h, Math.min((W - 24) / w, (H - 24) / h)]; }
+  };
+  var aspect = "16:9";
+  function layout() {
+    var m = $("main"), d = ASPECT[aspect](m.clientWidth, m.clientHeight);
+    stage.style.width = Math.round(d[0]) + "px";
+    stage.style.height = Math.round(d[1]) + "px";
+    $("scaler").style.transform = d[2] === 1 ? "" : "scale(" + d[2] + ")";
+  }
+  Object.keys(ASPECT).forEach(function (k) {
+    var b = document.createElement("button");
+    b.textContent = k; b.dataset.aspect = k;
+    b.onclick = function () { aspect = k; mark("aspects", "aspect", k); layout(); };
+    $("aspects").appendChild(b);
+  });
+  window.addEventListener("resize", layout);
+
+  function mark(box, attr, val) {
+    Array.prototype.forEach.call($(box).children, function (b) { b.classList.toggle("on", b.dataset[attr] === val); });
+  }
+
+  /* --- ground ------------------------------------------------------------------------ */
+  function ground() {
+    var m = +$("minute").value;
+    $("tod").textContent = String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+    B.setGround({ biome: $("biome").value, roofed: $("roofed").checked, minute: 20160 + m });
+  }
+  $("biome").onchange = ground; $("roofed").onchange = ground; $("minute").oninput = ground;
+
+  /* --- games: sliders per method, matching contracts §5.1 -------------------------- */
+  var SCHEMA = {
+    grind: [["ring", 0, 1, 0.3], ["struck", "bool"]],
+    mix: [["t", 0, 1, 0.5], ["gloss", 0, 1, 0.3], ["figure8", "bool"]],
+    brew: [["heat", 0, 1, 0.5], ["lo", 0, 1, 0.35], ["hi", 0, 1, 0.55], ["boil", "bool"]],
+    dry: [["count", 3, 5, 4, 1], ["cure", 0, 1, 0.4], ["turned", "bool"], ["lo", 0, 1, 0.6], ["hi", 0, 1, 0.8]],
+    reduce: [["level", 0, 1, 0.7], ["line", 0, 1, 0.35], ["heat", 0, 1, 0.6]],
+    extract: [["at", 0, 1, 0.4], ["pace", 0, 1, 0.5], ["nicked", "bool"]],
+    infuse: [["heat", 0, 1, 0.5], ["cold", 0, 1, 0.3], ["scorch", 0, 1, 0.75], ["fill", 0, 1, 0.5]],
+    steep: [["fill", 0, 1, 0.4], ["mark", 0, 1, 0.75], ["sealing", "bool"], ["seal", 0, 1, 0]],
+    neutralize: [["needle", -1, 1, 0.6], ["lo", -1, 1, -0.15], ["hi", -1, 1, 0.15], ["drops", 0, 12, 0, 1]]
+  };
+  var vals = {};
+  function guide(fig8) {
+    var g = [];
+    for (var i = 0; i <= 96; i++) {
+      var a = i / 96 * Math.PI * 2;
+      g.push(fig8 ? [0.5 + 0.36 * Math.sin(a), 0.5 + 0.3 * Math.sin(2 * a)] : [0.5 + 0.36 * Math.cos(a), 0.5 + 0.36 * Math.sin(a)]);
+    }
+    return g;
+  }
+  var PATH = [[0.1, 0.55], [0.3, 0.42], [0.5, 0.5], [0.7, 0.4], [0.9, 0.5]];
+  function state(m, v) {
+    if (m === "grind") return { ring: v.ring, struck: !!v.struck };
+    if (m === "mix") {
+      var g = guide(v.figure8), n = Math.floor(g.length * v.t), tr = [];
+      for (var i = 0; i < n; i++) tr.push([g[i][0] + Math.sin(i * 1.7) * 0.015, g[i][1] + Math.cos(i * 1.3) * 0.015]);
+      return { guide: g, trace: tr, gloss: v.gloss };
+    }
+    if (m === "brew") return { heat: v.heat, band: [v.lo, v.hi], boil: !!v.boil };
+    if (m === "dry") {
+      var b = [];
+      for (var k = 0; k < v.count; k++) b.push({ cure: Math.min(1, v.cure + k * 0.12), band: [v.lo, v.hi], turned: k === 0 && !!v.turned });
+      return { bundles: b };
+    }
+    if (m === "reduce") return { level: v.level, line: v.line, heat: v.heat };
+    if (m === "extract") return { path: PATH, at: v.at, pace: v.pace, nicked: !!v.nicked };
+    if (m === "infuse") return { heat: v.heat, cold: v.cold, scorch: v.scorch, fill: v.fill };
+    if (m === "steep") return { fill: v.fill, mark: v.mark, sealing: !!v.sealing, seal: v.seal };
+    return { needle: v.needle, safe: [v.lo, v.hi], drops: v.drops };
+  }
+  function push() { if (view) view.update(state(method, vals[method])); }
+  function buildGame() {
+    $("gname").textContent = method;
+    var box = $("game"); box.innerHTML = "";
+    var v = vals[method] = vals[method] || {};
+    SCHEMA[method].forEach(function (f) {
+      var lab = document.createElement("label"), inp = document.createElement("input");
+      if (f[1] === "bool") {
+        inp.type = "checkbox"; inp.checked = !!v[f[0]]; v[f[0]] = inp.checked;
+        lab.className = "inline";
+        lab.appendChild(inp); lab.appendChild(document.createTextNode(" " + f[0]));
+        inp.onchange = function () { v[f[0]] = inp.checked; push(); };
+      } else {
+        inp.type = "range"; inp.min = f[1]; inp.max = f[2]; inp.step = f[4] || 0.01;
+        if (v[f[0]] === undefined) v[f[0]] = f[3];
+        inp.value = v[f[0]];
+        var out = document.createElement("span"); out.textContent = " " + v[f[0]];
+        lab.appendChild(document.createTextNode(f[0])); lab.appendChild(out); lab.appendChild(inp);
+        inp.oninput = function () { v[f[0]] = +inp.value; out.textContent = " " + inp.value; push(); };
+      }
+      box.appendChild(lab);
+    });
+    view = B.game(method);
+  }
+
+  /* --- tools ------------------------------------------------------------------------- */
+  METHODS.forEach(function (m) {
+    var b = document.createElement("button");
+    b.textContent = m; b.dataset.m = m;
+    b.onclick = function () {
+      if (view) view.end();
+      method = m; mark("tools", "m", m);
+      var t0 = performance.now();
+      B.setTool(m).then(function () { window.__lastSwapMs = performance.now() - t0; });
+      buildGame();
+    };
+    $("tools").appendChild(b);
+  });
+
+  /* --- auto-play: the harness drives a game the way E will, then ends it ----------- */
+  var autoRaf = 0;
+  $("auto").onclick = function () {
+    if (autoRaf) return;
+    var t0 = performance.now(), v = JSON.parse(JSON.stringify(vals[method])), lastBeat = -1;
+    function tick() {
+      var t = (performance.now() - t0) / 4000;
+      if (t >= 1) { autoRaf = 0; view.end(); return; }
+      var beat = Math.floor(t * 8), ph = t * 8 - beat;
+      if (method === "grind") { v.ring = ph; v.struck = ph > 0.92; }
+      if (method === "mix") { v.t = t; v.gloss = t; }
+      if (method === "brew") { v.heat = 0.45 + 0.25 * Math.sin(t * 9); v.boil = v.heat > 0.66; }
+      if (method === "dry") { v.cure = t * 0.9; v.turned = t > 0.5; }
+      if (method === "reduce") { v.level = 0.9 - 0.6 * t; v.heat = 0.6 + 0.2 * Math.sin(t * 7); }
+      if (method === "extract") { v.at = t; v.pace = 0.5 + 0.4 * Math.sin(t * 12); v.nicked = t > 0.8; }
+      if (method === "infuse") { v.heat = 0.5 + 0.35 * Math.sin(t * 6); v.fill = t; }
+      if (method === "steep") { v.fill = Math.min(0.75, t * 1.4); v.sealing = t > 0.6; v.seal = Math.max(0, (t - 0.6) / 0.4); }
+      if (method === "neutralize") { v.needle = 0.8 * Math.cos(t * 9) * (1 - t); v.drops = Math.floor(t * 6); }
+      view.update(state(method, v));
+      if (beat !== lastBeat) { lastBeat = beat; if (beat % 3 === 2) view.miss(); else view.hit(0.5 + 0.5 * Math.random()); }
+      autoRaf = requestAnimationFrame(tick);
+    }
+    autoRaf = requestAnimationFrame(tick);
+  };
+  $("hit").onclick = function () { view.hit(0.9); };
+  $("miss").onclick = function () { view.miss(); };
+  $("end").onclick = function () { view.end(); };
+
+  /* --- flourishes, chips, drag ------------------------------------------------------- */
+  Array.prototype.forEach.call(document.querySelectorAll("[data-fl]"), function (b) {
+    b.onclick = function () {
+      var t0 = performance.now();
+      B.flourish(b.dataset.fl).then(function () { window.__lastFlourishMs = performance.now() - t0; });
+      if (b.dataset.fl === "land") {
+        setTimeout(function () {
+          var r = B.productRect(), el = $("prect");
+          el.style.display = "block";
+          el.style.left = r.left + "px"; el.style.top = r.top + "px";
+          el.style.width = r.width + "px"; el.style.height = r.height + "px";
+          setTimeout(function () { el.style.display = "none"; }, 900);
+        }, 470);
+      }
+    };
+  });
+  $("reduced").onchange = function () { B.reducedMotion($("reduced").checked); };
+  $("drag").onchange = function () { B.setDragOver($("drag").checked); };
+  var n = 0;
+  ["leaf", "root", "berry", "flower", "fungus", "gland", "mineral", "oil", "bark", "seed"].forEach(function (p) {
+    var b = document.createElement("button");
+    b.textContent = "+" + p;
+    b.onclick = function () { B.addIngredient({ key: "k" + (n++), part: p, name: p }); };
+    $("parts").appendChild(b);
+  });
+  $("clear").onclick = function () { B.clearIngredients(); };
+
+  /* --- context, stats -------------------------------------------------------------- */
+  var lose = null;
+  $("lose").onclick = function () {
+    var c = stage.querySelector("canvas"), gl = c && (c.getContext("webgl") || c.getContext("experimental-webgl"));
+    lose = gl && gl.getExtension("WEBGL_lose_context");
+    if (lose) lose.loseContext();
+  };
+  $("restore").onclick = function () { if (lose) lose.restoreContext(); };
+  $("unmount").onclick = function () { B.unmount(); };
+  $("remount").onclick = function () { B.mount(stage).then(function () { ground(); }); };
+  function stats() { $("stats").textContent = JSON.stringify(B._debug(), null, 1); }
+  $("refresh").onclick = stats;
+  $("reset").onclick = function () { B._resetStats(); stats(); };
+
+  layout();
+  mark("aspects", "aspect", aspect);
+  B.mount(stage).then(function (ok) {
+    $("avail").textContent = "available(): " + B.available() + ", mounted: " + ok;
+    ground();
+    mark("tools", "m", method);
+    B.setTool(method);
+    buildGame();
+    stats();
+  });
+})();
+</script>
+</body>
+</html>
