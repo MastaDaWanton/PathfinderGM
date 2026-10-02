@@ -48,6 +48,7 @@
     {"id": "alchemist", "label": "the alchemist", "title": "the alchemist",
      "words": ["alchemist", "apothecary", "herbalist"], "smallest": "town",
      "gear": ["alchemist's fire", "antitoxin", "sunrod"],
+     "tables": ["herbal-manuals"],
      "draw": ["alchemist", "herbalist"]}
   ],
   "stalls": [

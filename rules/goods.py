@@ -545,7 +545,7 @@ GOOD_PREFIX = "gear:"
 # What each kind of good is filed under on a shelf. The id carries the kind, so a row
 # picked on the screen names its own shelf with nothing looked up twice.
 PREFIXES = {"gear": "gear:", "weapon": "weapon:", "armour": "armour:", "shield": "shield:",
-            "mount": "mount:", "tack": "tack:"}
+            "mount": "mount:", "tack": "tack:", "manual": "manual:"}
 # The smallest coin, for the four weapons the Core Rulebook prints a dash for (club,
 # quarterstaff, sling, wooden stake). The outfit page gives them away; a counter cannot,
 # because `pricing.worth` reads an authored price of 0 as "no price written" and prices
@@ -640,6 +640,15 @@ def table_goods(table: str) -> list[Good]:
         return [g for g in (armour_good(k) for k in ARMOUR) if g is not None]
     if table == "shields":
         return [g for g in (shield_good(k) for k in SHIELDS) if g is not None]
+    if table == "herbal-manuals":
+        # The herbalism manuals (docs/herbalism-revamp-plan.md §8.4), carried like any book:
+        # `deliver` shelves one under its name, which is what `herbknowledge.holds_manual`
+        # looks for when the reader opens it.
+        from . import herbknowledge
+
+        return [Good(id=PREFIXES["manual"] + m["id"], name=str(m["name"]),
+                     price_gp=float(m["price_gp"]), kind="gear", key=str(m["id"]))
+                for m in herbknowledge.manuals().values()]
     return []
 
 
