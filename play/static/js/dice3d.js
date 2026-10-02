@@ -781,8 +781,10 @@
 
   function resetMat(opts, dieLabel) {
     mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
+    // A middle dot, one per line, not a long dash: the bench's copy rule (UI plan §8), and
+    // the mat is the one line every roll in the app shares ("Comfrey powder · 1d20").
     mat.querySelector("#d3d-why").textContent =
-      (opts.why || "") + (dieLabel ? (opts.why ? " — " : "") + dieLabel : "");
+      (opts.why || "") + (dieLabel ? (opts.why ? " · " : "") + dieLabel : "");
     mat.querySelector("#d3d-terms").innerHTML = "";
     mat.querySelector("#d3d-verdict").textContent = "";
     mat.querySelector("#d3d-verdict").className = "";

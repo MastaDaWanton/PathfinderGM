@@ -12,9 +12,13 @@
    game has a tap form, so the strip only has to stay readable. */
 
 .bench-game {
+  container-type: inline-size;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 184px 228px;
+  /* The meter is the game, so it is the column that keeps its room: the hint and the band
+     word give way first. Fixed at 184px and 228px they took 412px of a 760px stage and
+     left the meter a sliver beside them (owner's polish, 2026-10-02). */
+  grid-template-columns: minmax(0, 1fr) minmax(128px, 168px) minmax(132px, 200px);
   grid-template-areas: "meter hint tier";
   /* A fixed row. With an auto row the canvas's own backing-store height fed back into the
      row: a 120px strip measured a meter taller than itself and drew the pan off its foot. */
@@ -103,10 +107,14 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding-right: 20px;
+  padding-right: 16px;
   border-left: 1px solid var(--edge);
   font-family: var(--display);
+  /* 34px is the UI plan's size on a wide stage; the column narrows with the stage now, and
+     "Superior" at 34px in Cinzel is wider than its narrowest width, so the word scales with
+     the strip (a container query on the strip, below) rather than clipping. */
   font-size: 34px;
+  min-width: 0;
   line-height: 1;
   color: var(--gold);
   text-shadow: var(--engraved);
@@ -180,4 +188,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bench-game__help, .bench-game__act { transition: none; }
+}
+
+/* A narrow strip (a 1280 screen, or the stacked layout): the band word steps down so the
+   longest tier name fits its column instead of clipping. */
+@container (max-width: 640px) {
+  .bench-game__tier { font-size: 24px; padding-right: 10px; }
 }
