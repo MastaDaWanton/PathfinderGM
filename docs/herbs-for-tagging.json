@@ -31,7 +31,7 @@
   "name": "Aconite",
   "kind": "herb",
   "tier": "common",
-  "description": "Wolfsbane's blue-hooded leaves, chewed within the hour of a beast's bite, steel the blood: a +2 alchemical bonus on Fortitude saves for an hour, against lycanthropy and animal venom alike. It is still a poison. Whoever swallows it must make a DC 13 Fortitude save or be nauseated for 3 rounds and take 1d4 Strength damage, unless the bench has neutralised it. Rubbed on aching joints as a weak liniment, it heals 1d3 non-lethal damage.",
+  "description": "Wolfsbane's blue-hooded leaves, chewed within the hour of a beast's bite, steel the blood: a +2 alchemical bonus on Fortitude saves for an hour, against lycanthropy and animal venom alike. It is still a poison. Whoever swallows it must make a DC 13 Fortitude save or be nauseated for 1d4 rounds and take 1d4 Strength damage, unless the bench has neutralised it. Rubbed on aching joints as a weak liniment, it heals 1d3 non-lethal damage.",
   "harvesting": "",
   "effects": [
    {
@@ -43,7 +43,7 @@
     "route": "ingest"
    },
    {
-    "line": "Causes nauseated for 3 rounds",
+    "line": "Causes nauseated for 1d4 rounds",
     "route": "ingest"
    },
    {
@@ -114,7 +114,7 @@
   "name": "Allnight",
   "kind": "herb",
   "tier": "common",
-  "description": "A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake: a +2 alchemical bonus on Fortitude saves against fatigue and sleep, and +1 on initiative, for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.",
+  "description": "A treated wafer that dissolves into chalky paste under the tongue and jolts the imbiber awake, ending fatigue at once, then a +2 alchemical bonus on Fortitude saves against fatigue and sleep, and +1 on initiative, for 8 hours. The jitters cost focus, a -2 penalty on Perception checks for as long.",
   "harvesting": "",
   "effects": [
    {
@@ -127,6 +127,10 @@
    },
    {
     "line": "+1 Initiative for 8 hours",
+    "route": "ingest"
+   },
+   {
+    "line": "Ends fatigued",
     "route": "ingest"
    }
   ],
@@ -917,7 +921,7 @@
   "name": "Cowslip",
   "kind": "herb",
   "tier": "common",
-  "description": "The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour. The same tea eases headache and heals 1d3 non-lethal damage.",
+  "description": "The flowers brew into a draught against paralysis that restores strength: a +2 alchemical bonus on Fortitude saves against paralysis and +1 to Strength, for an hour. The same tea eases headache and heals 1d3 non-lethal damage, and given to someone paralyzed it ends the paralysis.",
   "harvesting": "",
   "effects": [
    {
@@ -930,6 +934,10 @@
    },
    {
     "line": "Heals 1d3 non-lethal damage",
+    "route": "ingest"
+   },
+   {
+    "line": "Ends paralyzed",
     "route": "ingest"
    }
   ],
@@ -992,7 +1000,7 @@
   "name": "Dawnpetal",
   "kind": "herb",
   "tier": "common",
-  "description": "Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy: a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.",
+  "description": "Bright yellow sunburst flowers of high meadows. Chewing them is a burst of energy that ends fatigue at once, then a +2 alchemical bonus to Strength and on Fortitude saves against fatigue, for an hour. The restless mind takes a -1 penalty on Will saves for the hour.",
   "harvesting": "",
   "effects": [
    {
@@ -1005,6 +1013,10 @@
    },
    {
     "line": "-1 Will for 1 hour",
+    "route": "ingest"
+   },
+   {
+    "line": "Ends fatigued",
     "route": "ingest"
    }
   ],
@@ -1117,11 +1129,11 @@
   "name": "Dragon Flower",
   "kind": "herb",
   "tier": "common",
-  "description": "A flower with a stench that fouls the air for sixty feet: anyone in it fights badly, -2 on attack rolls until 4 rounds after leaving (alchemy's use). Its sap, swallowed raw, gives a +2 alchemical bonus on Fortitude saves against poison for 10 rounds, and a preserved pod is a purgative, +1 on Fortitude saves against disease for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea for 4 rounds.",
+  "description": "A flower with a stench that fouls the air for sixty feet: anyone in it fights badly, -2 on attack rolls until 1d6 rounds after leaving (alchemy's use). Its sap, swallowed raw, gives a +2 alchemical bonus on Fortitude saves against poison for 10 rounds, and a preserved pod is a purgative, +1 on Fortitude saves against disease for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea for 1d6 rounds.",
   "harvesting": "",
   "effects": [
    {
-    "line": "-2 Attack rolls while in the stench for 4 rounds",
+    "line": "-2 Attack rolls while in the stench for 1d6 rounds",
     "route": "external"
    },
    {
@@ -1137,7 +1149,7 @@
     "route": "ingest"
    },
    {
-    "line": "Causes nauseated for 4 rounds",
+    "line": "Causes nauseated for 1d6 rounds",
     "route": "inhale"
    },
    {
@@ -2452,7 +2464,7 @@
   "name": "Lish Nut",
   "kind": "herb",
   "tier": "common",
-  "description": "Very nutritious: a handful is a day's food, 1d4 temporary hit points and a +1 alchemical bonus on Fortitude saves against hunger and fatigue for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 5 rounds.",
+  "description": "Very nutritious: a handful is a day's food, 1d4 temporary hit points and a +1 alchemical bonus on Fortitude saves against hunger and fatigue for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 2d4 rounds.",
   "harvesting": "",
   "effects": [
    {
@@ -2460,7 +2472,7 @@
     "route": "external"
    },
    {
-    "line": "Causes sickened for 5 rounds",
+    "line": "Causes sickened for 2d4 rounds",
     "route": "external"
    },
    {
@@ -2481,7 +2493,7 @@
   "name": "Mad Cap",
   "kind": "fungus",
   "tier": "common",
-  "description": "Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength and 1d4 temporary hit points for a minute. It is a poison: a DC 18 save or collapse, exhausted and unconscious for 3 hours, and confused for 6 rounds.",
+  "description": "Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength and 1d4 temporary hit points for a minute. It is a poison: a DC 18 save or collapse, exhausted and unconscious for 3 hours, and confused for 1d10 rounds.",
   "harvesting": "",
   "effects": [
    {
@@ -2497,7 +2509,7 @@
     "route": "ingest"
    },
    {
-    "line": "Causes confused for 6 rounds",
+    "line": "Causes confused for 1d10 rounds",
     "route": "ingest"
    },
    {
@@ -2545,7 +2557,7 @@
   "name": "Mandrake",
   "kind": "herb",
   "tier": "common",
-  "description": "A pain-relieving root. A little chewed heals 1d4 non-lethal damage, and the leaves rubbed on the skin heal 1d3 more. It sedates as it soothes: a DC 17 Fortitude save or sleep for 3 hours, unless an apothecary has neutralised it.",
+  "description": "A pain-relieving root. A little chewed heals 1d4 non-lethal damage, and the leaves rubbed on the skin heal 1d3 more. It sedates as it soothes: a DC 17 Fortitude save or sleep for 1d4 hours, unless an apothecary has neutralised it.",
   "harvesting": "",
   "effects": [
    {
@@ -2557,7 +2569,7 @@
     "route": "ingest"
    },
    {
-    "line": "Causes unconscious for 3 hours",
+    "line": "Causes unconscious for 1d4 hours",
     "route": "ingest"
    },
    {

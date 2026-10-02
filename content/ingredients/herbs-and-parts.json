@@ -69,7 +69,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Wolfsbane's blue-hooded leaves, chewed within the hour of a beast's bite, steel the blood: a +2 alchemical bonus on Fortitude saves for an hour, against lycanthropy and animal venom alike. It is still a poison. Whoever swallows it must make a DC 13 Fortitude save or be nauseated for 3 rounds and take 1d4 Strength damage, unless the bench has neutralised it. Rubbed on aching joints as a weak liniment, it heals 1d3 non-lethal damage.",
+      "text": "Wolfsbane's blue-hooded leaves, chewed within the hour of a beast's bite, steel the blood: a +2 alchemical bonus on Fortitude saves for an hour, against lycanthropy and animal venom alike. It is still a poison. Whoever swallows it must make a DC 13 Fortitude save or be nauseated for 1d4 rounds and take 1d4 Strength damage, unless the bench has neutralised it. Rubbed on aching joints as a weak liniment, it heals 1d3 non-lethal damage.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -101,7 +101,7 @@
           "type": "apply_condition",
           "target": "nauseated",
           "duration": {
-            "amount": 3,
+            "amount": "1d4",
             "unit": "round"
           },
           "route": "ingest"
@@ -2410,7 +2410,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A flower with a stench that fouls the air for sixty feet: anyone in it fights badly, -2 on attack rolls until 4 rounds after leaving (alchemy's use). Its sap, swallowed raw, gives a +2 alchemical bonus on Fortitude saves against poison for 10 rounds, and a preserved pod is a purgative, +1 on Fortitude saves against disease for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea for 4 rounds.",
+      "text": "A flower with a stench that fouls the air for sixty feet: anyone in it fights badly, -2 on attack rolls until 1d6 rounds after leaving (alchemy's use). Its sap, swallowed raw, gives a +2 alchemical bonus on Fortitude saves against poison for 10 rounds, and a preserved pod is a purgative, +1 on Fortitude saves against disease for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea for 1d6 rounds.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -2427,7 +2427,7 @@
           "bonus_type": "untyped",
           "note": "while in the stench",
           "duration": {
-            "amount": 4,
+            "amount": "1d6",
             "unit": "round"
           },
           "route": "external"
@@ -2461,7 +2461,7 @@
           "target": "nauseated",
           "route": "inhale",
           "duration": {
-            "amount": 4,
+            "amount": "1d6",
             "unit": "round"
           }
         },
@@ -5304,7 +5304,7 @@
       "craft_dc": 10,
       "source": "",
       "harvesting": "",
-      "text": "Very nutritious: a handful is a day's food, 1d4 temporary hit points and a +1 alchemical bonus on Fortitude saves against hunger and fatigue for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 5 rounds.",
+      "text": "Very nutritious: a handful is a day's food, 1d4 temporary hit points and a +1 alchemical bonus on Fortitude saves against hunger and fatigue for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 2d4 rounds.",
       "risky": false,
       "biomes_inferred": true,
       "biomes": [
@@ -5324,7 +5324,7 @@
           "type": "apply_condition",
           "target": "sickened",
           "duration": {
-            "amount": 5,
+            "amount": "2d4",
             "unit": "round"
           },
           "route": "external"
@@ -5364,7 +5364,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength and 1d4 temporary hit points for a minute. It is a poison: a DC 18 save or collapse, exhausted and unconscious for 3 hours, and confused for 6 rounds.",
+      "text": "Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength and 1d4 temporary hit points for a minute. It is a poison: a DC 18 save or collapse, exhausted and unconscious for 3 hours, and confused for 1d10 rounds.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -5403,7 +5403,7 @@
           "target": "confused",
           "route": "ingest",
           "duration": {
-            "amount": 6,
+            "amount": "1d10",
             "unit": "round"
           }
         },
@@ -5497,7 +5497,7 @@
       "craft_dc": null,
       "source": "",
       "harvesting": "",
-      "text": "A pain-relieving root. A little chewed heals 1d4 non-lethal damage, and the leaves rubbed on the skin heal 1d3 more. It sedates as it soothes: a DC 17 Fortitude save or sleep for 3 hours, unless an apothecary has neutralised it.",
+      "text": "A pain-relieving root. A little chewed heals 1d4 non-lethal damage, and the leaves rubbed on the skin heal 1d3 more. It sedates as it soothes: a DC 17 Fortitude save or sleep for 1d4 hours, unless an apothecary has neutralised it.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -5523,7 +5523,7 @@
           "type": "apply_condition",
           "target": "unconscious",
           "duration": {
-            "amount": 3,
+            "amount": "1d4",
             "unit": "hour"
           },
           "route": "ingest"

@@ -12,9 +12,9 @@ Acacia's gummy resin burns as a sweet incense: breathing the smoke gives a +1 al
 ## Aconite  
 `aconite` · herb · common · leaf
 
-Wolfsbane's blue-hooded leaves, chewed within the hour of a beast's bite, steel the blood: a +2 alchemical bonus on Fortitude saves for an hour, against lycanthropy and animal venom alike. It is still a poison. Whoever swallows it must make a DC 13 Fortitude save or be nauseated for 3 rounds and take 1d4 Strength damage, unless the bench has neutralised it. Rubbed on aching joints as a weak liniment, it heals 1d3 non-lethal damage.
+Wolfsbane's blue-hooded leaves, chewed within the hour of a beast's bite, steel the blood: a +2 alchemical bonus on Fortitude saves for an hour, against lycanthropy and animal venom alike. It is still a poison. Whoever swallows it must make a DC 13 Fortitude save or be nauseated for 1d4 rounds and take 1d4 Strength damage, unless the bench has neutralised it. Rubbed on aching joints as a weak liniment, it heals 1d3 non-lethal damage.
 
-**Effects.** +2 Fortitude against lycanthropy and animal venom for 1 hour (ingest); Fortitude DC 13 (ingest); Causes nauseated for 3 rounds (ingest); 1d4 Strength damage (ingest); Heals 1d3 non-lethal damage (skin)
+**Effects.** +2 Fortitude against lycanthropy and animal venom for 1 hour (ingest); Fortitude DC 13 (ingest); Causes nauseated for 1d4 rounds (ingest); 1d4 Strength damage (ingest); Heals 1d3 non-lethal damage (skin)
 
 ## Adder's-Tongue  
 `adder-s-tongue` · herb · common · leaf
@@ -320,9 +320,9 @@ Ground fine and sprinkled over armour, the scales guard against petrification fo
 ## Dragon Flower  
 `dragon-flower` · herb · common · flower
 
-A flower with a stench that fouls the air for sixty feet: anyone in it fights badly, -2 on attack rolls until 4 rounds after leaving (alchemy's use). Its sap, swallowed raw, gives a +2 alchemical bonus on Fortitude saves against poison for 10 rounds, and a preserved pod is a purgative, +1 on Fortitude saves against disease for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea for 4 rounds.
+A flower with a stench that fouls the air for sixty feet: anyone in it fights badly, -2 on attack rolls until 1d6 rounds after leaving (alchemy's use). Its sap, swallowed raw, gives a +2 alchemical bonus on Fortitude saves against poison for 10 rounds, and a preserved pod is a purgative, +1 on Fortitude saves against disease for an hour. The resin at its heart is poison: a DC 25 Fortitude save or 1d6 Constitution damage and nausea for 1d6 rounds.
 
-**Effects.** -2 Attack rolls while in the stench for 4 rounds (external); +2 Fortitude against poison for 10 rounds (ingest); 1d6 Constitution damage (ingest); Fortitude DC 25 (ingest); Causes nauseated for 4 rounds (inhale); +1 Fortitude against disease for 1 hour (ingest)
+**Effects.** -2 Attack rolls while in the stench for 1d6 rounds (external); +2 Fortitude against poison for 10 rounds (ingest); 1d6 Constitution damage (ingest); Fortitude DC 25 (ingest); Causes nauseated for 1d6 rounds (inhale); +1 Fortitude against disease for 1 hour (ingest)
 
 ## Dragon's Blood  
 `dragon-s-blood` · herb · common · resin · base for salve
@@ -689,16 +689,16 @@ Lovage leaves brewed into a love potion. The drinker warms to whoever served it,
 ## Lish Nut  
 `lish-nut` · herb · common · seed
 
-Very nutritious: a handful is a day's food, 1d4 temporary hit points and a +1 alchemical bonus on Fortitude saves against hunger and fatigue for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 5 rounds.
+Very nutritious: a handful is a day's food, 1d4 temporary hit points and a +1 alchemical bonus on Fortitude saves against hunger and fatigue for an hour. For two hours after eating one, the eater smells of it, and vermin that touch them must make a DC 11 Will save or be sickened for 2d4 rounds.
 
-**Effects.** Will DC 11 (external); Causes sickened for 5 rounds (external); 1d4 temporary hit points for 1 hour (ingest); +1 Fortitude against hunger and fatigue for 1 hour (ingest)
+**Effects.** Will DC 11 (external); Causes sickened for 2d4 rounds (external); 1d4 temporary hit points for 1 hour (ingest); +1 Fortitude against hunger and fatigue for 1 hour (ingest)
 
 ## Mad Cap  
 `mad-cap` · fungus · common · fungus
 
-Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength and 1d4 temporary hit points for a minute. It is a poison: a DC 18 save or collapse, exhausted and unconscious for 3 hours, and confused for 6 rounds.
+Red mushrooms, less deadly than the death cap and wilder. A small piece brings on a fighting rage, a +2 morale bonus to Strength and 1d4 temporary hit points for a minute. It is a poison: a DC 18 save or collapse, exhausted and unconscious for 3 hours, and confused for 1d10 rounds.
 
-**Effects.** DC 18 (ingest); Causes exhausted for 3 hours (ingest); Causes unconscious for 3 hours (ingest); Causes confused for 6 rounds (ingest); +2 Strength for 1 minute (ingest); 1d4 temporary hit points for 1 minute (ingest)
+**Effects.** DC 18 (ingest); Causes exhausted for 3 hours (ingest); Causes unconscious for 3 hours (ingest); Causes confused for 1d10 rounds (ingest); +2 Strength for 1 minute (ingest); 1d4 temporary hit points for 1 minute (ingest)
 
 ## Mallow  
 `mallow` · herb · common · leaf · base for cream
@@ -710,9 +710,9 @@ The shoots brew into an anti-love draught: a +2 alchemical bonus on Will saves a
 ## Mandrake  
 `mandrake` · herb · common · root
 
-A pain-relieving root. A little chewed heals 1d4 non-lethal damage, and the leaves rubbed on the skin heal 1d3 more. It sedates as it soothes: a DC 17 Fortitude save or sleep for 3 hours, unless an apothecary has neutralised it.
+A pain-relieving root. A little chewed heals 1d4 non-lethal damage, and the leaves rubbed on the skin heal 1d3 more. It sedates as it soothes: a DC 17 Fortitude save or sleep for 1d4 hours, unless an apothecary has neutralised it.
 
-**Effects.** Heals 1d4 non-lethal damage (ingest); Fortitude DC 17 (ingest); Causes unconscious for 3 hours (ingest); Heals 1d3 non-lethal damage (skin)
+**Effects.** Heals 1d4 non-lethal damage (ingest); Fortitude DC 17 (ingest); Causes unconscious for 1d4 hours (ingest); Heals 1d3 non-lethal damage (skin)
 
 ## Manticore Spine  
 `manticore-spine` · monster part · rare · bone · hybrid

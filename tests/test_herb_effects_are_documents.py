@@ -96,9 +96,25 @@ def test_every_effect_is_one_the_engine_runs():
 
 def test_anything_temporary_has_a_structured_duration():
     """54 temporary effects had no duration and 39 wrote theirs as text. The bench
-    lengthens a duration by multiplying `duration.amount`; one that is missing, prose or a
-    string cannot be lengthened, one with no duration at all never ends, and one in dice
-    raises in `engine._to_rounds`."""
+    lengthens a duration by scaling `duration.amount`; one that is missing or prose
+    cannot be lengthened, and one with no duration at all never ends.
+
+    Dice durations are rolled by the engine (owner, 2026-10-02: "roll them, it's what
+    should have been happening"). Every duration reader goes through one dice-aware door
+    (`Engine._duration_rounds`), and the bench scales dice as dice (1d4 at x1.5 is
+    1d4+2), so an amount may be a positive integer OR dice the project's own parser reads.
+    Prose ("a while", "1 week") still fails here."""
+    from rules.dice import BadDice, Dice
+
+    def readable(amount) -> bool:
+        if isinstance(amount, int):
+            return amount > 0
+        try:
+            Dice(seed=1).parse(str(amount))
+            return True
+        except (BadDice, ValueError):
+            return False
+
     bad = []
     for iid, where, s in _effects():
         if s.get("type") not in TEMPORARY:
@@ -108,9 +124,24 @@ def test_anything_temporary_has_a_structured_duration():
             bad.append(f"{iid} {where}: {dur}")
             continue
         amount = dur.get("amount")
-        if dur["unit"] != "permanent" and not (isinstance(amount, int) and amount > 0):
+        if dur["unit"] != "permanent" and not readable(amount):
             bad.append(f"{iid} {where}: amount {amount!r}")
     assert bad == []
+
+
+def test_the_sources_dice_durations_stay_dice():
+    """The herb rework (2026-10-02) flattened every dice duration to its average because
+    the engine could not roll one; the owner ruled they are rolled. These six are the
+    source's own dice, restored, and pinned so they cannot quietly become averages again.
+    (Mad Cap's rage stays at a minute by the owner's choice; Menhirite heals 1d6.)"""
+    from rules import ingredients
+
+    want = {("aconite", 2): "1d4", ("dragon-flower", 0): "1d6",
+            ("dragon-flower", 4): "1d6", ("lish-nut", 1): "2d4",
+            ("mad-cap", 3): "1d10", ("mandrake", 2): "1d4"}
+    every = ingredients.all_ingredients()
+    got = {k: every[k[0]].effects[k[1]]["duration"]["amount"] for k in want}
+    assert got == want
 
 
 def test_every_condition_ends():
