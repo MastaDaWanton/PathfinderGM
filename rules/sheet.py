@@ -4549,17 +4549,20 @@ def _progress_dict(p) -> dict:
          "mishaps": p.mishaps, "milestones": p.milestones}
     # The endless levels' perk picks and the migration stamp (docs/herbalism-revamp-plan.md
     # §4.2, §14). Only when set, so a save from before the revamp reads back unchanged.
-    if p.perks:
-        d["perks"] = {str(k): int(n) for k, n in p.perks.items() if int(n)}
+    # Filtered before the test, so a perk held at 0 never writes an empty `{}` that the
+    # save from before had no key for.
+    perks = {str(k): int(n) for k, n in p.perks.items() if int(n)}
+    if perks:
+        d["perks"] = perks
     if p.schema:
         d["schema"] = int(p.schema)
     return d
 
 
 def _progress(track_id: str, v: dict):
-    from .worldclass import Progress
+    from .worldclass import Progress, migrate
 
-    return Progress(
+    p = Progress(
         track=track_id, level=int(v.get("level", 1)), mp=int(v.get("mp", 0)),
         crafted={k: int(n) for k, n in (v.get("crafted") or {}).items()},
         mishaps={k: int(n) for k, n in (v.get("mishaps") or {}).items()},
@@ -4567,6 +4570,11 @@ def _progress(track_id: str, v: dict):
         perks={str(k): int(n) for k, n in (v.get("perks") or {}).items()},
         schema=int(v.get("schema") or 0),
     )
+    # The track's own load-time migration, if it has one (the Herbalist's revamp, plan
+    # §14). Every load, because each is idempotent by its schema stamp; doing it here
+    # rather than in a one-off pass means no save can reach the bench unsettled.
+    migrate(p)
+    return p
 
 
 def _temp_pools(data: dict) -> list[TempPool]:
