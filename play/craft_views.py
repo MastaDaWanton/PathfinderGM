@@ -29,7 +29,12 @@ from .apiutil import read_body, read_int
 # None where no world class exists yet, and the tab says so rather than 404ing.
 DISCIPLINES = [
     {"id": "herbalism", "name": "Herbalism", "track": "herbalist",
-     "blurb": "Foraging, harvesting and brewing — poultices, teas, tinctures, elixirs."},
+     "blurb": "Foraging, harvesting and brewing — poultices, teas, tinctures, elixirs.",
+     # The chain bench retired for herbalism on 2026-10-02: it works one step at a time
+     # at the table now (docs/herbalism-revamp-plan.md, play/bench_views.py). Foraging
+     # and the acquisition hub stay here. The page reads `moved` and draws a card.
+     "moved": "Herbalism is at the table now: open the bench from the table to work "
+              "one step at a time. Foraging stays here."},
     {"id": "alchemy", "name": "Alchemy", "track": "alchemist",
      "blurb": "Reagents, reactions, and bottled consequences."},
     {"id": "blacksmithing", "name": "Blacksmithing", "track": "blacksmith",
@@ -109,6 +114,8 @@ def _track_state(campaign, disc: dict) -> dict:
     here = track.at(progress.level)
     return {
         "available": True,
+        # Present only for a discipline whose chains moved to another bench (herbalism).
+        **({"moved": disc["moved"]} if disc.get("moved") else {}),
         "track": track.id,
         "name": track.name,
         "level": progress.level,
@@ -358,11 +365,8 @@ def craft_ingredients(request):
         # nothing on the shelf used to distinguish the two.
         d["poisons"] = [p.as_dict() for p in
                         consumables.poisons(item.specs, source=item.base)]
-        d["can_concentrate"] = item.count >= crafting.CONCENTRATE_COST
-        out_of = crafting.concentrate(item)
-        d["concentrates_to"] = {"name": out_of.name, "tier": out_of.tier,
-                                "potency": round(out_of.potency, 2),
-                                "cost": crafting.CONCENTRATE_COST}
+        # `can_concentrate` and `concentrates_to` went with the x2 Concentrate (retired
+        # 2026-10-02). Concentration is the table bench's Dry and Reduce now.
         stock.append(d)
     return JsonResponse({
         "ingredients": out, "stock": stock, "track": state,
@@ -384,6 +388,8 @@ def craft_preview(request):
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
 
+    if disc.get("moved"):
+        return _moved(disc)
     state = _track_state(c, disc)
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
@@ -422,6 +428,16 @@ def craft_preview(request):
     # player count it out and then find they were three short halfway through the batch.
     out["batch_max"] = batch_max(result, pc)
     return JsonResponse(out)
+
+
+def _moved(disc: dict) -> JsonResponse:
+    """A discipline whose chains are worked elsewhere now, refused in plain words.
+
+    409 rather than 404: the craft exists and the request was well formed; the bench it
+    asked has stopped taking that work. Only herbalism today, retired from this page
+    when it moved to the table's step bench (docs/herbalism-revamp-plan.md).
+    """
+    return JsonResponse({"error": disc["moved"], "moved": True}, status=409)
 
 
 def _shelf_refusals(methods) -> dict:
@@ -496,6 +512,8 @@ def craft_do(request):
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
 
+    if disc.get("moved"):
+        return _moved(disc)
     state = _track_state(c, disc)
     if not state.get("available"):
         return JsonResponse({"error": f"{disc['name']} has no rules yet."}, status=400)
@@ -684,6 +702,14 @@ def craft_recipes(request):
     """Keep a chain under a name, so a working recipe is worked out once."""
     body = read_body(request)
     c = campaign_mod.current()
+    try:
+        disc = _discipline(str(body.get("craft", "herbalism")))
+    except LookupError as exc:
+        return JsonResponse({"error": str(exc)}, status=404)
+    if disc.get("moved"):
+        # The table bench keeps herbalism's recipes in its own step shape
+        # (/api/bench/recipe); a chain saved here would be one it has to convert.
+        return _moved(disc)
     name = str(body.get("name", "")).strip()
     if not name:
         return JsonResponse({"error": "A recipe needs a name."}, status=400)
