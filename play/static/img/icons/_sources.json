@@ -1,0 +1,278 @@
+{
+ "leaf": {
+  "source": "delapouite/oak-leaf",
+  "url": "https://game-icons.net/1x1/delapouite/oak-leaf.html",
+  "author": "delapouite",
+  "bytes": 1790
+ },
+ "flower": {
+  "source": "lorc/daisy",
+  "url": "https://game-icons.net/1x1/lorc/daisy.html",
+  "author": "lorc",
+  "bytes": 4557
+ },
+ "root": {
+  "source": "delapouite/plant-roots",
+  "url": "https://game-icons.net/1x1/delapouite/plant-roots.html",
+  "author": "delapouite",
+  "bytes": 2653
+ },
+ "bark": {
+  "source": "delapouite/log",
+  "url": "https://game-icons.net/1x1/delapouite/log.html",
+  "author": "delapouite",
+  "bytes": 1896
+ },
+ "berry": {
+  "source": "delapouite/raspberry",
+  "url": "https://game-icons.net/1x1/delapouite/raspberry.html",
+  "author": "delapouite",
+  "bytes": 3750
+ },
+ "seed": {
+  "source": "delapouite/plant-seed",
+  "url": "https://game-icons.net/1x1/delapouite/plant-seed.html",
+  "author": "delapouite",
+  "bytes": 980
+ },
+ "sap": {
+  "source": "lorc/drop",
+  "url": "https://game-icons.net/1x1/lorc/drop.html",
+  "author": "lorc",
+  "bytes": 406
+ },
+ "resin": {
+  "source": "delapouite/amber-mosquito",
+  "url": "https://game-icons.net/1x1/delapouite/amber-mosquito.html",
+  "author": "delapouite",
+  "bytes": 2401
+ },
+ "fungus": {
+  "source": "lorc/mushroom-gills",
+  "url": "https://game-icons.net/1x1/lorc/mushroom-gills.html",
+  "author": "lorc",
+  "bytes": 1767
+ },
+ "gland": {
+  "source": "delapouite/kidneys",
+  "url": "https://game-icons.net/1x1/delapouite/kidneys.html",
+  "author": "delapouite",
+  "bytes": 1243
+ },
+ "organ": {
+  "source": "lorc/heart-organ",
+  "url": "https://game-icons.net/1x1/lorc/heart-organ.html",
+  "author": "lorc",
+  "bytes": 3292
+ },
+ "bone": {
+  "source": "lorc/broken-bone",
+  "url": "https://game-icons.net/1x1/lorc/broken-bone.html",
+  "author": "lorc",
+  "bytes": 953
+ },
+ "horn": {
+  "source": "delapouite/rhinoceros-horn",
+  "url": "https://game-icons.net/1x1/delapouite/rhinoceros-horn.html",
+  "author": "delapouite",
+  "bytes": 2756
+ },
+ "feather": {
+  "source": "lorc/feather",
+  "url": "https://game-icons.net/1x1/lorc/feather.html",
+  "author": "lorc",
+  "bytes": 835
+ },
+ "scale": {
+  "source": "delapouite/fish-scales",
+  "url": "https://game-icons.net/1x1/delapouite/fish-scales.html",
+  "author": "delapouite",
+  "bytes": 6515
+ },
+ "eye": {
+  "source": "lorc/eyeball",
+  "url": "https://game-icons.net/1x1/lorc/eyeball.html",
+  "author": "lorc",
+  "bytes": 2890
+ },
+ "shell": {
+  "source": "faithtoken/nautilus-shell",
+  "url": "https://game-icons.net/1x1/faithtoken/nautilus-shell.html",
+  "author": "faithtoken",
+  "bytes": 2063
+ },
+ "oil": {
+  "source": "delapouite/olive",
+  "url": "https://game-icons.net/1x1/delapouite/olive.html",
+  "author": "delapouite",
+  "bytes": 1702
+ },
+ "wax": {
+  "source": "lorc/honeycomb",
+  "url": "https://game-icons.net/1x1/lorc/honeycomb.html",
+  "author": "lorc",
+  "bytes": 1293
+ },
+ "mineral": {
+  "source": "lorc/rock",
+  "url": "https://game-icons.net/1x1/lorc/rock.html",
+  "author": "lorc",
+  "bytes": 546
+ },
+ "liquid": {
+  "source": "sbed/water-drop",
+  "url": "https://game-icons.net/1x1/sbed/water-drop.html",
+  "author": "sbed",
+  "bytes": 203
+ },
+ "grind": {
+  "source": "delapouite/mortar",
+  "url": "https://game-icons.net/1x1/delapouite/mortar.html",
+  "author": "delapouite",
+  "bytes": 1170
+ },
+ "mix": {
+  "source": "lorc/bowl-spiral",
+  "url": "https://game-icons.net/1x1/lorc/bowl-spiral.html",
+  "author": "lorc",
+  "bytes": 2530
+ },
+ "brew": {
+  "source": "delapouite/camp-cooking-pot",
+  "url": "https://game-icons.net/1x1/delapouite/camp-cooking-pot.html",
+  "author": "delapouite",
+  "bytes": 1686
+ },
+ "dry": {
+  "source": "delapouite/herbs-bundle",
+  "url": "https://game-icons.net/1x1/delapouite/herbs-bundle.html",
+  "author": "delapouite",
+  "bytes": 3465
+ },
+ "reduce": {
+  "source": "caro-asercion/saucepan",
+  "url": "https://game-icons.net/1x1/caro-asercion/saucepan.html",
+  "author": "caro-asercion",
+  "bytes": 1162
+ },
+ "extract": {
+  "source": "lorc/scalpel",
+  "url": "https://game-icons.net/1x1/lorc/scalpel.html",
+  "author": "lorc",
+  "bytes": 483
+ },
+ "infuse": {
+  "source": "delapouite/covered-jar",
+  "url": "https://game-icons.net/1x1/delapouite/covered-jar.html",
+  "author": "delapouite",
+  "bytes": 898
+ },
+ "steep": {
+  "source": "caro-asercion/mason-jar",
+  "url": "https://game-icons.net/1x1/caro-asercion/mason-jar.html",
+  "author": "caro-asercion",
+  "bytes": 1063
+ },
+ "neutralize": {
+  "source": "lorc/eyedropper",
+  "url": "https://game-icons.net/1x1/lorc/eyedropper.html",
+  "author": "lorc",
+  "bytes": 1029
+ },
+ "dried": {
+  "source": "lorc/sun",
+  "url": "https://game-icons.net/1x1/lorc/sun.html",
+  "author": "lorc",
+  "bytes": 2026
+ },
+ "ground": {
+  "source": "delapouite/powder-bag",
+  "url": "https://game-icons.net/1x1/delapouite/powder-bag.html",
+  "author": "delapouite",
+  "bytes": 2293
+ },
+ "neutralised": {
+  "source": "delapouite/gloves",
+  "url": "https://game-icons.net/1x1/delapouite/gloves.html",
+  "author": "delapouite",
+  "bytes": 4421
+ },
+ "steeping": {
+  "source": "lorc/hourglass",
+  "url": "https://game-icons.net/1x1/lorc/hourglass.html",
+  "author": "lorc",
+  "bytes": 612
+ },
+ "lock": {
+  "source": "lorc/padlock",
+  "url": "https://game-icons.net/1x1/lorc/padlock.html",
+  "author": "lorc",
+  "bytes": 659
+ },
+ "recipe": {
+  "source": "lorc/open-book",
+  "url": "https://game-icons.net/1x1/lorc/open-book.html",
+  "author": "lorc",
+  "bytes": 1144
+ },
+ "taste": {
+  "source": "delapouite/tongue",
+  "url": "https://game-icons.net/1x1/delapouite/tongue.html",
+  "author": "delapouite",
+  "bytes": 1456
+ },
+ "study": {
+  "source": "lorc/magnifying-glass",
+  "url": "https://game-icons.net/1x1/lorc/magnifying-glass.html",
+  "author": "lorc",
+  "bytes": 1212
+ },
+ "reagent": {
+  "source": "lorc/round-bottom-flask",
+  "url": "https://game-icons.net/1x1/lorc/round-bottom-flask.html",
+  "author": "lorc",
+  "bytes": 1641
+ },
+ "infusion": {
+  "source": "delapouite/teapot-leaves",
+  "url": "https://game-icons.net/1x1/delapouite/teapot-leaves.html",
+  "author": "delapouite",
+  "bytes": 2974
+ },
+ "decoction": {
+  "source": "lorc/boiling-bubbles",
+  "url": "https://game-icons.net/1x1/lorc/boiling-bubbles.html",
+  "author": "lorc",
+  "bytes": 3060
+ },
+ "tincture": {
+  "source": "lorc/brandy-bottle",
+  "url": "https://game-icons.net/1x1/lorc/brandy-bottle.html",
+  "author": "lorc",
+  "bytes": 1592
+ },
+ "acetum": {
+  "source": "delapouite/wine-bottle",
+  "url": "https://game-icons.net/1x1/delapouite/wine-bottle.html",
+  "author": "delapouite",
+  "bytes": 1046
+ },
+ "poultice": {
+  "source": "lorc/bandage-roll",
+  "url": "https://game-icons.net/1x1/lorc/bandage-roll.html",
+  "author": "lorc",
+  "bytes": 2206
+ },
+ "salve": {
+  "source": "delapouite/honey-jar",
+  "url": "https://game-icons.net/1x1/delapouite/honey-jar.html",
+  "author": "delapouite",
+  "bytes": 2229
+ },
+ "cream": {
+  "source": "delapouite/cloth-jar",
+  "url": "https://game-icons.net/1x1/delapouite/cloth-jar.html",
+  "author": "delapouite",
+  "bytes": 1598
+ }
+}

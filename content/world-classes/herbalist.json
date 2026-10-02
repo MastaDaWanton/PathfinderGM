@@ -1,108 +1,89 @@
 {
  "id": "herbalist",
  "name": "Herbalist",
- "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — foraging, harvesting and crafting — unlocking tools, methods and higher tiers of ingredient, from woodland herbs to planar flora and monster parts.",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (foraging, harvesting and every step at the bench), opening new methods and rarer material at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, duration, quality or yield.",
  "grantable_at_creation": true,
- "_thresholds_note": "Mastery to reach levels 2, 3, 4 and 5. The author's table read 10/25/50/100; the top two are kept and the bottom two raised, because 10 and 25 did not reach the author's own stated pacing. A qualifying level-1 craft is worth about 5 MP (3 first-time, +2 for a second stage), so 10 MP is two crafts against a target of 3-5; a level-2 craft is about 9 MP, so 25 is under three against a target of 6-8. At 25 and 65 those become 5 and 7.  The DIP AT LEVEL 4 IS DELIBERATE — do not 'fix' it. The author's craft counts fall from 6-8 to 4-5 at that step because each high-tier recipe is a larger undertaking, and 50 MP is 4.5 crafts at 11 MP each, which is exactly the target.",
+ "_ruling_2026_10_02_note": "The owner's herbalism revamp ruling, 2026-10-02 (docs/herbalism-revamp-plan.md §2, §4, §14). Three unlock levels replace five: level 1 grind, mix and brew on common and uncommon material; level 2 dry, reduce, extract, infuse and steep on rare and exotic; level 3 neutralize and legendary material. Distill, preserve, purify, refine and catalyst crafting are removed, with the old level 4 and 5 rows, the `legendary-catalyst` milestone and its deed. The Alchemist already has its own verbs (calcine through catalyze), so nothing moved across. Old saves keep their level: an old Herbalist 4 or 5 is an endless level 4 or 5 with its perk picks banked (rules/worldclass.py `migrate_herbalist`).",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the numbers the five-level track settled on (the author's table read 10/25, raised because 10 and 25 did not reach the author's own pacing targets), kept unchanged by the 2026-10-02 ruling. The awards behind them changed: the bench now pays each step on its own (1, +1 per rarity band above common, +1 at Superior, +2 at Flawless or higher) and firsts pay 3, so a level-1 step on common material is worth 1 and a first herb or product type 3 more. The pacing under the step awards has not yet been measured in play.",
  "thresholds": [
   25,
-  65,
-  50,
-  100
+  65
  ],
- "milestones": {
-  "5": "legendary-catalyst"
- },
- "_deeds_note": "The deed for Herbalist 5 was 'crafting a legendary catalyst', and read literally that gate could never open: `catalyst crafting` is a Level 5 method and legendary material is Level 5 material, so the deed required the level it was gating. Measured by brute force over every method permutation an Herbalist 1-4 knows against every legendary ingredient: 0 legal chains. Level 5 was unreachable and so was every catalyst. The deed is therefore the material, not the method — successfully working legendary material is the grand catalyst, and `catalyst crafting` is the mastery that follows it. An Herbalist 4 reaches legendary material the one way the rules already allow: the concentration ladder, two exotic doses into one legendary one, at 15%.",
- "deeds": {
-  "legendary-catalyst": {
-   "min_tier": "legendary",
-   "note": "Any successful craft at legendary tier, however it was reached."
+ "_endless_note": "Levels past the written table, plan §4.2, owner-accepted 2026-10-02. Leaving level 3 costs `base` and each level after it `step` more (50, 60, 70...), gentle on purpose because the perks are small. Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick of each is worth: potency and duration add to their multipliers, quality raises the ceiling by that many steps, yield is the chance per craft of one extra dose. All proposed numbers, tunable here without a code change.",
+ "endless": {
+  "base": 50,
+  "step": 10,
+  "picks_per_level": 2,
+  "perks": {
+   "potency": 0.05,
+   "duration": 0.1,
+   "quality": 1,
+   "yield": 0.05
   }
  },
+ "_ceiling_note": "`ceiling` is the highest quality index a level's hands can reach (0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless), plan §4.3. Each Quality perk adds one past Flawless: Flawless +1, +2 and so on.",
  "levels": [
   {
    "level": 1,
    "tools": [
-    "bowl or pot",
-    "mortar and pestle"
+    "mortar and pestle",
+    "bowl and paddle",
+    "camp pot"
    ],
    "methods": [
     "grind",
     "mix",
     "brew"
    ],
-   "max_tier": "common / mundane",
-   "note": "Basic poultices, teas and crushed powders."
+   "max_tier": "uncommon / volatile",
+   "ceiling": 2,
+   "note": "Infusions, decoctions, poultices and salve bases."
   },
   {
    "level": 2,
    "tools": [
-    "specialized tongs",
-    "specialized knives"
+    "drying rack",
+    "knives and tongs",
+    "oil crock",
+    "steeping jars"
    ],
    "methods": [
-    "preserve",
-    "extract"
+    "dry",
+    "reduce",
+    "extract",
+    "infuse",
+    "steep"
    ],
-   "max_tier": "uncommon / volatile",
-   "note": "Field harvesting of monster parts and delicate flora."
+   "max_tier": "exotic / planar",
+   "ceiling": 3,
+   "note": "Dried herbs, reductions, infused oils, salves, balms and creams, tinctures and acetums, and field harvesting of monster parts."
   },
   {
    "level": 3,
    "tools": [
-    "alchemical still"
+    "thick gloves",
+    "dropper",
+    "neutralizer reagents"
    ],
    "methods": [
-    "distill",
-    "purify"
-   ],
-   "max_tier": "rare / magical",
-   "note": "Concentration of liquids into potent tinctures, oils and tonics."
-  },
-  {
-   "level": 4,
-   "tools": [
-    "glass syringes",
-    "fire-resistant tongs"
-   ],
-   "methods": [
-    "infuse",
     "neutralize"
    ],
-   "max_tier": "exotic / planar",
-   "note": "Safe handling of hazardous, toxic or planar substances."
-  },
-  {
-   "level": 5,
-   "tools": [
-    "master herbalist workbench"
-   ],
-   "methods": [
-    "refine",
-    "catalyst crafting"
-   ],
    "max_tier": "legendary / mythic",
-   "note": "Masterwork concoctions, permanent elixirs and maximum efficiency."
+   "ceiling": 4,
+   "note": "Volatile material made safe, and legendary material."
   }
  ],
  "method_descriptions": {
-  "grind": "Pulverises solid ingredients into fine powders, preparing them for poultices, additives or inhalants.",
-  "mix": "Combines two distinct ingredients. The mixture keeps the primary effects of both at 80% of base strength and duration.",
-  "brew": "Steeps or boils ingredients in liquid to create teas, broths and washes. Unlocks full duration and secondary effects for liquid remedies.",
-  "preserve": "Waxes, drying or solvents to extend the shelf life of perishable ingredients.",
-  "extract": "Harvests organ meats, venoms and delicate plant nodes without destroying their magical properties.",
-  "distill": "Concentrates a liquid mixture: +25% to the primary effect, or turns a raw ingredient into an indefinite tincture.",
-  "purify": "Removes negative side effects, penalties and secondary toxicities while keeping the beneficial traits.",
-  "infuse": "Imbues liquids or powders with planar energy or monster essence, combining up to three components into one dose.",
-  "neutralize": "Disarms contact toxins and environmental side effects during harvesting.",
-  "refine": "Raises a crafted item to 125% of base strength, or extends its duration by 50%.",
-  "catalyst crafting": "Uses legendary components to craft permanent stat-altering elixirs and grand alchemical catalysts."
+  "grind": "Crushes a solid into powder. Bark, sap and resin grind into salve base.",
+  "mix": "Combines two or more prepared things: a fresh poultice with a binder, a salve base blend, or a salve, balm or cream from a base and an infused oil.",
+  "brew": "Boils a herb in water. Leaf and flower make an infusion; root, bark and berry make a stronger, slower decoction.",
+  "dry": "Dries two of a solid into one, half again as potent and half again as long lasting. What has been dried can be dried again.",
+  "reduce": "Simmers two doses of a liquid down to one, half again as potent and half again as long lasting.",
+  "extract": "Takes the usable part out of a shell, gland or pod without spoiling it. A clumsy cut costs potency.",
+  "infuse": "Steeps a dried herb in oil, one oil per dose, to make an infused oil for salves, balms and creams, or for sale.",
+  "steep": "Seals a herb in alcohol or vinegar. The jar is ready in two weeks as a tincture, or one week as an acetum.",
+  "neutralize": "Makes a volatile ingredient safe to work, at the cost of one neutralizer per dose and a little of its strength."
  },
- "_portable_note": "The workbench is furniture. Whether a recipe can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state.",
- "fixed_tools": [
-  "master herbalist workbench",
-  "alchemical still"
- ],
- "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
+ "fixed_tools": [],
+ "_fixed_tools_note": "Emptied 2026-10-02. The alchemical still left with distill and the master herbalist workbench with level 5. The revamped bench is a fold-out forager's kit that goes wherever the character stands (plan §2, 'Mood'), so the Herbalist has no installation. The 2026-08-25 ruling still holds for the tracks that declare fixed tools: they stay unread until property ownership exists."
 }

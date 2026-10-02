@@ -256,10 +256,18 @@ def test_a_save_written_before_places_heals_on_load(client):
 
 
 def test_travelling_changes_what_grows(client):
+    """The table is the ground's, so walking to other ground gives another table.
+
+    Until 2026-10-02 this read "a city grows nothing", which was true only because a
+    first-level herbalist was capped at common material and no common herb grows in town.
+    The owner's revamp opens uncommon material at level 1, and Golden Maple Leaves
+    (uncommon, grown only in towns) made the city's table non-empty. What the test was
+    always about is that the two tables DIFFER, so that is what it now pins."""
     green = _green_ground(client)
     urban = client.get("/api/forage/table?biome=urban").json()
     wild = client.get(f"/api/forage/table?biome={green}").json()
-    assert wild["table"]["rows"] and not urban["table"]["rows"]
+    names = lambda t: {r.get("id") or r.get("name") for r in t["table"]["rows"]}
+    assert wild["table"]["rows"] and names(wild) != names(urban)
 
     d = _walk_to_the_forest(client)
     assert d["biome"] == green

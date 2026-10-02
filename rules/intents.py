@@ -540,6 +540,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # item the meal is the scene's, as it always was: a tavern's supper is not carried.
     "eat": ((), ("actor", "item"), "hidden"),
     "drink": ((), ("actor",), "hidden"),
+    # A nibble of a raw herb, to learn what it does (docs/herbalism-revamp-plan.md §8.2):
+    # the dose is spent, the herb's own effects land for real, and one benefit and one
+    # drawback are learned. `item` is the herb's id or name; every number is the herb's.
+    "taste": (("item",), ("actor",), "hidden"),
     # `not_here` is written by code, never by the model: the world's own answer for a
     # person the player looked for who is not here (`judgement.repair_unknown_refs`,
     # item 29). It travels on `narrate_only` because there is no ref to hang it on — that

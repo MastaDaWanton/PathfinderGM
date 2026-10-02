@@ -301,6 +301,50 @@ An export where nothing at all is `none` has a generator with no rule for refusi
 this can be shipped in and the cue words that already mint a place from a settlement's own
 prose. `tools/check_places.py` checks an export against it.
 
+### `play.flora[]` (proposed: no export carries it yet, and it has no version number)
+
+A world's own herbs, fungi and the parts of its own creatures, for the herbalist's bench.
+Until an export carries them the app uses its shipped corpus,
+`content/ingredients/herbs-and-parts.json`, whose rows already have this shape. Written
+down now (2026-10-02, the herbalism revamp) so that the fields the bench reads are the
+fields a world would send, and a world's flora is never validated against the shipped herb
+it shares a name with (the owner's ruling on races: a world's peoples are its own even
+when one is called Orc, and the same holds for its plants).
+
+**Every field below is optional, and the default is what the app assumes when it is
+absent.** All of them are words or flags, never rules numbers: how strong a neutralizer is
+is an ordinal, and the app turns words into DCs and dice itself.
+
+```json
+{
+  "id": "5bbd0c40345f~flora:ashleaf",
+  "name": "Ashleaf",
+  "about": "A grey creeper on burned ground; chewed, it numbs a toothache.",
+  "kind": "herb",
+  "grows_in": ["forest", "hills"],
+  "rarity": "common",
+  "part": "leaf",
+  "uses": [{"text": "Chewed, it numbs a toothache.", "route": "ingest"}],
+  "base_for": [],
+  "solvent": "",
+  "neutralizer": 0,
+  "hybrid": false
+}
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `kind` | `herb`, `fungus`, `monster part`, `poison` | `herb` |
+| `part` | what of it is used: `leaf`, `flower`, `root`, `bark`, `berry`, `seed`, `sap`, `resin`, `fungus`, `gland`, `organ`, `bone`, `horn`, `feather`, `scale`, `eye`, `shell`, `oil`, `wax`, `mineral`, `liquid` | `leaf` for a herb or poison, `organ` for a monster part, `fungus` for a fungus |
+| `uses[].route` | how one use reaches a body: `ingest`, `skin`, `eyes`, `wound`, `inhale`, or `external` for a use that reaches outside the body or changes what others perceive (light, invisibility, a cloud over an area, a coating on a blade) | `ingest` |
+| `base_for` | what it thickens: any of `salve`, `balm`, `cream`. Ground bark and tree sap or resin are salve bases | `[]` |
+| `solvent` | a carrier it serves as: `oil`, `alcohol`, `vinegar`, `water` | `""` |
+| `neutralizer` | how strongly it quiets a volatile ingredient: `0` none, `1` mild, `2` strong. `true` reads as `1` | `0` |
+| `hybrid` | `true` when any use is magical (planar flora, a creature's supernatural part); it then also appears on the alchemist's shelf | `false` |
+
+The app reads these into `rules/ingredients.Ingredient`, whose `from_dict` applies the same
+defaults, so a world that sends only `name` and `about` still loads.
+
 ## SQLite
 
 Same data, one row per thing. `entities.facts` is a JSON string; `entities.prose` is every

@@ -1068,6 +1068,16 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 jars = ", ".join(f"{iid} ({s.base}" + (f" ×{s.count}" if s.count > 1 else "")
                                  + ")" for iid, s in sorted(stock.items()))
                 lines.append(f"    CARRYING (use_item by id): {jars}")
+            # The raw herbs, with what the character KNOWS of each and nothing more
+            # (docs/herbalism-revamp-plan.md §8.1, law 3): an unknown property never
+            # reaches the narrator, so the line is built by the one owner of herb
+            # knowledge and carries only known lines and a count of the rest.
+            from rules import herbknowledge as _hk
+
+            herbs = _hk.brief_line(actor)
+            if herbs:
+                lines.append(f"    HERBS (fact; only what {actor.name} knows of them — "
+                             f"tasting one is the taste op, item=<its name>): {herbs}")
             # And the purse and the goods, as facts. Neither was ever in the brief —
             # the UI showed 231 gp and a chunk of wood, the narrator was shown nothing,
             # and invented the coin changing hands (2026-09-18, the brothel). A thing

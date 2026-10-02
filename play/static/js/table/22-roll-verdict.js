@@ -89,6 +89,9 @@ async function showVerdict(v, rest) {
   const at = mat ? { x: mat.left + mat.width / 2, y: mat.top + mat.height / 2 }
                  : verdictOrigin();
   verdictWord(f, at, mat ? mat.width : 0);
+  // The sting arrives with the word, in reduced motion too: Short keeps the sound.
+  window.Sound && Sound.play(f.good ? "verdict.success" : "verdict.failure",
+                             { volume: f.sub ? 1 : 0.85 });
   if (!f.still) {
     VerdictSparks.burst(f.kind, at.x, at.y, f.ms,
                         mat ? Math.min(mat.width, mat.height) * 0.46 : 0);

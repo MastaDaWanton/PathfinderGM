@@ -78,6 +78,10 @@ class Level:
     methods: list[str] = field(default_factory=list)
     max_tier: str = "common"
     note: str = ""
+    # The highest quality index work at this level can reach (0 Crude ... 4 Flawless),
+    # for a track whose bench grades quality. None for a track that does not, so the
+    # older world classes load unchanged (docs/herbalism-revamp-plan.md §4.3).
+    ceiling: int | None = None
 
 
 @dataclass
@@ -101,6 +105,14 @@ class Track:
     # The last level the track *writes down*. Levelling does not stop there: see
     # `to_next`. A track that wants a hard ceiling says so with `capped`.
     capped: bool = False
+
+    # How the levels past the written table are priced and what they give, as the track
+    # declares it: {"base": 50, "step": 10, "picks_per_level": 2, "perks": {...}}. Empty
+    # for a track that prices its unwritten levels flat at `top_cost` and grants nothing
+    # but the number. Declared in the JSON, never keyed on a track id here, so a second
+    # track can adopt endless levels with no code change (docs/herbalism-revamp-plan.md
+    # §4.2).
+    endless: dict = field(default_factory=dict)
 
     @property
     def max_level(self) -> int:
@@ -161,15 +173,23 @@ class Track:
     def to_next(self, level: int) -> int | None:
         """Mastery needed to leave this level. None only for a track that says it caps.
 
-        Past the written table the cost is the last threshold, unchanged. A herbalist
-        who has unlocked everything at 5 keeps levelling at the same price, and every
-        number that reads the level — the potency a grind adds, a formula naming the
-        track — keeps growing with it.
+        Past the written table the cost is the last threshold, unchanged, unless the
+        track declares `endless` pricing: then the first unwritten level costs `base`
+        and each one after it `step` more, forever (the Herbalist's 50, 60, 70...). A
+        crafter who has unlocked everything keeps levelling, and every number that reads
+        the level — the potency a grind adds, a formula naming the track — keeps growing
+        with it.
         """
         if self.capped and level >= self.max_level:
             return None
         if level - 1 < len(self.thresholds):
             return self.thresholds[level - 1]
+        if self.endless:
+            # Counted from the first level the written thresholds do not price, so a
+            # track with two thresholds (to 2, to 3) charges `base` to leave level 3.
+            past = max(0, int(level) - len(self.thresholds) - 1)
+            return int(self.endless.get("base", self.top_cost)) + \
+                int(self.endless.get("step", 0)) * past
         return self.top_cost
 
 
@@ -196,44 +216,271 @@ class Progress:
 
 # --- endless levels (herbalism revamp; contracts in docs/herbalism-contracts.md) -------
 #
-# Scaffolding with working first implementations so every lane can call them on day one.
-# The progression lane owns this block and may refine the bodies; the signatures are the
-# contract and do not change without the lead.
+# Levels past a track's written table that pay out in perks rather than unlocks
+# (docs/herbalism-revamp-plan.md §4.2-4.4). Everything a track varies — where the unlocks
+# stop, how a level is priced, how many picks it gives, what each perk is worth, the
+# quality ceiling per level — is read from the track's own JSON, so nothing here names a
+# track. The signatures of `perk_picks_banked`, `ceiling_index` and `award_bonus` are the
+# lead's contract with the other lanes and do not change without the lead.
 
 PERKS = ("potency", "duration", "quality", "yield")
-UNLOCK_LEVELS = 3          # levels 1-3 unlock things; every level after picks perks
+# Fallbacks for a progress whose track cannot be found (a homebrew track the user since
+# removed). A known track answers from its own written table and `endless` block.
+UNLOCK_LEVELS = 3
 PICKS_PER_LEVEL = 2
 # Quality ladder indices: 0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless, 5 Flawless +1 ...
 CEILING_BY_LEVEL = {1: 2, 2: 3, 3: 4}
+QUALITY_NAMES = ("Crude", "Sound", "Fine", "Superior", "Flawless")
+
+# Mastery from a bench step (§4.4, owner-accepted 2026-10-02). These replace the old
+# "first time 3 / repeat 1" per recipe for a track whose bench works one step at a time:
+# a chain is now several rolls, each paid on its own, so a per-chain award would count
+# the same work twice.
+STEP_MP = 1                 # each successful step, +1 per rarity band above common
+QUALITY_MP = {3: 1, 4: 2}   # Superior +1; Flawless *or higher* +2 (index 4 and up)
+FIRST_MP = 3                # a first: a property learned, a product type, a new herb
+MANUAL_MP = 5               # an unread herbalism manual, once per manual
+
+# The stamp `migrate_herbalist` writes. 0 is every save from before the revamp.
+HERBALISM_SCHEMA = 2
 
 
-def perk_picks_banked(progress: Progress) -> int:
-    """Perk picks earned by endless levels and not yet spent."""
-    earned = max(0, int(progress.level) - UNLOCK_LEVELS) * PICKS_PER_LEVEL
+def quality_name(index: int) -> str:
+    """0 Crude ... 4 Flawless, then "Flawless +1", "+2" without end. The server names
+    tiers and the page never builds them (contracts §2), so this is the one copy."""
+    i = max(0, int(index))
+    top = len(QUALITY_NAMES) - 1
+    return QUALITY_NAMES[i] if i <= top else f"{QUALITY_NAMES[top]} +{i - top}"
+
+
+def _track_of(progress: Progress) -> Track | None:
+    try:
+        return get(progress.track)
+    except KeyError:
+        return None
+
+
+def _perk_size(track: Track | None, perk: str) -> float:
+    # The sizes live in the track's `endless.perks` so they tune in the JSON without a
+    # code change (plan §16). A track without the block grants nothing from a perk.
+    sizes = (track.endless.get("perks") or {}) if track is not None else {}
+    return float(sizes.get(perk, 0))
+
+
+def _banked(track: Track | None, progress: Progress) -> int:
+    if track is None:
+        start, per = UNLOCK_LEVELS, PICKS_PER_LEVEL
+    elif not track.endless:
+        # A track that never declared endless levels has no perks to pick. Before this
+        # the scaffold counted picks for every track past level 3, so an Alchemist 6
+        # would have been offered six Herbalist perks.
+        return 0
+    else:
+        start = track.max_level
+        per = int(track.endless.get("picks_per_level", PICKS_PER_LEVEL))
+    earned = max(0, int(progress.level) - start) * per
     return max(0, earned - sum(int(n) for n in progress.perks.values()))
 
 
+def _ceiling(track: Track | None, progress: Progress) -> int:
+    base = track.at(progress.level).ceiling if track is not None else None
+    if base is None:
+        base = CEILING_BY_LEVEL.get(min(int(progress.level), max(CEILING_BY_LEVEL)), 2)
+    step = _perk_size(track, "quality") if track is not None else 1
+    return int(base + int(step) * int(progress.perks.get("quality", 0)))
+
+
+def perk_picks_banked(progress: Progress) -> int:
+    """Perk picks earned by endless levels and not yet spent.
+
+    Counted, not stored: the level *is* the bank. Level 4 of a track whose unlocks stop
+    at 3 has earned one pair, level 5 two, and whatever has been picked is subtracted.
+    That is what lets the migration (§14) express "Herbalist 5 becomes 3 plus two
+    pick-pairs" by leaving the level alone.
+    """
+    return _banked(_track_of(progress), progress)
+
+
 def ceiling_index(progress: Progress) -> int:
-    """The highest quality index this crafter's hands can reach (§4.3)."""
-    base = CEILING_BY_LEVEL.get(min(int(progress.level), UNLOCK_LEVELS), 2)
-    return base + int(progress.perks.get("quality", 0))
+    """The highest quality index this crafter's hands can reach (§4.3): the level row's
+    `ceiling` (Fine, Superior, Flawless at 1-3), plus one step per Quality perk."""
+    return _ceiling(_track_of(progress), progress)
+
+
+def perk_multipliers(progress: Progress) -> dict:
+    """What the perks do to everything this crafter makes, for the bench to apply.
+
+    {"potency": 1.10, "duration": 1.2, "yield_chance": 0.05} for two Potency picks, two
+    Duration and one Yield. Rounded, because 1 + 0.05 * 3 is 1.1500000000000001 and a
+    number shown to the player should not be.
+    """
+    track = _track_of(progress)
+    n = {p: int(progress.perks.get(p, 0)) for p in PERKS}
+    return {
+        "potency": round(1 + _perk_size(track, "potency") * n["potency"], 4),
+        "duration": round(1 + _perk_size(track, "duration") * n["duration"], 4),
+        "yield_chance": round(_perk_size(track, "yield") * n["yield"], 4),
+    }
+
+
+def _next_rung(track: Track, progress: Progress, ceiling: int) -> str:
+    """Where the ceiling rises next, as a sentence: a written level that lifts it, or else
+    the next Quality perk. Empty when nothing ever raises it again."""
+    quality = int(_perk_size(track, "quality")) * int(progress.perks.get("quality", 0))
+    for row in sorted(track.levels, key=lambda r: r.level):
+        if row.level > progress.level and row.ceiling is not None \
+                and row.ceiling + quality > ceiling:
+            return f"{quality_name(row.ceiling + quality)} at {track.name} {row.level}"
+    step = int(_perk_size(track, "quality"))
+    if track.endless and step:
+        return f"{quality_name(ceiling + step)} at your next Quality perk"
+    return ""
+
+
+def track_summary(track: Track, progress: Progress) -> dict:
+    """The `track` object of the bench state (contracts §3.1), and the reply to a perk
+    pick (§3.5). One builder so the two can never disagree.
+
+    `to_next` here is {"need": the level's price, "have": mastery banked}, the contract's
+    shape, which is not `_remaining`'s {"need": what is left, "of": ...}.
+    """
+    need = track.to_next(progress.level)
+    ceiling = _ceiling(track, progress)
+    return {
+        "id": track.id,
+        "level": int(progress.level),
+        "mp": int(progress.mp),
+        "to_next": None if need is None else {"need": int(need), "have": int(progress.mp)},
+        "ceiling": ceiling,
+        "ceiling_name": quality_name(ceiling),
+        "perks": {p: int(progress.perks[p]) for p in PERKS if progress.perks.get(p)},
+        "picks_banked": _banked(track, progress),
+        "next_rung": _next_rung(track, progress, ceiling),
+    }
+
+
+def pick_perks(track: Track, progress: Progress, picks: list[str]) -> dict:
+    """Spend banked picks. The same perk twice is allowed (owner, 2026-10-02).
+
+    All or nothing: every pick is checked before any is taken, so a bad last pick never
+    leaves the first ones spent. Raises ValueError with a plain sentence the bench can
+    show as it is. Returns `track_summary`.
+    """
+    chosen = [str(p).strip().lower() for p in (picks or [])]
+    if not chosen:
+        raise ValueError("Choose at least one perk.")
+    unknown = [p for p in chosen if p not in PERKS]
+    if unknown:
+        raise ValueError(f"There is no perk called {unknown[0]!r}. The perks are "
+                         f"{', '.join(PERKS[:-1])} and {PERKS[-1]}.")
+    banked = _banked(track, progress)
+    if len(chosen) > banked:
+        have = "no perk picks" if not banked else \
+            f"{banked} perk pick{'s' if banked != 1 else ''}"
+        raise ValueError(f"You have {have} banked and chose {len(chosen)}.")
+    for p in chosen:
+        progress.perks[p] = int(progress.perks.get(p, 0)) + 1
+    return track_summary(track, progress)
+
+
+def _settle(track: Track, progress: Progress, reasons: list[dict]) -> dict:
+    gained = sum(r["mp"] for r in reasons)
+    progress.mp += gained
+    levelled = _advance(track, progress)
+    return {"track": track.id, "mp": gained, "reasons": reasons, "total": progress.mp,
+            "level": progress.level, "levelled": levelled,
+            "to_next": _remaining(track, progress)}
+
+
+def award_step(track: Track, progress: Progress, *, method: str, ingredient_id: str,
+               rarity_rank: int, quality_index: int, success: bool = True,
+               name: str = "") -> dict:
+    """Score one bench step (§4.4) and advance the track if it is earned.
+
+    A success pays `STEP_MP`, one more per rarity band above common, and a quality bonus
+    at Superior and up. Itemised exactly as `award` is, so "Grind, comfrey 1; rare
+    material 2; Superior work 1" is a sentence the player can check.
+
+    The anti-grind limits are `award`'s, keyed on (method, ingredient) instead of a recipe
+    id: a step pays `REPEAT_LIMIT` times and a mishap `MISHAP_LIMIT` times, then it is
+    something you know how to do. The quality bonus stops with it, or a stack of Flawless
+    grinds of one cheap root would be unlimited mastery. `TRIVIAL_GAP` is dropped on this
+    path: past level 3 the levels no longer climb in rarity bands, so "beneath you" has no
+    meaning, and at 1-3 the repeat limit already does its job.
+
+    `name` is the ingredient's display name for the line; the id stands in without it.
+    """
+    key = f"{method}:{ingredient_id}"
+    label = f"{str(method).title()}, {name or str(ingredient_id).replace('-', ' ')}"
+    reasons: list[dict] = []
+    if not success:
+        seen = progress.mishaps.get(key, 0)
+        if seen < MISHAP_LIMIT:
+            reasons.append({"why": f"{label}, a lesson in failure",
+                            "mp": MP_AWARDS["mishap"]})
+        progress.mishaps[key] = seen + 1
+    else:
+        times = progress.crafted.get(key, 0)
+        if times < REPEAT_LIMIT:
+            reasons.append({"why": label, "mp": STEP_MP})
+            bands = min(len(TIERS) - 1, max(0, int(rarity_rank) - 1))
+            if bands:
+                reasons.append({"why": f"{TIERS[bands]} material", "mp": bands})
+            q = int(quality_index)
+            bonus = max((mp for at, mp in QUALITY_MP.items() if q >= at), default=0)
+            if bonus:
+                reasons.append({"why": f"{quality_name(q)} work", "mp": bonus})
+        progress.crafted[key] = times + 1
+    return _settle(track, progress, reasons)
 
 
 def award_bonus(track: "Track", progress: Progress, *, why: str, mp: int) -> dict:
-    """Mastery that is not a craft: a first, a manual read, a quality bonus. Itemised the
-    way `award` is, and advances the track the same way."""
+    """Mastery that is not a step: a first (`FIRST_MP`) or a manual read (`MANUAL_MP`).
+    Itemised the way `award` is, and advances the track the same way. Nothing here
+    remembers which first or which manual: the caller owns that record (the herbarium,
+    `Actor.manuals_read`), because only it knows what "first" means."""
     gained = max(0, int(mp))
-    progress.mp += gained
-    levelled = _advance(track, progress)
-    return {"track": track.id, "mp": gained, "reasons": [{"why": why, "mp": gained}],
-            "total": progress.mp, "level": progress.level, "levelled": levelled,
-            "to_next": _remaining(track, progress)}
+    return _settle(track, progress, [{"why": why, "mp": gained}] if gained else [])
+
+
+def migrate_herbalist(progress: Progress) -> bool:
+    """Settle a pre-revamp Herbalist under the new rules, once (plan §14). True if it ran.
+
+    Old levels 4 and 5 (and the uncapped 6+ past them) become endless levels. Nothing has
+    to move to say so: the unlocks now stop at 3 and the bank is counted from the level,
+    so an old Herbalist 4 already holds one pick-pair and an old 5 two, waiting for the
+    player to choose on their first visit to the bench. Banked mastery is untouched. An
+    old `legendary-catalyst` in `milestones` is inert: no level waits on it any more.
+
+    Idempotent by the stamp: a progress at `HERBALISM_SCHEMA` or later is left alone, so
+    running it on every load is safe.
+    """
+    if int(progress.schema) >= HERBALISM_SCHEMA:
+        return False
+    progress.schema = HERBALISM_SCHEMA
+    return True
+
+
+# Load-time migrations by track id. The one place a track is named in this module, and
+# only because a migration is by definition about one track's own history.
+MIGRATIONS = {"herbalist": migrate_herbalist}
+
+
+def migrate(progress: Progress) -> bool:
+    """Run whatever migration this progress's track has. Called by `sheet._progress` on
+    every load, which is safe because each migration is idempotent."""
+    fn = MIGRATIONS.get(progress.track)
+    return bool(fn and fn(progress))
 
 
 def award(track: Track, progress: Progress, *, recipe_id: str, tier: str,
           success: bool = True, risky: bool = False, stages: int = 1,
           milestone: str = "") -> dict:
     """Score one craft and advance the track if it is earned.
+
+    The per-recipe award the Alchemist, Blacksmith, Leatherworker and Enchanter benches
+    and the GM's `craft` op use. The Herbalist's step-by-step bench scores through
+    `award_step` instead.
 
     Returns an itemised breakdown rather than a total, for the same reason every roll in
     this app does: "3 first time, 2 risky harvest, 4 for three stages" is a sentence the
@@ -268,14 +515,7 @@ def award(track: Track, progress: Progress, *, recipe_id: str, tier: str,
     if milestone and milestone not in progress.milestones:
         progress.milestones.append(milestone)
 
-    gained = sum(r["mp"] for r in reasons)
-    progress.mp += gained
-    levelled = _advance(track, progress)
-    return {
-        "track": track.id, "mp": gained, "reasons": reasons, "total": progress.mp,
-        "level": progress.level, "levelled": levelled,
-        "to_next": _remaining(track, progress),
-    }
+    return _settle(track, progress, reasons)
 
 
 def _advance(track: Track, progress: Progress) -> list[int]:
@@ -313,12 +553,17 @@ def from_dict(data: dict) -> Track:
         id=data["id"], name=data["name"], summary=data.get("summary", ""),
         levels=[Level(level=int(l["level"]), tools=l.get("tools", []),
                       methods=l.get("methods", []),
-                      max_tier=l.get("max_tier", "common"), note=l.get("note", ""))
+                      max_tier=l.get("max_tier", "common"), note=l.get("note", ""),
+                      ceiling=(int(l["ceiling"]) if l.get("ceiling") is not None
+                               else None))
                 for l in data.get("levels", [])],
         thresholds=[int(t) for t in data.get("thresholds", [])],
         milestones={int(k): v for k, v in (data.get("milestones") or {}).items()},
         deeds=dict(data.get("deeds") or {}),
         grantable_at_creation=bool(data.get("grantable_at_creation", True)),
+        # Author's notes (`_..._note`) inside the block are documentation, not rules.
+        endless={k: v for k, v in (data.get("endless") or {}).items()
+                 if not str(k).startswith("_")},
     )
 
 
