@@ -43,6 +43,10 @@
     "sound.ambience": 0.4,
     "sound.combat": 0.7,
     "sound.mute": false,
+    // The owner's background music (music.js, 2026-10-02): its own level under master,
+    // and an on/off the table's Music button flips without touching the level.
+    "sound.music": 0.45,
+    "music.on": true,
   };
 
   function fallback(key) {
@@ -53,7 +57,7 @@
   // What a stored value may be. A slider writes a string, a hand-edited localStorage can
   // hold anything, and a volume of 7 or "loud" must not reach a gain node.
   function coerce(key, v) {
-    if (key === "steady" || key === "sound.mute") {
+    if (key === "steady" || key === "sound.mute" || key === "music.on") {
       return v === true || v === "true" || v === 1 || v === "1";
     }
     if (key === "flourishes") {

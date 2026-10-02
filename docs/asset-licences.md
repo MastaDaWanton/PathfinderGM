@@ -64,3 +64,31 @@ file works as a CSS mask; the shapes themselves are unchanged.
 | `play/static/img/icons/taste.svg` | [delapouite/tongue](https://game-icons.net/1x1/delapouite/tongue.html) | Delapouite |
 | `play/static/img/icons/tincture.svg` | [lorc/brandy-bottle](https://game-icons.net/1x1/lorc/brandy-bottle.html) | Lorc |
 | `play/static/img/icons/wax.svg` | [lorc/honeycomb](https://game-icons.net/1x1/lorc/honeycomb.html) | Lorc |
+
+## Music: the owner's soundtrack
+
+Added 2026-10-02, supplied by the owner from their own Suno account (artist tag
+"djsolideo"; each file's comment reads "made with suno"). The owner's to license, and
+the plan they were made on is what decides it (Suno, "Rights & Ownership",
+https://help.suno.com/en/categories/550145, read 2026-10-02):
+- songs made on the free plan are for personal, non-commercial use, and Suno keeps them;
+- songs made while subscribed to Pro or Premier are the subscriber's, commercial use included;
+- subscribing later does not reach back to songs made on the free plan
+  (https://help.suno.com/en/articles/2425729);
+- since September 2026 the rights attach to songs downloaded while subscribed (secondary
+  sources only; not confirmed on Suno's own pages).
+
+The five "Ambient background music" files are dated 2026-10-02 in their own tags; the
+three "alone in the garden" and all five battle files are dated 2026-04-03. Before any public
+release the owner confirms each was made, and downloaded, on a paid plan.
+
+| File | Title in the file | Length |
+|---|---|---|
+| `play/static/audio/music/ambient/ambient-1.mp3` to `ambient-5.mp3` | Ambient background music | 4:40 to 4:58 |
+| `play/static/audio/music/ambient/alone-in-the-garden-1.mp3` to `-3.mp3` | alone in the garden | 2:32 to 3:26 |
+| `play/static/audio/music/battle/against-all-odds-1.mp3` to `-3.mp3` | against all odds | 2:18 to 3:02 |
+| `play/static/audio/music/battle/epic-sad-1.mp3`, `epic-sad-2.mp3` | Epic sad | 2:49 to 3:21 |
+
+Kept at the owner's own encoding (about 190 kbps MP3, 64 MB together), not re-encoded:
+quality of output beats size (CLAUDE.md).
+

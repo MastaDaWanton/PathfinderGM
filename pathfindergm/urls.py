@@ -13,6 +13,9 @@ mimetypes.add_type("text/javascript", ".js")
 # `text/plain` is not applied by a page in standards mode, and nothing on screen says why:
 # the page just loses its materials on the one machine whose registry disagrees.
 mimetypes.add_type("text/css", ".css")
+# And the soundtrack (play/static/audio/music, 2026-10-02), pinned for the same reason as
+# the two above: the type is this file's to say, not whatever one machine's registry holds.
+mimetypes.add_type("audio/mpeg", ".mp3")
 
 
 def static_serve(request, path, **kwargs):

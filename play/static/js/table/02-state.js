@@ -204,6 +204,12 @@ function render(s, hold) {
     document.title = "Pathfinder GM" + (s.world ? " — " + s.world : "");
   }
   renderCombat(s);
+  // The soundtrack follows the fight (music.js): battle while the scene is in an
+  // encounter, the calm playlist once it has stayed over a few seconds.
+  if (window.Music) {
+    try { Music.mode(s && s.scene && s.scene.in_encounter ? "battle" : "ambient"); }
+    catch (err) { /* music is a nicety; never the reason the table fails to draw */ }
+  }
   reflectMerchant(s);
   // `fresh` marks only the beats that were not on the page a moment ago, because this
   // rebuilds the whole transcript each state: without the gate, every line re-ran its

@@ -3151,6 +3151,7 @@
      script can read them. Guarded the same way as bench-games.css above. -->
 {% asset 'js/prefs.js' as prefs_js %}{% if '?v=' in prefs_js %}<script src="{% asset 'js/prefs.js' %}"></script>{% endif %}
 {% asset 'js/sound.js' as sound_js %}{% if '?v=' in sound_js %}<script src="{% asset 'js/sound.js' %}"></script>{% endif %}
+<script src="{% asset 'js/music.js' %}"></script>
 <script src="{% static 'js/scene3d.js' %}"></script>
 </head>
 <body class="page-backdrop-room mode-table">
@@ -3211,6 +3212,10 @@
     <button type="button" id="talktab" class="v2-btn talkbtn" aria-controls="talktray"
             aria-expanded="false" title="The conversation">Talk<span class="edgecount v2-count"
             hidden></span></button>
+    <!-- The background music on or off (music.js), without touching its level, which is
+         the Settings page's Music slider. -->
+    <button type="button" id="musictoggle" class="v2-btn is-quiet" aria-pressed="true"
+            title="Background music">Music</button>
     <button type="button" id="sheettoggle" class="v2-btn is-quiet" aria-expanded="true"
             aria-controls="sheet">Hide sheet</button>
   </div>

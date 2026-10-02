@@ -663,6 +663,25 @@ def check_the_herbalism_bench_ships(http: Http, repo: Path) -> None:
     note("the herbalism bench ships: page, scripts, icons, rules and API", faults)
 
 
+def check_the_soundtrack_ships(http: Http, repo: Path) -> None:
+    """The owner's thirteen tracks (play/static/audio/music), each fetched whole from the
+    frozen exe as audio. Like the bench's files, nothing else names them one by one, so a
+    track that did not ship would only ever be a silent gap in the loop."""
+    faults = []
+    tracks = sorted((repo / "play" / "static" / "audio" / "music").rglob("*.mp3"))
+    if len(tracks) < 13:
+        faults.append(f"{len(tracks)} tracks in the repo; expected the owner's 13")
+    for t in tracks:
+        rel = t.relative_to(repo / "play" / "static").as_posix()
+        s, body = http.get(f"/static/{rel}")
+        if s != 200 or len(body) != t.stat().st_size:
+            faults.append(f"/static/{rel} -> {s}, {len(body)} of {t.stat().st_size}b")
+    s, body = http.get("/static/js/music.js")
+    if s != 200 or b"window.Music" not in body:
+        faults.append(f"/static/js/music.js -> {s}")
+    note("the soundtrack ships: every track whole, and the player", faults)
+
+
 def run_checks(http: Http, repo: Path) -> None:
     # --- the baseline ---------------------------------------------------------------
     s, body = http.get("/")
@@ -737,6 +756,7 @@ def run_checks(http: Http, repo: Path) -> None:
             faults.append(f"beginning the campaign: {s}: {j(body)}")
     note("character created, outfitted and campaign begun", faults)
     check_the_herbalism_bench_ships(http, repo)
+    check_the_soundtrack_ships(http, repo)
 
     s, body = http.get("/api/sheet")
     past = (j(body).get("background") or {}).get("past") or {}

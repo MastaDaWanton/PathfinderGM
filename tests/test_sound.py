@@ -226,10 +226,17 @@ def test_no_audio_file_and_no_third_party_code():
         for bad in ("base64", "data:audio", "http://", "https://", "import ", "require(",
                     "fetch(", "new Audio(", "decodeAudioData"):
             assert bad not in src, f"{p.name} contains {bad!r}"
+    # The one exception is the owner's own soundtrack (2026-10-02, play/static/audio/music,
+    # played by music.js and recorded in docs/asset-licences.md). Sound EFFECTS stay
+    # synthesized: any other audio file in the static tree is still a stray asset.
     static = ROOT / "play" / "static"
+    music = static / "audio" / "music"
     audio = [f for ext in ("mp3", "wav", "ogg", "flac", "m4a", "opus")
-             for f in static.rglob(f"*.{ext}")]
+             for f in static.rglob(f"*.{ext}") if music not in f.parents]
     assert audio == [], audio
+    licences = (ROOT / "docs" / "asset-licences.md").read_text(encoding="utf-8")
+    assert all(f.name in licences or f.stem.rsplit("-", 1)[0] in licences
+               for f in music.rglob("*.mp3"))
     # Built from the raw material, as the header says.
     src = _read(SOUND)
     assert "createOscillator" in src and "createBufferSource" in src \
@@ -390,7 +397,9 @@ def test_prefs_have_their_defaults_survive_broken_storage_and_tell_listeners(tmp
     assert got["defaults"] == {"steady": False, "flourishes": "full", "sound.master": 0.8,
                                "sound.ui": 0.6, "sound.dice": 0.8, "sound.bench": 0.8,
                                "sound.ambience": 0.4, "sound.combat": 0.7,
-                               "sound.mute": False}
+                               "sound.mute": False,
+                               # The owner's soundtrack (music.js, 2026-10-02).
+                               "sound.music": 0.45, "music.on": True}
     assert got["clamped"] == [1, 0, 0.6, 0.25] and got["stored"] == "0.25"
     assert got["flags"] == [True, "full", "short"]
     assert got["heard"][-1] == ["sound.ui", 0.5], got["heard"]

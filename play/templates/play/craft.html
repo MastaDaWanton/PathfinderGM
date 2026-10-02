@@ -1368,6 +1368,10 @@ selectCraft(CRAFT);
 </script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<!-- The soundtrack carries on here from the table (music.js resumes the same song). -->
+<script src="{% asset 'js/prefs.js' %}"></script>
+<script src="{% asset 'js/music.js' %}"></script>
+<script>window.Music && Music.start("ambient");</script>
 <script src="{% static 'js/keepalive.js' %}"></script>
 </body>
 </html>

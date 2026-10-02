@@ -162,3 +162,27 @@ onRender(function shellWorld(s) {
 });
 
 shellPaint(SHELL_MODE, false);
+
+// The background music (music.js): it starts in the mode the table opened in, and the
+// Music button turns it on or off without touching its level (the Settings slider's).
+(function () {
+  const btn = document.getElementById("musictoggle");
+  const on = () => { try { return !window.PGMPrefs || PGMPrefs.get("music.on") !== false; } catch (err) { return true; } };
+  const paint = () => {
+    if (!btn) return;
+    btn.setAttribute("aria-pressed", on() ? "true" : "false");
+    btn.textContent = on() ? "Music" : "Music off";
+  };
+  if (window.Music) {
+    const fighting = !!(STATE && STATE.scene && STATE.scene.in_encounter);
+    try { Music.start(fighting ? "battle" : "ambient"); } catch (err) { /* silence */ }
+  }
+  if (btn) {
+    btn.addEventListener("click", () => {
+      try { if (window.PGMPrefs) PGMPrefs.set("music.on", !on()); } catch (err) { /* */ }
+      paint();
+    });
+    try { if (window.PGMPrefs) PGMPrefs.on("music.on", paint); } catch (err) { /* */ }
+    paint();
+  }
+})();
