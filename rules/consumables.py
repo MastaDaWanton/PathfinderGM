@@ -422,9 +422,12 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                                {"duration": {"amount": 1, "unit": "hour"}})}}]
 
     if kind == "remove_condition":
+        # `ends`, the op's own word (`_op_condition`). This read `remove` until 2026-10-02,
+        # which the op table has never taken: every jar with an "Ends X" line (cowslip's
+        # "Ends paralyzed") raised at parse when drunk. Found by Lane C's taste of all 161.
         return [{"op": "condition", "because": because,
                  "params": {"condition": spec.get("target") or "", "to": target,
-                            "remove": True}}]
+                            "ends": True}}]
 
     return []
 

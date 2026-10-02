@@ -10664,6 +10664,20 @@ class Engine:
         return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
                        because=intent.because)
 
+    def _duration_rounds(self, duration: dict) -> int:
+        """A `{amount, unit}` duration in rounds, rolling the amount when it is dice.
+
+        A dice duration is the source's own ("nauseated for 1d4 rounds", aconite) and the
+        engine rolls it. Read with int() it raised ValueError, so a jar was drunk and the
+        drinker's turn died with it (found by Lane C's taste of all 161 herbs, 2026-10-02).
+        One door for both ops that read a duration, so the two cannot drift apart again.
+        """
+        amount = duration.get("amount", 0)
+        if not str(amount).strip().lstrip("-").isdigit():
+            amount = self.dice.roll(str(amount), label="how long it lasts",
+                                    visibility="hidden").total
+        return _to_rounds(amount, duration.get("unit", "round"))
+
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
         target = self.scene.actors[ref]
@@ -10693,7 +10707,7 @@ class Engine:
         duration = intent.params.get("duration")
         rounds = None
         if isinstance(duration, dict):
-            rounds = _to_rounds(duration.get("amount", 0), duration.get("unit", "round"))
+            rounds = self._duration_rounds(duration)
         elif isinstance(duration, int):
             rounds = duration
         # Immunity is consulted HERE, and never inside `add_condition`. That applicator
@@ -12533,7 +12547,7 @@ class Engine:
         duration = intent.params.get("duration")
         rounds = None
         if isinstance(duration, dict):
-            rounds = _to_rounds(duration.get("amount", 0), duration.get("unit", "round"))
+            rounds = self._duration_rounds(duration)
         elif isinstance(duration, int):
             rounds = duration
 
