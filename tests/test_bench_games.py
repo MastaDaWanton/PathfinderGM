@@ -327,6 +327,24 @@ out.toggles = {
   steep: run('steep', 'Space', s => s.fill, 0.6),
   extract: run('extract', 'ArrowRight', s => s.at, 0.6),
 };
+// Dry: the bundle the player turns is named to the stage with the hit (2026-10-02). Play
+// until a bundle is inside its band, turn it by its number key, and keep what ctx heard.
+{
+  const calls = [], c = ctx(false);
+  c.hit = (...a) => calls.push(['hit'].concat(a));
+  c.miss = (...a) => calls.push(['miss'].concat(a));
+  const g = W.BenchGameDefs.dry.create(c);
+  let t = 0, target = -1;
+  for (let i = 0; i < 60 * 14 && target < 0; i++) {
+    t += 1 / 60; g.tick(1 / 60, t);
+    g.state().bundles.forEach((b, j) => {
+      if (target < 0 && !b.turned && b.cure >= b.band[0] + 0.02 && b.cure <= b.band[1]) target = j;
+    });
+  }
+  const before = calls.length;
+  g.down({ src: 'key', key: String(target + 1) });
+  out.dryIndex = { target, calls: calls.slice(before) };
+}
 process.stdout.write(JSON.stringify(out));
 """
 
@@ -408,3 +426,70 @@ def test_a_steady_hold_is_a_toggle(node_run, method):
         assert t["after"] < t["released"], f"brew: the second press did not bank the fire {t}"
     else:
         assert abs(t["after"] - t["released"]) < 1e-6, f"{method}: the second press did not stop it {t}"
+
+
+# --- the stage's missing inputs (added 2026-10-02) -------------------------------------------
+
+_MERGE_GAP = ("the stage could not draw Extract's stop points or Reduce's simmer band; both lanes "
+              "reported it at merge, 2026-10-02")
+
+
+def test_extract_hands_the_stage_its_stop_points(node_run):
+    """The stage could not draw Extract's stop points or Reduce's simmer band; both lanes
+    reported it at merge, 2026-10-02. Extract's state was `{path, at, pace, nicked}`: the four
+    nodes the player must stop at lived only in the game, so the 3D cut had nowhere marked to
+    stop. The state now carries `nodes`, in the same 0..1 units as `at`, ascending, and they are
+    the game's own scoring nodes (0.25, 0.5, 0.75, 0.97), not a copy that could drift."""
+    s = node_run["extract"]["state"]
+    assert "nodes" in s, _MERGE_GAP
+    nodes = s["nodes"]
+    assert nodes == sorted(nodes) and len(nodes) == 4, nodes
+    assert all(0 < u <= 1 for u in nodes), nodes
+    code = _code(_read(_game("extract")))
+    assert "var nodes = [0.25, 0.5, 0.75, 0.97];" in code
+    assert "nodes: nodes.slice()" in code, "the state must carry the scoring nodes, copied"
+
+
+def test_reduce_hands_the_stage_its_band_and_scorch(node_run):
+    """The stage could not draw Extract's stop points or Reduce's simmer band; both lanes
+    reported it at merge, 2026-10-02. Reduce's state was `{level, line, heat}`, so the pan showed
+    the level falling and nothing of where the heat should sit. It now carries `band` (the
+    simmer notch the score pays for) and `scorch` (where the crust penalty starts), in heat
+    units. The scorch sent is the one scored: one constant feeds the crust check, the strip's
+    hatched zone and the state."""
+    s = node_run["reduce"]["state"]
+    assert "band" in s and "scorch" in s, _MERGE_GAP
+    lo, hi = s["band"]
+    assert 0 <= lo < hi < s["scorch"] <= 1, s
+    code = _code(_read(_game("reduce")))
+    assert "heat >= SCORCH" in code, "the crust check no longer uses the scorch the stage is sent"
+    assert "A(SCORCH)" in code, "the strip's hatched scorch zone no longer uses the same constant"
+    assert "band: band.slice(), scorch: SCORCH" in code
+    assert "0.9" not in code.replace("var SCORCH = 0.9", ""), "a second copy of the scorch heat"
+
+
+def test_dry_names_the_bundle_it_hits(node_run):
+    """`hit()` had no bundle index, so the stage put each hit's glint on the bundle the LAST
+    state showed turning, which is a frame behind the press: the game calls hit() inside the
+    key press and only sends the state that says this bundle turned on the next tick, so the
+    stage marked the bundle turned before. Measured here: the turned bundle's index travels
+    with the hit as its fifth argument."""
+    r = node_run["dryIndex"]
+    assert r["target"] >= 0, "no bundle reached its band in fourteen seconds"
+    assert r["calls"], "turning a bundle in its band reported nothing"
+    kind, *args = r["calls"][0]
+    assert kind == "hit", r
+    assert args[-1] == r["target"], f"the hit named bundle {args[-1]}, the player turned {r['target']}"
+
+
+def test_the_frame_forwards_the_index_and_keeps_the_old_call():
+    """The frame passes a game's index to `stage.hit(s, index)` / `stage.miss(index)`, and when
+    a game sends none it makes the old one-argument call, so a stage or fake built against the
+    first contract sees exactly what it always did."""
+    code = _code(_read(FRAME))
+    assert "hit: function (strength, x, y, kind, index)" in code
+    assert 'if (typeof index === "number") r.stage.hit(s, index); else r.stage.hit(s);' in code
+    assert "miss: function (index)" in code
+    assert 'if (typeof index === "number") r.stage.miss(index); else r.stage.miss();' in code
+    dry = _code(_read(_game("dry")))
+    assert dry.count(", i);") >= 2 and "ctx.miss(i)" in dry

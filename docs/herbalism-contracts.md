@@ -310,8 +310,8 @@ BenchStage.productRect()               // -> DOMRect where the product appears, 
 BenchStage.reducedMotion(bool)         // set by D from the prefers-reduced-motion query and PGMPrefs
 ```
 
-**GameView**: `{update(state), hit(strength0to1), miss(), end()}`. The `state` for each
-method:
+**GameView**: `{update(state), hit(strength0to1, index?), miss(index?), end()}`. The `state`
+for each method:
 
 | Method | State |
 |---|---|
@@ -319,11 +319,29 @@ method:
 | mix | `{guide: [[x,y]...] in 0..1, trace: [[x,y]...], gloss: 0..1}` |
 | brew | `{heat: 0..1, band: [lo, hi], boil: bool}` |
 | dry | `{bundles: [{cure: 0..1, band: [lo, hi], turned: bool}]}` |
-| reduce | `{level: 0..1, line: 0..1, heat: 0..1}` |
-| extract | `{path: [[x,y]...], at: 0..1, pace: 0..1, nicked: bool}` |
+| reduce | `{level: 0..1, line: 0..1, heat: 0..1, band: [lo, hi], scorch: x}` |
+| extract | `{path: [[x,y]...], at: 0..1, pace: 0..1, nicked: bool, nodes: [u...]}` |
 | infuse | `{heat: 0..1, cold: x, scorch: y, fill: 0..1}` |
 | steep | `{fill: 0..1, mark: 0..1, sealing: bool, seal: 0..1}` |
 | neutralize | `{needle: -1..1, safe: [lo, hi], drops: n}` |
+
+Fields added after the lanes merged. Every one is optional: a game may leave it out, and a
+stage given the older state must draw what it can and never throw.
+
+- **extract `nodes`** (added 2026-10-02, optional): the stop points, as 0..1 positions along
+  the path in the same units as `at`. The stage draws each on the incision path by shape: an
+  open ring for one still ahead (the next one larger), a notch across the path once the knife
+  has passed it.
+- **reduce `band`** (added 2026-10-02, optional): the good simmer range `[lo, hi]`, in heat
+  units (0..1, the same scale as `heat`).
+- **reduce `scorch`** (added 2026-10-02, optional): the heat at which the crust forms, in heat
+  units. The stage shows `band` and `scorch` on a brass dial on the pan's handle: the band a
+  gold arc notched at both ends, the scorch zone hatched. Without them the dial shows the
+  game's defaults, `[0.55, 0.77]` and `0.9`, as Brew's dial does.
+- **`hit(strength, index)` and `miss(index)`** (added 2026-10-02, optional second and first
+  argument): which piece of the tool the result belongs to, for a game with several (Dry's
+  bundle, 0-based). Without it the stage falls back to its own guess, the bundle the last
+  state showed turning, which is a frame behind the press.
 
 The stage draws the game on the tool: the pestle, the needle on the pot, the bundles.
 Rendering only on demand: **no animation loop while idle** (UI plan §10).

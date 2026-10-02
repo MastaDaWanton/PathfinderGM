@@ -151,7 +151,8 @@
     mix: [["t", 0, 1, 0.5], ["gloss", 0, 1, 0.3], ["figure8", "bool"]],
     brew: [["heat", 0, 1, 0.5], ["lo", 0, 1, 0.35], ["hi", 0, 1, 0.55], ["boil", "bool"]],
     dry: [["count", 3, 5, 4, 1], ["cure", 0, 1, 0.4], ["turned", "bool"], ["lo", 0, 1, 0.6], ["hi", 0, 1, 0.8]],
-    reduce: [["level", 0, 1, 0.7], ["line", 0, 1, 0.35], ["heat", 0, 1, 0.6]],
+    reduce: [["level", 0, 1, 0.7], ["line", 0, 1, 0.35], ["heat", 0, 1, 0.6], ["lo", 0, 1, 0.55], ["hi", 0, 1, 0.77],
+             ["scorch", 0, 1, 0.9]],
     extract: [["at", 0, 1, 0.4], ["pace", 0, 1, 0.5], ["nicked", "bool"]],
     infuse: [["heat", 0, 1, 0.5], ["cold", 0, 1, 0.3], ["scorch", 0, 1, 0.75], ["fill", 0, 1, 0.5]],
     steep: [["fill", 0, 1, 0.4], ["mark", 0, 1, 0.75], ["sealing", "bool"], ["seal", 0, 1, 0]],
@@ -167,6 +168,7 @@
     return g;
   }
   var PATH = [[0.1, 0.55], [0.3, 0.42], [0.5, 0.5], [0.7, 0.4], [0.9, 0.5]];
+  var NODES = [0.25, 0.5, 0.75, 0.97];   // the Extract game's own stop points
   function state(m, v) {
     if (m === "grind") return { ring: v.ring, struck: !!v.struck };
     if (m === "mix") {
@@ -180,8 +182,8 @@
       for (var k = 0; k < v.count; k++) b.push({ cure: Math.min(1, v.cure + k * 0.12), band: [v.lo, v.hi], turned: k === 0 && !!v.turned });
       return { bundles: b };
     }
-    if (m === "reduce") return { level: v.level, line: v.line, heat: v.heat };
-    if (m === "extract") return { path: PATH, at: v.at, pace: v.pace, nicked: !!v.nicked };
+    if (m === "reduce") return { level: v.level, line: v.line, heat: v.heat, band: [v.lo, v.hi], scorch: v.scorch };
+    if (m === "extract") return { path: PATH, at: v.at, pace: v.pace, nicked: !!v.nicked, nodes: NODES };
     if (m === "infuse") return { heat: v.heat, cold: v.cold, scorch: v.scorch, fill: v.fill };
     if (m === "steep") return { fill: v.fill, mark: v.mark, sealing: !!v.sealing, seal: v.seal };
     return { needle: v.needle, safe: [v.lo, v.hi], drops: v.drops };

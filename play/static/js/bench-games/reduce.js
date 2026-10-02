@@ -13,6 +13,10 @@
 //     the fire's response halved, the line's window x1.6. The level still falls at the
 //     same pace, so the game keeps its length.
 //
+// State for the stage: {level, line, heat, band, scorch}. `band` (the simmer notch) and
+// `scorch` (where the crust zone starts), both in heat units, were added 2026-10-02 so the
+// stage's dial can show where the heat should sit; before them it showed only the level.
+//
 // Scoring: 55% for the simmer (time in the notch against the expected cooking time, capped
 // at 1), 45% for the pull (1 inside the line's window, falling with distance), less a
 // crust penalty for time spent in the scorch zone. Pulled too early still pays the simmer
@@ -36,6 +40,7 @@
       var line = 0.3;
       var centre = 0.66, half = k.clamp(0.11 * ctx.win, 0.08, 0.2);
       var band = [centre - half, Math.min(0.88, centre + half)];
+      var SCORCH = 0.9;                                           // heat at which the crust forms
       var tol = 0.05 * ctx.win;
       var cook = 0.85 * ctx.seconds / ctx.baseSpeed;              // expected time to the line
       var rate = (1 - line) / (centre * cook);
@@ -68,7 +73,7 @@
           level = Math.max(0, level - rate * heat * dt);
           var inBand = heat >= band[0] && heat <= band[1];
           if (inBand) simmer += dt;
-          if (heat >= 0.9) crust += dt;
+          if (heat >= SCORCH) crust += dt;
           if (t - lastEvt > 0.4 && inBand !== wasIn) {
             if (inBand) ctx.hit(0.4, 150, 60, "steam"); else ctx.miss();
             lastEvt = t;
@@ -95,7 +100,7 @@
           delete holders[key]; sync();
           return true;
         },
-        state: function () { return { level: level, line: line, heat: heat }; },
+        state: function () { return { level: level, line: line, heat: heat, band: band.slice(), scorch: SCORCH }; },
         score: function () {
           return k.clamp(0.55 * Math.min(1, simmer / cook) + 0.45 * pullQ - 0.25 * crust, 0, 1);
         },
@@ -132,7 +137,7 @@
           g.save(); g.strokeStyle = C.edge; g.lineWidth = 1.5;
           g.beginPath(); g.arc(cx, cy, R, Math.PI, 2 * Math.PI); g.stroke(); g.restore();
           k.dialBand(g, cx, cy, R - 12, R, A(band[0]), A(band[1]), C.goldDim, { gap: 4, notches: true, notchColour: C.gold });
-          k.dialBand(g, cx, cy, R - 12, R, A(0.9), A(1), C.alarm, { cross: true, jagged: true, gap: 4 });
+          k.dialBand(g, cx, cy, R - 12, R, A(SCORCH), A(1), C.alarm, { cross: true, jagged: true, gap: 4 });
           var a = A(heat), px = cx + Math.cos(a) * (R - 4), py = cy + Math.sin(a) * (R - 4);
           g.save(); g.strokeStyle = C.ink; g.lineWidth = 2;
           g.beginPath(); g.moveTo(cx, cy); g.lineTo(px, py); g.stroke(); g.restore();
