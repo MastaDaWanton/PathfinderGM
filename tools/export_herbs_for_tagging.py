@@ -11,7 +11,18 @@ that asks for the tags back as JSON keyed by id. Nothing here decides anything. 
 model's answer comes back through `tools/apply_herb_tags.py`, which validates it
 against the real ids before it touches the content.
 
-    python tools/export_herbs_for_tagging.py
+The herbalism revamp (2026-10-02) added a second set of tags: `part`, a `route` on every
+structured effect, `hybrid`, `base_for`, `solvent` and `neutralizer`
+(docs/herbalism-contracts.md section 2). The shipped corpus carries all of them already,
+tagged by hand, so the export shows the current values beside each entry and the prompt
+asks only for corrections. `apply_herb_tags.py` reads the six preparation flags and
+nothing else; a corrected part or route goes into the corpus by hand, and
+`tests/test_ingredient_tags.py` validates it there.
+
+Run it against a scratch data directory, or a homebrew herb from your own data lands in
+the docs:
+
+    PATHFINDER_GM_DATA=<scratch dir> python tools/export_herbs_for_tagging.py
 """
 from __future__ import annotations
 
@@ -69,8 +80,45 @@ Rules for your answer:
 * `kind` is a strong hint for `animal` — "monster part" is almost always yes — but read
   the text, because a few are plants growing on creatures.
 
+Each ingredient also already carries the herbalism tags below, shown as its current
+values. Check them against the text and propose a change only where the text disagrees.
+
+  part         What of it is used. One of: leaf, flower, root, bark, berry, seed, sap,
+               resin, fungus, gland, organ, bone, horn, feather, scale, eye, shell, oil,
+               wax, mineral, liquid. Read it off the text ("the bark", "the sap", "the
+               root"). If the text never says, leave the default: leaf for a herb,
+               organ for a monster part, fungus for a fungus.
+
+  route        On each effect: how that effect reaches the body. One of:
+                 ingest    eaten, drunk, chewed, a tea, a pill
+                 skin      rubbed on, a salve, a lotion, a worn patch
+                 eyes      dropped in or smeared on the eyes or eyelids
+                 wound     bound on, packed into or washed over a wound
+                 inhale    smoked, snorted, breathed as incense or vapour
+                 external  the effect reaches OUTSIDE the body or changes what
+                           others perceive: invisibility, light, flight, charming
+                           another, a cloud over an area, a coating on a blade or
+                           arrow that acts on a target, incorporeality, a ward
+                           on a place or an object
+               An effect on or in the taker's own body is never external, even when it
+               is magical: seeing the invisible through an eye salve is `eyes`, an
+               immunity swallowed is `ingest`, fire resistance rubbed on is `skin`.
+
+  hybrid       true when any effect is magical: planar flora, every monster part,
+               anything supernatural. A hybrid appears on both the herbalist's and the
+               alchemist's shelves. Every `external` effect should be on a hybrid,
+               unless it is plainly not herbalism at all (a glue, an ink, a blade poison).
+
+  base_for     ["salve"] for every bark, sap and resin: ground bark and tree sap
+               thicken a salve. Otherwise [].
+
+  solvent, neutralizer   Leave these alone. Only the bench's reagents (oil, spirits,
+               vinegar, lime, charcoal, clay) carry them, and those live on the
+               materials shelf, not in this list.
+
 Answer with JSON only, in exactly this shape, one object per ingredient you are
-changing from the defaults. Omit any ingredient you are leaving alone:
+changing from the defaults or from its current tags. Omit any ingredient you are
+leaving alone. Give `routes` as a full list, one per effect, in the order shown:
 
 {
   "adder-s-tongue": {
@@ -80,7 +128,11 @@ changing from the defaults. Omit any ingredient you are leaving alone:
     "mix_raw": false,
     "brew_raw": true,
     "animal": false,
-    "why": {"volatile": "the sap blisters skin", "mix_raw": "inert until crushed"}
+    "part": "leaf",
+    "routes": ["wound"],
+    "hybrid": false,
+    "why": {"volatile": "the sap blisters skin", "mix_raw": "inert until crushed",
+            "routes": "the ointment is laid on the wound"}
   }
 }
 
@@ -104,7 +156,14 @@ def main() -> int:
             "description": " ".join(str(getattr(item, "text", "") or "").split()),
             "harvesting": " ".join(
                 str(getattr(item, "harvesting", "") or "").split()),
-            "effects": list(getattr(item, "lines", []) or []),
+            # Each card line with its route. A line the extractor could not structure
+            # has no effect behind it and so no route; it is shown with null rather than
+            # dropped, because the model should still read what it says.
+            "effects": [{"line": line, "route": ing.route_of(spec) if spec else None}
+                        for line, spec in item.pairs],
+            "part": item.part,
+            "hybrid": item.hybrid,
+            "base_for": list(item.base_for),
         })
 
     data = OUT / "herbs-for-tagging.json"
@@ -117,7 +176,9 @@ def main() -> int:
              "model is in `docs/herb-tagging-prompt.md`; the machine-readable corpus "
              "is `docs/herbs-for-tagging.json`.", ""]
     for r in rows:
-        lines.append(f"## {r['name']}  \n`{r['id']}` · {r['kind']} · {r['tier']}")
+        tags = f"{r['part']}" + (" · hybrid" if r["hybrid"] else "") + (
+            f" · base for {', '.join(r['base_for'])}" if r["base_for"] else "")
+        lines.append(f"## {r['name']}  \n`{r['id']}` · {r['kind']} · {r['tier']} · {tags}")
         if r["description"]:
             lines.append("")
             lines.append(r["description"])
@@ -126,7 +187,9 @@ def main() -> int:
             lines.append(f"**Harvesting.** {r['harvesting']}")
         if r["effects"]:
             lines.append("")
-            lines.append("**Effects.** " + "; ".join(r["effects"]))
+            lines.append("**Effects.** " + "; ".join(
+                f"{e['line']} ({e['route']})" if e["route"] else e["line"]
+                for e in r["effects"]))
         lines.append("")
     (OUT / "herbs.md").write_text("\n".join(lines), encoding="utf-8")
 
