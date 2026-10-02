@@ -351,7 +351,7 @@ def bench_roll(request):
         got = worldclass.award_step(track, progress, method=plan.method,
                          ingredient_id=lead.ingredient_id if lead else "",
                          rarity_rank=plan.rank_in, quality_index=0, success=False,
-                         name=plan.name)
+                         name=crafting._lead_name(lead) if lead else "")
         out["mastery"] = {"lines": list(got.get("reasons") or []),
                           "total": got.get("total", progress.mp),
                           "level": got.get("level", progress.level),
@@ -428,7 +428,7 @@ def bench_finish(request):
     got = worldclass.award_step(track, progress, method=plan.method,
                      ingredient_id=lead.ingredient_id if lead else "",
                      rarity_rank=plan.rank_in, quality_index=tier, success=True,
-                     name=plan.name)
+                     name=crafting._lead_name(lead) if lead else "")
     lines += list(got.get("reasons") or [])
     levelled += list(got.get("levelled") or [])
 

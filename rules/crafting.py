@@ -1546,7 +1546,7 @@ class Material:
     part: str
     tier: str
     count: int
-    state: str = "raw"
+    state: str | None = "raw"
     form: str | None = None
     quality: int | None = None
     crafted: bool = False
@@ -1833,7 +1833,7 @@ def satchel(actor, now_minute: int | None = None,
             key=key, name=item.name, ingredient_id=lead,
             kind=(lead_ing.kind if lead_ing is not None else str(item.kind or "crafted")),
             part=(part_of(lead_ing) if lead_ing is not None else "liquid"),
-            tier=item.tier, count=count, state=item.state or "raw", form=item.form,
+            tier=item.tier, count=count, state=item.state, form=item.form,
             quality=item.quality, crafted=True, stock=item,
             spoils_in=spoils_in, spoiled=spoiled, ready_minute=item.ready_minute,
             old=old, worked=list(item.worked),
@@ -2268,18 +2268,19 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
             plan.state = lead.state if lead.form == "powder" else "dried"
         elif method == "reduce":
             plan.form = lead.form if lead.form in _LIQUID_PRODUCTS else "reduction"
-            plan.state = lead.state
+            # A liquid has no ingredient state; the five states are a solid's.
+            plan.state = None
         elif method == "extract":
             plan.form, plan.state = "extract", "extracted"
         elif method == "brew":
             plan.form = rules["methods"]["brew_product_by_part"].get(part, "decoction")
-            plan.state = lead.state
+            plan.state = None
         elif method == "infuse":
-            plan.form, plan.state = "infused-oil", lead.state
+            plan.form, plan.state = "infused-oil", None
         elif method == "steep":
             solvent = next(m.solvent for m, _ in reagents if m.reagent == "solvent")
             plan.form = "tincture" if solvent == "alcohol" else "acetum"
-            plan.state = lead.state
+            plan.state = None
             plan.ready_minutes = int(row.get("ready_minutes", {}).get(plan.form, 0))
         elif method == "neutralize":
             plan.form, plan.state = lead.form, "neutralised"
@@ -2311,7 +2312,7 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
                                  "one.")
             return plan
         plan.doses = batch
-        plan.state = "ground" if plan.form == "poultice" else None
+        plan.state = None
         for m, n in picks:
             take(m, n * batch)
         carried = list(picks)
