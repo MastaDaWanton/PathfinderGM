@@ -4,9 +4,9 @@ The report was that "legendary catalysts are generally unattainable". Measured a
 the shipped content, they were not merely rare — they were impossible, for four separate
 reasons stacked on the same door:
 
-  1. The gate was circular. Herbalist 5 waits on the deed `legendary-catalyst`, but
-     `catalyst crafting` is a Level 5 method and legendary is Level 5 material. Brute
-     forced over every method permutation an Herbalist 1-4 knows against all four
+  1. The gate was circular. Herbalist 5 waited on the deed `legendary-catalyst`, but
+     `catalyst crafting` was a Level 5 method and legendary was Level 5 material. Brute
+     forced over every method permutation an Herbalist 1-4 knew against all four
      legendary ingredients: 0 legal chains. The deed needed the level it was gating.
 
   2. The bench never recorded a deed. `craft_do` sent no `milestone` param at all, so
@@ -23,23 +23,36 @@ reasons stacked on the same door:
      and lost both of its exotic herbs and six of its seven rare ones while keeping all
      88 commons: 0% of the richest biome's table was rank 3 or better.
 
-What was *not* fixed, and is recorded here so the next person does not rediscover it:
-three of the four legendary ingredients are monster parts, and nothing in the app can
-put a monster part in a satchel — `Actor.carry` has exactly one caller, `_op_forage`,
-and foraging filters on `forageable`. See the last test in this file.
+**Retired 2026-10-02.** The owner's herbalism ruling removed catalyst crafting, distill,
+the old levels 4 and 5, the `legendary-catalyst` milestone and its deed
+(docs/herbalism-revamp-plan.md §4.1). Legendary material now opens at Herbalist 3, the
+last unlock level, and every level after it is an endless level bought with mastery
+alone. What each defect becomes:
+
+  1 and 2 are re-pinned as "no Herbalist level waits on a deed" and "every level lands
+  on mastery alone", including the owner's own save that sat at 110 of 100 MP.
+
+  3 is re-pinned through the engine against the new level-3 gate. The tests that drove
+  it through the old bench's distill chain (/api/craft/preview and /api/craft/do) are
+  deleted: distill is gone, and the bench and its concentration ladder belong to the
+  bench-engine lane, which re-pins the ceiling against the new bench.
+
+  The old concentration-DC test is deleted for the same reason: it pinned
+  `crafting._dc`'s retired ×2 ladder, which the bench-engine lane replaces with the
+  n(n+1) curve of plan §5.3 and pins in its own tests.
+
+  4 is untouched: the forage table never depended on the Herbalist's levels.
 """
 from __future__ import annotations
-
-import itertools
-import json
 
 import pytest
 from django.test import Client, override_settings
 
-from rules import crafting, foraging, ingredients
+from rules import foraging, ingredients
 from rules import worldclass as wc
-from rules.crafting import Chain
+from rules.bestiary import instantiate
 from rules.dice import Dice
+from rules.engine import Engine, Scene
 from rules.intents import IntentError
 from rules.sheet import load_pc
 from tests._places import stand_on
@@ -61,215 +74,97 @@ def client(tmp_path):
         cm._LIVE.clear()
 
 
-def _exotic(count: int = 4):
-    """A crafted exotic dose — the rung the ladder reaches legendary from."""
-    return crafting.Stock(base="Ice Lotus Tincture", concentration=1, tier="exotic",
-                          potency=1.0, count=count, craft="herbalist")
+def _engine_at(level: int) -> Engine:
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.track("herbalist").level = level
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(pc)
+    scene.add(instantiate("thug", scene=scene, name="the thug"))
+    return Engine(scene, Dice(seed=42))
 
 
-# --- 1. the circular gate ----------------------------------------------------------------
+# --- 1 and 2. the circular gate, and the deed nobody recorded ------------------------------
 
-def test_the_deed_that_unlocks_the_top_needed_the_level_it_was_gating(herbalist):
-    """Both halves of the circle, stated as the data still states them: `catalyst
-    crafting` is learned at 5 and legendary material is workable at 5, while level 5
-    waits on a legendary catalyst. Brute forced over every ordered method combination up
-    to length two that an Herbalist 1-4 knows, plus `catalyst crafting`, against all four
-    legendary ingredients: 0 legal chains of 0 attempted openings."""
-    assert herbalist.milestones == {5: "legendary-catalyst"}
-    assert next(l.level for l in herbalist.levels
-                if "catalyst crafting" in l.methods) == 5
-    assert next(l.level for l in sorted(herbalist.levels, key=lambda x: x.level)
-                if wc.tier_rank(l.max_tier) >= 5) == 5
-
-    shelf = ingredients.all_ingredients()
-    legendary = [i for i in shelf.values() if i.rank == 5]
-    assert len(legendary) == 4
-
-    satchel = {i.id: 9 for i in shelf.values()}
-    legal = 0
-    for level in (1, 2, 3, 4):
-        methods = herbalist.unlocked_methods(level) + ["catalyst crafting"]
-        for combo in itertools.permutations(methods, 2):
-            if "catalyst crafting" not in combo:
-                continue
-            for ing in legendary:
-                r = crafting.preview("herbalist", level,
-                                     Chain("herbalist", list(combo), [ing.id]),
-                                     stock={}, satchel=satchel)
-                legal += not r.problems
-    assert legal == 0
+def test_no_herbalist_level_waits_on_a_deed(herbalist):
+    """The circle was a level waiting on a deed that needed that level, and the bench
+    never recorded the deed anyway: 0 legal chains of every opening an Herbalist 1-4 had,
+    and a level that stayed locked whatever the character did. The ruling removed the
+    deed, so the pin is that none comes back: no milestone, no deed, and nothing for
+    `deed_done` to name that a bench could fail to record."""
+    assert herbalist.milestones == {}
+    assert herbalist.deeds == {}
+    assert herbalist.deed_done(tier="legendary", success=True) == ""
 
 
-def test_the_track_now_says_what_the_deed_actually_is(herbalist):
-    """A milestone that names a deed the engine cannot recognise is a level that never
-    lands. The track declares it, because nothing else can know: any successful craft at
-    legendary tier is the grand catalyst."""
-    assert herbalist.deeds["legendary-catalyst"]["min_tier"] == "legendary"
-    assert herbalist.deed_done(tier="legendary", success=True) == "legendary-catalyst"
-    assert herbalist.deed_done(tier="exotic", success=True) == ""
-    assert herbalist.deed_done(tier="legendary", success=False) == ""
+def test_legendary_material_opens_at_the_last_unlock_level(herbalist):
+    """The other half of the circle: legendary material was gated behind the very level
+    whose deed demanded it. Now the level that opens legendary is the last written level,
+    reached by points, with nothing after it gating anything."""
+    opens = next(row.level for row in sorted(herbalist.levels, key=lambda r: r.level)
+                 if wc.tier_rank(row.max_tier) >= 5)
+    assert opens == 3 == herbalist.max_level
+    assert wc.tier_rank(herbalist.at(2).max_tier) == 4      # exotic at best before it
+    assert "neutralize" in herbalist.unlocked_methods(3)
+    # And it stays open: an endless level reads the last row, never a lower one.
+    assert wc.tier_rank(herbalist.at(9).max_tier) == 5
 
 
-def test_an_herbalist_four_has_a_legal_opening_on_legendary_material(herbalist):
-    """The way out of the circle, and the only one the rules already contained: two
-    exotic doses concentrate into one legendary. Before, that chain previewed at 5% at
-    every level from 3 to 5 and the engine refused it outright; the deed was reachable
-    from nowhere."""
-    held = _exotic()
-    # A crafter, because the bonus is a check on a character now rather than a number
-    # derived from the track alone: an Herbalist 4 of 8th level with Wisdom 16 is +11.
-    crafter = load_pc("fixtures/pc-kesst.json")
-    crafter.level = 8
-    crafter.abilities["wis"] = 16
-    r = crafting.preview("herbalist", 4,
-                         Chain("herbalist", ["distill"], stock_used={held.id: 2}),
-                         stock={held.id: held}, satchel={}, carrier=crafter)
-    assert not r.problems
-    assert r.tier == "legendary" and r.concentrating
-    assert r.bonus == 11 and r.chance == 10
+def test_every_level_lands_on_mastery_alone(herbalist):
+    """Steps alone, common material, no deed: from Herbalist 1 to 6 with never a moment
+    where the banked mastery covers the price and the level does not move. That moment
+    was the whole defect, seen in the owner's save as a full bar going nowhere."""
+    p = wc.Progress(track="herbalist", schema=wc.HERBALISM_SCHEMA)
+    n = 0
+    while p.level < 6:
+        n += 1
+        assert n < 2000, f"stalled at Herbalist {p.level} with {p.mp} MP"
+        # A fresh ingredient each time, so the repeat limit never zeroes the step.
+        wc.award_step(herbalist, p, method="grind", ingredient_id=f"herb-{n}",
+                      rarity_rank=1, quality_index=2)
+        need = herbalist.to_next(p.level)
+        assert p.mp < need, (p.level, p.mp, need)
+    assert p.level == 6
 
 
-# --- 2. the DC that pinned the top rung to the floor -------------------------------------
+def test_the_save_that_sat_at_110_of_100_now_levels(herbalist):
+    """Found in the owner's own live save: Herbalist 4 at 110 MP of a 100 MP threshold,
+    `to_next.need` 0, bar drawn full, level not moving, waiting on `legendary-catalyst`.
+    Migrated, level 4 is an endless level costing 60 with no deed, so the next step it
+    earns lands Herbalist 5 and the rest of the 110 carries over."""
+    p = wc.Progress(track="herbalist", level=4, mp=110)
+    assert wc.migrate(p)
+    assert p.level == 4 and p.mp == 110                      # migration moves nothing
+    assert wc._remaining(herbalist, p)["milestone"] is None
 
-def test_the_ladders_top_rung_was_a_five_percent_floor_at_every_level():
-    """`_concentration` open-coded `10 + 5 * rank` where `_dc` reads `5 + 5 * rank` —
-    two copies of one rule, five apart, and the five bit at exactly one place. A
-    crafter's bonus was `3 * level` then, so at Herbalist 5 it was +15 and DC 35 needed a
-    20 on the d20. The last step of the ladder read 5% at Herbalist 3, 4 and 5 alike,
-    while each attempt ate two doses.
-
-    The DC is the part this test is about and it has not moved. The bonus since became a
-    real check — d20 + track level + half character level + Wisdom — so the percentages
-    are quoted against a stated bonus rather than derived from the level alone.
-    """
-    assert crafting._dc([], 5, 1) == 30                    # was 35
-    assert crafting._chance(30, 12) == 15                  # a bonus of +12 makes it 15%
-    assert crafting._chance(30, 15) == 30                  # +15, as the old formula gave
-    # The rungs below it kept their shape: still a ladder, not a lift.
-    assert crafting._chance(crafting._dc([], 4, 1), 12) == 40
-    assert crafting._chance(crafting._dc([], 3, 1), 12) == 65
+    got = wc.award_step(herbalist, p, method="dry", ingredient_id="comfrey",
+                        rarity_rank=1, quality_index=2)
+    assert got["levelled"] == [5]
+    assert p.mp == 110 + 1 - 60
 
 
-def test_the_ceiling_still_gates_the_ladder(herbalist):
-    """Opening the top rung must not open it to everyone. An Herbalist 3 works rare at
-    best, so the exotic pair is refused before the roll is ever offered."""
-    held = _exotic()
-    r = crafting.preview("herbalist", 3,
-                         Chain("herbalist", ["distill"], stock_used={held.id: 2}),
-                         stock={held.id: held}, satchel={})
-    assert r.problems and r.chance == 0
-    assert any("works rare / magical at best" in p for p in r.problems)
+# --- 3. the ceiling, one copy, through the engine -------------------------------------------
+
+def test_a_narrated_legendary_craft_is_refused_below_herbalist_3():
+    """The engine's copy of the ceiling against the new gate. A GM narrating "she brews
+    something legendary" at Herbalist 2 is refused with the level that allows it, because
+    scoring it would let a track level itself on work it has neither the tools nor the
+    methods to attempt. Before the ruling the refusal named Herbalist 5."""
+    with pytest.raises(IntentError, match="Reach Herbalist 3"):
+        _engine_at(2).validate([{"op": "craft", "actor": "pc",
+                                 "params": {"track": "herbalist", "recipe": "a grand elixir",
+                                            "tier": "legendary"}}])
 
 
-# --- 3. the two copies of the ceiling rule ------------------------------------------------
-
-def test_the_preview_and_the_post_agree_about_the_ceiling(client):
-    """The disagreement was visible in the running app: /api/craft/preview returned 200
-    with `tier: legendary, chance: 5%, problems: []` and /api/craft/do answered 400
-    "Reach Herbalist 5 first" on the byte-identical body. The ceiling governs the
-    material worked, not the band the result lands in."""
-    from play import campaign as cm
-
-    c = cm.current()
-    pc = c.scene.pc()
-    pc.track("herbalist").level = 4
-    pc.add_stock(_exotic(count=1), count=4)
-    c.save()
-
-    body = json.dumps({"craft": "herbalism", "methods": ["distill"],
-                       "ingredients": [], "stock": {_exotic().id: 2}})
-    preview = client.post("/api/craft/preview", data=body,
-                          content_type="application/json")
-    assert preview.status_code == 200
-    d = preview.json()
-    assert d["tier"] == "legendary" and d["concentrating"] and not d["problems"]
-
-    done = client.post("/api/craft/do", data=body, content_type="application/json")
-    assert done.status_code == 200, done.json()
-
-
-def test_a_narrated_craft_still_cannot_exceed_the_ceiling(client):
-    """The loosening is for concentration alone. A GM narrating "she brews something
-    legendary" at Herbalist 4 is still refused, because scoring it would let a track
-    level itself on work it has neither the tools nor the methods to attempt."""
-    from play import campaign as cm
-
-    engine = cm.current().engine()
-    with pytest.raises(IntentError, match="Reach Herbalist 5"):
-        engine.validate([{"op": "craft", "actor": "pc",
-                          "params": {"track": "herbalist", "recipe": "a grand elixir",
-                                     "tier": "legendary"}}])
-
-
-# --- 4. the bench never recorded the deed --------------------------------------------------
-
-def test_the_bench_records_the_deed_and_the_level_lands(client):
-    """`craft_do` sent no `milestone` param at all, so the deed could be done and the
-    level stayed locked: the mastery was kept, `to_next` went on naming a milestone that
-    nothing could ever satisfy, and the page had no way to say so."""
-    from play import campaign as cm
-
-    c = cm.current()
-    pc = c.scene.pc()
-    progress = pc.track("herbalist")
-    progress.level, progress.mp = 4, 500
-    # 100 doses is 50 attempts at 15%, so the dice fail to land it once in 3,000 runs.
-    # Twenty attempts flaked one run in twenty-five, which is a test nobody would trust.
-    pc.add_stock(_exotic(count=1), count=100)
-    c.save()
-
-    body = json.dumps({"craft": "herbalism", "methods": ["distill"],
-                       "ingredients": [], "stock": {_exotic().id: 2}})
-    for _ in range(50):
-        d = client.post("/api/craft/do", data=body,
-                        content_type="application/json").json()
-        if d.get("succeeded"):
-            break
-        if not cm.current().scene.pc().stock.get(_exotic().id):
-            pytest.skip("the dice never landed the 15%; the path is the point")
-
-    progress = cm.current().scene.pc().track("herbalist")
-    assert "legendary-catalyst" in progress.milestones
-    # The deed lands the level; the track no longer stops there.
-    assert progress.level >= 5
-    assert "catalyst crafting" in wc.get("herbalist").unlocked_methods(progress.level)
-
-
-def test_the_bench_says_what_the_level_is_waiting_on(client):
-    """Found in the user's own live save: Herbalist 4 at 110 MP of a 100 MP threshold,
-    `to_next.need` 0, bar drawn full, level not moving, and nothing anywhere on the page
-    saying why. The deed was in the track state the whole time and simply was never
-    drawn — the same shape as a hidden required field killing a submit in silence."""
-    from play import campaign as cm
-
-    c = cm.current()
-    progress = c.scene.pc().track("herbalist")
-    progress.level, progress.mp = 4, 110
-    c.save()
-
-    state = client.get("/api/craft/ingredients?craft=herbalism").json()["track"]
-    assert state["to_next"] == {"need": 0, "of": 100,
-                                "milestone": "legendary-catalyst"}
-
-    page = client.get("/craft/").content.decode()
-    assert "mwaits" in page
-    assert "also waits on" in page
-
-
-def test_the_catalyst_itself_is_craftable_once_the_level_lands():
-    """The point of the whole exercise: at Herbalist 5 a chain ending in `catalyst
-    crafting` over legendary material previews clean, where at every level below it came
-    back "Catalyst Crafting is learned at Herbalist 5"."""
-    shelf = ingredients.all_ingredients()
-    satchel = {i.id: 9 for i in shelf.values()}
-    r = crafting.preview("herbalist", 5,
-                         Chain("herbalist", ["grind", "catalyst crafting"],
-                               ["phoenix-feather"]),
-                         stock={}, satchel=satchel)
-    assert not r.problems
-    assert r.tier == "legendary"
-    assert r.name.endswith("Catalyst")
-    assert r.chance > 0
+def test_an_herbalist_3_may_work_legendary_material(herbalist):
+    """The way to the top needs no concentration ladder and no monster part now: the one
+    forageable legendary herb is within an Herbalist 3's reach, and the engine accepts the
+    craft that the old track refused until a level nobody could reach."""
+    herb = ingredients.all_ingredients()["tahtoalehti"]
+    assert herb.rank == 5 and herb.forageable
+    assert herb.rank <= wc.tier_rank(herbalist.at(3).max_tier)
+    _engine_at(3).validate([{"op": "craft", "actor": "pc",
+                             "params": {"track": "herbalist", "recipe": "tahtoalehti tea",
+                                        "tier": "legendary"}}])
 
 
 # --- 5. the forage table deleted its own rare end -----------------------------------------
@@ -340,8 +235,9 @@ def test_three_of_the_four_legendary_ingredients_cannot_be_foraged():
     it, so a GM handing over a Phoenix Feather works and is now the only way to hold one.
     There is still no harvest or loot op, so killing the phoenix yourself does not.
 
-    None of which blocks the top of the track. Concentration is the way in — two exotic
-    doses distil into one legendary at Herbalist 4 — and it needs no monster part.
+    None of which blocks the top of the track. Since the 2026-10-02 ruling an Herbalist 3
+    works legendary material directly, and the one forageable legendary herb is enough:
+    `test_an_herbalist_3_may_work_legendary_material` above.
     """
     shelf = ingredients.all_ingredients()
     stranded = [i for i in shelf.values() if i.rank == 5 and not i.forageable]
@@ -368,25 +264,3 @@ def test_a_gm_can_hand_over_a_legendary_monster_part(client):
         "op": "give", "actor": "c1", "because": "the trader hands it over",
         "params": {"to": "pc", "item": "Phoenix Feather", "count": 1}}]))
     assert scene.pc().inventory.get("phoenix-feather") == 1
-
-
-def test_the_way_to_the_top_needs_no_monster_part_at_all(herbalist):
-    """The practical route, end to end: an exotic jar is within an Herbalist 4's ceiling,
-    two of its doses concentrate to legendary, and a legendary success is the deed.
-
-    Worth pinning because the obvious reading of "legendary catalyst" is that you need
-    legendary material, and three of the four legendary ingredients cannot be foraged.
-    They are not the way in.
-    """
-    held = _exotic()
-    r = crafting.preview("herbalist", 4,
-                         Chain("herbalist", ["distill"], stock_used={held.id: 2}),
-                         stock={held.id: held}, satchel={})
-    assert not r.problems and r.tier == "legendary"
-    assert herbalist.deed_done(tier=r.tier, success=True) == "legendary-catalyst"
-    # And raw legendary material is still correctly out of reach at that level: the
-    # ceiling is what makes concentration the interesting move rather than a workaround.
-    raw = crafting.preview("herbalist", 4,
-                           Chain("herbalist", ["grind"], ["phoenix-feather"]),
-                           stock={}, satchel={"phoenix-feather": 1})
-    assert any("Herbalist 4 works exotic" in p for p in raw.problems), raw.problems

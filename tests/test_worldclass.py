@@ -10,6 +10,12 @@ pacing targets and their own award table disagreed: a qualifying level-1 craft i
 about 5 MP, so 10 MP to reach level 2 is two crafts against a stated target of 3-5, and
 25 MP to reach level 3 is under three against a target of 6-8. The top two were already
 right and are untouched.
+
+Since the herbalism revamp (owner's ruling 2026-10-02) the Herbalist has three unlock
+levels and endless perk levels after them, and its bench scores each step through
+`award_step`; tests/test_herbalist_endless.py holds those. The per-recipe `award` tests
+below run on the Alchemist, which still uses it with the five-level table they were
+written against, so they keep pinning what they always pinned.
 """
 from __future__ import annotations
 
@@ -29,6 +35,13 @@ def herbalist():
 
 
 @pytest.fixture
+def per_recipe():
+    """A track still scored per recipe by `award`, with the 25/65/50/100 table and a
+    deed at 5. The Herbalist was this until 2026-10-02."""
+    return wc.get("alchemist")
+
+
+@pytest.fixture
 def pc():
     return load_pc("fixtures/pc-kesst.json")
 
@@ -44,15 +57,17 @@ def engine(pc):
 # --- the track ---------------------------------------------------------------------------
 
 def test_the_herbalist_loads(herbalist):
-    assert herbalist.max_level == 5
+    """Three unlock levels since the 2026-10-02 ruling; the still left with distill."""
+    assert herbalist.max_level == 3
     assert herbalist.at(1).methods == ["grind", "mix", "brew"]
-    assert "alchemical still" in herbalist.at(3).tools
+    assert "drying rack" in herbalist.at(2).tools
+    assert "alchemical still" not in herbalist.unlocked_tools(9)
 
 
 def test_methods_accumulate_rather_than_being_replaced(herbalist):
-    """You do not forget how to grind when you learn to distil."""
-    assert set(herbalist.unlocked_methods(3)) == {
-        "grind", "mix", "brew", "preserve", "extract", "distill", "purify"}
+    """You do not forget how to grind when you learn to dry."""
+    assert set(herbalist.unlocked_methods(2)) == {
+        "grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep"}
     assert herbalist.unlocked_methods(1) == ["grind", "mix", "brew"]
 
 
@@ -67,141 +82,148 @@ def test_either_half_of_a_tier_name_is_understood(written, rank):
 
 # --- earning mastery ---------------------------------------------------------------------
 
-def test_a_first_craft_pays_more_than_a_repeat(herbalist):
-    p = wc.Progress(track="herbalist")
-    first = wc.award(herbalist, p, recipe_id="woundwort styptic", tier="common")
-    again = wc.award(herbalist, p, recipe_id="woundwort styptic", tier="common")
+def test_a_first_craft_pays_more_than_a_repeat(per_recipe):
+    p = wc.Progress(track="alchemist")
+    first = wc.award(per_recipe, p, recipe_id="woundwort styptic", tier="common")
+    again = wc.award(per_recipe, p, recipe_id="woundwort styptic", tier="common")
     assert first["mp"] == 3 and again["mp"] == 1
 
 
-def test_a_chain_pays_per_stage_beyond_the_first(herbalist):
+def test_a_chain_pays_per_stage_beyond_the_first(per_recipe):
     """"Multi-Stage Crafting Chain" — a single grind is not a chain. Counting the first
     stage would hand +2 to every craft in the game and re-inflate the whole curve."""
-    p = wc.Progress(track="herbalist")
-    assert wc.award(herbalist, p, recipe_id="a", tier="common", stages=1)["mp"] == 3
-    assert wc.award(herbalist, p, recipe_id="b", tier="common", stages=3)["mp"] == 3 + 4
+    p = wc.Progress(track="alchemist")
+    assert wc.award(per_recipe, p, recipe_id="a", tier="common", stages=1)["mp"] == 3
+    assert wc.award(per_recipe, p, recipe_id="b", tier="common", stages=3)["mp"] == 3 + 4
 
 
-def test_a_risky_harvest_is_worth_two(herbalist):
-    p = wc.Progress(track="herbalist", level=2)
-    got = wc.award(herbalist, p, recipe_id="trollheart tonic", tier="uncommon",
+def test_a_risky_harvest_is_worth_two(per_recipe):
+    p = wc.Progress(track="alchemist", level=2)
+    got = wc.award(per_recipe, p, recipe_id="trollheart tonic", tier="uncommon",
                    risky=True, stages=2)
     assert got["mp"] == 3 + 2 + 2
 
 
-def test_the_stated_pacing_is_what_the_thresholds_produce(herbalist):
+def test_the_stated_pacing_is_what_the_thresholds_produce(per_recipe):
     """The check that decided the numbers. A qualifying craft at each tier, repeated
     until the level turns over, must land inside the author's own stated craft counts."""
-    p = wc.Progress(track="herbalist")
+    p = wc.Progress(track="alchemist")
     crafts = 0
     while p.level == 1:
         crafts += 1
-        wc.award(herbalist, p, recipe_id=f"tea-{crafts}", tier="common", stages=2)
+        wc.award(per_recipe, p, recipe_id=f"tea-{crafts}", tier="common", stages=2)
     assert 3 <= crafts <= 5                       # author's target for level 2
 
     crafts = 0
     while p.level == 2:
         crafts += 1
-        wc.award(herbalist, p, recipe_id=f"tincture-{crafts}", tier="uncommon",
+        wc.award(per_recipe, p, recipe_id=f"tincture-{crafts}", tier="uncommon",
                  risky=True, stages=3)
     assert 6 <= crafts <= 8                       # author's target for level 3
 
     crafts = 0
     while p.level == 3:
         crafts += 1
-        wc.award(herbalist, p, recipe_id=f"elixir-{crafts}", tier="rare",
+        wc.award(per_recipe, p, recipe_id=f"elixir-{crafts}", tier="rare",
                  risky=True, stages=4)
     assert 4 <= crafts <= 5                       # author's target for level 4
 
 
-def test_trivial_recipes_stop_paying(herbalist):
+def test_trivial_recipes_stop_paying(per_recipe):
     """"Once an Herbalist reaches Level 3, Level 1 recipes no longer grant Mastery
     Points." Generalised to a gap so it keeps working at 4 and 5 without a new special
     case at each level."""
-    p = wc.Progress(track="herbalist", level=3)
-    assert wc.award(herbalist, p, recipe_id="basic tea", tier="common")["mp"] == 0
+    p = wc.Progress(track="alchemist", level=3)
+    assert wc.award(per_recipe, p, recipe_id="basic tea", tier="common")["mp"] == 0
 
-    p2 = wc.Progress(track="herbalist", level=2)
-    assert wc.award(herbalist, p2, recipe_id="basic tea", tier="common")["mp"] == 3
+    p2 = wc.Progress(track="alchemist", level=2)
+    assert wc.award(per_recipe, p2, recipe_id="basic tea", tier="common")["mp"] == 3
 
 
-def test_a_trivial_craft_still_counts_as_known(herbalist):
+def test_a_trivial_craft_still_counts_as_known(per_recipe):
     """It earns nothing and is still something you have made — otherwise it would pay the
     first-time bonus again later."""
-    p = wc.Progress(track="herbalist", level=3)
-    wc.award(herbalist, p, recipe_id="basic tea", tier="common")
+    p = wc.Progress(track="alchemist", level=3)
+    wc.award(per_recipe, p, recipe_id="basic tea", tier="common")
     assert p.knows("basic tea")
 
 
-def test_a_factory_line_stops_paying(herbalist):
+def test_a_factory_line_stops_paying(per_recipe):
     """The stated purpose of the award table is to stop players "spamming 100 basic
     health potions". Diminishing returns alone do not, because they only begin at level 3
     — at level 1 a production run of twenty-five teas is still a level."""
-    p = wc.Progress(track="herbalist")
-    earned = [wc.award(herbalist, p, recipe_id="same tea", tier="common")["mp"]
+    p = wc.Progress(track="alchemist")
+    earned = [wc.award(per_recipe, p, recipe_id="same tea", tier="common")["mp"]
               for _ in range(20)]
     assert earned[:5] == [3, 1, 1, 0, 0]
-    assert sum(earned) < herbalist.to_next(1)
+    assert sum(earned) < per_recipe.to_next(1)
     assert p.level == 1
 
 
-def test_failure_teaches_something_the_first_time_and_not_the_fifth(herbalist):
+def test_failure_teaches_something_the_first_time_and_not_the_fifth(per_recipe):
     """"Ensures failure still feels like learning." Without a limit, deliberate failure
     on cheap ingredients is free progress."""
-    p = wc.Progress(track="herbalist")
-    got = [wc.award(herbalist, p, recipe_id="hard one", tier="common",
+    p = wc.Progress(track="alchemist")
+    got = [wc.award(per_recipe, p, recipe_id="hard one", tier="common",
                     success=False)["mp"] for _ in range(5)]
     assert got == [1, 1, 0, 0, 0]
 
 
-def test_a_failed_craft_is_not_a_recipe_you_know(herbalist):
-    p = wc.Progress(track="herbalist")
-    wc.award(herbalist, p, recipe_id="hard one", tier="common", success=False)
+def test_a_failed_craft_is_not_a_recipe_you_know(per_recipe):
+    p = wc.Progress(track="alchemist")
+    wc.award(per_recipe, p, recipe_id="hard one", tier="common", success=False)
     assert not p.knows("hard one")
-    assert wc.award(herbalist, p, recipe_id="hard one", tier="common")["mp"] == 3
+    assert wc.award(per_recipe, p, recipe_id="hard one", tier="common")["mp"] == 3
 
 
 # --- levelling ----------------------------------------------------------------------------
 
-def test_mastery_is_spent_on_the_level_not_kept(herbalist):
-    p = wc.Progress(track="herbalist", mp=24)
-    got = wc.award(herbalist, p, recipe_id="one more", tier="common", stages=2)
+def test_mastery_is_spent_on_the_level_not_kept(per_recipe):
+    p = wc.Progress(track="alchemist", mp=24)
+    got = wc.award(per_recipe, p, recipe_id="one more", tier="common", stages=2)
     assert got["levelled"] == [2]
     assert p.mp == 24 + 5 - 25
 
 
-def test_the_top_level_waits_on_a_deed_as_well_as_points(herbalist):
+def test_the_top_level_waits_on_a_deed_as_well_as_points(per_recipe):
     """"Milestone-locked (Requires crafting a legendary catalyst)." The points are kept
-    rather than burned, so the level lands the moment the deed is done."""
-    p = wc.Progress(track="herbalist", level=4, mp=500)
-    wc.award(herbalist, p, recipe_id="something", tier="exotic")
+    rather than burned, so the level lands the moment the deed is done. Written for the
+    Herbalist's catalyst, which the 2026-10-02 ruling retired; the Alchemist's own deed
+    keeps the gate's mechanics pinned."""
+    deed = per_recipe.milestones[5]
+    p = wc.Progress(track="alchemist", level=4, mp=500)
+    wc.award(per_recipe, p, recipe_id="something", tier="exotic")
     assert p.level == 4
     assert p.mp >= 100
 
-    wc.award(herbalist, p, recipe_id="xian tao brew", tier="legendary",
-             milestone="legendary-catalyst")
+    wc.award(per_recipe, p, recipe_id="xian tao brew", tier="legendary",
+             milestone=deed)
     # At least 5: the deed opens the gate, and banked points now carry on past it
     # rather than piling up against a ceiling. The gate itself is the assertion above.
     assert p.level >= 5
 
 
-def test_the_track_goes_on_past_its_written_table(herbalist):
+def test_the_track_goes_on_past_its_written_table(per_recipe, herbalist):
     """Reversed on request: "uncap the level and dont increase the points required to
-    level beyond 100". The unlocks stop at 5 because that is where the track's own
-    table stops; the level does not, and everything scaling with it goes on scaling.
+    level beyond 100". The unlocks stop where the track's own table stops; the level does
+    not, and everything scaling with it goes on scaling. True of both shapes: a flat-priced
+    track and the Herbalist's endless levels.
     """
-    p = wc.Progress(track="herbalist", level=5, mp=9999)
-    wc.award(herbalist, p, recipe_id="another", tier="legendary")
-    assert p.level > 5
-    assert herbalist.to_next(5) is not None
+    for track in (per_recipe, herbalist):
+        p = wc.Progress(track=track.id, level=track.max_level, mp=9999)
+        wc.award(track, p, recipe_id="another", tier="legendary")
+        assert p.level > track.max_level, track.id
+        assert track.to_next(track.max_level) is not None
 
 
-def test_the_price_of_a_level_stops_climbing(herbalist):
+def test_the_price_of_a_level_stops_climbing(per_recipe):
     """"dont increase the points required to level beyond 100" — past the written
-    thresholds the cost is the last one, unchanged."""
-    top = herbalist.thresholds[-1]
-    assert herbalist.to_next(herbalist.max_level) == top
-    assert herbalist.to_next(herbalist.max_level + 40) == top
+    thresholds the cost is the last one, unchanged, for a track that declares no `endless`
+    pricing. (The Herbalist does: tests/test_herbalist_endless.py.)"""
+    assert not per_recipe.endless
+    top = per_recipe.thresholds[-1]
+    assert per_recipe.to_next(per_recipe.max_level) == top
+    assert per_recipe.to_next(per_recipe.max_level + 40) == top
 
 
 def test_a_track_that_wants_a_ceiling_still_gets_one(herbalist):
@@ -240,8 +262,9 @@ def test_the_engine_narrates_what_a_new_level_unlocks(engine, pc):
 
 def test_work_above_your_level_is_refused_with_the_level_that_allows_it(engine):
     """Scoring it instead would let a track level itself: mastery for work the character
-    has neither the tools nor the methods to attempt."""
-    with pytest.raises(IntentError, match="Reach Herbalist 3"):
+    has neither the tools nor the methods to attempt. Rare material opens at Herbalist 2
+    since the 2026-10-02 ruling (it was 3 on the five-level table)."""
+    with pytest.raises(IntentError, match="Reach Herbalist 2"):
         engine.validate([{"op": "craft", "actor": "pc",
                           "params": {"track": "herbalist", "recipe": "selpeme tincture",
                                      "tier": "rare"}}])
@@ -265,4 +288,5 @@ def test_progress_survives_a_save(pc):
     got = back.world_classes["herbalist"]
     assert got.level == 3 and got.mp == 12
     assert got.crafted["woundwort styptic"] == 2
+    # A retired deed in an old save is carried, not refused: nothing waits on it now.
     assert got.milestones == ["legendary-catalyst"]
