@@ -6796,7 +6796,14 @@ class Engine:
 
         nl_before = target.nonlethal
         temp_before = sum(p.amount for p in target.temp_pools)
-        healed = target.heal(amount)
+        # A non-lethal cure (a liniment, a willow-bark tea) takes off non-lethal damage
+        # and nothing else: no real hit points, no banked overflow (CRB: nonlethal damage
+        # is its own track, healed on its own).
+        if intent.params.get("nonlethal"):
+            target.heal_nonlethal(amount)
+            healed = 0
+        else:
+            healed = target.heal(amount)
         nl_healed = nl_before - target.nonlethal
         temp_banked = sum(p.amount for p in target.temp_pools) - temp_before
         # The dying stop dying when they are back above zero; nothing else clears it.

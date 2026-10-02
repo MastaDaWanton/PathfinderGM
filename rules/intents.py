@@ -276,7 +276,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
-    "heal": (("amount",), ("to",), "hidden"),
+    "heal": (("amount",), ("to", "nonlethal"), "hidden"),
     # Mending a construct, aimed by `target` (rules/repair.py, content/rules/repairs.json).
     # Not an amount op: the plan names WHAT is mended and the rule supplies the skill,
     # the DC, the time and the dice — a repaired machine's hit points are the row's,

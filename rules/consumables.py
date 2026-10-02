@@ -344,8 +344,14 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
     dice = spec.get("dice") or spec.get("amount")
 
     if kind == "heal":
-        return [{"op": "heal", "actor": target, "because": because,
-                 "params": {"amount": scale(str(dice), potency)}}]
+        # "Heals 4 non-lethal" cures the beating, not the wound. The spec says which
+        # (`lethality`, effectspec's "Heals which" field) and this branch dropped it, so
+        # all 39 non-lethal heals in the corpus restored real hit points: a liniment
+        # brought a taster at 0 back to 1 (Lane T, 2026-10-02).
+        params = {"amount": scale(str(dice), potency)}
+        if str(spec.get("lethality", "")).lower() == "nonlethal":
+            params["nonlethal"] = True
+        return [{"op": "heal", "actor": target, "because": because, "params": params}]
 
     if kind == "temp_hp":
         return [{"op": "temp_hp", "actor": target, "because": because,

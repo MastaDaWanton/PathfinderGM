@@ -65,3 +65,19 @@ def test_quality_lengthens_a_dice_duration_and_keeps_it_dice():
     assert longer == {"amount": "1d4+2", "unit": "round"}
     softer = crafting._scale_duration({"amount": "2d4", "unit": "round"}, 0.5, False)
     assert softer["amount"].startswith("2d4-")
+
+
+def test_a_non_lethal_cure_heals_non_lethal_damage_only():
+    """Lane T, 2026-10-02: the jar door dropped a heal's `lethality`, so every one of the
+    corpus's 39 "heals N non-lethal" restored REAL hit points; a liniment brought a
+    taster at 0 back to 1. A non-lethal cure takes off the beating and nothing else."""
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    engine = Engine(s, Dice(seed=2))
+    pc = s.pc()
+    pc.hp, pc.nonlethal = pc.hp_max - 6, 5
+    pc.stock["jar#1"] = Stock(base="Liniment", count=1, effects=["x"],
+                              specs=[{"type": "heal", "amount": 4, "lethality": "nonlethal"}])
+    engine.run(engine.validate([
+        {"op": "use_item", "actor": "pc", "params": {"item": "jar#1", "how": "drink"}}]))
+    assert pc.hp == pc.hp_max - 6 and pc.nonlethal == 1
