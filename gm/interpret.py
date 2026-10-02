@@ -571,6 +571,7 @@ _OP_NEEDS = {
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
     "loot": {"take", "steal"}, "cast": {"cast"},
     "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},
+    "taste": {"consume", "use"},
 }
 
 

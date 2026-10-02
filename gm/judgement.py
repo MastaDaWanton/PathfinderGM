@@ -2173,7 +2173,9 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
     pc = scene.pc()
     out = list(raw_intents)
 
-    if _EATS.search(player_text) and "eat" not in present:
+    # A taste is not a meal: "I chew a bit of the root" is `declare_taste`'s, which runs
+    # first, and a nibble of hemlock must not also reset the hunger clock.
+    if _EATS.search(player_text) and "eat" not in present and "taste" not in present:
         out.append({"op": "eat", "because": "the player said they eat"})
     # A drunk potion is `use_item`, declared before this runs; the waterskin sip is
     # for the sentence that names no jar.
@@ -4328,6 +4330,90 @@ def declare_use_item(raw_intents, player_text: str, scene) -> list:
                         "the player reached for a jar")
 
 
+# Tasting a herb to learn it (docs/herbalism-revamp-plan.md §8.2). The verb is the
+# player's own and must be followed, within a few words, by a herb they carry by name or
+# by a plant word: "I taste the hemlock", "I nibble the leaf", "I chew a bit of the root",
+# "I try a little of the woundwort". "I taste the stew" names neither and is left alone.
+_TASTES = re.compile(
+    r"\bI\s+(?:(?:carefully|cautiously|gingerly|warily|quickly|just)\s+)?"
+    r"(?P<verb>taste|nibble|sample|lick|try\s+(?:a\s+)?(?:little|bit|taste|nibble|piece|"
+    r"pinch)|chew(?:\s+on)?|bite(?:\s+into|\s+off)?)\b(?P<what>[^.!?;]{0,70})", re.I)
+# The verbs that mean tasting whatever follows. "Chew" and "bite" are also how people eat,
+# so those need a herb carried by name or a plant word before they are a taste.
+_TASTE_ONLY = re.compile(r"^(?:taste|nibble|sample)$", re.I)
+_HERB_WORDS = frozenset({
+    "herb", "herbs", "leaf", "leaves", "root", "roots", "berry", "berries", "flower",
+    "flowers", "petal", "petals", "stalk", "stem", "bark", "seed", "seeds", "sap", "resin",
+    "mushroom", "mushrooms", "cap", "fungus", "moss", "plant", "sprig", "sprigs", "bud",
+    "bulb", "nut", "shoot", "frond", "blossom", "tuber", "weed"})
+
+
+def _carried_herbs(pc) -> list:
+    from rules import herbknowledge as hk
+    from rules import ingredients as ing_mod
+
+    everything = ing_mod.all_ingredients()
+    ids = [k for k, n in (getattr(pc, "inventory", None) or {}).items() if n]
+    ids += [k for k in everything if hk.stock_of(pc, k)] if getattr(pc, "stock", None) else []
+    return [everything[k] for k in dict.fromkeys(ids) if k in everything]
+
+
+def declare_taste(raw_intents, player_text: str, scene) -> list:
+    """"I taste the hemlock" reaches the engine as the `taste` op, never as prose.
+
+    Detected in code, repaired in code (CLAUDE.md: every fix that held had this shape).
+    Without it the sentence had two readings and both were wrong: "chew" is an eating
+    word, so `inject_survival` made it a meal, and a model left alone narrates what the
+    leaf tastes of and what it does — a property the character does not know, which is
+    exactly what law 3 keeps from the narrator.
+
+    The herb is the one the words name among what the character carries; with no name,
+    a plant word ("the leaf") and exactly one herb carried is that herb. Anything else
+    goes to the engine as said, and the engine prints what is carried — a question with
+    the list in hand, never a guess at which leaf. A taste is the engine's whole act, so
+    any number the plan wrote beside it, and a meal, are dropped.
+    """
+    if not isinstance(raw_intents, list) or not player_text or scene is None:
+        return raw_intents
+    text = redact_speech(str(player_text))
+    if "?" in text:
+        return raw_intents
+    m = _TASTES.search(text)
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if not m or pc is None:
+        return raw_intents
+    what = " ".join(m.group("what").lower().split())
+    carried = _carried_herbs(pc)
+    named = next((h for h in sorted(carried, key=lambda h: -len(h.name))
+                  if re.search(rf"(?<![a-z]){re.escape(h.name.lower())}(?![a-z])", what)
+                  or re.search(rf"(?<![a-z]){re.escape(h.id.replace('-', ' '))}(?![a-z])",
+                               what)), None)
+    words = set(re.findall(r"[a-z]+", what))
+    if named is None and not (words & _HERB_WORDS):
+        # A taste of something that is not a herb by any word: the stew, the wine. A herb
+        # the corpus knows but nobody carries still goes to the engine on a plain tasting
+        # verb, so "I taste the hemlock" with none is told so rather than narrated.
+        from rules import ingredients as ing_mod
+
+        if not _TASTE_ONLY.match(m.group("verb")) or ing_mod.by_name(what) is None:
+            return raw_intents
+    if named is not None:
+        item = named.id
+    elif len(carried) == 1:
+        item = carried[0].id
+    else:
+        item = " ".join(w for w in what.split() if w not in ("the", "a", "an", "my", "some",
+                                                              "of", "little", "bit"))
+    from rules.intents import AMOUNT_OPS
+
+    kept = [r for r in raw_intents if isinstance(r, dict)
+            and str(r.get("op", "")).lower() not in AMOUNT_OPS
+            and str(r.get("op", "")).lower() not in ("eat", "taste")]
+    return kept + [{"op": "taste", "actor": pc.ref,
+                    "because": "the player tastes it to learn what it does",
+                    "params": {"item": item or what}}]
+
+
 # Walking up to somebody, in the player's own words, for the turns with no reading.
 _APPROACHES = re.compile(
     # "aprouch" is the measured line's own spelling.
@@ -5620,6 +5706,8 @@ _DECLARERS = (
     # Before survival: "I drink my healing potion" is a jar, not a waterskin, and
     # the survival injector stands down when a `use_item` is already in the list.
     ("jar", lambda raw, text, scene, world: declare_use_item(raw, text, scene)),
+    # Before survival: a nibble of a herb is a taste, never a meal.
+    ("taste", lambda raw, text, scene, world: declare_taste(raw, text, scene)),
     ("survival", lambda raw, text, scene, world: inject_survival(raw, text, scene)),
     # Before travel, and only here: `inject_travel` bows out when a travel is already
     # present, so a leaving sentence that also names new ground still gets its one
