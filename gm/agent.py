@@ -546,6 +546,9 @@ class GMAgent:
                 # Before survival: a drunk potion is the jar door, not a waterskin
                 # sip, and never a number the model wrote.
                 raw = judgement.declare_use_item(raw, player_input, self.engine.scene)
+                # A nibble of a herb is the engine's `taste`, never a meal and never the
+                # narrator's guess at what the leaf does (herbalism plan §8.2).
+                raw = judgement.declare_taste(raw, player_input, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
                 # Sale first, then goods. Selling is the more specific reading of handing
                 # something over and it is the one that pays — and the order was the other

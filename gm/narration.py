@@ -684,7 +684,7 @@ _MOVE_OPS = frozenset({"travel", "journey", "call_on"})
 # The engine ops each act is resolved by. When one of them was refused and none resolved,
 # the beat owes the refusal, not the deed (the herbs Sam was "not carrying", turn 4).
 _ACT_OPS = {"give": ("give",), "take": ("give", "take", "loot"), "attack": ("attack",),
-            "use": ("use_item", "use_ability"), "consume": ("use_item", "eat", "drink"),
+            "use": ("use_item", "use_ability"), "consume": ("use_item", "eat", "drink", "taste"),
             "steal": ("steal",), "insult": ("provoke",)}
 _CUE_STOP = frozenset({
     "i", "me", "my", "mine", "myself", "you", "your", "he", "him", "his", "she", "her",

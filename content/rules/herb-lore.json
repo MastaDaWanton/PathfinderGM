@@ -1,0 +1,61 @@
+{
+  "_about": [
+    "How a character learns what a herb does (docs/herbalism-revamp-plan.md §8). Read by",
+    "rules/herbknowledge.py and the taste op in rules/engine.py. Words, prices and times",
+    "only: every number here is the rules' own, so no model ever authors one, and every one",
+    "can be tuned in play without a code change (the owner accepted the plan's proposed",
+    "numbers as starting values, §16).",
+    "",
+    "Prices are in copper (Core Rulebook Table 6-1: 10 cp to a silver). A lesson from a",
+    "healer is priced like a skilled hireling's hour and a library's fee like a day's",
+    "unskilled wage; both are small on purpose, because the safe routes are meant to be",
+    "the sensible ones and tasting the dangerous one (§2, Tasting)."
+  ],
+  "taste": {
+    "minutes": 1,
+    "_condition_minutes": "A raw herb's condition with no stated length lasts this long. The corpus writes 'Causes paralyzed' with no duration on 28 rows, and the condition op mints an unbounded condition when none is given; an unbounded paralysis from a nibble is a campaign the character never plays again (rules/engine.py `_op_condition`'s own note). Death and dying keep their own rules.",
+    "condition_minutes": 10,
+    "condition_no_default": ["dead", "dying"]
+  },
+  "study": {
+    "minutes": 10,
+    "_dc": "10 + 5 per rarity band (common 10, uncommon 15, rare 20, exotic 25, legendary 30): the plan's proposed DC, accepted 2026-10-02.",
+    "dc_base": 10,
+    "dc_per_band": 5,
+    "reveal_per_margin": 5,
+    "skills": ["knowledge (nature)", "profession"],
+    "_untrained_dc_cap": "CRB p.99: an untrained Knowledge check can answer nothing harder than DC 10.",
+    "untrained_dc_cap": 10
+  },
+  "teacher": {
+    "price_cp": 20,
+    "minutes": 10,
+    "_works": "Occupation ids (content/people/occupations.json) whose people know herbs, and the words in a person's name or description that say so when no record carries a trade.",
+    "works": ["healer"],
+    "words": ["herbalist", "healer", "hedge-witch", "hedge witch", "hedgewitch", "midwife",
+              "apothecary", "physician", "wise woman", "wise-woman", "cunning woman",
+              "cunning man", "herb seller", "herb-seller", "herbwife", "herb-wife",
+              "druid", "leech", "bonesetter"],
+    "_teaches": "Properties taught per lesson by attitude step (rules/attitude.py). Below indifferent they refuse in words; the confiding gate (rules/confiding.py) is the model.",
+    "teaches": {"indifferent": 1, "friendly": 2, "helpful": 2}
+  },
+  "library": {
+    "price_cp": 50,
+    "minutes": 60,
+    "_words": "A place in the settlement whose name or kind says records are kept: the settlement table's 'the library' (rules/places.py) and a temple's archive.",
+    "words": ["library", "scriptorium", "archive", "archives", "temple"],
+    "_common": "What the world writes down: the benefits of common and uncommon herbs, and the bare DCs that guard nothing. A rare herb's secrets and every drawback stay unwritten.",
+    "tiers": ["common", "uncommon"],
+    "reveals": ["benefit", "neutral"]
+  },
+  "manual": {
+    "mastery": 5
+  },
+  "homeland": {
+    "_kinds": "What a new herbalist knows from home (owner's ruling Q4): the common, forageable plants of their homeland's biomes, every property of them.",
+    "tiers": ["common"],
+    "kinds": ["herb", "fungus"],
+    "_never": "A settlement's own biome says nothing about what grows in the land around it.",
+    "never": ["urban"]
+  }
+}
