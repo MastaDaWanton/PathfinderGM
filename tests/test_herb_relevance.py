@@ -314,6 +314,55 @@ def test_the_built_ingredient_agrees_with_the_file():
         assert built[e["id"]].specs == [dict(s) for s in e.get("effects") or []], e["id"]
 
 
+def classify(spec: dict) -> str:
+    """Benefit, drawback or neutral, as the herbarium reads a property.
+
+    `rules.herbknowledge.classify` is the owner of this question (Lane C of the revamp);
+    it is asked when it exists. Until that lane lands, the same rule is applied here, in
+    its words: a bare save gate is neutral, harm or a penalty is a drawback, anything
+    else is a benefit."""
+    from rules import herbknowledge
+
+    owner = getattr(herbknowledge, "classify", None)
+    if owner is not None:
+        return owner(spec)
+    kind = str(spec.get("type", ""))
+    if kind == "save_gate":
+        return "drawback" if consumables.hurts(spec) else "neutral"
+    if kind in ("vulnerability", "ability_drain", "bleed") or consumables.hurts(spec):
+        return "drawback"
+    return "benefit"
+
+
+def traits(entry: dict) -> int:
+    """How many properties a player can discover that mean something.
+
+    One per structured effect that `classify` calls a benefit or a drawback, except that
+    a poison (its save and the harm it gates, as `consumables.poisons` groups them) is
+    one trait however many effects make it up: "DC 15 or nausea and 1d8 poison" is one
+    thing learned, not three."""
+    specs = [dict(s) for s in entry.get("effects") or []]
+    found = consumables.poisons(specs, source=entry["name"])
+    claimed = {id(s) for p in found for s in p.effects}
+    claimed |= {id(p.gate) for p in found if p.gate is not None}
+    return len(found) + sum(1 for s in specs
+                            if id(s) not in claimed and classify(s) != "neutral")
+
+
+def test_every_herb_has_three_things_to_discover():
+    """The owner, 2026-10-02: "lets make sure every herb has at least 3 discoverable
+    traits." Tasting, study and teachers each reveal properties one at a time, and an
+    herb with one property is finished after the first taste.
+
+    Measured on ui/table-v2 before this pass: 154 of 161 entries had fewer than 3 (29
+    had none at all, 75 had one, 50 had two). Being a salve base is a role, not a
+    trait, so a base needs three too. After: 0, every one with at least one herbal-route
+    benefit among them."""
+    short = {e["id"]: traits(e) for e in _raw() if traits(e) < 3}
+    assert short == {}, f"{len(short)} herbs with fewer than 3 traits: {short}"
+    assert all(herbal_benefits(e) for e in _raw())
+
+
 def _average(dice) -> float:
     import re
 
