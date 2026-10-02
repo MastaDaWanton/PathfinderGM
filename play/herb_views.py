@@ -316,25 +316,27 @@ def herb_ask(request):
     if teacher is None:
         return JsonResponse({"error": "Nobody here by that name knows herbs."}, status=400)
     person = c.scene.actors[ref]
+    # "the herbalist" opens a sentence as "The herbalist".
+    who = person.name[:1].upper() + person.name[1:]
     rules = hk.lore()["teacher"]
     minutes = int(rules["minutes"])
     size = hk.lesson_size(person)
     if not size:
         hostile = attitude.of(person) == attitude.HOSTILE
-        said = (f"{person.name} wants nothing to do with you and will not say a word about "
+        said = (f"{who} wants nothing to do with you and will not say a word about "
                 f"{ing.name}." if hostile else
-                f"{person.name} has no wish to help you, and keeps what they know of "
+                f"{who} has no wish to help you, and keeps what they know of "
                 f"{ing.name} to themselves.")
         c.transcript.append({"who": "gm", "kind": "consequence", "text": said})
         c.save()
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})
     order = hk.lesson_order(pc, ing)[:size]
     if not order:
-        said = f"{person.name} has nothing to tell you about {ing.name} you do not know."
+        said = f"{who} has nothing to tell you about {ing.name} you do not know."
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})
     cp = int(rules["price_cp"])
     if not _pay(pc, cp):
-        said = f"{person.name} asks {_price(cp)}, and you cannot pay it."
+        said = f"{who} asks {_price(cp)}, and you cannot pay it."
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})
     person.purse = goods.credit(getattr(person, "purse", None) or {}, cp)
     c.scene.advance(minutes)
@@ -342,7 +344,7 @@ def herb_ask(request):
                      f"taught by {person.name}, day {hk.day_of(c.scene.clock_minutes)}")
     revealed = _revealed(pc, ing, keys)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
-        f"{person.name} looks over the {ing.name} and tells you: "
+        f"{who} looks over the {ing.name} and tells you: "
         + "; ".join(p["text"] for p in revealed) + f". ({_price(cp)} paid.)")})
     _log(c, "herb_taught", ing, teacher=person.name, learned=keys)
     c.save()

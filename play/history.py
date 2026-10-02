@@ -230,8 +230,9 @@ def _effect_lines(c, effect: dict, name, actor_of_intent: str) -> list[str]:
     # the rest are the herb card's rows (play/herb_views.py `_log`). A herb is a common
     # noun in a sentence, so "You tasted hemlock", not "Hemlock".
     if kind in _HERB_LINES and name(effect.get("ref")) == "you" and effect.get("name"):
-        herb = str(effect["name"])
-        herb = herb[:1].lower() + herb[1:] if not herb[1:2].isupper() else herb
+        # Lowered whole: the corpus title-cases every name ("Basilisk Eye"), and lowering
+        # only the first letter wrote "You tasted basilisk Eye." in the running page.
+        herb = str(effect["name"]).lower()
         return [_cap(_HERB_LINES[kind].format(herb=herb, **{
             k: str(effect.get(k) or "") for k in ("teacher", "place")}))]
     if kind == "manual_read" and name(effect.get("ref")) == "you" and effect.get("manual"):

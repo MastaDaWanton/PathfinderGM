@@ -293,6 +293,7 @@ def test_study_has_no_automatic_natural_twenty(camp):
     and attacks. A natural 20 short of a legendary herb's DC 30 is a miss."""
     pc = camp.scene.pc()
     pc.inventory["phoenix-feather"] = 1
+    pc.ranks.pop("appraise", None)
     pc.ranks["knowledge (nature)"] = 1
     camp.save()
     d = Client().post("/api/herb/study", data=json.dumps({"id": "phoenix-feather", "face": 20}),
@@ -306,6 +307,7 @@ def test_a_missed_study_waits_for_a_rest(camp):
     sleeping is refused; after a night it is allowed."""
     pc = camp.scene.pc()
     pc.inventory["comfrey"] = 1
+    pc.ranks.pop("appraise", None)
     pc.ranks["knowledge (nature)"] = 1
     camp.save()
     c = Client()
@@ -497,6 +499,7 @@ def test_every_endpoint_answers_its_contract(camp, monkeypatch):
     pc = camp.scene.pc()
     pc.inventory.update({"comfrey": 3, "hemlock": 1})
     pc.purse = {"gp": 5}
+    pc.ranks.pop("appraise", None)
     pc.ranks["knowledge (nature)"] = 1
     camp.save()
     c = Client()
@@ -567,6 +570,30 @@ def test_a_taste_is_history(camp):
                   content_type="application/json")
     lines = [l["text"] for d in history.history(cm.current())["days"] for l in d["lines"]]
     assert "You tasted hemlock." in lines
+
+
+def test_a_two_word_herb_reads_as_one_noun_in_history(camp):
+    """Seen in the running page: "You tasted basilisk Eye." — the first letter lowered and
+    the title-cased rest left standing."""
+    from play import history
+
+    camp.turn_log.append({"kind": "resolution", "outcomes": [{"intent_id": "i", "op": "taste",
+                          "tell": "", "effects": [{"ref": camp.scene.pc().ref, "kind": "taste",
+                                                   "name": "Basilisk Eye"}]}]})
+    lines = [l["text"] for d in history.history(camp)["days"] for l in d["lines"]]
+    assert lines == ["You tasted basilisk eye."]
+
+
+def test_a_library_is_the_settlement_tables_own():
+    """`library_here` reads the places the settlement already has (rules/places.py),
+    never mints one: Mirabalos in the shipped world has "the library"; a village with
+    none has none."""
+    from rules import places
+    from world import loader
+
+    world = loader.load_cached("fixtures/pangrella-campaign.json")
+    assert any(hk.is_library(p) for p in places.home_set(world.get("7ef5e373c993")))
+    assert not any(hk.is_library(p) for p in places.home_set(world.get("5bbd0c40345f")))
 
 
 # --- the declaration, detected in code -------------------------------------------------------

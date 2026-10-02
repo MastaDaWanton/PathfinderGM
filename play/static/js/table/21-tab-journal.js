@@ -76,7 +76,7 @@ function herbCardBody(id) {
         p.how ? `<br><span class="why">${esc(p.how)}</span>` : ""}</li>`
     : `<li><span aria-hidden="true">–</span> <span class="why">unknown</span></li>`).join("");
   return `${card.danger_known ? `<p class="why">You know this is dangerous: ${esc(card.danger_known)}.</p>` : ""}
-    <ul class="objectives">${props || `<li class="why">Nothing to know.</li>`}</ul>`;
+    <ul class="plain objectives">${props || `<li class="why">Nothing to know.</li>`}</ul>`;
 }
 
 // The engraved icon, when the bench's registry is loaded (lane D's `BenchIcons`); a herb
@@ -117,8 +117,26 @@ async function herbCardRead(id) {
   if (HERB_OPEN === id) herbariumDraw();
 }
 
+// Two columns on a desktop and one when narrow (UI plan §6.6). `.twocol` alone fits as
+// many 300px columns as it can — three at the journal's 1180px, measured in the running
+// page — so the count is pinned here. Layout only: every colour is the journal's own.
+function herbariumStyle() {
+  if (document.getElementById("jr-herbarium-style")) return;
+  const style = document.createElement("style");
+  style.id = "jr-herbarium-style";
+  style.textContent = `
+    #jr-herbarium-list .jr-herbs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 900px) {
+      #jr-herbarium-list .jr-herbs { grid-template-columns: minmax(0, 1fr); }
+    }
+    .jr-herb-tools { margin: 0 0 8px; }
+    .jr-herb-icon:empty { display: none; }`;
+  document.head.appendChild(style);
+}
+
 // Added after each draw of the journal, beside History, full width.
 function herbariumMount() {
+  herbariumStyle();
   const body = document.getElementById("sheetbody");
   const journal = body && body.querySelector(".journal");
   if (!journal || document.getElementById("jr-herbarium")) return;
