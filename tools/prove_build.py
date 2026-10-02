@@ -614,6 +614,55 @@ def static_assets(http: Http, repo: Path) -> list[str]:
     return faults
 
 
+def check_the_herbalism_bench_ships(http: Http, repo: Path) -> None:
+    """The herbalism bench in the frozen build (0.2.4, docs/herbalism-ui-plan.md §13 step 7).
+
+    Everything the bench is made of can only fail here, never in a test run against the
+    source: its scripts load through `{% asset %}` tags, which `static_assets` does not
+    read, its icons are a folder no template names one by one, and its rules are three
+    content files the spec bundles by directory. A missing one presents as a bench with no
+    methods, a grey roundel where an icon should be, or a stage that never draws.
+    """
+    import re
+
+    faults = []
+    s, body = http.get("/play/")
+    page = body.decode("utf-8", "replace") if isinstance(body, bytes) else str(body)
+    if s != 200 or 'id="bench"' not in page:
+        faults.append(f"/play/ {s}: the bench layer is not on the table")
+    tpl = (repo / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    wanted = sorted(set(re.findall(r"\{%\s*asset\s+'((?:js|css)/(?:table/3\d-bench|bench)[^']+)'", tpl)))
+    if len(wanted) < 15:
+        faults.append(f"only {len(wanted)} bench assets named in table.html; the pattern is stale")
+    for name in wanted:
+        gs, gb = http.get(f"/static/{name}")
+        if gs != 200 or len(gb) < 200:
+            faults.append(f"/static/{name} -> {gs}, {len(gb)}b")
+    icons = sorted(p.name for p in (repo / "play" / "static" / "img" / "icons").glob("*.svg"))
+    if len(icons) < 40:
+        faults.append(f"{len(icons)} icons in the repo; expected the 46-icon set")
+    for name in icons:
+        gs, gb = http.get(f"/static/img/icons/{name}")
+        if gs != 200 or b"<svg" not in gb:
+            faults.append(f"/static/img/icons/{name} -> {gs}")
+    s, body = http.get("/api/bench/state")
+    d = j(body)
+    if s != 200:
+        faults.append(f"/api/bench/state {s}: {d}")
+    elif len(d.get("methods") or []) != 9:
+        faults.append(f"{len(d.get('methods') or [])} bench methods; the rule rows did not ship")
+    s, body = http.post("/api/bench/check", {"method": "grind", "items": [], "batch": 1})
+    if s != 200:
+        faults.append(f"/api/bench/check {s}: {j(body)}")
+    s, body = http.get("/api/herbarium")
+    if s != 200:
+        faults.append(f"/api/herbarium {s}")
+    s, body = http.get("/api/herb/comfrey")
+    if s != 200 or not j(body).get("properties"):
+        faults.append(f"/api/herb/comfrey {s}: the herb corpus did not ship")
+    note("the herbalism bench ships: page, scripts, icons, rules and API", faults)
+
+
 def run_checks(http: Http, repo: Path) -> None:
     # --- the baseline ---------------------------------------------------------------
     s, body = http.get("/")
@@ -687,6 +736,7 @@ def run_checks(http: Http, repo: Path) -> None:
         if s != 200:
             faults.append(f"beginning the campaign: {s}: {j(body)}")
     note("character created, outfitted and campaign begun", faults)
+    check_the_herbalism_bench_ships(http, repo)
 
     s, body = http.get("/api/sheet")
     past = (j(body).get("background") or {}).get("past") or {}
