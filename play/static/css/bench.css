@@ -310,8 +310,6 @@
 }
 #bench-game.is-up { transform: none; opacity: 1; }
 #bench-game[hidden] { display: none; }
-.bench-devgame { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; min-height: 96px; }
-.bench-devgame p { margin: 0; color: var(--bench-quiet); }
 
 /* --- the tag (UI plan §6.5) ------------------------------------------------------------- */
 .bench-tagcol-in { gap: 14px; overflow-y: auto; }

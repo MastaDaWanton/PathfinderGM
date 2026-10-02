@@ -228,23 +228,22 @@ def test_motion_is_transform_and_opacity_and_reduced_motion_is_honoured():
 def test_the_bench_runs_with_no_stage_no_games_and_no_sound():
     """Contracts §5: every consumer must work when a provider is missing, so each lane can
     be verified alone. Each provider is looked up where it is used and guarded there; the
-    stage falls back to the tool's icon at 160px (UI plan §6.3), the games to a marked dev
-    button, and sound and prefs to nothing and to the page's own `pgm.steady` key."""
+    stage falls back to the tool's icon at 160px (UI plan §6.3), the games to a middling
+    score so a reserved craft is never stranded, and sound and prefs to nothing and to the
+    page's own `pgm.steady` key."""
     shell = _src(STATIC / "js" / "table" / "30-bench-shell.js")
     assert "window.BenchStage" in shell and "s.available()" in shell
     assert 'BenchIcons.el(m, { size: 160 })' in shell
     assert "games && typeof games.play === \"function\"" in shell
-    assert "devFinish(strip);      // MERGE: remove dev fallback" in shell
-    assert "score: 0.5" in shell and "Finish (no minigame yet)" in shell
+    assert "score: 0.5" in shell and "Finish (no minigame yet)" not in shell
     assert 'window.localStorage.getItem("pgm.steady")' in shell
     assert "window.Sound && typeof Sound.play" in shell
 
 
-def test_the_fake_and_the_dev_fallback_are_marked_for_the_merge():
-    """The `?benchfake=` canned API and the "Finish (no minigame yet)" button exist only
-    because lanes B2, C and E are built in parallel. Each carries a `// MERGE:` marker so
-    the lead finds and removes them in one search; an unmarked fake is how a stand-in ships."""
+def test_the_fake_and_the_dev_fallback_did_not_ship():
+    """The `?benchfake=` canned API and the "Finish (no minigame yet)" button existed only
+    while lanes B2, C and E were built in parallel, each marked `// MERGE:` so the lead
+    could find them in one search. They were removed at the merge (2026-10-02); a stand-in
+    that ships is a second, fake answer to every bench call hidden behind a query flag."""
     shell = _src(STATIC / "js" / "table" / "30-bench-shell.js")
-    assert shell.count("MERGE: remove fake") >= 3
-    assert shell.count("MERGE: remove dev fallback") >= 2
-    assert "benchfake" in shell
+    assert "MERGE" not in shell and "benchfake" not in shell and "devFinish" not in shell

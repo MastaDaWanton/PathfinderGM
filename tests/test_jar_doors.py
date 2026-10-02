@@ -48,3 +48,17 @@ def test_a_dice_duration_is_rolled_not_read_as_a_number():
                      "duration": {"amount": "1d4", "unit": "round"}}])
     held = [e for e in pc.effects if getattr(e, "key", "") == "nauseated"]
     assert held and 1 <= (held[0].rounds_left or 0) <= 4
+
+
+def test_a_steeping_jar_cannot_be_drunk_before_its_day():
+    """A tincture steeps for two weeks (plan §6). The bench refused an early jar, but the
+    narrated door ("I drink my tincture") had no clock check, so it was the one way round
+    the steep: found at the bench engine's merge, 2026-10-02."""
+    scene, engine = _board()
+    pc = scene.pc()
+    scene.clock_minutes = 1000
+    pc.stock["jar#1"] = Stock(base="Comfrey Tincture", count=1, effects=["x"],
+                              specs=[{"type": "heal", "amount": "1d4"}], ready_minute=1000 + 3 * 1440)
+    out = engine.run(engine.validate([
+        {"op": "use_item", "actor": "pc", "params": {"item": "jar#1", "how": "drink"}}])).outcomes[0]
+    assert "still steeping" in out.tell and pc.stock["jar#1"].count == 1

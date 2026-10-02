@@ -50,6 +50,13 @@ FINISHING = ("brew", "catalyst crafting")
 CONCENTRATE_RARITY_STEP = 1
 
 
+def _a(noun: str) -> str:
+    """"an infusion", "a salve": the article a refusal reads with. Written as f"a {form}"
+    the bench told players "A infusion can carry none of what this does"."""
+    noun = str(noun or "")
+    return ("an " if noun[:1].lower() in "aeiou" else "a ") + noun
+
+
 class CraftError(ValueError):
     """The chain cannot be attempted. Raised before anything is scored, so a chain the
     character cannot make never advances their track."""
@@ -2040,7 +2047,7 @@ def fit_reason(method: str, m: Material, pot: list[Material], level: int) -> str
         if not ok:
             return why
         if m.part not in herbal_rules()["methods"]["brew_product_by_part"]:
-            return f"a {m.part} does not brew"
+            return f"{_a(m.part)} does not brew"
         return one_thing("The pot")
 
     if method == "neutralize":
@@ -2382,7 +2389,7 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
             plan.dropped.append({"spec": spec, "why": "alchemy only"})
         elif route not in routes:
             plan.dropped.append({"spec": spec, "why":
-                                 f"a {prow.get('name', plan.form).lower()} cannot carry "
+                                 f"{_a(prow.get('name', plan.form).lower())} cannot carry "
                                  f"{ROUTE_WORDS.get(route, route)}"})
         else:
             kept.append(spec)
@@ -2406,7 +2413,7 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
         # The form could carry none of it: a poultice of a herb that only works when
         # swallowed is a wet leaf, and making one would spend the herb for nothing.
         plan.problems.append(
-            f"A {prow.get('name', plan.form).lower()} can carry none of what this does "
+            f"{_a(prow.get('name', plan.form).lower()).capitalize()} can carry none of what this does "
             f"({plan.dropped[0]['why']}).")
     elif lost_help and kept and all(id(s) in kept_harm for s in kept):
         if all(d["why"] == "alchemy only" for d in lost_help):

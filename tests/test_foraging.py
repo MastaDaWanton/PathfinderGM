@@ -339,20 +339,33 @@ def test_foraging_fills_the_satchel(client):
 
 
 def test_crafting_spends_what_was_foraged(client):
-    """The loop, closed: nothing can be brewed that was not first picked."""
+    """The loop, closed: nothing can be brewed that was not first picked.
+
+    On the herbalism bench at the table since 2026-10-02 (the old /api/craft/do answers
+    herbalism with "it is at the table now"): a herb nobody carries is not on the satchel
+    at all, and one carried is spent when the brew is finished."""
     from play import campaign as cm
 
-    r = client.post("/api/craft/preview", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-        content_type="application/json").json()
-    assert any("Forage for it" in p for p in r["problems"])
+    state = client.get("/api/bench/state").json()
+    assert not any(i.get("ingredient_id") == "woundwort" for i in state["satchel"])
 
     cm.current().scene.pc().carry("woundwort", 1)
     cm.current().save()
-    d = client.post("/api/craft/do", data=json.dumps({
-        "craft": "herbalism", "ingredients": ["woundwort"], "methods": ["brew"]}),
-        content_type="application/json").json()
-    assert d["spent"] == {"woundwort": 1}
+    state = client.get("/api/bench/state").json()
+    key = next(i["key"] for i in state["satchel"] if i.get("ingredient_id") == "woundwort")
+    # Whichever level-1 method the bench says can work it: the point is the spending,
+    # and a herb that only works on a wound cannot be a tea (the bench refuses that).
+    for method in ("grind", "brew", "mix"):
+        pot = {"method": method, "items": [{"key": key, "count": 1}], "batch": 1}
+        check = client.post("/api/bench/check", data=json.dumps(pot),
+                            content_type="application/json").json()
+        if check.get("can_roll"):
+            break
+    r = client.post("/api/bench/roll", data=json.dumps(dict(pot, face=20)),
+                    content_type="application/json").json()
+    assert r.get("roll", {}).get("success"), r
+    client.post("/api/bench/finish", data=json.dumps({"token": r["token"], "score": 0.5}),
+                content_type="application/json")
     assert "woundwort" not in cm.current().scene.pc().inventory
 
 

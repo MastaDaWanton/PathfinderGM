@@ -151,7 +151,6 @@
   // GET when there is no body. Errors are the server's own sentence (contracts §3:
   // `{"error": "<plain sentence>"}`), carried with the status so a 409 can be told apart.
   B.api = function (path, body) {
-    if (FAKE) return FAKE.handle(path, body);   // MERGE: remove fake
     var opts = body === undefined ? { cache: "no-store" } : {
       method: "POST", body: JSON.stringify(body),
       headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
@@ -396,9 +395,6 @@
       }
       B.pot = { method: null, items: [], batch: 1 };
       var ready = B.setMethod(last, { quiet: true });
-      // MERGE: remove fake. `?benchfake=demo` starts with comfrey on the mortar, for the
-      // lane's saved screenshots, which cannot click.
-      if (FAKE && FAKE.demo && ready) ready.then(function () { B.addItem("s1", 2); });
       // The methods did not exist when the layer opened, so focus waited on Close; it
       // moves to the chosen method unless the player has already gone somewhere.
       var at = document.activeElement;
@@ -850,7 +846,9 @@
         onScore: function (s) { B.emit("score", s); },
       }));
     } else {
-      game = devFinish(strip);      // MERGE: remove dev fallback
+      // The games ship with the bench; without them (a broken install) the step still
+      // finishes, at a middling score, rather than leaving the materials reserved.
+      game = Promise.resolve({ score: 0.5, stopped: false });
     }
     return game.then(function (out) {
       out = out || {};
@@ -860,20 +858,6 @@
       // stop (revamp plan §3), and the server says what came of it.
       console.error("bench game failed:", err);
       return finish(0, true);
-    });
-  }
-
-  // MERGE: remove dev fallback. Until Lane E's games land, a success posts a middling
-  // score from one button, so the whole flow (finish, land, mastery) runs end to end.
-  function devFinish(strip) {
-    return new Promise(function (done) {
-      strip.innerHTML = '<div class="bench-devgame"><p>The minigame for this method is not ' +
-        'built yet.</p><button type="button" class="v2-btn is-go" id="bench-devfinish">' +
-        'Finish (no minigame yet)</button></div>';
-      var b = $id("bench-devfinish");
-      b.addEventListener("click", function () { done({ score: 0.5, stopped: false }); });
-      B.devStop = function () { done({ score: 0, stopped: true }); };
-      b.focus();
     });
   }
 
@@ -893,7 +877,6 @@
       if (!B.live) return;
       if (yes) {
         if (games && typeof games.stop === "function") { try { games.stop(); } catch (err) { /* */ } }
-        else if (B.devStop) B.devStop();
       } else if (games && games.resume) {
         try { games.resume(); } catch (err) { /* */ }
       }
@@ -1254,355 +1237,4 @@
     try { if (window.Sound && Sound.unlock) Sound.unlock(); } catch (err) { /* */ }
   }, true);
 
-  // ======================================================================================
-  // MERGE: remove fake. `?benchfake=1` answers every bench and herb call from canned JSON
-  // in exactly the shapes of contracts §3 and §4, so the UI can be driven end to end while
-  // the API lanes (B2, C) are still stubs that answer 501. `?benchfake=perks` starts with
-  // two perk picks banked; `?benchfake=error` fails the state call, for the error state.
-  // ======================================================================================
-  var FAKE = /[?&]benchfake=/.test(location.search) ? makeFake(location.search) : null;
-
-  function makeFake(search) {
-    var mode = (search.match(/benchfake=([a-z0-9]+)/) || [])[1] || "1";
-    var minute = 14 * 1440 + 18 * 60 + 20;
-    var level = mode === "perks" ? 4 : 2;
-    var perks = {};
-    var serial = 20;
-    var dc = 12, bonus = 6;
-    var HERBS = {
-      comfrey: { name: "Comfrey", kind: "herb", part: "root", tier: "common", biomes: ["forest"],
-        props: [{ text: "Heals 1d4", drawback: false, known: true, how: "tasted, day 9" },
-                { text: "Knits a sprain", drawback: false, known: true, how: "studied, day 11" },
-                { text: "Nauseates if eaten raw", drawback: true, known: false },
-                { text: "Draws out splinters", drawback: false, known: false }] },
-      garlic: { name: "Garlic", kind: "herb", part: "root", tier: "common", biomes: ["grassland"],
-        props: [{ text: "Wards off sickness for a day", drawback: false, known: true, how: "told by Old Marta" }] },
-      yarrow: { name: "Yarrow", kind: "herb", part: "flower", tier: "uncommon", biomes: ["grassland", "road"],
-        props: [{ text: "Stops bleeding", drawback: false, known: true, how: "tasted, day 12" },
-                { text: "Sickened 1 round", drawback: true, known: false },
-                { text: "Eases a fever", drawback: false, known: false }] },
-      willow: { name: "Willow bark", kind: "herb", part: "bark", tier: "common", biomes: ["swamp"],
-        props: [{ text: "Dulls pain, +1 on saves against pain", drawback: false, known: true, how: "studied, day 3" }] },
-      barley: { name: "Barley", kind: "herb", part: "seed", tier: "common", biomes: ["grassland"],
-        props: [{ text: "Binds a poultice", drawback: false, known: true, how: "studied, day 2" }] },
-      hemlock: { name: "Hemlock", kind: "herb", part: "leaf", tier: "rare", biomes: ["forest"],
-        danger: "it can paralyse",
-        props: [{ text: "Numbs a wound", drawback: false, known: false },
-                { text: "Paralysis, Fortitude DC 16", drawback: true, known: true, how: "studied, day 13" }] },
-      spider: { name: "Spider venom gland", kind: "monster part", part: "gland", tier: "uncommon", biomes: ["forest"],
-        props: [{ text: "Poison, 1d2 Strength", drawback: true, known: true, how: "studied, day 6" }] },
-      olive: { name: "Olive oil", kind: "oil", part: "oil", tier: "common", biomes: [], props: [] },
-      beeswax: { name: "Beeswax", kind: "base", part: "wax", tier: "common", biomes: [], props: [] },
-      spirit: { name: "Grain spirit", kind: "solvent", part: "liquid", tier: "common", biomes: [], props: [] },
-      dragon: { name: "Dragon's tongue", kind: "herb", part: "leaf", tier: "legendary", biomes: ["mountain"],
-        props: [{ text: "Fire resistance 10", drawback: false, known: false }] },
-      mint: { name: "Mint", kind: "herb", part: "leaf", tier: "common", biomes: ["grassland"],
-        props: [{ text: "Settles the stomach", drawback: false, known: true, how: "tasted, day 1" }] },
-    };
-    function unknownOf(id) {
-      var h = HERBS[id];
-      return h ? h.props.filter(function (p) { return !p.known; }).length : 0;
-    }
-    function item(key, id, extra) {
-      var h = HERBS[id] || {};
-      var it = { key: key, name: h.name || id, ingredient_id: id, kind: h.kind || "herb",
-                 part: h.part || "leaf", tier: h.tier || "common", state: "raw", form: null,
-                 quality: null, quality_name: null, count: 1, unknown: unknownOf(id),
-                 spoils_in: 9840, ready_at: null, crafted: false };
-      Object.keys(extra || {}).forEach(function (k) { it[k] = extra[k]; });
-      return it;
-    }
-    var satchel = [
-      item("s1", "comfrey", { count: 3 }),
-      item("s2", "garlic", { count: 1 }),
-      item("s3", "yarrow", { count: 4, spoils_in: 290 }),
-      item("s4", "willow", { count: 2 }),
-      item("s5", "barley", { count: 2, state: "ground", name: "Barley, ground" }),
-      item("s6", "hemlock", { count: 1 }),
-      item("s7", "spider", { count: 1, spoils_in: 1200 }),
-      item("s8", "olive", { count: 2, spoils_in: null }),
-      item("s9", "beeswax", { count: 1, spoils_in: null }),
-      item("s10", "spirit", { count: 1, spoils_in: null }),
-      item("s11", "dragon", { count: 1 }),
-      item("s12", "mint", { count: 2, state: "dried", name: "Mint, dried", spoils_in: 40000 }),
-      item("s13", "yarrow", { name: "Yarrow infusion", form: "infusion", quality: 2, quality_name: "Fine",
-                              crafted: true, count: 1, spoils_in: 600, unknown: 0 }),
-      item("s14", "comfrey", { name: "Comfrey tincture", form: "tincture", crafted: true, count: 1,
-                               ready_at: minute + 9 * 1440, spoils_in: null, unknown: 0 }),
-    ];
-    var recipes = [{ id: "r1", name: "Comfrey poultice", steps: [
-      { method: "grind", items: [{ ingredient_id: "comfrey", count: 2 }] },
-      { method: "mix", items: [{ ingredient_id: "comfrey", count: 1 }, { ingredient_id: "barley", count: 1 }] }] }];
-    var mp = mode === "perks" ? 210 : 30;
-    var pending = null;
-    var firsts = {};
-
-    function ceiling() { return { 1: 2, 2: 3, 3: 4 }[Math.min(level, 3)] + (perks.quality || 0); }
-    function banked() {
-      var earned = Math.max(0, level - 3) * 2, spent = 0;
-      Object.keys(perks).forEach(function (k) { spent += perks[k]; });
-      return Math.max(0, earned - spent);
-    }
-    function label(m) {
-      var day = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), n = m % 60;
-      var hh = h % 12 || 12, ap = h < 12 ? "am" : "pm";
-      return "Day " + day + ", " + hh + ":" + (n < 10 ? "0" : "") + n + ap;
-    }
-    function track() {
-      var c = ceiling();
-      return { id: "herbalist", level: level, mp: mp, to_next: { need: level * 30 + 5, have: mp % (level * 30 + 5) },
-               ceiling: c, ceiling_name: c <= 4 ? TIER_FALLBACK[c] : "Flawless +" + (c - 4),
-               perks: Object.assign({}, perks), picks_banked: banked(),
-               next_rung: level < 3 ? "Flawless at Herbalist 3" : "Flawless +" + (c - 3) + " at your next Quality perk" };
-    }
-    var LEVEL_OF = { grind: 1, mix: 1, brew: 1, dry: 2, reduce: 2, extract: 2, infuse: 2, steep: 2, neutralize: 3 };
-    function state() {
-      return { track: track(),
-        methods: METHODS.map(function (id) {
-          var locked = LEVEL_OF[id] > level;
-          return { id: id, name: id.charAt(0).toUpperCase() + id.slice(1), level: LEVEL_OF[id],
-                   locked: locked, lock_reason: locked ? "Herbalist " + LEVEL_OF[id] : "" };
-        }),
-        satchel: satchel.filter(function (s) { return s.count > 0; }).map(function (s) { return Object.assign({}, s); }),
-        ground: { biome: "forest", roofed: false, minute: minute, place: "The Outskirts" },
-        recipes: recipes.slice(), clock: { day: Math.floor(minute / 1440), label: label(minute) } };
-    }
-    var SOLID = { leaf: 1, flower: 1, root: 1, bark: 1, berry: 1, seed: 1, fungus: 1 };
-    function fit(method, s) {
-      if (s.ready_at != null) return "it is still steeping";
-      if (s.tier === "legendary" && level < 3) return "Herbalist 3 for legendary";
-      if (s.crafted) return "a finished product can't be worked again";
-      if (s.part === "gland" && method !== "extract") return "it has to be extracted before anything else can be done with it";
-      var volatile = s.ingredient_id === "hemlock";
-      switch (method) {
-        case "grind":
-          if (volatile) return "it is volatile, neutralize it first";
-          if (s.state === "ground") return "already ground";
-          if (!SOLID[s.part]) return "only a solid can be ground";
-          return "";
-        case "mix":
-          if (s.state === "ground" || s.part === "wax" || s.part === "oil") return "";
-          return "grind it first";
-        case "brew":
-          if (!SOLID[s.part]) return "only a plant part can be brewed";
-          return "";
-        case "dry":
-          if (s.state === "dried") return "already dried";
-          if (!SOLID[s.part]) return "only a solid can be dried";
-          if (s.count < 2) return "you need 2 to make 1 dried";
-          return "";
-        case "reduce":
-          if (s.part !== "liquid") return "only a liquid can be reduced";
-          if (s.count < 2) return "you need 2 to make 1";
-          return "";
-        case "extract":
-          return s.part === "gland" ? "" : "there is nothing in it to extract";
-        case "infuse":
-          if (s.part === "oil" || s.state === "dried") return "";
-          return "dry it first";
-        case "steep":
-          if (s.part === "liquid" || SOLID[s.part]) return "";
-          return "only a herb or a spirit can be steeped";
-        default:
-          return "Herbalist 3";
-      }
-    }
-    var PER_DOSE = { grind: 10, mix: 10, brew: 30, dry: 480, reduce: 60, extract: 30, infuse: 240,
-                     steep: 10, neutralize: 20 };
-    var FORM = { grind: "powder", mix: "poultice", brew: "infusion", dry: "dried", reduce: "reduction",
-                 extract: "extract", infuse: "infused-oil", steep: "tincture", neutralize: "extract" };
-    var TAKEN = { powder: "stirred into food or drink", poultice: "bound on a wound", infusion: "drunk",
-                  decoction: "drunk", dried: "kept for later work", reduction: "drunk",
-                  extract: "kept for later work", "infused-oil": "not used directly; sold or mixed",
-                  tincture: "drops on the tongue", "salve-base": "kept for mixing" };
-    var KEEPS = { powder: 43200, poultice: 1440, infusion: 1440, decoction: 4320, dried: 129600, reduction: 10080,
-                  extract: 43200, "infused-oil": 43200, tincture: 525600, "salve-base": 129600 };
-    function byKey(k) { return satchel.filter(function (s) { return s.key === k; })[0]; }
-    function check(b) {
-      var fits = {};
-      satchel.forEach(function (s) { if (s.count > 0) fits[s.key] = fit(b.method, s); });
-      var items = (b.items || []).map(function (p) { return { s: byKey(p.key), count: p.count }; })
-        .filter(function (p) { return p.s; });
-      var problems = [];
-      var batch = Math.max(1, b.batch || 1);
-      items.forEach(function (p) {
-        if (fits[p.s.key]) problems.push(p.s.name + ": " + fits[p.s.key] + ".");
-        if (p.count * batch > p.s.count) problems.push("You carry " + p.s.count + " " + p.s.name + ", not " + p.count * batch + ".");
-      });
-      if (b.method === "infuse" && items.length && !items.some(function (p) { return p.s.part === "oil"; })) problems.push("Add 1 oil.");
-      if (b.method === "steep" && items.length && !items.some(function (p) { return p.s.part === "liquid"; })) problems.push("Add a spirit or vinegar.");
-      if (b.method === "mix" && items.length === 1) problems.push("Mixing needs two prepared things.");
-      var first = items[0] && items[0].s;
-      var form = FORM[b.method];
-      if (b.method === "grind" && first && (first.part === "bark")) form = "salve-base";
-      if (b.method === "brew" && first && (first.part === "root" || first.part === "bark")) form = "decoction";
-      var c = ceiling();
-      var effects = [], drawbacks = [], unknown = 0;
-      items.forEach(function (p) {
-        var h = HERBS[p.s.ingredient_id];
-        if (!h) return;
-        unknown += unknownOf(p.s.ingredient_id);
-        h.props.forEach(function (pr) {
-          if (!pr.known) return;
-          var m = pr.text.match(/^(.*?)(\d+)d(\d+)(.*)$/);
-          var tiers = [];
-          for (var i = 0; i <= c; i++) {
-            tiers.push(m ? m[1] + m[2] + "d" + (Number(m[3]) + Math.max(0, i - 1) * 2) + m[4] : pr.text + (i > 1 ? ", for " + (i * 10) + " minutes" : ""));
-          }
-          (pr.drawback ? drawbacks : effects).push({ base: pr.text, by_tier: tiers });
-        });
-      });
-      var name = first ? (first.name.replace(/, (ground|dried)$/, "") + " " + form.replace("-", " ")) : "";
-      var dcHere = dc + (items.some(function (p) { return p.s.tier === "rare"; }) ? 4 : 0);
-      var need = dcHere - bonus;
-      return { fits: fits, problems: problems, can_roll: !!items.length && !problems.length,
-        minutes: PER_DOSE[b.method] * batch, dc: dcHere, bonus: bonus,
-        terms: [{ label: "Herbalist " + level, value: level }, { label: "Wisdom", value: 2 },
-                { label: "Craft (alchemy) ranks", value: bonus - level - 2 }],
-        need: need > 20 ? null : Math.max(2, need),
-        impossible: need > 20 ? "No roll of the d20 can make this yet." : "",
-        product: first ? { name: name.charAt(0).toUpperCase() + name.slice(1), form: form, taken: TAKEN[form] || "",
-          keeps_minutes: KEEPS[form] || 1440, routes: ["ingest"], unknown: unknown,
-          effects: effects, drawbacks: drawbacks,
-          source_text: "Pound the fresh root to a pulp and bind it on the hurt with clean linen; change it at dusk." } : null };
-    }
-    function roll(b) {
-      var c = check(b);
-      if (!c.can_roll) throw Object.assign(new Error(c.problems[0] || "Nothing on the tool."), { status: 400 });
-      var face = b.face == null ? 1 + Math.floor(Math.random() * 20) : Number(b.face);
-      var total = face + bonus, ok = total >= c.dc, margin = total - c.dc;
-      var lost = [];
-      if (!ok && margin <= -5) {
-        b.items.forEach(function (p) {
-          var s = byKey(p.key);
-          var n = Math.ceil(p.count * (b.batch || 1) / 2);
-          s.count -= n;
-          lost.push({ key: s.key, name: s.name, count: n });
-        });
-      }
-      minute += c.minutes;
-      var token = ok ? "t" + (++serial) : undefined;
-      if (ok) pending = { token: token, body: b, check: c };
-      var first = byKey(b.items[0].key);
-      return { roll: { face: face, bonus: bonus, total: total, dc: c.dc, success: ok, margin: margin },
-        verdict: { verdict: ok ? "success" : "failure", natural: face === 20 ? 20 : face === 1 ? 1 : null },
-        lost: lost, minutes: c.minutes, clock: { day: Math.floor(minute / 1440), label: label(minute) },
-        token: token,
-        tuning: { method: b.method, part: first.part, difficulty: 0.6, seconds: 6, beats: 8,
-                  infusion: b.method === "brew" && (first.part === "leaf" || first.part === "flower") } };
-    }
-    function finish(b) {
-      if (!pending || pending.token !== b.token) throw Object.assign(new Error("That roll has already been finished."), { status: 409 });
-      var p = pending; pending = null;
-      var c = ceiling();
-      var score = Math.max(0, Math.min(1, Number(b.score) || 0));
-      var tier = Math.min(c, Math.floor(score * (c + 1)));
-      var batch = p.body.batch || 1;
-      p.body.items.forEach(function (it) { var s = byKey(it.key); s.count -= it.count * batch; });
-      var first = byKey(p.body.items[0].key);
-      var made = item("s" + (++serial), first.ingredient_id, {
-        name: p.check.product.name, form: p.check.product.form, quality: tier,
-        quality_name: tier <= 4 ? TIER_FALLBACK[tier] : "Flawless +" + (tier - 4), crafted: true,
-        count: batch, unknown: 0, spoils_in: p.check.product.keeps_minutes,
-        state: p.body.method === "dry" ? "dried" : p.body.method === "grind" ? "ground" : "raw" });
-      if (made.form === "salve-base" || made.form === "infused-oil" || p.body.method === "dry" || p.body.method === "grind") made.crafted = false;
-      satchel.push(made);
-      var lines = [{ why: p.body.method.charAt(0).toUpperCase() + p.body.method.slice(1) + ", " + first.name.toLowerCase(), mp: 1 }];
-      if (!firsts[made.form]) { firsts[made.form] = 1; lines.push({ why: "first " + made.form.replace("-", " "), mp: 3 }); }
-      if (tier >= 2) lines.push({ why: "quality bonus", mp: tier - 1 });
-      var gained = lines.reduce(function (a, l) { return a + l.mp; }, 0);
-      mp += gained;
-      var discoveries = [];
-      var h = HERBS[first.ingredient_id];
-      var hid = h && h.props.filter(function (pr) { return !pr.known && !pr.drawback; })[0];
-      if (hid) { hid.known = true; hid.how = "worked, day " + Math.floor(minute / 1440); discoveries.push({ ingredient_id: first.ingredient_id, name: h.name, text: hid.text }); }
-      satchel.forEach(function (s) { if (!s.crafted) s.unknown = unknownOf(s.ingredient_id); });
-      var nxt = null;
-      if (p.body.method === "grind" && first.ingredient_id === "comfrey") nxt = { method: "mix" };
-      return { tier: tier, tier_name: made.quality_name, score: score, ceiling: c, made: Object.assign({}, made),
-        count: batch, mastery: { lines: lines, total: mp, level: level, levelled: [] },
-        discoveries: discoveries, next: nxt, state: state() };
-    }
-    function herb(id) {
-      var h = HERBS[id];
-      if (!h) throw Object.assign(new Error("You have not met that herb."), { status: 400 });
-      return { id: id, name: h.name, kind: h.kind, part: h.part, tier: h.tier, biomes: h.biomes,
-        danger_known: h.props.some(function (p) { return p.drawback && p.known; }) ? (h.danger || "it has a drawback you know of") : "",
-        properties: h.props.map(function (p, i) {
-          return p.known ? { key: "p" + i, known: true, text: p.text, drawback: p.drawback, how: p.how || "" }
-                         : { key: "p" + i, known: false, text: null, drawback: null, how: null };
-        }),
-        can_study: h.props.some(function (p) { return !p.known; }), study_minutes: 10,
-        can_taste: satchel.some(function (s) { return s.ingredient_id === id && !s.crafted && s.count > 0; }),
-        teachers_here: id === "yarrow" || id === "comfrey" ? [{ ref: "npc3", name: "Old Marta", price: "2 sp" }] : [],
-        library_here: id === "hemlock" ? { name: "Temple archive", price: "5 sp", minutes: 60 } : null };
-    }
-    function reveal(id, how, wantBad) {
-      var h = HERBS[id], out = [];
-      if (!h) return out;
-      var good = h.props.filter(function (p) { return !p.known && !p.drawback; })[0];
-      var bad = wantBad ? h.props.filter(function (p) { return !p.known && p.drawback; })[0] : null;
-      [good, bad].forEach(function (p) {
-        if (!p) return;
-        p.known = true; p.how = how + ", day " + Math.floor(minute / 1440);
-        out.push({ key: "p" + h.props.indexOf(p), known: true, text: p.text, drawback: p.drawback, how: p.how });
-      });
-      satchel.forEach(function (s) { if (!s.crafted) s.unknown = unknownOf(s.ingredient_id); });
-      return out;
-    }
-    function handle(path, body) {
-      var answer = function () {
-        if (mode === "error" && path === "/api/bench/state") {
-          throw Object.assign(new Error("not built yet: docs/herbalism-contracts.md §3.1"), { status: 501 });
-        }
-        if (path === "/api/bench/state") return state();
-        if (path === "/api/bench/check") return check(body);
-        if (path === "/api/bench/roll") return roll(body);
-        if (path === "/api/bench/finish") return finish(body);
-        if (path === "/api/bench/perks") {
-          (body.picks || []).forEach(function (k) { perks[k] = (perks[k] || 0) + 1; });
-          return track();
-        }
-        if (path === "/api/bench/recipe") {
-          if (body["delete"]) recipes = recipes.filter(function (r) { return r.id !== body["delete"]; });
-          else recipes.push({ id: "r" + (++serial), name: body.name, steps: body.steps });
-          return { recipes: recipes.slice() };
-        }
-        if (path === "/api/herb/study") {
-          var face = body.face == null ? 1 + Math.floor(Math.random() * 20) : body.face;
-          var ok = face + 5 >= 13;
-          minute += 10;
-          return { roll: { face: face, bonus: 5, total: face + 5, dc: 13, success: ok, margin: face + 5 - 13 },
-                   revealed: ok ? reveal(body.id, "studied", false) : [], minutes: 10,
-                   clock: { day: Math.floor(minute / 1440), label: label(minute) } };
-        }
-        if (path === "/api/herb/taste") {
-          var s = satchel.filter(function (x) { return x.ingredient_id === body.id && !x.crafted && x.count > 0; })[0];
-          if (s) s.count -= 1;
-          minute += 1;
-          return { revealed: reveal(body.id, "tasted", true), tells: ["A bitter taste spreads across your tongue."],
-                   minutes: 1, down: false };
-        }
-        if (path === "/api/herb/ask") {
-          minute += 20;
-          return { revealed: reveal(body.id, "told by Old Marta", false), paid: "2 sp", minutes: 20, refused: "" };
-        }
-        if (path === "/api/herb/library") {
-          minute += 60;
-          return { revealed: reveal(body.id, "read in the Temple archive", true), paid: "5 sp", minutes: 60, refused: "" };
-        }
-        var m = path.match(/^\/api\/herb\/([^/]+)$/);
-        if (m) return herb(decodeURIComponent(m[1]));
-        throw Object.assign(new Error("The fake has no answer for " + path + "."), { status: 404 });
-      };
-      // A little latency, so the loading states are seen as they will be.
-      return new Promise(function (done, fail) {
-        setTimeout(function () {
-          try { done(JSON.parse(JSON.stringify(answer()))); } catch (err) { fail(err); }
-        }, path === "/api/bench/state" ? 350 : 120);
-      });
-    }
-    return { handle: handle, demo: mode === "demo" };
-  }
-  // ======================================================================== end of fake
 })();

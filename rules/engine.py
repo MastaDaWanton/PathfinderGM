@@ -10947,6 +10947,16 @@ class Engine:
         if target not in self.scene.actors:
             away = self._elsewhere(target)
             return self._refuse(intent, away or f"There is no {target} here to use it on.")
+        # A jar still steeping is not a tincture yet (docs/herbalism-revamp-plan.md §6): the
+        # bench refuses it, and so must the narrated door, or "I drink my tincture" on day 3
+        # of a two-week steep would be the one way round the clock (Lane B2's note at merge).
+        ready = int(getattr(held, "ready_minute", 0) or 0)
+        now = int(getattr(self.scene, "clock_minutes", 0) or 0)
+        if ready and now < ready:
+            days = max(1, -(-(ready - now) // 1440))
+            return self._refuse(
+                intent, f"The {held.base} is still steeping; it is ready in {days} "
+                        f"day{'s' if days != 1 else ''}. Nothing is opened.")
 
         use = consumables.plan(held, how=how, target=target, because=intent.because)
         if not use.ok:
