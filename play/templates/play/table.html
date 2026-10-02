@@ -3752,7 +3752,15 @@ window.BENCH_ICON_URLS = {
 {% asset 'js/bench-games/infuse.js' as g_infuse %}{% if '?v=' in g_infuse %}<script src="{% asset 'js/bench-games/infuse.js' %}"></script>{% endif %}
 {% asset 'js/bench-games/steep.js' as g_steep %}{% if '?v=' in g_steep %}<script src="{% asset 'js/bench-games/steep.js' %}"></script>{% endif %}
 {% asset 'js/bench-games/neutralize.js' as g_neutralize %}{% if '?v=' in g_neutralize %}<script src="{% asset 'js/bench-games/neutralize.js' %}"></script>{% endif %}
-{# MERGE: Lane F's bench-stage/*.js tags go here, guarded the same way, once its files are named. #}
+{# The stage's renderer (Lane F), in its own load order: maths, the GL layer, meshes, the
+   procedural grounds, particles, props, then the nine tools. 32 below is its API. #}
+<script src="{% asset 'js/bench-stage/00-math.js' %}"></script>
+<script src="{% asset 'js/bench-stage/01-gl.js' %}"></script>
+<script src="{% asset 'js/bench-stage/02-meshes.js' %}"></script>
+<script src="{% asset 'js/bench-stage/03-ground.js' %}"></script>
+<script src="{% asset 'js/bench-stage/04-particles.js' %}"></script>
+<script src="{% asset 'js/bench-stage/05-props.js' %}"></script>
+<script src="{% asset 'js/bench-stage/06-tools.js' %}"></script>
 <script src="{% asset 'js/table/30-bench-shell.js' %}"></script>
 <script src="{% asset 'js/table/31-bench-satchel.js' %}"></script>
 {% asset 'js/table/32-bench-stage.js' as bench_stage_js %}{% if '?v=' in bench_stage_js %}<script src="{% asset 'js/table/32-bench-stage.js' %}"></script>{% endif %}

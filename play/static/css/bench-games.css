@@ -1,0 +1,183 @@
+/* The bench minigame strip (play/static/js/table/33-bench-games.js), UI plan §6.4.
+
+   Tokens only: every colour, font and bevel here is theme-v2.css's (tests/test_bench_games.py
+   refuses a raw colour). The strip is chrome, MOTION 3 (UI plan §0): it moves only to say a
+   strike landed, a band rose, or the game paused, and transform and opacity are the only
+   things it animates.
+
+   Layout: a 120px strip. The meter (a canvas the game draws on) on the left, the input hint
+   in the centre, the live band word on the right in 34px Cinzel, and the 2px time thread
+   along the top with no background track (the design skill bans filled-track bars). Under
+   768px the meter takes the full width and the hint and band sit in a row beneath it: every
+   game has a tap form, so the strip only has to stay readable. */
+
+.bench-game {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 184px 228px;
+  grid-template-areas: "meter hint tier";
+  /* A fixed row. With an auto row the canvas's own backing-store height fed back into the
+     row: a 120px strip measured a meter taller than itself and drew the pan off its foot. */
+  grid-template-rows: minmax(0, 1fr);
+  height: 120px;
+  box-sizing: border-box;
+  /* Opaque: whatever the stage shows behind the strip must not ghost through its text. */
+  background: var(--sunk);
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  box-shadow: var(--bevel);
+  color: var(--ink);
+  font-family: var(--body);
+  user-select: none;
+  -webkit-user-select: none;
+  /* A drag on the strip is the game's, never a page scroll or a text selection. */
+  touch-action: none;
+  overflow: hidden;
+}
+
+.bench-game__thread {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--gold);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+.bench-game__meter { grid-area: meter; position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+/* Absolutely placed, so the canvas's pixel size never takes part in the grid's sizing. */
+.bench-game__canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+.bench-game__hint {
+  grid-area: hint;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-left: 1px solid var(--edge);
+  text-align: center;
+}
+.bench-game__hint-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--dim);
+}
+.bench-game__tools { display: flex; align-items: center; gap: 8px; }
+
+.bench-game__steady {
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 6px;
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  border-radius: 3px;
+}
+
+.bench-game__help,
+.bench-game__act {
+  font-family: var(--display);
+  color: var(--gold);
+  background: var(--panel);
+  border: 1px solid var(--gold-dim);
+  border-radius: 3px;
+  box-shadow: var(--bevel);
+  cursor: pointer;
+  transition: transform .12s ease-out, border-color .12s ease-out;
+}
+.bench-game__help { width: 26px; height: 26px; padding: 0; font-size: 14px; line-height: 1; }
+.bench-game__act { height: 26px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+.bench-game__help:hover,
+.bench-game__act:hover { border-color: var(--gold); }
+.bench-game__help:active,
+.bench-game__act:active { transform: translateY(1px); }
+.bench-game__help:focus-visible,
+.bench-game__act:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.bench-game__act:disabled { color: var(--ash); border-color: var(--edge); cursor: default; }
+
+.bench-game__tier {
+  grid-area: tier;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 20px;
+  border-left: 1px solid var(--edge);
+  font-family: var(--display);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--gold);
+  text-shadow: var(--engraved);
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+/* The band without names: five pips, filled up to the band reached. Shape (a diamond,
+   solid or hollow) carries it as well as colour. */
+.bench-game__band { display: flex; gap: 9px; }
+.bench-game__band i {
+  display: block;
+  width: 9px; height: 9px;
+  border: 1.5px solid var(--gold-dim);
+  transform: rotate(45deg);
+}
+.bench-game__band i.is-on { background: var(--gold); border-color: var(--gold); }
+/* One or the other: the word when the server named the bands, the pips when it did not. */
+.bench-game__band[hidden], .bench-game__word[hidden] { display: none; }
+
+.bench-game__live {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The first-time card and the paused card share one plate over the strip. */
+.bench-game__card {
+  position: absolute;
+  inset: 2px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  /* Opaque: a card the strip shows through reads as two lines of text on top of each other. */
+  background: var(--panel);
+  text-align: center;
+}
+.bench-game__card[hidden] { display: none; }
+.bench-game__card-text { margin: 0; font-size: 18px; color: var(--ink); }
+.bench-game__card-sub { margin: 0; font-size: 13px; color: var(--dim); }
+
+.bench-game.is-done .bench-game__hint-text { color: var(--ink); }
+
+@media (max-width: 767px) {
+  .bench-game {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 120px auto;
+    grid-template-areas: "meter meter" "hint tier";
+    height: auto;
+  }
+  .bench-game__hint {
+    align-items: flex-start;
+    text-align: left;
+    padding: 8px 12px;
+    border-left: 0;
+    border-top: 1px solid var(--edge);
+  }
+  .bench-game__tier {
+    font-size: 26px;
+    padding: 8px 12px;
+    border-left: 0;
+    border-top: 1px solid var(--edge);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bench-game__help, .bench-game__act { transition: none; }
+}
