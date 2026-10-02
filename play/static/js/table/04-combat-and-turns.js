@@ -121,6 +121,45 @@ function combatMenu(html) {
   m.innerHTML = html || "";
 }
 
+// The entries a reply added to the log. `log` is a sliding window of the last thirty
+// (play/views.py `_state`) with no ids, so the new ones are what is left after the longest
+// run of the old window that the new one starts with. If nothing lines up, nothing is new:
+// a missed sound is the safe failure, a replayed one is not.
+function newLogEntries(before, after) {
+  const a = (before || []).map(e => JSON.stringify(e));
+  const b = (after || []).map(e => JSON.stringify(e));
+  for (let n = 0; n <= b.length; n++) {
+    const keep = b.length - n;
+    if (keep > a.length) continue;
+    let same = true;
+    for (let i = 0; i < keep && same; i++) same = b[i] === a[a.length - keep + i];
+    if (same) return (after || []).slice(keep);
+  }
+  return [];
+}
+
+// The player's resolved attacks in a reply, heard (sound.js; silent without it). The log
+// carries the engine's own verdict, "hit" or "miss"; a critical is the hit whose
+// "Confirm critical" roll met the target, which is the engine's own test
+// (`confirm.total >= swing_ac`, rules/engine.py) and the only sign of it the log has.
+// A full attack's swings follow one another a beat apart rather than all at once.
+function attackSounds(before, after, wait) {
+  if (!window.Sound) return;
+  const strikes = [];
+  for (const e of newLogEntries(before, after)) {
+    for (const o of (e.outcomes || [])) {
+      if (o.op !== "attack" || (o.verdict !== "hit" && o.verdict !== "miss")) continue;
+      const ac = o.dc && o.dc.value;
+      const crit = o.verdict === "hit" && ac != null && (o.rolls || []).some(r =>
+        /^Confirm critical/.test(r.label || "") && r.total >= ac);
+      strikes.push(crit ? "combat.crit" : o.verdict === "hit" ? "combat.hit" : "combat.miss");
+    }
+  }
+  if (!strikes.length) return;
+  Promise.resolve(wait).catch(() => {}).then(() => strikes.forEach((name, i) =>
+    window.Sound && Sound.play(name, { delay: i * 0.22 })));
+}
+
 async function commitTurn(endOnly) {
   const actions = [];
   const said = [];
@@ -147,6 +186,7 @@ async function commitTurn(endOnly) {
   $("#err").textContent = "";
   $("#err").className = "";
   busy(true);
+  const logBefore = (typeof STATE !== "undefined" && STATE && STATE.log) || [];
   try {
     const d = await post("/api/combat/act", {
       actions: endOnly ? [] : actions,
@@ -156,6 +196,7 @@ async function commitTurn(endOnly) {
     COMBAT.move = COMBAT.standard = COMBAT.swift = null; COMBAT.frees = [];
     combatMenu("");
     render(d);
+    attackSounds(logBefore, d && d.log, null);
   } catch (e) { $("#err").textContent = e.message; }
   busy(false);
 }
@@ -349,9 +390,12 @@ async function sendRoll(face, shown) {
 
   busy(true);
   let state = null;
+  const logBefore = (STATE && STATE.log) || [];
   try { state = await post("/api/roll", { face: landed }); }
   catch (e) { $("#err").textContent = e.message; }
   finally { busy(false); }
+  // An attack this die finished, heard once the die is down (never awaited).
+  if (state) attackSounds(logBefore, state.log, rest);
 
   // Land the die on what the server rolled. Without this the main roll path asked,
   // played a decorative throw that ended on an arbitrary face, closed the mat, and
