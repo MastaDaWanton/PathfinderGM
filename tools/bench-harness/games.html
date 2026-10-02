@@ -1,0 +1,220 @@
+<!doctype html>
+<!-- The bench games harness: the nine herbalism minigames on their own, with no campaign,
+     no server and no 3D stage. Kept in the repo because tuning a timing game means playing
+     it a hundred times, and doing that through the bench means a hundred Craft rolls.
+
+     It loads the live files: theme-v2.css, bench-games.css, every js/bench-games/*.js and
+     js/table/33-bench-games.js, in the order table.html will (games before 33). So what
+     plays here is what the bench plays.
+
+     Serve the repo root (`python -m http.server 8762`) and open
+     /tools/bench-harness/games.html. The fake stage logs each GameView call to the panel on
+     the right, so the state shapes in docs/herbalism-contracts.md §5.1 can be read off it;
+     the fake Sound logs each sound name the game asks for. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bench games harness</title>
+<link rel="stylesheet" href="../../play/static/css/theme-v2.css">
+<link rel="stylesheet" href="../../play/static/css/bench-games.css">
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100dvh; background: var(--bg); color: var(--ink);
+    font: 16px/1.5 var(--body);
+  }
+  .hx { display: grid; grid-template-columns: 280px minmax(0, 1fr) 320px; gap: 20px;
+        padding: 20px; max-width: 1700px; margin: 0 auto; box-sizing: border-box; }
+  h1 { grid-column: 1 / -1; margin: 0; font: 600 22px var(--display); color: var(--gold);
+       text-shadow: var(--engraved); }
+  .hx-panel { background: var(--panel); border: 1px solid var(--edge); border-radius: 3px;
+              box-shadow: var(--bevel); padding: 14px 16px; }
+  .hx-panel h2 { margin: 0 0 10px; font: 15px var(--display); color: var(--gold); }
+  .hx-field { display: grid; gap: 4px; margin-bottom: 14px; }
+  .hx-field > span, .hx-legend { font-size: 13px; color: var(--dim); }
+  .hx-methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .hx-methods button, .hx-row button {
+    font: 13px var(--display); color: var(--gold); background: var(--sunk);
+    border: 1px solid var(--gold-dim); border-radius: 3px; padding: 6px 4px; cursor: pointer;
+  }
+  .hx-methods button[aria-pressed="true"] { border-color: var(--gold); color: var(--ink);
+    box-shadow: inset 0 -2px 0 var(--gold); }
+  .hx-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hx-row button.hx-primary { background: var(--gold); color: var(--sunk); border-color: var(--gold); }
+  .hx-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin-bottom: 6px; }
+  select, input[type="number"] { font: 14px var(--body); color: var(--ink); background: var(--sunk);
+    border: 1px solid var(--edge); border-radius: 3px; padding: 4px 6px; }
+  input[type="range"] { width: 100%; accent-color: var(--gold); }
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  /* A fixed-height ground: the strip must not move while it is being aimed at, and the
+     sound list growing below it once pushed it down mid-game. */
+  .hx-stage { display: grid; grid-template-rows: 360px auto auto; align-content: start; gap: 12px; min-width: 0; }
+  .hx-ground { position: relative; border-radius: 3px; min-height: 300px;
+    background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--edge) 70%, var(--bg)) 0%, var(--bg) 72%); }
+  .hx-ground > #tool { position: absolute; top: 20px; width: 100%; text-align: center; margin: 0;
+    font: 15px var(--display); color: var(--ash); }
+  #strip { position: absolute; left: 20px; right: 20px; bottom: 20px; }
+  .hx-out { font: 14px var(--body); color: var(--ink); }
+  .hx-out b { color: var(--gold); font-weight: normal; font-family: var(--display); }
+  #log, #sounds { margin: 0; font: 12px/1.5 ui-monospace, Consolas, monospace; color: var(--dim);
+    white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; }
+  #sounds { max-height: 140px; }
+  /* Narrow: the strip first, so it can be watched while the settings scroll below. */
+  @media (max-width: 1100px) {
+    .hx { grid-template-columns: 1fr; padding: 12px 16px; gap: 12px; }
+    .hx > * { order: 2; }
+    .hx > h1 { order: 0; }
+    .hx > .hx-stage { order: 1; grid-template-rows: 300px auto auto; }
+  }
+</style>
+</head>
+<body>
+<main class="hx">
+  <h1>Bench games harness</h1>
+
+  <section class="hx-panel" aria-label="Settings">
+    <div class="hx-field">
+      <span class="hx-legend" id="m-label">Method</span>
+      <div class="hx-methods" id="methods" role="group" aria-labelledby="m-label"></div>
+    </div>
+    <label class="hx-field"><span>Part</span>
+      <select id="part">
+        <option>leaf</option><option>flower</option><option>root</option><option>bark</option>
+        <option>seed</option><option>gland</option>
+      </select>
+    </label>
+    <label class="hx-field"><span>Difficulty <output id="d-out">0.50</output></span>
+      <input id="difficulty" type="range" min="0" max="1" step="0.05" value="0.5">
+    </label>
+    <label class="hx-field"><span>Seconds</span>
+      <input id="seconds" type="number" min="3" max="12" step="1" value="6">
+    </label>
+    <label class="hx-check"><input id="steady" type="checkbox"> Steady mode</label>
+    <label class="hx-check"><input id="reduced" type="checkbox"> Reduced motion</label>
+    <label class="hx-check"><input id="fake-stage" type="checkbox" checked> With fake stage</label>
+    <label class="hx-check"><input id="names" type="checkbox" checked> Band names from the server</label>
+    <label class="hx-check"><input id="infusion" type="checkbox"> Brew is an infusion</label>
+    <div class="hx-row" style="margin-top: 12px">
+      <button type="button" class="hx-primary" id="play">Play</button>
+      <button type="button" id="stop">Stop</button>
+      <button type="button" id="pause">Pause</button>
+      <button type="button" id="resume">Resume</button>
+    </div>
+    <div class="hx-row" style="margin-top: 8px">
+      <button type="button" id="reset">Show first-time cards again</button>
+    </div>
+  </section>
+
+  <section class="hx-stage" aria-label="Stage">
+    <div class="hx-ground">
+      <p id="tool">The tool sits here</p>
+      <div id="strip"></div>
+    </div>
+    <div class="hx-panel hx-out" aria-live="polite">
+      Live score <b id="live">none yet</b>. Result <b id="result">none yet</b>.
+    </div>
+    <div class="hx-panel">
+      <h2>Sounds asked for</h2>
+      <pre id="sounds"></pre>
+    </div>
+  </section>
+
+  <section class="hx-panel" aria-label="Fake stage log">
+    <h2>Fake stage</h2>
+    <pre id="log">Updates appear here while a game runs.</pre>
+  </section>
+</main>
+
+<script src="../../play/static/js/bench-games/grind.js"></script>
+<script src="../../play/static/js/bench-games/mix.js"></script>
+<script src="../../play/static/js/bench-games/brew.js"></script>
+<script src="../../play/static/js/bench-games/dry.js"></script>
+<script src="../../play/static/js/bench-games/reduce.js"></script>
+<script src="../../play/static/js/bench-games/extract.js"></script>
+<script src="../../play/static/js/bench-games/infuse.js"></script>
+<script src="../../play/static/js/bench-games/steep.js"></script>
+<script src="../../play/static/js/bench-games/neutralize.js"></script>
+<script src="../../play/static/js/table/33-bench-games.js"></script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var method = "grind";
+  var NAMES = ["Crude", "Sound", "Fine", "Superior", "Flawless"];
+
+  // The fake Sound: G's real one synthesises; this one only writes the name down.
+  var heard = [];
+  window.Sound = {
+    play: function (name) {
+      heard.push(name);
+      if (heard.length > 14) heard.shift();
+      $("sounds").textContent = heard.join("\n");
+    },
+    loop: function () { return { stop: function () {} }; },
+    unlock: function () {}
+  };
+
+  // The fake GameView: logs every call, the latest state in full plus a running count.
+  function fakeStage(m) {
+    var updates = 0, lines = [], latest = null, timer = 0;
+    function show() {
+      timer = 0;
+      $("log").textContent = "method " + m + ", update() calls " + updates + "\n" +
+        "latest state:\n" + JSON.stringify(latest, function (k, v) {
+          return typeof v === "number" ? Math.round(v * 1000) / 1000 : v;
+        }) + "\n\n" + lines.join("\n");
+    }
+    function later() { if (!timer) timer = setTimeout(show, 120); }
+    return {
+      update: function (s) { updates++; latest = s; later(); },
+      hit: function (x) { lines.unshift("hit(" + x.toFixed(2) + ")"); lines.length = Math.min(lines.length, 12); later(); },
+      miss: function () { lines.unshift("miss()"); lines.length = Math.min(lines.length, 12); later(); },
+      end: function () { lines.unshift("end()"); show(); }
+    };
+  }
+
+  BenchGames.methods.forEach(function (m, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = (window.BenchGameDefs[m] || {}).name || m;
+    b.setAttribute("aria-pressed", String(m === method));
+    b.addEventListener("click", function () {
+      method = m;
+      Array.prototype.forEach.call($("methods").children, function (c) { c.setAttribute("aria-pressed", "false"); });
+      b.setAttribute("aria-pressed", "true");
+      $("tool").textContent = "The " + b.textContent.toLowerCase() + " tool sits here";
+    });
+    $("methods").appendChild(b);
+  });
+  $("difficulty").addEventListener("input", function () { $("d-out").textContent = (+this.value).toFixed(2); });
+
+  $("play").addEventListener("click", function () {
+    $("result").textContent = "playing";
+    var tuning = { method: method, part: $("part").value, difficulty: +$("difficulty").value,
+      seconds: +$("seconds").value || 6, beats: 8, infusion: $("infusion").checked };
+    if ($("names").checked) tuning.names = NAMES;
+    this.blur();   // Space must reach the game, not press Play again
+    BenchGames.play({
+      method: method, part: $("part").value, tuning: tuning, mount: $("strip"),
+      stage: $("fake-stage").checked ? fakeStage(method) : null,
+      steady: $("steady").checked, reducedMotion: $("reduced").checked,
+      onScore: function (s) { $("live").textContent = s.toFixed(3); }
+    }).then(function (r) {
+      $("result").textContent = JSON.stringify({ score: Math.round(r.score * 1000) / 1000,
+        stopped: r.stopped, hits: r.hits, misses: r.misses });
+      window.lastResult = r;
+    });
+  });
+  $("stop").addEventListener("click", function () { BenchGames.stop(); });
+  $("pause").addEventListener("click", function () { BenchGames.pause(); });
+  $("resume").addEventListener("click", function () { BenchGames.resume(); });
+  $("reset").addEventListener("click", function () {
+    try {
+      BenchGames.methods.forEach(function (m) { localStorage.removeItem("pgm.games.seen." + m); });
+    } catch (e) { /* storage blocked: the cards show anyway */ }
+  });
+})();
+</script>
+</body>
+</html>
