@@ -17,8 +17,13 @@ on 2026-10-02, and each test below names what it pins and what that measurement 
   * the tool stood at 50% of the stage height at 16:9, 21:9 and 3440x1440, and at no less
     than 38% on a 418x760 narrow stage, measured from every vertex.
 """
+import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 JS = ROOT / "play" / "static" / "js"
@@ -352,3 +357,181 @@ def test_harness_loads_every_part_before_the_api():
     parts = [s for s in srcs if "/bench-stage/" in s]
     assert [Path(s).name for s in parts] == [p.name for p in PARTS]
     assert srcs.index(parts[-1]) < srcs.index(next(s for s in srcs if s.endswith("32-bench-stage.js")))
+
+
+# --- the inputs added at merge (2026-10-02) ---------------------------------------------
+#
+# The tools need no WebGL to pose: 00-math, 02-meshes, 05-props and 06-tools build plain
+# node trees, so node can load them, pose a tool, and read what it would draw. This is the
+# same no-browser harness tests/test_bench_games.py uses for the games.
+
+_TOOLS_NODE = r"""
+const fs = require('fs'), vm = require('vm');
+const files = JSON.parse(process.argv[2]);
+const sb = { window: {}, Math, JSON, Object, Array, Float32Array, Uint8Array, Uint16Array, Uint32Array,
+             Int16Array, console, isFinite };
+sb.window.window = sb.window;
+vm.createContext(sb);
+for (const f of files) vm.runInContext(fs.readFileSync(f, 'utf8'), sb);
+const K = sb.window.BenchStageKit, B = K.tools.BUILD;
+const out = {};
+function fx() {
+  const f = { dots: [], emits: [] };
+  f.dot = (p, c, a, s, add) => f.dots.push({ p: p, add: !!add });
+  f.emit = (kind, p) => f.emits.push({ kind: kind, p: p });
+  return f;
+}
+function walk(n, fn) { fn(n); (n.kids || []).forEach(k => walk(k, fn)); }
+function settle(T, f) { for (let i = 0; i < 200; i++) T.step(0.05, i * 0.05, f); }
+
+// Extract: the dots drawn with and without nodes, at three points along the cut.
+const path = [];
+for (let i = 0; i <= 40; i++) path.push([i / 40, 0.5 + 0.12 * Math.sin(i / 40 * 9)]);
+const NODES = [0.25, 0.5, 0.75, 0.97];
+out.extract = {};
+for (const at of [0, 0.6, 1]) {
+  const T = B.extract(), a = fx(), b = fx();
+  T.pose({ path: path, at: at, pace: 0.4, nicked: false }); settle(T, a); T.dots(a);
+  T.pose({ path: path, at: at, pace: 0.4, nicked: false, nodes: NODES }); settle(T, b); T.dots(b);
+  out.extract[String(at)] = {
+    add: b.dots.filter(d => d.add).length - a.dots.filter(d => d.add).length,
+    flat: b.dots.filter(d => !d.add).length - a.dots.filter(d => !d.add).length
+  };
+}
+// Reduce: where the band's notches stand and how much of the scale is hatched.
+function reduceMarks(state) {
+  const T = B.reduce();
+  if (state) T.pose(state);
+  settle(T, fx());
+  const notches = [], red = [];
+  walk(T.root, n => {
+    if (!n.mesh || !n.mat || n.visible === false) return;
+    const c = n.mat.color || [], e = n.mat.emit || [];
+    const ang = Math.round(Math.atan2(n.pos[0], n.pos[1]) * 180 / Math.PI);
+    if (e[0] === 0.1 && e[1] === 0.07) notches.push(ang);
+    if (c[0] === 0.69 && c[1] === 0.28) red.push(ang);
+  });
+  return { notches: notches.sort((x, y) => x - y), red: red.length };
+}
+out.reduce = {
+  none: reduceMarks(null),
+  old: reduceMarks({ level: 0.6, line: 0.3, heat: 0.5 }),
+  given: reduceMarks({ level: 0.6, line: 0.3, heat: 0.5, band: [0.25, 0.5], scorch: 0.5 })
+};
+// Dry: where a hit lands, with and without the bundle's index.
+{
+  const T = B.dry(), f = fx();
+  const st = { bundles: [0, 1, 2, 3].map(() => ({ cure: 0.4, band: [0.6, 0.8], turned: false })) };
+  T.pose(st); settle(T, f);
+  const xs = [];
+  walk(T.root, n => { if (!n.mesh && n.pos && n.pos[1] === 1.1) xs.push(n.pos[0]); });
+  // The fallback first: a named bundle becomes the tool's "last turned" from then on.
+  T.hit(1, f, null); const without = f.emits[0].p[0];
+  f.emits.length = 0; T.hit(1, f, 2); const withIndex = f.emits[0].p[0];
+  f.emits.length = 0; T.miss(f, 3); const missAt = f.emits[0].p[0];
+  out.dry = { xs: xs, withIndex: withIndex, without: without, missAt: missAt };
+}
+// Garbage and old shapes must not throw.
+out.survives = [];
+const odd = [
+  ['extract', { path: path, at: 0.5, pace: 0.5, nicked: false, nodes: [NaN, 'x', null, 2, -1] }],
+  ['extract', { path: [], at: 0.5, pace: 0.5, nicked: false, nodes: NODES }],
+  ['extract', { path: [[0.5, 0.5]], at: 0.5, pace: 0.5, nicked: false, nodes: NODES }],
+  ['reduce', { level: 0.5, line: 0.3, heat: 0.5, band: [0.4], scorch: 'hot' }],
+  ['reduce', { level: 0.5, line: 0.3, heat: 0.5, band: null, scorch: null }]
+];
+for (const [m, s] of odd) {
+  const T = B[m](), f = fx();
+  T.pose(s); settle(T, f); T.dots(f); T.hit(0.5, f); T.miss(f);
+  out.survives.push(m);
+}
+process.stdout.write(JSON.stringify(out));
+"""
+
+_GAP = ("the stage could not draw Extract's stop points or Reduce's simmer band; both lanes "
+        "reported it at merge, 2026-10-02")
+
+
+@pytest.fixture(scope="module")
+def tools_run(tmp_path_factory):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed; the behaviour checks need a JS engine")
+    script = tmp_path_factory.mktemp("stage") / "tools.js"
+    script.write_text(_TOOLS_NODE, encoding="utf-8")
+    parts = [str(p) for p in PARTS if p.name[:2] in ("00", "02", "05", "06")]
+    done = subprocess.run([node, str(script), json.dumps(parts)], capture_output=True, text=True,
+                          timeout=60)
+    assert done.returncode == 0, done.stderr[:2000]
+    return json.loads(done.stdout)
+
+
+def test_extract_draws_each_stop_point_by_shape(tools_run):
+    """The stage could not draw Extract's stop points or Reduce's simmer band; both lanes
+    reported it at merge, 2026-10-02. Now each node is drawn on the incision path, and its
+    state reads by SHAPE: a node still ahead is an open ring of glowing points (18 for the
+    next one to stop at, 14 for the rest), a passed node is a notch of 9 flat points cut square
+    across the path. Measured on the posed tool, as the extra points `nodes` adds:
+    at the start 60 ring points and no notch; past two nodes 32 ring and 18 notch; at the end
+    no ring and 36 notch."""
+    e = tools_run["extract"]
+    assert e["0"] == {"add": 18 + 14 * 3, "flat": 0}, _GAP + ": " + str(e["0"])
+    assert e["0.6"] == {"add": 18 + 14, "flat": 9 * 2}, e["0.6"]
+    assert e["1"] == {"add": 0, "flat": 9 * 4}, e["1"]
+
+
+def test_reduce_shows_its_band_and_scorch_on_a_dial(tools_run):
+    """The stage could not draw Extract's stop points or Reduce's simmer band; both lanes
+    reported it at merge, 2026-10-02. Reduce's pan now carries a brass dial whose band is
+    notched at both ends and whose scorch zone is hatched. Measured on the posed tool: a band
+    of [0.25, 0.5] stands its notches at -60 and 0 degrees on the 240-degree scale, and a
+    scorch at 0.5 hatches 9 bars plus the red mark (10 red pieces) against 5 for the default
+    0.9. A state from before the fields (no band, no scorch) shows the game's defaults, the
+    same as no state at all."""
+    r = tools_run["reduce"]
+    assert r["given"]["notches"] == [-60, 0], _GAP + ": " + str(r["given"])
+    assert r["given"]["red"] == 10, r["given"]
+    assert r["none"]["notches"] == [round(-120 + 240 * 0.55), round(-120 + 240 * 0.77)], r["none"]
+    assert r["none"]["red"] == 5, r["none"]
+    assert r["old"] == r["none"], "an old state should leave the default dial alone"
+
+
+def test_dry_puts_a_hit_on_the_bundle_named(tools_run):
+    """`hit()` had no bundle index, so the stage showed every hit on the bundle the last state
+    showed turning, a frame behind the press (the game calls hit() before it sends the state
+    that says the bundle turned). With `hit(strength, index)` the glint lands on bundle 2's x,
+    `miss(index)` on bundle 3's; with no index the old guess stands (bundle 0 here, nothing
+    having turned)."""
+    d = tools_run["dry"]
+    xs = sorted(d["xs"])
+    assert len(xs) == 4, d
+    assert abs(d["withIndex"] - xs[2]) < 1e-9, d
+    assert abs(d["missAt"] - xs[3]) < 1e-9, d
+    assert abs(d["without"] - xs[0]) < 1e-9, d
+
+
+def test_odd_and_old_states_never_throw(tools_run):
+    """A stage given the older state, or a malformed new field, must draw what it can and not
+    throw (contracts §5.1, the 2026-10-02 additions are optional). Five such states posed,
+    stepped, drawn, hit and missed without an exception."""
+    assert tools_run["survives"] == ["extract"] * 3 + ["reduce"] * 2
+
+
+def test_gameview_hit_and_miss_take_an_index():
+    """`hit(strength, index)` and `miss(index)` reach the tool as its third and second argument,
+    filtered to a whole number or null, so the tool's fallback runs on anything else."""
+    code = ALL_CODE[STAGE.name]
+    game = code[code.index("function game("):code.index("function flourish(")]
+    assert 'safe("game.hit", function (strength, index)' in game
+    assert "T.hit(s, FX, pieceIndex(index))" in game
+    assert 'safe("game.miss", function (index)' in game
+    assert "T.miss(FX, pieceIndex(index))" in game
+    assert "function pieceIndex(i)" in code
+
+
+def test_the_harness_sends_the_new_fields():
+    """The stage harness is where the tools are looked at by hand; it sends Extract's nodes and
+    Reduce's band and scorch, so the marks can be seen without a game running."""
+    html = _src(HARNESS)
+    assert "nodes: NODES" in html
+    assert "band: [v.lo, v.hi], scorch: v.scorch" in html

@@ -513,18 +513,28 @@
       rng: KIT.rng(seed),
       seed: seed,
       pointer: r.pointer,
-      hit: function (strength, x, y, kind) {
+      // `index` (optional) names WHICH piece on the tool the hit or miss belongs to, for a
+      // game with several (Dry's bundles). Without it the stage guessed from the last state
+      // it was sent, and that state is a frame behind the press: the hit showed on the
+      // bundle turned before. Added 2026-10-02; a stage that ignores it still works.
+      hit: function (strength, x, y, kind, index) {
         var s = clamp(strength == null ? 1 : strength, 0, 1);
         r.hits++;
         sound("bench.hit." + r.def.id, { volume: 0.5 + 0.5 * s });
-        if (r.stage) { try { r.stage.hit(s); } catch (e) { r.stage = null; } }
+        if (r.stage) {
+          try { if (typeof index === "number") r.stage.hit(s, index); else r.stage.hit(s); }
+          catch (e) { r.stage = null; }
+        }
         burst(r, x, y, kind || "grit", Math.round(4 + 8 * s));
         if (s >= 0.5) jolt(r);
       },
-      miss: function () {
+      miss: function (index) {
         r.misses++;
         sound("bench.miss." + r.def.id);
-        if (r.stage) { try { r.stage.miss(); } catch (e) { r.stage = null; } }
+        if (r.stage) {
+          try { if (typeof index === "number") r.stage.miss(index); else r.stage.miss(); }
+          catch (e) { r.stage = null; }
+        }
       },
       tick: function () {
         var now = performance.now();

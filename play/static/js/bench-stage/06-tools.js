@@ -13,7 +13,8 @@
  *   pose(state)            the contracts §5.1 GameView state for this method
  *   step(dt, t, fx)        ease toward the pose; returns true while anything still moves
  *   live(dt, t, fx)        continuous emitters (steam, smoke) while a game runs
- *   hit(strength, fx) / miss(fx)
+ *   hit(strength, fx, index) / miss(fx, index)
+ *                          index: which piece (Dry's bundle), or null when the game sent none
  *   dots(fx)               guide points drawn on the tool (the Mix stroke, the incision)
  *
  * WHY POSES EASE RATHER THAN SNAP. The games run at whatever rate E updates them, and a
@@ -259,6 +260,41 @@
      tipped back by the same 50 degrees. */
   var FACE_CAMERA = -50 * D2R;
 
+  /* Shape for a dial's zones, so they read without colour (UI plan §9; the strip's own
+     dials notch their band and hatch their scorch zone the same way). Added 2026-10-02 for
+     Reduce, whose stage showed the level and nothing of where the heat should sit:
+       - a NOTCH at each end of the band, a brass bar standing proud across the gold arc;
+       - the SCORCH zone HATCHED, slanted bars from the scorch mark to the end of the
+         scale, closed at the mark by a red tick across the arc.
+     Angles are the needle's, as in dial(). */
+  function dialMarks(d, R) {
+    var brass = P.mat("brass", { emit: [0.1, 0.07, 0.03] });
+    var red = P.mat("enamel", { color: [0.69, 0.28, 0.24], spec: 0.5, emit: [0.12, 0.03, 0.02] });
+    var notch = G.box(R * 0.06, R * 0.32, R * 0.05), bar = G.box(R * 0.04, R * 0.24, R * 0.03);
+    var lo = P.add(d, P.node(notch, brass, { glint: false })), hi = P.add(d, P.node(notch, brass, { glint: false }));
+    var edge = P.add(d, P.node(notch, red, { glint: false }));
+    var HATCH = 9, bars = [];
+    for (var i = 0; i < HATCH; i++) bars.push(P.add(d, P.node(bar, red, { glint: false })));
+    function place(n, a, slant) {
+      var ar = a * D2R;
+      n.pos = [Math.sin(ar) * R * 0.74, Math.cos(ar) * R * 0.74, 0.008];
+      n.rot = [0, 0, -ar + (slant || 0)];
+    }
+    return {
+      setBand: function (a0, a1) { place(lo, a0); place(hi, a1); },
+      setScorch: function (a0, a1) {
+        place(edge, a0);
+        // One bar every 6 degrees of the zone, leaning 35 degrees: hatching, not a solid arc.
+        // (The 1e-6 keeps 0.9's 24 degrees, which arrive as 23.99999..., at four bars.)
+        var n = Math.max(0, Math.min(HATCH, Math.floor((a1 - a0) / 6 + 1e-6)));
+        for (var i = 0; i < HATCH; i++) {
+          bars[i].visible = i < n;
+          if (i < n) place(bars[i], a0 + (a1 - a0) * (i + 0.75) / (n + 0.5), 35 * D2R);
+        }
+      }
+    };
+  }
+
   /* --- brew: blackened camp pot on a small fire, a brass dial on the rim ---------------- */
   function brew() {
     var T = base("brew"), sp = T.sp;
@@ -431,24 +467,31 @@
       if (Math.random() < dt * 9) fx.emit("smoke", [0, 0.12, 0], { count: 1, spread: 0.3 });
       if (Math.random() < dt * 3) fx.emit("ember", [0, 0.1, 0], { count: 1, spread: 0.2 });
     };
-    function bundlePos() {
+    /* The bundle a hit or miss lands on. The game names it (2026-10-02); without a name
+       the old guess stands, the last bundle a state showed turning. That guess is a frame
+       late, because the game calls hit() inside the press and only then sends the state
+       that says the bundle turned, so it marked the bundle turned BEFORE this one. */
+    function bundlePos(index) {
+      if (index !== null && index !== undefined && bundles[index]) lastTurned = index;
       var b = bundles[lastTurned] || bundles[0];
       return [b.node.pos[0], 0.8, 0];
     }
-    T.hit = function (s, fx) {
-      var p = bundlePos();
+    T.hit = function (s, fx, index) {
+      var p = bundlePos(index);
       fx.emit("glint", p, { count: 1 });
       fx.emit("grit", p, { count: Math.round(3 + 4 * s), col: [0.55, 0.5, 0.25], speed: 0.6 });
     };
-    T.miss = function (fx) {
-      fx.emit("grit", bundlePos(), { count: 6, col: [0.3, 0.2, 0.1], speed: 0.8 });
+    T.miss = function (fx, index) {
+      fx.emit("grit", bundlePos(index), { count: 6, col: [0.3, 0.2, 0.1], speed: 0.8 });
     };
     return T;
   }
 
   /* --- reduce: a small pan on a brazier ---------------------------------------------------
      The level falls toward a scored brass line; the liquor darkens as it thickens and
-     goes to char once it is let fall past the line. */
+     goes to char once it is let fall past the line. A brass heat dial stands on the
+     handle (added 2026-10-02): the needle is the heat, the simmer `band` a gold arc
+     notched at both ends, and the `scorch` zone hatched, as Brew's dial and the strip's. */
   function reduce() {
     var T = base("reduce"), sp = T.sp, i;
     var iron = P.mat("iron");
@@ -475,6 +518,13 @@
     var surf = P.add(T.root, P.node(G.disc(1, 44), liq));
     var lineMesh = G.ring(1, 0.012, 64, 6);
     var line = P.add(T.root, P.node(lineMesh, P.mat("gold", { alpha: 0.75 }), { glint: false }));
+    // The dial stands on a brass post on the handle, between the pan and the grip. It sits
+    // low enough that the pan's far rim stays the top of the tool, so the framing (fit to
+    // every vertex) does not shrink the pan to make room for it.
+    P.add(T.root, P.node(G.box(0.028, 0.12, 0.024), P.mat("brass"), { pos: [0.7, 0.53, 0.02] }));
+    var DR = 0.13;
+    var mount = P.add(T.root, P.group({ pos: [0.7, 0.6 + DR, 0.02], rot: [FACE_CAMERA, -0.3, 0] }));
+    var dl = dial(mount, DR, P.mat("enamel"), 120), marks = dialMarks(dl.group, DR);
     var st = null;
     T.ring = { r: 0.52, y: 0.48, x: 0, z: 0 };
     T.chip = { r: 0.82, y: 0, arc: 110, ground: true };
@@ -483,16 +533,30 @@
     T.glow = { pos: [0, 0.2, 0], col: [0, 0, 0] };
     function yAt(level) { return 0.31 + clamp(level) * 0.15; }
     function rAt(y) { return Math.max(0.05, G.radiusAt(panProf, y, true) - 0.004); }
-    function rest() { st = null; sp.set("level", 0.85, 4); sp.set("line", 0.4, 4); sp.set("heat", 0.3, 4); }
+    function ang(h) { return -120 + 240 * clamp(h); }
+    function showBand(b) {
+      dl.setBand(ang(b[0]), ang(b[1]));
+      marks.setBand(ang(b[0]), ang(b[1]));
+    }
+    // A state from before 2026-10-02 carries no band or scorch; the dial keeps the game's
+    // own defaults (the simmer notch round 0.66, the crust from 0.9), as Brew's does.
+    var BAND = [0.55, 0.77], SCORCH = 0.9;
+    function rest() {
+      st = null; sp.set("level", 0.85, 4); sp.set("line", 0.4, 4); sp.set("heat", 0.3, 4);
+      showBand(BAND); marks.setScorch(ang(SCORCH), ang(1));
+    }
     rest();
     T.end = rest;
     T.pose = function (s) {
       st = s;
       sp.set("level", clamp(s.level), 10); sp.set("line", clamp(s.line), 10); sp.set("heat", clamp(s.heat), 10);
+      if (Array.isArray(s.band) && s.band.length === 2) showBand([clamp(s.band[0]), clamp(s.band[1])]);
+      if (s.scorch !== undefined && s.scorch !== null && isFinite(+s.scorch)) marks.setScorch(ang(s.scorch), ang(1));
     };
     T.step = function (dt) {
       var moving = sp.step(dt);
       var lv = sp.get("level"), ln = sp.get("line"), h = sp.get("heat");
+      dl.setNeedle(ang(h));
       var y = yAt(lv), ry = rAt(y);
       surf.pos = [0, y, 0]; surf.scl = [ry, 1, ry];
       var yl = yAt(ln), rl = rAt(yl) + 0.004;
@@ -526,7 +590,8 @@
   /* --- extract: a board with knife and tongs ---------------------------------------------
      The incision path is dotted on the gland in brass; the knife's point follows it at
      `at`, tipped further as the pace climbs. A nick bursts the sac: a dark splash, and the
-     gland sags. */
+     gland sags. The stop points (`nodes`, added 2026-10-02) sit on the path: an open ring
+     for one still ahead, a notch cut across the path for one the knife has passed. */
   function extract() {
     var T = base("extract"), sp = T.sp;
     P.add(T.root, P.node(G.box(1.36, 0.07, 0.8), P.mat("wood", { color: [0.56, 0.4, 0.25], patScale: 0.8 }), { pos: [0, 0.035, 0] }));
@@ -552,7 +617,7 @@
     }
     function along(path, at) {
       if (!path || !path.length) return null;
-      if (path.length === 1) return { p: map(path[0]), d: [1, 0] };
+      if (path.length === 1) return { p: map(path[0]), d: [1, 0], flat: path[0] };
       var lens = [0], tot = 0, i;
       for (i = 1; i < path.length; i++) {
         tot += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
@@ -562,8 +627,46 @@
       for (i = 1; i < path.length; i++) if (lens[i] >= want) break;
       i = Math.min(i, path.length - 1);
       var seg = lens[i] - lens[i - 1] || 1, f = (want - lens[i - 1]) / seg;
-      var a = path[i - 1], b = path[i];
-      return { p: map([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]), d: [b[0] - a[0], b[1] - a[1]] };
+      var a = path[i - 1], b = path[i], flat = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+      return { p: map(flat), d: [b[0] - a[0], b[1] - a[1]], flat: flat };
+    }
+    // map() stretches the path's 0..1 square to 0.56 by 0.34 on the board. Marks are laid
+    // out in board units and divided back, so a ring is round on the gland and not an oval.
+    var SX = 0.56, SZ = 0.34;
+    /* The stop points. SHAPE carries the state, never colour alone (UI plan §9, the
+       accessibility rule every game draws to): a node ahead is an open ring of brass
+       points round the path, and the next one to stop at is the larger ring; a node the
+       knife has passed is a notch, a short bar cut square across the path. Every point is
+       laid through map(), so the marks follow the gland's curve as the path does. */
+    function nodeMarks(fx, path, at, nodes) {
+      var next = -1, j, k;
+      for (j = 0; j < nodes.length; j++) if (clamp(nodes[j]) > at) { next = j; break; }
+      for (j = 0; j < nodes.length; j++) {
+        var u = +nodes[j];
+        if (!isFinite(u)) continue;
+        var q = along(path, clamp(u));
+        if (!q || !q.flat) continue;
+        var c = q.flat;
+        if (clamp(u) > at) {
+          var R = j === next ? 0.036 : 0.026, n = j === next ? 18 : 14;
+          for (k = 0; k < n; k++) {
+            var a = k / n * TAU;
+            fx.dot(map([c[0] + Math.cos(a) * R / SX, c[1] + Math.sin(a) * R / SZ]),
+                   [1, 0.82, 0.48], j === next ? 0.95 : 0.6, j === next ? 0.016 : 0.013, true);
+          }
+        } else {
+          // Square across the cut: the path's direction on the board, turned a quarter.
+          var dx = q.d[0] * SX, dz = q.d[1] * SZ, dl = Math.hypot(dx, dz) || 1;
+          var nx = -dz / dl, nz = dx / dl;
+          // Short and bold: at 0.08 long and 0.017 thick (the first harness capture) the
+          // camera's 50-degree pitch stood the bar up into a thin pin; a stubby tick reads
+          // as a notch cut across the line.
+          for (k = -4; k <= 4; k++) {
+            var o = k / 4 * 0.026;
+            fx.dot(map([c[0] + nx * o / SX, c[1] + nz * o / SZ]), [0.86, 0.7, 0.4], 0.95, 0.022, false);
+          }
+        }
+      }
     }
     function rest() {
       st = null;
@@ -608,6 +711,8 @@
         var cut = i / n <= at;
         fx.dot(q.p, cut ? [0.35, 0.08, 0.06] : [1, 0.82, 0.48], cut ? 0.9 : 0.75, cut ? 0.016 : 0.02, !cut);
       }
+      // A state from before 2026-10-02 has no nodes, and draws the path alone.
+      if (Array.isArray(st.nodes)) nodeMarks(fx, path, at, st.nodes);
     };
     T.hit = function (s, fx) {
       fx.emit("glint", knife.pos, { count: 1 });

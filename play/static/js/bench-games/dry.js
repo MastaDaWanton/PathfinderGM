@@ -51,15 +51,17 @@
         if (!b || b.turned) return;
         b.turned = true;
         var c = b.cure, x = centreX(i);
+        // The bundle's index goes with every hit and miss, so the stage puts the glint on
+        // THIS bundle; the state it last saw does not yet say this one was turned.
         if (c >= band[0] && c <= band[1]) {
           b.q = 1 - 0.3 * Math.min(1, Math.abs(c - centre) / half);
-          ctx.hit(b.q, x, 50, "steam");
+          ctx.hit(b.q, x, 50, "steam", i);
         } else if (c < band[0]) {
           b.q = c >= band[0] - 0.08 ? 0.35 : 0;
-          if (b.q) ctx.hit(0.2, x, 50, "steam"); else ctx.miss();
+          if (b.q) ctx.hit(0.2, x, 50, "steam", i); else ctx.miss(i);
         } else {
           b.q = Math.max(0.1, 0.5 - (c - band[1]) * 3);
-          ctx.miss();
+          ctx.miss(i);
         }
       }
 
@@ -83,7 +85,7 @@
             if (b.turned) return;
             b.cure = Math.min(1, b.cure + b.rate * dt);
             if (!b.entered && b.cure >= band[0]) { b.entered = true; ctx.tick(); }
-            if (b.cure >= 1) { b.turned = true; b.q = 0; b.scorched = true; ctx.miss(); }
+            if (b.cure >= 1) { b.turned = true; b.q = 0; b.scorched = true; ctx.miss(i); }
           });
         },
         down: function (inp) {

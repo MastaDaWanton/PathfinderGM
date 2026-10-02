@@ -168,8 +168,12 @@
     function later() { if (!timer) timer = setTimeout(show, 120); }
     return {
       update: function (s) { updates++; latest = s; later(); },
-      hit: function (x) { lines.unshift("hit(" + x.toFixed(2) + ")"); lines.length = Math.min(lines.length, 12); later(); },
-      miss: function () { lines.unshift("miss()"); lines.length = Math.min(lines.length, 12); later(); },
+      // A second argument is the piece's index (Dry's bundle), logged when a game sends one.
+      hit: function (x, i) {
+        lines.unshift("hit(" + x.toFixed(2) + (i === undefined ? "" : ", " + i) + ")");
+        lines.length = Math.min(lines.length, 12); later();
+      },
+      miss: function (i) { lines.unshift("miss(" + (i === undefined ? "" : i) + ")"); lines.length = Math.min(lines.length, 12); later(); },
       end: function () { lines.unshift("end()"); show(); }
     };
   }

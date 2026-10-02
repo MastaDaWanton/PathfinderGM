@@ -618,6 +618,11 @@
   }
 
   /* --- the game -------------------------------------------------------------------------- */
+  /* A piece index from a game: a whole number, or null for "the tool decides". */
+  function pieceIndex(i) {
+    return typeof i === "number" && isFinite(i) && i >= 0 ? Math.floor(i) : null;
+  }
+
   function game(method) {
     var T = toolFor(method);
     function onTool() { return T && S.tool === T; }
@@ -629,10 +634,13 @@
         S.gameLast = now();
         if (onTool()) wake();
       }),
-      hit: safe("game.hit", function (strength) {
+      // `index` (optional, added 2026-10-02) names the piece of the tool the hit belongs
+      // to: Dry's bundle. Without it the tool falls back to its own guess, the last bundle
+      // a state showed turning, which is a frame behind the press.
+      hit: safe("game.hit", function (strength, index) {
         if (!onTool()) return;
         var s = Math.max(0, Math.min(1, +strength || 0));
-        T.hit(s, FX);
+        T.hit(s, FX, pieceIndex(index));
         S.flare = Math.max(S.flare, 0.45 + 0.75 * s);
         if (!S.reduced) {
           S.nudge = 1.5; S.nudgeAt = now();
@@ -640,9 +648,9 @@
         }
         wake();
       }),
-      miss: safe("game.miss", function () {
+      miss: safe("game.miss", function (index) {
         if (!onTool()) return;
-        T.miss(FX);
+        T.miss(FX, pieceIndex(index));
         wake();
       }),
       end: safe("game.end", function () {

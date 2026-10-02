@@ -18,8 +18,9 @@
 // halved if that stretch was nicked; a node run past earns 0. The score is the sum over all
 // nodes.
 //
-// State for the stage: {path, at, pace, nicked} as contracts §5.1 has it. The nodes are not
-// in that shape, so the stage cannot draw them; noted in the lane's hand-back.
+// State for the stage: {path, at, pace, nicked, nodes} as contracts §5.1 has it. `nodes`
+// (added 2026-10-02) carries the stop points in the same 0..1 units as `at`; before it the
+// stage had no way to draw where the player must stop, which both lanes reported at merge.
 (function () {
   "use strict";
   var defs = window.BenchGameDefs = window.BenchGameDefs || {};
@@ -127,7 +128,8 @@
         },
         state: function () {
           var i = seg();
-          return { path: pathN, at: at, pace: pace, nicked: i < nodes.length ? nicked[i] : nicked[nodes.length - 1] };
+          return { path: pathN, at: at, pace: pace, nicked: i < nodes.length ? nicked[i] : nicked[nodes.length - 1],
+                   nodes: nodes.slice() };
         },
         score: function () {
           var s = 0;
