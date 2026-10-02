@@ -6720,7 +6720,7 @@ class Engine:
         amount = int(intent.params.get("amount", 0) or 0)
         bypass = str(intent.params.get("bypass", "") or "")
         source = str(intent.params.get("source") or "a preparation")
-        rounds = _rounds_from(intent.params.get("duration"))
+        rounds = self._duration_rounds(intent.params.get("duration"), default_unit="hour")
         target.grant_defence(kind, against, amount=amount, bypass=bypass,
                              source=source, rounds=rounds, origin=intent.origin)
         said = {
@@ -6758,8 +6758,7 @@ class Engine:
         duration = intent.params.get("duration") or {}
         rounds = None
         if isinstance(duration, dict) and duration.get("amount"):
-            per = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
-            rounds = int(duration["amount"]) * per.get(str(duration.get("unit", "hour")), 600)
+            rounds = self._duration_rounds(duration, default_unit="hour")
         actor.add_buff(kind, target, amount, source=source, rounds=rounds,
                        note=str(intent.params.get("note", "")),
                        bonus_type=str(intent.params.get("bonus_type", "")),
@@ -10664,19 +10663,33 @@ class Engine:
         return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
                        because=intent.because)
 
-    def _duration_rounds(self, duration: dict) -> int:
-        """A `{amount, unit}` duration in rounds, rolling the amount when it is dice.
+    def _duration_rounds(self, duration, default_unit: str = "round") -> int | None:
+        """A `{amount, unit}` duration in rounds, rolling the amount when it is dice, or
+        None for no duration at all (an effect that does not wear off by itself).
 
         A dice duration is the source's own ("nauseated for 1d4 rounds", aconite) and the
-        engine rolls it. Read with int() it raised ValueError, so a jar was drunk and the
-        drinker's turn died with it (found by Lane C's taste of all 161 herbs, 2026-10-02).
-        One door for both ops that read a duration, so the two cannot drift apart again.
+        engine rolls it, every time (the owner, 2026-10-02: "roll them, it's what should have
+        been happening"). Read with int() it raised ValueError, so a jar was drunk and the
+        drinker's turn died with it (found by Lane C's taste of all 161 herbs); and the
+        defence op's reader swallowed the error and returned None, so a dice-length
+        resistance silently became permanent. Every op that reads a duration comes through
+        here, so they cannot drift apart again.
         """
+        if not isinstance(duration, dict) or not duration.get("amount"):
+            return None
         amount = duration.get("amount", 0)
+        unit = str(duration.get("unit") or default_unit)
+        if unit not in ("round", "minute", "hour", "day"):
+            unit = default_unit
         if not str(amount).strip().lstrip("-").isdigit():
-            amount = self.dice.roll(str(amount), label="how long it lasts",
-                                    visibility="hidden").total
-        return _to_rounds(amount, duration.get("unit", "round"))
+            from .dice import BadDice
+
+            try:
+                amount = self.dice.roll(str(amount), label="how long it lasts",
+                                        visibility="hidden").total
+            except BadDice:
+                return None
+        return _to_rounds(max(1, int(amount)), unit)
 
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
@@ -15561,17 +15574,6 @@ def survival_note(toll) -> str:
     if failed and not bits:
         bits.append(f"{failed} failed check{'s' if failed != 1 else ''}")
     return ("; ".join(bits) + ".") if bits else "nothing they could not walk off."
-
-
-def _rounds_from(duration) -> int | None:
-    """A duration block as a number of rounds, or None for one that never ends."""
-    if not isinstance(duration, dict) or not duration.get("amount"):
-        return None
-    per = {"round": 1, "minute": 10, "hour": 600, "day": 14400}
-    try:
-        return int(duration["amount"]) * per.get(str(duration.get("unit", "hour")), 600)
-    except (TypeError, ValueError):
-        return None
 
 
 def _doc_tell(template, actor) -> str:

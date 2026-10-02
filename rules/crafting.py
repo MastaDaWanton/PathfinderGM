@@ -1490,8 +1490,13 @@ def _scale_duration(duration, mult: float, up: bool):
     try:
         n = float(str(amount).strip())
     except (TypeError, ValueError):
-        return duration
+        # A dice duration stays dice and is rolled each time it lands (the owner,
+        # 2026-10-02: "roll them"); its average moves by the multiplier the way a dice
+        # amount does ("1d4 at 150%" is 1d4+1). Before this it passed through untouched,
+        # so the one kind of duration quality could not lengthen was the source's dice.
+        return {**duration, "amount": _scale_dice(str(amount), mult, up)}
     return {**duration, "amount": max(1, _round(n * mult, up))}
+
 
 
 def _harmful_ids(specs: list[dict]) -> set[int]:
