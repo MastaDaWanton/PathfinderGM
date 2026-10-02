@@ -54,14 +54,47 @@ def _ing(i):
     return ing_mod.get(i)
 
 
+# Fixture herbs, each with exactly the specs a mechanics test needs. Added 2026-10-02 when
+# the relevance pass rewrote the corpus: hemlock gained a poultice in front of its poison
+# and a four-minute paralysis, Menhirite's "Causes dead" went (a misparse), and Monkshood
+# gained a liniment that healed its own taster back up, so six tests that pinned shipped
+# herbs failed with every rule still working. A mechanism pinned to a fixture cannot be
+# broken by the next data edit; a test about the shipped corpus still reads the corpus.
+TESTBANE = {  # hemlock as it was: a Fortitude DC 15 gate on an unbounded paralysis
+    "id": "testbane", "name": "Testbane", "kind": "herb", "tier": "common",
+    "effects": [{"type": "save_gate", "target": "fort", "dc": 15, "route": "ingest"},
+                {"type": "apply_condition", "target": "paralyzed", "route": "ingest"}]}
+TESTMORT = {  # a death effect with no save, as Menhirite's misparse was
+    "id": "testmort", "name": "Testmort", "kind": "herb", "tier": "common",
+    "effects": [{"type": "apply_condition", "target": "dead", "route": "ingest"}]}
+TESTSHADE = {  # Monkshood as it was: 1d3 lethal poison damage and nothing else
+    "id": "testshade", "name": "Testshade", "kind": "herb", "tier": "common",
+    "effects": [{"type": "damage", "dice": "1d3", "damage_type": "poison",
+                 "lethality": "lethal", "route": "ingest"}]}
+
+
+@pytest.fixture
+def fixture_herbs(monkeypatch):
+    """The three fixture herbs on the shelf beside the corpus, for one test."""
+    shelf = dict(ing_mod.all_ingredients())
+    for raw in (TESTBANE, TESTMORT, TESTSHADE):
+        shelf[raw["id"]] = ing_mod.from_dict(raw)
+    monkeypatch.setattr(ing_mod, "_ALL", shelf)
+    return shelf
+
+
 # --- the classifier --------------------------------------------------------------------
 
-def test_drawback_or_benefit_is_read_off_the_spec():
+def test_drawback_or_benefit_is_read_off_the_spec(fixture_herbs):
     """The card's `drawback` field. Read from the structured spec, never the words: a
     condition caused, damage, ability damage and a penalty are drawbacks; healing, a
     bonus and a condition ended are benefits; a bare DC is neither. Measured on the
     corpus: 38 of 161 ingredients carry a bare "DC n" that gates nothing (the crafting
-    DC restated), and filing those as drawbacks would invent 38 poisons."""
+    DC restated), and filing those as drawbacks would invent 38 poisons.
+
+    Re-pinned 2026-10-02 because the herb data changed: hemlock's poultice now sits at
+    p0, so its gate moved to p1. The gate-to-body tie is asked of Testbane, a fixture
+    with hemlock's old two specs, so a data edit cannot move it again."""
     assert hk.classify({"type": "apply_condition", "target": "paralyzed"}) == hk.DRAWBACK
     assert hk.classify({"type": "ability_damage", "target": "con", "dice": "1d6"}) == hk.DRAWBACK
     assert hk.classify({"type": "damage", "dice": "1d3", "damage_type": "poison"}) == hk.DRAWBACK
@@ -74,31 +107,39 @@ def test_drawback_or_benefit_is_read_off_the_spec():
     assert hk.classify({"type": "save_gate", "dc": 15, "on_failure": [
         {"type": "apply_condition", "target": "nauseated"}]}) == hk.DRAWBACK
     # And the herb's own gate is tied to the body it guards.
-    assert hk.anatomy(_ing("hemlock"))["gate_of"] == {"p1": "p0"}
+    assert hk.anatomy(_ing("testbane"))["gate_of"] == {"p1": "p0"}
 
 
-def test_nothing_is_known_before_anything_is_learned():
+def test_nothing_is_known_before_anything_is_learned(fixture_herbs):
     """The scaffold read every property as known, which is how the game behaved before the
-    revamp: a stranger to hemlock already knew it paralyses."""
-    _s, pc = _scene("hemlock")
-    assert hk.known_keys(pc, _ing("hemlock")) == []
-    assert hk.unknown_count(pc, _ing("hemlock")) == 2
-    card = hk.card(pc, _ing("hemlock"))
+    revamp: a stranger to hemlock already knew it paralyses.
+
+    Re-pinned 2026-10-02 because the herb data changed: hemlock went from 2 properties to
+    4. Testbane, a fixture with hemlock's old 2, keeps the count exact."""
+    _s, pc = _scene("testbane")
+    assert hk.known_keys(pc, _ing("testbane")) == []
+    assert hk.unknown_count(pc, _ing("testbane")) == 2
+    card = hk.card(pc, _ing("testbane"))
     assert all(p["text"] is None and p["drawback"] is None for p in card["properties"])
     assert card["danger_known"] == ""
 
 
 # --- tasting ---------------------------------------------------------------------------
 
-def test_tasting_hemlock_paralyses_through_the_one_applicator():
+def test_tasting_hemlock_paralyses_through_the_one_applicator(fixture_herbs):
     """The owner's rule: "Real risk ... applies the raw effect for real." Hemlock's own
     spec is "Fortitude DC 15 / Causes paralyzed"; a failed save puts a real paralysed
-    `ActiveEffect` on the taster, and the record names the herb as the document."""
+    `ActiveEffect` on the taster, and the record names the herb as the document.
+
+    Re-pinned 2026-10-02 because the herb data changed: hemlock's paralysis now states
+    4 minutes, so the rule row's bound for a condition that states none was no longer
+    exercised by any shipped herb. Testbane, a fixture with hemlock's old specs, keeps
+    the unbounded "Causes paralyzed" this test exists to bound."""
     from rules.activeeffect import ActiveEffect
 
     for seed in range(1, 40):
-        s, pc = _scene("hemlock")
-        r = _taste(s, "hemlock", seed=seed)
+        s, pc = _scene("testbane")
+        r = _taste(s, "testbane", seed=seed)
         save = next(o for o in r.outcomes[0:1])  # the taste outcome
         if pc.has_state("state.held"):
             break
@@ -110,10 +151,10 @@ def test_tasting_hemlock_paralyses_through_the_one_applicator():
     assert held[0].rounds_left == hk.lore()["taste"]["condition_minutes"] * 10
     taste = r.outcomes[0]
     assert taste.op == "taste"
-    assert any(e.get("kind") == "taste" and e.get("origin") == "item:hemlock"
+    assert any(e.get("kind") == "taste" and e.get("origin") == "item:testbane"
                for e in taste.effects)
     assert "paralyzed" in taste.tell
-    assert set(hk.known_keys(pc, _ing("hemlock"))) == {"p0", "p1"}
+    assert set(hk.known_keys(pc, _ing("testbane"))) == {"p0", "p1"}
     assert save is taste
 
 
@@ -188,20 +229,31 @@ def test_the_dose_is_spent_and_none_is_refused_in_words():
     assert "no Comfrey" in r.outcomes[0].tell
 
 
-def test_a_deadly_taste_kills_through_the_one_door():
+def test_a_deadly_taste_kills_through_the_one_door(fixture_herbs):
     """Menhirite "Causes dead". Death is written by `Actor.die`, the door that clears the
-    ladder above it, never a bare condition op beside a living body."""
-    s, pc = _scene("menhirite")
-    r = _taste(s, "menhirite")
+    ladder above it, never a bare condition op beside a living body.
+
+    Re-pinned 2026-10-02 because the herb data changed: no shipped herb applies "dead"
+    now, which is right (Menhirite's and Nahre Lotus's were misparses). The door is still
+    the taste's to use, for a homebrew herb that does kill, so Testmort, a fixture death
+    effect with no save, keeps it tested."""
+    s, pc = _scene("testmort")
+    assert not pc.is_dead  # the premise
+    r = _taste(s, "testmort")
     assert pc.is_dead
     assert "is dead" in r.outcomes[0].tell
 
 
-def test_a_poison_that_hurts_downs_through_the_hit_point_ladder():
+def test_a_poison_that_hurts_downs_through_the_hit_point_ladder(fixture_herbs):
     """Monkshood's 1d3 poison damage on a taster at 1 hit point crosses the ladder the
-    way a blow does, and the tell says so."""
-    s, pc = _scene("monkshood", hp=1)
-    r = _taste(s, "monkshood", seed=2)
+    way a blow does, and the tell says so.
+
+    Re-pinned 2026-10-02 because the herb data changed: Monkshood gained a liniment that
+    heals 1d3, and a taste lands every property, so the taster was healed straight back
+    to 1 hit point. Testshade, a fixture with Monkshood's old damage alone, keeps the
+    ladder crossing tested."""
+    s, pc = _scene("testshade", hp=1)
+    r = _taste(s, "testshade", seed=2)
     assert pc.hp <= 0
     assert pc.has_state("state.down") or pc.has_condition("disabled") or pc.hp == 0
     assert any(w in r.outcomes[0].tell for w in ("dying", "unconscious", "disabled"))
@@ -548,12 +600,16 @@ def test_every_endpoint_answers_its_contract(camp, monkeypatch):
     assert bad.status_code == 400
 
 
-def test_a_fatal_taste_from_the_card_ends_the_campaign(camp):
+def test_a_fatal_taste_from_the_card_ends_the_campaign(camp, fixture_herbs):
     """`down` is true and the campaign ends the way the table's own turn ends it, so the
-    deathveil has something to show."""
-    camp.scene.pc().inventory["menhirite"] = 1
+    deathveil has something to show.
+
+    Re-pinned 2026-10-02 because the herb data changed: Menhirite no longer kills (its
+    "Causes dead" was a misparse), so the card's Taste button is driven with Testmort, a
+    fixture death effect, through the same endpoint."""
+    camp.scene.pc().inventory["testmort"] = 1
     camp.save()
-    d = Client().post("/api/herb/taste", data=json.dumps({"id": "menhirite"}),
+    d = Client().post("/api/herb/taste", data=json.dumps({"id": "testmort"}),
                       content_type="application/json").json()
     assert d["down"] is True and d.get("ended") == "died"
 
