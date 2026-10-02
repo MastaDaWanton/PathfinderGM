@@ -1,0 +1,118 @@
+{
+  "_about": [
+    "Herbalism manuals (docs/herbalism-revamp-plan.md §8.4): books that teach what herbs do.",
+    "Reading one takes hours of world time, teaches the properties it lists, and pays +5",
+    "herbalist mastery the first time (recorded per manual in `Actor.manuals_read`). Read by",
+    "rules/herbknowledge.py; bought like any good, at the alchemist's counter.",
+    "",
+    "Original writing for Pathfinder GM (2026-10-02). Prices in gold, in the range of the",
+    "Core Rulebook's books and kits (a spellbook is 15 gp, a healer's kit 50 gp).",
+    "",
+    "`teaches` names herbs by ingredient id and says which of each herb's properties the",
+    "book holds: \"all\", \"benefits\", \"drawbacks\", or a list of property keys (\"p0\"...).",
+    "The words are preferred over keys: keys are positions in an ingredient's effect list,",
+    "and a corrected corpus can move them; \"drawbacks\" still means the drawbacks after it",
+    "does. An id the corpus does not hold is skipped, never invented."
+  ],
+  "manuals": [
+    {
+      "id": "hedge-wifes-almanac",
+      "name": "A Hedge-Wife's Almanac",
+      "price_gp": 8,
+      "hours": 4,
+      "about": "A village healer's year of remedies, written plainly for whoever comes after her.",
+      "teaches": [
+        {"ingredient": "comfrey", "keys": "all"},
+        {"ingredient": "woundwort", "keys": "all"},
+        {"ingredient": "yarow", "keys": "all"},
+        {"ingredient": "st-john-s-wort", "keys": "all"},
+        {"ingredient": "althaea", "keys": "all"},
+        {"ingredient": "goldenrod", "keys": "all"},
+        {"ingredient": "sphagnum-moss", "keys": "all"},
+        {"ingredient": "cowslip", "keys": "all"}
+      ]
+    },
+    {
+      "id": "what-not-to-eat",
+      "name": "What Not to Eat in the Woods",
+      "price_gp": 12,
+      "hours": 3,
+      "about": "A forester's warnings, plant by plant, with the symptoms of each.",
+      "teaches": [
+        {"ingredient": "hemlock", "keys": "all"},
+        {"ingredient": "nightshade", "keys": "drawbacks"},
+        {"ingredient": "belladonna", "keys": "all"},
+        {"ingredient": "monkshood", "keys": "all"},
+        {"ingredient": "aconite", "keys": "all"},
+        {"ingredient": "bryony", "keys": "all"},
+        {"ingredient": "mad-cap", "keys": "all"},
+        {"ingredient": "juniper-berry", "keys": "all"},
+        {"ingredient": "sweetspire", "keys": "all"}
+      ]
+    },
+    {
+      "id": "marsh-and-shore",
+      "name": "Herbs of Marsh and Shore",
+      "price_gp": 10,
+      "hours": 4,
+      "about": "A fen-dweller's notes on what grows where the ground is wet and the air is salt.",
+      "teaches": [
+        {"ingredient": "anise", "keys": "all"},
+        {"ingredient": "chasmyre-leaf", "keys": "all"},
+        {"ingredient": "marsh-mallow", "keys": "all"},
+        {"ingredient": "sealwort", "keys": "all"},
+        {"ingredient": "woad", "keys": "all"},
+        {"ingredient": "oak", "keys": "all"},
+        {"ingredient": "old-man-s-friend", "keys": "drawbacks"}
+      ]
+    },
+    {
+      "id": "high-country-simples",
+      "name": "Simples of the High Country",
+      "price_gp": 15,
+      "hours": 5,
+      "about": "A mountain apothecary's book of the hardy plants of tundra, hill and stone.",
+      "teaches": [
+        {"ingredient": "tugwort", "keys": "all"},
+        {"ingredient": "dawnpetal", "keys": "all"},
+        {"ingredient": "frostbloom", "keys": "all"},
+        {"ingredient": "tyrant-s-sword", "keys": "all"},
+        {"ingredient": "barbarian-chew", "keys": "all"},
+        {"ingredient": "skull-orchid", "keys": "drawbacks"},
+        {"ingredient": "xian-tao", "keys": "benefits"}
+      ]
+    },
+    {
+      "id": "the-mushroom-gatherers-book",
+      "name": "The Mushroom-Gatherer's Book",
+      "price_gp": 9,
+      "hours": 3,
+      "about": "Caps, molds and mosses, the good and the deadly, drawn from life.",
+      "teaches": [
+        {"ingredient": "dreamcap", "keys": "all"},
+        {"ingredient": "fainne-mushroom", "keys": "all"},
+        {"ingredient": "grave-mold", "keys": "all"},
+        {"ingredient": "ironbark-moss", "keys": "all"},
+        {"ingredient": "mad-cap", "keys": "all"},
+        {"ingredient": "sphagnum-moss", "keys": "all"}
+      ]
+    },
+    {
+      "id": "parts-of-the-beast",
+      "name": "On the Useful Parts of Beasts",
+      "price_gp": 40,
+      "hours": 8,
+      "about": "A monster-hunter's treatise on what may be taken from a kill, and what it does.",
+      "teaches": [
+        {"ingredient": "basilisk-eye", "keys": "all"},
+        {"ingredient": "cockatrice-beak", "keys": "all"},
+        {"ingredient": "dire-boar-tusk", "keys": "all"},
+        {"ingredient": "griffon-talon", "keys": "all"},
+        {"ingredient": "harpy-vocal-cord", "keys": "all"},
+        {"ingredient": "salamander-ember-gland", "keys": "all"},
+        {"ingredient": "trollheart-sap", "keys": "benefits"},
+        {"ingredient": "wyrmfang-venom", "keys": "drawbacks"}
+      ]
+    }
+  ]
+}
