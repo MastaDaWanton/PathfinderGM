@@ -1317,14 +1317,13 @@ import re as _re
 
 HERBAL_CRAFTS = ("herbalism", "herbalist")
 TRACK_ID = "herbalist"
-BODY_ROUTES = ("ingest", "skin", "eyes", "wound", "inhale")
+# The routes a herbal product may carry: the data lane's list, never a second copy.
+BODY_ROUTES = tuple(ing_mod.HERBAL_ROUTES)
 ROUTE_WORDS = {
     "ingest": "what must be swallowed", "inhale": "what must be breathed in",
     "skin": "what works on the skin", "eyes": "what works on the eyes",
     "wound": "what works in a wound",
 }
-# The parts a bare corpus entry defaults to (contracts §2), until Lane A tags them.
-_PART_DEFAULT = {"monster part": "organ", "fungus": "fungus"}
 # Forms that are still raw material for the bench, rather than something finished.
 _WORKABLE_SOLID_FORMS = (None, "dried", "powder", "extract")
 _LIQUID_PRODUCTS = ("infusion", "decoction", "tincture", "acetum", "reduction")
@@ -1365,14 +1364,10 @@ def product_row(form: str | None) -> dict:
 # --- quality ---------------------------------------------------------------------------
 
 def quality_name(index: int) -> str:
-    """0 Crude ... 4 Flawless, then "Flawless +1" and on. The names come from here; the
-    page never builds one (contracts §2)."""
-    q = herbal_rules()["quality"]
-    tiers = q["tiers"]
-    index = max(0, int(index))
-    if index < len(tiers):
-        return tiers[index]
-    return q["beyond"]["name"].format(n=index - len(tiers) + 1)
+    """0 Crude ... 4 Flawless, then "Flawless +1" and on. The progression lane's one
+    copy (`worldclass.quality_name`), asked rather than repeated: the page never builds a
+    name (contracts §2), and two server copies could drift."""
+    return wc.quality_name(index)
 
 
 def quality_mult(kind: str, index: int) -> float:
@@ -1490,11 +1485,20 @@ def _scale_duration(duration, mult: float, up: bool):
 
 
 def _harmful_ids(specs: list[dict]) -> set[int]:
-    """Which of these specs are harm, asked through `consumables.sort_harm` so the bench
-    and the card sort a poison's save and its damage the same way."""
+    """Which of these specs are harm.
+
+    Two readers, both asked, never copied: `consumables.sort_harm` groups a poison's
+    save with the damage it gates (so the gate files beside its body), and
+    `herbknowledge.classify` is what the herbarium labels a property with (so a property
+    the Journal calls a drawback is never a benefit on the bench: it adds vulnerability,
+    which the jar's sort predates).
+    """
+    from . import herbknowledge
+
     sorted_out = con.sort_harm(specs)
     benefits = {id(s) for s in sorted_out.benefits}
-    return {id(s) for s in specs if id(s) not in benefits}
+    return {id(s) for s in specs
+            if id(s) not in benefits or herbknowledge.is_drawback(s)}
 
 
 def bake(specs: list[dict], potency: float, duration: float,
@@ -1718,11 +1722,12 @@ def _unknown_carried(actor, base_specs) -> int:
 
 
 def part_of(ingredient) -> str:
-    """An ingredient's part, with the contract's defaults until Lane A tags them."""
+    """An ingredient's part, with the data lane's defaults by kind for an entry that
+    never said (`ingredients.default_part`)."""
     got = getattr(ingredient, "part", None)
     if got:
         return str(got).strip().lower()
-    return _PART_DEFAULT.get(str(getattr(ingredient, "kind", "") or ""), "leaf")
+    return ing_mod.default_part(str(getattr(ingredient, "kind", "") or ""))
 
 
 def ingredient_specs(ing) -> list[dict]:
@@ -1738,17 +1743,9 @@ def ingredient_specs(ing) -> list[dict]:
 
 
 def _route(spec: dict) -> str:
-    """An effect's route, asked of the data lane's one reader when it is there.
-
-    `ingredients.route_of` reads a missing route as ingest and an unknown one as
-    external: a route nobody recognises must not slip into a remedy. The fallback is the
-    same rule, for the branch where the reader has not landed yet.
-    """
-    reader = getattr(ing_mod, "route_of", None)
-    if reader is not None:            # MERGE: drop fallback once lane/herb-data lands
-        return str(reader(spec))
-    route = str(spec.get("route") or "ingest").strip().lower()
-    return route if route in BODY_ROUTES else "external"
+    """An effect's route, asked of the data lane's one reader: a missing route is ingest
+    and an unknown one external, so a route nobody recognises never slips into a remedy."""
+    return str(ing_mod.route_of(spec))
 
 
 def _ingredient(iid: str):
@@ -1764,13 +1761,7 @@ def _reagent_for_stock(item):
     """A reagent bought at a counter arrives as `Stock(base="Beeswax", craft="")` through
     `goods.deliver`. Mapped back to its reagent row so it reaches the bench as what it
     is, rather than as a jar of nothing."""
-    named = getattr(ing_mod, "reagent_named", None)
-    if named is None:                 # MERGE: drop fallback once lane/herb-data lands
-        return None
-    try:
-        return named(item.base)
-    except Exception:                 # noqa: BLE001 — an unmapped name is simply not one
-        return None
+    return ing_mod.reagent_named(item.base)
 
 
 def is_reagent_ingredient(ing) -> bool:

@@ -226,13 +226,10 @@ METHOD_GLYPHS: dict[str, dict[str, str]] = {
     "herbalist": {
         "grind": "⚗️", "mix": "🥣", "brew": "🫖", "extract": "🔪",
         "infuse": "✨", "neutralize": "🧪",
-        # The step bench's new methods (docs/herbalism-revamp-plan.md §6).
+        # The step bench's new methods (docs/herbalism-revamp-plan.md §6). Preserve,
+        # distill, purify, refine and catalyst crafting were retired on 2026-10-02 and
+        # left the Herbalist document, so their glyphs went with them.
         "dry": "🌾", "reduce": "♨️", "steep": "🍶",
-        # MERGE: drop these five once lane/herb-progress lands. The owner retired them
-        # (plan §2) and the Herbalist document loses them on that branch; until it does,
-        # the old page still lists them and every listed station owes an icon.
-        "preserve": "🧊", "distill": "⚱️", "purify": "💧", "refine": "💎",
-        "catalyst crafting": "🌟",
     },
     "blacksmith": {
         "smelt": "🔥", "forge": "🔨", "quench": "💧", "flux": "🧱", "rivet": "🔩",

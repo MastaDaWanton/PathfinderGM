@@ -57,8 +57,12 @@ def _brew(pc):
 def test_the_card_the_jar_and_the_spec_say_one_number(leaf):
     """The card said "+20 Strength" and the drink gave +26. Now the card's Fine line is
     rendered from the very spec the jar carries, and the jar carries the landed number."""
+    from rules import herbknowledge
+
     pc = load_pc("fixtures/pc-kesst.json")
     plan = _brew(pc)
+    # The owner knows their own leaf; an unknown property is never on the card.
+    herbknowledge.reveal(pc, "power-leaf", herbknowledge.property_keys(leaf), "homebrew")
     card = crafting.product_card(plan, pc)
     lines = [e["by_tier"][FINE] for e in card["effects"]]
     assert lines == ["+23 Strength (permanent)", "+23 Constitution (permanent)"], lines

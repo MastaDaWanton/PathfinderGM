@@ -132,6 +132,15 @@ def _level(n: int):
     _pc().track("herbalist").level = n
 
 
+def _know(*ids):
+    """Teach the character every property of these herbs, as a study would."""
+    from rules import herbknowledge
+
+    for iid in ids:
+        ing = ingredients.get(iid)
+        herbknowledge.reveal(_pc(), iid, herbknowledge.property_keys(ing), "test")
+
+
 def _get(client, url):
     r = client.get(url)
     assert r.status_code == 200, r.content
@@ -241,6 +250,7 @@ def test_check_has_the_contract_shape(bench):
     """`check` is what the info line and the result tag are drawn from (contracts
     §3.2); every key it promises is present."""
     _carry(mint=2)
+    _know("mint")
     d = _post(bench, "/api/bench/check",
               {"method": "brew", "items": [{"key": _key(bench, "Mint"), "count": 2}]})
     assert set(d) >= {"fits", "problems", "can_roll", "minutes", "dc", "bonus", "terms",
@@ -251,7 +261,20 @@ def test_check_has_the_contract_shape(bench):
                       "effects", "drawbacks", "source_text"}
     assert p["form"] == "infusion" and p["name"] == "Mint Infusion"
     # by_tier runs from Crude to the ceiling: Fine at Herbalist 1 is three rungs.
+    assert len(p["effects"]) == 2
     assert all(len(e["by_tier"]) == 3 for e in p["effects"])
+
+
+def test_an_unknown_property_is_counted_on_the_card_and_never_shown(bench):
+    """Plan §8.1: unknown properties stay hidden on the bench card. A card that printed
+    what an untasted herb does would make the herbarium pointless; it says how many are
+    unknown instead, and a dropped one is not named either."""
+    _carry(glowcap=1)
+    card = _post(bench, "/api/bench/check", {"method": "brew", "items": [
+        {"key": _key(bench, "Glowcap"), "count": 1}]})["product"]
+    assert card["effects"] == [] and card["dropped"] == []
+    assert card["unknown"] == 1
+    assert "glows" not in json.dumps(card["effects"] + card["drawbacks"] + card["dropped"])
 
 
 def test_a_hand_written_key_that_is_not_carried_is_refused_not_raised(bench):
@@ -389,6 +412,7 @@ def test_an_external_effect_never_reaches_a_herbal_product(bench):
     `external` effect. Glowcap's glow is dropped from the tea and the card says
     "alchemy only"; its heal is kept."""
     _carry(glowcap=2)
+    _know("glowcap")
     body = {"method": "brew", "items": [{"key": _key(bench, "Glowcap"), "count": 1}]}
     card = _post(bench, "/api/bench/check", body)["product"]
     assert [d["why"] for d in card["dropped"]] == ["alchemy only"]
@@ -685,6 +709,7 @@ def test_harm_is_on_the_card_as_a_drawback_and_softens_with_quality(bench):
     """The card's Drawbacks list is harm only, with the save beside it, and quality
     "softens drawbacks" (plan §2): Nightshade's 1d6 is worse at Crude than at Fine."""
     _carry(nightshade=1)
+    _know("nightshade")
     card = _post(bench, "/api/bench/check", {"method": "brew", "items": [
         {"key": _key(bench, "Nightshade"), "count": 1}]})["product"]
     assert [e["from"] for e in card["effects"]] == ["Nightshade"]

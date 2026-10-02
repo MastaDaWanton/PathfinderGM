@@ -22,7 +22,6 @@ the roll took has passed either way, because it did.
 """
 from __future__ import annotations
 
-import inspect
 import re
 import secrets
 
@@ -48,66 +47,14 @@ def _err(text: str, status: int = 400) -> JsonResponse:
     return JsonResponse({"error": text}, status=status)
 
 
-# --- the progression lane's functions, through an adapter --------------------------------
+# --- the progression lane's functions ------------------------------------------------------
 #
-# Lane B1 (lane/herb-progress) adds these to rules/worldclass.py. Until that branch is
-# merged, each falls back to a minimal local version of the same contract, so this lane can
-# be built and verified alone.
-
-def _wc(name: str):
-    return getattr(worldclass, name, None)
-
-
-def track_summary(track, progress) -> dict:
-    fn = _wc("track_summary")
-    if fn is not None:
-        return fn(track, progress)
-    # MERGE: drop fallback once lane/herb-progress lands
-    ceiling = worldclass.ceiling_index(progress)
-    need = track.to_next(progress.level)
-    lvl = int(progress.level)
-    if lvl < worldclass.UNLOCK_LEVELS:
-        nxt = worldclass.CEILING_BY_LEVEL.get(lvl + 1, ceiling + 1)
-        rung = f"{crafting.quality_name(nxt)} at Herbalist {lvl + 1}"
-    else:
-        rung = f"{crafting.quality_name(ceiling + 1)} at your next Quality perk"
-    return {"id": track.id, "level": lvl, "mp": progress.mp,
-            "to_next": ({"need": need, "have": progress.mp} if need is not None else None),
-            "ceiling": ceiling, "ceiling_name": crafting.quality_name(ceiling),
-            "perks": {p: int(progress.perks.get(p, 0)) for p in worldclass.PERKS},
-            "picks_banked": worldclass.perk_picks_banked(progress), "next_rung": rung}
-
-
-def pick_perks(track, progress, picks) -> None:
-    fn = _wc("pick_perks")
-    if fn is not None:
-        fn(track, progress, picks)
-        return
-    # MERGE: drop fallback once lane/herb-progress lands
-    banked = worldclass.perk_picks_banked(progress)
-    if not isinstance(picks, list) or not all(isinstance(p, str) for p in picks):
-        raise ValueError("Send the perks as a list of names.")
-    bad = [p for p in picks if p not in worldclass.PERKS]
-    if bad:
-        raise ValueError(f"There is no perk called {bad[0]!r}. The perks are "
-                         f"{', '.join(worldclass.PERKS)}.")
-    if not banked:
-        raise ValueError("You have no perk picks banked.")
-    if len(picks) != banked and not (len(picks) == 2 and banked >= 2):
-        raise ValueError(f"Pick {min(banked, 2)}: you have {banked} banked.")
-    for p in picks:
-        progress.perks[p] = int(progress.perks.get(p, 0)) + 1
-
+# Lane B1's, in rules/worldclass.py: the track object, perk picks, what the perks
+# multiply, and the step award. Called straight through; the only adjustment is the
+# yield chance's unit.
 
 def perk_multipliers(progress) -> dict:
-    fn = _wc("perk_multipliers")
-    if fn is not None:
-        got = dict(fn(progress))
-    else:
-        # MERGE: drop fallback once lane/herb-progress lands
-        n = {p: int(progress.perks.get(p, 0)) for p in worldclass.PERKS}
-        got = {"potency": 1 + 0.05 * n["potency"], "duration": 1 + 0.10 * n["duration"],
-               "yield_chance": 0.05 * n["yield"]}
+    got = dict(worldclass.perk_multipliers(progress))
     chance = float(got.get("yield_chance", 0) or 0)
     # A fraction is the contract; a percentage would read as a certainty, so it is
     # brought back to one rather than trusted.
@@ -115,44 +62,7 @@ def perk_multipliers(progress) -> dict:
     return got
 
 
-def award_step(track, progress, *, method, ingredient_id, rarity_rank, quality_index,
-               success=True, name="") -> dict:
-    fn = _wc("award_step")
-    if fn is not None:
-        kw = dict(method=method, ingredient_id=ingredient_id, rarity_rank=rarity_rank,
-                  quality_index=quality_index, success=success)
-        if "name" in inspect.signature(fn).parameters:
-            kw["name"] = name
-        return fn(track, progress, **kw)
-    # MERGE: drop fallback once lane/herb-progress lands
-    key = f"{method}:{ingredient_id}"
-    what = name or ingredient_id
-    reasons = []
-    if not success:
-        seen = progress.mishaps.get(key, 0)
-        if seen < worldclass.MISHAP_LIMIT:
-            reasons.append({"why": f"mishap, {method} {what}",
-                            "mp": worldclass.MP_AWARDS["mishap"]})
-        progress.mishaps[key] = seen + 1
-    else:
-        times = progress.crafted.get(key, 0)
-        if times < worldclass.REPEAT_LIMIT:
-            reasons.append({"why": f"{method.title()}, {what}",
-                            "mp": 1 + max(0, int(rarity_rank) - 1)})
-        progress.crafted[key] = times + 1
-        if int(quality_index) >= 4:
-            reasons.append({"why": f"{crafting.quality_name(quality_index)} work", "mp": 2})
-        elif int(quality_index) == 3:
-            reasons.append({"why": "Superior work", "mp": 1})
-    gained = sum(r["mp"] for r in reasons)
-    progress.mp += gained
-    levelled = worldclass._advance(track, progress)
-    return {"track": track.id, "mp": gained, "reasons": reasons, "total": progress.mp,
-            "level": progress.level, "levelled": levelled,
-            "to_next": worldclass._remaining(track, progress)}
-
-
-FIRST_MP = getattr(worldclass, "FIRST_MP", 3)
+FIRST_MP = worldclass.FIRST_MP
 
 
 # --- reading the campaign ---------------------------------------------------------------
@@ -260,7 +170,7 @@ def _state_body(c, pc) -> dict:
     track, progress = _progress(pc)
     now = int(c.scene.clock_minutes or 0)
     return {
-        "track": track_summary(track, progress),
+        "track": worldclass.track_summary(track, progress),
         "methods": crafting.methods_view(progress.level),
         "satchel": [m.as_item(pc, now) for m in _satchel(c, pc)],
         "ground": _ground(c),
@@ -336,6 +246,10 @@ def bench_state(request):
     # Opening the bench abandons any craft still in flight: its reservation goes back
     # on the shelf (nothing was spent), so a reload never strands materials.
     _PENDING.pop(c.id, None)
+    # The discovery lane's one hook: a herbalist's homeland knowledge (plan §8.1, Q4) is
+    # seeded the first time the bench opens, and saved so it is seeded once.
+    if herbknowledge.ensure_seeded(pc, world=c.world, scene=c.scene):
+        c.save()
     return JsonResponse(_state_body(c, pc))
 
 
@@ -434,7 +348,7 @@ def bench_roll(request):
             said = f"Missed by {miss}. The time is lost; the materials are kept."
         out["said"] = said
         lead = plan.lead
-        got = award_step(track, progress, method=plan.method,
+        got = worldclass.award_step(track, progress, method=plan.method,
                          ingredient_id=lead.ingredient_id if lead else "",
                          rarity_rank=plan.rank_in, quality_index=0, success=False,
                          name=plan.name)
@@ -511,7 +425,7 @@ def bench_finish(request):
     lines: list[dict] = []
     levelled: list[int] = []
     lead = plan.lead
-    got = award_step(track, progress, method=plan.method,
+    got = worldclass.award_step(track, progress, method=plan.method,
                      ingredient_id=lead.ingredient_id if lead else "",
                      rarity_rank=plan.rank_in, quality_index=tier, success=True,
                      name=plan.name)
@@ -588,11 +502,11 @@ def bench_perks(request):
     body = read_body(request)
     track, progress = _progress(pc)
     try:
-        pick_perks(track, progress, body.get("picks"))
+        worldclass.pick_perks(track, progress, body.get("picks"))
     except ValueError as exc:
         return _err(str(exc))
     c.save()
-    return JsonResponse(track_summary(track, progress))
+    return JsonResponse(worldclass.track_summary(track, progress))
 
 
 # --- §3.6 ---------------------------------------------------------------------------------
