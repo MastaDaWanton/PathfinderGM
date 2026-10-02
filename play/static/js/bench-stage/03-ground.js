@@ -11,8 +11,9 @@
  * near an edge is drawn again on the far side, so the floor repeats without a seam.
  *
  * Seeded, so the same biome paints the same floor every time the bench opens. Each floor is
- * painted once per session and cached (about 60-120ms at 512 pixels, measured in the
- * harness); 512 is under the plan's 1K ceiling and plenty at the stage's viewing angle.
+ * painted once per session and cached; BenchStage._debug().groundPaintMs reports what the
+ * paint cost on this machine (not yet recorded for the notes). 512 is under the plan's 1K
+ * ceiling and plenty at the stage's viewing angle.
  */
 (function () {
   "use strict";
