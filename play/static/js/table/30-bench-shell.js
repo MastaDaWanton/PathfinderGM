@@ -504,7 +504,9 @@
       try { st.addIngredient({ key: key, part: it.part, name: it.name }); } catch (err) { /* */ }
     }
     B.result = null;
-    B.sound("bench.drop." + (it.part || "leaf"));
+    // The stage plays the drop itself as the item lands on its rim; only the flat
+    // stand-in needs the page to play it, or it sounds twice.
+    if (!(st && stageMounted)) B.sound("bench.drop." + (it.part || "leaf"));
     B.say(it.name + " on the " + TOOL[B.pot.method] + ", " + (have + add) + " in all.");
     B.emit("pot");
     renderStage();
@@ -582,7 +584,10 @@
     try { st.reducedMotion(B.reduced()); } catch (err) { /* */ }
     var ground = (B.state && B.state.ground) || {};
     var after = function () {
-      try { st.setGround({ biome: ground.biome, roofed: !!ground.roofed, minute: ground.minute }); } catch (err) { /* */ }
+      // `place` too: a tavern is not a biome, and the stage can only find the bar top in
+      // the place's own name (Lane F's note at merge).
+      try { st.setGround({ biome: ground.biome, roofed: !!ground.roofed, minute: ground.minute,
+                           place: ground.place }); } catch (err) { /* */ }
       try { if (B.pot.method) st.setTool(B.pot.method); } catch (err) { /* */ }
     };
     if (stageMounted) { after(); return; }
@@ -590,7 +595,10 @@
     host.innerHTML = "";
     host.classList.add("has-stage");
     try {
-      stageMounting = Promise.resolve(st.mount(host)).then(function () {
+      stageMounting = Promise.resolve(st.mount(host)).then(function (ok) {
+        // `mount` resolves false, not rejects, when WebGL refuses on this machine: the
+        // flat stand-in takes over exactly as for a rejection.
+        if (ok === false) throw new Error("no stage here");
         stageMounted = true; stageMounting = null; after();
         B.pot.items.forEach(function (p) {
           var it = B.item(p.key);
@@ -809,8 +817,7 @@
   function failed(r) {
     B.result = { failed: true, roll: r.roll, lost: r.lost || [], minutes: r.minutes,
                  pot: B.pot.items.map(function (p) { return { key: p.key, count: p.count }; }) };
-    B.sound("bench.fail");
-    flourish("fail");
+    flourish("fail");          // plays its own sting, once (stage or page)
     B.emit("result", B.result);
     var lost = r.lost || [];
     B.say(lost.length ? "Failure. Some materials were ruined." : "Failure. Nothing was lost.");
@@ -948,8 +955,8 @@
   // index 4 and up on the fixed ladder (contracts §2); the server named the index.
   function land(f, from) {
     var flawless = (Number(f.tier) || 0) >= 4;
-    if (flawless) { B.sound("bench.flawless"); flourish("flawless", f.tier_name); }
-    else { B.sound("bench.land"); flourish("land"); }
+    if (flawless) flourish("flawless", f.tier_name);
+    else flourish("land");
     var made = f.made;
     B.say("Made " + (made ? made.name : "it") + (f.count > 1 ? ", " + f.count + " of them" : "") +
           ", " + (f.tier_name || "") + ".");
@@ -1016,10 +1023,17 @@
   // a failure dims the stage for 600ms. Short flourishes keep the word and drop the rest.
   function flourish(kind, word) {
     var st = B.stage();
+    var staged = false;
     if (st && stageMounted && typeof st.flourish === "function") {
-      try { st.reducedMotion(B.reduced()); st.flourish(kind === "flawless" ? "flawless" : kind); return; }
-      catch (err) { /* fall back to the flat flourish */ }
+      // The stage plays its own sting with its flourish (bench.fail, bench.flawless,
+      // bench.land, bench.tier.up), so the page plays none here or every one sounds twice.
+      try { st.reducedMotion(B.reduced()); st.flourish(kind); staged = true; }
+      catch (err) { staged = false; }
     }
+    if (!staged) B.sound("bench." + (kind === "tierUp" ? "tier.up" : kind));
+    // The cast brass word is the page's, over the stage or the flat stand-in alike: the
+    // UI plan's Flawless is the 0.2.3 verdict word, which a WebGL canvas does not draw.
+    if (staged && kind !== "flawless") return;
     // From the tool's own disc, not its whole cell: from the cell the gilt ring opened
     // 300px wide round empty ground (first screenshot of the flourish).
     var tool = document.querySelector("#bench-tool .bench-flat .bicon") || $id("bench-tool");
@@ -1038,7 +1052,8 @@
         verdictWord({ good: true, word: word || "Flawless", text: word || "Flawless", sub: "",
                       still: still, ms: still ? 1200 : 1300 }, at, Math.min(r.width, r.height));
       } catch (err) { /* the word is a nicety */ }
-      if (!still && typeof VerdictSparks === "object" && VerdictSparks) {
+      // The stage throws its own gilt sparks; the page's are for the flat stand-in only.
+      if (!staged && !still && typeof VerdictSparks === "object" && VerdictSparks) {
         try { VerdictSparks.burst("triumph", at.x, at.y, 1300, Math.min(r.width, r.height) * 0.4); } catch (err) { /* */ }
       }
     }
