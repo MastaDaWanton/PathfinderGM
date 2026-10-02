@@ -1402,7 +1402,10 @@ def tier_from_score(score, ceiling: int) -> tuple[int, float]:
         s = 0.0 if s != s or s < 0 else 1.0
     s = max(0.0, min(1.0, s))
     ceiling = max(0, int(ceiling))
-    return min(ceiling, int(s * (ceiling + 1))), round(s, 4)
+    # A score on a band's edge lands in that band, not the one below: the strip's live
+    # word is drawn from the same edges (`tuning_for`), and float arithmetic would
+    # otherwise floor 1/3 x 3 one rung short of what the player was shown.
+    return min(ceiling, int(s * (ceiling + 1) + 1e-6)), round(s, 4)
 
 
 # --- baking a strength into an effect ----------------------------------------------------
@@ -2608,7 +2611,15 @@ def tuning_for(plan: StepPlan) -> dict:
     row = method_row(plan.method) or {}
     tun = row.get("tuning") or {}
     diff = tun.get("difficulty") or {}
+    ceiling = max(0, int(plan.ceiling))
     return {"method": plan.method, "part": plan.part,
             "difficulty": float(diff.get(plan.part, diff.get("default", 0.5))),
             "seconds": tun.get("seconds", 6), "beats": tun.get("beats", 6),
-            "infusion": plan.form == "infusion"}
+            "infusion": plan.form == "infusion",
+            # The ladder the strip shows while the game runs: every name to the ceiling
+            # and each tier's lower score bound, by the same even spread `tier_from_score`
+            # uses at finish, so the live word and the landed tier cannot disagree.
+            "names": [quality_name(t) for t in range(ceiling + 1)],
+            # Unrounded: 0.3333 x 3 floors to Crude where the strip showed Sound (measured
+            # by the test that pins this, before the epsilon in `tier_from_score`).
+            "bands": [t / (ceiling + 1) for t in range(ceiling + 1)]}

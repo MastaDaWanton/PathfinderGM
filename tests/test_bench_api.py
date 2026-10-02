@@ -676,6 +676,24 @@ def test_the_track_names_every_rung_and_what_each_perk_would_do(bench):
     assert t["tiers"][-1] == t["ceiling_name"]
 
 
+def test_the_strips_live_word_and_the_finish_agree_on_every_band(bench):
+    """The minigame strip shows a live tier word from `tuning.names` and `tuning.bands`
+    while the page never names the final tier. If the bands were not the finish's own
+    spread, the strip could say Fine and the result land Sound: every band's lower bound,
+    sent as the score, must finish on that band's name."""
+    _carry(mint=6)
+    items = [{"key": _key(bench, "Mint"), "count": 1}]
+    tuning = _post(bench, "/api/bench/roll", {"method": "grind", "items": items,
+                                              "face": 20})["tuning"]
+    assert tuning["names"] == ["Crude", "Sound", "Fine"]
+    assert tuning["bands"][0] == 0
+    for name, low in zip(tuning["names"], tuning["bands"]):
+        rolled = _post(bench, "/api/bench/roll", {"method": "grind", "items": items,
+                                                  "face": 20})
+        done = _post(bench, "/api/bench/finish", {"token": rolled["token"], "score": low})
+        assert done["tier_name"] == name, (low, done["tier_name"])
+
+
 def test_check_says_the_most_the_pot_allows_under_the_name_the_page_reads(bench):
     """The "All" button reads `max_batch`: batch units the satchel covers for what is on
     the tool, so 5 mint at 2 a unit is 2, not 5 and not 2.5."""
