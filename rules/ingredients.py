@@ -30,6 +30,47 @@ WORLD_FLORA = {
     "fey-cherry", "aelfengrape", "djinn-blossoms", "nahre-lotus", "salamander-orchids",
 }
 
+# --- the herbalism revamp's vocabulary (docs/herbalism-contracts.md §2) ------------------
+#
+# Fixed lists, because the bench keys tables on them: Brew turns leaf and flower into an
+# infusion and root, bark and berry into a decoction, and a part the table has never heard
+# of would fall through to nothing. Anything outside these is a content error, and
+# tests/test_ingredient_tags.py refuses it by name.
+PARTS = ("leaf", "flower", "root", "bark", "berry", "seed", "sap", "resin", "fungus",
+         "gland", "organ", "bone", "horn", "feather", "scale", "eye", "shell", "oil",
+         "wax", "mineral", "liquid")
+# How an effect reaches the body. The first five are the herbalist's; `external` is
+# alchemy's alone (plan §5.2: the effect reaches outside the body or changes what others
+# perceive — invisibility, light, flight, charming another, an area cloud, a blade coating
+# that acts on a target). A herbal product drops an external effect; it never keeps one.
+ROUTES = ("ingest", "skin", "eyes", "wound", "inhale", "external")
+HERBAL_ROUTES = ROUTES[:-1]
+SOLVENTS = ("oil", "alcohol", "vinegar", "water")
+BASE_FORMS = ("salve", "balm", "cream")
+
+
+def default_part(kind: str) -> str:
+    """The part an entry is taken to be when nobody wrote one: the contract's defaults,
+    so a homebrew herb saved before the field existed still lands on a real row of the
+    bench's tables."""
+    return {"monster part": "organ", "fungus": "fungus"}.get(str(kind or ""), "leaf")
+
+
+def route_of(effect: dict) -> str:
+    """The route one structured effect travels by.
+
+    Absent means `ingest`: every effect authored before routes existed was a thing you
+    drank or ate, and reading it that way keeps all of them behaving as they did.
+    *Present but unrecognised* means `external`, the closed side. A homebrew typo such as
+    "skn" read as the default would put an effect on the herbalist's bench that nobody
+    decided belonged there; read as external, it is dropped and the shelf card says
+    "alchemy only", which a person will notice and fix.
+    """
+    raw = str((effect or {}).get("route") or "").strip().lower()
+    if not raw:
+        return "ingest"
+    return raw if raw in ROUTES else "external"
+
 
 @dataclass
 class Ingredient:
@@ -69,6 +110,24 @@ class Ingredient:
     brew_raw: bool = True
     animal: bool = False
     liquid: bool = False
+    # The herbalism revamp's fields (docs/herbalism-contracts.md §2). On the dataclass
+    # for the reason the preparation flags above are: `from_dict` drops anything without
+    # a field, and a tag that loads and then vanishes is worse than one never written.
+    # Every default is the answer the bench gave before the field existed.
+    #
+    # `part`: what of the plant or creature is used. "" here means "not yet decided" and
+    # `from_dict` always fills it from the kind (`default_part`), so a built Ingredient
+    # never carries the empty string.
+    part: str = ""
+    # What this thickens, e.g. ["salve"]: beeswax, ground bark, ground sap or resin.
+    base_for: list[str] = field(default_factory=list)
+    # Strength as a neutralizer; Neutralize spends one dose of strength >= 1 per dose.
+    neutralizer: int = 0
+    # A carrier: "oil" for Infuse, "alcohol" for a tincture, "vinegar" for an acetum.
+    solvent: str = ""
+    # On both shelves: some effect is magical (planar flora, a monster part, anything
+    # supernatural). The herbalist may use such an entry only for its body routes.
+    hybrid: bool = False
 
     @property
     def rank(self) -> int:
@@ -122,6 +181,16 @@ class Ingredient:
     def world_gated(self) -> bool:
         return self.id in WORLD_FLORA
 
+    @property
+    def routes(self) -> list[str]:
+        """The route of each structured effect, in `specs` order (`route_of`)."""
+        return [route_of(s) for s in self.specs]
+
+    @property
+    def reagent(self) -> bool:
+        """A bench reagent rather than a remedy: it carries, thickens or neutralizes."""
+        return bool(self.solvent or self.base_for or self.neutralizer)
+
     def as_dict(self) -> dict:
         return {
             "id": self.id, "name": self.name, "kind": self.kind, "tier": self.tier,
@@ -132,6 +201,9 @@ class Ingredient:
             "biomes_inferred": self.biomes_inferred, "forageable": self.forageable,
             "effects": self.effects, "effects_converted": self.effects_converted,
             "lines": self.lines,
+            "part": self.part, "base_for": list(self.base_for),
+            "neutralizer": self.neutralizer, "solvent": self.solvent,
+            "hybrid": self.hybrid, "routes": self.routes,
         }
 
 
@@ -167,7 +239,30 @@ def from_dict(d: dict) -> Ingredient:
         # whether or not anyone ever tagged it, and only a liquid can be distilled.
         liquid=_flag(d.get("liquid"),
                      herbprep.looks_liquid(d.get("name", ""), d.get("kind", ""))),
+        # The revamp's fields. Each one is read defensively, because the homebrew editor
+        # writes strings ("yes", "2") and an old save writes nothing at all; either must
+        # come out as the default the bench used before the field existed.
+        part=(str(d.get("part") or "").strip().lower()
+              or default_part(d.get("kind", "herb"))),
+        base_for=_words(d.get("base_for")),
+        neutralizer=_int(d.get("neutralizer")),
+        solvent=str(d.get("solvent") or "").strip().lower(),
+        hybrid=_flag(d.get("hybrid"), False),
     )
+
+
+def _words(value) -> list[str]:
+    """A list of lower-case words from a list, or from one comma-separated string."""
+    if isinstance(value, str):
+        value = value.split(",")
+    return [str(v).strip().lower() for v in (value or []) if str(v).strip()]
+
+
+def _int(value) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _flag(value, default: bool) -> bool:
@@ -178,13 +273,17 @@ def _flag(value, default: bool) -> bool:
     return bool(value)
 
 
-def load_dir(path: str | Path) -> dict[str, dict]:
+def load_dir(path: str | Path, key: str = "ingredients") -> dict[str, dict]:
     """Raw entries from a directory, as dicts so they can be merged before they are built.
 
     Two shapes are accepted, because two things write here: the shipped corpus is one file
     holding a list, and the editor writes one file per thing it edits. Reading only the
     first shape meant an edit saved successfully, appeared in the editor when reopened, and
     never reached play — the worst of both, because nothing reported a problem.
+
+    `key` is the list's name inside a file holding many: "materials" when `reagents`
+    reads the shared shelf. A file holding some other list (the spell-potion book) has
+    no `id` at its top and is skipped.
     """
     out: dict[str, dict] = {}
     for p in sorted(Path(path).glob("*.json")):
@@ -193,7 +292,7 @@ def load_dir(path: str | Path) -> dict[str, dict]:
         except Exception as exc:
             files.unreadable(p, exc)
             continue
-        entries = data.get("ingredients") if isinstance(data, dict) else None
+        entries = data.get(key) if isinstance(data, dict) else None
         if not isinstance(entries, list):
             entries = [data] if isinstance(data, dict) and data.get("id") else []
         for raw in entries:
@@ -221,11 +320,93 @@ def all_ingredients() -> dict[str, Ingredient]:
     return _ALL
 
 
+# --- the bench's reagents: carriers, bases and neutralizers -------------------------------
+#
+# **One row, both shelves.** Oil, alcohol, vinegar, beeswax and the neutralizers are not
+# herbs, and three of them (Strong Spirits, White Vinegar, Beeswax) were already rows in
+# `content/materials/alchemist-materials.json`, priced and bought at the market. A second
+# copy under `content/ingredients/` would have been two prices for one jar of wax, and
+# the copy nobody looks at drifts (CLAUDE.md: "grep for every copy of it"). So the
+# herbalist reads the shared materials shelf instead, and a material is a herbalist
+# reagent exactly when its row declares one of the herbalist's own fields: `solvent`,
+# `base_for` or `neutralizer`. The alchemist's `Material` has no field for any of them
+# and drops them on load, so the row serves both crafts unchanged.
+#
+# That is also why buying needs nothing new: the alchemist's counter already draws every
+# priced, bought material on the shelf (`market.priced_from`, through
+# `alchemist.obtainable("bought")`), so a reagent row with `obtain`, `market` and
+# `price_gp` is for sale wherever alchemy's stock is.
+#
+# Kept out of `all_ingredients()` on purpose. That dict is the herb corpus: foraging
+# walks it, the herbarium counts it, the homebrew page lists it as shipped herbs, and a
+# scheme picks a random entry of it as a gift. A jar of vinegar in any of those would be
+# wrong. `get` falls back to the reagents so a chain or a satchel id still resolves.
+_REAGENTS: dict[str, Ingredient] | None = None
+
+
+def reagents() -> dict[str, Ingredient]:
+    """Every material on the shared shelf that the herbalist's bench can use, by id."""
+    global _REAGENTS
+    if _REAGENTS is None:
+        from django.conf import settings
+
+        raw = load_dir(Path(settings.BASE_DIR) / "content" / "materials", key="materials")
+        # The homebrew overlay, as the alchemist reads it (`alchemist.materials`): user
+        # data layered over the shipped rows, never replacing the folder.
+        user = Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "materials"
+        if user.is_dir():
+            raw.update(load_dir(user, key="materials"))
+        out: dict[str, Ingredient] = {}
+        for k, row in raw.items():
+            if not (row.get("solvent") or row.get("base_for") or row.get("neutralizer")):
+                continue
+            out[k] = from_dict({
+                **row, "id": k,
+                # One kind for the herbalist's shelf, whatever the alchemist files it
+                # under ("solvent", "treatment", "salt"), so the bench's kind-keyed
+                # tables need one new row and not four.
+                "kind": "reagent",
+                "forageable": False,
+                # A carrier pours: Infuse and Steep need it to be a liquid, and the name
+                # test in `herbprep.looks_liquid` does not know "Strong Spirits".
+                "liquid": row.get("liquid", bool(row.get("solvent"))),
+            })
+        _REAGENTS = out
+    return _REAGENTS
+
+
+def shelf() -> dict[str, Ingredient]:
+    """What the herbalist's bench can hold: the herb corpus and the reagents.
+
+    A corpus id wins over a reagent with the same id, so a herb can never be shadowed
+    by a material that happens to share its slug.
+    """
+    return {**reagents(), **all_ingredients()}
+
+
 def get(ingredient_id: str) -> Ingredient:
-    ing = all_ingredients().get((ingredient_id or "").strip().lower())
+    key = (ingredient_id or "").strip().lower()
+    ing = all_ingredients().get(key) or reagents().get(key)
     if ing is None:
         raise KeyError(f"no ingredient {ingredient_id!r}")
     return ing
+
+
+def reagent_named(text: str) -> Ingredient | None:
+    """The reagent a bought jar is, from its name or id, exactly; or None.
+
+    A purchase lands on the sheet as stock named for the material ("Beeswax", by
+    `goods.deliver`), so the bench needs the name to come back to the reagent. Exact,
+    not the prose search `by_name` does: "Strong Spirits" is one thing, and "spirits"
+    in a sentence is not a jar of it.
+    """
+    said = " ".join(str(text or "").split()).strip().lower()
+    if not said:
+        return None
+    for k, item in reagents().items():
+        if said in (k, item.name.lower()):
+            return item
+    return None
 
 
 def by_name(text: str) -> Ingredient | None:

@@ -66,7 +66,9 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "apothecary"
+      "market": "apothecary",
+      "part": "mineral",
+      "neutralizer": 1
     },
     {
       "id": "quicklime",
@@ -89,6 +91,23 @@
       "obtain": "bought",
       "price_gp": 1,
       "market": "apothecary"
+    },
+    {
+      "id": "slaked-lime",
+      "name": "Slaked Lime",
+      "kind": "salt",
+      "tier": "common",
+      "craft_dc": null,
+      "text": "Quicklime that has already drunk its water and given up its heat: a soft white powder, still alkaline enough to quiet an acid or a biting sap, and safe to handle with a dry hand.",
+      "risky": false,
+      "volatile": false,
+      "effects": [],
+      "effects_converted": true,
+      "obtain": "bought",
+      "price_gp": 1,
+      "market": "apothecary",
+      "part": "mineral",
+      "neutralizer": 2
     },
     {
       "id": "natron",
@@ -354,7 +373,9 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 2,
-      "market": "market"
+      "market": "market",
+      "part": "liquid",
+      "solvent": "alcohol"
     },
     {
       "id": "white-vinegar",
@@ -369,7 +390,9 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "part": "liquid",
+      "solvent": "vinegar"
     },
     {
       "id": "lamp-oil",
@@ -393,6 +416,23 @@
       "obtain": "bought",
       "price_gp": 1,
       "market": "market"
+    },
+    {
+      "id": "olive-oil",
+      "name": "Olive Oil",
+      "kind": "solvent",
+      "tier": "common",
+      "craft_dc": null,
+      "text": "Cold-pressed kitchen oil, green and mild. It will not burn a lamp clean, but it carries what a leaf or a flower gives up into a body that can be rubbed on the skin, which is the whole of an infused oil.",
+      "risky": false,
+      "volatile": false,
+      "effects": [],
+      "effects_converted": true,
+      "obtain": "bought",
+      "price_gp": 1,
+      "market": "market",
+      "part": "oil",
+      "solvent": "oil"
     },
     {
       "id": "turpentine",
@@ -564,7 +604,13 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "part": "wax",
+      "base_for": [
+        "salve",
+        "balm",
+        "cream"
+      ]
     },
     {
       "id": "cork-and-wick",
@@ -609,7 +655,9 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 1,
-      "market": "market"
+      "market": "market",
+      "part": "mineral",
+      "neutralizer": 1
     },
     {
       "id": "fire-beetle-gland",
@@ -932,7 +980,9 @@
       "effects_converted": true,
       "obtain": "bought",
       "price_gp": 25,
-      "market": "apothecary"
+      "market": "apothecary",
+      "part": "liquid",
+      "solvent": "alcohol"
     },
     {
       "id": "storm-quartz",
