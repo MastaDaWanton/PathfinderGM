@@ -486,6 +486,20 @@ def test_a_tincture_is_not_ready_before_its_day(bench):
 
 # --- bulk and time --------------------------------------------------------------------------
 
+def test_one_step_is_one_line_in_the_log(bench):
+    """Measured live on the real page: the roll wrote "works X at the bench" and the
+    finish "makes X", two lines in the table's log for every step, where the old bench
+    wrote one per batch. One step is one line, written when it lands; a miss writes its
+    own line, since it never lands."""
+    _carry(mint=2, hardroot=1)
+    before = len(_c().transcript)
+    _craft(bench, "grind", [{"key": _key(bench, "Mint"), "count": 1}])
+    assert len(_c().transcript) == before + 1
+    _post(bench, "/api/bench/roll", {"method": "grind", "face": 1, "items": [
+        {"key": _key(bench, "Hardroot"), "count": 1}]})
+    assert len(_c().transcript) == before + 2
+
+
 def test_a_bulk_batch_shares_one_tier(bench):
     """The owner's bulk rule (plan §2): one roll and one minigame for the stack, and the
     whole stack lands as one tier in one satchel entry."""

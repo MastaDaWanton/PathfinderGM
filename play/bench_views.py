@@ -382,8 +382,10 @@ def bench_roll(request):
                           "recipe": _recipe_ref(body)}
         out["token"] = token
         out["tuning"] = crafting.tuning_for(plan)
-        line = (f"{pc.name} works {plan.name} at the bench "
-                f"(d20 {face}{plan.bonus:+d} = {total} vs DC {plan.dc}).")
+        # No transcript line yet: the step is written once, when it lands (finish).
+        # Measured live: a line on the roll and another on the finish put two lines in
+        # the table's log for every step, where the old bench wrote one per batch.
+        line = ""
     else:
         miss = -margin
         losses = crafting.failure_losses(plan, miss)
@@ -406,7 +408,8 @@ def bench_roll(request):
         line = (f"{plan.name}: spoiled (d20 {face}{plan.bonus:+d} = {total} vs DC "
                 f"{plan.dc}). {said}")
     out["clock"] = _clock(c)
-    c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
+    if line:
+        c.transcript.append({"who": "gm", "kind": "consequence", "text": line})
     c.save()
     return JsonResponse(out)
 
