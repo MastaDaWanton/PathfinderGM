@@ -2,48 +2,26 @@
 
 Driven through the Django test client on a real campaign, with a small shelf of herbs
 whose parts, routes and reagent fields are known, standing in for the corpus while the
-data lane tags it. Each test names the defect it prevents.
-
-The bench's six routes are mounted first in a test URL conf below, because the shipped
-`pathfindergm/urls.py` lists `api/bench/<str:bench_id>` (the homebrew editor) ABOVE them
-and Django answers the first match: measured 2026-10-02, all six resolved to
-`home_views.bench`. `test_the_bench_routes_reach_the_bench` pins that and is expected to
-fail until the lead moves the routes (urls.py belongs to no lane).
+content lanes rewrite it. Each test names the defect it prevents.
 """
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
 
 import pytest
 from django.test import Client, override_settings
-from django.urls import path
 
-import pathfindergm.urls as real_urls
 from play import bench_views
 from play import campaign as cm
 from rules import crafting, ingredients
 from rules.ingredients import Ingredient
 from rules.sheet import load_pc
 
-urlpatterns = [
-    path("api/bench/state", bench_views.bench_state),
-    path("api/bench/check", bench_views.bench_check),
-    path("api/bench/roll", bench_views.bench_roll),
-    path("api/bench/finish", bench_views.bench_finish),
-    path("api/bench/perks", bench_views.bench_perks),
-    path("api/bench/recipe", bench_views.bench_recipe),
-] + list(real_urls.urlpatterns)
 
-
-@dataclass
-class Herb(Ingredient):
-    """An ingredient carrying the fields Lane A adds (contracts §2)."""
-    part: str = "leaf"
-    base_for: list = field(default_factory=list)
-    neutralizer: int = 0
-    solvent: str = ""
-    hybrid: bool = False
+def Herb(**kw) -> Ingredient:
+    """An ingredient with the data lane's fields (contracts §2), a leaf unless it says."""
+    kw.setdefault("part", "leaf")
+    return Ingredient(**kw)
 
 
 def _shelf() -> dict:
@@ -98,8 +76,7 @@ def _shelf() -> dict:
 def bench(tmp_path, monkeypatch):
     shelf = _shelf()
     monkeypatch.setattr(ingredients, "all_ingredients", lambda: shelf)
-    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns",
-                           ROOT_URLCONF="tests.test_bench_api"):
+    with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
         bench_views._PENDING.clear()
         # A quiet start: the default opening can begin in a fight, and the bench
@@ -174,18 +151,14 @@ ITEM_KEYS = {"key", "name", "ingredient_id", "kind", "part", "tier", "state", "f
 
 # --- the routes -----------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason="pathfindergm/urls.py lists api/bench/<bench_id> "
-                   "above the herbalism routes; the lead moves them (no lane owns urls.py)")
 def test_the_bench_routes_reach_the_bench():
     """Measured 2026-10-02: all six /api/bench/* routes resolved to the homebrew editor's
-    `home_views.bench`, because its `api/bench/<str:bench_id>` is listed first. The page
-    would have got the editor's 404 for every call. Strict, so the day the routes are
-    moved this XPASSes and the marker has to come off."""
+    `home_views.bench`, because its `api/bench/<str:bench_id>` was listed first, and the
+    page got its 404 ("no bench 'state'") for every call. The lead moved them (02d1dac)."""
     from django.urls import resolve
 
-    with override_settings(ROOT_URLCONF="pathfindergm.urls"):
-        for name in ("state", "check", "roll", "finish", "perks", "recipe"):
-            assert resolve(f"/api/bench/{name}").func.__module__ == "play.bench_views"
+    for name in ("state", "check", "roll", "finish", "perks", "recipe"):
+        assert resolve(f"/api/bench/{name}").func.__module__ == "play.bench_views"
 
 
 # --- §3.1 state -----------------------------------------------------------------------
@@ -651,6 +624,52 @@ def test_a_loaded_recipe_offers_its_next_step(bench):
         "face": 20, "recipe": rid, "step": 0})
     done = _post(bench, "/api/bench/finish", {"token": rolled["token"], "score": 0.5})
     assert done["next"]["method"] == "mix"
+    assert done["recipe"] == {"id": rid, "step": 0}
+
+
+def test_the_page_may_name_its_recipe_on_any_request_and_hears_it_back(bench):
+    """The bench UI keeps its loaded recipe as {recipe, step} and may send it on check,
+    roll or finish; each echoes it back as {id, step}, and finish's `next` follows the
+    step the page says it is on rather than the one the roll remembered."""
+    _carry(comfrey=2)
+    rid = _post(bench, "/api/bench/recipe", {"name": "Three steps", "steps": [
+        {"method": "grind", "items": []}, {"method": "grind", "items": []},
+        {"method": "mix", "items": []}]})["recipes"][0]["id"]
+    items = [{"key": _key(bench, "Comfrey"), "count": 1}]
+    ref = {"recipe": {"id": rid}, "step": 0}
+    assert _post(bench, "/api/bench/check", {"method": "grind", "items": items,
+                                             "recipe": ref})["recipe"] == {"id": rid,
+                                                                            "step": 0}
+    rolled = _post(bench, "/api/bench/roll", {"method": "grind", "items": items,
+                                              "face": 20, "recipe": ref})
+    assert rolled["recipe"]["id"] == rid
+    done = _post(bench, "/api/bench/finish", {"token": rolled["token"], "score": 0.5,
+                                              "recipe": rid, "step": 1})
+    assert done["next"] == {"method": "mix", "recipe": rid, "step": 2}
+
+
+def test_the_track_names_every_rung_and_what_each_perk_would_do(bench):
+    """The UI reads `track.tiers` before its own fallback names and `track.perk_info` for
+    the picker's numbers ("+5% potency, total +15%"); without them the page would have to
+    build names and sums the server owns."""
+    t = _get(bench, "/api/bench/state")["track"]
+    assert t["tiers"] == ["Crude", "Sound", "Fine"]
+    assert t["perk_info"]["potency"]["next"] == "+5% potency, total +5%"
+    _level(4)
+    _pc().track("herbalist").perks["potency"] = 2
+    t = _get(bench, "/api/bench/state")["track"]
+    assert t["perk_info"]["potency"] == {"next": "+5% potency, total +15%", "taken": 2}
+    assert t["perk_info"]["quality"]["next"].endswith("Flawless +1")
+    assert t["tiers"][-1] == t["ceiling_name"]
+
+
+def test_check_says_the_most_the_pot_allows_under_the_name_the_page_reads(bench):
+    """The "All" button reads `max_batch`: batch units the satchel covers for what is on
+    the tool, so 5 mint at 2 a unit is 2, not 5 and not 2.5."""
+    _carry(mint=5)
+    d = _post(bench, "/api/bench/check", {"method": "grind", "items": [
+        {"key": _key(bench, "Mint"), "count": 2}]})
+    assert d["max_batch"] == d["batch_max"] == 2
 
 
 # --- re-pinned from the old bench's tests ----------------------------------------------------

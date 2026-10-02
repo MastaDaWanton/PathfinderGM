@@ -166,11 +166,56 @@ def _recipes(c) -> list[dict]:
     return out
 
 
+def _pct(x: float) -> str:
+    return f"{round(x * 100, 1):g}%"
+
+
+def _track(track, progress) -> dict:
+    """The §3.1 `track` object, plus what the bench UI reads beyond the contract:
+    `tiers` (every name from Crude to the ceiling, so the page never builds one) and
+    `perk_info` (what the next pick of each perk does, in words with the numbers)."""
+    out = dict(worldclass.track_summary(track, progress))
+    ceiling = int(out.get("ceiling", worldclass.ceiling_index(progress)))
+    out["tiers"] = [crafting.quality_name(i) for i in range(ceiling + 1)]
+    sizes = (getattr(track, "endless", None) or {}).get("perks") or {}
+    taken = {p: int(progress.perks.get(p, 0)) for p in worldclass.PERKS}
+    info = {}
+    for perk in worldclass.PERKS:
+        size, n = float(sizes.get(perk, 0) or 0), taken[perk]
+        if perk == "quality":
+            step = int(size) or 1
+            nxt = (f"+{step} to your quality ceiling: "
+                   f"{crafting.quality_name(ceiling + step)}")
+        elif perk == "yield":
+            nxt = (f"+{_pct(size)} chance of an extra dose, total "
+                   f"{_pct(size * (n + 1))}")
+        else:
+            nxt = f"+{_pct(size)} {perk}, total +{_pct(size * (n + 1))}"
+        info[perk] = {"next": nxt, "taken": n}
+    out["perk_info"] = info
+    return out
+
+
+def _recipe_ref(body) -> dict | None:
+    """The loaded recipe a body names, as {"id", "step"}: `recipe` may be the id with a
+    separate `step`, or an object carrying both (the page keeps {recipe, step})."""
+    raw = body.get("recipe")
+    step = body.get("step")
+    if isinstance(raw, dict):
+        step = raw.get("step", step)
+        inner = raw.get("recipe")
+        raw = raw.get("id") or (inner.get("id") if isinstance(inner, dict) else inner)
+    if not isinstance(raw, (str, int)) or isinstance(raw, bool) or not str(raw).strip():
+        return None
+    step = step if isinstance(step, int) and not isinstance(step, bool) else 0
+    return {"id": str(raw).strip(), "step": max(0, step)}
+
+
 def _state_body(c, pc) -> dict:
     track, progress = _progress(pc)
     now = int(c.scene.clock_minutes or 0)
     return {
-        "track": worldclass.track_summary(track, progress),
+        "track": _track(track, progress),
         "methods": crafting.methods_view(progress.level),
         "satchel": [m.as_item(pc, now) for m in _satchel(c, pc)],
         "ground": _ground(c),
@@ -221,6 +266,7 @@ def _plan_from(c, pc, body) -> tuple[object, list, JsonResponse | None]:
 
 
 def _check_body(plan, items, pc, level) -> dict:
+    most = min((m.count // n for m, n in plan.picks if n > 0), default=0)
     return {
         "fits": crafting.fits_for(plan.method, items, plan.picks, level),
         "problems": list(plan.problems),
@@ -230,8 +276,9 @@ def _check_body(plan, items, pc, level) -> dict:
         "need": plan.need, "impossible": plan.impossible,
         # How many batch units what is on the tool allows, for the batch stepper's "all"
         # button (UI plan §6.5): the old bench learned that a player made to count it out
-        # finds out they were three short halfway through.
-        "batch_max": min((m.count // n for m, n in plan.picks if n > 0), default=0),
+        # finds out they were three short halfway through. Under both names: the page
+        # reads `max_batch`.
+        "batch_max": most, "max_batch": most,
         "product": crafting.product_card(plan, pc) if plan.form or plan.state else None,
     }
 
@@ -260,10 +307,13 @@ def bench_check(request):
     c, pc, refused = _ready(request)
     if refused:
         return refused
-    plan, items, refused = _plan_from(c, pc, read_body(request))
+    body = read_body(request)
+    plan, items, refused = _plan_from(c, pc, body)
     if refused:
         return refused
-    return JsonResponse(_check_body(plan, items, pc, pc.track(TRACK_ID).level))
+    out = _check_body(plan, items, pc, pc.track(TRACK_ID).level)
+    out["recipe"] = _recipe_ref(body)
+    return JsonResponse(out)
 
 
 # --- §3.3 ---------------------------------------------------------------------------------
@@ -325,14 +375,11 @@ def bench_roll(request):
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": face,
                        "word": "Success" if success else "Failure"},
-           "lost": [], "minutes": plan.minutes}
+           "lost": [], "minutes": plan.minutes, "recipe": _recipe_ref(body)}
     if success:
         token = secrets.token_urlsafe(16)
-        recipe = str(body.get("recipe") or "") or None
-        step = body.get("step")
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll,
-                          "recipe": recipe,
-                          "step": int(step) if isinstance(step, int) else None}
+                          "recipe": _recipe_ref(body)}
         out["token"] = token
         out["tuning"] = crafting.tuning_for(plan)
         line = (f"{pc.name} works {plan.name} at the bench "
@@ -464,12 +511,15 @@ def bench_finish(request):
     if yield_line:
         lines.append(yield_line)
 
+    # The loaded recipe's next step (UI plan §5 step 7). The finish body may name the
+    # recipe too, and wins: the page knows which step it is on.
+    ref = _recipe_ref(body) or pend.get("recipe")
     nxt = None
-    if pend.get("recipe") and pend.get("step") is not None:
-        recipe = next((r for r in _recipes(c) if r["id"] == pend["recipe"]), None)
-        if recipe and pend["step"] + 1 < len(recipe["steps"]):
-            nxt = {"method": recipe["steps"][pend["step"] + 1].get("method"),
-                   "recipe": recipe["id"], "step": pend["step"] + 1}
+    if ref:
+        recipe = next((r for r in _recipes(c) if r["id"] == ref["id"]), None)
+        if recipe and ref["step"] + 1 < len(recipe["steps"]):
+            nxt = {"method": recipe["steps"][ref["step"] + 1].get("method"),
+                   "recipe": recipe["id"], "step": ref["step"] + 1}
 
     tier_name = crafting.quality_name(tier)
     r = pend["roll"]
@@ -487,7 +537,7 @@ def bench_finish(request):
         "mastery": {"lines": lines, "total": progress.mp, "level": progress.level,
                     "levelled": levelled},
         "discoveries": discoveries,
-        "next": nxt,
+        "next": nxt, "recipe": ref,
         "state": _state_body(c, pc),
     })
 
@@ -506,7 +556,7 @@ def bench_perks(request):
     except ValueError as exc:
         return _err(str(exc))
     c.save()
-    return JsonResponse(worldclass.track_summary(track, progress))
+    return JsonResponse(_track(track, progress))
 
 
 # --- §3.6 ---------------------------------------------------------------------------------
