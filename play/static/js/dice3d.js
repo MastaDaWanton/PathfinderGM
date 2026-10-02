@@ -735,6 +735,14 @@
   }
 
   function clack(afterMs, level, pitch) {
+    // The app-wide sound (sound.js) when the page has it: the same clack, on the same
+    // audio clock offset, but under the player's dice volume and mute. This file's own
+    // synth stays below as the fallback for a page that loads no sound.js.
+    if (window.Sound && Sound.play("dice.land", { volume: level / 0.15, rate: pitch,
+                                                  delay: Math.max(0, afterMs) / 1000 })) {
+      return;
+    }
+    if (window.Sound) return;   // present but silent (muted, or no gesture yet): stay silent
     var ctx = audio();
     if (!ctx) return;
     var at = ctx.currentTime + Math.max(0, afterMs) / 1000;
@@ -944,6 +952,8 @@
     // starts, so the sound cannot drift from the frame it belongs to. Second one
     // quieter and a touch higher, the way a real second bounce is.
     var pitch = 0.9 + Math.random() * 0.25;
+    // The rattle as it leaves the hand (sound.js; nothing when the page has none).
+    window.Sound && Sound.play("dice.roll", { volume: slower ? 0.7 : 1 });
     clack(ms * 0.68, 0.15, pitch);
     clack(ms * 0.91, 0.07, pitch * 1.14);
 

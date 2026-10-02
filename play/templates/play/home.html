@@ -386,6 +386,28 @@
   .keyrow input { flex: 1; padding: 7px 9px; font: inherit; font-size: 13px;
     color: var(--ink); border-radius: 2px;
     background: linear-gradient(var(--sunk), #14100c); border: 1px solid #2e251a; }
+  /* Sound and motion (UI plan §6.9). The role cards' own frame and label type, so the
+     group reads as one more card in the same pane. A slider or a box is not a text
+     field: the field chrome `.rolefields input` gives every input is taken back off. */
+  .rolefields.sliders label { flex: 1 1 150px; }
+  .rolefields .lvl { display: flex; justify-content: space-between; gap: 8px; }
+  .rolefields .lvl b { color: var(--ink); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .rolefields input[type=range] { padding: 0; margin: 6px 0 2px; border: 0;
+    background: none; accent-color: var(--accent); width: 100%; }
+  .rolefields input[type=range]:disabled { opacity: .4; }
+  .prefrow { display: flex; align-items: flex-start; gap: 9px; margin-top: 11px;
+             font-size: 13px; color: var(--ink); }
+  .prefrow input { accent-color: var(--accent); margin: 3px 0 0; }
+  .prefrow .why, .prefnote { margin-top: 2px; font-size: 13px; color: var(--dim); }
+  .prefnote { margin-top: 7px; }
+  .preflabel { display: block; margin-top: 13px; font-size: 11.5px; color: var(--dim); }
+  .choice { display: inline-flex; margin-top: 3px; border: 1px solid #2e251a; border-radius: 2px;
+            background: linear-gradient(var(--sunk), #14100c); }
+  .choice label { display: inline-flex; align-items: center; gap: 6px;
+                  padding: 6px 13px; font-size: 13px; color: var(--dim); }
+  .choice label + label { border-left: 1px solid #2e251a; }
+  .choice label:has(input:checked) { color: var(--gold); background: rgba(201,168,106,.08); }
+  .choice input { accent-color: var(--accent); margin: 0; padding: 0; }
   .madebanner { border: 1px solid rgba(201,168,106,.34); border-left: 3px solid var(--gold);
                 background: rgba(201,168,106,.08); border-radius: 2px;
                 padding: 11px 15px; margin-bottom: 16px; font-size: 14.5px; }
@@ -805,6 +827,10 @@
 
 <main><div class="wrap" id="pane"></div></main>
 
+<!-- The player's preferences and the app's sound (Settings, "Sound and motion"). Ahead of
+     the page's own script, which draws the Settings pane from `PGMPrefs` on load. -->
+<script src="{% asset 'js/prefs.js' %}"></script>
+<script src="{% asset 'js/sound.js' %}"></script>
 <script>
 const STATE = {{ state_json|safe }};
 // Who was just forged, if the forge sent us back here. Opens on the roster rather than
@@ -1740,8 +1766,123 @@ async function installOllama() {
   }
 }
 
+/* --- Sound and motion -------------------------------------------------------------
+ *
+ * UI plan §6.9: a volume per bus, a master and a mute, Steady mode, and Flourishes. Kept by
+ * prefs.js in this machine's browser storage rather than in the model settings file:
+ * they apply the moment they change (no Save button), and the table and the bench read
+ * them live through `PGMPrefs.on`. Drawn even while the model settings are still being
+ * read, because nothing here waits on the server.
+ *
+ * Each slider plays a short sample of its own bus when it is let go (`change`, not
+ * `input`), so the player hears the level they chose rather than a stutter while dragging.
+ */
+const SOUND_SLIDERS = [
+  { key: "sound.master", label: "Master", sample: "dice.land" },
+  { key: "sound.ui", label: "Interface", sample: "ui.open" },
+  { key: "sound.dice", label: "Dice", sample: "dice.land" },
+  { key: "sound.bench", label: "Bench", sample: "bench.hit.grind" },
+  { key: "sound.ambience", label: "Ambience", sample: "ambience.forest" },
+  { key: "sound.combat", label: "Combat", sample: "combat.hit" },
+];
+
+function prefGet(key, dflt) {
+  try { return window.PGMPrefs ? PGMPrefs.get(key) : dflt; } catch { return dflt; }
+}
+
+function soundPanel() {
+  const muted = !!prefGet("sound.mute", false);
+  const pct = v => Math.round(Number(v) * 100);
+  const sliders = SOUND_SLIDERS.map(s => {
+    const v = prefGet(s.key, 0.8);
+    return `<label>
+      <span class="lvl">${esc(s.label)} <b data-prefshow="${esc(s.key)}">${pct(v)}</b></span>
+      <input type="range" min="0" max="1" step="0.05" value="${esc(String(v))}"
+        data-pref="${esc(s.key)}" data-sample="${esc(s.sample)}"
+        aria-label="${esc(s.label)} volume" ${muted ? "disabled" : ""}></label>`;
+  }).join("");
+  const flour = prefGet("flourishes", "full");
+  return `
+    <h2 class="sect">Sound and motion</h2>
+    <p class="note">Kept on this machine, and saved as you change them.</p>
+    <div class="rolecard">
+      <h3>Sound</h3>
+      <div class="why">Every sound is made by the app as it plays. Let go of a slider to
+        hear its level.</div>
+      <div class="rolefields sliders">${sliders}</div>
+      <label class="prefrow"><input type="checkbox" data-pref="sound.mute"
+        ${muted ? "checked" : ""}><span>Mute all sound</span></label>
+    </div>
+    <div class="rolecard">
+      <h3>Motion</h3>
+      <label class="prefrow"><input type="checkbox" data-pref="steady"
+        ${prefGet("steady", false) ? "checked" : ""}>
+        <span>Steady mode<div class="why">Slower minigames, and every hold becomes a
+          press.</div></span></label>
+      <span class="preflabel" id="flourlabel">Flourishes</span>
+      <div class="choice" role="radiogroup" aria-labelledby="flourlabel">
+        <label><input type="radio" name="flourishes" value="full" data-pref="flourishes"
+          ${flour === "full" ? "checked" : ""}>Full</label>
+        <label><input type="radio" name="flourishes" value="short" data-pref="flourishes"
+          ${flour === "short" ? "checked" : ""}>Short</label>
+      </div>
+      <div class="prefnote">Short keeps the sounds and the words, and leaves out the shake
+        and the sparks. It is chosen for you when your system asks for less motion.</div>
+    </div>`;
+}
+
+// Live while dragging: the level changes under the finger, and the number beside it.
+document.addEventListener("input", e => {
+  const el = e.target;
+  if (!el.matches || !el.matches('input[type=range][data-pref]') || !window.PGMPrefs) return;
+  const v = PGMPrefs.set(el.dataset.pref, Number(el.value));
+  const show = document.querySelector(`[data-prefshow="${el.dataset.pref}"]`);
+  if (show) show.textContent = Math.round(v * 100);
+});
+
+document.addEventListener("change", e => {
+  const el = e.target;
+  if (!el.matches || !el.matches("input[data-pref]") || !window.PGMPrefs) return;
+  const key = el.dataset.pref;
+  if (el.type === "range") {
+    PGMPrefs.set(key, Number(el.value));
+    soundSample(el.dataset.sample);
+  } else if (el.type === "checkbox") {
+    PGMPrefs.set(key, el.checked);
+    // Mute greys the sliders out rather than hiding them: the levels are kept for when
+    // the sound comes back.
+    if (key === "sound.mute") {
+      document.querySelectorAll('input[type=range][data-pref]').forEach(r => { r.disabled = el.checked; });
+      if (!el.checked) soundSample("ui.open");
+    }
+  } else if (el.type === "radio" && el.checked) {
+    PGMPrefs.set(key, el.value);
+  }
+});
+
+// A beat of the bus at its new level. An ambience is a bed, so it plays for two seconds
+// and fades; the one before it is stopped first, so a slider worked back and forth does
+// not stack beds.
+let SAMPLE_BED = null;
+const SAMPLED_AT = {};
+function soundSample(name) {
+  if (!window.Sound || !name) return;
+  // One sample per release. A drag in the preview pane fired `change` twice (two
+  // samples, measured 2026-10-02), and two clicks in a row would stack anyway.
+  const now = performance.now();
+  if (now - (SAMPLED_AT[name] || -1e9) < 250) return;
+  SAMPLED_AT[name] = now;
+  if (name.startsWith("ambience.")) {
+    if (SAMPLE_BED) SAMPLE_BED.stop();
+    const bed = SAMPLE_BED = Sound.loop(name);
+    setTimeout(() => { bed.stop(); if (SAMPLE_BED === bed) SAMPLE_BED = null; }, 2200);
+    return;
+  }
+  window.Sound && Sound.play(name);
+}
+
 function paneSettings() {
-  if (!SETTINGS) return `<p class="note">Reading the model settings…</p>`;
+  if (!SETTINGS) return `<p class="note">Reading the model settings…</p>` + soundPanel();
   const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
   return `
     <h2 class="sect">Before you can play</h2>
@@ -1798,7 +1939,8 @@ function paneSettings() {
       <button class="go" id="savemodels">Save</button>
       <span class="note" id="modelsaid" style="margin-left:12px"></span>
     </div>
-    <div id="modelerr"></div>`;
+    <div id="modelerr"></div>
+    ${soundPanel()}`;
 }
 
 /* --- Playing from a phone -------------------------------------------------------
