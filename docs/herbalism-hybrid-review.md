@@ -14,7 +14,7 @@ Three rulings of the owner, 2026-10-02, applied to every entry: the app's mechan
 - **Aconite.** Was: `ingest` DC 20; `ingest` Causes nauseated for 1d4 rounds. Now: `ingest` +2 Fortitude against lycanthropy and animal venom for 1 hour; `ingest` Fortitude DC 13; `ingest` Causes nauseated for 3 rounds; `ingest` 1d4 Strength damage; `skin` Heals 1d3 non-lethal damage.
 - **Adder's-Tongue.** Was: `wound` Heals 1-2 hit points. Now: `wound` Heals 1d3 hit points; `ingest` Heals 1d3 non-lethal damage; `ingest` +1 Fortitude against infection for 1 hour.
 - **Aelfengrape.** Was: `ingest` DC 15. Now: `ingest` 1d6 temporary hit points for 1 hour; `ingest` +2 Fortitude against hunger, thirst and fatigue for 1 hour; `ingest` +2 Will against fear for 1 hour.
-- **Allnight.** Was: `ingest` -2 skill checks until its effects wear off; `ingest` Ends fatigued; `ingest` Causes exhausted. Now: `ingest` +2 Fortitude against fatigue and sleep for 8 hours; `ingest` -2 Perception for 8 hours; `ingest` +1 Initiative for 8 hours.
+- **Allnight.** Was: `ingest` -2 skill checks until its effects wear off; `ingest` Ends fatigued; `ingest` Causes exhausted. Now: `ingest` +2 Fortitude against fatigue and sleep for 8 hours; `ingest` -2 Perception for 8 hours; `ingest` +1 Initiative for 8 hours; `ingest` Ends fatigued.
 - **Althaea.** Was: `wound` Heals 1d4 hit points. Now: `wound` Heals 1d4 hit points; `ingest` Heals 1d3 non-lethal damage; `skin` Heals 1d3 hit points.
 - **Amaranth.** Was: `wound` Heals 1d4 hit points. Now: `wound` Heals 1d4 hit points; `ingest` Heals 1d3 hit points; `ingest` +1 Fortitude against disease for 1 hour.
 - **Angelica.** Was: `ingest` +2 Fortitude vs disease for 1 hour; `ingest` Cures an ongoing disease when brewed and drunk. Now: `ingest` +2 Fortitude against disease for 1 hour; `ingest` +1 Will against hostile magic for 1 hour; `inhale` +1 Will against fear for 1 hour.
@@ -45,10 +45,10 @@ Three rulings of the owner, 2026-10-02, applied to every entry: the app's mechan
 - **Coldwood.** Was: `external` Iron-strong wood with none of iron's harm to fey; weapons and armour can be made of it; `external` +1 Will vs fey magic, carrying worked coldwood for 1 hour. Now: `external` +1 Damage rolls a coldwood weapon against fey for 1 day; `external` +1 Will vs fey magic, carrying worked coldwood for 1 hour; `ingest` +2 Will against fey enchantment for 1 hour.
 - **Comfrey.** Was: `wound` Heals 1-4 hit points. Now: `wound` Heals 1-4 hit points; `ingest` Heals 1d3 non-lethal damage; `skin` Heals 1d3 non-lethal damage.
 - **Cotsbalm.** Was: `skin` +8 Fortitude to resist the secondary effects; `skin` DC 35. Now: `skin` +4 Fortitude against poison for 1 hour; `skin` Heals 2d4 hit points; `wound` +3 Fortitude against poison in the wound for 1 hour.
-- **Cowslip.** Was: `ingest` Ends paralyzed. Now: `ingest` +2 Fortitude against paralysis for 1 hour; `ingest` +1 Strength for 1 hour; `ingest` Heals 1d3 non-lethal damage.
+- **Cowslip.** Was: `ingest` Ends paralyzed. Now: `ingest` +2 Fortitude against paralysis for 1 hour; `ingest` +1 Strength for 1 hour; `ingest` Heals 1d3 non-lethal damage; `ingest` Ends paralyzed.
 - **Damiana.** Was: `inhale` +1 Charisma within the incense vapours for 1 hour. Now: `inhale` +1 Charisma within the incense vapours for 1 hour; `ingest` +2 Diplomacy for 1 hour; `inhale` -1 Will against emotion effects for 1 hour.
 - **Darkroot.** Was: `external` DC 20. Now: `external` Causes entangled for 3 rounds; `wound` Heals 1d6 hit points; `skin` DR 1/— for 10 minutes.
-- **Dawnpetal.** Was: `ingest` +2 Strength for 2 hours; `ingest` Ends fatigued; `ingest` Causes exhausted. Now: `ingest` +2 Strength for 1 hour; `ingest` +2 Fortitude against fatigue for 1 hour; `ingest` -1 Will for 1 hour.
+- **Dawnpetal.** Was: `ingest` +2 Strength for 2 hours; `ingest` Ends fatigued; `ingest` Causes exhausted. Now: `ingest` +2 Strength for 1 hour; `ingest` +2 Fortitude against fatigue for 1 hour; `ingest` -1 Will for 1 hour; `ingest` Ends fatigued.
 - **Dire Boar Tusk.** Was: `inhale` +3 Strength for 1 hour, but the user becomes…. Now: `inhale` +2 Strength for 1 hour; `inhale` -2 Wisdom for 1 hour; `inhale` 1d6 temporary hit points for 1 hour.
 - **Dittany.** Was: `ingest` Heals 1d3 hit points. Now: `ingest` Heals 1d3 hit points; `ingest` +1 Fortitude against lingering poison for 1 hour; `wound` Heals 1d4 hit points.
 - **Djinn Blossoms.** Was: `external` +2 saves to resist inhaled poisons, gases, and spells for 24 hours; `skin` +2 Charisma skill for 24 hours; `skin` DC 20. Now: `external` +2 Fortitude against inhaled poisons, gases and clouds for 24 hours; `skin` +2 Diplomacy for 8 hours; `inhale` +2 Acrobatics light on the feet for 1 hour.
@@ -179,7 +179,7 @@ Three rulings of the owner, 2026-10-02, applied to every entry: the app's mechan
 ## The counts
 
 - **63 hybrid entries** of 161: all 20 monster parts and 43 plants and fungi.
-- **Routes, all entries:** ingest 276, skin 89, external 63, wound 48, inhale 39, eyes 10 (525 effects).
+- **Routes, all entries:** ingest 279, skin 89, external 63, wound 48, inhale 39, eyes 10 (528 effects).
 - **Routes, hybrid entries:** ingest 94, external 49, skin 24, inhale 20, eyes 7, wound 6.
 - **Parts:** leaf 63, flower 18, root 17, berry 12, sap 9, bark 8, fungus 7, organ 5, seed 4, horn 4, bone 3, gland 3, resin 2, feather 2, liquid 1, eye 1, scale 1, shell 1.
 - **Bases:** salve 17, balm 0, cream 4.
