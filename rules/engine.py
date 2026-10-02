@@ -7324,6 +7324,19 @@ class Engine:
             bits.append(f"{recipe} is beneath a {track.name} of {was} now; "
                         f"there is nothing left in it to learn.")
         for lvl in result["levelled"]:
+            if lvl > track.max_level:
+                # An endless level (docs/herbalism-revamp-plan.md §4.2): past the track's
+                # table nothing new unlocks, and `track.at` clamps to the last row — so
+                # Herbalist 4 used to be told "Unlocked: neutralize" a second time. The
+                # level banks perk picks instead, spent at the bench.
+                # MERGE: lane/herb-progress adds `worldclass.track_summary`; the banked
+                # count is the scaffold's `perk_picks_banked`, guarded until both land.
+                banked = (worldclass.perk_picks_banked(progress)
+                          if hasattr(worldclass, "perk_picks_banked") else 0)
+                bits.append(f"{actor.name} is {track.name} {lvl}. Nothing new unlocks "
+                            f"past {track.name} {track.max_level}; the level banks perk "
+                            f"picks ({banked} waiting at the bench).")
+                continue
             gained = track.at(lvl)
             bits.append(f"{actor.name} is {track.name} {lvl}. "
                         f"Unlocked: {', '.join(gained.methods)}"
@@ -14653,6 +14666,179 @@ class Engine:
             effects=[{"ref": actor.ref, "kind": "drink"}],
             tell=f"{actor.name} drinks.", because=intent.because,
         )
+
+    def _op_taste(self, intent: Intent, partial: dict) -> Outcome:
+        """A nibble of a raw herb, to learn what it does (docs/herbalism-revamp-plan.md
+        §8.2). The owner's ruling: "Real risk. It costs the dose, applies the raw effect
+        for real, and reveals 1 positive and 1 negative trait."
+
+        Everything the herb does goes through the doors it would go through in a jar:
+        its specs become ordinary intents (`consumables.plan`, one spec at a time so the
+        engine knows which property did what), validated with `origin item:<id>` — so
+        the mind gate, immunity and every other check apply — and run. A poison's save
+        is rolled first and GATES its body; `use_item` lists the two side by side and
+        the body lands whatever the save said, which a taste must not copy. The save is
+        rolled by the engine: the herb card's Taste button posts no die
+        (docs/herbalism-contracts.md §4.4) and a taste is not a choice of how hard to
+        resist. Death and downing arrive through the ops' own hit-point and condition
+        paths, so the table's deathveil sees them as it sees a blow.
+
+        What it TEACHES is narrower than what it DOES (`herbknowledge.taste_picks`): one
+        benefit and one drawback, unknown first, landed first. The tell names only
+        those; anything else that worked on the taster is said to be at work and not
+        named, because the narrator is never told a property the character does not
+        know (law 3). Hit-point states are said whatever caused them.
+        """
+        from . import herbknowledge as hk
+        from .dice import BadDice
+
+        actor = self._eater(intent)
+        said = str(intent.params.get("item") or "").strip()
+        ing = ing_mod.by_name(said) if said else None
+        if ing is None:
+            carried = [ing_mod.all_ingredients()[k].name for k, n in actor.inventory.items()
+                       if n and k in ing_mod.all_ingredients()]
+            return self._refuse(
+                intent, f"{actor.name} has no herb called {said or 'that'} to taste."
+                        + (f" Carried: {', '.join(sorted(carried))}." if carried else
+                           " The satchel holds no herbs."))
+        shelf = hk.stock_of(actor, ing.id)
+        if not hk.carried(actor, ing.id) and not shelf:
+            return self._refuse(intent, f"{actor.name} has no {ing.name} to taste.")
+        stopped = actor.blocking_condition()
+        if stopped:
+            return self._refuse(intent, f"{actor.name} is {stopped} and cannot taste "
+                                        f"anything.")
+        # Before anything is learned: a herbalist's homeland knowledge is theirs already,
+        # and a taste must not "teach" what they grew up knowing.
+        hk.ensure_seeded(actor, world=self.world, scene=self.scene)
+        hk.meet(actor, ing.id)
+        # The dose first, as a jar's is: a herb that kills the taster has still been eaten.
+        if not actor.spend(ing.id, 1):
+            actor.take_stock(shelf, 1)
+
+        origin, because = f"item:{ing.id}", intent.because or f"tasting {ing.name}"
+        anatomy = hk.anatomy(ing)
+        keys = anatomy["keys"]
+        by_key: dict[str, list] = {k: [] for k in keys}
+        rolls: list = []
+
+        def run_spec(key: str) -> None:
+            spec = hk.taste_condition(anatomy["specs"][key])
+            duration = spec.get("duration")
+            if isinstance(duration, dict) and not str(duration.get("amount", "")).isdigit():
+                # Aconite is "nauseated for 1d4 rounds", and `_op_condition` reads the
+                # amount with int(): the dice are the herb's and the engine rolls them,
+                # here, before the op ever sees a string it would die on.
+                try:
+                    lasted = self.dice.roll(str(duration.get("amount")),
+                                            label=f"{ing.name}: how long").total
+                except BadDice:
+                    lasted = int(hk.lore()["taste"]["condition_minutes"])
+                spec["duration"] = {**duration, "amount": max(1, lasted)}
+            cond = str(spec.get("target") or spec.get("condition") or "")
+            if str(spec.get("type")) == "apply_condition" \
+                    and "state.down.dead" in states.tags_for(cond):
+                # Menhirite "Causes dead". Death is written through the one door that
+                # clears the ladder above it (`Actor.die`), not a bare condition op —
+                # the coup de grâce's save walks the same way.
+                if actor.die(source=origin):
+                    by_key[key].append(Outcome(
+                        intent_id=intent.id, op="condition",
+                        effects=[{"ref": actor.ref, "kind": "condition", "condition": cond,
+                                  "origin": origin}],
+                        tell=f"{actor.name} is dead.", because=because))
+                return
+            use = consumables.plan({"name": ing.name, "specs": [spec], "count": 1},
+                                   how="drink", target=actor.ref, because=because)
+            # Every sub-intent is the engine's to roll: a taste suspends for nobody.
+            made = [dict(i, visibility="hidden") for i in use.intents]
+            for m in made:
+                # `consumables` writes a lifted condition as `remove`, which the op table
+                # has never taken (`ends` is its word): "Ends paralyzed" raised at parse.
+                # Spelled right here; the jar door's copy is reported, not owned.
+                params = m.get("params") or {}
+                if m.get("op") == "condition" and "remove" in params:
+                    m["params"] = {**{k: v for k, v in params.items() if k != "remove"},
+                                   "ends": bool(params["remove"])}
+            if made:
+                try:
+                    res = self.run(self.validate(made, origin=origin,
+                                                 origin_name=ing.name))
+                except IntentError:
+                    # A spec the engine cannot stand up is a property that did nothing
+                    # this time, never a taste that crashes the turn.
+                    return
+                by_key[key].extend(res.outcomes)
+
+        gate_of = anatomy["gate_of"]
+        bodies = set(gate_of)
+        for gate in dict.fromkeys(gate_of.values()):
+            dc = consumables.Poison(gate=anatomy["specs"][gate]).dc
+            save = str(anatomy["specs"][gate].get("target") or "fort").lower()
+            made_it = False
+            if dc is not None:
+                res = self.run(self.validate([{
+                    "op": "save", "actor": actor.ref, "because": because,
+                    "visibility": "hidden",
+                    "params": {"save": save if save in SAVES else "fort",
+                               "dc": {"value": dc}}}], origin=origin, origin_name=ing.name))
+                by_key[gate].extend(res.outcomes)
+                made_it = any(o.op == "save" and o.verdict == "success"
+                              for o in res.outcomes)
+            if not made_it:
+                for body in (k for k in keys if gate_of.get(k) == gate):
+                    run_spec(body)
+        for key in keys:
+            spec = anatomy["specs"][key]
+            if key in bodies or str(spec.get("type")) == "save_gate":
+                continue
+            run_spec(key)
+
+        landed = {k for k, outs in by_key.items()
+                  if any(o.effects and o.status != "refused" for o in outs)
+                  and str(anatomy["specs"][k].get("type")) != "save_gate"}
+        picks = hk.taste_picks(actor, ing, landed=landed)
+        day = hk.day_of(self.scene.clock_minutes)
+        new = hk.reveal(actor, ing.id, picks, f"tasted, day {day}")
+        lines = dict(zip(keys, (line for line, _ in ing.pairs)))
+
+        effects: list[dict] = [{"ref": actor.ref, "kind": "taste", "item": ing.id,
+                                "name": ing.name, "learned": new, "origin": origin}]
+        bits = [f"{actor.name} tastes {ing.name}."]
+        unnamed = False
+        for key in keys:
+            outs = by_key[key]
+            for o in outs:
+                rolls.extend(o.rolls or [])
+                effects.extend(o.effects or [])
+            if key in picks:
+                bits.extend(o.tell for o in outs if o.tell)
+            elif any(o.effects for o in outs if o.op != "save"):
+                unnamed = unnamed or any(e.get("kind") != "condition"
+                                         for o in outs if o.op != "save"
+                                         for e in (o.effects or []))
+                # A state the body is now in is a fact about the body, whatever caused
+                # it: the hit-point ladder's own sentence, never the property's line.
+                # A condition is the same: "is paralyzed" is how the body is, and the
+                # brief states conditions anyway (`gm.prompts._states_of`).
+                for e in (e for o in outs for e in (o.effects or [])):
+                    if e.get("kind") != "condition" or e.get("ends") \
+                            or e.get("ref") != actor.ref:
+                        continue
+                    down = self._hp_state_tell([e]).strip()
+                    named = CONDITIONS.get(str(e.get("condition") or ""), {}).get(
+                        "name", str(e.get("condition") or "")).lower()
+                    bits.append(down or f"{actor.name} is {named}.")
+        if picks:
+            bits.append(f"{actor.name} learns: "
+                        + "; ".join(lines[k] for k in picks) + ".")
+        else:
+            bits.append(f"{actor.name} learns nothing new about it.")
+        if unnamed:
+            bits.append("Something else in it is at work that they cannot yet name.")
+        return Outcome(intent_id=intent.id, op="taste", rolls=rolls, effects=effects,
+                       tell=" ".join(" ".join(bits).split()), because=intent.because)
 
     def _eater(self, intent: Intent):
         """Who the meal is for: the named actor, or the PC — the only creature whose
