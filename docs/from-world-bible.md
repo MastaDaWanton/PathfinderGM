@@ -152,6 +152,20 @@ were never mentioned (playtest items 17 and 19).
 | `play.cards[]` | Absent; hooks come only from this app's schemes | `{"giver", "want", "offer", "motive", "withholds"}`, so a world's own hooks arrive in the same shape a scheme's do. `giver` is an id |
 | `unwritten[].where_id` | `unwritten` names things with no location | The id of the settlement or place the unwritten thing belongs to, so it can be offered where it would be found |
 
+### Ingredients and reagents
+
+Added 2026-10-02 by the herbalism revamp. The export carries no flora at all, so every world
+gets the shipped corpus of 161 herbs and parts, and a world's own plants exist only in its
+prose. The proposed shape is `play.flora[]` in `campaign-format.md`.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.flora[]` | Absent. Fifteen shipped herbs are marked world flora (`ingredients.WORLD_FLORA`) because whether a world has them is the world's call | One row per plant, fungus or creature part the world names, with `about` in the world's own words, `grows_in` in the fourteen terrain words, and `rarity` |
+| `play.flora[].part` | Absent | One word from the part list, read off the world's own description ("the bark", "the sap") |
+| `play.flora[].uses[].route` | Absent | One word per use: `ingest`, `skin`, `eyes`, `wound`, `inhale`, or `external` for a use that reaches outside the body |
+| `play.flora[].hybrid` | Absent | `true` when any use is magical, so the alchemist's shelf carries it too |
+| `base_for`, `solvent`, `neutralizer` | Absent | Only on the few things that are bench reagents: a wax, an oil, a spirit, a lime. A world's own trade goods are the natural source (`trade.sells` already names them in prose) |
+
 ## Things worth stealing
 
 Patterns from World Bible that solved problems this app will hit too:
