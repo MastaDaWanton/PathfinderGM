@@ -2393,7 +2393,13 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
     before_harm = _harmful_ids(specs)
     lost_help = [d for d in plan.dropped if id(d["spec"]) not in before_harm]
     kept_harm = _harmful_ids(kept)
-    if specs and not kept and plan.dropped and method != "neutralize":
+    if plan.form == "salve-base":
+        # A base is structure, not medicine: ground bark thickens a salve whatever its
+        # own effects were (measured live: Breeam, whose every effect is external, was
+        # refused as a salve base for carrying nothing). What it does carry is filtered
+        # again by the salve, balm or cream it goes into.
+        pass
+    elif specs and not kept and plan.dropped and method != "neutralize":
         # The form could carry none of it: a poultice of a herb that only works when
         # swallowed is a wet leaf, and making one would spend the herb for nothing.
         plan.problems.append(

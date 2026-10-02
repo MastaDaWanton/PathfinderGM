@@ -35,6 +35,8 @@ def _shelf() -> dict:
              effects=[{"type": "heal", "dice": "1d6", "route": "wound"}]),
         Herb(id="ironbark", name="Ironbark", part="bark",
              effects=[{"type": "heal", "dice": "1d4", "route": "skin"}]),
+        Herb(id="shadowbark", name="Shadowbark", part="bark", effects=[
+            {"type": "narrative", "target": "a shadow that hides", "route": "external"}]),
         Herb(id="glowcap", name="Glowcap", kind="fungus", part="fungus", effects=[
             {"type": "narrative", "target": "glows like a lantern", "route": "external"},
             {**heal, "route": "ingest"}]),
@@ -405,6 +407,17 @@ def test_a_remedy_whose_help_is_all_alchemy_is_refused(bench):
                                             "count": 1}]})
     assert not d["can_roll"]
     assert any("alchemy's" in p for p in d["problems"])
+
+
+def test_bark_that_does_nothing_herbal_still_grinds_into_a_salve_base(bench):
+    """Measured live on the owner's data: Breeam's every effect is external, and its
+    bark was refused as a salve base for "carrying none of what this does". A base is
+    structure, not medicine; it is the salve made from it that carries effects."""
+    _carry(shadowbark=1)
+    d = _post(bench, "/api/bench/check", {"method": "grind", "items": [
+        {"key": _key(bench, "Shadowbark"), "count": 1}]})
+    assert d["can_roll"], d["problems"]
+    assert d["product"]["form"] == "salve-base"
 
 
 def test_each_form_carries_only_its_routes(bench):
