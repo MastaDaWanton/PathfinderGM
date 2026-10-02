@@ -1,0 +1,534 @@
+/* The herbalism bench (docs/herbalism-ui-plan.md), over the play table.
+
+   A REDESIGN THAT KEEPS THE LOOK. No new colour, font or texture: every value here is a
+   theme-v2.css token or the bench's semantic layer over them (UI plan §3). The one accent
+   is gold; quality is shown by metal and weight, never by hue; corners are 3px, and only
+   dials, dice, rings and the icons' discs are round.
+
+   THE LAYERS (UI plan §3; the table's scale, read from table.html): veil 20, popovers 30,
+   BENCH 35, deathveil 40, skip link 50, dice mat 60, verdict 65/66, gloss card 70. Inside
+   the bench, z-index only orders the bench's own children (1 to 9) within its stacking
+   context. The product's flight is the one element outside it, at the verdict word's 66.
+   tests/test_bench_ui.py fails any z-index here that is not 35, 66 or 1 to 9.
+
+   MOTION (UI plan §10). Chrome animates transform and opacity only, 200ms at most (the
+   product's 500ms flight is the stage's, run from 30-bench-shell.js). Nothing loops. The
+   reduced-motion block at the foot, and `.bench-still` (the OS asked, or the player chose
+   Short flourishes), take every transition and animation away. */
+
+.bench {
+  --bench-ground: var(--sunk);
+  --bench-ink: var(--ink);
+  --bench-quiet: var(--dim);
+  --bench-accent: var(--gold);
+  --bench-accent-deep: var(--gold-dim);
+  --bench-warn: var(--alarm);
+  --bench-light: var(--candle);
+  --bench-radius: 3px;
+  --bench-satchel-w: 300px;
+  --bench-tag-w: 320px;
+  --bench-gap: 36px;
+
+  position: fixed; inset: 0; z-index: 35;
+  display: grid; grid-template-rows: 56px minmax(0, 1fr) 44px; row-gap: 22px;
+  color: var(--bench-ink); font: 16px/1.5 var(--body);
+  /* The ground fills the whole window, the ultrawide included: a pool of the scene's
+     candle light under the tool, falling off into --bg (UI plan §4.2, "a camp at night"). */
+  background:
+    radial-gradient(48% 52% at 50% 46%, rgba(var(--ember), .07), transparent 70%),
+    radial-gradient(70% 80% at 50% 45%, var(--bench-ground) 0%, var(--bg) 78%),
+    var(--bg);
+  opacity: 0;
+  transition: opacity .2s ease-out;
+}
+.bench[hidden] { display: none; }
+.bench.is-in { opacity: 1; }
+.bench *, .bench *::before, .bench *::after { box-sizing: border-box; }
+
+/* Focus is always visible on the bench, on every control: the candle, as the theme's
+   wells draw it. */
+.bench :focus-visible { outline: 2px solid var(--bench-light); outline-offset: 2px; }
+
+/* The table's global button rule (cold iron, ember glow, 12px 24px padding) reaches every
+   <button> that is not a .v2-btn; the bench's own small buttons start from nothing. In
+   :where(), so this reset weighs one class and every bench rule below outranks it: at
+   `.bench button:not(.v2-btn)` it outweighed them and zeroed the "?" button's margin and
+   rim (seen in the first screenshot, the "?" sat 14px low). */
+.bench :where(button:not(.v2-btn)) {
+  appearance: none; background: none; border: 0; padding: 0; margin: 0; color: inherit;
+  font: inherit; letter-spacing: normal; font-variant: normal; text-align: inherit;
+  border-radius: var(--bench-radius); box-shadow: none; overflow: visible; cursor: pointer;
+  transition: none;
+}
+.bench :where(button:not(.v2-btn))::after { content: none; }
+.bench details { margin-top: 0; }
+.bench summary { color: var(--bench-quiet); font-size: 13px; }
+
+/* --- the caps: content to 2000px, centred (UI plan §4.3) ------------------------------- */
+.bench-cap { width: 100%; max-width: 2000px; margin: 0 auto; padding: 0 28px; }
+
+/* --- the method strip (UI plan §6.1) ---------------------------------------------------- */
+.bench-strip { border-bottom: 1px solid var(--bench-accent-deep); box-shadow: var(--sh-2); }
+.bench-strip-in { height: 100%; display: flex; align-items: center; gap: 20px; }
+.bench-title {
+  margin: 0; color: var(--bench-accent); font: 400 22px/1 var(--display);
+  letter-spacing: .09em; font-variant: small-caps; white-space: nowrap; text-shadow: var(--engraved);
+}
+.bench-methods { display: flex; gap: 2px; flex: 1; min-width: 0; align-items: stretch; height: 44px; }
+.bench .bm {
+  position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px;
+  color: var(--bench-quiet); font: 400 15px/1 var(--display); letter-spacing: .06em;
+  font-variant: small-caps; white-space: nowrap; text-shadow: var(--engraved);
+}
+.bench .bm:hover { color: var(--bench-ink); }
+.bench .bm[aria-checked="true"] { color: var(--bench-accent); }
+/* The active method's gilt underline plate. It slides by opacity and a scale from its
+   own centre, 160ms (UI plan §10, "strip underline slides"). */
+.bench .bm::after {
+  /* `top: auto` because the table's global button ::after sets `inset: 0`, and with a
+     height and a top the plate sat on the button's top edge, under the heading. */
+  content: ""; position: absolute; top: auto; left: 8px; right: 8px; bottom: 2px; height: 3px;
+  border-radius: 1px; background: var(--brass-grain), var(--gilt);
+  background-size: 120px auto, auto; background-blend-mode: soft-light, normal;
+  opacity: 0; transform: scaleX(.4); transition: opacity .16s ease-out, transform .16s ease-out;
+}
+.bench .bm[aria-checked="true"]::after { opacity: 1; transform: none; }
+/* Locked: the lock icon and the level in words carry it, in --dim. Not --ash, which the
+   plan names and which measured 2.98:1 on the strip's brightest grain (lane hand-back);
+   --dim held 4.66:1 there. */
+.bench .bm.is-locked { color: var(--dim); cursor: not-allowed; }
+.bench .bm.is-locked .bicon { opacity: .7; }
+.bm-lock { font: 13px/1 var(--body); font-variant: normal; letter-spacing: 0; color: var(--dim); }
+.bm-tip { display: none; }
+.bench-close { margin-left: auto; }
+
+/* --- the three columns (UI plan §4.2) ------------------------------------------------- */
+.bench-frame {
+  width: 100%; max-width: 2000px; margin: 0 auto; padding: 0 28px; min-height: 0;
+  display: grid; column-gap: var(--bench-gap);
+  grid-template-columns: var(--bench-satchel-w) minmax(560px, 1fr) var(--bench-tag-w);
+  grid-template-areas: "satchel stage tag";
+}
+.bench-satchel { grid-area: satchel; }
+.bench-stage { grid-area: stage; }
+.bench-tagcol { grid-area: tag; }
+
+/* The panels: the table's tooled leather in its gilt ring, clasped. Darker than the table's
+   sides, so --dim reason lines hold 4.5:1 on the grain's brightest patches (measured in
+   the lane's hand-back): where text on a material measured short, the fix is a darker
+   tint of the texture, never a lighter --dim (theme-v2.css, Materials). */
+.bench-panel {
+  --tooled-top: rgba(0, 0, 0, .46); --tooled-foot: rgba(0, 0, 0, .56);
+  min-height: 0; display: flex; flex-direction: column; border-radius: var(--bench-radius);
+  box-shadow: var(--sh-3);
+}
+.bench-panel > :not(.v2-rim) { position: relative; z-index: 1; }
+.bench-satchel-in, .bench-tagcol-in { display: flex; flex-direction: column; min-height: 0; flex: 1; padding: 16px; }
+
+/* --- the satchel (UI plan §6.2) -------------------------------------------------------- */
+.bs-head { display: grid; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid #221b13;
+           box-shadow: 0 1px 0 rgba(255, 225, 170, .08); }
+.bs-label { color: var(--bench-quiet); font-size: 13px; }
+.bench .bs-find, .bench .bs-show {
+  width: 100%; min-height: 36px; padding: 6px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink);
+}
+.bench .bs-show { appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--bench-quiet) 50%),
+                    linear-gradient(135deg, var(--bench-quiet) 50%, transparent 50%),
+                    linear-gradient(var(--sunk), #131009);
+  background-position: right 14px center, right 9px center, 0 0;
+  background-size: 5px 5px, 5px 5px, auto; background-repeat: no-repeat; padding-right: 26px; }
+.bench .bs-show option { background: var(--panel); color: var(--bench-ink); }
+.bs-showrow { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px; margin-top: 4px; }
+.bench input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) brightness(1.6); }
+
+.bs-list { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -16px; padding: 4px 16px 8px;
+           scrollbar-color: var(--bench-accent-deep) transparent; scrollbar-width: thin; }
+.bs-group { margin-top: 12px; }
+.bs-gh { margin: 0 0 4px; color: var(--bench-quiet); font: 400 13px/1.4 var(--body); }
+.bs-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.bs-state { padding: 18px 4px 6px; color: var(--bench-ink); font-size: 15px; }
+.bs-state p { margin: 0 0 10px; }
+.bs-state .bs-detail { color: var(--bench-quiet); font-size: 13px; }
+.bs-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* A row, 56px (UI plan §6.2): icon with its rarity rim, the name, its badges and lines,
+   the count on the right. */
+.bt { position: relative; }
+.bench .bt-add {
+  position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center;
+  gap: 10px; width: 100%; min-height: 56px; padding: 6px 10px 6px 6px; border-radius: var(--bench-radius);
+  color: var(--bench-ink); text-align: left; cursor: pointer;
+}
+.bench .bt.has-info .bt-add { padding-right: 46px; }
+.bench .bt-add:hover { background: rgba(255, 225, 170, .05); }
+.bench .bt-add:active:not([aria-disabled="true"]) { transform: translate(0, 1px); }
+.bench .bt-add[draggable="true"] { cursor: grab; }
+.bt-main { display: grid; gap: 1px; min-width: 0; }
+.bt-name { font-size: 15px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bt-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.bt-badge { font-size: 12px; line-height: 1.3; color: var(--bench-quiet); padding: 0 5px;
+            border: 1px solid var(--edge); border-radius: var(--bench-radius); }
+.bt-why, .bt-time { font-size: 13px; line-height: 1.3; color: var(--bench-quiet); }
+.bt-time.is-soon { color: var(--bench-ink); }
+.bt-count { min-width: 22px; text-align: right; color: var(--bench-accent);
+            font: 15px/1 var(--body); font-variant-numeric: lining-nums tabular-nums; }
+/* Can't use now: --dim words and a reason line, never colour alone. The icon sinks a
+   little; the text is not faded below --dim, so it holds its contrast. */
+.bt.is-dim .bt-name { color: var(--bench-quiet); }
+.bt.is-dim .bt-icon { opacity: .55; }
+.bt.is-dim .bt-count { color: var(--bench-quiet); }
+.bench .bt.is-dim .bt-add { cursor: not-allowed; }
+.bench .bt-info {
+  position: absolute; right: 8px; top: 50%; width: 28px; height: 28px; margin-top: -14px;
+  display: grid; place-items: center; border-radius: 50%; color: var(--bench-quiet);
+  font: 400 15px/1 var(--display); border: 1px solid var(--edge); background: rgba(8, 6, 4, .45);
+}
+.bench .bt-info.is-unknown { color: var(--bench-accent); border-color: var(--bench-accent-deep); }
+.bench .bt-info:hover { color: var(--bench-ink); border-color: var(--accent); }
+/* The tile a product landed on pulses once; one a refusal bounced off shows its reason. */
+.bt::after { content: ""; position: absolute; inset: 0; border-radius: var(--bench-radius); pointer-events: none;
+             box-shadow: inset 0 0 0 1px var(--bench-accent), 0 0 18px rgba(var(--ember), .25); opacity: 0; }
+.bt.is-landed::after { animation: bench-pulse .6s ease-out; }
+.bt.is-refused .bt-why { animation: bench-nudge .2s ease-out; }
+@keyframes bench-pulse { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes bench-nudge { 0% { transform: translateX(0); } 40% { transform: translateX(3px); } 100% { transform: translateX(0); } }
+
+/* Skeleton rows while the satchel loads (UI plan §7): the tile's shape, no spinner, and no
+   shimmer, which would be a loop. */
+.bt.is-skel .bt-add { cursor: default; }
+.sk-disc { display: block; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 225, 170, .07); }
+.sk-disc.is-big { width: 48px; height: 48px; flex: none; }
+.sk-bar { display: block; height: 10px; width: 70%; margin: 4px 0; border-radius: 2px; background: rgba(255, 225, 170, .07); }
+.sk-bar.is-short { width: 40%; }
+
+/* --- the icons (bench-icons.js, contracts §5.4) ------------------------------------------ */
+/* A struck brass disc with the art masked out of the same gilt, or, for an unknown name,
+   the name's first letter cut into it. The rim is rarity, hairline to gilt. */
+.bicon {
+  --bi: 28px; position: relative; display: inline-grid; place-items: center; flex: none;
+  width: var(--bi); height: var(--bi); border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 246, 215, .45), transparent 40%),
+              var(--brass-grain), var(--gilt);
+  background-size: auto, 120px auto, auto; background-blend-mode: normal, soft-light, normal;
+  box-shadow: inset 1px 1px 1px rgba(255, 244, 210, .55), inset -1px -2px 2px rgba(40, 26, 10, .7),
+              1px 2px 3px rgba(0, 0, 0, .55);
+}
+.bicon-l { font: 600 calc(var(--bi) * .52)/1 var(--display); color: #3a2a12;
+           text-shadow: 0 1px 0 rgba(255, 238, 200, .35), 0 -1px 0 rgba(0, 0, 0, .35); }
+/* With art: the disc gives way to the glyph itself in brass, engraved by the one lamp. */
+.bicon.is-mask { background: none; box-shadow: none; }
+.bicon.is-mask .bicon-l { display: none; }
+.bicon.is-mask::before {
+  content: ""; position: absolute; inset: 4%;
+  background: var(--brass-grain), var(--gilt); background-size: 120px auto, auto;
+  background-blend-mode: soft-light, normal;
+  -webkit-mask: var(--bi-mask) center / contain no-repeat; mask: var(--bi-mask) center / contain no-repeat;
+  filter: drop-shadow(0 -1px 1px rgba(0, 0, 0, .92)) drop-shadow(0 1px 0 rgba(255, 225, 175, .16));
+}
+.bicon.r0 { box-shadow: 0 0 0 1px var(--edge), 1px 2px 3px rgba(0, 0, 0, .55); }
+.bicon.r1 { box-shadow: 0 0 0 1px var(--gold-dim), 1px 2px 3px rgba(0, 0, 0, .55); }
+.bicon.r2 { box-shadow: 0 0 0 1.5px var(--gold), 1px 2px 3px rgba(0, 0, 0, .55); }
+.bicon.r3 { box-shadow: 0 0 0 2px var(--gold), 0 0 0 3px var(--gold-dim), 1px 2px 3px rgba(0, 0, 0, .55); }
+.bicon.r4 { box-shadow: 0 0 0 2px var(--candle), 0 0 0 4px var(--gold-dim), 0 0 10px rgba(var(--ember), .3); }
+.bicon.is-mask.r0, .bicon.is-mask.r1, .bicon.is-mask.r2, .bicon.is-mask.r3, .bicon.is-mask.r4 {
+  background: radial-gradient(closest-side, rgba(8, 6, 4, .55), rgba(8, 6, 4, .25));
+}
+
+/* --- the stage (UI plan §6.3) -------------------------------------------------------------- */
+/* No panel frame: the stage is the one bold thing, and it sits in the dark. */
+.bench-stage {
+  position: relative; min-height: 0; display: grid; overflow: hidden;
+  grid-template-rows: minmax(0, 1fr) auto auto auto; justify-items: center; align-items: center;
+  padding: 8px 0 24px;
+}
+.bench-tool { position: relative; width: 100%; height: 100%; min-height: 200px; display: grid; place-items: center; }
+.bench-tool.has-stage { place-items: stretch; }
+.bench-tool.has-stage > * { width: 100%; height: 100%; }
+/* The flat tool: its engraved icon at 160px on the ground (the WebGL fallback). */
+.bench-flat { position: relative; display: grid; justify-items: center; gap: 12px; }
+.bench-flat::before {
+  content: ""; position: absolute; left: 50%; top: 80px; width: 360px; height: 360px; margin: -180px 0 0 -180px;
+  border-radius: 50%; background: radial-gradient(closest-side, rgba(var(--ember), .12), transparent);
+  pointer-events: none;
+}
+.bench-flat .bicon { --bi: 160px; }
+.bench-flat-name { color: var(--bench-quiet); font: 400 15px/1 var(--display); letter-spacing: .12em;
+                   font-variant: small-caps; text-shadow: var(--engraved); }
+/* The drop target: a gold ring, a shape as well as a colour, while a tile is dragged over. */
+.bench-tool::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; margin: -126px 0 0 -110px;
+  border-radius: 50%; box-shadow: 0 0 0 2px var(--bench-accent), 0 0 28px rgba(var(--ember), .3);
+  opacity: 0; transform: scale(.94); transition: opacity .16s ease-out, transform .16s ease-out; pointer-events: none;
+}
+.bench-tool.has-stage::after { content: none; }
+.bench-tool.is-dragover::after { opacity: 1; transform: none; }
+
+.bench-chips { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+               max-width: 640px; }
+.bench-chips[hidden] { display: none; }
+.bench-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; font-size: 15px;
+              border: 1px solid var(--bench-accent-deep); border-radius: var(--bench-radius);
+              background: linear-gradient(#2a2118, #16110c); box-shadow: var(--bevel), var(--sh-1); }
+.bench .bench-chip-x { width: 28px; height: 28px; display: grid; place-items: center; color: var(--bench-quiet); font-size: 17px; }
+.bench .bench-chip-x:hover { color: var(--bench-ink); }
+.bench-info { margin: 10px 0 0; min-height: 24px; text-align: center; color: var(--bench-ink);
+              font-variant-numeric: lining-nums tabular-nums; }
+.bench-rollrow { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; margin-top: 10px;
+                 min-height: 48px; }
+.bench .bench-roll { min-width: 180px; min-height: 48px; font-size: 18px; font-weight: 600; justify-content: center; }
+/* The Roll button is the screen's only gold-filled button (UI plan §5, step 4). Filled with
+   the light half of the gold (--gold over --accent, the brass grain on it), not the full
+   --gilt ramp: --gilt runs down to #3a2c17 across its middle, and dark lettering crossing
+   that read as a smudge in the first screenshot. */
+.bench .bench-roll:not(:disabled) {
+  color: #1d150b; text-shadow: 0 1px 0 rgba(255, 238, 200, .45);
+  background: var(--brass-grain), linear-gradient(var(--gold), var(--accent));
+  background-size: 256px auto, auto; background-blend-mode: soft-light, normal;
+  border-color: var(--candle);
+}
+.bench .bench-roll:not(:disabled):hover { color: #000; }
+.bench-why { color: var(--bench-quiet); font-size: 15px; max-width: 36ch; }
+
+/* A failure dims the stage for 600ms (UI plan §10): a dark layer's opacity, nothing else. */
+.bench-stage::before {
+  content: ""; position: absolute; inset: 0; background: var(--bg); opacity: 0; pointer-events: none; z-index: 3;
+}
+.bench-stage.is-dim::before { animation: bench-dim .6s ease-out; }
+@keyframes bench-dim { 0% { opacity: 0; } 25% { opacity: .3; } 100% { opacity: 0; } }
+
+/* The minigame strip rises from the stage's foot, 220ms, over the bottom of the stage
+   rather than pushing it (UI plan §6.4, §4.3). Lane E fills it. */
+.bench-game {
+  position: absolute; left: 0; right: 0; bottom: 0; min-height: 120px; z-index: 4;
+  padding: 12px 18px; border-top: 1px solid var(--bench-accent-deep);
+  background: linear-gradient(rgba(16, 12, 9, .9), rgba(11, 9, 8, .96));
+  transform: translateY(100%); opacity: 0; transition: transform .22s ease-out, opacity .22s ease-out;
+}
+.bench-game.is-up { transform: none; opacity: 1; }
+.bench-game[hidden] { display: none; }
+.bench-devgame { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; min-height: 96px; }
+.bench-devgame p { margin: 0; color: var(--bench-quiet); }
+
+/* --- the tag (UI plan §6.5) ------------------------------------------------------------- */
+.bench-tagcol-in { gap: 14px; overflow-y: auto; }
+.bench-tag {
+  position: relative; padding: 26px 18px 16px; border-radius: var(--bench-radius);
+  border: 1px solid #2b2319; box-shadow: var(--sh-2), inset 0 0 22px rgba(0, 0, 0, .4);
+}
+/* The brass eyelet the tag hangs from: a ring, so round. */
+.tag-eyelet { position: absolute; left: 50%; top: 8px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%;
+              background: var(--brass-grain), var(--gilt); background-size: 60px auto, auto; background-blend-mode: soft-light, normal;
+              box-shadow: inset 0 0 0 3px rgba(20, 14, 8, .0), 0 0 0 1px rgba(0, 0, 0, .5), var(--sh-1); }
+.tag-eyelet::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: var(--sunk);
+                     box-shadow: inset 1px 1px 2px rgba(0, 0, 0, .9); }
+.tag-empty { margin: 0 0 12px; color: var(--bench-quiet); }
+.tag-name { margin: 0 0 4px; color: var(--bench-accent); font: 400 24px/1.15 var(--display); letter-spacing: .04em;
+            font-variant: small-caps; text-shadow: var(--engraved); }
+.tag-line { margin: 0; font-size: 15px; color: var(--bench-ink); }
+.tag-line:first-of-type { color: var(--bench-quiet); }
+.tag-ladder { list-style: none; margin: 14px 0 12px; padding: 0; display: grid; gap: 3px; }
+.rung { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+        padding: 3px 10px 3px 18px; border-radius: var(--bench-radius); font-size: 15px; }
+.rung-name { font-variant-numeric: lining-nums; }
+.rung-ceil { font-size: 13px; color: var(--bench-quiet); }
+/* Metal and weight per tier (UI plan §3). */
+/* Crude in --dim with no rim, Sound in --dim with a hairline: the plan's --ash measured
+   3.44:1 on the tag's paper, under AA, so the step between the two is the rim and the
+   word, never colour alone. */
+.rung.t0 { color: var(--dim); }
+.rung.t1 { color: var(--dim); box-shadow: inset 0 0 0 1px var(--edge); }
+.rung.t2 { color: var(--ink); box-shadow: inset 0 0 0 1px var(--gold-dim); }
+.rung.t3 { color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold), var(--bevel); }
+.rung.t4 { color: #1d150b; background: var(--brass-grain), linear-gradient(var(--gold), var(--accent)); background-size: 120px auto, auto;
+           background-blend-mode: soft-light, normal; text-shadow: 0 1px 0 rgba(255, 238, 200, .4); }
+.rung.t4 .rung-ceil { color: #2a1e0e; }
+.rung.is-ceiling { margin-bottom: 4px; }
+.rung.is-ceiling::after { content: ""; position: absolute; left: 0; right: 0; bottom: -4px; height: 1px; background: var(--gold-dim); }
+/* The greyed rung above the ceiling: the next goal, in words ("Flawless at Herbalist 3"). */
+.rung.is-next { color: var(--dim); font-size: 13px; font-style: italic; border: 1px dashed var(--edge); }
+/* The brass pointer at the current rung. Its move is a single 180ms brightening (§10). */
+.rung::before { content: ""; position: absolute; left: 5px; top: 50%; width: 0; height: 0; margin-top: -5px;
+                border: 5px solid transparent; border-left: 7px solid var(--bench-accent); opacity: 0; transition: opacity .18s ease-out; }
+.rung.is-at::before { opacity: 1; }
+.rung.t4.is-at::before { border-left-color: #2a1e0e; }
+.tag-fx { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 15px; }
+.fx-k, .hc-k { color: var(--bench-quiet); }
+.tag-unknown { margin: 8px 0 0; color: var(--bench-quiet); font-size: 15px; }
+.tag-source { margin-top: 10px; }
+.tag-source summary { cursor: pointer; color: var(--bench-quiet); font-size: 13px; }
+.tag-source p { margin: 6px 0 0; font-style: italic; font-size: 15px; color: var(--bench-ink); }
+.tag-result:empty { display: none; }
+.tag-result { margin-top: 12px; padding-top: 10px; border-top: 1px solid #2b2319; display: grid; gap: 6px; font-size: 15px;
+              animation: bench-slide .2s ease-out; }
+@keyframes bench-slide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.tag-result p { margin: 0; }
+.tr-made { color: var(--bench-accent); }
+.tr-loss { color: var(--bench-ink); border-left: 3px solid var(--bench-warn); padding-left: 10px; }
+.tr-note, .tr-level { color: var(--bench-ink); }
+.tr-new { color: var(--bench-ink); }
+.tr-mastery { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; color: var(--bench-quiet); }
+.tr-mastery li { display: flex; justify-content: space-between; gap: 10px; }
+.tr-mastery b { color: var(--bench-accent); font-weight: 400; font-variant-numeric: lining-nums tabular-nums; }
+.tag-result .v2-btn { justify-self: start; }
+
+.tag-batch { display: grid; gap: 6px; }
+.tag-batch[hidden] { display: none; }
+.tb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tb-label { color: var(--bench-quiet); font-size: 15px; }
+.bench .tb-step { gap: 3px; }
+.bench .tb-step .v2-btn { min-width: 32px; justify-content: center; }
+.bench .tb-n { width: 52px; min-height: 32px; text-align: center; font: 15px/1 var(--body);
+               font-variant-numeric: lining-nums tabular-nums; -moz-appearance: textfield; }
+.bench .tb-n::-webkit-inner-spin-button, .bench .tb-n::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.tb-say { margin: 0; color: var(--bench-quiet); font-size: 13px; }
+
+/* --- the footer (UI plan §6.8) ----------------------------------------------------------- */
+.bench-foot { border-top: 1px solid var(--bench-accent-deep); }
+.bench-foot-in { height: 100%; display: flex; align-items: center; gap: 22px; font-size: 13px; white-space: nowrap; }
+.bf-clock { color: var(--bench-ink); font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.bf-track { display: inline-flex; align-items: center; gap: 10px; color: var(--bench-quiet); }
+.bf-level { color: var(--bench-accent); font: 400 15px/1 var(--display); letter-spacing: .06em; font-variant: small-caps; }
+/* The mastery line: a brass line on the leather with no track behind it (UI plan §6.8). */
+.bf-line { position: relative; display: inline-block; width: 120px; height: 2px; }
+.bf-line i { position: absolute; inset: 0; background: var(--brass-grain), var(--gilt); background-size: 80px auto, auto;
+             background-blend-mode: soft-light, normal; transform-origin: left center; border-radius: 1px; }
+.bf-mp { font-variant-numeric: lining-nums tabular-nums; }
+.bf-gap { flex: 1; }
+.bench .bf-btn { min-height: 32px; padding: 0 10px; color: var(--bench-quiet); font: 400 15px/1 var(--display);
+                 letter-spacing: .06em; font-variant: small-caps; text-shadow: var(--engraved); display: inline-flex;
+                 align-items: center; gap: 8px; }
+.bench .bf-btn:hover { color: var(--bench-ink); }
+.bench .bf-perks { color: var(--bench-accent); }
+.bf-switch { position: relative; width: 30px; height: 16px; border-radius: 8px; background: rgba(8, 6, 4, .7);
+             box-shadow: var(--sunken); border: 1px solid #2e251a; }
+.bf-switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 10px; height: 10px; border-radius: 50%;
+                    background: var(--ash); transition: transform .16s ease-out; }
+.bf-steady[aria-checked="true"] .bf-switch::after { transform: translateX(14px); background: var(--bench-accent); }
+.bf-steady[aria-checked="true"] { color: var(--bench-ink); }
+
+/* --- the bench's popovers ---------------------------------------------------------------- */
+.bench-pops { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+.bench-pops > * { pointer-events: auto; }
+.bench-card {
+  position: fixed; width: 340px; max-height: calc(100vh - 16px); z-index: 7; border-radius: var(--bench-radius);
+  box-shadow: var(--sh-3), var(--ring-cast);
+}
+.bench-card[hidden] { display: none; }
+.hc-in { position: relative; z-index: 1; padding: 18px 20px 16px; max-height: calc(100vh - 28px); overflow-y: auto; }
+.hc-head { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 8px; padding-right: 22px; }
+.hc-head h3 { margin: 0; color: var(--bench-accent); font: 400 19px/1.2 var(--display); letter-spacing: .04em; font-variant: small-caps; }
+.hc-sub { margin: 2px 0 0; color: var(--bench-quiet); font-size: 13px; }
+.bench .hc-x { position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; display: grid; place-items: center;
+               color: var(--bench-quiet); font-size: 19px; z-index: 2; }
+.bench .hc-x:hover { color: var(--bench-ink); }
+.hc-danger { margin: 0 0 8px; color: var(--bench-ink); border-left: 3px solid var(--bench-warn); padding-left: 10px; font-size: 15px; }
+.hc-props { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 15px; }
+.hc-props li { display: grid; gap: 1px; }
+.hc-how { color: var(--bench-quiet); font-size: 13px; }
+.hc-props .is-unknown { grid-template-columns: 22px 1fr; align-items: center; gap: 8px; color: var(--bench-quiet); }
+.hc-rule { display: block; height: 1px; background: var(--bench-quiet); }
+.hc-msg { margin: 10px 0 0; font-size: 15px; color: var(--bench-ink); }
+.hc-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.bench .hc-acts .v2-btn { flex-direction: column; align-items: flex-start; gap: 3px; min-height: 40px; height: auto; display: inline-flex; }
+.hc-cost { font: 12px/1 var(--body); letter-spacing: 0; font-variant: normal; color: var(--bench-quiet); text-shadow: none; }
+
+.bench-modal { position: fixed; inset: 0; display: grid; place-items: center; z-index: 8; padding: 16px; }
+.bench-modal[hidden] { display: none; }
+.bench-scrim { position: absolute; inset: 0; background: rgba(6, 5, 4, .66); animation: bench-fade .16s ease-out; }
+@keyframes bench-fade { from { opacity: 0; } to { opacity: 1; } }
+.bench-dialog { position: relative; width: min(460px, 100%); border-radius: var(--bench-radius); box-shadow: var(--sh-3), var(--ring-cast);
+                padding: 26px 28px 22px; animation: bench-slide .2s ease-out; }
+.bench-dialog > :not(.v2-rim) { position: relative; z-index: 1; }
+.bench-dialog h3 { margin: 0 0 8px; color: var(--bench-accent); font: 400 21px/1.2 var(--display); letter-spacing: .05em; font-variant: small-caps; }
+.bench-dialog p { margin: 0 0 10px; }
+.bench-warnline { color: var(--bench-ink); border-left: 3px solid var(--bench-warn); padding-left: 10px; }
+.bench-dialog-acts { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.bench .bench-danger { border-color: var(--bench-warn); }
+
+.bench-perks { width: min(620px, 100%); }
+.pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 6px; }
+.bench .pk { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; padding: 12px; min-height: 96px;
+             border: 1px solid #3b3022; border-radius: var(--bench-radius); background: linear-gradient(#2a2118, #18130e);
+             box-shadow: var(--bevel), var(--sh-1); }
+.bench .pk:hover { border-color: var(--gold-dim); }
+.bench .pk.is-on { border-color: var(--bench-accent); box-shadow: inset 0 0 0 1px var(--bench-accent), var(--sh-1); }
+.pk-main { display: grid; gap: 3px; }
+.pk-main b { color: var(--bench-accent); font: 400 17px/1.2 var(--display); letter-spacing: .04em; font-variant: small-caps; }
+.pk-x { font: 15px/1 var(--display); font-variant-numeric: lining-nums; }
+.pk-next { font-size: 15px; color: var(--bench-ink); }
+.pk-taken { font-size: 13px; color: var(--bench-quiet); }
+.pk-left { color: var(--bench-quiet); font-size: 13px; }
+
+.bench-recipes { width: min(560px, 100%); }
+.rc-list { list-style: none; margin: 6px 0 12px; padding: 0; display: grid; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.rc-list li { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid #2b2319; border-radius: var(--bench-radius); }
+.rc-main { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.rc-main b { font-weight: 400; color: var(--bench-ink); }
+.rc-steps, .rc-empty, .rc-note { font-size: 13px; color: var(--bench-quiet); }
+.rc-save { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.rc-save label { color: var(--bench-quiet); font-size: 15px; }
+.bench .rc-save input { min-height: 32px; padding: 4px 10px; font: 15px/1.2 var(--body); animation: none; }
+
+/* The product's flight to its tile (30-bench-shell.js `fly`), at the verdict word's layer
+   so it covers nothing a click needs: it takes no pointer, and a click finishes it. */
+.bench-fly { position: fixed; left: 0; top: 0; z-index: 66; pointer-events: none; will-change: transform, opacity; }
+
+/* --- other sizes (UI plan §4.3) ------------------------------------------------------------ */
+/* 1280 to 1439 wide: narrower columns, and the method strip down to its icons, each with
+   its name shown on hover and focus. */
+@media (max-width: 1439px) and (min-width: 1180px) {
+  .bench { --bench-satchel-w: 260px; --bench-tag-w: 280px; --bench-gap: 32px; }
+  .bench .bm { padding: 0 9px; }
+  .bench .bm-name, .bench .bm-lock { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .bench .bm-tip {
+    display: block; position: absolute; left: 50%; top: calc(100% + 6px); z-index: 9; padding: 5px 9px;
+    background: var(--panel); border: 1px solid var(--gold-dim); border-radius: var(--bench-radius); box-shadow: var(--sh-2);
+    color: var(--bench-ink); font: 13px/1.2 var(--body); letter-spacing: 0; font-variant: normal; white-space: nowrap;
+    opacity: 0; transform: translateX(-50%); pointer-events: none; transition: opacity .12s ease-out;
+  }
+  .bench .bm:hover .bm-tip, .bench .bm:focus-visible .bm-tip { opacity: 1; }
+  .bench .bm .bicon { --bi: 26px !important; }
+}
+
+/* Under 1180 (the old bench's breakpoint): stage on top at 56vh, then the tag, then the
+   satchel. The layer scrolls as a page; nothing scrolls inside anything else. */
+@media (max-width: 1179px) {
+  .bench { display: block; overflow-y: auto; overscroll-behavior: contain; }
+  .bench-strip { position: sticky; top: 0; z-index: 5; }
+  .bench-strip-in { height: auto; min-height: 56px; flex-wrap: wrap; gap: 6px 14px; padding-top: 6px; padding-bottom: 6px; }
+  .bench-methods { order: 3; flex-basis: 100%; overflow-x: auto; scrollbar-width: thin; height: 46px; }
+  /* `clip` on x only: the panels' clasp box reaches 34px past each panel (theme-v2.css,
+     the framed card), and at 390 wide that made the layer 408px wide and scroll sideways
+     (measured, bench.scrollWidth). The metal itself sits inside the 16px gutter. */
+  .bench-frame { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage" "tag" "satchel";
+                 row-gap: 40px; padding-top: 20px; padding-bottom: 40px; overflow-x: clip; }
+  .bench-stage { height: 56vh; min-height: 380px; }
+  .bench-satchel-in, .bench-tagcol-in { overflow: visible; }
+  .bs-list { overflow: visible; }
+  .bench-foot { height: auto; }
+  .bench-foot-in { flex-wrap: wrap; white-space: normal; gap: 8px 18px; padding-top: 10px; padding-bottom: 10px; }
+}
+/* Under 768: one column throughout (skill §7, mobile override), 16px gutters. */
+@media (max-width: 767px) {
+  .bench-cap, .bench-frame { padding-left: 16px; padding-right: 16px; }
+  .bench-title { font-size: 19px; }
+  .bench-stage { height: auto; min-height: 340px; }
+  .bench-flat .bicon { --bi: 120px; }
+  .bench-tool { min-height: 180px; }
+  .pk-grid { grid-template-columns: 1fr; }
+  .bench .bench-roll { min-width: 160px; }
+}
+
+/* --- reduced motion (UI plan §10, the last column) --------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .bench, .bench *, .bench *::before, .bench *::after { transition: none !important; animation: none !important; }
+}
+.bench.bench-still, .bench.bench-still *, .bench.bench-still *::before, .bench.bench-still *::after {
+  transition: none !important; animation: none !important;
+}
+/* The landing still shows where the product went, by a still highlight, not a pulse. */
+.bench.bench-still .bt.is-landed::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .bench .bt.is-landed::after { opacity: 1; }
+}

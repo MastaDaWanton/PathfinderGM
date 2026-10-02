@@ -3126,7 +3126,20 @@
     -webkit-background-clip: text; background-clip: text; }
   .rv-word.is-bad .rv-sub { color: #e7b2a2; }
 </style>
+<!-- The herbalism bench (docs/herbalism-ui-plan.md), after the page's own styles so its
+     rules win where a name meets one of the table's global ones (`details`, `summary`).
+     The minigames' sheet is Lane E's, and a file not yet in this build is not named at
+     all: the asset tag stamps only a file it can find, so "?v=" in the URL is the proof
+     the file exists. A 404 would not break the page, but it would put an error in the
+     console on every load and fail test_template_scripts' "every file it loads is
+     served". -->
+<link rel="stylesheet" href="{% asset 'css/bench.css' %}">
+{% asset 'css/bench-games.css' as bench_games_css %}{% if '?v=' in bench_games_css %}<link rel="stylesheet" href="{% asset 'css/bench-games.css' %}">{% endif %}
 <script src="{% static 'js/dice3d.js' %}"></script>
+<!-- App-wide preferences and sound (Lane G), early and after the dice, so every later
+     script can read them. Guarded the same way as bench-games.css above. -->
+{% asset 'js/prefs.js' as prefs_js %}{% if '?v=' in prefs_js %}<script src="{% asset 'js/prefs.js' %}"></script>{% endif %}
+{% asset 'js/sound.js' as sound_js %}{% if '?v=' in sound_js %}<script src="{% asset 'js/sound.js' %}"></script>{% endif %}
 <script src="{% static 'js/scene3d.js' %}"></script>
 </head>
 <body class="page-backdrop-room mode-table">
@@ -3354,6 +3367,9 @@
       <div id="cp-actions"></div>
       <!-- The app's own door out of the hub to the full bench. -->
       <div class="poprow">
+        <!-- The herbalism bench, over the table; the full bench is the other crafts'. -->
+        <button type="button" class="v2-btn is-quiet is-small" data-bench-open
+                aria-haspopup="dialog" aria-controls="bench">Work at the bench</button>
         <a class="v2-btn is-quiet is-small" href="/craft/">Open the full bench</a>
         <button type="button" class="v2-btn is-quiet is-small" id="craftclose">Close</button>
       </div>
@@ -3393,7 +3409,11 @@
       <ul class="loadout" id="loadout"></ul>
       <p class="purse" id="purse"></p>
       <button type="button" class="v2-btn door" id="open-equipment">Equipment</button>
-      <!-- The bench, from the sheet as before (/craft/). -->
+      <!-- Herbalism opens over the table (30-bench-shell.js), so closing it keeps your
+           place; the old bench at /craft/ stays for the four other crafts until each is
+           revamped (docs/herbalism-ui-plan.md §4.1). -->
+      <button type="button" class="v2-btn door" id="open-bench" data-bench-open
+              aria-haspopup="dialog" aria-controls="bench">Herbalism</button>
       <a class="v2-btn door" href="/craft/">Crafting bench</a>
       <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
       <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
@@ -3574,6 +3594,62 @@
          hidden>
 </section>
 
+<!-- The herbalism bench (docs/herbalism-ui-plan.md §4): a full-window layer over the
+     table at z-index 35, above the popovers (30) and under the deathveil (40), the dice
+     mat (60) and the verdict (65/66), so a Craft roll is thrown over it and tasting
+     hemlock can still kill you on it. The table stays mounted underneath, so closing is
+     instant and keeps your place. 30-bench-shell.js opens it, traps focus in it and
+     gives focus back on close; 31-36 fill its four parts. -->
+<div id="bench" class="bench" role="dialog" aria-modal="true" aria-labelledby="bench-title"
+     hidden>
+  <!-- The strip and the footer are leather the full width of the window; their contents
+       and the three columns are capped at 2000px and centred (UI plan §4.3, the 3440px
+       ultrawide), so nothing stretches into a black bar. -->
+  <header class="bench-strip v2-card-leather">
+    <div class="bench-cap bench-strip-in">
+      <h2 class="bench-title" id="bench-title">Herbalism</h2>
+      <div class="bench-methods" id="bench-methods" role="radiogroup"
+           aria-label="Method"></div>
+      <button type="button" class="v2-btn is-quiet bench-close" id="bench-close">Close</button>
+    </div>
+  </header>
+
+  <div class="bench-frame">
+    <section class="bench-panel bench-satchel v2-framed v2-tooled-leather" id="bench-satchel"
+             aria-label="Your satchel">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-satchel-in" id="bench-satchel-in"></div>
+    </section>
+
+    <section class="bench-stage" id="bench-stage" aria-label="The tool">
+      <div class="bench-tool" id="bench-tool"></div>
+      <ul class="bench-chips" id="bench-chips" aria-label="On the tool"></ul>
+      <p class="bench-info" id="bench-info"></p>
+      <div class="bench-rollrow">
+        <button type="button" class="v2-btn is-go bench-roll" id="bench-roll" disabled
+                aria-describedby="bench-why">Roll Craft</button>
+        <span class="bench-why" id="bench-why"></span>
+      </div>
+      <!-- Where the minigame rises (contracts §5.2, `mount`). -->
+      <div class="bench-game" id="bench-game" hidden></div>
+    </section>
+
+    <section class="bench-panel bench-tagcol v2-framed v2-tooled-leather" id="bench-tagcol"
+             aria-label="What it makes">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-tagcol-in" id="bench-tagcol-in"></div>
+    </section>
+  </div>
+
+  <footer class="bench-foot v2-card-leather" id="bench-foot">
+    <div class="bench-cap bench-foot-in" id="bench-foot-in"></div>
+  </footer>
+  <!-- The bench's own popovers: the herbarium card, the confirms, the perk picker and
+       the recipe book, inside the layer's stacking context. -->
+  <div class="bench-pops" id="bench-pops"></div>
+  <div class="vh" id="bench-say" role="status" aria-live="polite"></div>
+</div>
+
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
@@ -3627,6 +3703,63 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/21-tab-journal.js' %}"></script>
 <!-- The roll's verdict, shown: success or failure as the engine judged the face. -->
 <script src="{% asset 'js/table/22-roll-verdict.js' %}"></script>
+<!-- The herbalism bench (docs/herbalism-contracts.md §1, "Script tags"): the icon
+     registry, then each game and the stage's parts, then 30-36 in number order. The
+     stage (32, Lane F) and the games (33 and bench-games/, Lane E) are optional
+     providers (contracts §5): the bench runs flat without them, so a file not in this
+     build yet is left out rather than named, by the same "?v=" test as the head's. -->
+<script>
+// The bench's icon art with its content stamp: "?v=" only on a file the server found, so
+// the Electron cache can never serve an old glyph, and a build without the art draws the
+// roundel instead of a broken mask (bench-icons.js says why). One entry per name in
+// bench-icons.js's NAMES; tests/test_bench_ui.py holds the two lists to each other.
+window.BENCH_ICON_URLS = {
+  leaf: "{% asset 'img/icons/leaf.svg' %}", flower: "{% asset 'img/icons/flower.svg' %}",
+  root: "{% asset 'img/icons/root.svg' %}", bark: "{% asset 'img/icons/bark.svg' %}",
+  berry: "{% asset 'img/icons/berry.svg' %}", seed: "{% asset 'img/icons/seed.svg' %}",
+  sap: "{% asset 'img/icons/sap.svg' %}", resin: "{% asset 'img/icons/resin.svg' %}",
+  fungus: "{% asset 'img/icons/fungus.svg' %}", gland: "{% asset 'img/icons/gland.svg' %}",
+  organ: "{% asset 'img/icons/organ.svg' %}", bone: "{% asset 'img/icons/bone.svg' %}",
+  horn: "{% asset 'img/icons/horn.svg' %}", feather: "{% asset 'img/icons/feather.svg' %}",
+  scale: "{% asset 'img/icons/scale.svg' %}", eye: "{% asset 'img/icons/eye.svg' %}",
+  shell: "{% asset 'img/icons/shell.svg' %}", oil: "{% asset 'img/icons/oil.svg' %}",
+  wax: "{% asset 'img/icons/wax.svg' %}", mineral: "{% asset 'img/icons/mineral.svg' %}",
+  liquid: "{% asset 'img/icons/liquid.svg' %}",
+  grind: "{% asset 'img/icons/grind.svg' %}", mix: "{% asset 'img/icons/mix.svg' %}",
+  brew: "{% asset 'img/icons/brew.svg' %}", dry: "{% asset 'img/icons/dry.svg' %}",
+  reduce: "{% asset 'img/icons/reduce.svg' %}", extract: "{% asset 'img/icons/extract.svg' %}",
+  infuse: "{% asset 'img/icons/infuse.svg' %}", steep: "{% asset 'img/icons/steep.svg' %}",
+  neutralize: "{% asset 'img/icons/neutralize.svg' %}",
+  dried: "{% asset 'img/icons/dried.svg' %}", ground: "{% asset 'img/icons/ground.svg' %}",
+  neutralised: "{% asset 'img/icons/neutralised.svg' %}",
+  steeping: "{% asset 'img/icons/steeping.svg' %}",
+  lock: "{% asset 'img/icons/lock.svg' %}", recipe: "{% asset 'img/icons/recipe.svg' %}",
+  taste: "{% asset 'img/icons/taste.svg' %}", study: "{% asset 'img/icons/study.svg' %}",
+  reagent: "{% asset 'img/icons/reagent.svg' %}",
+  infusion: "{% asset 'img/icons/infusion.svg' %}", decoction: "{% asset 'img/icons/decoction.svg' %}",
+  tincture: "{% asset 'img/icons/tincture.svg' %}", acetum: "{% asset 'img/icons/acetum.svg' %}",
+  poultice: "{% asset 'img/icons/poultice.svg' %}", salve: "{% asset 'img/icons/salve.svg' %}",
+  cream: "{% asset 'img/icons/cream.svg' %}",
+};
+</script>
+<script src="{% asset 'js/bench-icons.js' %}"></script>
+{% asset 'js/bench-games/grind.js' as g_grind %}{% if '?v=' in g_grind %}<script src="{% asset 'js/bench-games/grind.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/mix.js' as g_mix %}{% if '?v=' in g_mix %}<script src="{% asset 'js/bench-games/mix.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/brew.js' as g_brew %}{% if '?v=' in g_brew %}<script src="{% asset 'js/bench-games/brew.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/dry.js' as g_dry %}{% if '?v=' in g_dry %}<script src="{% asset 'js/bench-games/dry.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/reduce.js' as g_reduce %}{% if '?v=' in g_reduce %}<script src="{% asset 'js/bench-games/reduce.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/extract.js' as g_extract %}{% if '?v=' in g_extract %}<script src="{% asset 'js/bench-games/extract.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/infuse.js' as g_infuse %}{% if '?v=' in g_infuse %}<script src="{% asset 'js/bench-games/infuse.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/steep.js' as g_steep %}{% if '?v=' in g_steep %}<script src="{% asset 'js/bench-games/steep.js' %}"></script>{% endif %}
+{% asset 'js/bench-games/neutralize.js' as g_neutralize %}{% if '?v=' in g_neutralize %}<script src="{% asset 'js/bench-games/neutralize.js' %}"></script>{% endif %}
+{# MERGE: Lane F's bench-stage/*.js tags go here, guarded the same way, once its files are named. #}
+<script src="{% asset 'js/table/30-bench-shell.js' %}"></script>
+<script src="{% asset 'js/table/31-bench-satchel.js' %}"></script>
+{% asset 'js/table/32-bench-stage.js' as bench_stage_js %}{% if '?v=' in bench_stage_js %}<script src="{% asset 'js/table/32-bench-stage.js' %}"></script>{% endif %}
+{% asset 'js/table/33-bench-games.js' as bench_games_js %}{% if '?v=' in bench_games_js %}<script src="{% asset 'js/table/33-bench-games.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/34-bench-tag.js' %}"></script>
+<script src="{% asset 'js/table/35-bench-herbarium.js' %}"></script>
+<script src="{% asset 'js/table/36-bench-perks.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>
