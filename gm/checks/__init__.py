@@ -169,7 +169,8 @@ def _drop_covered(found: list["Finding"]) -> list["Finding"]:
     return [f for i, f in enumerate(found) if i not in dropped]
 
 
-def run(ctx: BeatContext, *, errors: list | None = None) -> list["Finding"]:
+def run(ctx: BeatContext, *, errors: list | None = None,
+        covered: list | None = None) -> list["Finding"]:
     """Every member that opted in to `ctx.door`, in order; their findings, overlaps dropped.
 
     `errors=None` lets a member's exception (or a finding of a kind it did not declare)
@@ -194,4 +195,10 @@ def run(ctx: BeatContext, *, errors: list | None = None) -> list["Finding"]:
                            "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
             continue
         found.extend(out)
-    return _drop_covered(found)
+    kept = _drop_covered(found)
+    # The findings dropped as covered, for a caller that must still ask their members
+    # once the heavier repair has run (`GMAgent._repair_sentences`): one repair per
+    # sentence, but not one fault per sentence.
+    if covered is not None:
+        covered.extend(f for f in found if f not in kept)
+    return kept

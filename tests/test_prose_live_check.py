@@ -150,13 +150,35 @@ def test_no_trade_at_all_is_no_finding():
     assert trade_claimed.find(_trade_ctx(SOLD_LIVE)) == []
 
 
-def test_the_last_pass_asks_every_member_not_only_the_heaviest():
+def test_the_last_pass_asks_the_member_whose_finding_was_covered(monkeypatch):
     """Measured live: "Korvu takes the crate with a grunt" was flagged by thing_kept and
     peoples_name; the lighter finding was dropped as covered, the rewrite fixed the crate,
-    and "Korvu eyes the crate" shipped because peoples_name was never asked again."""
-    import inspect
+    and "Korvu eyes the crate with a grunt" shipped because peoples_name was never asked
+    again. Driven through the real repair with the model's rewrite stubbed to what it
+    wrote live."""
+    from dataclasses import replace as _replace
 
-    from gm.agent import GMAgent
+    import _a_truth
+    from gm import checks, client
 
-    src = inspect.getsource(GMAgent._repair_sentences)
-    assert "for member in checks.registered():" in src
+    zhil = PANGRELLA.get("6953424c8a82")
+    agent, _ = _a_truth.scene_at("6953424c8a82~urban:the-market", world=PANGRELLA,
+                                 location=zhil)
+    agent.engine.scene.pc().goods["crate"] = 1
+    text = "Korvu takes the crate with a grunt. What do you do?"
+    ctx = _replace(_a_truth.context(agent, text), text=text)
+    covered: list = []
+    found = checks.run(ctx, errors=[], covered=covered)
+    assert {f.kind for f in found} >= {"thing-kept-shown-given"}
+    assert {f.kind for f in covered} == {"peoples-name-as-name"}
+
+    class _Reply:
+        seconds, model = 0.0, "stub"
+        text = '{"sentence": "Korvu eyes the crate with a grunt."}'
+
+        def json(self):
+            return {"sentence": "Korvu eyes the crate with a grunt."}
+
+    monkeypatch.setattr(client, "chat", lambda *a, **k: _Reply())
+    out, notes, _ = agent._repair_sentences(text, found, ctx, covered=covered)
+    assert out == "The Korvu eyes the crate with a grunt. What do you do?", notes

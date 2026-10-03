@@ -2134,11 +2134,13 @@ class GMAgent:
         from . import checks
 
         errors: list[dict] = []
-        findings = checks.run(ctx, errors=errors)
+        covered: list = []
+        findings = checks.run(ctx, errors=errors, covered=covered)
         self.mention_rows.extend(dict(e, door=ctx.door) for e in errors)
         if not findings:
             return ctx.text, [], []
-        text, notes, attempts = self._repair_sentences(ctx.text, findings, ctx)
+        text, notes, attempts = self._repair_sentences(ctx.text, findings, ctx,
+                                                       covered=covered)
         self.mention_rows.append({
             "kind": "truth-checks", "door": ctx.door,
             "findings": [{"kind": f.kind, "detail": f.detail,
@@ -2146,7 +2148,7 @@ class GMAgent:
             "repairs": list(notes)})
         return text, list(notes), list(attempts)
 
-    def _repair_sentences(self, text: str, findings: list, ctx
+    def _repair_sentences(self, text: str, findings: list, ctx, *, covered=()
                           ) -> tuple[str, list[str], list[Attempt]]:
         """Repair what the narrator checks found, sentence by sentence.
 
@@ -2250,17 +2252,16 @@ class GMAgent:
         # The backstops, over the beat as it now stands: only a member that still finds
         # something is asked, so a rewrite that held costs nothing here.
         #
-        # Every member at this door, not only those whose findings survived
-        # `_drop_covered`. Measured live on the 2026-10-03 batch: "Korvu takes the crate
-        # with a grunt" was flagged by `thing_kept` (weight 3) and `peoples_name`
-        # (weight 2); the lighter finding was dropped as covered, the rewrite fixed the
-        # crate ("Korvu eyes the crate"), and the people's name shipped, because its
-        # member was never asked again. The covering rule is about one repair per
-        # sentence, not about forgetting the second fault in it. `find` is mechanical,
-        # so asking every member costs no model call.
-        for member in checks.registered():
-            if (member not in members and ctx.door in member.DOORS
-                    and callable(getattr(member, "backstop", None))):
+        # And the members whose findings `_drop_covered` set aside. Measured live on the
+        # 2026-10-03 batch: "Korvu takes the crate with a grunt" was flagged by
+        # `thing_kept` (weight 3) and `peoples_name` (weight 2); the lighter finding was
+        # dropped as covered, the rewrite fixed the crate ("Korvu eyes the crate"), and
+        # the people's name shipped, because its member was never asked again. The
+        # covering rule is one repair per sentence, not one fault per sentence. `find`
+        # is mechanical, so asking again costs no model call.
+        for g in covered or ():
+            member = checks.owner_of(g.kind)
+            if member is not None and member not in members:
                 members.append(member)
         for member in members:
             if not callable(getattr(member, "backstop", None)):
