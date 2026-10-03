@@ -744,6 +744,12 @@ _READS_MECHANICS = {
         "speech had an op the call became unnecessary, because the words are already "
         "a fact the engine holds. Reading them here is cheaper, has no latency, and "
         "cannot invent a promise nobody made.",
+    "gm/ledger.py:_moved":
+        "what changed hands and between whom — the item, the giver and the taker the "
+        "engine wrote into a give, sell or buy effect — said as a numberless line "
+        "(`_DIGIT` still strips any digit). Item 7 of 2026-10-03: the template read the "
+        "first ref in the effect and remembered a wink that never left the player as "
+        "'handed something to Kesst Vayr'. Engine reporting to itself, as `_named`.",
     "gm/ledger.py:_named":
         "the ledger is the engine reporting to itself what it did in the turns that "
         "have since fallen out of the context window, and an effect is where the "

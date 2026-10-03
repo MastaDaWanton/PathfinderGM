@@ -90,11 +90,23 @@ def test_the_reading_is_asked_at_this_door_too():
 
 
 def test_handing_over_is_not_the_readings_to_veto():
-    """Only gains to the player are the reading's to stop, as in `drop_unread_gifts`: a
-    give away from the player takes nothing from nowhere."""
+    """Gains to the player are the reading's to stop, as in `drop_unread_gifts`; a give
+    away from the player of a thing they CARRY is not — it takes nothing from nowhere.
+
+    Narrowed 2026-10-03 (item 8): a give away of a thing they do not carry is. "I give a
+    friendly wink" read as `other` + `talk`, and the detector still planned a give of
+    "friendly wink": "Kesst Vayr has no friendly wink to give" reached the narrator and
+    the ledger kept "handed something to Kesst Vayr"."""
     said = "I hand over the brass key"
     interpret.remember(said, {"actions": [{"act": "talk"}]})
-    assert _gives(said) == [{"item": "brass key", "from_": "pc"}]
+    scene = _scene()
+    scene.pc().goods["brass key"] = 1
+    assert _gives(said, scene) == [{"item": "brass key", "from_": "pc"}]
+    assert _gives(said) == [], "not carried, and the reading read no hand-over"
+    winked = "I give a friendly wink and say hello"
+    interpret.remember(winked, {"actions": [{"act": "other", "target": "a friendly wink"},
+                                            {"act": "talk"}]})
+    assert _gives(winked) == []
 
 
 @pytest.mark.parametrize("act", ["insult", "attack", "talk", "rest", "go",

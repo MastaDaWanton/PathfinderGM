@@ -581,8 +581,15 @@ class GMAgent:
                 # Coin first: "I pay her ten gold" is a give of gp out of the purse,
                 # and a `sell gold_coins_10` the model wrote is the same give — before
                 # the sale injector can read "pay" as a sale of stock.
+                # Before coin: where the player's own words send a thing settles its
+                # direction — coin out of a pouch INTO the purse, a thing set down on the
+                # floor and not handed to the smith (items 4 and 5, 2026-10-03).
+                raw = judgement.declare_emptying(raw, player_input, self.engine.scene)
+                raw = judgement.declare_drop(raw, player_input, self.engine.scene)
                 raw = judgement.inject_payment(raw, player_input, self.engine.scene)
-                raw = judgement.inject_sale(raw, player_input, self.engine.scene)
+                # The last few beats, for a sale closed with no thing named ("Deal.").
+                raw = judgement.inject_sale(raw, player_input, self.engine.scene,
+                                            recent=getattr(self, "recent", ()))
                 raw = judgement.inject_goods(raw, player_input, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a

@@ -654,6 +654,23 @@ def gets_nothing(frame: dict | None) -> bool:
     return not ({a.get("act") for a in frame.get("actions") or []} & GETTING_ACTS)
 
 
+# And the other direction: the acts under which the player can part with something —
+# handing it over, dropping it, paying, selling. Measured 2026-10-03 on the market-talk
+# save: "I give a friendly wink and say …" was read as `other` + `talk`, the reading
+# overruled the detector's `give`, and `judgement.inject_goods` planned one anyway —
+# "Kesst Vayr has no friendly wink to give", and the ledger kept "handed something to
+# Kesst Vayr". The rule that already held for gains holds for hand-overs.
+PARTING_ACTS = frozenset({"give", "sell", "buy"})
+
+
+def hands_nothing(frame: dict | None) -> bool:
+    """Whether a reading exists and none of its acts can part the player from anything.
+    False when there is no reading to judge by — the regex decides then."""
+    if not frame or frame.get("error"):
+        return False
+    return not ({a.get("act") for a in frame.get("actions") or []} & PARTING_ACTS)
+
+
 def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
     """(the plan's intents, the gives dropped). A `give` to the player that no act of the
     reading asked for is the model conjuring: goods are open (rules/goods.py), so a give

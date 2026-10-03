@@ -29,7 +29,11 @@ def test_the_coin_is_recorded_beside_the_paper_given_away():
     assert out[2]["op"] == "give" and out[2]["params"] == {"item": "coin", "to": "pc"}
     engine = Engine(scene, Dice(seed=1))
     engine.run(engine.validate(out))
-    assert scene.pc().goods.get("coin") == 1
+    # Recorded in the PURSE since 2026-10-03 (item 3: "the coins" were a goods line
+    # beside an empty purse). Nothing counted it out, so it is the one coin the engine
+    # can vouch for — a single copper piece — and never the goods line "coin".
+    assert scene.pc().purse.get("cp") == 1
+    assert "coin" not in scene.pc().goods
 
 
 def test_a_direction_the_plan_already_filled_is_not_filled_twice():

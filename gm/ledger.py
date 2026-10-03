@@ -107,6 +107,11 @@ def note(outcomes, *, turn: int, hist: int = 0, spoke_with: str = "", where: str
     did: list[str] = []
     for o in outcomes or []:
         op = str(getattr(o, "op", "") or "")
+        if op in _MOVES_THINGS:
+            line = _moved(o, names)
+            if line and line not in did:
+                did.append(line)
+            continue
         if op == "say":
             words = _said(o)
             if words:
@@ -149,6 +154,64 @@ def note(outcomes, *, turn: int, hist: int = 0, spoke_with: str = "", where: str
     # ledger. A name with a digit in it is not worth the door it would open.
     text = _DIGIT.sub("", text)
     return {"turn": int(turn), "hist": int(hist), "at": str(where or ""), "text": text}
+
+
+# The ops that move a thing, which the ledger says by what moved and between whom
+# (item 7 of 2026-10-03). The templates above said "handed something to {who}" and read
+# `who` off the first ref in the effect — which for a pick-up is the taker — so the
+# market-talk save remembered "handed something to Kesst Vayr" for a wink that never
+# left her, and a sale was remembered as "sold to" the seller.
+_MOVES_THINGS = frozenset({"give", "sell", "buy"})
+
+
+def _moved(o, names: dict | None) -> str:
+    """One line for a thing that changed hands, or "" when nothing did: a refusal, a
+    give that moved nothing, the payment acknowledged a second time. Never a number —
+    the price is the tell's, and the ledger may hold no digit."""
+    if str(getattr(o, "status", "resolved") or "resolved") != "resolved":
+        return ""
+    op = str(getattr(o, "op", "") or "")
+    names = names or {}
+
+    def name(ref) -> str:
+        ref = str(ref or "")
+        return str(names.get(ref, ref)) if ref else ""
+
+    for e in getattr(o, "effects", None) or []:
+        if not isinstance(e, dict):
+            continue
+        thing = " ".join(str(e.get("item") or "").split())
+        the = thing if re.match(r"(?i)(the|a|an|some)\b", thing) else f"the {thing}"
+        if op == "sell" and e.get("kind") == "sold" and int(e.get("count") or 0) > 0:
+            buyer = name(e.get("to"))
+            return f"sold {the}" + (f" to {buyer}" if buyer else "")
+        if op == "buy" and e.get("kind") == "bought":
+            seller = name(e.get("from"))
+            return f"bought {the}" + (f" from {seller}" if seller else "")
+        if op != "give" or e.get("kind") != "give" or int(e.get("count") or 0) <= 0:
+            continue
+        how = str(e.get("how") or "")
+        if thing == "coin" or thing in ("gp", "sp", "cp", "pp"):
+            the = "coin"
+        giver, taker = name(e.get("from")), name(e.get("to"))
+        if how == "emptied":
+            return f"emptied {giver or 'a pouch'} into the purse"
+        if how == "took_from":
+            return f"took {the} from {giver}"
+        if how == "took_out":
+            return f"took {the} out of {giver}" if giver else f"took {the}"
+        if how == "set_down":
+            return f"set down {the}"
+        if how == "handed" and giver and taker:
+            # "you handed the lantern to the smith", or "you were handed the pouch by
+            # the clerk" — the entry is in the second person, about the player.
+            if str(e.get("from")) == "pc":
+                return f"handed {the} to {taker}"
+            if str(e.get("to")) == "pc":
+                return f"were handed {the} by {giver}"
+            return f"saw {giver} hand {the} to {taker}"
+        return f"took {the}"
+    return ""
 
 
 def _said(o) -> str:
