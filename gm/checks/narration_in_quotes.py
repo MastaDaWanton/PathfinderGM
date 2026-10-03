@@ -49,6 +49,24 @@ _HINT_ECHO = re.compile(
     re.I)
 
 
+def _names_self(line: str, name: str) -> bool:
+    """Whether a speaker's own line names them. A proper name ("Gorm Vesper") by its
+    words, as `names_person` reads it; a descriptor ("man in the heavy coat") only by the
+    whole description. Measured live on the merged 2026-10-03 branch: the man in the heavy
+    coat, asked where a rapier could be sharpened, answered "He's at the smithy near the
+    west crossing. But be warned—he's a grumpy man…" — "man" was read as him naming
+    himself, both lines were cut as narration, and the answer the player asked for was
+    gone from the page, leaving "he" pointing at nobody."""
+    from gm.checks._people import names_person
+    from rules import names as names_mod
+
+    if names_mod.is_descriptor(name) or name.lower().startswith(("the ", "a ", "an ")):
+        whole = re.sub(r"^(?:the|a|an)\s+", "", " ".join(name.lower().split()))
+        return bool(whole) and re.search(r"\b" + re.escape(whole) + r"\b",
+                                         " ".join(line.lower().split())) is not None
+    return names_person(line, name)
+
+
 def quoted_narration(text: str, said, actors) -> list[tuple[str, str]]:
     """(line, why) for every quotation on the page that is narration in quotes."""
     from gm.checks._people import names_person
@@ -67,7 +85,7 @@ def quoted_narration(text: str, said, actors) -> list[tuple[str, str]]:
         if actor is None:
             continue
         name = str(getattr(actor, "name", "") or "")
-        if not name or not names_person(line, name):
+        if not name or not _names_self(line, name):
             continue
         given = {w.lower() for _, n in introductions(line) for w in n.split()}
         if given & {w.lower() for w in name.split()}:

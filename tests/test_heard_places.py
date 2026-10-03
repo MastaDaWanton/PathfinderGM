@@ -196,3 +196,23 @@ def test_the_brief_names_it_with_its_landmark_and_speaker():
     text, facts = brief.section(ctx)
     assert "the smithy — off the counting house, as the clerk told it" in text
     assert facts["heard_places"][0]["landmark"] == COUNTING
+
+
+SMITH_ANSWER = ("He's at the smithy near the west crossing. But be warned\u2014he's a grumpy "
+                "man, and he does not care for strangers.")
+
+
+def test_the_answer_naming_the_smithy_is_speech_and_is_heard_of():
+    """Measured live: asked where a rapier could be sharpened, the man in the heavy coat
+    answered with this line; `narration_in_quotes` read the "man" in "a grumpy man" as
+    the speaker naming himself, cut it as narration, and the answer — and the smithy —
+    never reached the page or the record. The whole description names him; a word of it
+    does not."""
+    from gm.checks.narration_in_quotes import _names_self
+
+    assert not _names_self(SMITH_ANSWER, "man in the heavy coat")
+    assert _names_self("The man in the heavy coat says nothing.", "man in the heavy coat")
+    assert _names_self("Gorm Vesper watches you from their workspace.", "Gorm Vesper")
+    got = heard_places.heard_in(SMITH_ANSWER, _known(MARKET), MARKET)
+    assert got == [{"name": "the smithy", "kind": "smithy",
+                    "landmark": "6953424c8a82~urban:the-west-crossing"}]
