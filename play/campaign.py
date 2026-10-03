@@ -679,6 +679,23 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     # The clock starts at the hour the opening names ("Mid-morning, in the market row"),
     # not at midnight: the hour now decides who is where and which counters are open.
     scene.clock_minutes = opening.hour_of(here.when) * 60
+    # And the party stands where the row's own words are set (playtest 2026-10-03, item
+    # 12): "a lit doorway with a room's noise behind it" is a tavern's or an inn's door,
+    # not the market `place_party` chose. Before the watcher is added — `Scene.add` stands
+    # them wherever the party is. A town with none of the row's kinds keeps the way in.
+    if town is not None and here.kinds:
+        spot = openings.spot_for(world, town, {"where": {"at": "place",
+                                                         "kinds": list(here.kinds)}})
+        if spot is not None:
+            from rules import places as places_mod
+
+            # By name, as `openings.stage` stands a document's party: the engine's own
+            # id for that place, which the start's derivation does not promise.
+            eng = Engine(scene, Dice(seed), world=world)
+            target = places_mod.find(eng.places(), spot.name)
+            if target is not None and target.id != scene.at:
+                eng.place_party(target.id)
+                scene.begin_here()
     # Where they stand is what their own description says, read by the same cues the
     # prose is read by: "the stranger sharing the step" and "the neighbour beside you"
     # were added `near` and laid fifteen feet off (measured 2026-09-28), which the map

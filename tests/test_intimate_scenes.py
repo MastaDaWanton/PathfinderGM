@@ -485,6 +485,16 @@ def live(tmp_path, monkeypatch):
         c = cm.current("adults")
         # The fixture world opens on a chase; this scene is a quiet room.
         c.scene.initiative = []
+        # And the room is a room: under a roof (`places.is_indoors`). The fixture's start
+        # is open ground, and since 2026-10-03 `gm/checks/setting_kind` cuts "the room is
+        # quiet" from a beat the engine sets in the open air (playtest item 12).
+        from rules import places as places_mod
+
+        e = c.engine()
+        room = next((p for p in e.places() if not p.described_only
+                     and places_mod.is_indoors(p.id, p.terrain, p.shape)), None)
+        if room is not None and room.id != c.scene.at:
+            e.place_party(room.id)
         c.scene.add(instantiate("guildhand", scene=c.scene, name="Mira"), zone="near")
         c.transcript += [{"who": "gm", "kind": "setup", "text": WARM_BEFORE},
                          {"who": "player", "text": "I kiss her"},

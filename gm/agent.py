@@ -645,6 +645,14 @@ class GMAgent:
                 # A travel the model wrote with nowhere in it takes the place the
                 # player named, so validation can find it or name "found it first".
                 raw = judgement.fill_empty_travel(raw, player_input, self.engine.scene)
+                # And a walk toward a thing in this room is no journey at all: a travel
+                # or an undeclared found the words only aim across the room is dropped
+                # here, before validation's "found it first" teaches the retry to mint a
+                # place (playtest 2026-10-03 item 9: *the storage area*, *the smithy*).
+                raw = judgement.keep_movement_in_the_scene(
+                    raw, player_input, self.engine.scene,
+                    known=tuple(self.engine.places()) + tuple(self.engine.open_ground()),
+                    notes=own_words)
                 # A departure that names the room the party is in is asked again with
                 # the rooms that would have worked; raises into the correction path.
                 raw = judgement.refuse_leaving_in_place(raw, player_input,
