@@ -185,6 +185,25 @@ def outfit_page(request):
     })
 
 
+def proficient_keys(actor, cat: dict | None = None) -> dict[str, list[str]]:
+    """The catalogue's keys this character is trained in, per table: what the outfit
+    page sorts by (owner's ask, 2026-10-03: "a sort for the outfitting … that sorts by
+    proficiency"). Asked of the sheet's own answers — `Actor.is_proficient` for a weapon,
+    `armour.proficient_with` for armour and shields — so the order on the page is the
+    one the dice will apply (−4 on an unproficient weapon, the check penalty on attacks
+    in unproficient armour), never a second reading of the class's list."""
+    from rules import armour as armour_mod
+
+    cat = cat or catalogue()
+    return {
+        "weapon": [r["key"] for r in cat["weapons"] if actor.is_proficient(r["key"])],
+        "armour": [r["key"] for r in cat["armour"]
+                   if armour_mod.proficient_with(actor, "armour", r["key"])],
+        "shield": [r["key"] for r in cat["shields"]
+                   if armour_mod.proficient_with(actor, "shield", r["key"])],
+    }
+
+
 @require_GET
 def outfit_state(request, character_id: str):
     entry = roster.load(character_id)
@@ -198,6 +217,7 @@ def outfit_state(request, character_id: str):
         "weapons": list(actor.weapons), "armour": actor.armour, "shield": actor.shield,
         "stock": [f"{s.count}x {s.base}" for s in actor.stock.values()],
         "proficient": {k: actor.is_proficient(k) for k in ("simple", "martial")},
+        "proficient_keys": proficient_keys(actor),
         "begun": begun(entry),
         "closed": CLOSED.format(name=actor.name) if begun(entry) else "",
     })
