@@ -185,11 +185,12 @@ def test_an_offer_is_a_haggle_and_the_close_is_the_sale():
     scene = _scene("Korvu", "the clerk of the counting house")
     scene.pc().goods["crate"] = 1
     quiet = [{"op": "narrate_only", "params": {}}]
-    # The reader's `offer` (2026-10-03) is the haggle; `sell` is the close.
+    # A sale TRIED is the haggle (the reader's commitment, round 2); a sale done is the
+    # close.
     for said, target in (("I try to sell the crate to Korvu for coin", "Korvu"),
                          ("I smile and flirt with the clerk and offer the crate for coin.",
                           "the clerk")):
-        assert _read(said, scene, {"act": "offer", "object": "the crate",
+        assert _read(said, scene, {"act": "sell", "commit": "tried", "object": "the crate",
                                    "target": target}) == quiet, said
     raw = _read("I agree to sell the crate to the clerk at 75% of the crate's value.", scene,
                 {"act": "sell", "object": "the crate", "target": "the clerk"})

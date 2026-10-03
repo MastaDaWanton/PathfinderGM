@@ -177,16 +177,18 @@ def test_a_quoted_deal_closes_the_sale_to_the_one_spoken_to():
     assert "crate" not in pc.goods and scene.actors[smith].goods.get("crate") == 1
 
 
-def test_an_offer_is_a_haggle_unless_the_buyer_keeps_a_counter():
+def test_a_sale_tried_is_a_haggle_unless_the_buyer_keeps_a_counter():
     """"I try to sell the crate to Korvu for coin" — Korvu, a labourer, said no in the
-    fiction — and "I agree to sell the crate to the clerk" were both `sell` until the
-    reader learned `offer`. An offer to somebody with no counter is a haggle (no op);
-    the close is the sale (CircleMUD's shopkeeper buys what its trade takes; anybody
-    else has to agree)."""
+    fiction — and "I agree to sell the crate to the clerk" were both `sell`. Round 1 gave
+    the reader an `offer` act; the replay then read "I try to sell the crate to the smith"
+    as `sell` and sold it, so round 2 asks how far each deed is done instead: a sale
+    TRIED is an offer (ISO 24617-2's Offer, closed only by an Accept Offer), a haggle with
+    no op unless the buyer keeps a counter; a sale DONE is the close."""
     scene = _scene("Korvu")
     scene.pc().goods["crate"] = 1
     rows, raw = _turn(scene, "I try to sell the crate to Korvu for coin",
-                      _frame({"act": "offer", "object": "the crate", "target": "Korvu"}))
+                      _frame({"act": "sell", "commit": "tried", "object": "the crate",
+                              "target": "Korvu"}))
     assert not _gives(raw) and rows[0].note.startswith("an offer")
     _, raw = _turn(scene, "I agree to sell the crate to Korvu at 75% of its value",
                    _frame({"act": "sell", "object": "the crate", "target": "Korvu"}))
@@ -196,14 +198,55 @@ def test_an_offer_is_a_haggle_unless_the_buyer_keeps_a_counter():
 
 
 def test_a_plan_sale_no_act_stands_behind_is_overruled():
-    """The plan sold for an offer: an `offer` to a labourer builds no sale, and the
-    model's own `sell` of the crate, which only a `sell` act could stand behind, goes."""
+    """The plan sold for an offer: a sale tried with a labourer builds no sale, and the
+    model's own `sell` of the crate, which only a sale DONE could stand behind, goes."""
     scene = _scene("Korvu")
     scene.pc().goods["crate"] = 1
     _, raw = _turn(scene, "I try to sell the crate to Korvu for coin",
-                   _frame({"act": "offer", "object": "the crate", "target": "Korvu"}),
+                   _frame({"act": "sell", "commit": "tried", "object": "the crate",
+                           "target": "Korvu"}),
                    plan=[{"op": "sell", "actor": "pc", "params": {"item": "crate"}}])
     assert not _gives(raw)
+
+
+@pytest.mark.parametrize("said,actions", [
+    # Round 1's replay, the line that sold the crate a turn early.
+    ("I take the crate to the man in the counting house who will buy it from me.",
+     [{"act": "seek", "target": "the man in the counting house"},
+      {"act": "sell", "commit": "intended", "object": "it",
+       "target": "the man in the counting house"}]),
+    ("I go to the counting house to sell the crate.",
+     [{"act": "go", "place": "the counting house"},
+      {"act": "sell", "commit": "intended", "object": "the crate"}]),
+    ("I'm going to sell the crate to the clerk.",
+     [{"act": "sell", "commit": "intended", "object": "the crate", "target": "the clerk"}]),
+    ("Would you buy this crate?",
+     [{"act": "talk", "says": "Would you buy this crate?"},
+      {"act": "sell", "commit": "asked", "object": "this crate"}]),
+])
+def test_a_deed_intended_or_asked_about_moves_nothing(said, actions):
+    """Rich ERE marks every event's realis — "Other (future, hypothetical, negated,
+    uncertain, etc.)" against "Actual" (Song et al. 2015) — and the engine acts only on
+    the actual. Round 1's replay sold the crate on "…who will buy it from me": a purpose
+    or a plan is context, never an op of its own, and the plan's own sale of the same
+    crate has nothing to stand behind."""
+    scene = _scene("the clerk of the counting house")
+    scene.pc().goods["crate"] = 1
+    rows, raw = _turn(scene, said, _frame(*actions),
+                      plan=[{"op": "sell", "actor": "pc", "params": {"item": "crate"}}])
+    assert not _gives(raw), said
+    assert acts_to_ops.refusal(rows) == "" and not acts_to_ops.unresolved(rows)
+    assert all(r.note.endswith("no op") for r in rows if r.commit != "done")
+
+
+def test_a_deed_tried_still_moves_the_engine():
+    """"I try to pick up the crate" is a pick-up attempted now (1e rolls an attempt; the
+    engine's give finds or refuses it) — only a SALE tried is held back as an offer."""
+    scene = _scene()
+    scene.place_prop("crate", owner="pc")
+    _, raw = _turn(scene, "I try to pick up the crate",
+                   _frame({"act": "take", "commit": "tried", "object": "the crate"}))
+    assert [g["params"]["item"] for g in _gives(raw)] == ["crate"]
 
 
 # --- handing over, paying, and what is not here ----------------------------------------------
@@ -357,13 +400,17 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
     (memory: `contains` and `prefixItems` were 0 of 6, so a construct is probed before
     it is relied on). Each alternative: the span, the act as a const right after it — with
     the act last, the slot keys chose the act and "I look around" came back `claim` — and
-    exactly that act's slots, required."""
+    exactly that act's slots, required. Round 2 put the commitment between the span and
+    the act, the same enum in every alternative, so it chooses no act; required, because
+    an optional property is one the sampler skips (220 of 220 lines, 2026-09-27)."""
     items = interpret.per_act_schema()["properties"]["actions"]["items"]["anyOf"]
     assert {a["properties"]["act"]["const"] for a in items} == set(interpret.ACTS)
     for alt in items:
         act = alt["properties"]["act"]["const"]
-        assert list(alt["properties"])[:2] == ["span", "act"]
-        assert set(alt["properties"]) == {"span", "act", *interpret.ACT_SLOTS[act]}
+        assert list(alt["properties"])[:3] == ["span", "commit", "act"]
+        assert alt["properties"]["commit"]["enum"] == list(interpret.COMMITS)
+        assert set(alt["properties"]) == {"span", "commit", "act",
+                                          *interpret.ACT_SLOTS[act]}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 

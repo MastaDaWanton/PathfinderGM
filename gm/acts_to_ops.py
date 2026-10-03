@@ -21,10 +21,15 @@ every slot is resolved through the engine's own finders, or it is not resolved a
 
 Two kinds of row. Most acts owe an op the planner writes the params of (a `travel` to one
 of this town's real places, a `say`, a `provoke`): those are op NAMES, joined to the
-plan's required `declared` block. The acts that move a thing — take, drop, give, sell,
-offer — are built here WHOLE, because their params are exactly what the regexes kept
-getting wrong (which way the coin goes, who the buyer is, whether a deal was closed) and
-the reading's slots plus the engine's finders settle each of them.
+plan's required `declared` block. The acts that move a thing — take, drop, give, sell —
+are built here WHOLE, because their params are exactly what the regexes kept getting wrong
+(which way the coin goes, who the buyer is, whether a deal was closed) and the reading's
+slots plus the engine's finders settle each of them.
+
+Only what is done or tried NOW moves the engine (`interpret.COMMITS`, round 2): an action
+the reading marks intended or asked about makes no row of ops at all. A sale tried is an
+offer — ISO 24617-2's Offer, which only an Accept Offer closes — and becomes a sale only at
+a counter, whose keeper buys what is offered.
 
 Where a slot cannot be resolved, no op is invented: the row says what was not found, and
 the turn says so (`refusal`, and the brief's fact line). Prior art: FIREBALL (Zhu et al.,
@@ -40,7 +45,7 @@ import re
 from dataclasses import dataclass, field
 
 # The acts whose ops are built here, whole.
-GOODS_ACTS = frozenset({"take", "drop", "give", "sell", "offer"})
+GOODS_ACTS = frozenset({"take", "drop", "give", "sell"})
 # The acts under which coin leaves the player's purse. `rest` because a room is paid for
 # ("I take a room for the night": the act list's own words for `rest`).
 PAYING_ACTS = frozenset({"give", "buy", "drop", "rest"})
@@ -68,9 +73,12 @@ class Row:
     missing: str = ""                                   # what the words named and is not here
     note: str = ""                                      # why nothing was built, for the log
     thing: str = ""                                     # a goods row's object, resolved
+    commit: str = "done"                                # interpret.COMMITS
 
     def record(self) -> dict:
         out = {"act": self.act, "ops": list(self.ops)}
+        if self.commit != "done":
+            out["commit"] = self.commit
         if self.intents:
             out["built"] = [{"op": i["op"], "params": dict(i.get("params") or {})}
                             for i in self.intents]
@@ -312,11 +320,11 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
     a = frame["actions"][i]
     thing = _object(frame, i, pc, recent)
     key = _carried(pc, thing, coming) if thing else ""
-    if not key and row.act == "offer":
+    if not key and row.commit == "tried":
         # An offer of something not in the pack is talk, not a sale refused: the live
-        # reader read "I approach the man and offer to help him with the crate" as
-        # `offer, object: to help him with the crate`, and "not carrying to help him…"
-        # would have reached the brief as a fact.
+        # reader read "I approach the man and offer to help him with the crate" as an
+        # offer of "to help him with the crate", and "not carrying to help him…" would
+        # have reached the brief as a fact.
         row.note = f"an offer of {thing or 'nothing named'}, nothing carried to sell"
         return
     if not key:
@@ -329,10 +337,12 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
         row.missing = (f"there is nobody here who is {buyer_words}" if buyer_words
                        else f"nobody here to sell {thing} to")
         return
-    if row.act == "offer" and not keepers_mod.keeps_a_counter(scene.actors[buyer]):
-        # A stall buys whatever it is offered (CircleMUD's shopkeeper buys what its trade
-        # takes); anybody else has to agree, and until the player closes it the offer is
-        # a haggle the fiction answers.
+    if row.commit == "tried" and not keepers_mod.keeps_a_counter(scene.actors[buyer]):
+        # A sale tried is an offer (ISO 24617-2: an Offer, which only an Accept Offer
+        # closes). A stall buys whatever it is offered (CircleMUD's shopkeeper buys what
+        # its trade takes); anybody else has to agree, and until the player closes it the
+        # offer is a haggle the fiction answers. Measured on the replay, round 1: "I try
+        # to sell the crate to the smith for coin" was read `sell` and the crate sold.
         row.note = "an offer, not a sale: no counter here, so the buyer must agree first"
         return
     params: dict = {"item": key, "to": buyer}
@@ -359,7 +369,14 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
     gone: list[str] = []
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
-        row = Row(index=i, act=act)
+        row = Row(index=i, act=act, commit=str(a.get("commit") or "done"))
+        if not interpret.acting(a):
+            # Intended or asked about: context for the plan (`interpret.brief_lines` says
+            # so), never an op. Round 1's replay sold the crate a turn early on "I take
+            # the crate to the man … who will buy it from me", read as a sale.
+            row.note = f"{row.commit}, not done this turn: no op"
+            rows.append(row)
+            continue
         if act in GOODS_ACTS and pc is not None:
             row.thing = _object(frame, i, pc, recent)
             if act == "take":
@@ -456,8 +473,10 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
        the pouch into my coin purse" is coin IN; the model's coin give was a payment OUT).
     2. A plan op that moves a thing and that no act of the reading stands behind is
        overruled: a give to the player needs an act that gets something, a give from the
-       player one that parts with something, and a sale needs `sell` — an `offer` is a sale
-       only where the table built one. Gives between other people are theirs.
+       player one that parts with something, and a sale needs a `sell` DONE — a sale only
+       tried is a sale only where the table built one (a counter). Only acts done or tried
+       stand behind anything; an intended or asked-about one stands behind nothing. Gives
+       between other people are theirs.
     3. Built ops the plan did not carry are added.
 
     Only with a reading: with none there is nothing to stand behind or overrule with, and
@@ -471,7 +490,10 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         return raw
     built = [i for r in rows for i in r.intents]
     nothing = [r.thing for r in rows if r.act in GOODS_ACTS and r.thing and not r.intents]
-    acts = {str(a.get("act") or "") for a in frame.get("actions") or []}
+    acting = [a for a in frame.get("actions") or [] if interpret.acting(a)]
+    acts = {str(a.get("act") or "") for a in acting}
+    closed = any(a.get("act") == "sell" and (a.get("commit") or "done") == "done"
+                 for a in acting)
     out: list = []
     placed: set[int] = set()
     for r in raw:
@@ -510,7 +532,7 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
                              f"{op} of {p.get('item')}")
             continue
         if op == "sell":
-            stands = "sell" in acts
+            stands = closed
         elif _to_player(p, pc, target):
             stands = bool(acts & interpret.GETTING_ACTS)
         elif _is_coin(p.get("item")):
