@@ -3,7 +3,7 @@
 Run once against the author's `Feats_OGL.xlsx`; the output is committed and the workbook is
 not needed to build or run the app.
 
-    python tools/build_feats.py "C:/Users/natha/Downloads/Feats_OGL.xlsx"
+    python tools/build_feats.py "<path to>/Feats_OGL.xlsx"
 
 The interesting half is the prerequisite parser. The spreadsheet states prerequisites as
 prose — "Dex 15, Power Attack, base attack bonus +1." — and the whole reason to have feats

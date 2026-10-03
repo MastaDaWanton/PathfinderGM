@@ -3,7 +3,7 @@
 Run once against the author's `Pathfinder_Weapons_DB_filled_1.xlsx`; the output is
 committed and the workbook is not needed to build or run the app.
 
-    python tools/build_weapons.py "C:/Users/natha/Downloads/Pathfinder_Weapons_DB_filled_1.xlsx"
+    python tools/build_weapons.py "<path to>/Pathfinder_Weapons_DB_filled_1.xlsx"
 
 The sheet is a formatted document rather than a flat table: proficiency headings (SIMPLE,
 MARTIAL, EXOTIC) alternate with section headings (Light Weapons, Ranged Weapons, Siege

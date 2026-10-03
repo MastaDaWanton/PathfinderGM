@@ -101,7 +101,7 @@ Frozen, the first two are genuinely different directories, which is the whole re
 CLAUDE.md's rule exists. Measured on the real exe:
 
 ```
-resource_root C:\Users\natha\AppData\Local\Temp\_MEI180162
+resource_root %TEMP%\_MEI180162
 install_root  H:\coding\PathfinderGM\dist
 ```
 

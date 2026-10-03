@@ -13,7 +13,7 @@ onto levels, because flattening would lose the whole reason the table has two tr
 Nothing is paraphrased. Every description is the document's own sentence, so the class
 in the app says what the class in the document says.
 
-    python tools/import_blood_paths.py "C:/Users/natha/Downloads/Blood Bending.docx"
+    python tools/import_blood_paths.py "<path to>/Blood Bending.docx"
 """
 from __future__ import annotations
 
@@ -150,7 +150,9 @@ def _upgrade_of(listed: str, abilities: dict) -> tuple[str, str]:
 
 
 def main() -> int:
-    src = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\natha\Downloads\Blood Bending.docx"
+    # The author's document, in whoever is running this's Downloads folder by default.
+    src = (sys.argv[1] if len(sys.argv) > 1
+           else str(Path.home() / "Downloads" / "Blood Bending.docx"))
     paths = parse_paths(read_docx(src))
 
     data = json.loads(TARGET.read_text(encoding="utf-8"))

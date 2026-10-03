@@ -29,8 +29,8 @@ the wording:
     cuts off salvaged to its last whole sentence (`narration_from_cut_reply`).
   * **a note at the end** of the last message (`prompts.intimate_note`).
   * **the table's own passages as example turns**, from ONE file in the data folder that
-    the owner writes: `<data dir>/homebrew/style/intimate.txt` — on the owner's machine
-    `C:\\Users\\natha\\AppData\\Local\\PathfinderGM\\homebrew\\style\\intimate.txt`
+    the owner writes: `<data dir>/homebrew/style/intimate.txt`, which on Windows is
+    `%LOCALAPPDATA%\\PathfinderGM\\homebrew\\style\\intimate.txt`
     (`demonstrations_path`). Created holding only a header, and only when it is missing:
     the owner may write it before any build reads it, and a file that exists is never
     overwritten or prepended to.
