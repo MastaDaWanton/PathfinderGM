@@ -294,6 +294,27 @@ _DEMOS = [
           "says": "Done. The mule is yours.", "act": "talk"},
          {"span": "The mule is yours", "object": "The mule", "target": "the miller",
           "act": "sell"}]}),
+    # One deed, not two (round 2): a time is when the deed ends, a weapon is what it is
+    # done with, and where the player leans or stands is where they do it. Measured on the
+    # dev lines written for it (`authored:segment`, after an act-level count of held-out
+    # flips): 7 of 14 came back with an extra action — `go, wait`, `use, attack`,
+    # `wait, look`, `other, talk`.
+    ("I walk along the river until the bell rings.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "walk along the river until the bell rings", "place": "the river",
+          "time": "until the bell rings", "act": "go"}]}),
+    ("I level my spear and drive it into the boar.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "level my spear and drive it into the boar", "target": "the boar",
+          "object": "my spear", "act": "attack"}]}),
+    ("I lean against the doorframe and watch the street.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "lean against the doorframe and watch the street",
+          "object": "the street", "act": "look"}]}),
+    ("I seize the pickpocket by the arm.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "seize the pickpocket by the arm", "target": "the pickpocket",
+          "act": "attack"}]}),
     # What somebody else will do is not the player's deed at all: no action. Tried first
     # as `sell, commit: intended` for "who will pay me for it", and on the dev lines the
     # reader then read "the net, which he will mend for me" as the player's own sale.
@@ -527,19 +548,22 @@ def merge_repeats(actions: list[dict], dropped: list[str] | None = None) -> list
     place, time or words is a second deed ("I buy bread and buy cheese"; "I turn my back
     on him and tell the barkeep he smells" insults two people), and stays.
 
-    Narrowed in round 2: merged only when the FIRST is bare (a verb the second spells out:
-    `rest` then `rest, time: until dawn`) or the two are the same action twice. The first
-    rule — merge whenever nothing disagrees — joined `consume, object: …` and a bare
-    `consume` into one, and the held-out set had that as two deeds ("eat … and drink"):
-    one of the 4.4 acts-in-order points lost, found by an act-level count of the flips
-    (no sentence read). A bare SECOND is a deed whose object went unsaid."""
+    Narrowed in round 2: never when the SECOND is bare. The first rule — merge whenever
+    nothing disagrees — joined `consume, object: …` and a bare `consume` into one, and the
+    held-out set had that as two deeds ("eat … and drink"): one of the 4.4 acts-in-order
+    points lost, found by an act-level count of the flips (no sentence read). A bare second
+    is a deed whose object went unsaid; a second that only adds to the first (`rest` then
+    `rest, time: until dawn`; `attack, target: him` then the same with `object: the face`)
+    is the first spelled out. A first try that merged only after a bare FIRST lost the
+    second kind (`attack` twice, the same count). And the commitments must agree."""
     out: list[dict] = []
     for a in actions:
         prev = out[-1] if out else None
-        slots_of = (lambda x: {s: str(x[s]).lower() for s in SLOTS if x.get(s)})
         if prev is not None and prev.get("act") == a.get("act") \
                 and prev.get("commit", "done") == a.get("commit", "done") \
-                and (not slots_of(prev) or slots_of(prev) == slots_of(a)):
+                and any(a.get(s) for s in SLOTS) and not any(
+                    prev.get(s) and a.get(s) and prev[s].lower() != a[s].lower()
+                    for s in SLOTS):
             for s in SLOTS:
                 if a.get(s) and not prev.get(s):
                     prev[s] = a[s]

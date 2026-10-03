@@ -137,6 +137,20 @@ def test_the_planners_own_found_takes_the_speakers_landmark():
     assert plan[0]["params"]["parent"] == "the counting house"
 
 
+def test_a_walk_only_meant_founds_nothing():
+    """Round 2 of lane F: the reading's commitment. "I mean to go to the smithy tomorrow"
+    is a plan (Rich ERE's realis "Other"), and founding the smithy on it would make a
+    place the player has not gone to."""
+    agent = _agent(COUNTING)
+    e = agent.engine
+    heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0])
+    plan = judgement.go_to_heard_place(
+        [{"op": "narrate_only"}], "I mean to go to the smithy tomorrow.", e.scene,
+        tuple(e.places()), reading={"question": False, "actions": [
+            {"act": "go", "commit": "intended", "place": "the smithy"}]})
+    assert plan == [{"op": "narrate_only"}]
+
+
 def test_a_question_about_it_goes_nowhere():
     agent = _agent(COUNTING)
     e = agent.engine

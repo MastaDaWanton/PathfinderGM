@@ -364,7 +364,9 @@ GOLD = [
       [A("other", object="a healing salve")], "authored"),
     G("I read the letter she gave me.", [A("look", object="the letter she gave me")], "authored"),
     G("I put on the chain shirt.", [A("use", object="the chain shirt")], "authored"),
-    G("I drop the stolen purse in the well.", [A("give", object="the stolen purse", place="the well")],
+    # `drop` since 2026-10-03 (lane F): the act the vocabulary gained for exactly this. The
+    # label was `give`, when give's line read "drop something somewhere".
+    G("I drop the stolen purse in the well.", [A("drop", object="the stolen purse", place="the well")],
       "authored"),
     G("I introduce myself to the woman at the loom.",
       [A("talk", target="the woman at the loom")], "authored"),
@@ -422,6 +424,40 @@ GOLD = [
       "authored:commit", dev=True),
     G("I agree to sell the goat to the herder for six silver.",
       [A("sell", object="the goat", target="the herder")], "authored:commit", dev=True),
+    # --- one deed or two, dev (lane F round 2) ------------------------------------------------
+    # Written after an act-level count of the held-out flips (act names only, no sentence
+    # read) showed acts-in-order falling on extra actions: a time clause read as a second
+    # `wait`, a swing read as `use` before the `attack`, a search or a gesture read as
+    # `take`. These are new sentences of those KINDS, for tuning; the held-out ones stay
+    # unread.
+    G("I keep walking east until the sun goes down.",
+      [A("go", time="until the sun goes down")], "authored:segment", dev=True),
+    G("I lie back against the wall and rest for a bit.",
+      [A("rest", time="for a bit")], "authored:segment", dev=True),
+    G("I swing my hammer and break his jaw.",
+      [A("attack", target="his", object="my hammer")], "authored:segment", dev=True),
+    G("I raise my bow and loose an arrow at the wolf.",
+      [A("attack", target="the wolf", object="my bow")], "authored:segment", dev=True),
+    G("I search the cupboard for anything worth stealing.",
+      [A("search", object="the cupboard")], "authored:segment", dev=True),
+    G("I kneel at the altar and pray.", [A("other", place="the altar")],
+      "authored:segment", dev=True),
+    G("I lean on the counter and ask the clerk about the crate.",
+      [A("talk", target="the clerk", says="about the crate")], "authored:segment", dev=True),
+    G("I wander through the market until noon.",
+      [A("go", place="the market", time="until noon")], "authored:segment", dev=True),
+    G("I grab the thief by the collar.", [A("attack", target="the thief")],
+      "authored:segment", dev=True),
+    G("I nod to the guard and walk on.", [A("other", target="the guard"), A("go")],
+      "authored:segment", dev=True),
+    G("I go over to the well and drink.", [A("go", place="the well"), A("consume")],
+      "authored:segment", dev=True),
+    G("I tell the boy to fetch the healer.",
+      [A("talk", target="the boy", says="to fetch the healer")], "authored:segment", dev=True),
+    G("I check the body for wounds.", [A("look", object="the body")],
+      "authored:segment", dev=True),
+    G("I stand at the rail and watch the gulls.", [A("look", object="the gulls")],
+      "authored:segment", dev=True),
     # --- commitment, held out (lane F round 2) -------------------------------------------------
     # Written after the reader was frozen (commit e9d63ee's demonstrations), and never used
     # to write a fix. The first five are the owner's own lines from 2026-10-03, the first

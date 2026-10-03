@@ -3468,8 +3468,12 @@ def _acquired_words(reading=None, plan=None, pc_ref: str = "pc") -> set[str]:
     the way the sheet is (`_vouched_for`)."""
     phrases: list[str] = []
     if isinstance(reading, dict) and not reading.get("error"):
+        from . import interpret as _interpret
+
         for a in reading.get("actions") or []:
-            if isinstance(a, dict) and a.get("act") in _ACQUIRING_ACTS and a.get("object"):
+            # A thing only meant to be got ("I want to buy a crown") is not got.
+            if isinstance(a, dict) and a.get("act") in _ACQUIRING_ACTS and a.get("object") \
+                    and _interpret.acting(a):
                 phrases.append(str(a["object"]))
     for r in plan or ():
         if not isinstance(r, dict) or str(r.get("op", "")).lower() != "give":
@@ -5701,7 +5705,12 @@ def go_to_heard_place(raw_intents, player_text: str, scene, known=(), reading=No
     if isinstance(reading, dict) and reading.get("question") and not reading.get("actions"):
         return raw_intents
     rec = None
+    from . import interpret as _interpret
+
     for a in (reading or {}).get("actions") or []:
+        # Only a walk done now: "I mean to go to the smithy tomorrow" founds nothing yet.
+        if not _interpret.acting(a):
+            continue
         if a.get("act") in ("go", "journey", "seek", "call_on") and a.get("place"):
             rec = heard_places.named_in(str(a["place"]), scene, known)
             if rec is not None:
@@ -6130,9 +6139,14 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
     mine = _content_words(player_text)
     says = ""
     if isinstance(reading, dict):
+        from . import interpret as _interpret
+
+        # Words said now, never words the player means to say later ("I head for the
+        # stables to ask about a horse": the asking is intended, `interpret.COMMITS`).
         says = next((str(a.get("says") or "").strip()
                      for a in reading.get("actions") or []
-                     if isinstance(a, dict) and str(a.get("says") or "").strip()), "")
+                     if isinstance(a, dict) and _interpret.acting(a)
+                     and str(a.get("says") or "").strip()), "")
     out: list = []
     for entry in raw_intents:
         if not (isinstance(entry, dict) and str(entry.get("op", "")).lower() == "say"

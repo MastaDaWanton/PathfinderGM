@@ -420,6 +420,7 @@ class GMAgent:
 
             here_named = [a for a in self.reading.get("actions") or []
                           if a.get("act") in ("go", "leave") and a.get("place")
+                          and interpret.acting(a)
                           and getattr(places_mod.find(self.engine.places(), a["place"]),
                                       "id", None) == self.engine.scene.at]
             if here_named and "travel" not in by_reading:
