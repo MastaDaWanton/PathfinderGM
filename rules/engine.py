@@ -2569,11 +2569,7 @@ class Engine:
             # The open ground outside the walls answers by name too — the region
             # places a scheme's card names ("the approach", "the edge") — the same
             # lookup `_op_travel` makes, so validate and run agree.
-            outside = ()
-            if self.world is not None:
-                terrain = self._terrain_hint(self.world.get(self.scene.location_id)) or ""
-                if terrain:
-                    outside = places_mod.region_set(self.scene.location_id, terrain)
+            outside = self.open_ground()
             planned = _place_key(intent.params["place"]) in getattr(self, "_planned_places", ())
             if known and not planned \
                     and places_mod.find(known, str(intent.params["place"])) is None \
@@ -2592,7 +2588,10 @@ class Engine:
                     f"\"<the place above it stands in or off>\"}}}} (kind: what it is; "
                     f"parent: the place from that list it is in or off — where the "
                     f"player's words or the people here put it; leave parent out only "
-                    f"when it opens off where the party stands), then travel to it.",
+                    f"when it opens off where the party stands), then travel to it. "
+                    f"But a thing in the place the party stands — a door, a counter, a "
+                    f"corner, an area of it — is not a place: walking to it is "
+                    f"{{\"op\": \"narrate_only\"}}, and nothing is founded.",
                     "schema", code="no_such_place")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
@@ -7781,6 +7780,18 @@ class Engine:
             return next((b for b in found_biomes if b != places_mod.URBAN), "grassland")
         return ""
 
+    def open_ground(self) -> tuple:
+        """The region places outside the walls ("the approach", "the edge") that a
+        `travel` answers to by name beside `places()` — one reader, shared by the
+        validator's no-such-place refusal and `judgement.keep_movement_in_the_scene`,
+        so the two can never disagree about whether a destination exists."""
+        from . import places as places_mod
+
+        if self.world is None:
+            return ()
+        terrain = self._terrain_hint(self.world.get(self.scene.location_id)) or ""
+        return places_mod.region_set(self.scene.location_id, terrain) if terrain else ()
+
     def places(self) -> tuple:
         """Every place the party can name from where they stand — derived, never stored.
 
@@ -9098,8 +9109,9 @@ class Engine:
             # The road remembers only while you are on it.
             if self.scene.road and places_mod.setting_of(going_to.id) == "in":
                 self.scene.road = {}
-            # Walking out is walking away: the conversation ends, and the tell says
-            # they were left mid-sentence if no leave was taken (2026-09-24).
+            # Walking out is walking away: the conversation ends, and the tell says the
+            # party walked away from it if no leave was taken (2026-09-24; reworded
+            # 2026-10-03, see `end_talk`).
             parted = self.end_talk("walked away")
             # And whoever keeps the room they have just walked into, if it is a room
             # somebody keeps and nobody has kept it yet.
@@ -10464,7 +10476,15 @@ class Engine:
             return ""
         names = ", ".join(a.name for a in gone)
         if why == "walked away":
-            return f"You leave {names} mid-sentence."
+            # Not "mid-sentence". That was a claim about speech the engine never had:
+            # `states.TALKING` is sticky by the 2026-09-24 ruling, so it is held by whoever
+            # the player EVER spoke with here, and the owner's save of 2026-10-03 printed
+            # "You leave the servant carrying jugs two at a time, …, the figure, the man
+            # mid-sentence" for four people, three of whom had not spoken for turns. Every
+            # one of the save's five travel tells said it. What the engine knows is that a
+            # conversation was open and walking off closed it, so that is what it says.
+            return (f"You walk away from {_and_list(a.name for a in gone)}, and the "
+                    f"conversation is over.")
         if why == "a fight starts":
             return f"The talk with {names} is over: it has come to blows."
         return f"The conversation with {names} is over."
@@ -14369,8 +14389,8 @@ class Engine:
         talking = self.talking_to()
         if talking and actor.is_pc:
             return self._refuse(
-                intent, f"You are mid-sentence with "
-                        f"{', '.join(a.name for a in talking)}. Take your leave first.")
+                intent, f"You are still in conversation with "
+                        f"{_and_list(a.name for a in talking)}. Take your leave first.")
 
         # Sleeping on enough experience is how a level arrives: "once i have enough
         # Exp sleeping should initiate the leveling process." Before the rest itself,

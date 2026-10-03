@@ -93,6 +93,10 @@ class Situation:
     # say to the player first.
     label: str = ""
     says: str = ""
+    # The legacy table's own answer to a start document's `where.kinds`: the kinds of
+    # place (`rules/openings._kind_labels` vocabulary) its words are set in, so the party
+    # is stood in one (`play/campaign.new_campaign`). Empty: no settlement kind fits.
+    kinds: tuple = ()
 
 
 # The hour each opening's `when` names, for the world clock. Until 2026-09-27 every game
@@ -197,6 +201,33 @@ ERRANDS: tuple[str, ...] = (
 )
 assert len(ERRANDS) == len(SITUATIONS)
 SITUATIONS = tuple(replace(s, errand=e) for s, e in zip(SITUATIONS, ERRANDS))
+
+# Where each situation's own words are set, in the table's order. Until 2026-10-03 the
+# legacy table stood the party wherever `place_party` put them — the way in — and the
+# frame said whatever the row said. The owner's save of that date opened "Evening …
+# You are in a lit doorway with a room's noise behind it … You have just come in out of
+# the weather and not sat down yet" with the engine holding the party at the MARKET;
+# the narrator furnished a taproom round them for six turns ("the tavern patrons", "he
+# leans back against the bar") because the opening had. So each row names the kinds of
+# place its sentence describes, and a new campaign is stood in one when the town has it
+# — the start documents' `where.kinds`, for the table that predates them. The dusk
+# crossing names no kind: a crossing is a quarter's own place, not a settlement kind.
+SITUATION_KINDS: tuple[tuple[str, ...], ...] = (
+    ("market",),                                   # the market row, awnings going up
+    ("lodging",),                                  # a crowded common room at the meal
+    ("workshops", "carters yard", "smithy"),       # a work yard
+    ("well", "cistern"),                           # a well-head
+    ("gate",),                                     # the road in, under the gate
+    ("market", "green"),                           # a public square, notices read
+    ("workshops", "lane"),                         # a lane of open workshop doors
+    ("lodging",),                                  # a lit doorway with a room's noise
+    ("carters yard", "stables", "market"),         # a yard of carts being loaded
+    ("market",),                                   # a step where people stop to eat
+    (),                                            # a crossing thick with people
+    ("temple",),                                   # a regular public ritual
+)
+assert len(SITUATION_KINDS) == len(SITUATIONS)
+SITUATIONS = tuple(replace(s, kinds=k) for s, k in zip(SITUATIONS, SITUATION_KINDS))
 
 
 def suggestions_for(situation: Situation) -> list[str]:

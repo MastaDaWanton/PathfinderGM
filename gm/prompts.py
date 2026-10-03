@@ -731,6 +731,8 @@ keeps it for good, with that description, and refuses a kind that makes no sense
 words: market, smithy, mill, workshops, tannery, brewery, warehouses, guildhall, library,
 keep, gaol, barracks, shrine, temple, graveyard, inn, tavern, bathhouse, theatre, arena,
 gardens, well, granary, stables, docks, bridge, lane, back streets, warrens.
+Never for a thing in the place the party stands — a door, a counter, a corner, a storage
+area: walking over to it is {"op": "narrate_only"}, and nothing is founded.
 Ground the player goes INTO that is not a named place yet —
 the sewers, a cellar, a crypt, the rooftops, an alley, a cave, a mine, ruins, a tower —
 is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the

@@ -4676,6 +4676,154 @@ def _approach_fix(scene, who) -> str:
             "({\"op\": \"narrate_only\"}).")
 
 
+# --- walking toward a thing here is not a journey (playtest 2026-10-03, item 9) ----------
+#
+# Measured on the owner's save (items, turn_log rows 52 and 106). "I take the brunt of
+# the weight and move it toward the storage area": the plan's `travel` was refused
+# ("there is no 'the storage area' here. Name one of: …"), the retry planned `found` +
+# `travel`, and a new place *the storage area* opened off the docks with the player
+# walked into it. "I pocket the coins and head for the side door" (the clerk had said
+# "through the side door, past the smithy") founded *the smithy* off the counting house
+# the same way. Both times the founding was the planner's way out of a refused travel —
+# the refusal's own hint ("found it first in the same plan") taught it.
+#
+# Inform's world model is the line (WI §3.1, RB §6.9): only `going` changes the room, and
+# a room's things — a door, a counter, a corner — are reached without leaving it. MUDs
+# draw the same line by enumerating exits (Diku's exit list; Evennia's `dig` makes a room
+# only by command, docs/place-doors.md). So a movement verb aimed TOWARD something
+# ("toward the storage area", "in the direction of the cranes") or at a fixture of a room
+# ("head for the side door", "walk over to the counter") is moving within the scene, and
+# a `travel` or `found` the plan wrote for it is dropped before validation can refuse it
+# and teach the retry to found. A place the player's own words set out to FIND or go TO
+# is left to the existing doors: "I head toward the back streets to find the Velvet
+# Veil" still founds the Veil (2026-09-30 item 9, the owner's "go anywhere" ruling).
+
+_TOWARD = re.compile(
+    r"\b(?:toward|towards|in\s+the\s+direction\s+of)\s+"
+    r"(?P<obj>(?:the|a|an|that|this|those|these|some)\s+[\w'’-]+(?:\s+[\w'’-]+){0,3}?)"
+    r"(?=\s*[.,;!?]|\s+(?:and|to|for|with|then|where|so|while|before|after|as|but)\b|$)",
+    re.I)
+# A room's furniture and fittings: things in a place, never places (Inform's `thing`,
+# against its `room`). Closed, and the reason for each family is the same — it is part of
+# the room the party stands in. A door is here as a thing to walk to; going THROUGH one is
+# another sentence (`_THROUGH`), left to the doors places come in by.
+_FIXTURES = (r"door|doors|doorway|archway|exit|window|windows|corner|counter|bar|table|"
+             r"tables|bench|benches|desk|wall|walls|hearth|fireplace|stall|stalls|crate|"
+             r"crates|cart|carts|wagon|ramp|post|pillar|shelf|shelves|scale|scales|"
+             r"pile|stack|area|end|spot|side|back|front|middle|centre|center")
+_TO_A_FIXTURE = re.compile(
+    r"\b(?:head|heads|heading|move|moves|moving|walk|walks|walking|go|goes|going|step|"
+    r"steps|stepping|make|makes|making|edge|edges|sidle|sidles|stride|strides|wander|"
+    r"wanders|slip|slips|carry|carries|carrying|drag|drags|haul|hauls|run|runs|hurry|"
+    r"hurries|cross|crosses|back|backs|retreat|retreats|approach|approaches|lean|leans)\b"
+    r"(?:\s+(?:it|them|him|her|this|that|back|over|across|up|down|my\s+way|our\s+way|"
+    r"straight|quietly|slowly|quickly)){0,3}"
+    r"(?:\s+(?:to|toward|towards|for|at|into|up\s+to|over\s+to|across\s+to|by))?\s+"
+    r"(?P<obj>(?:the|a|an|that|this|those|these)\s+(?:[\w'’-]+\s+){0,3}?"
+    r"(?:" + _FIXTURES + r"))\b"
+    # The fixture ends the phrase: "the front gate" is a gate, not "the front", and "the
+    # side of the square" is the square.
+    r"(?=\s*[.,;!?\"”]|\s+(?:and|to|for|with|then|where|so|while|before|after|as|but|in|"
+    r"on|at|near|by|beside|behind|across)\b|$)", re.I)
+# Going THROUGH the door is leaving by it — a journey, not a step across the room.
+_THROUGH = re.compile(r"\b(?:through|out\s+(?:of|through)|past)\s+(?:the|a|that)\s+"
+                      r"(?:[\w'’-]+\s+){0,2}?(?:door|doorway|archway|gate|exit)\b", re.I)
+
+
+def _core(name: str) -> str:
+    return re.sub(r"^(?:the|a|an)\s+", "", " ".join(str(name or "").split()).lower())
+
+
+def movement_within(player_text: str, known=()) -> list[tuple[int, int, str]]:
+    """The spans of the player's own words that move within the scene: a movement aimed
+    toward something that is not a place here, or at a fixture of the room. `(start,
+    end, object)`; empty when the sentence is a journey or names no such thing."""
+    from rules import places as places_mod
+
+    text = redact_speech(str(player_text or ""))
+    if not text or _THROUGH.search(text):
+        return []
+    out: list[tuple[int, int, str]] = []
+    for rx in (_TOWARD, _TO_A_FIXTURE):
+        for m in rx.finditer(text):
+            obj = " ".join(m.group("obj").split())
+            # "toward the docks" is a journey when the docks are a place here.
+            if places_mod.find(known, obj) is not None:
+                continue
+            if any(a <= m.start("obj") < b for a, b, _o in out):
+                continue
+            out.append((m.start("obj"), m.end("obj"), obj))
+    return out
+
+
+def keep_movement_in_the_scene(raw_intents, player_text: str, scene, known=(),
+                               notes: list | None = None) -> list:
+    """A `travel` to a place that is not here, and a `found` the player never declared,
+    are dropped when the player's words only move within the scene (`movement_within`);
+    the turn becomes the narrated walk across the room.
+
+    Kept: a travel to any place `known` answers to; a `found` the player declared
+    (`_FOUNDS` / `_FOUNDS_AS`: "we make this our base"); and any travel or found whose
+    name the player's words say OUTSIDE the within-scene span ("toward the back streets
+    to find the Velvet Veil" keeps the Veil). `known` is the engine's places and open
+    ground (`Engine.places()` + `Engine.open_ground()`); with none, nothing is judged."""
+    from rules import places as places_mod
+
+    if not isinstance(raw_intents, list) or not player_text or not known:
+        return raw_intents
+    if "?" in str(player_text):
+        return raw_intents
+    spans = movement_within(player_text, known)
+    if not spans:
+        return raw_intents
+    declared = bool(_FOUNDS_AS.search(player_text) or _FOUNDS.search(player_text))
+    text = redact_speech(str(player_text)).lower()
+
+    def said_elsewhere(name: str) -> bool:
+        core = _core(name)
+        if len(core) < 3:
+            return False
+        for m in re.finditer(r"(?<![\w'])" + re.escape(core) + r"(?![\w'])", text):
+            if not any(a <= m.start() < b for a, b, _o in spans):
+                return True
+        return False
+
+    dropped: list[str] = []
+    out = []
+    for r in raw_intents:
+        op = str(r.get("op", "")).lower() if isinstance(r, dict) else ""
+        params = (r.get("params") or {}) if isinstance(r, dict) else {}
+        if op == "travel":
+            where = str(params.get("place") or "")
+            # A travel with nowhere in it is the schema's insistence on one for a
+            # sentence that only crosses the room; it goes too.
+            if params.get("biome") or (where and (places_mod.find(known, where) is not None
+                                                  or said_elsewhere(where))):
+                out.append(r)
+                continue
+            dropped.append(f"travel to {where!r}" if where else "a travel to nowhere")
+            continue
+        if op == "found" and not declared:
+            name = str(params.get("name") or "")
+            if said_elsewhere(name):
+                out.append(r)
+                continue
+            dropped.append(f"found {name!r}")
+            continue
+        out.append(r)
+    if not dropped:
+        return raw_intents
+    toward = spans[0][2]
+    if not any(isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only"
+               for r in out):
+        out.append({"op": "narrate_only",
+                    "because": f"the player moves within the scene, toward {toward}"})
+    if notes is not None:
+        notes.append(f"movement within the scene (toward {toward}): dropped "
+                     + ", ".join(dropped))
+    return out
+
+
 def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
                             reading=None, attached=()) -> list:
     """Told to leave, the model may not name the room the party is standing in.

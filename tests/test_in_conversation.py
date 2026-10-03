@@ -129,7 +129,8 @@ class TestItEndsOnlyThreeWays:
                    and p.terrain == places_mod.URBAN)
         out = _run(e, pc, [{"op": "travel", "actor": pc.ref, "because": "t",
                             "params": {"place": far.name}}])[-1]
-        assert "leave Grix mid-sentence" in out.tell, out.tell
+        assert "You walk away from Grix, and the conversation is over." in out.tell, out.tell
+        assert "mid-sentence" not in out.tell
         assert not grix.has_state(states.TALKING)
 
     def test_a_fight_starting_ends_it(self):

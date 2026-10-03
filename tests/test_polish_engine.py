@@ -81,8 +81,9 @@ class TestTheArticle:
                    and p.terrain == places_mod.URBAN)
         out = _run(e, [{"op": "travel", "actor": pc.ref, "because": "t",
                         "params": {"place": far.name}}])[-1]
-        assert "You leave the man mid-sentence." in out.tell, out.tell
-        assert "leave man" not in out.tell
+        said = "You walk away from the man, and the conversation is over."
+        assert said in out.tell, out.tell
+        assert "from man" not in out.tell
 
     def test_the_bobby_corpus_tells_read_with_their_articles(self):
         """The Bobby corpus (2026-09-28) printed "On the board: girl (c2)." and "Bobby
