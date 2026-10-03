@@ -120,6 +120,12 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from gm import mentions as mentions_mod
 
     monkeypatch.setattr(mentions_mod, "ENABLED", False)
+    # And the beat reader (gm/beat_reader.py), which grew out of that labeller and makes
+    # up to two calls per groomed beat. A test that needs a reading builds one with a
+    # stubbed reply (tests/beat_reader/stub.py); an explicit `chat=` runs even when off.
+    from gm import beat_reader as beat_reader_mod
+
+    monkeypatch.setattr(beat_reader_mod, "ENABLED", False)
 
 
 @pytest.fixture(autouse=True)
