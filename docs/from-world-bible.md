@@ -152,6 +152,19 @@ were never mentioned (playtest items 17 and 19).
 | `play.cards[]` | Absent; hooks come only from this app's schemes | `{"giver", "want", "offer", "motive", "withholds"}`, so a world's own hooks arrive in the same shape a scheme's do. `giver` is an id |
 | `unwritten[].where_id` | `unwritten` names things with no location | The id of the settlement or place the unwritten thing belongs to, so it can be offered where it would be found |
 
+### Things, what they are worth, and whose they are
+
+Added 2026-10-03 by Lane A of that day's playtest (`docs/items-have-owners.md`). A thing
+the world never priced — a crate of cargo at the docks, a merchant's pack — sells at this
+app's own bottom rung (`pricing.UNLISTED_GP`), because the Core Rulebook prices only what
+its tables list and the export says nothing about what a place's goods are worth.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.settlements[].trade.goods[]` | Absent; `trade` is one `sells` and one `buys` line of prose | One row per good the place trades in: `{"name": "salt fish", "worth": "cheap" \| "common" \| "dear" \| "precious", "kind": "food" \| "cloth" \| "metal" \| "stone" \| "timber" \| "other"}`. Words, not prices: the app would map `worth` onto the PF1e Trade Goods table, which sells at full value (Core Rulebook p.140). No reader yet; `pricing.goods_worth` is where it would go |
+| `play.places[].props[]` | Absent; the props ledger (`Scene.props`) starts empty in every place | The things that lie in a place before anybody arrives, as `{"name": "a rack of oars", "owner": "<cast id or empty>"}`, to be laid into `Scene.props` at the place with its `owner`, so a take of one is a take from somebody and not a thing out of the air. No reader yet |
+| `play.cast[].carries[]` | Absent; the app reads a person's hands only off a label like "the merchant with a heavy pack" (`holding.carried_by_label`) | A few words per thing a person is known to carry ("a ledger", "the harbour keys"), so a take from them is a take of something they actually had. No reader yet; `Engine._holder_of` is where it would go |
+
 ### Ingredients and reagents
 
 Added 2026-10-02 by the herbalism revamp. The export carries no flora at all, so every world

@@ -124,6 +124,12 @@ def coinage(world=None, place=None) -> list[Coin]:
     return [Coin(cid, f"{METALS[cid]} piece", value) for cid, value in DENOMINATIONS]
 
 
+# The words a denomination's name can end on, with any plural `s` taken off: the ids,
+# the metals, and the "piece"/"coin" every coined name ends with (`coinage`).
+_MONEY_LAST = frozenset({"cp", "sp", "gp", "pp", "copper", "silver", "gold", "platinum",
+                         "piece", "coin"})
+
+
 def coin_named(text: str, coins: list[Coin] | None = None) -> str:
     """The denomination id a piece of text is asking for, or "".
 
@@ -131,6 +137,12 @@ def coin_named(text: str, coins: list[Coin] | None = None) -> str:
     the GM writes "three silver" as readily as "3 sp" and a player writes either.
     """
     want = str(text or "").strip().lower().rstrip("s")
+    # The last word has to be money. "gold ring" starts with "gold", and read on the
+    # metal alone it was a gold piece: a ring picked up went into the purse. The same
+    # family as item 3 of 2026-10-03, where "the coins" went into the goods.
+    last = (re.findall(r"[a-z]+", want.replace("_", " ")) or [""])[-1].rstrip("s")
+    if last not in _MONEY_LAST:
+        return ""
     for cid, _ in DENOMINATIONS:
         if want == cid or want.startswith(METALS[cid]):
             return cid

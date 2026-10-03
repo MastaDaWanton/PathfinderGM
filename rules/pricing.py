@@ -168,6 +168,45 @@ def _open_worth(item) -> float:
     return round(price, 2)
 
 
+# What a carried thing nobody priced is worth, in gold: THIS APP'S number, not the book's.
+# The Core Rulebook prices what its tables list and says an item sells for "half its
+# listed price" (p.140); for a thing with no listed price at all — a crate of somebody's
+# cargo, a stranger's pack — no rule could be found (docs/items-have-owners.md, "could
+# not confirm"). The answer is the bottom rung of the ladder above, the same one
+# `_tier_base` gives anything untiered ("the only safe direction: a thing with no rarity
+# should be cheap"), and it is the engine's: a model never names it (law 3). A world that
+# says what its trade goods are worth would replace it (docs/from-world-bible.md).
+UNLISTED_GP = TIER_BASE["common"]
+
+
+def goods_worth(name: str) -> float:
+    """What one of a carried thing is worth on an open counter, in gold, by its name.
+
+    The Core tables first, at their printed prices: the general goods (`goods.GEAR`, by
+    key or by the name the shelf gives it), then the weapon, armour and shield rows. A
+    thing none of them lists is `UNLISTED_GP`. Never a price the fiction stated — that
+    is the haggle, and `accept` can only lower what the rule gives."""
+    from . import goods
+
+    low = " ".join(str(name or "").split()).lower()
+    for key, row in goods.GEAR.items():
+        if low in (key, str(row.get("name", "")).lower()):
+            return float(row.get("cost_gp") or 0) or UNLISTED_GP
+    entry = goods.known_item(low)
+    if entry and entry.get("cost_gp") not in (None, "", 0):
+        try:
+            return float(entry["cost_gp"])
+        except (TypeError, ValueError):
+            pass
+    return UNLISTED_GP
+
+
+def what_a_shop_pays_for_goods(name: str, *, seller=None, town="") -> float:
+    """Half of `goods_worth`, less for somebody the watch wants: the same rule
+    `what_a_shop_pays` applies to a jar off the bench, for a thing out of the pack."""
+    return round(goods_worth(name) * SHOP_BUYS_AT / markup_for(seller, town), 2)
+
+
 def what_a_shop_pays(item, *, seller=None, town="") -> float:
     """What a stallholder offers for it. Half, and a haggle moves from there — and
     less again from somebody the watch wants, by the same factor the shelf charges

@@ -2233,8 +2233,14 @@ initiative action reaction move measure account stance grip liberty leave offenc
 umbrage pride solace revenge vengeance revenge stock example lesson point issue matter
 scene action satisfaction job patience services service pleasure attention silence
 fight fistfight brawl quarrel argument feud duel dispute grudge
+brunt wink smile nod grin shrug glare wave salute kiss hug laugh hint nudge hand thanks
+compliment regards greeting apology promise warning signal gesture try go
 on off up in out over under away back down
 """.split())
+# "brunt" and the faces: measured 2026-10-03. "I take the brunt of the weight and move it"
+# put an item called "brunt of the weight" in the pack (and the player later dropped it
+# on a smithy floor), and "I give a friendly wink" planned a `give` of "friendly wink"
+# whose refusal reached the narrator and the ledger. A wink is given; it is not handed.
 # "fight" and its kin: "I pick a fight with the biggest man in the room" put a "fight" in
 # the goods on every recorded turn that sentence resolved — four in the committed fight
 # recordings (2026-09-25), one in the 2026-09-27 audit ("Kesst Vayr takes fight.").
@@ -2273,12 +2279,18 @@ def _is_a_thing(item: str) -> bool:
 
     The head noun is the one that decides — "the offer of a room" is an offer, and
     "a leather satchel" is a satchel. Read from the end, because English puts the head
-    last: adjectives pile up in front of it.
+    last: adjectives pile up in front of it — except before "of", where it comes
+    first (`holding.head_of`). Read from the end, "the brunt of the weight" was a
+    weight and became an item on 2026-10-03; "the offer of a room" this docstring
+    always called an offer was a room. A word that only measures ("a chunk of wood")
+    still hands the head to what follows it.
     """
+    from rules import holding
+
     words = [w for w in str(item or "").lower().replace("-", " ").split() if w]
     if not words:
         return False
-    head = words[-1]
+    head = holding.head_of(" ".join(words)) or words[-1]
     if head.endswith("s") and head[:-1] in _NOT_A_THING:
         return False
     return head not in _NOT_A_THING
@@ -2346,6 +2358,10 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     from . import interpret as _interpret
 
     reads_no_gain = _interpret.gets_nothing(_interpret.reading_of(player_text))
+    # And the same rule for what goes out (item 8, 2026-10-03): "I give a friendly wink"
+    # read as no hand-over at all, and this door still planned one.
+    reads_no_parting = _interpret.hands_nothing(_interpret.reading_of(player_text))
+    from rules import holding
 
     added: list[dict] = []
     for pattern, gains in ((_ACQUIRES, True), (_HANDS_OVER, False)):
@@ -2374,6 +2390,18 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
         # And the noun itself has to be something a satchel could hold.
         if not _is_a_thing(item):
             continue
+        # "I take the crate to the man in the counting house" is carrying what is
+        # already carried (2026-10-03, turn 73: a second crate came out of the air).
+        # Only "the"/"my": "I pick up another arrow" is another arrow.
+        if gains and holding.key_in(pc.goods, item) \
+                and re.match(r"\s*(?:\w+\s+)?(?:the|my)\b", rest, re.I):
+            continue
+        # A hand-over the reading never read, of a thing the player is not carrying, is
+        # a figure of speech: nothing to hand over, and its refusal would still reach the
+        # narrator. A carried thing's hand-over stands whatever the reading said — the
+        # 2026-09-27 ruling (`test_pick_a_fight`), which this narrows and keeps.
+        if not gains and reads_no_parting and not holding.key_in(pc.goods, item):
+            continue
         params = {"item": item}
         if gains:
             params["to"] = pc.ref
@@ -2384,6 +2412,109 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
             "because": f"the player said they {'took' if gains else 'handed over'} it",
         })
     return list(raw_intents) + added if added else raw_intents
+
+
+# --- coin out of a container, and things set down -------------------------------------------
+#
+# Item 4 and item 5 of 2026-10-03 (docs/items-have-owners.md). "I transfer the coins from
+# the pouch into my coin purse" did nothing — worse, the model's coin give was turned into a
+# PAYMENT out of the purse by `inject_payment`, so the coins would have left the purse they
+# were going into. And "I also drop the Brunt of the weight on the ground" was planned as a
+# give to the smith, who gained a copy while the player kept theirs. Both are the player's
+# own words naming where the thing goes, so both are read here, mechanically, before the
+# coin and goods doors run.
+
+_EMPTIES = re.compile(
+    r"\bI\s+(?:also\s+|then\s+)?(?:transfer|tip|empty|pour|shake|move|put|slide|count|drop)"
+    r"\s+(?:out\s+)?(?:all\s+)?(?:the|my|some\s+of\s+the)?\s*"
+    r"(?:coins?|money|gold|silver|copper|payment|cash)\s+(?:from|out\s+of)\s+"
+    r"(?:the|my|his|her|their)?\s*([a-z][a-z' -]{1,30}?)\s+(?:into|in|to)\s+(?:my|the)\s+"
+    r"(?:own\s+)?(?:coin\s*)?(?:purse|pocket|belt\s+pouch|money\s*bag)", re.I)
+_EMPTIES_BOX = re.compile(
+    r"\bI\s+(?:also\s+|then\s+)?(?:empty|tip|pour)\s+(?:out\s+)?(?:the|my|his|her|their)\s+"
+    r"([a-z][a-z' -]{1,30}?)\s+(?:into|in)\s+my\s+(?:own\s+)?(?:coin\s*)?(?:purse|pocket)",
+    re.I)
+
+
+def declare_emptying(raw_intents, player_text: str, scene) -> list:
+    """"I transfer the coins from the pouch into my coin purse" is coin OUT of the pouch
+    and INTO the purse: a give of the coins from the container to the player, whatever
+    shape the model wrote it in. Any coin give the plan carried for this sentence is
+    replaced, because its direction was the model's guess and the words settle it."""
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    from rules import holding
+
+    text = redact_speech(player_text)
+    m = _EMPTIES.search(text) or _EMPTIES_BOX.search(text)
+    if not m:
+        return raw_intents
+    box = " ".join(m.group(1).split()).strip(" -'")
+    if not holding.is_container(box):
+        return raw_intents
+    out = []
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() in ("give", "sell"):
+            item = str((r.get("params") or {}).get("item") or "")
+            if holding.is_money(item) or _COIN_ITEM.search(item):
+                continue                      # the model's coin, any direction: replaced
+        out.append(r)
+    return out + [{"op": "give", "because": "the player emptied it into their purse",
+                   "params": {"item": "coins", "from_": box, "to": pc.ref}}]
+
+
+# Putting a thing down. "drop", "discard" and "dump" say it alone; "set", "put", "lay",
+# "leave", "toss" and "throw" only with where it goes down ("on the ground", "behind",
+# "away") — "I put the ring on her finger" and "I throw it at him" are not drops.
+_DROPS = re.compile(
+    r"\bI\s+(?:also\s+|then\s+|just\s+)?(?:"
+    r"(?:drop|drops|discard|discards|dump|dumps)\s+(?P<a>(?:the|my|a|an|this|that)\s+"
+    r"[a-z][a-z' -]{1,40}?)(?=\s+(?:on|onto|to|in|at|behind|here|there|and)\b|[,.;!]|$)"
+    r"|(?:set|sets|put|puts|lay|lays|leave|leaves|toss|tosses|throw|throws)\s+"
+    r"(?P<b>(?:the|my|a|an|this|that)\s+[a-z][a-z' -]{1,40}?)\s+"
+    r"(?:down|aside|away|behind|on\s+the\s+(?:ground|floor|dirt)|here)\b)", re.I)
+
+
+def declare_drop(raw_intents, player_text: str, scene) -> list:
+    """A thing the player sets down goes to the floor of the place, from the player —
+    never to whoever is standing nearest. Every give the plan carried for the same thing
+    (matched the way people say it, capital letters and all) becomes that drop."""
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    from rules import holding
+
+    text = redact_speech(player_text)
+    m = _DROPS.search(text)
+    if not m:
+        return raw_intents
+    said = " ".join((m.group("a") or m.group("b") or "").split()).strip(" -'")
+    carried = holding.key_in(pc.goods, said)
+    # A thing in the pack is a thing, whatever its name: the save's own "brunt of the
+    # weight" was minted before the stop-list knew the word, and it can still be dropped.
+    if not said or said.lower() in ("it", "them") or not (carried or _is_a_thing(said)):
+        return raw_intents
+    item = carried or holding.plain(said)
+    out, dropped = [], False
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "give":
+            p = r.get("params") or {}
+            if holding.same(p.get("item"), item) or holding.same(p.get("item"), said):
+                if not dropped:
+                    out.append({"op": "give", "because": "the player set it down",
+                                "params": {"item": item, "from_": pc.ref}})
+                    dropped = True
+                continue
+        out.append(r)
+    if not dropped:
+        out.append({"op": "give", "because": "the player set it down",
+                    "params": {"item": item, "from_": pc.ref}})
+    return out
 
 
 # --- selling something -----------------------------------------------------------------
@@ -2443,7 +2574,19 @@ def inject_payment(raw_intents, player_text: str, scene) -> list:
             item = str(params.get("item") or "")
             coin = _COIN_ITEM.search(item)
             bare_denom = re.fullmatch(r"(?i)gp|sp|cp|pp", item.strip())
-            if coin and (str(raw.get("op", "")).lower() == "sell" or not bare_denom):
+            # Coin coming IN is not a payment. Measured 2026-10-03: "I transfer the
+            # coins from the pouch into my coin purse" carried the model's coin give,
+            # and this rewrote it as `give gp 1 from pc` — the coins would have left the
+            # purse they were going into ("Kesst Vayr has no gp to give"). A give to the
+            # player, or one with no direction at all (the player's, as
+            # `interpret.drop_unread_gifts` reads it), stays a gain unless the player's
+            # own words count coin out.
+            to = str(params.get("to") or "").strip().lower()
+            frm = str(params.get("from_") or params.get("from") or "").strip().lower()
+            coming_in = (str(raw.get("op", "")).lower() == "give" and m is None
+                         and (to in (pc.ref, "pc", "you", "player") or not (to or frm)))
+            if coin and not coming_in and (str(raw.get("op", "")).lower() == "sell"
+                                           or not bare_denom):
                 # "gold_coins_10", "10 gold", "gold coins": the amount is the
                 # player's own number first, then the item's, then the op's count.
                 in_item = re.search(r"\d+", item)
@@ -2749,13 +2892,16 @@ def _resolve_sold_item(raw_intents, pc) -> list:
     return out
 
 
-def inject_sale(raw_intents, player_text: str, scene) -> list:
+def inject_sale(raw_intents, player_text: str, scene, recent=()) -> list:
     """Make a declared sale reach the engine.
 
     Grounded in the satchel rather than in the sentence, which is the difference between
     this and `inject_goods`: the thing being sold has to be a jar the character is holding
     right now, so "I sell the draught" finds the draught and "I sell my soul" finds
     nothing and stays out of the way.
+
+    And the pack as well as the satchel (item 2 of 2026-10-03): `_sell_goods_declared`
+    reads a sale of a carried thing — the crate — once the player closes the deal.
     """
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
@@ -2763,8 +2909,10 @@ def inject_sale(raw_intents, player_text: str, scene) -> list:
         return raw_intents
 
     pc = scene.pc()
-    if pc is None or not getattr(pc, "stock", None):
+    if pc is None:
         return raw_intents
+    if not getattr(pc, "stock", None):
+        return _sell_goods_declared(raw_intents, player_text, scene, pc, recent)
 
     # Repair before deciding whether to inject. Measured in play, the turn after the
     # schema started *requiring* a `sell` when the player declares one: the model duly
@@ -2782,9 +2930,9 @@ def inject_sale(raw_intents, player_text: str, scene) -> list:
 
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if "sell" in present or "give" in present:
-        return raw_intents
+        return _sell_goods_declared(raw_intents, player_text, scene, pc, recent)
     if not _SELLS.search(player_text):
-        return raw_intents
+        return _sell_goods_declared(raw_intents, player_text, scene, pc, recent)
 
     said = player_text.lower()
     # Longest name first, so "Yarow Elixir" wins over a jar merely called "Elixir".
@@ -2799,7 +2947,112 @@ def inject_sale(raw_intents, player_text: str, scene) -> list:
                     "params": {"item": item.id},
                     "because": "the player said they were selling it",
                 }]
-    return raw_intents
+    return _sell_goods_declared(raw_intents, player_text, scene, pc, recent)
+
+
+# A sale of a thing out of the pack, closed. A stall buys whatever it is offered — the
+# shopkeeper's rule (CircleMUD's keeper buys what its trade takes, at its rate) — but
+# anybody else has to agree, and until the player says the deal is done it is a haggle.
+# Measured 2026-10-03: "I try to sell the crate to Korvu for coin" (Korvu, a labourer,
+# said no in the fiction), "I … offer the crate for coin" (to the clerk, an offer), then
+# "I agree to sell the crate to the clerk at 75% of the crate's value" — the close. All
+# four turns resolved to `narrate_only` and the crate was never sold.
+_SELLS_GOODS = re.compile(r"\b(?:sell|sells|selling|sold)\b", re.I)
+_OFFERS_SALE = re.compile(
+    r"\b(?:try|tries|trying|attempt|attempts|want|wants|would\s+like|hope|hopes|offer|"
+    r"offers|offering|could|might|will\s+you|would\s+you|see\s+if)\s+(?:\w+\s+){0,2}?"
+    r"(?:to\s+)?sell", re.I)
+_CLOSES_SALE = re.compile(
+    r"\b(?:agree(?:s|d)?\s+to\s+sell|accept\s+(?:the|his|her|their|your)\s+(?:offer|price|"
+    r"terms)|it'?s\s+a\s+deal|shake\s+on\s+it|(?:you|he|she|they)\s+can\s+have\s+"
+    r"(?:the|my|it)\b|(?:it'?s|they'?re)\s+(?:yours|sold))", re.I)
+# The player's own figure, as a share of what the thing is worth: "at 75% of the crate's
+# value". The engine prices the thing; this only turns the share into `accept`, which can
+# lower the engine's price and never raise it (`Engine._sell_goods`).
+_SHARE = re.compile(r"\b(\d{1,3})\s*(?:%|per\s*cent|percent)", re.I)
+
+
+def _named_here(text: str, scene, pc) -> str:
+    """The one person here the sentence names by a word of their name or label, else
+    the one the player is engaged with, else the only other person here; "" otherwise."""
+    low = text.lower()
+    skip = {"the", "of", "a", "an", "with", "and", "man", "woman", "who", "that", "from"}
+    hits = []
+    for ref, a in scene.actors.items():
+        if a.is_pc or a.is_down:
+            continue
+        words = {w for w in re.findall(r"[a-z][a-z'-]{3,}", str(a.name).lower())
+                 if w not in skip}
+        if any(re.search(rf"\b{re.escape(w)}\b", low) for w in words):
+            hits.append(ref)
+    if len(hits) == 1:
+        return hits[0]
+    engaged = engaged_refs(scene)
+    if len(engaged) == 1:
+        return engaged[0]
+    others = [r for r, a in scene.actors.items() if not a.is_pc and not a.is_down]
+    return others[0] if len(others) == 1 else ""
+
+
+def _sell_goods_declared(raw_intents, player_text: str, scene, pc, recent=()) -> list:
+    """A closed sale of something in the pack becomes a `sell`, with the buyer named and
+    the player's share of the value carried as `accept`. A `sell` the model already
+    wrote is left to the engine (which finds the thing by name) and only gets the share."""
+    from rules import holding, pricing
+
+    text = redact_speech(player_text)
+    share = _SHARE.search(text)
+    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
+    if "sell" in present:
+        if not share:
+            return raw_intents
+        out = []
+        for r in raw_intents:
+            if isinstance(r, dict) and str(r.get("op", "")).lower() == "sell":
+                p = dict(r.get("params") or {})
+                key = holding.key_in(pc.goods, p.get("item"))
+                if key and p.get("accept") is None:
+                    p["accept"] = round(int(share.group(1)) / 100
+                                        * pricing.goods_worth(key), 2)
+                    r = dict(r, params=p)
+            out.append(r)
+        return out
+    if "give" in present or not pc.goods:
+        return raw_intents
+    closes = _CLOSES_SALE.search(text)
+    if not (closes or _SELLS_GOODS.search(text)):
+        return raw_intents
+    # The thing: the longest carried name the sentence holds; for a close that names
+    # nothing ("Deal — it's yours"), the carried thing the last few beats talked about.
+    low = text.lower()
+    named = [k for k in sorted(pc.goods, key=len, reverse=True)
+             if len(holding.plain(k)) > 2
+             and re.search(rf"\b{re.escape(holding.plain(k))}s?\b", low)]
+    if not named and closes:
+        for beat in reversed(list(recent or ())):
+            beat = str(beat or "").lower()
+            named = [k for k in sorted(pc.goods, key=len, reverse=True)
+                     if len(holding.plain(k)) > 2
+                     and re.search(rf"\b{re.escape(holding.plain(k))}s?\b", beat)]
+            if named:
+                break
+    if not named:
+        return raw_intents
+    item = named[0]
+    buyer = _named_here(text, scene, pc)
+    if not buyer:
+        return raw_intents                    # nobody here to buy it
+    from rules import keepers as keepers_mod
+
+    keeps_shop = keepers_mod.keeps_a_counter(scene.actors[buyer])
+    offered = _OFFERS_SALE.search(text) and not closes
+    if offered and not keeps_shop:
+        return raw_intents                    # a haggle: the fiction answers it
+    params = {"item": item, "to": buyer}
+    if share:
+        params["accept"] = round(int(share.group(1)) / 100 * pricing.goods_worth(item), 2)
+    return list(raw_intents) + [{"op": "sell", "actor": pc.ref, "params": params,
+                                 "because": "the player closed the sale"}]
 
 
 # A declared risky action, by the verb that declares it. The same shape as the goods
@@ -5718,6 +5971,9 @@ _DECLARERS = (
     # Sale before goods, the same order the live chain runs them in — and asking them in
     # the wrong order here is what surfaced the bug: "I sell the Yarow Elixir" came back
     # as both `give` and `sell`, which is one item leaving twice.
+    # The live chain's order: where the words send a thing, before coin and sale.
+    ("emptying", lambda raw, text, scene, world: declare_emptying(raw, text, scene)),
+    ("drop", lambda raw, text, scene, world: declare_drop(raw, text, scene)),
     ("sale", lambda raw, text, scene, world: inject_sale(raw, text, scene)),
     ("goods", lambda raw, text, scene, world: inject_goods(raw, text, scene)),
     ("ability", lambda raw, text, scene, world: inject_ability(raw, text, scene)),
