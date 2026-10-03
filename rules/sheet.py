@@ -498,6 +498,10 @@ class Actor:
     # player may follow one or several. Empty for every class that has none.
     paths: list[str] = field(default_factory=list)
     race: str = "human"
+    # The world whose drafted race this is (its `races.world_key`), when the forge offered
+    # one: `race` alone names a registry entry, and a world's goblin is in no registry
+    # until the Races bench imports it. Empty for a Core or bench race.
+    race_world: str = ""
     # Stated, never guessed. The model called Kesst "him" in one sentence and "her" in
     # the next because nothing on the sheet said, so it invented one each time.
     pronouns: str = "they/them"
@@ -2962,6 +2966,12 @@ class Actor:
 
         if not str(self.race or "").strip():
             return None
+        # The world's draft first: that is the document the forge built this character
+        # from, and the registry's entry of the same id may be another people entirely.
+        if self.race_world:
+            drafted = races_mod.world_shared(self.race_world, self.race)
+            if drafted:
+                return drafted
         return races_mod.shared(self.race)
 
     def _creature_doc(self) -> dict | None:
@@ -4352,6 +4362,10 @@ def to_dict(actor: Actor) -> dict:
         d["herb_known"] = {str(k): dict(v) for k, v in actor.herb_known.items()}
     if actor.manuals_read:
         d["manuals_read"] = [str(m) for m in actor.manuals_read]
+    # Which world's drafted race `race` means, on the same rule: only a character forged
+    # as a world's race has one, and every older save reads back byte for byte.
+    if actor.race_world:
+        d["race_world"] = str(actor.race_world)
     return d
 
 
@@ -4402,9 +4416,8 @@ def _racial_traits(actor: Actor) -> list[dict]:
     the sheet shows afterwards. Imported here rather than at module scope because
     `rules.creation` imports this module.
     """
-    from . import races as races_mod
-
-    race = races_mod.document(str(actor.race or ""))
+    # The actor's own read, so a world's drafted race shows the traits the forge showed.
+    race = actor._race_doc()
     if not race:
         return []
     return [{"name": t, "source": race.get("name", actor.race)}
@@ -4414,7 +4427,7 @@ def _racial_traits(actor: Actor) -> list[dict]:
 def _race_body(actor: Actor) -> dict:
     from . import races as races_mod
 
-    doc = races_mod.document(str(actor.race or ""))
+    doc = actor._race_doc()
     if not doc:
         return {}
     return {
@@ -4744,6 +4757,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),
         race=data.get("race", "human"),
+        race_world=str(data.get("race_world") or ""),
         paths=[str(p) for p in (data.get("paths") or [])],
         pronouns=data.get("pronouns", "they/them"),
         # Every save written before the field existed still knows the answer, because

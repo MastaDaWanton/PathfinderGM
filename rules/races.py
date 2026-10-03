@@ -1452,6 +1452,42 @@ def for_world(world) -> list[dict]:
     return sorted(out, key=lambda d: d["name"])
 
 
+def world_shared(world: str, race_id: str) -> dict | None:
+    """The race a character was forged as in `world` (its `world_key`), read live — the
+    document `for_world` offered, the bench's copy winning exactly as it did in the forge.
+
+    The registry alone cannot answer for a world's people. A race the world drafts lives
+    nowhere on disk until somebody presses Import on the Races bench, so on a fresh install
+    the forge offered Aurvantis's goblin with its bite and the sheet then read `goblin` out
+    of a registry that had never heard of it: the character died at `validate` with
+    "unknown weapon 'bite'" (reported 2026-10-02 from a friend's install — goblin, orc,
+    half-orc and tengu by their bite, catfolk by its claws). Ids the Core Rulebook shares
+    were wrong more quietly: Aurvantis's half-orc has a bite and the core one does not, and
+    its dwarf is not the core dwarf, so writing the drafts onto the bench under their own
+    ids — what Import does — would have changed every other world's dwarf too.
+
+    Cached per registry, like `shared`, because `Actor._race_doc` asks under every
+    `has_state`. A world replaced on the shelf mid-session is read again when any race file
+    changes or the app restarts."""
+    key = str(world or "").strip()
+    if not key:
+        return None
+    registry = all_races()
+    hit = _CACHE.get("worlds")
+    if hit is None or hit[0] is not registry:
+        hit = (registry, {})
+        _CACHE["worlds"] = hit
+    if key not in hit[1]:
+        try:
+            from play import library
+
+            loaded = library.world(key)
+        except Exception:  # noqa: BLE001 — a world gone from the shelf leaves the registry
+            loaded = None
+        hit[1][key] = {d["id"]: d for d in for_world(loaded)} if loaded is not None else {}
+    return hit[1][key].get(slug(race_id))
+
+
 def import_from_world(world, overwrite: bool = False) -> list[str]:
     """Write the world's races onto the bench so they can be corrected. A file already
     there is the table's own answer and is kept unless told otherwise."""

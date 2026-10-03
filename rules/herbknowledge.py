@@ -591,7 +591,9 @@ def _people_entity(actor, world):
     from . import races as races_mod
 
     try:
-        doc = races_mod.get(str(getattr(actor, "race", "") or ""))
+        # The actor's own read when it has one: a world's drafted race is in no registry.
+        reader = getattr(actor, "_race_doc", None)
+        doc = reader() if callable(reader) else races_mod.get(str(getattr(actor, "race", "") or ""))
     except Exception:  # noqa: BLE001 — a race with no document has no homeland to read
         return None
     origin = str((doc or {}).get("origin") or "")

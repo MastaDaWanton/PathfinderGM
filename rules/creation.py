@@ -746,6 +746,10 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     sheet = {
         "name": name, "kind": "pc", "class": cid, "level": 1,
         "race": race["id"],
+        # Which world's draft that id means. The forge offered this document; the sheet
+        # must read the same one back, and a world's goblin is in no registry until the
+        # Races bench imports it — a fresh install died at `validate` over its bite.
+        "race_world": str(race.get("world") or ""),
         # The people of the world this body belongs to, when it is a world's race.
         "world_people_id": race.get("people_id") or None,
         "heritage": str(payload.get("heritage", "")).strip(),
