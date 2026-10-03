@@ -123,12 +123,20 @@ def test_a_quote_that_is_not_on_the_page_is_dropped():
     assert bv.diff(reading.claims, facts, beat["text"]) == []
 
 
-def test_the_same_claim_twice_is_one_claim():
-    """The burned man was reported hurt twice, once per sentence that burned him; the
-    first bench run scored the second as a false positive. Code keeps the first."""
+def test_the_same_claim_in_two_sentences_is_judged_in_each():
+    """The burned man was reported hurt twice, once per sentence that burned him. The
+    first cut kept only the first claim — "the heat licks across his face" — whose second
+    read answered "no" on both bench runs, and the burn the engine never rolled shipped in
+    the other sentence. Each sentence is judged; the same claim twice about ONE sentence
+    is still one."""
     reading, found = _diff("burning-hands")
-    assert len([c for c in reading.claims if c.category == "harm"]) == 1
-    assert len(found) == 1
+    assert len([c for c in reading.claims if c.category == "harm"]) == 2
+    assert len({d.sentence for d in found}) == 2
+    beat = G.by_id("burning-hands")
+    doubled = dict(RECORDED["burning-hands"])
+    doubled["harmed"] = doubled["harmed"] + [doubled["harmed"][0]]
+    again = bv.read(beat["text"], G.facts(beat), model="stub", chat=_chat(doubled))
+    assert len([c for c in again.claims if c.category == "harm"]) == 2
 
 
 def test_every_slot_is_an_enum_the_engine_supplies():

@@ -71,7 +71,15 @@ def score_claims(beat, claims: list[bv.Claim], tally) -> list[str]:
     notes = []
     golds = list(beat["claims"])
     used = set()
+    # One claim stated about two sentences is one claim to the label (the reader keeps
+    # both so each sentence can be judged).
+    once, seen = [], set()
     for c in claims:
+        key = json.dumps([c.category, c.slots], sort_keys=True, default=str)
+        if key not in seen:
+            seen.add(key)
+            once.append(c)
+    for c in once:
         hit = next((i for i, g in enumerate(golds) if i not in used and _match(g, c)), None)
         if hit is None:
             tally[c.category]["fp"] += 1

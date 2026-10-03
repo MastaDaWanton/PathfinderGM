@@ -343,8 +343,9 @@ _DEMO2_USER = (
     "somewhere not listed\n"
     "People: pc: Ashka Verel — the player (\"you\"); c4: Dunmar Oake — ferryman; "
     "c5: the drover — commoner\n"
-    "Things: coil of rope, something else\n\n"
+    "Things: coil of rope, eel basket, something else\n\n"
     "Passage:\n"
+    "You stoop and lift the eel basket from the cobbles onto your hip. "
     "You move toward the eel stalls and stop beside the drover. He looks at your coil "
     "of rope and shakes his head: he will not buy it, not tonight. 'Tomorrow morning, "
     "maybe,' he says. Dunmar Oake staggers back as the drover's fist cracks into his jaw, "
@@ -352,7 +353,8 @@ _DEMO2_USER = (
     "stars are out.")
 _DEMO2_ANSWER = {
     "player_ends_at": {"place": "the fish market", "quote": ""},
-    "changed_hands": [],
+    "changed_hands": [{"item": "eel basket", "from": "the floor", "to": "pc",
+                       "quote": "You stoop and lift the eel basket from the cobbles"}],
     "trades": [{"item": "coil of rope", "seller": "pc", "buyer": "c5", "settled": False,
                 "quote": "he will not buy it, not tonight"}],
     "harmed": [{"who": "c4", "how": "hurt",
@@ -485,12 +487,6 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
                "part": set(PARTS)}
     seen: set[str] = set()
     for c in claims:
-        # The same claim twice ("his scorched arms", "his face blackened") is one claim:
-        # the sampler lists every sentence that says it, and code keeps the first.
-        same = json.dumps([c.category, c.slots], sort_keys=True, default=str)
-        if same in seen:
-            continue
-        seen.add(same)
         bad = [k for k, v in c.slots.items()
                if k in allowed and str(v) not in allowed[k]]
         if c.category == "trade" and not isinstance(c.slots.get("settled"), bool):
@@ -512,6 +508,14 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
             c.why = "the quote is not the page's narration"
             dropped.append(c)
             continue
+        # The same claim about the same sentence is one claim. The same claim about two
+        # sentences is two: "the heat licks across his face" and "his hands clutching his
+        # scorched arms" both burn the man, and the first bench run kept only the first —
+        # whose second read was "no", so the burn the engine never rolled shipped.
+        same = json.dumps([c.category, c.slots, c.sentence], sort_keys=True, default=str)
+        if same in seen:
+            continue
+        seen.add(same)
         c.valid = True
         kept.append(c)
     return kept, dropped
@@ -770,7 +774,12 @@ def _name(facts: Facts, ref: str) -> str:
         return "you (the player)"
     p = facts.person(ref)
     if p is not None:
-        return p.name
+        # A descriptor name reads as a person only with its article: "is man in a stained
+        # leather jerkin physically hurt" is not a question a reader answers yes to.
+        name = str(p.name)
+        if name[:1].islower() and not name.lower().startswith(("the ", "a ", "an ")):
+            name = f"the {name}"
+        return name
     return {NEW_PERSON: "somebody", FLOOR: "the floor", NOBODY: "nobody"}.get(ref, ref)
 
 
@@ -793,8 +802,10 @@ def question(d: Discrepancy, facts: Facts) -> str:
         if s["to"] == facts.pc_ref:
             return (f"Does this sentence say that the {s['item']} is picked up, taken or "
                     f"given to you?")
+        # "left behind" is the narrator's commonest drop: asked without it, "the Brunt of
+        # the Weight is left behind on the dirt floor" was refused twice of twice.
         return (f"Does this sentence say that the {s['item']} is taken, handed over, set "
-                f"down or dropped?")
+                f"down, dropped or left behind?")
     if c.category == "trade":
         if s["settled"]:
             return ("Does this sentence say that a sale or purchase is completed — goods "
