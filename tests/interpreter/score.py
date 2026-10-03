@@ -55,19 +55,28 @@ ENGINE_SLOTS: dict[str, tuple[str, ...]] = {
     "go": ("place",), "leave": ("place",),
     "talk": ("target", "says"), "insult": ("target", "says"),
     "seek": ("target",), "call_on": ("target",), "break_in": ("target",),
-    "buy": ("object",), "sell": ("object", "target"), "offer": ("object", "target"),
+    "buy": ("object",), "sell": ("object", "target"),
     "give": ("object", "target"), "take": ("object", "target"), "drop": ("object",),
     "cast": ("object", "target", "place"), "wait": ("time",),
 }
+
+
+_ACTING = ("done", "tried")
 
 
 def score(gold: list[dict], got: list[dict], *, engine: bool = False) -> dict:
     """gold and got are parallel lists of frames. Returns the measures and the misses.
 
     `engine`: score only the slots the engine acts on (`ENGINE_SLOTS`), acts and the
-    question as strictly as ever."""
+    question as strictly as ever.
+
+    Commitment (2026-10-03, round 2) is part of the frame: strictly, the four values
+    must agree; for the engine, only whether the action moves it (done or tried, against
+    intended or asked) — "tried" for "done" changes no op but a sale's, which the table
+    already treats as the haggle. A frame with no commitment written is `done`."""
     n = len(gold)
     frame_ok = acts_ok = question_ok = 0
+    commit_ok = commit_n = 0
     tp = fp = fn = 0
     act_tp = act_fp = act_fn = 0
     misses = []
@@ -90,6 +99,13 @@ def score(gold: list[dict], got: list[dict], *, engine: bool = False) -> dict:
         slot_ok = True
         for i, ga_ in enumerate(g["actions"]):
             pa_ = (p.get("actions") or [])[i] if i < len(p.get("actions") or []) else None
+            if pa_ is not None and pa_.get("act") == ga_["act"]:
+                gc, pc = ga_.get("commit") or "done", pa_.get("commit") or "done"
+                agree = (gc in _ACTING) == (pc in _ACTING) if engine else gc == pc
+                commit_n += 1
+                commit_ok += agree
+                if not agree:
+                    slot_ok = False
             for s in (ENGINE_SLOTS.get(ga_["act"], ()) if engine else SLOTS):
                 gv = ga_.get(s)
                 pv = pa_.get(s) if pa_ is not None and pa_.get("act") == ga_["act"] else None
@@ -123,5 +139,6 @@ def score(gold: list[dict], got: list[dict], *, engine: bool = False) -> dict:
         "question_accuracy": round(question_ok / n, 3) if n else 0.0,
         "act_p_r_f1": f1(act_tp, act_fp, act_fn),
         "slot_p_r_f1": f1(tp, fp, fn),
+        "commit_accuracy": round(commit_ok / commit_n, 3) if commit_n else 1.0,
         "misses": misses,
     }

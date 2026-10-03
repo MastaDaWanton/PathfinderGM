@@ -39,19 +39,50 @@ ENABLED = True
 
 ACTS = (
     "go", "journey", "leave", "look", "search", "seek", "talk", "insult", "buy", "sell",
-    "offer", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
+    "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "call_on", "break_in", "stealth", "athletics", "gather", "follow", "claim",
     "other",
 )
-# `drop` and `offer` since 2026-10-03, because the act→op table (gm/acts_to_ops.py) needs
-# them and the vocabulary did not have them. `drop`: "I also drop the Brunt of the weight
-# on the ground" was read `give, target: the Brunt of the weight, place: the ground` on the
-# owner's items save, and a give is a hand-over to somebody — the smith gained a copy.
-# `offer`: a sale that is not closed yet. "I try to sell the crate to Korvu for coin"
-# (Korvu said no in the fiction) and "I agree to sell the crate to the clerk" were both
-# `sell`, and only the second is a sale; the regex that told them apart (`_OFFERS_SALE`)
-# is retired with the rest of the sentence readers (docs/structured-turn.md).
+# `drop` since 2026-10-03, because the act→op table (gm/acts_to_ops.py) needs it and the
+# vocabulary did not have it: "I also drop the Brunt of the weight on the ground" was read
+# `give, target: the Brunt of the weight, place: the ground` on the owner's items save, and
+# a give is a hand-over to somebody — the smith gained a copy.
+#
+# Tried and withdrawn the same day: an `offer` act, for a sale not yet closed. It moved the
+# problem rather than solving it — the live reader read "I try to sell the crate to Korvu"
+# as `offer` and "I try to sell the crate to the smith" as `sell`, and on the held-out lines
+# a `talk` came back `offer`. What separates them is not WHAT is done but how far it is
+# done, which every act has: COMMITMENT, below.
 SLOTS = ("target", "object", "place", "time", "says")
+
+# How far each action is done (2026-10-03, lane F round 2). The coordinator, after the
+# replay: "I take the crate to the man in the counting house who will buy it" was read as a
+# sale and the crate was sold a turn early; "I try to sell the crate to the smith" was read
+# `sell` and sold. The engine acted on something the player had not committed to.
+#
+# The research's answer is old. Event annotation marks every event mention with its REALIS:
+# Rich ERE's "Actual (asserted), Generic (generic, habitual), and Other (future,
+# hypothetical, negated, uncertain, etc.)" (Song et al. 2015, "From Light to Rich ERE",
+# ACL W15-0812; the TAC KBP event-nugget task scored the same three). FactBank grades the
+# same axis finer (certain / probable / possible, Saurí & Pustejovsky 2009). And dialogue
+# acts keep an offer apart from its acceptance: ISO 24617-2's Offer is answered by an
+# Accept Offer, "which has a functional dependence relation to the preceding Offer" (Bunt,
+# annotation guidelines) — a sale tried is an offer, and only an agreement closes it.
+# Ours is Rich ERE's split with the attempt kept apart, because 1e rolls for an attempt:
+#   done      performed now, as stated ("I sell the crate to him", "it's a deal")
+#   tried     attempted now, the outcome open ("I try to pick the lock", "I try to sell…")
+#   intended  a plan, purpose or wish, not done this turn ("to sell it", "who will buy it",
+#             "I'm going to…", "I want to…")
+#   asked     asked about, not done ("can I sell it here?", "would you buy it?")
+# Only `done` and `tried` move the engine (`acts_to_ops`, `ops_for`, `supported`).
+COMMITS = ("done", "tried", "intended", "asked")
+ACTING = frozenset({"done", "tried"})
+
+
+def acting(a: dict) -> bool:
+    """Whether this action of a reading is done or attempted now — the ones the engine
+    acts on. A reading from before commitment existed has none, and is `done`."""
+    return str(a.get("commit") or "done") in ACTING
 
 # The slots each act can have: TADS 3's verb templates, where a verb names the slots it
 # takes and nothing else (tads.org, "t3verb"). Measured 2026-09-27: with every slot
@@ -63,7 +94,7 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "look": ("object", "target", "place", "time"), "search": ("object", "place"),
     "seek": ("target", "place"), "talk": ("target", "says"), "insult": ("target", "says"),
     "buy": ("object", "target", "place"), "sell": ("object", "target"),
-    "offer": ("object", "target"), "drop": ("object", "place"),
+    "drop": ("object", "place"),
     # A take's `target` is who or what it comes OUT of — a person, or a container: "the
     # coins from the pouch" is `object: the coins, target: the pouch` (TADS 3's TakeFrom,
     # whose indirect object is the holder, person or thing).
@@ -95,8 +126,7 @@ talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebo
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
 buy       buy, order, pay for goods
-sell      sell, agree a sale, accept a price, close a deal ("it's a deal", "it's yours")
-offer     offer something for sale, try to sell it, ask what it would fetch — no deal yet
+sell      sell, offer for sale, agree a sale, accept a price, close a deal
 give      hand over, pay, buy somebody a drink
 take      pick up, loot, take, tip or count out of a container; the target is the
           person or the container it comes out of
@@ -175,11 +205,13 @@ _DEMOS = [
     ("I head for the cooper to ask about barrels.",
      {"question": False, "claims": [], "actions": [
          {"span": "head for the cooper", "target": "the cooper", "act": "seek"},
-         {"span": "ask about barrels", "says": "about barrels", "act": "talk"}]}),
+         {"span": "to ask about barrels", "commit": "intended", "says": "about barrels",
+          "act": "talk"}]}),
     ("I climb the bell tower to look over the rooftops.",
      {"question": False, "claims": [], "actions": [
          {"span": "climb the bell tower", "place": "the bell tower", "act": "athletics"},
-         {"span": "look over the rooftops", "object": "the rooftops", "act": "look"}]}),
+         {"span": "to look over the rooftops", "commit": "intended",
+          "object": "the rooftops", "act": "look"}]}),
     ("I sit on the bench for an hour.",
      {"question": False, "claims": [], "actions": [
          {"span": "sit on the bench for an hour", "place": "the bench", "time": "for an hour",
@@ -197,7 +229,8 @@ _DEMOS = [
     ("I head for the tannery to ask about hides.",
      {"question": False, "claims": [], "actions": [
          {"span": "head for the tannery", "place": "the tannery", "act": "go"},
-         {"span": "ask about hides", "says": "about hides", "act": "talk"}]}),
+         {"span": "to ask about hides", "commit": "intended", "says": "about hides",
+          "act": "talk"}]}),
     # …and the person beside it, because the place demonstration alone turned "I head for
     # the smith" into `go, place: the smith` on the dev bench. "ask for X" is what is said.
     ("I head for the ferryman and ask for a crossing.",
@@ -243,18 +276,17 @@ _DEMOS = [
           "target": "the sack", "act": "take"},
          {"span": "set the empty sack down by the door", "object": "the empty sack",
           "place": "by the door", "act": "drop"}]}),
-    ("I lift the lantern off the hook, then hand it to the boy.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "lift the lantern off the hook", "object": "the lantern",
-          "target": "the hook", "act": "take"},
-         {"span": "hand it to the boy", "object": "it", "target": "the boy",
-          "act": "give"}]}),
-    # A sale offered is not a sale made; a sale agreed, or closed in the player's own
-    # quoted words, is.
+    # Withdrawn, round 2: "I lift the lantern off the hook, then hand it to the boy." Two of
+    # the 4.4 points of acts-in-order lost on the held-out lines were a search and an
+    # `other` read as `take` (an act-level count, no sentence read), and this was one of
+    # two take demonstrations added that day; "it" is the table's to resolve, in code.
+    #
+    # How far a deed is done (`COMMITS`). A sale tried is an offer the fiction answers; a
+    # sale agreed, or closed in the player's own quoted words, is done.
     ("I offer the furrier my wolf pelts and ask what he would pay.",
      {"question": False, "claims": [], "actions": [
-         {"span": "offer the furrier my wolf pelts", "object": "my wolf pelts",
-          "target": "the furrier", "act": "offer"},
+         {"span": "offer the furrier my wolf pelts", "commit": "tried",
+          "object": "my wolf pelts", "target": "the furrier", "act": "sell"},
          {"span": "ask what he would pay", "says": "what he would pay", "act": "talk"}]}),
     ("I tell the miller, \"Done. The mule is yours.\"",
      {"question": False, "claims": [], "actions": [
@@ -262,6 +294,55 @@ _DEMOS = [
           "says": "Done. The mule is yours.", "act": "talk"},
          {"span": "The mule is yours", "object": "The mule", "target": "the miller",
           "act": "sell"}]}),
+    # What somebody else will do is not the player's deed at all: no action. Tried first
+    # as `sell, commit: intended` for "who will pay me for it", and on the dev lines the
+    # reader then read "the net, which he will mend for me" as the player's own sale.
+    ("I carry the barrel over to the cooper, who will pay me for it.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "carry the barrel over to the cooper", "target": "the cooper",
+          "act": "seek"}]}),
+    # A purpose clause or a plan: intended, never done. "going to <a place>" is going;
+    # "going to <do something>" is a plan.
+    ("I'm going to the baker's to buy bread.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "going to the baker's", "place": "the baker's", "act": "go"},
+         {"span": "to buy bread", "commit": "intended", "object": "bread", "act": "buy"}]}),
+    # …and "to <a place>" is where the walk goes, not a plan: "I head out of town to
+    # wherever the charcoal burners work" came back `go, commit: intended` on the dev lines
+    # — a walk the engine would never have made.
+    ("I ride out past the walls to the old mill.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ride out past the walls to the old mill", "place": "the old mill",
+          "act": "go"}]}),
+    ("I go to the forge to sell the horseshoes.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "go to the forge", "place": "the forge", "act": "go"},
+         {"span": "to sell the horseshoes", "commit": "intended",
+          "object": "the horseshoes", "act": "sell"}]}),
+    # A price is not a second thing sold: "agree to sell the goat to the herder for six
+    # silver" came back as two sales on the dev lines, the second of "six silver".
+    ("I accept four silver from the tanner for the hides.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "accept four silver from the tanner for the hides",
+          "object": "the hides", "target": "the tanner", "act": "sell"}]}),
+    ("I'm going to find the harbourmaster and ask about passage.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "going to find the harbourmaster", "commit": "intended",
+          "target": "the harbourmaster", "act": "seek"},
+         {"span": "ask about passage", "commit": "intended", "says": "about passage",
+          "act": "talk"}]}),
+    # Tried: done now, the outcome the dice's.
+    ("I try to pick the lock of the chapel door.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "try to pick the lock of the chapel door", "commit": "tried",
+          "target": "the chapel door", "act": "break_in"}]}),
+    # Asked about: the asking is done; the deed asked about is not.
+    ("I ask the trader whether she would buy my furs.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ask the trader whether she would buy my furs", "target": "the trader",
+          "says": "whether she would buy my furs", "act": "talk"},
+         {"span": "whether she would buy my furs", "commit": "asked", "object": "my furs",
+          "target": "the trader", "act": "sell"}]}),
 ]
 
 
@@ -277,14 +358,15 @@ def schema() -> dict:
                 "items": {
                     "type": "object",
                     "properties": {"span": {"type": "string"},
+                                   "commit": {"type": "string", "enum": list(COMMITS)},
                                    **{s: slot for s in SLOTS},
                                    "act": {"type": "string", "enum": list(ACTS)}},
                     # Every slot required (null allowed). Measured 2026-09-27 on the
                     # labelled set: with the slots optional, the constrained sampler
                     # wrote `span` and `act` and nothing else on 220 of 220 lines —
                     # slot recall 0.0 — because an optional property is one the grammar
-                    # lets it skip.
-                    "required": ["span", *SLOTS, "act"],
+                    # lets it skip. The commitment is required for the same reason.
+                    "required": ["span", "commit", *SLOTS, "act"],
                 },
             },
             "claims": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
@@ -310,7 +392,12 @@ def per_act_schema() -> dict:
     slot = {"type": ["string", "null"]}
     alts = []
     for act in ACTS:
-        props = {"span": {"type": "string"}, "act": {"const": act},
+        # The commitment between the span and the act: read off the words before the
+        # label, as the slots are ("Let Me Speak Freely": field order changes what a
+        # constrained model does), and the same in every alternative, so it chooses no act.
+        props = {"span": {"type": "string"},
+                 "commit": {"type": "string", "enum": list(COMMITS)},
+                 "act": {"const": act},
                  **{s: slot for s in ACT_SLOTS.get(act, ())}}
         alts.append({"type": "object", "properties": props, "required": list(props),
                      "additionalProperties": False})
@@ -324,12 +411,16 @@ def reply_schema() -> dict:
 
 
 def _demo_reply(frame: dict) -> str:
-    """A demonstration in the shape the sampler holds the reply to."""
-    if SCHEMA != "per_act":
-        return json.dumps(frame)
+    """A demonstration in the shape the sampler holds the reply to. A demonstration that
+    names no commitment is `done`."""
     acts = []
     for a in frame.get("actions") or []:
-        acts.append({"span": a.get("span", ""), "act": a["act"],
+        commit = a.get("commit") or "done"
+        if SCHEMA != "per_act":
+            acts.append({"span": a.get("span", ""), "commit": commit,
+                         **{s: a.get(s) for s in SLOTS}, "act": a["act"]})
+            continue
+        acts.append({"span": a.get("span", ""), "commit": commit, "act": a["act"],
                      **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())}})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
@@ -378,6 +469,11 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
         if not isinstance(a, dict) or a.get("act") not in ACTS:
             continue
         kept = {"act": a["act"]}
+        # How far it is done; a reply from the flat schema of before 2026-10-03, or a
+        # value outside the enum, is `done` — the reading the turn always acted on.
+        commit = str(a.get("commit") or "done")
+        if commit != "done":
+            kept["commit"] = commit if commit in COMMITS else "done"
         used: set[str] = set()
         for s in ACT_SLOTS.get(a["act"], SLOTS):
             v = a.get(s)
@@ -413,7 +509,7 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
         _speech_is_not_a_target(kept, dropped)
         actions.append(kept)
     actions = merge_repeats(actions)
-    claims =[c for c in (frame.get("claims") or []) if _within(c, sentence)]
+    claims = [c for c in (frame.get("claims") or []) if _within(c, sentence)]
     dropped += [f"claim={c!r}" for c in (frame.get("claims") or []) if not _within(c, sentence)]
     return ({"question": bool(frame.get("question")), "actions": actions,
              "claims": claims}, dropped)
@@ -429,12 +525,21 @@ def merge_repeats(actions: list[dict], dropped: list[str] | None = None) -> list
     then `talk, says: goodnight`. Each would be two ops in the turn — two rests, two says.
     Structure only, never the words: a second action that names a DIFFERENT target, object,
     place, time or words is a second deed ("I buy bread and buy cheese"; "I turn my back
-    on him and tell the barkeep he smells" insults two people), and stays."""
+    on him and tell the barkeep he smells" insults two people), and stays.
+
+    Narrowed in round 2: merged only when the FIRST is bare (a verb the second spells out:
+    `rest` then `rest, time: until dawn`) or the two are the same action twice. The first
+    rule — merge whenever nothing disagrees — joined `consume, object: …` and a bare
+    `consume` into one, and the held-out set had that as two deeds ("eat … and drink"):
+    one of the 4.4 acts-in-order points lost, found by an act-level count of the flips
+    (no sentence read). A bare SECOND is a deed whose object went unsaid."""
     out: list[dict] = []
     for a in actions:
         prev = out[-1] if out else None
-        if prev is not None and prev.get("act") == a.get("act") and not any(
-                prev.get(s) and a.get(s) and prev[s].lower() != a[s].lower() for s in SLOTS):
+        slots_of = (lambda x: {s: str(x[s]).lower() for s in SLOTS if x.get(s)})
+        if prev is not None and prev.get("act") == a.get("act") \
+                and prev.get("commit", "done") == a.get("commit", "done") \
+                and (not slots_of(prev) or slots_of(prev) == slots_of(a)):
             for s in SLOTS:
                 if a.get(s) and not prev.get(s):
                     prev[s] = a[s]
@@ -553,6 +658,10 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
 
     for a in (frame or {}).get("actions") or []:
         act = a.get("act")
+        # A plan, a purpose or a question owes no op this turn (`COMMITS`): "I head for
+        # the stables to ask about a horse" walks, and the asking is the next turn's.
+        if not acting(a):
+            continue
         if act == "cast" and scene is not None:
             # Where the spell goes, grounded here once: the cast's object, target or place
             # that is not the spell's own name, read by the same reader a typed and an
@@ -775,7 +884,7 @@ _OP_NEEDS = {
     "travel": {"go", "leave", "journey", "search", "seek", "call_on"},
     "journey": {"journey"}, "introduce": {"seek", "talk", "call_on"},
     "say": {"talk", "insult"}, "provoke": {"insult"}, "give": {"give", "take", "drop"},
-    "sell": {"sell", "offer"},
+    "sell": {"sell"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
     "loot": {"take", "steal"}, "cast": {"cast"},
@@ -795,7 +904,8 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     walk to another place to find the person beside you. Measured on the 2026-09-30 save
     (turn_log row 82). Inform's GO TO takes only a room for the same reason (Emily
     Short's *Approaches*, "go to [any visited room]")."""
-    actions = (frame or {}).get("actions") or []
+    # Only what is done or tried now stands behind an op (`COMMITS`).
+    actions = [a for a in (frame or {}).get("actions") or [] if acting(a)]
     acts = {a.get("act") for a in actions}
     elsewhere = {a.get("act") for a in actions
                  if not (a.get("act") == "seek" and a.get("here"))}
@@ -819,7 +929,8 @@ def gets_nothing(frame: dict | None) -> bool:
     anything. False when there is no reading to judge by."""
     if not frame or frame.get("error"):
         return False
-    return not ({a.get("act") for a in frame.get("actions") or []} & GETTING_ACTS)
+    return not ({a.get("act") for a in frame.get("actions") or [] if acting(a)}
+                & GETTING_ACTS)
 
 
 # And the other direction: the acts under which the player can part with something —
@@ -828,8 +939,8 @@ def gets_nothing(frame: dict | None) -> bool:
 # overruled the detector's `give`, and `judgement.inject_goods` (retired since) planned
 # one anyway — "Kesst Vayr has no friendly wink to give", and the ledger kept "handed
 # something to Kesst Vayr". The rule that already held for gains holds for hand-overs;
-# `drop` and `offer` joined with the acts themselves.
-PARTING_ACTS = frozenset({"give", "sell", "buy", "drop", "offer"})
+# `drop` joined with the act itself.
+PARTING_ACTS = frozenset({"give", "sell", "buy", "drop"})
 
 
 def hands_nothing(frame: dict | None) -> bool:
@@ -837,7 +948,8 @@ def hands_nothing(frame: dict | None) -> bool:
     False when there is no reading to judge by."""
     if not frame or frame.get("error"):
         return False
-    return not ({a.get("act") for a in frame.get("actions") or []} & PARTING_ACTS)
+    return not ({a.get("act") for a in frame.get("actions") or [] if acting(a)}
+                & PARTING_ACTS)
 
 
 def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
@@ -873,11 +985,17 @@ def brief_lines(frame: dict | None) -> str:
     rows = []
     for n, a in enumerate(frame.get("actions") or [], 1):
         slots = ", ".join(f"{s}: {a[s]}" for s in (*SLOTS, "aim") if a.get(s))
-        rows.append(f"{n}. {a['act']}" + (f" — {slots}" if slots else ""))
+        # How far it is done, said: a plan or a question is context for the plan, never
+        # an op of its own (`COMMITS`).
+        how = {"tried": " (TRIED now: the outcome is the dice's or the other person's)",
+               "intended": " (INTENDED, not done this turn: no op for it)",
+               "asked": " (ASKED ABOUT, not done: no op for it)"}.get(
+                   str(a.get("commit") or "done"), "")
+        rows.append(f"{n}. {a['act']}" + (f" — {slots}" if slots else "") + how)
     out = ""
     if rows:
         out = ("THE PLAYER'S WORDS, READ (fact, in the order they are done; the plan "
-               "carries each): " + " ".join(rows))
+               "carries each one done or tried now): " + " ".join(rows))
     if frame.get("claims"):
         out += (" THE PLAYER CLAIMS, and it is not so unless the engine makes it so: "
                 + "; ".join(frame["claims"]) + ".")

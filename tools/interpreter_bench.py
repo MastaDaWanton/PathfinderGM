@@ -89,8 +89,14 @@ def _acts_only(frames):
 # on the labelled sentences the fixes were NOT written from"). The first 60 lines were
 # read, miss by miss, when the 2026-10-03 fixes were written; the other 160 were not, and
 # their misses are never printed or saved — only their scores. A fix written from a
-# held-out miss would make the gate measure recall of the prompt.
+# held-out miss would make the gate measure recall of the prompt. Round 2 added labelled
+# lines for commitment, a few marked `dev=True` (written while the reader was built), the
+# rest held out (written after it was frozen).
 DEV = 60
+
+
+def is_dev(g) -> bool:
+    return g.get("dev") or GOLD.index(g) < DEV
 
 
 def _summary(gold, got) -> dict:
@@ -101,15 +107,21 @@ def _summary(gold, got) -> dict:
             "acts_in_order": strict["acts_in_order"],
             "act_p_r_f1": strict["act_p_r_f1"], "slot_p_r_f1": strict["slot_p_r_f1"],
             "engine_slot_p_r_f1": eng["slot_p_r_f1"],
+            "commit_accuracy": strict["commit_accuracy"],
+            "engine_commit_accuracy": eng["commit_accuracy"],
             "question_accuracy": strict["question_accuracy"]}
 
 
 def splits(gold, got) -> dict:
-    """The scores on the whole set, the dev 60 and the held-out 160."""
+    """The scores on the whole set, the dev lines and the held-out ones — and the held-out
+    lines split again into the first 220's and the commitment lines added after."""
     out = {"all": _summary(gold, got)}
-    if len(gold) == len(GOLD):
-        out["dev"] = _summary(gold[:DEV], got[:DEV])
-        out["held_out"] = _summary(gold[DEV:], got[DEV:])
+    for name, keep in (("dev", is_dev), ("held_out", lambda g: not is_dev(g)),
+                       ("held_out_first_220", lambda g: not is_dev(g) and GOLD.index(g) < 220),
+                       ("held_out_commit", lambda g: not is_dev(g) and GOLD.index(g) >= 220)):
+        idx = [i for i, g in enumerate(gold) if keep(g)]
+        if idx:
+            out[name] = _summary([gold[i] for i in idx], [got[i] for i in idx])
     return out
 
 
@@ -142,8 +154,8 @@ def main() -> None:
     ap.add_argument("--detectors-only", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--rescore", default="", help="a saved --json run, scored again")
-    ap.add_argument("--dev-only", action="store_true", help="the first 60 lines only")
-    ap.add_argument("--held-out-only", action="store_true", help="the gate: lines 61-220")
+    ap.add_argument("--dev-only", action="store_true", help="the dev lines only")
+    ap.add_argument("--held-out-only", action="store_true", help="the gate: the held-out")
     ap.add_argument("--schema", default="", help="flat or per_act (interpret.SCHEMA)")
     args = ap.parse_args()
     if args.schema:
@@ -153,8 +165,9 @@ def main() -> None:
     if args.rescore:
         rescore(args.rescore)
         return
-    gold = GOLD[:DEV] if args.dev_only else GOLD[DEV:] if args.held_out_only else (
-        GOLD[:args.limit] if args.limit else GOLD)
+    gold = [g for g in GOLD if is_dev(g)] if args.dev_only else \
+        [g for g in GOLD if not is_dev(g)] if args.held_out_only else (
+            GOLD[:args.limit] if args.limit else GOLD)
     scene, world = _scene()
 
     det = [detectors(g["text"], scene, world) for g in gold]
@@ -192,7 +205,7 @@ def main() -> None:
         print("splits:", json.dumps(out["splits"]))
         # Only the dev lines' misses: the held-out lines' are not to be read.
         out["misses_dev"] = [m for m in full["misses"]
-                             if m["text"] in {g["text"] for g in GOLD[:DEV]}]
+                             if m["text"] in {g["text"] for g in GOLD if is_dev(g)}]
         out["frames"] = [{"text": g["text"], "got": f} for g, f in zip(gold, got)]
         print("interpreter:", json.dumps(out["interpreter"]))
     if args.json:

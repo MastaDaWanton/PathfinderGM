@@ -19,7 +19,12 @@ facts the player asserts rather than attempts ("I am the lost heir").
 
 Conventions, so labels are consistent:
   * a purpose clause is an action: "I head for the stables to ask about a horse" is go,
-    then talk. What the player intends is what the turn must carry.
+    then talk — and since 2026-10-03 the talk is `commit="intended"`: what the player
+    means to do next is context the plan is shown, never an op of this turn.
+  * commitment (`A(act, commit, …)`): done; tried ("I try to…", an attempt with a roll);
+    intended (a purpose clause, "who will…", "I'm going to…", "I want to…"); asked ("would
+    you buy it?"). "I'm going to the chapel" is going, done; "I'm going to light a candle"
+    is intended.
   * looking for a PERSON is `seek` (target); for a thing or a place, `search` (object).
   * asking somebody something is `talk` with the question in `says`; `target` only when
     the sentence names who ("her", "the guard"), never guessed.
@@ -29,14 +34,19 @@ Conventions, so labels are consistent:
 from __future__ import annotations
 
 
-def A(act: str, **slots) -> dict:
-    return {"act": act, **{k: v for k, v in slots.items() if v is not None}}
+def A(act: str, commit: str = "done", **slots) -> dict:
+    """One action. `commit` is how far it is done (gm/interpret.py `COMMITS`): done,
+    tried, intended or asked — labelled on every line since 2026-10-03 (round 2 of lane F);
+    "done" unless the line says otherwise."""
+    return {"act": act, "commit": commit, **{k: v for k, v in slots.items() if v is not None}}
 
 
 def G(text: str, actions: list, source: str, *, question: bool = False,
-      claims: tuple = ()) -> dict:
+      claims: tuple = (), dev: bool = False) -> dict:
+    """`dev`: a line the reader's fixes may be written from (with the first 60). Every
+    other line is held out: its misses are never printed (tools/interpreter_bench.py)."""
     return {"text": text, "actions": actions, "source": source, "question": question,
-            "claims": list(claims)}
+            "claims": list(claims), "dev": dev}
 
 
 GOLD = [
@@ -46,7 +56,8 @@ GOLD = [
       [A("talk", target="the nearest stallholder", says="what work there is")], "script:town"),
     G("I ask them who runs this quarter.", [A("talk", target="them", says="who runs this quarter")], "script:town"),
     G("I head for the smith to see what he has on the rack.",
-      [A("seek", target="the smith"), A("look", object="what he has on the rack")], "script:town"),
+      [A("seek", target="the smith"),
+       A("look", "intended", object="what he has on the rack")], "script:town"),
     G("I ask the smith about the ore he uses.",
       [A("talk", target="the smith", says="about the ore he uses")], "script:town"),
     G("I leave the shop and walk out towards the gate.",
@@ -104,7 +115,8 @@ GOLD = [
     G("I find a quiet shrine and sit a while.",
       [A("search", object="a quiet shrine"), A("wait", time="a while")], "script:discover"),
     G("I head for the stables to ask about a horse.",
-      [A("go", place="the stables"), A("talk", says="about a horse")], "script:discover"),
+      [A("go", place="the stables"), A("talk", "intended", says="about a horse")],
+      "script:discover"),
     G("I look for a pawnbroker who asks no questions.",
       [A("seek", target="a pawnbroker who asks no questions")], "script:discover"),
     G("I ask around for the best cook in town and go to where they work.",
@@ -113,7 +125,7 @@ GOLD = [
     G("I look for a bookseller.", [A("seek", target="a bookseller")], "script:discover"),
     G("I find a back alley where nobody will see me count my coin.",
       [A("search", object="a back alley where nobody will see me count my coin"),
-       A("other", object="my coin")], "script:discover"),
+       A("other", "intended", object="my coin")], "script:discover"),
     G("I head out of town to wherever the charcoal burners work.",
       [A("go", place="wherever the charcoal burners work")], "script:discover"),
     # --- script:return / calling / homes / buying ----------------------------------------------
@@ -128,7 +140,8 @@ GOLD = [
     G("I ask around for the woman who sold me bread.",
       [A("seek", target="the woman who sold me bread")], "failure"),
     G("I find somewhere to sleep until morning.",
-      [A("search", object="somewhere to sleep"), A("rest", time="until morning")], "failure"),
+      [A("search", object="somewhere to sleep"), A("rest", "intended", time="until morning")],
+      "failure"),
     G("I go to the market and look for the bread seller.",
       [A("go", place="the market"), A("seek", target="the bread seller")], "failure"),
     G("I take the road to the nearest town.", [A("journey", place="the nearest town")], "script:return"),
@@ -145,7 +158,7 @@ GOLD = [
     G("I thank her, say goodnight and leave.",
       [A("talk", target="her", says="goodnight"), A("leave")], "script:calling"),
     G("I go to the market.", [A("go", place="the market")], "script:calling"),
-    G("I try to buy a coil of rope.", [A("buy", object="a coil of rope")], "failure"),
+    G("I try to buy a coil of rope.", [A("buy", "tried", object="a coil of rope")], "failure"),
     G("I go to the market and buy a coil of rope.",
       [A("go", place="the market"), A("buy", object="a coil of rope")], "failure"),
     G("I wait at the well until two in the morning.",
@@ -382,4 +395,29 @@ GOLD = [
       "authored"),
     G("I go to the smithy and sell my old sword.",
       [A("go", place="the smithy"), A("sell", object="my old sword")], "authored"),
+    # --- commitment, dev (lane F round 2, 2026-10-03) ------------------------------------------
+    # Written while the reader's commitment was built; the reader may be tuned on these.
+    G("I try to haggle the cobbler down to five silver.",
+      [A("talk", "tried", target="the cobbler", says="down to five silver")],
+      "authored:commit", dev=True),
+    G("I'm going to the chapel to light a candle.",
+      [A("go", place="the chapel"), A("use", "intended", object="a candle")],
+      "authored:commit", dev=True),
+    G("I want to buy a warm cloak.", [A("buy", "intended", object="a warm cloak")],
+      "authored:commit", dev=True),
+    G("I try to sell my old boots to the cobbler.",
+      [A("sell", "tried", object="my old boots", target="the cobbler")],
+      "authored:commit", dev=True),
+    G("I hand the fisherman the net, which he will mend for me.",
+      [A("give", object="the net", target="the fisherman")], "authored:commit", dev=True),
+    G("Would the baker sell me a loaf if I asked nicely?", [], "authored:commit",
+      question=True, dev=True),
+    G("I sit down to wait for the ferry.", [A("wait", target="the ferry")],
+      "authored:commit", dev=True),
+    G("I plan to leave town at first light.", [A("leave", "intended", place="town")],
+      "authored:commit", dev=True),
+    G("I try to climb the garden wall.", [A("athletics", "tried", place="the garden wall")],
+      "authored:commit", dev=True),
+    G("I agree to sell the goat to the herder for six silver.",
+      [A("sell", object="the goat", target="the herder")], "authored:commit", dev=True),
 ]
