@@ -2988,7 +2988,10 @@ def _ask_the_gm(c, engine, question: str) -> str:
         here=engine.here(), known=engine.places(), reading=None, player_text=question,
         report=report)
     agent.brief_facts = dict(report.get("facts") or {})
-    found = "\n".join(gm_answers.look_up(c, engine, question))
+    # The story's own use of a word before the rulebook's, as `answer` does: handed the
+    # spell *Veil* as grounding, the model answers about the spell (2026-10-03).
+    found = "\n".join(gm_answers.story_first(c, engine, question)
+                      or gm_answers.look_up(c, engine, question))
     # What the character would know (2026-09-18, item 9). Public facts are answered.
     # Rumour-grade facts ride ONE secret Knowledge (local) roll per place — DC 15, the
     # Core Rulebook's "common rumour", "Try Again: No" — recorded on the scene so
@@ -3158,6 +3161,16 @@ def _advance(c, agent, narration, plan, player_input):
         from rules import cards as cards_mod
 
         cards_mod.touch_from_outcomes(c.scene, resolution.outcomes, turn=len(c.transcript))
+        # And an errand's need, from the player's own words, the purse and where they
+        # stand: the bed card that never moved (2026-10-03, item 25). Not the author's
+        # cheat line and not Continue, which carry no words of the player's.
+        said = ("" if player_input == CARRY_ON
+                or str(player_input or "").startswith("(the author writes") else player_input)
+        moved = cards_mod.errand_progress(c.scene, engine.places(), player_text=said or "",
+                                          outcomes=resolution.outcomes,
+                                          turn=len(c.transcript))
+        if moved:
+            c.turn_log.append({"kind": "errand", "facts": moved})
     except (IntentError, ValueError, KeyError) as exc:
         c.scene.restore(undo)
         # Validation is meant to cover everything resolution accepts, so reaching here

@@ -151,6 +151,7 @@ were never mentioned (playtest items 17 and 19).
 | `play.settlements[].trade` | One `sells` and one `buys` line per settlement (Vormoor "iron"; Pangrella "Fine ironwork and crafted windcatchers"), and one keeper per market | `{"stalls": [{"line": "cord and canvas", "about": "<one sentence>"}], "authority": {"title": "clerk of the market", "answers_to": "<office>"}, "market_days": "<words>"}`. Lines as the world's own trades; words, not prices |
 | `play.cards[]` | Absent; hooks come only from this app's schemes | `{"giver", "want", "offer", "motive", "withholds"}`, so a world's own hooks arrive in the same shape a scheme's do. `giver` is an id |
 | `unwritten[].where_id` | `unwritten` names things with no location | The id of the settlement or place the unwritten thing belongs to, so it can be offered where it would be found |
+| Where beds are let (`play.places[].lodging`) | Absent. Added 2026-10-03 (playtest item 25): an opening errand "Find a bed you can pay for" never put a bed within reach. The app now takes the settlement table's `lodging` slot (the tavern, then the inn, or a founded place of either kind) and prices a bed at the Core Rulebook's common inn stay, 5 sp | On a place that lets beds, its quality as a WORD: `"lodging": "poor" \| "common" \| "good"` — the book's three inn stays (a floor by the hearth, a raised heated floor, a private room). A word, not a price; the app owns the number. A settlement with none says so with no row. Read by `cards.where_met` today, by place name and kind |
 
 ### Ingredients and reagents
 

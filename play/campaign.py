@@ -717,6 +717,18 @@ def _open_the_world(c: Campaign, world, here, watcher_ref: str, seed, town) -> N
     pc = scene.pc()
     cards_mod.open_card(scene, cards_mod.from_opening(
         here, scene.at, watcher_ref, pc.name if pc is not None else ""))
+    # The way to meet the errand, within reach from the first beat: "Beds are let at the
+    # tavern" on the bed card, from this settlement's own places (item 25, 2026-10-03).
+    # Through the one derivation directly, not `c.engine().places()`: building an Engine
+    # here re-seats `scene._dice`, and measured on test_blows_declared that alone moved
+    # a later roll and opened a fight. The ring outside the walls is never a bed.
+    opening_card = cards_mod.find(scene, "opening")
+    if opening_card is not None and cards_mod.need_of(opening_card):
+        from rules import places as places_mod
+
+        cards_mod.ground_the_errand(scene, places_mod.for_scene(
+            world.get(scene.location_id) or scene.location_id, scene.at,
+            founded=scene.founded))
     for card in cards_mod.from_world(world, scene.at):
         cards_mod.open_card(scene, card)
     # The campaign's opening undercurrent — the first world-state this app has ever

@@ -213,6 +213,17 @@ def test_the_watcher_advances_a_card_only_on_a_fact_about_it():
 
     from gm import watcher
 
+    from rules import cards
+
     src = inspect.getsource(watcher._apply_cards)
     assert "the fact is not about this card" in src
-    assert "cards_mod._hits(card, fact) >= 1" in src
+    # The test moved into `cards.about` on 2026-10-03 (item 25), one copy of the rule —
+    # and asserted as behaviour there: a water-rights card is not advanced by a fact
+    # about a shattered blade.
+    assert "cards_mod.about(card, fact" in src
+    water = cards.Card(id="w", title="Water rights in the lower town",
+                       facts=["The wells are rationed."], tags=(cards.TAG_STRAIN,),
+                       keys=cards.keys_from("Water rights in the lower town",
+                                            "The wells are rationed."))
+    assert not cards.about(water, "The warrior's blade is shattered.")
+    assert cards.about(water, "The wells run dry by noon.")

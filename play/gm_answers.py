@@ -147,7 +147,9 @@ def answer(campaign, engine, question: str) -> tuple[str, str]:
 
     out += about_what_is_here(campaign, engine, question)
 
-    found = look_up(campaign, engine, question)
+    # A word the story used is answered from the story, with the rulebook second
+    # (`story_first`; the veil, 2026-10-03).
+    found = story_first(campaign, engine, question) or look_up(campaign, engine, question)
     if found:
         out += found
 
@@ -386,9 +388,14 @@ def look_up(c, engine, question: str):
     The world's own material is no longer looked up here by exact name — it is FOUND, by
     `play.gm_search`, which ranks the whole record and hands the model its passages.
     """
+    return _look_up(c, engine, question)[1]
+
+
+def _look_up(c, engine, question: str) -> tuple[str, list[str]]:
+    """`look_up`, and the term that found the entry: ("veil", ["SPELL: Veil.", …])."""
     terms = _terms(question)
     if not terms:
-        return []
+        return "", []
     hint = _hint(question)
     finders = ([f for f in _FINDERS if f.__name__ == "_find_" + hint] if hint
                else list(_FINDERS))
@@ -407,8 +414,136 @@ def look_up(c, engine, question: str):
             except Exception:
                 got = []
             if got:
-                return got
-    return []
+                return term, got
+    return "", []
+
+
+# --- the story before the rulebook ------------------------------------------------------
+#
+# Measured on the owner's market-talk save, 2026-10-03 (playtest item 24): the narrator's
+# own suggestion one turn earlier read "I explain why I am looking for the veil", and
+# "/gm what is the veil?" was answered with the full text of the spell *Veil* — school,
+# range, duration — and nothing else. The player was asking about a word the STORY had
+# put in front of them. Every rules-lookup tool that answers a bare word has this
+# problem; the ones that work keep the conversation's own context first and the
+# catalogue second (docs/rules-and-opening-2026-10-03.md).
+#
+# So: a word the recent story used is answered from the story — the sentences that used
+# it, quoted, and plainly "nothing in play has said more" — and the rulebook entry is
+# offered after it as one line, with the question that fetches it. Read by code from the
+# transcript and the suggestions the page showed; no model is asked to decide, because a
+# model asked "is this the spell or the story's veil?" is the thing that guesses.
+# A question that names its catalogue ("the spell veil") is about the rules and is
+# answered exactly as before.
+
+# How far back the story is read: transcript entries (a turn is two or three), and the
+# prose rows whose suggestions the page showed.
+STORY_ENTRIES = 40
+STORY_SUGGESTION_TURNS = 4
+STORY_QUOTES = 3
+
+_SENTENCE = re.compile(r"[^.!?\n]+[.!?]?")
+
+
+def _story_lines(c) -> list[tuple[str, str]]:
+    """The recent story as (where, text), newest first: the narration and the player's
+    own lines, what people said, and the suggestions the page offered. Asides — the
+    out-of-character door this very question came through — are not the story."""
+    out: list[tuple[str, str]] = []
+    for entry in reversed(list(getattr(c, "transcript", None) or [])[-STORY_ENTRIES:]):
+        if not isinstance(entry, dict) or entry.get("kind") == "aside":
+            continue
+        text = str(entry.get("text") or "")
+        if text.lstrip().startswith("/"):
+            continue
+        where = "you said" if entry.get("who") == "player" else "the story"
+        out.append((where, text))
+    offered = [str(s) for s in (getattr(c, "suggestions", None) or [])]
+    rows = [r for r in (getattr(c, "turn_log", None) or [])
+            if isinstance(r, dict) and r.get("suggested")]
+    for r in reversed(rows[-STORY_SUGGESTION_TURNS:]):
+        offered += [str(s) for s in r.get("suggested") or []]
+    for s in dict.fromkeys(offered):
+        out.append(("a suggestion the GM offered", s))
+    return out
+
+
+def in_the_story(c, term: str) -> list[tuple[str, str]]:
+    """Each sentence of the recent story that uses `term` as a word, with where it was:
+    [("a suggestion the GM offered", "I explain why I am looking for the veil")]."""
+    term = " ".join(str(term or "").lower().split())
+    if len(term) < 3:
+        return []
+    pattern = re.compile(r"\b" + re.escape(term) + r"(?:s|es)?\b", re.I)
+    found: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for where, text in _story_lines(c):
+        for sentence in _SENTENCE.findall(text):
+            s = " ".join(sentence.split())
+            if s and pattern.search(s) and s.lower() not in seen:
+                seen.add(s.lower())
+                found.append((where, s if len(s) <= 220 else s[:217] + "…"))
+    return found
+
+
+def _on_the_sheet(c, name: str) -> bool:
+    """Whether the player's character has this by name: a spell known or prepared, a
+    feat. Read loosely — ids and names both, lower-case, hyphens as spaces."""
+    pc = c.scene.pc() if getattr(c, "scene", None) is not None else None
+    if pc is None:
+        return False
+
+    def norm(x) -> str:
+        x = x if isinstance(x, str) else (getattr(x, "name", "") or getattr(x, "id", "")
+                                          or (x.get("name") or x.get("id") if
+                                              isinstance(x, dict) else ""))
+        return " ".join(str(x or "").lower().replace("-", " ").replace("_", " ").split())
+
+    want = norm(name)
+    held: list = []
+    for attr in ("spellbook", "feats"):
+        held += list(getattr(pc, attr, None) or [])
+    prepared = getattr(pc, "prepared", None) or {}
+    if isinstance(prepared, dict):
+        for v in prepared.values():
+            held += list(v) if isinstance(v, (list, tuple)) else [v]
+    return bool(want) and any(norm(h) == want for h in held)
+
+
+def story_first(c, engine, question: str) -> list[str] | None:
+    """The answer to "what is X" when X is a word the recent story used: what the story
+    has said, then the rulebook's entry as a pointer. None when this does not apply —
+    the catalogue was named, nothing was found in the books, or the story never used
+    the word — and the ordinary answer stands."""
+    if _hint(question):
+        return None
+    term, entry = _look_up(c, engine, question)
+    if not entry:
+        return None
+    head = entry[0].rstrip(".")
+    kind, _, name = head.partition(": ")
+    name = name.split(" — ")[0].split(",")[0].strip()
+    if _on_the_sheet(c, name or term):
+        # The character's own spell or feat: the story used the word because the player
+        # did, and the rules are what they are asking after.
+        return None
+    mentions = in_the_story(c, term)
+    if not mentions:
+        return None
+    out = [f"IN THE STORY: \"{term}\" has come up in play."]
+    for where, s in mentions[:STORY_QUOTES]:
+        out.append(f"  {where}: “{s}”")
+    told = [m for m in mentions if m[0] != "a suggestion the GM offered"]
+    if told:
+        out.append("  That is all the story has said about it; the engine holds nothing "
+                   "more. Ask about it in play to learn more.")
+    else:
+        out.append(f"  Only a suggestion has named it. Nothing in play has said what "
+                   f"\"{term}\" is yet — ask about it in play to find out.")
+    out.append(f"IN THE RULES: {name or term} is also the name of a "
+               f"{kind.lower() or 'rules entry'}. Ask \"/gm what is the "
+               f"{kind.lower() or 'rule'} {term}\" for the entry.")
+    return out
 
 
 # --- matching a name, rather than searching for one -------------------------------------
