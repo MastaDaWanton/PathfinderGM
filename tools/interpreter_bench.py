@@ -118,7 +118,11 @@ def splits(gold, got) -> dict:
     out = {"all": _summary(gold, got)}
     for name, keep in (("dev", is_dev), ("held_out", lambda g: not is_dev(g)),
                        ("held_out_first_220", lambda g: not is_dev(g) and GOLD.index(g) < 220),
-                       ("held_out_commit", lambda g: not is_dev(g) and GOLD.index(g) >= 220)):
+                       ("held_out_commit", lambda g: not is_dev(g) and GOLD.index(g) >= 220
+                        and g["source"] != "authored:clean"),
+                       # Written after the reader was frozen and never consulted in any
+                       # form before its run: the clean gate (round 2).
+                       ("held_out_clean", lambda g: g["source"] == "authored:clean")):
         idx = [i for i, g in enumerate(gold) if keep(g)]
         if idx:
             out[name] = _summary([gold[i] for i in idx], [got[i] for i in idx])
