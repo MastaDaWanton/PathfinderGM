@@ -91,3 +91,19 @@ def test_goods_minted_from_words_are_put_right_on_load():
     _heal_minted_goods(s)
     assert pc.goods == {"pouch": 1, "crate": 1}
     assert pc.purse == {"cp": 1}
+
+
+def test_the_ledger_gives_a_descriptor_name_its_article():
+    """The healed market-talk save, played live: "you told man in the heavy coat, “who the
+    master of the docks is”". A descriptor name carries no article of its own."""
+    from types import SimpleNamespace
+
+    from gm import ledger
+
+    said = SimpleNamespace(op="say", status="resolved", effects=[
+        {"kind": "said", "who": "", "to": "c4", "words": "who the master of the docks is"}])
+    got = ledger.note([said], turn=18, names={"c4": "man in the heavy coat", "c7": "Grix"})
+    assert got["text"] == "you told the man in the heavy coat, “who the master of the docks is”"
+    named = SimpleNamespace(op="say", status="resolved", effects=[
+        {"kind": "said", "who": "", "to": "c7", "words": "hello"}])
+    assert ledger.note([named], turn=1, names={"c7": "Grix"})["text"] == "you told Grix, “hello”"

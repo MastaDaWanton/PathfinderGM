@@ -175,7 +175,7 @@ def _moved(o, names: dict | None) -> str:
 
     def name(ref) -> str:
         ref = str(ref or "")
-        return str(names.get(ref, ref)) if ref else ""
+        return _person(str(names[ref])) if ref in names else ref
 
     for e in getattr(o, "effects", None) or []:
         if not isinstance(e, dict):
@@ -243,6 +243,15 @@ def _named(o, keys, names: dict | None, places: dict | None = None) -> str:
     return ""
 
 
+def _person(name: str) -> str:
+    """A person's name as a sentence carries it: "the man in the heavy coat", never "you
+    told man in the heavy coat" (measured live, 2026-10-03, on the healed market-talk save
+    — a descriptor name has no article of its own, `names.is_descriptor`)."""
+    from rules import names as names_mod
+
+    return f"the {name}" if names_mod.is_descriptor(name) else name
+
+
 def _name_of(value: str, names: dict | None, places: dict | None) -> str:
     """A ref or a place id as the player read it.
 
@@ -251,7 +260,7 @@ def _name_of(value: str, names: dict | None, places: dict | None) -> str:
     slug ("6953424c8a82~urban:the-docks/the-storage-area" is "the storage area"), which
     is how every place id here is minted (`places.child_id`)."""
     if value in (names or {}):
-        return str(names[value])
+        return _person(str(names[value]))
     if value in (places or {}):
         return str(places[value])
     # A ref nobody could name is still not a name: "c4" with its digit cut is "you
