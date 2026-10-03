@@ -2249,6 +2249,19 @@ class GMAgent:
                 notes.append(f"{f.kind}: {sentence[:80]!r} -> {fixed[:80]!r}")
         # The backstops, over the beat as it now stands: only a member that still finds
         # something is asked, so a rewrite that held costs nothing here.
+        #
+        # Every member at this door, not only those whose findings survived
+        # `_drop_covered`. Measured live on the 2026-10-03 batch: "Korvu takes the crate
+        # with a grunt" was flagged by `thing_kept` (weight 3) and `peoples_name`
+        # (weight 2); the lighter finding was dropped as covered, the rewrite fixed the
+        # crate ("Korvu eyes the crate"), and the people's name shipped, because its
+        # member was never asked again. The covering rule is about one repair per
+        # sentence, not about forgetting the second fault in it. `find` is mechanical,
+        # so asking every member costs no model call.
+        for member in checks.registered():
+            if (member not in members and ctx.door in member.DOORS
+                    and callable(getattr(member, "backstop", None))):
+                members.append(member)
         for member in members:
             if not callable(getattr(member, "backstop", None)):
                 continue

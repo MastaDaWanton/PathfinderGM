@@ -102,3 +102,61 @@ def test_a_peoples_name_given_to_a_person_is_caught_and_respelled(sentence, fixe
 ])
 def test_the_people_themselves_are_not_flagged(sentence):
     assert peoples_name.find(_ctx(sentence)) == []
+
+
+# --- a trade the engine did not make, settled on the page ---------------------------------
+
+from gm.checks import trade_claimed  # noqa: E402
+
+REFUSED = [{"op": "sell", "status": "refused",
+            "tell": "The smith's counter is not open yet; it opens at first light.",
+            "effects": []}]
+SOLD_LIVE = ("The transaction is finalized. The heavy clink of the coin is the only thing "
+             "that breaks the silence of the forge. The smith turns toward the quenching "
+             "vats. What do you do?")
+
+
+def _trade_ctx(text, outcomes=(), reading=None):
+    ctx = _ctx(text, goods={"crate": 1}, outcomes=outcomes)
+    ctx.reading = reading
+    return ctx
+
+
+def test_a_refused_sale_settled_in_the_prose_is_cut_and_the_refusal_stands():
+    """Measured live: the engine refused the sale at half past one in the morning, and the
+    page opened "The transaction is finalized. The heavy clink of the coin…" with the
+    refusal nowhere on it."""
+    ctx = _trade_ctx(SOLD_LIVE, REFUSED)
+    found = trade_claimed.find(ctx)
+    assert [f.kind for f in found] == ["trade-claimed"]
+    assert len(found[0].sentences) == 2
+    kept, _ = trade_claimed.backstop(ctx, SOLD_LIVE, found)
+    assert kept == ("The smith's counter is not open yet; it opens at first light. "
+                    "The smith turns toward the quenching vats. What do you do?")
+
+
+def test_a_declared_sale_that_never_resolved_is_held_too():
+    read = {"actions": [{"act": "sell", "object": "the crate", "target": "the smith"}]}
+    assert trade_claimed.find(_trade_ctx(SOLD_LIVE, (), read))
+
+
+def test_a_sale_the_engine_made_may_be_shown():
+    sold = [{"op": "sell", "status": "resolved", "tell": "", "effects": []}]
+    assert trade_claimed.find(_trade_ctx(SOLD_LIVE, sold)) == []
+
+
+def test_no_trade_at_all_is_no_finding():
+    """Coin clinking in a beat where nobody traded is somebody else's business."""
+    assert trade_claimed.find(_trade_ctx(SOLD_LIVE)) == []
+
+
+def test_the_last_pass_asks_every_member_not_only_the_heaviest():
+    """Measured live: "Korvu takes the crate with a grunt" was flagged by thing_kept and
+    peoples_name; the lighter finding was dropped as covered, the rewrite fixed the crate,
+    and "Korvu eyes the crate" shipped because peoples_name was never asked again."""
+    import inspect
+
+    from gm.agent import GMAgent
+
+    src = inspect.getsource(GMAgent._repair_sentences)
+    assert "for member in checks.registered():" in src
