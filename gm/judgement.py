@@ -3105,6 +3105,16 @@ def _named_here(text: str, scene, pc) -> str:
     engaged = engaged_refs(scene)
     if len(engaged) == 1:
         return engaged[0]
+    # The person in conversation with the player, by the engine's own tag. "You can have
+    # the crate" names nobody; the smith it was said to was holding `state.talking`, and
+    # measured live (2026-10-03) the thread was empty, two bystanders stood in the
+    # smithy, and the close found no buyer.
+    from rules import states as states_mod
+
+    talking = [r for r, a in scene.actors.items()
+               if not a.is_pc and not a.is_down and a.has_state(states_mod.TALKING)]
+    if len(talking) == 1:
+        return talking[0]
     others = [r for r, a in scene.actors.items() if not a.is_pc and not a.is_down]
     return others[0] if len(others) == 1 else ""
 
@@ -3134,12 +3144,19 @@ def _sell_goods_declared(raw_intents, player_text: str, scene, pc, recent=()) ->
         return out
     if "give" in present or not pc.goods:
         return raw_intents
-    closes = _CLOSES_SALE.search(text)
+    # The close is read with the player's own speech IN: saying the words is how a deal
+    # is closed. Measured live on the merged 2026-10-03 batch, at first light with the
+    # smith's counter open: '"It's a deal. You can have the crate."' was the whole line,
+    # in quotation marks; `redact_speech` blanked all of it, nothing closed, and the
+    # crate stayed in the pack while the smith pried its lid off. The verbs that only
+    # MENTION selling ("'Would you sell me rope?'") are still read outside speech.
+    said = str(player_text or "")
+    closes = _CLOSES_SALE.search(said)
     if not (closes or _SELLS_GOODS.search(text)):
         return raw_intents
     # The thing: the longest carried name the sentence holds; for a close that names
     # nothing ("Deal — it's yours"), the carried thing the last few beats talked about.
-    low = text.lower()
+    low = said.lower() if closes else text.lower()
     named = [k for k in sorted(pc.goods, key=len, reverse=True)
              if len(holding.plain(k)) > 2
              and re.search(rf"\b{re.escape(holding.plain(k))}s?\b", low)]
@@ -9461,6 +9478,41 @@ def a_child_in(scene, beat: str) -> bool:
     return bool(_CHILD_WORDS.search(str(beat or "")))
 
 
+# Somebody already named, described: "He is a large man", "she was a tall woman", "who
+# is an old man". The phrase after the copula is a predicate about the subject, not a
+# person walking on.
+_PREDICATE_BEFORE = re.compile(
+    r"\b(?:he|she|they|who|it)\s+(?:is|was|'s|seems|seemed|looks\s+like|looked\s+like|"
+    r"appears\s+to\s+be|appeared\s+to\s+be)\s+(?:a|an)\s+$", re.I)
+
+
+def only_a_predicate(beat: str, phrase: str) -> bool:
+    """Whether every place the beat uses `phrase` is a description of somebody the
+    sentence already has as its subject.
+
+    Measured live on the merged 2026-10-03 batch: "The man at the workbench—the smith—
+    does not look up … He is a large man, his hands calloused … 'Well,' he grunts" made
+    "large man" a person (c15). The "he" of the next line then carried to that record,
+    and the smith's own words gave the duplicate a body; with two people in the
+    conversation, "It's a deal. You can have the crate" found no buyer."""
+    words = [w for w in re.findall(r"[a-z'’-]+", str(phrase or "").lower())
+             if w not in ("the", "a", "an")]
+    if not words:
+        return False
+    pat = re.compile(r"\b" + r"\s+".join(re.escape(w) for w in words) + r"\b", re.I)
+    text = str(beat or "")
+    spots = list(pat.finditer(text))
+    if not spots:
+        return False
+    for m in spots:
+        before = text[max(0, m.start() - 60):m.start()]
+        # The head may carry adjectives in the phrase itself; the copula sits just
+        # before the article that opens it.
+        if not _PREDICATE_BEFORE.search(before):
+            return False
+    return True
+
+
 def record_people(scene, introduced, *, turn: int = 0, world=None,
                   beat: str = "") -> list[dict]:
     """Everyone a beat introduced goes into the population, located, with a life rolled —
@@ -9497,6 +9549,8 @@ def record_people(scene, introduced, *, turn: int = 0, world=None,
     out = []
     for phrase in introduced or []:
         if _plural_role(phrase) or counts.get(phrase, 1) > 1:
+            continue
+        if beat and only_a_predicate(beat, phrase):
             continue
         how = seen_in_beat(beat, phrase) if beat else ""
         said_as = phrase

@@ -134,3 +134,49 @@ def test_a_cast_with_no_caster_is_refused_by_name():
     e = Engine(_scene(), Dice(seed=1))
     with pytest.raises(IntentError):
         e.validate([{"op": "cast", "params": {"spell": "light"}}])
+
+
+# --- the live sale at first light -------------------------------------------------------------
+
+SMITH_BEAT = ("The man at the workbench—the smith—does not look up from the crate as you "
+              "speak. He is a large man, his hands calloused and stained with the grey of "
+              "ash. 'Well,' he grunts. 'Let's see what's inside before we talk of coin.'")
+
+
+@pytest.mark.parametrize("phrase, only", [
+    ("large man", True),                       # "He is a large man" — the smith, described
+    ("man at the workbench", False),           # the smith himself, walking on
+])
+def test_a_description_after_he_is_is_nobody_new(phrase, only):
+    """Measured live: "He is a large man" became a second smith (c15), the "he" of the
+    next line carried to him, and with two people in the conversation the deal found no
+    buyer."""
+    assert judgement.only_a_predicate(SMITH_BEAT, phrase) is only
+
+
+def test_a_new_person_after_a_description_is_still_somebody():
+    beat = "He is a large man. A woman with a basket stops at the door."
+    assert judgement.only_a_predicate(beat, "large man")
+    assert not judgement.only_a_predicate(beat, "woman with a basket")
+
+
+def test_a_deal_spoken_aloud_sells_to_the_one_in_conversation():
+    """Measured live at first light, the counter open: '"It's a deal. You can have the
+    crate."' — the whole line in quotation marks. `redact_speech` blanked all of it, the
+    close was never read, and nobody was named, so even a read close found no buyer. The
+    words that close a deal are spoken; the buyer is the one being spoken to."""
+    from rules.bestiary import instantiate
+
+    s = _scene()
+    s.pc().goods["crate"] = 1
+    smith = instantiate("guildhand", scene=s, name="the smith")
+    s.add(smith)
+    s.add(instantiate("guildhand", scene=s, name="man"))
+    Engine(s, Dice(seed=1)).join_talk(smith)
+    said = '"It\'s a deal. You can have the crate."'
+    out = judgement.inject_sale([{"op": "narrate_only"}], said, s)
+    sells = [r for r in out if r.get("op") == "sell"]
+    assert sells and sells[0]["params"] == {"item": "crate", "to": smith.ref}
+    # And a mere mention inside speech is still not a sale.
+    out = judgement.inject_sale([{"op": "narrate_only"}], '"Would you sell me rope?"', s)
+    assert not [r for r in out if r.get("op") == "sell"]
