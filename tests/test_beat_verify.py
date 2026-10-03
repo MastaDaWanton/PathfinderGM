@@ -248,6 +248,29 @@ def test_the_bench_labels_only_values_the_engine_offers():
                 if k in allowed:
                     for one in (v if isinstance(v, list) else [v]):
                         assert one in allowed[k], (beat["id"], k, one)
-        for d in beat["text"]:
-            pass
         assert beat["start"] in bv._places(facts)
+
+
+# --- what retired ------------------------------------------------------------------------
+
+def test_the_regex_checks_the_round_trip_measured_better_are_gone_and_the_rest_stay():
+    """Retired 2026-10-03 on the bench (tests/beat_verify/gold.py, 50 beats, gemma-4-12B x2,
+    docs/beat-verify.md), each at precision 1.00 both ways:
+
+      * thing_kept     hands  recall 0.40 (2/5)  -> the read back 0.80 (8/10)
+      * trade_claimed  trade  recall 0.50 (2/4)  -> 1.00 (8/8)
+      * time_of_day    hour   recall 1.00 (3/3)  -> 1.00 (6/6), no false alarm either way
+
+    Kept, because the round trip measured worse or does not cover them: refused_move
+    (3/3 against 4/6 — "You are standing where the paths diverge" is read as staying at
+    the way in), empty_roll (equal on harm, 1/3 and 2/6, and the only reader of a victim
+    who is not on the actor list at all), and every check of a kind the bench has no row
+    for. When the read fails, nothing stands in for the three retired categories that
+    beat (0 of 244 reads failed on the bench)."""
+    from gm import checks
+
+    names = {m.__name__.rsplit(".", 1)[-1] for m in checks.registered()}
+    assert not names & {"thing_kept", "trade_claimed", "time_of_day"}
+    assert {"beat_verified", "refused_move", "empty_roll", "road_claimed"} <= names
+    owner = checks.owner_of("beat-settles-trade")
+    assert owner is not None and owner.__name__.endswith("beat_verified")

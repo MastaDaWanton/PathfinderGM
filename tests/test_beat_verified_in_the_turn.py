@@ -161,6 +161,34 @@ def test_a_refused_sale_the_page_never_mentions_gets_the_refusal(scripted):
     assert out == f"The forge is quiet and the coals are banked. {refusal} What do you do?"
 
 
+def test_the_last_pass_asks_the_member_whose_finding_was_covered(scripted):
+    """Moved from tests/test_prose_live_check.py when `thing_kept` retired into this
+    member. Measured live: "Korvu takes the crate with a grunt" was flagged for the crate
+    (weight 3) and by `peoples_name` (weight 2); the lighter finding was dropped as
+    covered, the rewrite fixed the crate ("Korvu eyes the crate"), and the people's name
+    shipped, because its member was never asked again. Driven through the real repair with
+    the model's rewrite stubbed to what it wrote live."""
+    import _a_truth
+    from world import loader
+
+    pangrella = loader.load_cached("fixtures/pangrella-campaign.json")
+    agent, _ = _a_truth.scene_at("6953424c8a82~urban:the-market", world=pangrella,
+                                 location=pangrella.get("6953424c8a82"))
+    agent.engine.scene.pc().goods["crate"] = 1
+    text = "Korvu takes the crate with a grunt. What do you do?"
+    ctx = _a_truth.context(agent, text)
+    scripted["reads"] = [_empty(changed_hands=[
+        {"item": "crate", "from": "pc", "to": bv.NEW_PERSON,
+         "quote": "Korvu takes the crate with a grunt"}])]
+    scripted["rewrites"] = ["Korvu eyes the crate with a grunt."]
+    covered: list = []
+    found = checks.run(ctx, errors=[], covered=covered)
+    assert {f.kind for f in found} >= {"beat-hands-over"}
+    assert {f.kind for f in covered} == {"peoples-name-as-name"}
+    out, notes, _ = agent._repair_sentences(text, found, ctx, covered=covered)
+    assert out == "The Korvu eyes the crate with a grunt. What do you do?", notes
+
+
 def test_the_groom_logs_what_the_beat_was_read_as(scripted):
     """Through `_groom`: a `beat-verify` row beside the `truth-checks` row, holding the
     claims and the seconds — how the read's failure rate is measured from turn logs."""

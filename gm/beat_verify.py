@@ -70,8 +70,9 @@ HOW = ("hurt", "down", "dead")
 
 # The parts of the day the reader may name, each with the hours (0-23) at which a narrator
 # may truthfully say it. Generous on purpose — the hour a narrator calls "night" at 19:00
-# is not wrong, and a guard that argues with dusk is noise (the same judgement
-# `gm/checks/time_of_day.py` measured on the owner's saves). The engine's own eight slots
+# is not wrong, and a guard that argues with dusk is noise (the same judgement the regex
+# check `gm/checks/time_of_day.py` made on the owner's saves; it retired into this module
+# on 2026-10-03, docs/beat-verify.md, and its windows live on here). The engine's own eight slots
 # (`residency._PARTS`) are three-hour bins named for a brief, not for prose: "the small
 # hours" and "late evening" are not words a narrator's sky is read into, so the reader is
 # offered the words prose uses and the windows map them back to the engine's clock.

@@ -13,7 +13,7 @@ import pytest
 
 from gm import agent as agent_mod
 from gm import checks, judgement
-from gm.checks import setting_kind, time_of_day
+from gm.checks import setting_kind
 from rules import places as places_mod
 from rules import states
 from rules.bestiary import instantiate
@@ -184,65 +184,11 @@ def _ctx(s, e, text, door="turn"):
         brief="", brief_facts={}, pull=None, was_at=s.at, acting="", turn=0)
 
 
-DOCKS_7 = ("The docks are a forest of masts and the frantic, rhythmic work of the morning; "
-           "crates are being winched from the hulls.")
-COUNTING_19 = ("Outside, the first hint of dawn is beginning to grey the edges of the "
-               "windows, and the heavy thud of boots can be heard in the corridors.")
-SMITHY_21 = ("You turn your collar up against the draft and begin to move through the "
-             "pre-dawn gloom of the district.")
-MARKET_5 = ("The market is a cavern of shadows and hushed whispers under the weight of the "
-            "midnight air.")
-
-
-def test_the_hour_the_page_says_is_the_hour_the_engine_keeps():
-    """The items save's clock ran 0 to 88 minutes — a little past midnight, which the
-    brief said every turn — and the page went "the work of the morning" (clock 32), "the
-    first hint of dawn" (clock 80), "the pre-dawn gloom" (clock 88). All three are found
-    against the clock, and put right without a model call: the clock's word where the
-    wrong one stood, and the first light that is not coming cut."""
-    s, e = _at("the docks", clock=32)
-    found = time_of_day.find(_ctx(s, e, DOCKS_7))
-    assert [f.kind for f in found] == ["time-of-day"]
-    fixed, _ = time_of_day.backstop(_ctx(s, e, DOCKS_7), DOCKS_7, found)
-    assert "work of the night" in fixed and "morning" not in fixed
-
-    s.clock_minutes = 80
-    text = COUNTING_19 + " The clerk watches you."
-    found = time_of_day.find(_ctx(s, e, text))
-    fixed, notes = time_of_day.backstop(_ctx(s, e, text), text, found)
-    assert fixed == "The clerk watches you." and "cut" in notes[0]
-
-    s.clock_minutes = 88
-    found = time_of_day.find(_ctx(s, e, SMITHY_21))
-    fixed, _ = time_of_day.backstop(_ctx(s, e, SMITHY_21), SMITHY_21, found)
-    assert "the night gloom of the district" in fixed
-    assert getattr(time_of_day, "REWRITE", True) is False
-
-
-def test_at_the_openings_own_evening_the_same_lines_take_its_words():
-    """Had the clock started where the opening said ("Evening", 19:00 — every campaign
-    since 2026-09-27 does), market-talk's last turn, "the midnight air", is the one
-    wrong, and the counting house's first light is the dusk's."""
-    s, e = _at("the market", clock=19 * 60)
-    found = time_of_day.find(_ctx(s, e, MARKET_5))
-    fixed, _ = time_of_day.backstop(_ctx(s, e, MARKET_5), MARKET_5, found)
-    assert "the evening air" in fixed
-    s.clock_minutes = 19 * 60 + 80
-    found = time_of_day.find(_ctx(s, e, COUNTING_19))
-    fixed, _ = time_of_day.backstop(_ctx(s, e, COUNTING_19), COUNTING_19, found)
-    assert "the first hint of dusk" in fixed
-
-
-def test_hours_that_are_not_now_and_hours_in_speech_are_left_alone():
-    """A character may say "before the morning shift arrives" (the clerk, row 97) or
-    "the evening shift … three hours from now" (Korvu, row 62) at any hour; the narrator
-    may say "since dawn", "tomorrow morning", "every night". Only the narration's own
-    present hour is read, and an hour inside its window is never argued with."""
-    s, e = _at("the market", clock=40)
-    quiet = ("'Sign here, and we move the crate before the morning shift arrives,' he says. "
-             "He has worked since dawn. You will sail tomorrow morning. The midnight air "
-             "is cold.")
-    assert time_of_day.find(_ctx(s, e, quiet)) == []
+# The hour checks of item 11 retired on 2026-10-03 into the beat read back
+# (gm/checks/beat_verified.py): equal on the bench (3 of 3 and 6 of 6 alarms, no false
+# alarm either way, docs/beat-verify.md), and the reading of "the pre-dawn gloom" is the
+# model's now. The measurement — clock 32 "the work of the morning", 80 "the first hint
+# of dawn", 88 "the pre-dawn gloom" — is pinned in tests/test_beat_verify_diff.py.
 
 
 # --- item 12: the setting drifts -------------------------------------------------------------
@@ -287,7 +233,8 @@ def test_the_same_words_in_the_tavern_or_seen_from_afar_are_not():
 
 def test_the_new_checks_are_members():
     names = {m.__name__.rsplit(".", 1)[-1] for m in checks.registered()}
-    assert {"time_of_day", "setting_kind"} <= names
+    assert {"beat_verified", "setting_kind"} <= names
+    assert "time_of_day" not in names       # retired into beat_verified, see above
 
 
 def test_a_legacy_opening_stands_the_party_where_its_words_are_set(monkeypatch, tmp_path):

@@ -12,9 +12,18 @@ words as a quote, which code checks is really the narration. Then code compares 
 claims with `ctx.outcomes` and the scene, and every contradiction is asked once more as a
 closed question about its one sentence (`beat_verify.confirm`) before it costs a word.
 
-Measured on tests/beat_verify/gold.py (docs/beat-verify.md has the table): the categories
-this member owns are the ones where it measured at least as good as the regex check it
-replaced, and those checks are gone; the rest of the package still runs beside it.
+Measured on tests/beat_verify/gold.py (docs/beat-verify.md has the table), 50 beats,
+gemma-4-12B twice, every alarm at precision 1.00 and no clean beat alarmed (0 of 72):
+
+  * `thing_kept` RETIRED  — things changing hands, recall 0.40 -> 0.80;
+  * `trade_claimed` RETIRED — a sale settled the engine did not make, 0.50 -> 1.00;
+  * `time_of_day` RETIRED — the hour against the clock, 1.00 -> 1.00, no false alarm;
+  * `refused_move` STAYS — 1.00 against this member's 0.67 ("You are standing where the
+    paths diverge" read as staying put); both run, and on one sentence the heavier wins;
+  * `empty_roll` STAYS — equal on harm (1/3 and 2/6), and the only reader of a victim
+    who is not on the actor list at all, which this member never judges.
+
+The rest of the package still runs beside it.
 
 Repair is the house shape, through `GMAgent._repair_sentences`: one targeted rewrite of
 the sentence with the engine's fact named (the finding's `fix_hint`), checked by reading
