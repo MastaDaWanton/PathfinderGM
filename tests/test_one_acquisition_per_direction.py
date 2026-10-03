@@ -77,5 +77,10 @@ def test_a_sale_is_one_op():
     scene = _sam("the merchant")
     plan = [{"op": "sell", "params": {"item": "yarow elixir"}}]
     frame = {"actions": [{"act": "sell", "object": "the Yarow Elixir"}]}
+    # Not carried: the reading named it, the table found none, and the plan's sale of it
+    # goes too — nothing for the engine to refuse into the prose.
+    assert [r["op"] for r in _read("I sell the Yarow Elixir", scene, frame, plan)] == [
+        "narrate_only"]
+    scene.pc().goods["yarow elixir"] = 1
     out = _read("I sell the Yarow Elixir", scene, frame, plan)
     assert [r["op"] for r in out] == ["sell"]

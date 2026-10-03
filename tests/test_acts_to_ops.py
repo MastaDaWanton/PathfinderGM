@@ -231,6 +231,28 @@ def test_it_is_the_thing_the_sentence_already_named():
         ("lantern", "pc"), ("lantern", _ref(scene, "the boy"))]
 
 
+def test_a_thing_set_down_and_left_behind_is_set_down_once():
+    """The items save's last line, read live on 2026-10-03: "I also drop the Brunt of the
+    weight on the ground and leave it behind" came back `drop: the Brunt of the weight`,
+    then `drop: it` — the same brunt twice, and the engine would refuse the second into
+    the prose ("not carrying"). One thing is parted with once; two payments stay two."""
+    scene = _scene("the smith")
+    pc = scene.pc()
+    pc.goods["brunt of the weight"] = 1
+    pc.purse = {"gp": 20, "sp": 10}
+    rows, raw = _turn(scene, "I also drop the Brunt of the weight on the ground and leave "
+                             "it behind.",
+                      _frame({"act": "drop", "object": "the Brunt of the weight",
+                              "place": "on the ground"}, {"act": "drop", "object": "it"}))
+    assert [g["params"]["item"] for g in _gives(raw)] == ["brunt of the weight"]
+    assert rows[1].note == "brunt of the weight is already parted with"
+    _, raw = _turn(scene, "I pay him ten gold and give him five silver",
+                   _frame({"act": "give", "object": "ten gold", "target": "him"},
+                          {"act": "give", "object": "five silver", "target": "him"}))
+    assert [(g["params"]["item"], g["params"]["count"]) for g in _gives(raw)] == [
+        ("gp", 10), ("sp", 5)]
+
+
 def test_nothing_found_is_the_turns_answer_and_nothing_is_invented():
     """"Where a slot cannot be resolved, the op is not invented" (docs/structured-turn.md).
     A sale of a thing the pack does not hold, and nothing else declared: the turn is the
@@ -246,6 +268,22 @@ def test_nothing_found_is_the_turns_answer_and_nothing_is_invented():
                            {"act": "talk", "target": "the smith", "says": "his name"}))
     assert acts_to_ops.refusal(rows) == ""
     assert acts_to_ops.unresolved(rows) == ["Kesst Vayr is not carrying the lantern"]
+
+
+def test_the_plans_op_on_a_thing_the_reading_found_missing_goes_too():
+    """The replay of the items save's last line on the new path (2026-10-03): the
+    reading's `drop: the Brunt of the weight` found none in the pack — the new path had
+    never minted one — and the plan's own `give actor=pc target=c13` of it stood, to be
+    refused into the prose ("Kesst Vayr has no Brunt of the weight to give"). The
+    reading named the thing; the table's answer for it is the turn's."""
+    scene = _scene("the smith")
+    smith = _ref(scene, "the smith")
+    rows, raw = _turn(scene, "I also drop the Brunt of the weight on the ground.",
+                      _frame({"act": "drop", "object": "the Brunt of the weight"}),
+                      plan=[{"op": "give", "actor": "pc", "target": smith,
+                             "params": {"item": "Brunt of the weight"}}])
+    assert not _gives(raw)
+    assert acts_to_ops.unresolved(rows) == ["Kesst Vayr is not carrying the Brunt of the weight"]
 
 
 def test_nobody_by_that_name_is_said_not_guessed():

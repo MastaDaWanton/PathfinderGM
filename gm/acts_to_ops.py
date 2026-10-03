@@ -67,6 +67,7 @@ class Row:
     intents: list[dict] = field(default_factory=list)  # ops built here, whole
     missing: str = ""                                   # what the words named and is not here
     note: str = ""                                      # why nothing was built, for the log
+    thing: str = ""                                     # a goods row's object, resolved
 
     def record(self) -> dict:
         out = {"act": self.act, "ops": list(self.ops)}
@@ -311,6 +312,13 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
     a = frame["actions"][i]
     thing = _object(frame, i, pc, recent)
     key = _carried(pc, thing, coming) if thing else ""
+    if not key and row.act == "offer":
+        # An offer of something not in the pack is talk, not a sale refused: the live
+        # reader read "I approach the man and offer to help him with the crate" as
+        # `offer, object: to help him with the crate`, and "not carrying to help him…"
+        # would have reached the brief as a fact.
+        row.note = f"an offer of {thing or 'nothing named'}, nothing carried to sell"
+        return
     if not key:
         row.missing = (f"{pc.name} is not carrying {thing}" if thing
                        else "nothing was named to sell")
@@ -348,10 +356,12 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
         return rows
     pc = scene.pc() if hasattr(scene, "pc") else None
     coming: list[str] = []
+    gone: list[str] = []
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
         row = Row(index=i, act=act)
         if act in GOODS_ACTS and pc is not None:
+            row.thing = _object(frame, i, pc, recent)
             if act == "take":
                 _take(row, frame, i, scene, pc, recent)
                 coming += [str(t["params"]["item"]) for t in row.intents]
@@ -361,6 +371,20 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _give(row, frame, i, scene, pc, recent, coming)
             else:
                 _sell(row, frame, i, scene, pc, sentence, recent, coming)
+            if act != "take":
+                # A thing an earlier deed of the sentence already parted with is not
+                # parted with twice. Measured on the items save's last line, read live:
+                # "I also drop the Brunt of the weight on the ground and leave it behind"
+                # came back `drop: the Brunt of the weight` then `drop: it` — the same
+                # brunt, set down twice, the second refused by the engine into the prose.
+                # Coin is a number, and two payments are two (`_same_thing` calls any two
+                # mentions of coin one thing, for replacing the plan's coin op).
+                twice = [t for t in row.intents if not _is_coin(t["params"]["item"])
+                         and any(_same_thing(t["params"]["item"], g, pc) for g in gone)]
+                if twice:
+                    row.intents = [t for t in row.intents if t not in twice]
+                    row.note = f"{twice[0]['params']['item']} is already parted with"
+                gone += [str(t["params"]["item"]) for t in row.intents]
         else:
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
@@ -380,7 +404,7 @@ def built_ops(rows: list[Row]) -> list[str]:
 
 
 def unresolved(rows: list[Row]) -> list[str]:
-    return [r.missing for r in rows if r.missing]
+    return list(dict.fromkeys(r.missing for r in rows if r.missing))
 
 
 def refusal(rows: list[Row]) -> str:
@@ -415,8 +439,11 @@ def _same_thing(a, b, pc=None) -> bool:
     return holding.same(a, b)
 
 
-def _to_player(p: dict, pc) -> bool:
-    to = str(p.get("to") or "").strip().lower()
+def _to_player(p: dict, pc, target=None) -> bool:
+    """Whether a give lands in the player's hands. The intent's own `target` is where it
+    goes when the params name nobody, as `Engine._op_give` reads it: the recorded
+    `give actor=pc target=c13` of the brunt was a give TO the smith."""
+    to = str(p.get("to") or target or "").strip().lower()
     frm = str(p.get("from_") or p.get("from") or "").strip().lower()
     return to in (pc.ref, "pc", "you", "player") or not (to or frm)
 
@@ -443,6 +470,7 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     if pc is None:
         return raw
     built = [i for r in rows for i in r.intents]
+    nothing = [r.thing for r in rows if r.act in GOODS_ACTS and r.thing and not r.intents]
     acts = {str(a.get("act") or "") for a in frame.get("actions") or []}
     out: list = []
     placed: set[int] = set()
@@ -453,13 +481,25 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         p = r.get("params") or {}
         actor = str(r.get("actor") or "")
+        target = r.get("target")
         mine = actor in ("", "pc", pc.ref, "None") or str(p.get("from_") or "") == pc.ref \
-            or _to_player(p, pc)
+            or _to_player(p, pc, target)
         if not mine:
             out.append(r)                        # between other people: theirs
             continue
         twin = next((k for k, b in enumerate(built)
                      if _same_thing(p.get("item"), b["params"].get("item"), pc)), None)
+        if twin is None and not _is_coin(p.get("item")) and any(
+                _same_thing(p.get("item"), t, pc) for t in nothing):
+            # The reading named this very thing and the table found nothing to move —
+            # not carried, already carried, not a thing. The plan's op on it goes too.
+            # Measured in the replay of the items save's last line: the reading's drop of
+            # the brunt found none in the pack, and the plan's `give actor=pc target=c13`
+            # of it stood and was refused into the prose ("has no Brunt of the weight").
+            if notes is not None:
+                notes.append(f"the plan's {op} of {p.get('item')!r}: the reading named it "
+                             f"and the table found nothing to move, dropped")
+            continue
         if twin is not None:
             if twin not in placed:
                 placed.add(twin)
@@ -471,7 +511,7 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         if op == "sell":
             stands = "sell" in acts
-        elif _to_player(p, pc):
+        elif _to_player(p, pc, target):
             stands = bool(acts & interpret.GETTING_ACTS)
         elif _is_coin(p.get("item")):
             # Coin out of the purse is a payment, and only paying pays: measured on the
