@@ -146,4 +146,170 @@ rows.
 
 ## The bench
 
-(numbers below)
+`tests/beat_verify/gold.py` holds 50 labelled beats.
+
+- **36 tuned beats.** These come from the owner's 2026-10-03 save as played live (the
+  `kesst:` and `talk:` sources) and from the Bobby corpus (`bobby:`). Their prose is cut
+  to the sentences a label needs; the saves themselves are never committed. A beat marked
+  "draft" is the text before a check repaired it: the flagged sentence from the save's
+  `truth-checks` row put back. The set includes every case in the brief:
+  - "You move toward the anvil";
+  - "the smith, Korvu, … takes the crate from you";
+  - "The transaction is finalized. The heavy clink of the coin";
+  - "The clerk's eyes drop to the floor";
+  - "midnight" and "the first hint of dawn" against the clock;
+  - "You step out of the heat of the smithy and into … the street";
+  - 24 clean beats that must raise nothing.
+- **14 held-out beats.** These come from the scripted sessions of 2026-09-25
+  (`tests/replay`). They were labelled before any run, and nothing was tuned on them.
+
+Each beat carries:
+- the engine's side, in the shape `facts_from` builds;
+- what the narration claims, hand-labelled;
+- the alarms a correct comparison raises.
+
+`tools/beat_verify_bench.py` scores three things:
+- the reader, per claim category;
+- the alarms, per category, before and after the second read;
+- the beat-level false-alarm rate on the clean beats.
+
+It also runs the regex checks on the same beats. Their harness is a stub engine with the
+same places, pack, clock and outcomes, plus `narration.contradicts_state`, the review's
+state reader.
+
+### Results, 2026-10-03
+
+**gemma-4-12B (heretic), 2 runs over all 50 beats.**
+
+Ollama was shared with lanes F and N throughout. An earlier run under heavier contention
+had a read median of 8.4 s.
+
+| claims (validated) | precision | recall | precision with no quote check |
+|---|---|---|---|
+| player ends at | 0.91 | 0.91 | 0.91 |
+| changed hands | 0.67 | 0.88 | 0.61 |
+| trades | **1.00** | **1.00** | 0.71 |
+| harmed | 0.86 | 0.86 | 0.86 |
+| time of day | 0.88 | 0.88 | 0.78 |
+| all | 0.84 | 0.90 | — |
+
+- The quote check made the difference on trades: "the exchange" and "the sound of a
+  person who has finished their part in the exchange" both arrived as settled sales.
+- Latency of the read: median 4.4 s, p90 6.1 s, max 14.7 s over 100 calls.
+- Reads that failed: **0 of 100**. Across every gemma bench run this session it is
+  0 of 244.
+
+**The alarms against the regex checks.** Alarm counts are summed over the two runs for
+gemma; the regex checks are deterministic and ran once.
+
+| category | regex checks: P / R | read back, first read only: P / R | read back + second read: P / R |
+|---|---|---|---|
+| move | 1.00 / 1.00 (3/3) | 0.67 / 0.67 | 1.00 / 0.67 (4/6) |
+| hands | 1.00 / 0.40 (2/5) | 0.80 / 0.80 | **1.00 / 0.80 (8/10)** |
+| trade | 1.00 / 0.50 (2/4) | 1.00 / 1.00 | **1.00 / 1.00 (8/8)** |
+| harm | 1.00 / 0.33 (1/3) | 1.00 / 0.33 | 1.00 / 0.33 (2/6) |
+| hour | 1.00 / 1.00 (3/3) | 1.00 / 1.00 | **1.00 / 1.00 (6/6)** |
+| all | 1.00 / 0.61 | 0.88 / 0.78 | **1.00 / 0.78** |
+| clean beats falsely alarmed | 0 of 36 | 2 of 72 | **0 of 72** |
+| bad beats fully caught | 7 of 14 | 20 of 28 | 20 of 28 |
+
+The second read asked 24 of the 100 beats, at a median of 3.5 s and a max of 20.9 s. It
+refuted both first-read false alarms and no true one:
+- "You thrust the heavy crate forward across the workbench" as a hand-over;
+- "the sudden, ringing silence of the square" as a move.
+
+The regex checks' 0 false alarms are not free. Each was patched after a live false alarm
+on these same beats (`refused_move` for the anvil, `contradicts_state` for the clerk's
+eyes), and their misses are the phrasings nobody had patched yet:
+- "Korvu takes the crate" with no "from you";
+- "the transaction is finalized" on a turn with no `sell`;
+- the crate lifted "from the dirt" that the engine never picked up.
+
+**Osmosis-Structure-0.6B, 1 run over all 50 beats.** This ran an earlier build of the
+module: before the bench's last fixes (each sentence judged, descriptor names, "left
+behind", the pick-up demonstration).
+- Claims: precision **0.06**, recall **0.16**.
+- 242 claims were dropped by validation, mostly quotes that are not on the page.
+- 11 of 50 reads did not parse (22%). It runs to its token limit repeating rows.
+- Alarms before the second read: P 0.27, R 0.20, and 6 of 28 clean beats falsely alarmed.
+- Read latency: median 3.7 s.
+
+It is a model for re-shaping another model's answer, which is what its card says. It is
+not a reader of prose, and it is not used.
+
+**NuExtract 2.0** has no Ollama build on this machine, so it was not measured.
+
+**The pick: gemma-4-12B, the narrator's own model.** The check routes to the narrator's
+model and host (`BeatContext.reader`), so it costs no second model in memory.
+
+### What the reader still gets wrong
+
+- **"You are standing where the paths diverge"** (bobby:6) is read as staying at the way
+  in, both runs. This is why `refused_move` stays.
+- **Held-out harm.** When the player swings at a Commoner and misses, and the page has
+  "the man" hit the ground, the reader puts the blow on the man in stained leather, who is
+  already down. A hurt claim against a body already down is not judged, so no alarm is
+  raised. The regex checks miss both of these beats too.
+- **"the pre-dawn gloom" at 01:28** is read as "dawn". The alarm is right either way:
+  neither word fits that hour.
+- **Hands over-reports.** "He takes the paper back from you" and "closes his hand around
+  one of the shards" come back as "something else". Things with no engine name are never
+  judged, so these cost nothing.
+
+### The second read, and what it was not allowed to do
+
+The first wording of the questions refused true alarms.
+- With "Answer no unless the sentence plainly says it", gemma refused 3 of 5 true
+  contradictions on a probe, "The transaction is finalized." among them.
+- "Does the crate pass from you to the smith?" was refused for "Korvu takes the crate":
+  the sentence never says "from you".
+
+The questions now ask only whether the thing moved; the first read supplies the
+direction. The hour is not asked again: "is it dawn now?" of "the pre-dawn light" is
+correctly answered no, and that is still a true alarm at 01:28.
+
+## Retired, and what stays
+
+Retired where the round trip measured at least as good, at equal precision:
+
+| check | category | regex | read back |
+|---|---|---|---|
+| `thing_kept` | hands | R 0.40 | R 0.80 |
+| `trade_claimed` | trade | R 0.50 | R 1.00 |
+| `time_of_day` | hour | R 1.00 | R 1.00, no false alarm |
+
+Kept:
+- **`refused_move`** measured better (3/3 against 4/6). Both run. On one sentence the
+  heavier finding wins, and the read back goes first at equal weight.
+- **`empty_roll`** is equal on harm. It is also the only reader of a victim who is not on
+  the actor list ("Dagan Havenstone", G2), a claim this member never judges.
+- **Every other check.** The bench has no row for its kind: road, direction, route,
+  bearing, land, setting, faces, speech, keepers, hooks, size, and the rest. Those are the
+  next rows to label before anything else retires.
+
+`time_of_day`'s repair cost no model call: it swapped the clock's word in. Its
+replacement costs the read, plus at most one rewrite of the sentence, and the backstop
+cuts. That is a real cost, accepted because the old repair was itself an English reader.
+
+## When the read fails
+
+`beat_verified.find` raises. The registry books a `check-error` row for the member, and
+the turn goes on with every other check. On that beat, nothing stands in for the three
+retired categories; the brief allowed this, and it is said here plainly.
+- Measured on the bench: 0 of 244 gemma reads failed.
+- Osmosis failed 11 of 50.
+
+Every live read is logged as a `beat-verify` row in the turn log: claims, dropped claims,
+seconds, and the error if there was one. The live failure rate can be read off saves.
+
+## Not done
+
+- Not played live in the running app. The member is proven through `_repair_sentences`
+  and `_groom` with scripted replies, and on the bench with the real model.
+- The interface for lane N's beat reader is `facts_from` / `read` / `diff`. Folding this
+  read into that call is for after lane N merges; whether one call answering both does
+  worse than two must be measured, not assumed.
+- Omissions are judged for trades only.
+- `arrived` and `left` are read, but only a `left` of somebody the engine keeps here is
+  judged, and the bench has a single `left` claim. That is too few to say anything.
+- The regex checks without a bench row remain English readers.

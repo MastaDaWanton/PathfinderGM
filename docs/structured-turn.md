@@ -114,13 +114,30 @@ extra demonstrated fields bled escaped JSON into the narration (4 of 8 runs, 202
 3. **The regex harvesters retire** as the beat reader covers them: `seen_people`'s phrase
    finding, `speaker_real`'s clause heuristics, `mentioned_elsewhere`, `places_heard`'s
    reading of speech, `pronouns_adopted`, `name_given`.
-4. **Policing** (the 33 checks) is out of scope for this pass, except where a check
+4. **Policing** (the 33 checks) was out of scope for lane N, except where a check
    only existed to guess what the beat reader now declares. Their re-reading of English is
-   the same problem, and the follow-up is to have the beat reader answer closed
-   questions, with code comparing those answers to the engine's outcomes:
+   the same problem, and the follow-up was to have a reader answer closed questions, with
+   code comparing those answers to the engine's outcomes:
    - "where does the player end up: one of these places, or none";
    - "what changes hands".
-   Recorded here as the next step, not done in this pass.
+
+   **Started in lane V, 2026-10-03** (`docs/beat-verify.md`, branch
+   `structured/beat-verify`).
+   - `gm/beat_verify.py` reads the finished beat back. Every slot is an enum the engine
+     supplies: where the player ends, what changed hands, trades, harm, arrivals and
+     departures, and the hour.
+   - Every claim's quote is checked in code to be the page's narration.
+   - Code diffs the claims against `resolution.outcomes` and the scene. Each
+     contradiction is asked once more as a yes-or-no question about its one sentence.
+   - `gm/checks/beat_verified.py` runs it behind the registry and repairs through
+     `_repair_sentences`.
+   - On a 50-beat bench (gemma-4-12B, 2 runs): alarm precision 1.00, recall 0.78, no
+     clean beat alarmed. The regex checks scored precision 1.00, recall 0.61.
+   - Retired: `thing_kept`, `trade_claimed` and `time_of_day`.
+   - Kept: `refused_move`, which measured better, and `empty_roll`, which is equal on
+     harm and covers victims who are not listed.
+   - Its interface (`facts_from` / `read` / `diff`) is kept separate so it can be folded
+     into this beat reader after lane N merges, if one call measures as well as two.
 
 ## How it is proven
 
