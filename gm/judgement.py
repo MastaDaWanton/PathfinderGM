@@ -9390,19 +9390,20 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
     player. "'You're a long way from the interior,' he says" is a hail; "'Fine weather,'
     the carter tells the drover" is not.
 
-    **Tags first, then spans over the whole beat** (item 13, 2026-09-28). The prose call
-    tags who said each line and to whom (`speech.lift`), and a tagged `to=you` line by a
-    living person here is a hail with no reading of the page at all — only the check that
-    the line is still on it. Before this the tags were read inside a per-sentence span
-    loop, and on Drenn's beat no sentence held a whole quotation ("'You!" ends one), so
-    two correct `to=you` tags were never read: 0 hails where there were 2. Untagged lines
-    are then found over the whole beat (`checks._people.spans_in_context`), each read with
-    the narration around it, and attributed by the name and head-word matching the
-    introductions use. Tags are per line: one speaker is never given every line in a
-    stretch (Muzny et al. 2017 report "one speaker per paragraph" only to refute it).
-    """
-    from .checks._people import name_words, spans_in_context
+    **The booked lines only** (item 13, 2026-09-28, and the beat reader, 2026-10-03). The
+    prose call tags who said each line and to whom (`speech.lift`), the beat reader books
+    every line the tags left out (`play/aftermath/speaker_real.py`), and a booked `to=you`
+    line by a living person here is a hail with no reading of the page at all — only the
+    check that the line is still on it. Before item 13 the tags were read inside a
+    per-sentence span loop, and on Drenn's beat no sentence held a whole quotation ("'You!"
+    ends one), so two correct `to=you` tags were never read: 0 hails where there were 2.
 
+    Until 2026-10-03 the untagged lines were then guessed over the whole beat: the
+    narration round each line read for a word of somebody's name, else a role word
+    ("the man", "the woman in the corner") — and "the man" was the servant carrying jugs
+    for six beats of the owner's save (item 15). That reading is the beat reader's now;
+    with no reading, an untagged line hails nobody.
+    """
     if scene is None or not beat:
         return []
     actors = getattr(scene, "actors", {}) or {}
@@ -9428,130 +9429,7 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
         aimed = str(rec.get("to") or "")
         if aimed == "you" or (not aimed and you.search(str(rec.get("line") or ""))):
             out.append(who)
-    # 2. The untagged lines, over the whole beat.
-    from .checks._quotes import pc_spoken
-
-    blank = speech.blanked(beat)
-    pc = scene.pc() if hasattr(scene, "pc") else None
-    after = -1
-    for qa, qb, outside in spans_in_context(beat):
-        line = beat[qa + 1:qb - 1] if qb - qa >= 2 else ""
-        before, after = after, qb
-        tagged = speech.speaker(said, line)
-        if tagged is not None and tagged.get("who") in actors:
-            continue          # decided by its tag above, hail or not
-        if not you.search(line):
-            continue
-        # "'…,' you say": the player's own line, never somebody hailing them — item 15
-        # of 2026-10-03, where the PC's words were booked as the clerk's.
-        if pc_spoken(blank, qa, qb, str(getattr(pc, "name", "") or ""), after=before):
-            continue
-        words = _name_words(outside)
-        # Half of a hyphenated noun is not that noun: "nodding at the lock-keeper" is not
-        # the keeper of the general store. Harmless while keepers carried proper names;
-        # since they go by their descriptor (owner ruling F1, 2026-09-30) the store's
-        # keeper took the apron man's hail in the G2 case below on the word "keeper".
-        compounds = re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)+", outside)
-        if compounds:
-            parts = {p.lower() for c in compounds for p in c.split("-")}
-            alone = _name_words(re.sub(r"[A-Za-z]+(?:-[A-Za-z]+)+", " ", outside))
-            words = words - (parts - alone)
-        speaker = None
-        # A named person first, by any word of their name, a descriptor by its head
-        # noun (never "through" for the watchman waving traffic through); then by the
-        # role word the narration uses ("the man", "the woman in the corner").
-        for ref, a in people:
-            mine = set(name_words(a.name))
-            if mine and mine & words:
-                speaker = ref
-                break
-        if speaker is None:
-            role = _ROLE_WORD.search(outside)
-            if role:
-                head = role.group(0).lower()
-                for ref, a in people:
-                    if head in _name_words(a.name):
-                        speaker = ref
-                        break
-        if speaker and speaker not in out:
-            out.append(speaker)
     return out
-
-
-def doubt_tags(scene, beat: str, said, attribution=None) -> list[dict]:
-    """Un-attribute the prose call's speaker tags the page itself contradicts. Edits the
-    records of `said` in place — `who` emptied, the claim kept in `was`, the reason in
-    `doubt`, the shape `speech.lift` gives a tag naming nobody — and returns one row per
-    record for the turn log.
-
-    Measured on the owner's 2026-10-03 save (item 15): in market-talk the model tagged
-    every line of "the man" — "The man on the stool blinks… 'What is going on?' he
-    repeats" — to c1, the servant carrying jugs, who appears nowhere in those beats. Each
-    tag opened a conversation with the servant (`hailed_by`), the brief then told the
-    narrator the player was talking to the servant, and the next beats tagged him again:
-    six beats, and `greets-known-as-stranger` fired at the servant for the man's line.
-    In the items save the PC's own invented line was booked as the clerk's.
-
-    The quote-attribution literature's lesson is precision over recall: Muzny et al.
-    2017's high-precision sieve leaves a third of quotes unattributed on purpose (90.4%
-    precision at 65.1% recall), and on PDNC (Vishnubhotla et al. 2022) every system is
-    near a coin toss on anaphoric quotes. So a tag is never re-pointed at somebody else
-    here — it is only withdrawn, and only when the page says otherwise:
-
-      * the line is the player's character's ("…,' you say": `_quotes.pc_spoken`);
-      * the tagged person is nowhere in the beat (not by a word of their name, not by
-        their ref, not by the attribution) AND the narration makes somebody else the
-        speaker: the clause's or the nearest description's head noun is a person word
-        that is no word of theirs ("the man" for "the servant carrying jugs").
-
-    A withdrawn line to the player is then `speaker_real`'s to settle, by the page."""
-    from .checks._people import name_words
-    from .checks._quotes import page_speaker_head, pc_spoken, quote_of
-
-    if scene is None or not beat or not said:
-        return []
-    actors = getattr(scene, "actors", {}) or {}
-    pc = scene.pc() if hasattr(scene, "pc") else None
-    pc_name = str(getattr(pc, "name", "") or "")
-    blank = speech.blanked(beat)
-    narration = speech.unquoted(beat)
-    spans = speech.spans(beat)
-    rows: list[dict] = []
-    for rec in said:
-        who = str(rec.get("who") or "")
-        if not who or rec.get("from") or who not in actors or actors[who].is_pc:
-            continue
-        q = quote_of(beat, str(rec.get("line") or ""))
-        if q is None:
-            continue
-        qa, qb = q
-        after = max((b for a, b in spans if b <= qa), default=-1)
-        why = ""
-        if pc_spoken(blank, qa, qb, pc_name, after=after):
-            why = "the line is the player's character's own"
-        else:
-            a = actors[who]
-            words = set(name_words(str(a.name or ""))) | set(
-                name_words(str(getattr(a, "true_name", "") or "")))
-            here = (f"({who})" in beat or any(
-                re.search(r"\b" + re.escape(w) + r"(?:s|es)?\b", narration, re.I)
-                for w in words))
-            if not here and attribution is not None:
-                try:
-                    here = bool(attribution.mentioned_in(beat, who))
-                except Exception:  # noqa: BLE001 — the attribution only adds certainty
-                    pass
-            head = "" if here else page_speaker_head(blank, qa, qb)
-            if head and head not in {w.lower() for w in words}:
-                why = (f"{a.name} ({who}) is nowhere in the beat, and the page makes "
-                       f"the {head} the speaker")
-        if why:
-            rec["was"] = who
-            rec["who"] = ""
-            rec["doubt"] = why
-            rows.append({"kind": "speech-doubt", "was": who,
-                         "line": str(rec.get("line") or "")[:80], "why": why})
-    return rows
 
 
 def _take_the_name(scene, who, given: str) -> None:
@@ -9583,68 +9461,22 @@ def a_child_in(scene, beat: str) -> bool:
     return bool(_CHILD_WORDS.search(str(beat or "")))
 
 
-# Somebody already named, described: "He is a large man", "she was a tall woman", "who
-# is an old man". The phrase after the copula is a predicate about the subject, not a
-# person walking on.
-_PREDICATE_BEFORE = re.compile(
-    r"\b(?:he|she|they|who|it)\s+(?:is|was|'s|seems|seemed|looks\s+like|looked\s+like|"
-    r"appears\s+to\s+be|appeared\s+to\s+be)\s+(?:a|an)\s+$", re.I)
+def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]:
+    """Phrases into the population, located where the party stands and with a life rolled
+    — records the player can find later (the user's question of 2026-09-25: "there is
+    nothing left of her?"). Returns the records. A plural or a counted group is not one
+    person with one life (measured live 2026-09-25: "neighboring merchants" was rolled a
+    work, a face and a quirk of its own), and somebody heard of a beat or two ago whom
+    these words describe is that record, not a second (`population.heard_of_match`).
 
-
-def only_a_predicate(beat: str, phrase: str) -> bool:
-    """Whether every place the beat uses `phrase` is a description of somebody the
-    sentence already has as its subject.
-
-    Measured live on the merged 2026-10-03 batch: "The man at the workbench—the smith—
-    does not look up … He is a large man, his hands calloused … 'Well,' he grunts" made
-    "large man" a person (c15). The "he" of the next line then carried to that record,
-    and the smith's own words gave the duplicate a body; with two people in the
-    conversation, "It's a deal. You can have the crate" found no buyer."""
-    words = [w for w in re.findall(r"[a-z'’-]+", str(phrase or "").lower())
-             if w not in ("the", "a", "an")]
-    if not words:
-        return False
-    pat = re.compile(r"\b" + r"\s+".join(re.escape(w) for w in words) + r"\b", re.I)
-    text = str(beat or "")
-    spots = list(pat.finditer(text))
-    if not spots:
-        return False
-    for m in spots:
-        before = text[max(0, m.start() - 60):m.start()]
-        # The head may carry adjectives in the phrase itself; the copula sits just
-        # before the article that opens it.
-        if not _PREDICATE_BEFORE.search(before):
-            return False
-    return True
-
-
-def record_people(scene, introduced, *, turn: int = 0, world=None,
-                  beat: str = "") -> list[dict]:
-    """Everyone a beat introduced goes into the population, located, with a life rolled —
-    before promotion, so a promoted person wears the face their record rolled and one who
-    is not is still somebody the player can find later (the user's question of
-    2026-09-25: "there is nothing left of her?"). Returns the records.
-
-    A plural or a counted group is not one person with one life. Measured live
-    2026-09-25: "neighboring merchants" was rolled a work, a face and a quirk of its own.
-    `promote_cast` already treats a bare plural as scenery; a group's members are recorded
-    when the prose singles one of them out.
-
-    With the beat in hand (`beat`), each person is read for HOW the beat has them
-    (`seen_in_beat`), after the owner's ruling of 2026-10-01 — "show described people in
-    the scene. if i can see them they should be in the scene as a fully made person ready
-    to be interacted with and saved if not already existing":
-
-      * **seen** here, now: recorded at the party's place and marked `shown` with this
-        turn, which `embody_seen` (the "people" stage, `play/aftermath/seen_people.py`)
-        reads to give them a body;
-      * **heard** of only (the narration reports somebody's words about them): recorded
-        with NO place (`spot=""`), heard from the one person the player is talking with —
-        never at the place the talk happened. Measured on the owner's save: the woman
-        Gorm said lives "three streets over" was recorded twice, both in the tavern;
-      * either way, somebody heard of in the last beat or two whom these words describe
-        is that same person, not a second record (`population.heard_of_match`).
-    """
+    **It no longer reads the beat.** Until 2026-10-03 it took the beat as well and decided
+    for each phrase whether the page SHOWED the person here (a body, the owner's ruling of
+    2026-10-01) or only spoke of them, with `seen_in_beat`'s cue words, `_gendered`'s "It
+    is a woman", `_said_to_live`, `_shown_again` and `only_a_predicate` — code reading
+    English, one rule per phrasing. The last of them was written the day "He is a large
+    man" made a second smith (c15). Who is new, and whether they are here, is the beat
+    reader's answer now (gm/beat_reader.py), applied by `play/aftermath/seen_people.py`;
+    this stays as the plain recorder the batch doors and the tests stand people up with."""
     from rules import names as names_mod
     from rules import population
 
@@ -9655,228 +9487,15 @@ def record_people(scene, introduced, *, turn: int = 0, world=None,
     for phrase in introduced or []:
         if _plural_role(phrase) or counts.get(phrase, 1) > 1:
             continue
-        if beat and only_a_predicate(beat, phrase):
-            continue
-        how = seen_in_beat(beat, phrase) if beat else ""
-        said_as = phrase
-        if how == SEEN:
-            phrase = _gendered(beat, phrase)
         heard = population.heard_of_match(scene, phrase, turn=turn)
-        if heard is not None:
-            if how == SEEN:
-                # Heard of a moment ago and now standing here: the same person, seen.
-                heard["spot"] = getattr(scene, "at", None)
-                population.seen(scene, heard)
-                heard["last_seen"] = int(getattr(scene, "clock_minutes", 0) or 0)
-                heard["shown"] = int(turn)
-                heard["said_as"] = said_as
-            out.append(heard)
-            continue
-        if how == HEARD:
-            rec = population.note(scene, phrase, turn=turn, body=body, spot="",
-                                  heard_from=_the_one_talking(scene))
-            if _said_to_live(beat, phrase) and isinstance(rec.get("life"), dict):
-                # "a woman lives there": a resident, whatever the roll said of roads.
-                rec["life"]["mobility"] = "resident"
-                rec.pop("anchor", None)
-        else:
-            rec = population.note(scene, phrase, turn=turn, body=body)
-            if how == SEEN:
-                rec["shown"] = int(turn)
-                rec["said_as"] = said_as
-        out.append(rec)
-    if beat:
-        out += _shown_again(scene, beat, set(introduced or []), turn=turn)
+        out.append(heard if heard is not None
+                   else population.note(scene, phrase, turn=turn, body=body))
     return out
 
 
-def _shown_again(scene, beat: str, introduced: set, *, turn: int) -> list[dict]:
-    """Somebody the ledger booked on an earlier beat, without a body, whom THIS beat shows
-    here: `note_cast` books a definite "the woman" as somebody already booked and returns
-    nothing for her, so the loop above never sees her. Replayed 2026-10-01 on the owner's
-    save: "there is no sign of the woman" booked her (heard of), and the next beat's "You
-    find the woman standing in the entryway" made nobody — the ruling's own case, a woman
-    the player can see, left as prose."""
-    from rules import population
-
-    out = []
-    bodies = getattr(scene, "people", {}) or {}
-    for e in list(getattr(scene, "cast", None) or []):
-        who = str(e.get("who") or "")
-        if (not who or who in introduced or (e.get("ref") and e["ref"] in bodies)
-                or int(e.get("count", 1) or 1) > 1 or _plural_role(who)):
-            continue
-        if seen_in_beat(beat, who) != SEEN:
-            continue
-        # The ledger keeps twelve turns; the transcript counts two entries a turn.
-        rec = population.heard_of_match(scene, who, turn=turn, within=24)
-        if rec is not None:
-            rec["spot"] = getattr(scene, "at", None)
-            population.seen(scene, rec)
-            rec["last_seen"] = int(getattr(scene, "clock_minutes", 0) or 0)
-        else:
-            rec = population.at_spot(scene, who) or population.here_as(scene, who)
-        if rec is None or (rec.get("ref") and rec["ref"] in bodies):
-            continue
-        rec["shown"] = int(turn)
-        rec["said_as"] = who
-        out.append(rec)
-    return out
-
-
-# --- seen, or only heard of -----------------------------------------------------------
-#
-# The owner's ruling of 2026-10-01 overturns the 2026-09-27 one ("the prose records people;
-# engagement or the plan makes them actors"): a person the player can SEE is in the scene
-# as a full person at once. The ruling turns on seeing, so the test is whether the beat
-# shows them here and now — not whether it names them. Interactive fiction's rule is the
-# same one: "if an object is mentioned in the room description, it should probably be
-# implemented" (the Inform 7 Handbook, "Scenery"), because a player who reads a thing in
-# the room will try to touch it; the owner's "/cheat the woman … pounces on me" was that,
-# refused as "unknown ref 'woman'" because she was prose and nothing else. And the same
-# tradition keeps the opposite case apart: somebody merely spoken of is *familiar*, not
-# *seen* (Eric Eve's Epistemology, Inform Recipe Book §5.5) — a woman a barkeep says lives
-# across town is a record, not a body in the tavern.
-#
-# Seen needs positive evidence, because a body is what a misread turns into a phantom in a
-# fight (the 2026-09-27 hand check: 11 of 30 prose-booked people wrong). A sentence about
-# the person that places or acts them here, and that is no report of somebody's words.
-
-SEEN = "seen"
-HEARD = "heard"
-
-# The person is the object of telling: "he had told you that a woman lives there",
-# "the elder Gorm spoke of". Not a bare "says": the man who says something is here.
-_HEARSAY = re.compile(
-    r"\b(?:told|tells\s+you|tell\s+you|spoke\s+(?:of|about)|speaks\s+(?:of|about)|"
-    r"spoken\s+(?:of|about)|mention\w*|rumou?r\w*|heard\s+(?:of|about|that|tell)|"
-    r"word\s+is|according\s+to|talk(?:ed|s)?\s+(?:of|about)|lives?\s+(?:there|in|at|over|"
-    r"across|on|by|near|out|beyond|up|down)|who\s+lives|resides?|dwells?)\b", re.I)
-_IF = re.compile(r"^\W*(?:if|unless|should|perhaps|maybe|when(?:ever)?)\b", re.I)
-# What the eye does, beside `_PLACES_THEM_HERE`'s being-here verbs.
-_SEEN_HERE = re.compile(
-    r"\b(?:you\s+(?:see|notice|spot|glimpse|make\s+out)|catch\s+sight|silhouett\w*|"
-    r"visible|framed|perched|seated|lounging|hunched|loom(?:s|ing)|hovers?|hovering|"
-    r"behind\s+the\s+(?:counter|bar|desk|stall)|at\s+the\s+top\s+of|at\s+the\s+foot\s+of|"
-    r"polish\w*|wip(?:es|ing)|tend(?:s|ing)|look(?:s|ing)\s+(?:at|up|over|down)|stares?|"
-    r"staring|glances?|nods?|smiles?|frowns?|shrugs?|gestures?|beckons?|waves?)\b", re.I)
-
-
-def seen_in_beat(beat: str, phrase: str) -> str:
-    """SEEN, HEARD or "" — how this beat has the person: shown here and now, only spoken
-    of, or neither clearly (recorded where the party is, as before, and given no body)."""
-    from .narration import _sentences, unquoted
-
-    if not beat or not phrase:
-        return ""
-    plain = unquoted(beat)
-    head = _role_head(phrase)
-    if not head:
-        return ""
-    about = [s for s in _sentences(plain)
-             if re.search(rf"\b{re.escape(head)}s?\b", s, re.I)]
-    if not about:
-        return HEARD                       # only ever inside somebody's speech
-    told = [s for s in about if _HEARSAY.search(s) or _IF.match(s)]
-    plain_about = [s for s in about if s not in told]
-    for s in plain_about:
-        if _shown_in(s, head):
-            return SEEN
-    if not plain_about or not present_in_scene(beat, phrase):
-        return HEARD
-    # Only ever the object of a question or a search: "the question you posed — concerning
-    # the woman three streets over — hangs in the air" (replayed 2026-10-01) is talk of her,
-    # and recorded her where the party stood, on the outskirts.
-    if all(_OBJECT_OF.search(s[:m.start()][-70:])
-           for s in plain_about
-           for m in re.finditer(rf"\b{re.escape(head)}s?\b", s, re.I)):
-        return HEARD
-    return ""
-
-
-# The cue must be THEIRS. Replayed 2026-10-01 on the owner's save: "You are still standing
-# before him, and the search for the woman has just become…" read as the woman standing
-# here (the player was), and `action_sentences` counted "a woman who exists in the stories
-# of the desperate" as somebody acting — a phantom woman walked on with a Ratfolk face.
-# So the verb must follow the person within a clause ("a figure IS SILHOUETTED", "a boy
-# STANDS in the doorway"), or the person must follow the eye ("you see a man …", "at the
-# top of the stairs, a figure").
-_CUE_RX: list = []
-
-
-def _cue() -> re.Pattern:
-    """Being here or being looked at, as one pattern (built late: `_PLACES_THEM_HERE` is
-    defined further down, beside `present_in_scene`)."""
-    if not _CUE_RX:
-        _CUE_RX.append(re.compile(r"(?:" + _PLACES_THEM_HERE.pattern + r")|(?:"
-                                  + _SEEN_HERE.pattern + r")", re.I))
-    return _CUE_RX[0]
-_LOOKED_AT = re.compile(
-    r"(?:\byou\s+(?:see|notice|spot|glimpse|make\s+out)|\bthere\s+(?:is|stands|sits|waits)|"
-    r"^\W*(?:at|in|on|behind|beside|by|near|across)\s+[^,]{1,40},)\s*(?:\w+\s+){0,4}$", re.I)
-_OBJECT_OF = re.compile(r"\b(?:for|of|about|after|from|like|than|concerning|regarding)\s+"
-                        r"(?:the|a|an|that|this)"
-                        r"\s+(?:\w+\s+){0,2}$", re.I)
-
-
-def _shown_in(sentence: str, head: str) -> bool:
-    """Whether this sentence shows the person its `head` names here, by a cue of theirs."""
-    for m in re.finditer(rf"\b{re.escape(head)}s?\b", sentence, re.I):
-        before = sentence[max(0, m.start() - 70):m.start()]
-        if _OBJECT_OF.search(before):
-            continue                       # "the search for the woman", "the memory of a man"
-        after = sentence[m.end():m.end() + 70]
-        clause = re.split(r"[,;:—–]|\bwho\b|\bthat\b|\bwhich\b|\band\b", after, maxsplit=1)[0]
-        if _cue().search(" ".join(clause.split()[:6])):
-            return True
-        # "a man who stands in the doorway": the relative clause is still his.
-        rel = re.match(r"\s*,?\s*(?:who|that)\s+((?:\w+\s+){0,4})", after, re.I)
-        if rel and _cue().search(rel.group(1)):
-            return True
-        if _LOOKED_AT.search(before):
-            return True
-    return False
-
-
-# A head that says nothing of who: the prose's word for somebody not yet made out.
+# A head that says nothing of who: the prose's word for somebody not yet made out. Read by
+# `_householder`: in somebody's own house, "a figure at the top of the stairs" is them.
 _VAGUE_HEADS = frozenset({"figure", "shape", "silhouette", "form", "person"})
-
-
-def _gendered(beat: str, phrase: str) -> str:
-    """"figure" → "woman" when the beat goes on to say so ("a figure is silhouetted … It
-    is a woman"): the owner's next words were "the woman", and every "her" after it went to
-    the only woman the engine held (Quin Nutmeg, in another room). Only a vague head, and
-    only an explicit "it is a woman" within the next two sentences — a pronoun guess would
-    hand the figure somebody else's "she"."""
-    from .narration import _sentences, unquoted
-
-    head = _role_head(phrase)
-    if head not in _VAGUE_HEADS:
-        return phrase
-    sentences = _sentences(unquoted(beat))
-    for i, s in enumerate(sentences):
-        if not re.search(rf"\b{re.escape(head)}\b", s, re.I):
-            continue
-        window = " ".join(sentences[i:i + 3])
-        m = re.search(rf"\b(?:it|they|the\s+(?:\w+\s+)?{re.escape(head)})\s+(?:is|was|turns\s+"
-                      rf"out\s+to\s+be|proves\s+to\s+be)\s+(?:a|an)\s+(?:[a-z]+\s+){{0,2}}?"
-                      rf"(woman|man|girl|boy)\b", window, re.I)
-        if m:
-            return re.sub(rf"\b{re.escape(head)}\b", m.group(1).lower(), phrase, count=1,
-                          flags=re.I)
-        break
-    return phrase
-
-
-def _said_to_live(beat: str, phrase: str) -> bool:
-    """Whether the beat says this person lives somewhere: "a human woman lives there"."""
-    from .narration import _sentences, unquoted
-
-    head = _role_head(phrase)
-    return bool(head) and any(
-        re.search(rf"\b{re.escape(head)}\b.*\b(?:lives?|dwells?|resides?)\b", s, re.I)
-        or re.search(rf"\bwho\s+lives\b.*\b{re.escape(head)}\b", s, re.I)
-        for s in _sentences(unquoted(beat or "")))
 
 
 def _the_one_talking(scene) -> str:

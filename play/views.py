@@ -3583,24 +3583,15 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                    "in_prose": [bool(judgement._role_head(w)) and
                                                 judgement._role_head(w) in text.lower()
                                                 for w in booked_in]})
-            introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
-            # And every one of them into the population, located and with a life rolled —
-            # a RECORD, which the player can find later (the user's question of
-            # 2026-09-25: "there is nothing left of her?"). Never a body any more: ruled
-            # 2026-09-27, option (a) of the declared-not-guessed review. A hand check of
-            # the prose door found 11 of 30 booked people wrong (the "elder" out of "the
-            # elder-quarter" in a quote, a second old man, "man in a stained leather", a
-            # thug named "weapon"), and a body is what a misread turned into a phantom in
-            # a fight. Bodies come from the plan (`introduce`) or from the player engaging
-            # somebody (`judgement.embody_sought`); a misread now leaves a stray record.
-            # Overturned in part by the owner on 2026-10-01: somebody the beat SHOWS here
-            # is a full person at once. The beat goes along so each person is read as seen
-            # or only heard of; the bodies are made in the "people" stage below
-            # (play/aftermath/seen_people.py), after a speaker has been made real.
+            # The ledger the brief reads ("ALSO PRESENT"). Not who is new or here: since
+            # 2026-10-03 that is the beat reader's answer (gm/beat_reader.py), recorded and
+            # given bodies in the "people" stage below (play/aftermath/seen_people.py).
+            # `record_people` used to do it here from this ledger's phrases, deciding seen
+            # or heard with `seen_in_beat`'s cue words and `only_a_predicate` — and "He is
+            # a large man" made a second smith the day the last of those rules was written.
+            judgement.note_cast(c.scene, text, turn=len(c.transcript))
             from rules import population
 
-            judgement.record_people(c.scene, introduced, turn=len(c.transcript),
-                                    world=c.world, beat=text)
             # Every search for somebody that found nobody this turn, so the synonym table
             # (content/people/synonyms.json) grows from what real play missed.
             c.turn_log.extend(population.drain_misses())
@@ -3617,26 +3608,19 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 c.turn_log.append({"kind": "manner", "quirks_shown": shown,
                                    "traits_named": named})
             _log_mentions(c, agent)
-            # A name given in play renames the panel: "call me Kael" from an unnamed
-            # person here makes him Kael from now on (2026-09-18: he called himself
-            # "the stranger", our placeholder, because nothing held a name).
-            refused_names: list = []
             attribution = getattr(agent, "attribution", None)
-            whose = attribution.who if attribution is not None else None
-            # A speaker tag the page contradicts is withdrawn before anything reads it —
-            # the names below, the bodies of the "people" stage and the hails after it
-            # (item 15, 2026-10-03: six beats of "the man" tagged to the servant, each
-            # one opening a conversation with him).
-            c.turn_log.extend(judgement.doubt_tags(c.scene, text, agent.last_said,
-                                                   attribution=attribution))
-            for ref, given in judgement.apply_introductions(c.scene, text, player_input,
-                                                             said=agent.last_said,
-                                                             refused=refused_names,
-                                                             whose=whose,
-                                                             world=c.world):
-                repairs.append(f"{ref} gave the name {given}: the panel shows it now")
-            for ref, given, whose in refused_names:
-                repairs.append(f"{ref} was not renamed {given}: {whose} answers to it")
+            # A speaker tag the beat reader contradicts is withdrawn before anything reads
+            # it — the bodies of the "people" stage and the hails after it (item 15,
+            # 2026-10-03: six beats of "the man" tagged to the servant, each one opening a
+            # conversation with him). Where `judgement.doubt_tags` ran its patterns.
+            from gm import beat_reader
+
+            if isinstance(attribution, beat_reader.Reading):
+                c.turn_log.extend(beat_reader.reconcile_tags(attribution, agent.last_said))
+            # A name given in play renames the panel ("call me Kael", 2026-09-18) — read
+            # by the beat reader and taken in the "people" stage, after the newcomers it
+            # names have bodies (play/aftermath/seen_people.py). `apply_introductions`
+            # read it here by pattern until 2026-10-03.
             # The after-the-beat steps' "people" stage (play/aftermath, §2.3): here, and
             # not with the "beat" stage below, because a speaker the page made real has to
             # exist before `hailed_by` reads who spoke to the player. `said` is the live
@@ -3746,9 +3730,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
                                  **({"added": added} if added else {}),
                                  **({"said": said} if said else {})})
-            # The measurement the tags are judged by: a valid ref on the wrong line looks
-            # fine to the parser, so the tagged hails are logged beside what the old
-            # guess would have said, and a disagreement means one of them is wrong.
+            # The measurement the tags are judged by: how many lines the prose call tagged,
+            # how many were booked from the page, and who hailed the player.
             c.turn_log.append({"kind": "speech-tags",
                                # The model's tags only: a line `speaker_real` read off
                                # the page (`"from": "page"`) is counted apart, so the
@@ -3766,8 +3749,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                                        if not r["who"]}),
                                "on_the_page": len(said),
                                "lines": len(speech_mod.lines(text)),
-                               "hails_tagged": judgement.hailed_by(c.scene, text, said=said),
-                               "hails_guessed": judgement.hailed_by(c.scene, text)})
+                               # Every hail is a booked line now (the tags, and the beat
+                               # reader's speakers); `hails_guessed`, the untagged-line
+                               # pattern it was measured against, retired with it.
+                               "hails_tagged": judgement.hailed_by(c.scene, text, said=said)})
             # The "beat" stage: the beat is on the transcript now, with the lines kept on
             # it, so a step can index it (the conversation log, F) and `c.suggestions` is
             # already this turn's (D).

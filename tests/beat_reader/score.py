@@ -145,6 +145,13 @@ def score(case: dict, ans: dict) -> dict:
             out[f"made_{where}"] = {"got": len(got), "right": hit, "want": len(want),
                                     "found": len(want & matched), "wrong": wrong}
 
+    # somebody known elsewhere walked in: right when the gold says they came, else wrong.
+    if "arrived" in ans:
+        gold = set(case.get("arrived") or [])
+        got = set(ans["arrived"])
+        out["arrived"] = {"right": len(gold & got), "of": len(gold),
+                          "wrong": sorted(got - gold)}
+
     # (b) who speaks each line.
     if "lines" in ans:
         right = of = 0
@@ -243,7 +250,7 @@ def strict(tallies: dict) -> bool:
     """The whole beat right: every answered question right, nothing made or recorded that
     should not be, nothing required missed."""
     for q, t in tallies.items():
-        if q in ("mentions", "lines", "to", "grouping", "pronouns", "names"):
+        if q in ("mentions", "lines", "to", "grouping", "pronouns", "names", "arrived"):
             if t["right"] != t["of"] or t.get("wrong"):
                 return False
         elif q.startswith("made_"):

@@ -552,6 +552,47 @@ CASES: list[dict] = [
         "places": [{"words": "forge|smithy", "kind": "smithy", "near": "the docks",
                     "one_of": "forge"}],
     },
+    # --- Sam's save, replayed 2026-10-01 (the seen-people ruling's own cases) ------------
+    {
+        "id": "sam-a-figure-it-is-a-woman",
+        "why": "'a figure … It is a woman' stayed prose; '/cheat the woman …' was refused "
+               "and every 'her' went to Quin Nutmeg in another room",
+        "cast": [KESST, ("c9", "Gorm Vesper", "barkeep")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": ("The door gives under your hand. At the top of the stairs, a figure is "
+                 "silhouetted against the lamplight. It is a woman, her face mostly in "
+                 "shadow, and she does not move."),
+        "said": [],
+        "people": {"a figure": "new:woman", "a woman": "new:woman"},
+        "new": {"woman": {"head": "woman", "where": "here"}},
+        "lines": {},
+    },
+    {
+        "id": "sam-a-woman-in-the-stories",
+        "why": "the player standing, and a woman who exists in stories, were read as a woman "
+               "here: a phantom walked on with a Ratfolk face",
+        "cast": [KESST, ("c9", "Gorm Vesper", "barkeep")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": ("You have been chasing a ghost, a woman who exists in the stories of the "
+                 "desperate. You are still standing before him, and the search for the "
+                 "woman has just become a search for why the lie persists."),
+        "said": [],
+        "people": {"a woman": "nobody|new:story", "the woman": "nobody|new:story"},
+        "new": {"story": {"head": "woman", "where": "elsewhere", "optional": True}},
+        "lines": {},
+    },
+    {
+        "id": "sam-the-question-you-posed",
+        "why": "talk of the woman three streets over recorded her where the party stood",
+        "cast": [KESST, ("c9", "Gorm Vesper", "barkeep")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": ("Gorm sets down the cup. The question you posed, concerning the woman "
+                 "three streets over, hangs in the air between you."),
+        "said": [],
+        "people": {"the woman": "new:three"},
+        "new": {"three": {"head": "woman", "where": "elsewhere"}},
+        "lines": {},
+    },
     # --- the Bobby corpus (read from disk; no text here) ------------------------------
     {
         "id": "bobby-01-the-watchman", "corpus": ("bobby-2026-09-28", 1, 0),

@@ -86,14 +86,21 @@ def test_the_words_people_wins_over_the_towns():
 
 
 def test_the_speaker_made_real_records_their_people():
-    """`speaker_real._embody` goes through `judgement.embody` → `population.embody`."""
-    from play.aftermath import speaker_real
+    """A speaker the beat reader reads as somebody new and here gets a body through
+    `seen_people` → `judgement.embody` → `population.embody` (`speaker_real._embody`
+    until 2026-10-03), and the body records their people."""
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
 
-    scene, _ = _table(MARKET)
-    rec = population.note(scene, "man in a stained apron")
-    ctx = SimpleNamespace(scene=scene, world=WORLD)
-    actor = speaker_real._embody(ctx, rec)
-    _agrees(actor, RATFOLK)
+    scene, engine = _table(MARKET)
+    text = "A man in a stained apron looks up. 'You lost?' he asks."
+    reading = stub.read(text, scene, engine=engine, who={"A man": "new"},
+                        new=[("A man", "here", "man in a stained apron")],
+                        lines={"You lost": ("A man", "you")})
+    seen_people.step(stub.ctx(scene, reading, text=text, engine=engine, world=WORLD,
+                              turn=3))
+    (n,) = reading.newcomers
+    _agrees(scene.actors[n.ref], RATFOLK)
 
 
 def test_a_named_spawn_still_records_its_people():

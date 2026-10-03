@@ -11,8 +11,9 @@ tests/test_beat_reader_gold.py.
 labeller (`mentions.attribute`), `doubt_tags`, `note_cast` + `record_people` (seen or
 heard: `seen_in_beat`, `only_a_predicate`), `speaker_real`, `embody_seen`,
 `heard_places.heard_in`, `mentioned_elsewhere.phrases_at` and `pronouns_adopted` — over the
-same beats and the same scenes. Those functions were retired by the beat reader; to run
-`--before` again, check out the commit that added this tool (it says so in the log).
+same beats and the same scenes. Those functions were retired by the beat reader in the
+commit after fceeb44; to run `--before` again, check out fceeb44 (its result is recorded
+in docs/beat-reader.md).
 """
 from __future__ import annotations
 
@@ -221,6 +222,7 @@ def run_reader(case, cfg) -> tuple[dict, dict]:
                    for p in r.places],
         "placed": [{"words": p.words, "at": names.get(p.at, p.at)} for p in r.placed],
         "pronouns": dict(r.pronouns),
+        "arrived": list(r.arrived),
         # The names that would be TAKEN: the reader's, through the engine's checks.
         "names": [{"who": (n["who"] if n["who"] in r.refs
                            else f"new:{root_key.get(n['who']) or n['who']}"),
@@ -353,7 +355,14 @@ def main() -> None:
     ap.add_argument("--only", default="", help="run the cases whose id holds this")
     ap.add_argument("--runs", type=int, default=1)
     ap.add_argument("--model", default="")
+    ap.add_argument("--places-new-only", action="store_true",
+                    help="the places call lists only places the town lacks "
+                         "(beat_reader.LIST_TOWN_PLACES off)")
     args = ap.parse_args()
+    if args.places_new_only:
+        from gm import beat_reader
+
+        beat_reader.LIST_TOWN_PLACES = False
 
     from play import modelcfg
 

@@ -91,7 +91,9 @@ def test_the_tag_decides_who_hailed_the_player(scene):
     tagged = (f"The man looks up from the fire. <say who={woman} to=you>'You're late,'"
               f"</say> the woman says.")
     beat, said = speech.lift(tagged, refs={man, woman})
-    assert judgement.hailed_by(scene, beat) == [man], "the defect this replaces"
+    # The guess this replaced said [man]; since 2026-10-03 there is no guess at all: an
+    # unbooked line hails nobody, and the beat reader books what the tags left out.
+    assert judgement.hailed_by(scene, beat) == []
     assert judgement.hailed_by(scene, beat, said=said) == [woman]
 
 
@@ -114,10 +116,21 @@ def test_the_tag_decides_whose_name_was_given(scene):
     assert scene.actors[man].name == "Kael" and scene.actors[woman].name != "Kael"
 
 
-def test_an_untagged_line_still_gets_the_old_answer(scene):
+def test_an_untagged_line_is_the_readers_to_book(scene):
+    """"'You're late,' she says", untagged. The old answer was a guess from the role word
+    before the line; the beat reader books the line now (`speaker_real`), and the booked
+    line is the hail."""
+    from play.aftermath import speaker_real
+    from tests.beat_reader import stub
+
     woman = _refs(scene)["woman at the counter"]
     beat = "The woman at the counter looks at you. 'You're late,' she says."
-    assert judgement.hailed_by(scene, beat, said=[]) == [woman]
+    assert judgement.hailed_by(scene, beat, said=[]) == []
+    said: list = []
+    reading = stub.read(beat, scene, who={"The woman": woman},
+                        lines={"You're late": (woman, "you")})
+    speaker_real.step(stub.ctx(scene, reading, text=beat, said=said))
+    assert judgement.hailed_by(scene, beat, said=said) == [woman]
 
 
 # --- every reader lifts, and nothing reaches the page ----------------------------------

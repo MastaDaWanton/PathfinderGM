@@ -59,11 +59,33 @@ def _watchman(scene):
     return w
 
 
-def _beat(scene, engine, world, said, text="", reading=None):
+def _beat(scene, engine, world, said, text="", reading=None, placed=(), lines=None):
+    """The "beat" stage over NPC lines, with the beat reader's places answer for them
+    stubbed as a careful reader gives it (tests/beat_reader/stub.py): `placed` is
+    (first words of the line, the speaker's words for the person, the town place). Until
+    2026-10-03 `mentioned_elsewhere` found "<person> in/at/near <place>" with a pattern
+    and carried "She's in the market" to the speaker's last person; the reader answers
+    now, and these tests pin what the engine keeps of its answer."""
+    from tests.beat_reader import stub
+
+    if not text:
+        text = " ".join(f'They say, "{r["line"]}"' for r in said)
+    if lines is None:
+        lines = {" ".join(r["line"].split()[:3]): (r["who"], "you") for r in said
+                 if r.get("who")}
+    beat_reading = stub.read(text, scene, engine=engine, said=said, lines=lines,
+                             placed=placed)
     c = _campaign(scene, engine, world)
     ctx = aftermath.context("beat", "turn", c, engine=engine, text=text, said=said,
-                            reading=reading)
+                            reading=reading, attribution=beat_reading)
     return aftermath.run("beat", ctx), c
+
+
+GIRL_PLACED = ("The girl in the market", "The girl in the market", None)
+
+
+def _girl(market):
+    return [(GIRL_PLACED[0], GIRL_PLACED[1], market["name"])]
 
 
 # --- 5.1: asking about is not addressing ---------------------------------------------------
@@ -124,7 +146,7 @@ def test_heard_of_is_recorded_at_the_place_heard_from_the_speaker(worlds):
     w = _watchman(s)
     said = [{"who": w.ref, "to": "you", "line": GIRL_LINE},
             {"who": w.ref, "to": "you", "line": SHE_LINE}]
-    rows, _c = _beat(s, e, worlds, said, text=" ".join(r["line"] for r in said))
+    rows, _c = _beat(s, e, worlds, said, placed=_girl(market))
     heard = [r for r in rows if r.get("kind") == "heard-of"]
     assert len(heard) == 1, rows
     rec = s.population[heard[0]["record"]]
@@ -133,28 +155,30 @@ def test_heard_of_is_recorded_at_the_place_heard_from_the_speaker(worlds):
     assert "girl" in rec["phrase"] and "market" in rec["phrase"]
     assert "minor" not in rec["life"]["tags"], "Q25: a girl is a young adult by default"
     # Said twice (the pronoun line is hers too): still one person.
-    rows, _c = _beat(s, e, worlds, said)
+    rows, _c = _beat(s, e, worlds, said, placed=_girl(market))
     assert not [r for r in rows if r.get("kind") == "heard-of"]
     assert sum("girl" in r["phrase"] for r in s.population.values()) == 1
 
 
 def test_a_place_the_town_lacks_makes_nobody(worlds):
     """The engine owns geography: a person placed somewhere this settlement does not have
-    is not recorded anywhere."""
+    is not recorded anywhere. The reader's "at" is an enum of the town's own places, and
+    an answer outside it is refused, not matched."""
     s, e, _m, _g = _town(worlds)
     w = _watchman(s)
     said = [{"who": w.ref, "to": "you",
              "line": "The girl in the glassblowers' quarter might know."}]
-    rows, _c = _beat(s, e, worlds, said)
+    rows, _c = _beat(s, e, worlds, said,
+                     placed=[("The girl in", "The girl", "the glassblowers' quarter")])
     assert not rows and not s.population
 
 
 def test_the_players_own_words_and_the_pc_make_nobody(worlds):
-    """Only an NPC's line places somebody; the player saying it is a question."""
-    s, e, _m, _g = _town(worlds)
-    pc = s.pc()
-    rows, _c = _beat(s, e, worlds, [{"who": pc.ref, "to": "", "line": GIRL_LINE},
-                                    {"who": "you", "to": "", "line": GIRL_LINE}])
+    """Only an NPC's line places somebody; the player saying it is a question. The reader
+    gives the line to the player, and what it read out of it is dropped."""
+    s, e, market, _g = _town(worlds)
+    rows, _c = _beat(s, e, worlds, [], text=f'You ask, "{GIRL_LINE}"',
+                     lines={"The girl in": ("you", "nobody")}, placed=_girl(market))
     assert not rows and not s.population
 
 
@@ -163,7 +187,8 @@ def test_heard_of_is_found_on_arrival_and_the_brief_says_so(worlds):
     watchman described to me" is HERE, and the brief's sought line names her."""
     s, e, market, _g = _town(worlds)
     w = _watchman(s)
-    _beat(s, e, worlds, [{"who": w.ref, "to": "you", "line": GIRL_LINE}])
+    _beat(s, e, worlds, [{"who": w.ref, "to": "you", "line": GIRL_LINE}],
+          placed=_girl(market))
     sought = "I head to the market and look for the girl that the watchman described to me"
     # Away from the market she is elsewhere, and where is said. (Asked with the watchman
     # in the room, "…that the watchman described" is read by `scope.in_the_room` as the
@@ -210,11 +235,17 @@ def test_the_replayed_watchman_lines_place_the_girl_at_the_market():
     e = Engine(s, Dice(seed=5), world=world)
     e.place_party(next(p.id for p in e.places() if "way in" in p.name or "gate" in p.name))
     w = _watchman(s)
+    market = next(p.name for p in e.places() if p.name == "the market")
     rows = []
+    # What a careful reader says of the two beats: turn 2's "The girl in the market might
+    # know…" places her; turn 3's "She's in the market, near the well" is a pronoun, and
+    # a pronoun alone is nobody the finder could match (checked: `beat_reader`).
+    answers = {2: [("The girl in the market", "The girl in the market", market)],
+               3: [("She's in the market", "She", market)]}
     for n in (2, 3):
         beat = replays.turn(n)["beats"][0]
         said = [dict(r, who=w.ref) for r in beat["said"]]
-        got, _c = _beat(s, e, world, said, text=beat["text"])
+        got, _c = _beat(s, e, world, said, text=beat["text"], placed=answers[n])
         rows += got
     heard = [r for r in rows if r.get("kind") == "heard-of"]
     assert len(heard) == 1

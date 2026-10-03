@@ -79,8 +79,10 @@ OTHER = "other"
 # rest stay unread (counted in the row), never guessed.
 MAX_MENTIONS = 12
 MAX_LINES = 12
-# One beat telling of more new places or placed people than this is a list, not talk.
-MAX_PLACES = 4
+# One beat telling of more places or placed people than this is a list, not talk. The
+# places call lists the town's own places too (code sorts them out: `places.find`), so it
+# has room for a few of those beside the new ones.
+MAX_PLACES = 6
 MAX_PLACED = 4
 
 
@@ -148,6 +150,7 @@ class Reading(Attribution):
     dropped: list[dict] = field(default_factory=list)
     refs: set = field(default_factory=set)          # the people here
     away: set = field(default_factory=set)          # known elsewhere in this town
+    arrived: list = field(default_factory=list)     # away refs the passage shows here
     read: bool = False        # the people call answered
     places_read: bool = False
     asked: bool = False       # a call was made at all (False: nothing to read, or off)
@@ -193,6 +196,7 @@ class Reading(Attribution):
             "placed": [{"words": p.words, "at": p.at} for p in self.placed],
             **({"pronouns": dict(self.pronouns)} if self.pronouns else {}),
             **({"names": list(self.names)} if self.names else {}),
+            **({"arrived": list(self.arrived)} if self.arrived else {}),
             **({"dropped": self.dropped} if self.dropped else {}),
             "read": self.read, "places_read": self.places_read,
             "seconds": self.timings,
@@ -294,6 +298,12 @@ def people_schema(mention_ids: list[str], refs: list[str], line_ids: list[str],
                                     "properties": {"who": {"type": "string", "enum": named},
                                                    "name": {"type": "string"}},
                                     "required": ["who", "name"]}}
+    # Somebody known elsewhere in town whom the passage shows here now: the cage owner met
+    # in the back streets, written hunched over a ledger in the tavern. They walk in
+    # (`Engine.walk_in`), never made twice — the owner's "saved if not already existing".
+    if away:
+        props["arrived"] = {"type": "array", "maxItems": 3,
+                            "items": {"type": "string", "enum": list(away)}}
     for ref in vague:
         props[f"pronoun {ref}"] = {"type": "string", "enum": ["he", "she", "they", "not said"]}
     return {"type": "object", "properties": props, "required": list(props)}
@@ -316,6 +326,8 @@ _PEOPLE_SYSTEM = (
     "copy the passage's own words that best describe them.\n"
     "Under \"names\", a person's own name if the passage gives one (they say it, or the "
     "narration names them), exactly as written; leave it empty when nobody is named.\n"
+    "Under \"arrived\", anybody from the people known but not here whom the passage shows "
+    "here now; usually nobody.\n"
     "Under \"pronoun\", the pronoun the passage uses for that listed person, or \"not said\".")
 
 # One demonstration carrying the hard cases measured 2026-10-03 (CLAUDE.md: instruction
@@ -327,20 +339,27 @@ _PEOPLE_EXAMPLE_USER = (
     "pc: Ashka Verel — the player's character, \"you\" in the story\n"
     "c4: the cooper — commoner\n"
     "c5: Dunmar Oake — ferryman\n\n"
+    "Known, but not here — a mention may speak of one of them, but somebody the passage "
+    "shows here and now is not one of them unless it says they came:\n"
+    "c2: the harbour clerk\n"
+    "c6: the net-mender with the limp\n\n"
     "Passage:\n"
     "[m1: The man at the barrel] does not look up. He is [m2: a broad man], his apron "
     "stiff with pitch. {q1}'Not today,' he says. You lean on the barrel. {q2}'I only want "
     "a word,' you say. Behind you [m3: a girl] with a basket of eels has stopped to "
     "watch, and [m4: the crowd] on the quay goes quiet. {q3}'Leave him be. Folk call me "
     "Tam,' [m5: the girl] calls to you. The cooper mutters that [m6: his brother] would "
-    "have the hoops, if he were not away at sea.")
+    "have the hoops, if he were not away at sea, and that [m7: the clerk] still owes "
+    "him. [m8: The net-mender] limps in out of the rain and sits by the stove.")
 _PEOPLE_EXAMPLE_ASSISTANT = json.dumps({
     "m1": "c4", "m2": "c4", "m3": "new", "m4": "nobody", "m5": "same as m3", "m6": "new",
+    "m7": "c2", "m8": "c6",
     "q1": {"by": "c4", "to": "you"}, "q2": {"by": "you", "to": "c4"},
     "q3": {"by": "m3", "to": "you"},
     "new": [{"mention": "m3", "where": "here", "words": "a girl with a basket of eels"},
             {"mention": "m6", "where": "elsewhere", "words": "his brother"}],
     "names": [{"who": "m3", "name": "Tam"}],
+    "arrived": ["c6"],
     "pronoun c5": "not said"})
 
 
@@ -385,14 +404,23 @@ def places_schema(line_ids: list[str], place_names: list[str]) -> dict:
                 "line": {"type": "string", "enum": line_ids},
                 "words": {"type": "string"},
                 # One place told of twice in other words ("The Forge of the Broken Tide"
-                # … "the back of the smithy") is one place: measured 2026-10-03, the
-                # instruction alone did not stop two entries, so the link is a choice.
-                "same as": {"type": "string",
-                            "enum": [FIRST] + [f"entry {i}" for i in range(1, MAX_PLACES)]},
-                "kind": {"type": "string", "enum": place_kinds()},
+                # … "the back of the smithy") is one place. Measured 2026-10-03: the
+                # instruction alone did not stop two entries, and a "same as: entry N"
+                # choice was not taken either (the forge and the smithy came back as two
+                # unlinked entries, at temperature 0, twice); the place's other words, in
+                # the same entry, are what the model writes when it knows they are one.
+                "also called": {"type": "string"},
+                # The kind as the model's own word, mapped onto the vocabulary in code
+                # (`_kind_of`). Measured on the bench, 2026-10-03, with the kind an enum:
+                # "the tunnels" came back "tannery", "the main thoroughfare" "theatre",
+                # "the smithy" and "The Forge of the Broken Tide" "workshops" — 1 kind of
+                # 3 right. Constrained decoding cuts the model's own word off at its first
+                # letters and forces the nearest enum member that shares them; an enum
+                # holds the vocabulary, not the reading.
+                "kind": {"type": "string"},
                 "near": {"type": "string",
                          "enum": list(place_names) + [HERE_SPEAKER, NONE]}},
-            "required": ["line", "words", "same as", "kind", "near"]}},
+            "required": ["line", "words", "also called", "kind", "near"]}},
         "people": {"type": "array", "maxItems": MAX_PLACED, "items": {
             "type": "object", "properties": {
                 "line": {"type": "string", "enum": line_ids},
@@ -402,15 +430,36 @@ def places_schema(line_ids: list[str], place_names: list[str]) -> dict:
         "required": ["places", "people"]}
 
 
-_PLACES_SYSTEM = (
-    "You read what people say in a story and note two things.\n"
+# Whether the places call lists the town's own places too (code sorts them out) or only
+# the ones the town lacks (the model judges "not on the list"). Measured both ways on the
+# bench, docs/beat-reader.md.
+LIST_TOWN_PLACES = True
+
+_PLACES_ALL = (
+    "\"places\": every place a speaker names or points the player to, the town's own "
+    "places among them — the speaker's own words for it, the kind of place it is (one of "
+    "the kinds listed, or \"other\"), and which of the town's places it is near (\"where "
+    "the speaker is\" for a place reached from the speaker's own spot, \"none\" if they do "
+    "not say). When a speaker tells of the same place again in other words, it is ONE "
+    "entry: put the other words under \"also called\" (\"\" when there are none). Leave "
+    "out people, and anything that is not somewhere one could go.\n")
+_PLACES_NEW = (
     "\"places\": each place a speaker tells of that is NOT one of the town's places "
-    "listed — the speaker's own words for it, the kind of place it is, and which of the "
-    "town's places it is near (\"where the speaker is\" for a place reached from the "
-    "speaker's own spot, \"none\" if they do not say). When a speaker tells of the same "
-    "place again in other words, say which earlier entry it is (\"same as\"). Leave out "
-    "the town's own places, a part of one of them (the quay of the docks, the back room "
-    "of the tavern), people, and anything that is not somewhere one could go.\n"
+    "listed — the speaker's own words for it, the kind of place it is (one of the kinds "
+    "listed, or \"other\"), and which of the town's places it is near (\"where the speaker "
+    "is\" for a place reached from the speaker's own spot, \"none\" if they do not say). "
+    "When a speaker tells of the same place again in other words, it is ONE entry: put "
+    "the other words under \"also called\" (\"\" when there are none). Leave out the town's "
+    "own places, a part of one of them (the quay of the docks, the back room of the "
+    "tavern), people, and anything that is not somewhere one could go.\n")
+
+
+def _places_system() -> str:
+    return ("You read what people say in a story and note two things.\n"
+            + (_PLACES_ALL if LIST_TOWN_PLACES else _PLACES_NEW) + _PLACES_TAIL)
+
+
+_PLACES_TAIL = (
     "\"people\": each single person (not a group) a speaker says is at one of the town's "
     "places — the speaker's own words for the person (never just \"he\" or \"she\"), and "
     "the place.\n"
@@ -418,31 +467,41 @@ _PLACES_SYSTEM = (
 
 _PLACES_EXAMPLE_USER = (
     "The town's places: the gate; the market; the docks; the counting house; the "
-    "tavern\nThe speakers are at: the market\n\nLines:\n"
+    "tavern\nThe speakers are at: the market\n"
+    "Kinds of place (words for the \"kind\" answer — NOT places this town has): docks, "
+    "gate, house, market, smithy, tavern, warehouses, well, other\n\nLines:\n"
     "{q1} the ferryman: 'You'll want the salt-sheds. Follow the quay to the docks, and "
     "it's the long shed past the fish stalls. The Salt Sheds, they call it.'\n"
     "{q2} the ferryman: 'Ask the girl in the counting house, she keeps the tallies.'\n"
     "{q3} the ferryman: 'Or try the tavern. Or my sister's cottage, out back of here.'")
-_PLACES_EXAMPLE_ASSISTANT = json.dumps({
-    "places": [{"line": "q1", "words": "the long shed", "same as": FIRST,
-                "kind": "warehouses", "near": "the docks"},
-               {"line": "q1", "words": "The Salt Sheds", "same as": "entry 1",
-                "kind": "warehouses", "near": "the docks"},
-               {"line": "q3", "words": "my sister's cottage", "same as": FIRST,
-                "kind": "house", "near": "where the speaker is"}],
-    "people": [{"line": "q2", "words": "the girl in the counting house",
-                "at": "the counting house"}]})
+_SHEDS = {"line": "q1", "words": "The Salt Sheds", "also called": "the long shed",
+          "kind": "warehouses", "near": "the docks"}
+_COTTAGE = {"line": "q3", "words": "my sister's cottage", "also called": "",
+            "kind": "house", "near": "where the speaker is"}
+_GIRL = [{"line": "q2", "words": "the girl in the counting house", "at": "the counting house"}]
+
+
+def _places_example() -> str:
+    town = [{"line": "q1", "words": "the docks", "also called": "the quay", "kind": "docks",
+             "near": "none"},
+            {"line": "q3", "words": "the tavern", "also called": "", "kind": "tavern",
+             "near": "none"}]
+    places = ([_SHEDS, town[0], town[1], _COTTAGE] if LIST_TOWN_PLACES
+              else [_SHEDS, _COTTAGE])
+    return json.dumps({"places": places, "people": _GIRL})
 
 
 def places_messages(lines: list[Line], names: dict, place_names: list[str],
                     here_name: str) -> list[dict]:
     body = ["The town's places: " + "; ".join(place_names),
-            f"The speakers are at: {here_name}", "", "Lines:"]
+            f"The speakers are at: {here_name}",
+            "Kinds of place (words for the \"kind\" answer — NOT places this town has): "
+            + ", ".join(place_kinds()), "", "Lines:"]
     for ln in lines:
         body.append(f"{{{ln.id}}} {names.get(ln.id, 'somebody')}: '{ln.words}'")
-    return [{"role": "system", "content": _PLACES_SYSTEM},
+    return [{"role": "system", "content": _places_system()},
             {"role": "user", "content": _PLACES_EXAMPLE_USER},
-            {"role": "assistant", "content": _PLACES_EXAMPLE_ASSISTANT},
+            {"role": "assistant", "content": _places_example()},
             {"role": "user", "content": "\n".join(body)}]
 
 
@@ -643,9 +702,15 @@ def _apply_people(reading: Reading, ans: dict, ask_m, ask_l, refs, vague, text,
             roots[m.id] = m.id
         elif got.startswith(SAME):
             earlier = got[len(SAME):]
+            prior = reading.mention(earlier)
             if earlier in roots:
                 m.model = NOBODY
                 roots[m.id] = roots[earlier]
+            elif prior is not None and prior.model and prior.model != NOBODY:
+                # "the same as m4", m4 being somebody listed: that person. Measured on the
+                # bench, 2026-10-03: "A man in a stained leather harness, a passing
+                # carter" came back m5 = "same as m4", and m4 was the carter's ref.
+                m.model = prior.model
             else:
                 reading.dropped.append({"mention": m.id, "answer": got,
                                         "why": "same as a mention that is no newcomer"})
@@ -715,6 +780,14 @@ def _apply_people(reading: Reading, ans: dict, ask_m, ask_l, refs, vague, text,
             continue
         if not any(n["who"] == person for n in reading.names):
             reading.names.append({"who": person, "name": name})
+    for ref in ans.get("arrived") or []:
+        # Only somebody a mention of this passage was answered as: an arrival the passage
+        # never mentions is the model's, not the page's.
+        if ref in away and ref not in reading.arrived and any(
+                m.model == ref for m in ask_m):
+            reading.arrived.append(ref)
+        elif ref in away:
+            reading.dropped.append({"arrived": ref, "why": "no mention of them here"})
     for ref in vague:
         p = str(ans.get(f"pronoun {ref}") or "")
         if p in ("he", "she"):
@@ -767,9 +840,22 @@ def _read_places(reading: Reading, scene, engine, chat, model, host, provider,
     kinds = set(place_kinds()) - {OTHER}
     seen: set[str] = set()
     entries: list = []        # per answered item: its HeardPlace, or None when dropped
+    # A place's other words ("also called") are read as a second entry that is the same
+    # place as the first, so the one set of checks below holds for both names: each must
+    # be in a speaker's own line, and a name the town already has makes the place that.
+    expanded: list = []
     for item in ans.get("places") or []:
         if not isinstance(item, dict):
             continue
+        expanded.append(item)
+        alias = " ".join(str(item.get("also called") or "").split()).strip(" ,.;:!?")
+        if alias:
+            where = next((ln.id for ln in npc_lines if on_page(alias, ln.words)),
+                         str(item.get("line") or ""))
+            expanded.append({"line": where, "words": alias,
+                             "same as": f"entry {len(expanded)}",
+                             "kind": item.get("kind"), "near": item.get("near")})
+    for item in expanded:
         ln = lines.get(str(item.get("line") or ""))
         words = " ".join(str(item.get("words") or "").split()).strip(" ,.;:!?")
         same = str(item.get("same as") or "")
@@ -804,8 +890,7 @@ def _read_places(reading: Reading, scene, engine, chat, model, host, provider,
                                         "why": f"the same place as {on_map.name}"})
             entries.append(None)
             continue
-        kind = str(item.get("kind") or "")
-        kind = kind if kind in kinds else ""
+        kind = _kind_of(str(item.get("kind") or ""), kinds)
         if kind == "house" and re.search(r"(?:'s|’s)\b|\b(?:my|his|her|their|our|your)\b",
                                          words, re.I):
             # Somebody's house is `call_on`'s, which founds it the first time anybody
@@ -919,6 +1004,17 @@ def name_refusal(scene, world, ref: str, name: str) -> str:
 
 _PRONOUNS = frozenset({"he", "she", "they", "him", "her", "them", "it", "his", "their",
                        "one", "someone", "somebody", "you", "i", "me", "we", "us"})
+
+
+def _kind_of(word: str, kinds) -> str:
+    """The model's word for the kind, as the settlement table's kind, or "": the kind
+    itself, or the word people say for it (`places.KIND_WORDS`: "forge" is no kind,
+    "stable" is the stables). A lookup in the engine's own table, never a guess: a word
+    the table does not hold is "" — the place is still heard of, with no kind."""
+    from rules import places as places_mod
+
+    k = places_mod.kind_named(word)
+    return k if k in kinds else ""
 
 
 def _place_name(words: str) -> str:

@@ -78,9 +78,13 @@ class TestItOpens:
 
     def test_being_spoken_to_opens_it_from_their_side(self):
         s, e, pc, grix = _table()
-        refs = judgement.hailed_by(
-            s, "Grix looks up from his ale. 'You're a long way from the interior,' he "
-               "says. The rain keeps on.")
+        beat = ("Grix looks up from his ale. 'You're a long way from the interior,' he "
+                "says. The rain keeps on.")
+        # The line booked to him (a prose tag, or the beat reader's booking since
+        # 2026-10-03 — `play/aftermath/speaker_real.py`) is the hail.
+        said = [{"who": grix.ref, "to": "you",
+                 "line": "You're a long way from the interior,"}]
+        refs = judgement.hailed_by(s, beat, said=said)
         assert refs == [grix.ref]
         assert e.join_talk(grix, how="they spoke to you") == "Grix is talking to you."
         assert grix.has_state(states.TALKING)
