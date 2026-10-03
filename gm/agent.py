@@ -2118,7 +2118,12 @@ class GMAgent:
             pull=pull,
             was_at=str(getattr(self, "_was_at", None) or getattr(scene, "at", "") or ""),
             acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0),
-            intimate=self._intimate_beat())
+            intimate=self._intimate_beat(),
+            # The beat read back (gm/beat_verify.py) goes to the narrator's own model:
+            # measured on the bench against the 0.6B structure model, which could not
+            # keep its quotes on the page (docs/beat-verify.md).
+            reader={"model": self.prose_model, "host": self.prose_host,
+                    "provider": self.prose_provider, "api_key": self.prose_key})
 
     def _ref_named(self, name: str) -> str:
         """The ref of the one person here called `name`; "" when none or several are."""
@@ -2143,16 +2148,29 @@ class GMAgent:
         covered: list = []
         findings = checks.run(ctx, errors=errors, covered=covered)
         self.mention_rows.extend(dict(e, door=ctx.door) for e in errors)
+        self._log_beat_read(ctx.door)
         if not findings:
             return ctx.text, [], []
         text, notes, attempts = self._repair_sentences(ctx.text, findings, ctx,
                                                        covered=covered)
+        self._log_beat_read(ctx.door)
         self.mention_rows.append({
             "kind": "truth-checks", "door": ctx.door,
             "findings": [{"kind": f.kind, "detail": f.detail,
                           "sentences": list(f.sentences)} for f in findings],
             "repairs": list(notes)})
         return text, list(notes), list(attempts)
+
+    def _log_beat_read(self, door: str) -> None:
+        """The beat as `beat_verified` read it back, one `beat-verify` row per call that
+        was made (gm/beat_verify.py): the claims, what validation dropped, the seconds,
+        and the error when the read failed — how the read's failure rate is measured
+        from real turn logs (docs/beat-verify.md)."""
+        from . import beat_verify
+
+        row = beat_verify.take_last()
+        if row:
+            self.mention_rows.append(dict(row, door=door))
 
     def _repair_sentences(self, text: str, findings: list, ctx, *, covered=()
                           ) -> tuple[str, list[str], list[Attempt]]:

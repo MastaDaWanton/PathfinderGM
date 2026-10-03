@@ -75,6 +75,10 @@ class BeatContext:
     # player's character, so `speaks_for_player` stands aside. Defaulted so a context
     # built before the field existed still means "an ordinary table".
     intimate: bool = False
+    # Where a member that reads the beat back with a model sends its call
+    # (`beat_verified`): {"model", "host", "provider", "api_key"}, the narrator's own
+    # route. None — a test, a tool — and that member reads nothing.
+    reader: Mapping | None = None
 
 
 class CheckContractError(TypeError):
