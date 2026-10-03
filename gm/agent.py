@@ -312,7 +312,7 @@ class GMAgent:
         # docs/the-interpreter.md): the readers below consult it before their regex, and
         # the planner is shown it. A reading that fails costs nothing but the reading —
         # the turn goes on exactly as it did before the interpreter existed.
-        from . import interpret
+        from . import acts_to_ops, interpret
 
         self.reading = None
         if interpret.ENABLED:
@@ -321,6 +321,30 @@ class GMAgent:
                 interpret.remember(player_input, self.reading)
             except Exception as exc:  # noqa: BLE001 — never a reason to lose the turn
                 self.reading = {"error": str(exc)[:200]}
+        else:
+            # Off (the test suite): a reading handed in through `interpret.remember` is
+            # the turn's, so a test pins what the READING does with a sentence — the
+            # retired regex readers' tests moved here (docs/structured-turn.md).
+            self.reading = interpret.reading_of(player_input)
+        # A failed reading is a missing one: the plan alone, never the retired regex
+        # readers behind it. Measured 2026-10-03: 0 failed calls in 220 bench lines and
+        # in every turn row of both owner saves, so the fallback is for an Ollama that
+        # stopped between the reader's call and the planner's — and Rasa's CALM answers
+        # its own failed command generation with a "cannot handle" pattern, not a
+        # second parser.
+        read_ok = (self.reading if isinstance(self.reading, dict)
+                   and "error" not in self.reading else None)
+        # The act→op table (gm/acts_to_ops.py): one row per action of the reading.
+        self.rows = acts_to_ops.table(read_ok, self.engine.scene,
+                                      places=self.engine.places(), sentence=player_input)
+        if read_ok is not None:
+            read_ok["table"] = [r.record() for r in self.rows]
+        # Every deed the words declared moves a thing and not one of them can — "I sell
+        # the crate" with no crate: the turn is the refusal, and no model is asked.
+        stop = acts_to_ops.refusal(self.rows)
+        if stop:
+            return self._refused_plan({"text": stop, "code": "not_found", "fix": None},
+                                      [], [f"the reading's table found nothing: {stop}"])
         judgement.embody_sought(self.engine.scene, player_input, self.world)
         # The plan sees the situation cards — the GM's secret ones included — keyed
         # off the last few beats the view hands over (`self.recent`).
@@ -330,10 +354,15 @@ class GMAgent:
                                     turn=getattr(self, "turn", 0),
                                     reading=getattr(self, "reading", None),
                                     player_text=player_input)
-        read = interpret.brief_lines(self.reading if isinstance(self.reading, dict)
-                                     and "error" not in self.reading else None)
+        read = interpret.brief_lines(read_ok)
         if read:
             brief += "\n\n" + read
+        # What the words named that the engine does not have, as fact: the planner says
+        # so and makes nothing up (a give of a pint nobody carries is never minted).
+        missing = acts_to_ops.unresolved(self.rows)
+        if missing:
+            brief += ("\n\nNOT HERE (fact — the turn says so, and nothing is made to fill "
+                      "it): " + "; ".join(missing) + ".")
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first
@@ -352,20 +381,35 @@ class GMAgent:
         # What the player's own words already commit this turn to, read by asking the
         # injectors what they would add. Computed once: it depends on the player's text
         # and the scene, and neither moves between attempts.
-        declared = judgement.declared_ops(player_input, self.engine.scene, self.world,
-                                          attached=getattr(self, "attachments", ()))
-        # And what the reading grounds, joined — the detectors stay a second opinion
-        # until each is retired on a measured comparison (docs/the-interpreter.md).
-        if isinstance(self.reading, dict) and "error" not in self.reading:
-            by_reading = interpret.ops_for(self.reading, self.engine.scene,
-                                           self.engine.places())
+        #
+        # Since 2026-10-03 (docs/structured-turn.md) the reading is what declares: the
+        # act→op table's op names, in the words' order. The declarers left in
+        # `judgement.declared_ops` are the ones that read a CLOSED vocabulary the reading
+        # does not — a spell's name against the catalogue, a jar against the satchel, a
+        # skill — and each of their ops stands only where an act of the reading stands
+        # behind it (`interpret.supported`). The goods declarers (`inject_goods`,
+        # `inject_sale`, `declare_drop`, `declare_emptying`) are gone: the table builds
+        # those ops whole (`acts_to_ops.apply`, below).
+        attached = getattr(self, "attachments", ())
+        if read_ok is not None:
+            detectors = judgement.declared_ops(player_input, self.engine.scene, self.world,
+                                               attached=attached)
+            by_reading = acts_to_ops.declared(self.rows)
             self.reading["ops"] = by_reading
-            self.reading["detectors"] = list(declared)
+            self.reading["built"] = acts_to_ops.built_ops(self.rows)
+            self.reading["detectors"] = list(detectors)
             # The reading decides where the two disagree (`interpret.supported`); the
             # overruled op is kept on the record.
-            declared, overruled = interpret.supported(declared, self.reading)
+            declared, overruled = interpret.supported(detectors, self.reading)
             self.reading["overruled"] = overruled
             declared = list(dict.fromkeys([*declared, *by_reading]))
+        else:
+            # No reading: the plan alone. Only a chip the player attached declares (a
+            # spell or a place picked from a list is not English), so the words are read
+            # by nobody but the planner — never by the retired regexes behind its back.
+            declared = judgement.declared_ops("", self.engine.scene, self.world,
+                                              attached=attached)
+        if read_ok is not None:
             # Where the reading says the named place is the one the party stands in, no
             # walk is owed. Measured live 2026-09-27: at the market already, "I go to the
             # market and buy a coil of rope" had a detector require `travel`, and with a
@@ -573,24 +617,20 @@ class GMAgent:
                 # narrator's guess at what the leaf does (herbalism plan §8.2).
                 raw = judgement.declare_taste(raw, player_input, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
-                # Sale first, then goods. Selling is the more specific reading of handing
-                # something over and it is the one that pays — and the order was the other
-                # way round for exactly as long as it took `declared_ops` to notice: "I
-                # sell the Yarow Elixir" matched `_HANDS_OVER`, became a `give`, and the
-                # elixir left the satchel for nothing.
-                # Coin first: "I pay her ten gold" is a give of gp out of the purse,
-                # and a `sell gold_coins_10` the model wrote is the same give — before
-                # the sale injector can read "pay" as a sale of stock.
-                # Before coin: where the player's own words send a thing settles its
-                # direction — coin out of a pouch INTO the purse, a thing set down on the
-                # floor and not handed to the smith (items 4 and 5, 2026-10-03).
-                raw = judgement.declare_emptying(raw, player_input, self.engine.scene)
-                raw = judgement.declare_drop(raw, player_input, self.engine.scene)
+                # Things changing hands are the reading's (gm/acts_to_ops.py): the table's
+                # take, drop, give, sell and offer, built whole, replace the plan's op for
+                # the same thing — the words settle which way it goes and to whom — and a
+                # plan op that moves a thing no act of the reading stands behind is
+                # overruled. This is where five sentence readers stood until 2026-10-03
+                # (`declare_emptying`, `declare_drop`, `inject_sale`, `inject_goods`, and
+                # `inject_payment`'s "I pay her ten gold"); each was a regex taught one more
+                # phrasing per live bug (docs/structured-turn.md).
+                raw = acts_to_ops.apply(raw, self.rows, read_ok, self.engine.scene,
+                                        notes=own_words)
+                # The model's own coin op as a give of a denomination, and its sell
+                # pointed at the jar's id: the PLAN's shapes straightened, no words read.
                 raw = judgement.inject_payment(raw, player_input, self.engine.scene)
-                # The last few beats, for a sale closed with no thing named ("Deal.").
-                raw = judgement.inject_sale(raw, player_input, self.engine.scene,
-                                            recent=getattr(self, "recent", ()))
-                raw = judgement.inject_goods(raw, player_input, self.engine.scene)
+                raw = judgement.resolve_sold_items(raw, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a
                 # printed refusal, never the model's guess at what it does.
@@ -675,7 +715,8 @@ class GMAgent:
                 # After the within-scene filter, so a walk across the room stays one.
                 raw = judgement.go_to_heard_place(
                     raw, player_input, self.engine.scene,
-                    known=tuple(self.engine.places()) + tuple(self.engine.open_ground()))
+                    known=tuple(self.engine.places()) + tuple(self.engine.open_ground()),
+                    reading=read_ok)
                 raw = judgement.inject_found(raw, player_input, self.engine.scene, self.world)
                 raw = judgement.inject_venture(raw, player_input, self.engine.scene)
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
@@ -731,6 +772,11 @@ class GMAgent:
                     raw, player_input,
                     self.reading if isinstance(self.reading, dict) else None,
                     notes=own_words)
+                # The ops the reading owes, in the order the words do them — after every
+                # injector has appended its own, and before a chip's op is put where the
+                # words put it (which then has the last word on order).
+                if not getattr(self, "attachments", ()):
+                    raw = acts_to_ops.order(raw, self.rows)
                 # And the attached spell or place put where the words do it, after
                 # every injector above has appended its own (gm/sequence.py).
                 raw = judgement.order_the_attached(
@@ -743,7 +789,12 @@ class GMAgent:
                     # A refusal only the player can fix, on an op the player declared,
                     # ends the turn here: shown to them once, never retried (item 21.3).
                     # One the plan invented is dropped and the rest validated again.
-                    stop, raw = self._players_refusal(exc, raw, declared, player_input)
+                    # The table's built ops are the player's declaration as much as the
+                    # schema's required ones: "I sell the crate to the smith" refused by
+                    # the engine is the player's to hear, not the plan's to retry.
+                    stop, raw = self._players_refusal(
+                        exc, raw, [*declared, *acts_to_ops.built_ops(self.rows)],
+                        player_input)
                     if stop is not None:
                         rejections.append(f"attempt {n + 1} [{exc.check}, "
                                           f"{exc.code}]: {exc} — the player's to fix")

@@ -35,9 +35,37 @@ def same(a, b) -> bool:
 
 SLOTS = ("target", "object", "place", "time", "says")
 
+# The slots the engine acts on, per act: what `gm/acts_to_ops.py` reads to build an op, and
+# nothing else. Scored BESIDE the strict measure, never instead of it (docs/structured-turn.md
+# "the bench scored two ways"). Measured 2026-10-03 on the first 60 lines: about 8 of the 19
+# strict misses were a slot no op reads — `look … place=the street`, `seek … place=the
+# street` — or a debatable label on one, and the strict score cannot say which misses cost
+# a turn. An act with no row here makes no op, so only the act itself is scored for it.
+#
+# Each row is a slot some code of the turn READS from the reading, named here so the row can
+# be checked against it: `acts_to_ops` (take/drop/give/sell/offer, built whole);
+# `interpret.ops_for` (a go's or a leave's place, a wait's time, a talk's words, a seek's
+# target for "somebody here", a cast's aim); `interpret.target_of`/`addressee` (who a
+# talk, insult or call_on addresses, for `person_sought` and `asked_about_not_addressed`);
+# `own_words_only` (the words of a talk or insult); `bought`, `broken_into`. A slot nothing
+# reads — a journey's place (the journey's destination is the planner's enum), a rest's
+# time, an attack's target (the fight schema's), a consume's object (the satchel's
+# declarer) — is scored only strictly.
+ENGINE_SLOTS: dict[str, tuple[str, ...]] = {
+    "go": ("place",), "leave": ("place",),
+    "talk": ("target", "says"), "insult": ("target", "says"),
+    "seek": ("target",), "call_on": ("target",), "break_in": ("target",),
+    "buy": ("object",), "sell": ("object", "target"), "offer": ("object", "target"),
+    "give": ("object", "target"), "take": ("object", "target"), "drop": ("object",),
+    "cast": ("object", "target", "place"), "wait": ("time",),
+}
 
-def score(gold: list[dict], got: list[dict]) -> dict:
-    """gold and got are parallel lists of frames. Returns the measures and the misses."""
+
+def score(gold: list[dict], got: list[dict], *, engine: bool = False) -> dict:
+    """gold and got are parallel lists of frames. Returns the measures and the misses.
+
+    `engine`: score only the slots the engine acts on (`ENGINE_SLOTS`), acts and the
+    question as strictly as ever."""
     n = len(gold)
     frame_ok = acts_ok = question_ok = 0
     tp = fp = fn = 0
@@ -62,7 +90,7 @@ def score(gold: list[dict], got: list[dict]) -> dict:
         slot_ok = True
         for i, ga_ in enumerate(g["actions"]):
             pa_ = (p.get("actions") or [])[i] if i < len(p.get("actions") or []) else None
-            for s in SLOTS:
+            for s in (ENGINE_SLOTS.get(ga_["act"], ()) if engine else SLOTS):
                 gv = ga_.get(s)
                 pv = pa_.get(s) if pa_ is not None and pa_.get("act") == ga_["act"] else None
                 if gv and pv and same(gv, pv):

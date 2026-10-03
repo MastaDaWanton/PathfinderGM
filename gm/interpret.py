@@ -39,9 +39,18 @@ ENABLED = True
 
 ACTS = (
     "go", "journey", "leave", "look", "search", "seek", "talk", "insult", "buy", "sell",
-    "give", "take", "steal", "attack", "cast", "use", "consume", "wait", "rest",
-    "call_on", "break_in", "stealth", "athletics", "gather", "follow", "claim", "other",
+    "offer", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
+    "rest", "call_on", "break_in", "stealth", "athletics", "gather", "follow", "claim",
+    "other",
 )
+# `drop` and `offer` since 2026-10-03, because the act→op table (gm/acts_to_ops.py) needs
+# them and the vocabulary did not have them. `drop`: "I also drop the Brunt of the weight
+# on the ground" was read `give, target: the Brunt of the weight, place: the ground` on the
+# owner's items save, and a give is a hand-over to somebody — the smith gained a copy.
+# `offer`: a sale that is not closed yet. "I try to sell the crate to Korvu for coin"
+# (Korvu said no in the fiction) and "I agree to sell the crate to the clerk" were both
+# `sell`, and only the second is a sale; the regex that told them apart (`_OFFERS_SALE`)
+# is retired with the rest of the sentence readers (docs/structured-turn.md).
 SLOTS = ("target", "object", "place", "time", "says")
 
 # The slots each act can have: TADS 3's verb templates, where a verb names the slots it
@@ -54,6 +63,10 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "look": ("object", "target", "place", "time"), "search": ("object", "place"),
     "seek": ("target", "place"), "talk": ("target", "says"), "insult": ("target", "says"),
     "buy": ("object", "target", "place"), "sell": ("object", "target"),
+    "offer": ("object", "target"), "drop": ("object", "place"),
+    # A take's `target` is who or what it comes OUT of — a person, or a container: "the
+    # coins from the pouch" is `object: the coins, target: the pouch` (TADS 3's TakeFrom,
+    # whose indirect object is the holder, person or thing).
     "give": ("target", "object", "place"), "take": ("object", "target"),
     "steal": ("object", "target"), "attack": ("target", "object", "place", "time"),
     # `place` as well since I3 (2026-09-29): where a spell goes is as often a place-shaped
@@ -82,9 +95,12 @@ talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebo
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
 buy       buy, order, pay for goods
-sell      sell
-give      hand over, pay, buy somebody a drink, drop something somewhere
-take      pick up, loot, take
+sell      sell, agree a sale, accept a price, close a deal ("it's a deal", "it's yours")
+offer     offer something for sale, try to sell it, ask what it would fetch — no deal yet
+give      hand over, pay, buy somebody a drink
+take      pick up, loot, take, tip or count out of a container; the target is the
+          person or the container it comes out of
+drop      put down, set down, drop or leave a thing behind
 steal     pick a pocket, steal, filch
 attack    hit, punch, stab, shoot, finish somebody
 cast      cast a named spell
@@ -172,6 +188,80 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "buy the old soldier a pint", "target": "the old soldier",
           "object": "a pint", "act": "give"}]}),
+    # --- 2026-10-03: the reader now carries the turn (docs/structured-turn.md) ----------
+    # Each from a measured systematic miss on the first 60 labelled lines — never a line
+    # of the labelled set itself, and none from the 160 held out. Demonstrations, not
+    # instructions: CLAUDE.md's ratio rule, and "head for the cooper" above taught `seek`
+    # for every "head for", places included ("I head for the stables" came back `seek,
+    # target: the stables`). A place headed for is `go`; a person headed for is `seek`.
+    ("I head for the tannery to ask about hides.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "head for the tannery", "place": "the tannery", "act": "go"},
+         {"span": "ask about hides", "says": "about hides", "act": "talk"}]}),
+    # …and the person beside it, because the place demonstration alone turned "I head for
+    # the smith" into `go, place: the smith` on the dev bench. "ask for X" is what is said.
+    ("I head for the ferryman and ask for a crossing.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "head for the ferryman", "target": "the ferryman", "act": "seek"},
+         {"span": "ask for a crossing", "says": "for a crossing", "act": "talk"}]}),
+    # "ask where/what X" is what is said, all of it, pronoun and all: "I wave down a
+    # passing carter and ask where he is headed" came back `talk, target: he` and the
+    # question was lost; "ask where the dockhands drink" came back `target: the
+    # dockhands`. Nobody is named as spoken to, so the target is null.
+    ("I flag down a porter and ask where she is taking the trunk.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "flag down a porter", "target": "a porter", "act": "seek"},
+         {"span": "ask where she is taking the trunk",
+          "says": "where she is taking the trunk", "act": "talk"}]}),
+    ("I ask where the ropemakers work, and walk there.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ask where the ropemakers work", "says": "where the ropemakers work",
+          "act": "talk"},
+         {"span": "walk there", "place": "there", "act": "go"}]}),
+    # A house, and where somebody lives, is a place: "I go to her house" lost `place`.
+    ("I ask around where the midwife lives.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "ask around where the midwife lives", "target": "the midwife",
+          "place": "where the midwife lives", "act": "seek"}]}),
+    ("I call the bailiff a drunk to his face.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "call the bailiff a drunk to his face", "target": "the bailiff",
+          "says": "a drunk", "act": "insult"}]}),
+    # A gesture is no hand-over: "I give a friendly wink" planned a `give` of "friendly
+    # wink" on the owner's market save (2026-10-03, item 8).
+    ("I give the guard a lazy salute and say \"Long night, friend?\"",
+     {"question": False, "claims": [], "actions": [
+         {"span": "give the guard a lazy salute", "target": "the guard", "act": "other"},
+         {"span": "say \"Long night, friend?\"",
+          "says": "Long night, friend?", "act": "talk"}]}),
+    # Things moving, the shapes the owner's items save misread. Out of a container, the
+    # container is the take's target; set down is `drop`, never a give to the nearest.
+    ("I shake the silver out of the sack into my purse and set the empty sack down by "
+     "the door.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "shake the silver out of the sack into my purse", "object": "the silver",
+          "target": "the sack", "act": "take"},
+         {"span": "set the empty sack down by the door", "object": "the empty sack",
+          "place": "by the door", "act": "drop"}]}),
+    ("I lift the lantern off the hook, then hand it to the boy.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "lift the lantern off the hook", "object": "the lantern",
+          "target": "the hook", "act": "take"},
+         {"span": "hand it to the boy", "object": "it", "target": "the boy",
+          "act": "give"}]}),
+    # A sale offered is not a sale made; a sale agreed, or closed in the player's own
+    # quoted words, is.
+    ("I offer the furrier my wolf pelts and ask what he would pay.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "offer the furrier my wolf pelts", "object": "my wolf pelts",
+          "target": "the furrier", "act": "offer"},
+         {"span": "ask what he would pay", "says": "what he would pay", "act": "talk"}]}),
+    ("I tell the miller, \"Done. The mule is yours.\"",
+     {"question": False, "claims": [], "actions": [
+         {"span": "tell the miller, \"Done. The mule is yours.\"", "target": "the miller",
+          "says": "Done. The mule is yours.", "act": "talk"},
+         {"span": "The mule is yours", "object": "The mule", "target": "the miller",
+          "act": "sell"}]}),
 ]
 
 
@@ -203,6 +293,48 @@ def schema() -> dict:
     }
 
 
+# Which reply shape the reader is held to: "flat" (every slot on every action, the act
+# last) or "per_act" (an `anyOf` of one object per act, the act a `const` straight after
+# the span, and only that act's slots — TADS 3's verb templates, enforced by the sampler
+# instead of dropped in code afterwards). Probed 2026-10-03 on six real lines before any
+# reliance: Ollama enforced the per-act shape on 6 of 6, in both field orders. With the act
+# LAST, the slot keys the model wrote first chose the act — "I look around and take stock"
+# came back `claim, claim`, the one act with no slots — so the act goes straight after the
+# span. Chosen on the dev bench (the first 60 labelled lines; docs/structured-turn.md),
+# the same demonstrations both ways: engine-relevant frames 0.833 per-act against 0.767
+# flat, strict 0.683 against 0.650, median 1.4 s against 2.4 s — fewer keys to write.
+SCHEMA = "per_act"
+
+
+def per_act_schema() -> dict:
+    slot = {"type": ["string", "null"]}
+    alts = []
+    for act in ACTS:
+        props = {"span": {"type": "string"}, "act": {"const": act},
+                 **{s: slot for s in ACT_SLOTS.get(act, ())}}
+        alts.append({"type": "object", "properties": props, "required": list(props),
+                     "additionalProperties": False})
+    out = schema()
+    out["properties"]["actions"]["items"] = {"anyOf": alts}
+    return out
+
+
+def reply_schema() -> dict:
+    return per_act_schema() if SCHEMA == "per_act" else schema()
+
+
+def _demo_reply(frame: dict) -> str:
+    """A demonstration in the shape the sampler holds the reply to."""
+    if SCHEMA != "per_act":
+        return json.dumps(frame)
+    acts = []
+    for a in frame.get("actions") or []:
+        acts.append({"span": a.get("span", ""), "act": a["act"],
+                     **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())}})
+    return json.dumps({"question": frame.get("question", False), "actions": acts,
+                       "claims": frame.get("claims", [])})
+
+
 def messages(sentence: str) -> list[dict]:
     system = (
         "You read what a player typed in a text role-playing game and write down, in "
@@ -215,7 +347,7 @@ def messages(sentence: str) -> list[dict]:
     out = [{"role": "system", "content": system}]
     for said, frame in _DEMOS:
         out.append({"role": "user", "content": said})
-        out.append({"role": "assistant", "content": json.dumps(frame)})
+        out.append({"role": "assistant", "content": _demo_reply(frame)})
     out.append({"role": "user", "content": sentence})
     return out
 
@@ -228,6 +360,9 @@ _TIME_WORD = re.compile(
 
 # A slot that is nothing but a time: "a while", "for an hour", "until he stops moving".
 _A_TIME = re.compile(r"^(?:until|till|for|all|a|the)\s+(?:while\b|night\b|day\b|hour|moment|morning|evening)|^(?:until|till)\b|^for\s+(?:a|an|the|\d+|one|two|three|some|several)\b", re.I)
+
+
+_NULL_WORDS = frozenset({"none", "null", "n/a", "-"})
 
 
 def _within(span, sentence: str) -> bool:
@@ -249,6 +384,10 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             if v in (None, ""):
                 continue
             v = str(v).strip()
+            # The null written as a word: the per-act schema's probe came back
+            # `target: "none"` on a gesture. Nothing is there.
+            if v.lower() in _NULL_WORDS:
+                continue
             if not _within(v, sentence):
                 dropped.append(f"{a['act']}.{s}={v!r}")
                 continue
@@ -273,10 +412,37 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             used.add(low)
         _speech_is_not_a_target(kept, dropped)
         actions.append(kept)
-    claims = [c for c in (frame.get("claims") or []) if _within(c, sentence)]
+    actions = merge_repeats(actions)
+    claims =[c for c in (frame.get("claims") or []) if _within(c, sentence)]
     dropped += [f"claim={c!r}" for c in (frame.get("claims") or []) if not _within(c, sentence)]
     return ({"question": bool(frame.get("question")), "actions": actions,
              "claims": claims}, dropped)
+
+
+def merge_repeats(actions: list[dict], dropped: list[str] | None = None) -> list[dict]:
+    """One deed read twice is one deed: two actions in a row with the same act whose
+    slots do not disagree are merged, the first's slots kept and the second's added.
+
+    Measured 2026-10-03 on the first 60 labelled lines, 3 of the 19 misses: "I make camp
+    and sleep until dawn" came back `rest` then `rest, time: until dawn`; "I look around
+    and take stock" `look` then `look …`; "I thank her, say goodnight" `talk, target: her`
+    then `talk, says: goodnight`. Each would be two ops in the turn — two rests, two says.
+    Structure only, never the words: a second action that names a DIFFERENT target, object,
+    place, time or words is a second deed ("I buy bread and buy cheese"; "I turn my back
+    on him and tell the barkeep he smells" insults two people), and stays."""
+    out: list[dict] = []
+    for a in actions:
+        prev = out[-1] if out else None
+        if prev is not None and prev.get("act") == a.get("act") and not any(
+                prev.get(s) and a.get(s) and prev[s].lower() != a[s].lower() for s in SLOTS):
+            for s in SLOTS:
+                if a.get(s) and not prev.get(s):
+                    prev[s] = a[s]
+            if dropped is not None:
+                dropped.append(f"{a['act']} (the same deed twice, merged)")
+            continue
+        out.append(a)
+    return out
 
 
 _SAY_HEAD = re.compile(r"^\s*(?:say|says|said|tell|tells|ask|asks|shout|shouts|whisper|"
@@ -331,7 +497,7 @@ def interpret(sentence: str, *, model: str | None = None, host: str | None = Non
                         host or cfg["host"], as_json=True, think=False,
                         temperature=temperature, num_predict=400,
                         provider=provider or cfg.get("provider", "ollama"),
-                        api_key=api_key or cfg.get("api_key", ""), schema=schema())
+                        api_key=api_key or cfg.get("api_key", ""), schema=reply_schema())
     try:
         raw = reply.json()
     except Exception:
@@ -608,7 +774,8 @@ def _going(frame, scene, places, location) -> str:
 _OP_NEEDS = {
     "travel": {"go", "leave", "journey", "search", "seek", "call_on"},
     "journey": {"journey"}, "introduce": {"seek", "talk", "call_on"},
-    "say": {"talk", "insult"}, "provoke": {"insult"}, "give": {"give"}, "sell": {"sell"},
+    "say": {"talk", "insult"}, "provoke": {"insult"}, "give": {"give", "take", "drop"},
+    "sell": {"sell", "offer"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
     "loot": {"take", "steal"}, "cast": {"cast"},
@@ -641,14 +808,15 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
 
 
 # The acts under which the player can come away holding something. One set for both
-# doors that make a give to the player: the plan's (`drop_unread_gifts`) and the
-# detector's (`judgement.inject_goods`).
+# doors that judge a give to the player: `drop_unread_gifts` and the act→op table's
+# overrule (`acts_to_ops.apply`; until 2026-10-03 the other door was the retired
+# `judgement.inject_goods`).
 GETTING_ACTS = frozenset({"give", "take", "buy", "steal", "gather", "sell"})
 
 
 def gets_nothing(frame: dict | None) -> bool:
     """Whether a reading exists and none of its acts can leave the player holding
-    anything. False when there is no reading to judge by — the regex decides then."""
+    anything. False when there is no reading to judge by."""
     if not frame or frame.get("error"):
         return False
     return not ({a.get("act") for a in frame.get("actions") or []} & GETTING_ACTS)
@@ -657,15 +825,16 @@ def gets_nothing(frame: dict | None) -> bool:
 # And the other direction: the acts under which the player can part with something —
 # handing it over, dropping it, paying, selling. Measured 2026-10-03 on the market-talk
 # save: "I give a friendly wink and say …" was read as `other` + `talk`, the reading
-# overruled the detector's `give`, and `judgement.inject_goods` planned one anyway —
-# "Kesst Vayr has no friendly wink to give", and the ledger kept "handed something to
-# Kesst Vayr". The rule that already held for gains holds for hand-overs.
-PARTING_ACTS = frozenset({"give", "sell", "buy"})
+# overruled the detector's `give`, and `judgement.inject_goods` (retired since) planned
+# one anyway — "Kesst Vayr has no friendly wink to give", and the ledger kept "handed
+# something to Kesst Vayr". The rule that already held for gains holds for hand-overs;
+# `drop` and `offer` joined with the acts themselves.
+PARTING_ACTS = frozenset({"give", "sell", "buy", "drop", "offer"})
 
 
 def hands_nothing(frame: dict | None) -> bool:
     """Whether a reading exists and none of its acts can part the player from anything.
-    False when there is no reading to judge by — the regex decides then."""
+    False when there is no reading to judge by."""
     if not frame or frame.get("error"):
         return False
     return not ({a.get("act") for a in frame.get("actions") or []} & PARTING_ACTS)
