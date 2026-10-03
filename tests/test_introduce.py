@@ -241,12 +241,12 @@ def test_our_own_face_line_is_not_read_as_an_invented_name():
 
     line = narration.a_face_for("seasoned traveler",
                                 "Korvu: Somewhere in the middle of life; a limp.")
-    assert "Korvu: somewhere in the middle of life" in line
+    assert "Korvu people: somewhere in the middle of life" in line
     assert not [f for f in narration.review(line, pc_name="Kesst Vayr",
                                             known_names={"Korvu"}).findings
                 if f.kind == "invented-name"]
     assert narration.a_face_for("smith", "Korvu: Korvu have four limbs.").endswith(
-        "Korvu: Korvu have four limbs.")
+        "Korvu people: Korvu have four limbs.")
 
 
 def test_two_different_people_are_not_the_same_turn_twice(engine):

@@ -398,6 +398,110 @@ def heal_ref_names(scene) -> list[tuple[str, str, str]]:
     return out
 
 
+def _pinned_on_the_page(ref: str, transcript) -> str:
+    """The description the narration pinned to `ref` — "the man in the heavy coat (c4)"
+    — the first time it did, without its article; "" when it never did."""
+    pat = re.compile(r"\b(?:the|a|an)\s+((?:[a-z'’-]+\s+){0,6}?[a-z'’-]+)\s*\("
+                     + re.escape(ref) + r"\)", re.I)
+    for entry in transcript or ():
+        if not isinstance(entry, dict) or entry.get("who") != "gm":
+            continue
+        m = pat.search(str(entry.get("text") or ""))
+        if m and not _not_a_name(m.group(1)):
+            return " ".join(m.group(1).split())
+    return ""
+
+
+def _not_a_name(phrase: str) -> str:
+    from .names import not_a_name
+
+    return not_a_name(phrase)
+
+
+def heal_phrase_names(scene, world=None, transcript=()) -> list[tuple[str, str, str]]:
+    """On load: a person an older build named with something that is not a name gets a
+    descriptor back. Returns [(ref, old name, new name)].
+
+    Two shapes, both measured on the owner's 2026-10-03 saves:
+
+      * **the player's own words** (item 13): `introduce who='say "just trying to start a
+        conversation…"'` minted c4 under that phrase — `names.not_a_name`'s shapes;
+      * **a people's name** (item 14): "a man named Korvu" renamed the laborer c11
+        "Korvu", true name and all — `names.is_a_peoples_name`.
+
+    The descriptor, first that holds — `heal_ref_names`' order, with the page first,
+    because it is what the player read them as:
+
+      1. the description the narration pinned to their ref ("the man in the heavy coat
+         (c4)" — the polish shipped refs that beat; item 19 is that leak, and this is its
+         one use);
+      2. their population record's own words, when those are a name's shape;
+      3. the work their record rolled; 4. their stat block's; 5. "a stranger".
+
+    A people's name taken as a TRUE name is drawn again from the world's pools, so asked
+    their name they give a person's. The record's phrase and the cast entry follow."""
+    from . import names as names_mod
+
+    out: list[tuple[str, str, str]] = []
+    pop = getattr(scene, "population", None) or {}
+    known = names_mod.people_names(world, scene)
+    taken = {str(getattr(a, "true_name", "") or "") for a in
+             (getattr(scene, "people", None) or {}).values()}
+    for ref, actor in (getattr(scene, "people", None) or {}).items():
+        old = str(getattr(actor, "name", "") or "").strip()
+        if getattr(actor, "is_pc", False) or not old:
+            continue
+        # A people's name only as a NAME — the page's rename writes `name` and `true_name`
+        # alike (`judgement._take_the_name`). "dwarf" as a bystander's descriptor is a
+        # kind of person, and stays.
+        a_people = (names_mod.is_a_peoples_name(old, known=known)
+                    and old == str(getattr(actor, "true_name", "") or ""))
+        if not (names_mod.not_a_name(old) or a_people):
+            continue
+        rec = next((r for r in pop.values() if r.get("ref") == ref), None)
+        phrase = str((rec or {}).get("phrase") or "").strip()
+        work = str(((rec or {}).get("life") or {}).get("work_name") or "").strip()
+        block = str(getattr(actor, "from_template", "") or "").strip().lower()
+        pinned = _pinned_on_the_page(ref, transcript)
+        if pinned:
+            new = pinned
+        elif phrase and not names_mod.not_a_name(phrase) \
+                and not names_mod.is_a_peoples_name(phrase, known=known):
+            new = phrase
+        elif work:
+            new = ("an " if work[:1].lower() in "aeiou" else "a ") + work.lower()
+        elif block and block not in _GENERIC_BLOCKS:
+            noun = block.replace("-", " ")
+            new = ("an " if noun[:1] in "aeiou" else "a ") + noun
+        else:
+            new = "a stranger"
+        actor.name = new
+        true = str(getattr(actor, "true_name", "") or "")
+        if true and (names_mod.not_a_name(true)
+                     or names_mod.is_a_peoples_name(true, known=known)):
+            drawn = ""
+            if world is not None:
+                try:
+                    drawn = names_mod.true_name(
+                        world, getattr(scene, "location_id", None), ref, taken,
+                        people_id=getattr(actor, "world_people_id", None) or None)
+                except Exception:  # noqa: BLE001 — a world that cannot answer draws nobody
+                    drawn = ""
+            actor.true_name = drawn
+            taken.add(drawn)
+        if rec is not None and (names_mod.not_a_name(phrase)
+                                or names_mod.is_a_peoples_name(phrase, known=known)):
+            rec["phrase"] = new
+        for entry in getattr(scene, "cast", None) or []:
+            if entry.get("ref") == ref and str(entry.get("who") or "") == old:
+                entry["who"] = new
+        for entry in getattr(scene, "conversation_log", None) or []:
+            if entry.get("who") == ref and str(entry.get("name") or "") == old:
+                entry["name"] = new
+        out.append((ref, old, new))
+    return out
+
+
 def record_peoples(scene, world) -> list[str]:
     """On load: everybody an older build minted with a people's face and no people gets
     the people their face already shows. Returns the refs recorded.

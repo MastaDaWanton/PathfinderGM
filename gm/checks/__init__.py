@@ -70,6 +70,11 @@ class BeatContext:
     was_at: str                       # scene.at when plan_turn began (agent._was_at)
     acting: str                       # the NPC ref on an NPC's turn, else ""
     turn: int
+    # An intimate scene between adults at an explicit table (`GMAgent._intimate_beat`):
+    # the one beat the owner's ruling of 2026-10-01 lets the narrator speak for the
+    # player's character, so `speaks_for_player` stands aside. Defaulted so a context
+    # built before the field existed still means "an ordinary table".
+    intimate: bool = False
 
 
 class CheckContractError(TypeError):

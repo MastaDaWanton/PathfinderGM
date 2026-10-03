@@ -23,7 +23,7 @@ broken nose on a beaked one — is not offered, decided by what the body line sa
 than by a list of races kept here.
 
 The result keeps the label form `People: body. details.` that `narration.a_face_for`
-reads, so the backstop still says "The man is an Orc: …" and the brief still shows the
+reads, so the backstop still says "The man is of the Orc people: …" and the brief still shows the
 people's name.
 """
 from __future__ import annotations

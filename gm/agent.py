@@ -2018,7 +2018,8 @@ class GMAgent:
             brief_facts=dict(getattr(self, "brief_facts", None) or {}),
             pull=pull,
             was_at=str(getattr(self, "_was_at", None) or getattr(scene, "at", "") or ""),
-            acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0))
+            acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0),
+            intimate=self._intimate_beat())
 
     def _ref_named(self, name: str) -> str:
         """The ref of the one person here called `name`; "" when none or several are."""

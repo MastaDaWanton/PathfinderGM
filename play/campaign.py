@@ -539,6 +539,15 @@ class Campaign:
         person_words.record_peoples(self.scene, world)
         # And a person an older build named with a ref ("c8", item 7) gets words back.
         person_words.heal_ref_names(self.scene)
+        # Or named with the player's quoted words, or with a people's name (2026-10-03,
+        # items 13 and 14). The ledger's own lines carried the phrase as a person ("you
+        # told say \"just trying…\""), so they are respelled with the new words — the
+        # one edit to the ledger this lane makes; what the ledger records is lane D's.
+        for _ref, old, new in person_words.heal_phrase_names(self.scene, world,
+                                                             self.transcript):
+            for entry in self.ledger or []:
+                if isinstance(entry, dict) and old in str(entry.get("text") or ""):
+                    entry["text"] = str(entry["text"]).replace(old, new)
 
     def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
         """A save from before actors had a place, stood somewhere real.

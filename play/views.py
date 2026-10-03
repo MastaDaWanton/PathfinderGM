@@ -3623,10 +3623,17 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             refused_names: list = []
             attribution = getattr(agent, "attribution", None)
             whose = attribution.who if attribution is not None else None
+            # A speaker tag the page contradicts is withdrawn before anything reads it —
+            # the names below, the bodies of the "people" stage and the hails after it
+            # (item 15, 2026-10-03: six beats of "the man" tagged to the servant, each
+            # one opening a conversation with him).
+            c.turn_log.extend(judgement.doubt_tags(c.scene, text, agent.last_said,
+                                                   attribution=attribution))
             for ref, given in judgement.apply_introductions(c.scene, text, player_input,
                                                              said=agent.last_said,
                                                              refused=refused_names,
-                                                             whose=whose):
+                                                             whose=whose,
+                                                             world=c.world):
                 repairs.append(f"{ref} gave the name {given}: the panel shows it now")
             for ref, given, whose in refused_names:
                 repairs.append(f"{ref} was not renamed {given}: {whose} answers to it")
@@ -3688,7 +3695,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 # 2026-09-22: "the description of Ashla is tagged to the end as an after
                 # thought ... if she was next to drenn she should have been described
                 # right after i saw drenn."
-                text = narration_mod.place_the_face(text, who.name, line)
+                text = narration_mod.place_the_face(text, who.name, line, ref=ref,
+                                                    attribution=attribution)
                 ours.append(line)
                 who.described = True
                 repairs.append(f"nobody stands here undescribed: added {who.name}'s "

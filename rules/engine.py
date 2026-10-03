@@ -15061,10 +15061,15 @@ class Engine:
             )
         # "I ask her name." came back as `introduce who="her name"` (live, 2026-09-27).
         if not population.names_a_person(who):
+            from .names import not_a_name
+
+            why = not_a_name(who)
             return self._refuse(
-                intent, f"introduce brings in a PERSON, and {who!r} is not somebody. "
-                        f"Asking a name, a price or a question of somebody here is `say` "
-                        f"to them, or narrate_only.")
+                intent, f"introduce brings in a PERSON, and {who!r} is not somebody"
+                        + (f" ({why})" if why else "") + ". "
+                        f"Words the player says are a `say` (its `words`), never who is "
+                        f"spoken to; asking a name, a price or a question of somebody "
+                        f"here is `say` to them, or narrate_only.")
         n = int(intent.params.get("count", 1) or 1)
         how = intent.params.get("how") or "already_here"
         template = intent.params.get("template") or "guildhand"

@@ -37,7 +37,7 @@ class TestTheMeasuredScene:
     def test_and_the_backstop_still_reads_it_as_a_sentence(self):
         line = names.appearance_for(WORLD, VORMOOR, ORC["people_id"], ref="c3")
         said = narration.a_face_for("Ashla Ironvale", line)
-        assert said.startswith("Ashla Ironvale is an Orc: Powerfully built")
+        assert said.startswith("Ashla Ironvale is of the Orc people: Powerfully built")
         assert said.count(":") == 1
 
 
