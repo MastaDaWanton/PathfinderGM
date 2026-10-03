@@ -2401,7 +2401,18 @@ class Engine:
                             )
             return
 
-        needs_actor = intent.op in ("check", "save", "attack", "move")
+        # A trade or an item used with nobody named doing it is the player's own: the
+        # handlers read `self.scene.actors[intent.actor]`, and measured live on the
+        # 2026-10-03 batch, "I agree to sell the crate to the smith for whatever it is
+        # worth" came back as a `sell` with no actor — `KeyError: None`, and the player
+        # read "The engine refused the GM's intents: None" with their turn lost. `cast`
+        # is refused instead of defaulted: an NPC's turn casts too, and guessing the
+        # caster is the one thing this must not do.
+        if not intent.actor and intent.op in ("sell", "buy", "use_item"):
+            pc = self.scene.pc()
+            if pc is not None:
+                intent.actor = pc.ref
+        needs_actor = intent.op in ("check", "save", "attack", "move", "cast")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
         for t in intent.targets():

@@ -107,3 +107,30 @@ def test_the_ledger_gives_a_descriptor_name_its_article():
     named = SimpleNamespace(op="say", status="resolved", effects=[
         {"kind": "said", "who": "", "to": "c7", "words": "hello"}])
     assert ledger.note([named], turn=1, names={"c7": "Grix"})["text"] == "you told Grix, “hello”"
+
+
+@pytest.mark.parametrize("op, params", [
+    ("sell", {"item": "crate"}),
+    ("buy", {"item": "rope"}),
+])
+def test_a_trade_with_no_actor_is_the_players_not_a_crash(op, params):
+    """Measured live: "I agree to sell the crate to the smith for whatever it is worth"
+    came back from the model as a `sell` with no actor, `_op_sell` read
+    `scene.actors[None]`, and the player saw "The engine refused the GM's intents: None"
+    with the turn thrown away. Whatever the trade then says, it says it as a refusal or
+    a sale — never a KeyError."""
+    s = _scene()
+    s.pc().goods["crate"] = 1
+    e = Engine(s, Dice(seed=1))
+    out = e.run(e.validate([{"op": op, "params": dict(params)}])).outcomes
+    assert [o.op for o in out] == [op]
+
+
+def test_a_cast_with_no_caster_is_refused_by_name():
+    """The other bare lookup on the same line of handlers: a `cast` with nobody casting
+    is refused at validation, where the planner gets the fix named, not guessed at."""
+    from rules.intents import IntentError
+
+    e = Engine(_scene(), Dice(seed=1))
+    with pytest.raises(IntentError):
+        e.validate([{"op": "cast", "params": {"spell": "light"}}])
