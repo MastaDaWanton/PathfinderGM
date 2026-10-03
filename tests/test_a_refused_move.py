@@ -204,3 +204,33 @@ def test_the_street_a_tavern_opens_off_is_outside_it():
         origin="author:test"))
     assert e.here().name == "the Copper Kettle" and "market" in e.here().parent
     assert _flags(agent, "You are standing in the market, the tavern behind you.")
+
+
+_ANVIL = "I set the crate down on the ground and walk over toward the anvil."
+_ANVIL_READ = {"actions": [{"act": "use", "object": "the ground", "target": "the crate"},
+                           {"act": "go", "place": "the anvil"}]}
+
+
+def test_a_walk_across_the_room_is_not_a_refused_journey():
+    """Measured live on the 2026-10-03 batch, the first turn played on the merged branch:
+    the reading said `go: the anvil`, the planner rightly made no travel of it, and with no
+    move resolved this check took the reading's `go` for a refused one — "You move toward
+    the anvil, the massive block of iron…" was cut and the beat ended "You are still at the
+    smithy." An anvil is not on `_INSIDE`'s list and no fixed list holds every fitting, so
+    the judge is the planner's own `movement_within`."""
+    agent = _in_a_tavern()
+    ctx = context(agent, "You move toward the anvil, the massive block of iron standing "
+                         "like a monument in the heat.", player=_ANVIL, reading=_ANVIL_READ,
+                  was_at=agent.engine.scene.at)
+    assert refused_move.find(ctx) == []
+
+
+def test_a_walk_out_of_the_place_is_still_caught_without_a_refusal():
+    """The other side of the same door: the reading's `go` to the street, with no move
+    resolved, is still a walk nobody made."""
+    agent = _in_a_tavern()
+    ctx = context(agent, "You leave the Copper Kettle and walk out into the street.",
+                  player="I walk out into the street.",
+                  reading={"actions": [{"act": "go", "place": "the street"}]},
+                  was_at=agent.engine.scene.at)
+    assert [f.kind for f in refused_move.find(ctx)] == ["refused-move-shown-as-moved"]

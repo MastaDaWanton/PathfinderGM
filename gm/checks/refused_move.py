@@ -280,7 +280,31 @@ def _applies(ctx) -> bool:
     if refused_moves(ctx):
         return True
     acts = (ctx.reading or {}).get("actions") or [] if isinstance(ctx.reading, dict) else []
-    return any(isinstance(a, dict) and a.get("act") in ("go", "leave") for a in acts)
+    goes = [a for a in acts if isinstance(a, dict) and a.get("act") in ("go", "leave")]
+    if not goes:
+        return False
+    # A walk across the room is not a journey nobody made. Measured live on the
+    # 2026-10-03 batch: "I set the crate down on the ground and walk over toward the
+    # anvil" read as `go: the anvil`, `keep_movement_in_the_scene` rightly planned no
+    # travel, and with no move resolved this check took the reading's `go` for a refused
+    # one — "You move toward the anvil" was cut and the beat ended "You are still at the
+    # smithy." `_INSIDE`'s fixed list has no anvil, and no list ever will hold every
+    # fitting of every room; the judge of "within the scene" is the one the planner
+    # already used (`judgement.movement_within`), so the two cannot disagree about it.
+    if all(a.get("act") == "go" for a in goes) and _moves_within(ctx):
+        return False
+    return True
+
+
+def _moves_within(ctx) -> bool:
+    """Whether the player's own words only move them within the place they stand in."""
+    from gm.judgement import movement_within
+
+    try:
+        known = tuple(ctx.engine.places()) + tuple(ctx.engine.open_ground())
+    except Exception:  # noqa: BLE001 — no engine answer, no judgement
+        return False
+    return bool(known) and bool(movement_within(ctx.player_text, known))
 
 
 def refusal_words(ctx) -> str:

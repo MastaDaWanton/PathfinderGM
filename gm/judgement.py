@@ -2266,6 +2266,34 @@ _THING = re.compile(
 _OBJECT = re.compile(r"\s*(?:(?:back|up|out|down|away|along)\s+)?" + _THING.pattern, re.I)
 
 
+# A second deed in the same sentence, with its "I" left out: "I pick the crate back up,
+# then tip the coins from the pouch into my coin purse". Every reader of a declared deed
+# here anchors on "I <verb>", so the second clause was read by none of them — measured
+# live on the 2026-10-03 batch, the second turn played on the merged branch: the reading
+# had both takes, the plan was `narrate_only`, the prose showed the crate lifted and the
+# coins tipped, and the engine moved neither. Only the sequencers that cannot be anything
+# else are split on ("then", "and then", a semicolon); a bare "and" joins nouns as often
+# as clauses ("the bread and cheese") and is left alone.
+_THEN_CLAUSE = re.compile(r"\s*(?:[,;]\s*|\s)(?:and\s+)?then\s+(?!I\b)(?=[a-z])|;\s*(?!I\b)"
+                          r"(?=[a-z])"
+                          # "and" only before one of the deeds these readers read: "I drop
+                          # the pouch on the floor and pick up the crate".
+                          r"|,?\s+and\s+(?=(?:take|pick|grab|pocket|drop|set|put|lay|tip|"
+                          r"empty|pour|give|hand|sell|buy|collect|toss|transfer)\b)", re.I)
+# The particle after the object: "pick the crate (back) up" is "pick up the crate".
+# `_OBJECT` reads the particle before the noun only, which is the less common English.
+_PICK_X_UP = re.compile(
+    r"\b(pick)\s+((?:the|a|an|my|his|her|their|that|this|some)\s+[a-z][a-z' -]{1,28}?)"
+    r"\s+(?:back\s+)?up\b", re.I)
+
+
+def as_declarations(player_text: str) -> str:
+    """The player's sentence with every sequenced deed starting "I <verb>" and every
+    "pick X up" as "pick up X", for the readers that anchor on that shape."""
+    text = _PICK_X_UP.sub(lambda m: f"{m.group(1)} up {m.group(2)}", str(player_text or ""))
+    return _THEN_CLAUSE.sub(". I ", text)
+
+
 # Nouns that are never objects, however much they read like them after "I take". Found in
 # a live save: the Inventory tab listed "offer" and "scene on" beside a traveller's outfit,
 # because "I accept the offer" and "I take in the scene on the ridge" both parse as a
@@ -2387,7 +2415,7 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     # is the player's, as `interpret.drop_unread_gifts` reads it.
     # A purchase covers both: the thing comes in and the price goes out, and "I pay the
     # merchant for the rope" is the purchase's coin, not a merchant handed over.
-    coming_in = going_out = "buy" in present
+    coming_in = going_out = coin_in = "buy" in present
     for r in raw_intents:
         if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "give"):
             continue
@@ -2395,7 +2423,19 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
         to = str(p.get("to") or "").strip().lower()
         frm = str(p.get("from_") or p.get("from") or "").strip().lower()
         if to in (pc.ref, "pc", "you", "player") or not (to or frm):
-            coming_in = True
+            # Coin into the purse is not the pack's acquisition. Measured live on the
+            # 2026-10-03 batch: "I pick the crate back up, then tip the coins from the
+            # pouch into my coin purse" — `declare_emptying` wrote the coins' give, this
+            # door read it as the turn's one thing coming in, and the crate stayed on the
+            # smithy floor while the prose lifted it.
+            # Each covers its own kind: coin covers "I pocket the coin", goods cover
+            # "I pick up the crate".
+            from rules import holding as _holding
+
+            if _holding.is_money(str(p.get("item") or "")):
+                coin_in = True
+            else:
+                coming_in = True
         else:
             going_out = True
     # The reading's rule, at this door too. `interpret.drop_unread_gifts` takes the
@@ -2413,15 +2453,18 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
     from rules import holding
 
     added: list[dict] = []
+    # The reading is keyed on the sentence as typed; the verbs are read off its
+    # declarations ("…, then tip the coins" as "I tip the coins", `as_declarations`).
+    declared = as_declarations(player_text)
     for pattern, gains in ((_ACQUIRES, True), (_HANDS_OVER, False)):
-        if gains and (reads_no_gain or coming_in):
+        if gains and (reads_no_gain or (coming_in and coin_in)):
             continue
         if not gains and going_out:
             continue
-        found = pattern.search(player_text)
+        found = pattern.search(declared)
         if not found:
             continue
-        rest = player_text[found.end():]
+        rest = declared[found.end():]
         # "I take in the scene", "I take a moment", "I take cover". The verb is not
         # acquisition when these follow it, and reading on for a noun phrase is how an
         # afternoon's reflection became a line in the inventory.
@@ -2438,6 +2481,8 @@ def inject_goods(raw_intents, player_text: str, scene) -> list:
             continue
         # And the noun itself has to be something a satchel could hold.
         if not _is_a_thing(item):
+            continue
+        if gains and (coin_in if holding.is_money(item) else coming_in):
             continue
         # "I take the crate to the man in the counting house" is carrying what is
         # already carried (2026-10-03, turn 73: a second crate came out of the air).
@@ -2497,7 +2542,7 @@ def declare_emptying(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     from rules import holding
 
-    text = redact_speech(player_text)
+    text = as_declarations(redact_speech(player_text))
     m = _EMPTIES.search(text) or _EMPTIES_BOX.search(text)
     if not m:
         return raw_intents
@@ -2538,7 +2583,7 @@ def declare_drop(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     from rules import holding
 
-    text = redact_speech(player_text)
+    text = as_declarations(redact_speech(player_text))
     m = _DROPS.search(text)
     if not m:
         return raw_intents

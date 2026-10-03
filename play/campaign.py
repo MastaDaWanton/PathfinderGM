@@ -548,6 +548,8 @@ class Campaign:
             for entry in self.ledger or []:
                 if isinstance(entry, dict) and old in str(entry.get("text") or ""):
                     entry["text"] = str(entry["text"]).replace(old, new)
+        # And the goods an older build minted from words (2026-10-03, items 1 and 3).
+        _heal_minted_goods(self.scene)
 
     def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
         """A save from before actors had a place, stood somewhere real.
@@ -1126,6 +1128,33 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     open_the_story(c, written=False)
     c.save()
     return c
+
+
+def _heal_minted_goods(scene) -> None:
+    """Goods lines an older build minted from words, put right on load.
+
+    The owner's items save (2026-10-03) carried `{"brunt of the weight": 1, "coins": 1}`
+    in Kesst's pack, both written by `inject_goods` before it knew better: a figure of
+    speech taken for a thing, and coin taken for an item. The fixes stop new ones; this
+    clears the ones already saved, by the same two judges the planner now uses —
+    `judgement._is_a_thing` for the words, `holding.is_money` for the coin. Coin is
+    credited the way the engine credits coin no record vouches for (one copper piece a
+    line, `Engine._give_money`), because no amount was ever recorded and law 3 forbids
+    inventing one. A pouch stays: it was a real pouch, only empty."""
+    from gm.judgement import _is_a_thing
+    from rules import goods as goods_mod
+    from rules import holding
+
+    for actor in list(getattr(scene, "actors", {}).values()):
+        store = getattr(actor, "goods", None)
+        if not isinstance(store, dict):
+            continue
+        for name in list(store):
+            if holding.is_money(name):
+                n = max(1, int(store.pop(name) or 1))
+                actor.purse = goods_mod.credit(actor.purse, n)
+            elif not _is_a_thing(name) and not holding.is_container(name):
+                store.pop(name)
 
 
 def _heal_background(c) -> None:
