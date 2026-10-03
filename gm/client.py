@@ -50,6 +50,88 @@ class ModelUnavailable(RuntimeError):
     not running is an ordinary situation with an ordinary fix, not a crash."""
 
 
+class ModelNotInstalled(ModelUnavailable):
+    """Ollama answered, and said it does not have this model: HTTP 404 from `/api/chat`
+    (`server/routes.go`: `model 'x' not found`, or the scheduler's `model "x" not found,
+    try pulling it first`). A different fact from "Ollama is down" with a different fix,
+    and it was reported as the other one: "could not be reached: cannot reach Ollama at
+    http://localhost:11434: HTTP Error 404" (playtest 2026-10-03, item 18), while the
+    same Ollama was answering the narrator's calls in the same turn. A subclass, so every
+    caller that catches `ModelUnavailable` still does."""
+
+
+def model_tag(model: str) -> str:
+    """Ollama's own spelling of a tag. `foo` and `foo:latest` are one model.
+
+    `/api/tags` always answers with the tag present, and `settings.MODELS` may or may
+    not carry one — `richardyoung/qwen3-4b-instruct-2507-abliterated` is configured
+    without. Compared raw, an installed model reads as missing. (Moved here from
+    `play/preflight.py`, which now calls this, so the two questions "is it installed"
+    cannot disagree about a spelling.)
+    """
+    name = (model or "").strip()
+    if not name:
+        return ""
+    # A digest-pinned reference (`model@sha256:...`) names one exact blob; the part
+    # before the `@` is still the tag Ollama lists it under.
+    name = name.split("@", 1)[0]
+    return name if ":" in name.rsplit("/", 1)[-1] else f"{name}:latest"
+
+
+# What `/api/tags` said, per host: (when, the tags, whether it answered). Cached because
+# the question is asked on every turn and the answer changes only when the player pulls
+# or deletes a model; a minute is short enough that a pull made mid-session is seen on
+# the next turn after it. LiteLLM keeps a cooldown cache for the same reason
+# (docs/turn-pipeline-2026-10-03.md).
+TAGS_TTL = 60.0
+_tags_cache: dict[str, tuple[float, frozenset, bool]] = {}
+_said_missing: set[tuple[str, str]] = set()
+
+
+def has_model(model: str, host: str = "http://localhost:11434",
+              provider: str = "ollama") -> bool | None:
+    """Whether `host`'s Ollama has `model` pulled: True, False, or None when it cannot
+    say (a hosted provider, or an Ollama that did not answer — then the call itself is the
+    test, and its own error says what is wrong)."""
+    if (provider or "ollama") != "ollama" or not model:
+        return None
+    key = (host or "").rstrip("/")
+    now = time.monotonic()
+    got = _tags_cache.get(key)
+    if got is None or now - got[0] > TAGS_TTL:
+        found = probe(host)
+        got = (now, frozenset(model_tag(n) for n in found.installed), found.reachable)
+        _tags_cache[key] = got
+    if not got[2]:
+        return None
+    return model_tag(model) in got[1]
+
+
+def _forget_model(model: str, host: str) -> None:
+    """A 404 said this model is gone: the cache stops listing it until its next refresh."""
+    key = (host or "").rstrip("/")
+    got = _tags_cache.get(key)
+    if got is not None:
+        _tags_cache[key] = (got[0], got[1] - {model_tag(model)}, got[2])
+
+
+def say_missing_once(model: str, host: str, role: str = "") -> bool:
+    """Log, once per process, that a configured model is not on its host. True the first
+    time. Once, because the check runs every turn and the fact does not change between
+    them; a log that says it sixty times is a log nobody reads."""
+    key = (model_tag(model), (host or "").rstrip("/"))
+    if key in _said_missing:
+        return False
+    _said_missing.add(key)
+    import logging
+
+    logging.getLogger("pathfindergm").warning(
+        "%s%s is not installed on the Ollama at %s, so it is skipped. Download it from "
+        "the app's model setup, or choose another model in Settings.",
+        f"the {role} model " if role else "", model, host)
+    return True
+
+
 @dataclass
 class Reply:
     text: str
@@ -218,6 +300,15 @@ def chat(
                     return node
                 bare = dict(payload, format=_strip(payload["format"]))
                 body = _post(bare)
+            elif exc.code == 404:
+                # The server is up — it answered — and the model is not on it.
+                _forget_model(model, host)
+                why = " ".join(detail.split())[:160] or "not found"
+                raise ModelNotInstalled(
+                    f"{model} is not installed on the Ollama at {host} (it answered "
+                    f"404: {why}). Download it from the app's model setup, or choose "
+                    f"another model in Settings."
+                ) from exc
             else:
                 raise
     except TimeoutError as exc:

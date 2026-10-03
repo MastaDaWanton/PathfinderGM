@@ -68,18 +68,11 @@ DISK_HEADROOM = 2_000_000_000
 def _norm(model: str) -> str:
     """Ollama's own spelling of a tag. `foo` and `foo:latest` are one model.
 
-    `/api/tags` always answers with the tag present, and `settings.MODELS` may or may
-    not carry one — `richardyoung/qwen3-4b-instruct-2507-abliterated` is configured
-    without. Compared raw, an installed model reads as missing and the player is
-    offered a 2.5 GB download of something they already have.
+    Compared raw, an installed model reads as missing and the player is offered a 2.5 GB
+    download of something they already have. One rule with the turn's own "is the backup
+    narrator installed" check, so it lives in `gm.client.model_tag`.
     """
-    name = (model or "").strip()
-    if not name:
-        return ""
-    # A digest-pinned reference (`model@sha256:...`) names one exact blob; the part
-    # before the `@` is still the tag Ollama lists it under.
-    name = name.split("@", 1)[0]
-    return name if ":" in name.rsplit("/", 1)[-1] else f"{name}:latest"
+    return gm_client.model_tag(model)
 
 
 @dataclass

@@ -36,8 +36,16 @@ import re
 # What the ledger may say about a turn. Deliberately short of the full op vocabulary:
 # a Perception check is not a thing worth remembering forty turns later, and a ledger
 # that records everything is a second transcript rather than a memory.
+#
+# The fields a shape may use, all resolved to what the player read — never a ref, never
+# a place id (`_name_of`): {where} the place gone to, {came_from} the place left, {who}
+# the person the effect names, {title} a card's or a place's name, {item} the thing an
+# item op moved. Measured 2026-10-03 (item 22): "you went to ca~urban:the-docks" was a
+# raw place id in the prompt, because a travel effect carries `place` as an id and the
+# shape printed it; and "you spoke with someone" said nothing at all.
 _WORTH_KEEPING = {
-    "travel": "went to {where}",
+    "travel": "went from {came_from} to {where}",
+    "journey": "set out on the road to {where}",
     "quest": "took up {title}",
     "quest_step": "moved {title} along",
     "found": "founded {title}",
@@ -47,8 +55,17 @@ _WORTH_KEEPING = {
     "give": "handed something to {who}",
     "loot": "stripped {who}",
     "begin_encounter": "fought {who}",
+    "introduce": "met {who}",
     "rest": "rested",
     "craft": "worked at a craft",
+}
+
+# Ops whose meaning turns on a flag in the effect rather than the op alone: a `company`
+# can be somebody joining or parting, and a `talk` outcome is a conversation ending.
+_BY_EFFECT = {
+    ("company", True): "{who} came along with you",
+    ("company", False): "parted company with {who}",
+    ("talk", True): "the conversation with {who} ended",
 }
 
 # What was actually said, kept in full up to here. docs/memory-policy.md planned one
@@ -69,32 +86,55 @@ BUDGET_CHARS = 1200
 ENTRY_CAP = 400
 
 _DIGIT = re.compile(r"\d")
+# A place id as `places` mints them: location id, "~", terrain, ":", slug path. After the
+# digit strip an old entry's id has lost its hex digits ("ca~urban:the-docks"), so the
+# location part is any run of word characters, or none.
+_PLACE_ID = re.compile(r"\w*~[a-z_-]+:[\w/-]+")
+# The scene's refs, as `bestiary.next_ref` mints them, and the player's.
+_REF = re.compile(r"(?:c|n)\d+|pc")
 
 
 def note(outcomes, *, turn: int, hist: int = 0, spoke_with: str = "", where: str = "",
-         names: dict | None = None) -> dict | None:
+         names: dict | None = None, places: dict | None = None) -> dict | None:
     """One entry for one resolved turn, or None if nothing worth keeping happened.
 
     `outcomes` are the engine's own, so the op names here are the engine's decisions
     rather than anything a model proposed. `names` maps refs to the names the player
-    read, because "you stripped c6" is not a memory of anything.
+    read, because "you stripped c6" is not a memory of anything. `places` maps place ids
+    to the names the player read, for the same reason; an id it does not hold is still
+    never printed (`_name_of`). `where` is where the party stood, as a name.
     """
     did: list[str] = []
     for o in outcomes or []:
-        if str(getattr(o, "op", "") or "") == "say":
+        op = str(getattr(o, "op", "") or "")
+        if op == "say":
             words = _said(o)
             if words:
-                heard = _named(o, ("to",), names)
+                # Spoken to nobody in particular, inside a conversation: it was said to
+                # the person being talked to, and the ledger can say who.
+                heard = _named(o, ("to",), names, places) or spoke_with
                 did.append((f"told {heard}" if heard else "said") + f", “{words}”")
             continue
-        shape = _WORTH_KEEPING.get(str(getattr(o, "op", "") or ""))
+        flag = _flag(o, op)
+        shape = _BY_EFFECT.get((op, flag)) if flag is not None else None
+        shape = shape or _WORTH_KEEPING.get(op)
         if not shape:
             continue
-        said = shape.format(where=_named(o, ("place", "to", "biome"), names) or where
-                            or "somewhere new",
-                            title=_named(o, ("title", "name"), names) or "something",
-                            who=_named(o, ("ref", "to", "from_", "target", "who"),
-                                       names) or "someone")
+        gone_to = _named(o, ("to_name", "place", "to", "biome"), names, places)
+        came_from = _named(o, ("was_place",), names, places)
+        if op == "travel" and not came_from:
+            shape = "went to {where}"
+        # Who an introduce made, by the names the engine gave them — not the `who` the
+        # plan asked for, which is a description.
+        who = (_introduced(o) if op == "introduce" else "") or \
+            _named(o, ("ref", "to", "from_", "target", "who"), names, places)
+        if op == "introduce" and not who:
+            continue
+        said = shape.format(where=gone_to or where or "somewhere new",
+                            came_from=came_from,
+                            title=_named(o, ("title", "name"), names, places) or "something",
+                            who=who or "someone",
+                            item=_named(o, ("item",), names, places) or "something")
         if said not in did:
             did.append(said)
     # Only when the turn produced no `say` of its own. With both, the entry read
@@ -119,22 +159,68 @@ def _said(o) -> str:
     return ""
 
 
-def _named(o, keys, names: dict | None) -> str:
+def _named(o, keys, names: dict | None, places: dict | None = None) -> str:
     """The first of `keys` any of this outcome's effects carries, as a name.
 
     An `Outcome` holds `effects`, a list of dicts the engine wrote — there is no
     params bag to read, and the ref in an effect is `c6` rather than anybody the
-    player would recognise, so refs are resolved through the scene's own names.
+    player would recognise, so refs are resolved through the scene's own names, and
+    place ids through the places' (`_name_of`).
     """
     for e in getattr(o, "effects", None) or []:
         if not isinstance(e, dict):
             continue
         for key in keys:
             got = e.get(key)
-            if got in (None, "", []):
+            # Names are strings. A number under the same key is a measure — the
+            # `regard` effect's "to": 37 — and would print as a name with its digits cut.
+            if not isinstance(got, str) or not got.strip():
                 continue
-            got = str(got)
-            return str((names or {}).get(got, got))
+            return _name_of(str(got), names, places)
+    return ""
+
+
+def _name_of(value: str, names: dict | None, places: dict | None) -> str:
+    """A ref or a place id as the player read it.
+
+    A place id the caller's table does not hold — a place since left behind, a world
+    re-read — is still never printed as an id: its last segment is the place's own
+    slug ("6953424c8a82~urban:the-docks/the-storage-area" is "the storage area"), which
+    is how every place id here is minted (`places.child_id`)."""
+    if value in (names or {}):
+        return str(names[value])
+    if value in (places or {}):
+        return str(places[value])
+    # A ref nobody could name is still not a name: "c4" with its digit cut is "you
+    # told c" (2026-10-03, a ref whose bearer had left the table).
+    if _REF.fullmatch(value):
+        return "someone"
+    if "~" in value or (":" in value and " " not in value):
+        tail = re.split(r"[:/]", value)[-1]
+        return " ".join(tail.replace("_", "-").split("-")).strip() or "somewhere"
+    return value
+
+
+def _flag(o, op: str):
+    """The flag that says which of an op's meanings this outcome had, or None."""
+    for e in getattr(o, "effects", None) or []:
+        if isinstance(e, dict):
+            if op == "company" and "travels" in e:
+                return bool(e["travels"])
+            if op == "talk" and e.get("left"):
+                return True
+    return None
+
+
+def _introduced(o) -> str:
+    """Who an `introduce` brought into the scene, by the names the engine gave them."""
+    for e in getattr(o, "effects", None) or []:
+        if isinstance(e, dict) and e.get("kind") == "introduce":
+            made = [str(a.get("name") or "") for a in e.get("actors") or ()
+                    if isinstance(a, dict) and a.get("name")]
+            if made:
+                return " and ".join(made) if len(made) <= 2 else \
+                    ", ".join(made[:-1]) + " and " + made[-1]
     return ""
 
 
@@ -185,7 +271,12 @@ def block(entries, *, before_hist: int, budget: int = BUDGET_CHARS) -> str:
               "engine; do not contradict them):\n")
     lines, spent = [], len(header)
     for e in reversed(older):
-        line = f"  * {e.get('text', '')}" + (f" (at {e['at']})" if e.get("at") else "")
+        # Entries are never rewritten, so a save written before item 22 still holds
+        # "you went to ca~urban:the-docks"; the id is read as a name on the way out.
+        text = _PLACE_ID.sub(lambda m: _name_of(m.group(0), None, None),
+                             str(e.get("text", "")))
+        at = _PLACE_ID.sub(lambda m: _name_of(m.group(0), None, None), str(e.get("at") or ""))
+        line = f"  * {text}" + (f" (at {at})" if at else "")
         cost = len(line) + (1 if lines else 0)
         if spent + cost > budget:
             break
