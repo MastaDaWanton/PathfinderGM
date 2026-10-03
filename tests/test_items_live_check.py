@@ -180,3 +180,25 @@ def test_a_deal_spoken_aloud_sells_to_the_one_in_conversation():
     # And a mere mention inside speech is still not a sale.
     out = judgement.inject_sale([{"op": "narrate_only"}], '"Would you sell me rope?"', s)
     assert not [r for r in out if r.get("op") == "sell"]
+
+
+def test_a_deal_said_to_the_smith_by_name_finds_him_though_two_are_talking():
+    """Measured live: 'I tell the smith, "It's a deal. You can have the crate."' redacted
+    to "I tell the" — the buyer's name went with the speech — and with a second person in
+    the conversation nothing chose between them. Read off the whole line, the smith is
+    named."""
+    from rules.bestiary import instantiate
+
+    s = _scene()
+    s.pc().goods["crate"] = 1
+    smith = instantiate("guildhand", scene=s, name="the smith")
+    other = instantiate("guildhand", scene=s, name="large man")
+    s.add(smith)
+    s.add(other)
+    e = Engine(s, Dice(seed=1))
+    e.join_talk(smith)
+    e.join_talk(other)
+    said = 'I tell the smith, "It\'s a deal. You can have the crate."'
+    out = judgement.inject_sale([{"op": "narrate_only"}], said, s)
+    sells = [r for r in out if r.get("op") == "sell"]
+    assert sells and sells[0]["params"]["to"] == smith.ref

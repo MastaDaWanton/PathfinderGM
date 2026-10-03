@@ -3171,7 +3171,9 @@ def _sell_goods_declared(raw_intents, player_text: str, scene, pc, recent=()) ->
     if not named:
         return raw_intents
     item = named[0]
-    buyer = _named_here(text, scene, pc)
+    # Who it is said to, read off the same line the close was: measured live, "I tell the
+    # smith, \"It's a deal…\"" redacts to "I tell the" — the name went with the speech.
+    buyer = _named_here(said if closes else text, scene, pc)
     if not buyer:
         return raw_intents                    # nobody here to buy it
     from rules import keepers as keepers_mod
