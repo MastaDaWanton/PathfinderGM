@@ -120,6 +120,13 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from gm import mentions as mentions_mod
 
     monkeypatch.setattr(mentions_mod, "ENABLED", False)
+    # And the beat read back (gm/beat_verify.py): one read per groomed beat, and one
+    # closed question per contradiction it finds. tests/test_beat_verify.py scripts its
+    # replies; with it off the `beat_verified` check finds nothing.
+    from gm import beat_verify as beat_verify_mod
+
+    monkeypatch.setattr(beat_verify_mod, "ENABLED", False)
+    beat_verify_mod.clear_cache()
 
 
 @pytest.fixture(autouse=True)
