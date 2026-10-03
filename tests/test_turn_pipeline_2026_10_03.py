@@ -83,6 +83,31 @@ def test_a_signature_read_back_from_a_save_still_compares():
     assert not v.ok
 
 
+def test_asking_again_for_what_was_refused_is_not_a_repeat(monkeypatch):
+    """Measured live on the merged branch: the smith's counter was shut at half past one
+    and the sale refused; the player asked again, "I offer the smith the crate and agree
+    to sell it to him for whatever it is worth", and the planner's `sell crate to c13` —
+    exactly last turn's, exactly right — was refused twice as a repeat, the turn degraded
+    to narration, and the engine never said why the sale could not happen."""
+    from gm import interpret
+
+    monkeypatch.setattr(interpret, "_READINGS", {})
+    said = "I offer the smith the crate and agree to sell it to him for whatever it is worth."
+    interpret.remember(said, {"actions": [
+        {"act": "give", "target": "the smith", "object": "the crate"},
+        {"act": "sell", "object": "it", "target": "him"}]})
+    plan = parse_all([{"op": "narrate_only"},
+                      {"op": "sell", "actor": "pc", "params": {"item": "crate", "to": "c13"}}])
+    v = judgement.review(said, plan, None, previous=judgement._signature(plan))
+    assert v.ok, v.as_log()
+    # The guard's own case stands: a plan that does something the player did NOT
+    # declare this turn, repeated, has not read them.
+    other = "I look around the forge."
+    interpret.remember(other, {"actions": [{"act": "look"}]})
+    v = judgement.review(other, plan, None, previous=judgement._signature(plan))
+    assert [o.kind for o in v.objections] == ["repeats-the-last-turn"]
+
+
 def test_a_quiet_plan_is_quiet():
     assert judgement.is_quiet(_talk("hello"))
     assert not judgement.is_quiet(parse_all([{"op": "check", "actor": "pc",

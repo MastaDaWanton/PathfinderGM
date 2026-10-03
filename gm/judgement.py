@@ -343,6 +343,26 @@ def _says_the_players_words(intents, player_text: str) -> bool:
                _words_of(i.params.get("words", "")) in line for i in said)
 
 
+def _does_what_was_declared(intents, player_text: str) -> bool:
+    """Every op in the plan that does something is one the player's own words declared
+    THIS turn, by the reading (`interpret._OP_NEEDS`). Then a repeat of last turn's plan
+    is the player asking again, not the planner failing to read them.
+
+    Measured live on the 2026-10-03 batch: the smith's counter was shut, the sale of the
+    crate was refused, and the player asked again — "I offer the smith the crate and
+    agree to sell it to him for whatever it is worth". The planner's `sell crate to c13`
+    was exactly last turn's, which is exactly right; the guard refused it twice, the turn
+    degraded to narration, and the engine never got to say why the sale could not happen.
+    """
+    from . import interpret
+
+    frame = interpret.reading_of(player_text) or {}
+    acts = {str(a.get("act") or "") for a in frame.get("actions") or [] if isinstance(a, dict)}
+    need = dict(interpret._OP_NEEDS, give={"give", "take"}, buy={"buy"})
+    loud = [i for i in intents if i.op not in QUIET_OPS]
+    return bool(loud) and all(need.get(i.op, set()) & acts for i in loud)
+
+
 def review(player_text: str, intents, scene=None, previous=None) -> Review:
     """Compare what the GM decided against what the player asked for."""
     out = Review()
@@ -367,7 +387,8 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
     #    failure this guards against.
     if (previous and _frozen(_signature(intents)) == _frozen(list(previous))
             and any(i.op != "narrate_only" for i in intents)
-            and not _says_the_players_words(intents, text)):
+            and not _says_the_players_words(intents, text)
+            and not _does_what_was_declared(intents, text)):
         out.objections.append(Finding(
             "repeats-the-last-turn",
             f"you have proposed exactly the same thing as last turn, but the player "
