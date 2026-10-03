@@ -102,9 +102,9 @@ def test_a_failed_check_is_logged_and_never_shown():
 
 
 def test_the_update_log_is_a_file_a_player_can_send():
-    """It was `console.log`, and a packaged Windows app has no console. From 08c4b35 to
-    0.2.5 `require('electron-updater')` threw on every launch of every install and the
-    line saying so went nowhere — reported 2026-10-02 as "it did not update"."""
+    """It was `console.log`, and a packaged Windows app has no console. In 0.2.4 and 0.2.5
+    `require('electron-updater')` threw on every launch and the line saying so went
+    nowhere — reported 2026-10-02 as "it did not update"."""
     js = _code(_main())
     assert "function updateLog(" in js
     assert "'update.log'" in js and "PATHFINDER_GM_DATA" in js
@@ -177,9 +177,10 @@ def _asar_files(path: Path) -> set[str]:
 def test_electron_updater_is_installed_where_the_build_reads_it():
     """Declaring it was never the defect. Measured 2026-10-02: package.json and the
     lockfile both named electron-updater 6.8.9, `electron/node_modules` on the build
-    machine did not have it, and electron-builder packs what is in node_modules — so
-    every installer from 08c4b35 to 0.2.5 shipped without it and none ever updated.
-    The test above passed the whole time. Skipped where no `npm ci` has run at all."""
+    machine did not have it, and electron-builder packs what is in node_modules — so the
+    0.2.4 and 0.2.5 installers shipped without it (0.2.4's is within 1.4 KB of 0.2.5's;
+    the updater is 319 KB) and neither could offer an update. The test above passed the
+    whole time. Skipped where no `npm ci` has run at all."""
     import pytest
 
     modules = ELECTRON / "node_modules"

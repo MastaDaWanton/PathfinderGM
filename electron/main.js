@@ -387,11 +387,13 @@ function wireUpdates() {
  * %LOCALAPPDATA%\PathfinderGM — `pathfindergm/paths.py:user_data_root`).
  *
  * It used to be `console.log`, and a packaged Windows app has no console. Measured
- * 2026-10-02: from 08c4b35 to 0.2.5 every installer shipped an asar holding only
- * main.js and package.json — electron-updater was in the lockfile and never installed on
- * the build machine — so `require` threw on every launch, the line saying so went
- * nowhere, and no installed copy ever offered an update. "Logged and never shown" is
- * only true if the log is somewhere.
+ * 2026-10-02: the 0.2.5 installer shipped an asar holding only main.js and package.json
+ * — electron-updater was in the lockfile and missing from the build machine's
+ * node_modules — so `require` threw on every launch, the line saying so went nowhere,
+ * and an install could not offer an update. 0.2.4 was the same (its installer is within
+ * 1.4 KB of 0.2.5's; the updater is 319 KB), while an update was downloaded on the build
+ * machine on 2026-09-30, so the 0.1.x builds evidently carried it. "Logged and never
+ * shown" is only true if the log is somewhere.
  */
 function updateLog(level, message) {
   const line = `${new Date().toISOString()} [update] ${level}: ${message}`;
