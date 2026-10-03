@@ -115,17 +115,13 @@ LABORER_BEAT = ("The laborer—a man named Korvu, his face etched with the deep 
 def test_a_peoples_name_is_refused_as_a_persons():
     """The beat that renamed c11 "Korvu". The people's names come from the scene's own
     heritages here (no world): nothing is a list of Pangrella's names."""
+    from gm import beat_reader
+
     s, (laborer,) = _scene(("lone laborer", {"heritage": "Korvu"}))
-    refused: list = []
-    got = judgement.apply_introductions(s, LABORER_BEAT, "I walk up to the laborer",
-                                        refused=refused)
-    assert got == []
-    assert laborer.name == "lone laborer"
-    assert refused == [(laborer.ref, "Korvu", "a people of this world")]
+    assert beat_reader.name_refusal(s, None, laborer.ref, "Korvu") == \
+        "a people of this world"
     # And a person's name in the same sentence still lands.
-    got = judgement.apply_introductions(
-        s, LABORER_BEAT.replace("Korvu", "Aethorin Vex"), "I walk up to the laborer")
-    assert got == [(laborer.ref, "Aethorin Vex")]
+    assert beat_reader.name_refusal(s, None, laborer.ref, "Aethorin Vex") == ""
 
 
 def test_the_face_line_reads_as_a_people_never_as_a_name():

@@ -11,10 +11,11 @@ lane owns. A shared list to append to is the conflict every one of them would ha
 there is no list: a module dropped into this package is a member.
 
 **Two stages, because the plan's one hook site was wrong** (§1.1 P3). The plan put the
-hook "after the said/hails block"; the hails are not there. `_finish` runs
-`apply_introductions`, then `hailed_by` → `join_talk`, and only much later appends the beat
-and writes the speech-tags row. A speaker made real has to exist before `hailed_by` reads
-the page (A), and a log entry needs the beat's transcript index (F). So:
+hook "after the said/hails block"; the hails are not there. `_finish` reconciles the tags
+with the beat reader's speakers (`beat_reader.reconcile_tags`), then runs `hailed_by` →
+`join_talk`, and only much later appends the beat and writes the speech-tags row. A
+speaker made real has to exist, and every line be booked, before `hailed_by` reads them
+(A), and a log entry needs the beat's transcript index (F). So:
 
   * ``"people"`` runs immediately before the `hailed_by` loop. `said` is the LIVE
     `agent.last_said`, and this stage alone may fill an empty `who` (adding ``"made"``);

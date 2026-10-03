@@ -111,8 +111,14 @@ def test_the_tag_decides_whose_name_was_given(scene):
     tagged = f"The woman glances at the man. <say who={man} to=you>'Call me Kael,'</say> he says."
     beat, said = speech.lift(tagged, refs={man, woman})
     assert narration.introductions(beat) == [("woman", "Kael")], "the defect this replaces"
-    named = judgement.apply_introductions(scene, beat, "", said=said)
-    assert named == [(man, "Kael")]
+    # The beat reader is shown the tagged line and answers whose the name is (bench:
+    # names-the-tag-decides-whose); it is taken through the one door.
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+
+    reading = stub.read(beat, scene, said=said, lines={"Call me Kael": (man, "you")},
+                        names={man: "Kael"})
+    seen_people.name_them(stub.ctx(scene, reading, text=beat), reading)
     assert scene.actors[man].name == "Kael" and scene.actors[woman].name != "Kael"
 
 

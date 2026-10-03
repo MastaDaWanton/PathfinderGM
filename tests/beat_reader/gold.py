@@ -552,6 +552,75 @@ CASES: list[dict] = [
         "places": [{"words": "forge|smithy", "kind": "smithy", "near": "the docks",
                     "one_of": "forge"}],
     },
+    # --- names: the shapes the retired name patterns were tested on (tests/ texts) -------
+    {
+        "id": "names-the-man-korgath-varn",
+        "why": "'The man—Korgath Varn—takes a slow pull of his ale': the panel kept 'man' "
+               "(reported 2026-09-24)",
+        "cast": [("pc", "Spree", "pc"), ("c8", "man", "guildhand")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": ("The man—Korgath Varn—takes a slow pull of his ale, the mug letting out a "
+                 "wet sound as he sets it back down. He watches you over the rim."),
+        "said": [],
+        "people": {"The man": "c8"},
+        "new": {}, "lines": {},
+        "names": {"c8": "Korgath Varn"},
+    },
+    {
+        "id": "names-two-men-one-named",
+        "why": "the head word 'man' belonged to two unnamed men; the guess took the first",
+        "cast": [("pc", "Spree", "pc"), ("c2", "man by the door", "guildhand"),
+                 ("c3", "man at the bar", "guildhand")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": ("The man by the door watches the street. At the bar, the man—Korgath "
+                 "Varn—takes a slow pull of his ale."),
+        "said": [],
+        "people": {"The man": "c2", "the man": "c3"},
+        "new": {}, "lines": {},
+        "names": {"c3": "Korgath Varn"},
+    },
+    {
+        "id": "names-the-tag-decides-whose",
+        "why": "'The woman glances at the man. \"Call me Kael,\" he says.' — the role-word "
+               "guess gave the woman his name",
+        "cast": [("pc", "Kesst Vayr", "pc"), ("c2", "man by the fire", "guildhand"),
+                 ("c3", "woman at the counter", "guildhand")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": "The woman glances at the man. 'Call me Kael,' he says.",
+        "said": [],
+        "people": {"The woman": "c3", "the man": "c2"},
+        "new": {}, "lines": {"Call me Kael": "c2"},
+        "names": {"c2": "Kael"},
+    },
+    {
+        "id": "names-the-one-who-was-asked",
+        "why": "asked her name, the woman in the corner said 'you may call me Gorvothor'; "
+               "two women here, and the panel kept the descriptor (2026-09-19)",
+        "cast": [("pc", "Kesst Vayr", "pc"), ("c4", "woman in the corner", "guildhand"),
+                 ("c5", "woman", "guildhand")], "vague": [],
+        "town": ZHIL, "here": "the tavern",
+        "text": ("The woman in the corner looks up at your question. 'Names are heavy things "
+                 "to carry in a place like this,' she says, her voice a low, resonant grind. "
+                 "'But if you must have one, you may call me Gorvothor.'"),
+        "said": [],
+        "people": {"The woman": "c4"},
+        "new": {}, "lines": {"Names are heavy": "c4", "But if you must": "c4"},
+        "names": {"c4": "Gorvothor"},
+    },
+    {
+        "id": "names-a-place-in-apposition",
+        "why": "a place in apposition is no person's name; nor is a name inside somebody "
+               "else's speech",
+        "cast": [("pc", "Kesst Vayr", "pc"), ("c2", "Drenn Ironvale", "agent")],
+        "vague": ["c2"], "town": ZHIL, "here": "the market",
+        "text": ("You cross the market, Vormoor's heart, at a walk. Drenn says, 'the man, "
+                 "Korgath Varn, sits in the back corner.'"),
+        "said": [("c2", "the man, Korgath Varn")],
+        "people": {},
+        "new": {}, "lines": {"the man, Korgath": "c2"},
+        "names": {},
+        "pronouns": {"c2": "*"},
+    },
     # --- Sam's save, replayed 2026-10-01 (the seen-people ruling's own cases) ------------
     {
         "id": "sam-a-figure-it-is-a-woman",

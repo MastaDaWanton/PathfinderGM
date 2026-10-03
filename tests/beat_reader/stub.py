@@ -102,7 +102,7 @@ def people_answer(text: str, scene, *, who: dict | None = None, new=(), lines=No
                     break
     if ids:
         ans["new"] = [{"mention": mid(p), "where": w, "words": words} for p, w, words in new]
-        ans["names"] = [{"who": person(w), "name": n} for w, n in (names or {}).items()]
+    ans["names"] = [{"who": person(w), "name": n} for w, n in (names or {}).items()]
     if arrived:
         ans["arrived"] = list(arrived)
     for ref, p in (pronouns or {}).items():

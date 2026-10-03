@@ -24,6 +24,18 @@ from rules.engine import Scene
 from rules.sheet import load_pc
 
 
+
+
+def _named(scene, text, ref, name, world=None):
+    """The beat reader's answer — this name, this person's — through the one door that
+    takes a name read off the page (`seen_people.name_them`, since 2026-10-03; it was
+    `judgement.apply_introductions`' patterns before)."""
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+
+    reading = stub.read(text, scene, names={ref: name})
+    return seen_people.name_them(stub.ctx(scene, reading, text=text, world=world), reading)
+
 @pytest.fixture(scope="module")
 def world():
     return cm.load_cached(cm._resolve_world_source("fixtures/aurvantis-campaign.json"))
@@ -83,9 +95,8 @@ def test_a_name_given_in_play_renames_the_panel_and_an_invented_one_becomes_the_
     settled, swaps = narration.settle_introductions(beat, {"stranger": true})
     assert f"Call me {true}" in settled and "Kaelen" not in settled
     assert swaps == [f"Kaelen -> {true}"]
-    renamed = judgement.apply_introductions(step, settled)
-    assert renamed == [(stranger.ref, true)]
-    assert stranger.name == true
+    (row,) = _named(step, settled, stranger.ref, true)
+    assert row["taken"] and stranger.name == true
     # Refusing to give a name stays legitimate: nothing is introduced, nothing renamed.
     assert narration.introductions("'I'm not telling you my name,' he says.") == []
     # A quoted "I am" opening on a common word is not a name.
@@ -128,10 +139,12 @@ def test_a_bare_quoted_answer_to_the_question_is_an_introduction(world, step):
             f"he grunts, finally. He does not look up. What do you do?")
     assert narration.introductions(beat) == []
     assert narration.introductions(beat, asked_for_name=True) == [("stranger", stranger.true_name)]
-    renamed = judgement.apply_introductions(step, beat, "I ask the stranger for his name")
-    assert renamed == [(stranger.ref, stranger.true_name)] and stranger.name == stranger.true_name
-    # Not asked, a quoted capitalised word is not somebody's name.
-    assert judgement.apply_introductions(step, '"Vormoor," he grunts.', "I wait") == []
+    # The beat reader reads the bare answer as his name (`seen_people.name_them`).
+    (row,) = _named(step, beat, stranger.ref, stranger.true_name)
+    assert row["taken"] and stranger.name == stranger.true_name
+    # And a place's name is no person's: "Vormoor" is the world's (`name_refusal` holds
+    # what the reader reads to the engine's own checks; the reader is asked, and the
+    # bench measures it, not to call a place a name — names-a-place-in-apposition).
 
 
 def test_looking_somebody_over_owes_a_face_and_old_actors_get_names(world, step):

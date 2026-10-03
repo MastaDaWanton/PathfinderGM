@@ -991,49 +991,10 @@ def settle_introductions(text: str, expected: dict[str, str],
     return text, swaps
 
 
-# The narrator naming somebody in passing, outside any speech: "The man—Korgath
-# Varn—takes a slow pull of his ale", "the woman, Marra Tull, looks up", "a man named
-# Korgath Varn". Reported 2026-09-24 with the panel on screen — "I am supposedly
-# speaking with korgath Varn but he is not scene or Man did not update to Korgath" —
-# on exactly the first of those sentences. `introductions` reads names GIVEN, inside
-# speech, and skips the narrator's own sentence about somebody on purpose; this is the
-# other way a page names a person, and it was read by nothing.
-_A_NAME = r"(?P<name>[A-Z][a-zA-Z'’-]+(?:\s+[A-Z][a-zA-Z'’-]+){0,2})"
-_A_HEAD = r"(?P<head>(?:[a-z][a-z'’-]*\s+){0,4}?[a-z][a-z'’-]*)"
-# Case-sensitive on purpose — the name is what carries the capitals — so the article is
-# spelled both ways rather than the whole pattern being case-blind.
-_THE = r"\b(?:[Tt]he|[Tt]his|[Tt]hat)\s+"
-_A_OR_THE = r"\b(?:[Tt]he|[Aa]n?|[Tt]his|[Tt]hat)\s+"
-_APPOSITIONS = (
-    re.compile(_THE + _A_HEAD + r"\s*[—–]\s*" + _A_NAME + r"\s*[—–]"),
-    re.compile(_THE + _A_HEAD + r"\s*,\s*" + _A_NAME + r"\s*,"),
-    re.compile(_A_OR_THE + _A_HEAD + r"\s+(?:named|called|known as)\s+" + _A_NAME + r"\b"),
-)
-
-
-def named_in_apposition(text: str) -> list[tuple[str, str]]:
-    """(role head word, name) for each person the narration names in passing.
-
-    The head has to carry a role word — man, woman, guard, merchant — so "the market,
-    Vormoor's heart," is not a merchant called Vormoor. Speech is left out: what a
-    character says about somebody is `introductions`' business, or nobody's.
-    """
-    out: list[tuple[str, str]] = []
-    if not text:
-        return out
-    from .judgement import _ROLE_WORD
-
-    plain = unquoted(text)
-    for pattern in _APPOSITIONS:
-        for m in pattern.finditer(plain):
-            name = " ".join(m.group("name").split())
-            if name.split()[0] in _NOT_A_GIVEN_NAME:
-                continue
-            roles = _ROLE_WORD.findall(m.group("head"))
-            if not roles:
-                continue
-            out.append((roles[-1].lower(), name))
-    return out
+# The narrator naming somebody in passing ("The man—Korgath Varn—takes a slow pull of
+# his ale", reported 2026-09-24) was read here by `named_in_apposition`'s three
+# patterns until 2026-10-03. The beat reader reads names now (gm/beat_reader.py, its
+# "names"), and `seen_people.name_them` takes them through the engine's checks.
 
 
 _CREATURE_NOUNS = re.compile(
