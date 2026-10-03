@@ -96,6 +96,10 @@ def test_a_town_holds_only_so_many_heard_of_places():
 
 # --- going there ---------------------------------------------------------------------------
 
+GO_SMITHY = {"question": False, "claims": [],
+             "actions": [{"act": "go", "place": "the smithy"}]}
+
+
 def test_going_to_the_smithy_founds_it_where_the_clerk_said_and_stands_you_in_it():
     """The items save's turn, as it should have gone: the clerk named the smithy, the
     player goes there, and the smithy is a place off the counting house with the party in
@@ -105,8 +109,9 @@ def test_going_to_the_smithy_founds_it_where_the_clerk_said_and_stands_you_in_it
     heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0],
                         said_by="c12", line=CLERK)
     known = tuple(e.places()) + tuple(e.open_ground())
+    # The reading's `go, place: the smithy` (since 2026-10-03; `_GOES_TO` is retired).
     plan = judgement.go_to_heard_place([{"op": "narrate_only"}], "I go to the smithy.",
-                                       e.scene, known)
+                                       e.scene, known, reading=GO_SMITHY)
     assert [r["op"] for r in plan] == ["narrate_only", "found", "travel"]
     assert plan[1]["params"] == {"name": "the smithy", "kind": "smithy",
                                  "parent": "the counting house"}
@@ -115,7 +120,7 @@ def test_going_to_the_smithy_founds_it_where_the_clerk_said_and_stands_you_in_it
     assert here.name == "the smithy" and here.parent == COUNTING
     assert heard_places.of_here(e.scene, e.places()) == []
     again = judgement.go_to_heard_place([{"op": "narrate_only"}], "I go to the smithy.",
-                                        e.scene, tuple(e.places()))
+                                        e.scene, tuple(e.places()), reading=GO_SMITHY)
     assert [r["op"] for r in again] == ["narrate_only"]
 
 
@@ -137,7 +142,8 @@ def test_a_question_about_it_goes_nowhere():
     e = agent.engine
     heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0])
     plan = judgement.go_to_heard_place([{"op": "narrate_only"}],
-                                       "Where is the smithy?", e.scene, tuple(e.places()))
+                                       "Where is the smithy?", e.scene, tuple(e.places()),
+                                       reading={"question": True, "actions": []})
     assert plan == [{"op": "narrate_only"}]
 
 

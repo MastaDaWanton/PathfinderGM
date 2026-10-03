@@ -108,6 +108,18 @@ def addressed(scene) -> str:
     return others[0] if len(others) == 1 else ""
 
 
+_FORMS = {"he": {"he", "him", "his"}, "him": {"he", "him", "his"},
+          "she": {"she", "her", "hers"}, "her": {"she", "her", "hers"},
+          "they": {"they", "them", "their"}, "them": {"they", "them", "their"}}
+
+
+def _pronoun_forms(pronouns) -> set[str]:
+    out: set[str] = set()
+    for p in str(pronouns or "").lower().split("/"):
+        out |= _FORMS.get(p.strip(), set())
+    return out
+
+
 def person(scene, words) -> str:
     """The ref of the person here the slot names; a bare pronoun is `addressed`."""
     from rules import scope
@@ -116,7 +128,14 @@ def person(scene, words) -> str:
     if not said or scene is None:
         return ""
     if said.lower() in _PRONOUNS:
-        return addressed(scene)
+        # The pronoun against the pronouns the engine holds for each person here (the
+        # sheet's `pronouns`, a closed vocabulary): "I toss her five silver" with a woman
+        # and the challenger in the ring is the woman. Else the one the player is dealing
+        # with.
+        fits = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
+                if not a.is_pc and not a.is_down
+                and said.lower() in _pronoun_forms(getattr(a, "pronouns", ""))]
+        return fits[0] if len(fits) == 1 else addressed(scene)
     ref = scope.in_the_room(scene, said)
     actor = (getattr(scene, "actors", {}) or {}).get(ref)
     if actor is None or actor.is_pc:
@@ -158,11 +177,15 @@ def _stock_id(pc, words) -> str:
     return ""
 
 
-def _carried(pc, words) -> str:
-    """The pack's key for the thing, or the stock jar's id; "" when the player has none."""
+def _carried(pc, words, coming=()) -> str:
+    """The pack's key for the thing, or the stock jar's id; "" when the player has none.
+    `coming` is what an earlier deed of the same sentence picks up: "I lift the lantern off
+    the hook, then hand it to the boy" hands over a lantern the pack does not hold YET —
+    one action at a time, each against the state the last one leaves (Inform's DM4 §34)."""
     from rules import holding
 
-    return holding.key_in(getattr(pc, "goods", {}) or {}, words) or _stock_id(pc, words)
+    return (holding.key_in(getattr(pc, "goods", {}) or {}, words) or _stock_id(pc, words)
+            or next((c for c in coming if holding.same(c, words)), ""))
 
 
 def _a_thing(words) -> bool:
@@ -171,32 +194,52 @@ def _a_thing(words) -> bool:
     return judgement._is_a_thing(words)
 
 
-def _object(frame, i: int) -> str:
+def _object(frame, i: int, pc=None, recent=()) -> str:
     """The action's object; "it" and its kin are the object of the deed before it in the
     same sentence ("I lift the lantern off the hook, then hand it to the boy") — the
-    frame's own structure, and nothing when there is none."""
+    frame's own structure. With none there, the one thing in the pack the last few beats
+    name, longest name first: "It's a deal, he can have it" after "The clerk eyes the
+    crate". The pack is a closed vocabulary, matched whole-word, as a spell's name is
+    matched against the catalogue (`judgement.spell_in_words`); the beats are not read for
+    anything else. Nothing when that is not one thing."""
+    from rules import holding
+
     acts = frame.get("actions") or []
     said = " ".join(str(acts[i].get("object") or "").split())
-    if said.lower() in _IT:
-        for prev in reversed(acts[:i]):
-            if prev.get("object") and str(prev["object"]).lower() not in _IT:
-                return " ".join(str(prev["object"]).split())
-        return ""
-    return said
+    if said.lower() not in _IT:
+        return said
+    for prev in reversed(acts[:i]):
+        if prev.get("object") and str(prev["object"]).lower() not in _IT:
+            return " ".join(str(prev["object"]).split())
+    goods = sorted((getattr(pc, "goods", {}) or {}), key=len, reverse=True)
+    for beat in reversed([str(b or "").lower() for b in recent or ()]):
+        named = [k for k in goods if len(holding.plain(k)) > 2 and re.search(
+            rf"\b{re.escape(holding.plain(k))}s?\b", beat)]
+        if len(named) == 1:
+            return named[0]
+    return ""
 
 
 # --- the rows -------------------------------------------------------------------------------
 
-def _take(row: Row, frame, i, scene, pc) -> None:
+def _a_person(scene, words) -> bool:
+    """Whether an object slot names a person, not a thing: a bare pronoun for one, or
+    somebody standing here. "I grab him and throw him over a table" was read `take` — and a
+    take of "him" is a grapple, never goods (the fight recordings, 2026-09-25 and 09-27)."""
+    said = " ".join(str(words or "").split()).lower()
+    return said in _PRONOUNS or said in ("me", "myself", "you") or bool(person(scene, said))
+
+
+def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
     from rules import holding
 
     a = frame["actions"][i]
-    thing = _object(frame, i)
+    thing = _object(frame, i, pc, recent)
     if not thing:
         row.note = "nothing named to take"
         return
     coin = _is_coin(thing)
-    if not coin and not _a_thing(thing):
+    if not coin and (_a_person(scene, thing) or not _a_thing(thing)):
         row.note = f"{thing!r} is not a thing to carry"
         return
     source = " ".join(str(a.get("target") or "").split())
@@ -216,12 +259,12 @@ def _take(row: Row, frame, i, scene, pc) -> None:
                         "because": "the player took it"})
 
 
-def _drop(row: Row, frame, i, scene, pc) -> None:
-    thing = _object(frame, i)
+def _drop(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
+    thing = _object(frame, i, pc, recent)
     if not thing:
         row.note = "nothing named to set down"
         return
-    key = _carried(pc, thing)
+    key = _carried(pc, thing, coming)
     if not key and not _is_coin(thing):
         row.missing = f"{pc.name} is not carrying {thing}"
         return
@@ -230,16 +273,16 @@ def _drop(row: Row, frame, i, scene, pc) -> None:
                         "because": "the player set it down"})
 
 
-def _give(row: Row, frame, i, scene, pc) -> None:
+def _give(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
     a = frame["actions"][i]
-    thing = _object(frame, i)
+    thing = _object(frame, i, pc, recent)
     if not thing:
         row.note = "nothing named to hand over"
         return
     amount = coin_amount(thing)
-    key = _carried(pc, thing)
+    key = _carried(pc, thing, coming)
     if not (amount or key or _is_coin(thing)):
-        if not _a_thing(thing):
+        if _a_person(scene, thing) or not _a_thing(thing):
             row.note = f"{thing!r} is not a thing to hand over"
         else:
             # "I buy the old soldier a pint": nothing in the pack to hand over, and the
@@ -247,10 +290,11 @@ def _give(row: Row, frame, i, scene, pc) -> None:
             row.missing = f"{pc.name} is not carrying {thing}"
         return
     to_words = " ".join(str(a.get("target") or "").split())
-    to = person(scene, to_words) if to_words else ""
+    # Nobody named ("I hand over the brass key"): the one the player is dealing with.
+    to = person(scene, to_words) if to_words else addressed(scene)
     if not to:
         row.missing = (f"there is nobody here who is {to_words}" if to_words
-                       else f"nobody was named to give {thing} to")
+                       else f"nobody here to give {thing} to")
         return
     if amount:
         params = {"item": amount[0], "count": amount[1], "from_": pc.ref, "to": to}
@@ -260,13 +304,13 @@ def _give(row: Row, frame, i, scene, pc) -> None:
                         "because": "the player handed it over"})
 
 
-def _sell(row: Row, frame, i, scene, pc, sentence: str) -> None:
+def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) -> None:
     from rules import keepers as keepers_mod
     from rules import pricing
 
     a = frame["actions"][i]
-    thing = _object(frame, i)
-    key = _carried(pc, thing) if thing else ""
+    thing = _object(frame, i, pc, recent)
+    key = _carried(pc, thing, coming) if thing else ""
     if not key:
         row.missing = (f"{pc.name} is not carrying {thing}" if thing
                        else "nothing was named to sell")
@@ -291,8 +335,10 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str) -> None:
                         "because": "the player sold it"})
 
 
-def table(frame: dict | None, scene, *, places=(), sentence: str = "") -> list[Row]:
-    """The rows the reading makes, one per action, in the order the words do them."""
+def table(frame: dict | None, scene, *, places=(), sentence: str = "",
+          recent=()) -> list[Row]:
+    """The rows the reading makes, one per action, in the order the words do them.
+    `recent` is the last few beats, asked only for which carried thing "it" is."""
     from . import interpret
 
     rows: list[Row] = []
@@ -301,18 +347,20 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "") -> list[R
     if frame.get("question") and not frame.get("actions"):
         return rows
     pc = scene.pc() if hasattr(scene, "pc") else None
+    coming: list[str] = []
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
         row = Row(index=i, act=act)
         if act in GOODS_ACTS and pc is not None:
             if act == "take":
-                _take(row, frame, i, scene, pc)
+                _take(row, frame, i, scene, pc, recent)
+                coming += [str(t["params"]["item"]) for t in row.intents]
             elif act == "drop":
-                _drop(row, frame, i, scene, pc)
+                _drop(row, frame, i, scene, pc, recent, coming)
             elif act == "give":
-                _give(row, frame, i, scene, pc)
+                _give(row, frame, i, scene, pc, recent, coming)
             else:
-                _sell(row, frame, i, scene, pc, sentence)
+                _sell(row, frame, i, scene, pc, sentence, recent, coming)
         else:
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
@@ -353,11 +401,17 @@ def _op(r) -> str:
     return str((r or {}).get("op", "")).lower() if isinstance(r, dict) else ""
 
 
-def _same_thing(a, b) -> bool:
+def _same_thing(a, b, pc=None) -> bool:
+    """Two mentions of one thing: both coin, or the same name — a jar by its shelf id
+    ("yarow-elixir#1") or the way a person says it ("Yarow Elixir"). Measured on the
+    trade tests: the plan's give of "Yarow Elixir" stood beside the table's sale of
+    yarow-elixir#1, and the elixir left twice."""
     from rules import holding
 
     if _is_coin(a) and _is_coin(b):
         return True
+    if pc is not None:
+        a, b = (_stock_id(pc, a) or a), (_stock_id(pc, b) or b)
     return holding.same(a, b)
 
 
@@ -405,7 +459,7 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             out.append(r)                        # between other people: theirs
             continue
         twin = next((k for k, b in enumerate(built)
-                     if _same_thing(p.get("item"), b["params"].get("item"))), None)
+                     if _same_thing(p.get("item"), b["params"].get("item"), pc)), None)
         if twin is not None:
             if twin not in placed:
                 placed.add(twin)

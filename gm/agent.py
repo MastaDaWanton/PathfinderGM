@@ -336,7 +336,8 @@ class GMAgent:
                    and "error" not in self.reading else None)
         # The act→op table (gm/acts_to_ops.py): one row per action of the reading.
         self.rows = acts_to_ops.table(read_ok, self.engine.scene,
-                                      places=self.engine.places(), sentence=player_input)
+                                      places=self.engine.places(), sentence=player_input,
+                                      recent=getattr(self, "recent", ()))
         if read_ok is not None:
             read_ok["table"] = [r.record() for r in self.rows]
         # Every deed the words declared moves a thing and not one of them can — "I sell

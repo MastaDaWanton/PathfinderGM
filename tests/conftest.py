@@ -109,7 +109,9 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     monkeypatch.setattr(schemes_mod, "ENABLED", False)
     # And the interpreter's reading of the player's sentence (gm/interpret.py): a turn
     # test that scripts the model's replies in order would have one spent on it.
-    # tests/test_interpreter_in_the_turn.py turns it back on.
+    # tests/test_interpreter_in_the_turn.py turns it back on. Off, a reading handed in
+    # with `interpret.remember` is the turn's (`GMAgent.plan_turn`): since 2026-10-03 the
+    # reading drives the goods ops and declares, and with none the plan stands alone.
     from gm import interpret as interpret_mod
 
     monkeypatch.setattr(interpret_mod, "ENABLED", False)
