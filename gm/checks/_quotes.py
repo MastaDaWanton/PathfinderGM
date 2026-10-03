@@ -57,6 +57,101 @@ _NAMED_BEFORE = re.compile(r"(?P<subj>[A-Z][a-zA-Z'’-]+(?:\s+[A-Z][a-zA-Z'’-
                            + r"(?:\s+[a-z]+){0,3}\s*[,:]?\s*$")
 
 
+# --- the player's character as the speaker ----------------------------------------------
+#
+# "'A piece of work like this,' you say, your voice dropping into a sultry lilt…, 'deserves
+# a bit more respect…'" (the owner's 2026-10-03 save, beat 32). Nothing on the page side
+# read "you" as a speaker: `clause` knows he/she/they, a description and a name, so the
+# page attribution carried both halves to the clerk the sentence before had named, and
+# the conversation log booked the PC's invented words as the clerk's (items 15 and 16).
+# The verbs are the second-person forms: "you say", never "you says".
+_YOU_VERBS = (r"(?:say|ask|add|answer|reply|tell|whisper|murmur|mutter|shout|call|"
+              r"venture|offer|insist|explain|agree|admit|speak|greet|purr|breathe|begin|"
+              r"press|repeat|counter|suggest|drawl|coo|laugh|continue|finish|plead|"
+              r"protest|joke|tease|declare|announce|confide|remark|quip|chuckle|sigh|"
+              r"manage|lie|hiss|growl|snap|rasp|grunt|bark|demand|inquire|enquire)")
+_YOU_ADVERB = r"(?:[a-z]+ly\s+)?"
+# "…,' you say" / "…,' you add quietly"
+_YOU_AFTER = re.compile(r"^[\s,—–-]*(?:you|You)\s+" + _YOU_ADVERB + _YOU_VERBS + r"\b")
+# "…,' say you" is not English; "…,' Kesst says" is the name's, read by `pc_spoken`.
+# "You lean in and murmur, '…" / "you tell him, '…" — never "you hear the man say": a
+# person between "you" and the verb is the one speaking.
+_YOU_BEFORE = re.compile(
+    r"\b(?:you|You)\s+(?:(?!(?:him|her|them|it|the|a|an|his|their|its|someone|somebody|"
+    r"anyone|everyone)\b)[a-z]+\s+){0,5}?" + _YOU_ADVERB + _YOU_VERBS
+    + r"\b(?:\s+[a-z]+){0,4}\s*[,:—–-]?\s*$")
+# "Your voice is low: '…" — the voice is the speaker.
+_YOUR_VOICE = re.compile(r"\b(?:your|Your)\s+voice\b[^\"“”'‘’.!?]*$")
+
+
+def pc_spoken(blank: str, qa: int, qb: int, pc_name: str = "", after: int = -1) -> bool:
+    """Whether the quotation at [qa, qb) of `blank` (`speech.blanked` of the beat) is the
+    player's character speaking: its clause's subject is "you" (or the PC's name), with
+    no third-person clause nearer to it. The head is read from the sentence's start, or
+    from `after` (the end of the line before) when that is later — so the second half of
+    a split line, "…,' you say, …, '…'", is read from "you say" and is the player's too."""
+    if clause(blank, qa, qb):
+        subj = clause(blank, qa, qb, names=True)
+        first = (pc_name or "").split()[0].lower() if pc_name else ""
+        return bool(first and subj and subj.split()[0].lower() == first)
+    if _YOU_AFTER.match(_tail(blank, qb)):
+        return True
+    head = _head(blank, qa)
+    if after >= 0 and qa - after < len(head):
+        head = blank[after:qa]
+        # The clause between the two halves of one line is the second half's too.
+        if _YOU_AFTER.match(head):
+            return True
+    if _YOU_BEFORE.search(head) or _YOUR_VOICE.search(head):
+        return True
+    if pc_name:
+        subj = clause(blank, qa, qb, names=True)
+        first = pc_name.split()[0].lower()
+        return bool(subj and subj.split()[0].lower() == first)
+    return False
+
+
+def pc_lines(text: str, said=(), pc_name: str = "", pc_ref: str = "pc"
+             ) -> list[tuple[int, int, str]]:
+    """(qa, qb, line) for every quotation on the page the player's character speaks: a
+    "you" clause (`pc_spoken`), or a tag naming the player (`<say who=pc>`)."""
+    from gm import speech
+
+    text = str(text or "")
+    blank = speech.blanked(text)
+    out: list[tuple[int, int, str]] = []
+    prev = -1
+    for qa, qb in speech.spans(text):
+        line = text[qa + 1:qb - 1] if qb - qa >= 2 else ""
+        after, prev = prev, qb
+        if not line.strip():
+            continue
+        rec = speech.speaker(list(said or ()), line)
+        if rec is not None and str(rec.get("who") or "") in (pc_ref, "pc", "you"):
+            out.append((qa, qb, line))
+            continue
+        if pc_spoken(blank, qa, qb, pc_name, after=after):
+            out.append((qa, qb, line))
+    return out
+
+
+def page_speaker_head(blank: str, qa: int, qb: int) -> str:
+    """The head word of the person the narration makes the speaker of the quotation at
+    [qa, qb) — a description's head noun ("man" for "the man in the heavy coat") — or ""
+    when the page names nobody or only by a proper name. The clause's own subject first;
+    for a pronoun or no clause, the nearest person the narration described before it."""
+    from gm.checks._people import _PERSON, head_of
+
+    subj = clause(blank, qa, qb)
+    if subj and subj.split()[0].lower() not in ("he", "she", "they"):
+        head = head_of(subj).lower()
+        return head if head in _PERSON else ""
+    alt = "|".join(sorted(_PERSON, key=len, reverse=True))
+    found = list(re.finditer(r"\b(?:the|a|an|this|that)\s+(?:[a-z'’-]+\s+){0,3}?(" + alt
+                             + r")\b(?!-)", blank[:qa], re.I))
+    return found[-1].group(1).lower() if found else ""
+
+
 def _tail(blank: str, qb: int) -> str:
     """The narration after a quotation, up to its sentence's end."""
     tail = blank[qb:]
@@ -241,6 +336,12 @@ def speakers(text: str, said, actors) -> list[tuple[int, int, str, str]]:
         has_clause = False
         if rec is not None and rec.get("who") in actors:
             ref = str(rec["who"])
+        elif pc_spoken(blank, qa, qb, after=prev[0] if prev is not None else -1):
+            # The player's own line is nobody's on the board (item 15, 2026-10-03), and
+            # it stops a run: the next clause-less line is not carried to the man before.
+            out.append((qa, qb, line, ""))
+            prev = (qb, "")
+            continue
         else:
             subj = clause(blank, qa, qb, names=True)
             has_clause = bool(subj)

@@ -141,6 +141,13 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "tell the sergeant, \"We march at dawn.\"", "target": "the sergeant",
           "says": "We march at dawn.", "act": "talk"}]}),
+    # Words said to nobody named: the quotation is `says`, and the target is null — never
+    # the quotation (2026-10-03, item 13, where `say "…"` came back as the target and was
+    # minted as a person). Kept out of the labelled set, like every demonstration here.
+    ("I shrug and say \"Only passing through, friend.\"",
+     {"question": False, "claims": [], "actions": [
+         {"span": "say \"Only passing through, friend.\"",
+          "says": "Only passing through, friend.", "act": "talk"}]}),
     ("I spit on the ground in front of the fat merchant.",
      {"question": False, "claims": [], "actions": [
          {"span": "spit on the ground in front of the fat merchant",
@@ -264,11 +271,46 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
                 continue
             kept[s] = v
             used.add(low)
+        _speech_is_not_a_target(kept, dropped)
         actions.append(kept)
     claims = [c for c in (frame.get("claims") or []) if _within(c, sentence)]
     dropped += [f"claim={c!r}" for c in (frame.get("claims") or []) if not _within(c, sentence)]
     return ({"question": bool(frame.get("question")), "actions": actions,
              "claims": claims}, dropped)
+
+
+_SAY_HEAD = re.compile(r"^\s*(?:say|says|said|tell|tells|ask|asks|shout|shouts|whisper|"
+                       r"whispers|murmur|murmurs|reply|replies|answer|answers|mutter|"
+                       r"mutters|add|adds)\b[\s,:]*", re.I)
+
+
+def _speech_is_not_a_target(action: dict, dropped: list[str]) -> None:
+    """A quotation is never who is spoken to; "say X" is speech, not a person called
+    "say X".
+
+    Measured on the owner's 2026-10-03 save (item 13): `I give a friendly wink and say
+    "just trying to start a conversation and see what is happening here."` came back
+    `talk, target: say "just trying…"` — the span was the sentence's own words, so
+    grounding kept it — and `introduce` minted a person by that name. Inform's grammar
+    keeps a topic or a quoted string out of the object slots entirely (WI §7.6, §17.5),
+    and TADS 3 reads SAY's argument as a literal (`LiteralAction`). Same here, in code:
+    a target whose shape is not a person's (`names.not_a_name`) is dropped, and its
+    words become what is said when the act can say anything and nothing else was read."""
+    from rules.names import not_a_name
+
+    target = action.get("target")
+    if not target or not not_a_name(target):
+        return
+    del action["target"]
+    dropped.append(f"{action['act']}.target={target!r} (speech, not somebody)")
+    if "says" in ACT_SLOTS.get(action["act"], ()) and not action.get("says"):
+        from .speech import spans
+
+        # The one quotation scanner (gm/speech.py), never a second rule here.
+        quoted = [target[a + 1:b - 1] for a, b in spans(target) if b - a > 2]
+        words = (quoted[0] if quoted else _SAY_HEAD.sub("", target)).strip()
+        if words:
+            action["says"] = words
 
 
 def interpret(sentence: str, *, model: str | None = None, host: str | None = None,

@@ -44,12 +44,14 @@ class TestTheLine:
 
     def test_it_reads_as_a_sentence_rather_than_a_stat_block(self):
         said = narration.a_face_for("Ashla Ironvale", BODY)
-        assert said.startswith("Ashla Ironvale is an Orc: ")
+        assert said.startswith("Ashla Ironvale is of the Orc people: ")
         assert said.count(":") == 1
 
-    def test_the_article_agrees(self):
-        assert narration.a_face_for("X", "Orc: tall.").startswith("X is an Orc")
-        assert narration.a_face_for("X", "Korvu: tall.").startswith("X is a Korvu")
+    def test_a_people_reads_as_a_people_never_as_a_name(self):
+        """2026-10-03, item 14: "is a Korvu" was copied by the next beat as "a man named
+        Korvu", and the laborer took his people's name."""
+        assert narration.a_face_for("X", "Orc: tall.").startswith("X is of the Orc people")
+        assert narration.a_face_for("X", "Korvu: tall.").startswith("X is of the Korvu people")
 
     def test_the_bodys_own_case_is_left_alone(self):
         """`opening._clause`'s rule: lower-casing reads better on "Powerfully built" and
@@ -78,7 +80,7 @@ class TestWhereItGoes:
 
     def test_it_follows_the_sentence_that_names_them(self):
         out = self._placed("Ashla Ironvale")
-        assert "watching the road. Ashla Ironvale is an Orc" in out
+        assert "watching the road. Ashla Ironvale is of the Orc people" in out
 
     def test_it_is_no_longer_behind_the_hand_back(self):
         out = self._placed("Ashla Ironvale")
@@ -92,7 +94,7 @@ class TestWhereItGoes:
         that beat by luck and would not in the next one."""
         out = self._placed("Ashla Ironvale")
         drenn = out.index("is Drenn Ironvale")
-        face = out.index("Ashla Ironvale is an Orc")
+        face = out.index("Ashla Ironvale is of the Orc people")
         hers = out.index("Ashla Ironvale keeps a pace")
         assert drenn < hers < face
 
@@ -101,7 +103,7 @@ class TestWhereItGoes:
         out = narration.place_the_face(
             beat, "the crier working through the notices",
             narration.a_face_for("the crier working through the notices", BODY))
-        assert out.index("is an Orc") < out.index("You wait")
+        assert out.index("is of the Orc people") < out.index("You wait")
 
     def test_somebody_the_beat_never_names_is_still_said_before_the_hand_back(self):
         """The case the append was written for — a person the prose used without ever
@@ -110,14 +112,14 @@ class TestWhereItGoes:
         out = narration.place_the_face(beat, "Marra",
                                        narration.a_face_for("Marra", BODY))
         assert out.rstrip().endswith("What do you do?")
-        assert "Marra is an Orc" in out
+        assert "Marra is of the Orc people" in out
 
     def test_a_beat_with_no_hand_back_takes_it_at_the_end(self):
         beat = "The queue shuffles forward and nobody speaks."
         out = narration.place_the_face(beat, "Marra",
                                        narration.a_face_for("Marra", BODY))
         assert out.rstrip().endswith(".")
-        assert "Marra is an Orc" in out
+        assert "Marra is of the Orc people" in out
 
     def test_nothing_is_edited_only_added(self):
         """The rule this file keeps everywhere: a deterministic backstop may add a
@@ -143,14 +145,14 @@ class TestWhereItGoes:
                 'What do you do?')
         out = narration.place_the_face(beat, "Ashla Ironvale",
                                        narration.a_face_for("Ashla Ironvale", BODY))
-        assert "looks at the road. Ashla Ironvale is an Orc" in out
+        assert "looks at the road. Ashla Ironvale is of the Orc people" in out
         assert out.rstrip().endswith("What do you do?")
 
     def test_a_full_stop_inside_speech_does_not_cut_the_sentence(self):
         beat = ('Ashla Ironvale says "We go. Now." and turns away. What do you do?')
         out = narration.place_the_face(beat, "Ashla Ironvale",
                                        narration.a_face_for("Ashla Ironvale", BODY))
-        assert '"We go. Now." and turns away. Ashla Ironvale is an Orc' in out
+        assert '"We go. Now." and turns away. Ashla Ironvale is of the Orc people' in out
 
 
 class TestTheViewUsesIt:

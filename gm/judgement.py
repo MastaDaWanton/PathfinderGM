@@ -7957,8 +7957,13 @@ def _introducible(player_text: str, phrase: str | None = None) -> str:
     """
     from rules import population
 
+    from rules.names import not_a_name
+
     phrase = phrase if phrase is not None else person_sought(player_text)
     if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
+        return ""
+    # Quoted words or "say …" are speech, never somebody (2026-10-03, item 13).
+    if not_a_name(phrase):
         return ""
     if not population._tokens(phrase):
         m = re.search(re.escape(phrase) + r"\s+(who\s+[^,.;!?]+?)(?=\s+and\b|[,.;!?]|$)",
@@ -8013,8 +8018,10 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     # never a stranger to introduce.
     if called_on(player_text)[0]:
         return raw_intents
+    from rules.names import not_a_name
+
     phrase = person_sought(player_text)
-    if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
+    if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE or not_a_name(phrase):
         return raw_intents
     # "The nearest person" is somebody standing here, never a newcomer — and a person the
     # sentence only asks ABOUT is not the one looked for (G3, 2026-09-29, market-seek
@@ -8491,7 +8498,7 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
 
 def apply_introductions(scene, beat: str, player_text: str = "",
                         said=None, refused: list | None = None,
-                        whose=None) -> list[tuple[str, str]]:
+                        whose=None, world=None) -> list[tuple[str, str]]:
     """A name given in play becomes the panel's name for that person.
 
     From `narration.introductions`: the speaker's head word finds the unnamed actor
@@ -8515,6 +8522,12 @@ def apply_introductions(scene, beat: str, player_text: str = "",
         return not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
 
     asked_words = _name_words(redact_speech(player_text or ""))
+    # A people's name is never a person's (2026-10-03, item 14): "a man named Korvu",
+    # Korvu being a people of the world, renamed the laborer c11 "Korvu". The names come
+    # from the world and the scene (`names.people_names`), never from a list kept here.
+    from rules import names as names_mod
+
+    peoples_names = names_mod.people_names(world, scene)
     # The person the player asked, if they asked anybody: the most certain answer there is,
     # and the one that was missing. Measured live 2026-09-19: asked for her name, the woman
     # in the corner said "you may call me Gorvothor" — and the panel kept "woman in the
@@ -8553,7 +8566,7 @@ def apply_introductions(scene, beat: str, player_text: str = "",
                 who = unnamed[0]
         if who is None or not _unnamed(who):
             continue
-        taken_by = _answers_to(actors, who, given)
+        taken_by = _answers_to(actors, who, given) or _a_people(given, peoples_names)
         if taken_by:
             if refused is not None:
                 refused.append((who.ref, given, taken_by))
@@ -8592,7 +8605,7 @@ def apply_introductions(scene, beat: str, player_text: str = "",
                 who = unnamed[0]
         if who is None:
             continue
-        taken_by = _answers_to(actors, who, given)
+        taken_by = _answers_to(actors, who, given) or _a_people(given, peoples_names)
         if taken_by:
             if refused is not None:
                 refused.append((who.ref, given, taken_by))
@@ -8600,6 +8613,15 @@ def apply_introductions(scene, beat: str, player_text: str = "",
         _take_the_name(scene, who, given)
         out.append((who.ref, given))
     return out
+
+
+def _a_people(given: str, peoples_names) -> str:
+    """"a people of this world" when `given` is what a people is called, else "" — in the
+    shape `_answers_to` returns, so the refusal is logged the same way."""
+    from rules import names as names_mod
+
+    return ("a people of this world" if names_mod.is_a_peoples_name(
+        given, known=peoples_names) else "")
 
 
 def _answers_to(actors, who, given: str) -> str:
@@ -8677,12 +8699,22 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
         if aimed == "you" or (not aimed and you.search(str(rec.get("line") or ""))):
             out.append(who)
     # 2. The untagged lines, over the whole beat.
+    from .checks._quotes import pc_spoken
+
+    blank = speech.blanked(beat)
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    after = -1
     for qa, qb, outside in spans_in_context(beat):
         line = beat[qa + 1:qb - 1] if qb - qa >= 2 else ""
+        before, after = after, qb
         tagged = speech.speaker(said, line)
         if tagged is not None and tagged.get("who") in actors:
             continue          # decided by its tag above, hail or not
         if not you.search(line):
+            continue
+        # "'…,' you say": the player's own line, never somebody hailing them — item 15
+        # of 2026-10-03, where the PC's words were booked as the clerk's.
+        if pc_spoken(blank, qa, qb, str(getattr(pc, "name", "") or ""), after=before):
             continue
         words = _name_words(outside)
         # Half of a hyphenated noun is not that noun: "nodding at the lock-keeper" is not
@@ -8714,6 +8746,82 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
         if speaker and speaker not in out:
             out.append(speaker)
     return out
+
+
+def doubt_tags(scene, beat: str, said, attribution=None) -> list[dict]:
+    """Un-attribute the prose call's speaker tags the page itself contradicts. Edits the
+    records of `said` in place — `who` emptied, the claim kept in `was`, the reason in
+    `doubt`, the shape `speech.lift` gives a tag naming nobody — and returns one row per
+    record for the turn log.
+
+    Measured on the owner's 2026-10-03 save (item 15): in market-talk the model tagged
+    every line of "the man" — "The man on the stool blinks… 'What is going on?' he
+    repeats" — to c1, the servant carrying jugs, who appears nowhere in those beats. Each
+    tag opened a conversation with the servant (`hailed_by`), the brief then told the
+    narrator the player was talking to the servant, and the next beats tagged him again:
+    six beats, and `greets-known-as-stranger` fired at the servant for the man's line.
+    In the items save the PC's own invented line was booked as the clerk's.
+
+    The quote-attribution literature's lesson is precision over recall: Muzny et al.
+    2017's high-precision sieve leaves a third of quotes unattributed on purpose (90.4%
+    precision at 65.1% recall), and on PDNC (Vishnubhotla et al. 2022) every system is
+    near a coin toss on anaphoric quotes. So a tag is never re-pointed at somebody else
+    here — it is only withdrawn, and only when the page says otherwise:
+
+      * the line is the player's character's ("…,' you say": `_quotes.pc_spoken`);
+      * the tagged person is nowhere in the beat (not by a word of their name, not by
+        their ref, not by the attribution) AND the narration makes somebody else the
+        speaker: the clause's or the nearest description's head noun is a person word
+        that is no word of theirs ("the man" for "the servant carrying jugs").
+
+    A withdrawn line to the player is then `speaker_real`'s to settle, by the page."""
+    from .checks._people import name_words
+    from .checks._quotes import page_speaker_head, pc_spoken, quote_of
+
+    if scene is None or not beat or not said:
+        return []
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pc_name = str(getattr(pc, "name", "") or "")
+    blank = speech.blanked(beat)
+    narration = speech.unquoted(beat)
+    spans = speech.spans(beat)
+    rows: list[dict] = []
+    for rec in said:
+        who = str(rec.get("who") or "")
+        if not who or rec.get("from") or who not in actors or actors[who].is_pc:
+            continue
+        q = quote_of(beat, str(rec.get("line") or ""))
+        if q is None:
+            continue
+        qa, qb = q
+        after = max((b for a, b in spans if b <= qa), default=-1)
+        why = ""
+        if pc_spoken(blank, qa, qb, pc_name, after=after):
+            why = "the line is the player's character's own"
+        else:
+            a = actors[who]
+            words = set(name_words(str(a.name or ""))) | set(
+                name_words(str(getattr(a, "true_name", "") or "")))
+            here = (f"({who})" in beat or any(
+                re.search(r"\b" + re.escape(w) + r"(?:s|es)?\b", narration, re.I)
+                for w in words))
+            if not here and attribution is not None:
+                try:
+                    here = bool(attribution.mentioned_in(beat, who))
+                except Exception:  # noqa: BLE001 — the attribution only adds certainty
+                    pass
+            head = "" if here else page_speaker_head(blank, qa, qb)
+            if head and head not in {w.lower() for w in words}:
+                why = (f"{a.name} ({who}) is nowhere in the beat, and the page makes "
+                       f"the {head} the speaker")
+        if why:
+            rec["was"] = who
+            rec["who"] = ""
+            rec["doubt"] = why
+            rows.append({"kind": "speech-doubt", "was": who,
+                         "line": str(rec.get("line") or "")[:80], "why": why})
+    return rows
 
 
 def _take_the_name(scene, who, given: str) -> None:

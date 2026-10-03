@@ -757,7 +757,9 @@ def face_line(name: str, appearance: str) -> str:
     if not body:
         return _sentence(f"{name}: {appearance}")
     body = body[:1].lower() + body[1:] if body[1:2].islower() else body
-    return f"{name[:1].upper()}{name[1:]} is {_article(people)} {people}: " + (
+    # "of the Korvu people", never "a Korvu": the second copy of `narration.a_face_for`'s
+    # rule, changed with it (2026-10-03, item 14 — "a man named Korvu").
+    return f"{name[:1].upper()}{name[1:]} is of the {people} people: " + (
         body if body.endswith((".", "!", "?")) else body + ".")
 
 

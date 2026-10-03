@@ -254,6 +254,104 @@ _DETERMINERS = frozenset({
 })
 
 
+# --- what can be a person's name at all ------------------------------------------------
+#
+# Measured on the owner's 2026-10-03 save (docs/playtest-2026-10-03.md, item 13): the
+# player typed `I give a friendly wink and say "just trying to start a conversation and
+# see what is happening here."`, the reading came back `talk, target: say "just trying…"`,
+# and an actor (c4) was minted with that whole phrase as his NAME. It printed in prose
+# ("The say \"just trying…\" is a Korvu"), in every tell and in the ledger, and he was
+# still being spoken to ten turns later. Inform and TADS settle the same question by
+# kind, not by guess: a quoted string or the words after SAY are a topic or a literal,
+# never resolved against the world's objects (Writing with Inform §7.6, §17.5; TADS 3
+# `LiteralAction`). So a person's name is refused by its SHAPE, in code, at every door
+# that mints or renames one — the reason is returned, so the refusal can name the fix.
+_QUOTE_MARKS = re.compile(r"[\"“”«»]|(?:^|\s)['‘]")
+# A verb of speech or of the player's own doing at the head of a phrase: "say …",
+# "ask him …", "tell the guard …" are things done, never somebody.
+_SPEECH_HEAD = re.compile(
+    r"^\s*(?:i\s+|you\s+)?(?:say|says|said|saying|ask|asks|asked|asking|tell|tells|told|"
+    r"telling|shout|shouts|shouted|whisper|whispers|whispered|murmur|murmurs|reply|"
+    r"replies|replied|answer|answers|answered|mutter|mutters|muttered|yell|yells|yelled|"
+    r"call\s+out|greet|greets|greeted|explain|explains|explained|add|adds|added)\b", re.I)
+_FIRST_PERSON_HEAD = re.compile(r"^\s*(?:i|i'm|i've|we|let's|let\s+me)\b", re.I)
+# Longer than any description the corpus holds ("the tailor who mended my cloak last
+# week" is 8 words) by a margin: past this it is a sentence, not somebody.
+_MOST_NAME_WORDS = 14
+
+
+def not_a_name(phrase: str) -> str:
+    """Why `phrase` cannot be what a person is called, or "" when it can.
+
+    Shape only — a quotation, a verb of speech at its head, a first-person opening, a
+    sentence's closing mark (see below), or more words than any description
+    — so it is world-agnostic and needs no list of names. "the woman who sold me bread"
+    and "a Korvu porter" pass; `say "just trying…"` does not."""
+    p = " ".join(str(phrase or "").split())
+    if not p:
+        return "it is empty"
+    if _QUOTE_MARKS.search(p):
+        return "it holds quoted words, which are something said, not somebody"
+    if _SPEECH_HEAD.match(p):
+        return "it opens with a verb of speech, which is something done, not somebody"
+    if _FIRST_PERSON_HEAD.match(p):
+        return "it is the player's own sentence, not somebody"
+    words = p.split()
+    end = p.rstrip(")]")[-1:]
+    # A question or an exclamation is a sentence; a full stop alone is not proof — a
+    # sloppy reply writes "the man at the bar." — so it counts only after six words that
+    # do not open as a description does.
+    if (end in "!?" and len(words) >= 3) or (
+            end == "." and len(words) >= 6 and words[0].lower() not in _DETERMINERS):
+        return "it is a sentence, not somebody"
+    if len(words) > _MOST_NAME_WORDS:
+        return f"it is {len(words)} words long, a sentence rather than somebody"
+    return ""
+
+
+def people_names(world=None, scene=None) -> set[str]:
+    """Every name a PEOPLE goes by, lowercased: the world's own (its PEOPLE entities and
+    its `play.races` rows), the heritages the scene's people carry, and the rulebook's
+    races (`rules.races`). World-agnostic: nothing here is a list of one world's names.
+
+    Item 14 of the 2026-10-03 playtest: the narrator wrote "a man named Korvu", Korvu
+    being one of Pangrella's peoples, and the laborer c11 became "Korvu" — the people's
+    name taken for his. OntoNotes keeps the two apart for the same reason (NORP,
+    "nationalities or religious or political groups", is not PERSON, even inside one
+    noun phrase: "Nicaraguan President Daniel Ortega")."""
+    out: set[str] = set()
+    if world is not None:
+        out |= {str(n).lower() for n in peoples(world).values() if n}
+        play = getattr(world, "play", None) or {}
+        for r in (play.get("races") if isinstance(play, dict) else None) or []:
+            if isinstance(r, dict) and r.get("name"):
+                out.add(str(r["name"]).lower())
+    for a in (getattr(scene, "people", None) or getattr(scene, "actors", None) or {}
+              ).values() if scene is not None else ():
+        for held in (getattr(a, "heritage", ""), getattr(a, "race", "")):
+            if str(held or "").strip():
+                out.add(str(held).strip().lower())
+    try:
+        from . import races as races_mod
+
+        for doc in races_mod.shipped().values():
+            if isinstance(doc, dict) and doc.get("name"):
+                out.add(str(doc["name"]).lower())
+    except Exception:  # noqa: BLE001 — the rulebook's names only ever add certainty
+        pass
+    return {n for n in (" ".join(x.split()) for x in out) if n}
+
+
+def is_a_peoples_name(name: str, world=None, scene=None, *, known=None) -> bool:
+    """Whether a name given in play is a people's name rather than a person's: the whole
+    of it, or of it less a plural "s" ("Korvus"), is what a people is called."""
+    n = " ".join(str(name or "").split()).lower()
+    if not n:
+        return False
+    names = known if known is not None else people_names(world, scene)
+    return n in names or (n.endswith("s") and n[:-1] in names)
+
+
 def is_descriptor(name: str) -> bool:
     """Whether a person's name is a kind of person that needs its article — "man",
     "girl", "man with the ledger" — rather than a proper name ("Grix", "Guard") or a

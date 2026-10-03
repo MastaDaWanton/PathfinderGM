@@ -186,6 +186,8 @@ class _Room:
             words |= set(name_words(str(getattr(a, "true_name", "") or "")))
             self.board[ref] = {w.lower() for w in words}
         self.att = getattr(ctx, "attribution", None)
+        pc = scene.pc() if hasattr(scene, "pc") else None
+        self.pc_name = str(getattr(pc, "name", "") or "")
 
     def by_head(self, head: str) -> tuple[list[dict], list[str]]:
         head = head.lower()
@@ -210,6 +212,14 @@ class _Room:
             pat = _words_re(words)
             if pat:
                 found += [(m.start(), m.end(), "board", ref) for m in pat.finditer(narration)]
+            # A description the page pinned to a ref — "the man in the heavy coat (c4)" —
+            # is that person, whatever their name's words: measured on the 2026-10-03 save
+            # (item 15), c4's name was the player's quoted words, the page called him "the
+            # man in the heavy coat (c4)", and "man" made a new man, c6, out of his lines.
+            # The whole description is claimed, so a shorter match inside it loses.
+            for m in re.finditer(r"\b(?:the|a|an|this|that)\s+(?:[a-z'’-]+\s+){0,6}?"
+                                 r"[a-z'’-]+\s*\(" + re.escape(ref) + r"\)", narration, re.I):
+                found.append((m.start(), m.end(), "board", ref))
         # Anybody else the narration describes — with a determiner, the way the
         # attribution's own finder reads a description (`mentions.find`): "wiping his
         # hands on a rag" is a body part, and `_PERSON` holds "hand" for the farmhand.
@@ -372,6 +382,14 @@ def _from_the_page(ctx) -> list[dict]:
 def _whose(room: _Room, blank: str, text: str, qa: int, qb: int,
            prev: tuple[int, tuple[str, str]] | None) -> tuple[str, str]:
     """One untagged line's speaker, by rules 1-3 of the module docstring."""
+    # 0: the player's character's own line — "'…,' you say", or the second half of one
+    # ("…,' you say, …, '…'"). Measured on the 2026-10-03 save (item 15): with no "you"
+    # among the clause subjects, rule 3 gave Kesst's invented line to the clerk the
+    # sentence before named, and "You speak clearly, 'Just trying…'" to the servant.
+    from gm.checks._quotes import pc_spoken
+
+    if pc_spoken(blank, qa, qb, room.pc_name, after=prev[0] if prev is not None else -1):
+        return "", "the player's own line"
     subj = _clause(blank, qa, qb)
     if subj:
         return _speaker(room, blank, subj, qa)

@@ -4907,11 +4907,37 @@ def a_face_for(name: str, appearance: str) -> str:
         ours = tuple(y.lower() for y in (*faces_mod.YEARS, *lives_mod._CHILD_YEARS))
         if body[:1].isupper() and body.lower().startswith(ours):
             body = body[:1].lower() + body[1:]
-        return f"{name} is {_an(people)} {people}: {body}"
+        # "of the Korvu people", never "a Korvu" (2026-10-03, item 14): the line read
+        # "The merchant with a heavy pack is a Korvu: …", the next beats wrote "a man
+        # named Korvu", and the laborer was renamed after his people. "A Korvu" is a
+        # noun phrase a name fits in; "of the Korvu people" can only be a people. Not
+        # the fix on its own — `judgement.apply_introductions` refuses a people's name
+        # in code — but this backstop was the source the model copied.
+        return f"{name} is of the {people} people: {body}"
     return f"{name}: {said}"
 
 
-def place_the_face(text: str, name: str, line: str) -> str:
+def _someone_elses(sentence: str, ref: str, attribution=None) -> bool:
+    """Whether a sentence that names a person by `ref`'s words is plainly about somebody
+    else: it carries another person's ref marker ("the man in the heavy coat (c4)"), or
+    the attribution read it and found only other people in it."""
+    if not ref:
+        return False
+    marks = set(re.findall(r"\((pc|c\d+)\)", sentence))
+    if marks and ref not in marks:
+        return True
+    if attribution is not None:
+        try:
+            refs = attribution.refs_in(sentence)
+        except Exception:  # noqa: BLE001 — the attribution only ever adds certainty
+            refs = None
+        if refs and ref not in refs:
+            return True
+    return False
+
+
+def place_the_face(text: str, name: str, line: str, *, ref: str = "",
+                   attribution=None) -> str:
     """Put the face where the person is first seen, not at the end of the beat.
 
     The other half of the same report: *"if she was next to drenn she should have been
@@ -4955,19 +4981,28 @@ def place_the_face(text: str, name: str, line: str) -> str:
     # through" had his face placed after the first sentence holding "the" (item 4).
     words = name_words(whole)
     first_word = words[0] if words else ""
+    # Never beside somebody else's sentence: measured on the 2026-10-03 save (item 15),
+    # c6 — booked as just "man" — had his face (wet-rope hair, ink-dot knuckles) put
+    # after "The man in the heavy coat (c4) leans against a timber post", and the man
+    # with c4's missing tooth read as wearing c6's face. A sentence the page pinned to
+    # another ref, or that the attribution read as only other people, is passed over.
+    def _theirs(m) -> bool:
+        return not _someone_elses(text[m.start():m.end()], ref, attribution)
+
     found = None
     for handle in (whole, first_word):
         if len(handle) < 3:
             continue
         hit = re.compile(chr(92) + "b" + re.escape(handle) + chr(92) + "b", re.I)
-        found = next((m for m in spans if hit.search(m.group(0))), None)
+        found = next((m for m in spans if hit.search(m.group(0)) and _theirs(m)), None)
         if found is not None:
             break
     if found is None:
         about = _sentences_about(blank, name)
         if about:
             want = about[0].strip()
-            found = next((m for m in spans if m.group(0).strip() == want), None)
+            found = next((m for m in spans if m.group(0).strip() == want and _theirs(m)),
+                         None)
     if found is None:
         # Never named in the beat — the case the append was written for. Still not after
         # the hand-back: a face that comes after "What do you do?" is an afterthought
