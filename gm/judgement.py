@@ -2962,6 +2962,95 @@ def fill_bare_checks(raw_intents) -> list:
     return out
 
 
+def _sway_candidates(scene) -> list[str]:
+    """The people here a word could change the mind of: conscious, not the player."""
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    alive = getattr(scene, "conscious", None)
+    return [r for r, a in actors.items()
+            if not getattr(a, "is_pc", False) and (pc is None or r != pc.ref)
+            and (alive is None or alive(r))]
+
+
+def aim_the_sway(raw_intents, player_text: str, scene) -> list:
+    """A Diplomacy (or, out of a fight, Intimidate) check at somebody is aimed at them,
+    so the book's attitude DC prices it and never a band the plan named.
+
+    Measured on the owner's save of 2026-10-03 (items, turn-log rows 78 and 84): "I smile
+    and flirt with the clerk and offer the crate for coin" came back as
+    `check diplomacy` with NO target and `dc: {band: average}`. The clerk (c12) was in
+    conversation with the player, Cha 14, indifferent at regard 39 — the Core Rulebook's
+    DC is 15 + 2 = 17. The plan's "average" made it 10, a favourable circumstance made it
+    8, and a natural 4 (total 10) succeeded by 2. `Engine._sway_subject` reads only the
+    intent's `target`, and validation refuses a targeted social check that carries a dc
+    (`intents._check_params`), so a plan that drops the target to get past that refusal
+    has written its own price for changing a mind — law three.
+
+    Who it is aimed at, most certain first, and never a guess between two:
+      1. the one person here whose name the player's own words use ("the clerk");
+      2. else the one person the player is in conversation with (`states.TALKING`);
+      3. else the one conscious person here at all.
+    Then the plan's `dc` and `circumstance` are dropped: the attitude table is the price,
+    and `_op_check`'s influence branch never read a circumstance anyway — leaving it on
+    the record made the turn log claim a +2 that did nothing. A check already aimed at
+    somebody keeps its target and loses only the dc, which would otherwise have been
+    refused and retried (a model round trip) to reach the same intent.
+
+    Intimidate in a fight is Demoralize (CRB p.99), not a change of attitude, and is left
+    exactly as written. Nobody to aim at leaves the check alone: talking to a crowd is
+    still a check, at whatever band the plan named.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    from rules import states as _states
+
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pc_ref = getattr(pc, "ref", "pc")
+    fighting = bool(getattr(scene, "in_encounter", False))
+    out = []
+    changed = False
+    for raw in raw_intents:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "check"):
+            out.append(raw)
+            continue
+        params = dict(raw.get("params") or {})
+        skill = str(params.get("skill", "")).strip().lower()
+        if skill not in ("diplomacy", "intimidate") or params.get("opposed_by"):
+            out.append(raw)
+            continue
+        if skill == "intimidate" and fighting:
+            out.append(raw)
+            continue
+        if (raw.get("actor") or pc_ref) != pc_ref:
+            out.append(raw)                       # an NPC's own talk is not the track
+            continue
+        target = raw.get("target")
+        if isinstance(target, list):
+            target = next((t for t in target if isinstance(t, str) and t), None)
+        if not (isinstance(target, str) and target in actors and target != pc_ref):
+            here = _sway_candidates(scene)
+            said = _name_words(redact_speech(player_text or ""))
+            named = [r for r in here if _name_words(actors[r].name) & said]
+            talking = [r for r in here if actors[r].has_state(_states.TALKING)]
+            if len(named) > 1:
+                named = [r for r in named if r in talking] or named
+            target = (named[0] if len(named) == 1 else
+                      None if named else
+                      talking[0] if len(talking) == 1 else
+                      here[0] if len(here) == 1 else None)
+            if target is None:
+                out.append(raw)
+                continue
+        raw = dict(raw, target=target)
+        params.pop("dc", None)
+        params.pop("circumstance", None)
+        raw["params"] = params
+        changed = True
+        out.append(raw)
+    return out if changed else raw_intents
+
+
 def inject_checks(raw_intents, player_text: str, scene) -> list:
     """A declared risky action reaches the dice.
 

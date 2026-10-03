@@ -28,24 +28,41 @@ class ResolvedDC:
     clamped: bool = False
     circumstance: int = 0
     circumstance_why: str = ""
+    # Where a DC the engine computed came from, in the book's terms: "indifferent 15,
+    # Cha +2". Empty for a band or a stated number, which say so themselves.
+    basis: str = ""
 
     @property
     def final(self) -> int:
         # A favourable circumstance makes the task easier, which lowers the DC. It is
         # applied here rather than to the roll so that the number the player is asked to
-        # beat is the number they see.
+        # beat is the number they see. Checked 2026-10-03: the 3.5 SRD's "Favorable and
+        # Unfavorable Conditions" names four options, +2/-2 on the check and -2/+2 on the
+        # DC, and PF1e's Core Rulebook did not carry that passage over — its nearest is
+        # the GM's "+2 or a -2 bonus or penalty" fiat. Moving the DC is the inherited 3.5
+        # option and the odds are identical, so the arithmetic stands; what `explain`
+        # said about it was wrong (below). docs/rules-and-opening-2026-10-03.md.
         return self.value - self.circumstance
 
     def explain(self) -> str:
         bits = []
-        if self.band:
+        if self.basis:
+            bits.append(f"DC {self.value} ({self.basis})")
+        elif self.band:
             bits.append(f"{self.band.replace('_', ' ')} (DC {self.value})")
         else:
             bits.append(f"DC {self.value}")
         if self.clamped:
             bits.append(f"clamped from {self.stated}")
         if self.circumstance:
-            bits.append(f"{self.circumstance:+d} circumstance: {self.circumstance_why}")
+            # Said as what was done to the number. It read "+2 circumstance: …" until
+            # 2026-10-03, which is the book's wording for a BONUS ON THE CHECK — beside a
+            # DC that had gone DOWN by 2 (the clerk's average 10 shown as 8). Same odds,
+            # wrong rule named; the record should say which of the book's options ran.
+            moved = "lowered" if self.circumstance > 0 else "raised"
+            kind = "favourable" if self.circumstance > 0 else "unfavourable"
+            bits.append(f"DC {moved} by {abs(self.circumstance)} to {self.final} for "
+                        f"a {kind} circumstance: {self.circumstance_why}")
         return "; ".join(bits)
 
     def as_dict(self) -> dict:
@@ -58,6 +75,7 @@ class ResolvedDC:
             "circumstance": self.circumstance,
             "circumstance_why": self.circumstance_why,
             "explain": self.explain(),
+            **({"basis": self.basis} if self.basis else {}),
         }
 
 

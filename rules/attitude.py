@@ -283,6 +283,20 @@ def intimidate_dc(target) -> int:
     return INTIMIDATE_BASE_DC + _hit_dice(target) + _mod(target, "wis")
 
 
+def dc_basis(target, skill: str) -> str:
+    """Where `influence_dc` / `intimidate_dc` got their number, in the book's terms —
+    "indifferent 15, Cha +2" — for the record a check leaves (`dc.ResolvedDC.basis`).
+
+    Until 2026-10-03 the engine's own attitude DC was logged as a bare "DC 17", which
+    could not be told apart from a number somebody chose; the clerk's average-band 10
+    (playtest item 23) sat in the same log with nothing to show which was the book's."""
+    if skill == "intimidate":
+        return (f"Intimidate: {INTIMIDATE_BASE_DC} + {_hit_dice(target)} Hit Dice, "
+                f"Wis {_mod(target, 'wis'):+d}")
+    step = of(target)
+    return f"{step} {INFLUENCE_DC.get(step, INFLUENCE_DC[DEFAULT])}, Cha {_mod(target, 'cha'):+d}"
+
+
 def steps_for(margin: int) -> int:
     """How far a Diplomacy check moves somebody, from how far it beat the DC.
 

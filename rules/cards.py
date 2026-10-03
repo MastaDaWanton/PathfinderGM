@@ -179,18 +179,27 @@ def keys_from(*texts: str) -> list[str]:
 
 
 def _keys_of(card: Card) -> list[str]:
-    """The card's keys, plus the words of its open objectives.
+    """The card's keys, plus the words of its open objectives, plus its need's.
 
     What a quest is about is what is left to do on it: "Ask the harbourmaster where the
     salt went" makes *harbourmaster* a key whether or not the title or a fact ever said
     it. Measured by the first write-back test — a beat in which the harbourmaster
     talked about the salt did not count as carrying the salt quest, because the
-    objective's words were not keys."""
-    if not card.objectives:
-        return list(card.keys)
-    extra = keys_from(*[str(o.get("text", "")) for o in card.objectives
-                        if not o.get("done")])
-    return list(card.keys) + [k for k in extra if k not in card.keys]
+    objective's words were not keys.
+
+    And an errand's need (`need_of`): "Find a bed you can pay for" had eleven keys on
+    the owner's save of 2026-10-03 — find, weather, down, gone, door, hurry, room,
+    working, hard, having, noticed — and not *bed*, because `keys_from` drops words of
+    three letters. The one word the errand is about could never key it."""
+    out = list(card.keys)
+    if card.objectives:
+        extra = keys_from(*[str(o.get("text", "")) for o in card.objectives
+                            if not o.get("done")])
+        out += [k for k in extra if k not in out]
+    need = need_of(card)
+    if need:
+        out += [k for k in NEED_KEYS[need] if k not in out]
+    return out
 
 
 def _hits(card: Card, haystack: str) -> int:
@@ -266,7 +275,12 @@ def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True) -> C
     # so every tell that named Drenn — two of them the engine's own "is already a
     # quest on the table" refusals — ticked a clock whose maximum was two.
     if tick and card.kind != "quest":
-        card.clock = min(card.clock_max, card.clock + 1)
+        # An errand with a need is met by meeting it (`errand_progress`: a night in a
+        # bed), never by being talked about four times. Blades' clocks track the
+        # obstacle, not the method; Bethesda's objectives complete on their own stage.
+        # Its clock fills to one short and waits there.
+        top = card.clock_max - 1 if need_of(card) else card.clock_max
+        card.clock = min(top, card.clock + 1)
         if card.clock >= card.clock_max:
             card.stage = "resolved"
             card.resolved_turn = int(turn)
@@ -865,3 +879,190 @@ def _fact(entity, keys) -> str:
 def _sentence(text: str) -> str:
     text = " ".join(str(text or "").split()).rstrip(" .;,")
     return text[:1].upper() + text[1:] + "." if text else ""
+
+
+# --- what an errand needs, and where in the world it is had ------------------------------
+#
+# Playtest item 25 (the owner's saves, 2026-10-03): the opening card "Find a bed you can
+# pay for" was pulled six times — overheard, then asked ×5 — and never moved. Nothing put
+# a bed within reach: the town HAD a tavern (three people stood in it) and the card never
+# said so. The watcher's one proposal for it, "The man's hostility has been replaced by a
+# weary curiosity as he considers the offer of work", was refused as "not about this
+# card", and the player — with an empty purse — drifted into a dock job with the bed
+# forgotten.
+#
+# What the traditions do (docs/rules-and-opening-2026-10-03.md): Bethesda's objectives
+# name their target and complete on their own stage; Dungeon World's GM "offers an
+# opportunity" and points at the thing; Blades' clocks are "about the obstacle, not the
+# method". So an errand that names a need gets three things, all read by code:
+#   - its need's words as keys (`_keys_of`), so talk about a bed is about the card;
+#   - the place in this settlement that meets it, from the world's own place set, put
+#     on the card as a fact — the way to satisfy it, within reach;
+#   - progress from what the engine can see: the player asking after it, the player
+#     asking for paid work while they cannot pay for it, arriving where it is had, and
+#     a night slept there, which settles it.
+# Only lodging is wired: it is the measured case. The table is the shape for more.
+
+NEED_LODGING = "lodging"
+# Read off the errand's own words. "find a bed you can pay for", "hear where a stranger
+# can sleep tonight", "a bed for the night".
+_NEED_CUES = {NEED_LODGING: re.compile(r"\b(?:bed|beds|sleep|lodging|lodgings)\b", re.I)}
+# The words that are about the need, as keys. Not "room": "the room is working hard at
+# not having noticed" is the same opening card's own fact, and every tavern beat has one.
+NEED_KEYS = {NEED_LODGING: ("bed", "beds", "lodging", "lodgings", "inn", "innkeeper")}
+# The player asking after it. "room" only in the phrases that mean a room to sleep in.
+_ASKS_AFTER = {NEED_LODGING: re.compile(
+    r"\b(?:beds?|lodgings?|an inn|the inn|innkeeper|somewhere to sleep|a place to sleep|"
+    r"place to stay|somewhere to stay|rooms? for the night|rent (?:a|the) room|"
+    r"a room to (?:rent|let)|rooms? to (?:rent|let))\b", re.I)}
+# An errand that says it has to be paid for: earning the money is then part of it.
+_PAYS_ITS_WAY = re.compile(r"\b(?:pay|paid|afford|purse|money|coin)\b", re.I)
+# Asking for paid work, or for coin. "Is there anything I can do for some coin?" and
+# "…to earn some coin?" are the two lines on the save that the card never heard.
+_ASKS_FOR_WORK = re.compile(
+    r"\b(?:for (?:some )?coin|earn(?:ing)? (?:some )?(?:coin|money)|paid work|"
+    r"work for (?:coin|pay|money)|any work|a job|need(?:s)? (?:a )?hand|"
+    r"(?:who|anyone|anybody) (?:is )?hiring|hire me)\b", re.I)
+# The words a fact uses about earning, for the watcher's about-test on such an errand.
+MEANS_KEYS = ("coin", "coins", "work", "wage", "wages", "earn", "paid", "hire", "job")
+# What a bed costs, in copper, when the world says nothing: the Core Rulebook's "Inn stay
+# (common)", 5 sp — "a place on a raised, heated floor and the use of a blanket and a
+# pillow". (Poor, 2 sp, is "a place on the floor near the hearth", which is not a bed.)
+# A world that exports its own room prices replaces this (docs/from-world-bible.md).
+BED_PRICE_CP = 50
+
+
+def need_of(card: Card) -> str:
+    """What this errand needs — "lodging" — or "" for anything else. An errand card
+    only; read off its title and its first fact, which is the errand sentence."""
+    if not card.is_(TAG_ERRAND):
+        return ""
+    said = " ".join([card.title] + list(card.facts[:1]))
+    return next((n for n, cue in _NEED_CUES.items() if cue.search(said)), "")
+
+
+def pays_its_way(card: Card) -> bool:
+    """Whether the errand says the need must be paid for."""
+    return bool(_PAYS_ITS_WAY.search(" ".join([card.title] + list(card.facts[:1]))))
+
+
+def cannot_pay(scene, price_cp: int = BED_PRICE_CP) -> bool:
+    """The player's purse holds less than the price."""
+    from . import goods
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    return pc is not None and goods.in_copper(getattr(pc, "purse", None) or {}) < price_cp
+
+
+def where_met(need: str, places, at: str = ""):
+    """The place among `places` that meets this need, or None. Lodging is the
+    settlement table's own `lodging` slot (`schemes.PLACE_KINDS`: the tavern, the
+    inn), or a place founded with one of those kinds. The one the party stands in
+    first, so a card never sends the player to the tavern from inside the inn."""
+    if need != NEED_LODGING:
+        return None
+    from . import places as places_mod
+    from . import schemes
+
+    labels = tuple(schemes.PLACE_KINDS.get("lodging") or ())
+    kinds = {lbl.removeprefix("the ") for lbl in labels}
+    fits = [p for p in places or ()
+            if " ".join(str(getattr(p, "name", "")).lower().split()) in labels
+            or places_mod.kind_named(getattr(p, "kind", "") or "") in kinds]
+    here = [p for p in fits if getattr(p, "id", "") == at]
+    return (here or fits or [None])[0]
+
+
+def _met_fact(place, at: str) -> str:
+    """"Beds are let at the tavern." — or, standing in it, who lets them."""
+    from . import places as places_mod
+
+    if getattr(place, "id", "") == at:
+        keeper, _words = places_mod.keeper_of(getattr(place, "name", ""))
+        return f"Beds are let here{', by ' + keeper if keeper else ''}."
+    return f"Beds are let at {getattr(place, 'name', 'the inn')}."
+
+
+def about(card: Card, fact: str, scene=None) -> bool:
+    """Whether a proposed fact is about this card: one of its keys, one of its people,
+    or one of its identity words — and, for an errand that has to be paid for while the
+    player cannot pay, the earning of the money. The watcher's test (`gm/watcher.py`);
+    one place, so the rule is not copied there."""
+    names = _card_names(card, scene) if scene is not None else []
+    if (_hits(card, fact) >= 1 or _names_in(names, fact)
+            or _identity_hits(identity_keys(card, names), fact) >= 1):
+        return True
+    return bool(scene is not None and need_of(card) and pays_its_way(card)
+                and cannot_pay(scene) and _identity_hits(MEANS_KEYS, fact) >= 1)
+
+
+def ground_the_errand(scene, places, turn: int = 0) -> str:
+    """Put the place that meets the errand's need on its card, once, without a tick.
+    Returns the fact added, or ""."""
+    card = next((c for c in load(scene) if c.live and need_of(c)), None)
+    if card is None:
+        return ""
+    at = str(getattr(scene, "at", "") or "")
+    place = where_met(need_of(card), places, at)
+    if place is None:
+        return ""
+    fact = _met_fact(place, at)
+    if fact in card.facts or any(f.startswith("Beds are let") for f in card.facts):
+        return ""
+    card.facts = (card.facts + [fact])[-FACT_CAP:]
+    _store(scene, card)
+    return fact
+
+
+def errand_progress(scene, places, *, player_text: str = "", outcomes=(),
+                    turn: int = 0) -> list[str]:
+    """Move an errand with a need on what the engine can see this turn. Returns the
+    facts added (the turn log records them).
+
+    Each step lands once (a fact already on the card is not ticked again — asking five
+    times is not five steps): asked after it; asked for paid work while unable to pay
+    for it (the errand says "you can pay for", and the purse is empty — on the save it
+    was `{}` from the first turn); arrived where it is had. A night's `rest` resolved
+    where it is had settles the card. Never the model's say-so: these are the player's
+    words, the purse, `scene.at` and an outcome's op."""
+    card = next((c for c in load(scene) if c.live and need_of(c)), None)
+    if card is None:
+        return []
+    need = need_of(card)
+    at = str(getattr(scene, "at", "") or "")
+    place = where_met(need, places, at)
+    added: list[str] = []
+    grounded = ground_the_errand(scene, places, turn=turn)
+    if grounded:
+        added.append(grounded)
+
+    def step(fact: str) -> None:
+        live = find(scene, card.id)
+        if live is None or not live.live or fact in live.facts:
+            return
+        touch(scene, card.id, fact, turn=turn, tick=True)
+        added.append(fact)
+
+    text = " ".join(str(player_text or "").split())
+    if text and _ASKS_AFTER[need].search(text):
+        step("You have asked after a bed for the night.")
+    if (text and pays_its_way(card) and cannot_pay(scene)
+            and _ASKS_FOR_WORK.search(text)):
+        step("With nothing in your purse, you have asked after work to pay for a bed.")
+    if place is not None and getattr(place, "id", "") == at:
+        step(f"You have found {getattr(place, 'name', 'somewhere')}, where beds are let.")
+        # The engine's own night: a `rest` that ran ("… rests for 8 hours."), not one
+        # refused mid-conversation (`Engine._op_rest`).
+        slept = any(str(getattr(o, "op", "")) == "rest"
+                    and str(getattr(o, "status", "") or "") != "refused"
+                    and " rests for " in str(getattr(o, "tell", ""))
+                    for o in outcomes or ())
+        if slept:
+            fact = f"You have slept in a bed at {getattr(place, 'name', 'the inn')}."
+            live = find(scene, card.id)
+            if live is not None and live.live:
+                live.facts = (live.facts + [fact])[-FACT_CAP:]
+                _store(scene, live)
+                resolve(scene, card.id, turn=turn)
+                added.append(fact)
+    return added

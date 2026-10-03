@@ -608,6 +608,9 @@ class GMAgent:
                 # default band" the old docstring promised never existed.
                 raw = judgement.drop_premature_end(raw)
                 raw = judgement.drop_stray_checks(raw, player_input)
+                # Before the band fill: a Diplomacy check at a person is priced by
+                # their attitude, never by a band (the clerk's DC 8, 2026-10-03).
+                raw = judgement.aim_the_sway(raw, player_input, self.engine.scene)
                 raw = judgement.fill_bare_checks(raw)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)

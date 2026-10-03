@@ -4336,7 +4336,8 @@ class Engine:
 
             resolved_dc = dc_mod.ResolvedDC(
                 value=(attitude_mod.influence_dc(swayed) if skill == "diplomacy"
-                       else attitude_mod.intimidate_dc(swayed)), band=None)
+                       else attitude_mod.intimidate_dc(swayed)), band=None,
+                basis=attitude_mod.dc_basis(swayed, skill))
         else:
             resolved_dc = dc_mod.resolve(
                 intent.params.get("dc"), level, intent.params.get("circumstance")
