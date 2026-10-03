@@ -670,6 +670,12 @@ class GMAgent:
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
                 raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
+                # A place somebody named and the player now goes to: founded under the
+                # landmark the speaker gave, then walked into (rules/heard_places.py).
+                # After the within-scene filter, so a walk across the room stays one.
+                raw = judgement.go_to_heard_place(
+                    raw, player_input, self.engine.scene,
+                    known=tuple(self.engine.places()) + tuple(self.engine.open_ground()))
                 raw = judgement.inject_found(raw, player_input, self.engine.scene, self.world)
                 raw = judgement.inject_venture(raw, player_input, self.engine.scene)
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)

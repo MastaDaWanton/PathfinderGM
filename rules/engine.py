@@ -326,6 +326,11 @@ class Scene:
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
     # set by parent at read time. `Engine.found`/`Engine.venture` are the doors.
     founded: list[dict] = field(default_factory=list)
+    # Places a person named that the settlement does not have yet (`rules/heard_places.py`):
+    # heard of, not been to — Inform's *familiar*. Stored because a conversation made
+    # them; each becomes a place through `found`, under the landmark the speaker gave,
+    # the first time the player goes there (`judgement.go_to_heard_place`).
+    heard_places: list[dict] = field(default_factory=list)
     # The schemes running in this campaign (rules/schemes.py): one instance per opened
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.

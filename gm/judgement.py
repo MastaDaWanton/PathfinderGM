@@ -6098,6 +6098,15 @@ def found_parent(name: str, player_text: str, scene, known, kind: str = ""):
         mine = places_mod.find(known, name)
         if mine is not None:
             skip.add(mine.id)
+        # Somebody told the player where it is (`rules/heard_places.py`): the landmark
+        # they gave, after the player's own "the X in Y" and before any guess.
+        from rules import heard_places
+
+        heard = heard_places.named_in(name, scene, known)
+        if heard is not None and heard.get("landmark"):
+            p = places_mod.find(known, heard["landmark"])
+            if p is not None:
+                return p
     p = _place_said(text, known, skip=skip)
     if p is not None:
         return p
@@ -6157,11 +6166,105 @@ def fill_found_parent(raw_intents, player_text: str, scene, world=None) -> list:
         p = found_parent(str(params.get("name") or ""), player_text, scene, known,
                          kind=str(params.get("kind") or ""))
         here = places_mod.find(known, getattr(scene, "at", "") or "")
+        # A landmark a speaker gave is kept by name even when it is here: the engine's
+        # default for an unnamed parent climbs out of a building to the street, and "the
+        # smithy through the side door" of the counting house is off the counting house.
+        from rules import heard_places
+
+        heard = heard_places.named_in(str(params.get("name") or ""), scene, known)
+        if p is not None and heard is not None and heard.get("landmark") == p.id:
+            params["parent"] = p.name
+            out[i] = dict(out[i], params=params)
+            continue
         if p is None or (here is not None and p.id == here.id):
             params.pop("parent", None)
         else:
             params["parent"] = p.name
         out[i] = dict(out[i], params=params)
+    return out
+
+
+_GOES_TO = re.compile(
+    r"\b(?:go|goes|going|head|heads|heading|walk|walks|make\s+(?:my|our)\s+way|set\s+off|"
+    r"set\s+out|travel|visit|find|look\s+for|seek|return|hurry|run|wander|stroll|cross)\b",
+    re.I)
+
+
+def go_to_heard_place(raw_intents, player_text: str, scene, known=()) -> list:
+    """Going to a place somebody named becomes that place, under the landmark they gave.
+
+    The owner's ruling (2026-10-03): places are creatable. What this adds is WHERE: the
+    clerk's "through the side door, past the smithy" puts the smithy off the counting
+    house, and the player who then says "I go to the smithy" stands there, with the
+    smithy now a place for every later turn. Before this the same walk was a `travel` the
+    engine refused ("there is no 'the smithy' here") and a retry that founded it wherever
+    the planner could reach — measured on the owner's items save, where *the smithy* and
+    *the storage area* came into being exactly that way (docs/playtest-2026-10-03.md).
+
+    Fires when the player's own words go to a heard-of place this settlement does not have
+    yet (`heard_places.named_in`), or the plan already travels there. Any `found` the plan
+    wrote for it is replaced by one with the record's kind and landmark; a travel is added
+    if the plan had none. A place already on the map is `known`'s and left alone, and a
+    question is never a journey."""
+    from rules import heard_places
+    from rules import places as places_mod
+
+    if not isinstance(raw_intents, list) or scene is None or not player_text:
+        return raw_intents
+    if "?" in player_text or not getattr(scene, "heard_places", None):
+        return raw_intents
+    said = redact_speech(str(player_text))
+    rec = None
+    if _GOES_TO.search(said):
+        rec = heard_places.named_in(said, scene, known)
+    if rec is None:
+        for r in raw_intents:
+            if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel":
+                rec = heard_places.named_in(str((r.get("params") or {}).get("place") or ""),
+                                            scene, known)
+                if rec is not None:
+                    break
+    if rec is None:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    params = {"name": rec["name"]}
+    if rec.get("kind"):
+        params["kind"] = rec["kind"]
+    landmark = places_mod.find(known, rec.get("landmark") or "") if rec.get("landmark") \
+        else None
+    # Named even when it is where the party stands: left out, `fill_found_parent` would
+    # look for evidence of its own and could put a smithy on its trade street, over the
+    # clerk's "through the side door".
+    if landmark is not None:
+        params["parent"] = landmark.name
+    core = re.sub(r"^the\s+", "", rec["name"].lower())
+    out, travelled = [], False
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        op = str(r.get("op", "")).lower()
+        p = r.get("params") or {}
+        if op == "found" and core in str(p.get("name") or "").lower():
+            continue                       # replaced below, with the speaker's landmark
+        if op == "travel" and core in str(p.get("place") or "").lower():
+            travelled = True
+            r = dict(r, params=dict(p, place=rec["name"]))
+        out.append(r)
+    found = {"op": "found", "params": params,
+             "because": f"the player went to {rec['name']}, which they had heard of"}
+    if pc is not None:
+        found["actor"] = pc.ref
+    # The found first: validation projects a founded name for the travel after it.
+    at = next((i for i, r in enumerate(out) if isinstance(r, dict)
+               and str(r.get("op", "")).lower() == "travel"), len(out))
+    out.insert(at, found)
+    if not travelled:
+        travel = {"op": "travel", "params": {"place": rec["name"]},
+                  "because": f"the player went to {rec['name']}"}
+        if pc is not None:
+            travel["actor"] = pc.ref
+        out.append(travel)
     return out
 
 

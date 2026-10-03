@@ -69,6 +69,35 @@ bestiary, by the ground's terrain, through `gathering.creature_for`, never inven
   also propose it. Either way the engine validates the name, the parent, the owner and
   the kind, and refuses with the fix named.
 
+## Heard of: the state between a name and a place (2026-10-03)
+
+The owner's ruling of 2026-10-03, asked how a place an NPC names should be handled:
+"places must be creatable for example peoples houses". A fixed map is ruled out. What was
+missing was the middle state. In the owner's items save the clerk said "make your exit
+through the side door, past the smithy". Nothing recorded the smithy. "Head for the side
+door" then had the planner found *the smithy* wherever it could, after a refused travel.
+
+- **Prior art.** The traditions keep three states, not two:
+  - Inform's Epistemology (Eric Eve, Recipe Book §5.5): *seen* and *familiar*, where
+    familiar means known about but not found.
+  - Skyrim draws a place you were told of as a grey marker, and you cannot travel to it
+    until you have been there.
+  - Morrowind keeps no marker; it writes the speaker's directions into the journal,
+    relative to landmarks the player already knows.
+- **Recorded** (`play/aftermath/places_heard.py` → `rules/heard_places.py`):
+  - from an NPC's own line, never the narration;
+  - only a place this settlement's map does not answer;
+  - with the landmark the speaker tied it to. That is a real place named beside it ("the
+    tannery out past the docks"), or where they stand ("through the side door").
+  - Kept on `Scene.heard_places`, saved, at most eight per settlement.
+  - Somebody's house stays `call_on`'s.
+- **Made real on the first visit** (`judgement.go_to_heard_place`): the player's words
+  going there, or a travel the plan already wrote, become `found` under the landmark and
+  then `travel`. This uses door two, so the place is an ordinary founded place afterwards.
+  `found_parent` reads the same landmark when the model founds it itself.
+- **Shown** to the planner and narrator as words (`gm/brief/heard_places.py`): "the smithy
+  — off the counting house, as the clerk told it".
+
 ## Still open
 
 - World Bible could ship places directly (`docs/campaign-format.md` says nothing about

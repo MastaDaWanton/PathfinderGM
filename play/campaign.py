@@ -341,6 +341,9 @@ class Campaign:
                      [self.scene.at] if self.scene.at else []),
             # Notes and maps written with ink and paper (2026-10-01).
             "writings": ([dict(w) for w in self.scene.writings], []),
+            # Places somebody named that the town does not have yet (2026-10-03,
+            # rules/heard_places.py): a conversation made them, so nothing derives them.
+            "heard_places": ([dict(h) for h in self.scene.heard_places], []),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -444,6 +447,7 @@ class Campaign:
             settled=int(s.get("settled") or 0),
             came_along=list(s.get("came_along") or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
+            heard_places=[dict(h) for h in (s.get("heard_places") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
