@@ -785,8 +785,16 @@ def question(d: Discrepancy, facts: Facts) -> str:
         return (f"Does this sentence say that you (the player) have left {facts.start} and "
                 f"are now somewhere else — not just moving about inside {facts.start}?")
     if c.category == "hands":
-        return (f"Does this sentence say that the {s['item']} passes from "
-                f"{_name(facts, s['from'])} to {_name(facts, s['to'])}?")
+        # Not "passes from you to the smith": asked that way, gemma answered "no" to
+        # "Korvu takes the crate with a grunt" — the sentence never says "from you", and a
+        # people's name is not plainly the smith (probe of 2026-10-03, 0 of 2 such
+        # sentences confirmed). The direction is the first read's; this asks only whether
+        # the thing moved at all.
+        if s["to"] == facts.pc_ref:
+            return (f"Does this sentence say that the {s['item']} is picked up, taken or "
+                    f"given to you?")
+        return (f"Does this sentence say that the {s['item']} is taken, handed over, set "
+                f"down or dropped?")
     if c.category == "trade":
         if s["settled"]:
             return ("Does this sentence say that a sale or purchase is completed — goods "
@@ -800,15 +808,21 @@ def question(d: Discrepancy, facts: Facts) -> str:
     if c.category in ("arrived", "left"):
         way = "comes into" if c.category == "arrived" else "goes out of"
         return f"Does this sentence say that {_name(facts, s['who'])} {way} the place?"
-    if c.category == "hour":
-        return f"Does this sentence say that it is {s['part']} now?"
+    # The hour is not asked again. Asked "does this sentence say that it is dawn now?" of
+    # "the pre-dawn light is just beginning to bleed into the gray", gemma said no — and
+    # was right, it says before dawn, at 01:28, which is just as wrong. The part word is
+    # the reader's approximation and the windows in `PARTS` are generous for that reason;
+    # a second read that grades the word would only refuse true alarms.
     return ""
 
 
+# No "answer no unless it plainly says it": with that line gemma refused 3 of 5 true
+# contradictions on the probe of 2026-10-03, "The transaction is finalized." among them;
+# without it, 1 of 5 (and the 4 false ones stayed refused either way).
 _CONFIRM_SYSTEM = (
     "You answer one yes-or-no question about one sentence of a story told to a player "
     "(\"you\"). Answer from what the narrator says, not from what a character says aloud "
-    "inside quotation marks. Answer \"no\" unless the sentence plainly says it.")
+    "inside quotation marks.")
 
 
 def confirm(found: list[Discrepancy], text: str, facts: Facts, *, chat=None,

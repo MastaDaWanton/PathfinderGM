@@ -155,7 +155,8 @@ def regex_ctx(beat):
     for p in beat["people"]:
         pc = bool(p[3]) if len(p) > 3 else False
         actors[p[0]] = _Actor(ref=p[0], name=p[1], is_pc=pc, from_template="", race=p[2],
-                              true_name="", hp=10, hp_max=10, is_down=False,
+                              true_name="", hp=10, hp_max=10,
+                              is_down=len(p) > 4 and p[4] in ("down", "dead"),
                               world_entity_id="", abilities={},
                               goods={g: 1 for g in beat["pack"]} if pc else {},
                               at=end.id)
@@ -194,13 +195,15 @@ def regex_alarms(beat) -> tuple[set[str], list[str]]:
     # for a man down.
     from gm.narration import contradicts_state
 
-    state = {p[1]: {"alive": True, "hurt": False} for p in beat["people"]
-             if not (len(p) > 3 and p[3])}
+    # As `GMAgent._live_state` builds it: alive is conscious, hurt is below full.
     harmed = {e.get("ref") for o in beat["outcomes"] for e in o.get("effects") or ()
               if e.get("kind") in ("damage", "condition")}
+    state = {}
     for p in beat["people"]:
-        if p[0] in harmed:
-            state[p[1]]["hurt"] = True
+        if len(p) > 3 and p[3]:
+            continue
+        down = len(p) > 4 and p[4] in ("down", "dead")
+        state[p[1]] = {"alive": not down, "hurt": down or p[0] in harmed}
     try:
         if contradicts_state(beat["text"], state):
             got.add("harm(review)")
@@ -211,8 +214,19 @@ def regex_alarms(beat) -> tuple[set[str], list[str]]:
 
 # --- the run ----------------------------------------------------------------------------------
 
+def beats_of(subset: str) -> list[dict]:
+    """"tuned": the beats the prompt, the quote rules and the questions were shaped on;
+    "held": the beats labelled before any run and never looked at while shaping."""
+    held = [b for b in G.GOLD if "held out" in b["source"]]
+    if subset == "held":
+        return held
+    if subset == "tuned":
+        return [b for b in G.GOLD if b not in held]
+    return list(G.GOLD)
+
+
 def run_model(model: str, runs: int, host: str, record: dict, verbose: bool,
-              confirm: bool = True) -> dict:
+              confirm: bool = True, subset: str = "all", replay: dict | None = None) -> dict:
     from gm import client
 
     claim_t = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0})
@@ -223,10 +237,18 @@ def run_model(model: str, runs: int, host: str, record: dict, verbose: bool,
     first_beats = defaultdict(int)
     confirm_secs: list[float] = []
     secs, errors, dropped = [], 0, 0
+    gold = beats_of(subset)
     for r in range(runs):
-        for beat in G.GOLD:
+        for beat in gold:
             facts = facts_of(beat)
-            reading = bv.read(beat["text"], facts, model=model, host=host, chat=client.chat)
+            chat = client.chat
+            if replay is not None:
+                kept = (replay.get(beat["id"]) or [{}])[r % max(1, len(replay.get(beat["id"]) or [1]))]
+
+                def chat(*a, _raw=kept.get("raw", ""), **k):
+                    return SimpleNamespace(text=_raw, seconds=0.0, model="replay",
+                                           json=lambda: json.loads(_raw))
+            reading = bv.read(beat["text"], facts, model=model, host=host, chat=chat)
             record.setdefault(beat["id"], []).append(
                 {"model": model, "raw": reading.raw, "seconds": reading.seconds,
                  "error": reading.error})
@@ -258,14 +280,14 @@ def run_model(model: str, runs: int, host: str, record: dict, verbose: bool,
             "first": {"alarms": first_t, "beats": dict(first_beats)},
             "confirm_seconds": confirm_secs,
             "seconds": secs, "errors": errors, "dropped": dropped,
-            "calls": runs * len(G.GOLD)}
+            "calls": runs * len(gold)}
 
 
-def run_regex(verbose: bool) -> dict:
+def run_regex(verbose: bool, subset: str = "all") -> dict:
     alarm_t = defaultdict(lambda: {"tp": 0, "fp": 0, "fn": 0})
     beats = defaultdict(int)
     errs = []
-    for beat in G.GOLD:
+    for beat in beats_of(subset):
         got, errors = regex_alarms(beat)
         errs += [f"{beat['id']}: {e}" for e in errors]
         mapped = {("harm" if a == "harm(review)" else a) for a in got}
@@ -325,16 +347,22 @@ def main() -> None:
     ap.add_argument("--json", default="")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--no-confirm", action="store_true")
+    ap.add_argument("--subset", choices=("all", "tuned", "held"), default="all")
+    ap.add_argument("--replay", default="", help="score a --record file's extractions "
+                    "instead of calling the model to read (the second read still calls it)")
     args = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
-    results = {"regex": run_regex(args.verbose)}
+    results = {"regex": run_regex(args.verbose, args.subset)}
     report("regex checks", results["regex"])
     record: dict = {}
     if not args.regex_only:
         for model in args.model or ["igorls/gemma-4-12B-it-heretic-GGUF:latest"]:
             started = time.time()
+            replay = (json.loads(Path(args.replay).read_text(encoding="utf-8"))
+                      if args.replay else None)
             results[model] = run_model(model, args.runs, args.host, record, args.verbose,
-                                       confirm=not args.no_confirm)
+                                       confirm=not args.no_confirm, subset=args.subset,
+                                       replay=replay)
             report(f"{model} x{args.runs} ({time.time() - started:.0f}s)", results[model])
     if args.record:
         Path(args.record).write_text(json.dumps(record, indent=1), encoding="utf-8")

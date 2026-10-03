@@ -171,14 +171,17 @@ def test_a_failed_read_is_an_error_and_no_claim():
 
 def test_a_contradiction_the_second_read_does_not_confirm_costs_nothing():
     """The narrow question about one sentence is asked before a contradiction costs a
-    word; a "no" refutes it."""
+    word; a "no" refutes it. The hour is not asked: "the pre-dawn light" is not "dawn",
+    and a second read that grades the reader's word refused that true alarm (probe of
+    2026-10-03)."""
     _r, found = _diff("finalized")
     beat = G.by_id("finalized")
-    chat = _chat({"answer": "yes"}, {"answer": "no"}, {"answer": "yes"})
+    chat = _chat({"answer": "yes"}, {"answer": "no"})
     kept, refuted, _s = bv.confirm(found, beat["text"], G.facts(beat), model="stub",
                                    chat=chat)
-    assert len(kept) == 2 and len(refuted) == 1
-    assert len(chat.asked) == 3
+    assert {d.category for d in kept} == {"hands", "hour"}
+    assert [d.category for d in refuted] == ["trade"]
+    assert len(chat.asked) == 2
     question = chat.asked[0][0][-1]["content"]
     assert "Question: Does this sentence say" in question
 

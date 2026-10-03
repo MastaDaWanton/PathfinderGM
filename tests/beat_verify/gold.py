@@ -38,6 +38,9 @@ ZH_PLACES = ("the market", "the docks", "the tavern", "the counting house",
 # Founded places and what they are, for the regex harness's Place objects.
 ZH_KINDS = {"the smithy": ("smithy", "the counting house"),
             "the storage area": ("warehouses", "the docks")}
+# The scripted sessions of 2026-09-25 (tests/replay), on the Pangrella fixture's Zhilvarnia.
+PG_PLACES = ("the market", "the gate", "the north crossing", "the west crossing",
+             "the great square", "the docks", "the approach")
 VM_PLACES = ("the way in", "the market", "the well", "the guildhall", "the lane",
              "the green", "the upper floor of the guildhall", "the approach", "the edge")
 
@@ -51,12 +54,17 @@ BOBBY = ["pc", "Bobby", "", True]
 JERKIN = ["c8", "man in a stained leather jerkin", "commoner"]
 WATCH = ["c1", "the watchman waving traffic through", "Orc"]
 
+PG_C2 = ["c2", "Commoner", "commoner"]
+PG_C3 = ["c3", "Commoner", "commoner"]
+PG_LEATHER = ["c4", "man in a stained leather", "commoner", False, "down"]
+PG_DESP = ["c7", "desperate stranger", "commoner"]
+
 REFUSED_SALE = {"intent_id": "i2", "op": "sell", "status": "refused", "effects": [],
                 "tell": "The smith's counter is not open yet; it opens at first light."}
 
 
 def places_of(beat) -> tuple[str, ...]:
-    return VM_PLACES if beat["world"] == "VM" else ZH_PLACES
+    return {"VM": VM_PLACES, "PG": PG_PLACES}.get(beat["world"], ZH_PLACES)
 
 
 def facts(beat):
@@ -65,7 +73,9 @@ def facts(beat):
     from gm import beat_verify as bv
 
     people = tuple(bv.Person(ref=p[0], name=p[1], what=p[2],
-                             pc=bool(p[3]) if len(p) > 3 else False)
+                             pc=bool(p[3]) if len(p) > 3 else False,
+                             down=len(p) > 4 and p[4] in ("down", "dead"),
+                             dead=len(p) > 4 and p[4] == "dead")
                    for p in beat["people"])
     return bv.Facts(start=beat["start"], end=beat["end"], places=places_of(beat),
                     went_by=tuple(beat["went_by"]), pack=tuple(beat["pack"]),
@@ -555,4 +565,167 @@ GOLD = [
       world="VM", start="the way in", people=(BOBBY, WATCH),
       player="I ask him about the girl in the market.",
       claims=[C("hour", opt=True, part="morning")]),
+
+    # --- HELD OUT: labelled before any run, never shown to the prompt or the questions ------
+    # The scripted sessions of 2026-09-25 (tests/replay/*-gemma4-12b.jsonl.gz), recorded
+    # with the narrator of the day. The confirmation questions and the quote rules were
+    # shaped on the beats above; these say whether that shaping generalises.
+    B("ho-fist-misses-floor", "fight:13 (held out)",
+      "The crowd's tension breaks as he commits to the strike, and your fist meets his face "
+      "in a blunt, heavy strike. The impact sends his head snapping back, the force of your "
+      "punch throwing his balance wide as he stumbles into the nearest table. The wood "
+      "groans and shatters under the weight of his fall. He hits the ground hard, the air "
+      "leaving his lungs in a wheeze, and the crowd falls into a stunned, heavy silence.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      player="I punch him again.",
+      outcomes=[{"intent_id": "i1", "op": "attack", "status": "resolved",
+                 "tell": "Kesst Vayr's attack misses Commoner (9 against AC 10).",
+                 "effects": []}],
+      claims=[C("harm", who=["c2", "c3"], how="hurt"),
+              C("harm", opt=True, who=["c2", "c3"], how="down")],
+      alarms=["harm"]),
+    B("ho-sickening-thud", "fight:14 (held out)",
+      "The man's head snaps back from your blow, and he falls, the back of his head hitting "
+      "the cobblestones with a sickening thud. He doesn't move. The crowd is frozen, a wall "
+      "of faces and eyes watching the blood pool around the man in the stained leather.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      player="I keep hitting him.",
+      outcomes=[{"intent_id": "i1", "op": "attack", "status": "resolved",
+                 "tell": "Kesst Vayr's attack misses Commoner (6 against AC 10).",
+                 "effects": []}],
+      claims=[C("harm", who=["c2", "c3", "c4"], how=["hurt", "down", "dead"]),
+              C("harm", opt=True, who=["c2", "c3", "c4"], how=["down", "dead", "hurt"])],
+      alarms=["harm"]),
+    B("ho-first-fall", "fight:3 (held out)",
+      "The man's head snaps back from the force of your fist, his body reeling into the "
+      "heavy crate with a dull thud. He collapses into the mud, the air leaving his lungs in "
+      "a wet gasp as he hits the ground, and the heavy thud of his body against the wood is "
+      "the only sound in the sudden, ringing silence of the square.",
+      world="PG", start="the west crossing",
+      people=(KESST, ["c4", "man in a stained leather", "commoner", False, "down"]),
+      player="I punch him again.",
+      outcomes=[{"intent_id": "i1", "op": "attack", "status": "resolved",
+                 "tell": "Kesst Vayr hits man in a stained leather for 7 piercing. man in a "
+                         "stained leather is unconscious and dying.",
+                 "effects": [{"ref": "c4", "kind": "damage", "amount": 7},
+                             {"ref": "c4", "kind": "condition", "condition": "unconscious"},
+                             {"ref": "c4", "kind": "condition", "condition": "dying"}]}],
+      claims=[C("harm", who="c4", how="hurt"), C("harm", who="c4", how="down")]),
+    B("ho-lies-still", "fight:6 (held out)",
+      "The man in stained leather lies still beneath you, the dirt of the west crossing "
+      "mingling with the blood on his tunic. The crowd has halted; the heavy, rhythmic thump "
+      "of boots on cobblestone echoes from the nearest lane as the local watch responds to "
+      "the outcry.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      player="I stand over him and tell him to stay down.",
+      outcomes=[{"intent_id": "i2", "op": "say", "status": "resolved", "tell": "",
+                 "effects": [{"kind": "said", "to": ""}]},
+                {"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner's attack misses Kesst Vayr (5 against AC 15).",
+                 "effects": []}],
+      claims=[C("harm", opt=True, who="c4", how=["down", "hurt"])]),
+    B("ho-stool-misses", "fight:8 npc (held out)",
+      "The commoner swings the heavy stool with a desperate, panicked grunt, but the wood "
+      "whistles through the air and strikes only empty space. The intruder remains "
+      "untouched, their stance unbroken by the clumsy blow.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner's attack misses Kesst Vayr (6 against AC 15).",
+                 "effects": []}]),
+    B("ho-shove-lands", "fight:8 npc (held out)",
+      "The commoner lunges forward and slams their weight into you, their heavy hands "
+      "striking your chest with enough force to knock the wind from your lungs. You stumble "
+      "back a few paces, your footing momentarily faltering as they struggle to clear the "
+      "path.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner hits Kesst Vayr for 2 bludgeoning.",
+                 "effects": [{"ref": "pc", "kind": "damage", "amount": 2}]}],
+      claims=[C("harm", who="pc", how="hurt")]),
+    B("ho-swing-misses", "fight:12 npc (held out)",
+      "The commoner lunges forward with a desperate, frantic swing, but their strike misses "
+      "your guard entirely. The blade whistles through the air, narrowly missing your "
+      "shoulder and clattering harmlessly against the stone behind you.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner's attack misses Kesst Vayr (13 against AC 15).",
+                 "effects": []}]),
+    B("ho-grasp-short", "fight:14 npc (held out)",
+      "The commoner lunges forward, their voice cracking as they reach out to seize the "
+      "intruder's attention and demand an answer. Their grasp falls short, however, and they "
+      "stumble slightly as they fail to make contact with you.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner's attack misses Kesst Vayr (9 against AC 15).",
+                 "effects": []}]),
+    B("ho-blow-lands", "fight:13 npc (held out)",
+      "The commoner lunges forward, slamming their weight into the intruder with a "
+      "desperate, heavy shove. The blow catches you squarely in the chest, knocking the "
+      "wind from your lungs and sending you reeling back.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      outcomes=[{"intent_id": "n1", "op": "attack", "status": "resolved",
+                 "tell": "Commoner hits Kesst Vayr for 4 bludgeoning.",
+                 "effects": [{"ref": "pc", "kind": "damage", "amount": 4}]}],
+      claims=[C("harm", who="pc", how="hurt")]),
+    B("ho-satchel", "fight:8 (held out)",
+      "The man's satchel is heavy with the weight of stolen coin and trade-papers, and you "
+      "snatch it from the dirt. His own blood is still wet on the leather. The crowd's roar "
+      "has turned into a tense, watchful hush; they see you standing over him with the bag.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      player="I take what he was carrying.",
+      outcomes=[{"intent_id": "i1", "op": "use_item", "status": "refused",
+                 "tell": "Kesst Vayr is not carrying the man's satchel.", "effects": []}],
+      # The satchel is on no ledger the engine keeps, so nothing can judge the snatch: a
+      # known limit, shared with the regex check it replaces (it reads the pack only).
+      claims=[C("hands", item="something else",
+                **{"from": ["the floor", "c4", "nobody", "someone not listed"]}, to="pc")]),
+    B("ho-life-extinguished", "fight:10 (held out)",
+      "The man in stained leather lies still at your feet, the blood from his wound staining "
+      "the stones of the west crossing. A few feet away, the commoner, the one who gripped "
+      "the stool, is watching you with wide eyes, his chest heaving. The air is thick with "
+      "the smell of iron and the sudden, heavy silence of a crowd that has seen a life "
+      "extinguished.",
+      world="PG", start="the west crossing", people=(KESST, PG_C2, PG_C3, PG_LEATHER, PG_DESP),
+      player="I find somewhere quiet and sit down.",
+      outcomes=[{"intent_id": "i1", "op": "narrate_only", "status": "refused",
+                 "tell": "No somewhere quiet is here.", "effects": []}],
+      claims=[C("harm", opt=True, who="c4", how=["dead", "down", "hurt"])],
+      may_alarm=["harm"]),
+    B("ho-at-the-gate", "town:5 (held out)",
+      "The air of the smithy's district fades, replaced by the salt-tang of the docks and "
+      "the heavy, humid press of the gate's outer perimeter. You pass the merchant's row. "
+      "Now, you stand at the gate. The massive timbered archway looms overhead, its "
+      "underside scarred by the passage of heavy wagons.",
+      world="PG", start="the market", end="the gate", people=(KESST,),
+      player="I leave the shop and walk out towards the gate.",
+      outcomes=[{"intent_id": "i1", "op": "travel", "status": "resolved",
+                 "tell": "You are at the gate now.",
+                 "effects": [{"kind": "biome", "place": "p~urban:the-gate",
+                              "was_place": "p~urban:the-market"}]}],
+      claims=[C("move", place="the gate")]),
+    B("ho-grassland", "town:7 (held out)",
+      "The sudden shift in the ground is a physical jolt; the cobblestones and the heavy, "
+      "oppressive atmosphere of the city gates fall away, replaced by the wide, open sweep "
+      "of the grassland. You are at the approach now, where the city's shadow finally "
+      "yields to the vastness of the plains.",
+      world="PG", start="the gate", end="the approach", people=(KESST,),
+      player="I walk out into the grassland beyond the wall.",
+      outcomes=[{"intent_id": "i1", "op": "travel", "status": "resolved",
+                 "tell": "You are at the approach now.",
+                 "effects": [{"kind": "biome", "place": "p~plains:the-approach",
+                              "was_place": "p~urban:the-gate"}]}],
+      claims=[C("move", place="the approach")]),
+    B("ho-squabble-at-the-gate", "town:15 (held out)",
+      "You leave the heat of the smithy behind and move into the bustle of the market, where "
+      "the air is thick with the scent of spices and the calls of vendors. The crowd thins "
+      "as you reach the transition to the gate, and the open space of the entryway forces a "
+      "sudden halt. In the center of the thoroughfare, two men are grappling.",
+      world="PG", start="the market", end="the gate", went_by=("the market",),
+      people=(KESST,),
+      player="I leave the shop and walk out towards the gate.",
+      outcomes=[{"intent_id": "i1", "op": "travel", "status": "resolved",
+                 "tell": "The way there ran through the market. You are at the gate now.",
+                 "effects": [{"kind": "biome", "place": "p~urban:the-gate",
+                              "was_place": "p~urban:the-market", "went_by": ["the market"]}]}],
+      claims=[C("move", opt=True, place=["the gate", "the market"])]),
 ]
