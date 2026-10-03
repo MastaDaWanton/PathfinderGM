@@ -43,6 +43,10 @@ def gm(monkeypatch):
     monkeypatch.setattr(modelcfg, "for_role",
                         lambda role: {"model": "spare-model", "host": "http://x"}
                         if role == "fallback" else {})
+    # The spare is on its host: a fallback Ollama does not list is never scheduled
+    # (2026-10-03, item 18 — tests/test_turn_pipeline_2026_10_03.py).
+    monkeypatch.setattr(client, "probe",
+                        lambda *a, **k: client.Probe(True, installed=("spare-model:latest",)))
     return g
 
 

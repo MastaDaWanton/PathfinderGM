@@ -753,6 +753,15 @@ _READS_MECHANICS = {
         "tell, not a bypass of one. Building it from tell TEXT instead would mean "
         "parsing names back out of English in the presentation layer, which is the "
         "second vocabulary _deaths_from is allowed here to avoid.",
+    "gm/ledger.py:_flag":
+        "which of an op's two meanings the engine resolved — a `company` joining or "
+        "parting (`travels`), a `talk` ending (`left`) — read for the same numberless "
+        "ledger line as `_named`, for the same reason: the alternative is parsing the "
+        "tell's English back into a flag (item 22, 2026-10-03).",
+    "gm/ledger.py:_introduced":
+        "who an `introduce` made, by the names the engine gave them, for the ledger's "
+        "\"met …\" line; the same reasoning as `_named`. The plan's `who` is a "
+        "description and not a name, so it is not what the ledger may say.",
 }
 
 

@@ -4414,21 +4414,49 @@ def _remember(c, resolution, player_input: str) -> None:
     (35.3% against 94.4% for full context), and the cause named is detail lost through
     repeated re-compression. See gm/ledger.py.
     """
+    # Who was spoken to: the person the words name, else the conversation the engine
+    # holds (`states.TALKING`), else the one person here. Never "someone" — measured
+    # 2026-10-03 (item 22), "you spoke with someone" was a ledger line that remembered
+    # nothing, written while the engine knew exactly who the player was talking to.
+    from rules import states
+
     spoke = ""
     if judgement.was_speech(player_input):
-        here = [a.name for a in c.scene.actors.values() if not a.is_pc]
-        spoke = next(
-            (n for n in here
-             if len(str(n).split()[-1]) > 2
-             and str(n).split()[-1].lower() in (player_input or "").lower()),
-            "someone")
+        here = [a for a in c.scene.actors.values() if not a.is_pc]
+        named = next(
+            (a.name for a in here
+             if len(str(a.name).split()[-1]) > 2
+             and str(a.name).split()[-1].lower() in (player_input or "").lower()), "")
+        talking = [a.name for a in here if a.has_state(states.TALKING)]
+        spoke = (named or (talking[0] if len(talking) == 1 else "")
+                 or (here[0].name if len(here) == 1 else ""))
+    # Places by the names the player read, and where the party stood by its own name
+    # within the settlement — "the smithy, Zhilvarnia", not the settlement alone for
+    # every entry, and never an id (item 22: "you went to ca~urban:the-docks").
+    try:
+        known = places_mod.for_scene(c.location, c.scene.at,
+                                     founded=getattr(c.scene, "founded", ()) or ())
+    except Exception:  # noqa: BLE001 — a memory line is never worth the turn
+        known = ()
+    place_names = {p.id: p.name for p in known if getattr(p, "id", "")}
+    for p in getattr(c.scene, "founded", ()) or ():
+        pid, pname = getattr(p, "id", ""), getattr(p, "name", "")
+        if pid and pname:
+            place_names.setdefault(pid, pname)
+    settlement = getattr(c.location, "name", "") or ""
+    spot = place_names.get(str(getattr(c.scene, "at", "") or ""), "")
+    where = ", ".join(x for x in (spot, settlement) if x)
     ledger_mod.keep(c.ledger, ledger_mod.note(
         resolution.outcomes,
         turn=len(c.transcript),
         hist=len(c.history),
         spoke_with=spoke,
-        where=getattr(c.location, "name", "") or "",
-        names={r: a.name for r, a in c.scene.actors.items()}))
+        where=where,
+        # Everybody the scene holds, not only who stands here now: a turn that spoke to
+        # somebody and then walked away has left them behind by the time it is written.
+        names={r: a.name for r, a in (getattr(c.scene, "people", None)
+                                      or c.scene.actors).items()},
+        places=place_names))
 
 
 def _log_turn(c, plan, resolution, replace: bool = False):

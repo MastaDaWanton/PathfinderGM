@@ -286,16 +286,61 @@ class Review:
 # `who`: two people introduced are two turns. Measured live 2026-09-25: the introduce net
 # writes the same `because` every time, so a baker introduced after a guide read as "the
 # same thing as last turn", was refused five times, and the turn was lost.
-_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone", "who")
+# `to`, and the words of a `say` (the last element of each row): a conversation turn is
+# `narrate_only` + `say` every time, legitimately, so with only the op, the `because`
+# ("the player said it") and these params compared, every talk turn read as the turn
+# before it. Measured 2026-10-03 (docs/playtest-2026-10-03.md item 17): "about the docks"
+# then "I ask him who the master of the docks is", both `say` to c4, refused five times
+# running (76 s), and "Is there anything I can do to earn some coin?" five times (85 s);
+# both turns were then lost. Tool-loop detectors learned the same thing: matching on the
+# call alone stopped legitimate edit-and-rerun loops, and "same call, different result is
+# progress" was the fix (docs/turn-pipeline-2026-10-03.md).
+_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone", "who", "to")
+
+
+def _words_of(text) -> str:
+    """Speech compared by its words: case, punctuation and spacing are not new words."""
+    return " ".join(re.findall(r"[a-z0-9']+", str(text or "").lower().replace("’", "'")))
 
 
 def _signature(intents) -> list[tuple]:
     """What a turn's intents amount to, for comparing one turn against the last."""
     return [
         (i.op, i.actor, str(i.target), (i.because or "").strip().lower(),
-         tuple(str(i.params.get(k, "")).lower() for k in _IDENTIFYING))
+         tuple(str(i.params.get(k, "")).lower() for k in _IDENTIFYING),
+         _words_of(i.params.get("words", "")) if i.op == "say" else "")
         for i in intents
     ]
+
+
+def _frozen(value):
+    """Lists to tuples, all the way down: a signature read back from a save is JSON, and
+    `["", ""] != ("", "")`, so a reloaded campaign's previous turn never compared equal."""
+    if isinstance(value, (list, tuple)):
+        return tuple(_frozen(v) for v in value)
+    return value
+
+
+# Ops that resolve nothing the dice or the books would remember. A plan made only of
+# these, proposed twice, is two quiet turns at worst — accepting it costs the player
+# nothing, where refusing it again costs them the turn (`GMAgent.plan_turn`).
+QUIET_OPS = frozenset({"narrate_only", "say"})
+
+
+def is_quiet(intents) -> bool:
+    return all(getattr(i, "op", "") in QUIET_OPS for i in intents or ())
+
+
+def _says_the_players_words(intents, player_text: str) -> bool:
+    """Every `say` in the plan carries words the player wrote THIS turn, and nothing but
+    talk is in it. Then the plan has read the player, whatever the last turn was: a player
+    who says the same thing twice is answered the same way twice, on purpose."""
+    said = [i for i in intents if i.op == "say"]
+    if not said or not is_quiet(intents):
+        return False
+    line = _words_of(player_text)
+    return all(_words_of(i.params.get("words", "")) and
+               _words_of(i.params.get("words", "")) in line for i in said)
 
 
 def review(player_text: str, intents, scene=None, previous=None) -> Review:
@@ -317,8 +362,12 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
     #    politely declined a trainer and the GM's "same" turn was the same *nothing*.
     #    Rolling the same check again is the GM not reading; saying nothing twice is
     #    just two quiet turns.
-    if (previous and _signature(intents) == list(previous)
-            and any(i.op != "narrate_only" for i in intents)):
+    #    And not when the plan's only content is the player's own words of this turn
+    #    (`_says_the_players_words`): that is the plan reading them, the opposite of the
+    #    failure this guards against.
+    if (previous and _frozen(_signature(intents)) == _frozen(list(previous))
+            and any(i.op != "narrate_only" for i in intents)
+            and not _says_the_players_words(intents, text)):
         out.objections.append(Finding(
             "repeats-the-last-turn",
             f"you have proposed exactly the same thing as last turn, but the player "

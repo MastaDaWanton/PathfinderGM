@@ -725,6 +725,44 @@ _CUE_SYNONYMS = {
     "eat": ("bite", "chew", "swallow"),
 }
 
+# Verb classes: one deed, the several ways prose says it. Every member stands for every
+# other. Measured 2026-10-03 (item 21): "drop the Brunt of the weight on the ground" was
+# owed, and both passages the repair wrote — "You release your grip on the heavy weight
+# and let it fall, the object hitting the dirt floor" and "You loosen your grip… and let
+# it fall" — were refused as not showing it, because the cues left were "drop" and
+# "ground" and neither word was written. The beat was kept without the deed. A `*` in a
+# form is up to three words between ("let it fall", "set the crate down"). Kept to deeds
+# with a physical object and a plain verb; the same caution as the list above applies.
+_VERB_CLASSES = (
+    ("drop", "let * fall", "let * drop", "let go", "release", "set * down", "put * down",
+     "lay * down", "discard", "dump"),
+    ("ground", "floor", "dirt", "earth", "deck", "cobbles", "flagstones"),
+    ("throw", "toss", "hurl", "fling", "lob"),
+    ("lift", "hoist", "heave", "raise"),
+    ("shove", "push", "heave"),
+    ("open", "unlatch", "unbolt", "swing * open", "push * open"),
+    ("close", "shut", "latch", "pull * closed", "push * closed"),
+    ("hide", "conceal", "stash", "tuck * away"),
+)
+for _class in _VERB_CLASSES:
+    for _member in _class:
+        if " " in _member:
+            continue    # a phrase is found, never looked up as a cue
+        _CUE_SYNONYMS[_member] = tuple(dict.fromkeys(
+            [*_CUE_SYNONYMS.get(_member, ()), *(m for m in _class if m != _member)]))
+del _class, _member
+
+
+def _phrase(form: str) -> re.Pattern:
+    """A multi-word form as a pattern: each word in any inflection, `*` up to three
+    words."""
+    parts = []
+    for w in form.split():
+        parts.append(r"(?:[\w'’-]+\s+){0,3}?" if w == "*"
+                     else re.escape(_stem(w)) + r"\w*\s+")
+    body = "".join(parts)
+    return re.compile(r"\b" + body[:-3] + r"\b" if body.endswith(r"\s+") else body, re.I)
+
 
 def _stem(word: str) -> str:
     w = re.sub(r"['’]s$", "", str(word or "").lower().strip("'’"))
@@ -748,7 +786,7 @@ def _cue_found(cue: str, stems: set[str], low: str) -> bool:
     """`cue` (or a synonym) is written in the text whose stems and lowercase are given."""
     for form in (cue, *_CUE_SYNONYMS.get(cue, ())):
         if " " in form:
-            if form in low:
+            if form in low or _phrase(form).search(low):
                 return True
             continue
         s = _stem(form)
@@ -805,7 +843,11 @@ def deed_cues(action: dict) -> list[str]:
     span = str(action.get("span") or "")
     words = re.findall(r"[a-z][a-z'’]*", span.lower()) if span else \
         re.findall(r"[a-z][a-z'’]*", str(action.get("object") or "").lower())
-    target = set(re.findall(r"[a-z][a-z'’]*", str(action.get("target") or "").lower()))
+    # A deed done to a PLACE ("drop the weight on the ground": act give, target "the
+    # Brunt of the weight", place "the ground") has a thing in `target`, not a person,
+    # and the thing is exactly what a beat showing the deed will name (item 21).
+    target = set() if action.get("place") and not action.get("object") else \
+        set(re.findall(r"[a-z][a-z'’]*", str(action.get("target") or "").lower()))
     content = [re.sub(r"['’]s$", "", w) for w in words if w not in _CUE_STOP]
     strong = [w for w in content if w not in _CUE_GENERIC and w not in target]
     if strong:
@@ -1418,9 +1460,20 @@ def ends_unfinished(text: str) -> bool:
     if re.search(r"[.!?…][\"'”’)\]]*$", said):
         return False
     spans = speech.spans(said)
-    if spans and spans[-1][1] == len(said) and said[-1] in "\"'”’":
+    if spans and spans[-1][1] == len(said) and said[-1] in "\"'”’" \
+            and said[-1] in _CLOSES.get(said[spans[-1][0]], ""):
         return False            # it ends on a closed quotation: "…'Go home,'" is whole
+    # A quotation opened with one mark and "closed" with another is not closed. Item 19,
+    # 2026-10-03: a double-quoted line cut off mid-word as "…see if they'll sell you a'"
+    # — the stray apostrophe ended the text, an unclosed span ran to the end, and the beat
+    # read as finished, so it shipped as "…sell you a'. What do you do?".
     return True
+
+
+# Which marks may close a quotation each opening mark begins (straight quotes close
+# themselves; a curly opener takes its own closer or, from a tidy-minded model, a
+# straight one).
+_CLOSES = {"\"": "\"”", "“": "”\"", "‟": "”\"", "'": "'’", "‘": "’'", "’": "’'"}
 
 
 def trim_unfinished(text: str) -> tuple[str, str]:
@@ -1532,6 +1585,26 @@ _FELLED = re.compile(
     r"falls?\s+(?:dead|lifeless|limp|still|unconscious)|"
     r"goes\s+(?:limp|still|slack)|"
     r"hits?\s+the\s+(?:ground|floor|cobbles|dirt))\b", re.I)
+
+# A part of somebody falling that is not somebody falling. Measured 2026-10-03 (item 20):
+# "The clerk’s eyes drop to the floor for a heartbeat, as if measuring the distance
+# between your voice and his ears, before he looks back up" read as the clerk "down or
+# dead", and the turn spent a polish call on a clerk who was looking at his shoes. Eyes,
+# a gaze, a voice, a face or a pair of shoulders can drop, fall, die away, go slack or
+# slump without the body under them doing anything at all; the subject is what says
+# which, so the phrase is lifted out before `_FELLED` reads the sentence. A body part
+# that only falls when its owner does ("his head hits the floor") is not on the list.
+_PART_FALLS = re.compile(
+    r"\b(?:eyes?|gaze|glance|look|stare|attention|voice|tone|words?|smile|grin|face|"
+    r"expression|shoulders|eyelids|lids|lashes|brows?)\s+(?:\w+\s+){0,2}?"
+    r"(?:drops?|dropped|dropping|falls?|fell|falling|dies|died|dying|"
+    r"slumps?|slumped|slumping|goes|went|going|go|collapses?|collapsed)"
+    r"(?:\s+(?:dead|lifeless|limp|still|slack|away|to\s+the\s+\w+))?\b", re.I)
+
+
+def felled(sentence: str) -> bool:
+    """Whether a sentence has somebody going down — not their eyes, voice or shoulders."""
+    return bool(_FELLED.search(_PART_FALLS.sub(" ", str(sentence or ""))))
 
 # A place going about its business. Harmless prose, and the one thing a square with
 # bodies in it is not doing.
@@ -1667,7 +1740,7 @@ def contradicts_state(text: str, state: dict | None) -> list[tuple]:
             continue
         for sentence in _sentences_about_linked(bare_text, str(name), state):
             bare = sentence
-            if how.get("alive") and _FELLED.search(bare):
+            if how.get("alive") and felled(bare):
                 out.append((name, "down or dead", sentence.strip()))
                 break
             if not how.get("hurt") and _WOUNDED.search(bare):
@@ -3087,7 +3160,7 @@ def cut_dead_men_walking(text: str, dead_names, fresh=(),
         hit = next((h for h in pattern.finditer(s)
                     if not _shared_with_the_living(h.group(0), living_words)), None)
         dying_now = bool(just_died and just_died.search(s)
-                         and (_FELLED.search(s) or _DEATH_LANGUAGE.search(s)))
+                         and (felled(s) or _DEATH_LANGUAGE.search(s)))
         if hit and not dying_now and not _DEAD_MAY.search(s) \
                 and not _PLAYER_ACTS.match(s.strip()) \
                 and not (spare and spare(s, hit.group(0))):
@@ -3950,9 +4023,9 @@ def press_the_death(text: str, deaths: list[dict],
         # rather than following it: two fallings of one man is the "dead man
         # swinging" the player reported (2026-09-18). With no such sentence, the
         # line is appended as before.
-        felled = [s for s in _sentences_about(unquoted(text), name) if _FELLED.search(s)]
-        if felled:
-            text = text.replace(felled[-1], line, 1) if felled[-1] in text else \
+        going = [s for s in _sentences_about(unquoted(text), name) if felled(s)]
+        if going:
+            text = text.replace(going[-1], line, 1) if going[-1] in text else \
                 _append_before_hand_back(text, line)
         else:
             text = _append_before_hand_back(text, line)
