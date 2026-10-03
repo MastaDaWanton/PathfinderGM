@@ -314,17 +314,17 @@ function wireUpdates() {
   } catch (error) {
     // The dependency is named in `build.files`; if it is ever dropped from the asar
     // this is the line that says so, in the log, rather than a blank window.
-    console.error('[update] electron-updater is not in the build:', error.message);
+    updateLog('error', 'electron-updater is not in the build: ' + error.message);
     return;
   }
 
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = false;
-  updater.logger = { info: console.log, warn: console.warn, error: console.error,
-                     debug: () => {} };
+  updater.logger = { info: (m) => updateLog('info', m), warn: (m) => updateLog('warn', m),
+                     error: (m) => updateLog('error', m), debug: () => {} };
 
   updater.on('error', (error) => {
-    console.error('[update]', error && error.message ? error.message : error);
+    updateLog('error', error && error.message ? error.message : error);
   });
 
   updater.on('update-available', async (info) => {
@@ -340,7 +340,7 @@ function wireUpdates() {
     });
     if (response !== 0) return;
     updater.downloadUpdate().catch((error) => {
-      console.error('[update] download failed:', error.message);
+      updateLog('error', 'download failed: ' + error.message);
     });
   });
 
@@ -377,6 +377,38 @@ function wireUpdates() {
   });
 
   updater.checkForUpdates().catch((error) => {
-    console.error('[update] check failed:', error.message);
+    updateLog('error', 'check failed: ' + error.message);
   });
+}
+
+/**
+ * The updater's own log, in a file a player can send: `logs/update.log` beside the
+ * backend's `pathfindergm.log`, under the same data folder (`PATHFINDER_GM_DATA`, else
+ * %LOCALAPPDATA%\PathfinderGM — `pathfindergm/paths.py:user_data_root`).
+ *
+ * It used to be `console.log`, and a packaged Windows app has no console. Measured
+ * 2026-10-02: from 08c4b35 to 0.2.5 every installer shipped an asar holding only
+ * main.js and package.json — electron-updater was in the lockfile and never installed on
+ * the build machine — so `require` threw on every launch, the line saying so went
+ * nowhere, and no installed copy ever offered an update. "Logged and never shown" is
+ * only true if the log is somewhere.
+ */
+function updateLog(level, message) {
+  const line = `${new Date().toISOString()} [update] ${level}: ${message}`;
+  (level === 'error' ? console.error : console.log)(line);
+  try {
+    const fs = require('fs');
+    const root = process.env.PATHFINDER_GM_DATA ||
+      path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'PathfinderGM');
+    const dir = path.join(root, 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'update.log');
+    // Truncated past 512 KB rather than rotated, as the backend's log is at 2 MB.
+    try {
+      if (fs.statSync(file).size > 512 * 1024) fs.unlinkSync(file);
+    } catch (_) { /* no file yet */ }
+    fs.appendFileSync(file, line + '\n', 'utf8');
+  } catch (_) {
+    // A log that cannot be written is not worth stopping a game over.
+  }
 }

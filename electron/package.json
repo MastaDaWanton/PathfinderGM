@@ -8,6 +8,7 @@
   "scripts": {
     "electron": "electron .",
     "build:backend": "cd .. && python -m PyInstaller --noconfirm pathfindergm.spec",
+    "predist": "node -e \"require.resolve('electron-updater')\"",
     "dist": "npm run build:backend && electron-builder"
   },
   "devDependencies": {

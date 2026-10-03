@@ -95,9 +95,21 @@ def test_a_failed_check_is_logged_and_never_shown():
     """Offline, GitHub down, a rate limit — all normal, none of them worth a box in
     front of somebody's game."""
     js = _code(_main())
-    handler = js[js.index("updater.on('error'"):js.index("updater.on('error'") + 200]
-    assert "console.error" in handler
+    start = js.index("updater.on('error'")
+    handler = js[start:js.index("});", start)]
+    assert "updateLog(" in handler
     assert "dialog" not in handler, "an update failure puts a dialog on screen"
+
+
+def test_the_update_log_is_a_file_a_player_can_send():
+    """It was `console.log`, and a packaged Windows app has no console. From 08c4b35 to
+    0.2.5 `require('electron-updater')` threw on every launch of every install and the
+    line saying so went nowhere — reported 2026-10-02 as "it did not update"."""
+    js = _code(_main())
+    assert "function updateLog(" in js
+    assert "'update.log'" in js and "PATHFINDER_GM_DATA" in js
+    body = js[js.index("function wireUpdates"):js.index("function updateLog")]
+    assert "console." not in body, "an updater line still goes only to the console"
 
 
 # --- where it must not fire -----------------------------------------------------------------
@@ -140,6 +152,58 @@ def test_electron_updater_ships_inside_the_app():
     assert "electron-updater" not in (pkg.get("devDependencies") or {})
     assert "node_modules/**/*" in pkg["build"]["files"], \
         "the asar would not carry node_modules"
+
+
+def _asar_files(path: Path) -> set[str]:
+    """Every path in an asar archive, from its JSON header: four little-endian uint32s
+    (pickle size, header size, payload size, string length) and then the string."""
+    import struct
+
+    with open(path, "rb") as f:
+        _, _, _, size = struct.unpack("<4I", f.read(16))
+        header = json.loads(f.read(size).decode("utf-8"))
+    out: set[str] = set()
+
+    def walk(node: dict, prefix: str) -> None:
+        for name, child in (node.get("files") or {}).items():
+            here = f"{prefix}/{name}" if prefix else name
+            out.add(here)
+            walk(child, here)
+
+    walk(header, "")
+    return out
+
+
+def test_electron_updater_is_installed_where_the_build_reads_it():
+    """Declaring it was never the defect. Measured 2026-10-02: package.json and the
+    lockfile both named electron-updater 6.8.9, `electron/node_modules` on the build
+    machine did not have it, and electron-builder packs what is in node_modules — so
+    every installer from 08c4b35 to 0.2.5 shipped without it and none ever updated.
+    The test above passed the whole time. Skipped where no `npm ci` has run at all."""
+    import pytest
+
+    modules = ELECTRON / "node_modules"
+    if not modules.is_dir():
+        pytest.skip("electron/node_modules is absent — run `npm ci` in electron/")
+    assert (modules / "electron-updater" / "package.json").exists(), (
+        "electron-updater is declared but not installed; run `npm ci` in electron/ "
+        "before `npm run dist`, or the installer ships with no updater")
+    assert "require.resolve('electron-updater')" in _pkg()["scripts"].get("predist", ""), \
+        "npm run dist no longer refuses to build without the updater"
+
+
+def test_a_built_asar_carries_the_updater():
+    """The check against the thing that ships, when a build is present: the 0.2.5 asar
+    held two files, main.js and package.json."""
+    import pytest
+
+    asar = ELECTRON / "release" / "win-unpacked" / "resources" / "app.asar"
+    if not asar.exists():
+        pytest.skip("no build in electron/release — run `npm run dist` to check this")
+    files = _asar_files(asar)
+    assert "node_modules/electron-updater/package.json" in files, (
+        f"the built app.asar has no electron-updater ({len(files)} entries); the "
+        f"installer would never offer an update")
 
 
 def test_the_feed_points_at_this_repository():
