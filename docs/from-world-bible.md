@@ -166,6 +166,35 @@ prose. The proposed shape is `play.flora[]` in `campaign-format.md`.
 | `play.flora[].hybrid` | Absent | `true` when any use is magical, so the alchemist's shelf carries it too |
 | `base_for`, `solvent`, `neutralizer` | Absent | Only on the few things that are bench reagents: a wax, an oil, a spirit, a lime. A world's own trade goods are the natural source (`trade.sells` already names them in prose) |
 
+### Metals and the smith's materials
+
+Added 2026-10-04 by the blacksmithing revamp (plan §15.1; fixes are world-agnostic). The
+export carries no materials, so every world smiths the shipped shelf of 112 (iron, steel,
+mithral, the skymetals and the rest), and a world's own metals — Pangrella's "fine
+ironwork", any "blue iron of the eastern hills" — exist only in its prose. The proposed
+shape is `play.materials[]` in `campaign-format.md`, the same document the shipped rows
+are.
+
+This is the one ask that carries numbers, and it is still optional. The app's own
+validator holds a world's rows to the fences the shipped ones meet (house numbers start
+at ±2, a tier ceiling, at least one drawback per list, nothing narrative), and reports a
+row it refuses. If numbers are unwelcome on the World Bible side, the words alone are
+still worth sending: a row with `name`, `kind`, `tier`, `text` and `biomes` puts the
+world's own metal on the shelf by its own name, and `material` pointing at a shipped id
+links the two as one material for knowledge and prospecting. What it does at the forge
+then comes only from the effect lists the row carries — a row with none is inert there,
+never given the shipped metal's numbers by guess.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.materials[]` | Absent. Every forge works the shipped shelf | One row per metal, alloy, ore, fitting, fuel, flux, quenchant or finish the world names, with `text` in the world's own words and `biomes` in the fourteen terrain words |
+| `play.materials[].material` | Absent | The id of the shipped (or world) material this is a form of, when it is one: an ore names its metal, "the guild's mithral fittings" name `mithral` |
+| `play.materials[].pieces` | Absent | Which slots it fills: weapon `head`/`haft`/`fittings`, armour `body`/`fastenings`/`lining` |
+| `play.materials[].weapon`, `.armour` | Absent | At least three effects each where `pieces` names that gear, at least one a drawback, in the effect vocabulary; house numbers at ±2 |
+| `play.materials[].working` | Absent | At least one working trait (`forgiving`, `slaggy`, `narrow_window`, `reactive`...) |
+| `play.materials[].quench_mark` | Absent | Quenchants only: one small effect |
+| `play.materials[].forms`, `feeds`, `finishes`, `not_on`, `book`, `assay_danger` | Absent | As `campaign-format.md` describes; all default sensibly, and `book` stays `false` for a world's own metal |
+
 ## Things worth stealing
 
 Patterns from World Bible that solved problems this app will hit too:

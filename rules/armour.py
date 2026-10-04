@@ -178,6 +178,43 @@ def proficient_with(actor, kind: str, key: str) -> bool:
     return actor.has_state("proficient.shield")
 
 
+def worn_rows(actor) -> tuple[dict, dict]:
+    """(armour row, shield row) for what this creature has on — a forged suit's or
+    shield's numbers from its build (`Actor.armour_stats` / `shield_stats`), else the
+    table's.
+
+    Measured 2026-10-04 (lane H): spell failure and the unproficient attack penalty both
+    read `row("armour", actor.armour)`, the BASE suit's table row, so a mithral chain shirt
+    still failed a wizard's spell 20% of the time where the book (and the sheet's own AC
+    line, which already read the build) says 10%. One reader of what is worn, here."""
+    a_key = str(getattr(actor, "armour", "none") or "none")
+    s_key = str(getattr(actor, "shield", "none") or "none")
+    a = actor.armour_stats() if hasattr(actor, "armour_stats") else row("armour", a_key)
+    s = actor.shield_stats() if hasattr(actor, "shield_stats") else row("shield", s_key)
+    return a, s
+
+
+# The suits and shields made of iron or steel (CRB Table 6-6). The table carries no
+# material column, so it is named once here: the smith's own list (`blacksmith.
+# FORGED_ARMOUR`, the metal suits of the table) plus studded leather's rivets, and the
+# steel shields and the buckler. Leather, padded and hide, and the wooden shields, are not.
+METAL_ARMOUR = frozenset({"studded leather", "chain shirt", "scale mail", "breastplate",
+                          "chainmail", "splint mail", "banded mail", "half-plate",
+                          "full plate"})
+METAL_SHIELDS = frozenset({"buckler", "light shield", "heavy shield"})
+
+
+def wears_metal(actor) -> bool:
+    """Whether this creature has metal armour or a metal shield on — what inubrix's house
+    clause (`when: {"target": {"armour_metal": true}}`) asks of a defender. A stat block
+    with a printed AC wears what its note says, which this cannot read, so it answers no:
+    a clause nothing can evaluate is dropped, never applied."""
+    if getattr(actor, "flat_ac", None) is not None:
+        return False
+    return (str(getattr(actor, "armour", "none") or "none") in METAL_ARMOUR
+            or str(getattr(actor, "shield", "none") or "none") in METAL_SHIELDS)
+
+
 def attack_penalties(actor) -> list[tuple[int, str]]:
     """(value, why) for every attack-roll penalty what is worn imposes: the armour check
     penalty of anything worn unproficiently (CRB "Armor Proficiency": "The penalty for
@@ -186,7 +223,7 @@ def attack_penalties(actor) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
     a_key = str(getattr(actor, "armour", "none") or "none")
     s_key = str(getattr(actor, "shield", "none") or "none")
-    a, s = row("armour", a_key), row("shield", s_key)
+    a, s = worn_rows(actor)
     if a_key != "none" and a.get("acp") and not proficient_with(actor, "armour", a_key):
         out.append((int(a["acp"]), f"not proficient with {a['name']}"))
     if s_key != "none" and s.get("acp") and not proficient_with(actor, "shield", s_key):
@@ -232,7 +269,7 @@ def spell_failure(actor, spell) -> tuple[int, str]:
 
     a_key = str(getattr(actor, "armour", "none") or "none")
     s_key = str(getattr(actor, "shield", "none") or "none")
-    a, s = row("armour", a_key), row("shield", s_key)
+    a, s = worn_rows(actor)
     pct, why = 0, []
     bard = str(casting.caster_data(actor).get("list") or "").lower() == "bard"
     if a_key != "none" and a.get("asf") and not (bard and a.get("weight") == "light"):
@@ -246,4 +283,4 @@ def spell_failure(actor, spell) -> tuple[int, str]:
 
 __all__ = ["key_for", "row", "change_cost", "proficiency_tags", "is_armour_token",
            "proficient_with", "attack_penalties", "is_arcane", "spell_failure",
-           "ARCANE_LISTS"]
+           "ARCANE_LISTS", "worn_rows", "wears_metal", "METAL_ARMOUR", "METAL_SHIELDS"]

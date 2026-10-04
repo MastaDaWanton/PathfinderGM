@@ -342,6 +342,10 @@ BOOK = {
     "cold-iron": {_r("weapon", "strikes_as", "cold_iron")},
     "nexavaran-steel": {_r("weapon", "strikes_as", "cold_iron")},
     "cold-iron-blanching": {_r("weapon", "strikes_as", "cold_iron")},
+    # The other weapon blanch (Ultimate Equipment): full damage to incorporeal creatures.
+    # A house +2 against undead stood in for it until `strikes_as: ghost_touch` existed
+    # (contracts §12 item 5, lane H).
+    "ghost-salt-blanching": {_r("weapon", "strikes_as", "ghost_touch")},
     "alchemical-silver-plating": {
         _r("weapon", "strikes_as", "silver"), _r("weapon", "combat_mod", "damage", -1)},
     "singing-steel": {

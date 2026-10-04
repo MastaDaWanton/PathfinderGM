@@ -33,24 +33,28 @@ player still reads them, and listed here so they are not forgotten):
   its armour. No item repair, no "struck on a natural 1" trigger.
 - **Inubrix**: ignores iron and steel armour bonuses, cannot damage iron or steel,
   damage as one size smaller. Approximated by a house +3 attack against a
-  metal-armoured target (`when: {"target": {"armour_metal": true}}`, which lane B must
-  evaluate).
+  metal-armoured target (`when: {"target": {"armour_metal": true}}`, evaluated since
+  lane H: the defender's suit or shield is iron or steel, `armour.wears_metal`).
 - **Noqual**: +4 on the *object's* saves against magic. Items have no saves yet. The
   +5,000 gp enchanting surcharge is the field `enchant_surcharge_gp` for the enchanter.
-- **Ghost-salt blanch**: full damage to incorporeal creatures until the next hit. Needs
-  a `strikes_as` target such as `ghost_touch` (lane A's list); a house stand-in is used.
+  Assaying it is a **house rule** (the owner, 2026-10-04): magic recoils, and the
+  assayer's buffs and wards are suppressed for 1d4 rounds (`assay_danger`).
+- **Ghost-salt blanch**: full damage to incorporeal creatures, now `strikes_as:
+  ghost_touch` (lane H). "Until the next hit" is in the data (`uses: once`) and no reader
+  spends a finish yet, as for holy anointing.
 - **Wyroot**: stores a life point for ki or arcane pools. Approximated by 1 temporary hp
   on a critical, once a day.
 - **Abysium**: glows like a candle. No light vocabulary.
 - **Singing steel**: speeds bardic performance. Approximated by a house Perform bonus.
 - **Horacalcum**: +¼ hit points. Only its hardness is carried.
 
-`when` clauses this data uses that lane B's reader must evaluate (contract §2 names the
-first): `{"target": {"type": ...}}` and `{"target": {"subtype": ...}}` against the
-struck creature, where a **list** value means "any of"; `{"armour": {"weight": ...}}`
-against the base armour at build time (adamantine's DR 1/2/3, horacalcum's initiative,
-elysian bronze); `{"attacker": {"type": [...]}}` for elysian bronze's DR against claws
-and fists; `{"against": "spell"}` for noqual's saves; `{"weapon":
+`when` clauses this data uses, all evaluated since lane H (2026-10-04; a clause nothing
+can evaluate is still dropped, never applied): `{"target": {"type": ...}}` and
+`{"target": {"subtype": ...}}` against the struck creature, where a **list** value means
+"any of"; `{"armour": {"weight": ...}}` against the base armour at build time
+(adamantine's DR 1/2/3, horacalcum's initiative, elysian bronze); `{"attacker": {"type":
+[...]}}` for elysian bronze's DR (the "natural weapons and unarmed strikes only" in its
+note is not yet asked); `{"against": "spell"}` for noqual's saves; `{"weapon":
 {"slashing_or_piercing": true}}` for silver's −1 damage.
 
 Quench marks are a single effect (contract §3). Dragon blood's plan wanted resistance on
@@ -136,7 +140,7 @@ are one `bundle`.
 | Cold Iron Blanching | uncommon | finishes weapon | – | – | weapon: Strikes as cold iron (once ever) | easily_worked, forgiving |
 | Gold Gilding | uncommon | finishes weapon, armour | +2 Diplomacy | +2 Diplomacy | – | easily_worked, malleable |
 | Lead Lining | uncommon | finishes armour | – | +1 Will against scrying and divination: a house stand-in for the lead's block; **Weighs 10% more** | – | easily_worked, malleable |
-| Ghost Salt Blanching | rare | finishes weapon | +2 Damage rolls house stand-in: the book's full damage to incorporeal creatures has no vocabulary yet (once ever) (when target type undead) | – | – | narrow_window, pure |
+| Ghost Salt Blanching | rare | finishes weapon | – | – | weapon: Strikes as ghost touch (once ever) | narrow_window, pure |
 | Holy Anointing | rare | finishes weapon | +2 Damage rolls its first battle after the rite (once ever) (when target type undead) | – | – | pure, flawless |
 | Adamantine Edging | exotic | finishes weapon | Strikes as adamantine; **-2 hit points per inch** | – | – | narrow_window, weld_aid |
 
@@ -210,4 +214,4 @@ are one `bundle`.
 | Abyssal Salt | exotic | – | cleans_slag, easily_worked, reactive |
 | Stardust Flux | legendary | – | weld_aid, pure, flawless |
 
-Totals: 224 house modifiers and quench marks, 83 book effects, 112 materials.
+Totals: 223 house modifiers and quench marks, 84 book effects, 112 materials.

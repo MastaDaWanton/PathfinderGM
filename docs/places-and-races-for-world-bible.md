@@ -572,6 +572,17 @@ amount of data to keep stable across exports for very little gain.
   be seen arriving at is one the narrator invents a gate for and the law can never watch.
   An authored entrance is better than a generated one: it can be a gate, a bridge, a
   crossing or a quay, and it can be where the world says the road actually reaches.
+- **Every city needs a smithy, and please author it.** The owner's ruling of 2026-10-04:
+  "every city gets a smithy, even when the world's author did not list one". The forge's
+  furnace work (smelting, alloying, folding, rare metal) can only be done at a smithy, and
+  measured across the shipped exports the same day a smithy was in **4 of Aurvantis's 16
+  cities** (5 of its 64 settlements) and **0 of Pangrella's 6** (0 of 12). The consumer
+  now appends "the smithy" to any authored city that lists none, beside the way in
+  (`appended_to_authored` in `docs/place-vocabulary.json`). A town or village gets one
+  only when its own words name its smiths (the `the smithy` cue row above), so an author
+  who wants a smith in a town should list the place. Any name works — a forge, an
+  armoury, "the Anvil" with `"kind": "smithy"` — as long as its kind is one whose keeper
+  is a smith.
 - **Size a settlement by its own `scale`** — a village of six rooms, a town of nine, a
   city of eighteen. One ceiling for every settlement is what this app did until
   2026-09-15, and it was wrong in the way that matters: Aurvantis ships 16 villages, 32
