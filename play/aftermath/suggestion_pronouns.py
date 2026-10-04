@@ -105,6 +105,15 @@ def _on_page(ctx) -> list[str]:
         head = head_of(rec.get("phrase", "")).lower()
         if head and re.search(rf"\b{re.escape(head)}\b", text):
             genders.append(person_words.from_words(rec.get("phrase", ""))["gender"])
+    # And anybody the beat itself spoke of by that pronoun, here or not. Measured live on
+    # the merged structured-turn branch (2026-10-03): the smith said "There is a woman who
+    # operates near the old tannery. She is discreet…", the suggestion read "I ask her
+    # name or where exactly she is located", and with the smith the only one present it
+    # was rewritten to "I ask his name or where exactly he is located" — the fence turned
+    # into the smith. A pronoun the beat just used means whoever the beat used it for;
+    # this step cannot tell who that is, so it leaves the suggestion alone.
+    for m in _PRONOUN.finditer(text):
+        genders.append(_FAMILY[m.group(1).lower()])
     return genders
 
 

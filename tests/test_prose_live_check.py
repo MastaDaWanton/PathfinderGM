@@ -84,3 +84,33 @@ def test_a_peoples_name_is_cut_never_rewritten():
     found = peoples_name.find(ctx)
     kept, _ = peoples_name.backstop(ctx, ctx.text, found)
     assert kept == "The smith leans over the crate you just set down."
+
+
+def test_a_suggestion_about_a_woman_the_smith_spoke_of_is_left_alone():
+    """Measured live on the merged structured-turn branch: the smith said "There is a woman
+    who operates near the old tannery. She is discreet…", the suggestion read "I ask her
+    name or where exactly she is located", and with the smith the only one present it was
+    rewritten to "I ask his name or where exactly he is located" — the fence turned into
+    the smith. A pronoun the beat just used is left for whoever the beat used it for."""
+    from play.aftermath import suggestion_pronouns
+    from rules.bestiary import instantiate
+
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    smith = instantiate("guildhand", scene=s, name="the smith")
+    smith.gender, smith.pronouns = "man", "he/him"
+    s.add(smith)
+    said = "There is a woman who operates near the old tannery. She is discreet."
+    camp = SimpleNamespace(suggestions=["I ask her name or where exactly she is located."])
+    ctx = SimpleNamespace(campaign=camp, scene=s, text=f"'{said}' he says.",
+                          said=[{"who": smith.ref, "to": "you", "line": said}],
+                          talking_after=(smith.ref,), attribution=None, reading=None)
+    assert suggestion_pronouns.step(ctx) == []
+    assert camp.suggestions == ["I ask her name or where exactly she is located."]
+    # The measured defect it was built for still holds: nobody spoken of as "she", only
+    # the smith on the page, and "I ask her…" is his.
+    camp.suggestions = ["I ask her what she is looking for."]
+    ctx.text, ctx.said = "'Back again,' he says.", [{"who": smith.ref, "to": "you",
+                                                      "line": "Back again."}]
+    suggestion_pronouns.step(ctx)
+    assert camp.suggestions == ["I ask him what he is looking for."]
