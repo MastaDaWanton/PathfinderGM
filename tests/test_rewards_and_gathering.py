@@ -319,7 +319,9 @@ def test_prospecting_in_the_hills_turns_up_ore_and_nothing_in_a_swamp_but_bog_ir
     stock = [st for e in out.effects if e.get("kind") == "prospect"
              for st in e.get("stock", [])]
     assert stock, out.tell
-    hill_ores = {m.name for m in blacksmith.materials().values()
-                 if m.kind == "ore" and "hills" in m.biomes}
+    # Everything mined in the hills, not only `kind == "ore"`: the forge revamp (plan
+    # §12.7) let prospecting yield every mined material — limestone flux comes out of the
+    # same ground — where the ore-only filter left 16 mined materials unreachable.
+    hill_ores = {m.name for m in blacksmith.obtainable("mined", biome="hills")}
     assert {st["base"] for st in stock} <= hill_ores
     assert any(x.base in hill_ores for x in s.pc().stock.values()), "the ore is carried"

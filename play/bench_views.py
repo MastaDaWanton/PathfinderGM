@@ -184,8 +184,10 @@ def _track(track, progress) -> dict:
         size, n = float(sizes.get(perk, 0) or 0), taken[perk]
         if perk == "quality":
             step = int(size) or 1
-            nxt = (f"+{step} to your quality ceiling: "
-                   f"{crafting.quality_name(ceiling + step)}")
+            # The forge's wording (play/forge_views.py, lane U5's report 2026-10-04): the
+            # rung by name, without a second "+1" beside "Flawless +1".
+            nxt = (f"Your quality ceiling rises {'one step' if step == 1 else f'{step} steps'}, "
+                   f"to {crafting.quality_name(ceiling + step)}")
         elif perk == "yield":
             nxt = (f"+{_pct(size)} chance of an extra dose, total "
                    f"{_pct(size * (n + 1))}")

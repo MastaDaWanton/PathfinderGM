@@ -13,6 +13,15 @@
 // so `track.perk_info[id].next` is read when present and otherwise the perk is described
 // in words with no number, rather than a number invented here.
 //
+// ONE PICKER, TWO TRACKS (blacksmithing UI plan §6.8, lane U5, 2026-10-04). The forge's
+// perks are potency, hardening, quality and yield (contracts §7), picked exactly as the
+// herbs' are, so the picker is `window.BenchPerks.open({track, ...})` over a table of
+// tracks and the herb bench calls it with "herbalist". It is defined before the herb
+// wiring's `if (!B) return`, so a page with the forge and no herb shell still has it.
+// A copy of the picker for the forge was the alternative and was refused: two pickers
+// drift (CLAUDE.md, "when you fix a rule, grep for every copy of it"). The herb's markup
+// is the same string it was, byte for byte, built from the herbalist row.
+//
 // THE RECIPE BOOK (UI plan §6.8, revamp plan §9.6). Loading a recipe sets the method and
 // pre-drops its ingredients; you still roll and still play, and each finished step offers
 // the next ("Next: Mix", 34-bench-tag.js). Save recipe keeps the steps finished since the
@@ -20,60 +29,91 @@
 
 (function () {
   "use strict";
-  var B = window.Bench;
-  if (!B) return;
-  var esc = B.esc;
-  var pops = document.getElementById("bench-pops");
-  var foot = document.getElementById("bench-foot");
-  if (!pops) return;
 
-  var PERKS = [
-    { id: "potency", name: "Potency", words: "Your products are stronger." },
-    { id: "duration", name: "Duration", words: "Your products last longer." },
-    { id: "quality", name: "Quality", words: "Your ceiling rises one rung." },
-    { id: "yield", name: "Extra yield", words: "A chance of an extra dose from each batch." },
-  ];
-  var ICON = { potency: "reagent", duration: "steeping", quality: "salve", yield: "seed" };
+  // --- the picker, for any track ------------------------------------------------------------
+  // Each row: the dialog's id prefix, the level's title, the route the picks post to, the
+  // four perks in the order they are drawn, and the engraved icon for each. A name with no
+  // art yet draws bench-icons.js's lettered roundel, so the forge's names light up the day
+  // its icons land with no edit here. The words are the fallback only: the server's
+  // `perk_info[id].next` (with its numbers) is read first, for both tracks.
+  var TRACKS = {
+    herbalist: {
+      prefix: "bench", title: "Herbalist", route: "/api/bench/perks",
+      perks: [
+        { id: "potency", name: "Potency", words: "Your products are stronger." },
+        { id: "duration", name: "Duration", words: "Your products last longer." },
+        { id: "quality", name: "Quality", words: "Your ceiling rises one rung." },
+        { id: "yield", name: "Extra yield", words: "A chance of an extra dose from each batch." },
+      ],
+      icon: { potency: "reagent", duration: "steeping", quality: "salve", yield: "seed" },
+    },
+    blacksmith: {
+      prefix: "forge", title: "Blacksmith", route: "/api/forge/perks",
+      perks: [
+        { id: "potency", name: "Potency", words: "The bonuses of everything you make are stronger." },
+        { id: "hardening", name: "Hardening", words: "The drawbacks of everything you make are softer." },
+        { id: "quality", name: "Quality", words: "Your ceiling rises one rung." },
+        { id: "yield", name: "Extra yield", words: "A chance of one more ingot or blank from each Smelt or Forge." },
+      ],
+      icon: { potency: "anvil", hardening: "quench", quality: "hone", yield: "ingot" },
+    },
+  };
 
-  // A modal of the bench's own, inside its stacking context, with its own Esc and the
-  // focus handed back on close (the shell's trap wraps Tab inside `.bench-modal`).
-  function modal(labelId) {
-    var wrap = document.createElement("div");
-    wrap.className = "bench-modal";
-    wrap.setAttribute("role", "dialog");
-    wrap.setAttribute("aria-modal", "true");
-    wrap.setAttribute("aria-labelledby", labelId);
-    pops.appendChild(wrap);
-    return wrap;
-  }
+  var escHtml = function (s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  };
+  var noop = function () {};
+  var openNow = null;            // one picker on the page at a time
 
-  // --- perks ------------------------------------------------------------------------------
-  var picker = null;
-  function openPerks() {
-    var t = B.state && B.state.track;
-    if (!t || !t.picks_banked || picker) return;
+  // BenchPerks.open(o) opens the picker for `o.track` ("herbalist" or "blacksmith"):
+  //   state      the track summary from the server: level, perks, picks_banked, perk_info
+  //   pops       where the modal goes: inside the bench's own layer, so its trap holds it
+  //   pushEsc / dropEsc   the bench's Esc stack (29-bench-core.js), one layer at a time
+  //   api        fn(path, body) -> Promise (BenchCore.api); sound fn(name), optional
+  //   home       fn() -> where focus goes if the opener left the page
+  //   saved      fn(track, picks) with the server's new track, before the picker closes
+  //   afterClose fn() once it has closed after a save
+  // Returns the modal, or null when there is nothing to pick or a picker is already open.
+  function open(o) {
+    var row = TRACKS[o && o.track];
+    var t = o && o.state;
+    if (!row || !t || !t.picks_banked || openNow || !o.pops) return null;
+    var esc = o.esc || escHtml;
+    var sound = o.sound || noop;
+    var PERKS = row.perks, ICON = row.icon;
+    var titleId = row.prefix + "-perks-t";
     var back = document.activeElement;
     var need = Math.min(2, t.picks_banked);
     var picks = [];
     var err = "";
-    var wrap = modal("bench-perks-t");
-    picker = wrap;
-    B.sound("ui.open");
+    // A modal of the bench's own, inside its stacking context, with its own Esc and the
+    // focus handed back on close (the shell's trap wraps Tab inside `.bench-modal`).
+    var wrap = document.createElement("div");
+    wrap.className = "bench-modal";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-labelledby", titleId);
+    o.pops.appendChild(wrap);
+    openNow = wrap;
+    sound("ui.open");
     var close = function () {
-      B.dropEsc(close);
+      if (o.dropEsc) o.dropEsc(close);
       wrap.remove();
-      picker = null;
-      B.sound("ui.close");
-      var again = foot && foot.querySelector("[data-bench-perks]");
-      ((back && document.contains(back)) ? back : again || document.getElementById("bench-close")).focus();
+      openNow = null;
+      sound("ui.close");
+      var again = o.home ? o.home() : null;
+      var to = (back && document.contains(back)) ? back : again;
+      if (to && to.focus) to.focus();
     };
-    B.pushEsc(close);
+    if (o.pushEsc) o.pushEsc(close);
     var draw = function (focusId) {
       var info = t.perk_info || {};
       wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog bench-perks v2-framed v2-card-leather">' +
         '<i class="v2-rim" aria-hidden="true"></i>' +
-        '<h3 id="bench-perks-t">' + (need === 1 ? "Pick a perk" : "Pick two perks") + '</h3>' +
-        '<p>Herbalist ' + esc(t.level) + '. The same perk twice is allowed.</p>' +
+        '<h3 id="' + titleId + '">' + (need === 1 ? "Pick a perk" : "Pick two perks") + '</h3>' +
+        '<p>' + row.title + ' ' + esc(t.level) + '. The same perk twice is allowed.</p>' +
         '<div class="pk-grid">' + PERKS.map(function (p) {
           var mine = picks.filter(function (x) { return x === p.id; }).length;
           var taken = (t.perks && t.perks[p.id]) || 0;
@@ -111,13 +151,10 @@
       if (a.dataset.pk === "clear") { picks = []; draw(); return; }
       if (a.dataset.pk === "ok" && picks.length === need) {
         a.disabled = true;
-        B.api("/api/bench/perks", { picks: picks.slice() }).then(function (track) {
-          if (B.state) B.state.track = track;
-          B.emit("state", B.state);
-          B.renderFoot();
-          B.say("Perks taken: " + picks.join(", ") + ".");
+        o.api(row.route, { picks: picks.slice() }).then(function (track) {
+          if (o.saved) o.saved(track, picks.slice());
           close();
-          B.runCheck();
+          if (o.afterClose) o.afterClose();
         }).catch(function (e2) {
           // The picks are kept, so a retry is one press (UI plan §7).
           err = "Couldn't save your picks. " + (e2.message || "") + " Try again.";
@@ -126,6 +163,49 @@
       }
     });
     draw();
+    return wrap;
+  }
+  window.BenchPerks = { open: open, tracks: TRACKS, isOpen: function () { return !!openNow; } };
+
+  // --- the herb bench's wiring ---------------------------------------------------------------
+  var B = window.Bench;
+  if (!B) return;
+  var esc = B.esc;
+  var pops = document.getElementById("bench-pops");
+  var foot = document.getElementById("bench-foot");
+  if (!pops) return;
+
+  // A modal of the bench's own, inside its stacking context, with its own Esc and the
+  // focus handed back on close (the shell's trap wraps Tab inside `.bench-modal`).
+  function modal(labelId) {
+    var wrap = document.createElement("div");
+    wrap.className = "bench-modal";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-labelledby", labelId);
+    pops.appendChild(wrap);
+    return wrap;
+  }
+
+  // --- perks ------------------------------------------------------------------------------
+  function openPerks() {
+    var t = B.state && B.state.track;
+    if (!t || !t.picks_banked) return;
+    open({
+      track: "herbalist", state: t, pops: pops, esc: esc,
+      pushEsc: function (f) { B.pushEsc(f); }, dropEsc: function (f) { B.dropEsc(f); },
+      sound: function (n) { B.sound(n); }, api: function (p, b) { return B.api(p, b); },
+      home: function () {
+        return (foot && foot.querySelector("[data-bench-perks]")) || document.getElementById("bench-close");
+      },
+      saved: function (track, picks) {
+        if (B.state) B.state.track = track;
+        B.emit("state", B.state);
+        B.renderFoot();
+        B.say("Perks taken: " + picks.join(", ") + ".");
+      },
+      afterClose: function () { B.runCheck(); },
+    });
   }
   B.openPerks = openPerks;
 

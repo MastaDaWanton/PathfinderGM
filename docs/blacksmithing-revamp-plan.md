@@ -229,13 +229,13 @@ as `"book": true` effects. Then house modifiers top each list up to 3. Examples:
 
 | Material | Book effects (main piece only, fixed) | House top-up to 3 (scaled) |
 |---|---|---|
-| **Mithral** (armour) | `gear_mod` acp −3 (min 0), max_dex +2, asf −10, weight_pct −50, category −1 (movement only) | already ≥3; house negative: `gear_mod` hardness −5 vs steel (book hardness 15) |
+| **Mithral** (armour) | `gear_mod` acp +3 (penalty 3 lighter, min 0), max_dex +2, asf −10, weight_pct −50, category −1 (movement only) | already ≥3; house negative: `gear_mod` hardness −5 vs steel (book hardness 15) |
 | **Mithral** (weapon) | `strikes_as` silver, `gear_mod` weight_pct −50 | +2 `combat_mod` attack (light in the hand); negative: −2 damage |
 | **Adamantine** (weapon) | `strikes_as` adamantine (ignores hardness < 20) | +2 damage; negative: `gear_mod` weight_pct +10 |
 | **Adamantine** (armour) | `damage_reduction` 1/2/3 by armour weight | +2 AC; negative: ACP −2 (it does not flex) |
 | **Cold iron** (weapon) | `strikes_as` cold_iron | +2 attack vs fey (`when`); negative: −2 hardness (forged low, it is softer) |
 | **Alchemical silver** (weapon, Finish) | `strikes_as` silver, `combat_mod` damage −1 (slashing and piercing only, min 1) | it is a treatment, not a piece: one house mod, +2 damage vs lycanthropes |
-| **Noqual** (armour) | asf **+20** (all casting), save +2 vs spells, object +4 vs magic, weight −50, category −1, max_dex +2, acp −3; **+5,000 gp to enchant** | already ≥3 |
+| **Noqual** (armour) | asf **+20** (all casting), save +2 vs spells, object +4 vs magic, weight −50, category −1, max_dex +2, acp +3 (3 lighter); **+5,000 gp to enchant** | already ≥3 |
 | **Abysium** | carrier `apply_condition` sickened while carried and 1d4 hours after (no save) | +2 damage (it burns); negative: the carrier effect *is* the negative |
 
 The book's prices (+3,000 gp for an adamantine weapon, ×2 for cold iron, and so on) go into

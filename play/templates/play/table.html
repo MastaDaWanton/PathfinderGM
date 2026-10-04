@@ -3146,6 +3146,11 @@
      served". -->
 <link rel="stylesheet" href="{% asset 'css/bench.css' %}">
 {% asset 'css/bench-games.css' as bench_games_css %}{% if '?v=' in bench_games_css %}<link rel="stylesheet" href="{% asset 'css/bench-games.css' %}">{% endif %}
+<!-- The forge (docs/blacksmithing-ui-plan.md §12), after bench.css: its layer is a bench
+     and this sheet holds only what is the forge's own. The forge games' sheet is lane
+     U3's, named only once it is in the build, by the same "?v=" test. -->
+<link rel="stylesheet" href="{% asset 'css/forge.css' %}">
+{% asset 'css/forge-games.css' as forge_games_css %}{% if '?v=' in forge_games_css %}<link rel="stylesheet" href="{% asset 'css/forge-games.css' %}">{% endif %}
 <script src="{% static 'js/dice3d.js' %}"></script>
 <!-- App-wide preferences and sound (Lane G), early and after the dice, so every later
      script can read them. Guarded the same way as bench-games.css above. -->
@@ -3433,6 +3438,10 @@
            revamped (docs/herbalism-ui-plan.md §4.1). -->
       <button type="button" class="v2-btn door" id="open-bench" data-bench-open
               aria-haspopup="dialog" aria-controls="bench">Herbalism</button>
+      <!-- Smithing opens the forge over the table the same way (40-forge-shell.js,
+           docs/blacksmithing-ui-plan.md §5.1). -->
+      <button type="button" class="v2-btn door" id="open-forge" data-forge-open
+              aria-haspopup="dialog" aria-controls="forge">Smithing</button>
       <a class="v2-btn door" href="/craft/">Crafting bench</a>
       <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
       <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
@@ -3669,6 +3678,57 @@
   <div class="vh" id="bench-say" role="status" aria-live="polite"></div>
 </div>
 
+<!-- The forge (docs/blacksmithing-ui-plan.md §5): the second bench, mounted on the same
+     core (29-bench-core.js) at the same z-index, so it carries the bench's classes and
+     its own ids. The layout is the smith's: the rack on the left (only what you carry),
+     the anvil in the middle, the work order on the right (piece slots, the paper tag,
+     the build). 40-forge-shell.js opens it; 41 fills the rack, 43 the work order. -->
+<div id="forge" class="bench forge" role="dialog" aria-modal="true" aria-labelledby="forge-title"
+     hidden>
+  <header class="bench-strip v2-card-leather">
+    <div class="bench-cap bench-strip-in">
+      <h2 class="bench-title" id="forge-title">Smithing</h2>
+      <div class="bench-methods" id="forge-methods" role="radiogroup"
+           aria-label="Method"></div>
+      <button type="button" class="v2-btn is-quiet bench-close" id="forge-close">Close</button>
+    </div>
+  </header>
+
+  <div class="bench-frame forge-frame">
+    <section class="bench-panel bench-satchel forge-rack v2-framed v2-tooled-leather" id="forge-rack"
+             aria-label="Your rack">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-satchel-in" id="forge-rack-in"></div>
+    </section>
+
+    <section class="bench-stage forge-stage" id="forge-stage" aria-label="The anvil">
+      <div class="bench-tool" id="forge-tool"></div>
+      <ul class="bench-chips" id="forge-chips" aria-label="On the work" hidden></ul>
+      <p class="bench-info" id="forge-info"></p>
+      <div class="bench-rollrow">
+        <button type="button" class="v2-btn is-go bench-roll" id="forge-roll" disabled
+                aria-describedby="forge-why">Roll Craft</button>
+        <span class="bench-why" id="forge-why"></span>
+      </div>
+      <!-- Where the minigame rises (contracts §11, `mount`). -->
+      <div class="bench-gamebay" id="forge-game" hidden></div>
+    </section>
+
+    <section class="bench-panel bench-tagcol forge-order v2-framed v2-tooled-leather" id="forge-order"
+             aria-label="The work order">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-tagcol-in" id="forge-order-in"></div>
+    </section>
+  </div>
+
+  <footer class="bench-foot v2-card-leather" id="forge-foot">
+    <div class="bench-cap bench-foot-in" id="forge-foot-in"></div>
+  </footer>
+  <!-- The forge's own popovers: the build card, the confirms, lane U5's ledger card. -->
+  <div class="bench-pops" id="forge-pops"></div>
+  <div class="vh" id="forge-say" role="status" aria-live="polite"></div>
+</div>
+
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
@@ -3771,6 +3831,19 @@ window.BENCH_ICON_URLS = {
 {% asset 'js/bench-games/infuse.js' as g_infuse %}{% if '?v=' in g_infuse %}<script src="{% asset 'js/bench-games/infuse.js' %}"></script>{% endif %}
 {% asset 'js/bench-games/steep.js' as g_steep %}{% if '?v=' in g_steep %}<script src="{% asset 'js/bench-games/steep.js' %}"></script>{% endif %}
 {% asset 'js/bench-games/neutralize.js' as g_neutralize %}{% if '?v=' in g_neutralize %}<script src="{% asset 'js/bench-games/neutralize.js' %}"></script>{% endif %}
+{% comment %}The forge's games (lane U3, contracts §10 and §11), one file per method, each
+registering on window.BenchGameDefs before 33 reads it, exactly as the herb games above.
+Named only once each file is in the build.{% endcomment %}
+{% asset 'js/forge-games/smelt.js' as fg_smelt %}{% if '?v=' in fg_smelt %}<script src="{% asset 'js/forge-games/smelt.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/alloy.js' as fg_alloy %}{% if '?v=' in fg_alloy %}<script src="{% asset 'js/forge-games/alloy.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/forge.js' as fg_forge %}{% if '?v=' in fg_forge %}<script src="{% asset 'js/forge-games/forge.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/quench.js' as fg_quench %}{% if '?v=' in fg_quench %}<script src="{% asset 'js/forge-games/quench.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/temper.js' as fg_temper %}{% if '?v=' in fg_temper %}<script src="{% asset 'js/forge-games/temper.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/fold.js' as fg_fold %}{% if '?v=' in fg_fold %}<script src="{% asset 'js/forge-games/fold.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/hone.js' as fg_hone %}{% if '?v=' in fg_hone %}<script src="{% asset 'js/forge-games/hone.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/assemble.js' as fg_assemble %}{% if '?v=' in fg_assemble %}<script src="{% asset 'js/forge-games/assemble.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/finish.js' as fg_finish %}{% if '?v=' in fg_finish %}<script src="{% asset 'js/forge-games/finish.js' %}"></script>{% endif %}
+{% asset 'js/forge-games/strengthen.js' as fg_strengthen %}{% if '?v=' in fg_strengthen %}<script src="{% asset 'js/forge-games/strengthen.js' %}"></script>{% endif %}
 {% comment %}The stage's renderer (Lane F), in its own load order: maths, the GL layer,
 meshes, the procedural grounds, particles, props, then the nine tools. 32 below is its
 API. A comment block, not {# #}: Django's hash comment is one line only, and the two-line
@@ -3782,6 +3855,7 @@ one printed itself at the foot of the table (seen live, 2026-10-02).{% endcommen
 <script src="{% asset 'js/bench-stage/04-particles.js' %}"></script>
 <script src="{% asset 'js/bench-stage/05-props.js' %}"></script>
 <script src="{% asset 'js/bench-stage/06-tools.js' %}"></script>
+<script src="{% asset 'js/table/29-bench-core.js' %}"></script>
 <script src="{% asset 'js/table/30-bench-shell.js' %}"></script>
 <script src="{% asset 'js/table/31-bench-satchel.js' %}"></script>
 {% asset 'js/table/32-bench-stage.js' as bench_stage_js %}{% if '?v=' in bench_stage_js %}<script src="{% asset 'js/table/32-bench-stage.js' %}"></script>{% endif %}
@@ -3789,6 +3863,44 @@ one printed itself at the foot of the table (seen live, 2026-10-02).{% endcommen
 <script src="{% asset 'js/table/34-bench-tag.js' %}"></script>
 <script src="{% asset 'js/table/35-bench-herbarium.js' %}"></script>
 <script src="{% asset 'js/table/36-bench-perks.js' %}"></script>
+<!-- The forge (docs/blacksmithing-contracts.md §10): its icon art with the content stamp,
+     a registry of its own beside BENCH_ICON_URLS (whose 46 herb names bench-icons.js pins);
+     lane U4's stage parts and adapter; then 40 to 44 in number order. 42 (lane U4) is an
+     optional provider (§11), named only once it is in the build; 44 (lane U5's ledger
+     card, merged 2026-10-04) always is. -->
+<script>
+window.FORGE_ICON_URLS = {
+  smelt: "{% asset 'img/icons/smelt.svg' %}", alloy: "{% asset 'img/icons/alloy.svg' %}",
+  forge: "{% asset 'img/icons/forge.svg' %}", quench: "{% asset 'img/icons/quench.svg' %}",
+  temper: "{% asset 'img/icons/temper.svg' %}", fold: "{% asset 'img/icons/fold.svg' %}",
+  hone: "{% asset 'img/icons/hone.svg' %}", assemble: "{% asset 'img/icons/assemble.svg' %}",
+  finish: "{% asset 'img/icons/finish.svg' %}", strengthen: "{% asset 'img/icons/strengthen.svg' %}",
+  assay: "{% asset 'img/icons/assay.svg' %}",
+  ore: "{% asset 'img/icons/ore.svg' %}", ingot: "{% asset 'img/icons/ingot.svg' %}",
+  bar: "{% asset 'img/icons/bar.svg' %}", blank: "{% asset 'img/icons/blank.svg' %}",
+  plate: "{% asset 'img/icons/plate.svg' %}", haft: "{% asset 'img/icons/haft.svg' %}",
+  grip: "{% asset 'img/icons/grip.svg' %}", guard: "{% asset 'img/icons/guard.svg' %}",
+  rivets: "{% asset 'img/icons/rivets.svg' %}", mail: "{% asset 'img/icons/mail.svg' %}",
+  "scale-mail": "{% asset 'img/icons/scale-mail.svg' %}",
+  breastplate: "{% asset 'img/icons/breastplate.svg' %}", shield: "{% asset 'img/icons/shield.svg' %}",
+  coal: "{% asset 'img/icons/coal.svg' %}", charcoal: "{% asset 'img/icons/charcoal.svg' %}",
+  flux: "{% asset 'img/icons/flux.svg' %}", quenchant: "{% asset 'img/icons/quenchant.svg' %}",
+  treatment: "{% asset 'img/icons/treatment.svg' %}",
+  anvil: "{% asset 'img/icons/anvil.svg' %}", bellows: "{% asset 'img/icons/bellows.svg' %}",
+  hot: "{% asset 'img/icons/hot.svg' %}", brittle: "{% asset 'img/icons/brittle.svg' %}",
+  slaggy: "{% asset 'img/icons/slaggy.svg' %}", manual: "{% asset 'img/icons/manual.svg' %}",
+};
+</script>
+{% asset 'js/forge-stage/00-heat.js' as fs_heat %}{% if '?v=' in fs_heat %}<script src="{% asset 'js/forge-stage/00-heat.js' %}"></script>{% endif %}
+{% asset 'js/forge-stage/01-props.js' as fs_props %}{% if '?v=' in fs_props %}<script src="{% asset 'js/forge-stage/01-props.js' %}"></script>{% endif %}
+{% asset 'js/forge-stage/02-families.js' as fs_families %}{% if '?v=' in fs_families %}<script src="{% asset 'js/forge-stage/02-families.js' %}"></script>{% endif %}
+{% asset 'js/forge-stage/03-smithy.js' as fs_smithy %}{% if '?v=' in fs_smithy %}<script src="{% asset 'js/forge-stage/03-smithy.js' %}"></script>{% endif %}
+{% asset 'js/forge-stage/04-fx.js' as fs_fx %}{% if '?v=' in fs_fx %}<script src="{% asset 'js/forge-stage/04-fx.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/40-forge-shell.js' %}"></script>
+<script src="{% asset 'js/table/41-forge-rack.js' %}"></script>
+{% asset 'js/table/42-forge-stage.js' as forge_stage_js %}{% if '?v=' in forge_stage_js %}<script src="{% asset 'js/table/42-forge-stage.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/43-forge-order.js' %}"></script>
+<script src="{% asset 'js/table/44-forge-ledger.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>

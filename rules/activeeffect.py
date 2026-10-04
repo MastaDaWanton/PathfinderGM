@@ -25,6 +25,9 @@ from dataclasses import dataclass, field
 # done — but the vocabulary names it so a document can say it and a validator can check.
 DURATIONS = ("instant", "rounds", "until-dismissed")
 
+# The clocks a `periodic` entry may name (see `ActiveEffect.periodic`).
+PERIODIC_CLOCKS = ("round", "day")
+
 # Stacking policies the applicator understands.
 #   refresh   — the same effect reapplied resets its clock and values; never two copies.
 #   stack     — copies from different applications accumulate (a Coagulator's pools).
@@ -60,7 +63,18 @@ class ActiveEffect:
     # Anything the mechanisms above cannot hold: a coating's dose, a granted weapon.
     payload: dict = field(default_factory=dict)
     stacking: str = "refresh"
-    # Per-round work: effect specs run by the ticker each round while this holds.
+    # Work done on a clock while this holds. Each entry names its clock (`per`: "round",
+    # the default, or "day") and one job:
+    #   {"spend_pool": "rage", "amount": 1, "or_ends": true}  upkeep (`Scene._drain_periodic`)
+    #   {"heal": 1 | "1d4"}                                   hit points back (fast healing)
+    #   {"damage": "1d4", "damage_type": "fire"}               harm, through `take_damage`
+    #   {"effect": {save_gate | ability_damage document}}      a price paid on the clock
+    # The last three are `Actor.run_periodic`'s, built at the forge revamp: until then
+    # `spend_pool` was the only consumer and the ledger listed periodic heal and damage as
+    # "promised, not built" — troll blood's fast healing needed them. Rounds fire in
+    # played rounds only (`Scene.advance_turn`); days fire once per day boundary the world
+    # clock crosses (`Scene.advance`), because an eight-hour skip is 4,800 rounds and
+    # firing a round's work that often is the error `advance`'s docstring records.
     periodic: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:

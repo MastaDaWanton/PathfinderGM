@@ -654,6 +654,12 @@ def test_every_executable_type_has_something_that_executes_it():
         "fast_healing", "bleed", "ability_damage", "ability_drain", "ability_restore",
         "apply_condition", "remove_condition", "suppress_condition", "resistance",
         "damage_reduction", "immunity", "vulnerability", "save_gate", "object_damage",
+        # The forge's three (contracts §2), read off a forged item's build rather than run
+        # by `_run_one`: `gear_mod` by `forge_items.build` into `Actor.armour_stats` and the
+        # object's hardness; `strikes_as` as the traits a weapon hit passes to
+        # `_apply_damage` (tests/test_forge_engine.py). `working` is the bench's (lane D):
+        # the build keeps it out of every number on purpose (plan §5.5).
+        "gear_mod", "strikes_as", "working",
     }
     claimed = {t.id for c in fx.CATEGORIES for t in c.types if t.engine}
     assert claimed - runs - already == set(), \

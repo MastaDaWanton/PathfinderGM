@@ -1,0 +1,116 @@
+{
+  "_about": [
+    "Smithing manuals (docs/blacksmithing-revamp-plan.md §9.3; contract §6): books that",
+    "teach what metals do, the herbal manuals' counterpart (content/rules/herbal-manuals.json,",
+    "0.2.4). Reading one takes hours of world time and teaches the properties it lists; the",
+    "bench pays its mastery once (smithing-lore.json `manual`). Read by rules/knowledge.py;",
+    "sold at the smiths' counters (rules/goods.py `table_goods('smithing-manuals')`).",
+    "",
+    "Original writing for Pathfinder GM (2026-10-03). Prices in gold, in the herbal manuals'",
+    "range, the deep-metals book dearer as the beast-parts book is.",
+    "",
+    "`teaches` names metals by material id and says which of each one's properties the book",
+    "holds: \"all\", \"benefits\", \"drawbacks\", \"working\" (the working traits only), or a",
+    "list of property keys (\"w0\", \"a1\", \"t0\"...). The words are preferred over keys: keys",
+    "are positions in a material's lists, and the data pass can move them. An id the",
+    "materials do not hold is skipped, never invented. Metals are named by id only, so the",
+    "skymetal names' licensing call (plan §15.2) can rename them without touching this file."
+  ],
+  "manuals": [
+    {
+      "id": "the-ironmongers-daybook",
+      "name": "The Ironmonger's Daybook",
+      "price_gp": 8,
+      "hours": 4,
+      "about": "A market-town ironmonger's ledger of the common stock, with a line on how each bar behaves at the fire.",
+      "teaches": [
+        {"material": "iron", "keys": "all"},
+        {"material": "wrought-iron", "keys": "all"},
+        {"material": "steel", "keys": "all"},
+        {"material": "copper", "keys": "all"},
+        {"material": "tin", "keys": "all"},
+        {"material": "bronze", "keys": "all"},
+        {"material": "brass", "keys": "all"}
+      ]
+    },
+    {
+      "id": "fire-and-water",
+      "name": "Fire and Water: A Journeyman's Notes",
+      "price_gp": 10,
+      "hours": 4,
+      "about": "Fuels and quenches, written by a smith who learned each one by spoiling a blade in it.",
+      "teaches": [
+        {"material": "peat", "keys": "all"},
+        {"material": "coal", "keys": "all"},
+        {"material": "charcoal", "keys": "all"},
+        {"material": "coke", "keys": "all"},
+        {"material": "water", "keys": "all"},
+        {"material": "quenching-brine", "keys": "all"},
+        {"material": "quenching-oil", "keys": "all"},
+        {"material": "whale-oil", "keys": "all"}
+      ]
+    },
+    {
+      "id": "the-clean-melt",
+      "name": "The Clean Melt",
+      "price_gp": 6,
+      "hours": 3,
+      "about": "A smelter's short treatise on ores and the fluxes that clear them.",
+      "teaches": [
+        {"material": "iron-ore", "keys": "all"},
+        {"material": "bog-iron", "keys": "all"},
+        {"material": "copper-ore", "keys": "all"},
+        {"material": "tin-ore", "keys": "all"},
+        {"material": "limestone", "keys": "all"},
+        {"material": "silica-sand", "keys": "all"},
+        {"material": "potash", "keys": "all"},
+        {"material": "borax", "keys": "working"}
+      ]
+    },
+    {
+      "id": "hafts-grips-and-guards",
+      "name": "Hafts, Grips and Guards",
+      "price_gp": 8,
+      "hours": 3,
+      "about": "A cutler's pattern book: which wood, which wrap, which guard, and what each does to the blade it carries.",
+      "teaches": [
+        {"material": "ash-haft", "keys": "all"},
+        {"material": "oak-haft", "keys": "all"},
+        {"material": "bone-grip", "keys": "all"},
+        {"material": "leather-grip", "keys": "all"},
+        {"material": "cord-wrapped-grip", "keys": "all"},
+        {"material": "brass-guard", "keys": "all"},
+        {"material": "steel-crossguard", "keys": "all"},
+        {"material": "darkwood-haft", "keys": "benefits"}
+      ]
+    },
+    {
+      "id": "the-precious-metals",
+      "name": "On the Precious Metals",
+      "price_gp": 25,
+      "hours": 6,
+      "about": "A goldsmith's account of silver, gold and their kin, and of the iron that fey cannot abide.",
+      "teaches": [
+        {"material": "silver", "keys": "all"},
+        {"material": "gold", "keys": "all"},
+        {"material": "electrum", "keys": "all"},
+        {"material": "platinum", "keys": "benefits"},
+        {"material": "cold-iron", "keys": "all"}
+      ]
+    },
+    {
+      "id": "deep-metals",
+      "name": "A Delver's Book of Deep Metals",
+      "price_gp": 120,
+      "hours": 8,
+      "about": "Notes from the deep forges on the rare metals, with the warnings the author paid for.",
+      "teaches": [
+        {"material": "mithral", "keys": "all"},
+        {"material": "adamantine", "keys": "all"},
+        {"material": "star-iron", "keys": "benefits"},
+        {"material": "abysium", "keys": "drawbacks"},
+        {"material": "noqual", "keys": "drawbacks"}
+      ]
+    }
+  ]
+}

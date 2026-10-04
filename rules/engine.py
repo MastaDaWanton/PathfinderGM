@@ -43,8 +43,9 @@ from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from .grid import Grid
 from . import hazards
+from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
-from .sheet import Actor
+from .sheet import MAGIC_SUPPRESSED, Actor, attacker_traits
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, maneuver_text,
@@ -59,6 +60,12 @@ from .tables import (
 # two people shouting across a room.
 SQUARES_BY_ZONE = {"engaged": 1, "near": 3, "far": 8}
 FEET_PER_SQUARE = 5
+
+# The seam, from what any success turns up to what only a check far past the DC reaches:
+# one tier further up for every five points over (`Engine._op_prospect`). It stopped at
+# rare until 2026-10-03, which kept every exotic and legendary mined metal out of reach of
+# the only door that digs.
+PROSPECT_TIERS = ("common", "uncommon", "rare", "exotic", "legendary")
 
 
 def zone_for_feet(feet: int) -> str:
@@ -1022,6 +1029,11 @@ class Scene:
                         actor.clear_temp_hp(source=e.source)
                     out.append({"kind": "upkeep_failed", "ref": actor.ref,
                                 "what": e.name or e.key, "pool": str(pool)})
+        # The other periodic work — fast healing, a burn that keeps burning — is the
+        # sheet's executor (`Actor.run_periodic`), fired here once per played round. Its
+        # records are `heal` / `damage` in the shape `_ward_tell` says, so the round's
+        # narration carries them like a cloud's fire.
+        out.extend(actor.run_periodic("round", 1, self._dice))
         return out
 
     # --- things standing in the scene ------------------------------------------------
@@ -1120,6 +1132,7 @@ class Scene:
         # Hours crossed on the world clock, not minutes // 60: the clock mostly moves
         # in ten-minute steps, and flooring each step would never heal anybody.
         hours = (int(self.clock_minutes) + minutes) // 60 - int(self.clock_minutes) // 60
+        days = (int(self.clock_minutes) + minutes) // 1440 - int(self.clock_minutes) // 1440
         self.clock_minutes += minutes
         ended: list[str] = []
         # Everyone the campaign holds: an eight-hour rest expires the buff on the
@@ -1173,6 +1186,16 @@ class Scene:
             elif a.held_breath_rounds or a.drown_failures:
                 a.held_breath_rounds = 0
                 a.drown_failures = 0
+            # A day's periodic work, once per day boundary the clock crossed — the
+            # executor's "per day" clock (`Actor.run_periodic`). A day boundary is a fact
+            # of the clock like the hour boundaries above; the per-ROUND work stays with
+            # played rounds, for the reason this method's docstring gives.
+            said = a.run_periodic("day", days, self._dice) if days else []
+            # What the pack grants, granted; what left it, taken back and left to linger
+            # (`Actor.sync_carried`). Time passing is when a bench step or a sale away
+            # from the engine's ops is first noticed.
+            said += a.sync_carried(self._dice)
+            ended.extend(t for t in (_ward_tell(self, r) for r in said) if t)
         # The scene's own standing things expire on the same clock. `tick_standing` fires
         # `each_round` wards as well, which is exactly the work this must not repeat — so
         # it is called once, for expiry, and the firing stays where the rounds are real.
@@ -1199,7 +1222,7 @@ class Scene:
         # roll thousands of saves, while firing once would understate a cloud stood in
         # for a minute. Expiry still runs — a fog cloud does not outlive the night.
         for ward in list(self.wards) if fire else ():
-            if ward.trigger == "each_round":
+            if ward.trigger == "each_round" and not self._held_off(ward):
                 out.extend(self._fire(ward))
         out.extend(self.tick_effects(rounds))
         return out
@@ -1253,6 +1276,12 @@ class Scene:
             self.wards.remove(holder)
         return {"kind": "ward_ended", "ref": holder.owner or "",
                 "source": holder.source, "what": holder.source}
+
+    def _held_off(self, ward: "Ward") -> bool:
+        """Whether the creature this ward sits on has its magic suppressed (noqual's
+        recoil): the ward waits, its clock still running. An area's ward has no owner."""
+        owner = (self.people.get(ward.owner) if ward.owner else None)
+        return owner is not None and owner.has_state(MAGIC_SUPPRESSED)
 
     def _fire(self, ward: "Ward", struck_by: str = "") -> list[dict]:
         """Resolve one ward against whoever it aims at, and say what it did."""
@@ -2139,7 +2168,17 @@ class Engine:
         parse. Resolved by the door while it still holds the document, because the
         jar's last dose is popped from the satchel before its own heal is validated.
         """
-        intents = parse_all(raw_intents)
+        # The forged blades the people here carry may be named in an attack: parse cannot
+        # see an actor, so it is told for this call (`intents.carrying`, contracts §12
+        # item 2). Whether THIS attacker holds one is the legality step's question below.
+        carried: set[str] = set()
+        for who in list(self.scene.actors.values()):
+            try:
+                carried |= who.crafted_weapon_names()
+            except Exception:  # noqa: BLE001 — a body with no pack names no blade
+                continue
+        with intents_mod.carrying(carried):
+            intents = parse_all(raw_intents)
         for intent in intents:
             intent.origin = str(origin or "")
             intent.origin_name = str(origin_name or "")
@@ -2763,6 +2802,11 @@ class Engine:
                 # through. Asking the actor is the only question worth asking — it is
                 # their race document that says whether they have jaws.
                 pass
+            elif actor._crafted_weapon(key) is not None:
+                # A crafted weapon the actor holds (contract §5): its record in the pack
+                # or worn is the proof it is carried, and its key is the record's id,
+                # which no table holds.
+                pass
             elif not weapons_mod.has(key):
                 raise IntentError(
                     f"attack: {actor.name} has no weapon {key!r}", "legality", index, code="no_such_weapon"
@@ -2977,6 +3021,9 @@ class Engine:
         # A creature holding its ground answers what this batch did: struck, closed on,
         # or gone — and a find it was sitting on is paid once it has gone.
         resolution.outcomes.extend(self._holding_ground_settles())
+        # What the pack grants after this batch moved things in and out of it — the
+        # abysium bar just bought, the cursed blade just sold (`_carried_settles`).
+        resolution.outcomes.extend(self._carried_settles())
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -3002,6 +3049,25 @@ class Engine:
                              tell="", because="")]
         resolution.outcomes.extend(self._articled(o) for o in extra)
         return resolution
+
+    def _carried_settles(self) -> list:
+        """Carried effects brought up to date with the packs of everybody here, said.
+
+        One pass at the end of every batch rather than a hook in each of the ops that
+        move things between packs (give, sell, use_item, prospect, the bench's own
+        doors): a door added later cannot forget it. Each change is an `ActiveEffect`
+        through the one applicator (`Actor.sync_carried`) and comes back as an outcome
+        whose tell the narrator is fed (law 3).
+        """
+        out = []
+        for a in list(self.scene.actors.values()):
+            recs = a.sync_carried(self.dice)
+            if not recs:
+                continue
+            tell = " ".join(t for t in (_ward_tell(self.scene, r) for r in recs) if t)
+            out.append(Outcome(intent_id="", op="carried", effects=recs, tell=tell,
+                               because=""))
+        return out
 
     def resume(self, face: int) -> Resolution:
         """Continue a suspended list with the face the player rolled."""
@@ -4575,7 +4641,10 @@ class Engine:
     def _op_save(self, intent: Intent, partial: dict) -> Outcome:
         actor = self.scene.actors[intent.actor]
         save = intent.params["save"]
-        mods = actor.save_modifiers(save)
+        # A save a spell document called for is a save against a spell (the provenance
+        # stamp, stage 8), which noqual's `when: {"against": "spell"}` asks.
+        ctx = {"against": "spell"} if str(intent.origin or "").startswith("spell:") else None
+        mods = actor.save_modifiers(save, ctx)
         level = actor.level if actor.is_pc else 1
         resolved_dc = dc_mod.resolve(intent.params["dc"], level)
 
@@ -5050,8 +5119,10 @@ class Engine:
                 swing_ac = defender.touch_ac(flat_footed or bool(flounders)) + footing
                 swing_note = (f"touch AC {swing_ac}"
                               + (" (flat-footed)" if flat_footed else ""))
+            # The defender rides in the roll context, so a term that is "against fey"
+            # (cold iron's, contract §2) is asked of THIS defender and nobody else.
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
-                                              lethality=lethality)
+                                              lethality=lethality, defender=defender)
             # Compulsions are charged here rather than in `attack_modifiers` because the
             # penalty depends on *who is being attacked*, which the sheet does not know.
             # It penalises and never prohibits: see the header of rules/compulsion.py.
@@ -5179,7 +5250,8 @@ class Engine:
             if state["stage"] == "damage":
                 mult = weapon["crit_mult"] if state.get("crit") else 1
                 dice_notation = _multiply_dice(weapon["damage"], mult)
-                dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power)
+                dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power,
+                                                  defender=defender)
                 rider_col = str(weapon.get("rider_column") or "")
                 if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
@@ -5284,7 +5356,43 @@ class Engine:
                 if wet_row and water.damage_halved(wet_row, str(weapon["type"])):
                     amount = max(1, amount // 2)
                     state["tells"].append("The water takes half the force out of it.")
+                # What the blade is made of reaches the damage (contract §5): a forged
+                # weapon's `strikes_as` are the traits `Reduction.bypassed_by` reads.
+                # Weapon hits passed none until the forge revamp, so DR 5/cold iron held
+                # against a cold iron sword exactly as against a stick. Said when it
+                # mattered — the DR that would have held and did not (law 3: the
+                # narrator is told why the wound is deeper, never left to guess).
+                struck_as = tuple(weapon.get("strikes_as") or ())
+                if struck_as:
+                    would = defender.damage_reduction(weapon["type"], (), lethality)
+                    does = defender.damage_reduction(weapon["type"], struck_as, lethality)
+                    if would is not None and (does is None or does.amount < would.amount):
+                        said = " and ".join(s.replace("_", " ") for s in struck_as)
+                        state["tells"].append(
+                            f"The {said} bites past {defender.name}'s {would.label}.")
+                # An incorporeal defender "takes only half damage from a corporeal
+                # source" (Bestiary, Incorporeal), and a ghost touch weapon is the book's
+                # exception: "An incorporeal creature's 50% reduction in damage from
+                # corporeal sources does not apply to attacks made against it with ghost
+                # touch weapons" (CRB). Neither half existed before lane H (2026-10-04):
+                # a ghost took a sword's full damage, so ghost salt had nothing to undo
+                # and lane C's data stood a +2 against undead in for it. Halved here,
+                # where the weapon and both bodies are known, never below one, as the
+                # water's half is. Not done: the book's "immune to all nonmagical attack
+                # forms" — the app has no magic-weapon channel to ask yet (stage 9).
+                if (defender.has_state("subtype.incorporeal")
+                        and not actor.has_state("subtype.incorporeal")):
+                    if "ghost_touch" in struck_as:
+                        state["tells"].append(
+                            f"The ghost-touched {weapon['name'].lower()} bites "
+                            f"{defender.name} as if it were flesh.")
+                    else:
+                        amount = max(1, amount // 2)
+                        state["tells"].append(
+                            f"Half the blow passes through {defender.name}'s "
+                            f"insubstantial form.")
                 hit = self._apply_damage(defender, amount, weapon["type"],
+                                         traits=struck_as + attacker_traits(actor),
                                          lethality=lethality)
                 if printed:
                     # Whose numbers these were: the stat block's, by the provenance
@@ -5331,6 +5439,13 @@ class Engine:
                 for extra in self._deliver_coating(actor, defender, weapon_key):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # A forged blade's own riders — a wyvern-blood quench on the first wound
+                # of the day, viridium on the crit (plan §12.4).
+                for extra in self._item_riders(actor, defender, weapon,
+                                               crit=bool(state.get("crit"))):
+                    state["effects"].append(extra["effect"])
+                    if extra["tell"]:
+                        state["tells"].append(extra["tell"])
                 # What the body itself does past the wound: a jaw that holds on, a tail
                 # that sweeps the legs. The race's own tags, read here because this is
                 # where a hit is known to have landed.
@@ -5856,8 +5971,14 @@ class Engine:
                     extra_rolls.append(dmg)
                     item = defender.item(item_name)
                     was_broken = item.broken
+                    # The blade's material reaches the object: adamantine ignores
+                    # hardness under 20 (CRB, Special Materials), said in the line below.
                     res = defender.damage_item(item_name, max(0, dmg.total),
-                                               str(weapon["type"]))
+                                               str(weapon["type"]),
+                                               tuple(weapon.get("strikes_as") or ()))
+                    if res.get("sheared"):
+                        bits.append(f"The adamantine edge shears straight through the "
+                                    f"{item_name}'s hardness.")
                     if res["destroyed"]:
                         what = "destroyed — in pieces"
                         # A weapon in pieces is not in the hand any more.
@@ -9714,7 +9835,8 @@ class Engine:
             for s in stock or []:
                 actor.add_stock(crafting.Stock(base=s["base"], tier=s.get("tier", "common"),
                                                kind=s.get("kind", "ore"),
-                                               craft=s.get("craft", "smithing")),
+                                               craft=s.get("craft", "blacksmith"),
+                                               from_materials=([s["material"]] if s.get("material") else [])),
                                 int(s.get("count", 1)) * (enc.yield_times - 1))
             return clause
         made = self._bring_in(enc.creature["id"], count=1, name=enc.creature["name"])
@@ -9905,8 +10027,11 @@ class Engine:
             return self._refuse(
                 intent, "The ground here has not been named, so there is nothing to "
                         "search. Travel somewhere first.")
-        ores = [m for m in blacksmith.materials().values()
-                if m.kind == "ore" and biome in (m.biomes or [])]
+        # Everything the smith's own shelf says is MINED on this ground (`obtainable`, the
+        # excursion's declared table) — ore, the native metals (star-iron, viridium),
+        # coal, limestone — not only `kind == "ore"`, which left 16 of the shelf's 36 mined
+        # materials unfindable by the one door that digs (measured 2026-10-03).
+        ores = blacksmith.obtainable("mined", biome=biome)
         if not ores:
             return Outcome(intent_id=intent.id, op="prospect", effects=[],
                            tell=f"{actor.name} looks, and there is no ore in "
@@ -9942,21 +10067,38 @@ class Engine:
             margin = die + bonus - dc
             if margin < 0:
                 continue
-            tiers = ["common"] + (["uncommon"] if margin >= 5 else []) \
-                + (["rare"] if margin >= 10 else [])
-            pool = [m for m in ores if m.tier in tiers] or ores
+            # Each band of five over the DC reaches one tier further up the seam. The
+            # old fallback (`or ores`) handed out ANY tier when none was in reach, so on
+            # ground whose only mined things are exotic a bare success dug up exotic
+            # metal; nothing in reach now means nothing found that hour.
+            tiers = PROSPECT_TIERS[:1 + min(len(PROSPECT_TIERS) - 1, margin // 5)]
+            pool = [m for m in ores if m.tier in tiers]
+            if not pool:
+                continue
             pick = pool[self.dice.roll(f"1d{len(pool)}", label="which ore",
                                        visibility="hidden").total - 1]
             count = 1 + margin // 5
-            stock.append({"base": pick.name, "tier": pick.tier, "kind": "ore",
-                          "craft": "smithing", "count": count})
+            # `craft: "blacksmith"` — the bench's own track id. This wrote "smithing",
+            # and the bench filters its stock on `craft == "blacksmith"`
+            # (`play/craft_views._stock_of`): RUN 2026-10-03 on scratch data, three
+            # hours in the hills brought back 4 Calamine and 1 Copper Ore and the forge
+            # saw none of it. `from_materials` names the material id, so a reader keyed
+            # on ids ("calamine") finds a stack keyed "calamine#1".
+            stock.append({"base": pick.name, "tier": pick.tier, "kind": pick.kind,
+                          "craft": "blacksmith", "count": count, "material": pick.id})
         for s in stock:
-            actor.add_stock(crafting.Stock(base=s["base"], tier=s["tier"], kind="ore",
-                                           craft="smithing"), s["count"])
+            actor.add_stock(crafting.Stock(base=s["base"], tier=s["tier"], kind=s["kind"],
+                                           craft="blacksmith",
+                                           from_materials=[s["material"]]), s["count"])
         self.scene.advance(worked * survival.MINUTES_PER_HOUR, charge_body=False)
         span = f"{worked} hour{'s' if worked != 1 else ''}"
         if stock:
-            got = ", ".join(f"{s['count']}× {s['base']}" for s in stock)
+            # One count per thing found: "2× Calamine, 2× Calamine" read as two finds of
+            # something the tell had already named (seen in the same run).
+            totals: dict[str, int] = {}
+            for s in stock:
+                totals[s["base"]] = totals.get(s["base"], 0) + int(s["count"])
+            got = ", ".join(f"{n}× {base}" for base, n in totals.items())
             tell = f"{span} of digging: {actor.name} comes back with {got}."
         else:
             tell = f"{actor.name} spends {span} and turns up nothing worth carrying."
@@ -10124,8 +10266,12 @@ class Engine:
         # that makes sense here (`places.fits_here`). A name that is itself a kind —
         # "the docks" — needs no `kind` to say so.
         kind = places_mod.kind_named(str(intent.params.get("kind") or ""))
-        if not kind and name.lower().removeprefix("the ") in places_mod.KINDS:
-            kind = name.lower().removeprefix("the ")
+        # Through the same word table as `kind` (`places.kind_named`): "the forge" is a
+        # smithy (lane G's KIND_WORDS). This asked for the name EXACTLY in `KINDS`, so a
+        # `found` of "the forge" with no kind made a place with no kind — not a smithy,
+        # and the bench refused to work there (found by lane G, 2026-10-03).
+        if not kind and places_mod.kind_named(name) in places_mod.KINDS:
+            kind = places_mod.kind_named(name)
         # A building hangs off the street, not off the room the party is standing in.
         # Measured live 2026-09-26: "I head for the stables" from inside a shrine made
         # "the stables … off the shrine". A settlement kind (`places.KINDS` — the smithy,
@@ -10841,7 +10987,8 @@ class Engine:
         if key in states.ATTITUDES:
             cond = self._set_attitude(target, key, rounds, intent.because)
         else:
-            cond = target.add_condition(key, rounds, source=intent.because)
+            cond = target.add_condition(key, rounds, source=intent.because,
+                                         origin=intent.origin)
         return Outcome(
             intent_id=intent.id, op="condition",
             effects=[{"ref": target.ref, "kind": "condition", "condition": key,
@@ -11016,6 +11163,73 @@ class Engine:
                 out.append({"effect": {"ref": defender.ref, "kind": "coating"},
                             "tell": o.tell})
         return [x for x in out if x["effect"] or x["tell"]]
+
+    # A day, in rounds: how long "the first wound it deals each day" stays spent.
+    ROUNDS_PER_DAY = 24 * 60 * 10
+
+    def _item_riders(self, actor: Actor, defender: Actor, weapon: dict,
+                     crit: bool = False) -> list[dict]:
+        """Fire a forged weapon's on-hit riders (plan §12.4) on the hit that just landed.
+
+        Each rider is a document from the build (`forge_items.build(...)["riders"]`) with a
+        `trigger`: `hit` on every hit, `crit` on a confirmed critical, `first_wound_daily`
+        on the first wound the item deals in a day (spent as an `item_spent` effect on the
+        wielder with a day's clock, so it comes back through the one ticker). `carried`
+        riders are the pack's (`Actor.sync_carried`), not the blow's.
+
+        Resolved the way a coating is (`_deliver_coating`): the document becomes ordinary
+        intents through `consumables.coating_intents` — a save gate and what failing it
+        costs — validated with `origin: item:<id>` and run through the one applicator, so
+        what lands is an `ActiveEffect` that says which item put it there, and each op
+        speaks its own tell. Hidden saves: the defender's roll is never the player's popup
+        in the middle of their own attack.
+        """
+        build = weapon.get("build")
+        if not isinstance(build, dict) or not build.get("riders") or defender.hp <= 0:
+            return []
+        from . import forge_items
+
+        out: list[dict] = []
+        item = str(build.get("name") or weapon.get("name") or "the weapon")
+        for rider in build["riders"]:
+            trigger = str(rider.get("trigger") or "")
+            if trigger == "crit" and not crit:
+                continue
+            if trigger not in ("hit", "crit", "first_wound_daily"):
+                continue
+            origin = str(rider.get("origin") or f"item:{build.get('id')}")
+            if trigger == "first_wound_daily":
+                spent = f"first-wound:{build.get('id')}:{rider.get('source', '')}"
+                if any(e.kind == "item_spent" and e.key == spent for e in actor.effects):
+                    continue
+                actor.apply_effect(ActiveEffect(
+                    name=f"{item}: first wound of the day dealt", kind="item_spent",
+                    key=spent, source=origin, origin=origin, duration="rounds",
+                    rounds_left=self.ROUNDS_PER_DAY))
+            spec = {k: v for k, v in rider.items()
+                    if k not in ("trigger", "origin", "source", "book")}
+            source_doc = forge_items.material(str(rider.get("source") or "")) or {}
+            what = str(source_doc.get("name") or rider.get("source") or "metal").lower()
+            intents = consumables.coating_intents(
+                consumables.Coating(item=f"the {what} in the {item}", specs=[spec]),
+                defender.ref)
+            if not intents:
+                continue
+            for i in intents:
+                i["visibility"] = "hidden"
+            out.append({"effect": {"ref": defender.ref, "kind": "item_rider",
+                                   "item": build.get("id"), "trigger": trigger,
+                                   "source": rider.get("source", ""), "origin": origin},
+                        "tell": f"The {what} in {actor.name}'s {item} works on "
+                                f"{defender.name}."})
+            res = self.run(self.validate(intents, origin=origin, origin_name=item))
+            for o in res.outcomes:
+                for e in o.effects or []:
+                    out.append({"effect": e, "tell": ""})
+                if o.tell:
+                    out.append({"effect": {"ref": defender.ref, "kind": "item_rider_said"},
+                                "tell": o.tell})
+        return out
 
     def _op_use_item(self, intent: Intent, partial: dict) -> Outcome:
         """Drink it, throw it, or put it on a blade.
@@ -11706,7 +11920,10 @@ class Engine:
                 # PC roll their own save against a spell and keeps every NPC's save with
                 # the engine, through the one rule `_force_visibility` states.
                 save_roll = self._roll_or_suspend_stage(
-                    intent, target, target.save_modifiers(plan["save"]),
+                    # Against a spell: noqual armour's +2 resistance "on saves against
+                    # spells" is a `when: {"against": "spell"}` term, asked of this.
+                    intent, target, target.save_modifiers(plan["save"],
+                                                          {"against": "spell"}),
                     f"{SAVES[plan['save']]} save against {spell.name}", dc,
                     partial, state, "1d20", state_key="cast_state",
                 )
@@ -12051,6 +12268,10 @@ class Engine:
         reason `Scene.guards` gives: this is a relationship, and it belongs to the scene.
         """
         out: list[dict] = []
+        # A ward on a body whose magic is held off (noqual's recoil, `MAGIC_SUPPRESSED`)
+        # does not answer: suppressed, not ended, so it answers again when that lifts.
+        if struck.has_state(MAGIC_SUPPRESSED):
+            return out
         for ward in list(self.scene.wards):
             if ward.trigger == "when_struck" and ward.owner == struck.ref:
                 out.extend(self.scene._fire(ward, struck_by=by.ref))
@@ -12108,8 +12329,14 @@ class Engine:
                  "choose_one", "bundle", "attitude")
 
     def _executes(self, spec: dict) -> bool:
+        # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
+        # ward's: those fire from `_item_riders` and `Actor.sync_carried`. Registered as a
+        # ward here they would stand in the scene waiting for a trigger no ward ever sees.
+        trigger = str(spec.get("trigger") or "on_cast")
+        from .effectspec import ITEM_TRIGGERS
+
         return (str(spec.get("type", "")) in self._EXECUTES
-                or str(spec.get("trigger") or "on_cast") != "on_cast"
+                or (trigger != "on_cast" and trigger not in ITEM_TRIGGERS)
                 or _ac_grant(spec) is not None)
 
     def _run_specs(self, specs: list[dict], ctx: dict) -> tuple[list[dict], list[str]]:
@@ -13606,7 +13833,8 @@ class Engine:
             for s in g.get("stock") or []:
                 pc.add_stock(crafting.Stock(base=s["base"], tier=s.get("tier", "common"),
                                             kind=s.get("kind", "ore"),
-                                            craft=s.get("craft", "smithing")),
+                                            craft=s.get("craft", "blacksmith"),
+                                            from_materials=([s["material"]] if s.get("material") else [])),
                              int(s.get("count", 1)))
                 got.append(f"{s.get('count', 1)}× {s['base']}")
             held_by = str(g.get("guard_name") or "")
@@ -14604,6 +14832,13 @@ class Engine:
             return Outcome(intent_id=intent.id, op="wear", effects=[], tell=why,
                            because=intent.because)
 
+        # A crafted record by its id or name (contract §5): the forged sword, the forged
+        # chain shirt. Before the forge revamp this op set `equipped` and `armour` from
+        # table keys only, so a thing made at the bench could be carried and never held.
+        crafted = actor.crafted_record(item)
+        if crafted is not None and _record_gear(crafted) in ("weapon", "armour", "shield"):
+            return self._wear_crafted(intent, actor, crafted, no)
+
         # The one key, by the two resolvers (E1). Compared key to key, so "leather
         # armour", "Chain Shirt" and "bo staff" find what the sheet holds as "leather",
         # "chain shirt" and "bo-staff" — and what is put on is stored by its key.
@@ -14634,7 +14869,8 @@ class Engine:
                              for w in actor.weapons]
             actor.equipped = key
             if key == "unarmed":
-                what = weapons_mod.get(held)["name"] if weapons_mod.has(held) else ""
+                what = weapons_mod.get(held)["name"] if weapons_mod.has(held) else str(
+                    (actor.crafted_record(held) or {}).get("name") or "")
                 tell = (f"{actor.name} puts the {what.lower()} away; their hands are "
                         f"empty." if what and held != "unarmed"
                         else f"{actor.name}'s hands are empty.")
@@ -14655,9 +14891,14 @@ class Engine:
                 return no(f"Putting on the {name} takes {cost['said']}, and there is a "
                           f"fight on: only a shield changes mid-fight (a move action).")
             was = str(getattr(actor, kind) or "none")
+            # A forged suit being swapped out goes back to being a record on the shelf
+            # (it never left the pack); it must not ALSO become a plain suit in `goods`.
+            forged_suit = actor.armour_record() if kind == "armour" else actor.shield_record()
+            if forged_suit is not None:
+                actor.take_off(str(forged_suit.get("name") or ""))
             # A suit worn straight off the outfit page was never in `goods`; changing out
             # of it must not make it vanish.
-            if was != "none" and was != key and not any(
+            elif was != "none" and was != key and not any(
                     goods.canonical(k) == was for k in actor.goods):
                 actor.goods[was] = actor.goods.get(was, 0) + 1
             actor.remove_effects(match=lambda e: str(e.source or "").startswith(
@@ -14701,6 +14942,129 @@ class Engine:
             because=intent.because,
         )
 
+    def _wear_crafted(self, intent: Intent, actor: Actor, rec: dict, no) -> Outcome:
+        """Draw a crafted weapon or put on a crafted suit (contract §5).
+
+        A weapon: the record is kept in `worn` and `equipped` names its id, so the attack
+        roll's context carries the record and the record's modifiers land on its own swing
+        and no other (`Actor._standing_mods`). It stays in the pack too: drawing a sword
+        does not take it out of your possession.
+
+        A suit: `armour` takes the base suit's table key, so every table reader keeps the
+        base suit's facts (proficiency, donning time), and the record goes in the armour
+        slot, where `Actor.armour_stats` reads its build. Same time costs and the same
+        mid-fight refusal as a plain suit (owner's ruling E2).
+        """
+        from . import armour as armour_mod
+        from . import weapons as weapons_mod
+
+        gear = _record_gear(rec)
+        name = str(rec.get("name") or rec.get("id") or "the item")
+        rec_id = str(rec.get("id") or name).strip().lower()
+        base = str(rec.get("base") or rec.get(gear) or "")
+        if gear == "shield":
+            return self._wear_forged_shield(intent, actor, rec, name, rec_id, base, no)
+        if gear == "weapon":
+            base_key = weapons_mod.key_for(base)
+            ok, why = weapons_mod.wieldable(base_key or base)
+            if not ok:
+                return no(why)
+            clash = armour_mod.hands_clash(actor, weapon_key=base_key)
+            if clash:
+                return no(clash)
+            actor.worn[name.strip().lower()] = dict(rec)
+            actor.equipped = rec_id
+            return Outcome(
+                intent_id=intent.id, op="wear",
+                effects=[{"ref": actor.ref, "kind": "wear", "item": rec_id,
+                          "crafted": True, "base": base_key, "ac": actor.ac()}],
+                tell=f"{actor.name} draws the {name}.", because=intent.because)
+
+        kind, base_key = armour_mod.key_for(base)
+        base_key = base_key or base.lower()
+        if kind != "armour" and base_key not in armour_mod.ARMOUR:
+            return no(f"The {name} is not built on any suit the rules know ({base!r}).")
+        cost = armour_mod.change_cost("armour", base_key, off=False)
+        if self.scene.in_encounter:
+            return no(f"Putting on the {name} takes {cost['said']}, and there is a fight "
+                      f"on: only a shield changes mid-fight (a move action).")
+        before = actor.ac()
+        was_suit = actor.armour_record()
+        if was_suit is not None:
+            actor.take_off(str(was_suit.get("name") or ""))
+        elif actor.armour not in ("", "none") and not any(
+                goods.canonical(k) == actor.armour for k in actor.goods):
+            actor.goods[actor.armour] = actor.goods.get(actor.armour, 0) + 1
+        actor.remove_effects(match=lambda e: str(e.source or "").startswith(
+            "donned hastily:"))
+        actor.armour = base_key
+        slot = actor.slot_list("armor")
+        slot[0] = name
+        actor.worn[name.strip().lower()] = dict(rec)
+        if cost.get("minutes"):
+            self.scene.advance(minutes=int(cost["minutes"]))
+        if cost.get("hasty"):
+            actor.apply_effect(ActiveEffect(
+                name="donned hastily", kind="buff", source=f"donned hastily:{base_key}",
+                origin="rule:don-hastily", duration="until-dismissed",
+                modifiers=[{"kind": "combat_mod", "target": "ac", "amount": -1,
+                            "bonus_type": "", "note": "armour donned hastily"},
+                           {"kind": "combat_mod", "target": "armour_check",
+                            "amount": -1, "bonus_type": "",
+                            "note": "armour donned hastily"}]))
+        after = actor.ac()
+        moved = f" Armour class {before} to {after}." if after != before else ""
+        took = (f" ({cost['said']}" + (", hastily: nobody is helping" if cost.get("hasty")
+                                       else "") + ")") if cost.get("said") else ""
+        return Outcome(
+            intent_id=intent.id, op="wear",
+            effects=[{"ref": actor.ref, "kind": "wear", "item": rec_id, "crafted": True,
+                      "base": base_key, "ac": after,
+                      **({"minutes": int(cost["minutes"])} if cost.get("minutes") else {}),
+                      **({"hasty": True} if cost.get("hasty") else {})}],
+            tell=f"{actor.name} puts on the {name}{took}.{moved}",
+            because=intent.because)
+
+    def _wear_forged_shield(self, intent: Intent, actor: Actor, rec: dict, name: str,
+                            rec_id: str, base: str, no) -> Outcome:
+        """Strap on a forged shield (contracts §12 item 6).
+
+        Wave 1 refused it with a sentence while the bench made bucklers and steel shields.
+        The suit's arrangement, for the shield slot: `shield` takes the base shield's
+        table key, so the hands-clash rule and proficiency keep the base shield's facts,
+        and the record goes in the shield slot, where `Actor.shield_stats` reads its build
+        (its material's AC folded into the shield bonus, masterwork's −1 check penalty).
+        A move action, in a fight or out of one, as every shield is (owner's ruling E2).
+        """
+        from . import armour as armour_mod
+
+        kind, base_key = armour_mod.key_for(base)
+        base_key = base_key or base.lower()
+        if kind != "shield" and base_key not in armour_mod.SHIELDS:
+            return no(f"The {name} is not built on any shield the rules know ({base!r}).")
+        clash = armour_mod.hands_clash(actor, shield_key=base_key)
+        if clash:
+            return no(clash)
+        before = actor.ac()
+        was = actor.shield_record()
+        if was is not None:
+            actor.take_off(str(was.get("name") or ""))
+        elif actor.shield not in ("", "none") and not any(
+                goods.canonical(k) == actor.shield for k in actor.goods):
+            actor.goods[actor.shield] = actor.goods.get(actor.shield, 0) + 1
+        actor.shield = base_key
+        slot = actor.slot_list("shield")
+        slot[0] = name
+        actor.worn[name.strip().lower()] = dict(rec)
+        after = actor.ac()
+        moved = f" Armour class {before} to {after}." if after != before else ""
+        return Outcome(
+            intent_id=intent.id, op="wear",
+            effects=[{"ref": actor.ref, "kind": "wear", "item": rec_id, "crafted": True,
+                      "base": base_key, "ac": after}],
+            tell=f"{actor.name} straps on the {name} (a move action).{moved}",
+            because=intent.because)
+
     def _op_take_off(self, intent: Intent, partial: dict) -> Outcome:
         """Take off armour or a shield, or put away what is in hand (E4).
 
@@ -14736,6 +15100,17 @@ class Engine:
         bare = re.sub(r"^(?:my|the|his|her|their)\s+", "", said)
         kind, key = armour_mod.key_for(bare)
         held = weapons_mod.key_for(actor.equipped or "") or str(actor.equipped or "")
+        # A forged thing by its own name: the suit in the armour slot, or the blade in hand.
+        crafted = actor.crafted_record(bare) if bare else None
+        if not kind and crafted is not None:
+            if crafted is actor.armour_record():
+                kind, key = "armour", str(actor.armour)
+            elif crafted is actor.shield_record():
+                kind, key = "shield", str(actor.shield)
+            elif str(crafted.get("id") or crafted.get("name") or "").lower() == held.lower():
+                return self._op_wear(Intent(
+                    id=intent.id, op="wear", actor=actor.ref,
+                    params={"item": "unarmed"}, because=intent.because), partial)
         if not kind:
             if bare in ("", "armour", "armor", "suit", "mail", "my armour"):
                 kind, key = "armour", str(actor.armour)
@@ -14769,9 +15144,15 @@ class Engine:
                                   visibility="hidden")
             rolls.append(roll)
             minutes = max(1, roll.total)
+        # A forged suit comes off into the pack it never left (its record is stock); only a
+        # plain suit goes back to `goods`.
+        forged_suit = actor.armour_record() if kind == "armour" else actor.shield_record()
         setattr(actor, kind, "none")
         actor.remove_effects(match=lambda e: str(e.source or "") == f"donned hastily:{worn}")
-        if not any(goods.canonical(k) == worn for k in actor.goods):
+        if forged_suit is not None:
+            actor.take_off(str(forged_suit.get("name") or ""))
+            name = str(forged_suit.get("name") or name)
+        elif not any(goods.canonical(k) == worn for k in actor.goods):
             actor.goods[worn] = actor.goods.get(worn, 0) + 1
         if minutes:
             self.scene.advance(minutes=minutes)
@@ -16233,8 +16614,23 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "upkeep_failed":
         return (f"{e.get('what', 'It')} runs dry and lets go of {name} — "
                 f"no {e.get('pool', 'fuel')} left to hold it.")
+    if kind == "carried":
+        return f"{name} is carrying the {e.get('what', 'thing')}; it takes its toll each day."
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
+    return ""
+
+
+def _record_gear(rec: dict) -> str:
+    """What kind of gear a crafted record is: a forged record says (`gear`), an old one
+    names its base under `weapon` or `armour`. "" for anything that is not gear."""
+    gear = str((rec or {}).get("gear") or "").strip().lower()
+    if gear in ("weapon", "armour", "shield"):
+        return gear
+    if (rec or {}).get("weapon"):
+        return "weapon"
+    if (rec or {}).get("armour"):
+        return "armour"
     return ""
 
 

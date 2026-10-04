@@ -1,169 +1,282 @@
 {
  "id": "blacksmith",
  "name": "Blacksmith",
- "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — smelting, forging and finishing — unlocking forge stations, methods and higher tiers of metal, from bog iron to the skymetals and the legendary orange-gold horacalcum.",
+ "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (every step at the forge), opening methods and rarer metal at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, hardening, quality or yield.",
  "grantable_at_creation": true,
- "_thresholds_note": "Copied from Herbalist deliberately, dip and all: the two tracks are meant to pace the same, a level-1 forge chain is worth about the same MP as a level-1 herb chain (3 first-time + 2 for a second stage), and a second curve would mean two clocks to balance instead of one. The dip at level 4 is the Herbalist author's and is deliberate — do not 'fix' it here either.",
+ "_ruling_2026_10_03_note": "The owner's blacksmithing revamp ruling, 2026-10-03 (docs/blacksmithing-revamp-plan.md §2, §4, §7, §14), 'same as Herbalism'. Three unlock levels replace five: level 1 forge, quench, assemble and assay on common and uncommon metal, and smelt at a smithy; level 2 alloy, temper, fold, hone, strengthen and finish on rare and exotic; level 3 legendary metal and the sacred finishes. Draw merged into forge, polish into hone, flux became an ingredient of smelt and rivet became assemble; the level 4 and 5 rows, the `legendary-metal` milestone and its deed are gone. Old saves keep their level: an old Blacksmith 4 or 5 is an endless level 4 or 5 with its perk picks banked (rules/worldclass.py `migrate_blacksmith`).",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's numbers on purpose: the two tracks are meant to pace the same, and a second curve would be two clocks to balance instead of one.",
  "thresholds": [
   25,
-  65,
-  50,
-  100
+  65
  ],
- "milestones": {
-  "5": "legendary-metal"
- },
- "_deeds_note": "Mirrors the Herbalist's legendary-catalyst lesson: the deed is the material, not the method, because polish is a level-5 method and gating level 5 on a level-5 method is a gate that never opens. A Blacksmith 4 reaches legendary metal the one way the rules allow below level 5: the novel-alloy rule, where alloying two different metals of the same tier yields a metal one band rarer — two exotic skymetals in one crucible is a legendary melt. rules/blacksmith.py implements that step.",
- "deeds": {
-  "legendary-metal": {
-   "min_tier": "legendary",
-   "note": "Any successful forging at legendary tier, however the metal was reached."
+ "_endless_note": "Levels past the written table, plan §4.2 (proposed numbers, tunable here without a code change). Leaving level 3 costs `base` and each level after it `step` more (50, 60, 70...). Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick is worth: potency adds to the multiplier on the bonus modifiers of everything made, hardening takes that fraction off the negative modifiers (multiplied with the per-level cut), quality raises the ceiling by that many steps, yield is the chance per Smelt or Forge of one extra ingot or blank.",
+ "endless": {
+  "base": 50,
+  "step": 10,
+  "picks_per_level": 2,
+  "perks": {
+   "potency": 0.05,
+   "hardening": 0.05,
+   "quality": 1,
+   "yield": 0.05
   }
  },
+ "_ceiling_note": "`ceiling` is the highest quality index a level's hands can reach (0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless), plan §4.4. Superior or better is masterwork. Each Quality perk adds one past Flawless.",
  "levels": [
   {
    "level": 1,
    "tools": [
-    "field forge",
-    "hammer and tongs"
+    "field kit: camp anvil, bellows, field hearth, quench bucket, whetstone"
    ],
    "methods": [
-    "smelt",
     "forge",
-    "quench"
+    "quench",
+    "assemble",
+    "assay",
+    "smelt"
    ],
-   "max_tier": "common / mundane",
-   "note": "Bar iron, horseshoes, plain blades and simple repairs."
+   "max_tier": "uncommon / volatile",
+   "ceiling": 2,
+   "note": "Blanks from bar stock, hardened in the bath and put together into a working weapon or a suit of armour. Smelting ore needs a smithy's furnace."
   },
   {
    "level": 2,
    "tools": [
-    "bellows and anvil",
-    "riveting set"
-   ],
-   "methods": [
-    "flux",
-    "rivet"
-   ],
-   "max_tier": "uncommon / volatile",
-   "note": "Clean melts, fitted hafts and grips, silver and cold iron work."
-  },
-  {
-   "level": 3,
-   "tools": [
-    "smelting furnace",
     "crucible",
-    "grindstone and whetstone"
+    "welding flux",
+    "tempering tongs",
+    "grindstone"
    ],
    "methods": [
     "alloy",
     "temper",
-    "hone"
-   ],
-   "max_tier": "rare / magical",
-   "note": "True steel-making: crucible alloys, the heat-treatment that holds an edge, and the first masterwork pieces. This is the professional smith, and masterwork is professional work."
-  },
-  {
-   "level": 4,
-   "tools": [
-    "masterwork forge",
-    "drawplate and swage"
-   ],
-   "methods": [
-    "draw",
-    "fold"
+    "fold",
+    "hone",
+    "strengthen",
+    "finish"
    ],
    "max_tier": "exotic / planar",
-   "note": "Pattern-welding and wire-drawing: named steels, mail, and the skymetals."
+   "ceiling": 3,
+   "note": "Named alloys, tempered and honed work, folded and strengthened bars, and the mundane finishes. Superior work is masterwork. Alloy, fold and strengthen need a smithy."
   },
   {
-   "level": 5,
+   "level": 3,
    "tools": [
-    "starmetal forge"
+    "starmetal tongs",
+    "altar oils"
    ],
-   "methods": [
-    "polish"
-   ],
+   "methods": [],
    "max_tier": "legendary / mythic",
-   "note": "Mirror finishes, legendary metal, and work that outlives its maker."
+   "ceiling": 4,
+   "note": "Legendary metal, and the sacred and planar finishes: holy anointing, ghost-salt blanching, styx water."
   }
  ],
  "method_descriptions": {
-  "smelt": "Reduces ore to workable metal in the fire. Needs fuel in the charge, and metal above rare tier needs a fuel of rare tier or better — adamantine does not melt over charcoal.",
-  "forge": "Heats and hammers metal to shape on the anvil. The heart of every chain, and the step everything after the fire depends on. Needs fuel.",
-  "quench": "Plunges forged work into a bath to fix its hardness. What the bath is made of soaks into the steel — brine bites harder than water, and stranger liquids leave stranger marks.",
-  "flux": "Adds a cleansing agent to the melt that carries off slag and impurity. Strips the drawbacks of dirty ore the way Purify strips a poison — but it cleans the metal, not the smith: hazardous metal is hazardous still.",
-  "rivet": "Cold-joins fittings to finished metal: hafts, grips, guards and bindings. The way everything that is not the blade gets onto the blade.",
-  "alloy": "Melts two or more metals into one. Alloying two different metals of the same tier yields a metal one band rarer — a novel alloy is a discovery. Some metals refuse it: what makes cold iron cold iron does not survive the mixing.",
-  "temper": "Reheats quenched steel to a chosen colour and lets it down slowly, trading brittleness for spring. The step that separates a tool from a bar of hard iron, and the first requirement of fine and masterwork quality.",
-  "draw": "Pulls metal through a plate into wire and thin section — mail rings, springs, filigree. With fold, the shaping half of masterwork quality.",
-  "fold": "Doubles and welds the billet over itself, evening the carbon and layering the steel. The watered pattern on a fine blade is this method made visible.",
-  "hone": "Grinds and whets the working edge to its final geometry. With temper, what raises a piece from plain to fine.",
-  "polish": "Brings the surface to a mirror over days of ever-finer abrasive. The last touch on masterwork and the method of legendary metal."
+  "smelt": "Reduces ore to an ingot in a smithy's furnace. Fuel feeds the fire; a flux in the charge carries off slag, so the ingot is clean.",
+  "alloy": "Melts ingots of two or more metals together in a ratio the recipe names, and pours a bar of the named alloy: bronze, brass, steel. An unlisted pair still makes something new, named after what went in.",
+  "forge": "Heats a bar and hammers it into a blank for a weapon or a plate for armour, in the shape you pick from the real weapon and armour lists.",
+  "quench": "Plunges a hot blank into a bath to harden it. The bath leaves its mark on the metal, and the hardening leaves it brittle until it is tempered.",
+  "temper": "Lets quenched steel back down to the colour it needs, trading brittleness for spring. A quenched piece left untempered stays brittle.",
+  "fold": "Doubles and welds a bar or blank over itself. It drives the slag out of dirty metal; on clean metal it adds only a little hardness. Folding two different steels together makes pattern steel.",
+  "hone": "Grinds and whets a blade's edge. An edged weapon needs it to be Superior or better.",
+  "assemble": "Joins the pieces into the finished item: head, haft and fittings for a weapon, body, fastenings and lining for armour. This is where the item's numbers are computed.",
+  "finish": "Treats a finished item's surface: bluing, blackening, etching, plating, gilding, and at Blacksmith 3 the sacred finishes. Each treatment adds its own effect, and the book's restrictions apply.",
+  "strengthen": "Forge-welds two bars of one metal into one strengthened bar. Every modifier the metal carries counts half again as much, bonuses and drawbacks alike, and it can be done again.",
+  "assay": "Tests a sliver of a material against what you already know: a tenth of a bar, or one ore, and ten minutes. It reveals one benefit and one drawback. Reactive metals bite back."
  },
- "_method_help_note": "The structured half of a method's tooltip: `does` is the mechanical effect in numbers, `needs` is what must be in the charge for it to be legal, `for` is what a player reaches for it to accomplish. `method_descriptions` above stays as the prose half. Every method in the level table has an entry — a test asserts the two sets match, because a method with no tooltip is a button whose effect the player can only learn by spending materials on it.",
+ "_method_help_note": "The structured half of a method's tooltip: `does` is the mechanical effect, `needs` what must be on the anvil, `for` what a player reaches for it to do. Every method in the level table has an entry; a test asserts the two sets match.",
  "method_help": {
   "smelt": {
-   "does": "Turns ore into metal. No DC change of its own; the melt's rarity is the rarest thing in it. Exotic or legendary metal needs a fuel of rare tier or better.",
-   "needs": "Ore, metal or alloy in the charge, and a fuel. Charcoal will not melt a skymetal — dragonfire coal or better.",
-   "for": "Getting workable metal out of what you dug up, and the first step of any alloy."
-  },
-  "forge": {
-   "does": "Shapes the metal into the named base item. +2 DC as a stage, like every step. Everything after the fire depends on it having happened.",
-   "needs": "A fuel in the charge and a base item named — a weapon from the weapons list or an armour by name.",
-   "for": "Making the thing. No chain produces an object without it."
-  },
-  "quench": {
-   "does": "Fixes hardness. +2 DC as a stage, and the bath's own effects join the piece — brine, blessed water and wyvern blood each leave their own mark.",
-   "needs": "Forge earlier in the same chain. You cannot quench what was never forged.",
-   "for": "Hardening the work, and the cheapest way to put an exotic property into an ordinary blade."
-  },
-  "flux": {
-   "does": "Strips the harmful effects carried by ore in the charge — bog iron's slag-brittle -1 damage comes off, and the removal is named on the result. It does not touch metal-borne harm.",
-   "needs": "A flux in the charge and dirty ore to clean. Fluxing a clean melt removes nothing.",
-   "for": "Smelting cheap or filthy ore without the finished piece carrying the penalty."
-  },
-  "rivet": {
-   "does": "Cold-joins fittings to the piece, adding each fitting's effects — a wire-wrapped grip's +2 CMD against disarm, a darkwood haft's halved weight.",
-   "needs": "A base item named. Fittings in the charge to attach; it burns no fuel.",
-   "for": "Everything that is not the blade: hafts, grips, guards and bindings."
+   "does": "Two ore and two fuel make one ingot of the ore's metal. A flux in the charge cancels slaggy ore. A batch makes many ingots from one roll and one game.",
+   "needs": "A smithy, ore, and fuel. Exotic or legendary ore needs a fuel of rare tier or better: charcoal will not melt a skymetal.",
+   "for": "Getting workable metal out of what you dug up."
   },
   "alloy": {
-   "does": "Melts two or more metals into one. Two DIFFERENT metals of the same tier come out one band rarer — the novel-alloy rule, and the level-4 route to legendary metal.",
-   "needs": "Smelt earlier in the same chain and at least two metals. Cold iron, mithral, adamantine, noqual, inubrix and horacalcum refuse the crucible entirely.",
-   "for": "Making steel and bronze, and for reaching a tier of metal above anything you own."
+   "does": "Pours a bar of the named alloy for every ingot or bar that went in, when the shares sit inside the recipe's window. Melting resets strengthening.",
+   "needs": "A smithy and Blacksmith 2. Ingots or bars of two or more metals, plus any additive the recipe names (carbon for steel). Cold iron, mithral, adamantine and the other solitary metals only go into a recipe that names them.",
+   "for": "Steel, bronze, brass and the rarer alloys, and new metals nobody has named."
+  },
+  "forge": {
+   "does": "Turns bars into a blank (weapon) or a plate (armour or shield). The book's Craft DC for the item: simple weapons 12, martial 15, exotic 18, armour and shields 10 plus their AC bonus.",
+   "needs": "A field kit or smithy, enough bars for the shape, one fuel per piece, and the shape picked from the list.",
+   "for": "The main piece of anything you make."
+  },
+  "quench": {
+   "does": "Hardens a blank or plate and puts the bath's quench mark on it. Leaves it brittle until tempered.",
+   "needs": "A blank or plate not yet quenched, and one quenchant.",
+   "for": "Hardening the work, and the cheapest way to put a rare liquid's mark into an ordinary blade."
   },
   "temper": {
-   "does": "Trades brittleness for spring. No effect of its own, and it is half of the quality ladder: with a finishing method it makes masterwork, alone it makes fine.",
-   "needs": "Quench earlier in the same chain. Tempering is letting quenched steel back down, so there must be quenched steel.",
-   "for": "Quality. Nothing above plain is reachable without it."
-  },
-  "draw": {
-   "does": "Pulls stock through the plate into wire and thin section. +2 DC as a stage; it does not change quality on its own.",
-   "needs": "Forge earlier in the same chain.",
-   "for": "Mail rings, springs and filigree — the shaping half of pattern and mail work."
+   "does": "Removes the brittleness a quench leaves. A Superior result needs a tempered main piece.",
+   "needs": "Blacksmith 2 and a quenched piece that is still brittle.",
+   "for": "Masterwork, and armour that does not crack."
   },
   "fold": {
-   "does": "Doubles and welds the billet over itself, evening the steel. +2 DC as a stage; it does not change quality on its own.",
-   "needs": "Forge earlier in the same chain.",
-   "for": "Pattern-welded blades — the watered steel a named smith signs."
+   "does": "Cancels slaggy. On clean metal, the piece counts as folded (+1 hardness). A steel bar folded with a high-carbon steel bar makes a pattern steel bar.",
+   "needs": "A smithy, Blacksmith 2, and a bar, ingot, blank or plate.",
+   "for": "Saving cheap bloom iron, and pattern steel."
   },
   "hone": {
-   "does": "Grinds the working edge to its final geometry. The finishing half of the quality ladder: with temper it makes masterwork, which sets the DC floor to 20 and gives a weapon +1 enhancement on attack rolls (armour: check penalty lessened by 1).",
-   "needs": "Forge earlier in the same chain.",
-   "for": "Masterwork. This is the method the enchanter's vessel requirement is waiting on."
+   "does": "Puts the edge on a weapon blank. An edged weapon (slashing or piercing) needs a honed head to be Superior or better.",
+   "needs": "Blacksmith 2 and a weapon blank with an edge.",
+   "for": "Masterwork blades."
   },
-  "polish": {
-   "does": "Brings the surface to a mirror. Counts as a finishing method, so it can stand in for hone in the quality ladder. Nothing may follow it in the chain.",
-   "needs": "Hone earlier in the same chain — polish is the last grade of an honed surface.",
-   "for": "The final grade on legendary metal, and the last thing a master does to a piece."
+  "assemble": {
+   "does": "Makes the finished weapon or armour from its pieces: the main piece counts in full, the others half. The book's Craft DC; aiming for masterwork raises it to 20 (not for flawless metal). No batch: one item per roll.",
+   "needs": "A field kit or smithy, a blank or plate, and the second piece (haft or grip, fastenings). The third (fittings, lining) is optional.",
+   "for": "A real item you can wield or wear."
+  },
+  "finish": {
+   "does": "Adds a treatment's own effect to a finished item, unscaled. Alchemical silver will not take on adamantine, cold iron or mithral.",
+   "needs": "Blacksmith 2 (3 for holy anointing, ghost-salt blanching and styx water), a finished item and a treatment.",
+   "for": "Silvering against lycanthropes, blessing against undead, bluing against rust."
+  },
+  "strengthen": {
+   "does": "Two bars of one metal become one bar strengthened once more: every modifier it carries counts half again. Repeatable.",
+   "needs": "A smithy, Blacksmith 2, and two bars or ingots of the same metal at the same strength.",
+   "for": "Pushing one metal's numbers further than any quality can."
+  },
+  "assay": {
+   "does": "Reveals one benefit and one drawback of a material. Each known material of the same kind makes it 1 easier, at most 4.",
+   "needs": "A field kit or smithy, and the material carried: a tenth of a bar or one ore is used up.",
+   "for": "Knowing what a metal will do before you build with it."
   }
  },
- "_portable_note": "The furnace and the masterwork forge are architecture, not baggage. Whether a chain can be attempted is therefore partly a question about where the character is standing, which is scene state rather than sheet state — same call as the Herbalist's still and workbench.",
+ "_bench_note": "The forge bench's rule rows (docs/blacksmithing-revamp-plan.md §7, §10, §11), read by rules/blacksmith.py. Every number marked proposed in the plan lives here so it tunes without a code change. `where` is `kit` (field kit or smithy) or `smithy`. `bulk` methods take a batch: one roll and one game for the stack. `minutes` is per unit (per ingot, bar or piece); `minutes_plate` is a plate's. Tuning: `difficulty` is the game's base, raised by `rarity_step` per band above common (better metal, tighter window: OSRS Giants' Foundry), and the working traits scale the band.",
+ "bench": {
+  "order": [
+   "smelt",
+   "alloy",
+   "forge",
+   "quench",
+   "temper",
+   "fold",
+   "hone",
+   "assemble",
+   "finish",
+   "strengthen",
+   "assay"
+  ],
+  "methods": {
+   "smelt": {
+    "name": "Smelt", "where": "smithy", "bulk": true, "minutes": 60,
+    "takes": "ore, fuel, and a flux if the ore is dirty", "makes": "ingots",
+    "ore_per_unit": 2, "fuel_per_unit": 2, "flux_per_unit": 1,
+    "tuning": {"seconds": 7, "difficulty": 0.4, "band": "smelting"}
+   },
+   "alloy": {
+    "name": "Alloy", "where": "smithy", "bulk": true, "minutes": 30,
+    "takes": "ingots or bars of two or more metals", "makes": "an alloy bar for each metal bar in",
+    "tuning": {"seconds": 6, "difficulty": 0.45, "band": "pour"}
+   },
+   "forge": {
+    "name": "Forge", "where": "kit", "bulk": true, "minutes": 90, "minutes_plate": 180,
+    "takes": "bars and fuel", "makes": "a blank or a plate",
+    "fuel_per_unit": 1,
+    "tuning": {"seconds": 7, "difficulty": 0.45, "band": "forging"}
+   },
+   "quench": {
+    "name": "Quench", "where": "kit", "bulk": false, "minutes": 10,
+    "takes": "a blank or plate and a quenchant", "makes": "a hardened piece",
+    "tuning": {"seconds": 5, "difficulty": 0.45, "band": "plunge"}
+   },
+   "temper": {
+    "name": "Temper", "where": "kit", "bulk": false, "minutes": 30,
+    "takes": "a quenched piece", "makes": "a tempered piece",
+    "tuning": {"seconds": 6, "difficulty": 0.4, "band": "oxide"}
+   },
+   "fold": {
+    "name": "Fold", "where": "smithy", "bulk": false, "minutes": 60,
+    "takes": "a bar or piece, or two steels", "makes": "a folded bar or piece, or pattern steel",
+    "tuning": {"seconds": 7, "difficulty": 0.5, "band": "welding"}
+   },
+   "hone": {
+    "name": "Hone", "where": "kit", "bulk": false, "minutes": 30,
+    "takes": "a weapon blank with an edge", "makes": "a honed blank",
+    "tuning": {"seconds": 6, "difficulty": 0.4, "band": "angle"}
+   },
+   "assemble": {
+    "name": "Assemble", "where": "kit", "bulk": false, "minutes": 60,
+    "takes": "the main piece, the second piece, and the third if you have one", "makes": "the finished item",
+    "tuning": {"seconds": 6, "difficulty": 0.4, "band": "fit"}
+   },
+   "finish": {
+    "name": "Finish", "where": "kit", "bulk": false, "minutes": 60,
+    "takes": "a finished item and a treatment", "makes": "the treated item",
+    "tuning": {"seconds": 6, "difficulty": 0.4, "band": "coverage"}
+   },
+   "strengthen": {
+    "name": "Strengthen", "where": "smithy", "bulk": true, "minutes": 60,
+    "takes": "two bars of one metal", "makes": "one strengthened bar",
+    "bars_per_unit": 2,
+    "tuning": {"seconds": 7, "difficulty": 0.55, "band": "welding"}
+   },
+   "assay": {
+    "name": "Assay", "where": "kit", "bulk": false, "minutes": 10,
+    "takes": "a sliver of a material", "makes": "knowledge"
+   }
+  },
+  "_gates_note": "`smithy_rank`: material of this rank or rarer (rare and up) needs a smithy (plan §10). `hot_metal_rank` / `hot_fuel_rank`: smelting exotic or rarer ore needs a fuel of rare tier or better, today's rule kept. `masterwork_dc` and `masterwork_index` are the book's: a masterwork component is DC 20, and Superior (index 3) or better is masterwork. Book Craft DCs at Forge and Assemble (CRB Craft): simple 12, martial 15, exotic 18, armour and shields 10 + AC bonus.",
+  "smithy_rank": 3,
+  "hot_metal_rank": 4,
+  "hot_fuel_rank": 3,
+  "masterwork_dc": 20,
+  "masterwork_index": 3,
+  "book_dc": {"simple": 12, "martial": 15, "exotic": 18, "armour_base": 10},
+  "_bars_note": "Bars a shape takes at Forge (proposed): one per 4 lb of weapon, per 10 lb of armour, per 5 lb of shield, at least one. A bar is 1 lb of worked stock (plan §8).",
+  "bars_per_lb": {"weapon": 4, "armour": 10, "shield": 5},
+  "reheat_minutes": 5,
+  "rarity_step": 0.05,
+  "_traits_note": "What the working traits do at the bench (plan §5.5, proposed percentages). `band` scales every game's band; `quench_band` only Quench's; `weld_band` only Fold's and Strengthen's; `time` scales the minutes. A trait not listed here is still read where the rules name it (slaggy, malleable, pure, flawless, clean_heat, sulfurous, cleans_slag, reactive).",
+  "traits": {
+   "forgiving": {"band": 1.2},
+   "narrow_window": {"band": 0.8},
+   "sulfurous": {"band": 1.1},
+   "quench_sensitive": {"quench_band": 0.7},
+   "weld_aid": {"weld_band": 1.2},
+   "easily_worked": {"time": 0.5}
+  },
+  "_finish_note": "Treatments that need Blacksmith 3 (`sacred`), and the book's restrictions by treatment (`rules`): `not_on` names main-piece materials the treatment will not take on (alchemical silver: not adamantine, cold iron or mithral, Ultimate Equipment), `gear` the kinds of item it goes on. Styx water is a quenchant that can also be used as a finish.",
+  "sacred_finishes": ["holy-anointing", "ghost-salt-blanching", "styx-water"],
+  "sacred_level": 3,
+  "finish_rules": {
+   "alchemical-silver-plating": {"not_on": ["adamantine", "cold-iron", "mithral"], "book": true},
+   "adamantine-edging": {"gear": ["weapon"]},
+   "cold-iron-blanching": {"gear": ["weapon"]},
+   "lead-lining": {"gear": ["armour", "shield"]}
+  },
+  "_alloys_note": "The alloy recipe table (plan §7, Vintage Story's model: a window per component, no quality gradient inside it). Each component is a material id or {\"any\": [...], \"as\": label} for an additive any of several things can supply (carbon for steel). Shares are percent by count across everything in the crucible. Windows are wider than Vintage Story's (bronze 88-92 / 8-12) because a charge here is a handful of bars, not a hundred nuggets; the sweep's strongest finding was 'start generous'. `via: fold` marks an alloy made by folding, not melting. `house: true` marks a recipe with no printed source, borrowed from the material's own text; singing steel follows the PF1e precedent (gold and mithral). A recipe that names a solitary metal is the one way it enters a crucible.",
+  "alloys": {
+   "steel": {"parts": [{"id": "iron", "min": 75, "max": 90}, {"any": ["charcoal", "coke", "bone-char"], "as": "carbon", "min": 10, "max": 25}]},
+   "high-carbon-steel": {"parts": [{"id": "iron", "min": 60, "max": 74}, {"any": ["charcoal", "coke", "bone-char"], "as": "carbon", "min": 26, "max": 40}]},
+   "bronze": {"parts": [{"id": "copper", "min": 81, "max": 92}, {"id": "tin", "min": 8, "max": 19}]},
+   "bell-bronze": {"parts": [{"id": "copper", "min": 66, "max": 80}, {"id": "tin", "min": 20, "max": 34}]},
+   "brass": {"parts": [{"id": "copper", "min": 60, "max": 80}, {"any": ["zinc", "calamine"], "as": "zinc", "min": 20, "max": 40}]},
+   "pewter": {"parts": [{"id": "tin", "min": 75, "max": 95}, {"id": "copper", "min": 5, "max": 25}]},
+   "electrum": {"parts": [{"id": "gold", "min": 40, "max": 60}, {"id": "silver", "min": 40, "max": 60}]},
+   "nexavaran-steel": {"parts": [{"id": "cold-iron", "min": 60, "max": 80}, {"id": "steel", "min": 20, "max": 40}]},
+   "pattern-steel": {"via": "fold", "parts": [{"id": "steel"}, {"id": "high-carbon-steel"}]},
+   "elysian-bronze": {"house": true, "parts": [{"id": "bronze", "min": 80, "max": 95}, {"id": "star-iron", "min": 5, "max": 20}]},
+   "living-steel": {"house": true, "parts": [{"id": "steel", "min": 75, "max": 95}, {"id": "wyroot-haft", "min": 5, "max": 25}]},
+   "fire-forged-steel": {"house": true, "parts": [{"id": "steel", "min": 75, "max": 95}, {"id": "dragonfire-coal", "min": 5, "max": 25}]},
+   "frost-forged-steel": {"house": true, "parts": [{"id": "steel", "min": 75, "max": 95}, {"id": "glacier-melt", "min": 5, "max": 25}]},
+   "singing-steel": {"parts": [{"id": "mithral", "min": 50, "max": 80}, {"id": "gold", "min": 20, "max": 50}]},
+   "wyrmsteel": {"house": true, "parts": [{"id": "adamantine", "min": 70, "max": 90}, {"id": "dragonfire-coal", "min": 5, "max": 20}, {"id": "dragon-blood", "min": 5, "max": 20}]}
+  },
+  "_novel_note": "Two metals no recipe names still pour a bar, named after both ('Copper-Silver Alloy'), when each is at least `min_share` percent. Two different metals of the same top rarity come out `rarity_step` band rarer: mixing can beat purity (Giants' Foundry).",
+  "novel_alloy": {"min_share": 20, "rarity_step": 1}
+ },
+ "_old_methods_note": "Methods removed 2026-10-03 and what an old recipe naming one maps onto (plan §14).",
+ "old_methods": {
+  "draw": "forge",
+  "polish": "hone",
+  "flux": "smelt",
+  "rivet": "assemble"
+ },
+ "_portable_note": "Where you smith is read from the scene (rules/places.py `smithy_here`) and the pack (`has_field_kit`), never from the player's words (plan §10). The field kit works anywhere for kit methods on common and uncommon metal; a smithy, a town forge you pay by the hour or one you found and own, adds smelt, alloy, fold, strengthen and rare-and-up metal.",
  "fixed_tools": [
   "smelting furnace",
-  "masterwork forge",
-  "starmetal forge"
+  "forge-welding hearth"
  ],
- "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work."
+ "_fixed_tools_note": "Read now. The 2026-08-25 ruling ('leave these alone until property ownership exists') is retired by plan §10: founded places and their `holds.place.<slug>` effects exist, so a smithy is a place you can own, and the bench asks where you are standing."
 }

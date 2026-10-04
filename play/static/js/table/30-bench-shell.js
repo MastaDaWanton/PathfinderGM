@@ -16,9 +16,15 @@
 // names the tier (the page never does, contracts §3.4); the product flies to its satchel
 // tile; on a failure the tag says in words what was lost.
 //
-// WHO DRAWS WHAT. 30 owns the layer, focus, keys, the clock, the stage column and the
-// footer. 31 draws the satchel, 34 the result tag, 35 the herbarium card, 36 the perk
-// picker and the recipe book. They talk through `Bench.on(event, fn)`.
+// WHO DRAWS WHAT. 29-bench-core.js owns what every bench shares: the layer, open and
+// close, Esc and "Stop and keep what you have?", the focus trap and its return, the clock,
+// the footer's frame, the confirm, the flourish layer and the one-second rule (split out
+// 2026-10-03 so the forge can mount on the same machinery instead of copying it; see the
+// head of 29). 30 mounts the herb bench on it and owns the herbs: the method strip, the
+// pot, the stage column, the roll, the minigame call and what the footer holds. 31 draws
+// the satchel, 34 the result tag, 35 the herbarium card, 36 the perk picker and the recipe
+// book. They talk through `Bench.on(event, fn)`, and `window.Bench` keeps every name it had
+// before the split, so 31-36 did not change.
 //
 // MOTION (UI plan §10). Chrome moves by transform and opacity only, 200ms at most; the
 // product's flight is 500ms; nothing loops while the bench is idle (no setInterval and no
@@ -40,19 +46,16 @@
                reduce: "reduced", extract: "extracted", infuse: "infused", steep: "steeped",
                neutralize: "neutralized" };
 
+  var C = window.BenchCore;
   var $id = function (id) { return document.getElementById(id); };
-  var esc = function (s) {
-    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
-  };
+  var esc = C.esc;
 
   var B = window.Bench = {
     METHODS: METHODS, TOOL: TOOL, DONE: DONE, esc: esc,
     state: null,          // the last /api/bench/state body (contracts §3.1)
     check: null,          // the last /api/bench/check answer for the pot below (§3.2)
     pot: { method: null, items: [], batch: 1 },   // items: [{key, count}]
-    open: false,
+    // `open` is the core's (a getter, defined where the layer is mounted below).
     busy: false,          // a roll or a finish in flight
     live: null,           // a minigame running: {token, tuning}
     result: null,         // the last finish (§3.4) or failed roll (§3.3), for the tag
@@ -70,63 +73,24 @@
     });
   };
 
-  // --- time in words (UI plan §8) -------------------------------------------------------
-  // Prose: "30 minutes", "2 hours 30 minutes", "3 days". Compact, for the stage's info
-  // line only: "30m", "2h 30m", "3d".
-  B.minutes = function (m, compact) {
-    m = Math.max(0, Math.round(Number(m) || 0));
-    var d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), n = m % 60;
-    var parts = [];
-    var unit = function (v, one, many, short) {
-      if (!v) return;
-      parts.push(compact ? v + short : v + " " + (v === 1 ? one : many));
-    };
-    unit(d, "day", "days", "d");
-    unit(h, "hour", "hours", "h");
-    if (!d) unit(n, "minute", "minutes", "m");
-    return parts.length ? parts.join(" ") : (compact ? "0m" : "no time");
-  };
-  // A coarse span for the satchel's lines: "5 hours", "3 days", "40 minutes".
-  B.span = function (m) {
-    m = Math.max(0, Math.round(Number(m) || 0));
-    if (m >= 2880) return Math.round(m / 1440) + " days";
-    if (m >= 1440) return "1 day";
-    if (m >= 120) return Math.round(m / 60) + " hours";
-    if (m >= 60) return "1 hour";
-    return m + (m === 1 ? " minute" : " minutes");
-  };
-  B.sign = function (v) { v = Number(v) || 0; return (v >= 0 ? "+" : "") + v; };
+  // --- the shared helpers, from the core (29-bench-core.js) ----------------------------
+  // Time in words (UI plan §8), the API with its CSRF and its error sentences, sound,
+  // reduced motion and Steady mode are every bench's, so they live in the core; the names
+  // stay on `Bench` because 31-36 call them there.
+  B.minutes = C.minutes;
+  B.span = C.span;
+  B.sign = C.sign;
+  B.sound = C.sound;
+  B.reduced = C.reduced;
+  B.steady = C.steady;
+  B.setSteady = C.setSteady;
+  B.api = C.api;
 
-  // --- providers, each optional (contracts §5) ---------------------------------------
+  // --- the herb stage, optional (contracts §5) -----------------------------------------
   B.stage = function () {
     var s = window.BenchStage;
     try { return s && typeof s.available === "function" && s.available() ? s : null; }
     catch (err) { return null; }
-  };
-  B.sound = function (name) {
-    try { if (window.Sound && typeof Sound.play === "function") Sound.play(name); }
-    catch (err) { /* sound is a nicety; never the reason a craft fails */ }
-  };
-  var STILL = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
-  // Reduced motion: the OS asked, or the player chose Short flourishes (UI plan §6.9).
-  B.reduced = function () {
-    var short = false;
-    try { short = !!(window.PGMPrefs && PGMPrefs.get("flourishes") === "short"); }
-    catch (err) { short = false; }
-    return !!(STILL && STILL.matches) || short;
-  };
-  // Steady mode (UI plan §9): PGMPrefs when Lane G is here, else this page's own key.
-  B.steady = function () {
-    try {
-      if (window.PGMPrefs && typeof PGMPrefs.get === "function") return !!PGMPrefs.get("steady");
-    } catch (err) { /* fall through to the page's own key */ }
-    try { return window.localStorage.getItem("pgm.steady") === "1"; } catch (err) { return false; }
-  };
-  B.setSteady = function (on) {
-    try {
-      if (window.PGMPrefs && typeof PGMPrefs.set === "function") { PGMPrefs.set("steady", !!on); return; }
-    } catch (err) { /* fall through */ }
-    try { window.localStorage.setItem("pgm.steady", on ? "1" : "0"); } catch (err) { /* private */ }
   };
   function remember(key, value) {
     try { window.localStorage.setItem(key, value); } catch (err) { /* private window */ }
@@ -134,40 +98,6 @@
   function recall(key) {
     try { return window.localStorage.getItem(key); } catch (err) { return null; }
   }
-
-  // Said once to a screen reader (the layer's own status line).
-  B.say = function (text) {
-    var s = $id("bench-say");
-    if (!s) return;
-    s.textContent = "";
-    setTimeout(function () { s.textContent = text; }, 30);
-  };
-
-  // --- the API ---------------------------------------------------------------------------
-  function csrf() {
-    var m = document.cookie.match(/csrftoken=([^;]+)/);
-    return m ? m[1] : "";
-  }
-  // GET when there is no body. Errors are the server's own sentence (contracts §3:
-  // `{"error": "<plain sentence>"}`), carried with the status so a 409 can be told apart.
-  B.api = function (path, body) {
-    var opts = body === undefined ? { cache: "no-store" } : {
-      method: "POST", body: JSON.stringify(body),
-      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
-    };
-    return fetch(path, opts).then(function (r) {
-      return r.text().then(function (raw) {
-        var data = null;
-        try { data = JSON.parse(raw); } catch (err) { data = null; }
-        if (!r.ok || !data) {
-          var e = new Error((data && data.error) || ("The server failed (HTTP " + r.status + ")."));
-          e.status = r.status;
-          throw e;
-        }
-        return data;
-      });
-    });
-  };
 
   // --- lookups -------------------------------------------------------------------------
   B.item = function (key) {
@@ -203,178 +133,69 @@
     return i < TIER_FALLBACK.length ? TIER_FALLBACK[i] : "Flawless +" + (i - 4);
   };
 
-  // --- the layer: open, close, focus ----------------------------------------------------
+  // --- the layer, mounted on the core (UI plan §4.1) ------------------------------------
+  // Open, close, inert, the clock on the stage, Esc one layer at a time, "Stop and keep
+  // what you have?", the focus trap and its return, the blur pause and the footer's frame
+  // are 29-bench-core.js's. What is the herb bench's own is said here: its ids, its hash
+  // (the old /craft/ page's door), the Craft action panel that shuts as the bench opens,
+  // the 1-9 keys for the nine methods, and what opening and closing do to the herbs.
   var bench = $id("bench");
-  var opener = null;
-  // What the layer makes inert while it is open: everything a click or Tab could reach on
-  // the table. Not the deathveil (40), which must be able to cover the bench, and not the
-  // dice mat, which dice3d.js builds on first use and which this list never names.
-  var BEHIND = [".topbar", "#stage", ".modepage", "#tradepanel", "#sheetpanel", ".skip", "#veil",
-                "#talktray"];
-  var wasInert = [];
-  var clockHome = null;
   var ambience = null;
-
-  B.openBench = function (from) {
-    if (!bench) return;
-    if (B.open) return;
-    B.open = true;
-    opener = from || document.activeElement;
-    wasInert = [];
-    BEHIND.forEach(function (sel) {
-      document.querySelectorAll(sel).forEach(function (el) {
-        if (el === bench || bench.contains(el)) return;
-        wasInert.push([el, el.inert]);
-        el.inert = true;
-      });
-    });
-    // The time-skip clock (09-clock.js) lives in #stage at z-index 8, under this layer. A
-    // step of an hour or more turns the scene clock with that same animation (UI plan
-    // §4.1), so while the bench is open the clock's element stands on the bench's stage;
-    // 09 finds it by id, wherever it is.
-    var clock = $id("clockpop");
-    var stage = $id("bench-stage");
-    if (clock && stage && clock.parentNode !== stage) {
-      clockHome = { parent: clock.parentNode, next: clock.nextSibling };
-      stage.appendChild(clock);
-    }
-    document.body.classList.add("bench-on");
-    bench.hidden = false;
-    bench.classList.toggle("bench-still", B.reduced());
-    void bench.offsetWidth;            // so the 200ms fade starts from nothing
-    bench.classList.add("is-in");
-    if (location.hash !== "#bench") {
-      try { history.replaceState(null, "", "#bench"); } catch (err) { /* file: URL */ }
-    }
-    B.sound("bench.open");
-    B.emit("open");
-    focusFirst();
-    load();
-  };
-
-  B.closeBench = function () {
-    if (!B.open) return;
-    if (B.live) { askStop(); return; }       // never drop a live game on the floor
-    B.open = false;
-    bench.classList.remove("is-in");
-    bench.hidden = true;
-    document.body.classList.remove("bench-on");
-    wasInert.forEach(function (p) { p[0].inert = p[1]; });
-    wasInert = [];
-    var clock = $id("clockpop");
-    if (clock && clockHome) {
-      clockHome.parent.insertBefore(clock, clockHome.next);
-      clockHome = null;
-    }
-    if (ambience) { try { ambience.stop(); } catch (err) { /* */ } ambience = null; }
-    var stage = B.stage();
-    if (stage && stageMounted) { try { stage.unmount(); } catch (err) { /* */ } stageMounted = false; }
-    B.emit("close");
-    if (location.hash === "#bench") {
-      try { history.replaceState(null, "", location.pathname + location.search); } catch (err) { /* */ }
-    }
-    // Time passed and the satchel changed: the table under the layer is drawn again from
-    // the server, the same way every other action of the table's ends.
-    if (typeof render === "function" && typeof getState === "function") {
-      getState().then(function (s) { render(s); }).catch(function () { /* resync catches up */ });
-    }
-    var back = opener && document.contains(opener) && !opener.closest("[inert]") ? opener : $id("open-bench");
-    opener = null;
-    if (back && typeof back.focus === "function") back.focus();
-  };
-
-  function focusFirst() {
-    var active = bench.querySelector(".bm[aria-checked='true']") || $id("bench-close");
-    if (active) active.focus();
-  }
-
-  // What may hold focus right now: the dice mat while it shows a roll, else the bench's
-  // open modal popover, else the bench. The trap wraps Tab inside it (UI plan §4.1).
-  function trapRoot() {
-    var mat = document.querySelector("#d3d-mat.on");
-    if (mat) return mat;
-    var modal = bench.querySelector(".bench-modal:not([hidden])");
-    return modal || bench;
-  }
-  function focusables(root) {
-    return Array.prototype.filter.call(root.querySelectorAll(
-      "button, [href], input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"),
-      function (el) {
-        return !el.disabled && el.getClientRects().length && !el.closest("[hidden]") &&
-               el.getAttribute("tabindex") !== "-1";
-      });
-  }
-  document.addEventListener("keydown", function (e) {
-    if (!B.open || e.key !== "Tab") return;
-    if (document.querySelector("#deathveil.on")) return;    // death owns the screen
-    var root = trapRoot();
-    var list = focusables(root);
-    if (!list.length) return;
-    var first = list[0], last = list[list.length - 1];
-    var at = document.activeElement;
-    if (!root.contains(at)) { e.preventDefault(); first.focus(); return; }
-    if (e.shiftKey && at === first) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
-  }, true);
-
-  // --- Esc, one layer at a time ----------------------------------------------------------
-  // The popovers (card, confirm, perks, recipes) push a closer; Esc runs the newest.
-  var escStack = [];
-  B.pushEsc = function (fn) { escStack.push(fn); };
-  B.dropEsc = function (fn) { escStack = escStack.filter(function (f) { return f !== fn; }); };
-
-  bench && bench.addEventListener("keydown", function (e) {
-    var tag = e.target && e.target.tagName;
-    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag);
-    if (e.key === "Escape") {
-      e.preventDefault();
-      e.stopPropagation();
-      if (escStack.length) { escStack[escStack.length - 1](); return; }
-      if (B.live) { askStop(); return; }
-      if (document.querySelector("#d3d-mat.on")) return;
-      B.closeBench();
-      return;
-    }
-    // 1-9 pick a method (UI plan §6.1), unless the player is typing or a game has the keys.
-    if (!typing && !B.live && !escStack.length && /^[1-9]$/.test(e.key) &&
-        !e.ctrlKey && !e.metaKey && !e.altKey) {
-      e.preventDefault();
-      B.setMethod(METHODS[Number(e.key) - 1], { focus: true });
-    }
-    // The table's own shortcuts listen on the document ("m" opens the map, Esc closes the
-    // sheet's details): none of them may act on a table that is behind the bench. While a
-    // game is live its keys go through, because Lane E may listen on the document.
-    if (!B.live) e.stopPropagation();
-  });
-
-  // A game running while the player's attention is elsewhere would score time they were
-  // not there for (UI plan §7): it pauses on blur. It does NOT carry on by itself on
-  // focus: the UI plan's line is "Paused. Press Space to carry on.", and resuming the
-  // instant the window came back would start the clock before the player's hand was on
-  // the key (the games lane's note at merge). The frame waits for Space or a click.
-  window.addEventListener("blur", function () {
-    if (B.live && window.BenchGames && BenchGames.pause) { try { BenchGames.pause(); } catch (err) { /* */ } }
-  });
-
-  // --- the opener buttons and the #bench hash (UI plan §4.1) ----------------------------
-  document.addEventListener("click", function (e) {
-    var go = e.target.closest && e.target.closest("[data-bench-open]");
-    if (!go) return;
+  var core = C.mount({
+    layer: "bench", close: "bench-close", stage: "bench-stage", say: "bench-say",
+    pops: "bench-pops", foot: "bench-foot", footIn: "bench-foot-in", home: "open-bench",
+    clockId: "bench-clock", hash: "#bench", bodyClass: "bench-on",
+    openWith: "[data-bench-open]",
     // From the Craft action panel: shut it first, so the bench's focus comes back to the
     // panel's own button rather than to a control inside a closed popover.
-    var panel = $id("craftpanel");
-    var from = go;
-    if (panel && panel.contains(go)) {
-      panel.hidden = true;
-      if (typeof shellCraftExpanded === "function") shellCraftExpanded(false);
-      from = $id("craftaction") || go;
-    }
-    B.openBench(from);
+    openFrom: function (go) {
+      var panel = $id("craftpanel");
+      if (panel && panel.contains(go)) {
+        panel.hidden = true;
+        if (typeof shellCraftExpanded === "function") shellCraftExpanded(false);
+        return $id("craftaction") || go;
+      }
+      return go;
+    },
+    first: ".bm[aria-checked='true']",
+    // A method, an ingredient, the roll, the card's study and taste have sounds of their own.
+    quiet: ".bm, .bt-add, #bench-roll, [data-hc]",
+    live: function () { return !!B.live; },
+    // 1-9 pick a method (UI plan §6.1); the core asks only when the player is not typing,
+    // no game has the keys and no popover is open.
+    keys: function (e) {
+      if (/^[1-9]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        B.setMethod(METHODS[Number(e.key) - 1], { focus: true });
+      }
+    },
+    opened: function () {
+      B.sound("bench.open");
+      B.emit("open");
+      focusFirst();
+      load();
+    },
+    closing: function () {
+      if (ambience) { try { ambience.stop(); } catch (err) { /* */ } ambience = null; }
+      var stage = B.stage();
+      if (stage && stageMounted) { try { stage.unmount(); } catch (err) { /* */ } stageMounted = false; }
+      B.emit("close");
+    },
+    footer: function () { return footParts(); },
   });
-  $id("bench-close") && $id("bench-close").addEventListener("click", function () { B.closeBench(); });
+  Object.defineProperty(B, "open", { enumerable: true, get: function () { return core.open; } });
+  B.openBench = core.openLayer;
+  B.closeBench = core.closeLayer;
+  B.pushEsc = core.pushEsc;
+  B.dropEsc = core.dropEsc;
+  B.confirm = core.confirm;
+  // Said once to a screen reader (the layer's own status line).
+  B.say = core.say;
+  function focusFirst() { core.focusFirst(); }
+
+  // /play/#bench, the old bench's "Open the herbalism bench" (craft.html), opens it on load.
   function fromHash() { if (location.hash === "#bench" && !B.open) B.openBench($id("open-bench")); }
   window.addEventListener("hashchange", fromHash);
-  // /play/#bench, the old bench's "Open the herbalism bench" (craft.html), opens it on load.
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", fromHash);
   else setTimeout(fromHash, 0);
 
@@ -668,11 +489,8 @@
   }
   B.renderStage = renderStage;
 
+  // (A plain button's `ui.click` is the core's, which skips the ones named in `quiet`.)
   bench && bench.addEventListener("click", function (e) {
-    // A press of any plain button answers with `ui.click`; the ones with a sound of their
-    // own (a method, an ingredient, the roll, the card's study and taste) do not double it.
-    var btn = e.target.closest("button");
-    if (btn && !btn.disabled && !btn.closest(".bm, .bt-add, #bench-roll, [data-hc]")) B.sound("ui.click");
     var x = e.target.closest("[data-unpot]");
     if (x) { B.removeItem(x.dataset.unpot); return; }
     if (e.target.closest("#bench-roll")) { B.roll(); }
@@ -712,28 +530,14 @@
   document.addEventListener("dragend", function () { if (B.open) { dragOver(false); B.dragKey = null; } });
 
   // --- the roll (UI plan §5, step 4) ------------------------------------------------------
-  // The d20 is the table's own: Dice3D.ask winds it up and holds the mat open (`hold`),
+  // The d20 is the table's own, thrown by the core (29-bench-core.js `rollD20`, moved there
+  // 2026-10-04 so the forge throws the same die the same way): Dice3D.ask holds the mat,
   // the server rolls the face (a null face, the old bench's convention, contracts §3.3),
-  // Dice3D.land throws it onto that face, and showVerdict (22-roll-verdict.js) plays the
-  // engine's word once the die is at rest. Exactly the path 04's sendRoll takes.
-  function focusMat() {
-    setTimeout(function () {
-      // The player's own die (the mat's debug toggle) wants its number typed first.
-      var own = document.querySelector("#d3d-own.on #d3d-face");
-      var go = document.getElementById("d3d-go");
-      if (own && go && !go.disabled && go.textContent === "Roll") own.focus();
-      else if (go && !go.disabled) go.focus();
-    }, 40);
-  }
+  // Dice3D.land throws it onto that face and showVerdict plays the engine's word. The
+  // herb bench says only what goes on the mat and where the face is posted. The game
+  // rises only after the player closes the mat, so nothing starts under a mat being read.
+  var focusMat = C.focusMat;
   B.focusMat = focusMat;
-  function rollTerms(c) {
-    var terms = (c.terms || []).map(function (t) { return { label: t.label, value: B.sign(t.value) }; });
-    if (c.terms && c.terms.length !== 1 && c.bonus != null) {
-      terms.push({ label: "your modifier", value: B.sign(c.bonus), total: true });
-    }
-    if (c.dc != null) terms.push({ label: "beat", value: c.dc });
-    return terms;
-  }
 
   B.roll = function () {
     var c = B.check;
@@ -743,35 +547,31 @@
     B.emit("rolling");
     renderStage();
     var name = c.product && c.product.name ? c.product.name : "Herbalism";
-    var shown = { title: "Craft (herbalism)", why: name, sides: 20, lo: 1, hi: 20, die: "1d20",
-                  terms: rollTerms(c) };
-    var dice = window.Dice3D;
-    var asking = dice ? dice.ask(Object.assign({ hold: true }, shown)) : Promise.resolve(null);
-    if (dice) focusMat();
     var body = potBody();
-    var roll = null;
-    return asking.then(function (face) {
-      B.sound("bench.roll");
-      body.face = face == null ? null : face;
-      return B.api("/api/bench/roll", body);
-    }).then(function (r) {
-      roll = r;
-      tickClock(r.minutes, r.clock);
-      if (!dice) return null;
-      var closing = dice.land(Object.assign({}, shown, { result: r.roll.face }));
-      var rest = typeof dice.settled === "function" ? dice.settled() : null;
-      if (typeof showVerdict === "function") showVerdict(r.verdict, rest);
-      if (rest) rest.then(focusMat);
-      // The mat is the player's to close (dice3d.js: `land` resolves on Close), and the
-      // game rises only after it, so nothing starts under a mat still being read.
-      return closing;
-    }).then(function () {
+    return C.rollD20({
+      shown: { title: "Craft (herbalism)", why: name, sides: 20, lo: 1, hi: 20, die: "1d20",
+               terms: C.rollTerms(c) },
+      post: function (face) {
+        B.sound("bench.roll");
+        body.face = face;
+        return B.api("/api/bench/roll", body);
+      },
+      // A success is followed by the step's game: the clock face waits for it (29's turnClock).
+      landed: function (r) { tickClock(r.minutes, r.clock, !!(r.roll && r.roll.success && r.token)); },
+      face: function (r) { return r.roll.face; },
+      verdict: function (r) { return r.verdict; },
+    }).then(function (roll) {
       B.busy = false;
-      if (roll.roll && roll.roll.success && roll.token) return play(roll);
+      if (roll.roll && roll.roll.success && roll.token) {
+        return Promise.resolve(play(roll)).then(
+          function (x) { C.releaseClock(); return x; },
+          function (e) { C.releaseClock(); throw e; });
+      }
       return failed(roll).then(focusAfterRoll);
     }).catch(function (err) {
       B.busy = false;
-      if (dice && typeof dice.close === "function") dice.close();
+      C.releaseClock();
+      C.closeMat();
       $id("bench-why").textContent = err.message || String(err);
       B.say(err.message || String(err));
       renderStage();
@@ -792,16 +592,13 @@
   // The scene clock, moved by the step's time (UI plan §4.1). The footer reads the API's
   // own label; a step of an hour or more also turns the table's clock face (09-clock.js),
   // which waits for the dice mat to close before it shows.
-  function tickClock(minutes, clock) {
+  function tickClock(minutes, clock, hold) {
     var g = B.state && B.state.ground;
     if (clock && B.state) B.state.clock = clock;
     if (g && typeof g.minute === "number" && minutes) {
       var before = g.minute, after = before + minutes;
       g.minute = after;
-      // 09 keeps its own rule (an hour or more) and its own reduced-motion face.
-      if (minutes >= 60 && typeof clockWhenClear === "function") {
-        try { clockWhenClear(before, after, ""); } catch (err) { /* the label still moved */ }
-      }
+      C.turnClock(before, after, hold);
     }
     renderFoot();
   }
@@ -821,7 +618,6 @@
   }
 
   // --- the minigame (UI plan §5, step 5; contracts §5.2) ---------------------------------
-  var stopAsking = false;
   function play(r) {
     B.live = { token: r.token, tuning: r.tuning || {} };
     var strip = $id("bench-game");
@@ -861,27 +657,9 @@
     });
   }
 
-  // Esc during a game: "Stop and keep what you have?" (UI plan §4.1). Stopping scores the
-  // run so far, through BenchGames.stop(), which resolves the game's promise.
-  function askStop() {
-    if (stopAsking || !B.live) return;
-    stopAsking = true;
-    var games = window.BenchGames;
-    if (games && games.pause) { try { games.pause(); } catch (err) { /* */ } }
-    B.confirm({
-      title: "Stop and keep what you have?",
-      body: "The run so far is scored. No materials are lost to a stop.",
-      ok: "Stop", cancel: "Keep playing",
-    }).then(function (yes) {
-      stopAsking = false;
-      if (!B.live) return;
-      if (yes) {
-        if (games && typeof games.stop === "function") { try { games.stop(); } catch (err) { /* */ } }
-      } else if (games && games.resume) {
-        try { games.resume(); } catch (err) { /* */ }
-      }
-    });
-  }
+  // Esc or Close during a game asks "Stop and keep what you have?" (UI plan §4.1): the
+  // core's `askStop`, which stops through BenchGames.stop() and so resolves the promise
+  // above, and `finish` runs as for any ending.
 
   // --- the finish and the landing (UI plan §5, step 6) ------------------------------------
   function finish(score, stopped) {
@@ -911,8 +689,10 @@
         land(f, from);
         renderStage();
         B.runCheck();
-        var next = $id("bench-next");
-        (next || $id("bench-roll")).focus();
+        // Roll Craft is still disabled while the check above answers, and a disabled
+        // button refuses focus: the core's refocus never lets it fall to <body> (lane F's
+        // found bug, fixed 2026-10-04).
+        core.refocus(["bench-next", "bench-roll", '#bench-list .bt-add[tabindex="0"]']);
       }).catch(function (err) {
         B.live = null;
         B.busy = false;
@@ -964,40 +744,13 @@
   }
   function cssEscape(s) { return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/"/g, '\\"'); }
 
-  // 500ms along a curve: up off the tool, then over to the tile, as a brass roundel. On its
-  // own fixed element with pointer-events: none, at the verdict layer's height (66), so it
-  // covers nothing a click needs; a click anywhere finishes it at once.
-  var flying = [];
+  // The flight itself (500ms along a curve, pointer-events: none, any click finishes it)
+  // is the core's; the herb bench only says what flies: the product's own roundel.
   function fly(item, from, to) {
     var el = window.BenchIcons ? BenchIcons.el(item.form || item.part || "leaf", { size: 44, label: item.name })
                                : document.createElement("span");
-    el.classList.add("bench-fly");
-    document.body.appendChild(el);
-    var x0 = from.left + from.width / 2 - 22, y0 = from.top + from.height / 2 - 22;
-    var x1 = to.left + 18 - 22 + 8, y1 = to.top + to.height / 2 - 22;
-    var lift = Math.min(160, Math.max(60, (y0 - Math.min(y0, y1)) + 80));
-    var at = function (p) {
-      // A quadratic Bezier through a control point above both ends: the arc of a thrown thing.
-      var cx = (x0 + x1) / 2, cy = Math.min(y0, y1) - lift;
-      var x = (1 - p) * (1 - p) * x0 + 2 * (1 - p) * p * cx + p * p * x1;
-      var y = (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * cy + p * p * y1;
-      var s = p < 0.2 ? 1 + p : 1.2 - 0.5 * p;
-      return { transform: "translate(" + x.toFixed(1) + "px," + y.toFixed(1) + "px) scale(" + s.toFixed(3) + ")",
-               opacity: p > 0.92 ? (1 - p) / 0.08 : 1, offset: p };
-    };
-    var frames = [0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1].map(at);
-    var anim = el.animate(frames, { duration: 500, easing: "cubic-bezier(.3,.1,.3,1)", fill: "forwards" });
-    flying.push(anim);
-    return anim.finished.catch(function () { /* skipped */ }).then(function () {
-      flying = flying.filter(function (a) { return a !== anim; });
-      el.remove();
-    });
+    return C.fly(el, from, to);
   }
-  // Any click skips a flourish (UI plan §10, the one-second rule): it completes at once.
-  document.addEventListener("pointerdown", function () {
-    if (!flying.length) return;
-    flying.slice().forEach(function (a) { try { a.finish(); } catch (err) { /* */ } });
-  }, true);
 
   // Flourishes through the stage when it is there, else the flat ones: Flawless borrows
   // the table's own cast brass word (22-roll-verdict.js `verdictWord`) and its gilt sparks;
@@ -1018,67 +771,13 @@
     // From the tool's own disc, not its whole cell: from the cell the gilt ring opened
     // 300px wide round empty ground (first screenshot of the flourish).
     var tool = document.querySelector("#bench-tool .bench-flat .bicon") || $id("bench-tool");
-    if (kind === "fail") {
-      var stage = $id("bench-stage");
-      stage.classList.remove("is-dim");
-      void stage.offsetWidth;
-      stage.classList.add("is-dim");
-      return;
-    }
-    if (kind === "flawless" && typeof verdictWord === "function" && tool) {
-      var r = tool.getBoundingClientRect();
-      var at = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-      var still = B.reduced();
-      try {
-        verdictWord({ good: true, word: word || "Flawless", text: word || "Flawless", sub: "",
-                      still: still, ms: still ? 1200 : 1300 }, at, Math.min(r.width, r.height));
-      } catch (err) { /* the word is a nicety */ }
-      // The stage throws its own gilt sparks; the page's are for the flat stand-in only.
-      if (!staged && !still && typeof VerdictSparks === "object" && VerdictSparks) {
-        try { VerdictSparks.burst("triumph", at.x, at.y, 1300, Math.min(r.width, r.height) * 0.4); } catch (err) { /* */ }
-      }
-    }
+    if (kind === "fail") { C.dim($id("bench-stage")); return; }
+    // The stage throws its own gilt sparks; the page's are for the flat stand-in only.
+    if (kind === "flawless") C.word(tool, word || "Flawless", !staged);
   }
   B.flourish = flourish;
 
-  // --- a confirm inside the layer (taste, stop) ----------------------------------------
-  // A small modal of the bench's own: two buttons, the safe one focused first, Esc is the
-  // safe one. Resolves true for the first button.
-  B.confirm = function (o) {
-    return new Promise(function (done) {
-      var pops = $id("bench-pops");
-      var back = document.activeElement;
-      var wrap = document.createElement("div");
-      wrap.className = "bench-modal bench-confirm";
-      wrap.setAttribute("role", "alertdialog");
-      wrap.setAttribute("aria-modal", "true");
-      var id = "bench-confirm-" + Date.now();
-      wrap.setAttribute("aria-labelledby", id + "-t");
-      wrap.setAttribute("aria-describedby", id + "-b");
-      wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog v2-framed v2-card-leather">' +
-        '<i class="v2-rim" aria-hidden="true"></i>' +
-        '<h3 id="' + id + '-t">' + esc(o.title) + '</h3>' +
-        '<p id="' + id + '-b">' + esc(o.body || "") + '</p>' +
-        (o.warn ? '<p class="bench-warnline">' + esc(o.warn) + '</p>' : "") +
-        '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-no>' +
-        esc(o.cancel || "Cancel") + '</button><button type="button" class="v2-btn ' +
-        (o.danger ? "is-quiet bench-danger" : "is-go") + '" data-yes>' + esc(o.ok || "OK") +
-        '</button></div></div>';
-      pops.appendChild(wrap);
-      var finish = function (v) {
-        B.dropEsc(onEsc);
-        wrap.remove();
-        if (back && document.contains(back) && back.focus) back.focus();
-        done(v);
-      };
-      var onEsc = function () { finish(false); };
-      B.pushEsc(onEsc);
-      wrap.querySelector("[data-no]").addEventListener("click", function () { finish(false); });
-      wrap.querySelector("[data-yes]").addEventListener("click", function () { finish(true); });
-      wrap.querySelector(".bench-scrim").addEventListener("click", function () { finish(false); });
-      wrap.querySelector("[data-no]").focus();
-    });
-  };
+  // (The confirm inside the layer, for taste, stop and delete, is the core's: B.confirm.)
 
   // --- the method strip (UI plan §6.1) ---------------------------------------------------
   // A radio group: one stop in the Tab order, ← and → move and choose, 1-9 jump. Locked
@@ -1164,43 +863,27 @@
   renderMethods();
 
   // --- the footer (UI plan §6.8) ----------------------------------------------------------
-  function renderFoot() {
-    var foot = $id("bench-foot-in");
-    if (!foot) return;
+  // The core draws the frame (the clock first, the track's level and mastery line, the
+  // picks, a gap, then Steady mode last, and the Steady switch's click); the herb bench
+  // says what is in it: the scene clock's label, "Herbalist" and its numbers, and its two
+  // buttons, Recipes (36 opens it) and Herbarium (below).
+  function footParts() {
     var s = B.state, t = s && s.track;
-    var clock = s && s.clock && s.clock.label ? s.clock.label : "";
-    var prog = "";
-    if (t) {
-      var need = t.to_next && t.to_next.need, have = t.to_next && t.to_next.have;
-      var frac = need ? Math.max(0, Math.min(1, have / need)) : 1;
-      prog = '<span class="bf-level">Herbalist ' + esc(t.level) + '</span>' +
-        '<span class="bf-line" aria-hidden="true"><i style="transform:scaleX(' + frac.toFixed(3) + ')"></i></span>' +
-        '<span class="bf-mp">' + (need ? esc(have) + " / " + esc(need) : esc(t.mp) + " mastery") + '</span>';
-    }
-    var picks = t && t.picks_banked ? '<button type="button" class="bf-btn bf-perks" data-bench-perks>' +
-      (t.picks_banked === 1 ? "1 perk to pick" : t.picks_banked + " perks to pick") + '</button>' : "";
-    var steady = B.steady();
-    foot.innerHTML =
-      '<span class="bf-clock" id="bench-clock">' + esc(clock) + '</span>' +
-      '<span class="bf-track" role="group" aria-label="Your herbalism">' + prog + '</span>' + picks +
-      '<span class="bf-gap"></span>' +
-      '<button type="button" class="bf-btn" data-bench-recipes aria-haspopup="dialog">Recipes</button>' +
-      '<button type="button" class="bf-btn" data-bench-herbarium>Herbarium</button>' +
-      '<button type="button" class="bf-btn bf-steady" role="switch" aria-checked="' + steady +
-      '" data-bench-steady>Steady mode<span class="bf-switch" aria-hidden="true"></span></button>';
+    return {
+      clock: s && s.clock && s.clock.label ? s.clock.label : "",
+      trackLabel: "Your herbalism",
+      track: t ? { title: "Herbalist", level: t.level, mp: t.mp,
+                   need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
+      picks: t && t.picks_banked,
+      buttons: '<button type="button" class="bf-btn" data-bench-recipes aria-haspopup="dialog">Recipes</button>' +
+        '<button type="button" class="bf-btn" data-bench-herbarium>Herbarium</button>',
+    };
   }
+  function renderFoot() { core.renderFoot(); }
   B.renderFoot = renderFoot;
   var footEl = $id("bench-foot");
   if (footEl) {
     footEl.addEventListener("click", function (e) {
-      if (e.target.closest("[data-bench-steady]")) {
-        B.setSteady(!B.steady());
-        renderFoot();
-        var s = footEl.querySelector("[data-bench-steady]");
-        if (s) s.focus();
-        B.say(B.steady() ? "Steady mode on." : "Steady mode off.");
-        return;
-      }
       if (e.target.closest("[data-bench-herbarium]")) {
         // The Journal's herbarium (Lane C, 21-tab-journal.js), in place of the bench: the
         // bench closes and the Journal opens; `bench:herbarium` tells it which section.
@@ -1221,20 +904,7 @@
     if (btn && panel && panel.hidden) btn.click();
   };
 
-  // Reduced motion can change while the bench is open (the OS setting, or Settings).
-  if (STILL && STILL.addEventListener) {
-    STILL.addEventListener("change", function () { if (bench) bench.classList.toggle("bench-still", B.reduced()); });
-  }
-  try {
-    if (window.PGMPrefs && typeof PGMPrefs.on === "function") {
-      PGMPrefs.on("flourishes", function () { if (bench) bench.classList.toggle("bench-still", B.reduced()); });
-      PGMPrefs.on("steady", renderFoot);
-    }
-  } catch (err) { /* prefs are optional */ }
-  // The first gesture unlocks audio (contracts §5.3).
-  document.addEventListener("pointerdown", function once() {
-    document.removeEventListener("pointerdown", once, true);
-    try { if (window.Sound && Sound.unlock) Sound.unlock(); } catch (err) { /* */ }
-  }, true);
+  // (Reduced motion changing while the bench is open, Steady mode changed in Settings, and
+  // the first gesture that unlocks audio are the core's, wired by `mount` above.)
 
 })();

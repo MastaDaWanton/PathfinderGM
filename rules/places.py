@@ -220,7 +220,22 @@ ALWAYS_BY_SCALE = {
     # once fired.
     "village": ("the way in", "the well"),
     "town": ("the gate", "the guardhouse", "the well", "the guildhall"),
-    "city": ("the gate", "the guardhouse", "the barracks", "the well", "the guildhall"),
+    # A city has a smithy, whatever the seed (blacksmithing plan §10). Measured 2026-10-03
+    # over 200 seeds per scale: the old fill gave a smithy to 0 of 200 villages, 0 of 200
+    # towns and 0 of 200 cities. In a village and a town the guarantees and the four
+    # essentials spend the budget before the fill starts; in a city the fill takes the
+    # biggest thing a settlement is entitled to first, and the smithy is a village-floor
+    # row — a city of fifty thousand had a theatre, an arena and a counting house and
+    # nowhere to shoe a horse. The medieval record says otherwise: "almost every village
+    # in Europe had its own smithy" (medievalists.net, "The medieval blacksmith and his
+    # products"). A village and a town are NOT given one by scale, because their budgets
+    # are where the four essentials live: every place guaranteed here is taken ahead of
+    # the earned ones and the essentials, so a town with a smithy guaranteed and one spot
+    # its words earned has nine places before "where nobody is watching" is reached. A
+    # smaller settlement gets its smithy from its own words (`IMPLIED`), or through the
+    # `found` door when play needs one (`smithy_here`).
+    "city": ("the gate", "the guardhouse", "the barracks", "the well", "the guildhall",
+             "the smithy"),
 }
 
 # What counts as a way in or out of a settlement, in one place. Read by the guarantee in
@@ -464,6 +479,23 @@ IMPLIED = (
      ("the shrine", "somewhere to be quiet")),
     (("the well", "a well", "wells", "wellhead", "cistern", "fountain"),
      ("the well", "where the water is")),
+    # A settlement whose words name its smiths has a smithy (blacksmithing plan §10: the
+    # town forge is where rare work, smelting and alloying happen). Last in the table on
+    # purpose: earned spots are taken in table order up to `MOST_IMPLIED`, and a row added
+    # at the top would have pushed a docks or a library out of towns that already earned
+    # them.
+    #
+    # "forge" is a phrase cue ("a forge", "the forges") and its verb forms — "forged",
+    # "forging", and "forges" as in "forges ahead" — are not cues at all. Measured 2026-10-03
+    # across the three shipped exports' settlement facts and prose: "forged" fired twice
+    # and "forging" six times, and all eight were metaphors — "alliances forged in ancient
+    # traditions", "the great forging's aftermath". Not one was a smithy. "smiths" fired
+    # once (Kestwick: "the smiths and the wool merchants both want..."), and that one is.
+    (("smith", "smiths", "smithy", "smithies", "blacksmith", "blacksmiths", "a forge",
+      "the forge", "the forges", "its forges", "anvil", "anvils", "ironworks", "farrier", "farriers",
+      "foundry", "foundries", "metalworking", "metalworkers", "armourer", "armourers",
+      "armorer", "armorers", "weaponsmith", "weaponsmiths", "bladesmith", "bladesmiths"),
+     ("the smithy", "a hearth, an anvil, and the noise of both")),
 )
 # Some cues are phrases, and that is the fix for a word that is also a common verb or
 # adverb. Reported from the World Bible side on 2026-09-15 and then measured here against
@@ -1048,6 +1080,62 @@ def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Pl
     return (first,) + tuple(authored[1:]) + (way,)
 
 
+# What an authored settlement of a scale is given when its author listed none of it. One
+# row today, the owner's ruling of 2026-10-04 (blacksmithing contracts §13.3): "every city
+# gets a smithy, even when the world's author did not list one". Published in
+# docs/place-vocabulary.json (`appended_to_authored`) so the author can see it happen and
+# write their own instead.
+APPENDED_TO_AUTHORED = {"city": ("the smithy",)}
+
+
+def _with_a_smithy(authored: tuple[Place, ...], here: str,
+                   location) -> tuple[Place, ...]:
+    """An authored city that lists no smithy gets one appended — the second amendment to
+    "an author who listed six rooms has said what the town has", after the way in, and for
+    the same kind of reason: it is what the city is FOR in a rule the app runs, not a
+    flourish.
+
+    Measured 2026-10-04 on the shipped exports: a smithy in 5 of Aurvantis's 64 authored
+    settlements (4 of its 16 cities, 1 of 32 towns, 0 of 16 villages) and in 0 of
+    Pangrella's 12 (0 of its 6 cities). The forge's furnace work (Smelt, Alloy, Fold,
+    Strengthen, rare metal) needs a smithy (`smithy_here`), so a player in eighteen of
+    those twenty-two cities had no town forge to rent. A generated city already has one
+    (`ALWAYS_BY_SCALE`); this gives an authored one the same. Towns and villages get one
+    only when their own words imply it (`IMPLIED`) or through the `found` door — the
+    owner's line, not this function's.
+
+    Attached as the way in is: its exits run to the first place, and the first place
+    gains it, so it is reachable (an exit is adjacency, and adjacency runs both ways). In
+    a quartered city (`within`), it hangs off the first place's own quarter.
+    """
+    wanted = APPENDED_TO_AUTHORED.get(scale_of(location), ())
+    if not wanted or not _settled(location, "") or not authored:
+        return authored
+    from dataclasses import replace
+
+    from . import floorplan as floorplan_mod
+
+    out = list(authored)
+    for label in wanted:
+        row = next((r for r in SETTLEMENT_PLACES if r[0] == label), None)
+        if row is None:
+            continue
+        probe = Place(id="", name=label, about="", terrain=URBAN, exits=())
+        tags = place_tags(probe)
+        if any(tags & place_tags(p) for p in out if tags):
+            continue                        # the author wrote one: theirs stands
+        place_id = f"{here}~{URBAN}:{_slug(label)}"
+        if any(p.id == place_id for p in out):
+            continue
+        anchor = out[0]
+        out[0] = replace(anchor, exits=tuple(anchor.exits or ()) + (place_id,))
+        out.append(Place(id=place_id, name=label, about=row[1], terrain=URBAN,
+                         exits=(anchor.id,), within=anchor.within or "",
+                         origin="generated",
+                         shape=floorplan_mod.shape_for(place_id, URBAN)))
+    return tuple(out)
+
+
 def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     """The location's own places — a settlement's rooms, or a wild site's reaches.
 
@@ -1070,7 +1158,7 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     # and nothing else changes.
     authored = _authored(location)
     if authored:
-        return _with_a_way_in(authored, here, location)
+        return _with_a_smithy(_with_a_way_in(authored, here, location), here, location)
     hint = str(terrain_hint or "").strip().lower()
     if _settled(location, hint):
         return _settlement_set(here, scale_of(location), location)
@@ -1564,6 +1652,13 @@ KIND_WORDS: dict[str, str] = {
     "chapel": "shrine", "church": "temple", "jail": "gaol", "prison": "gaol",
     "stable": "stables", "warehouse": "warehouses", "dock": "docks", "harbour": "docks",
     "harbor": "docks", "cemetery": "graveyard",
+    # A smith's place, said the ways people say it, so a plan's `found kind="forge"` mints
+    # a smithy (blacksmithing plan §10: "your own smithy, founded through the places
+    # system's `found` door"). Not "smith": that is the person, and `_said_as` reads these
+    # as words naming a PLACE — "the smith hands you the tongs" would have the prose
+    # standing in the smithy.
+    "forge": "smithy", "blacksmith's": "smithy", "smithy's": "smithy",
+    "ironworks": "smithy", "foundry": "smithy",
 }
 
 
@@ -1804,3 +1899,231 @@ def route(places, start: str, dest: str) -> tuple[str, ...]:
     while came[walk[-1]]:
         walk.append(came[walk[-1]])
     return tuple(reversed(walk[:-1]))
+
+
+# --- where the smith works (blacksmithing plan §10, contracts §8) ----------------------------
+#
+# The forge has two benches. The field kit — camp anvil, bellows, field hearth, bucket,
+# whetstone — goes wherever the smith stands and does common and uncommon work. A SMITHY
+# adds the furnace: Smelt, Alloy, Fold, Strengthen, and rare-and-above material. A smithy
+# is either the town's (a place whose keeper is a smith, paid by the hour) or the player's
+# own (founded through the `found` door and held as `holds.place.<slug>`).
+#
+# The 2026-08-25 ruling — "leave fixed tools alone until property ownership exists" — is
+# retired by this: property ownership exists (the `found` door's holder effect), so a
+# fixed installation now means something a character can own.
+#
+# Which one the party is at is READ OFF THE SCENE: its coordinate (`scene.at`), the place
+# that coordinate names, that place's kind, its keeper and its holder. Never off the
+# player's words — "I work at my forge" said in a meadow is a meadow, and the bench is the
+# field kit. The same shape every place question here has: derived from the one
+# coordinate, nothing stored beside it.
+#
+# **The smithy tag.** A place is not an actor and carries no effects (docs/place-doors.md:
+# "the origin of a place is a field on the `Place`, not a tag"), so a place's tags are
+# DERIVED from its kind, never stored: `place.<kind>` for any kind, and `place.smithy` for
+# a kind whose keeper works at the forge by occupation (`content/people/occupations.json`,
+# the `forge` tag — the smith today; an armourer or a world's own metalworker the day a
+# row says so). Asked as a prefix question, as every state is (`has_place_tag`), so no
+# caller matches the word "smithy" against a name.
+
+SMITHY = "place.smithy"
+# The occupation tag that makes a keeper a smith. One word in one table, so a world (or a
+# later row) that adds an armourer tagged `forge` gets its armoury counted as a smithy
+# with nothing here changed.
+FORGE_WORK = "forge"
+
+
+# Origins whose NAME somebody in play chose: the plan's `found`, the page's old door, and
+# ground gone into. Their kind is the engine's validated `kind` field and nothing else.
+_NAMED_IN_PLAY = frozenset({"found", "narrated", "venture"})
+
+
+def _kind_of_place(place) -> str:
+    """A place's kind: its own `kind` when it has one, else — for a place the world or
+    the generator named — the table's name for it ("the smithy" → "smithy").
+
+    A place minted in play is never read by its name. "my forge", founded with no kind,
+    is a name the player chose; reading it as a smithy would be the player's words
+    opening the furnace, which contracts §8 forbids. Its kind is what the `found` door
+    validated, or it has none."""
+    kind = kind_named(getattr(place, "kind", "") or "")
+    if kind or str(getattr(place, "origin", "") or "") in _NAMED_IN_PLAY:
+        return kind
+    return kind_named(getattr(place, "name", "") or "")
+
+
+def _occupation_works_forge(work: dict | None) -> bool:
+    return bool(work) and FORGE_WORK in (work.get("tags") or ())
+
+
+def kind_works_forge(kind: str) -> bool:
+    """Whether the keeper of a place of this kind is a smith by occupation: the keeper's
+    title (`STAFFED`) read through the occupation table (`lives.occupation_for`)."""
+    title = keeper_of(f"the {kind_named(kind)}")[0] if kind else ""
+    if not title:
+        return False
+    from . import lives
+
+    return _occupation_works_forge(lives.occupation_for(title))
+
+
+def place_tags(place) -> frozenset[str]:
+    """The tags a place answers to, derived from its kind and never stored."""
+    kind = _kind_of_place(place)
+    if not kind:
+        return frozenset()
+    out = {f"place.{_slug(kind)}"}
+    if kind_works_forge(kind):
+        out.add(SMITHY)
+    return frozenset(out)
+
+
+def has_place_tag(place, query: str) -> bool:
+    """Exact match or dot-boundary prefix, the same question `Actor.has_state` asks."""
+    q = str(query or "").strip().lower()
+    return any(t == q or t.startswith(q + ".") for t in place_tags(place)) if q else False
+
+
+def _place_at(scene, known=()) -> Place | None:
+    """The place the scene's coordinate names, from what the scene holds.
+
+    `known` is `Engine.places()` when the caller has it, which is the only way an
+    authored place whose id is not its table name can be read — the scene holds no world.
+    Without it: a founded place from `scene.founded`, else the generated place the id
+    spells (`{loc}~urban:the-smithy` is "the smithy", which is how `keepers.label_of`
+    reads it too). A floor above or below the ground one is not the forge: the anvil is
+    where you walk in.
+    """
+    at = str(getattr(scene, "at", "") or "").strip()
+    if not at or storey_of(at):
+        return None
+    for p in known or ():
+        if getattr(p, "id", "") == at:
+            return p
+    for raw in getattr(scene, "founded", None) or ():
+        d = raw.as_dict() if isinstance(raw, Place) else raw
+        if isinstance(d, dict) and str(d.get("id") or "") == at:
+            return from_dict(d)
+    head, _sep, spot = at.partition(":")
+    if not spot or SEP not in head or "/" in spot:
+        return None
+    return Place(id=at, name=spot.replace("-", " "), terrain=terrain_of(at))
+
+
+def _actor(scene, ref: str):
+    if not ref:
+        return None
+    people = getattr(scene, "people", None) or {}
+    if ref in people:
+        return people[ref]
+    try:
+        return (getattr(scene, "actors", None) or {}).get(ref)
+    except Exception:
+        return None
+
+
+def _keeper_works_forge(scene, place, keeper) -> bool:
+    """A smith keeps it: the person stood up there, when the population knows their
+    work; else the work the place's keeper is stood up as."""
+    if keeper is not None:
+        from . import lives
+        from . import population
+
+        rec = population.of_ref(scene, getattr(keeper, "ref", "") or "")
+        work = str(((rec or {}).get("life") or {}).get("work") or "")
+        if work:
+            row = next((o for o in lives.tables()["occupations"] if o.get("id") == work),
+                       None)
+            return _occupation_works_forge(row)
+    return has_place_tag(place, SMITHY)
+
+
+def smithy_here(scene, known=()) -> dict | None:
+    """The smithy the party is standing in, or None (contracts §8).
+
+    {"kind": "owned" | "town", "place": id, "keeper": ref | None, "rate_cp_per_hour": int}
+
+    **Owned** first: a founded place tagged `place.smithy` whose holder — the place's
+    `owner` — answers `has_state("holds.place.<slug>")`. The owner field is the claim and
+    the holder's effect is the fact: remove the effect (the place sold, seized, burnt)
+    and the same building is no longer theirs, with nothing here to update. Free to its
+    owner; anybody else's forge (a friend's, founded as theirs) is rented at the town's
+    rate, from them.
+
+    **Town** otherwise: a place in a settlement (urban ground) whose keeper is a smith by
+    occupation. A smithy founded with no holder is the town's — "places must be
+    creatable" (ruled 2026-10-03), so a settlement whose author listed no smithy gets one
+    the first time play walks to it, and `keepers.staff` stands a smith up behind it.
+    The keeper is None when nobody has been stood up yet, or the smith is gone; the
+    forge is still there and still the town's.
+    """
+    place = _place_at(scene, known)
+    if place is None or not has_place_tag(place, SMITHY):
+        return None
+    from . import keepers
+    from . import market
+
+    keeper = keepers.keeper_in(scene, place.id)
+    keeper_ref = (getattr(keeper, "ref", None) or None) if keeper is not None else None
+    founded = place.origin == "found" or any(
+        str((raw.as_dict() if isinstance(raw, Place) else raw).get("id") or "") == place.id
+        for raw in getattr(scene, "founded", None) or ())
+    holder = _actor(scene, place.owner) if founded else None
+    slug = place.id.rsplit("/", 1)[-1]
+    if holder is not None and holder.has_state(f"holds.place.{slug}"):
+        pc = scene.pc() if hasattr(scene, "pc") else None
+        ours = pc is not None and getattr(pc, "ref", None) == getattr(holder, "ref", None)
+        return {"kind": "owned", "place": place.id,
+                "keeper": keeper_ref if ours else (getattr(holder, "ref", None) or keeper_ref),
+                "rate_cp_per_hour": market.forge_rate(owned_by_party=ours)}
+    if terrain_of(place.id) != URBAN:
+        return None
+    if not _keeper_works_forge(scene, place, keeper):
+        return None
+    return {"kind": "town", "place": place.id, "keeper": keeper_ref,
+            "rate_cp_per_hour": market.forge_rate(owned_by_party=False)}
+
+
+# The smith's field kit, as a carried thing. NOT in the goods tables yet: `rules/goods.py`
+# and `content/rules/gear.json` belong to another lane this wave (contracts §1), so the
+# row is named here and asked for in the lane report — until it lands, the kit is found
+# by its name in the pack, which is how `gear.carried` finds everything else anyway.
+FIELD_KIT = "smith's field kit"
+# The names the fiction and a counter hand it over by. Never "field kit" alone: a healer
+# carries a kit into the field too, and a bare "kit" opening the forge would be the
+# player's words deciding the bench.
+FIELD_KIT_NAMES = frozenset({
+    FIELD_KIT, "smiths field kit", "smith's kit", "smithing kit", "blacksmith's kit",
+    "blacksmiths kit", "field forge", "portable forge",
+})
+
+
+def _kit_name(name) -> bool:
+    return " ".join(str(name or "").lower().replace("’", "'").split()) in FIELD_KIT_NAMES
+
+
+def has_field_kit(actor) -> bool:
+    """Whether this actor carries the smith's field kit (contracts §8).
+
+    Both stores a carried thing can be in, as `gear.carried` reads them: a counter's
+    purchases in `stock` (`goods.deliver` files bought gear there under its name) and the
+    fiction's handovers in `goods`. A count of nought is not carried — `take_stock`
+    deletes an empty entry, but a `goods` row can sit at zero. Once the goods row exists
+    with a `gear.json` entry, `gear.holds` answers too.
+    """
+    if actor is None:
+        return False
+    for s in (getattr(actor, "stock", None) or {}).values():
+        if int(getattr(s, "count", 0) or 0) > 0 and (
+                _kit_name(getattr(s, "base", "")) or _kit_name(getattr(s, "name", ""))):
+            return True
+    for name, n in (getattr(actor, "goods", None) or {}).items():
+        if int(n or 0) > 0 and _kit_name(name):
+            return True
+    try:
+        from . import gear
+
+        return gear.holds(actor, FIELD_KIT)
+    except Exception:
+        return False

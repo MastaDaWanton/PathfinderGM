@@ -6,10 +6,17 @@ fixed order, and a key that is a slug of the text would break the moment an auth
 corrected a typo in it.
 
 **One store, one owner.** `Actor.herb_known` maps an ingredient id to
-`{"keys": [...], "how": {key: "tasted, day 14"}, ...}` and nothing but this module reads or
-writes it, so the bench card, the Journal and the narrator's brief cannot disagree about
-what is known. Keys that begin with "_" are this module's bookkeeping (`_seeded` records
-that the homeland and converted-herbalist seeds have run), never an ingredient.
+`{"keys": [...], "how": {key: "tasted, day 14"}, ...}`. Since the blacksmithing revamp
+(docs/blacksmithing-contracts.md §6) the same store holds what the smith knows of each
+material, keyed by material id, and the machinery that reads and writes it lives in
+`rules/knowledge.py`, which this module re-exports: every name below still works exactly
+as it did, so the herb bench, the Journal and the narrator's brief are untouched and
+cannot disagree with the forge about what is known. Keys that begin with "_" are
+bookkeeping (`_seeded` records that the homeland and converted-herbalist seeds have run),
+never an ingredient.
+
+What stays here is what only herbs have: the herb lore and manuals files, tasting's
+condition rule, the satchel and the herbarium rows, the homeland seed, and the brief.
 
 **Four doors in, and each says how.** Tasting (the engine's `taste` op: real effects, one
 benefit and one drawback revealed), study (a Knowledge or Profession check on the player's
@@ -27,19 +34,46 @@ content/rules/herb-lore.json; every effect is the ingredient's own spec.
 from __future__ import annotations
 
 import functools
-import json
 import re
-from pathlib import Path
 
-# The bookkeeping slot inside `Actor.herb_known`. Underscored so no ingredient id (the
-# corpus slugs are lowercase letters, digits and hyphens) can ever collide with it.
-SEEDED = "_seeded"
-
-BENEFIT, DRAWBACK, NEUTRAL = "benefit", "drawback", "neutral"
-
-# Effect types that hurt whoever takes them on top of `consumables.hurts`, which was
-# written for a jar's Drawbacks panel and predates these three in the catalogue.
-_HARM_TYPES = frozenset({"vulnerability", "ability_drain", "bleed"})
+from . import knowledge as _k
+# The generic machinery, re-exported under the names this module always had (lane E of
+# the blacksmithing revamp). Bound, not wrapped, wherever the signature is unchanged, so
+# `herbknowledge.reveal is knowledge.reveal` and there is one copy of each rule.
+from .knowledge import (  # noqa: F401 — re-exports are this module's public face
+    BENEFIT,
+    DRAWBACK,
+    NEUTRAL,
+    SEEDED,
+    _HARM_TYPES,
+    _entry,
+    _ingredient,
+    _key_index,
+    _rested_since,
+    _specs,
+    _words_say,
+    anatomy,
+    classify,
+    common_knowledge,
+    danger_known,
+    day_of,
+    holds_manual,
+    is_drawback,
+    known_keys,
+    lesson_order,
+    manual_keys,
+    meet,
+    properties,
+    property_keys,
+    reveal,
+    study,
+    study_dc,
+    study_order,
+    study_waits,
+    unknown_count,
+    with_gates,
+)
+from .knowledge import reveal_picks as taste_picks  # noqa: F401 — the taste op's name
 
 
 # --- the rule rows ------------------------------------------------------------------------
@@ -49,181 +83,46 @@ _HARM_TYPES = frozenset({"vulnerability", "ability_drain", "bleed"})
 # ratchet is about overlays, and these have none).
 
 def _content(name: str) -> dict:
-    from django.conf import settings
-
-    path = Path(settings.BASE_DIR) / "content" / "rules" / name
-    return json.loads(path.read_text(encoding="utf-8"))
+    return _k._content(name)
 
 
 @functools.lru_cache(maxsize=1)
 def lore() -> dict:
     """content/rules/herb-lore.json: the prices, times and DCs of learning."""
-    return _content("herb-lore.json")
-
-
-@functools.lru_cache(maxsize=1)
-def _manual_rows() -> tuple:
-    return tuple(_content("herbal-manuals.json").get("manuals") or ())
+    return _k.lore(_k.HERBALIST)
 
 
 def manuals() -> dict[str, dict]:
     """Every herbalism manual, by id (content/rules/herbal-manuals.json)."""
-    return {str(m["id"]): dict(m) for m in _manual_rows() if m.get("id")}
+    return _k.manuals(_k.HERBALIST)
 
 
-# --- properties -----------------------------------------------------------------------------
-
-def property_keys(ingredient) -> list[str]:
-    """Every property this ingredient has, as keys."""
-    return [f"p{i}" for i in range(len(getattr(ingredient, "pairs", []) or []))]
+def manual_named(said: str) -> dict | None:
+    """A herbalism manual by id or by name, as the browser or a shelf calls it."""
+    return _k.manual_named(said, _k.HERBALIST)
 
 
-def _key_index(key: str) -> int:
-    return int(key[1:]) if str(key)[1:].isdigit() else 0
+# --- teachers and libraries: the herbalist's rows -----------------------------------------
+
+def teaches(person, rec: dict | None = None) -> bool:
+    """Whether this person knows herbs: their trade by the population record (`work`,
+    an occupation id), or their own words — name, template, description."""
+    return _k.teaches(person, rec, _k.HERBALIST)
 
 
-def _ingredient(ingredient_or_id):
-    if isinstance(ingredient_or_id, str):
-        from . import ingredients as ing_mod
-
-        try:
-            return ing_mod.get(ingredient_or_id)
-        except KeyError:
-            return None
-    return ingredient_or_id
+def lesson_size(person) -> int:
+    """How many properties this person will teach for one fee, by how they feel about the
+    player — the confiding gate's shape (rules/confiding.py). 0 is a refusal."""
+    return _k.lesson_size(person, _k.HERBALIST)
 
 
-def classify(spec: dict) -> str:
-    """Whether one property is good for the taker, bad for them, or neither.
-
-    Read off the structured spec, never the words: a penalty (a negative modifier), a
-    condition caused, damage or ability damage to the taker is a drawback; healing, a
-    bonus, a resistance or a condition ended is a benefit. A bare save gate is NEUTRAL:
-    measured on the corpus, 38 of the 161 ingredients carry a "DC n" that gates nothing
-    (the entry's crafting DC restated, swept up by the extractor), and the rest gate a
-    poison's body, which is the drawback. `consumables.hurts` already says this for the
-    jar's Drawbacks panel, so it is asked rather than copied.
-    """
-    from . import consumables
-
-    kind = str((spec or {}).get("type", ""))
-    if kind == "save_gate":
-        return DRAWBACK if consumables.hurts(spec) else NEUTRAL
-    if kind in _HARM_TYPES or consumables.hurts(spec):
-        return DRAWBACK
-    return BENEFIT
+def is_library(place) -> bool:
+    """A place that keeps records: the settlement table's library, a scriptorium, an
+    archive, a temple's archive (rules/places.py names them; nothing here mints one)."""
+    return _k.is_library(place, _k.HERBALIST)
 
 
-def is_drawback(spec: dict) -> bool:
-    """The question the card's `drawback` field answers."""
-    return classify(spec) == DRAWBACK
-
-
-def _specs(ingredient) -> list[dict]:
-    """The ingredient's specs, one per key, as the SAME dict objects each time asked
-    within a call — `consumables.poisons` groups by identity."""
-    return [spec for _, spec in (getattr(ingredient, "pairs", None) or [])]
-
-
-def anatomy(ingredient) -> dict:
-    """Each key's class, and which bare gate guards which poison body.
-
-    `gate_of` maps a body key to the key of the save that gates it ("Fortitude DC 15"
-    gates "Causes paralyzed"). A gate is revealed with its body, because 1e writes a
-    poison as one thing — a save, and what happens when you fail it (`consumables.Poison`).
-    """
-    from . import consumables
-
-    specs = _specs(ingredient)
-    keys = property_keys(ingredient)
-    index = {id(s): k for s, k in zip(specs, keys)}
-    kinds = {k: classify(s) for s, k in zip(specs, keys)}
-    gate_of: dict[str, str] = {}
-    name = str(getattr(ingredient, "name", "") or "")
-    for poison in consumables.poisons(specs, source=name):
-        gate = index.get(id(poison.gate)) if poison.gate is not None else None
-        for body in poison.effects:
-            k = index.get(id(body))
-            if k and gate and gate != k:
-                gate_of[k] = gate
-    return {"keys": keys, "kinds": kinds, "gate_of": gate_of, "specs": dict(zip(keys, specs))}
-
-
-# --- what is known --------------------------------------------------------------------------
-
-def _entry(actor, ingredient_id: str) -> dict | None:
-    got = (getattr(actor, "herb_known", None) or {}).get(str(ingredient_id))
-    return got if isinstance(got, dict) else None
-
-
-def known_keys(actor, ingredient) -> list[str]:
-    """The keys this actor knows, in key order. Only keys the ingredient still has: a
-    corpus correction that shortens an effect list must not leave a phantom "known"."""
-    entry = _entry(actor, getattr(ingredient, "id", ""))
-    if entry is None:
-        return []
-    have = set(entry.get("keys") or ())
-    return [k for k in property_keys(ingredient) if k in have]
-
-
-def unknown_count(actor, ingredient) -> int:
-    """How many of this ingredient's properties the actor does not yet know."""
-    known = set(known_keys(actor, ingredient))
-    return sum(1 for k in property_keys(ingredient) if k not in known)
-
-
-def reveal(actor, ingredient_id: str, keys, how: str) -> list[str]:
-    """Record that `keys` are now known, and how. Returns the keys that were NEW, so the
-    caller can say "New: ..." only for real discoveries and pay mastery for firsts."""
-    entry = actor.herb_known.setdefault(str(ingredient_id), {"keys": [], "how": {}})
-    entry.setdefault("keys", [])
-    entry.setdefault("how", {})
-    have = set(entry.get("keys") or [])
-    new = [k for k in dict.fromkeys(keys) if k not in have]
-    if new:
-        entry["keys"] = sorted(have | set(new), key=_key_index)
-        for k in new:
-            entry["how"][k] = str(how)
-    return new
-
-
-def meet(actor, ingredient_id: str) -> None:
-    """Note that the character has come across this herb, knowing nothing yet, so the
-    herbarium lists it. A herb met is a collection entry even before a property is."""
-    actor.herb_known.setdefault(str(ingredient_id), {"keys": [], "how": {}})
-
-
-def day_of(clock_minutes: int) -> int:
-    """Day 1 is the first day, the way the Journal's history counts (play/history.py)."""
-    return int(clock_minutes or 0) // (24 * 60) + 1
-
-
-def properties(actor, ingredient) -> list[dict]:
-    """The card's property rows (docs/herbalism-contracts.md §4.2): a known one says what
-    it does and how it was learned; an unknown one says nothing at all."""
-    entry = _entry(actor, ingredient.id) or {}
-    how = entry.get("how") or {}
-    known = set(known_keys(actor, ingredient))
-    out = []
-    for key, (line, spec) in zip(property_keys(ingredient), ingredient.pairs):
-        if key in known:
-            out.append({"key": key, "known": True, "text": line,
-                        "drawback": is_drawback(spec), "how": str(how.get(key) or "")})
-        else:
-            out.append({"key": key, "known": False, "text": None, "drawback": None,
-                        "how": None})
-    return out
-
-
-def danger_known(actor, ingredient) -> str:
-    """What the character knows can hurt them, in one line, or "" — the card's warning
-    ("You know this is dangerous: ..."). Read from known drawbacks every time, so every
-    route that reveals one sets it, not only study."""
-    known = set(known_keys(actor, ingredient))
-    lines = [line for key, (line, spec) in zip(property_keys(ingredient), ingredient.pairs)
-             if key in known and is_drawback(spec)]
-    return "; ".join(lines)
-
+# --- the satchel and the herbarium ----------------------------------------------------------
 
 def carried(actor, ingredient_id: str) -> int:
     """Raw doses of this herb in the satchel."""
@@ -305,40 +204,6 @@ def card(actor, ingredient, *, clock: int = 0) -> dict:
 
 # --- tasting -----------------------------------------------------------------------------
 
-def taste_picks(actor, ingredient, landed=()) -> list[str]:
-    """Which keys a taste reveals: at most one benefit and at most one drawback, each the
-    first UNKNOWN one, preferring what actually landed on the taster (if hemlock paralysed
-    you, the paralysis is what you learned). A drawback brings its gate with it. A herb
-    whose benefits are all known teaches nothing new on that side: a second taste is for
-    the side you have not learned.
-
-    "Benefit" here is anything not a drawback, so a herb whose only line is a bare DC
-    still teaches that line on a first taste; a gate that guards a poison is never the
-    benefit — it is half of the drawback.
-    """
-    a = anatomy(ingredient)
-    known = set(known_keys(actor, ingredient))
-    landed = set(landed)
-    gates = set(a["gate_of"].values())
-
-    def best(cands: list[str]) -> str:
-        # Landed first, and among what landed a condition first: being paralysed is
-        # the thing a taster cannot fail to notice, more than a point of Constitution.
-        fresh = [k for k in cands if k not in known]
-        fresh.sort(key=lambda k: (k not in landed,
-                                  str(a["specs"][k].get("type")) != "apply_condition",
-                                  _key_index(k)))
-        return fresh[0] if fresh else ""
-
-    good = best([k for k in a["keys"] if a["kinds"][k] == BENEFIT]) or best(
-        [k for k in a["keys"] if a["kinds"][k] == NEUTRAL and k not in gates])
-    bad = best([k for k in a["keys"] if a["kinds"][k] == DRAWBACK])
-    picks = [k for k in (good, bad) if k]
-    if bad and a["gate_of"].get(bad) and a["gate_of"][bad] not in known:
-        picks.append(a["gate_of"][bad])
-    return sorted(dict.fromkeys(picks), key=_key_index)
-
-
 def taste_condition(spec: dict) -> dict:
     """A raw herb's condition with the rule row's default length when it states none.
 
@@ -359,16 +224,6 @@ def taste_condition(spec: dict) -> dict:
 
 
 # --- study -------------------------------------------------------------------------------
-
-def study_dc(ingredient) -> int:
-    """10 + 5 per rarity band (§8.3)."""
-    from .worldclass import tier_rank
-
-    rules = lore()["study"]
-    # `tier_rank` counts from 1 (common is 1), and common is the band with nothing added.
-    band = max(0, tier_rank(ingredient.tier) - 1)
-    return int(rules["dc_base"]) + int(rules["dc_per_band"]) * band
-
 
 def study_skill(actor, dc: int) -> tuple[str, list]:
     """The better of Knowledge (nature) and Profession, as (skill, modifiers), or ("", [])
@@ -392,190 +247,6 @@ def study_skill(actor, dc: int) -> tuple[str, list]:
         am = actor.ability_mod("int")
         return "knowledge (nature)", ([Modifier(am, "Int (untrained)")] if am else [])
     return "", []
-
-
-def _rested_since(actor, mark: dict, clock: int) -> bool:
-    """Whether the character has slept since `mark` was written. `awake_minutes` rises
-    with every minute the clock moves and is reset by a night's sleep (rules/survival.py
-    `sleep`), so a waking count lower than the miss's plus the time since is a sleep."""
-    try:
-        then_clock = int(mark.get("clock", 0))
-        then_awake = int(mark.get("awake", 0))
-    except (TypeError, ValueError):
-        return True
-    elapsed = max(0, int(clock) - then_clock)
-    return int(getattr(actor, "awake_minutes", 0) or 0) < then_awake + elapsed
-
-
-def study_waits(actor, ingredient_id: str, clock: int | None = None) -> bool:
-    """A miss cannot be retried until after a rest (§8.3; PF1e's take-the-time
-    convention). True while that rest is still owed. Clears itself once it is not."""
-    entry = _entry(actor, ingredient_id)
-    mark = (entry or {}).get("study_after_rest")
-    if not isinstance(mark, dict):
-        return False
-    now = int(mark.get("clock", 0)) if clock is None else int(clock)
-    if clock is None:
-        # Asked without the clock (the card): the waking count alone says it — a sleep
-        # puts it below what it was at the miss.
-        return int(getattr(actor, "awake_minutes", 0) or 0) >= int(mark.get("awake", 0))
-    if _rested_since(actor, mark, now):
-        entry.pop("study_after_rest", None)
-        return False
-    return True
-
-
-def study_order(actor, ingredient) -> list[str]:
-    """The unknown keys a study reveals, in order, with each poison's gate folded into its
-    body: a gate is free, it is the same fact as what it guards."""
-    a = anatomy(ingredient)
-    known = set(known_keys(actor, ingredient))
-    gates = set(a["gate_of"].values())
-    return [k for k in a["keys"] if k not in known and k not in gates]
-
-
-def study(actor, ingredient, total: int, *, clock: int) -> dict:
-    """Resolve a study on a total already rolled. No automatic natural 20: a skill check
-    in 1e succeeds on the total alone (CRB p.180), which `dice.d20_succeeds` exists to
-    keep apart from saves and attacks. Success reveals one property and one more per 5
-    points over the DC; a miss stamps the herb until the next rest."""
-    dc = study_dc(ingredient)
-    margin = int(total) - dc
-    success = margin >= 0
-    revealed: list[str] = []
-    if success:
-        n = 1 + margin // int(lore()["study"]["reveal_per_margin"])
-        order = study_order(actor, ingredient)[:n]
-        gate_of = anatomy(ingredient)["gate_of"]
-        keys = order + [gate_of[k] for k in order if k in gate_of]
-        revealed = reveal(actor, ingredient.id, keys, f"studied, day {day_of(clock)}")
-    else:
-        meet(actor, ingredient.id)
-        actor.herb_known[ingredient.id]["study_after_rest"] = {
-            "clock": int(clock), "awake": int(getattr(actor, "awake_minutes", 0) or 0)}
-    return {"dc": dc, "total": int(total), "success": success, "margin": margin,
-            "revealed": revealed}
-
-
-# --- teachers and libraries ---------------------------------------------------------------
-
-def _words_say(text: str, words) -> bool:
-    low = f" {str(text or '').lower()} "
-    return any(re.search(rf"(?<![a-z]){re.escape(w.lower())}s?(?![a-z])", low)
-               for w in words)
-
-
-def teaches(person, rec: dict | None = None) -> bool:
-    """Whether this person knows herbs: their trade by the population record (`work`,
-    an occupation id), or their own words — name, template, description."""
-    rules = lore()["teacher"]
-    work = str((((rec or {}).get("life") or {}).get("work")) or "")
-    if work and work in set(rules["works"]):
-        return True
-    said = " ".join(str(x or "") for x in (
-        getattr(person, "name", ""), getattr(person, "template", ""),
-        (rec or {}).get("phrase", ""), getattr(person, "notes", "")))
-    return _words_say(said, rules["words"])
-
-
-def lesson_size(person) -> int:
-    """How many properties this person will teach for one fee, by how they feel about the
-    player — the confiding gate's shape (rules/confiding.py). 0 is a refusal."""
-    from . import attitude
-
-    step = attitude.step_of(attitude.of(person))
-    sizes = {attitude.step_of(k): int(v) for k, v in lore()["teacher"]["teaches"].items()}
-    # The highest row at or below where they stand: "friendly" covers devoted too.
-    fitting = [s for s in sizes if 0 <= s <= step]
-    return sizes[max(fitting)] if fitting else 0
-
-
-def lesson_order(actor, ingredient) -> list[str]:
-    """What a teacher tells first: the dangers, then the uses. A healer warns before they
-    recommend, and a gate is told with its body."""
-    a = anatomy(ingredient)
-    known = set(known_keys(actor, ingredient))
-    gates = set(a["gate_of"].values())
-    fresh = [k for k in a["keys"] if k not in known and k not in gates]
-    return [k for k in fresh if a["kinds"][k] == DRAWBACK] + \
-        [k for k in fresh if a["kinds"][k] != DRAWBACK]
-
-
-def with_gates(ingredient, keys: list[str]) -> list[str]:
-    gate_of = anatomy(ingredient)["gate_of"]
-    return list(keys) + [gate_of[k] for k in keys if k in gate_of]
-
-
-def is_library(place) -> bool:
-    """A place that keeps records: the settlement table's library, a scriptorium, an
-    archive, a temple's archive (rules/places.py names them; nothing here mints one)."""
-    if place is None or getattr(place, "described_only", False):
-        return False
-    said = f"{getattr(place, 'name', '')} {getattr(place, 'kind', '')}"
-    return _words_say(said, lore()["library"]["words"])
-
-
-def common_knowledge(ingredient) -> list[str]:
-    """What the world writes down about a herb: the benefits (and the bare DCs that guard
-    nothing) of a common or uncommon herb. A rare herb's secrets and every drawback stay
-    unwritten — the library is the safe route, never the complete one."""
-    rules = lore()["library"]
-    if str(ingredient.tier) not in set(rules["tiers"]):
-        return []
-    a = anatomy(ingredient)
-    gates = set(a["gate_of"].values())
-    want = set(rules["reveals"])
-    return [k for k in a["keys"] if a["kinds"][k] in want and k not in gates]
-
-
-# --- manuals ------------------------------------------------------------------------------
-
-def manual_keys(manual: dict) -> dict[str, list[str]]:
-    """A manual's teaching, resolved against the corpus as it stands: ingredient id ->
-    keys. An id the corpus does not hold is skipped, never invented."""
-    out: dict[str, list[str]] = {}
-    for row in manual.get("teaches") or ():
-        ing = _ingredient(str(row.get("ingredient") or ""))
-        if ing is None:
-            continue
-        a = anatomy(ing)
-        want = row.get("keys", "all")
-        if want == "all":
-            keys = list(a["keys"])
-        elif want == "benefits":
-            keys = [k for k in a["keys"] if a["kinds"][k] != DRAWBACK
-                    and k not in set(a["gate_of"].values())]
-        elif want == "drawbacks":
-            keys = with_gates(ing, [k for k in a["keys"] if a["kinds"][k] == DRAWBACK])
-        else:
-            keys = [str(k) for k in (want or ()) if str(k) in a["keys"]]
-        if keys:
-            out.setdefault(ing.id, [])
-            out[ing.id] += [k for k in keys if k not in out[ing.id]]
-    return out
-
-
-def manual_named(said: str) -> dict | None:
-    """A manual by id or by name, as the browser or a shelf calls it."""
-    said_l = " ".join(str(said or "").lower().split())
-    for mid, m in manuals().items():
-        if said_l in (mid, str(m.get("name", "")).lower()):
-            return m
-    return None
-
-
-def holds_manual(actor, manual: dict) -> bool:
-    """Whether the character has this book with them: bought off a counter it is a shelf
-    entry under its name (`goods.deliver`); handed over or looted it may be a good."""
-    names = {str(manual.get("id", "")).lower(), str(manual.get("name", "")).lower()}
-    for s in (getattr(actor, "stock", None) or {}).values():
-        if str(getattr(s, "base", "")).lower() in names and int(getattr(s, "count", 0)) > 0:
-            return True
-    for bag in ("goods", "loadout"):
-        for k, n in (getattr(actor, bag, None) or {}).items():
-            if str(k).lower() in names and int(n or 0) > 0:
-                return True
-    return False
 
 
 # --- what a new herbalist already knows ----------------------------------------------------

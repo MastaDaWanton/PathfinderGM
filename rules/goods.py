@@ -460,6 +460,12 @@ GEAR: dict[str, dict] = {
     "caltrops": {"name": "caltrops", "cost_gp": 1.0, "lb": 2},
     "sunrod": {"name": "sunrod", "cost_gp": 2.0, "lb": 1},
     "alchemist's fire": {"name": "alchemist's fire", "cost_gp": 20.0, "lb": 1},
+    # The blacksmith's field kit (docs/blacksmithing-revamp-plan.md §10; `places.FIELD_KIT`
+    # names it): common and uncommon smithing anywhere, without a smithy. PROPOSED price
+    # and weight, not the book's, which prints no such kit: Ultimate Equipment's farrier's
+    # anvil (50 lb) plus artisan's tools (5 gp, 5 lb) and a whetstone, rounded to 15 gp
+    # and 55 lb. The owner may tune both; what carrying it does is content/rules/gear.json.
+    "smith's field kit": {"name": "smith's field kit", "cost_gp": 15.0, "lb": 55},
     # Food and drink, Core Rulebook Table 6-9 ("Food, Drink, and Lodging"), read from the
     # PRD's own table 2026-09-27 (legacy.aonprd.com/coreRulebook/equipment.html). Open
     # Game Content; the book is in OGL-NOTICE.md's section 15. Provisions a market sells
@@ -491,7 +497,8 @@ _GEAR_NAMES = frozenset(str(v["name"]).lower() for v in GEAR.values())
 # stocks the ones its trade would: staples, always there, never sold out — a general
 # store does not run out of rope by noon.
 _SMITH_GOODS = frozenset({"crowbar", "grappling hook", "hammer", "pitons", "manacles",
-                          "shovel", "caltrops", "whetstone", "lantern", "mirror"})
+                          "shovel", "caltrops", "whetstone", "lantern", "mirror",
+                          "smith's field kit"})
 def _category(key: str) -> str:
     return str((GEAR.get(key) or {}).get("category") or "gear")
 
@@ -661,6 +668,15 @@ def table_goods(table: str) -> list[Good]:
         return [Good(id=PREFIXES["manual"] + m["id"], name=str(m["name"]),
                      price_gp=float(m["price_gp"]), kind="gear", key=str(m["id"]))
                 for m in herbknowledge.manuals().values()]
+    if table == "smithing-manuals":
+        # The smithing manuals (docs/blacksmithing-revamp-plan.md §9.3), the herbal ones'
+        # counterpart and shelved the same way, so `knowledge.holds_manual` finds a bought
+        # one under its name exactly as it finds a herbal one.
+        from . import knowledge
+
+        return [Good(id=PREFIXES["manual"] + m["id"], name=str(m["name"]),
+                     price_gp=float(m["price_gp"]), kind="gear", key=str(m["id"]))
+                for m in knowledge.manuals(knowledge.BLACKSMITH).values()]
     return []
 
 

@@ -1,15 +1,22 @@
-"""Blacksmithing chains: what a charge of metal and a sequence of forge work produces.
+"""Blacksmithing: the forge's rules, in two halves.
 
-The second world class, and the proof of `rules/worldclass.py`'s claim that blacksmithing
-is "three more files rather than three more code paths": the track is a JSON file the
-generic loader reads unchanged, the materials are a content file shaped like the herb
-corpus, and this module is the only new code — the chain semantics, mirroring
-`rules/crafting.py`'s concepts (ordered methods, cleansing, finishing, problems-lists
-that refuse before rolling) without inheriting any of its herb specifics.
+**The step bench** (the second half of this file, docs/blacksmithing-revamp-plan.md §4,
+§7, §10, §11 and docs/blacksmithing-contracts.md §7). Herbalism's revamp, mirrored: one
+method at a time, each its own d20 Craft roll, then an always-played minigame whose 0..1
+score the server turns into a quality tier under the smith's ceiling. Every step puts a
+real thing on the shelf: ore smelts to an ingot, ingots alloy to a named bar, a bar is
+forged into a blank or plate, the blank is quenched, tempered, folded and honed, and
+Assemble joins head, haft and fittings (or body, fastenings and lining) into the crafted
+record of contracts §4, whose numbers lane B's `forge_items.build` computes on read.
+
+**The chain library** (the first half). The old one-shot chain (`Chain`, `preview`) that
+the `/craft/` tab still drives until wave 2 retires it (contracts §1, U7). Kept working
+against the new three-level track; draw, polish, rivet and flux-as-a-method are gone from
+it, as from the track (plan §4.1).
 
 The naming mirrors `crafting.py` deliberately — `TRACK_ID`, `CraftError`, `Chain`,
-`preview` — so a later dispatch layer can route a craft to whichever module owns the
-track without either module knowing about the other.
+`preview`, `plan_step`, `make`, `failure_losses` — so a dispatch layer can route a craft
+to whichever module owns the track without either module knowing about the other.
 
 One rule is stated here because the source documents state percentages without one:
 
@@ -19,6 +26,8 @@ One rule is stated here because the source documents state percentages without o
 """
 from __future__ import annotations
 
+import hashlib
+import importlib
 import json
 import math
 from dataclasses import dataclass, field
@@ -40,26 +49,25 @@ FUEL_BURNING = ("smelt", "forge")
 HOT_METAL_RANK = 4
 HOT_FUEL_RANK = 3
 
-# Methods that remove a drawback rather than shaping metal — `flux` is to dirty ore what
-# `purify` is to a poisonous herb. It cleans the *metal*, not the smith: the harm it
-# strips is the harm carried by ore-kind materials, and a metal that sickens whoever
-# works it (abysium) stays risky however much flux goes in the melt.
-CLEANSING = ("flux",)
+# Flux is no longer a method (plan §2, "Flux becomes an ingredient of Smelt"): a flux in
+# a charge that is smelted cleans the *metal*, not the smith. The harm it strips is the
+# harm carried by ore-kind materials, and a metal that sickens whoever works it (abysium)
+# stays risky however much flux goes in the melt.
+CLEANSED_BY = "smelt"
 
-# The method that has to come last if it is used at all: you polish the finished piece,
-# you do not forge the polish.
-FINISHING = ("polish",)
+# The method that has to come last if it is used at all: a treatment goes on the
+# finished piece. (Polish was this until 2026-10-03, when it merged into Hone.)
+FINISHING = ("finish",)
 
 # Each method's prerequisite, which must appear *earlier in the same chain*. This is the
 # physical grammar of the forge — you cannot quench what was never forged — and it is
-# what makes a chain an ordered list rather than a bag of verbs.
+# what makes a chain an ordered list rather than a bag of verbs. Draw and polish left
+# with the 2026-10-03 ruling, and their rows with them.
 AFTER = {
     "quench": "forge",
     "temper": "quench",   # tempering is letting quenched steel back down
     "fold": "forge",
-    "draw": "forge",
     "hone": "forge",
-    "polish": "hone",     # a mirror finish is the last grade of an honed edge
     "alloy": "smelt",     # alloying happens in the melt, so something must be molten
 }
 
@@ -69,9 +77,7 @@ _AFTER_WHY = {
     "quench": "You cannot quench what was never forged — quench follows forge.",
     "temper": "Tempering lets quenched steel back down — temper follows quench.",
     "fold": "Folding doubles hot metal over itself — fold follows forge.",
-    "draw": "Drawing pulls forged stock through the plate — draw follows forge.",
     "hone": "Honing grinds a forged edge — hone follows forge.",
-    "polish": "Polish is the last grade of an honed surface — polish follows hone.",
     "alloy": "Alloying happens in the melt — alloy follows smelt.",
 }
 
@@ -86,10 +92,10 @@ SOLITARY = frozenset({
 })
 
 # A novel alloy is a discovery: melting two *different* metals of the same tier yields a
-# metal one band rarer. This is the blacksmith's counterpart to the Herbalist's
-# concentration ladder, and for the same structural reason — it is the one way a
-# Blacksmith 4 reaches legendary metal, which the level-5 deed requires. Without it the
-# milestone gate could never open, which is the exact bug the Herbalist deed notes.
+# metal one band rarer (mixing can beat purity, OSRS Giants' Foundry). It was once the
+# Blacksmith 4 route to the level-5 deed; the deed went with the 2026-10-03 ruling, so the
+# step is now simply a reward, and the output is gated by the smith's level like any
+# other metal (a legendary melt needs Blacksmith 3).
 ALLOY_RARITY_STEP = 1
 
 # Material kinds that count as metal for alloying and for "is there anything to work".
@@ -481,7 +487,7 @@ def chain_from_body(body: dict) -> Chain:
 
     return Chain(
         track=TRACK_ID,
-        methods=_list("methods"),
+        methods=migrate_methods(_list("methods")),
         material_ids=_list("materials") or _list("material_ids"),
         base=base,
         name=str(body.get("name") or "").strip(),
@@ -512,21 +518,19 @@ def stock_from_body(body: dict) -> dict[str, int]:
 # The quality ladder, decided by which methods the chain contains. Masterwork is the
 # book's own rule made procedural: Craft says a masterwork component is its own DC-20
 # piece of work, and here that work is named — the steel must be tempered and the
-# working surface finished. Fine is the honest step between: one of the two, not both.
+# working edge honed. Fine is the honest step between: one of the two, not both.
 #
-# The shaping methods (fold, draw) were originally required for masterwork as well, and
-# that was measured to be a dead end. `rules/enchanter.py` gates every binding on a
-# masterwork vessel at Enchanter *1* — "Commission one from the smith" — while fold and
-# draw are Blacksmith 4, so the whole enchanting economy sat behind 140 MP of a track
-# the enchanter may never have taken. Masterwork is professional work in 1e, not
-# legendary work: DC 20, purchasable in any city. It belongs where the professional
-# methods are, which is Blacksmith 3. Fold and draw stay at 4 as what they always
-# were — pattern-welding and wire-drawing, which make named steels and mail, not
-# quality on their own.
+# The shaping methods were originally required for masterwork as well, and that was
+# measured to be a dead end. `rules/enchanter.py` gates every binding on a masterwork
+# vessel at Enchanter *1* — "Commission one from the smith" — while fold and draw were
+# Blacksmith 4, so the whole enchanting economy sat behind 140 MP of a track the
+# enchanter may never have taken. Masterwork is professional work in 1e, not legendary
+# work: DC 20, purchasable in any city. Under the 2026-10-03 track temper and hone are
+# Blacksmith 2, so masterwork is reachable there.
 MASTERWORK_DC = 20
 
-SHAPING = ("fold", "draw")
-FINISHING_QUALITY = ("hone", "polish")
+SHAPING = ("fold",)
+FINISHING_QUALITY = ("hone",)
 
 
 def quality_of(methods: list[str]) -> str:
@@ -733,7 +737,10 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
 
     for m in chain.methods:
         if m not in track.unlocked_methods(track.max_level):
-            problems.append(f"{track.name} has no method called {m!r}.")
+            moved = old_method(m)
+            problems.append(
+                f"{track.name} has no method called {m!r}"
+                + (f": {m.title()} became {moved.title()}." if moved != m else "."))
         elif m not in known:
             need = next(l.level for l in sorted(track.levels, key=lambda x: x.level)
                         if m in l.methods)
@@ -753,7 +760,7 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
         problems.append(
             f"No such base item {chain.base!r}: name a weapon from the weapons list "
             f"or an armour by name.")
-    if not chain.base and any(m in ("forge", "rivet") for m in chain.methods):
+    if not chain.base and any(m in ("forge", "assemble") for m in chain.methods):
         problems.append("Forging needs a shape: say what is being made.")
 
     # The physical grammar: each method's prerequisite must already have happened.
@@ -794,11 +801,10 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
                 break
 
     # The result is as rare as its rarest component — and a novel alloy of two distinct
-    # same-tier metals is one band rarer than either, which is the Blacksmith 4 path to
-    # the legendary deed (see the track file's _deeds_note). The ceiling is checked
-    # against the *inputs*, never the stepped-up output, exactly as the Herbalist's
-    # concentration ladder checks the held jar and not the rarer one it makes: gating on
-    # the output would re-create the unreachable-deed bug that ladder exists to avoid.
+    # same-tier metals is one band rarer than either. Until 2026-10-03 the ceiling was
+    # checked against the inputs only, because the stepped-up output was the one road
+    # to the level-5 deed; the deed is gone, so the output is gated as well, as the
+    # Herbalist's revamped bench gates a concentration by what it makes.
     rank = max((i.rank for i in items), default=1)
     tops = {i.id for i in metals if i.rank == rank}
     if ("alloy" in chain.methods and len(tops) >= 2
@@ -810,6 +816,9 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
         if i.rank > ceiling:
             problems.append(f"{i.name} is {i.tier}; {track.name} {level} works "
                             f"{track.at(level).max_tier} at best.")
+    if rank > ceiling and not any(i.rank > ceiling for i in items):
+        problems.append(f"This would make {tier} metal, beyond {track.name} {level}: "
+                        f"it needs {track.name} {_level_for_rank(rank) or track.max_level}.")
 
     quality = quality_of(chain.methods)
     dc = _dc(items, rank, chain.stages)
@@ -818,10 +827,11 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
         # own right, so the chain is never easier than that.
         dc = max(dc, MASTERWORK_DC)
 
-    # Effects: what every material contributes, plus what the quality adds. Flux strips
-    # the harm carried by dirty ore, the way purify strips a poison — but only from ore:
-    # a metal that sickens the smith (abysium) is not cleaner for the slag being gone.
-    cleansed = any(m in CLEANSING for m in chain.methods)
+    # Effects: what every material contributes, plus what the quality adds. A flux in a
+    # smelted charge strips the harm carried by dirty ore, the way purify strips a
+    # poison — but only from ore: a metal that sickens the smith (abysium) is not cleaner
+    # for the slag being gone.
+    cleansed = CLEANSED_BY in chain.methods and any(i.kind == "flux" for i in items)
     specs: list[dict] = []
     effects: list[str] = []
     removed: list[str] = []
@@ -831,7 +841,7 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
         for spec in i.specs:
             marked = {**spec, "from": spec.get("from") or i.name}
             if cleansed and i.kind == "ore" and con.hurts(marked):
-                removed.append(f"Flux carried off {i.name}'s impurity: "
+                removed.append(f"The flux in the melt carried off {i.name}'s impurity: "
                                f"{effectspec.render(spec)}.")
                 continue
             specs.append(marked)
@@ -867,6 +877,15 @@ def preview(level: int, chain: Chain, stock: dict | None = None,
     )
 
 
+def _level_for_rank(rank: int) -> int | None:
+    """The first Blacksmith level whose rarity reaches this rank."""
+    track = wc.get(TRACK_ID)
+    for row in sorted(track.levels, key=lambda r: r.level):
+        if wc.tier_rank(row.max_tier) >= rank:
+            return row.level
+    return None
+
+
 def _dc(items: list[Material], rank: int, stages: int) -> int:
     """Hardest material sets the floor; length of the chain adds to it.
 
@@ -894,3 +913,1986 @@ def _name_for(items: list[Material], base: dict | None, quality: str) -> str:
             metal = metal[:-4]
     prefix = {"masterwork": "Masterwork ", "fine": "Fine "}.get(quality, "")
     return f"{prefix}{metal} {shape}".replace("  ", " ").strip().title()
+
+
+# =========================================================================================
+# The step bench (docs/blacksmithing-revamp-plan.md §4, §7, §10, §11; contracts §4, §7, §8)
+# =========================================================================================
+#
+# Herbalism's step bench, for metal. The page sends a method, what is in each slot, a
+# batch, the player's d20 face and the game's 0..1 score; everything else is computed here
+# (or by lane B's `forge_items`, for an item's numbers). Nothing in this half reads the
+# player's words: shapes come from the weapon and armour tables, materials from lane C's
+# documents, the smithy from lane G's places.
+#
+# Three sibling lanes are built in parallel with this one and may not be merged yet:
+# `rules/materials.py` (C), `rules/forge_items.py` (B), `rules/knowledge.py` (E), and
+# `places.smithy_here` / `places.has_field_kit` / `market.forge_rent` (G). Each is imported
+# lazily through `_lane` and every call has a stated fallback, so the bench works (more
+# plainly) before they land and picks them up the moment they do, with no edit here.
+
+import copy as _copy
+
+METHODS = ("smelt", "alloy", "forge", "quench", "temper", "fold", "hone", "assemble",
+           "finish", "strengthen", "assay")
+
+# Station icons for the old /craft/ tab's method strip (`benches.method_glyphs` prefers a
+# module's own map). Distinct within the track: the test that pins it measured eleven
+# stations drawn as the same fallback crate.
+METHOD_GLYPH: dict[str, str] = {
+    "smelt": "🔥", "alloy": "⚗️", "forge": "🔨", "quench": "💧", "temper": "🌡️",
+    "fold": "📐", "hone": "🪒", "assemble": "🔩", "finish": "✨", "strengthen": "⛓️",
+    "assay": "🔍",
+}
+
+# Piece slots per gear (contracts §3, plan §6.1). The first is the main piece, counted in
+# full; the others count half. The first two are required at Assemble and the third is
+# optional ("a piece may be none where the base item has no such part", plan §6.1): a
+# sword needs a grip, it does not need a guard.
+PIECES = {"weapon": ("head", "haft", "fittings"),
+          "armour": ("body", "fastenings", "lining"),
+          "shield": ("body", "fastenings", "lining")}
+REQUIRED_PIECES = 2
+
+RECORD_SCHEMA = 3
+BAR_FORMS = ("ingot", "bar")
+PIECE_FORMS = ("blank", "plate")
+WORKED_FORMS = BAR_FORMS + PIECE_FORMS + ("item",)
+# Stock written by the forge. "smithing" is what `_op_prospect` writes today (plan §12.7,
+# lane B fixes it); both are read so prospected ore reaches the rack either way.
+BENCH_CRAFTS = (TRACK_ID, "smithing")
+
+# Armour and shields a smith makes: the metal suits and shields of CRB Table 6-6. Leather,
+# hide and padded are the tanner's; the wooden shields are a carpenter's.
+FORGED_ARMOUR = ("chain shirt", "scale mail", "breastplate", "chainmail", "splint mail",
+                 "banded mail", "half-plate", "full plate")
+FORGED_SHIELDS = ("buckler", "light shield", "heavy shield")
+# Weapon families a forge shapes: the melee sections of the weapons table. Bows, firearms,
+# siege engines and ammunition are other trades.
+WEAPON_FAMILIES = ("Light Weapons", "One-Handed Weapons", "Two-Handed Weapons")
+
+OLD_WORK = ("made at the old forge: it can be worn, wielded or sold, not worked further")
+
+GROUPS = {"ore": "Ore", "ingot": "Ingots", "bar": "Bars", "blank": "Blanks and plates",
+          "plate": "Blanks and plates", "fitting": "Hafts, grips and fittings",
+          "fuel": "Fuel", "flux": "Flux", "quenchant": "Quenchants",
+          "treatment": "Treatments", "item": "Finished work", "old": "Old work"}
+
+
+def _lane(name: str):
+    """A sibling lane's module, or None while it is not merged (contracts §1). Imported on
+    each call rather than at module load, so a test can stand a fake in `sys.modules`."""
+    try:
+        return importlib.import_module(f"rules.{name}")
+    except ImportError:
+        return None
+
+
+def bench_rules() -> dict:
+    """The track JSON's `bench` block: every number the plan marks proposed."""
+    return dict(wc.get(TRACK_ID).data.get("bench") or {})
+
+
+def method_row(method: str) -> dict | None:
+    return (bench_rules().get("methods") or {}).get(str(method or "").strip().lower())
+
+
+def method_level(method: str) -> int:
+    track = wc.get(TRACK_ID)
+    for row in sorted(track.levels, key=lambda r: r.level):
+        if method in row.methods:
+            return row.level
+    return track.max_level + 1
+
+
+def old_method(name: str) -> str:
+    """What a removed method became (plan §14: draw -> forge, polish -> hone, flux -> a
+    Smelt ingredient, rivet -> assemble), for an old recipe or chain naming it."""
+    key = str(name or "").strip().lower()
+    return str((wc.get(TRACK_ID).data.get("old_methods") or {}).get(key, key))
+
+
+def migrate_methods(methods) -> list[str]:
+    """An old recipe's method list with the removed methods mapped onto the new (plan §14).
+
+    Before this (measured 2026-10-04, lane H) a saved recipe naming draw or polish was
+    loaded as written and refused by `preview` — "Blacksmith has no method called 'draw':
+    Draw became Forge." — a sentence telling the player what the code already knew. Now
+    the step is the new one: draw -> forge, polish -> hone, rivet -> assemble, and flux,
+    which became an ingredient of Smelt, is the Smelt step (the flux stays in the charge,
+    where Smelt reads it). A step the map produces twice in a row is one step: "forge,
+    draw" was always one shaping, and is now "forge"."""
+    out: list[str] = []
+    for m in methods or ():
+        new = old_method(str(m))
+        if new and (not out or out[-1] != new) and not (new == "smelt" and "smelt" in out):
+            out.append(new)
+    return out
+
+
+# The record an old "Iron Work" is re-derived into (plan §14). Its haft and fittings the
+# old bench never recorded: they default to plain ash and iron, "value 0" — named so the
+# card can say what it is made of, marked `plain` so `forge_items.build` counts nothing
+# for them. A suit's fastenings are plain iron; it never had a lining.
+MIGRATED_PLAIN = {"weapon": {"haft": "ash-haft", "fittings": "iron"},
+                  "armour": {"fastenings": "iron"}}
+MIGRATION_STAMP = "plan-14"
+_OLD_QUALITY_INDEX = {"plain": 1, "fine": 2, "masterwork": 3}
+
+
+def is_old_record(d) -> bool:
+    """An old forge record: made by the one-shot chain, a weapon or a suit with flat
+    `specs` and no `pieces` (contracts §4 has pieces; the step bench writes `forge.*`
+    tags). The thing plan §14 converts on load."""
+    if not isinstance(d, dict) or isinstance(d.get("pieces"), dict):
+        return False
+    if str(d.get("craft") or "") not in BENCH_CRAFTS:
+        return False
+    if any(str(p).startswith("forge.") for p in d.get("properties") or ()):
+        return False
+    return bool(d.get("weapon") or d.get("armour"))
+
+
+def _main_material_of(d: dict) -> str:
+    """The metal an old record was made of, inferred: its own `from_materials` first (the
+    charge it was smelted from: a metal or alloy before an ore, an ore read as its metal),
+    then the `from` its specs carry, then the longest metal name inside its own name
+    ("Masterwork Cold Iron Longsword" is cold iron, not iron), and iron when nothing
+    says. Only a material that can fill the main piece is an answer."""
+    gear = "weapon" if d.get("weapon") else "armour"
+    main = "head" if gear == "weapon" else "body"
+    mats = _lane("materials")
+    shelf = mats.all() if mats is not None else {}
+
+    def fills(mid: str) -> str:
+        mid = str(mid or "").strip().lower()
+        doc = shelf.get(mid)
+        if doc is None:
+            return ""
+        if doc.get("kind") == "ore" and doc.get("material") and doc["material"] != mid:
+            return fills(doc["material"])
+        if main in (doc.get("pieces") or {}).get(gear, ()):
+            return mid
+        return ""
+
+    tried = list(d.get("from_materials") or ())
+    tried.sort(key=lambda m: 0 if (shelf.get(str(m).lower()) or {}).get("kind")
+               in ("metal", "alloy") else 1)
+    for mid in tried:
+        got = fills(mid)
+        if got:
+            return got
+    by_name = {str(doc.get("name") or "").lower(): mid for mid, doc in shelf.items()}
+    for spec in d.get("specs") or ():
+        said = str((spec or {}).get("from") or "").strip().lower()
+        got = fills(by_name.get(said, said))
+        if got:
+            return got
+    name = " ".join(str(d.get("name") or d.get("base") or "").lower().split())
+    for label in sorted(by_name, key=len, reverse=True):
+        if label and f" {label} " in f" {name} ":
+            got = fills(by_name[label])
+            if got:
+                return got
+    return "iron"
+
+
+def migrate_old_record(d: dict) -> dict | None:
+    """An old "Iron Work" record re-derived as a contracts §4 record, or None when `d` is
+    not one (plan §14, the owner's "convert").
+
+    The id and name are kept, so `equipped`, a worn slot and the shelf key still find it.
+    The main piece is the material inferred by `_main_material_of`; the haft and fittings
+    (fastenings for a suit) are plain (`MIGRATED_PLAIN`). Masterwork stays masterwork:
+    the old quality becomes the index (masterwork 3, the Superior that is masterwork at
+    the new bench; fine 2; plain 1) and the flag is kept. The smith is level 1 with no
+    perks — the old record never said, and level 1 cuts nothing from a negative.
+
+    **The old record is kept beside the new one, for one version** (`migrated_from`), so
+    a bad inference can be undone (`undo_migration`). Remove the field in the release
+    after the one that ships this."""
+    if not is_old_record(d):
+        return None
+    gear = "weapon" if d.get("weapon") else "armour"
+    base = str(d.get("weapon") or d.get("armour") or "")
+    main = "head" if gear == "weapon" else "body"
+    quality = str(d.get("quality") or ("masterwork" if d.get("masterwork") else "plain"))
+    q = _OLD_QUALITY_INDEX.get(quality.lower(), 1)
+    pieces = {main: {"material": _main_material_of(d), "passes": 0}}
+    for slot, mid in MIGRATED_PLAIN[gear].items():
+        pieces[slot] = {"material": mid, "passes": 0, "plain": True}
+    name = str(d.get("name") or d.get("base") or "Iron Work")
+    # A shelf entry's id carries the jar's concentration ("...-longsword#1"), which is the
+    # shelf key and not the thing's name; the item's own id is the slug, as the old
+    # bench's output wrote it, so `item:<id>` names the blade and not the jar.
+    rid = str(d.get("id") or _slug(name)).split("#", 1)[0] or _slug(name)
+    return {
+        "id": rid, "name": name,
+        "kind": "crafted", "craft": TRACK_ID, "count": int(d.get("count", 1) or 1),
+        "gear": gear, "base": base,
+        "slot": str(d.get("slot") or ("hands" if gear == "weapon" else "armor")),
+        "quality": wc.quality_name(q).lower(), "quality_index": q,
+        "masterwork": bool(d.get("masterwork")) or quality == "masterwork",
+        "pieces": pieces, "quench": None, "finish": [], "flaws": [],
+        "smith": {"level": 1, "perks": {}},
+        "schema": RECORD_SCHEMA, "migrated": MIGRATION_STAMP,
+        "migrated_from": _copy.deepcopy(d),
+    }
+
+
+def undo_migration(rec: dict) -> dict | None:
+    """The old record a migrated one was made from, while it is still kept."""
+    old = (rec or {}).get("migrated_from")
+    return _copy.deepcopy(old) if isinstance(old, dict) else None
+
+
+def _mw_index() -> int:
+    return int(bench_rules().get("masterwork_index", 3))
+
+
+# --- materials, through lane C ----------------------------------------------------------
+
+_FORM_BY_KIND = {"ore": "ore", "metal": "bar", "alloy": "bar", "fuel": "fuel",
+                 "flux": "flux", "quenchant": "quenchant", "fitting": "fitting",
+                 "treatment": "treatment"}
+_FITTING_FORMS = ("haft", "grip", "guard", "fitting", "binding", "core", "lining",
+                  "fastening", "fastenings", "wrap")
+
+
+@dataclass
+class Metal:
+    """One material as the forge sees it: lane C's normalised document (contracts §3) with
+    the few things the bench asks of it lifted out. `doc` is the document itself, passed
+    on to lane E's knowledge functions untouched."""
+    id: str
+    name: str
+    kind: str = "metal"
+    tier: str = "common"
+    form: str = ""
+    parent: str = ""
+    pieces: dict = field(default_factory=dict)
+    working: list = field(default_factory=list)
+    craft_dc: int | None = None
+    doc: dict = field(default_factory=dict)
+
+    @property
+    def rank(self) -> int:
+        return wc.tier_rank(self.tier)
+
+    @property
+    def dc(self) -> int:
+        """The material's own DC: an authored craft_dc wins, else 5 + 5 x rank (the rule
+        every bench in the app uses for an intermediate step)."""
+        return int(self.craft_dc) if self.craft_dc is not None else 5 + 5 * self.rank
+
+    def has(self, trait: str) -> bool:
+        return trait in self.working
+
+    def fills(self, gear: str, piece: str) -> bool:
+        key = "armour" if gear in ("armour", "shield") else "weapon"
+        return piece in (self.pieces.get(key) or [])
+
+    @property
+    def rack_form(self) -> str:
+        f = str(self.form or "").strip().lower()
+        if f in ("bar", "alloy bar", "ingot"):
+            return "bar"
+        if f == "ore":
+            return "ore"
+        if f in _FITTING_FORMS:
+            return "fitting"
+        if f in ("fuel", "flux", "quenchant", "treatment"):
+            return f
+        return _FORM_BY_KIND.get(self.kind, "fitting" if any(self.pieces.values()) else "")
+
+
+def _fallback_pieces(m: Material) -> dict:
+    """Which pieces an old-format material fills, until lane C's documents say (contracts
+    §3 `pieces`). Read off the kind, and for fittings off the id's own word, because the
+    pre-revamp file has no other record of whether a fitting is a haft or a guard. Lane
+    C's `pieces` replaces this the moment it is merged."""
+    if m.kind in ("metal", "alloy", "ore"):
+        return {"weapon": ["head", "fittings"], "armour": ["body", "fastenings"]}
+    if m.kind == "fitting":
+        if "guard" in m.id:
+            return {"weapon": ["fittings"]}
+        if "grip" in m.id or "binding" in m.id:
+            return {"weapon": ["haft"], "armour": ["lining"]}
+        return {"weapon": ["haft"]}
+    return {}
+
+
+def _fallback_parent(mid: str) -> str:
+    if mid.endswith("-ore") and mid[:-4] in materials():
+        return mid[:-4]
+    return mid
+
+
+def metal(material_id: str) -> Metal | None:
+    """The material by id, from lane C's one door (`materials.get`) when it exists, else
+    from this module's own loader with the new fields at their defaults."""
+    mid = str(material_id or "").strip().lower()
+    if not mid:
+        return None
+    mats = _lane("materials")
+    doc = None
+    if mats is not None and hasattr(mats, "get"):
+        try:
+            doc = mats.get(mid)
+        except Exception:          # noqa: BLE001 - a bad document is "no such material"
+            doc = None
+    old = materials().get(mid)
+    if doc is None and old is None:
+        return None
+    if doc is None:
+        doc = {"id": old.id, "name": old.name, "kind": old.kind, "tier": old.tier,
+               "form": _FORM_BY_KIND.get(old.kind, ""), "pieces": _fallback_pieces(old),
+               "weapon": [], "armour": [], "working": [], "quench_mark": None,
+               "price_gp": old.price_gp, "text": old.text, "craft_dc": old.craft_dc}
+    parent = ""
+    if mats is not None and hasattr(mats, "material_of"):
+        try:
+            parent = str(mats.material_of(mid) or "")
+        except Exception:          # noqa: BLE001
+            parent = ""
+    if not parent or parent == mid:
+        parent = str(doc.get("material") or "") or _fallback_parent(mid)
+    working = []
+    for w in doc.get("working") or []:
+        trait = w.get("trait") if isinstance(w, dict) else w
+        if trait:
+            working.append(str(trait))
+    craft_dc = doc.get("craft_dc")
+    if craft_dc is None and old is not None:
+        craft_dc = old.craft_dc
+    return Metal(id=mid, name=str(doc.get("name") or (old.name if old else mid)),
+                 kind=str(doc.get("kind") or (old.kind if old else "metal")),
+                 tier=str(doc.get("tier") or (old.tier if old else "common")),
+                 form=str(doc.get("form") or ""), parent=parent,
+                 pieces={k: list(v or []) for k, v in (doc.get("pieces") or {}).items()},
+                 working=working, craft_dc=craft_dc, doc=dict(doc))
+
+
+def _by_name(name: str) -> str:
+    """A material id from a display name: prospected ore arrives as `Stock(base="Iron
+    Ore")` and carries no id (rules/engine.py `_op_prospect`)."""
+    want = str(name or "").strip().lower()
+    for mid, m in materials().items():
+        if m.name.lower() == want:
+            return mid
+    return ""
+
+
+def _forge_relevant(m: Metal) -> bool:
+    return m.kind in KIND_GLYPH or any(m.pieces.values())
+
+
+def _known_keys(actor, mid: str) -> set:
+    entry = (getattr(actor, "herb_known", None) or {}).get(mid) or {}
+    return set(entry.get("keys") or [])
+
+
+def unknown_count(actor, m: Metal | None) -> int:
+    """Properties of this material the actor does not know (the rack's "?"). One store:
+    `Actor.herb_known`, keyed by material id (contracts §6)."""
+    kn = _lane("knowledge")
+    if kn is None or actor is None or m is None:
+        return 0
+    try:
+        keys = list(kn.property_keys(m.doc))
+    except Exception:              # noqa: BLE001
+        return 0
+    known = _known_keys(actor, m.id)
+    return sum(1 for k in keys if k not in known)
+
+
+# --- what the forge puts on the shelf ---------------------------------------------------
+#
+# Every forge product is a `crafting.Stock` with `craft="blacksmith"`, because that is the
+# one shelf the sheet saves and the engine reads. Stock has no field for a piece's passes,
+# quench or build, and `crafting.Stock` belongs to no lane in this wave, so the forge's
+# state travels in `Stock.properties` as hierarchical tags (`forge.form.blank`,
+# `forge.passes.1`, `forge.piece.head.iron.1`): law 1's vocabulary, asked by prefix,
+# and it survives a save and load untouched because `properties` already does. The record
+# of contracts §4 is rebuilt from the tags (`record`), so it stores ids and passes and
+# never a computed number.
+
+def _enc(text: str) -> str:
+    return str(text).replace(" ", "_")
+
+
+def _dec(text: str) -> str:
+    return str(text).replace("_", " ")
+
+
+@dataclass
+class Work:
+    """A forge product: an ingot, a bar, a blank, a plate, or a finished item."""
+    form: str
+    material: str
+    passes: int = 0
+    quality: int | None = None
+    shape: str = ""
+    gear: str = ""
+    quench: str = ""
+    worked: list = field(default_factory=list)
+    traits: list = field(default_factory=list)      # slaggy, brittle, hot_short, folded
+    alloy_of: list = field(default_factory=list)    # a novel alloy's other metals
+    cut: int = 0                                    # tenths cut off one bar by assaying
+    pieces: dict = field(default_factory=dict)      # item: slot -> {material, passes}
+    finish: list = field(default_factory=list)
+    smith: dict = field(default_factory=dict)
+    rid: str = ""
+    name: str = ""
+    tier: str = "common"
+
+    def copy(self) -> "Work":
+        return _copy.deepcopy(self)
+
+    def tags(self) -> list[str]:
+        t = [f"forge.form.{self.form}", f"forge.material.{self.material}"]
+        if self.passes:
+            t.append(f"forge.passes.{int(self.passes)}")
+        if self.quality is not None:
+            t.append(f"forge.quality.{int(self.quality)}")
+        if self.shape:
+            t.append(f"forge.shape.{_enc(self.shape)}")
+        if self.gear:
+            t.append(f"forge.gear.{self.gear}")
+        if self.quench:
+            t.append(f"forge.quench.{self.quench}")
+        t += [f"forge.worked.{w}" for w in self.worked]
+        t += [f"forge.trait.{x}" for x in sorted(set(self.traits))]
+        t += [f"forge.alloy.{a}" for a in self.alloy_of]
+        for slot, p in self.pieces.items():
+            t.append(f"forge.piece.{slot}.{p['material']}.{int(p.get('passes', 0))}"
+                     + (".folded" if p.get("folded") else ""))
+            t += [f"forge.piecealloy.{slot}.{a}" for a in p.get("alloy_of") or []]
+        t += [f"forge.finish.{f}" for f in self.finish]
+        if self.smith:
+            t.append(f"forge.smith.level.{int(self.smith.get('level', 1))}")
+            for k, n in sorted((self.smith.get("perks") or {}).items()):
+                t.append(f"forge.smith.perk.{k}.{int(n)}")
+        if self.rid:
+            t.append(f"forge.id.{self.rid}")
+        if self.form == "item":
+            t.append(f"forge.schema.{RECORD_SCHEMA}")
+        if self.cut:
+            t.append(f"forge.cut.{int(self.cut)}")
+        return t
+
+    @classmethod
+    def from_tags(cls, tags, *, name: str = "", tier: str = "common") -> "Work | None":
+        tags = [str(t) for t in (tags or []) if str(t).startswith("forge.")]
+        if not any(t.startswith("forge.form.") for t in tags):
+            return None
+        w = cls(form="", material="", name=name, tier=tier)
+        for t in tags:
+            parts = t.split(".")
+            head, rest = parts[1], parts[2:]
+            val = ".".join(rest)
+            if head == "form":
+                w.form = val
+            elif head == "material":
+                w.material = val
+            elif head == "passes":
+                w.passes = int(val or 0)
+            elif head == "quality":
+                w.quality = int(val)
+            elif head == "shape":
+                w.shape = _dec(val)
+            elif head == "gear":
+                w.gear = val
+            elif head == "quench":
+                w.quench = val
+            elif head == "worked":
+                w.worked.append(val)
+            elif head == "trait":
+                w.traits.append(val)
+            elif head == "alloy":
+                w.alloy_of.append(val)
+            elif head == "piece" and len(rest) >= 3:
+                folded = rest[-1] == "folded"
+                body = rest[:-1] if folded else rest
+                slot, passes, mat = body[0], body[-1], ".".join(body[1:-1])
+                piece = {"material": mat, "passes": int(passes or 0)}
+                if folded:
+                    piece["folded"] = True
+                w.pieces[slot] = {**w.pieces.get(slot, {}), **piece}
+            elif head == "piecealloy" and len(rest) >= 2:
+                w.pieces.setdefault(rest[0], {}).setdefault("alloy_of", []).append(
+                    ".".join(rest[1:]))
+            elif head == "finish":
+                w.finish.append(val)
+            elif head == "smith" and rest:
+                if rest[0] == "level":
+                    w.smith["level"] = int(rest[1])
+                elif rest[0] == "perk" and len(rest) >= 3:
+                    w.smith.setdefault("perks", {})[rest[1]] = int(rest[2])
+            elif head == "id":
+                w.rid = val
+            elif head == "cut":
+                w.cut = int(val or 0)
+        return w
+
+    @classmethod
+    def from_stock(cls, item) -> "Work | None":
+        if str(getattr(item, "craft", "") or "") not in BENCH_CRAFTS:
+            return None
+        return cls.from_tags(getattr(item, "properties", None),
+                             name=str(getattr(item, "base", "") or ""),
+                             tier=str(getattr(item, "tier", "") or "common"))
+
+    def digest(self) -> str:
+        """What makes two products the same thing to stack: everything but a sliver cut."""
+        sig = json.dumps([t for t in self.tags() if not t.startswith("forge.cut.")])
+        return hashlib.md5(sig.encode()).hexdigest()[:10]
+
+    @property
+    def flaws(self) -> list[str]:
+        return [t for t in ("brittle", "hot_short", "slaggy") if t in self.traits]
+
+
+def shapes() -> dict:
+    """What a smith can shape, from the engine's own tables and never from free text
+    (plan §7: "the shape is picked from the engine's list of weapon and armour
+    families"). Grouped by family, each with the bars it takes and the book's DC.
+
+    Memoised on the identity of the two tables it reads, so a homebrew weapon saved at
+    the weapon bench (which drops `weapons._ALL`) or a reloaded track is seen at once,
+    while the dozens of names a rack asks for in one request do not rebuild 456 rows."""
+    global _SHAPES
+    from . import weapons as weapons_mod
+
+    table = weapons_mod.all_weapons()
+    track = wc.get(TRACK_ID)
+    # Compared by identity on the objects themselves, held in the cache, so a freed table
+    # can never hand its id to a new one and pass for it.
+    if _SHAPES is not None and _SHAPES[0] is table and _SHAPES[1] is track:
+        return _SHAPES[2]
+    rules = bench_rules()
+    dcs = rules.get("book_dc") or {}
+    per = rules.get("bars_per_lb") or {}
+    from .tables import ARMOUR, SHIELDS
+
+    fams: dict[str, list] = {f: [] for f in WEAPON_FAMILIES}
+    for key, row in sorted(table.items()):
+        section = str(row.get("section") or "")
+        if section not in fams or "shield" in key or row.get("category") == "ranged":
+            continue
+        lb = float(row.get("weight_lb") or 0)
+        types = set(row.get("types") or [row.get("type")])
+        fams[section].append({
+            "id": key, "name": str(row.get("name") or key), "gear": "weapon",
+            "prof": str(row.get("prof") or "martial"),
+            "edged": bool(types & {"slashing", "piercing"}),
+            "bars": max(1, math.ceil(lb / float(per.get("weapon", 4)))) if lb else 1,
+            "dc": int(dcs.get(str(row.get("prof") or "martial"), dcs.get("martial", 15))),
+            "pieces": list(PIECES["weapon"])})
+    out = [{"family": f, "gear": "weapon", "shapes": fams[f]} for f in WEAPON_FAMILIES]
+    for weight in ("light", "medium", "heavy"):
+        rows = []
+        for key in FORGED_ARMOUR:
+            a = ARMOUR.get(key)
+            if a and a.get("weight") == weight:
+                rows.append({"id": key, "name": str(a.get("name") or key), "gear": "armour",
+                             "edged": False,
+                             "bars": max(1, math.ceil(float(a.get("lb") or 0)
+                                                      / float(per.get("armour", 10)))),
+                             "dc": int(dcs.get("armour_base", 10)) + int(a.get("ac", 0)),
+                             "pieces": list(PIECES["armour"])})
+        out.append({"family": f"{weight.title()} armour", "gear": "armour", "shapes": rows})
+    rows = []
+    for key in FORGED_SHIELDS:
+        s = SHIELDS.get(key)
+        if s:
+            rows.append({"id": key, "name": str(s.get("name") or key), "gear": "shield",
+                         "edged": False,
+                         "bars": max(1, math.ceil(float(s.get("lb") or 0)
+                                                  / float(per.get("shield", 5)))),
+                         "dc": int(dcs.get("armour_base", 10)) + int(s.get("ac", 0)),
+                         "pieces": list(PIECES["shield"])})
+    out.append({"family": "Shields", "gear": "shield", "shapes": rows})
+    got = {"families": out}
+    _SHAPES = (table, track, got)
+    return got
+
+
+# Filled on first use and dropped by tests/conftest.py with the other content caches.
+_SHAPES: tuple | None = None
+
+
+def shape_info(shape: str) -> dict | None:
+    """One shape by id, exactly as `shapes` lists it, or None. Weapons accept any
+    spelling the weapons table knows ("Longsword", "longsword")."""
+    want = str(shape or "").strip().lower()
+    if not want:
+        return None
+    from . import weapons as weapons_mod
+
+    wkey = weapons_mod.key_for(want) or want
+    for fam in shapes()["families"]:
+        for row in fam["shapes"]:
+            if row["id"] == want or row["id"] == wkey:
+                return row
+    return None
+
+
+def _shape_name(shape: str) -> str:
+    info = shape_info(shape)
+    return (info or {}).get("name") or str(shape or "")
+
+
+def _metal_name(w: Work) -> str:
+    names = []
+    for mid in [w.material] + list(w.alloy_of):
+        m = metal(mid)
+        names.append(m.name if m else mid.replace("-", " ").title())
+    return f"{'-'.join(names)} Alloy" if w.alloy_of else names[0]
+
+
+def work_name(w: Work) -> str:
+    """"Iron Ingot", "Steel Bar (strengthened ×2)", "Tempered Iron Blank (Longsword)",
+    "Fine Iron Longsword" (contracts §4's example). The rack shows quality on its own
+    badge, so only a finished item carries it in its name."""
+    metal_name = _metal_name(w)
+    if w.form == "item":
+        q = int(w.quality or 0)
+        prefix = "" if q == 1 else f"{wc.quality_name(q)} "
+        return f"{prefix}{metal_name} {_shape_name(w.shape).title()}".strip()
+    words = []
+    if "temper" in w.worked:
+        words.append("Tempered")
+    elif w.quench:
+        words.append("Quenched")
+    if "hone" in w.worked:
+        words.append("Honed")
+    if "folded" in w.traits:
+        words.append("Folded")
+    noun = {"ingot": "Ingot", "bar": "Bar", "blank": "Blank", "plate": "Plate"}.get(
+        w.form, w.form.title())
+    name = " ".join(words + [metal_name, noun])
+    if w.form in PIECE_FORMS and w.shape:
+        name += f" ({_shape_name(w.shape).title()})"
+    if w.passes:
+        name += f" (strengthened ×{w.passes})" if w.form in BAR_FORMS \
+            else f", strengthened ×{w.passes}"
+    return name
+
+
+def _slot_of(gear: str) -> str:
+    return {"weapon": "hands", "armour": "armor", "shield": "shield"}.get(gear, "hands")
+
+
+def to_stock(w: Work):
+    """The forge product as a shelf entry. A finished weapon points `weapon` at its base,
+    so it is wieldable as what it really is before lane B's reader of the build lands."""
+    from .crafting import Stock
+
+    item = w.form == "item"
+    mats = ([p.get("material") for p in w.pieces.values()] if item
+            else [w.material] + list(w.alloy_of))
+    return Stock(
+        base=w.name or work_name(w), tier=w.tier, count=1, craft=TRACK_ID,
+        kind="crafted" if item else w.form,
+        slot=_slot_of(w.gear) if item else None, wearable=item,
+        how=[] if item else ["ingredient"],
+        weapon=w.shape if item and w.gear == "weapon" else None,
+        armour=w.shape if item and w.gear == "armour" else None,
+        masterwork=bool(item and int(w.quality or 0) >= _mw_index()),
+        from_materials=[m for m in mats if m],
+        properties=w.tags())
+
+
+def stock_key(w: Work) -> str:
+    """The shelf key: the name's slug and the digest of what it is. Not `Stock.id`, which
+    is the name and a concentration: two Fine Iron Longswords on different hafts have the
+    same name and must not stack into one."""
+    return f"{_slug(w.name or work_name(w))}~{w.digest()}"
+
+
+def put(actor, w: Work, count: int = 1) -> str:
+    """Put a product on the shelf, stacking with an identical one. Returns its key."""
+    if not w.name:
+        w.name = work_name(w)
+    key = stock_key(w)
+    have = actor.stock.get(key)
+    if have is not None:
+        have.count = int(have.count or 0) + int(count)
+    else:
+        st = to_stock(w)
+        st.count = int(count)
+        actor.stock[key] = st
+    return key
+
+
+def record(item, count: int | None = None) -> dict | None:
+    """The crafted record of contracts §4, rebuilt from a forge item's tags, or None for
+    anything else. Public so lane B's readers can ask it of any Stock."""
+    w = item if isinstance(item, Work) else Work.from_stock(item)
+    if w is None or w.form != "item":
+        return None
+    q = int(w.quality or 0)
+    n = int(count if count is not None else getattr(item, "count", 1) or 1)
+    return {
+        "id": w.rid or _slug(w.name), "name": w.name or work_name(w),
+        "kind": "crafted", "craft": TRACK_ID, "count": n,
+        "gear": w.gear, "base": w.shape, "slot": _slot_of(w.gear),
+        "quality": wc.quality_name(q).lower(), "quality_index": q,
+        "masterwork": q >= _mw_index(),
+        "pieces": _copy.deepcopy(w.pieces),
+        "quench": w.quench or None, "finish": list(w.finish), "flaws": w.flaws,
+        "smith": _copy.deepcopy(w.smith) or {"level": 1, "perks": {}},
+        "schema": RECORD_SCHEMA,
+    }
+
+
+def records(actor) -> list[dict]:
+    """Every finished forge item the actor carries, as records (contracts §4)."""
+    out = []
+    for item in (getattr(actor, "stock", {}) or {}).values():
+        rec = record(item)
+        if rec is not None:
+            out.append(rec)
+    return out
+
+
+def build_of(rec: dict | None) -> dict | None:
+    """Lane B's `forge_items.build(record)`, or None while it is not merged: the page then
+    shows the pieces without a sum rather than numbers this lane made up."""
+    fi = _lane("forge_items")
+    if rec is None or fi is None or not hasattr(fi, "build"):
+        return None
+    return fi.build(rec)
+
+
+def preview_of(pieces: dict, *, gear: str, base: str, quality_index: int, level: int,
+               perks: dict) -> dict | None:
+    """Lane B's `forge_items.preview` (contracts §4), or None while it is not merged."""
+    fi = _lane("forge_items")
+    if fi is None or not hasattr(fi, "preview") or not pieces:
+        return None
+    return fi.preview(pieces, gear=gear, base=base, quality_index=int(quality_index),
+                      level=int(level), perks=dict(perks))
+
+
+# --- the rack ---------------------------------------------------------------------------
+
+@dataclass
+class Piece:
+    """One rack entry (UI plan §6.2): raw material from the satchel's counts, or a forge
+    product from the shelf. `count` is whole units usable; `amount` adds the part of a
+    bar an assay has left ("Iron bar 1.9")."""
+    key: str
+    name: str
+    material: str
+    form: str
+    count: int
+    tier: str = "common"
+    work: Work | None = None
+    cut: int = 0
+    old: str = ""
+
+    @property
+    def rank(self) -> int:
+        return wc.tier_rank(self.tier)
+
+    @property
+    def amount(self) -> float:
+        return round(self.count + ((10 - self.cut) / 10 if self.cut else 0), 1)
+
+    @property
+    def passes(self) -> int:
+        return int(self.work.passes) if self.work else 0
+
+    @property
+    def quality(self) -> int | None:
+        return self.work.quality if self.work else None
+
+    @property
+    def traits(self) -> list[str]:
+        if self.work is not None:
+            return list(self.work.traits)
+        m = metal(self.material)
+        return ["slaggy"] if m and m.has("slaggy") else []
+
+    def as_work(self) -> Work:
+        """This entry as a forge product, so a bought bar and a smelted ingot are worked
+        the same way. A raw slaggy bar is slaggy (plan §5.5)."""
+        if self.work is not None:
+            return self.work.copy()
+        m = metal(self.material)
+        form = "ingot" if self.form == "ingot" else "bar"
+        return Work(form=form, material=self.material, tier=self.tier,
+                    traits=["slaggy"] if m and m.has("slaggy") else [])
+
+    def badges(self) -> list[str]:
+        w = self.work
+        out = []
+        if w is not None:
+            if w.quench:
+                out.append("quenched")
+            if "temper" in w.worked:
+                out.append("tempered")
+            if "hone" in w.worked:
+                out.append("honed")
+            if w.passes:
+                out.append(f"strengthened ×{w.passes}")
+        for t in self.traits:
+            out.append(t.replace("_", "-"))
+        return out
+
+    def as_item(self, actor=None) -> dict:
+        m = metal(self.material) if self.material else None
+        d = {"key": self.key, "name": self.name, "material": self.material,
+             "form": self.form, "group": GROUPS.get(self.form, "Other"),
+             "count": self.count, "amount": self.amount, "tier": self.tier,
+             "rank": self.rank, "glyph": KIND_GLYPH.get(m.kind, "🪨") if m else "🪨",
+             "passes": self.passes, "quality": self.quality,
+             "quality_name": wc.quality_name(self.quality) if self.quality is not None
+             else None,
+             "badges": self.badges(),
+             "unknown": unknown_count(actor, m) if m else 0,
+             "old": self.old}
+        if self.work is not None:
+            d["shape"] = self.work.shape
+            d["gear"] = self.work.gear
+            if self.work.quench:
+                d["quench"] = self.work.quench
+            if self.work.form == "item":
+                d["record"] = record(self.work, self.count)
+        return d
+
+
+def rack(actor, reserved: dict | None = None) -> list[Piece]:
+    """Everything the forge can reach for: only what is carried (UI plan §6.2). Raw
+    materials from `Actor.inventory` (bought, gathered), and from the shelf the forge's
+    own products plus prospected ore. `reserved` is `{key: count}` held by a step between
+    its roll and its finish."""
+    reserved = reserved or {}
+    out: list[Piece] = []
+    if actor is None:
+        return out
+    for iid, n in sorted((getattr(actor, "inventory", {}) or {}).items()):
+        if int(n or 0) <= 0:
+            continue
+        m = metal(iid)
+        if m is None or not _forge_relevant(m):
+            continue
+        key = f"inv:{m.id}"
+        count = int(n) - int(reserved.get(key, 0))
+        if count > 0:
+            out.append(Piece(key=key, name=m.name, material=m.id, form=m.rack_form,
+                             count=count, tier=m.tier))
+    for sid, st in sorted((getattr(actor, "stock", {}) or {}).items(),
+                          key=lambda kv: kv[1].name.lower()):
+        if str(st.craft or "") not in BENCH_CRAFTS:
+            continue
+        key = f"stock:{sid}"
+        whole = int(st.count or 0)
+        w = Work.from_stock(st)
+        if w is not None:
+            # The bar an assay has cut into is the last of the stack: whole bars are
+            # the rest (plan §9.2, "bars track tenths").
+            avail = whole - (1 if w.cut else 0) - int(reserved.get(key, 0))
+            if avail <= 0 and not w.cut:
+                continue
+            out.append(Piece(key=key, name=st.name, material=w.material, form=w.form,
+                             count=max(0, avail), tier=w.tier, work=w, cut=w.cut))
+            continue
+        count = whole - int(reserved.get(key, 0))
+        if count <= 0:
+            continue
+        m = metal(_by_name(st.base))
+        if m is not None:
+            out.append(Piece(key=key, name=st.name, material=m.id, form=m.rack_form,
+                             count=count, tier=m.tier))
+        else:
+            out.append(Piece(key=key, name=st.name, material="", form="old", count=count,
+                             tier=str(st.tier or "common"), old=OLD_WORK))
+    return out
+
+
+# --- where you smith (lane G, contracts §8) ----------------------------------------------
+
+def where_here(scene, actor, known=()) -> dict:
+    """{"smithy": lane G's smithy dict or None, "kit": carrying a field kit}.
+
+    Asked of `places.smithy_here(scene, known)` and `places.has_field_kit(actor)`, never
+    of the player's words (plan §10). `known` is `Engine.places()`, which lane G needs for
+    an authored place whose id does not spell its name. Before lane G is present there is
+    no smithy anywhere and the kit folds out wherever the character stands, which is how
+    the forge worked before the revamp."""
+    places = _lane("places")
+    smithy, kit = None, True
+    fn = getattr(places, "smithy_here", None) if places is not None else None
+    if fn is not None:
+        try:
+            smithy = fn(scene, known) or None
+        except Exception:          # noqa: BLE001 - a place we cannot read is no smithy
+            smithy = None
+    fk = getattr(places, "has_field_kit", None) if places is not None else None
+    if fk is not None:
+        try:
+            kit = bool(fk(actor))
+        except Exception:          # noqa: BLE001
+            kit = False
+    return {"smithy": smithy, "kit": kit}
+
+
+def rent_cp(scene, smithy: dict | None, minutes: int, known=()) -> int:
+    """What the forge here charges for the hours (plan §10), asked of lane G's
+    `market.forge_rent`, which knows that your own smithy is free and a friend's is not.
+    Never computed from a rate here while that exists: a second answer to what the smith
+    charges is how two numbers drift. The smithy's own `rate_cp_per_hour` is the fallback
+    only while lane G is absent."""
+    if not smithy or minutes <= 0:
+        return 0
+    hours = minutes / 60
+    market = _lane("market")
+    fn = getattr(market, "forge_rent", None) if market is not None else None
+    if fn is not None:
+        return max(0, int(fn(scene, hours, known)))
+    return max(0, int(math.ceil(round(int(smithy.get("rate_cp_per_hour") or 0) * hours,
+                                      6))))
+
+
+def methods_view(level: int, where: dict | None = None) -> list[dict]:
+    """The method strip (UI plan §6.1): every method in craft order, with its lock in
+    words: "Blacksmith 2", "Needs a smithy", "Needs a field kit or a smithy"."""
+    where = where or {"smithy": None, "kit": True}
+    rules = bench_rules()
+    out = []
+    for mid in rules.get("order") or METHODS:
+        row = (rules.get("methods") or {}).get(mid) or {}
+        need = method_level(mid)
+        reason = ""
+        if need > int(level):
+            reason = f"Blacksmith {need}"
+        elif row.get("where") == "smithy" and not where.get("smithy"):
+            reason = "Needs a smithy"
+        elif not where.get("smithy") and not where.get("kit"):
+            reason = "Needs a field kit or a smithy"
+        out.append({"id": mid, "name": row.get("name", mid.title()), "level": need,
+                    "where": row.get("where", "kit"), "bulk": bool(row.get("bulk")),
+                    "locked": bool(reason), "lock_reason": reason,
+                    "takes": row.get("takes", ""), "makes": row.get("makes", ""),
+                    "glyph": METHOD_GLYPH.get(mid, "")})
+    return out
+
+
+# --- whether one thing fits a slot --------------------------------------------------------
+
+METHOD_SLOTS = {
+    "smelt": ("ore", "fuel", "flux"),
+    "forge": ("metal", "fuel"),
+    "quench": ("piece", "quenchant"),
+    "temper": ("piece",),
+    "fold": ("piece", "with", "flux"),
+    "hone": ("piece",),
+    "finish": ("item", "treatment"),
+    "strengthen": ("bar", "flux"),
+}
+OPTIONAL = {"smelt": ("flux",), "fold": ("with", "flux"), "strengthen": ("flux",)}
+
+_MISSING = {
+    "ore": "Put ore in the furnace.",
+    "fuel": "Add fuel: the fire needs feeding.",
+    "metal": "Put a bar or ingot on the anvil.",
+    "piece": "Put a blank or plate on the anvil.",
+    "quenchant": "Choose a quenchant for the bath.",
+    "item": "Put a finished item on the bench.",
+    "treatment": "Choose a treatment.",
+    "bar": "Put bars of one metal on the anvil.",
+    "head": "Put a blank in the head slot.",
+    "haft": "Put a haft or grip in the haft slot.",
+    "body": "Put a plate in the body slot.",
+    "fastenings": "Put fastenings in the fastenings slot.",
+}
+
+
+def _alloy_ids() -> set[str]:
+    out = set()
+    for r in (bench_rules().get("alloys") or {}).values():
+        for part in r.get("parts") or []:
+            out |= set(part.get("any") or []) | ({part["id"]} if part.get("id") else set())
+    return out
+
+
+def _edged(shape: str) -> bool:
+    return bool((shape_info(shape) or {}).get("edged"))
+
+
+def fit_reason(method: str, slot: str, p: Piece, *, gear: str = "") -> str:
+    """Why this rack entry cannot go in this slot for this method, in words, or "" when
+    it fits. Every dimmed row carries one (UI plan §6.2: never colour alone)."""
+    if p.old:
+        return p.old
+    if p.count <= 0:
+        return "only part of a bar is left of it"
+    f, w = p.form, p.work
+    m = metal(p.material)
+    if method == "smelt":
+        want = {"ore": ("ore",), "fuel": ("fuel",), "flux": ("flux",)}.get(slot, ())
+        return "" if f in want else {"ore": "only ore goes in the furnace",
+                                     "fuel": "that is not fuel",
+                                     "flux": "that is not a flux"}.get(slot, "no such slot")
+    if method == "alloy":
+        if f in BAR_FORMS or (m is not None and m.id in _alloy_ids() and f != "item"
+                              and f not in PIECE_FORMS):
+            return ""
+        return "only ingots, bars and what an alloy recipe names go in the crucible"
+    if method == "forge":
+        if slot == "metal":
+            return "" if f in BAR_FORMS else "forge works bars and ingots"
+        return "" if f == "fuel" else "that is not fuel"
+    if method in ("quench", "temper", "hone") and slot == "piece":
+        if f not in PIECE_FORMS:
+            return "only a blank or a plate is worked here"
+        if method == "quench" and w.quench:
+            return "it has already been quenched"
+        if method == "temper":
+            if not w.quench:
+                return "it has not been quenched: temper follows quench"
+            if "temper" in w.worked:
+                return "it is already tempered"
+        if method == "hone":
+            if w.gear != "weapon":
+                return "only a weapon blank has an edge"
+            if not _edged(w.shape):
+                return f"a {_shape_name(w.shape).lower()} has no edge to hone"
+            if "hone" in w.worked:
+                return "it is already honed"
+        return ""
+    if method == "quench" and slot == "quenchant":
+        return "" if f == "quenchant" else "that is not a quenchant"
+    if method in ("fold", "strengthen") and slot == "flux":
+        return "" if f == "flux" else "that is not a flux"
+    if method == "fold":
+        if slot == "with":
+            return "" if f in BAR_FORMS else "only a second bar can be folded in"
+        if f not in BAR_FORMS + PIECE_FORMS:
+            return "fold works a bar, an ingot, a blank or a plate"
+        if "folded" in p.traits and "slaggy" not in p.traits:
+            return "it is already folded: folding clean metal again adds nothing"
+        return ""
+    if method == "strengthen":
+        return "" if f in BAR_FORMS else "strengthen welds bars and ingots"
+    if method == "assemble":
+        gear = gear or ("weapon" if slot in PIECES["weapon"] else "armour")
+        main = PIECES[gear][0]
+        if slot == main:
+            if f not in PIECE_FORMS:
+                return f"the {slot} is a forged {'blank' if gear == 'weapon' else 'plate'}"
+            want = ("weapon",) if slot == "head" else ("armour", "shield")
+            return "" if w.gear in want else f"that is not shaped for a {slot}"
+        if f in PIECE_FORMS or f == "item":
+            return f"a worked piece cannot be the {slot}"
+        if m is None or not m.fills(gear, slot):
+            return f"{p.name} does not make a {slot}"
+        return ""
+    if method == "finish":
+        if slot == "item":
+            return "" if f == "item" else "only a finished item takes a finish"
+        sacred = set(bench_rules().get("sacred_finishes") or [])
+        if m is not None and (m.kind == "treatment" or m.id in sacred):
+            return ""
+        return "that is not a treatment"
+    return "no such slot"
+
+
+def assemble_slots(gear: str) -> tuple[str, ...]:
+    return PIECES.get(gear, PIECES["weapon"])
+
+
+def fits_for(method: str, items: list[Piece], *, gear: str = "") -> dict:
+    """`{slot: {key: reason or ""}}` for every rack entry and every slot of the method,
+    which is what dims rows (contracts §7 `check`)."""
+    names = METHOD_SLOTS.get(method)
+    if method == "assemble":
+        names = assemble_slots(gear or "weapon")
+    elif method == "alloy":
+        names = ("part",)
+    return {slot: {p.key: fit_reason(method, slot, p, gear=gear) for p in items}
+            for slot in names or ()}
+
+
+# --- one step ---------------------------------------------------------------------------
+
+@dataclass
+class ForgePlan:
+    """What one step would do: everything `check` shows, `roll` gates on and `finish`
+    makes. Built fresh for every request; nothing in it is trusted from the page."""
+    method: str
+    batch: int = 1
+    slots: dict = field(default_factory=dict)       # slot -> (Piece, count per unit)
+    problems: list = field(default_factory=list)
+    dc: int = 0
+    bonus: int = 0
+    terms: list = field(default_factory=list)
+    need: int | None = None
+    impossible: str = ""
+    minutes: int = 0
+    units: int = 0
+    consumes: list = field(default_factory=list)    # (Piece, total)
+    outputs: list = field(default_factory=list)     # (Work, count) before the tier
+    lead: Metal | None = None
+    rank_in: int = 1
+    rank_out: int = 1
+    tier: str = "common"
+    level: int = 1
+    ceiling: int = 2
+    step_ceiling: int = 2
+    shape: str = ""
+    gear: str = ""
+    masterwork_work: bool = False
+    masterwork_why: str = ""
+    aim: bool = True                                # aiming for masterwork at Assemble
+    perks: dict = field(default_factory=dict)
+    working: list = field(default_factory=list)
+    fuel: Metal | None = None
+    flux: Metal | None = None
+    yields: bool = False
+    smithy: bool = False
+    name: str = ""
+    noun: str = ""
+
+    @property
+    def can_roll(self) -> bool:
+        return not self.problems and self.need is not None and self.units > 0
+
+    @property
+    def info(self) -> str:
+        """The line under the stage (UI plan §6.3): "1 blank. 1h 30m. DC 15, you need 9 or
+        better." Every number in it is this plan's."""
+        if not self.units:
+            return ""
+        n = sum(c for _, c in self.outputs) or self.units
+        hours, mins = divmod(int(self.minutes), 60)
+        span = (f"{hours}h {mins}m" if hours and mins else f"{hours}h" if hours
+                else f"{mins}m")
+        word = self.noun + ("" if n == 1 else "s")
+        line = f"{n} {word}. {span}. DC {self.dc}"
+        if self.need is None:
+            return f"{line}: {self.impossible}."
+        return f"{line}, you need {self.need} or better."
+
+
+def _perk_counts(progress) -> dict:
+    held = getattr(progress, "perks", {}) or {}
+    return {p: int(held.get(p, 0)) for p in ("potency", "hardening", "quality", "yield")}
+
+
+def plan_step(actor, progress, method: str, slots: dict, batch: int = 1, *,
+              shape: str = "", where: dict | None = None,
+              masterwork: bool = True) -> ForgePlan:
+    """One step, worked out without changing anything.
+
+    `slots` maps a slot name to (rack Piece, count per unit); the count is read only by
+    Alloy, whose ratio is the player's choice, and fixed by the rule everywhere else.
+    `where` is `where_here`'s answer; None means a field kit and no smithy, which is what
+    the rules tests want. `masterwork` is the smith's ambition at Assemble (the sweep's
+    Burning Wheel lesson: choose before the roll): aiming for Superior raises the DC to
+    the book's 20, and not aiming caps the work at Fine.
+    """
+    method = str(method or "").strip().lower()
+    level = int(getattr(progress, "level", 1) or 1)
+    batch = max(1, int(batch or 1))
+    where = where or {"smithy": None, "kit": True}
+    plan = ForgePlan(method=method, batch=batch, slots=dict(slots or {}), level=level,
+                     perks=_perk_counts(progress), shape=str(shape or "").strip(),
+                     aim=bool(masterwork),
+                     ceiling=wc.ceiling_index(progress) if progress is not None else 2)
+    plan.step_ceiling = plan.ceiling
+    row = method_row(method)
+    if row is None:
+        plan.problems.append(f"There is no forge step called {method!r}.")
+        return plan
+    if method == "assay":
+        plan.problems.append("An assay is not worked at the anvil: assay the material "
+                             "from its card.")
+        return plan
+    plan.terms = check_terms(actor, level)
+    plan.bonus = sum(t["value"] for t in plan.terms)
+    need = method_level(method)
+    if need > level:
+        plan.problems.append(f"{row['name']} is learned at Blacksmith {need}.")
+    plan.smithy = row.get("where") == "smithy"
+    if plan.smithy and not where.get("smithy"):
+        plan.problems.append(f"{row['name']} needs a smithy: a furnace and a "
+                             f"forge-welding hearth, not a field kit.")
+    elif not where.get("smithy") and not where.get("kit"):
+        plan.problems.append("You have no field kit with you, and there is no smithy "
+                             "here.")
+    if batch > 1 and not row.get("bulk"):
+        plan.problems.append(f"{row['name']} works one piece at a time; there is no "
+                             f"batch.")
+        return plan
+
+    # Every slot the page filled must fit before anything is worked out.
+    gear = ""
+    if method == "assemble":
+        main = plan.slots.get("head") or plan.slots.get("body")
+        gear = (main[0].work.gear if main and main[0].work is not None else "") or \
+            ("weapon" if "head" in plan.slots else "armour")
+        plan.gear = gear
+    for slot, (p, n) in plan.slots.items():
+        why = fit_reason(method, "part" if method == "alloy" else slot, p, gear=gear)
+        if why:
+            plan.problems.append(f"{p.name}: {why}.")
+        if int(n) <= 0:
+            plan.problems.append(f"{p.name}: a count of {n} is nothing.")
+    if plan.problems:
+        return plan
+
+    _BUILD[method](plan, row)
+    if plan.problems:
+        return plan
+
+    # Enough of everything, across the whole batch, counting one piece used twice.
+    used: dict[str, list] = {}
+    for p, n in plan.consumes:
+        used.setdefault(p.key, [p, 0])[1] += int(n)
+    for p, n in used.values():
+        if n > p.count:
+            plan.problems.append(f"{p.name}: the step wants {n} and you carry {p.count}.")
+
+    # Rarity: the level's band, and the smithy for rare and up (plan §4.1, §10).
+    track = wc.get(TRACK_ID)
+    top = wc.tier_rank(track.at(level).max_tier)
+    smithy_rank = int(bench_rules().get("smithy_rank", 3))
+    seen = []
+    for p, _ in plan.consumes:
+        if p.material and p.material not in seen:
+            seen.append(p.material)
+    for w, _ in plan.outputs:
+        for mid in [w.material] + list(w.alloy_of):
+            if mid and mid not in seen:
+                seen.append(mid)
+    for mid in seen:
+        m = metal(mid)
+        if m is None:
+            continue
+        if m.rank > top:
+            lvl = _level_for_rank(m.rank)
+            plan.problems.append(f"{m.name} is {m.tier}; Blacksmith {level} works "
+                                 f"{wc.TIERS[top - 1]} at best"
+                                 + (f": it needs Blacksmith {lvl}." if lvl else "."))
+        elif m.rank >= smithy_rank and not where.get("smithy"):
+            plan.problems.append(f"{m.name} is {m.tier}: rare and rarer metal needs a "
+                                 f"smithy, not a field kit.")
+    if plan.rank_out > top and not any("needs Blacksmith" in x for x in plan.problems):
+        lvl = _level_for_rank(plan.rank_out)
+        plan.problems.append(f"This would make {wc.TIERS[plan.rank_out - 1]} metal, "
+                             f"beyond Blacksmith {level}"
+                             + (f": it needs Blacksmith {lvl}." if lvl else "."))
+    plan.tier = wc.TIERS[max(1, min(len(wc.TIERS), plan.rank_out)) - 1]
+
+    from .crafting import check_odds
+
+    plan.need, plan.impossible = check_odds(plan.dc, plan.bonus)
+    plan.step_ceiling = max(0, plan.step_ceiling)
+    return plan
+
+
+def _piece(plan: ForgePlan, slot: str, *, optional: bool = False):
+    got = plan.slots.get(slot)
+    if not got:
+        if not optional:
+            plan.problems.append(_MISSING.get(slot, f"Fill the {slot} slot."))
+        return None
+    return got[0]
+
+
+def _minutes(plan: ForgePlan, row: dict, units: int, key: str = "minutes") -> int:
+    base = int(row.get(key, row.get("minutes", 0)) or 0) * max(1, units)
+    scale = 1.0
+    traits = bench_rules().get("traits") or {}
+    if plan.lead is not None:
+        for t in plan.lead.working:
+            scale *= float((traits.get(t) or {}).get("time", 1.0))
+    return int(round(base * scale))
+
+
+def _slag_cap(plan: ForgePlan, w: Work | None) -> None:
+    # Slaggy: the quality ceiling is one lower until the metal is folded (plan §5.5).
+    if w is not None and "slaggy" in w.traits:
+        plan.step_ceiling = min(plan.step_ceiling, plan.ceiling - 1)
+
+
+def _build_smelt(plan: ForgePlan, row: dict) -> None:
+    ore = _piece(plan, "ore")
+    fuel = _piece(plan, "fuel")
+    flux = _piece(plan, "flux", optional=True)
+    if plan.problems:
+        return
+    rules = bench_rules()
+    units = plan.batch
+    m, fm = metal(ore.material), metal(fuel.material)
+    xm = metal(flux.material) if flux else None
+    parent = metal(m.parent) or m
+    if m.rank >= int(rules.get("hot_metal_rank", 4)) \
+            and fm.rank < int(rules.get("hot_fuel_rank", 3)):
+        plan.problems.append(f"{m.name} does not melt over {fm.name.lower()}: smelting "
+                             f"{m.tier} ore needs a fuel of rare tier or better.")
+        return
+    plan.consumes = [(ore, int(row.get("ore_per_unit", 2)) * units),
+                     (fuel, int(row.get("fuel_per_unit", 2)) * units)]
+    if flux is not None:
+        plan.consumes.append((flux, int(row.get("flux_per_unit", 1)) * units))
+    # A flux in the charge carries off the slag (plan §7: "flux cancels slaggy"). One
+    # whose document names its working traits must name `cleans_slag`; one from before
+    # the data pass, which names none, is taken at its kind's word.
+    cleans = xm is not None and (xm.has("cleans_slag") or not xm.working)
+    slaggy = (m.has("slaggy") or parent.has("slaggy")) and not cleans
+    out = Work(form="ingot", material=parent.id, tier=parent.tier,
+               traits=["slaggy"] if slaggy else [])
+    plan.outputs = [(out, units)]
+    plan.units = units
+    plan.lead, plan.fuel, plan.flux = m, fm, xm
+    plan.dc = m.dc
+    plan.rank_in = max(x.rank for x in (m, fm, xm) if x is not None)
+    plan.rank_out = parent.rank
+    plan.working = list(m.working) + list(fm.working)
+    plan.minutes = _minutes(plan, row, units)
+    plan.yields = True
+    plan.noun = "ingot"
+    _slag_cap(plan, out)
+
+
+def _match_recipe(ids: set[str], *, via: str = "") -> tuple[str, dict, dict] | None:
+    found = _match_recipes(ids, via=via)
+    return found[0] if found else None
+
+
+def _match_recipes(ids: set[str], *, via: str = "") -> list[tuple[str, dict, dict]]:
+    """Every alloy whose components are exactly these materials: (alloy id, recipe,
+    {material id: part index}). Every part must be supplied and nothing else may be in
+    the crucible; an `any` part is supplied by any one of its members. Several can match
+    one set (copper and tin are bronze, bell bronze or pewter by their shares), and the
+    windows decide which."""
+    out = []
+    for aid, r in (bench_rules().get("alloys") or {}).items():
+        if str(r.get("via") or "") != via:
+            continue
+        parts = r.get("parts") or []
+        assign: dict[str, int] = {}
+        ok = True
+        for mid in ids:
+            hit = next((i for i, part in enumerate(parts)
+                        if mid == part.get("id") or mid in (part.get("any") or [])), None)
+            if hit is None:
+                ok = False
+                break
+            assign[mid] = hit
+        if ok and set(assign.values()) == set(range(len(parts))):
+            out.append((aid, r, assign))
+    return out
+
+
+def _window_misses(recipe: dict, assign: dict, parts: list, total: int) -> list[str]:
+    """Each part of a recipe whose share of the melt is outside its window, in words:
+    "copper 81 to 92%" beside what the melt has."""
+    out = []
+    for i, part in enumerate(recipe.get("parts") or []):
+        share = 100 * sum(n for p, n in parts if assign.get(p.material) == i) / total
+        lo, hi = float(part.get("min", 0)), float(part.get("max", 100))
+        if share + 1e-9 < lo or share - 1e-9 > hi:
+            label = part.get("as") or (metal(part.get("id")) or Metal(id="", name=str(
+                part.get("id")))).name.lower()
+            out.append(f"{label} {lo:g} to {hi:g}% (the melt has {share:.0f}%)")
+    return out
+
+
+def _build_alloy(plan: ForgePlan, row: dict) -> None:
+    parts = [(p, int(n)) for p, n in plan.slots.values()]
+    if len({p.material for p, _ in parts}) < 2:
+        plan.problems.append("Alloying combines metals: put two or more different metals "
+                             "in the crucible.")
+        return
+    if len({p.material for p, _ in parts}) != len(parts):
+        plan.problems.append("The same metal is in the crucible twice: put it in once, "
+                             "with the count you want.")
+        return
+    total = sum(n for _, n in parts)
+    ids = {p.material for p, _ in parts}
+    if _match_recipe(ids, via="fold"):
+        plan.problems.append("Pattern steel is folded, not melted: fold a steel bar with a "
+                             "high-carbon steel bar.")
+        return
+    candidates = _match_recipes(ids)
+    metal_units = sum(n for p, n in parts if p.form in BAR_FORMS)
+    slag = any("slaggy" in p.traits for p, _ in parts)
+    rules = bench_rules()
+    found = next((c for c in candidates if not _window_misses(c[1], c[2], parts, total)),
+                 None)
+    if candidates and found is None:
+        names = " and ".join(sorted(p.name.lower() for p, _ in parts))
+        said = "; ".join(
+            f"{(metal(aid).name if metal(aid) else aid).lower()} wants "
+            + ", ".join(_window_misses(r, a, parts, total))
+            for aid, r, a in candidates)
+        plan.problems.append(f"No alloy of {names} pours at those shares: {said}.")
+        return
+    if found:
+        aid, recipe, assign = found
+        am = metal(aid)
+        if am is None:
+            plan.problems.append(f"The recipe names {aid}, which is not on the shelf.")
+            return
+        if not metal_units:
+            plan.problems.append("Nothing in the crucible is an ingot or a bar.")
+        if plan.problems:
+            return
+        out = Work(form="bar", material=am.id, tier=am.tier,
+                   traits=["slaggy"] if slag else [])
+        plan.lead = am
+        plan.dc = am.dc
+        plan.rank_out = am.rank
+    else:
+        if any(p.form not in BAR_FORMS for p, _ in parts):
+            plan.problems.append("No recipe names that mix. A new alloy is made from "
+                                 "ingots and bars of metal alone.")
+            return
+        mats = [metal(p.material) for p, _ in parts]
+        for m in mats:
+            if m.id in SOLITARY or m.parent in SOLITARY:
+                others = ", ".join(sorted(x.name for x in mats if x is not m))
+                plan.problems.append(
+                    f"{m.name} works alone: melted together with {others} it is only dead "
+                    f"metal — what makes it {m.name.lower()} does not survive the mixing.")
+                return
+        floor = float((rules.get("novel_alloy") or {}).get("min_share", 20))
+        for p, n in parts:
+            share = 100 * n / total
+            if share + 1e-9 < floor:
+                plan.problems.append(f"A new alloy needs each metal at {floor:g}% or more; "
+                                     f"{p.name} is {share:.0f}%.")
+        if plan.problems:
+            return
+        order = sorted(zip(parts, mats), key=lambda pm: (-pm[0][1], -pm[1].rank, pm[1].id))
+        lead = order[0][1]
+        top = max(m.rank for m in mats)
+        tops = {m.id for m in mats if m.rank == top}
+        step = int((rules.get("novel_alloy") or {}).get("rarity_step", 1))
+        rank = min(len(wc.TIERS), top + (step if len(tops) >= 2 else 0))
+        out = Work(form="bar", material=lead.id, tier=wc.TIERS[rank - 1],
+                   alloy_of=[m.id for _, m in order[1:]],
+                   traits=["slaggy"] if slag else [])
+        plan.lead = lead
+        plan.dc = max(m.dc for m in mats)
+        plan.rank_out = rank
+    units = plan.batch
+    plan.consumes = [(p, n * units) for p, n in parts]
+    plan.outputs = [(out, metal_units * units)]
+    plan.units = units
+    plan.rank_in = max(p.rank for p, _ in parts)
+    plan.working = list(plan.lead.working)
+    plan.minutes = _minutes(plan, row, metal_units * units)
+    plan.noun = "bar"
+    _slag_cap(plan, out)
+
+
+def _build_forge(plan: ForgePlan, row: dict) -> None:
+    bar = _piece(plan, "metal")
+    fuel = _piece(plan, "fuel")
+    if plan.problems:
+        return
+    info = shape_info(plan.shape)
+    if info is None:
+        plan.problems.append(
+            "Pick what to forge from the list of weapons and armour."
+            if not plan.shape else
+            f"There is no {plan.shape!r} on the weapon or armour lists to forge.")
+        return
+    units = plan.batch
+    plan.shape, plan.gear = info["id"], info["gear"]
+    m, fm = metal(bar.material), metal(fuel.material)
+    src = bar.as_work()
+    plate = info["gear"] != "weapon"
+    out = Work(form="plate" if plate else "blank", material=src.material,
+               passes=src.passes, shape=info["id"], gear=info["gear"],
+               traits=[t for t in src.traits if t in ("slaggy", "hot_short")],
+               alloy_of=list(src.alloy_of), tier=src.tier or m.tier)
+    plan.consumes = [(bar, int(info["bars"]) * units),
+                     (fuel, int(row.get("fuel_per_unit", 1)) * units)]
+    plan.outputs = [(out, units)]
+    plan.units = units
+    plan.lead, plan.fuel = m, fm
+    # The book's Craft DC for the item at Forge (plan §7), not the metal's: PF1e prices a
+    # special material and leaves the DC alone.
+    plan.dc = int(info["dc"])
+    plan.rank_in = max(bar.rank, fm.rank)
+    plan.rank_out = wc.tier_rank(out.tier)
+    plan.working = list(m.working) + list(fm.working)
+    plan.minutes = _minutes(plan, row, units, "minutes_plate" if plate else "minutes")
+    plan.yields = True
+    plan.noun = "plate" if plate else "blank"
+    _slag_cap(plan, out)
+
+
+def _single(plan: ForgePlan, row: dict, change) -> None:
+    """Quench, temper and hone: one blank or plate in, the same piece out, changed."""
+    p = _piece(plan, "piece")
+    if plan.problems:
+        return
+    m = metal(p.material)
+    out = p.as_work()
+    extra = change(out)
+    if plan.problems:
+        return
+    plan.consumes = [(p, 1)] + [(x, 1) for x in extra]
+    plan.outputs = [(out, 1)]
+    plan.units = 1
+    plan.lead = m
+    plan.dc = m.dc
+    plan.rank_in = max([p.rank] + [x.rank for x in extra])
+    plan.rank_out = wc.tier_rank(out.tier)
+    plan.working = list(m.working)
+    plan.minutes = _minutes(plan, row, 1)
+    plan.noun = out.form
+    _slag_cap(plan, out)
+
+
+def _build_quench(plan: ForgePlan, row: dict) -> None:
+    q = _piece(plan, "quenchant")
+
+    def change(w: Work) -> list:
+        w.quench = q.material
+        w.worked.append("quench")
+        # A quench leaves the steel brittle until it is tempered (plan §7, accepted
+        # 2026-10-03: skipping Temper leaves a real flaw).
+        if "brittle" not in w.traits:
+            w.traits.append("brittle")
+        return [q]
+
+    if q is None:
+        _piece(plan, "piece")
+        return
+    _single(plan, row, change)
+
+
+def _build_temper(plan: ForgePlan, row: dict) -> None:
+    def change(w: Work) -> list:
+        w.traits = [t for t in w.traits if t != "brittle"]
+        w.worked.append("temper")
+        return []
+
+    _single(plan, row, change)
+
+
+def _build_hone(plan: ForgePlan, row: dict) -> None:
+    def change(w: Work) -> list:
+        w.worked.append("hone")
+        return []
+
+    _single(plan, row, change)
+
+
+def _build_fold(plan: ForgePlan, row: dict) -> None:
+    p = _piece(plan, "piece")
+    other = _piece(plan, "with", optional=True)
+    flux = _piece(plan, "flux", optional=True)
+    if plan.problems:
+        return
+    m = metal(p.material)
+    extra = [flux] if flux is not None else []
+    if other is not None:
+        pair = {p.material, other.material}
+        found = _match_recipe(pair, via="fold") if len(pair) == 2 else None
+        if found is None or p.form not in BAR_FORMS:
+            plan.problems.append("Folding two bars together makes pattern steel, from a "
+                                 "steel bar and a high-carbon steel bar.")
+            return
+        am = metal(found[0])
+        out = Work(form="bar", material=am.id, tier=am.tier)
+        plan.consumes = [(p, 1), (other, 1)] + [(x, 1) for x in extra]
+        plan.lead = am
+        plan.dc = am.dc
+        plan.rank_out = am.rank
+        plan.rank_in = max([p.rank, other.rank] + [x.rank for x in extra])
+    else:
+        out = p.as_work()
+        if "slaggy" in out.traits:
+            # Folding drives the slag out of dirty metal (pattern welding was a fix for
+            # bloom iron, sweep §3.5) and adds nothing else to it.
+            out.traits = [t for t in out.traits if t != "slaggy"]
+        else:
+            out.traits.append("folded")
+        out.worked.append("fold")
+        plan.consumes = [(p, 1)] + [(x, 1) for x in extra]
+        plan.lead = m
+        plan.dc = m.dc
+        plan.rank_out = wc.tier_rank(out.tier)
+        plan.rank_in = max([p.rank] + [x.rank for x in extra])
+    plan.flux = metal(flux.material) if flux is not None else None
+    plan.outputs = [(out, 1)]
+    plan.units = 1
+    plan.working = list(plan.lead.working) + (list(plan.flux.working) if plan.flux else [])
+    plan.minutes = _minutes(plan, row, 1)
+    plan.noun = out.form
+
+
+def _build_strengthen(plan: ForgePlan, row: dict) -> None:
+    bar = _piece(plan, "bar")
+    flux = _piece(plan, "flux", optional=True)
+    if plan.problems:
+        return
+    units = plan.batch
+    per = int(row.get("bars_per_unit", 2))
+    m = metal(bar.material)
+    out = bar.as_work()
+    out.form = "bar"
+    out.passes = int(out.passes) + 1
+    out.cut = 0
+    out.worked = [w for w in out.worked if w != "fold"]
+    plan.consumes = [(bar, per * units)]
+    if flux is not None:
+        plan.consumes.append((flux, units))
+        plan.flux = metal(flux.material)
+    plan.outputs = [(out, units)]
+    plan.units = units
+    plan.lead = m
+    plan.dc = m.dc
+    plan.rank_in = max(bar.rank, plan.flux.rank if plan.flux else 1)
+    plan.rank_out = wc.tier_rank(out.tier)
+    plan.working = list(m.working) + (list(plan.flux.working) if plan.flux else [])
+    plan.minutes = _minutes(plan, row, units)
+    plan.noun = "bar"
+    _slag_cap(plan, out)
+
+
+def masterwork_ready(w: Work | None) -> tuple[bool, str]:
+    """Whether a main piece can carry Superior work (plan §7, "Masterwork chain"): it has
+    been tempered (so it is not brittle) and, for an edged weapon, honed."""
+    if w is None:
+        return False, "there is no main piece"
+    if "temper" not in w.worked or "brittle" in w.traits:
+        return False, "the main piece is not tempered"
+    if w.gear == "weapon" and _edged(w.shape) and "hone" not in w.worked:
+        return False, "the blade is not honed"
+    return True, ""
+
+
+def _build_assemble(plan: ForgePlan, row: dict) -> None:
+    gear = plan.gear or "weapon"
+    names = PIECES[gear]
+    main = _piece(plan, names[0])
+    if main is None:
+        return
+    for slot in names[1:REQUIRED_PIECES]:
+        _piece(plan, slot)
+    for slot in plan.slots:
+        if slot not in names:
+            plan.problems.append(f"A {_shape_name(main.work.shape).lower()} has no "
+                                 f"{slot}.")
+    if plan.problems:
+        return
+    head = main.work.copy()
+    info = shape_info(head.shape) or {}
+    pieces: dict[str, dict] = {}
+    for slot in names:
+        got = plan.slots.get(slot)
+        if not got:
+            continue
+        p = got[0]
+        w = p.work
+        piece = {"material": p.material, "passes": int(w.passes) if w else 0}
+        if slot == names[0]:
+            if "folded" in head.traits:
+                piece["folded"] = True
+            if head.alloy_of:
+                piece["alloy_of"] = list(head.alloy_of)
+        elif w is not None and w.alloy_of:
+            piece["alloy_of"] = list(w.alloy_of)
+        pieces[slot] = piece
+    ready, why = masterwork_ready(head)
+    mw = _mw_index()
+    plan.masterwork_work = bool(ready and plan.aim)
+    plan.masterwork_why = why if not ready else ("" if plan.aim
+                                                  else "you are not aiming for masterwork")
+    m = metal(main.material)
+    plan.dc = int(info.get("dc", m.dc))
+    cap = plan.ceiling
+    if head.quality is not None:
+        # The finished item can rise one step above its main piece, no more (proposed:
+        # a Crude blank does not become a Superior sword in one assembly).
+        cap = min(cap, int(head.quality) + 1)
+    if not plan.masterwork_work:
+        cap = min(cap, mw - 1)
+    elif plan.ceiling >= mw and not m.has("flawless"):
+        # The book's masterwork component is DC 20 (CRB Craft); Unchained's `flawless`
+        # raw material waives the increase.
+        plan.dc = max(plan.dc, int(bench_rules().get("masterwork_dc", MASTERWORK_DC)))
+    plan.step_ceiling = cap
+    out = Work(form="item", material=head.material, shape=head.shape, gear=gear,
+               quench=head.quench, pieces=pieces,
+               traits=[t for t in head.traits if t in ("brittle", "hot_short", "slaggy")],
+               smith={"level": plan.level,
+                      "perks": {"potency": plan.perks.get("potency", 0),
+                                "hardening": plan.perks.get("hardening", 0)}},
+               tier=wc.TIERS[max(p.rank for p, _ in plan.slots.values()) - 1])
+    plan.consumes = [(p, 1) for p, _ in plan.slots.values()]
+    plan.outputs = [(out, 1)]
+    plan.units = 1
+    plan.lead = m
+    plan.rank_in = max(p.rank for p, _ in plan.slots.values())
+    plan.rank_out = wc.tier_rank(out.tier)
+    plan.working = list(m.working)
+    plan.minutes = _minutes(plan, row, 1)
+    plan.noun = "item"
+    plan.shape = head.shape
+    if "slaggy" in head.traits:
+        plan.step_ceiling = min(plan.step_ceiling, plan.ceiling - 1)
+
+
+def _build_finish(plan: ForgePlan, row: dict) -> None:
+    item = _piece(plan, "item")
+    tr = _piece(plan, "treatment")
+    if plan.problems:
+        return
+    rules = bench_rules()
+    w = item.work.copy()
+    tm = metal(tr.material)
+    sacred = set(rules.get("sacred_finishes") or [])
+    if tm.id in sacred and plan.level < int(rules.get("sacred_level", 3)):
+        plan.problems.append(f"{tm.name} is a sacred finish, learned at Blacksmith "
+                             f"{int(rules.get('sacred_level', 3))}.")
+    if tm.id in w.finish:
+        plan.problems.append(f"It already carries {tm.name.lower()}.")
+    law = (rules.get("finish_rules") or {}).get(tm.id) or {}
+    main = (w.pieces.get(PIECES.get(w.gear, PIECES["weapon"])[0]) or {}).get("material", "")
+    main_m = metal(main)
+    if main and (main in (law.get("not_on") or [])
+                 or (main_m is not None and main_m.parent in (law.get("not_on") or []))):
+        plan.problems.append(f"{tm.name} will not take on "
+                             f"{(main_m.name if main_m else main).lower()}.")
+    if law.get("gear") and w.gear not in law["gear"]:
+        plan.problems.append(f"{tm.name} goes on "
+                             f"{' or '.join(g for g in law['gear'])}, not this.")
+    if plan.problems:
+        return
+    w.finish.append(tm.id)
+    plan.consumes = [(item, 1), (tr, 1)]
+    plan.outputs = [(w, 1)]
+    plan.units = 1
+    plan.lead = tm
+    plan.dc = tm.dc
+    plan.rank_in = max(item.rank, tm.rank)
+    plan.rank_out = max(wc.tier_rank(w.tier), tm.rank)
+    plan.working = list(tm.working)
+    plan.minutes = _minutes(plan, row, 1)
+    plan.noun = "item"
+    plan.gear, plan.shape = w.gear, w.shape
+    # A finish does not re-grade the item: its quality was earned at Assemble.
+    plan.step_ceiling = plan.ceiling
+
+
+_BUILD = {"smelt": _build_smelt, "alloy": _build_alloy, "forge": _build_forge,
+          "quench": _build_quench, "temper": _build_temper, "fold": _build_fold,
+          "hone": _build_hone, "assemble": _build_assemble, "finish": _build_finish,
+          "strengthen": _build_strengthen}
+
+
+def make(plan: ForgePlan, tier: int, *, extra: int = 0) -> list[tuple[Work, int]]:
+    """What a finished step puts on the shelf, at the tier the player's hands earned.
+
+    `extra` is the Yield perk's one more ingot or blank, rolled by the caller and shown
+    (plan §4.2). A Crude result over a sulfurous fuel picks up a `hot_short` flaw unless
+    the fuel burns clean (plan §5.5). A Finish leaves the item's quality alone.
+    """
+    tier = max(0, min(int(tier), plan.step_ceiling))
+    out = []
+    for i, (template, n) in enumerate(plan.outputs):
+        w = template.copy()
+        if plan.method != "finish":
+            w.quality = tier
+        if plan.method in ("smelt", "forge") and tier == 0 and plan.fuel is not None \
+                and plan.fuel.has("sulfurous") and not plan.fuel.has("clean_heat") \
+                and "hot_short" not in w.traits:
+            w.traits.append("hot_short")
+        w.name = ""
+        w.name = work_name(w)
+        out.append((w, int(n) + (int(extra) if i == 0 and plan.yields else 0)))
+    return out
+
+
+def land(actor, made: list[tuple[Work, int]]) -> list[tuple[str, Work, int]]:
+    """Put what a step made on the shelf. A finished item whose name another, different
+    build already holds is numbered ("Fine Iron Longsword (2)"), so wielding it by name
+    and lane B's lookup by record id can never pick up the wrong one."""
+    landed = []
+    for w, n in made:
+        if w.form == "item":
+            base, k = w.name, 1
+            while True:
+                w.rid = _slug(w.name)
+                key = stock_key(w)
+                clash = any(st.name == w.name and sid != key
+                            for sid, st in (actor.stock or {}).items())
+                if not clash:
+                    break
+                k += 1
+                w.name = f"{base} ({k})"
+        landed.append((put(actor, w, n), w, n))
+    return landed
+
+
+def failure_losses(plan: ForgePlan, miss: int) -> list[tuple[Piece, int]]:
+    """What a failed roll ruins, by the book's Craft rule as the plan states it (§11):
+    miss by 4 or less and only the time is lost; miss by 5 or more and half of what was
+    on the anvil is ruined, rounded down, which is at least one whenever there were two.
+    A `malleable` main metal ruins nothing (Pathfinder Unchained).
+
+    Shared out by each material's share, largest remainders first; a tie goes to the
+    cheaper thing (raw fuel and quenchant before worked pieces, then the lower rarity).
+    Every smithing minigame that shipped was softened afterwards (sweep §1), so the
+    forge starts on the generous side of a tie: a failed quench by 5 spoils the bath, not
+    the blank."""
+    if miss < 5 or (plan.lead is not None and plan.lead.has("malleable")):
+        return []
+    total = sum(int(n) for _, n in plan.consumes)
+    ruin = total // 2
+    if ruin <= 0:
+        return []
+    shares = []
+    for i, (p, n) in enumerate(plan.consumes):
+        exact = n * ruin / total
+        worked = 1 if p.work is not None else 0
+        shares.append([p, int(exact), exact - int(exact), n, (worked, p.rank, i)])
+    left = ruin - sum(s[1] for s in shares)
+    for s in sorted(shares, key=lambda s: (-round(s[2], 9), s[4])):
+        if left <= 0:
+            break
+        if s[1] < s[3]:
+            s[1] += 1
+            left -= 1
+    return [(p, k) for p, k, _, _, _ in shares if k > 0]
+
+
+def spend(actor, consumes: list[tuple[Piece, int]]) -> list[dict]:
+    """Take what a step used: raw material from the satchel's counts, products off the
+    shelf, by the key the rack was read under."""
+    out = []
+    for p, n in consumes:
+        if n <= 0:
+            continue
+        if p.key.startswith("stock:"):
+            took = actor.take_stock(p.key.split(":", 1)[1], n)
+        else:
+            took = actor.spend(p.material, n)
+        if took:
+            out.append({"key": p.key, "name": p.name, "count": int(took)})
+    return out
+
+
+def tuning_for(plan: ForgePlan) -> dict:
+    """The minigame's numbers (UI plan §9): the method's base difficulty, harder by
+    `rarity_step` per band above common (better metal, tighter window: Giants' Foundry),
+    and the working traits' band scales (forgiving wider, narrow_window narrower,
+    quench_sensitive only at the quench, weld_aid only when welding). The same at every
+    level: skill raises the ceiling, not the window, as for herbs."""
+    rules = bench_rules()
+    row = method_row(plan.method) or {}
+    tun = row.get("tuning") or {}
+    traits = rules.get("traits") or {}
+    band = 1.0
+    for t in dict.fromkeys(plan.working):
+        spec = traits.get(t) or {}
+        band *= float(spec.get("band", 1.0))
+        if plan.method == "quench":
+            band *= float(spec.get("quench_band", 1.0))
+        if plan.method in ("fold", "strengthen"):
+            band *= float(spec.get("weld_band", 1.0))
+    rank = plan.lead.rank if plan.lead is not None else 1
+    diff = float(tun.get("difficulty", 0.45)) + float(rules.get("rarity_step", 0.05)) \
+        * max(0, rank - 1)
+    ceiling = max(0, int(plan.step_ceiling))
+    return {"method": plan.method, "game": plan.method,
+            "difficulty": round(min(0.95, diff), 4), "band_scale": round(band, 4),
+            "band": tun.get("band", ""), "seconds": tun.get("seconds", 6),
+            "traits": list(dict.fromkeys(plan.working)),
+            "reheat_minutes": int(rules.get("reheat_minutes", 5)),
+            "names": [wc.quality_name(t) for t in range(ceiling + 1)],
+            "bands": [t / (ceiling + 1) for t in range(ceiling + 1)],
+            "masterwork_at": _mw_index()}
+
+
+# --- assay (lane E, contracts §6) --------------------------------------------------------
+
+def assay_source(actor, material_id: str) -> Piece | None:
+    """What a sliver for assaying this material would come from: a bar or ingot of it
+    first (a tenth is cut), else ore or any raw unit of it (one is used)."""
+    mid = str(material_id or "").strip().lower()
+    items = [p for p in rack(actor) if p.material == mid and not p.old
+             and p.form not in PIECE_FORMS + ("item",)]
+    # A bar already cut into is cut again before a whole one is started, or two assays
+    # would leave two part-bars on the rack.
+    bars = sorted((p for p in items if p.form in BAR_FORMS and (p.count > 0 or p.cut)),
+                  key=lambda p: (not p.cut, p.key))
+    return (bars or [p for p in items if p.count > 0] or [None])[0]
+
+
+def cut_sliver(actor, p: Piece, tenths: int = 1) -> dict:
+    """Cut tenths of a bar off a carried bar (plan §9.2: "bars track tenths"). A raw bar
+    from the satchel becomes a forge bar on the shelf the first time it is cut."""
+    tenths = max(1, int(tenths))
+    if p.key.startswith("inv:"):
+        actor.spend(p.material, 1)
+        w = p.as_work()
+        w.cut = tenths
+        key = put(actor, w, 1)
+        return {"key": f"stock:{key}", "name": p.name, "tenths": tenths}
+    sid = p.key.split(":", 1)[1]
+    st = actor.stock.get(sid)
+    w = Work.from_stock(st)
+    w.cut = int(w.cut) + tenths
+    while w.cut >= 10:
+        actor.take_stock(sid, 1)
+        w.cut -= 10
+    st = actor.stock.get(sid)
+    if st is not None:
+        st.properties = w.tags()
+    return {"key": p.key, "name": p.name, "tenths": tenths}
+
+
+def pay_assay(actor, material_id: str, cost: dict) -> list[dict]:
+    """Take what lane E's assay says it cost: `{"bars": 0.1}` cuts a tenth of a bar,
+    `{"ore": 1}` (or any other count) uses whole units of the material."""
+    p = assay_source(actor, material_id)
+    if p is None:
+        return []
+    cost = dict(cost or {})
+    if "bars" in cost and p.form in BAR_FORMS:
+        return [cut_sliver(actor, p, int(round(float(cost["bars"]) * 10)) or 1)]
+    n = int(next((v for k, v in cost.items() if k != "bars"), 1) or 1)
+    return spend(actor, [(p, max(1, n))])
+
+
+def working_keys(doc: dict) -> list[str]:
+    """The knowledge keys of a material's working traits, revealed by working it (plan
+    §9.2: "you watched it behave"). Lane E's `working_keys` when it offers one; else read
+    from `property_keys` assuming its order is weapon effects, armour effects, working
+    traits, quench mark (contracts §6 says one positional key per effect and working
+    trait, "as today")."""
+    kn = _lane("knowledge")
+    if kn is None:
+        return []
+    fn = getattr(kn, "working_keys", None)
+    if fn is not None:
+        return list(fn(doc))
+    keys = list(kn.property_keys(doc))
+    n_fx = len(doc.get("weapon") or []) + len(doc.get("armour") or [])
+    return keys[n_fx:n_fx + len(doc.get("working") or [])]
+
+
+def reveal(actor, material_id: str, keys, how: str) -> list[str]:
+    """Record keys as known; returns the new ones. Lane E's `reveal` when it has one, else
+    the herbarium's own (one store, `Actor.herb_known`, contracts §6)."""
+    kn = _lane("knowledge")
+    fn = getattr(kn, "reveal", None) if kn is not None else None
+    if fn is None:
+        from . import herbknowledge
+
+        fn = herbknowledge.reveal
+    return list(fn(actor, material_id, list(keys), how) or [])

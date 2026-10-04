@@ -17,7 +17,9 @@ import pytest
 from rules import worldclass as wc
 from rules.sheet import from_dict, load_pc, to_dict
 
-OTHERS = ("alchemist", "blacksmith", "leatherworker", "enchanter")
+# Blacksmith left this list with its own revamp (docs/blacksmithing-revamp-plan.md §4): it
+# is three levels then endless now, pinned by tests/test_forge_bench.py.
+OTHERS = ("alchemist", "leatherworker", "enchanter")
 
 
 @pytest.fixture
@@ -286,7 +288,8 @@ def test_a_save_loads_migrated_and_keeps_its_mastery():
     herb = back.world_classes["herbalist"]
     assert (herb.level, herb.mp, herb.schema) == (5, 88, wc.HERBALISM_SCHEMA)
     assert wc.perk_picks_banked(herb) == 4
-    assert back.world_classes["blacksmith"].schema == 0
+    # The blacksmith migrates on the same load now (the forge revamp's `migrate_blacksmith`).
+    assert back.world_classes["blacksmith"].schema == wc.BLACKSMITH_SCHEMA
 
 
 def test_a_settled_save_round_trips_byte_for_byte():

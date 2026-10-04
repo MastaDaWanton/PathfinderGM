@@ -345,6 +345,75 @@ is an ordinal, and the app turns words into DCs and dice itself.
 The app reads these into `rules/ingredients.Ingredient`, whose `from_dict` applies the same
 defaults, so a world that sends only `name` and `about` still loads.
 
+## Materials
+
+### `play.materials[]` (proposed: no export carries it yet, and it has no version number)
+
+A world's own metals, alloys, fittings and forge reagents, for the smith's bench. Until an
+export carries them the app uses its shipped shelf, `content/materials/*.json`, read through
+the one door `rules/materials.py`, whose rows already have this shape. Written down
+2026-10-04 (the blacksmithing revamp, plan §15.1) under the standing instruction that fixes
+are world-agnostic: a world's local metal goes through the same build as the shipped iron,
+and can stand in for iron or silver with numbers of its own. As with races and flora, a
+world's metal is its own even when it is called Mithral; it is never validated against the
+shipped material it shares a name with.
+
+**Every field below is optional, and the default is what the app assumes when it is
+absent** (`materials.normalise` applies them, so a row with only `id`, `name`, `kind` and
+`text` loads and is simply inert at the forge). The numbers in `weapon`, `armour` and
+`quench_mark` are the one place in `play` that carries rules-shaped values, and they are
+held to the same fences the shipped data is (`materials.validate`, with the fix named):
+house modifiers start at ±2 and stay within the tier's ceiling (common and uncommon ±2,
+rare and exotic ±3, legendary ±4), every structural list has at least three effects and
+at least one drawback, nothing is `narrative`, and every material has at least three
+things to discover. A row that fails is reported, not guessed at.
+
+```json
+{
+  "id": "5bbd0c40345f~material:dusk-iron",
+  "name": "Dusk Iron",
+  "kind": "metal",
+  "tier": "uncommon",
+  "text": "A blue-black iron smelted in the eastern hills; it takes an edge and keeps it.",
+  "pieces": {"weapon": ["head", "fittings"], "armour": ["body", "fastenings"]},
+  "weapon": [
+    {"type": "combat_mod", "target": "damage", "amount": 2, "bonus_type": "material"},
+    {"type": "combat_mod", "target": "attack", "amount": -2, "bonus_type": "material"},
+    {"type": "gear_mod", "target": "hardness", "amount": 2}
+  ],
+  "armour": [
+    {"type": "combat_mod", "target": "ac", "amount": 2, "bonus_type": "material"},
+    {"type": "gear_mod", "target": "acp", "amount": -2},
+    {"type": "gear_mod", "target": "hardness", "amount": 2}
+  ],
+  "working": [{"type": "working", "trait": "forgiving"}],
+  "forms": ["ore:dusk-iron-ore", "ingot", "bar"]
+}
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `kind` | `ore`, `metal`, `alloy`, `fuel`, `flux`, `quenchant`, `fitting`, `treatment` | `metal` |
+| `tier` | `common`, `uncommon`, `rare`, `exotic`, `legendary`: what the bench may work and the ceiling on any one house number | `common` |
+| `form` | the shelf it sits on: `ore`, `bar`, `alloy bar`, `haft`, `grip`, `guard`, `fuel`, `flux`, `quenchant`, `treatment`... | read from `kind` (a fitting's from its id) |
+| `material` | the id of the material this is a FORM of ("mithral fittings" is mithral; an ore points at its metal), so a prospected ore and a bought bar are one material | its own id |
+| `pieces` | which piece slots it fills, per gear: weapon `head`, `haft`, `fittings`; armour (and shield) `body`, `fastenings`, `lining`. The head and body count in full, every other piece at half | `{"weapon": [], "armour": []}`: fills nothing |
+| `weapon` | the effects it brings to a weapon, in the effect vocabulary (`rules/effectspec.py`): `combat_mod`, `gear_mod` (`acp`, `max_dex`, `asf`, `weight_pct`, `hardness`, `hp_per_inch`, `category`, `speed_penalty`), `strikes_as` (`cold_iron`, `silver`, `adamantine`, `ghost_touch`), riders with a `trigger` (`hit`, `crit`, `first_wound_daily`, `carried`) and conditions in `when` (`target`, `attacker`, `armour`, `weapon`, `against`) | `[]` |
+| `armour` | the same, for a suit or a shield (a forged shield reads the `armour` list) | `[]` |
+| `working` | how it behaves at the anvil: `{"type": "working", "trait": ...}` with a trait from `effectspec.WORKING_TRAITS` (`forgiving`, `slaggy`, `narrow_window`, `reactive`...). Never reaches the finished item | `[]` |
+| `quench_mark` | quenchants only: the one small effect it leaves on what it hardens | `null` |
+| `book` | `true` when the row carries printed PF1e numbers, each such effect marked `"book": true`; those come from the main piece only and are never scaled. A world's own metal is house, not book | `false` |
+| `forms` | the chain of shelves it passes through (`"ore:<id>"`, `ingot`, `bar`, `blank`, `plate`) | computed from `kind` and from the rows that name it as their `material` |
+| `feeds` | for a metal with no piece to fill, which forge methods it is stock for (`alloy`, `smelt`) | `[]` |
+| `finishes` | treatments only: which gear it can be laid over (`weapon`, `armour`) | `[]` |
+| `not_on` | treatments only: material ids it may not be laid over (the book's alchemical silver is never put on adamantine, cold iron or mithral) | `[]` |
+| `assay_danger` | reactive metals only: what handling a sliver does to the assayer when its harm is not a carried effect. One type today, `suppress_magic` (noqual's, a house rule), with a `duration` and `"house": true` or `"book": true` | `null`: an assay is safe |
+| `price_gp`, `biomes`, `obtain` | what it costs at a market, where it is found, how (`mined`, `bought`, `harvested`) | none, `[]`, `""` |
+
+The app reads these through `rules/materials.py`; the forge's item build
+(`rules/forge_items.py`) computes everything else on read — a record of a forged item
+stores which material went into each piece, never a number.
+
 ## SQLite
 
 Same data, one row per thing. `entities.facts` is a JSON string; `entities.prose` is every

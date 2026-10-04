@@ -152,10 +152,36 @@ function herbariumMount() {
   if (HERBARIUM === null) herbariumRead(); else herbariumDraw();
 }
 
+// --- The smith's ledger (docs/blacksmithing-ui-plan.md §6.7) -----------------------------
+// Every material met, beside the herbarium: "3 of 7 known", an "Unknowns first" toggle,
+// and each material's known lines. 44-forge-ledger.js draws it (`ForgeLedger.journal`,
+// contracts §11) from `/api/forge/ledger`, the same renderer as the forge's ledger card,
+// so the two cannot drift. 44 loads after this file, so it is looked up at mount time;
+// a page without it draws no section rather than an empty card. The list's id is
+// "jr-ledger-list", never the heading's "jr-ledger" (the history card's lesson above).
+function ledgerMount() {
+  const body = document.getElementById("sheetbody");
+  const journal = body && body.querySelector(".journal");
+  if (!journal || document.getElementById("jr-ledger")) return;
+  if (!window.ForgeLedger || typeof window.ForgeLedger.journal !== "function") return;
+  const host = document.createElement("div");
+  host.innerHTML = sheetCard("jr-ledger", "Smith's ledger", `<div id="jr-ledger-list"></div>`, "jr-ledger");
+  const card = host.firstElementChild;
+  card.style.gridColumn = "1 / -1";
+  const herbs = document.getElementById("jr-herbarium");
+  const beside = herbs && herbs.closest("section");
+  const history = document.getElementById("jr-history");
+  const before = history && history.closest("section");
+  if (beside && beside.parentElement === journal) beside.insertAdjacentElement("afterend", card);
+  else if (before && before.parentElement === journal) before.insertAdjacentElement("beforebegin", card);
+  else journal.appendChild(card);
+  window.ForgeLedger.journal(document.getElementById("jr-ledger-list"));
+}
+
 (function watchTheJournal() {
   const body = document.getElementById("sheetbody");
   if (!body || typeof MutationObserver !== "function") return;
-  new MutationObserver(() => herbariumMount()).observe(body, { childList: true });
+  new MutationObserver(() => { herbariumMount(); ledgerMount(); }).observe(body, { childList: true });
 })();
 
 document.addEventListener("click", e => {

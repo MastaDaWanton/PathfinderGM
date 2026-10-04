@@ -125,6 +125,14 @@
       "source": "CRB p.158: 'The DC to escape hemp rope bonds is equal to 20 + the CMB of the creature that tied the bonds ... This rope has 2 hit points and can be burst with a DC 23 Strength check.' Climb DCs: 'A rope with a wall to brace against, or a knotted rope' DC 5.",
       "tags": ["gear.rope"],
       "not_yet": ["a Climb check's DC is the band the GM names, so the rope's DC is said, not set", "there is no bind or escape op for the bonds DC to be read by"]
+    },
+    "smith's field kit": {
+      "names": ["smith's field kit", "smiths field kit", "smithing kit",
+                "field forge", "portable forge", "travelling forge", "traveling forge"],
+      "does": "A small anvil, hammers, tongs and a bellows: common and uncommon smithing anywhere, without a smithy. Rare work, smelting and alloying still need a real furnace.",
+      "source": "No book prints this kit. The owner's ruling (docs/blacksmithing-revamp-plan.md §2, 'Field kit + smithy'): the kit does common and uncommon work anywhere.",
+      "house_rule": "PROPOSED price and weight (rules/goods.py GEAR): Ultimate Equipment's farrier's anvil (50 lb) plus artisan's tools (5 gp, 5 lb) and a whetstone, rounded to 15 gp and 55 lb.",
+      "not_yet": ["the forge asks for the kit by name (rules/places.py has_field_kit); it grants no standing tag"]
     }
   },
   "camp": {
