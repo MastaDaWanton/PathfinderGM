@@ -1174,7 +1174,7 @@ def forge_material(request, material_id: str):
             # on `reactive` and warns in general words, so a reactive metal whose effect is
             # not yet written (noqual, until lane H adds §13.2's recoil) still asks first.
             found = kn.danger_of(m.doc)
-            if found:
+            if found and _danger_words(found[1]):
                 card["assay_danger"] = _danger_words(found[1])
         except Exception:      # noqa: BLE001
             pass
@@ -1187,7 +1187,12 @@ def _danger_words(effect: dict | None) -> str:
     if not effect:
         return ""
     line = _render(effect)
-    note = str(effect.get("note") or "")
+    note = str(effect.get("note") or effect.get("text") or "")
+    # An effect type with no renderer comes back as its own id ("suppress_magic", lane H's
+    # noqual recoil, 2026-10-04): an id is not words, so the card says nothing of its own
+    # and lane U5's confirm falls back on its general warning rather than print the id.
+    if " " not in line.strip():
+        return note
     return f"{line}: {note}" if note else line
 
 

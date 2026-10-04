@@ -600,11 +600,28 @@
       pieces[slot] = { material: it.material, color: it.color, passes: it.passes || 0,
                        folded: (it.badges || []).indexOf("folded") >= 0 };
     };
-    Object.keys(o.slots).forEach(function (s) { put(s, o.slots[s]); });
-    o.parts.forEach(function (p, i) { put("part" + i, p.key); });
     var c = F.check || {};
     var main = F.item(o.slots.head || o.slots.body || o.slots.piece || o.slots.item || "");
-    stageCall("setWork", { gear: c.gear || (main && main.gear) || o.gear,
+    var gear = c.gear || (main && main.gear) || o.gear || "weapon";
+    var mainSlot = gear === "weapon" ? "head" : "body";
+    if (o.method === "assemble") {
+      Object.keys(o.slots).forEach(function (s) { put(s, o.slots[s]); });
+    } else if (o.slots.item && main && main.record && main.record.pieces) {
+      // A finished item at Finish: its own pieces, coloured by the server's table.
+      var colors = (F.state && F.state.colors) || {};
+      Object.keys(main.record.pieces).forEach(function (s) {
+        var p = main.record.pieces[s] || {};
+        pieces[s] = { material: p.material, color: colors[p.material] || "", passes: p.passes || 0,
+                      folded: !!p.folded };
+      });
+    } else {
+      // The stage's slots are the work's pieces (head, haft, fittings): before Assemble the
+      // metal being worked is the main piece, and fuel, quenchants and flux are not on it.
+      var metal = o.slots.piece || o.slots.metal || o.slots.bar || o.slots.ore ||
+        (o.parts[0] && o.parts[0].key) || "";
+      if (metal) put(mainSlot, metal);
+    }
+    stageCall("setWork", { gear: gear,
                            base: c.shape || o.shape || (main && main.shape) || "",
                            pieces: pieces, quality_index: main && main.quality != null ? main.quality : null,
                            hot_c: null });
