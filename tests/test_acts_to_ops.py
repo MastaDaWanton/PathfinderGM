@@ -239,6 +239,52 @@ def test_a_deed_intended_or_asked_about_moves_nothing(said, actions):
     assert all(r.note.endswith("no op") for r in rows if r.commit != "done")
 
 
+def test_a_walk_carries_what_it_names_and_picks_it_up_first():
+    """Round 2's replay of the owner's items save: "I take the crate to the man in the
+    counting house who will buy it from me" read as a walk to him, and a crate the player
+    was not holding never came along — the agreed sale four turns later had nothing to
+    sell. A walk's `object` is what is carried: picked up first, before the walk; a thing
+    already in the pack is only carried."""
+    scene = _scene("the clerk of the counting house")
+    scene.place_prop("crate", owner="")
+    frame = _frame({"act": "seek", "target": "the man in the counting house",
+                    "object": "the crate"},
+                   {"act": "sell", "commit": "intended", "object": "it"})
+    rows = acts_to_ops.table(frame, scene, sentence="I take the crate to the man …")
+    rows[0].ops = ["travel"]
+    raw = acts_to_ops.apply([{"op": "travel", "params": {"place": "the counting house"}}],
+                            rows, frame, scene)
+    assert [(r["op"], r["params"].get("item")) for r in acts_to_ops.order(raw, rows)] == [
+        ("give", "crate"), ("travel", None)]
+    scene.pc().goods["crate"] = 1
+    rows = acts_to_ops.table(frame, scene, sentence="I take the crate to the man …")
+    assert not rows[0].intents and rows[0].note == "the crate carried along"
+
+
+def test_a_sale_to_somebody_with_no_counter_is_asked_again():
+    """Round 2's replay, frozen reader: "I smile and flirt with the clerk and offer the
+    crate for coin" and "…who will buy it from me" came back as sales DONE. Asked alone
+    (`interpret.confirm_sale`, measured: both replay lines held back, 7 of 9 held-out
+    sale commitments right, 1 sale actually agreed held back as an offer), a sale that is
+    not closed is held back; the plan's own sale of it with it. A failed check holds back
+    too — a sale cannot be taken back, an offer can be made again."""
+    scene = _scene("the clerk of the counting house")
+    scene.pc().goods["crate"] = 1
+    said = "I smile and flirt with the clerk and offer the crate for coin."
+    for answer, built in (("tried", False), ("", False), ("done", True)):
+        frame = _frame({"act": "other", "target": "the clerk"},
+                       {"act": "sell", "object": "the crate", "target": "the clerk",
+                        "span": "offer the crate for coin"})
+        rows = acts_to_ops.table(frame, scene, sentence=said)
+        asked = []
+        acts_to_ops.confirm_sales(rows, frame, scene, sentence=said,
+                                  ask=lambda s, sp: asked.append(sp) or answer)
+        raw = acts_to_ops.apply([{"op": "sell", "actor": "pc", "params": {"item": "crate"}}],
+                                rows, frame, scene)
+        assert bool(_gives(raw)) is built, answer
+        assert asked == ["offer the crate for coin"]
+
+
 def test_a_deed_tried_still_moves_the_engine():
     """"I try to pick up the crate" is a pick-up attempted now (1e rolls an attempt; the
     engine's give finds or refuses it) — only a SALE tried is held back as an offer."""
@@ -420,4 +466,4 @@ def test_a_null_written_as_a_word_is_no_slot():
     frame, _ = interpret.ground({"question": False, "claims": [], "actions": [
         {"span": "give a friendly wink", "act": "other", "target": "none",
          "object": "none", "place": "none"}]}, "I give a friendly wink, none the wiser")
-    assert frame["actions"] == [{"act": "other"}]
+    assert frame["actions"] == [{"act": "other", "span": "give a friendly wink"}]

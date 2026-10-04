@@ -90,9 +90,13 @@ def acting(a: dict) -> bool:
 # ("the ore he uses" as object AND place), slot precision 0.33. A slot the act cannot
 # have is not the act's, and is dropped in code — never asked of the model twice.
 ACT_SLOTS: dict[str, tuple[str, ...]] = {
-    "go": ("place", "time"), "journey": ("place",), "leave": ("place",),
+    # A walk's `object` is what is carried along (round 2): "I take the crate to the man in
+    # the counting house" was read `go`, and a crate the player was not yet holding never
+    # came with them — the replay of the owner's items save then had nothing to sell.
+    "go": ("place", "object", "time"), "journey": ("place",), "leave": ("place",),
     "look": ("object", "target", "place", "time"), "search": ("object", "place"),
-    "seek": ("target", "place"), "talk": ("target", "says"), "insult": ("target", "says"),
+    "seek": ("target", "place", "object"), "talk": ("target", "says"),
+    "insult": ("target", "says"),
     "buy": ("object", "target", "place"), "sell": ("object", "target"),
     "drop": ("object", "place"),
     # A take's `target` is who or what it comes OUT of — a person, or a container: "the
@@ -321,7 +325,11 @@ _DEMOS = [
     ("I carry the barrel over to the cooper, who will pay me for it.",
      {"question": False, "claims": [], "actions": [
          {"span": "carry the barrel over to the cooper", "target": "the cooper",
-          "act": "seek"}]}),
+          "object": "the barrel", "act": "seek"}]}),
+    ("I take the lamp along to the old woman's hut.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "take the lamp along to the old woman's hut",
+          "place": "the old woman's hut", "object": "the lamp", "act": "go"}]}),
     # A purpose clause or a plan: intended, never done. "going to <a place>" is going;
     # "going to <do something>" is a plan.
     ("I'm going to the baker's to buy bread.",
@@ -528,6 +536,10 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             kept[s] = v
             used.add(low)
         _speech_is_not_a_target(kept, dropped)
+        # The action's own words, when they are the player's: what a targeted second
+        # question is asked about (`confirm_sale`).
+        if _within(a.get("span"), sentence):
+            kept["span"] = " ".join(str(a["span"]).split())
         actions.append(kept)
     actions = merge_repeats(actions)
     claims = [c for c in (frame.get("claims") or []) if _within(c, sentence)]
@@ -635,6 +647,69 @@ def interpret(sentence: str, *, model: str | None = None, host: str | None = Non
     frame.update(dropped=dropped, seconds=round(time.monotonic() - started, 2),
                  raw=reply.text)
     return frame
+
+
+# --- a sale, asked again ---------------------------------------------------------------------
+#
+# CLAUDE.md's rule: detect mechanically, repair with a targeted call. A sale is the one
+# goods op the player cannot take back, and the frozen reader still misread its
+# commitment on the owner's own lines (round 2's replay, readings from the frozen reader):
+# "I take the crate to the man in the counting house who will buy it from me" came back
+# `sell` DONE, and "I smile and flirt with the clerk and offer the crate for coin" `sell`
+# DONE — the round-1 regression back, through a different door. So when the table is
+# about to build a sale to somebody who keeps no counter, the reader is asked that one
+# question alone, with the sale's own words in front of it: closed now, only offered,
+# meant for later, or asked about? One enum, demonstrated; the frame's other twenty
+# fields are not asked again. The demonstrations are not in the labelled set.
+_SALE_DEMOS = [
+    ("I tell the tanner the hides are his for four silver.", "the hides are his", "done"),
+    ("I offer the tanner the hides.", "offer the tanner the hides", "tried"),
+    ("I haggle with the tanner over the hides, smiling.", "haggle with the tanner over the hides",
+     "tried"),
+    ("I bring the hides to the tanner, who always buys them from me.",
+     "who always buys them from me", "intended"),
+    ("I shake the tanner's hand on the price.", "shake the tanner's hand on the price", "done"),
+    ("Tomorrow I'll sell the hides to the tanner.", "sell the hides to the tanner", "intended"),
+    ("I ask the tanner if she would take the hides.", "if she would take the hides", "asked"),
+    ("I hand the hides over to the tanner and take her coin.",
+     "hand the hides over to the tanner", "done"),
+]
+
+
+def sale_messages(sentence: str, span: str) -> list[dict]:
+    system = ("A player in a role-playing game wrote the line below. Answer one question "
+              "about the sale in it: is the sale CLOSED now (done: agreed, accepted, handed "
+              "over for the price), only OFFERED or haggled over (tried), meant for LATER or "
+              "something somebody else will do (intended), or ASKED ABOUT (asked)?")
+    out = [{"role": "system", "content": system}]
+    for said, part, commit in _SALE_DEMOS:
+        out.append({"role": "user", "content": f"Line: {said}\nThe sale: {part}"})
+        out.append({"role": "assistant", "content": json.dumps({"commit": commit})})
+    out.append({"role": "user", "content": f"Line: {sentence}\nThe sale: {span}"})
+    return out
+
+
+def confirm_sale(sentence: str, span: str, *, model: str | None = None) -> str:
+    """How far the sale in `span` is done, asked alone: one of `COMMITS`; "" when the
+    call fails (the caller then holds the sale back — an offer, never a sale)."""
+    from . import client
+    from play import modelcfg
+
+    cfg = modelcfg.for_role("interpreter")
+    if not cfg.get("model"):
+        cfg = modelcfg.for_role("narrator")
+    schema = {"type": "object", "properties": {"commit": {"type": "string",
+                                                          "enum": list(COMMITS)}},
+              "required": ["commit"]}
+    try:
+        reply = client.chat(sale_messages(sentence, span), model or cfg["model"], cfg["host"],
+                            as_json=True, think=False, temperature=0.0, num_predict=30,
+                            provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""), schema=schema)
+        got = str((reply.json() or {}).get("commit") or "")
+    except Exception:  # noqa: BLE001 — a failed check holds the sale back
+        return ""
+    return got if got in COMMITS else ""
 
 
 # --- in the turn ---------------------------------------------------------------------

@@ -52,9 +52,9 @@ SLOTS = ("target", "object", "place", "time", "says")
 # time, an attack's target (the fight schema's), a consume's object (the satchel's
 # declarer) — is scored only strictly.
 ENGINE_SLOTS: dict[str, tuple[str, ...]] = {
-    "go": ("place",), "leave": ("place",),
+    "go": ("place", "object"), "leave": ("place",),
     "talk": ("target", "says"), "insult": ("target", "says"),
-    "seek": ("target",), "call_on": ("target",), "break_in": ("target",),
+    "seek": ("target", "object"), "call_on": ("target",), "break_in": ("target",),
     "buy": ("object",), "sell": ("object", "target"),
     "give": ("object", "target"), "take": ("object", "target"), "drop": ("object",),
     "cast": ("object", "target", "place"), "wait": ("time",),

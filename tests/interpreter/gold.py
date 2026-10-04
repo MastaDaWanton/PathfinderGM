@@ -462,8 +462,10 @@ GOLD = [
     # Written after the reader was frozen (commit e9d63ee's demonstrations), and never used
     # to write a fix. The first five are the owner's own lines from 2026-10-03, the first
     # two the replay regressions of round 1.
+    # `object` on a walk since 2026-10-03 (round 2): what is carried along.
     G("I take the crate to the man in the counting house who will buy it from me.",
-      [A("seek", target="the man in the counting house")], "playtest:2026-10-03"),
+      [A("seek", target="the man in the counting house", object="the crate")],
+      "playtest:2026-10-03"),
     G("I try to sell the crate to the smith for coin",
       [A("sell", "tried", object="the crate", target="the smith")], "playtest:2026-10-03"),
     G("I try to sell the crate to Korvu for coin",

@@ -338,8 +338,15 @@ class GMAgent:
         self.rows = acts_to_ops.table(read_ok, self.engine.scene,
                                       places=self.engine.places(), sentence=player_input,
                                       recent=getattr(self, "recent", ()))
+        # A sale to somebody with no counter is asked again on its own before the engine
+        # is committed to it (`acts_to_ops.confirm_sales`); off with the reader.
+        held_back = acts_to_ops.confirm_sales(
+            self.rows, read_ok, self.engine.scene, sentence=player_input,
+            ask=interpret.confirm_sale if interpret.ENABLED else None)
         if read_ok is not None:
             read_ok["table"] = [r.record() for r in self.rows]
+            if held_back:
+                read_ok["sales_held_back"] = held_back
         # Every deed the words declared moves a thing and not one of them can — "I sell
         # the crate" with no crate: the turn is the refusal, and no model is asked.
         stop = acts_to_ops.refusal(self.rows)

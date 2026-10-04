@@ -406,8 +406,75 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
             row.ops = interpret.ops_for({"actions": [a]}, scene, places)
+            if act in ("go", "seek") and a.get("object") and pc is not None:
+                _carry(row, frame, i, scene, pc, recent)
+                coming += [str(t["params"]["item"]) for t in row.intents]
         rows.append(row)
     return rows
+
+
+def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
+    """What a walk carries along is picked up first when the player is not holding it:
+    "I take the crate to the man in the counting house" carries the docks man's crate
+    there. Measured on round 2's replay of the owner's items save: read as a walk with no
+    crate, the crate never came, and the agreed sale four turns later had nothing to sell
+    (the retired `inject_goods` had read "I take the crate" and picked it up). A thing
+    already in the pack is only carried; a person is never goods."""
+    from rules import holding
+
+    thing = _object(frame, i, pc, recent)
+    if not thing or _a_person(scene, thing) or not _a_thing(thing):
+        return
+    if holding.key_in(pc.goods, thing):
+        row.note = f"{thing} carried along"
+        return
+    row.thing = thing
+    row.intents.append({"op": "give", "actor": pc.ref,
+                        "params": {"item": _plain(thing) or thing, "to": pc.ref},
+                        "because": "the player took it along"})
+
+
+def confirm_sales(rows: list[Row], frame: dict | None, scene, *, sentence: str = "",
+                  ask=None) -> list[str]:
+    """A sale about to be built to somebody who keeps no counter is asked again, alone
+    (`interpret.confirm_sale`): closed now, or only offered, meant for later, asked about?
+    Anything but "closed" holds it back — an offer, a plan, a question; a failed check
+    holds it back too, because a sale cannot be taken back and an offer can be repeated.
+    Returns a line per sale held back, for the turn log. `ask` None (no model: the test
+    suite, or the reader off) trusts the reading.
+
+    Measured: round 2's replay with the frozen reader read "I take the crate to the man
+    in the counting house who will buy it from me" and "I smile and flirt with the clerk
+    and offer the crate for coin" as sales DONE — the round-1 regression back. A keeper's
+    counter buys what it is offered, so a sale there is never held back."""
+    from rules import keepers as keepers_mod
+
+    notes: list[str] = []
+    if ask is None or not frame:
+        return notes
+    actions = frame.get("actions") or []
+    for row in rows:
+        sale = next((i for i in row.intents if i["op"] == "sell"), None)
+        if row.act != "sell" or sale is None or row.commit != "done":
+            continue
+        buyer = (getattr(scene, "actors", {}) or {}).get(sale["params"].get("to"))
+        if buyer is None or keepers_mod.keeps_a_counter(buyer):
+            continue
+        a = actions[row.index] if row.index < len(actions) else {}
+        said = ask(sentence, str(a.get("span") or sentence))
+        if said == "done":
+            continue
+        row.commit = said or "tried"
+        row.intents = []
+        if isinstance(a, dict):
+            # The reading carries the answer, so the plan's own sale has nothing to stand
+            # behind either (`apply`), and the brief says how far it was done.
+            a["commit"] = row.commit
+        row.note = (f"the sale asked again: {said or 'no answer'}, so an offer, not a sale"
+                    if row.commit == "tried" else
+                    f"the sale asked again: {row.commit}, not done this turn: no op")
+        notes.append(f"{row.thing or sale['params'].get('item')}: {row.note}")
+    return notes
 
 
 def declared(rows: list[Row]) -> list[str]:
@@ -577,11 +644,13 @@ def order(raw, rows: list[Row]) -> list:
             idx = owners[_op(r)][0]
         if idx is not None:
             slots.append(k)
-            keyed.append((idx, k, r))
+            # Within one action, what the table built goes first: the crate a walk carries
+            # is picked up before the walk (`_carry`), not at the far end of it.
+            keyed.append((idx, 0 if id(r) in by_built else 1, k, r))
     if len(keyed) < 2:
         return raw
-    keyed.sort(key=lambda t: (t[0], t[1]))
+    keyed.sort(key=lambda t: t[:3])
     out = list(raw)
-    for at, (_, _, r) in zip(slots, keyed):
+    for at, (*_, r) in zip(slots, keyed):
         out[at] = r
     return out
