@@ -28,8 +28,8 @@ slots plus the engine's finders settle each of them.
 
 Only what is done or tried NOW moves the engine (`interpret.COMMITS`, round 2): an action
 the reading marks intended or asked about makes no row of ops at all. A sale tried is an
-offer — ISO 24617-2's Offer, which only an Accept Offer closes — and becomes a sale only at
-a counter, whose keeper buys what is offered.
+offer — ISO 24617-2's Offer, which only an Accept Offer closes — and is never a sale, at a
+counter or anywhere else: only an agreement closes it.
 
 Where a slot cannot be resolved, no op is invented: the row says what was not found, and
 the turn says so (`refusal`, and the brief's fact line). Prior art: FIREBALL (Zhu et al.,
@@ -314,7 +314,6 @@ def _give(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
 
 
 def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) -> None:
-    from rules import keepers as keepers_mod
     from rules import pricing
 
     a = frame["actions"][i]
@@ -337,13 +336,16 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
         row.missing = (f"there is nobody here who is {buyer_words}" if buyer_words
                        else f"nobody here to sell {thing} to")
         return
-    if row.commit == "tried" and not keepers_mod.keeps_a_counter(scene.actors[buyer]):
+    if row.commit == "tried":
         # A sale tried is an offer (ISO 24617-2: an Offer, which only an Accept Offer
-        # closes). A stall buys whatever it is offered (CircleMUD's shopkeeper buys what
-        # its trade takes); anybody else has to agree, and until the player closes it the
-        # offer is a haggle the fiction answers. Measured on the replay, round 1: "I try
-        # to sell the crate to the smith for coin" was read `sell` and the crate sold.
-        row.note = "an offer, not a sale: no counter here, so the buyer must agree first"
+        # closes) — a haggle the fiction answers, and only an agreement closes it. At a
+        # counter too: round 1 let a keeper buy whatever was offered (CircleMUD's
+        # shopkeeper, the retired `_sell_goods_declared`'s rule), and in round 2's replay
+        # the counting house's clerk keeps one, so "…offer the crate for coin" would have
+        # sold the crate three turns before the player agreed a price. A stall's own
+        # screen is where a priced sale is made in one step. Measured on the replay,
+        # round 1: "I try to sell the crate to the smith for coin" was read `sell` and sold.
+        row.note = "an offer, not a sale: the buyer must agree first"
         return
     params: dict = {"item": key, "to": buyer}
     share = _SHARE.search(str(sentence or ""))
@@ -436,19 +438,16 @@ def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
 
 def confirm_sales(rows: list[Row], frame: dict | None, scene, *, sentence: str = "",
                   ask=None) -> list[str]:
-    """A sale about to be built to somebody who keeps no counter is asked again, alone
-    (`interpret.confirm_sale`): closed now, or only offered, meant for later, asked about?
-    Anything but "closed" holds it back — an offer, a plan, a question; a failed check
-    holds it back too, because a sale cannot be taken back and an offer can be repeated.
+    """A sale about to be built is asked again, alone (`interpret.confirm_sale`): closed
+    now, or only offered, meant for later, asked about? Anything but "closed" holds it back
+    — an offer, a plan, a question — at a counter as anywhere else. A failed check holds
+    it back too, because a sale cannot be taken back and an offer can be repeated.
     Returns a line per sale held back, for the turn log. `ask` None (no model: the test
     suite, or the reader off) trusts the reading.
 
     Measured: round 2's replay with the frozen reader read "I take the crate to the man
     in the counting house who will buy it from me" and "I smile and flirt with the clerk
-    and offer the crate for coin" as sales DONE — the round-1 regression back. A keeper's
-    counter buys what it is offered, so a sale there is never held back."""
-    from rules import keepers as keepers_mod
-
+    and offer the crate for coin" as sales DONE — the round-1 regression back."""
     notes: list[str] = []
     if ask is None or not frame:
         return notes
@@ -457,11 +456,11 @@ def confirm_sales(rows: list[Row], frame: dict | None, scene, *, sentence: str =
         sale = next((i for i in row.intents if i["op"] == "sell"), None)
         if row.act != "sell" or sale is None or row.commit != "done":
             continue
-        buyer = (getattr(scene, "actors", {}) or {}).get(sale["params"].get("to"))
-        if buyer is None or keepers_mod.keeps_a_counter(buyer):
-            continue
         a = actions[row.index] if row.index < len(actions) else {}
         said = ask(sentence, str(a.get("span") or sentence))
+        # Only a sale closed stands, at a counter too: the counting house's clerk keeps
+        # one, and in the replay "…who will buy it from me" sold the crate to him a turn
+        # early while a check that skipped keepers never asked.
         if said == "done":
             continue
         row.commit = said or "tried"
@@ -541,8 +540,8 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     2. A plan op that moves a thing and that no act of the reading stands behind is
        overruled: a give to the player needs an act that gets something, a give from the
        player one that parts with something, and a sale needs a `sell` DONE — a sale only
-       tried is a sale only where the table built one (a counter). Only acts done or tried
-       stand behind anything; an intended or asked-about one stands behind nothing. Gives
+       tried is an offer, never a sale. Only acts done or tried stand behind anything; an
+       intended or asked-about one stands behind nothing. Gives
        between other people are theirs.
     3. Built ops the plan did not carry are added.
 

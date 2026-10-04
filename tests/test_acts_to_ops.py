@@ -177,13 +177,14 @@ def test_a_quoted_deal_closes_the_sale_to_the_one_spoken_to():
     assert "crate" not in pc.goods and scene.actors[smith].goods.get("crate") == 1
 
 
-def test_a_sale_tried_is_a_haggle_unless_the_buyer_keeps_a_counter():
+def test_a_sale_tried_is_a_haggle_and_only_an_agreement_closes_it():
     """"I try to sell the crate to Korvu for coin" — Korvu, a labourer, said no in the
     fiction — and "I agree to sell the crate to the clerk" were both `sell`. Round 1 gave
     the reader an `offer` act; the replay then read "I try to sell the crate to the smith"
     as `sell` and sold it, so round 2 asks how far each deed is done instead: a sale
     TRIED is an offer (ISO 24617-2's Offer, closed only by an Accept Offer), a haggle with
-    no op unless the buyer keeps a counter; a sale DONE is the close."""
+    no op — at a counter too, since the counting house's clerk keeps one and an offer
+    there would have sold the crate three turns early; a sale DONE is the close."""
     scene = _scene("Korvu")
     scene.pc().goods["crate"] = 1
     rows, raw = _turn(scene, "I try to sell the crate to Korvu for coin",
