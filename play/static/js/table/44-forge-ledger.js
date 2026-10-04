@@ -23,12 +23,15 @@
 // `roll.success`: deciding it from total and DC on the page would be the page authoring
 // a result. Fields the card reads when present and leaves out when absent (lane U5's
 // hand-back names them as asks of forge_views): `color` (the swatch), `obtain`/`source`/
-// `biomes` (where found or bought), `assay_minutes` and `assay_cost`, `smiths_here`.
+// `biomes` (where found or bought), `assay_minutes` and `assay_cost`, `smiths_here`,
+// `assay_danger` (what testing it does to the assayer, in words).
 //
-// THE REACTIVE ASSAY (UI plan §6.7). Assaying noqual or abysium hurts for real (contracts
-// §6: the metal's own carrier effect), so it always asks first, in --alarm words, with
-// the safe button focused: "Noqual reacts badly to testing. Assay it anyway?", Assay it /
-// Keep it, the herb bench's "Taste it / Keep it" shape. `reactive` is the server's flag.
+// THE REACTIVE ASSAY (UI plan §6.7, contracts §13.2). Assaying abysium sickens (the
+// book) and assaying noqual makes magic recoil, suppressing the assayer's active magic
+// for 1d4 rounds (the owner's house rule), so it always asks first, in --alarm words,
+// with the safe button focused: "Noqual reacts badly to testing. Assay it anyway?", then
+// what it does in the server's words, Assay it / Keep it (the herb bench's "Taste it /
+// Keep it" shape). Whether to ask is the server's `assay_danger`, else its `reactive`.
 //
 // WHERE THE CARD LIVES. Inside the forge's own layer when the anchor is in one (the
 // core's trap wraps Tab inside the layer, so a card appended to <body> would have buttons
@@ -120,6 +123,23 @@
     return bits.join(", ");
   }
   function reactiveLine(name) { return name + " reacts badly to testing. Assay it anyway?"; }
+  // What testing it does to the assayer, in the server's words. Abysium sickens (the
+  // book); noqual's magic recoils and suppresses the assayer's active magic for 1d4 rounds
+  // (the owner's house rule, contracts §13.2). Both are the material's own data, so the
+  // page names no metal: it prints `assay_danger` (a sentence, or {text}) when the card
+  // carries it, and a plain warning when it does not.
+  function dangerWords(c) {
+    var d = c.assay_danger;
+    var t = d && typeof d === "object" ? d.text : d;
+    return typeof t === "string" && t.trim() ? t.trim() : "";
+  }
+  // Ask first when the server says the assay is dangerous. A card that carries
+  // `assay_danger` says it exactly (null for a reactive ore with no effect on a handler);
+  // one that does not falls back on the `reactive` flag, which over-asks rather than
+  // letting a dangerous assay through without a word.
+  function needsConfirm(c) {
+    return Object.prototype.hasOwnProperty.call(c, "assay_danger") ? !!c.assay_danger : !!c.reactive;
+  }
   // A colour is drawn only when it is a plain colour value: it goes into a style attribute.
   function swatch(color, big) {
     var ok = typeof color === "string" && /^(#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|hsla?\([\d\s.,%deg]+\))$/i.test(color.trim());
@@ -154,11 +174,9 @@
         '<ul class="hc-props">' + rows + '</ul>';
     }).join("");
   }
-  function knownCount(c) {
-    var props = c.properties || [];
-    var k = props.filter(function (p) { return p.known; }).length;
-    return props.length ? k + " of " + props.length + " known" : "";
-  }
+  // No "3 of 7 known" on the card: the material endpoint sends no such count, and counting
+  // rows here would be the page making a number. The card shows a line per unknown
+  // instead, and the Journal's row prints the ledger's own `known` and `total`.
   function dangerHtml(c) {
     var known = (c.properties || []).filter(function (p) { return p.known && p.drawback; })
       .map(function (p) { return p.text; });
@@ -185,7 +203,7 @@
     o = o || {};
     var where = foundLine(c);
     var carried = Number(c.carried) > 0 ? c.carried + " carried" : "";
-    var sub = [c.kind, c.tier, knownCount(c), carried].filter(Boolean).join(", ");
+    var sub = [c.kind, c.tier, carried].filter(Boolean).join(", ");
     return '<i class="v2-rim" aria-hidden="true"></i><div class="hc-in">' +
       '<div class="hc-head"><span class="fl-mark">' +
         icon(c.form || c.kind || "", { size: 48, tier: c.tier, label: c.name }) + swatch(c.color, true) + '</span>' +
@@ -389,17 +407,21 @@
     var h = benchOf(open && open.anchor);
     if (h) { h.pushEsc(escClose); return; }
     if (looseEsc) return;
+    // Capture phase, and stopped there: the table closes its Journal sheet on Esc from a
+    // document listener, and seen live (2026-10-04) one Esc closed the card AND the
+    // Journal under it. One Esc, one layer.
     looseEsc = function (e) {
       if (e.key !== "Escape" || !open || !open.pinned || document.querySelector(".fl-confirm")) return;
       e.preventDefault();
+      e.stopPropagation();
       escClose();
     };
-    document.addEventListener("keydown", looseEsc);
+    document.addEventListener("keydown", looseEsc, true);
   }
   function dropEsc() {
     var C = core();
     if (C && C.current && C.current.dropEsc) C.current.dropEsc(escClose);
-    if (looseEsc) { document.removeEventListener("keydown", looseEsc); looseEsc = null; }
+    if (looseEsc) { document.removeEventListener("keydown", looseEsc, true); looseEsc = null; }
   }
 
   function show(id, anchor, o) {
@@ -467,6 +489,17 @@
     if (open && open.id === id) { draw(); open.wantFocus = true; focusIn(); }
   }
 
+  function confirmHtml(c) {
+    return '<div class="bench-scrim"></div><div class="bench-dialog v2-framed v2-card-leather">' +
+      '<i class="v2-rim" aria-hidden="true"></i>' +
+      '<h3 id="fl-confirm-t">Assay ' + esc(c.name) + '</h3>' +
+      '<div id="fl-confirm-b"><p class="fl-alarm">' + esc(reactiveLine(c.name)) + '</p>' +
+      '<p class="fl-alarm">' + esc(dangerWords(c) || "Testing it can turn on you, whatever the roll says.") + '</p>' +
+      '<p>' + esc("It takes " + assayCost(c) + ".") + '</p></div>' +
+      '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-no>Keep it</button>' +
+      '<button type="button" class="v2-btn is-quiet bench-danger" data-yes>Assay it</button></div></div>';
+  }
+
   // A modal of the card's own: the safe button first and focused, Esc is the safe one.
   // Inside the bench's layer it is a `.bench-modal`, so the core's trap holds Tab in it.
   function confirmReactive(c) {
@@ -480,13 +513,7 @@
       wrap.setAttribute("aria-modal", "true");
       wrap.setAttribute("aria-labelledby", "fl-confirm-t");
       wrap.setAttribute("aria-describedby", "fl-confirm-b");
-      wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog v2-framed v2-card-leather">' +
-        '<i class="v2-rim" aria-hidden="true"></i>' +
-        '<h3 id="fl-confirm-t">Assay ' + esc(c.name) + '</h3>' +
-        '<p id="fl-confirm-b" class="fl-alarm">' + esc(reactiveLine(c.name)) + '</p>' +
-        '<p>' + esc("It takes " + assayCost(c) + ", and handling it hurts whatever the roll says.") + '</p>' +
-        '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-no>Keep it</button>' +
-        '<button type="button" class="v2-btn is-quiet bench-danger" data-yes>Assay it</button></div></div>';
+      wrap.innerHTML = confirmHtml(c);
       host.appendChild(wrap);
       var onKey = null;
       var finish = function (v) {
@@ -542,7 +569,9 @@
       var roll = r.roll || {};
       var how = "You assayed " + c.name + (roll.total != null
         ? " (d20 " + roll.face + " " + sign(roll.bonus) + " = " + roll.total + ")." : ".");
-      var line = learnedLine(r, how) + (r.minutes ? " " + minutesWords(r.minutes) + " passed." : "");
+      var hurt = dangerWords({ assay_danger: r.danger_text || r.danger });
+      var line = learnedLine(r, how) + (hurt ? " " + hurt : "") +
+        (r.minutes ? " " + minutesWords(r.minutes) + " passed." : "");
       return after(id, r, line);
     }).catch(function (err) {
       if (dice && dice.close) { try { dice.close(); } catch (e2) { /* */ } }
@@ -574,7 +603,7 @@
     // Hovering opened it; acting on it pins it, so the answer stays to be read.
     if (!open.pinned) { open.pinned = true; el.classList.add("is-pinned"); pushEsc(); }
     if (k === "assay") {
-      if (!c.reactive) { assay(c); return; }
+      if (!needsConfirm(c)) { assay(c); return; }
       confirmReactive(c).then(function (yes) { if (yes && open && open.id === id) assay(c); });
       return;
     }
@@ -664,6 +693,7 @@
     forget: function (materialId) { if (materialId) delete cache[materialId]; else cache = {}; },
     journal: journal,
     // The renderers, for tests and for the forge's shell; pure: data in, markup out.
-    render: { card: cardHtml, props: propsHtml, rows: rowsHtml, found: foundLine, reactive: reactiveLine },
+    render: { card: cardHtml, props: propsHtml, rows: rowsHtml, found: foundLine, reactive: reactiveLine,
+              confirm: confirmHtml, needsConfirm: needsConfirm, danger: dangerWords },
   };
 })();
