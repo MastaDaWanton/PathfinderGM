@@ -49,6 +49,18 @@ def _names(scene):
     return {r: a.name for r, a in scene.people.items()}
 
 
+def _read(said, scene, *actions, plan=None, recent=()):
+    """The turn's goods door with this reading (gm/acts_to_ops.py): since 2026-10-03 the
+    reading drives these ops, and the regex readers these tests first pinned
+    (`inject_goods`, `inject_sale`, `declare_drop`, `declare_emptying`) are retired."""
+    from gm import acts_to_ops
+
+    frame = {"question": False, "claims": [], "actions": [dict(a) for a in actions]}
+    rows = acts_to_ops.table(frame, scene, sentence=said, recent=recent)
+    return acts_to_ops.apply(list(plan or [{"op": "narrate_only", "params": {}}]),
+                             rows, frame, scene)
+
+
 # --- 1. a take is FROM somewhere, and a figure of speech is nothing ------------------------
 
 def test_the_brunt_of_the_weight_is_not_a_thing():
@@ -57,7 +69,9 @@ def test_the_brunt_of_the_weight_is_not_a_thing():
     dropped on a smithy floor. Read from the end, the head was "weight"; before "of" the
     head comes first, and a brunt is not something a satchel holds."""
     said = "I take the brunt of the weight and move it toward the storage area."
-    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+    # The reading of that line on the save: `take, object: the brunt of the weight`.
+    out = _read(said, _scene(), {"act": "take", "object": "the brunt of the weight"},
+                {"act": "go", "place": "the storage area"})
     assert not [i for i in out if i.get("op") == "give"]
     assert not judgement._is_a_thing("brunt of the weight")
     # The rule's own docstring example, which the old head-at-the-end reading got wrong.
@@ -115,7 +129,8 @@ def test_carrying_what_is_already_carried_mints_nothing():
     scene = _scene()
     scene.pc().goods["crate"] = 1
     said = "I take the crate to the man in the counting house who will buy it from me."
-    out = judgement.inject_goods([{"op": "narrate_only"}], said, scene)
+    out = _read(said, scene, {"act": "take", "object": "the crate",
+                              "target": "the man in the counting house"})
     assert not [i for i in out if i.get("op") == "give"]
 
 
@@ -146,9 +161,8 @@ def test_the_players_seventy_five_percent_cannot_raise_the_price():
     scene = _scene("the clerk of the counting house")
     clerk = _ref(scene, "the clerk of the counting house")
     scene.pc().goods["crate"] = 1
-    raw = judgement.inject_sale(
-        [{"op": "narrate_only", "params": {}}],
-        "I agree to sell the crate to the clerk at 75% of the crate's value.", scene)
+    raw = _read("I agree to sell the crate to the clerk at 75% of the crate's value.", scene,
+                {"act": "sell", "object": "the crate", "target": "the clerk"})
     sell = next(r for r in raw if r["op"] == "sell")
     assert sell["params"]["to"] == clerk and sell["params"]["item"] == "crate"
     assert sell["params"]["accept"] == round(0.75 * pricing.UNLISTED_GP, 2)
@@ -171,19 +185,22 @@ def test_an_offer_is_a_haggle_and_the_close_is_the_sale():
     scene = _scene("Korvu", "the clerk of the counting house")
     scene.pc().goods["crate"] = 1
     quiet = [{"op": "narrate_only", "params": {}}]
-    for said in ("I try to sell the crate to Korvu for coin",
-                 "I smile and flirt with the clerk and offer the crate for coin."):
-        assert judgement.inject_sale(list(quiet), said, scene) == quiet, said
-    raw = judgement.inject_sale(
-        list(quiet), "I agree to sell the crate to the clerk at 75% of the crate's value.",
-        scene)
+    # A sale TRIED is the haggle (the reader's commitment, round 2); a sale done is the
+    # close.
+    for said, target in (("I try to sell the crate to Korvu for coin", "Korvu"),
+                         ("I smile and flirt with the clerk and offer the crate for coin.",
+                          "the clerk")):
+        assert _read(said, scene, {"act": "sell", "commit": "tried", "object": "the crate",
+                                   "target": target}) == quiet, said
+    raw = _read("I agree to sell the crate to the clerk at 75% of the crate's value.", scene,
+                {"act": "sell", "object": "the crate", "target": "the clerk"})
     assert [r["op"] for r in raw] == ["narrate_only", "sell"]
     # A close that names nothing takes the thing the last beats were about, and is
     # made to the person the player is talking to.
     scene.thread = {"ref": _ref(scene, "the clerk of the counting house")}
-    raw = judgement.inject_sale(list(quiet), "It's a deal, he can have it.", scene,
-                                recent=["You set the crate on the counter.",
-                                        "The clerk eyes the crate."])
+    raw = _read("It's a deal, he can have it.", scene,
+                {"act": "sell", "object": "it", "target": "he"},
+                recent=["You set the crate on the counter.", "The clerk eyes the crate."])
     assert raw[-1]["op"] == "sell" and raw[-1]["params"]["item"] == "crate"
 
 
@@ -265,7 +282,7 @@ def test_a_pouch_handed_over_carries_its_coin_and_empties_into_the_purse():
     assert pc.goods == {"pouch": 1} and pc.purse == {}
     assert scene.prop_named("pouch")["held_by"] == "pc"
     said = "I transfer the coins from the pouch into my coin purse."
-    raw = judgement.declare_emptying([{"op": "narrate_only", "params": {}}], said, scene)
+    raw = _read(said, scene, {"act": "take", "object": "the coins", "target": "the pouch"})
     out = _run(scene, raw)
     assert goods.in_copper(pc.purse) == 1200 and pc.goods == {"pouch": 1}
     assert holding.coin_in(scene.prop_named("pouch")) == 0
@@ -302,8 +319,9 @@ def test_a_drop_goes_to_the_floor_not_to_the_smith():
               "params": {"item": "Brunt of the weight"}}]
     said = ("I transfer the coins from the pouch into my coin purse.  I also drop the "
             "Brunt of the weight on the ground and leave it behind.")
-    raw = judgement.declare_drop(list(model), said, scene)
-    assert raw == [{"op": "give", "because": "the player set it down",
+    raw = _read(said, scene, {"act": "drop", "object": "the Brunt of the weight",
+                              "place": "the ground"}, plan=model)
+    assert raw == [{"op": "give", "actor": "pc", "because": "the player set it down",
                     "params": {"item": "brunt of the weight", "from_": "pc"}}]
     _run(scene, raw)
     assert "brunt of the weight" not in pc.goods and not smith.goods
@@ -333,10 +351,10 @@ def test_a_wink_is_not_handed_over_and_nothing_remembers_it():
     "handed something to Kesst Vayr"."""
     said = ('I give a friendly wink and say "just trying to start a conversation and see '
             'what is happening here."')
-    interpret.remember(said, {"actions": [{"act": "other", "target": "a friendly wink"},
-                                          {"act": "talk"}]})
     scene = _scene()
-    out = judgement.inject_goods([{"op": "narrate_only"}], said, scene)
+    # The plan's give of the wink, which the detector used to add: no act stands behind it.
+    out = _read(said, scene, {"act": "other", "target": "a friendly wink"}, {"act": "talk"},
+                plan=[{"op": "give", "params": {"item": "friendly wink", "from_": "pc"}}])
     assert not [i for i in out if i.get("op") == "give"]
     # And the engine's own floor: a give of what the player does not carry is a refusal,
     # which the ledger does not remember as something that happened.
@@ -403,9 +421,13 @@ def test_the_recorded_drop_through_the_turn_lands_on_the_floor(monkeypatch):
     gm, s, e = _agent_with(monkeypatch, plan, "the smith")
     smith = _ref(s, "the smith")
     s.pc().goods["brunt of the weight"] = 1
-    turn = gm.plan_turn("I transfer the coins from the pouch into my coin purse.  I also "
-                        "drop the Brunt of the weight on the ground and leave it behind.",
-                        history=[])
+    said = ("I transfer the coins from the pouch into my coin purse.  I also drop the "
+            "Brunt of the weight on the ground and leave it behind.")
+    # The reading the 2026-10-03 reader gave this line (the replay of the items save).
+    interpret.remember(said, {"question": False, "claims": [], "actions": [
+        {"act": "take", "object": "the coins", "target": "the pouch"},
+        {"act": "drop", "object": "the Brunt of the weight", "place": "the ground"}]})
+    turn = gm.plan_turn(said, history=[])
     e.run(turn.intents)
     assert "brunt of the weight" not in s.pc().goods and not s.actors[smith].goods
     assert any(p["name"] == "brunt of the weight" for p in s.props_here())
@@ -419,8 +441,10 @@ def test_the_recorded_close_through_the_turn_sells_the_crate(monkeypatch):
          "because": "the negotiation of a price is a social interaction"}]},
         "the clerk of the counting house")
     s.pc().goods["crate"] = 1
-    turn = gm.plan_turn("I agree to sell the crate to the clerk at 75% of the crate's "
-                        "value.", history=[])
+    said = "I agree to sell the crate to the clerk at 75% of the crate's value."
+    interpret.remember(said, {"question": False, "claims": [], "actions": [
+        {"act": "sell", "object": "the crate", "target": "the clerk"}]})
+    turn = gm.plan_turn(said, history=[])
     e.run(turn.intents)
     assert "crate" not in s.pc().goods
     assert goods.in_copper(s.pc().purse) == round(pricing.UNLISTED_GP / 2 * 100)

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from gm import interpret, judgement
+from gm import acts_to_ops, interpret, judgement
 from play.campaign import _heal_minted_goods
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -37,26 +37,40 @@ def _scene():
     return s
 
 
-@pytest.mark.parametrize("said, read", [
-    (LIVE, "I pick up the crate. I tip the coins from the pouch into my coin purse."),
+# The reading of LIVE, as the reader produced it on 2026-10-03: two takes, in order. The
+# regex that split "…, then tip" into its own "I tip" declaration (`as_declarations`) is
+# retired with the readers it fed (docs/structured-turn.md): a reading is already one
+# action per deed, whether or not the deed has its own "I".
+LIVE_READING = {"question": False, "claims": [], "actions": [
+    {"act": "take", "object": "the crate"},
+    {"act": "take", "object": "the coins", "target": "the pouch"}]}
+
+
+def _table(said, frame, s, plan=None):
+    rows = acts_to_ops.table(frame, s, sentence=said)
+    return acts_to_ops.apply(list(plan or [{"op": "narrate_only"}]), rows, frame, s)
+
+
+@pytest.mark.parametrize("said, frame, items", [
+    (LIVE, LIVE_READING, ["crate", "coins"]),
     ("I drop the pouch on the floor and pick up the crate.",
-     "I drop the pouch on the floor. I pick up the crate."),
-    # A bare "and" between nouns, or before a verb no deed reader reads, stays put.
-    ("I buy the bread and cheese.", "I buy the bread and cheese."),
-    ("I take the rope and the lantern.", "I take the rope and the lantern."),
-    ("I walk in and look around.", "I walk in and look around."),
+     {"actions": [{"act": "drop", "object": "the pouch", "place": "the floor"},
+                  {"act": "take", "object": "the crate"}]}, ["pouch", "crate"]),
 ])
-def test_a_sequenced_deed_is_read_as_its_own_declaration(said, read):
-    assert judgement.as_declarations(said) == read
+def test_a_sequenced_deed_is_its_own_op(said, frame, items):
+    """Each deed of the reading is its own op, the second clause's with no "I" too."""
+    s = _scene()
+    s.pc().goods["pouch"] = 1
+    assert [r["params"]["item"] for r in _table(said, frame, s)
+            if r.get("op") == "give"] == items
 
 
 def test_the_live_sentence_plans_the_crate_and_the_coins():
     """Both deeds reach the plan, and the coins' give does not stand in for the crate's:
-    coin goes to the purse, not the pack, so it is not the turn's one thing coming in."""
+    coin goes to the purse, out of the pouch, and the crate into the pack."""
     s = _scene()
     s.pc().goods["pouch"] = 1
-    raw = judgement.declare_emptying([{"op": "narrate_only"}], LIVE, s)
-    raw = judgement.inject_goods(raw, LIVE, s)
+    raw = _table(LIVE, LIVE_READING, s)
     gives = [(r["params"].get("item"), r["params"].get("from_"), r["params"].get("to"))
              for r in raw if r.get("op") == "give"]
     assert ("coins", "pouch", s.pc().ref) in gives
@@ -72,9 +86,7 @@ def test_a_crate_set_down_is_picked_back_up_off_the_floor():
     e.run(e.validate([{"op": "give", "actor": "pc",
                        "params": {"item": "crate", "from_": "pc"}}]))
     assert "crate" not in s.pc().goods
-    raw = judgement.inject_goods([{"op": "narrate_only"}], LIVE, s)
-    for r in raw:
-        r.setdefault("actor", "pc")
+    raw = _table(LIVE, {"actions": [{"act": "take", "object": "the crate"}]}, s)
     e.run(e.validate(raw))
     assert s.pc().goods.get("crate") == 1
     assert not [p for p in s.props_here() if p.get("name") == "crate"]
@@ -174,11 +186,15 @@ def test_a_deal_spoken_aloud_sells_to_the_one_in_conversation():
     s.add(instantiate("guildhand", scene=s, name="man"))
     Engine(s, Dice(seed=1)).join_talk(smith)
     said = '"It\'s a deal. You can have the crate."'
-    out = judgement.inject_sale([{"op": "narrate_only"}], said, s)
+    out = _table(said, {"actions": [{"act": "talk", "says": said.strip('"')},
+                                    {"act": "sell", "object": "the crate"}]}, s)
     sells = [r for r in out if r.get("op") == "sell"]
     assert sells and sells[0]["params"] == {"item": "crate", "to": smith.ref}
-    # And a mere mention inside speech is still not a sale.
-    out = judgement.inject_sale([{"op": "narrate_only"}], '"Would you sell me rope?"', s)
+    # And a mere mention inside speech is still not a sale: the reading reads a question
+    # said, and no act of it stands behind a sale.
+    out = _table('"Would you sell me rope?"',
+                 {"actions": [{"act": "talk", "says": "Would you sell me rope?"}]}, s,
+                 plan=[{"op": "sell", "actor": "pc", "params": {"item": "crate"}}])
     assert not [r for r in out if r.get("op") == "sell"]
 
 
@@ -191,14 +207,19 @@ def test_a_deal_said_to_the_smith_by_name_finds_him_though_two_are_talking():
 
     s = _scene()
     s.pc().goods["crate"] = 1
+    # Each added before the next is made: made together, both drew the ref c1 and the
+    # second replaced the first — this test passed for months with no smith in the room.
     smith = instantiate("guildhand", scene=s, name="the smith")
-    other = instantiate("guildhand", scene=s, name="large man")
     s.add(smith)
+    other = instantiate("guildhand", scene=s, name="large man")
     s.add(other)
+    assert smith.ref != other.ref
     e = Engine(s, Dice(seed=1))
     e.join_talk(smith)
     e.join_talk(other)
     said = 'I tell the smith, "It\'s a deal. You can have the crate."'
-    out = judgement.inject_sale([{"op": "narrate_only"}], said, s)
+    out = _table(said, {"actions": [
+        {"act": "talk", "target": "the smith", "says": "It's a deal. You can have the crate."},
+        {"act": "sell", "object": "the crate", "target": "the smith"}]}, s)
     sells = [r for r in out if r.get("op") == "sell"]
     assert sells and sells[0]["params"]["to"] == smith.ref

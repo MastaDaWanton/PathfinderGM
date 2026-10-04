@@ -42,9 +42,9 @@ def test_continue_asks_the_model_for_no_plan_and_the_directive_never_reaches_the
     src = inspect.getsource(agent_mod.GMAgent.plan_turn)
     assert "if player_input == prompts.CARRY_ON:" in src
     assert "return self._continue_plan()" in src
-    # And the directive buys nothing and says nothing when it does reach an injector.
-    raw = judgement.inject_goods([{"op": "narrate_only", "params": {}}], prompts.CARRY_ON, room)
-    assert [r["op"] for r in raw] == ["narrate_only"]
+    # And the directive never reaches the reader, whose reading drives the goods ops since
+    # 2026-10-03 (`inject_goods`, which once bought "scene on" with it, is retired).
+    assert src.index("return self._continue_plan()") < src.index("interpret.interpret(")
 
 
 def test_the_standing_action_is_a_fact_for_the_continue_beat_and_survives_a_fight(room):

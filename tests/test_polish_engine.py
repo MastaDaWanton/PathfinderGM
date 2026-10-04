@@ -256,7 +256,12 @@ def test_the_cast_aim_enum_holds_the_scene_s_own_aims(monkeypatch):
         return _Reply()
 
     monkeypatch.setattr(agent_mod.client, "chat", chat)
-    agent.plan_turn("I cast burning hands into the tree tops", history=[])
+    # The reading is what declares since 2026-10-03 (docs/structured-turn.md): the cast
+    # stands behind the spell detector's `cast` (a spell's name against the catalogue).
+    said = "I cast burning hands into the tree tops"
+    interpret.remember(said, {"question": False, "claims": [], "actions": [
+        {"act": "cast", "object": "burning hands", "place": "the tree tops"}]})
+    agent.plan_turn(said, history=[])
     declared = seen["schema"]["properties"].get("declared") or {}
     cast = declared.get("properties", {}).get("cast")
     assert cast is not None, "the cast was not declared"

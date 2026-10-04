@@ -87,6 +87,12 @@ def test_the_unprepared_cast_is_one_refusal_and_no_retries(monkeypatch, coded_ca
     gm = _wizard_agent()
     calls = _script(monkeypatch, {"narration": "", "intents": [
         {"op": "cast", "actor": "pc", "params": {"spell": "burning-hands"}}]})
+    # The reading declares the cast since 2026-10-03: with none, the plan stands alone and
+    # its cast is an op nobody asked for (docs/structured-turn.md).
+    from gm import interpret
+
+    interpret.remember(line, {"question": False, "claims": [], "actions": [
+        {"act": "cast", "object": "burning hands", "place": "the tree tops"}]})
     plan = gm.plan_turn(line, history=[])
     assert len(calls) == 1, "one plan call, no retry and no second model"
     # The sentence is Lane E's `for_a_person` from `_check_cast` since both lanes merged:

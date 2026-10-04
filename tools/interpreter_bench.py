@@ -85,14 +85,93 @@ def _acts_only(frames):
             for f in frames]
 
 
+# The split the reader's fixes are gated on (docs/structured-turn.md, "the gate is measured
+# on the labelled sentences the fixes were NOT written from"). The first 60 lines were
+# read, miss by miss, when the 2026-10-03 fixes were written; the other 160 were not, and
+# their misses are never printed or saved — only their scores. A fix written from a
+# held-out miss would make the gate measure recall of the prompt. Round 2 added labelled
+# lines for commitment, a few marked `dev=True` (written while the reader was built), the
+# rest held out (written after it was frozen).
+DEV = 60
+
+
+def is_dev(g) -> bool:
+    return g.get("dev") or GOLD.index(g) < DEV
+
+
+def _summary(gold, got) -> dict:
+    strict = score(gold, got)
+    eng = score(gold, got, engine=True)
+    return {"n": strict["n"], "strict_frame_exact": strict["frame_exact"],
+            "engine_frame_exact": eng["frame_exact"],
+            "acts_in_order": strict["acts_in_order"],
+            "act_p_r_f1": strict["act_p_r_f1"], "slot_p_r_f1": strict["slot_p_r_f1"],
+            "engine_slot_p_r_f1": eng["slot_p_r_f1"],
+            "commit_accuracy": strict["commit_accuracy"],
+            "engine_commit_accuracy": eng["commit_accuracy"],
+            "question_accuracy": strict["question_accuracy"]}
+
+
+def splits(gold, got) -> dict:
+    """The scores on the whole set, the dev lines and the held-out ones — and the held-out
+    lines split again into the first 220's and the commitment lines added after."""
+    out = {"all": _summary(gold, got)}
+    for name, keep in (("dev", is_dev), ("held_out", lambda g: not is_dev(g)),
+                       ("held_out_first_220", lambda g: not is_dev(g) and GOLD.index(g) < 220),
+                       ("held_out_commit", lambda g: not is_dev(g) and GOLD.index(g) >= 220
+                        and g["source"] != "authored:clean"),
+                       # Written after the reader was frozen and never consulted in any
+                       # form before its run: the clean gate (round 2).
+                       ("held_out_clean", lambda g: g["source"] == "authored:clean")):
+        idx = [i for i, g in enumerate(gold) if keep(g)]
+        if idx:
+            out[name] = _summary([gold[i] for i in idx], [got[i] for i in idx])
+    return out
+
+
+def rescore(path: str) -> None:
+    """Score a saved run again, with no model: the frames are re-grounded by today's
+    `interpret.ground` from their raw replies, so a code-only change is measured on the
+    very replies it was written against."""
+    from gm import interpret
+
+    saved = json.loads(Path(path).read_text(encoding="utf-8"))
+    frames = saved["frames"]
+    gold = GOLD[:len(frames)]
+    got = []
+    for g, f in zip(gold, frames):
+        got_ = f["got"]
+        try:
+            raw = json.loads(got_.get("raw") or "{}")
+        except ValueError:
+            raw = {}
+        frame, _ = interpret.ground(raw if isinstance(raw, dict) else {}, g["text"])
+        got.append(frame)
+    print(json.dumps({"saved": {k: v for k, v in splits(gold, [f["got"] for f in frames]).items()},
+                      "regrounded": splits(gold, got)}, indent=1))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default="")
     ap.add_argument("--json", default="")
     ap.add_argument("--detectors-only", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--rescore", default="", help="a saved --json run, scored again")
+    ap.add_argument("--dev-only", action="store_true", help="the dev lines only")
+    ap.add_argument("--held-out-only", action="store_true", help="the gate: the held-out")
+    ap.add_argument("--schema", default="", help="flat or per_act (interpret.SCHEMA)")
     args = ap.parse_args()
-    gold = GOLD[:args.limit] if args.limit else GOLD
+    if args.schema:
+        from gm import interpret as _interpret
+
+        _interpret.SCHEMA = args.schema
+    if args.rescore:
+        rescore(args.rescore)
+        return
+    gold = [g for g in GOLD if is_dev(g)] if args.dev_only else \
+        [g for g in GOLD if not is_dev(g)] if args.held_out_only else (
+            GOLD[:args.limit] if args.limit else GOLD)
     scene, world = _scene()
 
     det = [detectors(g["text"], scene, world) for g in gold]
@@ -125,7 +204,12 @@ def main() -> None:
             "p90": round(sorted(seconds)[int(len(seconds) * 0.9) - 1], 2),
             "max": round(max(seconds), 2)}
         out["interpreter"]["slots_dropped_as_not_the_players_words"] = dropped
-        out["misses"] = full["misses"]
+        out["interpreter"]["failed_calls"] = sum(1 for f in got if f.get("error"))
+        out["splits"] = splits(gold, got)
+        print("splits:", json.dumps(out["splits"]))
+        # Only the dev lines' misses: the held-out lines' are not to be read.
+        out["misses_dev"] = [m for m in full["misses"]
+                             if m["text"] in {g["text"] for g in GOLD if is_dev(g)}]
         out["frames"] = [{"text": g["text"], "got": f} for g, f in zip(gold, got)]
         print("interpreter:", json.dumps(out["interpreter"]))
     if args.json:
