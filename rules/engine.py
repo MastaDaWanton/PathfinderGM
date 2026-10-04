@@ -14001,6 +14001,23 @@ class Engine:
             # still, and never a second piece of wood from nowhere.
             if taker is not None and not denom:
                 rec = self.scene.prop_on_the_ground(item)
+                if rec is None:
+                    # The world never runs out of a stone or a stick nobody recorded —
+                    # but a thing the engine HAS a record of, lying somewhere else, is
+                    # that thing, and it is not here. Measured live on the merged
+                    # structured-turn branch: the crate set down on the smithy floor,
+                    # then "I pick the crate back up and head to the old tannery" ran the
+                    # pick-up after the walk, and at the tannery a second crate came out
+                    # of the world while the first still lay in the smithy.
+                    away = next((r for r in self.scene.props
+                                 if not r.get("held_by") and r.get("at")
+                                 and r.get("at") != self.scene.at
+                                 and holding.same(r.get("name"), item)), None)
+                    if away is not None:
+                        return self._refuse(
+                            intent, f"{self._the(str(away['name']))} is not here: it lies "
+                                    f"at {self._place_name(str(away['at']))}. Go back for "
+                                    f"it first.")
                 if rec is not None:
                     # Picking a thing up is done with a hand, from where you stand
                     # (natural reach; 1e Table 7-2: a move action). A thing lying

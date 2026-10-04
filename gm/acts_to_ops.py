@@ -408,6 +408,17 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
             row.ops = interpret.ops_for({"actions": [a]}, scene, places)
+            # A walk to a place somebody named and the town does not have yet owes the
+            # found and the travel `judgement.go_to_heard_place` writes for it — owned by
+            # this action, so `order` puts them where the words do. Measured live on the
+            # merged branch: "I pick the crate back up and head to the old tannery" left
+            # the travel unowned (`ops_for` grounds only places the town has), the
+            # pick-up ran at the tannery, and the engine minted a second crate there.
+            if act == "go" and not row.ops and a.get("place"):
+                from rules import heard_places
+
+                if heard_places.named_in(str(a["place"]), scene, places) is not None:
+                    row.ops = ["found", "travel"]
             if act in ("go", "seek") and a.get("object") and pc is not None:
                 _carry(row, frame, i, scene, pc, recent)
                 coming += [str(t["params"]["item"]) for t in row.intents]

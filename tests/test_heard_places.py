@@ -327,3 +327,60 @@ def test_the_answer_naming_the_smithy_is_speech_and_is_heard_of():
     (got,) = e.scene.heard_places
     assert (got["name"], got["kind"], got["landmark"]) == \
         ("the smithy", "smithy", "6953424c8a82~urban:the-west-crossing")
+
+
+TANNERY = {"name": "the old tannery", "kind": "tannery", "landmark": ""}
+PICK_UP_AND_GO = {"question": False, "claims": [], "actions": [
+    {"act": "take", "object": "the crate"},
+    {"act": "go", "place": "the old tannery"},
+    {"act": "seek", "commit": "intended", "target": "her"}]}
+
+
+def test_picking_up_then_walking_to_a_heard_of_place_picks_up_first():
+    """Measured live on the merged structured-turn branch: "I pick the crate back up and
+    head to the old tannery to find her" — the crate set down on the floor here, the
+    tannery heard of from the smith. The reading was right (take, then go), but the
+    travel was owned by no action (`ops_for` grounds only places the town has), so the
+    pick-up ran at the tannery and the engine minted a second crate there while the first
+    still lay on the floor. The go owes found + travel now, and the words' order holds."""
+    from gm import acts_to_ops
+
+    agent = _agent(COUNTING)
+    e = agent.engine
+    pc = e.scene.pc()
+    pc.goods["crate"] = 1
+    e.run(e.validate([{"op": "give", "actor": "pc",
+                       "params": {"item": "crate", "from_": "pc"}}]))
+    assert "crate" not in pc.goods
+    heard_places.record(e.scene, TANNERY, said_by="c13")
+    known = tuple(e.places()) + tuple(e.open_ground())
+    said = "I pick the crate back up and head to the old tannery to find her."
+    rows = acts_to_ops.table(PICK_UP_AND_GO, e.scene, places=known, sentence=said)
+    raw = acts_to_ops.apply([{"op": "travel", "params": {"place": "the old tannery"}}],
+                            rows, PICK_UP_AND_GO, e.scene)
+    raw = judgement.go_to_heard_place(raw, said, e.scene, known, reading=PICK_UP_AND_GO)
+    raw = acts_to_ops.order(raw, rows)
+    assert [r["op"] for r in raw if r["op"] != "narrate_only"] == ["give", "found", "travel"]
+    for r in raw:
+        r.setdefault("actor", "pc")
+    e.run(e.validate(raw))
+    assert e.here().name == "the old tannery"
+    assert pc.goods.get("crate") == 1
+    assert not [p for p in e.scene.props if p.get("name") == "crate" and p.get("at")]
+
+
+def test_a_thing_recorded_elsewhere_is_not_minted_here():
+    """The engine's half of the same turn: a take of a thing the engine holds a record of,
+    lying at another place, is refused with where it lies — the world never runs out of
+    an unrecorded stone, but THIS crate is at the counting house."""
+    agent = _agent(COUNTING)
+    e = agent.engine
+    pc = e.scene.pc()
+    pc.goods["crate"] = 1
+    e.run(e.validate([{"op": "give", "actor": "pc",
+                       "params": {"item": "crate", "from_": "pc"}}]))
+    e.run(e.validate([{"op": "travel", "actor": "pc", "params": {"place": "the market"}}]))
+    out = e.run(e.validate([{"op": "give", "actor": "pc",
+                             "params": {"item": "crate", "to": "pc"}}])).outcomes
+    assert out[0].status == "refused" and "counting house" in out[0].tell
+    assert "crate" not in pc.goods

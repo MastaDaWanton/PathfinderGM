@@ -218,3 +218,16 @@ def test_the_reading_row_says_what_was_read_and_what_was_dropped():
     assert row["newcomers"] == [{"words": "woman with a basket", "where": "here",
                                  "mentions": ["m1"]}]
     json.dumps(row)                                  # a turn-log row is plain data
+
+
+def test_a_possessive_newcomer_is_the_person_not_their_name():
+    """Measured live on the merged structured-turn branch, 2026-10-03: "the steady,
+    rhythmic thud of a worker's mallet against a frame" made a person called "worker's"
+    (c15). The 's is grammar, a closed form: the newcomer is "worker"."""
+    s, e, _ = _market()
+    text = "The only sound is the steady, rhythmic thud of a worker's mallet against a frame."
+    ids = stub._mention_ids(text, s)
+    phrase = next(p for p in ids if "worker" in p)
+    reading = stub.read(text, s, engine=e, who={phrase: "new"}, new=[(phrase, "here", "")])
+    (n,) = reading.newcomers
+    assert n.words == "worker"

@@ -827,9 +827,13 @@ def _apply_people(reading: Reading, ans: dict, ask_m, ask_l, refs, vague, text,
             reading.dropped.append({"mention": root, "why": "no answer for here or "
                                     "elsewhere: recorded, not made"})
             where = ""
+        # A possessive is the person, not their name: "the steady thud of a worker's
+        # mallet" made a person called "worker's" (measured live on the merged branch,
+        # 2026-10-03). The 's is grammar, a closed form, and comes off.
+        words = re.sub(r"(?:'s|’s|s'|s’)$", "", _article_off(words)).strip()
         reading.newcomers.append(Newcomer(
             root=root, mentions=[k for k, v in roots.items() if v == root],
-            where=where, words=_article_off(words)))
+            where=where, words=words))
     # Lines.
     mids = {m.id for m in ask_m}
     who_ok = set(refs) | {YOU, NOBODY} | mids
