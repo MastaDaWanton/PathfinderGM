@@ -127,7 +127,7 @@
       "not_yet": ["a Climb check's DC is the band the GM names, so the rope's DC is said, not set", "there is no bind or escape op for the bonds DC to be read by"]
     },
     "smith's field kit": {
-      "names": ["smith's field kit", "smiths field kit", "field kit", "smithing kit",
+      "names": ["smith's field kit", "smiths field kit", "smithing kit",
                 "field forge", "portable forge", "travelling forge", "traveling forge"],
       "does": "A small anvil, hammers, tongs and a bellows: common and uncommon smithing anywhere, without a smithy. Rare work, smelting and alloying still need a real furnace.",
       "source": "No book prints this kit. The owner's ruling (docs/blacksmithing-revamp-plan.md §2, 'Field kit + smithy'): the kit does common and uncommon work anywhere.",

@@ -344,6 +344,14 @@ def build(record: dict) -> dict:
         for eff in FLAWS.get(str(flaw).strip().lower(), ()):
             _unscaled(eff, f"flaw:{flaw}")
 
+    # Fold on clean metal (plan §7): the bench marks the piece `folded`, and it is worth +1
+    # hardness, fixed and outside the sum like a flaw. On slaggy metal Fold only cancels the
+    # flaw, which the bench records by not leaving `slaggy` in the flaws.
+    for slot, piece in (rec.get("pieces") or {}).items():
+        if isinstance(piece, dict) and piece.get("folded"):
+            _unscaled({"type": "gear_mod", "target": "hardness", "amount": 1},
+                      f"folded:{slot}")
+
     specs.extend(extras)
     return {
         "id": item_id, "name": str(rec.get("name") or item_id), "kind": gear,
@@ -385,7 +393,22 @@ def record_of(thing) -> dict | None:
     if is_forged(thing):
         return thing
     rec = getattr(thing, "record", None)
-    return rec if is_forged(rec) else None
+    if is_forged(rec):
+        return rec
+    # The bench keeps a finished item as a plain `crafting.Stock` with its build in
+    # `forge.*` tags (no change to crafting.py), and `blacksmith.record` rebuilds the
+    # contract §4 record from them. Asked here so every reader that goes through this door
+    # finds a forged blade wherever it was stored; without it the readers and the bench were
+    # two halves that never met (found when lanes B and D were merged, 2026-10-04).
+    if getattr(thing, "craft", None) == "blacksmith" and getattr(thing, "properties", None):
+        from . import blacksmith
+
+        try:
+            rebuilt = blacksmith.record(thing)
+        except Exception:  # noqa: BLE001 - a shelf entry that is not a forge item
+            return None
+        return rebuilt if is_forged(rebuilt) else None
+    return None
 
 
 _ROLL_EXCLUDED = frozenset({"gear_mod", "strikes_as", "working", "narrative"})
