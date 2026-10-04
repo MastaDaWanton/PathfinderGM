@@ -50,6 +50,21 @@ class ModelUnavailable(RuntimeError):
     not running is an ordinary situation with an ordinary fix, not a crash."""
 
 
+class ModelStalled(ModelUnavailable):
+    """Ollama has the model loaded and has stopped answering, or cannot start it at all.
+
+    Measured 2026-10-03 on this machine: after a normal reply at 20:50, Ollama took every
+    later request and answered none — the game's turn and a five-token probe both sat
+    silent while `/api/ps` went on answering and listing the model as loaded. At 21:35 the
+    idle model was unloaded and every reload failed in the log ("llama-server GPU discovery
+    watchdog timed out", "Load failed … timed out waiting for llama-server"); the GPU was
+    healthy and nearly empty. The game waited the full 600-second cold-load allowance per
+    call, several calls a turn. Ollama's own tracker has the same shape (ollama/ollama
+    #18685, #15950: the HTTP server stays up while a runner is wedged). Only a restart of
+    Ollama clears it, and that is what the player is told, in a minute or two rather than
+    half an hour. A subclass, so every caller that catches `ModelUnavailable` still does."""
+
+
 class ModelNotInstalled(ModelUnavailable):
     """Ollama answered, and said it does not have this model: HTTP 404 from `/api/chat`
     (`server/routes.go`: `model 'x' not found`, or the scheduler's `model "x" not found,
@@ -161,6 +176,60 @@ class Reply:
 # absence, never by a turn.
 KEEP_ALIVE = "45m"
 
+# How long a LOADED model may go without sending a single token — before the first or
+# between two — before the call is given up as a wedged Ollama (`ModelStalled`). A warm
+# reply's first token comes after prompt evaluation (about 0.5 s per thousand tokens on
+# this machine; a full 16k window is under ten seconds) plus any queue behind the game's
+# own other calls; between tokens the gap is milliseconds, and still well under a second
+# on a CPU-only machine. Two minutes is generous to all of that and far short of the
+# half hour a wedged server cost (`ModelStalled`). A model NOT loaded keeps the caller's
+# own allowance, because a cold load really is slow (104.8 s measured on a 3-token reply).
+STALL_SECONDS = 120
+
+
+def loaded(model: str, host: str) -> bool | None:
+    """Whether Ollama has `model` in memory right now (`/api/ps`), or None when it cannot
+    say. Not cached: it is asked once per call, costs milliseconds, and a stale "loaded"
+    would cut a genuine cold load short."""
+    try:
+        with urllib.request.urlopen(f"{host.rstrip('/')}/api/ps", timeout=3) as r:
+            models = json.loads(r.read().decode("utf-8")).get("models") or []
+    except Exception:  # noqa: BLE001 — no answer means no claim either way
+        return None
+    want = model_tag(model)
+    return any(model_tag(str(m.get("name") or m.get("model") or "")) == want
+               for m in models)
+
+
+def _fold(text: str) -> dict:
+    """One reply from `/api/chat`, streamed or not: the streamed lines' content and
+    thinking joined, the last line's counts and `done_reason` kept, an `error` line
+    raised. A single JSON object (an unstreamed reply, or a test's) is returned as is."""
+    lines = [json.loads(ln) for ln in str(text or "").splitlines() if ln.strip()]
+    if not lines:
+        raise ModelUnavailable("Ollama sent an empty reply.")
+    for ln in lines:
+        if isinstance(ln, dict) and ln.get("error"):
+            raise ModelUnavailable(f"Ollama answered with an error: {ln['error']}")
+    if len(lines) == 1:
+        return lines[0]
+    body = dict(lines[-1])
+    message = {"role": "assistant",
+               "content": "".join(str((ln.get("message") or {}).get("content") or "")
+                                  for ln in lines)}
+    thinking = "".join(str((ln.get("message") or {}).get("thinking") or "") for ln in lines)
+    if thinking:
+        message["thinking"] = thinking
+    body["message"] = message
+    return body
+
+
+def _stalled(model: str, host: str, why: str) -> ModelStalled:
+    return ModelStalled(
+        f"The model has stopped answering: Ollama has {model} loaded but {why}. This is "
+        f"Ollama, not your game — quit Ollama from its tray icon, start it again, and send "
+        f"your line again. Your turn has not been lost.")
+
 
 def warm(model: str, host: str, provider: str = "ollama") -> bool:
     """Ask Ollama to load `model` now, and keep it. No prompt, so nothing is
@@ -227,7 +296,11 @@ def chat(
     payload = {
         "model": model,
         "messages": messages,
-        "stream": False,
+        # Streamed, so silence can be told from work: the socket's wait applies to each
+        # chunk, and a loaded model that sends nothing for `STALL_SECONDS` is wedged, not
+        # thinking (`ModelStalled`). Unstreamed, the whole reply is one read, and a wedged
+        # server and a long answer look the same until the full allowance runs out.
+        "stream": True,
         # num_ctx is not decoration: Ollama's default window is 4096, and the
         # prose call's real prompt measured 4,086 tokens — the model was left TEN
         # tokens of room, answered '{"narration": "The woman stands by the' and
@@ -264,6 +337,10 @@ def chat(
         payload["think"] = think
 
     started = time.monotonic()
+    # Loaded: silence past `STALL_SECONDS` is a wedged Ollama. Not loaded (or no answer
+    # from `/api/ps`): the caller's own allowance, which covers a cold load.
+    warm = loaded(model, host) is True
+    wait = min(timeout, STALL_SECONDS) if warm else timeout
 
     def _post(pl):
         req = urllib.request.Request(
@@ -271,8 +348,8 @@ def chat(
             data=json.dumps(pl).encode("utf-8"),
             headers={"Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        with urllib.request.urlopen(req, timeout=wait) as resp:
+            return _fold(resp.read().decode("utf-8"))
 
     try:
         try:
@@ -309,9 +386,20 @@ def chat(
                     f"404: {why}). Download it from the app's model setup, or choose "
                     f"another model in Settings."
                 ) from exc
+            elif exc.code >= 500 and re.search(r"llama|runner|load", detail, re.I):
+                # Ollama answered, and could not start the model: measured 2026-10-03,
+                # "Load failed … timed out waiting for llama-server" after its GPU
+                # discovery watchdog timed out, on a healthy GPU. The same cure as a stall.
+                why = " ".join(detail.split())[:160] or f"HTTP {exc.code}"
+                raise ModelStalled(
+                    f"Ollama could not start {model} ({why}). This is Ollama, not your "
+                    f"game — quit Ollama from its tray icon, start it again, and send "
+                    f"your line again. Your turn has not been lost.") from exc
             else:
                 raise
     except TimeoutError as exc:
+        if warm:
+            raise _stalled(model, host, f"sent nothing for {wait} seconds") from exc
         raise ModelUnavailable(
             f"{model} did not answer within {timeout}s."
         ) from exc

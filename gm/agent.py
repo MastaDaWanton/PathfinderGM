@@ -515,6 +515,11 @@ class GMAgent:
                                     if "cast" in declared else ()))
             except client.ModelUnavailable as exc:
                 down.add(model)
+                # A wedged Ollama is wedged for every model it serves: the backup on the
+                # same host would only stall again, another two minutes of the player's
+                # turn (`client.ModelStalled`, measured 2026-10-03).
+                if isinstance(exc, client.ModelStalled):
+                    down |= {m for m, h, *_ in schedule if h == host}
                 rejections.append(f"attempt {n + 1}: {exc}"
                                   if isinstance(exc, client.ModelNotInstalled)
                                   else f"attempt {n + 1}: {model} could not be reached: "
