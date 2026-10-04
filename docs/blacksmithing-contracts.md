@@ -310,3 +310,23 @@ From the wave-1 reports, each confirmed in their code:
    masterwork kept), the old record kept beside it for one version.
 8. Plan §15.1: the material fields as optional, defaulted fields in `docs/campaign-format.md`,
    and what the next export should carry in `docs/from-world-bible.md`.
+
+## 13. The owner's answers during wave 2 (2026-10-04)
+
+1. **Icons: download approved.** The ~25 forge icons from game-icons.net (CC BY 3.0, credited in
+   About, the manual and `docs/asset-licences.md`, SVGs into `play/static/img/icons/`), the same
+   way as the herb icons. Lane U2 lists the names; the lead downloads them.
+2. **Noqual: magic recoils.** Assaying noqual suppresses the assayer's active magical effects
+   (buffs, wards) for 1d4 rounds. A house rule, marked as one; abysium keeps the book's sickness.
+   Lane H (or E's code in `rules/knowledge.py`) adds it as a reactive danger effect on noqual.
+3. **Every city gets a smithy**, even when the world's author did not list one. Towns and villages
+   get one only when their own words imply it (lane G's cue row). Lane H appends it to authored
+   cities and updates the tests that pin exact authored lists.
+
+## 14. State at the weekly usage limit (2026-10-04)
+
+All six wave-2 lanes stopped mid-work when the account reached its weekly limit (resets
+2026-10-07 08:00 America/New_York). Each lane's partial work is committed as a `WIP` commit on its
+own branch, untested and unreviewed: `lane/forge-u2` fb3b984, `lane/forge-u3` 3f60fdc,
+`lane/forge-u4` a123194, `lane/forge-u5` 906ec2c, `lane/forge-u6` 8dd3804. `lane/forge-h` had
+made no changes. Resume each lane from its branch with the same brief plus §13.
