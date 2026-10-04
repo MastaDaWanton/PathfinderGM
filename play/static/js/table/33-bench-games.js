@@ -289,6 +289,185 @@
     }
   };
 
+  // --- heat (forge games only) ---------------------------------------------------------------
+  // The named bands on the gauge: Chapman's table (Workshop Technology, 1972, via
+  // docs/blacksmithing-prior-art.md §3.1), its nine names merged to the five the UI plan §6.4
+  // prints, because nine labels do not fit under a 300px bar and a smith says "cherry" for
+  // both cherry and light cherry. Below 594 °C steel shows no useful colour ("black heat").
+  // These colours are CONTENT, like a material's swatch: they are the metal's own light and
+  // appear only on the gauge's scale, never on chrome (UI plan §4).
+  var HEAT_NAMES = [
+    { name: "Dark red", lo: 594, hi: 815 },
+    { name: "Cherry", lo: 815, hi: 982 },
+    { name: "Orange", lo: 982, hi: 1093 },
+    { name: "Yellow", lo: 1093, hi: 1315 },
+    { name: "White", lo: 1315, hi: 1700 }
+  ];
+  var HEAT_STOPS = [
+    [450, "#1c0805"], [600, "#4a0d06"], [760, "#8a1a0a"], [850, "#b3260e"], [940, "#d8441a"],
+    [1040, "#ef7a22"], [1150, "#f6b443"], [1280, "#f9de8a"], [1350, "#fff3d6"], [1700, "#fffaf0"]
+  ];
+  var GAUGE_H = 32;            // px the gauge takes from the foot of the meter
+  var REHEAT_S = 1.5;          // a reheat: about a second and a half in the fire (UI plan §7.2)
+  var NARROW = 0.8;            // `narrow_window` metal: the band at 0.8 (blacksmith.json traits)
+
+  function finite(v) { return typeof v === "number" && isFinite(v); }
+
+  // The metal's heat for one game. `spec` is the game's own default (its HEAT), `given` the
+  // server's opts.heat; every field the server sends wins. The band is widened about its
+  // middle by `scale` (the generous start, the server's band scale, Steady's factor), but
+  // never into the burning zone: a band pushed up against the burn grows downward instead.
+  //
+  // Cooling is Newton's law toward the room, so a white-hot bar loses heat faster than a
+  // dull red one, as the metal does; `cool_rate` is the °C per second at the band's middle.
+  // Steady mode halves it (UI plan §7.2), and narrow-window metal cools a quarter faster
+  // (§7.2: "faster for narrow_window metals"). A reheat pulls the heat toward the hearth's
+  // over REHEAT_S seconds and is counted: the server charges world minutes for each
+  // (revamp plan §11), which is why play() resolves with `reheats`.
+  function makeHeat(spec, given, steady, scale, narrow) {
+    given = given || {};
+    var b = Array.isArray(given.band) && given.band.length === 2 && finite(+given.band[0]) &&
+      finite(+given.band[1]) && +given.band[1] > +given.band[0]
+      ? [+given.band[0], +given.band[1]] : spec.band.slice();
+    var burn = finite(given.burn_c) ? +given.burn_c : (finite(spec.burn_c) ? spec.burn_c : null);
+    var mid = (b[0] + b[1]) / 2, half = (b[1] - b[0]) / 2 * scale * (steady ? (spec.steadyBand || 1) : 1);
+    var band = [mid - half, mid + half];
+    if (burn != null && band[1] > burn - 5) { band[0] -= band[1] - (burn - 5); band[1] = burn - 5; }
+    var hearth = finite(given.hearth_c) ? +given.hearth_c : spec.hearth_c;
+    var start = finite(given.start_c) ? +given.start_c
+      : finite(spec.start_c) ? spec.start_c : band[1] - (band[1] - band[0]) * 0.15;
+    var cool = (finite(given.cool_rate) && given.cool_rate >= 0 ? +given.cool_rate : spec.cool_rate) *
+      (steady ? 0.5 : 1) * (narrow ? 1.25 : 1);
+    var lo = Math.min(550, band[0] - 80), hi = Math.max(1400, (burn != null ? burn : band[1]) + 90, hearth + 30);
+    var h = {
+      label: spec.label || "Heat",
+      c: start, band: band, burn: burn, hearth: hearth, cool: cool, mid: (band[0] + band[1]) / 2,
+      scale: [lo, hi], reheats: 0, reheating: 0, quiet: false,
+      canReheat: spec.reheat !== false,
+      coldHint: spec.coldHint || "Reheat: R",
+      step: function (dt) {
+        if (h.reheating > 0) {
+          h.c += (h.hearth - h.c) * (1 - Math.exp(-dt / (REHEAT_S / 3)));
+          h.reheating = Math.max(0, h.reheating - dt);
+          return;
+        }
+        if (h.quiet) return;   // the game holds the heat itself (the quench bath)
+        h.c -= h.cool * (h.c - 20) / Math.max(1, h.mid - 20) * dt;
+        if (h.c < 20) h.c = 20;
+      },
+      reheat: function () {
+        if (!h.canReheat || h.reheating > 0 || h.quiet) return false;
+        h.reheating = REHEAT_S;
+        h.reheats++;
+        return true;
+      },
+      add: function (deg) { h.c = clamp(h.c + deg, 20, h.scale[1]); },
+      inBand: function () { return h.c >= h.band[0] && h.c <= h.band[1]; },
+      // 1 in the band's inner `inner` share, falling to `edge` at its rim, 0 outside.
+      quality: function (inner, edge) {
+        if (!h.inBand()) return 0;
+        var hw = (h.band[1] - h.band[0]) / 2, d = Math.abs(h.c - (h.band[0] + h.band[1]) / 2);
+        var iw = hw * (inner == null ? 0.5 : inner);
+        return d <= iw ? 1 : 1 - (1 - (edge == null ? 0.5 : edge)) * ((d - iw) / Math.max(1e-6, hw - iw));
+      },
+      status: function () {
+        if (h.reheating > 0) return "reheating";
+        if (h.quiet) return "in";
+        if (h.burn != null && h.c >= h.burn) return "burn";
+        if (h.c > h.band[1]) return "hot";
+        if (h.c < h.band[0]) return "cold";
+        return "in";
+      }
+    };
+    return h;
+  }
+
+  // What the hint says. The heat speaks first, in words (UI plan §6.4: "Reheat: R" when the
+  // metal leaves the band), because a strike out of band is wasted whatever the game's own
+  // hint says; then the game's live hint, if it has one; then its fixed one.
+  var HEAT_WORDS = { reheating: "Reheating", hot: "Too hot: let it cool", burn: "Burning: let it cool" };
+  function hintNow(r) {
+    if (r.heat) {
+      var s = r.heat.status();
+      if (s === "cold") return r.heat.coldHint;
+      if (HEAT_WORDS[s]) return HEAT_WORDS[s];
+    }
+    var live = r.game && r.game.hint ? r.game.hint() : null;
+    return live || r.def.hint(r.steady);
+  }
+
+  function degrees(c) {
+    var n = String(Math.round(c / 5) * 5);
+    return n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " °C";
+  }
+
+  // The gauge (UI plan §6.4), drawn across the foot of the meter: the blackbody scale as a
+  // bar, the burning zone cross-hatched with a saw edge, the target band outlined in gold with
+  // a notch at each end (shape, not only colour), the needle in ink on a dark keel so it reads
+  // on the white end too, and the five band names under the bar. A name that would collide
+  // with one already drawn is left out, target bands first, so the band that matters is the
+  // one that is always named.
+  function drawGauge(r, g, W, top) {
+    var H = r.heat, C = r.C, x0 = 10, x1 = W - 10;
+    if (x1 - x0 < 80) return;
+    var lo = H.scale[0], hi = H.scale[1];
+    var X = function (c) { return x0 + (x1 - x0) * clamp((c - lo) / (hi - lo), 0, 1); };
+    var by = top + 6, bh = 9;
+    var grad = g.createLinearGradient(x0, 0, x1, 0);
+    HEAT_STOPS.forEach(function (s) { grad.addColorStop(clamp((s[0] - lo) / (hi - lo), 0, 1), s[1]); });
+    g.fillStyle = grad;
+    g.fillRect(x0, by, x1 - x0, bh);
+    g.save(); g.strokeStyle = C.edge; g.lineWidth = 1; g.strokeRect(x0 + 0.5, by + 0.5, x1 - x0 - 1, bh - 1); g.restore();
+    if (H.burn != null) {
+      var bx = X(H.burn);
+      KIT.barBand(g, bx, by - 2, Math.max(2, x1 - bx), bh + 4, C.alarm, { cross: true, gap: 4 });
+      g.save(); g.strokeStyle = C.alarm; g.lineWidth = 1.2; g.beginPath();
+      for (var i = 0, n = Math.max(2, Math.round((x1 - bx) / 5)); i <= n; i++) {
+        var px = bx + (x1 - bx) * i / n, py = by - 3 - (i % 2 ? 4 : 0);
+        if (i) g.lineTo(px, py); else g.moveTo(px, py);
+      }
+      g.stroke(); g.restore();
+    }
+    var ax = X(H.band[0]), zx = X(H.band[1]);
+    g.save();
+    g.strokeStyle = C.gold; g.lineWidth = 2;
+    g.strokeRect(ax, by - 4, Math.max(2, zx - ax), bh + 8);
+    g.restore();
+    KIT.notch(g, ax, by - 5, Math.PI / 2, 5, C.gold);
+    KIT.notch(g, zx, by - 5, Math.PI / 2, 5, C.gold);
+    // The needle.
+    var nx = X(H.c);
+    g.save();
+    g.lineCap = "round";
+    g.strokeStyle = C.sunk; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(nx, by - 6); g.lineTo(nx, by + bh + 4); g.stroke();
+    g.strokeStyle = C.ink; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(nx, by - 6); g.lineTo(nx, by + bh + 4); g.stroke();
+    g.restore();
+    KIT.diamond(g, nx, by - 7, 3.5, C.ink, C.sunk, 1);
+    // The names, the target's first.
+    g.save();
+    g.font = "13px " + C.body;
+    var spans = [], order = HEAT_NAMES.map(function (b, i) {
+      var hit = b.hi > H.band[0] && b.lo < H.band[1];
+      return { b: b, i: i, hit: hit };
+    }).sort(function (p, q) { return (q.hit ? 1 : 0) - (p.hit ? 1 : 0) || p.i - q.i; });
+    order.forEach(function (o) {
+      var a = Math.max(o.b.lo, lo), z = Math.min(o.b.hi, hi);
+      if (z <= a) return;
+      var cx = (X(a) + X(z)) / 2, w = g.measureText(o.b.name).width;
+      var l = clamp(cx - w / 2, x0, x1 - w), rr = l + w;
+      for (var k = 0; k < spans.length; k++) if (l < spans[k][1] + 6 && rr > spans[k][0] - 6) return;
+      spans.push([l, rr]);
+      g.fillStyle = o.hit ? C.ink : C.dim;
+      g.textBaseline = "middle";
+      g.fillText(o.b.name, l, by + bh + 12);
+      // A tick at the band's lower edge, so the name sits between marks on the scale.
+      g.fillRect(X(a), by + bh, 1, 3);
+    });
+    g.restore();
+  }
+
   // --- DOM ---------------------------------------------------------------------------------
   function build(mount, def, steady) {
     var old = mount.querySelector(".bench-game");
