@@ -1,6 +1,6 @@
 {
  "source": "Pathfinder 1st Edition special materials (Core Rulebook, Ultimate Equipment) and the skymetals (Pathfinder Campaign Setting), with fuels, fluxes, quenchants and fittings authored for the forge chains.",
- "note": "Tier follows the worldclass ladder: common/uncommon/rare/exotic/legendary. `effects` is what the material contributes to a finished piece, in rules/effectspec.py vocabulary; whatever the vocabulary cannot say stays prose in `text` with no fake spec, the way the creature import handled the same problem. `weight_factor` scales the base item's weight and is not an effect, because the vocabulary has no type for it. `source` is how a smith gets it: mined, bought, harvested or monster.",
+ "note": "Tier follows the worldclass ladder: common/uncommon/rare/exotic/legendary. The forge reads `pieces`, `weapon`, `armour`, `working` and `quench_mark` through rules/materials.py (docs/blacksmithing-contracts.md §3); effects marked \"book\": true are printed PF1e rules, applied from the main piece only and never scaled, and every other number is a house modifier for the owner's review (docs/blacksmithing-review.md). `effects` is the pre-revamp flat list that rules/blacksmith.py still reads until its bench moves to the new fields. `weight_factor` is the old weight multiplier the same reader uses. `source` is how a smith gets it: mined, bought, harvested or monster.",
  "materials": [
   {
    "id": "iron-ore",
@@ -8,7 +8,7 @@
    "kind": "ore",
    "tier": "common",
    "craft_dc": 10,
-   "text": "Red-brown haematite, the commonest ore worth carting. A day's smelting turns a hundredweight into a bloom of workable iron.",
+   "text": "Red-brown haematite, the commonest ore worth carting. It smelts to iron, and assaying a lump tells you what iron will do; the melt is wide and patient.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -17,7 +17,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "iron",
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bog-iron",
@@ -25,7 +34,7 @@
    "kind": "ore",
    "tier": "common",
    "craft_dc": 10,
-   "text": "Lumps of ore raked out of marsh beds. Cheap and everywhere, but full of slag: work smelted from it is brittle until the melt is fluxed clean.",
+   "text": "Lumps of ore raked out of marsh beds. Cheap and everywhere, and it smelts to soft wrought iron, but full of slag: work from it cannot reach its best until the melt is fluxed clean or the bar is folded.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -41,7 +50,16 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "wrought-iron",
+   "working": [
+    {
+     "type": "working",
+     "trait": "slaggy"
+    }
+   ],
+   "book": false
   },
   {
    "id": "copper-ore",
@@ -49,7 +67,7 @@
    "kind": "ore",
    "tier": "common",
    "craft_dc": null,
-   "text": "Green malachite and blue azurite, smelting to the first metal anyone ever worked. Soft alone; the better half of bronze.",
+   "text": "Green malachite and blue azurite, smelting quickly to copper, the first metal anyone ever worked. Soft alone; the better half of bronze.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -58,7 +76,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "copper",
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "tin-ore",
@@ -66,7 +93,7 @@
    "kind": "ore",
    "tier": "common",
    "craft_dc": null,
-   "text": "Heavy black cassiterite from stream gravels. Worth more than its weight suggests: without tin there is no bronze.",
+   "text": "Heavy black cassiterite from stream gravels. It smelts fast to tin, worth more than its weight suggests: without tin there is no bronze.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -74,7 +101,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "tin",
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "lead-ore",
@@ -82,7 +118,7 @@
    "kind": "ore",
    "tier": "common",
    "craft_dc": null,
-   "text": "Glittering cubic galena, so heavy a sack of it staggers a mule. Smelts low and easy, and often carries silver in it.",
+   "text": "Glittering cubic galena, so heavy a sack of it staggers a mule. Smelts low and easy to lead, and a botched melt costs nothing but the fire.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -91,7 +127,20 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "lead",
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "calamine",
@@ -99,7 +148,7 @@
    "kind": "ore",
    "tier": "common",
    "craft_dc": null,
-   "text": "Dull zinc earth. Never smelted alone: heaped in the crucible with copper it makes brass without the zinc ever showing itself as metal.",
+   "text": "Dull zinc earth. It smelts to zinc only in a tight band of heat before the metal boils off; most smiths heap it in with copper and take brass instead.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -107,7 +156,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "zinc",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "cinnabar-ore",
@@ -115,7 +173,7 @@
    "kind": "ore",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Blood-red mercury ore. Roasting it drives off quicksilver as an invisible vapour, and the smith who works it unmasked breathes the vapour.",
+   "text": "Blood-red mercury ore. Roasting it drives off quicksilver as an invisible vapour, so assaying it is dangerous, and the roast must be caught in a narrow band or the metal is lost to the air.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -140,7 +198,20 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "quicksilver",
+   "working": [
+    {
+     "type": "working",
+     "trait": "reactive"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "silver-ore",
@@ -148,7 +219,7 @@
    "kind": "ore",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Dark sulphide ore threaded with native wire silver. The moon's metal, and the one the shapechanged fear.",
+   "text": "Dark sulphide ore threaded with native wire silver. It smelts to silver carrying dross that a bone-ash cupel or a fold has to take out.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -157,7 +228,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "silver",
+   "working": [
+    {
+     "type": "working",
+     "trait": "slaggy"
+    }
+   ],
+   "book": false
   },
   {
    "id": "gold-ore",
@@ -165,7 +245,7 @@
    "kind": "ore",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Quartz veined with visible gold, or dust panned from river gravel. Too soft for any working edge and too valuable to care.",
+   "text": "Quartz veined with visible gold, or dust panned from river gravel. It smelts clean to gold, and a smelt of it is very hard to spoil.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -174,7 +254,20 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "gold",
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "nickel-ore",
@@ -182,7 +275,7 @@
    "kind": "ore",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Kupfernickel — 'devil's copper', named by miners it disappointed. Alloyed into steel it fights rust and whitens the metal.",
+   "text": "Kupfernickel, 'devil's copper', named by miners it disappointed. It gives no metal a smith can forge alone; it feeds an alloy, where it makes a weld take more easily, after a dirty and finicky smelt.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -190,7 +283,26 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "working": [
+    {
+     "type": "working",
+     "trait": "slaggy"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    }
+   ],
+   "feeds": [
+    "alloy"
+   ],
+   "book": false
   },
   {
    "id": "cold-iron-ore",
@@ -198,7 +310,7 @@
    "kind": "ore",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Iron mined deep underground, never touched by the sun. It must be worked at lower temperatures than common iron and forgives no shortcuts, which is why cold iron work costs double.",
+   "text": "Iron mined deep underground, never touched by the sun. It smelts to cold iron only at a lower heat than common iron, in a narrow band that forgives no shortcuts.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -211,7 +323,16 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "cold-iron",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "platinum-ore",
@@ -219,7 +340,7 @@
    "kind": "ore",
    "tier": "rare",
    "craft_dc": null,
-   "text": "Grey grains heavier than gold that shrug off every acid in the alchemist's cabinet. Needs a furnace hotter than most smithies own.",
+   "text": "Grey grains heavier than gold that shrug off every acid in the alchemist's cabinet. It smelts to platinum only at furnace heat few smithies reach, and comes out pure when it does.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -227,7 +348,20 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "platinum",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "book": false
   },
   {
    "id": "mithral-ore",
@@ -235,7 +369,7 @@
    "kind": "ore",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Silvery ore light enough to surprise the hand that lifts it. Dwarven veins guard it jealously; it smelts to the truesilver of legend.",
+   "text": "Silvery ore light enough to surprise the hand that lifts it. It smelts to mithral, and the book says it is worked like steel: the heat is forgiving.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -244,7 +378,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "mithral",
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "adamantine-ore",
@@ -252,7 +395,7 @@
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Night-black metal found only in the hearts of fallen stars and the deepest delvings. Ordinary picks blunt against the seam that holds it.",
+   "text": "Night-black metal found only in the hearts of fallen stars and the deepest delvings. It smelts to adamantine in a narrow band of white heat that only a rare fuel reaches.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -260,7 +403,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "adamantine",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "abysium-ore",
@@ -268,7 +420,7 @@
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A skymetal ore that glows blue-green in the dark and warms the hand that holds it. Miners who sleep beside the seam wake sick, and some do not wake.",
+   "text": "A skymetal ore that glows blue-green in the dark and warms the hand that holds it. It smelts to abysium, and it sickens whoever carries it: assaying it is genuinely dangerous.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -293,7 +445,16 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "abysium",
+   "working": [
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "book": false
   },
   {
    "id": "djezet-ore",
@@ -301,7 +462,7 @@
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Rust-red skymetal that is liquid at every temperature, collected drop by drop where it seeps from volcanic rock. It is carried in wax-stoppered vials, not sacks.",
+   "text": "Rust-red skymetal that is liquid at every temperature, collected drop by drop where it seeps from volcanic rock. Carried in wax-stoppered vials; nothing a smith does to it can ruin it.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -309,7 +470,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "djezet",
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "inubrix-ore",
@@ -317,7 +487,7 @@
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "The ghost iron. Seams of it are found threaded through solid iron deposits they have visibly sunk through, and a pick of common steel passes into the ore without biting.",
+   "text": "The ghost iron. Seams of it are found threaded through iron deposits they have visibly sunk through. It smelts to inubrix, only slightly less malleable than lead.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -325,7 +495,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "inubrix",
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "noqual-ore",
@@ -333,7 +512,7 @@
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale green skymetal crystal, found in crater rims. Detect magic slides off a nugget of it as though there were nothing there, which is exactly the point.",
+   "text": "Pale green skymetal crystal, found in crater rims. Detect magic slides off a nugget of it as though there were nothing there. It smelts to noqual, which the book says is worked as iron.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -341,7 +520,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "noqual",
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "siccatite-ore",
@@ -349,7 +537,7 @@
    "kind": "ore",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A skymetal that comes out of the ground either searing hot or freezing cold and never changes its mind. The two kinds are told apart by which glove burns.",
+   "text": "A skymetal that comes out of the ground either searing hot or freezing cold and never changes its mind. It smelts to siccatite, and assaying it burns.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -365,7 +553,16 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "siccatite",
+   "working": [
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "book": false
   },
   {
    "id": "horacalcum-ore",
@@ -373,7 +570,7 @@
    "kind": "ore",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "The rarest skymetal: a dull coppery ore around which time itself runs a half-step slow. Watches carried into the mine come out wrong, and always in the miner's favour.",
+   "text": "The rarest skymetal: a dull coppery ore around which time runs a half-step slow. It smelts to horacalcum in the narrowest band of any ore.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -382,7 +579,16 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "form": "ore",
+   "material": "horacalcum",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "iron",
@@ -390,14 +596,68 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": 10,
-   "text": "Bar iron, the smith's daily bread. Everything else in the trade is a variation on knowing what this does under the hammer.",
+   "text": "Bar iron, the smith's daily bread, and heavy with it. An iron head hits harder and swings slower, and iron plate turns more blows and stiffens the wearer; either way the piece is harder to break. Its heat band is wide and forgiving.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "wrought-iron",
@@ -405,14 +665,71 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": null,
-   "text": "Iron worked soft and fibrous, with the slag hammered into threads. Bends before it breaks; the right metal for hinges, chain and anything that must forgive.",
+   "text": "Iron worked soft and fibrous, with the slag hammered into threads. It bends before it breaks: a wrought head is tough and hard to wrest away but cuts softly, and wrought mail moves with the wearer at the cost of hardness. Very hard to ruin at the anvil.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bismuth",
@@ -420,14 +737,32 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": null,
-   "text": "A brittle white metal that cools into staircase crystals sheened like oil on water. Useless for an edge; alloyers prize it for melts that must pour thin.",
+   "text": "A brittle white metal that cools into staircase crystals sheened like oil on water. Useless for an edge and fills no piece; alloyers melt it in for pours that must run thin, and it helps a weld take.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 3
+   "price_gp": 3,
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "brittle"
+    },
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    }
+   ],
+   "feeds": [
+    "alloy"
+   ],
+   "book": false
   },
   {
    "id": "copper",
@@ -435,14 +770,75 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": null,
-   "text": "Warm red metal that works cold and greens with age. Too soft for war on its own, and the parent of bronze and brass.",
+   "text": "Warm red metal that works cold and greens with age. A copper head swings true and will not shatter, but cuts softly; copper armour is supple and tough and turns fewer blows, with the book's hardness of 9. In the book a copper weapon is fragile, which this app does not yet model.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 5
+   "price_gp": 5,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -1,
+     "note": "primitive bronze, copper or tin armour: hardness 9",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": true
   },
   {
    "id": "tin",
@@ -450,14 +846,68 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": null,
-   "text": "Soft grey metal that cries when bent. One part in ten turns copper into bronze.",
+   "text": "Soft grey metal that cries when bent. As fittings and fastenings it lightens the piece and lets a hand or a body move quicker, and it is the first thing to give. One part in ten turns copper into bronze.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 5
+   "price_gp": 5,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -20
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -20
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "lead",
@@ -465,7 +915,7 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": null,
-   "text": "Dense, dull and obedient: it melts over a candle and holds any shape it is given. A thin lead lining turns aside detection and scrying magic, which is why certain coffers are heavier than they look.",
+   "text": "Dense, dull and obedient: it melts over a candle and holds any shape. A lead pommel or counterweight puts weight behind a blow and drags the swing; a lead lining deadens blows and the wearer pays for it in weight. The lining that stops scrying is its own treatment.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -477,7 +927,63 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "lining"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "zinc",
@@ -485,14 +991,32 @@
    "kind": "metal",
    "tier": "common",
    "craft_dc": null,
-   "text": "Bluish-white and brittle, boiling away out of any careless melt. Married to copper it makes brass; painted over iron it holds rust at bay.",
+   "text": "Bluish-white and brittle, boiling away out of any careless melt. It fills no piece; it is alloying stock, married to copper to make brass.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 4
+   "price_gp": 4,
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "brittle"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "feeds": [
+    "alloy"
+   ],
+   "book": false
   },
   {
    "id": "silver",
@@ -500,7 +1024,7 @@
    "kind": "metal",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "The moon's metal. Too soft to hold an edge alone — a silver weapon is silver over steel, which is the alchemical plating treatment — but lycanthropes and certain devils fear no other metal so much.",
+   "text": "The moon's metal, too soft to hold an edge alone. Silver fittings make a weapon bite harder and truer against shapechangers, and silver fastenings let armour move freely; both are softer than steel. A weapon that strikes as silver is the alchemical plating treatment.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -512,7 +1036,68 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 25
+   "price_gp": 25,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "subtype": "shapechanger"
+      }
+     }
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "subtype": "shapechanger"
+      }
+     }
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "gold",
@@ -520,14 +1105,102 @@
    "kind": "metal",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Heavy, incorruptible and useless in a fight. Ceremonial blades, temple fittings and inlay that says more about the buyer than the smith.",
+   "text": "Heavy, incorruptible and useless in a fight, exactly as the book prints it: solid gold cuts softer, guards worse, weighs half again and breaks easily. What it does is announce the owner, and people listen. The kindest metal at the anvil.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 500
+   "price_gp": 500,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "note": "solid gold weapon, minimum 1",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -5,
+     "note": "half the base hardness",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 50,
+     "note": "solid gold",
+     "book": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": -2,
+     "bonus_type": "armour",
+     "note": "solid gold armour",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2,
+     "note": "the book's +2 check penalty",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -5,
+     "note": "hardness 5",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 50,
+     "note": "solid gold",
+     "book": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "book": true
   },
   {
    "id": "platinum",
@@ -535,14 +1208,72 @@
    "kind": "metal",
    "tier": "rare",
    "craft_dc": null,
-   "text": "White metal that no acid touches and no common furnace melts. Worked only by smiths with a crucible worth boasting about.",
+   "text": "White metal that no acid touches and no common furnace melts. A platinum head is dense enough to hit very hard and drags the swing; platinum armour shrugs off acid and turns blows, and is very heavy.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1000
+   "price_gp": 1000,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "resistance",
+     "target": "acid",
+     "amount": 3
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 30
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "book": false
   },
   {
    "id": "cold-iron",
@@ -550,7 +1281,7 @@
    "kind": "metal",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Iron mined deep and forged at low heat, never allowed to forget the dark it came from. It bites through the defences of demons and fey, and it costs twice the time and coin of common iron because the metal forgives no reworking.",
+   "text": "Iron mined deep and forged at low heat, never allowed to forget the dark it came from. A cold iron head strikes as cold iron, through the defences of demons and fey, and swings truer against the fey; cold iron armour steadies the wearer's will. Forged low, it is softer than common iron, and its heat window is narrow.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -566,7 +1297,66 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 4
+   "price_gp": 4,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "cold_iron",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "type": "fey"
+      }
+     }
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "star-iron",
@@ -574,7 +1364,7 @@
    "kind": "metal",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Meteoric iron, sky-fallen and already smelted by its landing. It counts as cold iron against the creatures cold iron bites, and smiths swear the metal remembers falling.",
+   "text": "Meteoric iron, sky-fallen and already smelted by its landing, which makes it quick to work and full of stony inclusions. A star-iron head strikes as cold iron and hits hard but chips; star-iron plate is hard and stiff. A house metal with no book behind it.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -589,7 +1379,63 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "cold_iron"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "slaggy"
+    }
+   ],
+   "book": false
   },
   {
    "id": "viridium",
@@ -597,7 +1443,7 @@
    "kind": "metal",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "A dull green metal that sheds an invisible taint. Wounds dealt by viridium fester — the struck must save against a wasting sickness — and the smith who grinds it unmasked breathes the same taint.",
+   "text": "A dull green volcanic glass, knapped rather than forged, though smiths shelve it with the metals. Only a piercing or slashing head: every hit risks leprosy (Fortitude DC 12), a critical leaves a sliver of greenblood oil (DC 13), and whoever carries it saves against the leprosy each day unless the blade sleeps in lead. Half as hard as steel, and fragile in the book.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -608,22 +1454,90 @@
     {
      "type": "save_gate",
      "target": "fort",
-     "dc": 14,
+     "dc": 12,
      "on_failure": [
       {
-       "type": "apply_condition",
-       "target": "sickened",
-       "duration": {
-        "amount": 1,
-        "unit": "day"
-       }
+       "type": "ability_damage",
+       "target": "cha",
+       "dice": "1d2"
       }
      ],
-     "note": "any wound from a viridium edge; the sickness is a slow leprosy"
+     "note": "leprosy, on any wound from a viridium edge"
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 12,
+     "trigger": "hit",
+     "on_failure": [
+      {
+       "type": "ability_damage",
+       "target": "cha",
+       "dice": "1d2"
+      }
+     ],
+     "note": "leprosy: onset 2d4 weeks, 1/week, cured by 2 consecutive saves; oozes, plants and outsiders are immune",
+     "book": true
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 13,
+     "trigger": "crit",
+     "on_failure": [
+      {
+       "type": "ability_damage",
+       "target": "con",
+       "dice": "1"
+      }
+     ],
+     "note": "a fragment breaks off as greenblood oil: 1/round for 4 rounds",
+     "book": true
+    },
+    {
+     "type": "save_gate",
+     "target": "fort",
+     "dc": 12,
+     "trigger": "carried",
+     "recipient": "self",
+     "on_failure": [
+      {
+       "type": "ability_damage",
+       "target": "cha",
+       "dice": "1d2"
+      }
+     ],
+     "note": "leprosy, saved every 24 hours, unless kept extradimensional or in a lead-lined scabbard",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -5,
+     "note": "half hardness",
+     "book": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "brittle"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "mithral",
@@ -631,7 +1545,7 @@
    "kind": "metal",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Truesilver: as hard as steel at half the weight. Armour of mithral counts one category lighter, lets the wearer keep two more points of Dexterity, and eases the armour check penalty by three.",
+   "text": "Truesilver: harder than steel at half the weight. A mithral head strikes as silver and is quick in the hand but light behind the blow. Mithral armour is the book's: half weight, a lighter check penalty, two more points of Dexterity, less spell failure, and it moves one class lighter, for movement and never for proficiency. Its plates are thinner than steel's. Worked like steel, forgivingly.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -639,16 +1553,109 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Half weight; armour counts one category lighter for movement and proficiency"
+     "target": "Half weight; armour counts one category lighter for movement (not for proficiency)"
     },
     {
      "type": "narrative",
-     "target": "Armour: maximum Dexterity bonus +2, armour check penalty lessened by 3"
+     "target": "Armour: maximum Dexterity bonus +2, armour check penalty 3 lighter, spell failure 10% lower; a weapon counts as silver"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 500
+   "price_gp": 500,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "silver",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -50,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 3,
+     "note": "armour check penalty 3 lighter, never above 0",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 2,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "asf",
+     "amount": -10,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -50,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "category",
+     "amount": -1,
+     "note": "for movement only, never for proficiency",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": true
   },
   {
    "id": "adamantine",
@@ -656,7 +1663,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "The unbreakable night-black metal of fallen stars. A blade of it shears through stone and steel as though they were hide — it ignores hardness less than 20 — and an edge set in adamantine does not lose its masterwork keenness to wear. Armour of it turns blows outright.",
+   "text": "The unbreakable night-black metal of fallen stars, hardness 20. An adamantine head strikes as adamantine, through hardness below 20, and hits harder, though it is heavier than steel. Adamantine armour gives the book's damage reduction of 1, 2 or 3 by weight and turns blows, but it does not flex.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -674,7 +1681,113 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 3000
+   "price_gp": 3000,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "adamantine",
+     "note": "ignores hardness below 20",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 10,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 10,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "armour": [
+    {
+     "type": "damage_reduction",
+     "amount": 1,
+     "bypass": "",
+     "when": {
+      "armour": {
+       "weight": "light"
+      }
+     },
+     "book": true
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 2,
+     "bypass": "",
+     "when": {
+      "armour": {
+       "weight": "medium"
+      }
+     },
+     "book": true
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 3,
+     "bypass": "",
+     "when": {
+      "armour": {
+       "weight": "heavy"
+      }
+     },
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 10,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 10,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "abysium",
@@ -682,7 +1795,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Feverstone: a glowing blue-green skymetal that poisons by nearness. The smith who works it without a lead-lined apron and water between themselves and the metal sickens by the day, and what they forge carries the same slow fire.",
+   "text": "Feverstone: a skymetal that glows like a candle and works as steel. Its weapons bite and its armour turns blows better than steel, and it sickens whoever carries it, with no save, until 1d4 hours after it is put down. Assaying it is genuinely dangerous.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -690,20 +1803,9 @@
    ],
    "effects": [
     {
-     "type": "save_gate",
-     "target": "fort",
-     "dc": 18,
-     "on_failure": [
-      {
-       "type": "apply_condition",
-       "target": "sickened",
-       "duration": {
-        "amount": 1,
-        "unit": "day"
-       }
-      }
-     ],
-     "note": "each day spent working or wearing unshielded abysium"
+     "type": "apply_condition",
+     "target": "sickened",
+     "note": "while carried and for 1d4 hours after; a poison effect, no save"
     },
     {
      "type": "narrative",
@@ -711,7 +1813,69 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "apply_condition",
+     "target": "sickened",
+     "trigger": "carried",
+     "note": "while carried and for 1d4 hours after; a poison effect, no save",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "apply_condition",
+     "target": "sickened",
+     "trigger": "carried",
+     "note": "while carried and for 1d4 hours after; a poison effect, no save",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "reactive"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "djezet",
@@ -719,7 +1883,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "The quickmetal: rust-red and liquid at every temperature. It cannot be forged into a blade — it is alloyed into other metals, or channelled in sealed veins through a piece, where it quickens spellwork worked through the object.",
+   "text": "The quickmetal: rust-red and liquid at every temperature. It fills no piece; the book makes it useless for metal objects except alloys, and at the crucible it is the kindest of the skymetals. Its spell-quickening use is a spellcaster's, not a smith's.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -732,7 +1896,25 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    }
+   ],
+   "feeds": [
+    "alloy"
+   ],
+   "book": false
   },
   {
    "id": "inubrix",
@@ -740,7 +1922,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Ghost iron. The softest of the skymetals, and it passes through iron and steel as though they were not there — a blade of inubrix ignores armour of those metals entirely, and can never be parried by them.",
+   "text": "Ghost iron, the softest of the skymetals. An inubrix head is always broken in the book, deals damage as a size smaller and cannot harm iron or steel, but passes through iron and steel armour as if it were not there; here it swings truer against a metal-armoured foe. Poor for armour, so it fills no armour piece.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -749,11 +1931,71 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Passes through iron and steel: a weapon of it strikes as a touch attack against wearers of iron or steel armour"
+     "target": "Ignores armour and shield bonuses from iron or steel, but is always broken, deals damage as one size smaller and cannot damage iron or steel"
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "note": "always broken",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "untyped",
+     "note": "always broken; and damage as one size smaller",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -5,
+     "note": "hardness 5",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -20,
+     "note": "10 hit points per inch",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 3,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "armour_metal": true
+      }
+     },
+     "note": "house approximation of the book's 'ignores armour and shield bonuses from iron or steel'"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "noqual",
@@ -761,7 +2003,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale green and crystalline, and magic slides off it. It cannot be enchanted without extraordinary effort, and armour of it scars spells: the wearer shrugs off magic that would settle on lesser metal.",
+   "text": "Pale green and crystalline, and magic slides off it. Noqual is half weight; its weapons bite constructs and made undead harder, and its armour moves a class lighter and wards its wearer against spells, at a fifth more spell failure for any caster. Any magic item made with it costs 5,000 gp more to enchant. Worked as iron, but assaying it is dangerous.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -770,11 +2012,135 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Resists enchantment; armour of it grants its wearer a +2 bonus on saves against spells and spell-like abilities"
+     "target": "Half weight; armour: +2 resistance on saves against spells, +20% spell failure for all casting, one category lighter; any magic item made with it costs 5,000 gp more"
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -50,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "when": {
+      "target": {
+       "type": "construct"
+      }
+     },
+     "note": "constructs made by feats or spells",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 1,
+     "bonus_type": "enhancement",
+     "when": {
+      "target": {
+       "type": "undead"
+      }
+     },
+     "note": "undead made by feats or spells",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "asf",
+     "amount": 20,
+     "note": "for all spellcasting, not only arcane",
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "fort",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "when": {
+      "against": "spell"
+     },
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "ref",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "when": {
+      "against": "spell"
+     },
+     "book": true
+    },
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "resistance",
+     "when": {
+      "against": "spell"
+     },
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -50,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "category",
+     "amount": -1,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 2,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 3,
+     "book": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "enchant_surcharge_gp": 5000,
+   "book": true
   },
   {
    "id": "siccatite",
@@ -782,7 +2148,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "The skymetal of extremes: a given piece is forever searing hot or forever freezing cold. A siccatite blade brands what it cuts, and the wielder's own grip pays a toll unless the hilt is fitted in something else.",
+   "text": "The skymetal of extremes; this is the hot kind. A siccatite head brands what it hits for a point of fire and burns its wielder a point each round of combat. Siccatite armour burns its wearer and anyone who grapples them, and keeps the cold off. Assaying it burns.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -805,7 +2171,97 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head"
+    ],
+    "armour": [
+     "body"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "trigger": "hit",
+     "note": "hot siccatite; cold siccatite deals cold",
+     "book": true
+    },
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "recipient": "self",
+     "trigger": "each_round",
+     "duration": {
+      "unit": "permanent"
+     },
+     "note": "to the wielder, each round of combat",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "recipient": "self",
+     "trigger": "each_round",
+     "duration": {
+      "unit": "permanent"
+     },
+     "note": "to the wearer, each round",
+     "book": true
+    },
+    {
+     "type": "damage",
+     "dice": "1",
+     "damage_type": "fire",
+     "lethality": "lethal",
+     "recipient": "attacker",
+     "trigger": "when_grappled",
+     "duration": {
+      "unit": "permanent"
+     },
+     "note": "to whoever grapples the wearer, each round",
+     "book": true
+    },
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 5,
+     "note": "hot siccatite armour; cold siccatite gives fire resistance 5 instead",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "reactive"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "horacalcum",
@@ -813,7 +2269,7 @@
    "kind": "metal",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "The rarest skymetal, a dull coppery gold around which time runs slow. The bearer of a horacalcum blade is always a half-beat ahead of the world: strikes land before they are seen coming.",
+   "text": "The rarest skymetal, a dull coppery gold around which time runs slow. A horacalcum blade gives the book's +1 on the attack and puts its bearer ahead in the fight, though it lands lightly. Horacalcum armour quickens the wearer by its weight, +1 to +3 initiative, and sits stiffly.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -824,17 +2280,111 @@
     {
      "type": "combat_mod",
      "amount": 1,
-     "bonus_type": "untyped",
-     "target": "initiative",
-     "note": "time favours the bearer"
-    },
-    {
-     "type": "narrative",
-     "target": "Time runs a half-step slow around the metal: the bearer perceives a fraction more of every moment"
+     "bonus_type": "circumstance",
+     "target": "attack",
+     "note": "a horacalcum weapon; armour instead gives +1/+2/+3 initiative by weight"
     }
    ],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 1,
+     "bonus_type": "circumstance",
+     "note": "not ammunition",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 4,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "when": {
+      "armour": {
+       "weight": "light"
+      }
+     },
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "when": {
+      "armour": {
+       "weight": "medium"
+      }
+     },
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 3,
+     "bonus_type": "untyped",
+     "when": {
+      "armour": {
+       "weight": "heavy"
+      }
+     },
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "book": true
   },
   {
    "id": "steel",
@@ -842,14 +2392,67 @@
    "kind": "alloy",
    "tier": "common",
    "craft_dc": 10,
-   "text": "Iron with carbon taken into itself in the fire. The trade's whole ladder — quench, temper, hone — exists because steel answers to it and iron does not.",
+   "text": "Iron with carbon taken into itself in the fire. A steel head swings true and holds its hardness, and is less forgiving of a hard knock than iron; steel plate turns blows and is hard, and binds the wearer a little. The trade's whole ladder of quench, temper and hone exists because steel answers to it.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 2
+   "price_gp": 2,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bronze",
@@ -857,14 +2460,73 @@
    "kind": "alloy",
    "tier": "common",
    "craft_dc": null,
-   "text": "Copper and tin, the metal that named an age. Casts beautifully, keeps at sea where iron rusts, and takes a serviceable edge.",
+   "text": "Copper and tin, the metal that named an age. A bronze head swings true and is tough but softer than steel; bronze armour turns blows, has the book's hardness of 9, and is heavy. Casts beautifully. In the book bronze weapons are fragile, which this app does not yet model.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 6
+   "price_gp": 6,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -1,
+     "note": "primitive bronze armour: hardness 9",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": true
   },
   {
    "id": "brass",
@@ -872,14 +2534,66 @@
    "kind": "alloy",
    "tier": "common",
    "craft_dc": null,
-   "text": "Copper and zinc, gold's honest cousin. Guards, fittings, instruments and anything meant to shine without a polishing servant.",
+   "text": "Copper and zinc, gold's honest cousin. Brass fittings hold a blade in the hand and shine without a servant, and brass fastenings move easily; it is softer than steel. Easy to work and file.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 6
+   "price_gp": 6,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 2
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "pewter",
@@ -887,14 +2601,67 @@
    "kind": "alloy",
    "tier": "common",
    "craft_dc": null,
-   "text": "Tin stiffened with a little copper and less honesty. Tankards, buckles and buttons; nothing that will ever be swung.",
+   "text": "Tin stiffened with a little copper and less honesty. Pewter buckles and fittings are light and cheap and the first thing to break.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 4
+   "price_gp": 4,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -20
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -20
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "electrum",
@@ -902,14 +2669,75 @@
    "kind": "alloy",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Gold and silver as nature sometimes pours them together, pale and moonish. Coinage and ornament; the two metals keep each other honest.",
+   "text": "Gold and silver as nature sometimes pours them together, pale and moonish. Electrum fittings impress, and carry enough silver to bite a shapechanger harder; fastenings of it impress and flex. Soft, and a pleasure to work.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 250
+   "price_gp": 250,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "subtype": "shapechanger"
+      }
+     }
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bell-bronze",
@@ -917,7 +2745,7 @@
    "kind": "alloy",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Bronze rich in tin, brittle as glass and voiced like an angel. Struck, it rings for a full minute; a bell of it carries across a valley.",
+   "text": "Bronze rich in tin, brittle as glass and voiced like an angel. Fittings of it ring on every blow, which unsettles whoever hears them; it is hard and it cracks. Casts easily.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -929,7 +2757,62 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 30
+   "price_gp": 30,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ],
+    "armour": [
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "skill_mod",
+     "target": "intimidate",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "brittle"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "high-carbon-steel",
@@ -937,7 +2820,7 @@
    "kind": "alloy",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Steel fed carbon to the edge of temper's patience. It takes and keeps a keener edge than common steel, and shatters rather than bends when the temper is botched.",
+   "text": "Steel fed carbon to the edge of temper's patience. A head of it cuts deeper and holds its hardness, and plate of it turns more blows, but both shatter sooner. The quench is narrow and brine cracks it on a miss.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -949,7 +2832,62 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 15
+   "price_gp": 15,
+   "pieces": {
+    "weapon": [
+     "head"
+    ],
+    "armour": [
+     "body"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "quench_sensitive"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "pattern-steel",
@@ -957,7 +2895,7 @@
    "kind": "alloy",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Billets of hard and soft steel folded and welded until the blade carries water-marks. The pattern is not decoration: it is the folding made visible, spring and edge in one bar.",
+   "text": "Billets of hard and soft steel folded and welded until the blade carries water-marks. Spring and edge in one bar: it cuts deep and survives what snaps a plain blade, and is a little softer for the spring. Masterwork costs it no extra difficulty, in a narrow heat window.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -969,7 +2907,62 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 40
+   "price_gp": 40,
+   "pieces": {
+    "weapon": [
+     "head"
+    ],
+    "armour": [
+     "body"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "flawless"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "nexavaran-steel",
@@ -977,7 +2970,7 @@
    "kind": "alloy",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Cold iron drawn out with a measure of common steel. It counts as cold iron against the creatures that fear it, at half again the price rather than cold iron's double — the compromise metal of frontier fey-hunters.",
+   "text": "Cold iron drawn out with a measure of common steel, the compromise metal of frontier fey-hunters. A head of it strikes as cold iron, as the book says, and cuts well but is softer; armour of it steadies the will and is stiff.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -989,7 +2982,64 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 20
+   "price_gp": 20,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "cold_iron",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": true
   },
   {
    "id": "elysian-bronze",
@@ -997,7 +3047,7 @@
    "kind": "alloy",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Bronze alloyed with traces of celestial metal, first beaten out for heroes who hunted monsters. Weapons of it remember the hunt: they bite deeper into magical beasts and the monstrous.",
+   "text": "Bronze alloyed with traces of celestial metal, first beaten out for heroes who hunted monsters. Its weapons bite magical beasts and monstrous humanoids harder, and after drawing blood from one swing truer against that kind for a day. Its armour gives damage reduction, 1 to 3 by weight, against their claws and fists. Softer than steel, and stiff as armour.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -1012,7 +3062,130 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 300
+   "price_gp": 300,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "when": {
+      "target": {
+       "type": [
+        "magical beast",
+        "monstrous humanoid"
+       ]
+      }
+     },
+     "note": "multiplied on a critical hit",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "trigger": "hit",
+     "recipient": "self",
+     "duration": {
+      "amount": 24,
+      "unit": "hour"
+     },
+     "when": {
+      "target": {
+       "type": [
+        "magical beast",
+        "monstrous humanoid"
+       ]
+      }
+     },
+     "note": "after it damages one, against that kind of creature for 24 hours",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "damage_reduction",
+     "amount": 1,
+     "bypass": "",
+     "when": {
+      "armour": {
+       "weight": "light"
+      },
+      "attacker": {
+       "type": [
+        "magical beast",
+        "monstrous humanoid"
+       ]
+      }
+     },
+     "note": "only against their natural weapons and unarmed strikes",
+     "book": true
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 2,
+     "bypass": "",
+     "when": {
+      "armour": {
+       "weight": "medium"
+      },
+      "attacker": {
+       "type": [
+        "magical beast",
+        "monstrous humanoid"
+       ]
+      }
+     },
+     "note": "only against their natural weapons and unarmed strikes",
+     "book": true
+    },
+    {
+     "type": "damage_reduction",
+     "amount": 3,
+     "bypass": "",
+     "when": {
+      "armour": {
+       "weight": "heavy"
+      },
+      "attacker": {
+       "type": [
+        "magical beast",
+        "monstrous humanoid"
+       ]
+      }
+     },
+     "note": "only against their natural weapons and unarmed strikes",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": true
   },
   {
    "id": "living-steel",
@@ -1020,7 +3193,7 @@
    "kind": "alloy",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Steel quickened by waters from trees that will not die. It heals its own notches and hairline cracks overnight, and blades that strike it come away the worse for the exchange.",
+   "text": "Steel quickened by waters from trees that will not die: the book's hardness 15 and 35 hit points an inch. A living-steel weapon is hard to wrest away and its grain fights the hand; its armour turns blows and is stiff. In the book it mends 2 hit points a day and can break a weapon that rolls a 1 against it; neither is modelled yet.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1029,11 +3202,83 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Self-repairing: the item mends its own damage overnight, and weapons that strike it risk notching themselves"
+     "target": "Repairs 2 hit points a day (1 if broken); a metal weapon that rolls a natural 1 against its armour saves DC 20 Fortitude or breaks"
     }
    ],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 5,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": true
   },
   {
    "id": "fire-forged-steel",
@@ -1041,7 +3286,7 @@
    "kind": "alloy",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Steel worked with channels that drink heat and carry it away from the wearer. Armour of it turns a furnace into an inconvenience; a blade of it grows hungrier the longer it sits in flame.",
+   "text": "Dwarven steel worked with channels that carry heat one way. Its armour gives the book's fire resistance 2, always, and turns blows but is stiff. Its weapons bite cold creatures harder and are tough but softer. The book's weapon rule, extra fire after it has sat in flame, is not modelled yet.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -1050,12 +3295,71 @@
      "type": "resistance",
      "target": "fire",
      "amount": 2,
-     "note": "armour, once it has drunk a round of flame"
+     "note": "armour, always"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 250
+   "price_gp": 250,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "subtype": "cold"
+      }
+     }
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 2,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "frost-forged-steel",
@@ -1063,7 +3367,7 @@
    "kind": "alloy",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "The winter twin of fire-forged steel, quenched and channelled to shed cold instead. Armour of it keeps a glacier's breath off the skin.",
+   "text": "The winter twin of fire-forged steel. Its armour gives the book's cold resistance 2, always, and turns blows but binds the wearer. Its weapons bite fire creatures harder and are tough but softer. The book's weapon rule, extra cold after it has been chilled, is not modelled yet.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -1072,12 +3376,71 @@
      "type": "resistance",
      "target": "cold",
      "amount": 2,
-     "note": "armour, once it has stood a round of cold"
+     "note": "armour, always"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 250
+   "price_gp": 250,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material",
+     "when": {
+      "target": {
+       "subtype": "fire"
+      }
+     }
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "resistance",
+     "target": "cold",
+     "amount": 2,
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "singing-steel",
@@ -1085,22 +3448,115 @@
    "kind": "alloy",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A pale gold-green steel that chimes at a touch and holds the note. Performers prize instruments and blades of it alike: the metal carries a voice further than lungs can.",
+   "text": "A pale gold and mithral alloy that chimes at a touch. Its weapons strike as alchemical silver, with silver's lighter cut; its armour moves a class lighter with a little less spell failure and check penalty. Both are less tough than steel, and both carry a performer's voice. In the book striking it speeds a bardic performance; here it lends Perform.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [
     {
-     "type": "skill_mod",
-     "amount": 2,
-     "bonus_type": "circumstance",
-     "target": "perform",
-     "note": "when the singing metal itself is part of the performance"
+     "type": "combat_mod",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "counts as alchemical silver: slashing or piercing only"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1500
+   "price_gp": 1500,
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "silver",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "when": {
+      "weapon": {
+       "slashing_or_piercing": true
+      }
+     },
+     "note": "counts as alchemical silver: slashing or piercing only, minimum 1",
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -10,
+     "note": "20 hit points per inch",
+     "book": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perform",
+     "amount": 3,
+     "bonus_type": "material"
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "category",
+     "amount": -1,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "asf",
+     "amount": -5,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "max_dex",
+     "amount": 1,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 1,
+     "book": true
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -10,
+     "note": "20 hit points per inch",
+     "book": true
+    },
+    {
+     "type": "skill_mod",
+     "target": "perform",
+     "amount": 3,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": true
   },
   {
    "id": "wyrmsteel",
@@ -1108,7 +3564,7 @@
    "kind": "alloy",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "Adamantine folded over dragonfire coal and quenched in dragon's blood, an alloy more legend than recipe. The finished metal keeps a dragon's indifference to flame, and smiths who have made it once spend their lives trying to make it twice.",
+   "text": "Adamantine folded over dragonfire coal and quenched in dragon's blood, an alloy more legend than recipe. Its weapons strike as adamantine and hit very hard, and are heavy; its armour keeps a dragon's indifference to flame and turns blows, and is stiff. A house metal with no book behind it.",
    "risky": false,
    "source": "monster",
    "biomes": [],
@@ -1116,12 +3572,8 @@
     {
      "type": "resistance",
      "target": "fire",
-     "amount": 5,
+     "amount": 4,
      "note": "the metal's own dragon-nature, carried by armour of it"
-    },
-    {
-     "type": "narrative",
-     "target": "Keeps adamantine's contempt for hardness less than 20"
     }
    ],
    "effects_converted": true,
@@ -1129,7 +3581,63 @@
    "from_creatures": [
     "dragon",
     "wyrm"
-   ]
+   ],
+   "pieces": {
+    "weapon": [
+     "head",
+     "fittings"
+    ],
+    "armour": [
+     "body",
+     "fastenings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "adamantine"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 4,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 30
+    }
+   ],
+   "armour": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 4
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
+    }
+   ],
+   "book": false
   },
   {
    "id": "peat",
@@ -1137,7 +3645,7 @@
    "kind": "fuel",
    "tier": "common",
    "craft_dc": null,
-   "text": "Cut from the bog and dried through a season. Burns low, slow and smoky — enough for a field forge, an insult to a furnace.",
+   "text": "Cut from the bog and dried through a season. Burns low, slow and smoky: a forgiving fire for a field forge, but it runs sulfurous and leaves the work slaggy.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1145,7 +3653,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "sulfurous"
+    },
+    {
+     "type": "working",
+     "trait": "slaggy"
+    }
+   ],
+   "book": false
   },
   {
    "id": "coal",
@@ -1153,7 +3676,7 @@
    "kind": "fuel",
    "tier": "common",
    "craft_dc": null,
-   "text": "Black seam-rock that burns hotter and longer than any wood. The smell of a coal fire is the smell of a working smithy.",
+   "text": "Black seam-rock that burns hotter and longer than wood, so work goes faster, but raw coal is sulfurous and a careless heat leaves the iron hot-short.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -1162,7 +3685,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "sulfurous"
+    },
+    {
+     "type": "working",
+     "trait": "hot_short"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "charcoal",
@@ -1170,14 +3708,29 @@
    "kind": "fuel",
    "tier": "common",
    "craft_dc": 10,
-   "text": "Wood burned slow under turf until only the burning part is left. Clean heat that adds nothing to the melt but temperature, which is exactly what a smith wants.",
+   "text": "Wood burned slow under turf until only the burning part is left. Clean, forgiving heat that adds nothing to the melt but temperature, which is exactly what a smith wants.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "working": [
+    {
+     "type": "working",
+     "trait": "clean_heat"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "book": false
   },
   {
    "id": "coke",
@@ -1185,14 +3738,29 @@
    "kind": "fuel",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Coal baked in an airless oven until its smoke and sulphur are driven off. Burns hotter and cleaner than the coal it came from; the furnace fuel of serious smelting.",
+   "text": "Coal baked in an airless oven until its smoke and sulphur are driven off. Burns hotter and cleaner than coal, so the work goes quickly, in a tighter heat band.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 3
+   "price_gp": 3,
+   "working": [
+    {
+     "type": "working",
+     "trait": "clean_heat"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bone-char",
@@ -1200,14 +3768,29 @@
    "kind": "fuel",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Charred bone, packed around iron in a sealed box to feed carbon into the surface. The old way of making a soft bar hard-skinned, and the fuel of case-hardening.",
+   "text": "Charred bone, packed around iron to feed carbon into the surface. The fuel of case-hardening: a clean heat that lifts work to masterwork without extra difficulty, in a narrow band.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 5
+   "price_gp": 5,
+   "working": [
+    {
+     "type": "working",
+     "trait": "flawless"
+    },
+    {
+     "type": "working",
+     "trait": "clean_heat"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "dwarven-hearthcoal",
@@ -1215,7 +3798,7 @@
    "kind": "fuel",
    "tier": "rare",
    "craft_dc": null,
-   "text": "Coal from seams the dwarves keep secret, dense as ore and slow as grudges. A single scuttle burns a full day and night at forging heat.",
+   "text": "Coal from seams the dwarves keep secret, dense as ore and slow as grudges. One scuttle burns a day and a night at forging heat: clean, steady and quick to work over.",
    "risky": false,
    "source": "bought",
    "biomes": [
@@ -1224,7 +3807,22 @@
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 50
+   "price_gp": 50,
+   "working": [
+    {
+     "type": "working",
+     "trait": "clean_heat"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "dragonfire-coal",
@@ -1232,7 +3830,7 @@
    "kind": "fuel",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Coal from seams a dragon once slept over, still holding a memory of the sleeper's heat. It burns white where common coal burns orange — hot enough to melt the skymetals — and it does not care whether the smith's beard is in the way.",
+   "text": "Coal from seams a dragon once slept over. It burns white, hot enough to melt the skymetals, fast and in a narrow band, and sulfurous; it does not care whether the smith's beard is in the way.",
    "risky": true,
    "source": "mined",
    "biomes": [
@@ -1240,7 +3838,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "sulfurous"
+    }
+   ],
+   "book": false
   },
   {
    "id": "salamander-cinder",
@@ -1248,7 +3861,7 @@
    "kind": "fuel",
    "tier": "exotic",
    "craft_dc": null,
-   "text": "Embers raked from a slain salamander's own hearth-flesh. They burn without fuel for a month and scorch the tongs that turn them.",
+   "text": "Embers raked from a slain salamander's own hearth-flesh. They burn without fuel for a month, so the work is quick and a bad blow can be reheated and saved, in a narrow band.",
    "risky": true,
    "source": "monster",
    "biomes": [
@@ -1267,7 +3880,22 @@
    "obtain": "harvested",
    "from_creatures": [
     "salamander"
-   ]
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "efreet-brand",
@@ -1275,7 +3903,7 @@
    "kind": "fuel",
    "tier": "exotic",
    "craft_dc": null,
-   "text": "A brand cut from a bonfire on the Plane of Fire and carried home still burning, because it does not know how to stop. Forge-fire from it burns any colour the smith asks.",
+   "text": "A brand from a bonfire on the Plane of Fire, carried home still burning. Forge-fire from it burns any colour the smith asks: the widest heat band there is, and very hard to spoil a piece over.",
    "risky": false,
    "source": "monster",
    "biomes": [
@@ -1287,7 +3915,22 @@
    "from_creatures": [
     "efreeti",
     "efreet"
-   ]
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "phoenix-ash-ember",
@@ -1295,21 +3938,31 @@
    "kind": "fuel",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "An ember sifted from the pyre of a phoenix, which never quite dies: smothered, drowned or buried, it relights itself by morning. Work forged over it is said to share the habit.",
+   "text": "An ember from the pyre of a phoenix, which relights itself by morning however it is put out. Nothing forged over it is ruined by a bad blow, the check is rolled twice, and masterwork costs no extra difficulty.",
    "risky": false,
    "source": "monster",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Never dies: the ember relights itself however it is put out"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "harvested",
    "from_creatures": [
     "phoenix"
-   ]
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
+    }
+   ],
+   "book": false
   },
   {
    "id": "limestone",
@@ -1317,7 +3970,7 @@
    "kind": "flux",
    "tier": "common",
    "craft_dc": null,
-   "text": "Crushed grey stone thrown into the melt, where it gathers the slag to itself and floats it off the good metal. The cheapest honest flux there is.",
+   "text": "Crushed grey stone thrown into the melt, where it gathers the slag and floats it off the good metal. The cheapest honest flux: it cleans a smelt and makes it easier.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -1325,7 +3978,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "cleans_slag"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "silica-sand",
@@ -1333,7 +4001,7 @@
    "kind": "flux",
    "tier": "common",
    "craft_dc": null,
-   "text": "Clean white sand for the forge-weld: scattered on hot metal it melts to glass and keeps the air off the joint until the hammer closes it.",
+   "text": "Clean white sand for the forge-weld: it melts to glass and keeps the air off the joint. Helps folding and strengthening, cleans a little slag, and wants a precise heat.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -1342,7 +4010,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    },
+    {
+     "type": "working",
+     "trait": "cleans_slag"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "potash",
@@ -1350,14 +4033,29 @@
    "kind": "flux",
    "tier": "common",
    "craft_dc": null,
-   "text": "Wood ash leached and boiled down to a white salt. An old fireside flux for small work and soldering.",
+   "text": "Wood ash leached and boiled down to a white salt. An old fireside flux for small work and soldering: welds come easier and a slip spoils nothing.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "working": [
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "borax",
@@ -1365,7 +4063,7 @@
    "kind": "flux",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "White crystal from dry lake beds, the wandering smith's flux of choice: it melts low, spreads thin and leaves a weld clean enough to vanish.",
+   "text": "White crystal from dry lake beds, the wandering smith's flux: it melts low, widens the weld's heat band, and leaves a weld clean enough for masterwork at no extra difficulty.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -1373,7 +4071,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bone-ash",
@@ -1381,14 +4094,29 @@
    "kind": "flux",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Calcined bone, white and hungry. Lining a cupel with it lets base metal soak away and leaves silver and gold sitting proud — the assayer's flux.",
+   "text": "Calcined bone, the assayer's flux. It soaks base metal away and leaves silver and gold sitting proud: it cleans a smelt and the check is rolled twice, in a narrow heat.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 5
+   "price_gp": 5,
+   "working": [
+    {
+     "type": "working",
+     "trait": "cleans_slag"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "crushed-quartz",
@@ -1396,7 +4124,7 @@
    "kind": "flux",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Clear crystal ground fine, for melts that must run glassy and pour thin. Finicky, and worth it for fine casting.",
+   "text": "Clear crystal ground fine, for melts that must run glassy. Finicky, with a narrow heat, and worth it: fine work reaches masterwork at no extra difficulty and welds come easier.",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -1404,7 +4132,22 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "mined"
+   "obtain": "mined",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
+    },
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    }
+   ],
+   "book": false
   },
   {
    "id": "consecrated-flux",
@@ -1412,19 +4155,29 @@
    "kind": "flux",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Chalk blessed at a temple altar and ground with silver dust. Fluxed into a melt it leaves no mark the eye can find, but the finished work counts as blessed for rites and oaths sworn on it.",
+   "text": "Chalk blessed at a temple altar and ground with silver dust. In the melt it cleans thoroughly and steadies the smith's hand. A flux leaves no mark on the finished work; for a blessed edge, quench in holy water or anoint it.",
    "risky": false,
    "source": "bought",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Work fluxed with it counts as blessed for rites, oaths and consecration"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 100
+   "price_gp": 100,
+   "working": [
+    {
+     "type": "working",
+     "trait": "cleans_slag"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
+    }
+   ],
+   "book": false
   },
   {
    "id": "abyssal-salt",
@@ -1432,20 +4185,30 @@
    "kind": "flux",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Salt scraped from the shores of a lake in the Abyss. It strips a melt cleaner than any earthly flux, and the metal remembers where the salt has been: holy water hisses on work fluxed with it.",
+   "text": "Salt scraped from the shores of a lake in the Abyss. It strips a melt cleaner and faster than any earthly flux, and assaying it is dangerous: holy water hisses on it.",
    "risky": true,
    "source": "mined",
    "biomes": [
     "planar"
    ],
-   "effects": [
+   "effects": [],
+   "effects_converted": true,
+   "obtain": "mined",
+   "working": [
     {
-     "type": "narrative",
-     "target": "The finished work registers faintly evil to detection, and holy water hisses on it"
+     "type": "working",
+     "trait": "cleans_slag"
+    },
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "reactive"
     }
    ],
-   "effects_converted": true,
-   "obtain": "mined"
+   "book": false
   },
   {
    "id": "stardust-flux",
@@ -1453,20 +4216,30 @@
    "kind": "flux",
    "tier": "legendary",
    "craft_dc": 30,
-   "text": "Glittering dust gathered where a star fell, sold by the pinch. In the crucible it persuades the skymetals — which despise one another — to mingle, and no other flux known can.",
+   "text": "Glittering dust gathered where a star fell, sold by the pinch. It makes any weld take, steadies the check and costs masterwork nothing extra; the old smiths say it alone persuades the skymetals to mingle.",
    "risky": false,
    "source": "mined",
    "biomes": [
     "planar"
    ],
-   "effects": [
+   "effects": [],
+   "effects_converted": true,
+   "obtain": "mined",
+   "working": [
     {
-     "type": "narrative",
-     "target": "Makes skymetals miscible in the melt: without it they refuse one another"
+     "type": "working",
+     "trait": "weld_aid"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
     }
    ],
-   "effects_converted": true,
-   "obtain": "mined"
+   "book": false
   },
   {
    "id": "water",
@@ -1474,13 +4247,29 @@
    "kind": "quenchant",
    "tier": "common",
    "craft_dc": null,
-   "text": "The oldest bath. Quenches fast and hard, and cracks a careless blade for the same reason.",
+   "text": "The oldest bath, always to hand. Quenches fast and hard, leaving the piece a point harder, in a narrow window that cracks a careless blade.",
    "risky": false,
    "source": "harvested",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "quench_mark": {
+    "type": "gear_mod",
+    "target": "hardness",
+    "amount": 1
+   },
+   "book": false
   },
   {
    "id": "quenching-brine",
@@ -1488,7 +4277,7 @@
    "kind": "quenchant",
    "tier": "common",
    "craft_dc": null,
-   "text": "Salt water bites faster than sweet: the steam blanket collapses and the steel cools all at once. A harder quench, and a less forgiving one.",
+   "text": "Salt water bites faster than sweet. It leaves the hardest skin of the common baths, and the narrowest window, and it can leave a careless blade brittle.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1496,7 +4285,23 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "brittle"
+    }
+   ],
+   "quench_mark": {
+    "type": "gear_mod",
+    "target": "hardness",
+    "amount": 2
+   },
+   "book": false
   },
   {
    "id": "quenching-oil",
@@ -1504,14 +4309,30 @@
    "kind": "quenchant",
    "tier": "common",
    "craft_dc": null,
-   "text": "Rendered fat or seed oil, the gentle bath. Slower than water, kinder to thin sections, and it catches fire exactly as often as the apprentice forgets it will.",
+   "text": "Rendered fat or seed oil, the gentle bath. Slower than water and kinder: the piece comes out tougher rather than harder, and a bad quench ruins nothing.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "quench_mark": {
+    "type": "gear_mod",
+    "target": "hp_per_inch",
+    "amount": 2
+   },
+   "book": false
   },
   {
    "id": "whale-oil",
@@ -1519,7 +4340,7 @@
    "kind": "quenchant",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "The finest quenching oil money buys, even-tempered from first plunge to last. Coastal smithies smell of it and charge accordingly.",
+   "text": "The finest quenching oil money buys, even-tempered from first plunge to last. Leaves the piece tougher, and the quench is forgiving and sure.",
    "risky": false,
    "source": "bought",
    "biomes": [
@@ -1528,7 +4349,23 @@
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 10
+   "price_gp": 10,
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "quench_mark": {
+    "type": "gear_mod",
+    "target": "hp_per_inch",
+    "amount": 2
+   },
+   "book": false
   },
   {
    "id": "glacier-melt",
@@ -1536,7 +4373,7 @@
    "kind": "quenchant",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Water from ice older than the kingdom, carried down in casks. Smiths of the far north swear a blade quenched in it keeps winter in the edge.",
+   "text": "Water from ice older than the kingdom. A blade quenched in it keeps a little winter: its bearer shrugs off a point of cold. A sharp, clean quench.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1544,7 +4381,23 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "quench_mark": {
+    "type": "resistance",
+    "target": "cold",
+    "amount": 1
+   },
+   "book": false
   },
   {
    "id": "mercury-bath",
@@ -1552,7 +4405,7 @@
    "kind": "quenchant",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Quicksilver quenches with unearthly evenness and gives off a vapour that steals wits. The smiths who use it either work outdoors or do not work long.",
+   "text": "Quicksilver quenches with unearthly evenness, leaving the piece a point harder, and gives off a vapour that steals wits: assaying it is dangerous.",
    "risky": true,
    "source": "bought",
    "biomes": [],
@@ -1576,7 +4429,24 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 30
+   "price_gp": 30,
+   "material": "quicksilver",
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "quench_mark": {
+    "type": "gear_mod",
+    "target": "hardness",
+    "amount": 1
+   },
+   "book": false
   },
   {
    "id": "blessed-water",
@@ -1584,19 +4454,44 @@
    "kind": "quenchant",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Holy water in quantity enough to quench in, which is a conversation with the temple before it is a bath. Steel quenched in it remembers the blessing: the restless dead flinch from the edge.",
+   "text": "Holy water enough to quench in, which is a conversation with the temple first. Steel quenched in it bites the undead a little harder. It does not make the blade good-aligned: in the book that needs magic, and a quench is not magic.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [
     {
-     "type": "narrative",
-     "target": "The edge counts as blessed; undead struck by it flinch, and it can strike home where a plain blade could not"
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "against undead"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 100
+   "price_gp": 100,
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "quench_mark": {
+    "type": "combat_mod",
+    "target": "damage",
+    "amount": 1,
+    "bonus_type": "untyped",
+    "when": {
+     "target": {
+      "type": "undead"
+     }
+    }
+   },
+   "book": false
   },
   {
    "id": "troll-blood",
@@ -1604,21 +4499,49 @@
    "kind": "quenchant",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Blood drawn from a troll and kept warm, because it does not accept being dead. Steel quenched in it knits its own hairline cracks, the way the donor knitted worse.",
+   "text": "Blood drawn from a troll and kept warm, because it does not accept being dead. What it hardens heals its bearer: fast healing 1 for a minute after the first wound each day.",
    "risky": true,
    "source": "monster",
    "biomes": [],
    "effects": [
     {
-     "type": "narrative",
-     "target": "The metal knits hairline cracks and small notches over a night's rest"
+     "type": "fast_healing",
+     "amount": 1,
+     "duration": {
+      "amount": 1,
+      "unit": "minute"
+     },
+     "note": "once a day, after the first wound"
     }
    ],
    "effects_converted": true,
    "obtain": "harvested",
    "from_creatures": [
     "troll"
-   ]
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    },
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "quench_mark": {
+    "type": "fast_healing",
+    "amount": 1,
+    "recipient": "self",
+    "trigger": "first_wound_daily",
+    "duration": {
+     "amount": 1,
+     "unit": "minute"
+    },
+    "uses": "per_day",
+    "uses_count": 1
+   },
+   "book": false
   },
   {
    "id": "wyvern-blood",
@@ -1626,7 +4549,7 @@
    "kind": "quenchant",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Envenomed blood from a wyvern's tail-stock. A blade quenched in it carries the sting into its first wound, and the smith who splashes it learns why the wyvern never worries about its own tail.",
+   "text": "Envenomed blood from a wyvern's tail-stock. A blade quenched in it carries the sting into its first wound each day: Fortitude DC 17 or 1d4 Constitution. Assaying it is dangerous.",
    "risky": true,
    "source": "monster",
    "biomes": [],
@@ -1649,7 +4572,32 @@
    "obtain": "harvested",
    "from_creatures": [
     "wyvern"
-   ]
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "quench_mark": {
+    "type": "save_gate",
+    "target": "fort",
+    "dc": 17,
+    "trigger": "first_wound_daily",
+    "on_failure": [
+     {
+      "type": "ability_damage",
+      "target": "con",
+      "dice": "1d4"
+     }
+    ],
+    "note": "wyvern venom, in the first wound the blade deals each day"
+   },
+   "book": false
   },
   {
    "id": "dragon-blood",
@@ -1657,7 +4605,7 @@
    "kind": "quenchant",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Blood of a true dragon, which quenches steel without ever quite going cold itself. The metal takes on a shadow of the donor's element and shrugs at flame ever after.",
+   "text": "Blood of a true dragon, which quenches steel without ever quite going cold. The piece takes a shadow of the donor's element: its bearer resists 2 fire from a red dragon's blood.",
    "risky": true,
    "source": "monster",
    "biomes": [],
@@ -1675,7 +4623,24 @@
     "dragon",
     "wyrm",
     "drake"
-   ]
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "quench_mark": {
+    "type": "resistance",
+    "target": "fire",
+    "amount": 2,
+    "note": "a fire dragon's blood; other lineages lend their own element"
+   },
+   "book": false
   },
   {
    "id": "styx-water",
@@ -1683,7 +4648,7 @@
    "kind": "quenchant",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Water drawn from the river of forgetting, carried in vessels of horn because it eats through everything else. A blade quenched in it steals moments from those it wounds; the smith works fast, and tries not to breathe the steam.",
+   "text": "Water from the river of forgetting, carried in horn. A blade quenched in it bites outsiders harder and dulls its bearer's will; the smith works fast and tries not to breathe the steam.",
    "risky": true,
    "source": "harvested",
    "biomes": [
@@ -1691,20 +4656,50 @@
    ],
    "effects": [
     {
-     "type": "save_gate",
-     "target": "will",
-     "dc": 16,
-     "on_failure": [
-      {
-       "type": "narrative",
-       "target": "The struck creature loses its memory of the last minute"
-      }
-     ],
-     "note": "on a telling wound from the quenched blade"
+     "type": "combat_mod",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "target": "damage",
+     "note": "against outsiders; the bearer takes -1 on Will saves"
     }
    ],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "quench_mark": {
+    "type": "bundle",
+    "label": "Styx-quenched",
+    "effects": [
+     {
+      "type": "combat_mod",
+      "target": "damage",
+      "amount": 1,
+      "bonus_type": "untyped",
+      "when": {
+       "target": {
+        "type": "outsider"
+       }
+      }
+     },
+     {
+      "type": "save_mod",
+      "target": "will",
+      "amount": -1,
+      "bonus_type": "untyped",
+      "recipient": "self"
+     }
+    ]
+   },
+   "book": false
   },
   {
    "id": "ash-haft",
@@ -1712,7 +4707,7 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Straight-grained ash, the spear-wood: springy enough to soak a blow that would crack oak. The default haft of every armoury.",
+   "text": "Straight-grained ash, the spear-wood. Springy in the hand, so the weapon swings truer and is harder to wrest away, though wood is weaker than steel.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1720,7 +4715,38 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "oak-haft",
@@ -1728,7 +4754,7 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Heavy, stiff and stubborn. Where ash bends, oak insists — the right wood under an axe or maul that leads with weight.",
+   "text": "Heavy, stiff and stubborn: the right wood under an axe or maul that leads with weight. It hits harder and lasts, and drags the swing.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1736,7 +4762,38 @@
    ],
    "effects": [],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bone-grip",
@@ -1744,7 +4801,7 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Scales of polished bone riveted to the tang. Cheap, hard-wearing and indifferent to weather.",
+   "text": "Scales of polished bone riveted to the tang. Hard-wearing and sure against a disarm, and slick in a sweating hand.",
    "risky": false,
    "source": "harvested",
    "biomes": [],
@@ -1757,7 +4814,38 @@
     "deer",
     "boar",
     "aurochs"
-   ]
+   ],
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "leather-grip",
@@ -1765,14 +4853,66 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Wet-wrapped leather that dries to the shape of the hand that will hold it. The commonest grip because it is the best cheap one.",
+   "text": "Wet-wrapped leather that dries to the shape of the hand. As a grip it holds true and hard to wrest away; as a lining it pads blows and eases movement at the cost of weight.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "pieces": {
+    "weapon": [
+     "haft"
+    ],
+    "armour": [
+     "lining"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "armour": [
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "acp",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "cord-wrapped-grip",
@@ -1780,14 +4920,45 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Waxed cord laid in tight courses over the tang. Grips wet or dry, and a field repair needs only more cord.",
+   "text": "Waxed cord laid in tight courses over the tang. Grips wet or dry, which helps both the swing and a trip or disarm, and wears through; a field repair needs only more cord.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1
+   "price_gp": 1,
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmb",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "brass-guard",
@@ -1795,14 +4966,44 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "A cast brass crossguard or basket, bright and forgiving to file. Turns a blade without ever needing a polish it will not get.",
+   "text": "A cast brass crossguard or basket, bright and forgiving to file. It hardens the hilt and turns a disarming blade, and cast brass cracks before forged steel would.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 3
+   "price_gp": 3,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 2
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "steel-crossguard",
@@ -1810,14 +5011,44 @@
    "kind": "fitting",
    "tier": "common",
    "craft_dc": null,
-   "text": "Plain forged steel between hand and harm. Nothing about it is clever, which is why it works.",
+   "text": "Plain forged steel between hand and harm. It turns a disarm and outlasts the grip, and adds weight. Nothing about it is clever, which is why it works.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 3
+   "price_gp": 3,
+   "pieces": {
+    "weapon": [
+     "fittings"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "wire-wrapped-grip",
@@ -1825,7 +5056,7 @@
    "kind": "fitting",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Twisted silver or steel wire laid over leather, the duellist's grip: it does not shift in the hand, and a blade so gripped is hard to take away.",
+   "text": "Twisted silver or steel wire laid over leather, the duellist's grip: it does not shift in the hand, so the blade swings true and is hard to take away. Fiddly to lay, and softer than a solid grip.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -1840,7 +5071,39 @@
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 15
+   "price_gp": 15,
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material",
+     "note": "the duellist's grip, against being disarmed"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "sharkskin-grip",
@@ -1848,21 +5111,47 @@
    "kind": "fitting",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Ray or shark hide, rough as a file in one direction. It never slips, wet, bloody or otherwise — the sailor's and the surgeon's grip.",
+   "text": "Ray or shark hide, rough as a file in one direction. It never slips, wet, bloody or otherwise, so the swing and the grab are both surer; a hide grip is softer than bone.",
    "risky": false,
    "source": "bought",
    "biomes": [
     "coast"
    ],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Never slips when wet: no grip penalty in rain, blood or surf"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 20
+   "price_gp": 20,
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmb",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": -2
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "book": false
   },
   {
    "id": "mammoth-ivory-grip",
@@ -1870,7 +5159,7 @@
    "kind": "fitting",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Ancient ivory dug from the tundra, dense and cool in the hand. Carves beautifully and outlasts the blade it is fitted to.",
+   "text": "Ancient ivory dug from the tundra, dense and cool. It outlasts the blade and impresses anyone who sees it, and it is slick in the hand.",
    "risky": false,
    "source": "bought",
    "biomes": [
@@ -1879,7 +5168,38 @@
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 40
+   "price_gp": 40,
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": false
   },
   {
    "id": "darkwood-haft",
@@ -1887,7 +5207,7 @@
    "kind": "fitting",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Wood as dark as coffee and half the weight of oak at the same strength. A darkwood haft halves what the haft contributes to the scales.",
+   "text": "Wood as dark as coffee and half the weight of oak. On a wholly wooden weapon the book halves its weight; as a haft under a metal head the book gives nothing, so here it is quick in the hand and light behind the blow.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1897,11 +5217,44 @@
    "effects": [
     {
      "type": "narrative",
-     "target": "Half weight for the hafted portion, at no loss of strength"
+     "target": "Half weight on a wholly wooden weapon (the book gives a haft alone no benefit)"
     }
    ],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": -50,
+     "note": "only where the wood is the main piece: a wholly wooden weapon, as the book requires",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "book": true
   },
   {
    "id": "ironwood-haft",
@@ -1909,7 +5262,7 @@
    "kind": "fitting",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Wood worked by druidic rite until it answers as steel. It is still wood in the eyes of oath and spell — druids may carry it, and rust never will.",
+   "text": "Wood worked by druidic rite until it answers as steel: as hard and tough, and heavier than plain wood. It is still wood in the eyes of oath and spell, and rust never touches it.",
    "risky": false,
    "source": "harvested",
    "biomes": [
@@ -1922,7 +5275,36 @@
     }
    ],
    "effects_converted": true,
-   "obtain": "gathered"
+   "obtain": "gathered",
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hardness",
+     "amount": 3
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 2
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 20
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "wyroot-haft",
@@ -1930,20 +5312,53 @@
    "kind": "fitting",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Root-wood that refuses to finish dying. A wyroot haft drinks a spark of life from telling blows and gives it back to the wielder's hand — monks and ki-adepts pay dearly for it.",
+   "text": "Root-wood that refuses to finish dying. A confirmed critical through a wyroot haft gives its wielder a spark of life once a day, and the haft swings true but is weaker than ash. The book stores a point for ki or arcane pools, which the app does not have.",
    "risky": false,
    "source": "harvested",
    "biomes": [
     "forest"
    ],
-   "effects": [
+   "effects": [],
+   "effects_converted": true,
+   "obtain": "gathered",
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
     {
-     "type": "narrative",
-     "target": "Stores a point of life or ki from a telling blow, returned to the wielder on demand"
+     "type": "temp_hp",
+     "dice": "1",
+     "recipient": "self",
+     "trigger": "crit",
+     "duration": {
+      "amount": 1,
+      "unit": "day"
+     },
+     "note": "house approximation of the book's stored life point; gone at dusk",
+     "uses": "per_day",
+     "uses_count": 1
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2
     }
    ],
-   "effects_converted": true,
-   "obtain": "gathered"
+   "working": [
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "book": false
   },
   {
    "id": "dragonhide-grip",
@@ -1951,14 +5366,16 @@
    "kind": "fitting",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "Hide from a true dragon, supple where scale meets scale. It shrugs sparks and forge-heat, and it makes a statement no gold wire can.",
+   "text": "Red dragonhide, supple where scale meets scale. The grip shrugs off flame, so its wielder does too, and it holds the weapon fast, but the scale is slick under a swing. The book's dragonhide is for armour and shields.",
    "risky": false,
    "source": "monster",
    "biomes": [],
    "effects": [
     {
-     "type": "narrative",
-     "target": "Proof against incidental flame and spark: the grip never burns in the hand"
+     "type": "resistance",
+     "target": "fire",
+     "amount": 1,
+     "note": "a red dragonhide grip, to its wielder"
     }
    ],
    "effects_converted": true,
@@ -1967,7 +5384,39 @@
     "dragon",
     "wyrm",
     "drake"
-   ]
+   ],
+   "material": "red-dragonhide",
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "resistance",
+     "target": "fire",
+     "amount": 3
+    },
+    {
+     "type": "combat_mod",
+     "target": "cmd",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": -2,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "book": false
   },
   {
    "id": "angelskin-binding",
@@ -1975,16 +5424,11 @@
    "kind": "fitting",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale leather from a celestial's remains, traded in whispers because owning it is a confession. Bound over armour it muffles the wearer's own darkness: auras of evil read faint or not at all.",
+   "text": "Pale leather from a celestial's remains. Bound inside armour it steadies the wearer's will and turns blows, and anyone who learns what it is trusts them less. The book's angelskin dims an evil aura, which the app does not model.",
    "risky": false,
    "source": "monster",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Muffles the wearer's evil aura against detection"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "harvested",
    "from_creatures": [
@@ -1993,7 +5437,39 @@
     "deva",
     "planetar",
     "solar"
-   ]
+   ],
+   "pieces": {
+    "armour": [
+     "lining"
+    ]
+   },
+   "armour": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "ac",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": -3,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "book": false
   },
   {
    "id": "fiend-bone-core",
@@ -2001,16 +5477,11 @@
    "kind": "fitting",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A rod of fiend's bone set down the spine of a haft or hilt. The weapon swings a half-thought ahead of the wielder's intent, and it whispers, and it is best not to answer.",
+   "text": "A rod of fiend's bone set down the spine of a haft. The weapon swings a half-thought ahead of its wielder, quick and true, and it whispers: the wielder's will weakens. Assaying it is dangerous.",
    "risky": true,
    "source": "monster",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "The weapon anticipates: it whispers to its wielder, and what it wants is not always what they want"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "harvested",
    "from_creatures": [
@@ -2018,7 +5489,39 @@
     "demon",
     "daemon",
     "fiend"
-   ]
+   ],
+   "pieces": {
+    "weapon": [
+     "haft"
+    ]
+   },
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "initiative",
+     "amount": 3,
+     "bonus_type": "material"
+    },
+    {
+     "type": "combat_mod",
+     "target": "attack",
+     "amount": 2,
+     "bonus_type": "material"
+    },
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": -3,
+     "bonus_type": "material"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "reactive"
+    }
+   ],
+   "book": false
   },
   {
    "id": "bluing",
@@ -2026,19 +5529,45 @@
    "kind": "treatment",
    "tier": "common",
    "craft_dc": null,
-   "text": "A controlled black-blue oxide raised over the steel in heat and oil. Rust has nowhere to start, and the finish drinks light instead of throwing it.",
+   "text": "A controlled black-blue oxide raised over the steel. Rust has nowhere to start, so the piece lasts a little longer. Quick and forgiving to apply.",
    "risky": false,
    "source": "bought",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Rust-proofed: the treated steel does not corrode under weather or neglect"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 2
+   "price_gp": 2,
+   "weapon": [
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 1,
+     "note": "rust has nowhere to start"
+    }
+   ],
+   "armour": [
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": 1,
+     "note": "rust has nowhere to start"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "finishes": [
+    "weapon",
+    "armour"
+   ],
+   "book": false
   },
   {
    "id": "oil-blackening",
@@ -2046,7 +5575,7 @@
    "kind": "treatment",
    "tier": "common",
    "craft_dc": null,
-   "text": "The piece is heated and plunged in oil until the surface carries a dead-black skin. Night workers pay for it: a blackened blade throws no glint.",
+   "text": "The piece is heated and plunged in oil until it carries a dead-black skin. It throws no glint, which is worth a point of Stealth.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -2054,14 +5583,43 @@
     {
      "type": "skill_mod",
      "amount": 1,
-     "bonus_type": "circumstance",
+     "bonus_type": "untyped",
      "target": "stealth",
-     "note": "in darkness, while the treated piece is bared"
+     "note": "a blackened piece throws no glint"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 2
+   "price_gp": 2,
+   "weapon": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "a blackened piece throws no glint"
+    }
+   ],
+   "armour": [
+    {
+     "type": "skill_mod",
+     "target": "stealth",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "a blackened piece throws no glint"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    }
+   ],
+   "finishes": [
+    "weapon",
+    "armour"
+   ],
+   "book": false
   },
   {
    "id": "acid-etching",
@@ -2069,14 +5627,43 @@
    "kind": "treatment",
    "tier": "common",
    "craft_dc": null,
-   "text": "Wax resist and aqua fortis, biting a design or a maker's mark into the steel. Decoration, provenance and — on pattern steel — the bath that makes the watering show.",
+   "text": "Wax resist and aqua fortis, biting a design or a maker's mark into the steel. A marked piece carries its provenance, worth a point of Diplomacy. The acid bites fast.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 5
+   "price_gp": 5,
+   "weapon": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "a maker's mark and provenance"
+    }
+   ],
+   "armour": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "a maker's mark and provenance"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "finishes": [
+    "weapon",
+    "armour"
+   ],
+   "book": false
   },
   {
    "id": "cold-iron-blanching",
@@ -2084,19 +5671,43 @@
    "kind": "treatment",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Powdered cold iron fused over an ordinary edge. The weapon bites as cold iron until the blanching wears through — a few telling blows — and then it is only steel again. The poor hunter's answer to a fey problem.",
+   "text": "The book's weapon blanch: powdered cold iron melted over an edge in a round of flame. The weapon strikes as cold iron until it next hits, and then it is only steel again. One dose coats a weapon or ten arrows.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [
     {
      "type": "narrative",
-     "target": "Counts as cold iron against damage reduction until the blanching wears off with use"
+     "target": "Strikes as cold iron until the weapon next hits"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 30
+   "price_gp": 20,
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "cold_iron",
+     "uses": "once",
+     "uses_count": 1,
+     "note": "weapon blanch: until the weapon next hits; one dose coats one weapon or 10 pieces of ammunition",
+     "book": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "forgiving"
+    }
+   ],
+   "finishes": [
+    "weapon"
+   ],
+   "book": true
   },
   {
    "id": "ghost-salt-blanching",
@@ -2104,19 +5715,49 @@
    "kind": "treatment",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "A white alchemical crust worked over the striking surface. So treated, the weapon bites the bodiless: it deals half damage to incorporeal creatures that plain steel cannot touch at all.",
+   "text": "A white alchemical crust worked over the striking surface. In the book it lets a weapon deal full damage to incorporeal creatures until it next hits; the app cannot yet say that, so here it bites the undead harder for one hit.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [
     {
      "type": "narrative",
-     "target": "Strikes incorporeal creatures at half damage until the blanching wears off"
+     "target": "Deals full damage to incorporeal creatures until the weapon next hits"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 200
+   "price_gp": 200,
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "when": {
+      "target": {
+       "type": "undead"
+      }
+     },
+     "uses": "once",
+     "uses_count": 1,
+     "note": "house stand-in: the book's full damage to incorporeal creatures has no vocabulary yet"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "pure"
+    }
+   ],
+   "finishes": [
+    "weapon"
+   ],
+   "book": false
   },
   {
    "id": "alchemical-silver-plating",
@@ -2124,7 +5765,7 @@
    "kind": "treatment",
    "tier": "uncommon",
    "craft_dc": 15,
-   "text": "Silver alchemically bonded over a steel core: the whole reason 'silvered weapon' does not mean 'bent weapon'. It bypasses the damage reduction of lycanthropes and devils, and the softer metal costs the blow a little of its weight.",
+   "text": "Silver alchemically bonded over a steel core. The weapon strikes as silver, through the defences of lycanthropes and devils, and a slashing or piercing edge loses a point of damage. The book forbids it on adamantine, cold iron and mithral.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -2134,16 +5775,51 @@
      "amount": -1,
      "bonus_type": "untyped",
      "target": "damage",
-     "note": "the softer silver skin, on the treated weapon"
+     "note": "slashing or piercing only, minimum 1"
     },
     {
      "type": "narrative",
-     "target": "Bypasses the damage reduction of lycanthropes and some devils (DR/silver)"
+     "target": "Strikes as silver; cannot be applied to adamantine, cold iron or mithral"
     }
    ],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 90
+   "price_gp": 90,
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "silver",
+     "book": true
+    },
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": -1,
+     "bonus_type": "untyped",
+     "when": {
+      "weapon": {
+       "slashing_or_piercing": true
+      }
+     },
+     "note": "slashing or piercing only, minimum 1",
+     "book": true
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    }
+   ],
+   "finishes": [
+    "weapon"
+   ],
+   "not_on": [
+    "adamantine",
+    "cold-iron",
+    "mithral"
+   ],
+   "book": true
   },
   {
    "id": "gold-gilding",
@@ -2151,14 +5827,45 @@
    "kind": "treatment",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Gold leaf burnished onto the finished piece. It stops no blow and turns no rust; it announces the owner across a room, which is sometimes the entire job.",
+   "text": "Gold leaf burnished onto the finished piece. It stops no blow; it announces the owner across a room, which is worth two points of Diplomacy.",
    "risky": false,
    "source": "bought",
    "biomes": [],
    "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 50
+   "price_gp": 50,
+   "weapon": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "untyped"
+    }
+   ],
+   "armour": [
+    {
+     "type": "skill_mod",
+     "target": "diplomacy",
+     "amount": 2,
+     "bonus_type": "untyped"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "finishes": [
+    "weapon",
+    "armour"
+   ],
+   "book": false
   },
   {
    "id": "lead-lining",
@@ -2166,19 +5873,42 @@
    "kind": "treatment",
    "tier": "uncommon",
    "craft_dc": null,
-   "text": "Sheet lead beaten into the inner faces of a helm, casket or breastplate. Scrying and detection magic stop at the lead, which is why the paranoid weigh more than they look.",
+   "text": "Sheet lead beaten into the inner faces of a helm or breastplate. Scrying stops at the lead: the wearer's will is a point harder to reach, and the armour a tenth heavier.",
    "risky": false,
    "source": "bought",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Blocks detect spells and scrying through the lined surface"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 20
+   "price_gp": 20,
+   "armour": [
+    {
+     "type": "save_mod",
+     "target": "will",
+     "amount": 1,
+     "bonus_type": "untyped",
+     "note": "against scrying and divination: a house stand-in for the lead's block"
+    },
+    {
+     "type": "gear_mod",
+     "target": "weight_pct",
+     "amount": 10
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "easily_worked"
+    },
+    {
+     "type": "working",
+     "trait": "malleable"
+    }
+   ],
+   "finishes": [
+    "armour"
+   ],
+   "book": false
   },
   {
    "id": "holy-anointing",
@@ -2186,19 +5916,44 @@
    "kind": "treatment",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "The finished work is oiled, censed and blessed at an altar. For its first battle thereafter it counts as a blessed weapon — the rites do not last, and the faithful say that is the point.",
+   "text": "The finished work is oiled, censed and blessed at an altar. For its first battle after the rite it bites the undead harder; the rites do not last.",
    "risky": false,
    "source": "bought",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "Counts as blessed for its first battle after the rite"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 150
+   "price_gp": 150,
+   "weapon": [
+    {
+     "type": "combat_mod",
+     "target": "damage",
+     "amount": 2,
+     "bonus_type": "untyped",
+     "when": {
+      "target": {
+       "type": "undead"
+      }
+     },
+     "uses": "once",
+     "uses_count": 1,
+     "note": "its first battle after the rite"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "pure"
+    },
+    {
+     "type": "working",
+     "trait": "flawless"
+    }
+   ],
+   "finishes": [
+    "weapon"
+   ],
+   "book": false
   },
   {
    "id": "adamantine-edging",
@@ -2206,19 +5961,41 @@
    "kind": "treatment",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "A ribbon of adamantine forge-welded along the working edge of a lesser blade. The edge ignores hardness below 20 as true adamantine does; the blade behind it is what it always was, and a hard parry will remind everyone.",
+   "text": "A ribbon of adamantine forge-welded along a lesser blade's edge. Here the weapon strikes as adamantine, a house rule, since the book gives a part-made edge nothing; the weld line is a weakness a hard parry finds.",
    "risky": false,
    "source": "bought",
    "biomes": [],
-   "effects": [
-    {
-     "type": "narrative",
-     "target": "The edge ignores hardness less than 20 when striking objects; the body of the blade remains its base metal"
-    }
-   ],
+   "effects": [],
    "effects_converted": true,
    "obtain": "bought",
-   "price_gp": 1500
+   "price_gp": 1500,
+   "weapon": [
+    {
+     "type": "strikes_as",
+     "target": "adamantine",
+     "note": "a house rule: the book gives a part-made edge no benefit"
+    },
+    {
+     "type": "gear_mod",
+     "target": "hp_per_inch",
+     "amount": -2,
+     "note": "the weld line"
+    }
+   ],
+   "working": [
+    {
+     "type": "working",
+     "trait": "narrow_window"
+    },
+    {
+     "type": "working",
+     "trait": "weld_aid"
+    }
+   ],
+   "finishes": [
+    "weapon"
+   ],
+   "book": false
   }
  ]
 }
