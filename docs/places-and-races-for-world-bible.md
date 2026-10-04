@@ -348,6 +348,7 @@ settlement's facts today:
 | `the mine`, `a mine`, mines, mining, quarry, ore | **the mine head** |
 | shrine, temple, cathedral, priests, prayers, faith | **the shrine** |
 | `the well`, `a well`, wells, wellhead, cistern, fountain | **the well** |
+| smith, smiths, smithy, smithies, blacksmith, blacksmiths, `a forge`, `the forge`, `the forges`, `its forges`, anvil, anvils, ironworks, farrier, farriers, foundry, foundries, metalworking, metalworkers, armourer, armourers, armorer, armorers, weaponsmith, weaponsmiths, bladesmith, bladesmiths | **the smithy** |
 
 If your generator authors a place list, **it must cover at least these** — a town whose
 paragraphs say "port access" and then has no docks is the exact complaint that built this

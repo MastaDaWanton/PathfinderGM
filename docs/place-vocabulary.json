@@ -141,7 +141,8 @@
    "the guardhouse",
    "the barracks",
    "the well",
-   "the guildhall"
+   "the guildhall",
+   "the smithy"
   ]
  },
  "junctions_by_scale": {
@@ -685,6 +686,40 @@
     "wellhead",
     "cistern",
     "fountain"
+   ]
+  },
+  {
+   "place": "the smithy",
+   "slug": "the-smithy",
+   "about": "a hearth, an anvil, and the noise of both",
+   "words": [
+    "smith",
+    "smiths",
+    "smithy",
+    "smithies",
+    "blacksmith",
+    "blacksmiths",
+    "a forge",
+    "the forge",
+    "the forges",
+    "its forges",
+    "anvil",
+    "anvils",
+    "ironworks",
+    "farrier",
+    "farriers",
+    "foundry",
+    "foundries",
+    "metalworking",
+    "metalworkers",
+    "armourer",
+    "armourers",
+    "armorer",
+    "armorers",
+    "weaponsmith",
+    "weaponsmiths",
+    "bladesmith",
+    "bladesmiths"
    ]
   }
  ],
