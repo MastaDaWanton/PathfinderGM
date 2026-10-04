@@ -707,6 +707,72 @@ def test_a_declared_attack_never_lands_on_the_players_own_companion():
     assert hits and all(h["target"] == thug.ref for h in hits), hits
 
 
+def _travels_with_you(actor):
+    from rules.activeeffect import ActiveEffect
+    from rules import states
+    actor.apply_effect(ActiveEffect(
+        name="travels with you", kind="bond", key="company", source=f"company:{actor.ref}",
+        origin="test", duration="until-dismissed", tags=(states.TRAVELS_WITH_YOU,)))
+    return actor
+
+
+def _the_replay_room():
+    """The 2026-10-01 replay's fight, reduced: two companions who travel with the
+    player, and the thug the drover's club has just left at exactly 0 hp."""
+    from rules.bestiary import instantiate
+    room = _empty_room()
+    drover = _travels_with_you(room.add(instantiate("guildhand", scene=room,
+                                                    name="a young drover")))
+    bob = _travels_with_you(room.add(instantiate("guildhand", scene=room, name="Bob")))
+    thug = room.add(instantiate("thug", scene=room, name="thug"))
+    thug.hp = 0
+    thug.add_condition("disabled", source="the drover's club")
+    return room, drover, bob, thug
+
+
+def test_the_declared_blow_is_not_added_twice_when_its_target_is_disabled():
+    """Measured 2026-10-01, a live in-process replay of the companions lane on scratch
+    data. The drover's club left the thug at exactly 0 hp — disabled, still on his feet —
+    and the player typed "I shoot the thug again.". The plan held the declared blow
+    (i1 attack pc -> c13), but `inject_fight` counted only targets above 0 hp, so it
+    added it again (i2 attack pc -> c12, "because: the player said they attack") at the
+    lowest ref it could find: the drover, holding `bond.travels-with-you`. The engine
+    resolved both: "Sam hits a young drover with the shortbow for 5 piercing ... a young
+    drover is unconscious and dying", and the prose wrote "your second shot catches the
+    young drover in the shoulder". Two blows for one declared, the second at a friend."""
+    room, drover, bob, thug = _the_replay_room()
+    assert drover.ref < thug.ref, "the premise: the companion is the lowest ref"
+    raw = [{"op": "attack", "actor": "pc", "target": thug.ref, "because": ""}]
+    out = judgement.inject_fight(raw, "I shoot the thug again.", room)
+    assert out == raw, "the declared blow was already in the plan; nothing may be added"
+
+    # And once he is down and dying, the blow the player named stays on him: it is not
+    # moved onto whoever else is standing, and both of those are the player's people.
+    thug.hp = -1
+    thug.add_condition("dying", source="the second arrow")
+    assert judgement.inject_fight(raw, "I shoot the thug again.", room) == raw
+    assert judgement.redirect_attacks_off_corpses(raw, "I shoot the thug again.",
+                                                  room) is None
+
+
+def test_a_companion_is_only_hit_when_the_player_names_them():
+    """The other half of the same replay's rule: the player's own people are never the
+    reading of an unnamed blow — the drover went down dying for a sentence about the
+    thug — but "I attack Bob" means Bob, and must not spawn a stranger instead."""
+    room, drover, bob, thug = _the_replay_room()
+    thug.hp = -9                                      # long past fighting
+    thug.add_condition("dying", source="the second arrow")
+
+    raw = [{"op": "attack", "actor": "pc", "target": thug.ref, "because": ""}]
+    moved = judgement.redirect_attacks_off_corpses(raw, "I keep shooting", room)
+    assert not moved or all(r.get("target") not in (drover.ref, bob.ref)
+                            for r in moved), moved
+
+    out = judgement.inject_fight([{"op": "narrate_only"}], "I attack Bob.", room)
+    assert [i["op"] for i in out] == ["narrate_only", "attack"], out
+    assert out[-1]["target"] == bob.ref
+
+
 def test_a_brawl_opens_within_reach_and_rolls_the_first_punch():
     """Reported from play: "thug is still 15ft away from you and no rolls have been
     tracked in the roll tracker".

@@ -17,7 +17,13 @@ off each sentence about the person (`_people.about`):
     Pangrella Korvu has talons and wings, so no body slot is assumed;
   * age band — young against old, never "older" against a middle age;
   * hair — bald against a hair colour, and one basic colour against another;
-  * what they carry — a named weapon they do not carry (`Actor.weapons`).
+  * what they carry — a named weapon they do not carry (`Actor.weapons`), and that
+    nobody else the same sentence is about carries either. Measured 2026-10-01 on the
+    companions replay (gemma-4-12B): "The young drover grips their club tightly, eyes
+    darting between the thug and the nearest exit" was read as the thug's, the thug
+    carries a sap and a dagger, and the repair — told the thug's face — wrote "grips
+    their dagger" in 4 of 15 wind-ups; on the outcome door every "swings their club at
+    the thug" was filed the same way, and the consequence prose came back with a sap.
 
 An unfilled slot is never a contradiction, and a new detail is drift, not a finding (the
 owner's ruling on Q9: faces are handled in the brief; no flag for a new detail that
@@ -117,8 +123,18 @@ def _carried(actor) -> set[str]:
     return {h for h in held if h and h not in ("unarmed", "improvised")}
 
 
-def contradictions(held: str, sentence: str, actor, peoples: list[str]) -> list[str]:
-    """The slots on which `sentence` says otherwise than the held face, by name."""
+def _among(weapon: str, carried: set[str]) -> bool:
+    return any(weapon in c or c in weapon for c in carried)
+
+
+def contradictions(held: str, sentence: str, actor, peoples: list[str],
+                   others_carry: set[str] = frozenset()) -> list[str]:
+    """The slots on which `sentence` says otherwise than the held face, by name.
+
+    `others_carry`: what anybody else this same sentence is about carries. "Their club"
+    in a sentence about two people is the club of whichever of them has one — measured
+    2026-10-01, the drover's own wind-up named the thug it was watching, and the thug was
+    told he carried the drover's club."""
     out = []
     was = _people_in(held, peoples)
     now = _people_in(sentence, peoples, as_a_description=True)
@@ -142,7 +158,7 @@ def contradictions(held: str, sentence: str, actor, peoples: list[str]) -> list[
         held_rx = re.compile(rf"\b(?:{_THEIRS}|{_HOLDS}){_SWORDISH.pattern[2:]}", re.I)
         for m in held_rx.finditer(sentence):
             w = m.group(1).lower()
-            if w in ("sword",) or any(w in c or c in w for c in carried):
+            if w in ("sword",) or _among(w, carried) or _among(w, others_carry):
                 continue
             out.append(f"carrying a {w}, and they carry {', '.join(sorted(carried))}")
             break
@@ -152,15 +168,21 @@ def contradictions(held: str, sentence: str, actor, peoples: list[str]) -> list[
 def find(ctx) -> list:
     peoples = _peoples(ctx.world)
     found = []
-    for ref, actor in ctx.scene.actors.items():
-        if getattr(actor, "is_pc", False) or not getattr(actor, "described", False):
+    # Every person's sentences, described or not: an undescribed drover still owns the
+    # club in the sentence that also names the thug.
+    npcs = {r: a for r, a in ctx.scene.actors.items() if not getattr(a, "is_pc", False)}
+    theirs = {r: {w for w, _ in about(ctx, r)} for r in npcs}
+    for ref, actor in npcs.items():
+        if not getattr(actor, "described", False):
             continue
         held = " ".join([str(getattr(actor, "appearance", "") or "")]
                         + [str(s) for s in (getattr(actor, "described_as", None) or [])])
         if not held.strip():
             continue
         for written, narration in about(ctx, ref):
-            wrong = contradictions(held, narration, actor, peoples)
+            others = set().union(*(_carried(npcs[r]) for r in npcs
+                                   if r != ref and written in theirs[r]))
+            wrong = contradictions(held, narration, actor, peoples, others)
             if not wrong:
                 continue
             found.append(Finding(
