@@ -136,6 +136,310 @@ def _track(track, progress) -> dict:
     return out
 
 
+# --- what the page draws and must not work out for itself (UI plan §12, lane U2) ---------
+#
+# The forge page never computes a number, and it never invents a colour either: the swatch
+# beside a rack row and the metal on lane U4's anvil are content, like the heat colour
+# (UI plan §4, "a material swatch ... is content"). They are served from here so both draw
+# the same steel. A table in the view and not in the material documents because those
+# files are lane H's this wave (contracts §10); the right home is a `color` field on each
+# document, and lane H can lift this table into them unchanged.
+
+# Approximate surface colours of the bare metal, by eye from reference photographs of each
+# (iron's grey, bronze's brown-gold, copper's salmon, mithral's blue-white per the UI plan
+# §4). The fantasy metals follow their book descriptions where one exists (adamantine
+# "dark", noqual "pale", djezet "rust-red", abysium "blue-green glow").
+_COLOUR = {
+    "iron": "#8a8d91", "wrought-iron": "#7b7a76", "steel": "#a7adb3",
+    "high-carbon-steel": "#9097a0", "cold-iron": "#5f6670", "copper": "#b8733f",
+    "bronze": "#a8763a", "bell-bronze": "#9c6b33", "brass": "#c9a54f", "tin": "#c3c6c4",
+    "lead": "#6f7477", "zinc": "#a9b0b5", "bismuth": "#c2b8c8", "pewter": "#9a9d9a",
+    "gold": "#d4af37", "silver": "#c8ccd0", "electrum": "#d8c47a", "platinum": "#d9dad7",
+    "mithral": "#cfe0ee", "adamantine": "#3d4a4f", "star-iron": "#59606e",
+    "viridium": "#5e8f5a", "abysium": "#5ab6a8", "djezet": "#b0462e", "inubrix": "#8f8a7a",
+    "noqual": "#c9cfc4", "siccatite": "#a7b9c9", "horacalcum": "#c7a86a",
+    "elysian-bronze": "#c8964a", "nexavaran-steel": "#7d8a95", "pattern-steel": "#8e939a",
+    "fire-forged-steel": "#9a6a55", "frost-forged-steel": "#a9c2d4",
+    "living-steel": "#6c8a5c", "singing-steel": "#b9c3cc", "wyrmsteel": "#7a3b33",
+    "quicksilver": "#b9bec2",
+}
+_KIND_COLOUR = {"fuel": "#2b2622", "flux": "#d9d2c2", "quenchant": "#5d7d96",
+                "treatment": "#8a6f4a"}
+_WORD_COLOUR = (("haft", "#8b6a43"), ("ivory", "#d8cfb8"), ("bone", "#d8cfb8"),
+                ("grip", "#6b4a2f"), ("hide", "#6b4a2f"), ("leather", "#6b4a2f"),
+                ("binding", "#cbbf9f"), ("core", "#4a3b38"))
+_DEFAULT_COLOUR = "#8a8d91"
+
+
+def material_color(material_id: str) -> str:
+    """The swatch for one material id: its own entry, else its parent metal's (an ore,
+    a fitting cut from a metal), else a word in its id (a haft is wood), else its kind's,
+    else iron grey. Never empty, so a swatch is never a hole."""
+    mid = str(material_id or "").strip().lower()
+    if not mid:
+        return _DEFAULT_COLOUR
+    if mid in _COLOUR:
+        return _COLOUR[mid]
+    doc = None
+    try:
+        from rules import materials as mats
+
+        doc = mats.get(mid)
+    except Exception:      # noqa: BLE001 - a swatch is never worth failing a request for
+        doc = None
+    parent = str((doc or {}).get("material") or "").strip().lower()
+    if parent in _COLOUR:
+        return _COLOUR[parent]
+    for word, colour in _WORD_COLOUR:
+        if word in mid:
+            return colour
+    kind = str((doc or {}).get("kind") or "")
+    if kind in _KIND_COLOUR:
+        return _KIND_COLOUR[kind]
+    m = bs.metal(mid)
+    if m is not None and m.parent in _COLOUR:
+        return _COLOUR[m.parent]
+    return _DEFAULT_COLOUR
+
+
+def _rack_items(c, pc) -> list[dict]:
+    """The rack as the page draws it: lane D's rows, each with its swatch colour."""
+    out = []
+    for p in _rack(c, pc):
+        item = p.as_item(pc)
+        item["color"] = material_color(item.get("material") or "")
+        out.append(item)
+    return out
+
+
+def _colors(items: list[dict]) -> dict:
+    """{material id: colour} for everything the page may draw: the rack's materials and
+    the pieces of every worked item on it, so lane U4's stage colours a haft it was never
+    shown as a rack row."""
+    out = {}
+    for it in items:
+        mid = it.get("material")
+        if mid:
+            out[mid] = it.get("color") or material_color(mid)
+        rec = it.get("record") or {}
+        for piece in (rec.get("pieces") or {}).values():
+            pm = (piece or {}).get("material")
+            if pm and pm not in out:
+                out[pm] = material_color(pm)
+    return out
+
+
+def _coins(cp: int) -> str:
+    """"1 sp", "3 cp", "2 gp": the largest coin that says it exactly."""
+    cp = int(cp)
+    if cp and cp % 100 == 0:
+        return f"{cp // 100} gp"
+    if cp and cp % 10 == 0:
+        return f"{cp // 10} sp"
+    return f"{cp} cp"
+
+
+def _place_line(c, where: dict) -> str:
+    """The footer's place line (UI plan §5.2, §6.8): where you are decides which methods
+    and metals are open, so it is said in words. "At the field kit", "At Brannoc's
+    smithy, 1 sp an hour", "At your smithy"."""
+    smithy = where.get("smithy")
+    if smithy:
+        rate = int(smithy.get("rate_cp_per_hour") or 0)
+        if smithy.get("kind") == "owned" and not rate:
+            return "At your smithy"
+        keeper = ""
+        ref = smithy.get("keeper")
+        if ref:
+            try:
+                from rules import places as places_mod
+
+                who = places_mod._actor(c.scene, ref)
+                keeper = str(getattr(who, "name", "") or "")
+            except Exception:      # noqa: BLE001 - a name is never worth failing for
+                keeper = ""
+        whose = f"{keeper}'s smithy" if keeper else (where.get("place") or "the smithy")
+        if not keeper and where.get("place"):
+            whose = f"the smithy at {where['place']}"
+        return f"At {whose}, {_coins(rate)} an hour" if rate else f"At {whose}"
+    if where.get("kit"):
+        return "At the field kit"
+    return "No forge here: carry a smith's field kit or find a smithy"
+
+
+# The heat each step works in, for lane U3's gauge (contracts §11, `opts.heat`). The bands
+# are the documented ones in docs/blacksmithing-prior-art.md §3.1 and §3.3, from the table
+# Wikipedia credits to Chapman, Workshop Technology (1972), and the tempering-colour table:
+#   forging     cherry red to orange, 815-1,092 °C (hot forging 950-1,250 °C)
+#   welding     yellow, 1,093-1,258 °C ("common steel at a bright yellow heat")
+#   plunge      from cherry red, 760-870 °C: past iron's Curie point (about 770 °C), the
+#               old smith's magnet cue for "hot enough to harden"
+#   smelting    a bloomery's working heat, 1,150-1,300 °C
+#   oxide       tempering colours: light straw to brown (205-260 °C) for an edge, purple
+#               to light blue (282-337 °C) for armour and spring work
+# `hearth_c` is what the fire can reach: a field hearth less than a smithy's furnace.
+# `cool_rate` is °C a second in the game's few seconds, compressed from the minute a real
+# blank takes to fall out of the band, and faster for `narrow_window` metals (UI plan
+# §7.2). Every number here is PROPOSED, to be tuned in lane U3's games on a flat build.
+_HEAT_BANDS = {"forging": (815, 1092), "welding": (1093, 1258), "plunge": (760, 870),
+               "smelting": (1150, 1300)}
+_OXIDE = {"edge": (205, 260), "spring": (282, 337)}
+_HEARTH_C = {"kit": 1150, "smithy": 1320}
+_COOL_C_PER_S = 45.0
+_NARROW_COOL = 1.25
+
+
+def _heat(plan) -> dict | None:
+    row = bs.method_row(plan.method) or {}
+    band_name = str((row.get("tuning") or {}).get("band") or "")
+    narrow = bool(plan.lead is not None and plan.lead.has("narrow_window"))
+    hearth = _HEARTH_C["smithy" if plan.smithy or plan.method in ("smelt", "fold",
+                                                                   "strengthen")
+                      else "kit"]
+    if band_name == "oxide":
+        edged = plan.gear == "weapon" and bool((bs.shape_info(plan.shape) or {}).get("edged"))
+        lo, hi = _OXIDE["edge" if edged or not plan.gear else "spring"]
+        return {"band_name": "oxide", "band": [lo, hi], "start_c": 20, "hearth_c": 400,
+                "cool_rate": 0, "narrow": narrow, "target": "edge" if edged else "spring"}
+    if band_name not in _HEAT_BANDS:
+        return None
+    lo, hi = _HEAT_BANDS[band_name]
+    rate = _COOL_C_PER_S * (_NARROW_COOL if narrow else 1.0)
+    return {"band_name": band_name, "band": [lo, hi], "start_c": hearth, "hearth_c": hearth,
+            "cool_rate": round(rate, 2), "narrow": narrow}
+
+
+# Slot words for the work order (UI plan §6.5). The slot ids are lane D's
+# (`bs.METHOD_SLOTS`, `bs.PIECES`); these are only how each reads on the page.
+_SLOT_LABEL = {"ore": "Ore", "fuel": "Fuel", "flux": "Flux", "metal": "Bar", "piece": "Piece",
+               "quenchant": "Quenchant", "with": "Second bar", "item": "Finished item",
+               "treatment": "Treatment", "bar": "Bars", "part": "Crucible",
+               "head": "Head", "haft": "Haft", "fittings": "Fittings", "body": "Body",
+               "fastenings": "Fastenings", "lining": "Lining"}
+_SLOT_EMPTY = {"ore": "Drop ore here, or press Enter on it in the rack",
+               "fuel": "Drop fuel here, or press Enter on it in the rack",
+               "flux": "Optional: a flux carries off slag",
+               "metal": "Drop a bar here, or press Enter on one in the rack",
+               "piece": "Drop a blank or plate here, or press Enter on one in the rack",
+               "quenchant": "Drop a quenchant here, or press Enter on one in the rack",
+               "with": "Optional: a second steel folds into pattern steel",
+               "item": "Drop a finished item here, or press Enter on one in the rack",
+               "treatment": "Drop a treatment here, or press Enter on one in the rack",
+               "bar": "Drop bars of one metal here, or press Enter on them in the rack",
+               "part": "Add two or more metals, or press Enter on them in the rack",
+               "head": "Drop a blank here, or press Enter on one in the rack",
+               "haft": "Drop a haft or grip here, or press Enter on one in the rack",
+               "fittings": "Optional: a guard, studs or fittings",
+               "body": "Drop a plate here, or press Enter on one in the rack",
+               "fastenings": "Drop fastenings here, or press Enter on them in the rack",
+               "lining": "Optional: a lining or binding"}
+
+
+def _slot_view(method: str, gear: str = "") -> list[dict]:
+    """The work order's slots for one method, in lane D's order, with which may stay
+    empty. Assemble's follow the main piece's gear: Head, Haft, Fittings for a weapon;
+    Body, Fastenings, Lining for armour and shields."""
+    if method == "assemble":
+        names = bs.assemble_slots(gear or "weapon")
+        optional = set(names[bs.REQUIRED_PIECES:])
+    elif method == "alloy":
+        names, optional = ("part",), set()
+    else:
+        names = bs.METHOD_SLOTS.get(method, ())
+        optional = set(bs.OPTIONAL.get(method, ()))
+    return [{"id": s, "label": _SLOT_LABEL.get(s, s.title()), "optional": s in optional,
+             "empty": _SLOT_EMPTY.get(s, f"Fill the {s} slot")} for s in names]
+
+
+# Target names in the build card's rows: the sum's own ids, said as a smith would.
+_TARGET_LABEL = {"attack": "Attack", "damage": "Damage", "hardness": "Hardness",
+                 "hp_per_inch": "Hit points an inch", "acp": "Armour check penalty",
+                 "max_dex": "Max Dex", "asf": "Spell failure", "weight_pct": "Weight",
+                 "category": "Weight class", "speed_penalty": "Speed", "ac": "Armour",
+                 "crit_confirm": "Critical confirm", "cmb": "Combat manoeuvres",
+                 "cmd": "Manoeuvre defence"}
+_MINUS = "−"
+
+
+def _num(v, places: int = 1) -> str:
+    """A signed number for the card, rounded only for display: "+3", "−1.8", "0"."""
+    v = round(float(v or 0), places)
+    if v == 0:
+        return "0"
+    text = f"{abs(v):.{places}f}".rstrip("0").rstrip(".")
+    return ("+" if v > 0 else _MINUS) + text
+
+
+def _render(spec: dict) -> str:
+    try:
+        from rules import effectspec
+
+        return effectspec.render(spec)
+    except Exception:      # noqa: BLE001 - a line in words is never worth failing for
+        return str(spec.get("type") or "")
+
+
+def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "") -> dict | None:
+    """The build card (UI plan §6.6) and the build summary (§6.5), every number lane B's
+    and formatted here, so the page draws it and adds nothing: one row per target, one
+    column per piece, the bonuses after quality, the drawbacks after the cut, and the
+    final number, rounded toward zero. Book effects and what it strikes as, in words."""
+    if not build or build.get("problems"):
+        return None
+    try:
+        from rules import forge_items as fi
+
+        main_w, other_w, per = fi.MAIN_WEIGHT, fi.OTHER_WEIGHT, fi.STRENGTHEN_PER_PASS
+    except Exception:      # noqa: BLE001 - the fixed rule of contracts §4, said as text
+        main_w, other_w, per = 1.0, 0.5, 1.5
+    slots = list(bs.PIECES.get(gear or "weapon", bs.PIECES["weapon"]))
+    pieces = pieces or {}
+    cols = []
+    for i, slot in enumerate(slots):
+        mid = str((pieces.get(slot) or {}).get("material") or "")
+        m = bs.metal(mid) if mid else None
+        cols.append({"slot": slot, "label": _SLOT_LABEL.get(slot, slot.title()),
+                     "material": m.name if m else (mid.replace("-", " ").title() if mid
+                                                   else "none"),
+                     "color": material_color(mid) if mid else "",
+                     "weight": f"×{main_w:g}" if i == 0 else f"×{other_w:g}"})
+    mult = build.get("multipliers") or {}
+    rows, summary = [], []
+    for s in build.get("sum") or []:
+        target = str(s.get("target") or "")
+        label = _TARGET_LABEL.get(target, target.replace("_", " ").capitalize())
+        rows.append({"target": target, "label": label, "when": bool(s.get("when")),
+                     "cells": {slot: _num((s.get("pieces") or {}).get(slot, 0), 2)
+                               for slot in slots},
+                     "bonus": _num(s.get("bonus"), 2), "negative": _num(s.get("negative"), 2),
+                     "final": _num(s.get("final"), 0)})
+        if s.get("final"):
+            line = _render({"type": s.get("type") or "combat_mod", "target": target,
+                            "amount": int(s["final"]), "bonus_type": "material"})
+            summary.append(line + (" (when it applies)" if s.get("when") else ""))
+    powers = [_render(e) for e in build.get("book") or []]
+    for t in build.get("strikes_as") or []:
+        line = _render({"type": "strikes_as", "target": t})
+        if line not in powers:
+            powers.append(line)
+    q = mult.get("quality")
+    cut = mult.get("negative_cut")
+    return {
+        "columns": cols, "rows": rows, "summary": summary, "powers": powers,
+        "masterwork": bool(build.get("masterwork")),
+        "quality": quality,
+        "bonus_head": f"Bonuses ×{q:g}" if q is not None else "Bonuses",
+        "negative_head": f"Drawbacks ×{cut:g}" if cut is not None else "Drawbacks",
+        "how": (f"The main piece counts {main_w:g}, the others {other_w:g} each, and every "
+                f"strengthening pass ×{per:g}. Bonuses are multiplied by the quality"
+                + (f" (×{q:g}" + (f" at {quality}" if quality else "") + ")" if q is not None
+                   else "")
+                + ", drawbacks cut by your level and perks"
+                + (f" (×{cut:g})" if cut is not None else "")
+                + ". Each row is added up, then rounded toward zero."),
+    }
+
+
 def _alloys() -> list[dict]:
     """The recipe table, for the page to show beside the crucible (Vintage Story shows
     its alloy windows; the window is a fact, not a secret)."""
@@ -160,13 +464,19 @@ def _alloys() -> list[dict]:
 def _state_body(c, pc) -> dict:
     track, progress = _progress(pc)
     where = _where(c, pc)
+    where["line"] = _place_line(c, where)
+    rack = _rack_items(c, pc)
+    summary = _track(track, progress)
+    summary["masterwork_index"] = bs._mw_index()
     return {
-        "track": _track(track, progress),
+        "track": summary,
         "level": int(progress.level),
         "ceiling": worldclass.ceiling_index(progress),
         "picks_banked": worldclass.perk_picks_banked(progress),
         "methods": bs.methods_view(progress.level, where),
-        "rack": [p.as_item(pc) for p in _rack(c, pc)],
+        "rack": rack,
+        "colors": _colors(rack),
+        "slots": {m: _slot_view(m) for m in bs.METHODS if m != "assay"},
         "where": where,
         "shapes": bs.shapes()["families"],
         "alloys": _alloys(),
