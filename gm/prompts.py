@@ -2563,8 +2563,12 @@ COMPANION_EXAMPLES = [
                "with that as themselves: do it, do it their own way, or refuse. The "
                "engine decides what lands.\nWhat does {Self} do?",
         "reply": {
-            "narration": "{Companion} lifts the club, looks at {Foe}, and lowers it again, "
-                         "wincing — shaking their head at you without a word.",
+            # No weapon named: this example is shown to every companion, and "lifts the
+            # club" put a club in the prompt of one holding a sword. The turn's own
+            # "In hand:" line is the only weapon a companion's prompt may name.
+            "narration": "{Companion} draws back to strike, looks at {Foe}, and lets "
+                         "their arm fall again, wincing — shaking their head at you "
+                         "without a word.",
             "intents": [{"op": "narrate_only",
                          "because": "will fight beside you, but will not kill a beaten "
                                     "man"}],

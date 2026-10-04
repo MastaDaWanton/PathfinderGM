@@ -1317,16 +1317,28 @@ def inject_fight(raw_intents, player_text: str, scene):
     # long-dead ref, this guard read "attack" and stood aside, and the player swung
     # at a body while the well-thing existed only in sentences. A dead target means
     # the fight still needs making.
-    living = {r for r, a in (getattr(scene, "actors", {}) or {}).items()
-              if not getattr(a, "is_pc", False) and getattr(a, "hp", 0) > 0
-              and not a.has_state("state.down")}
+    #
+    # Standing, not "above zero". Measured 2026-10-01 (the companions lane's replay):
+    # the drover's club left the thug at exactly 0 hp — disabled, still on his feet —
+    # the player typed "I shoot the thug again.", and the plan's attack on him was
+    # not counted because this read `hp > 0`. So the declared blow was added a second
+    # time, at the lowest ref left standing: the drover, who went down dying. And a
+    # blow at somebody the player's own sentence names is the declared one whatever
+    # state they are in, short of dead — "the thug" was named, and that settles it.
+    actors = getattr(scene, "actors", {}) or {}
+    said = _name_words(player_text)
+    declared = {r for r, a in actors.items()
+                if not getattr(a, "is_pc", False)
+                and ((int(getattr(a, "hp", 0)) >= 0 and not a.has_state("state.down"))
+                     or (not a.has_state("state.down.dead")
+                         and said & _name_words(getattr(a, "name", ""))))}
     for raw in raw_intents:
         if not isinstance(raw, dict):
             continue
         op = str(raw.get("op", "")).lower()
         if op in ("spawn", "begin_encounter"):
             return raw_intents
-        if op == "attack" and str(raw.get("target", "")) in living:
+        if op == "attack" and str(raw.get("target", "")) in declared:
             return raw_intents
     # Somebody is already standing there: the player is not starting a fight, they are
     # swinging in one. `fill_obvious_targets` cannot help — it puts a target on an attack
@@ -1336,8 +1348,20 @@ def inject_fight(raw_intents, player_text: str, scene):
     # player typed "I punch the bruiser in the face", the narration described the punch
     # landing, and the turn log read `outcomes: []`. No attack roll, nothing in the roll
     # tracker, and the thug's hit points moved only when the thug swung back.
-    foes = [a for r, a in (getattr(scene, "actors", {}) or {}).items()
+    foes = [a for r, a in actors.items()
             if not getattr(a, "is_pc", False) and _can_be_fought(a)]
+    # `_can_be_fought` keeps the player's own people out of that list, so "I attack"
+    # never means them — but "I attack Bob" does, and must not spawn a stranger to
+    # take the blow instead. Their name in the player's words, read the way the
+    # companions module reads an order, and nothing else, puts them back.
+    from gm import companions as companions_mod
+
+    kin = [a for a in actors.values()
+           if (companions_mod.is_companion(a) or companions_mod.owned(a))
+           and int(getattr(a, "hp", 0)) > 0 and not a.has_state("state.down")
+           and companions_mod.names_them(player_text, a)]
+    if kin:
+        foes = kin
     if foes:
         pc = scene.pc() if hasattr(scene, "pc") else None
         if pc is None:
@@ -2725,14 +2749,28 @@ def redirect_attacks_off_corpses(raw_intents, player_text: str, scene):
     # somebody who asked for neither. The same guard silences inject_fight.
     if is_finishing_blow(player_text, scene):
         return None
+    from gm import companions as companions_mod
+
     dead = {r for r, a in scene.actors.items()
             if not a.is_pc and a.is_down}
+    # Never the player's own people unless the player names them: the same rule as
+    # `inject_fight`'s, measured there (2026-10-01, the drover shot dying for "I shoot
+    # the thug again."). `living[0]` is the lowest ref, and companions join early.
     living = [r for r, a in scene.actors.items()
-              if not a.is_pc and not a.is_down]
+              if not a.is_pc and not a.is_down
+              and (not (companions_mod.is_companion(a) or companions_mod.owned(a))
+                   or companions_mod.names_them(player_text, a))]
     targets_dead = [r for r in raw_intents
                     if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
                     and str(r.get("target", "")) in dead]
     if not targets_dead:
+        return None
+    # A body the player names is the blow they declared — "I shoot the thug again"
+    # at a thug who has just gone down — and is theirs to waste, like kicking the
+    # fallen. Moving it would land it on whoever else is standing.
+    said = _name_words(redact_speech(player_text or ""))
+    if all(said & _name_words(scene.actors[str(r.get("target"))].name)
+           for r in targets_dead):
         return None
     if living:
         swap = living[0]
