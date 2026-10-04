@@ -796,6 +796,15 @@ def danger_of(doc) -> tuple[str, dict] | None:
     """
     if not is_reactive(doc):
         return None
+    # A danger the material states for the assay itself, when its harm is not a carrier
+    # effect: noqual's "magic recoils" (the owner's house rule, 2026-10-04). Its key is
+    # the `reactive` working trait's, so what the assayer learns from it is that the
+    # metal is reactive — learned by having their wards go quiet.
+    stated = _field(doc, "assay_danger", None)
+    if isinstance(stated, dict) and stated.get("type"):
+        key = next((k for k, spec, _g in _material_specs(doc)
+                    if str(spec.get("trait") or "") == "reactive"), "reactive")
+        return key, {k: v for k, v in stated.items() if k != "note"}
     for key, spec, _group in _material_specs(doc):
         if str(spec.get("trigger") or "") == "carried":
             effect = {k: v for k, v in spec.items() if k not in ("trigger", "book")}
@@ -864,6 +873,8 @@ def apply_danger(engine, actor, material_id: str, effect: dict | None,
     mid = doc_id(doc) if doc else str(material_id)
     name = str(doc.get("name") or mid)
     spec = dict(effect)
+    if str(spec.get("type") or "") == "suppress_magic":
+        return [_suppress_magic(engine, actor, mid, name, spec, because)]
     use = consumables.plan({"name": name, "specs": [spec], "count": 1}, how="drink",
                            target=actor.ref, because=because or f"assaying {name}")
     made = [dict(i, visibility="hidden") for i in use.intents]
@@ -881,6 +892,46 @@ def apply_danger(engine, actor, material_id: str, effect: dict | None,
     except IntentError:
         return []
     return list(res.outcomes)
+
+
+def _suppress_magic(engine, actor, mid: str, name: str, spec: dict, because: str):
+    """Noqual's recoil (the owner's HOUSE RULE, 2026-10-04, contracts §13.2): the
+    assayer's active magical effects — buffs and wards — are suppressed for 1d4 rounds.
+
+    One `ActiveEffect` through the one applicator, `origin: item:<material>`, granting
+    `suppressed.magic` (`sheet.MAGIC_SUPPRESSED`); `Actor._buff_mods` skips a spell's
+    modifiers and the engine skips the bearer's wards while it holds. Nothing is removed
+    or re-timed: the book's antimagic field "suppresses" a spell, which resumes when the
+    field is gone, and so do these when the recoil wears off (law 2 — remove the effect
+    and its contribution evaporates; here the contribution is the silence). The duration
+    is rolled by `Engine._duration_rounds`, the one place every duration is rolled. The
+    tell says it (law 3)."""
+    from .activeeffect import ActiveEffect
+    from .engine import Outcome
+    from .sheet import MAGIC_SUPPRESSED, is_magical
+
+    rounds = engine._duration_rounds(spec.get("duration"), default_unit="round") \
+        if engine is not None else None
+    rounds = max(1, int(rounds or 1))
+    held = [e for e in actor.effects if is_magical(e)]
+    actor.apply_effect(ActiveEffect(
+        name="magic recoils", kind="situation", key="magic-recoils",
+        source=because or f"assaying {name}", origin=f"item:{mid}",
+        duration="rounds", rounds_left=rounds, tags=(MAGIC_SUPPRESSED,),
+        payload={"house_rule": True}))
+    wards = [w for w in (getattr(getattr(engine, "scene", None), "wards", None) or ())
+             if getattr(w, "owner", "") == actor.ref]
+    span = f"{rounds} round{'s' if rounds != 1 else ''}"
+    tell = (f"The {name.lower()} recoils from magic: "
+            + (f"the spells and wards on {actor.name} go quiet for {span}."
+               if held or wards else
+               f"{actor.name} carries no magic for it to touch, but for {span} it would."))
+    return Outcome(intent_id="assay", op="condition",
+                   effects=[{"ref": actor.ref, "kind": "condition",
+                             "condition": "magic-recoils", "rounds_left": rounds,
+                             "origin": f"item:{mid}", "house_rule": True,
+                             "suppressed": [str(e.source or e.name) for e in held]}],
+                   tell=tell, because=because or f"assaying {name}")
 
 
 def worked(actor, material_id: str, *, clock: int) -> list[str]:

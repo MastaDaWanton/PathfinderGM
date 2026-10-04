@@ -276,6 +276,38 @@ def _good_weight(name: str, count: int) -> float | None:
     return None
 
 
+def _forged_weight(item) -> tuple[float, str] | None:
+    """(pounds each, record id) for a forged weapon, suit or shield on the shelf, from its
+    build — or None for anything not forged. The shelf entry's `base` is the record's
+    name ("Fine Iron Longsword"), which no goods table holds, so before lane H a forged
+    blade in the pack was listed as `unknown` and weighed nothing."""
+    from . import forge_items
+    from . import weapons as weapons_mod
+    from .tables import ARMOUR, SHIELDS
+
+    rec = forge_items.record_of(item)
+    if rec is None:
+        return None
+    gear = str(rec.get("gear") or "")
+    base = str(rec.get("base") or "")
+    b = forge_items.build(rec)
+    rid = str(rec.get("id") or rec.get("name") or "").lower()
+    if gear == "weapon":
+        key = weapons_mod.key_for(base)
+        if not key:
+            return None
+        row = forge_items.weapon_row(dict(weapons_mod.all_weapons()[key]), b, rec)
+        return float(row.get("weight_lb") or 0), rid
+    table = ARMOUR if gear == "armour" else SHIELDS
+    from . import armour as armour_mod
+
+    _kind, key = armour_mod.key_for(base)
+    row = table.get(key or base.lower())
+    if row is None:
+        return None
+    return float(forge_items.armour_row(row, b).get("lb") or 0), rid
+
+
 def load(actor) -> dict:
     """What this character carries, in pounds, against what they can.
 
@@ -292,10 +324,20 @@ def load(actor) -> dict:
         if not k or k == "unarmed":
             continue
         lb += float(weapons_mod.all_weapons()[k].get("weight_lb") or 0)
+    # What is worn weighs what it is made of: a forged suit's or shield's row comes from
+    # its build (`Actor.armour_stats` / `shield_stats`), so a mithral shirt is 12.5 lb, not
+    # the 25 of the table's chain shirt (measured 2026-10-04, lane H: this read the base
+    # row and a half-weight metal changed nothing in the pack).
+    worn_records: list[str] = []
     for attr, table in (("armour", ARMOUR), ("shield", SHIELDS)):
         key = str(getattr(actor, attr, "none") or "none").lower()
         if key != "none" and key in table:
-            lb += float(table[key].get("lb") or 0)
+            stats = getattr(actor, f"{attr}_stats", None)
+            lb += float((stats() if callable(stats) else table[key]).get("lb") or 0)
+            rec_of = getattr(actor, f"{attr}_record", None)
+            rec = rec_of() if callable(rec_of) else None
+            if rec is not None:
+                worn_records.append(str(rec.get("id") or rec.get("name") or "").lower())
     for name, n in (getattr(actor, "goods", None) or {}).items():
         n = int(n or 0)
         if n <= 0:
@@ -320,6 +362,17 @@ def load(actor) -> dict:
         n = int(getattr(s, "count", 0) or 0)
         base = str(getattr(s, "base", "") or "")
         if n <= 0 or "outfit" in base.lower():
+            continue
+        forged = _forged_weight(s)
+        if forged is not None:
+            lb_each, rid = forged
+            # The worn suit (or shield) never leaves the pack — its record stays in the
+            # stock while the slot holds a copy — and it was counted above at its worn
+            # weight, so one of this stack is already on the scale.
+            if rid in worn_records:
+                worn_records.remove(rid)
+                n -= 1
+            lb += lb_each * max(0, n)
             continue
         got = _good_weight(base, n)
         if got is None:

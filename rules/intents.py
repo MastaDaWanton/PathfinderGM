@@ -15,6 +15,8 @@ failed and kept failing.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import difflib
 import functools
 import re
@@ -164,10 +166,37 @@ def _square(raw, op: str, index: int) -> tuple[int, ...]:
     )
 
 
+# The names and ids of the crafted weapons the people in the scene carry, for the parse
+# below. Parse cannot see an actor — it runs before anybody is looked up — so the engine
+# that is about to validate a batch says, for the length of that call, which forged blades
+# exist (`Engine.validate` → `carrying`). Measured 2026-10-04 (lane H, contracts §12 item 2):
+# "attack with the Fine Iron Longsword", or its record id, was refused at parse as "no
+# such weapon" although the engine's legality check already resolved crafted records
+# (`Actor._crafted_weapon`) — the forged blade could be drawn and never swung by name.
+_CARRIED_WEAPONS: contextvars.ContextVar[frozenset] = contextvars.ContextVar(
+    "carried_crafted_weapons", default=frozenset())
+
+
+@contextlib.contextmanager
+def carrying(names):
+    """Let these crafted weapon names through the parse gate while the block runs."""
+    token = _CARRIED_WEAPONS.set(frozenset(
+        " ".join(str(n).split()).lower() for n in names or () if str(n).strip()))
+    try:
+        yield
+    finally:
+        _CARRIED_WEAPONS.reset(token)
+
+
 def _known_weapon(name) -> bool:
     """Imported lazily: `rules.weapons` reads Django settings, and this module is imported
     before settings are configured in some entry points."""
     from .weapons import has
+
+    # A forged weapon somebody here carries: let through as the natural weapons are, and
+    # checked against the actor by the engine's legality step (`_crafted_weapon`).
+    if " ".join(str(name).split()).lower() in _CARRIED_WEAPONS.get():
+        return True
 
     # The armament's own weapon exists on the wearer, not in the table — the sheet
     # builds it from the class's blood die. Validation lets it through; whether the

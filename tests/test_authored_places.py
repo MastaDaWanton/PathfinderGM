@@ -184,5 +184,10 @@ def test_both_shipped_worlds_are_read_the_same_way():
     assert len(towns) >= 60, len(towns)
     for ent in towns[:12]:
         got = places.home_set(ent)
-        assert got and all(p.origin == "world" for p in got), ent.name
+        # Authored, but for the two things the app appends to an authored settlement that
+        # lacks them: a way in (2026-09-21) and, in a city, a smithy (2026-10-04).
+        appended = {"the way in", *places.APPENDED_TO_AUTHORED.get(places.scale_of(ent), ())}
+        assert got and all(p.origin == "world" or (p.origin == "generated"
+                                                   and p.name in appended)
+                           for p in got), ent.name
         assert all(places.terrain_of(p.id) for p in got), ent.name

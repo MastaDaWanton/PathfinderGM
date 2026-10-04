@@ -230,6 +230,45 @@ class Reduction:
 # CRB, Special Materials: adamantine "ignores hardness less than 20".
 ADAMANTINE_IGNORES_BELOW = 20
 
+# A blow's trait naming one tag of whoever made it: "attacker:type.magical-beast". Traits
+# are the one channel that travels with damage from the swing to `take_damage` (through
+# interception), so who struck rides there rather than in a second parameter every damage
+# door would have to thread. Never a bypass word: `Reduction.bypassed_by` compares whole
+# trait words, and no DR is bypassed by "attacker:...".
+ATTACKER_TRAIT = "attacker:"
+
+
+# Magic held off: the tag an effect grants while the bearer's active magic is suppressed
+# (`Actor._buff_mods` skips a magical effect's modifiers, `Engine` skips the bearer's
+# wards). Granted today by one thing, the owner's HOUSE RULE of 2026-10-04 — assaying
+# noqual, "magic recoils": the assayer's buffs and wards are suppressed for 1d4 rounds
+# (contracts §13.2, `knowledge.apply_danger`). Suppressed, not dispelled: the book's
+# antimagic field "suppresses" and the spell resumes when the field is gone, which is the
+# shape this keeps — the clocks keep running underneath.
+MAGIC_SUPPRESSED = "suppressed.magic"
+# What counts as magic for it: effects a spell or a ward put there (the provenance stamp,
+# stage 8). A herbal tea's buff (`item:<herb>`) is chemistry and stays; a class ability's
+# rage stays (the owner named buffs and wards).
+MAGIC_ORIGINS = ("spell:", "ward:")
+
+
+def is_magical(effect) -> bool:
+    return str(getattr(effect, "origin", "") or "").startswith(MAGIC_ORIGINS)
+
+
+def attacker_traits(actor) -> tuple[str, ...]:
+    """The `attacker:` traits for a blow this creature makes — its type and subtype tags."""
+    if actor is None:
+        return ()
+    # Both stores `has_state` reads: the stat block's standing type tags and any an effect
+    # grants (a polymorph's new body, a template).
+    try:
+        tags = list(actor.standing_tags()) + [t for e in actor.effects for t in e.tags]
+    except Exception:  # noqa: BLE001 — a body with no tags strikes as nobody in particular
+        return ()
+    return tuple(f"{ATTACKER_TRAIT}{t}" for t in sorted(set(map(str, tags)))
+                 if t.startswith(("type.", "subtype.")))
+
 
 def _trait_word(text) -> str:
     """"Cold_Iron", "cold-iron" and "cold iron" as one word sequence."""
@@ -691,6 +730,23 @@ class Actor:
                 return rec
         return None
 
+    def crafted_weapon_names(self) -> set[str]:
+        """Every word a crafted weapon this creature carries answers to — its record's id
+        and name, and its shelf key — for the parse gate (`intents.carrying`)."""
+        from . import forge_items
+
+        names: set[str] = set()
+        for rec in self.worn.values():
+            if isinstance(rec, dict) and _is_weapon_record(rec):
+                names.update(str(rec.get(k) or "") for k in ("id", "name"))
+        for sid, item in self.stock.items():
+            rec = forge_items.record_of(item)
+            if rec is None and getattr(item, "weapon", None):
+                rec = item.as_dict()
+            if rec is not None and _is_weapon_record(rec):
+                names.update((str(sid), str(rec.get("id") or ""), str(rec.get("name") or "")))
+        return {" ".join(n.split()).lower() for n in names if n.strip()}
+
     def _crafted_weapon(self, key: str) -> dict | None:
         """The weapons-table row for a crafted weapon record, or None (contract §5)."""
         from . import forge_items
@@ -746,6 +802,40 @@ class Actor:
 
         base = ARMOUR.get(self.armour, ARMOUR["none"])
         rec = self.armour_record()
+        if rec is None:
+            return base
+        return forge_items.armour_row(base, forge_items.build(rec))
+
+    def shield_record(self) -> dict | None:
+        """The forged shield on the arm, when it is the shield being carried — the armour
+        slot's rule (`armour_record`), for the shield slot. `shield` stays the base
+        shield's table key ("light shield"), so the hands-clash rule, the donning time and
+        proficiency keep the base shield's facts; the record says what it was made of.
+
+        Wave 1 refused a forged shield with a sentence ("forged shields cannot be carried
+        into a fight yet") although the bench made them (contracts §12 item 6)."""
+        from . import forge_items
+        from . import armour as armour_mod
+
+        if self.shield in ("", "none", None):
+            return None
+        for name in self.slots.get("shield") or ():
+            rec = self.worn.get(str(name or "").strip().lower())
+            if not forge_items.is_forged(rec) or rec.get("gear") != "shield":
+                continue
+            kind, key = armour_mod.key_for(str(rec.get("base") or ""))
+            if (key or str(rec.get("base") or "").lower()) == self.shield:
+                return rec
+        return None
+
+    def shield_stats(self) -> dict:
+        """The carried shield's row: the table's, or a forged shield's from its build. Its
+        material's AC folds into the SHIELD bonus, as a suit's folds into the armour bonus
+        (plan §5.2), so it never meets the shield's own bonus as a second term."""
+        from . import forge_items
+
+        base = SHIELDS.get(self.shield, SHIELDS["none"])
+        rec = self.shield_record()
         if rec is None:
             return base
         return forge_items.armour_row(base, forge_items.build(rec))
@@ -993,11 +1083,12 @@ class Actor:
 
         crafted = {k for k in self.worn}
         suit = self.armour_record()
+        arm = self.shield_record()
         for rec in self.worn_items():
             if _is_weapon_record(rec):
                 continue                        # its own swing only: read below
             if forge_items.is_forged(rec):
-                if rec is suit:
+                if rec is suit or rec is arm:
                     read(forge_items.standing_specs(forge_items.build(rec)),
                          str(rec.get("name") or "worn gear"))
                 continue
@@ -1527,7 +1618,7 @@ class Actor:
         # hastily", 1 worse (CRB "Don Hastily"), and that arrives as an ActiveEffect so
         # taking the suit off takes it away (`Engine._op_wear`).
         return (int(self.armour_stats()["acp"])
-                + SHIELDS.get(self.shield, SHIELDS["none"])["acp"]
+                + int(self.shield_stats()["acp"])
                 + sum(m.value for m in self._buff_mods("combat_mod", "armour_check")))
 
     def can_act(self) -> bool:
@@ -2329,7 +2420,7 @@ class Actor:
             # A forged suit's row comes from its build (`armour_stats`): its material's AC
             # folded into the armour bonus, its max Dex moved.
             armour = self.armour_stats()
-            shield = SHIELDS.get(self.shield, SHIELDS["none"])
+            shield = self.shield_stats()
             # Typed, so the channels collide as 1e intends: bracers of armour over a
             # breastplate is the better of the two, not the sum, while a ring's
             # deflection sits beside either untouched.
@@ -2742,7 +2833,17 @@ class Actor:
         # The worn forged suit's build: adamantine armour's book DR, read live from the
         # suit while it is worn (contract §5), so taking it off takes the DR with it.
         suit = self.armour_record()
+        # A suit's DR may be conditional on who struck (elysian bronze: "against magical
+        # beasts and monstrous humanoids"). The blow names its maker in its traits as
+        # `attacker:<tag>` (`Engine` adds them on a weapon hit), and the clause is asked
+        # through `_when_holds` like every other; a blow that names nobody — a fall, a
+        # hazard — drops the conditional row, never applies it.
+        blow = {"attacker_tags": frozenset(
+            str(t)[len(ATTACKER_TRAIT):] for t in traits or ()
+            if str(t).startswith(ATTACKER_TRAIT))}
         for s in self._armour_build_specs("damage_reduction"):
+            if not _when_holds(s.get("when"), blow):
+                continue
             if int(s.get("amount", 0) or 0) > 0 and wants(s):
                 pool.append(Reduction(int(s["amount"]), str(s.get("bypass") or ""),
                                       str((suit or {}).get("name") or "armour")))
@@ -3548,7 +3649,16 @@ class Actor:
                   "category": w.get("category", "melee"),
                   "light": bool(w.get("light", False)),
                   "finessable": bool(w.get("finessable", False)),
-                  "ranged": w.get("category") == "ranged"}
+                  "ranged": w.get("category") == "ranged",
+                  # Alchemical silver's −1 damage is "slashing or piercing only" (CRB,
+                  # Special Materials), and singing steel counts as silver. The weapon
+                  # table writes the type as words ("piercing or slashing", "B and P"
+                  # spelled out), so either word anywhere in it answers yes. Until
+                  # lane H nothing set this field and the clause was dropped on every
+                  # swing (`_when_holds`: an unevaluable key means no).
+                  "slashing_or_piercing": any(
+                      word in str(w.get("type") or "").lower()
+                      for word in ("slashing", "piercing"))}
         rec = w.get("crafted_record")
         if isinstance(rec, dict):
             weapon["key"] = str(w.get("crafted_base") or key)
@@ -3665,7 +3775,13 @@ class Actor:
         """
         want = str(target).lower()
         out: list[Modifier] = []
+        # Magic held off (noqual's recoil, `MAGIC_SUPPRESSED`): a spell's buff contributes
+        # nothing while the suppressing effect holds and everything again when it ends —
+        # the effect is not removed, its contribution is (law 2, read live).
+        held_off = self.has_state(MAGIC_SUPPRESSED)
         for e in self.effects:
+            if held_off and is_magical(e):
+                continue
             for m in e.modifiers:
                 amount = int(m.get("amount", 0) or 0)
                 if m.get("kind") == kind and str(m.get("target", "")).lower() == want \
@@ -4123,7 +4239,7 @@ def body_slots(actor: Actor) -> dict:
         if key == "armor" and actor.armour != "none":
             items[0] = actor.armour_stats()["name"]
         if key == "shield" and actor.shield != "none":
-            items[0] = SHIELDS[actor.shield]["name"]
+            items[0] = actor.shield_stats()["name"]
         rules_limit = SLOT_RULES_LIMIT.get(key, 1)
         return {
             "key": key,
@@ -4299,7 +4415,7 @@ def full_sheet(actor: Actor) -> dict:
         })
 
     armour = actor.armour_stats()
-    shield = SHIELDS.get(actor.shield, SHIELDS["none"])
+    shield = actor.shield_stats()
 
     # Every named thing the sheet might show, with its text, for the click-popover.
     # The feats' computed effect lines are merged on top of the static glossary, because
@@ -4708,6 +4824,19 @@ def _scope_holds(scope, doc: dict, ctx: dict | None) -> bool:
     return True
 
 
+def _kind_leaf(word) -> str:
+    """A creature type word as its tag leaf: "magical beast" -> "magical-beast", the
+    spelling `states.type_tags` writes."""
+    return _trait_word(word).replace(" ", "-")
+
+
+def _is_of_kind(actor, field_name: str, value) -> bool:
+    """Whether this creature is of the type (or subtype) named — any of a list (elysian
+    bronze's "magical beast" or "monstrous humanoid") — by tag prefix (law 1)."""
+    wanted = value if isinstance(value, (list, tuple)) else [value]
+    return any(actor.has_state(f"{field_name}.{_kind_leaf(v)}") for v in wanted)
+
+
 def _when_holds(when, ctx: dict | None) -> bool:
     """A `when` is a condition on the roll context; an unevaluable key means no.
 
@@ -4715,6 +4844,13 @@ def _when_holds(when, ctx: dict | None) -> bool:
     `{"choice": "power_attack"}` asks the attack op's boolean; `{"range_ft": {"lte":
     30}}` needs a range the context does not carry yet, so it is dropped — the plan's
     rule for every clause nothing can evaluate.
+
+    The forge's material data (lane H, 2026-10-04) added `target.armour_metal` (the
+    defender wears iron or steel), `attacker` (who struck, by type tag — from
+    `attacker_actor` or the blow's `attacker:` traits) and the weapon field
+    `slashing_or_piercing` (`_roll_context`); `against` is the generic equality below,
+    passed by the spell saves; `armour.weight` is answered at build (`forge_items.at_build`)
+    and never reaches here.
     """
     if not when:
         return True
@@ -4739,11 +4875,39 @@ def _when_holds(when, ctx: dict | None) -> bool:
             if defender is None or not isinstance(want, dict):
                 return False
             for field_name, value in want.items():
+                if field_name == "armour_metal":
+                    # Inubrix's house approximation of "ignores armour and shield bonuses
+                    # from iron or steel": the defender has metal on (`armour.wears_metal`,
+                    # the suit or the shield). Asked of what is worn, never of a name.
+                    from . import armour as armour_mod
+
+                    if bool(value) != armour_mod.wears_metal(defender):
+                        return False
+                    continue
                 if field_name not in ("type", "subtype"):
                     return False
+                if not _is_of_kind(defender, field_name, value):
+                    return False
+        elif key == "attacker":
+            # Elysian bronze's DR "against magical beasts and monstrous humanoids": asked
+            # of whoever made the blow. The damage path knows them only by the blow's
+            # traits, so `Actor.damage_reduction` hands their type tags in as
+            # `attacker_tags`; a roll that knows the actor passes `attacker_actor`.
+            if not isinstance(want, dict):
+                return False
+            who = ctx.get("attacker_actor")
+            tags = ctx.get("attacker_tags")
+            if who is None and tags is None:
+                return False
+            for field_name, value in want.items():
+                if field_name not in ("type", "subtype"):
+                    return False
+                if who is not None:
+                    if not _is_of_kind(who, field_name, value):
+                        return False
+                    continue
                 wanted = value if isinstance(value, (list, tuple)) else [value]
-                if not any(defender.has_state(f"{field_name}.{_trait_word(v).replace(' ', '-')}")
-                           for v in wanted):
+                if not any(f"{field_name}.{_kind_leaf(v)}" in tags for v in wanted):
                     return False
         elif isinstance(want, dict):
             have = ctx.get(key)
@@ -5067,8 +5231,28 @@ def _stock(raw: dict):
     from . import forge_items
     from .crafting import from_stock_dict
 
-    return {k: (forge_items.stock_item(v) if forge_items.is_forged(v) else from_stock_dict(v))
-            for k, v in raw.items()}
+    out = {}
+    for k, v in raw.items():
+        v = _migrated(v)
+        out[k] = forge_items.stock_item(v) if forge_items.is_forged(v) else from_stock_dict(v)
+    return out
+
+
+def _migrated(d):
+    """An old "Iron Work" record (flat specs, no pieces) re-derived on load as a forged
+    record — plan §14, `blacksmith.migrate_old_record`, which keeps the old record beside
+    it for one version. Anything else comes back as it went in. Measured 2026-10-04 (lane
+    H): an old forge blade loaded as a plain shelf entry whose numbers were its flat specs,
+    read by none of the forge's readers (no material, no strikes, no build)."""
+    if not isinstance(d, dict):
+        return d
+    from . import blacksmith
+
+    try:
+        new = blacksmith.migrate_old_record(d)
+    except Exception:  # noqa: BLE001 — a record the migration cannot read stays as it was
+        return d
+    return new if new is not None else d
 
 
 def _progress_dict(p) -> dict:
@@ -5289,7 +5473,9 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         notes=data.get("notes", ""),
         slots={k: list(v) for k, v in (data.get("slots") or {}).items()
                if k in SLOTS},
-        worn={str(k).strip().lower(): dict(v)
+        # The worn copy migrates with the shelf's (plan §14), keeping its key: the slot
+        # names it, and an old blade in hand must still be the blade in hand.
+        worn={str(k).strip().lower(): dict(_migrated(v))
               for k, v in (data.get("worn") or {}).items() if isinstance(v, dict)},
     )
     if data.get("active_effects") is not None:

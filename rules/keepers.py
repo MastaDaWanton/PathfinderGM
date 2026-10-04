@@ -346,6 +346,14 @@ def staff(engine):
     here = places_mod.find(engine.places(), at)
     if here is None:
         return None
+    if _held(scene, here):
+        # Somebody's own place is kept by whoever holds it. Measured 2026-10-04 (lane H,
+        # contracts §12 item 3): the player founded "my own forge" (kind forge, owner pc),
+        # walked in, and a hired smith was stood behind the anvil of the PC's own smithy —
+        # and `places.smithy_here` then named that stranger as its keeper. Not stamped in
+        # `staffed`: if the place is sold or seized (the holder's effect removed), it is
+        # an ordinary counter again and may be staffed on the next visit.
+        return None
     from . import market as market_mod
 
     location = _location(engine.world, scene.location_id)
@@ -367,6 +375,24 @@ def staff(engine):
             first = stand_up(scene, engine.world, at, general, even_when_shut=True)
             made = made or first
     return made
+
+
+def _held(scene, place) -> bool:
+    """Whether a place has a holder: its `owner` is somebody in the store who holds it
+    (`holds.place.<slug>`, the `found` door's effect). The owner field is the claim and
+    the effect is the fact, as `places.smithy_here` reads it."""
+    owner = str(getattr(place, "owner", "") or "")
+    if not owner:
+        return False
+    people = getattr(scene, "people", None) or {}
+    holder = people.get(owner)
+    if holder is None:
+        try:
+            holder = (getattr(scene, "actors", None) or {}).get(owner)
+        except Exception:  # noqa: BLE001
+            holder = None
+    slug = str(getattr(place, "id", "") or "").rsplit("/", 1)[-1]
+    return holder is not None and bool(slug) and holder.has_state(f"holds.place.{slug}")
 
 
 def _location(world, location_id: str):

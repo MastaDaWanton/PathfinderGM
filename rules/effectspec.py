@@ -61,7 +61,13 @@ GEAR_TARGETS: dict[str, dict] = {
 # What a weapon counts as against damage reduction and hardness. A list, and meant to grow:
 # `Reduction.bypassed_by` has existed on the sheet since stage 2 and nothing ever passed it a
 # trait, because there was no way to say a blade *was* cold iron.
-STRIKES_AS: list[str] = ["cold_iron", "silver", "adamantine"]
+#
+# `ghost_touch` (lane H, 2026-10-04) is the book's own clause, not a material: "An
+# incorporeal creature's 50% reduction in damage from corporeal sources does not apply to
+# attacks made against it with ghost touch weapons" (CRB, ghost touch). Ghost salt
+# blanching gives it as a finish; until it was here lane C's data had to stand in a +2
+# against undead for it, which is a different creature and a different rule.
+STRIKES_AS: list[str] = ["cold_iron", "silver", "adamantine", "ghost_touch"]
 
 # How a material behaves while it is being worked. Read by the bench only; none of them
 # reaches the finished item (plan §5.5). The first four are Pathfinder Unchained's, the rest

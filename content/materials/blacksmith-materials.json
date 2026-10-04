@@ -2003,7 +2003,7 @@
    "kind": "metal",
    "tier": "exotic",
    "craft_dc": 25,
-   "text": "Pale green and crystalline, and magic slides off it. Noqual is half weight; its weapons bite constructs and made undead harder, and its armour moves a class lighter and wards its wearer against spells, at a fifth more spell failure for any caster. Any magic item made with it costs 5,000 gp more to enchant. Worked as iron, but assaying it is dangerous.",
+   "text": "Pale green and crystalline, and magic slides off it. Noqual is half weight; its weapons bite constructs and made undead harder, and its armour moves a class lighter and wards its wearer against spells, at a fifth more spell failure for any caster. Any magic item made with it costs 5,000 gp more to enchant. Worked as iron, but assaying it is dangerous: magic recoils from it, and whatever spells and wards the assayer carries go quiet for a few moments (a house rule).",
    "risky": false,
    "source": "mined",
    "biomes": [
@@ -2140,6 +2140,15 @@
     }
    ],
    "enchant_surcharge_gp": 5000,
+   "assay_danger": {
+    "type": "suppress_magic",
+    "duration": {
+     "amount": "1d4",
+     "unit": "round"
+    },
+    "house": true,
+    "note": "House rule (the owner, 2026-10-04): magic recoils. Assaying a sliver suppresses the assayer's active magical effects, buffs and wards, for 1d4 rounds."
+   },
    "book": true
   },
   {
@@ -5715,7 +5724,7 @@
    "kind": "treatment",
    "tier": "rare",
    "craft_dc": 20,
-   "text": "A white alchemical crust worked over the striking surface. In the book it lets a weapon deal full damage to incorporeal creatures until it next hits; the app cannot yet say that, so here it bites the undead harder for one hit.",
+   "text": "A white alchemical crust worked over the striking surface. The weapon strikes as ghost touch: an incorporeal creature takes its full damage instead of half, until the weapon next hits.",
    "risky": false,
    "source": "bought",
    "biomes": [],
@@ -5730,18 +5739,12 @@
    "price_gp": 200,
    "weapon": [
     {
-     "type": "combat_mod",
-     "target": "damage",
-     "amount": 2,
-     "bonus_type": "untyped",
-     "when": {
-      "target": {
-       "type": "undead"
-      }
-     },
+     "type": "strikes_as",
+     "target": "ghost_touch",
      "uses": "once",
      "uses_count": 1,
-     "note": "house stand-in: the book's full damage to incorporeal creatures has no vocabulary yet"
+     "note": "the book's full damage to incorporeal creatures until the weapon next hits",
+     "book": true
     }
    ],
    "working": [
@@ -5757,7 +5760,7 @@
    "finishes": [
     "weapon"
    ],
-   "book": false
+   "book": true
   },
   {
    "id": "alchemical-silver-plating",
