@@ -444,3 +444,17 @@ def test_the_herb_shell_loads_on_the_core_with_its_api_whole(run):
     assert run["herbOpenBefore"] is False
     assert run["herbOpen"] == {"open": True, "core": True, "hash": "#bench"}
     assert run["herbLiveClose"] is True, "Close dropped the herb bench's live game"
+
+
+def test_the_clock_face_waits_for_the_steps_game():
+    """Seen live on the forge at the merge (2026-10-04): the four-second clock face turned
+    over the anvil for the game's opening seconds, covering the blank while the first blows
+    had to be struck; 09 waits only for the dice mat, and the game starts as the mat closes.
+    The herb bench had the same overlap. A roll a game follows holds the turn, and the bench
+    releases it when the game settles, with no timer polling (the core runs no loop)."""
+    core = _code(_src(CORE))
+    assert "C.releaseClock = function" in core and "heldClock = [before, after]" in core
+    for path in (SHELL, TABLE_JS / "40-forge-shell.js"):
+        shell = _src(path)
+        assert "tickClock(r.minutes, r.clock, !!(r.roll && r.roll.success && r.token))" in shell, path
+        assert shell.count("C.releaseClock()") >= 3, path

@@ -556,15 +556,21 @@
         body.face = face;
         return B.api("/api/bench/roll", body);
       },
-      landed: function (r) { tickClock(r.minutes, r.clock); },
+      // A success is followed by the step's game: the clock face waits for it (29's turnClock).
+      landed: function (r) { tickClock(r.minutes, r.clock, !!(r.roll && r.roll.success && r.token)); },
       face: function (r) { return r.roll.face; },
       verdict: function (r) { return r.verdict; },
     }).then(function (roll) {
       B.busy = false;
-      if (roll.roll && roll.roll.success && roll.token) return play(roll);
+      if (roll.roll && roll.roll.success && roll.token) {
+        return Promise.resolve(play(roll)).then(
+          function (x) { C.releaseClock(); return x; },
+          function (e) { C.releaseClock(); throw e; });
+      }
       return failed(roll).then(focusAfterRoll);
     }).catch(function (err) {
       B.busy = false;
+      C.releaseClock();
       C.closeMat();
       $id("bench-why").textContent = err.message || String(err);
       B.say(err.message || String(err));
@@ -586,13 +592,13 @@
   // The scene clock, moved by the step's time (UI plan §4.1). The footer reads the API's
   // own label; a step of an hour or more also turns the table's clock face (09-clock.js),
   // which waits for the dice mat to close before it shows.
-  function tickClock(minutes, clock) {
+  function tickClock(minutes, clock, hold) {
     var g = B.state && B.state.ground;
     if (clock && B.state) B.state.clock = clock;
     if (g && typeof g.minute === "number" && minutes) {
       var before = g.minute, after = before + minutes;
       g.minute = after;
-      C.turnClock(before, after);
+      C.turnClock(before, after, hold);
     }
     renderFoot();
   }

@@ -192,10 +192,24 @@
   // A step of an hour or more turns the table's clock face (09-clock.js) with its own
   // animation, which waits for the dice mat to close before it shows. 09 keeps its own rule
   // (an hour or more) and its own reduced-motion face; the bench only says when.
-  C.turnClock = function (before, after) {
-    if (after - before >= 60 && typeof clockWhenClear === "function") {
-      try { clockWhenClear(before, after, ""); } catch (err) { /* the label still moved */ }
-    }
+  //
+  // It also waits for the step's minigame. 09 waits only for the dice mat, and the game
+  // starts the moment the mat closes, so the four-second clock face played over the work
+  // for the game's opening seconds: seen live on the forge at the merge (2026-10-04), a
+  // clock dial covering the blank on the anvil while the first blows had to be struck. The
+  // herb bench had the same overlap. A roll that a game will follow passes `hold`: the turn
+  // is kept until the bench calls `releaseClock` when the game settles. No timer polls for
+  // the game (the core runs no loop); the shell that started the game says when it ended.
+  var heldClock = null;
+  C.turnClock = function (before, after, hold) {
+    if (!(after - before >= 60) || typeof clockWhenClear !== "function") return;
+    if (hold) { heldClock = [before, after]; return; }
+    try { clockWhenClear(before, after, ""); } catch (err) { /* the label still moved */ }
+  };
+  C.releaseClock = function () {
+    var h = heldClock;
+    heldClock = null;
+    if (h) C.turnClock(h[0], h[1]);
   };
 
   // --- the flourish layer and the one-second rule (herb UI plan §10) ---------------------

@@ -564,3 +564,13 @@ def test_choosing_a_tab_never_shows_the_last_tabs_card_while_it_loads():
     sel = src[src.index("async function selectCraft("):src.index("function renderHerbalismMoved()")]
     assert sel.index("renderLoading();") < sel.index("await Promise.all(")
     assert "const seq = ++CRAFT_SEQ;" in sel and "if (seq !== CRAFT_SEQ) return;" in sel
+
+
+def test_the_frames_heat_reaches_the_stage_through_the_game_view():
+    """Found live at the merge (2026-10-04): the strip's gauge read 1,135 °C while the blank
+    on the anvil stayed grey for the whole game. The frame hands the temperature on only
+    through `view.heat` (33-bench-games.js `feed`), the stage's game view reads `heat_c`
+    from the game state, and no forge game carries `heat_c`. The shell forwards it."""
+    src = (ROOT / "play/static/js/table/40-forge-shell.js").read_text(encoding="utf-8")
+    assert 'if (view && typeof view.heat !== "function")' in src
+    assert 'view.heat = function (c) { stageCall("heat", c); }' in src

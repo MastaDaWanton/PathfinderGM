@@ -742,15 +742,21 @@
         body.face = face;
         return F.api("/api/forge/roll", body);
       },
-      landed: function (r) { tickClock(r.minutes, r.clock); },
+      // A success is followed by the step's game: the clock face waits for it (29's turnClock).
+      landed: function (r) { tickClock(r.minutes, r.clock, !!(r.roll && r.roll.success && r.token)); },
       face: function (r) { return r.roll.face; },
       verdict: function (r) { return r.verdict; },
     }).then(function (r) {
       F.busy = false;
-      if (r.roll && r.roll.success && r.token) return play(r, heat, order);
+      if (r.roll && r.roll.success && r.token) {
+        return Promise.resolve(play(r, heat, order)).then(
+          function (x) { C.releaseClock(); return x; },
+          function (e) { C.releaseClock(); throw e; });
+      }
       return failed(r).then(focusAfterRoll);
     }).catch(function (err) {
       F.busy = false;
+      C.releaseClock();
       C.closeMat();
       $id("forge-why").textContent = err.message || String(err);
       F.say(err.message || String(err));
@@ -763,11 +769,11 @@
     core.refocus(["forge-roll", FITS, '#forge-rack .fr-add[tabindex="0"]', "forge-close"]);
   }
 
-  function tickClock(minutes, clock) {
+  function tickClock(minutes, clock, hold) {
     var s = F.state;
     var before = s && s.clock && typeof s.clock.minute === "number" ? s.clock.minute : null;
     if (clock && s) s.clock = clock;
-    if (before != null && clock && typeof clock.minute === "number") C.turnClock(before, clock.minute);
+    if (before != null && clock && typeof clock.minute === "number") C.turnClock(before, clock.minute, hold);
     renderFoot();
   }
   F.tickClock = tickClock;
@@ -804,6 +810,13 @@
       // cools), through a view that forwards only that.
       var view = stageCall("game", method) || null;
       if (!view && stageMounted) view = { update: function () {}, heat: function (c) { stageCall("heat", c); } };
+      // The frame owns the metal's temperature and hands it on only through `view.heat`
+      // (33-bench-games.js `feed`); the stage's game view reads `heat_c` from the game's
+      // state, which no forge game carries. Found live at the merge, 2026-10-04: a blank at
+      // 1,135 °C on the gauge sat grey on the anvil for the whole game. Forward it.
+      if (view && typeof view.heat !== "function") {
+        view.heat = function (c) { stageCall("heat", c); };
+      }
       game = Promise.resolve(games.play({
         method: method, tuning: r.tuning || {}, heat: heat, mount: strip, stage: view,
         steady: F.steady(), reducedMotion: F.reduced(),
