@@ -45,6 +45,12 @@ renderers and catalogue entries:
 | `strikes_as` | `cold_iron`, `silver`, `adamantine` (extensible list `STRIKES_AS`) | none |
 | `working` | a trait id from `WORKING_TRAITS`: `easily_worked`, `flawless`, `malleable`, `pure`, `slaggy`, `sulfurous`, `clean_heat`, `quench_sensitive`, `narrow_window`, `forgiving`, `reactive`, `cleans_slag`, `weld_aid`, `brittle`, `hot_short` | `amount` optional |
 
+- **Sign convention (lane A, merged 7b49a9f):** a `gear_mod` amount is **added to the number as
+  `tables.ARMOUR` stores it**. Armour check penalty is stored negative, so a lighter penalty is a
+  **positive** amount (mithral `acp +3`) and a heavier one negative (iron `acp −2`); `asf` is a
+  positive percentage (mithral −10, noqual +20); `weight_pct −50` is half weight; `category −1`
+  is one weight class lighter, for movement only. `effectspec.is_drawback(spec)` decides which
+  direction is worse, per target.
 - `bonus_type: "material"` joins the bonus-type vocabulary. It stacks with every other type and
   never with itself.
 - Any effect may carry `"book": true` (a printed PF1e number: main piece only, never scaled) and
