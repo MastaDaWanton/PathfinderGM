@@ -591,6 +591,58 @@ def counter_for_want(want: str, choices, place: str, day: int, taken: dict | Non
     return best[0], best[1]
 
 
+# --- the town forge, by the hour (blacksmithing plan §10, contracts §8) -------------------------
+#
+# A town smithy is rented, not bought from: the smith's furnace, fuel and anvil for as
+# long as the work takes. One silver an hour, the plan's proposal and the UI plan's
+# footer ("At Brannoc's smithy, 1 sp an hour"). For scale: the Core Rulebook's services
+# table hires a trained hireling for 3 sp a DAY, so an hour at somebody else's furnace —
+# charcoal included — is dear on purpose, the price of skipping the furnace you would
+# otherwise have to own. Flat across village, town and city, as the Core table's
+# services are; the till tiers above size what a counter can PAY, not what it charges.
+#
+# In copper, because the purse arithmetic is (`goods.spend` takes copper) and a rent of
+# a tenth of an hour is a coin and a bit, never a fraction of a gold piece.
+FORGE_RENT_CP_PER_HOUR = 10
+
+
+def forge_rate(*, owned_by_party: bool = False) -> int:
+    """Copper an hour at a smithy: nothing at the party's own, the town rate elsewhere.
+    The one answer `places.smithy_here` puts in its `rate_cp_per_hour`."""
+    return 0 if owned_by_party else FORGE_RENT_CP_PER_HOUR
+
+
+def forge_rent(scene, hours: float, known=()) -> int:
+    """What `hours` at the forge the party is standing in costs, in copper (contracts §8).
+
+    Read off where the party is (`places.smithy_here`), never passed a rate: a caller
+    that could name its own rate is a second answer to what the smith charges. Nothing
+    when there is no smithy here, or it is the party's own.
+
+    Charged for every copper's worth of time begun — the smith does not split a coin —
+    so ten minutes is 2 cp, not 1.67 of one. Rounded to a millionth first so floating
+    point cannot charge a copper for nothing: 10 × 0.1 is 1.0000000000000002 in binary,
+    and a bare ceiling turns that one copper into two.
+
+    `known` is passed through to `smithy_here` (`Engine.places()`), for an authored
+    place whose id does not spell its name.
+    """
+    import math
+
+    from . import places as places_mod
+
+    try:
+        h = float(hours or 0)
+    except (TypeError, ValueError):
+        return 0
+    if not h > 0 or math.isinf(h):
+        return 0
+    here = places_mod.smithy_here(scene, known)
+    if here is None:
+        return 0
+    return int(math.ceil(round(int(here["rate_cp_per_hour"]) * h, 6)))
+
+
 def is_market(place_id: str, founded=()) -> bool:
     """Whether this place is a market with counters: the table's own "the market", or a
     place founded in play as one."""
