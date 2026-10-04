@@ -11,7 +11,9 @@ owner's approval. Licence: **Creative Commons Attribution 3.0** (CC BY 3.0,
 https://creativecommons.org/licenses/by/3.0/). Credit is due to each artist, and the app
 shows it in the manual's credits.
 
-Artists: Caro Asercion, Delapouite, Faithtoken, Lorc, Sbed.
+Artists: Caro Asercion, Delapouite, Faithtoken, Lorc, Sbed, Willdabeast.
+
+The forge's 35 icons were added 2026-10-04 the same way, with the owner's approval (docs/blacksmithing-contracts.md §13).
 
 Change made: the full-bleed background square was removed and the glyph filled black, so each
 file works as a CSS mask; the shapes themselves are unchanged.
@@ -64,6 +66,41 @@ file works as a CSS mask; the shapes themselves are unchanged.
 | `play/static/img/icons/taste.svg` | [delapouite/tongue](https://game-icons.net/1x1/delapouite/tongue.html) | Delapouite |
 | `play/static/img/icons/tincture.svg` | [lorc/brandy-bottle](https://game-icons.net/1x1/lorc/brandy-bottle.html) | Lorc |
 | `play/static/img/icons/wax.svg` | [lorc/honeycomb](https://game-icons.net/1x1/lorc/honeycomb.html) | Lorc |
+| `play/static/img/icons/alloy.svg` | [delapouite/melting-metal](https://game-icons.net/1x1/delapouite/melting-metal.html) | Delapouite |
+| `play/static/img/icons/anvil.svg` | [lorc/anvil](https://game-icons.net/1x1/lorc/anvil.html) | Lorc |
+| `play/static/img/icons/assay.svg` | [lorc/magnifying-glass](https://game-icons.net/1x1/lorc/magnifying-glass.html) | Lorc |
+| `play/static/img/icons/assemble.svg` | [lorc/hammer-nails](https://game-icons.net/1x1/lorc/hammer-nails.html) | Lorc |
+| `play/static/img/icons/bar.svg` | [lorc/metal-bar](https://game-icons.net/1x1/lorc/metal-bar.html) | Lorc |
+| `play/static/img/icons/bellows.svg` | [delapouite/bellows](https://game-icons.net/1x1/delapouite/bellows.html) | Delapouite |
+| `play/static/img/icons/blank.svg` | [lorc/sword-smithing](https://game-icons.net/1x1/lorc/sword-smithing.html) | Lorc |
+| `play/static/img/icons/breastplate.svg` | [lorc/breastplate](https://game-icons.net/1x1/lorc/breastplate.html) | Lorc |
+| `play/static/img/icons/brittle.svg` | [delapouite/hammer-break](https://game-icons.net/1x1/delapouite/hammer-break.html) | Delapouite |
+| `play/static/img/icons/charcoal.svg` | [lorc/thrown-charcoal](https://game-icons.net/1x1/lorc/thrown-charcoal.html) | Lorc |
+| `play/static/img/icons/coal.svg` | [delapouite/coal-pile](https://game-icons.net/1x1/delapouite/coal-pile.html) | Delapouite |
+| `play/static/img/icons/finish.svg` | [delapouite/paint-brush](https://game-icons.net/1x1/delapouite/paint-brush.html) | Delapouite |
+| `play/static/img/icons/flux.svg` | [delapouite/powder-bag](https://game-icons.net/1x1/delapouite/powder-bag.html) | Delapouite |
+| `play/static/img/icons/fold.svg` | [lorc/hammer-drop](https://game-icons.net/1x1/lorc/hammer-drop.html) | Lorc |
+| `play/static/img/icons/forge.svg` | [lorc/anvil-impact](https://game-icons.net/1x1/lorc/anvil-impact.html) | Lorc |
+| `play/static/img/icons/grip.svg` | [lorc/sword-hilt](https://game-icons.net/1x1/lorc/sword-hilt.html) | Lorc |
+| `play/static/img/icons/guard.svg` | [delapouite/spiral-hilt](https://game-icons.net/1x1/delapouite/spiral-hilt.html) | Delapouite |
+| `play/static/img/icons/haft.svg` | [delapouite/wood-stick](https://game-icons.net/1x1/delapouite/wood-stick.html) | Delapouite |
+| `play/static/img/icons/hone.svg` | [lorc/sparkling-sabre](https://game-icons.net/1x1/lorc/sparkling-sabre.html) | Lorc |
+| `play/static/img/icons/hot.svg` | [lorc/fluffy-flame](https://game-icons.net/1x1/lorc/fluffy-flame.html) | Lorc |
+| `play/static/img/icons/ingot.svg` | [willdabeast/gold-bar](https://game-icons.net/1x1/willdabeast/gold-bar.html) | Willdabeast |
+| `play/static/img/icons/mail.svg` | [willdabeast/chain-mail](https://game-icons.net/1x1/willdabeast/chain-mail.html) | Willdabeast |
+| `play/static/img/icons/manual.svg` | [delapouite/rule-book](https://game-icons.net/1x1/delapouite/rule-book.html) | Delapouite |
+| `play/static/img/icons/ore.svg` | [faithtoken/ore](https://game-icons.net/1x1/faithtoken/ore.html) | Faithtoken |
+| `play/static/img/icons/plate.svg` | [delapouite/metal-plate](https://game-icons.net/1x1/delapouite/metal-plate.html) | Delapouite |
+| `play/static/img/icons/quench.svg` | [delapouite/steam](https://game-icons.net/1x1/delapouite/steam.html) | Delapouite |
+| `play/static/img/icons/quenchant.svg` | [delapouite/full-wood-bucket](https://game-icons.net/1x1/delapouite/full-wood-bucket.html) | Delapouite |
+| `play/static/img/icons/rivets.svg` | [delapouite/screw](https://game-icons.net/1x1/delapouite/screw.html) | Delapouite |
+| `play/static/img/icons/scale-mail.svg` | [lorc/scale-mail](https://game-icons.net/1x1/lorc/scale-mail.html) | Lorc |
+| `play/static/img/icons/shield.svg` | [delapouite/viking-shield](https://game-icons.net/1x1/delapouite/viking-shield.html) | Delapouite |
+| `play/static/img/icons/slaggy.svg` | [delapouite/stone-stack](https://game-icons.net/1x1/delapouite/stone-stack.html) | Delapouite |
+| `play/static/img/icons/smelt.svg` | [delapouite/furnace](https://game-icons.net/1x1/delapouite/furnace.html) | Delapouite |
+| `play/static/img/icons/strengthen.svg` | [delapouite/stack](https://game-icons.net/1x1/delapouite/stack.html) | Delapouite |
+| `play/static/img/icons/temper.svg` | [lorc/small-fire](https://game-icons.net/1x1/lorc/small-fire.html) | Lorc |
+| `play/static/img/icons/treatment.svg` | [delapouite/paint-bucket](https://game-icons.net/1x1/delapouite/paint-bucket.html) | Delapouite |
 
 ## Music: the owner's soundtrack
 

@@ -274,5 +274,215 @@
   "url": "https://game-icons.net/1x1/delapouite/cloth-jar.html",
   "author": "delapouite",
   "bytes": 1598
+ },
+ "smelt": {
+  "source": "delapouite/furnace",
+  "url": "https://game-icons.net/1x1/delapouite/furnace.html",
+  "author": "delapouite",
+  "bytes": 648
+ },
+ "alloy": {
+  "source": "delapouite/melting-metal",
+  "url": "https://game-icons.net/1x1/delapouite/melting-metal.html",
+  "author": "delapouite",
+  "bytes": 1914
+ },
+ "forge": {
+  "source": "lorc/anvil-impact",
+  "url": "https://game-icons.net/1x1/lorc/anvil-impact.html",
+  "author": "lorc",
+  "bytes": 681
+ },
+ "quench": {
+  "source": "delapouite/steam",
+  "url": "https://game-icons.net/1x1/delapouite/steam.html",
+  "author": "delapouite",
+  "bytes": 829
+ },
+ "temper": {
+  "source": "lorc/small-fire",
+  "url": "https://game-icons.net/1x1/lorc/small-fire.html",
+  "author": "lorc",
+  "bytes": 1163
+ },
+ "fold": {
+  "source": "lorc/hammer-drop",
+  "url": "https://game-icons.net/1x1/lorc/hammer-drop.html",
+  "author": "lorc",
+  "bytes": 928
+ },
+ "hone": {
+  "source": "lorc/sparkling-sabre",
+  "url": "https://game-icons.net/1x1/lorc/sparkling-sabre.html",
+  "author": "lorc",
+  "bytes": 1700
+ },
+ "assemble": {
+  "source": "lorc/hammer-nails",
+  "url": "https://game-icons.net/1x1/lorc/hammer-nails.html",
+  "author": "lorc",
+  "bytes": 1603
+ },
+ "finish": {
+  "source": "delapouite/paint-brush",
+  "url": "https://game-icons.net/1x1/delapouite/paint-brush.html",
+  "author": "delapouite",
+  "bytes": 1225
+ },
+ "strengthen": {
+  "source": "delapouite/stack",
+  "url": "https://game-icons.net/1x1/delapouite/stack.html",
+  "author": "delapouite",
+  "bytes": 351
+ },
+ "assay": {
+  "source": "lorc/magnifying-glass",
+  "url": "https://game-icons.net/1x1/lorc/magnifying-glass.html",
+  "author": "lorc",
+  "bytes": 1212
+ },
+ "ore": {
+  "source": "faithtoken/ore",
+  "url": "https://game-icons.net/1x1/faithtoken/ore.html",
+  "author": "faithtoken",
+  "bytes": 1208
+ },
+ "ingot": {
+  "source": "willdabeast/gold-bar",
+  "url": "https://game-icons.net/1x1/willdabeast/gold-bar.html",
+  "author": "willdabeast",
+  "bytes": 838
+ },
+ "bar": {
+  "source": "lorc/metal-bar",
+  "url": "https://game-icons.net/1x1/lorc/metal-bar.html",
+  "author": "lorc",
+  "bytes": 597
+ },
+ "blank": {
+  "source": "lorc/sword-smithing",
+  "url": "https://game-icons.net/1x1/lorc/sword-smithing.html",
+  "author": "lorc",
+  "bytes": 1344
+ },
+ "plate": {
+  "source": "delapouite/metal-plate",
+  "url": "https://game-icons.net/1x1/delapouite/metal-plate.html",
+  "author": "delapouite",
+  "bytes": 427
+ },
+ "haft": {
+  "source": "delapouite/wood-stick",
+  "url": "https://game-icons.net/1x1/delapouite/wood-stick.html",
+  "author": "delapouite",
+  "bytes": 862
+ },
+ "grip": {
+  "source": "lorc/sword-hilt",
+  "url": "https://game-icons.net/1x1/lorc/sword-hilt.html",
+  "author": "lorc",
+  "bytes": 1394
+ },
+ "guard": {
+  "source": "delapouite/spiral-hilt",
+  "url": "https://game-icons.net/1x1/delapouite/spiral-hilt.html",
+  "author": "delapouite",
+  "bytes": 2331
+ },
+ "rivets": {
+  "source": "delapouite/screw",
+  "url": "https://game-icons.net/1x1/delapouite/screw.html",
+  "author": "delapouite",
+  "bytes": 2270
+ },
+ "mail": {
+  "source": "willdabeast/chain-mail",
+  "url": "https://game-icons.net/1x1/willdabeast/chain-mail.html",
+  "author": "willdabeast",
+  "bytes": 1836
+ },
+ "scale-mail": {
+  "source": "lorc/scale-mail",
+  "url": "https://game-icons.net/1x1/lorc/scale-mail.html",
+  "author": "lorc",
+  "bytes": 1800
+ },
+ "breastplate": {
+  "source": "lorc/breastplate",
+  "url": "https://game-icons.net/1x1/lorc/breastplate.html",
+  "author": "lorc",
+  "bytes": 2676
+ },
+ "shield": {
+  "source": "delapouite/viking-shield",
+  "url": "https://game-icons.net/1x1/delapouite/viking-shield.html",
+  "author": "delapouite",
+  "bytes": 2746
+ },
+ "coal": {
+  "source": "delapouite/coal-pile",
+  "url": "https://game-icons.net/1x1/delapouite/coal-pile.html",
+  "author": "delapouite",
+  "bytes": 888
+ },
+ "charcoal": {
+  "source": "lorc/thrown-charcoal",
+  "url": "https://game-icons.net/1x1/lorc/thrown-charcoal.html",
+  "author": "lorc",
+  "bytes": 1319
+ },
+ "flux": {
+  "source": "delapouite/powder-bag",
+  "url": "https://game-icons.net/1x1/delapouite/powder-bag.html",
+  "author": "delapouite",
+  "bytes": 2293
+ },
+ "quenchant": {
+  "source": "delapouite/full-wood-bucket",
+  "url": "https://game-icons.net/1x1/delapouite/full-wood-bucket.html",
+  "author": "delapouite",
+  "bytes": 2166
+ },
+ "treatment": {
+  "source": "delapouite/paint-bucket",
+  "url": "https://game-icons.net/1x1/delapouite/paint-bucket.html",
+  "author": "delapouite",
+  "bytes": 2625
+ },
+ "anvil": {
+  "source": "lorc/anvil",
+  "url": "https://game-icons.net/1x1/lorc/anvil.html",
+  "author": "lorc",
+  "bytes": 462
+ },
+ "bellows": {
+  "source": "delapouite/bellows",
+  "url": "https://game-icons.net/1x1/delapouite/bellows.html",
+  "author": "delapouite",
+  "bytes": 1656
+ },
+ "hot": {
+  "source": "lorc/fluffy-flame",
+  "url": "https://game-icons.net/1x1/lorc/fluffy-flame.html",
+  "author": "lorc",
+  "bytes": 1492
+ },
+ "brittle": {
+  "source": "delapouite/hammer-break",
+  "url": "https://game-icons.net/1x1/delapouite/hammer-break.html",
+  "author": "delapouite",
+  "bytes": 691
+ },
+ "slaggy": {
+  "source": "delapouite/stone-stack",
+  "url": "https://game-icons.net/1x1/delapouite/stone-stack.html",
+  "author": "delapouite",
+  "bytes": 2155
+ },
+ "manual": {
+  "source": "delapouite/rule-book",
+  "url": "https://game-icons.net/1x1/delapouite/rule-book.html",
+  "author": "delapouite",
+  "bytes": 1989
  }
 }
