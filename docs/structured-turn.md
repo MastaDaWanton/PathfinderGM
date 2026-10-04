@@ -389,6 +389,37 @@ extra demonstrated fields bled escaped JSON into the narration (4 of 8 runs, 202
    - Its interface (`facts_from` / `read` / `diff`) is kept separate so it can be folded
      into this beat reader after lane N merges, if one call measures as well as two.
 
+### Built (lane N, branch structured/beat-reader, 2026-10-03)
+
+`gm/beat_reader.py`, measured in docs/beat-reader.md. Two calls, not one: the people
+call (mentions, lines, newcomers here or elsewhere, names, arrivals of people known
+elsewhere in town, pronouns) and the places call (places named, people placed), run side
+by side. Every answer is an enum the engine supplies, or a string that must be on the
+page; a failed check drops the answer with the reason in the `beat-reading` row.
+
+| retired | replaced by |
+|---|---|
+| `judgement.record_people`'s seen/heard reading (`seen_in_beat`, `_shown_in`, `_cue`, `_gendered`, `_said_to_live`, `_shown_again`) and `only_a_predicate` | newcomers "here"/"elsewhere" (`seen_people`); `record_people` is a plain recorder |
+| `speaker_real`'s `_from_tags`, `_from_the_page`, `_Room`, `_whose`, `_speaker` | each line's `by`/`to` (`speaker_real`, booking only) |
+| `judgement.doubt_tags` | `beat_reader.reconcile_tags` |
+| `judgement.hailed_by`'s untagged-line guess | booked lines only |
+| `judgement.apply_introductions`, `narration.named_in_apposition` | `names` + `beat_reader.name_refusal` (`seen_people.name_them`) |
+| `heard_places.heard_in` and its patterns | the places call (`places_heard`) |
+| `mentioned_elsewhere.phrases_at`, `_PRONOUN_AT` | the places call's people (`mentioned_elsewhere`) |
+| `pronouns_adopted`'s `_from_mentions`, `_from_tags` | the people call's `pronoun cN` |
+
+Kept, as structure: `mentions.find` (candidate spans from the engine's vocabularies),
+`speech.spans`, `name_given` (the brief's exact name on the page), `note_cast` (the
+brief's ledger only — next step below), `embody_seen`'s limits.
+
+**When the reader fails** nothing is harvested from the beat and each step writes a
+`beat-unread` row; the prose call's own tags still stand.
+
+**Next steps, not done in this pass:** `note_cast` still books the brief's "ALSO
+PRESENT" ledger with its own phrase patterns — it should take the reader's newcomers; the
+33 policing checks (lane V); `narration.introductions`/`settle_introductions` (read by the
+checks and the groom); `speech.vocalisations` (who grunted); the opening's `note_cast`.
+
 ## How it is proven
 
 - `tools/interpreter_bench.py` on all 220 labelled sentences: strict and engine-relevant

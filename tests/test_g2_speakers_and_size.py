@@ -25,7 +25,7 @@ import pytest
 from gm import judgement, speech
 from gm.checks import size_words
 from play import aftermath
-from play.aftermath import conversation_log, speaker_real
+from play.aftermath import conversation_log  # noqa: F401 — the "beat" stage's member
 from rules import places
 
 from _a_truth import WORLD, context, scene_at
@@ -67,12 +67,28 @@ def _halhollow(people=(), world=WORLD, location=None):
     return engine, engine.scene, campaign
 
 
-def _book(scene, text, world=WORLD):
-    """What `_finish` does before the "people" stage: the prose's people on the ledger
-    and into the population, as records with no body."""
-    introduced = judgement.note_cast(scene, text, turn=4)
-    judgement.record_people(scene, introduced, turn=4, world=world)
-    return introduced
+def _read(scene, text, engine, **answers):
+    """The beat reader's answer for this beat, stubbed with what a careful reader says
+    (tests/beat_reader/stub.py). Until 2026-10-03 the "people" stage read the page itself
+    (`speaker_real._from_the_page`: a "…,' he says" clause, a carry-on from the line
+    before, the nearest person described); the reader answers now, and these tests pin
+    what the stage does with the answer."""
+    from tests.beat_reader import stub
+
+    judgement.note_cast(scene, text, turn=4)
+    return stub.read(text, scene, engine=engine, **answers)
+
+
+def _people(campaign, engine, text, said, reading):
+    return aftermath.run("people", aftermath.context(
+        "people", "turn", campaign, engine=engine, text=text, said=said,
+        attribution=reading, turn=4))
+
+
+APRON_READ = dict(who={"A man": "new"},
+                  new=[("A man", "here", "man in a stained leather apron")],
+                  lines={"That's a long way": ("A man", "you"),
+                         "You looking for": ("A man", "you")})
 
 
 def test_the_apron_man_who_spoke_untagged_is_embodied_and_the_conversation_opens():
@@ -80,12 +96,11 @@ def test_the_apron_man_who_spoke_untagged_is_embodied_and_the_conversation_opens
     through the arrival door with a square and a face, both lines are his, `hailed_by`
     opens the conversation, and the conversation log gets his two lines."""
     engine, scene, campaign = _halhollow([("Ysolde's companion", "guildhand")])
-    _book(scene, APRON)
     said: list[dict] = []           # the prose call tagged nothing
+    reading = _read(scene, APRON, engine, **APRON_READ)
     assert judgement.hailed_by(scene, APRON, said=said) == []
     before = set(scene.actors)
-    rows = aftermath.run("people", aftermath.context("people", "turn", campaign,
-                                                     engine=engine, text=APRON, said=said))
+    rows = _people(campaign, engine, APRON, said, reading)
     made = set(scene.actors) - before
     assert len(made) == 1, rows
     ref = made.pop()
@@ -93,8 +108,8 @@ def test_the_apron_man_who_spoke_untagged_is_embodied_and_the_conversation_opens
     assert man.name == "man in a stained leather apron"
     assert man.appearance, "a face from the world's own pools"
     assert scene.positions.get(ref), "every arrival has a square (item 14)"
-    assert [r["kind"] for r in rows] == ["speaker-real"] and rows[0]["made"] == ref
-    assert rows[0]["untagged"] == 2
+    assert [r["made"] for r in rows if r.get("made")] == [ref]
+    assert {"kind": "speaker-read", "booked": ref, "lines": 2} in rows
     assert [r["line"] for r in said] == speech.lines(APRON)
     assert all(r["who"] == ref and r["made"] == ref and r["to"] == "you" for r in said)
     # The hail opens the conversation, through the engine's own door, as `_finish` does.
@@ -105,21 +120,21 @@ def test_the_apron_man_who_spoke_untagged_is_embodied_and_the_conversation_opens
     campaign.transcript.append({"who": "player", "text": "I sit and wait."})
     campaign.transcript.append({"who": "gm", "text": APRON})
     aftermath.run("beat", aftermath.context("beat", "turn", campaign, engine=engine,
-                                            text=APRON, said=said, beat_index=1))
+                                            text=APRON, said=said, beat_index=1,
+                                            attribution=reading))
     log = scene.conversation_log
     assert [(e["who"], e["kind"]) for e in log] == [(ref, "line"), (ref, "line")]
     assert [e["text"] for e in log] == speech.lines(APRON)
 
 
 def test_the_apron_man_is_embodied_in_every_world(worlds):
-    """World-agnostic: the step reads no Aurvantis name. In each export's first sized
-    settlement the same beat makes one man, labelled by the page's descriptor."""
+    """World-agnostic: the steps read no Aurvantis name. In each export's first sized
+    settlement the same reading makes one man, labelled by the page's descriptor."""
     small, _city = _small_and_city(worlds)
     engine, scene, campaign = _halhollow(world=worlds, location=small)
-    _book(scene, APRON, world=worlds)
     said: list[dict] = []
-    rows = speaker_real.step(aftermath.context("people", "turn", campaign, engine=engine,
-                                               text=APRON, said=said))
+    reading = _read(scene, APRON, engine, **APRON_READ)
+    rows = _people(campaign, engine, APRON, said, reading)
     made = [r for r in rows if r.get("made")]
     assert len(made) == 1
     assert scene.actors[made[0]["made"]].name == "man in a stained leather apron"
@@ -128,17 +143,22 @@ def test_the_apron_man_is_embodied_in_every_world(worlds):
 
 def test_a_pronoun_alone_embodies_nobody():
     """'…,' he says, with no person described anywhere in the beat: there is nobody to
-    make, and a body out of a bare "he" is the phantom this project keeps paying for."""
+    make, and a body out of a bare "he" is the phantom this project keeps paying for. The
+    reader is asked about the lines and has no mention to give them to: "nobody" is its
+    only honest answer, and nobody is booked or made."""
     engine, scene, campaign = _halhollow()
     text = ("The market thins as the light goes. 'You've been sitting there since noon,' "
             "he says. 'Waiting for someone?'")
-    _book(scene, text)
     said: list[dict] = []
+    calls: list = []
+    reading = _read(scene, text, engine, calls=calls,
+                    lines={"You've been": ("nobody", "you"), "Waiting": ("nobody", "you")})
+    people_schema = next(s for kind, s, _m in calls if kind == "people")
+    assert not [k for k in people_schema["properties"] if k[:1] == "m" and k[1:].isdigit()]
     before = set(scene.actors)
-    rows = speaker_real.step(aftermath.context("people", "turn", campaign, engine=engine,
-                                               text=text, said=said))
+    rows = _people(campaign, engine, text, said, reading)
     assert set(scene.actors) == before and said == []
-    assert rows and all(not r.get("made") for r in rows)
+    assert all(not r.get("made") for r in rows)
 
 
 def test_a_speaker_already_on_the_board_is_attributed_not_duplicated():
@@ -150,30 +170,38 @@ def test_a_speaker_already_on_the_board_is_attributed_not_duplicated():
     43 real NPC lines never reached the conversation log that way."""
     engine, scene, campaign = _halhollow([("man in a stained leather apron", "guildhand")])
     ref = next(r for r, a in scene.actors.items() if a.name.startswith("man in"))
-    _book(scene, APRON)
     said: list[dict] = []
+    reading = _read(scene, APRON, engine, who={"A man": ref},
+                    lines={"That's a long way": (ref, "you"), "You looking for": (ref, "you")})
     before = set(scene.actors)
-    rows = speaker_real.step(aftermath.context("people", "turn", campaign, engine=engine,
-                                               text=APRON, said=said))
+    rows = _people(campaign, engine, APRON, said, reading)
     assert set(scene.actors) == before
     assert all(not r.get("made") for r in rows)
     assert [r["line"] for r in said] == speech.lines(APRON)
     assert all(r["who"] == ref and r["from"] == "page" and "made" not in r for r in said)
-    assert any(r.get("booked") == ref and "on the board" in r["why"] for r in rows), rows
+    assert {"kind": "speaker-read", "booked": ref, "lines": 2} in rows
 
 
-def test_a_line_not_to_the_player_makes_nobody():
+def test_a_line_not_to_the_player_hails_nobody():
     """"'Fine weather,' the carter tells the drover" is not a hail: the ruling is about a
-    person who speaks TO the player."""
+    person who speaks TO the player. Since the seen-people ruling (2026-10-01) the carter
+    the page shows is a body anyway; his line is booked to him, said to the drover, and it
+    opens no conversation with the player."""
     engine, scene, campaign = _halhollow()
     text = ("A carter in a patched coat leans on his wagon by the well. 'Fine weather for "
             "it,' the carter tells the drover beside him.")
-    _book(scene, text)
     said: list[dict] = []
-    before = set(scene.actors)
-    speaker_real.step(aftermath.context("people", "turn", campaign, engine=engine,
-                                        text=text, said=said))
-    assert set(scene.actors) == before and said == []
+    reading = _read(scene, text, engine,
+                    who={"A carter": "new", "the carter": "same as A carter",
+                         "the drover": "new"},
+                    new=[("A carter", "here", "carter in a patched coat"),
+                         ("the drover", "here", "drover")],
+                    lines={"Fine weather": ("A carter", "the drover")})
+    _people(campaign, engine, text, said, reading)
+    carter = next(r for r, a in scene.actors.items() if "carter" in a.name)
+    drover = next(r for r, a in scene.actors.items() if "drover" in a.name)
+    assert [(r["who"], r["to"]) for r in said] == [(carter, drover)]
+    assert judgement.hailed_by(scene, text, said=said) == []
 
 
 def test_one_body_per_person_however_many_lines_and_phrases():
@@ -183,11 +211,15 @@ def test_one_body_per_person_however_many_lines_and_phrases():
     text = ("A woman with a basket of eggs stops at your elbow. 'You're new here,' she "
             "says. The woman shifts the basket. 'You'll want the clan-hall for supper,' "
             "the woman adds.")
-    _book(scene, text)
     said: list[dict] = []
+    reading = _read(scene, text, engine,
+                    who={"A woman": "new", "The woman": "same as A woman",
+                         "the woman": "same as A woman"},
+                    new=[("A woman", "here", "woman with a basket of eggs")],
+                    lines={"You're new here": ("A woman", "you"),
+                           "You'll want": ("The woman", "you")})
     before = set(scene.actors)
-    speaker_real.step(aftermath.context("people", "turn", campaign, engine=engine,
-                                        text=text, said=said))
+    _people(campaign, engine, text, said, reading)
     made = set(scene.actors) - before
     assert len(made) == 1
     assert {r["who"] for r in said} == made and len(said) == 2

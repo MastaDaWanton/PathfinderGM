@@ -155,21 +155,50 @@ SMITH_BEAT = ("The man at the workbench—the smith—does not look up from the 
               "ash. 'Well,' he grunts. 'Let's see what's inside before we talk of coin.'")
 
 
-@pytest.mark.parametrize("phrase, only", [
-    ("large man", True),                       # "He is a large man" — the smith, described
-    ("man at the workbench", False),           # the smith himself, walking on
-])
-def test_a_description_after_he_is_is_nobody_new(phrase, only):
+def _smithy(people=(("the smith", "guildhand"),)):
+    from rules.bestiary import instantiate
+
+    s = _scene()
+    refs = [s.add(instantiate(t, scene=s, name=n)).ref for n, t in people]
+    return s, refs
+
+
+def test_a_description_after_he_is_is_nobody_new():
     """Measured live: "He is a large man" became a second smith (c15), the "he" of the
     next line carried to him, and with two people in the conversation the deal found no
-    buyer."""
-    assert judgement.only_a_predicate(SMITH_BEAT, phrase) is only
+    buyer. `judgement.only_a_predicate` caught that one phrasing with a pattern the same
+    day; the beat reader answers it now — "a large man" is the smith — and nobody is made.
+    The beat itself is on the bench (tests/beat_reader/gold.py, kesst-62), where the
+    reader is measured on it."""
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+    from tests.beat_reader.gold import CASES
+
+    gold = next(c for c in CASES if c["id"] == "kesst-62-he-is-a-large-man")
+    assert gold["people"]["a large man"].split("|")[0] == "c13" and not gold["new"]
+    s, (smith,) = _smithy()
+    before = set(s.actors)
+    reading = stub.read(SMITH_BEAT, s, who={"The man": smith, "the smith": smith,
+                                            "a large man": smith},
+                        lines={"Well": (smith, "you"), "Let's see": (smith, "you")})
+    seen_people.step(stub.ctx(s, reading, text=SMITH_BEAT, turn=62))
+    assert set(s.actors) == before and not reading.newcomers
 
 
 def test_a_new_person_after_a_description_is_still_somebody():
+    """The other side of it: a woman walking in after the description is somebody new,
+    and the reader's "new … here" makes her."""
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+
     beat = "He is a large man. A woman with a basket stops at the door."
-    assert judgement.only_a_predicate(beat, "large man")
-    assert not judgement.only_a_predicate(beat, "woman with a basket")
+    s, (smith,) = _smithy()
+    before = set(s.actors)
+    reading = stub.read(beat, s, who={"a large man": smith, "A woman": "new"},
+                        new=[("A woman", "here", "woman with a basket")])
+    rows = seen_people.step(stub.ctx(s, reading, text=beat, turn=63))
+    made = set(s.actors) - before
+    assert len(made) == 1 and s.actors[made.pop()].name == "woman with a basket", rows
 
 
 def test_a_deal_spoken_aloud_sells_to_the_one_in_conversation():

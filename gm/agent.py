@@ -1889,12 +1889,19 @@ class GMAgent:
             repairs += p_repairs
             attempts += p_attempts
 
-        # Who every person the beat mentions is, declared once for the checks below to
-        # read instead of guessing from names (gm/mentions.py). After the rewrite, which
-        # is the last thing to change most of the text; a sentence cut or rewritten
-        # after this is not in the attribution, and the checks fall back to their guess.
-        self.attribution = mentions_mod.attribute(
-            text, self.engine.scene, acting=acting, facts=facts,
+        # The beat read once, into closed answers (gm/beat_reader.py, docs/beat-reader.md):
+        # who every person mention is — declared for the checks below to read instead of
+        # guessing from names, as gm/mentions.py's labeller did — who speaks each line,
+        # who is new and whether they are here, the names the page gives, and the places
+        # and people a speaker told of. After the rewrite, which is the last thing to
+        # change most of the text; a sentence cut or rewritten after this is not in the
+        # reading, and the checks fall back to their guess. The aftermath applies the
+        # rest (play/aftermath), reading it as `ctx.attribution`.
+        from . import beat_reader
+
+        self.attribution = beat_reader.read(
+            text, self.engine.scene, engine=self.engine, said=self.last_said,
+            acting=acting, facts=facts,
             model=self.prose_model, host=self.prose_host,
             provider=self.prose_provider, api_key=self.prose_key)
         if self.attribution.mentions:

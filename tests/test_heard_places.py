@@ -45,38 +45,122 @@ def _agent(at):
     return agent
 
 
-# --- what a line names ---------------------------------------------------------------------
+def _speaker(e, name="the clerk of the counting house"):
+    from rules.bestiary import instantiate
+
+    who = instantiate("guildhand", scene=e.scene, name=name)
+    e.scene.add(who)
+    return who.ref
+
+
+def _heard(e, line: str, ref: str, places=(), placed=(), turn: int = 40):
+    """One NPC line in a beat, the beat reader's places answer for it (stubbed with what a
+    careful reader says: tests/beat_reader/stub.py), and `places_heard` applying it — the
+    path a turn takes since 2026-10-03. The places used to be read out of the line by
+    `heard_places.heard_in`'s patterns; the cases below are the ones it was measured on,
+    and they now pin what the engine's checks keep of the reader's answer."""
+    from play.aftermath import places_heard
+    from tests.beat_reader import stub
+
+    text = f"The speaker leans in. '{line}'"
+    said = [{"who": ref, "to": "you", "line": line}]
+    prefix = " ".join(line.split()[:3])
+    reading = stub.read(text, e.scene, engine=e, said=said, lines={prefix: (ref, "you")},
+                        places=[(prefix, *p) for p in places])
+    ctx = stub.ctx(e.scene, reading, text=text, engine=e, said=said, turn=turn,
+                   stage="beat")
+    return places_heard.step(ctx), reading
+
+
+# --- what a line names, read by the reader and checked by the engine ----------------------
 
 def test_the_clerks_smithy_is_heard_of_off_the_counting_house():
     """"through the side door, past the smithy", said in the counting house: the smithy is
     not on Zhilvarnia's map, and the side door is the counting house's own."""
-    got = heard_places.heard_in(CLERK, _known(COUNTING), COUNTING)
-    assert got == [{"name": "the smithy", "kind": "smithy", "landmark": COUNTING}]
+    e = _agent(COUNTING).engine
+    clerk = _speaker(e)
+    _heard(e, CLERK, clerk, places=[("the smithy", "smithy", "where the speaker is")])
+    (got,) = e.scene.heard_places
+    assert (got["name"], got["kind"], got["landmark"], got["from"]) == \
+        ("the smithy", "smithy", COUNTING, clerk)
 
 
-def test_the_western_warehouses_are_heard_of_and_the_master_of_the_docks_is_a_man():
-    got = heard_places.heard_in(DOCKS_MAN, _known(MARKET), MARKET)
-    assert got == [{"name": "the western warehouses", "kind": "warehouses", "landmark": ""}]
+def test_the_western_warehouses_are_heard_of_by_the_line_that_names_them():
+    """Measured on the items save: the docks man's "the western warehouses" was never
+    recorded. Said in a line, it is; with no landmark the speaker gave, it has none."""
+    e = _agent(MARKET).engine
+    man = _speaker(e, "the man on the stool")
+    line = ("There's work moving the shipments from the western warehouses before the "
+            "tide turns.")
+    _heard(e, line, man, places=[("the western warehouses", "warehouses", "none")])
+    (got,) = e.scene.heard_places
+    assert (got["name"], got["kind"], got["landmark"]) == \
+        ("the western warehouses", "warehouses", "")
 
 
-@pytest.mark.parametrize("line, want", [
-    ("There is a tannery out past the docks.",
-     [{"name": "the tannery", "kind": "tannery", "landmark": DOCKS}]),
+@pytest.mark.parametrize("line, place, want", [
+    ("There is a tannery out past the docks.", ("a tannery", "tannery", "the docks"),
+     ("the tannery", "tannery", DOCKS)),
     ("You will find the harbourmaster at his office by the docks.",
-     [{"name": "the harbourmaster's office", "kind": "", "landmark": DOCKS}]),
+     ("his office", "other", "the docks"), ("his office", "", DOCKS)),
 ])
-def test_a_landmark_the_speaker_gives_is_kept(line, want):
-    assert heard_places.heard_in(line, _known(MARKET), MARKET) == want
+def test_a_landmark_the_speaker_gives_is_kept(line, place, want):
+    e = _agent(MARKET).engine
+    _heard(e, line, _speaker(e), places=[place])
+    (got,) = e.scene.heard_places
+    assert (got["name"], got["kind"], got["landmark"]) == want
 
 
-@pytest.mark.parametrize("line", [
-    "I know a man in the counting house.",              # on the map already
-    "Marra's house is three streets over.",             # somebody's house: call_on's
-    "The house of the clerk is by the well.",
-    "Try the tavern, or the docks at dawn.",
+@pytest.mark.parametrize("line, place, why", [
+    ("I know a man in the counting house.",
+     ("the counting house", "counting house", "none"), "on the map already"),
+    ("Try the tavern, or the docks at dawn.", ("the tavern", "tavern", "none"),
+     "on the map already"),
+    ("Marra's house is three streets over.", ("Marra's house", "house", "none"),
+     "somebody's house"),
+    ("Ask at the guild about it.", ("the tannery", "tannery", "none"),
+     "the words are not the speaker's"),
 ])
-def test_known_places_and_peoples_houses_are_not_heard_of(line):
-    assert heard_places.heard_in(line, _known(MARKET), MARKET) == []
+def test_what_the_engine_refuses_of_a_readers_place(line, place, why):
+    """The reader's answer is checked, not trusted: a place the town has is on the map
+    already; somebody's house is `call_on`'s, which founds it the first time anybody calls
+    and knows whose it is; and a name not in the speaker's own words is the model's, not
+    the page's (LangExtract's rule: an extraction not located in the source is not kept).
+    Each refusal is a row of the reading, saying why."""
+    e = _agent(MARKET).engine
+    rows, reading = _heard(e, line, _speaker(e), places=[place])
+    assert rows == [] and e.scene.heard_places == []
+    assert any(why in d.get("why", "") for d in reading.dropped), reading.dropped
+
+
+def test_one_place_told_of_twice_is_one_record_with_what_both_gave():
+    """Measured live 2026-10-03: "'The Forge of the Broken Tide,' … 'Follow the main quay
+    until you hit the turn for the wharf … sitting in the back of the smithy'" became TWO
+    heard-of places, neither with a landmark. The reader links the second name to the
+    first ("same as"), and the record keeps the proper name, the kind and the landmark."""
+    from play.aftermath import places_heard
+    from tests.beat_reader import stub
+
+    e = _agent(MARKET).engine
+    man = _speaker(e, "man in the heavy coat")
+    text = ("He turns his head. 'The Forge of the Broken Tide,' he says. 'Follow the main "
+            "quay until you hit the turn for the wharf. He's there every night, sitting in "
+            "the back of the smithy.'")
+    said = [{"who": man, "to": "you", "line": "The Forge of the Broken Tide,"},
+            {"who": man, "to": "you", "line": "Follow the main quay until you hit the turn "
+                                             "for the wharf. He's there every night, "
+                                             "sitting in the back of the smithy."}]
+    reading = stub.read(text, e.scene, engine=e, said=said,
+                        lines={"The Forge": (man, "you"), "Follow the main": (man, "you")},
+                        places=[("The Forge", "The Forge of the Broken Tide", "other",
+                                 "none"),
+                                ("Follow the main", "the smithy", "smithy", "the docks",
+                                 "entry 1")])
+    places_heard.step(stub.ctx(e.scene, reading, text=text, engine=e, said=said, turn=22,
+                               stage="beat"))
+    (got,) = e.scene.heard_places
+    assert (got["name"], got["kind"], got["landmark"]) == \
+        ("The Forge of the Broken Tide", "smithy", DOCKS)
 
 
 def test_a_record_is_kept_once_and_gains_a_landmark_later():
@@ -98,6 +182,7 @@ def test_a_town_holds_only_so_many_heard_of_places():
 
 GO_SMITHY = {"question": False, "claims": [],
              "actions": [{"act": "go", "place": "the smithy"}]}
+SMITHY = {"name": "the smithy", "kind": "smithy", "landmark": COUNTING}
 
 
 def test_going_to_the_smithy_founds_it_where_the_clerk_said_and_stands_you_in_it():
@@ -106,8 +191,7 @@ def test_going_to_the_smithy_founds_it_where_the_clerk_said_and_stands_you_in_it
     it — then a place for every later turn, so a second visit founds nothing."""
     agent = _agent(COUNTING)
     e = agent.engine
-    heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0],
-                        said_by="c12", line=CLERK)
+    heard_places.record(e.scene, SMITHY, said_by="c12", line=CLERK)
     known = tuple(e.places()) + tuple(e.open_ground())
     # The reading's `go, place: the smithy` (since 2026-10-03; `_GOES_TO` is retired).
     plan = judgement.go_to_heard_place([{"op": "narrate_only"}], "I go to the smithy.",
@@ -130,7 +214,7 @@ def test_the_planners_own_found_takes_the_speakers_landmark():
     engine's unnamed default would climb out of the counting house to the street."""
     agent = _agent(COUNTING)
     e = agent.engine
-    heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0])
+    heard_places.record(e.scene, SMITHY)
     plan = judgement.fill_found_parent(
         [{"op": "found", "params": {"name": "the smithy", "kind": "smithy"}}],
         "I head out to the smithy.", e.scene, PANGRELLA)
@@ -143,7 +227,7 @@ def test_a_walk_only_meant_founds_nothing():
     place the player has not gone to."""
     agent = _agent(COUNTING)
     e = agent.engine
-    heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0])
+    heard_places.record(e.scene, SMITHY)
     plan = judgement.go_to_heard_place(
         [{"op": "narrate_only"}], "I mean to go to the smithy tomorrow.", e.scene,
         tuple(e.places()), reading={"question": False, "actions": [
@@ -154,7 +238,7 @@ def test_a_walk_only_meant_founds_nothing():
 def test_a_question_about_it_goes_nowhere():
     agent = _agent(COUNTING)
     e = agent.engine
-    heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0])
+    heard_places.record(e.scene, SMITHY)
     plan = judgement.go_to_heard_place([{"op": "narrate_only"}],
                                        "Where is the smithy?", e.scene, tuple(e.places()),
                                        reading={"question": True, "actions": []})
@@ -164,23 +248,28 @@ def test_a_question_about_it_goes_nowhere():
 # --- the beat that records it, the save that keeps it, the brief that shows it -------------
 
 def test_the_beat_records_an_npcs_place_and_never_the_players():
+    """A place in the player's own quoted words is no NPC telling the player of one: the
+    reader is shown every line, and what it takes from a line it gives to the player is
+    dropped after (`beat_reader._places_from_npcs`)."""
     from play.aftermath import places_heard
+    from tests.beat_reader import stub
 
     agent = _agent(COUNTING)
     e = agent.engine
-    from rules.bestiary import instantiate
-
-    clerk = instantiate("guildhand", scene=e.scene, name="the clerk of the counting house")
-    e.scene.add(clerk)
-    ctx = SimpleNamespace(scene=e.scene, turn=40, campaign=SimpleNamespace(engine=lambda: e),
-                          said=[{"who": clerk.ref, "to": "you", "line": CLERK},
-                                {"who": "you", "to": clerk.ref,
-                                 "line": "I'll try the tannery past the docks."}])
-    rows = places_heard.step(ctx)
+    clerk = _speaker(e)
+    text = (f"The clerk leans back. '{CLERK}' You nod. 'I'll try the tannery past the "
+            f"docks,' you say.")
+    said = [{"who": clerk, "to": "you", "line": CLERK}]
+    reading = stub.read(text, e.scene, engine=e, said=said,
+                        lines={"I suggest you": (clerk, "you"), "I'll try": ("you", clerk)},
+                        places=[("I suggest you", "the smithy", "smithy",
+                                 "where the speaker is"),
+                                ("I'll try", "the tannery", "tannery", "the docks")])
+    rows = places_heard.step(stub.ctx(e.scene, reading, text=text, engine=e, said=said,
+                                      turn=40, stage="beat"))
     assert [r["name"] for r in rows] == ["the smithy"]
-    assert e.scene.heard_places[0]["from"] == clerk.ref
-
-
+    assert e.scene.heard_places[0]["from"] == clerk
+    assert any(d.get("why") == "not a line an NPC spoke" for d in reading.dropped)
 def test_heard_places_survive_a_save_and_a_load(tmp_path):
     """Nothing derives them — a conversation made them — so a reload that dropped them
     would forget every direction the player was given."""
@@ -210,8 +299,7 @@ def test_the_brief_names_it_with_its_landmark_and_speaker():
 
     clerk = instantiate("guildhand", scene=e.scene, name="the clerk")
     e.scene.add(clerk)
-    heard_places.record(e.scene, heard_places.heard_in(CLERK, e.places(), COUNTING)[0],
-                        said_by=clerk.ref)
+    heard_places.record(e.scene, SMITHY, said_by=clerk.ref)
     ctx = SimpleNamespace(scene=e.scene, known=tuple(e.places()))
     text, facts = brief.section(ctx)
     assert "the smithy — off the counting house, as the clerk told it" in text
@@ -227,12 +315,15 @@ def test_the_answer_naming_the_smithy_is_speech_and_is_heard_of():
     answered with this line; `narration_in_quotes` read the "man" in "a grumpy man" as
     the speaker naming himself, cut it as narration, and the answer — and the smithy —
     never reached the page or the record. The whole description names him; a word of it
-    does not."""
+    does not. And the smithy he names is heard of, by the west crossing he gave."""
     from gm.checks.narration_in_quotes import _names_self
 
     assert not _names_self(SMITH_ANSWER, "man in the heavy coat")
     assert _names_self("The man in the heavy coat says nothing.", "man in the heavy coat")
     assert _names_self("Gorm Vesper watches you from their workspace.", "Gorm Vesper")
-    got = heard_places.heard_in(SMITH_ANSWER, _known(MARKET), MARKET)
-    assert got == [{"name": "the smithy", "kind": "smithy",
-                    "landmark": "6953424c8a82~urban:the-west-crossing"}]
+    e = _agent(MARKET).engine
+    _heard(e, SMITH_ANSWER, _speaker(e, "man in the heavy coat"),
+           places=[("the smithy", "smithy", "the west crossing")])
+    (got,) = e.scene.heard_places
+    assert (got["name"], got["kind"], got["landmark"]) == \
+        ("the smithy", "smithy", "6953424c8a82~urban:the-west-crossing")

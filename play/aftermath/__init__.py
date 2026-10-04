@@ -11,10 +11,11 @@ lane owns. A shared list to append to is the conflict every one of them would ha
 there is no list: a module dropped into this package is a member.
 
 **Two stages, because the plan's one hook site was wrong** (§1.1 P3). The plan put the
-hook "after the said/hails block"; the hails are not there. `_finish` runs
-`apply_introductions`, then `hailed_by` → `join_talk`, and only much later appends the beat
-and writes the speech-tags row. A speaker made real has to exist before `hailed_by` reads
-the page (A), and a log entry needs the beat's transcript index (F). So:
+hook "after the said/hails block"; the hails are not there. `_finish` reconciles the tags
+with the beat reader's speakers (`beat_reader.reconcile_tags`), then runs `hailed_by` →
+`join_talk`, and only much later appends the beat and writes the speech-tags row. A
+speaker made real has to exist, and every line be booked, before `hailed_by` reads them
+(A), and a log entry needs the beat's transcript index (F). So:
 
   * ``"people"`` runs immediately before the `hailed_by` loop. `said` is the LIVE
     `agent.last_said`, and this stage alone may fill an empty `who` (adding ``"made"``);
@@ -275,7 +276,29 @@ def context(stage: str, door: str, campaign, *, engine=None, text: str = "",
         turn=int(turn if turn is not None else len(getattr(campaign, "transcript", []) or [])))
 
 
-def after_opening(campaign) -> list[dict]:
+def _read_opening(campaign, engine, text: str, said: list[dict], chat=None):
+    """The opening beat read by the beat reader (gm/beat_reader.py), as a turn's beat is
+    read in `GMAgent._groom`: the opening has no agent, so the narrator's own model is
+    asked here. Measured on Sam's save (2026-09-30, item 1): the cage owner's two opening
+    lines — "'Went down in the second and has not got up,' the cage owner says" — never
+    reached the conversation log; the patterns that booked them retired with the reader.
+    None when the reader is off and no `chat` is given (the suite)."""
+    from gm import beat_reader
+
+    if not beat_reader.ENABLED and chat is None:
+        return None
+    cfg = {}
+    if chat is None:
+        from play import modelcfg
+
+        cfg = modelcfg.for_role("narrator")
+    return beat_reader.read(text, campaign.scene, engine=engine, said=said, chat=chat,
+                            model=cfg.get("model", ""), host=cfg.get("host", ""),
+                            provider=cfg.get("provider", "ollama"),
+                            api_key=cfg.get("api_key", ""))
+
+
+def after_opening(campaign, *, chat=None) -> list[dict]:
     """Both stages over a new campaign's opening beat, with `door="opening"`.
 
     INERT in Phase 1: nothing calls it. Lane C calls it at the end of `new_campaign` in
@@ -307,10 +330,14 @@ def after_opening(campaign) -> list[dict]:
         if kept and at is not None:
             transcript[at]["said"] = [dict(r) for r in kept]
     live = [dict(r) for r in kept]
+    reading = _read_opening(campaign, engine, text, live, chat=chat) if text else None
+    if reading is not None and reading.mentions:
+        rows.append(reading.as_log())
     rows += run("people", context("people", "opening", campaign, engine=engine, text=text,
-                                  said=live))
+                                  said=live, attribution=reading))
     if at is not None and live != list(beat.get("said") or []):
         transcript[at]["said"] = live
     rows += run("beat", context("beat", "opening", campaign, engine=engine, text=text,
-                                said=list(beat.get("said") or []), beat_index=at))
+                                said=list(beat.get("said") or []), beat_index=at,
+                                attribution=reading))
     return rows

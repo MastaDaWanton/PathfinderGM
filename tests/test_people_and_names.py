@@ -115,17 +115,13 @@ LABORER_BEAT = ("The laborer—a man named Korvu, his face etched with the deep 
 def test_a_peoples_name_is_refused_as_a_persons():
     """The beat that renamed c11 "Korvu". The people's names come from the scene's own
     heritages here (no world): nothing is a list of Pangrella's names."""
+    from gm import beat_reader
+
     s, (laborer,) = _scene(("lone laborer", {"heritage": "Korvu"}))
-    refused: list = []
-    got = judgement.apply_introductions(s, LABORER_BEAT, "I walk up to the laborer",
-                                        refused=refused)
-    assert got == []
-    assert laborer.name == "lone laborer"
-    assert refused == [(laborer.ref, "Korvu", "a people of this world")]
+    assert beat_reader.name_refusal(s, None, laborer.ref, "Korvu") == \
+        "a people of this world"
     # And a person's name in the same sentence still lands.
-    got = judgement.apply_introductions(
-        s, LABORER_BEAT.replace("Korvu", "Aethorin Vex"), "I walk up to the laborer")
-    assert got == [(laborer.ref, "Aethorin Vex")]
+    assert beat_reader.name_refusal(s, None, laborer.ref, "Aethorin Vex") == ""
 
 
 def test_the_face_line_reads_as_a_people_never_as_a_name():
@@ -153,21 +149,41 @@ def test_a_tag_on_somebody_the_beat_never_shows_is_withdrawn():
     """Market-talk beat 2: tagged to c1, the servant carrying jugs, who is nowhere in it;
     the page makes "the man" the speaker. Six beats ran this way, each opening a
     conversation with the servant."""
+    from gm import beat_reader
+    from tests.beat_reader import stub
+
     s, (servant,) = _scene(("the servant carrying jugs two at a time", {}))
     said = [{"who": servant.ref, "to": "you", "line": "What is going on?"}]
-    rows = judgement.doubt_tags(s, BEAT_2, said)
+    # The beat reader reads "the man on the stool" as somebody new, and his the line;
+    # `judgement.doubt_tags` read it until 2026-10-03 with a pattern for the head noun
+    # beside the line. The reader's speaker against the tag withdraws the tag.
+    reading = stub.read(BEAT_2, s, said=said,
+                        who={"The man": "new", "the man": "new"},
+                        new=[("The man", "here", "man on the stool"),
+                             ("the man", "here", "man at the bar")],
+                        lines={"What is going on": ("The man", "you")})
+    rows = beat_reader.reconcile_tags(reading, said)
     assert said[0]["who"] == "" and said[0]["was"] == servant.ref
-    assert rows and "the man the speaker" in rows[0]["why"]
+    assert rows and rows[0]["was"] == servant.ref
     assert judgement.hailed_by(s, BEAT_2, said=said) == []
 
 
 def test_a_tag_on_somebody_the_beat_shows_is_kept():
     """The control: the servant on the page, the tag stands — a tag is only ever
     withdrawn on the page's word, never re-pointed."""
+    from gm import beat_reader
+    from tests.beat_reader import stub
+
     s, (servant,) = _scene(("the servant carrying jugs two at a time", {}))
     beat = BEAT_2.replace("The man on the stool", "The servant")
     said = [{"who": servant.ref, "to": "you", "line": "What is going on?"}]
-    assert judgement.doubt_tags(s, beat, said) == []
+    reading = stub.read(beat, s, said=said, who={"The servant": servant.ref},
+                        lines={"What is going on": (servant.ref, "you")})
+    assert beat_reader.reconcile_tags(reading, said) == []
+    assert said[0]["who"] == servant.ref
+    # And the reader's "nobody" withdraws nothing: only a speaker it names overrules.
+    reading = stub.read(beat, s, said=said, lines={"What is going on": ("nobody", "you")})
+    assert beat_reader.reconcile_tags(reading, said) == []
     assert said[0]["who"] == servant.ref
 
 
@@ -200,13 +216,15 @@ def test_the_players_own_line_is_nobodys_on_the_board():
 def test_the_page_pinned_description_is_that_person_not_a_new_man():
     """Market-talk beat 14: "The man in the heavy coat (c4)" spoke, and the attribution
     found "man", made c6 out of a record and gave him c4's lines."""
-    from play.aftermath.speaker_real import _Room
+    from tests.beat_reader import stub
 
     s, (c4,) = _scene(("somebody", {}))
     narr = f"The man in the heavy coat ({c4.ref}) leans against a timber post."
-    room = _Room(SimpleNamespace(scene=s, attribution=None), narr)
-    kinds = [(k, ident) for _a, _b, k, ident in room.mentions(narr)]
-    assert kinds == [("board", c4.ref)]
+    # `speaker_real._Room` read the "(c4)" pin with a pattern; the reader is shown c4 in
+    # the list and answers him. Nobody new.
+    reading = stub.read(narr, s, who={"The man": c4.ref})
+    (m,) = reading.mentions
+    assert m.ref == c4.ref and not reading.newcomers
 
 
 def test_a_face_is_not_placed_beside_another_persons_sentence():

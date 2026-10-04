@@ -60,18 +60,29 @@ def veil():
     return scene, engine, gorm
 
 
-def _beat(scene, text, turn, world=WORLD, engine=None):
-    """The prose door as `views._finish` runs it: the ledger, the records, then the
-    "people" stage's bodies — with the engine, whose door walks a known person in (the
-    one-spatial-authority ratchet: nothing in gm/ moves people itself)."""
+def _beat(scene, text, turn, world=WORLD, engine=None, **reader):
+    """The prose door as `views._finish` runs it since the beat reader (2026-10-03): the
+    ledger, then the "people" stage's `seen_people` applying the READING — stubbed here
+    with the answers a careful reader gives (`reader`: who / new / arrived, by the page's
+    words; tests/beat_reader/stub.py) — with the engine, whose door walks a known person
+    in (the one-spatial-authority ratchet: nothing in gm/ moves people itself).
+
+    Until then the who-and-where was read here in code (`record_people`'s
+    `seen_in_beat`); the cases those tests measured are the bench's now
+    (tests/beat_reader/gold.py), and these tests pin what follows from the answer."""
     from rules.dice import Dice
     from rules.engine import Engine
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
 
     engine = engine or Engine(scene, Dice(seed=1), world=world)
-    introduced = judgement.note_cast(scene, text, turn=turn)
-    recs = judgement.record_people(scene, introduced, turn=turn, world=world, beat=text)
-    rows = judgement.embody_seen(scene, turn=turn, world=world, beat=text, engine=engine)
-    return introduced, recs, rows
+    judgement.note_cast(scene, text, turn=turn)
+    reading = stub.read(text, scene, engine=engine, **reader)
+    rows = seen_people.step(stub.ctx(scene, reading, text=text, engine=engine, world=world,
+                                     turn=turn))
+    recs = [scene.population[n.record] for n in reading.newcomers
+            if n.record in (scene.population or {})]
+    return reading, recs, rows
 
 
 # --- B. heard of: one record, not where the talk happened ----------------------------------
@@ -86,7 +97,8 @@ def test_the_woman_gorm_spoke_of_is_one_record_and_not_in_the_tavern(veil):
     place — she lives three streets over, not in the tavern — and a resident."""
     scene, engine, gorm = veil
     turn = 95
-    _, recs, rows = _beat(scene, TOLD, turn)
+    _, recs, rows = _beat(scene, TOLD, turn, who={"a human": "new"},
+                          new=[("a human", "elsewhere", "human woman")])
     assert rows == []                               # heard of: nobody walks in
     found = granted.detect("it is a human woman who lives there right?",
                            [{"who": gorm.ref, "line": "Aye. A human woman. She is there."}],
@@ -145,7 +157,9 @@ def test_a_person_only_spoken_of_in_the_narration_is_no_body_and_has_no_place(ve
     quarter, spoken of, stood in the tavern as a record."""
     scene, engine, gorm = veil
     _, recs, rows = _beat(scene, "Gorm tells you that an old man lives across the "
-                                 "river and owes him money.", 40)
+                                 "river and owes him money.", 40,
+                          who={"Gorm": gorm.ref, "an old man": "new"},
+                          new=[("an old man", "elsewhere", "old man")])
     assert rows == [] and recs
     assert recs[0]["spot"] == "" and recs[0].get("seen") is False
     assert not any(a.name.endswith("old man") for a in scene.actors.values())
@@ -246,7 +260,9 @@ def test_a_figure_the_beat_shows_is_a_woman_with_a_body_and_a_square(veil):
     Nutmeg in another room. Now she walks on as a woman, she/her, on a square, with the
     life her record rolled, and the finder's "the woman" is her."""
     scene, engine, gorm = veil
-    _, recs, rows = _beat(scene, FIGURE, 104)
+    _, recs, rows = _beat(scene, FIGURE, 104, who={"a figure": "new",
+                                                   "a woman": "same as a figure"},
+                          new=[("a figure", "here", "woman")])
     made = [r["made"] for r in rows if r.get("made")]
     assert len(made) == 1, rows
     woman = scene.people[made[0]]
@@ -259,7 +275,13 @@ def test_a_figure_the_beat_shows_is_a_woman_with_a_body_and_a_square(veil):
     assert population.find(scene, "the woman", world=WORLD).people == [rec]
     # The same beat again does not make her twice.
     assert judgement.embody_seen(scene, turn=104, world=WORLD) == []
-    _, _, again = _beat(scene, "The woman at the top of the stairs watches you.", 106)
+    _, _, again = _beat(scene, "The woman at the top of the stairs watches you.", 106,
+                        who={"The woman": woman.ref})
+    assert not [r for r in again if r.get("made")]
+    # And a reader that called her new a second time still makes nobody twice: the
+    # population knows her by these words here (`population.note` → `here_as`).
+    _, _, again = _beat(scene, "The woman at the top of the stairs watches you.", 108,
+                        who={"The woman": "new"}, new=[("The woman", "here", "woman")])
     assert not [r for r in again if r.get("made")]
 
 
@@ -272,7 +294,9 @@ def test_somebody_heard_of_and_then_shown_is_that_one_person_with_a_body(veil):
     scene, engine, gorm = veil
     scene.cast.clear()
     _, recs, rows = _beat(scene, "You search the street, but there is no sign of the "
-                                 "woman, and the shutters stay closed.", 20)
+                                 "woman, and the shutters stay closed.", 20,
+                          who={"the woman": "new"},
+                          new=[("the woman", "elsewhere", "woman")])
     heard = [r for r in recs if "woman" in r["phrase"]]
     assert heard and heard[0].get("seen") is False and not rows
     rec = heard[0]
@@ -280,7 +304,8 @@ def test_somebody_heard_of_and_then_shown_is_that_one_person_with_a_body(veil):
     assert population.find(scene, "the human woman Grom spoke of",
                            world=WORLD).people == [rec]
     _, _, rows = _beat(scene, "You find the woman standing in the entryway, her hands "
-                              "clasped.", 22)
+                              "clasped.", 22, who={"the woman": "new"},
+                       new=[("the woman", "here", "woman")])
     made = [r["made"] for r in rows if r.get("made")]
     assert len(made) == 1 and rec["ref"] == made[0], rows
     assert len([r for r in scene.population.values() if "woman" in r["phrase"]]) == 1
@@ -288,12 +313,19 @@ def test_somebody_heard_of_and_then_shown_is_that_one_person_with_a_body(veil):
 
 def test_a_crowd_is_scenery_not_people(veil):
     """"a crowd of drinkers" is not N actors: a plural or a counted group is no one person
-    with one life (`record_people`), and a group is the troop door's to make."""
+    with one life (`record_people`), and a group is the troop door's to make. The reader's
+    answer is checked, not trusted: even a reading that calls "a few laborers" somebody
+    new and here makes nobody."""
     scene, engine, gorm = veil
     before = set(scene.actors)
-    _, _, rows = _beat(scene, "A crowd of drinkers fills the room, and a few laborers sit "
-                              "by the hearth in heavy silence.", 20)
+    text = ("A crowd of drinkers fills the room, and a few laborers sit by the hearth in "
+            "heavy silence.")
+    _, _, rows = _beat(scene, text, 20)               # the reader's "nobody"
     assert set(scene.actors) == before and not [r for r in rows if r.get("made")]
+    _, _, rows = _beat(scene, text, 21, who={"a few laborers": "new"},
+                       new=[("a few laborers", "here", "a few laborers")])
+    assert set(scene.actors) == before and not [r for r in rows if r.get("made")]
+    assert any(r.get("why") == "a group, not one person" for r in rows)
 
 
 def test_in_a_fight_the_prose_makes_nobody(veil):
@@ -303,7 +335,9 @@ def test_in_a_fight_the_prose_makes_nobody(veil):
     scene.initiative = [("pc", 15), (gorm.ref, 8)]
     scene.turn = 0
     assert scene.in_encounter
-    _, _, rows = _beat(scene, "A man in a leather apron stands by the door, watching.", 30)
+    _, _, rows = _beat(scene, "A man in a leather apron stands by the door, watching.", 30,
+                       who={"A man": "new"},
+                       new=[("A man", "here", "man in a leather apron")])
     assert not [r for r in rows if r.get("made")]
     assert any(r.get("why") == "in a fight the prose brings nobody in" for r in rows)
 
@@ -314,7 +348,9 @@ def test_no_more_than_the_cap_from_one_beat(veil):
     scene, engine, gorm = veil
     text = ("A tall woman leans on the bar. A bald man sits by the fire. A young sailor "
             "stands at the door. An old smith nods at you. A thin clerk waits by the stairs.")
-    _, recs, rows = _beat(scene, text, 50)
+    five = ["A tall woman", "A bald man", "A young sailor", "An old smith", "A thin clerk"]
+    _, recs, rows = _beat(scene, text, 50, who={p: "new" for p in five},
+                          new=[(p, "here", p[p.index(" ") + 1:]) for p in five])
     made = [r for r in rows if r.get("made")]
     assert len(made) == judgement.SEEN_CAP
     assert any("more than" in str(r.get("why", "")) for r in rows)
@@ -324,15 +360,38 @@ def test_somebody_held_elsewhere_in_town_walks_in_rather_than_twice(veil):
     """"saved if not already existing": somebody the party met at the gate, written into
     the tavern by the prose by every word of what they go by, is that person — not a
     second one with a second face. (The save's case was the cage owner, met in the back
-    streets and written hunched over a ledger in the Velvet Veil.)"""
+    streets and written hunched over a ledger in the Velvet Veil.)
+
+    Two doors to the same end since the beat reader: the reader is shown the people known
+    elsewhere in town, and answers that the passage shows him here ("arrived"); and a
+    reader that calls him "new" anyway still finds him by every word of his name
+    (`embody_seen`'s `_held_elsewhere`)."""
     scene, engine, gorm = veil
     owner = instantiate("guildhand", scene=scene, name="the old fisherman")
     scene.arrive(owner, place_id=GATE)
     count = len(scene.people)
-    _, _, rows = _beat(scene, "The old fisherman is hunched over a mug at the far table.", 60)
+    text = "The old fisherman is hunched over a mug at the far table."
+    reading, _, rows = _beat(scene, text, 60, who={"The old fisherman": owner.ref},
+                             arrived=[owner.ref])
+    assert owner.ref in reading.away and reading.arrived == [owner.ref]
     assert len(scene.people) == count, rows
     assert owner.at == scene.at and owner.ref in scene.actors
     assert any(r.get("same_as") == owner.ref for r in rows)
+    # The second door.
+    other = instantiate("guildhand", scene=scene, name="the lamp seller")
+    scene.arrive(other, place_id=GATE)
+    count = len(scene.people)
+    _, _, rows = _beat(scene, "The lamp seller is trimming a wick by the fire.", 62,
+                       who={"The lamp seller": "new"},
+                       new=[("The lamp seller", "here", "lamp seller")])
+    assert len(scene.people) == count and other.ref in scene.actors, rows
+    # And a mention of somebody known elsewhere that the reader did NOT place here walks
+    # nobody in: talk of the fisherman is not the fisherman.
+    gone = instantiate("guildhand", scene=scene, name="the net mender")
+    scene.arrive(gone, place_id=GATE)
+    _beat(scene, "Gorm says the net mender still owes him for the ale.", 64,
+          who={"the net mender": gone.ref})
+    assert gone.at == GATE
 
 
 def test_the_figure_in_her_own_house_is_the_householder(veil):
@@ -362,9 +421,15 @@ def test_the_figure_in_her_own_house_is_the_householder(veil):
         call = out.outcomes[0]
     assert scene.at == call.effects[0]["house"] and her.ref in scene.actors, call.tell
     count = len(scene.people)
-    introduced = judgement.note_cast(scene, FIGURE, turn=104)
-    judgement.record_people(scene, introduced, turn=104, world=WORLD, beat=FIGURE)
-    rows = judgement.embody_seen(scene, turn=104, world=WORLD, beat=FIGURE)
+    # The reader, shown her among the people here, answers that the figure is her.
+    reading, _, rows = _beat(scene, FIGURE, 104, engine=engine,
+                             who={"a figure": her.ref, "a woman": her.ref})
+    assert len(scene.people) == count and not reading.newcomers, rows
+    # And a reader that calls the figure new is still answered by the house: in her own
+    # house, with her in it, a vague figure there is the householder.
+    _, _, rows = _beat(scene, FIGURE, 105, engine=engine,
+                       who={"a figure": "new", "a woman": "same as a figure"},
+                       new=[("a figure", "here", "figure")])
     assert len(scene.people) == count, rows
     assert any(r.get("same_as") == her.ref for r in rows)
     # Standing in the hall with the party, she has been seen (replayed: three beats in her
@@ -372,9 +437,8 @@ def test_the_figure_in_her_own_house_is_the_householder(veil):
     assert rec.get("seen") is not False
     # A figure who comes in is somebody arriving, not the householder.
     came = "A hooded figure enters from the street behind you and stands by the door."
-    introduced = judgement.note_cast(scene, came, turn=108)
-    judgement.record_people(scene, introduced, turn=108, world=WORLD, beat=came)
-    rows = judgement.embody_seen(scene, turn=108, world=WORLD, beat=came)
+    _, _, rows = _beat(scene, came, 108, engine=engine, who={"A hooded figure": "new"},
+                       new=[("A hooded figure", "here", "hooded figure")])
     assert [r for r in rows if r.get("made")], rows
     # She was granted nothing here, but her people came from the record's own words.
     assert her.pronouns in ("she/her", "")
@@ -385,7 +449,8 @@ def test_a_child_the_beat_shows_stands_here_and_the_adults_only_rule_sees_him(ve
     the doorway is an actor whose record is a minor, and `a_child_in` — the guard under the
     intimate briefing — reads him from the room, with no word of him in the next beat."""
     scene, engine, gorm = veil
-    _, _, rows = _beat(scene, "A small boy stands in the doorway, watching you.", 70)
+    _, _, rows = _beat(scene, "A small boy stands in the doorway, watching you.", 70,
+                       who={"A small boy": "new"}, new=[("A small boy", "here", "small boy")])
     made = [r["made"] for r in rows if r.get("made")]
     assert made
     rec = population.of_ref(scene, made[0])
@@ -393,35 +458,35 @@ def test_a_child_the_beat_shows_stands_here_and_the_adults_only_rule_sees_him(ve
     assert judgement.a_child_in(scene, "The fire crackles.")
 
 
-def test_the_step_runs_in_the_people_stage_after_the_speaker_is_made_real():
-    """`speaker_real` (ORDER 10) must see this beat's records without bodies, or a hail
-    tagged to a ref nobody held could never be given to its speaker."""
+def test_the_step_runs_in_the_people_stage_before_the_lines_are_booked():
+    """`seen_people` (ORDER 10) gives the newcomers their bodies before `speaker_real`
+    (ORDER 20) books the lines, so a newcomer who spoke — Bobby's man in a stained leather
+    jerkin, three lines to `new1` and none attributed (2026-09-28) — has a ref to book
+    them to. Until the beat reader the order was the other way round, because the speaker
+    door made its own body out of a record."""
     members = {m.__name__.rsplit(".", 1)[-1]: m for m in aftermath.registered()}
     seen, speaker = members["seen_people"], members["speaker_real"]
-    assert seen.STAGE == speaker.STAGE == "people" and seen.ORDER > speaker.ORDER
+    assert seen.STAGE == speaker.STAGE == "people" and seen.ORDER < speaker.ORDER
 
 
-def test_seen_and_heard_are_read_from_the_sentence():
-    """The test that decides a body: placed or acting here, and no report of somebody's
-    words about them."""
-    assert judgement.seen_in_beat(FIGURE, "figure") == judgement.SEEN
-    assert judgement.seen_in_beat(TOLD, "human woman") == judgement.HEARD
-    assert judgement.seen_in_beat("'There is a woman upstairs,' he says.", "woman") == \
-        judgement.HEARD
-    assert judgement.seen_in_beat("If a guard sees you, run.", "guard") == judgement.HEARD
-    # Replayed 2026-10-01: the player standing, and a woman who exists only in stories,
-    # were read as a woman here, and a phantom walked on with a face. The cue must be hers.
-    ghost = ("You have been chasing a ghost, a woman who exists in the stories of the "
-             "desperate. You are still standing before him, and the search for the woman "
-             "has just become a search for why the lie persists.")
-    assert judgement.seen_in_beat(ghost, "woman") != judgement.SEEN
-    # And talk of her is not her: recorded with no place, not where the party stands.
-    asked = ("The question you posed, concerning the woman three streets over, hangs in "
-             "the air.")
-    assert judgement.seen_in_beat(asked, "woman") == judgement.HEARD
-    assert judgement.seen_in_beat("You see a woman by the well, mending a net.",
-                                  "woman") == judgement.SEEN
-    assert judgement.seen_in_beat("A man who stands in the doorway eyes your purse.",
-                                  "man") == judgement.SEEN
-    assert judgement._gendered(FIGURE, "figure") == "woman"
-    assert judgement._gendered("A figure waits by the well.", "figure") == "figure"
+def test_seen_and_heard_are_the_readers_answer_and_the_bench_holds_the_cases():
+    """Seen or only heard of was decided here by `judgement.seen_in_beat`'s cue words
+    until 2026-10-03, and each case below once needed its own rule: the replays of
+    2026-10-01, where the player standing and "a woman who exists in the stories of the
+    desperate" were read as a woman here and a phantom walked on with a face, and where
+    "the question you posed, concerning the woman three streets over" recorded her where
+    the party stood; and FIGURE, where "It is a woman" had to be read by `_gendered`.
+
+    It is the beat reader's answer now. The cases live on the bench as labelled beats
+    (tests/beat_reader/gold.py), so the reader is measured on exactly them."""
+    from tests.beat_reader.gold import CASES
+
+    by_id = {c["id"]: c for c in CASES}
+    ghost = by_id["sam-a-woman-in-the-stories"]
+    assert all(v == "nobody" or "nobody" in v.split("|") or v.startswith("new")
+               for v in ghost["people"].values())
+    assert not any(n["where"] == "here" for n in ghost["new"].values())
+    asked = by_id["sam-the-question-you-posed"]
+    assert all(n["where"] == "elsewhere" for n in asked["new"].values())
+    figure = by_id["sam-a-figure-it-is-a-woman"]
+    assert figure["new"]["woman"] == {"head": "woman", "where": "here"}

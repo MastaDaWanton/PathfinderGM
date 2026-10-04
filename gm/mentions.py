@@ -219,6 +219,39 @@ def people(scene) -> list[dict]:
     return out
 
 
+# Words in the content tables' person vocabularies that are no person on the page: a
+# calloused "hand", and the occupation table's qualifiers ("day labourer", "herbal …").
+_NOT_A_PERSON = frozenset({"hand", "caravan", "day", "herbal", "household", "market",
+                           "minor", "tavern", "town", "travelling", "retired", "reeve's",
+                           "smith's", "family", "kin", "crew"})
+_VOCAB: list = []
+
+
+def _vocabulary() -> frozenset:
+    """Every person word the project already holds, as candidates for the finder: the
+    narration checks' (`checks._people._PERSON`), the population's, and the occupations'
+    ids and names (content/people). Measured on the beat-reader gold, 2026-10-03: with
+    only the list above, "a lone laborer", "the clerk" and "the lamplighter" were never
+    marked, so the reader could not be asked about them — the finder's recall, not the
+    reader's, was the ceiling. Over-finding is cheap: "nobody" is an answer."""
+    if not _VOCAB:
+        words: set[str] = set()
+        try:
+            from rules import lives, population
+            from .checks._people import _PERSON
+
+            words |= {w.lower() for w in _PERSON}
+            words |= {w.lower() for w in population._PERSON_WORDS}
+            for occ in lives.tables()["occupations"]:
+                words.add(str(occ["id"]).lower())
+                words |= {w.lower() for w in str(occ["name"]).split()}
+        except Exception:  # noqa: BLE001 — no content to hand: the list above stands
+            return frozenset()
+        _VOCAB.append(frozenset(w for w in words
+                                if w not in _NOT_A_PERSON and re.fullmatch(r"[a-z][a-z-]+", w)))
+    return _VOCAB[0]
+
+
 def find(text: str, cast: list[dict]) -> list[Mention]:
     """Every mention of a person in the beat's narration, with the ref code is certain
     of for names. Speech is left out: a character may name anybody, here or not."""
@@ -232,7 +265,7 @@ def find(text: str, cast: list[dict]) -> list[Mention]:
             if _proper(held):
                 for w in _name_words(held):
                     owners.setdefault(w, set()).add(p["ref"])
-    heads = set(_PERSON_WORDS.split("|"))
+    heads = set(_PERSON_WORDS.split("|")) | _vocabulary()
     for p in cast:
         if not _proper(p["name"]) and _head(p["name"]):
             heads.add(_head(p["name"]))
