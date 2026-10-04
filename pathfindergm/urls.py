@@ -32,7 +32,7 @@ def static_serve(request, path, **kwargs):
 from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
-                  craft_views, home_views, views, bench_views, herb_views)
+                  craft_views, home_views, views, bench_views, herb_views, forge_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -84,6 +84,19 @@ urlpatterns = [
     path("api/trade/do", views.trade_do, name="trade_do"),
     path("craft/", craft_views.craft_page, name="craft"),
     path("api/world/<str:world_id>", home_views.world_detail, name="world_detail"),
+    # The forge bench (docs/blacksmithing-contracts.md §7). Every fixed name sits above the
+    # one pattern with a parameter, and the whole block above the homebrew benches'
+    # `api/bench/<bench_id>`, so the herb bench's route-order bug (a fixed name read as a
+    # parameter, test_bench_routes) cannot recur here (tests/test_forge_api.py pins it).
+    path("api/forge/state", forge_views.forge_state, name="forge_state"),
+    path("api/forge/check", forge_views.forge_check, name="forge_check"),
+    path("api/forge/roll", forge_views.forge_roll, name="forge_roll"),
+    path("api/forge/finish", forge_views.forge_finish, name="forge_finish"),
+    path("api/forge/assay", forge_views.forge_assay, name="forge_assay"),
+    path("api/forge/perks", forge_views.forge_perks, name="forge_perks"),
+    path("api/forge/ledger", forge_views.forge_ledger, name="forge_ledger"),
+    path("api/forge/material/<str:material_id>", forge_views.forge_material,
+         name="forge_material"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
     # `api/bench/<bench_id>`: Django takes the first match, and below it "state" was read
     # as a homebrew bench id and answered 404 "no bench 'state'" (Lane D, 2026-10-02).

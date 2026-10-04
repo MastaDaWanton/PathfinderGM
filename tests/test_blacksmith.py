@@ -26,44 +26,103 @@ def stock():
 # --- the track loads through the unchanged framework --------------------------------------
 
 def test_track_loads_through_the_generic_loader():
-    """The whole point of the framework: `load_dir` reads blacksmith.json with zero code
-    changes to worldclass.py. If this needs a special case, the design has failed."""
+    """The whole point of the framework: `load_dir` reads blacksmith.json through the same
+    loader as the Herbalist. Three written levels since the 2026-10-03 ruling (plan
+    §4.1), then endless ones priced by the track's own `endless` block, with no
+    track id named in worldclass.py's pricing."""
     tracks = wc.load_dir(Path(settings.BASE_DIR) / "content" / "world-classes")
     assert "blacksmith" in tracks
     track = tracks["blacksmith"]
     assert track.name == "Blacksmith"
-    assert track.max_level == 5
+    assert track.max_level == 3
+    assert track.thresholds == [25, 65], "paced as the Herbalist, on purpose"
+    assert [track.to_next(n) for n in (1, 2, 3, 4, 5)] == [25, 65, 50, 60, 70]
+    assert track.perks == ("potency", "hardening", "quality", "yield")
 
 
 def test_levels_gate_tiers_in_order():
-    """common -> uncommon -> rare -> exotic -> legendary, one band per level, exactly the
-    Herbalist's ladder. A skipped or repeated band would let a level-2 smith work
-    skymetal or strand a level-4 one on rare."""
+    """Plan §4.1: Blacksmith 1 works common and uncommon, 2 rare and exotic, 3 legendary,
+    the Herbalist's three-level ladder. Retired: the five-level, one-band-a-level table
+    (its defect, a skipped band stranding a smith, is re-pinned on the new bands)."""
     track = wc.get("blacksmith")
     ranks = [wc.tier_rank(track.at(n).max_tier) for n in range(1, 6)]
-    assert ranks == [1, 2, 3, 4, 5]
+    assert ranks == [2, 4, 5, 5, 5]
 
 
 def test_methods_accumulate_and_never_expire():
-    """`unlocked_methods` is cumulative: a Blacksmith 5 still smelts. All eleven methods
-    exist by level 5, and the level-1 set is the minimum that can forge anything at all
-    (fire, hammer, bath)."""
+    """`unlocked_methods` is cumulative: a Blacksmith 3 still forges. All eleven methods of
+    plan §7 exist by level 2, the level-1 set is the minimum that makes a usable item
+    (forge, quench, assemble) plus assay and smelt, and the merged methods are gone."""
     track = wc.get("blacksmith")
-    assert set(track.unlocked_methods(1)) == {"smelt", "forge", "quench"}
-    assert len(track.unlocked_methods(5)) == 11
-    for lo, hi in zip(range(1, 5), range(2, 6)):
+    assert set(track.unlocked_methods(1)) == {"forge", "quench", "assemble", "assay",
+                                              "smelt"}
+    assert set(track.unlocked_methods(3)) == set(blacksmith.METHODS)
+    assert len(track.unlocked_methods(3)) == 11
+    for gone in ("draw", "polish", "flux", "rivet"):
+        assert gone not in track.unlocked_methods(9)
+    for lo, hi in zip(range(1, 3), range(2, 4)):
         assert set(track.unlocked_methods(lo)) <= set(track.unlocked_methods(hi))
 
 
-def test_level_5_deed_is_the_material_not_the_method():
-    """Mirrors the Herbalist's legendary-catalyst lesson: gating level 5 on a level-5
-    method is a gate that never opens, so the deed is working legendary *metal*, and the
-    novel-alloy rule (tested below) is the level-4 path to it."""
+def test_no_deed_gates_a_level_any_more():
+    """Retired: the level-5 `legendary-metal` deed (plan §4.1 removes it). Its defect was
+    a gate that never opened; re-pinned as "no level waits on a deed": legendary metal is
+    simply Blacksmith 3's band, and an old save holding the milestone loses nothing."""
     track = wc.get("blacksmith")
-    assert track.milestones[5] == "legendary-metal"
-    assert track.deeds["legendary-metal"]["min_tier"] == "legendary"
-    assert track.deed_done(tier="legendary", success=True) == "legendary-metal"
-    assert track.deed_done(tier="exotic", success=True) == ""
+    assert track.milestones == {} and track.deeds == {}
+    p = wc.Progress(track="blacksmith", level=3, mp=55, milestones=["legendary-metal"])
+    got = wc.award_bonus(track, p, why="test", mp=0)
+    assert got["level"] == 4, "65 to leave level 3 would be wrong: endless base is 50"
+
+
+def test_endless_levels_bank_forge_perks():
+    """Plan §4.2: past level 3 every level banks two picks of potency, hardening, quality
+    or yield. The Herbalist's duration is not a forge perk, and asking for it is refused
+    in words."""
+    track = wc.get("blacksmith")
+    p = wc.Progress(track="blacksmith", level=5)
+    assert wc.perk_picks_banked(p) == 4
+    wc.pick_perks(track, p, ["hardening", "hardening"])
+    with pytest.raises(ValueError, match="no perk called 'duration'"):
+        wc.pick_perks(track, p, ["duration"])
+    got = wc.perk_multipliers(p)
+    assert got["hardening"] == round(0.95 ** 2, 4)
+    assert wc.track_summary(track, p)["perks"] == {"hardening": 2}
+    assert wc.perk_picks_banked(p) == 2
+
+
+def test_the_ceiling_is_fine_superior_flawless_and_masterwork_is_superior():
+    """Plan §4.4: the quality ceiling is Fine at 1, Superior (masterwork) at 2, Flawless at
+    3, plus one per Quality perk. Superior is the masterwork rung."""
+    ceilings = [wc.ceiling_index(wc.Progress(track="blacksmith", level=n))
+                for n in (1, 2, 3)]
+    assert ceilings == [2, 3, 4]
+    assert wc.ceiling_index(wc.Progress(track="blacksmith", level=4,
+                                        perks={"quality": 1})) == 5
+    assert blacksmith._mw_index() == 3 and wc.quality_name(3) == "Superior"
+
+
+def test_an_old_blacksmith_5_migrates_to_endless_levels_with_picks():
+    """Plan §14: levels above 3 become endless levels with perks picked on first load,
+    as `migrate_herbalist` did: the level and mastery are kept, the picks are banked, and
+    the migration runs once."""
+    p = wc.Progress(track="blacksmith", level=5, mp=40, milestones=["legendary-metal"])
+    assert wc.migrate(p) is True and p.schema == wc.BLACKSMITH_SCHEMA
+    assert (p.level, p.mp) == (5, 40)
+    assert wc.perk_picks_banked(p) == 4
+    assert wc.migrate(p) is False
+
+
+def test_old_recipes_map_their_removed_methods():
+    """Plan §14: an old recipe naming draw, polish, flux or rivet loads with the step
+    mapped onto its successor, and the old chain says where the method went rather than
+    only that it is gone."""
+    assert [blacksmith.old_method(m) for m in ("draw", "polish", "flux", "rivet",
+                                                 "forge")] == \
+        ["forge", "hone", "smelt", "assemble", "forge"]
+    r = blacksmith.preview(3, Chain("blacksmith", ["smelt", "forge", "polish"],
+                                    ["iron", "charcoal"], base="longsword"))
+    assert any("Polish became Hone" in p for p in r.problems)
 
 
 # --- the material catalogue ---------------------------------------------------------------
@@ -148,10 +207,10 @@ def test_quench_before_forge_is_refused_with_a_sentence():
 
 def test_metal_above_your_tier_is_refused_by_name():
     """Same sentence shape as the Herbalist's tier refusal, so the two benches read the
-    same. Adamantine is exotic; a Blacksmith 1 works common at best."""
+    same. Adamantine is exotic; a Blacksmith 1 works uncommon at best (plan §4.1)."""
     r = blacksmith.preview(1, Chain("blacksmith", ["smelt", "forge", "quench"],
                                     ["adamantine", "charcoal"], base="longsword"))
-    assert any("Adamantine is exotic" in p and "works common" in p
+    assert any("Adamantine is exotic" in p and "works uncommon" in p
                for p in r.problems)
 
 
@@ -217,22 +276,22 @@ def test_masterwork_requires_temper_and_a_finished_surface():
     assert plain.quality == "plain"
 
 
-def test_masterwork_is_reachable_at_blacksmith_3_for_the_enchanter():
+def test_masterwork_is_reachable_at_blacksmith_2_for_the_enchanter():
     """The dead-end check, measured rather than assumed.
 
     `rules/enchanter.py` refuses every binding whose vessel is not masterwork — at
     Enchanter *1*, with the message "Commission one from the smith". The first version
-    of this ladder also required fold or draw, which are Blacksmith 4, so the entire
+    of this ladder also required fold or draw, which were Blacksmith 4, so the entire
     enchanting economy sat behind 140 MP of a track the enchanter may never have taken.
-    Masterwork is DC 20 professional work in 1e, purchasable in any city, so it belongs
-    with the professional methods at Blacksmith 3.
+    Re-pinned 2026-10-03: temper and hone are Blacksmith 2 under the three-level track,
+    and Superior (masterwork) is Blacksmith 2's ceiling (plan §4.4).
 
     Pinned on both vessels the enchanter is most likely to be handed: a longsword and a
     breastplate, at the level and DC the book says.
     """
     for base, weapon, armour in (("longsword", "longsword", None),
                                  ("breastplate", None, "breastplate")):
-        r = blacksmith.preview(3, Chain(
+        r = blacksmith.preview(2, Chain(
             "blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
             ["steel", "charcoal"], base=base))
         assert r.problems == [], f"{base}: {r.problems}"
@@ -242,12 +301,12 @@ def test_masterwork_is_reachable_at_blacksmith_3_for_the_enchanter():
         assert r.output["weapon"] == weapon
         assert r.output["armour"] == armour
 
-    # And a Blacksmith 2 still cannot: temper is learned at 3, so the gate is a real
+    # And a Blacksmith 1 still cannot: temper is learned at 2, so the gate is a real
     # one rather than a formality.
-    early = blacksmith.preview(2, Chain(
+    early = blacksmith.preview(1, Chain(
         "blacksmith", ["smelt", "forge", "quench", "temper", "hone"],
         ["steel", "charcoal"], base="longsword"))
-    assert any("Temper is learned at Blacksmith 3" in p for p in early.problems)
+    assert any("Temper is learned at Blacksmith 2" in p for p in early.problems)
 
 
 # --- the dispatch surface -----------------------------------------------------------------
@@ -514,17 +573,19 @@ def test_buying_and_gathering_are_offered_and_populated():
     assert {"salvage", "gather", "buy"} <= set(blacksmith.ACQUISITION)
 
 
-def test_a_novel_alloy_is_one_band_rarer_and_reaches_the_deed():
-    """The Blacksmith 4 path to the level-5 milestone, mirroring the Herbalist's
-    concentration ladder: two distinct exotic skymetals in one crucible come out
-    legendary, and the ceiling is checked against the inputs, never the stepped-up
-    output — gating on the output is exactly the unreachable-deed bug the Herbalist's
-    _deeds_note records."""
-    r = blacksmith.preview(4, Chain(
-        "blacksmith", ["smelt", "alloy", "forge", "quench"],
-        ["siccatite", "abysium", "dragonfire-coal"], base="longsword"))
+def test_a_novel_alloy_is_one_band_rarer_and_gated_by_what_it_makes():
+    """Two distinct exotic skymetals in one crucible come out legendary (mixing can beat
+    purity). Re-pinned 2026-10-03: the input-only check existed so a Blacksmith 4 could
+    reach the level-5 deed; the deed is gone, so a legendary melt now needs the level that
+    works legendary metal, as the Herbalist's revamped bench gates by its output."""
+    chain = Chain("blacksmith", ["smelt", "alloy", "forge", "quench"],
+                  ["siccatite", "abysium", "dragonfire-coal"], base="longsword")
+    r = blacksmith.preview(3, chain)
     assert r.problems == []
     assert r.tier == "legendary"
+    early = blacksmith.preview(2, chain)
+    assert any("would make legendary metal" in p and "Blacksmith 3" in p
+               for p in early.problems)
 
 
 def test_mithral_halves_weight_and_the_cost_rounds_down():
@@ -538,27 +599,33 @@ def test_mithral_halves_weight_and_the_cost_rounds_down():
     assert blacksmith.round_benefit(0.8) == 1
 
 
-def test_flux_cleans_the_ore_but_not_the_smith(stock):
+def test_flux_in_a_smelted_charge_cleans_the_ore_but_not_the_smith(stock):
     """Flux is to dirty ore what Purify is to a poisonous herb: bog iron's slag-brittle
-    penalty is stripped, and the removal is named on the result. But it cleans the
-    metal, not the smith — a chain of hazardous *metal* stays risky whatever went in
-    the melt."""
+    penalty is stripped, and the removal is named on the result. Re-pinned 2026-10-03:
+    flux is no longer a method but an ingredient of Smelt (plan §2), so the flux in a
+    smelted charge does the cleaning, and naming the old method is refused."""
     dirty = blacksmith.preview(2, Chain(
         "blacksmith", ["smelt", "forge", "quench"],
         ["bog-iron", "charcoal"], base="longsword"))
     assert any("slag-brittle" in line for line in dirty.effects)
 
     fluxed = blacksmith.preview(2, Chain(
-        "blacksmith", ["smelt", "flux", "forge", "quench"],
+        "blacksmith", ["smelt", "forge", "quench"],
         ["bog-iron", "limestone", "charcoal"], base="longsword"))
     assert not any("slag-brittle" in line for line in fluxed.effects)
     assert fluxed.removed and "impurity" in fluxed.removed[0]
+    assert fluxed.problems == []
+
+    old = blacksmith.preview(2, Chain(
+        "blacksmith", ["smelt", "flux", "forge", "quench"],
+        ["bog-iron", "limestone", "charcoal"], base="longsword"))
+    assert any("Flux became Smelt" in p for p in old.problems)
 
 
 def test_the_finished_piece_is_named_after_its_metal():
     """"Masterwork Cold Iron Longsword", not "Untitled" — and ore names shed the word
     "ore", because a sword smelted from cold iron ore is a cold iron sword."""
-    r = blacksmith.preview(4, Chain(
+    r = blacksmith.preview(2, Chain(
         "blacksmith", ["smelt", "forge", "quench", "temper", "fold", "hone"],
         ["cold-iron", "charcoal"], base="longsword"))
     assert r.name == "Masterwork Cold Iron Longsword"
