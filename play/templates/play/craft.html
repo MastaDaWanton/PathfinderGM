@@ -580,6 +580,7 @@
 
 const STATE = {{ state_json|safe }};
 let CRAFT = "herbalism";       // the discipline tab in front
+let CRAFT_SEQ = 0;             // which tab choice is newest: an older one's answer is dropped
 let SHELF = [];                // raw ingredients for the current discipline
 let STOCK = [];                // things already made, which can go back in the pot
 let CHOSEN = [];               // raw ingredient ids in the pot
@@ -690,10 +691,20 @@ async function selectCraft(id, mode) {
   // Herbalism moved to the table (docs/herbalism-ui-plan.md §4.1): its tab here is one
   // card and a way there, and the old shelf, chain and preview are never drawn for it.
   // The other four crafts keep this bench exactly as it was until each is revamped.
-  document.body.classList.toggle("herb-moved", CRAFT === "herbalism");
+  // Blacksmithing moved the same way on 2026-10-04 (docs/blacksmithing-ui-plan.md §15,
+  // lane U7): its tab is the card that opens the forge over the table. The class keeps
+  // its first name; it now means "this tab is a door, not a bench".
+  const moved = CRAFT === "herbalism" || CRAFT === "blacksmithing";
+  document.body.classList.toggle("herb-moved", moved);
+  const seq = ++CRAFT_SEQ;
   if (CRAFT === "herbalism") { renderHerbalismMoved(); return; }
+  if (CRAFT === "blacksmithing") { renderForgeMoved(); return; }
   const track = STATE.tracks[CRAFT] || {};
   if (!track.available) { renderLocked(); return; }
+  // The tab's own panel at once, before the two requests below (measured on the audit,
+  // UI plan §2: "Herbalism is at the table now" stood under the newly chosen tab for
+  // about two seconds, because #main kept the last tab's card while the shelf loaded).
+  renderLoading();
   const [r, ft] = await Promise.all([
     fetch(`/api/craft/ingredients?craft=${encodeURIComponent(CRAFT)}${
       MODE ? `&mode=${encodeURIComponent(MODE)}` : ""}`),
@@ -701,6 +712,9 @@ async function selectCraft(id, mode) {
   ]);
   const d = await r.json();
   const f = await ft.json();
+  // A tab chosen while these were in flight has drawn its own panel: this answer is
+  // for a tab no longer in front, and drawing it would put the old craft back.
+  if (seq !== CRAFT_SEQ) return;
   BIOMES = f.biomes || []; ATTEMPTS = f.attempts || 1;
   BUSY = f.busy || "";
   SHELF = d.ingredients;
@@ -737,6 +751,30 @@ function renderLocked() {
     Herbalism is the one that is finished.</div>`;
   $("#craft").disabled = true; $("#save").disabled = true;
   $("#mastery").innerHTML = "";
+}
+
+// The card that stands where the old forge was (lane U7). Its one button returns to the
+// table with the forge open (`/play/#forge`, which 40-forge-shell.js opens on load).
+function renderForgeMoved() {
+  $("#main").innerHTML = `<section class="panel moved-card" aria-labelledby="moved-title">
+      <h2 id="moved-title">The forge is at the table now</h2>
+      <div class="inner">
+        <p>Your rack, the anvil and the work order open over the table, where you stand.
+          A field kit works anywhere; a smithy opens the furnace, the crucible and rare
+          metal. The time each step takes passes in the scene.</p>
+        <a class="act moved-go" href="/play/#forge">Open the forge</a>
+      </div>
+    </section>`;
+  $("#craft").disabled = true; $("#save").disabled = true;
+  $("#mastery").innerHTML = "";
+}
+
+// What a tab shows while its shelf loads: its own name, never the last tab's card.
+function renderLoading() {
+  const d = STATE.disciplines.find(x => x.id === CRAFT) || { name: CRAFT };
+  $("#main").innerHTML = `<div class="locked-note" role="status">
+    <b>${esc(d.name)}</b>Laying out the shelf.</div>`;
+  $("#craft").disabled = true; $("#save").disabled = true;
 }
 
 function renderBench() {

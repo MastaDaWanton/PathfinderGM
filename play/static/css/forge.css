@@ -1,0 +1,146 @@
+/* The forge (docs/blacksmithing-ui-plan.md), over the play table, after bench.css.
+
+   THE SAME BENCH, LAID OUT FOR SMITHING. The forge's layer carries both classes,
+   `bench forge`, so every rule of bench.css (the layer at z 35, the leather strip and
+   footer, the tooled panels, the method strip, the rows, the paper tag and its ladder,
+   the confirms, the reduced-motion block) is the forge's too, and this sheet holds only
+   what is the forge's own: the wider stage and the work order's column (UI plan §5.2),
+   the material swatches, the piece slots and the build card.
+
+   NO NEW COLOUR, FONT OR TEXTURE (UI plan §4). Every value is a theme-v2.css token or the
+   bench's semantic layer over them. The one exception is content, not chrome: a
+   material's swatch is filled with the server's colour for that metal (`--sw`, set per
+   row from play/forge_views.py), exactly as heat colour lives only in the scene.
+
+   LAYERS. Only the bench's own: 1 to 9 inside the layer's stacking context; nothing here
+   sets 35 or 66 again. MOTION. Transform and opacity only, 200ms at most, and the
+   reduced-motion block in bench.css (`.bench *`) already reaches every element here. */
+
+.forge {
+  --bench-satchel-w: 280px;
+  --bench-tag-w: 340px;
+}
+.forge .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(620px, 1fr) var(--bench-tag-w); }
+
+/* The strip carries eleven methods (UI plan §6.1). A locked one keeps its reason in words
+   beside its name, set under the name in a second line so "Needs a smithy" and
+   "Blacksmith 2" do not push the row past the window at 1600 (measured live). */
+.forge .bm.is-locked {
+  display: inline-grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  column-gap: 7px; row-gap: 1px; align-content: center; justify-items: start;
+}
+.forge .bm.is-locked .bicon { grid-row: 1 / span 2; align-self: center; }
+.forge .bm.is-locked .bm-lock { font-size: 12px; line-height: 1.1; }
+.forge .bm.is-locked .bm-name { line-height: 1; }
+.forge .bm .bicon-l.is-two { font-size: calc(var(--bi) * .42); letter-spacing: -.02em; }
+
+/* --- the swatch (UI plan §4) ------------------------------------------------------------- */
+/* An 8px disc of the material's own colour, with a hairline of the edge so a dark metal
+   still reads on the leather. Never meaning alone: the name is always beside it. */
+.fr-swatch {
+  display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--sw, var(--ash));
+  box-shadow: 0 0 0 1px rgba(8, 6, 4, .85), 0 0 0 2px var(--edge);
+}
+.fr-icon { position: relative; display: inline-grid; place-items: center; }
+/* A rack name may take two lines: at 1280 wide the rack is 240px, and "Brass G..." and
+   "Leather ..." were all the row said (seen live). The reason line under it already
+   wraps; the name is the one thing a row must say whole. */
+.forge .fr .bt-name { white-space: normal; overflow: visible; }
+.fr-icon .fr-swatch { position: absolute; right: -2px; bottom: -1px; z-index: 1; }
+.forge .bench-chip { gap: 7px; }
+
+/* --- the stage ------------------------------------------------------------------------ */
+/* The minigame strip rises from the stage's foot (UI plan §6.4), as #bench-game does. */
+#forge-game {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 4;
+  transform: translateY(calc(100% + 12px)); opacity: 0;
+  transition: transform .2s ease-out, opacity .2s ease-out;
+}
+#forge-game.is-up { transform: none; opacity: 1; }
+#forge-game[hidden] { display: none; }
+
+/* --- the work order (UI plan §6.5) --------------------------------------------------------- */
+.forge .bench-tagcol-in { gap: 16px; }
+.fo-h { margin: 0 0 6px; color: var(--bench-quiet); font: 400 13px/1.4 var(--body); }
+.fo-slots { display: grid; gap: 6px; }
+.fo-slots:empty { display: none; }
+.fo-slot { position: relative; border-radius: var(--bench-radius); }
+/* Filled: the piece on leather, its label in small caps on the left. Empty: a dashed rim,
+   a shape as well as a colour, saying what goes there. */
+.fo-slot.is-full {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr) 30px; align-items: center; gap: 8px;
+  min-height: 52px; padding: 6px 4px 6px 10px;
+  border: 1px solid #3b3022; background: linear-gradient(#2a2118, #18130e); box-shadow: var(--bevel), var(--sh-1);
+}
+.fo-label { color: var(--bench-accent); font: 400 15px/1.1 var(--display); letter-spacing: .05em; font-variant: small-caps;
+            text-shadow: var(--engraved); }
+.fo-piece { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fo-piece .fr-swatch { margin-left: -4px; }
+.fo-name { display: grid; min-width: 0; font-size: 15px; line-height: 1.25; color: var(--bench-ink); }
+.fo-name small { color: var(--bench-quiet); font-size: 12px; }
+.forge .fo-x { width: 28px; height: 28px; display: grid; place-items: center; color: var(--bench-quiet); font-size: 17px; }
+.forge .fo-x:hover { color: var(--bench-ink); }
+.forge .fo-slot-b {
+  display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; width: 100%;
+  min-height: 52px; padding: 6px 10px; text-align: left; border: 1px dashed var(--edge); border-radius: var(--bench-radius);
+}
+.forge .fo-slot-b:hover { border-color: var(--gold-dim); }
+.fo-hint { color: var(--bench-quiet); font-size: 13px; line-height: 1.3; }
+.fo-slot.is-optional .fo-label { color: var(--bench-quiet); }
+.fo-slot.is-hinted .fo-slot-b { border-style: solid; border-color: var(--bench-accent); }
+.fo-slot.is-dragover .fo-slot-b, .fo-slot.is-dragover.is-full { box-shadow: inset 0 0 0 2px var(--bench-accent); }
+
+.fo-parts { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.fo-part { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 0 4px 8px; }
+.fo-n { min-width: 28px; text-align: center; font-variant-numeric: lining-nums tabular-nums; }
+.forge .fo-part .tb-step { display: inline-flex; align-items: center; gap: 3px; }
+.forge .fo-part .tb-step .v2-btn { min-width: 32px; justify-content: center; }
+
+.fo-make, .fo-make > div { display: grid; gap: 10px; }
+.fo-make:empty, .fo-make > div:empty { display: none; }
+.fo-field { display: grid; gap: 6px; }
+.forge .fo-shape { width: 100%; min-height: 36px; padding: 6px 26px 6px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink); }
+.forge .fo-shape optgroup { background: var(--panel); color: var(--bench-quiet); font-style: normal; }
+.fo-check { display: inline-flex; align-items: center; gap: 8px; color: var(--bench-ink); font-size: 15px; cursor: pointer; }
+.fo-check input { width: 16px; height: 16px; accent-color: var(--gold); }
+.fo-aim .tb-say { margin: 0; }
+
+.fo-build { display: grid; gap: 6px; padding-top: 2px; }
+.fo-build:empty { display: none; }
+.fo-as { margin: 0; color: var(--bench-quiet); font-size: 13px; }
+.fo-sum { margin: 0; color: var(--bench-ink); font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.fo-powers { margin: 0; color: var(--bench-accent); font-size: 15px; }
+.fo-build .v2-btn { justify-self: start; }
+
+/* --- the build card (UI plan §6.6) ---------------------------------------------------------- */
+.fc-dialog { width: min(720px, 100%); }
+.fc-scroll { overflow-x: auto; margin: 4px 0 10px; }
+.fc-table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: lining-nums tabular-nums; }
+.fc-table th, .fc-table td { padding: 6px 10px; text-align: right; vertical-align: top; }
+.fc-table thead th { color: var(--bench-quiet); font: 400 13px/1.3 var(--body); border-bottom: 1px solid var(--gold-dim); }
+.fc-table th small { display: block; color: var(--bench-quiet); font-size: 12px; font-weight: 400; }
+.fc-table th:first-child, .fc-table td:first-child { text-align: left; }
+.fc-table tbody th { color: var(--bench-ink); font-weight: 400; }
+.fc-table .fc-final { color: var(--bench-accent); font: 400 17px/1.2 var(--display); }
+.fc-round { margin: 0 0 8px; color: var(--bench-ink); font-size: 13px; }
+.fc-book { margin: 0 0 6px; font-size: 15px; }
+.fc-how { margin: 6px 0 0; color: var(--bench-quiet); font-size: 13px; }
+
+/* --- the footer's place line (UI plan §6.8) --------------------------------------------------- */
+.bf-place { color: var(--bench-ink); font-size: 15px; }
+
+/* --- other sizes (UI plan §5.3) ----------------------------------------------------------------- */
+/* 1280 to 1439: the rack to 240px, the work order to 300px (the strip goes to icons by
+   bench.css's own rule for this band). */
+@media (max-width: 1439px) and (min-width: 1180px) {
+  .forge { --bench-satchel-w: 240px; --bench-tag-w: 300px; --bench-gap: 28px; }
+  .forge .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(520px, 1fr) var(--bench-tag-w); }
+  .forge .bm.is-locked { display: inline-flex; }
+  /* "Quenchant" at 15px ran into its swatch in a 70px column (seen live at 1280). */
+  .fo-slot.is-full, .forge .fo-slot-b { grid-template-columns: 78px minmax(0, 1fr) auto; }
+  .fo-label { font-size: 13px; letter-spacing: .03em; }
+}
+@media (max-width: 1179px) {
+  .forge .bench-frame { grid-template-columns: minmax(0, 1fr); }
+}

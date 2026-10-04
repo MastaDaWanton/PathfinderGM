@@ -530,21 +530,14 @@
   document.addEventListener("dragend", function () { if (B.open) { dragOver(false); B.dragKey = null; } });
 
   // --- the roll (UI plan §5, step 4) ------------------------------------------------------
-  // The d20 is the table's own: Dice3D.ask winds it up and holds the mat open (`hold`),
+  // The d20 is the table's own, thrown by the core (29-bench-core.js `rollD20`, moved there
+  // 2026-10-04 so the forge throws the same die the same way): Dice3D.ask holds the mat,
   // the server rolls the face (a null face, the old bench's convention, contracts §3.3),
-  // Dice3D.land throws it onto that face, and showVerdict (22-roll-verdict.js) plays the
-  // engine's word once the die is at rest. Exactly the path 04's sendRoll takes. Where the
-  // keyboard goes while the mat is up is the core's (every bench throws the same die).
+  // Dice3D.land throws it onto that face and showVerdict plays the engine's word. The
+  // herb bench says only what goes on the mat and where the face is posted. The game
+  // rises only after the player closes the mat, so nothing starts under a mat being read.
   var focusMat = C.focusMat;
   B.focusMat = focusMat;
-  function rollTerms(c) {
-    var terms = (c.terms || []).map(function (t) { return { label: t.label, value: B.sign(t.value) }; });
-    if (c.terms && c.terms.length !== 1 && c.bonus != null) {
-      terms.push({ label: "your modifier", value: B.sign(c.bonus), total: true });
-    }
-    if (c.dc != null) terms.push({ label: "beat", value: c.dc });
-    return terms;
-  }
 
   B.roll = function () {
     var c = B.check;
@@ -554,35 +547,25 @@
     B.emit("rolling");
     renderStage();
     var name = c.product && c.product.name ? c.product.name : "Herbalism";
-    var shown = { title: "Craft (herbalism)", why: name, sides: 20, lo: 1, hi: 20, die: "1d20",
-                  terms: rollTerms(c) };
-    var dice = window.Dice3D;
-    var asking = dice ? dice.ask(Object.assign({ hold: true }, shown)) : Promise.resolve(null);
-    if (dice) focusMat();
     var body = potBody();
-    var roll = null;
-    return asking.then(function (face) {
-      B.sound("bench.roll");
-      body.face = face == null ? null : face;
-      return B.api("/api/bench/roll", body);
-    }).then(function (r) {
-      roll = r;
-      tickClock(r.minutes, r.clock);
-      if (!dice) return null;
-      var closing = dice.land(Object.assign({}, shown, { result: r.roll.face }));
-      var rest = typeof dice.settled === "function" ? dice.settled() : null;
-      if (typeof showVerdict === "function") showVerdict(r.verdict, rest);
-      if (rest) rest.then(focusMat);
-      // The mat is the player's to close (dice3d.js: `land` resolves on Close), and the
-      // game rises only after it, so nothing starts under a mat still being read.
-      return closing;
-    }).then(function () {
+    return C.rollD20({
+      shown: { title: "Craft (herbalism)", why: name, sides: 20, lo: 1, hi: 20, die: "1d20",
+               terms: C.rollTerms(c) },
+      post: function (face) {
+        B.sound("bench.roll");
+        body.face = face;
+        return B.api("/api/bench/roll", body);
+      },
+      landed: function (r) { tickClock(r.minutes, r.clock); },
+      face: function (r) { return r.roll.face; },
+      verdict: function (r) { return r.verdict; },
+    }).then(function (roll) {
       B.busy = false;
       if (roll.roll && roll.roll.success && roll.token) return play(roll);
       return failed(roll).then(focusAfterRoll);
     }).catch(function (err) {
       B.busy = false;
-      if (dice && typeof dice.close === "function") dice.close();
+      C.closeMat();
       $id("bench-why").textContent = err.message || String(err);
       B.say(err.message || String(err));
       renderStage();
@@ -700,8 +683,10 @@
         land(f, from);
         renderStage();
         B.runCheck();
-        var next = $id("bench-next");
-        (next || $id("bench-roll")).focus();
+        // Roll Craft is still disabled while the check above answers, and a disabled
+        // button refuses focus: the core's refocus never lets it fall to <body> (lane F's
+        // found bug, fixed 2026-10-04).
+        core.refocus(["bench-next", "bench-roll", '#bench-list .bt-add[tabindex="0"]']);
       }).catch(function (err) {
         B.live = null;
         B.busy = false;

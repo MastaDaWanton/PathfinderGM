@@ -95,6 +95,7 @@ urlpatterns = [
     path("api/forge/assay", forge_views.forge_assay, name="forge_assay"),
     path("api/forge/perks", forge_views.forge_perks, name="forge_perks"),
     path("api/forge/ledger", forge_views.forge_ledger, name="forge_ledger"),
+    path("api/forge/ask", forge_views.forge_ask, name="forge_ask"),
     path("api/forge/material/<str:material_id>", forge_views.forge_material,
          name="forge_material"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
