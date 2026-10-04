@@ -330,3 +330,31 @@ All six wave-2 lanes stopped mid-work when the account reached its weekly limit 
 own branch, untested and unreviewed: `lane/forge-u2` fb3b984, `lane/forge-u3` 3f60fdc,
 `lane/forge-u4` a123194, `lane/forge-u5` 906ec2c, `lane/forge-u6` 8dd3804. `lane/forge-h` had
 made no changes. Resume each lane from its branch with the same brief plus §13.
+
+## 15. Built (2026-10-04)
+
+All wave-2 lanes resumed after the limit and merged into `forge/revamp` (U6 650f1e8, U5 da8a330,
+U3 c1308cf, U4 e0992d3, H ac0389c, U2 689dfa8), with the lead's joins (noqual's warning in words,
+the herb Quality perk wording, the stage glow and the clock wait, e1a9abd). Full suite: **8801
+passed, 48 skipped, 1 xfailed**. Driven live on scratch data at 1600×900: the forge opens over
+the table at the field kit, the rack, method locks, work order, build preview, d20 and the Forge
+game with its heat gauge all work, and the blank glows on the anvil.
+
+**Still open** (none blocks play):
+1. The forge chunk is not lazy-loaded; it loads with the table (UI plan §12).
+2. After a game, focus lands on "Next: <method>", so a stray Space advances the step (both
+   benches).
+3. No forge recipes: the plan's Recipes button has no API behind it.
+4. One-use finishes (ghost salt, holy anointing) are never spent (true before the revamp too).
+5. Noqual's +20% spell failure applies to arcane casters only; elysian bronze's "natural weapons
+   and unarmed strikes only" is not checked.
+6. Migrated old items show as "Old work" on the rack; the material colour table lives in
+   `play/forge_views.py`, not the material documents.
+7. Book effects lane C could not express yet (fragile breaking on a natural 1, fire- and
+   frost-forged exposure damage, living steel's self-repair, abysium's glow, and the rest listed
+   in `docs/blacksmithing-review.md`).
+8. Not yet checked: the packaged build (plan §13.7), 3440×1440, under 1180px, frame rate in a
+   visible pane.
+9. **The owner's review of the house modifiers** (`docs/blacksmithing-review.md`).
+10. Not merged to master. The other session's `fix/playtest-2026-10-03` also changes
+    `rules/engine.py` and `rules/sheet.py`; expect conflicts at that merge.
