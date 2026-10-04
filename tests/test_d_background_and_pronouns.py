@@ -115,11 +115,20 @@ def _drenn(s, gender=""):
     return d
 
 
-def _after(s, e, world, *, text, said, suggestions, reading=None, talking=()):
+def _after(s, e, world, *, text, said, suggestions, reading=None, talking=(),
+           pronouns=None):
+    """The "beat" stage. `pronouns`: the beat reader's answer for the they/them people
+    here, stubbed as a careful reader gives it (tests/beat_reader/stub.py); until
+    2026-10-03 `pronouns_adopted` read "'…,' he says" beside their line with a pattern."""
     c = SimpleNamespace(scene=s, world=world, transcript=[], suggestions=list(suggestions),
                         engine=lambda: e)
+    beat_reading = None
+    if pronouns is not None:
+        from tests.beat_reader import stub
+
+        beat_reading = stub.read(text, s, engine=e, said=said, pronouns=pronouns)
     ctx = aftermath.context("beat", "turn", c, engine=e, text=text, said=said,
-                            reading=reading)
+                            reading=reading, attribution=beat_reading)
     rows = aftermath.run("beat", ctx)
     return rows, c
 
@@ -190,12 +199,14 @@ def test_pronouns_are_adopted_from_the_page_and_held(worlds):
     d = _drenn(s)
     line = "You look like you could use work"
     rows, _c = _after(s, e, worlds, text=f"'{line},' he says, not unkindly.",
-                      said=[{"who": d.ref, "to": "you", "line": line}], suggestions=[])
+                      said=[{"who": d.ref, "to": "you", "line": line}], suggestions=[],
+                      pronouns={d.ref: "he"})
     assert d.pronouns == "he/him" and d.gender == "man"
     assert {"kind": "pronouns-adopted", "ref": d.ref, "pronouns": "he/him"}.items() <= \
         next(r for r in rows if r.get("kind") == "pronouns-adopted").items()
     _after(s, e, worlds, text=f"'{line},' she says.",
-           said=[{"who": d.ref, "to": "you", "line": line}], suggestions=[])
+           said=[{"who": d.ref, "to": "you", "line": line}], suggestions=[],
+           pronouns={d.ref: "she"})
     assert d.pronouns == "he/him"
 
 
@@ -216,6 +227,7 @@ def test_the_replayed_drenn_beat_adopts_he_and_repairs_the_suggestion():
     beat = replays.turn(4)["beats"][0]
     said = [dict(r, who=d.ref) for r in beat["said"]]
     rows, c = _after(s, e, world, text=beat["text"], said=said,
-                     suggestions=["I ask her what she's looking for"])
+                     suggestions=["I ask her what she's looking for"],
+                     pronouns={d.ref: "he"})
     assert d.pronouns == "he/him"
     assert c.suggestions == ["I ask him what he's looking for"]

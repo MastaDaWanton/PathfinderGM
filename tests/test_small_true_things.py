@@ -50,6 +50,18 @@ TOWN = "5bbd0c40345f"
 MARKET = f"{TOWN}~urban:the-market"
 
 
+
+
+def _named(scene, text, ref, name, world=None):
+    """The beat reader's answer — this name, this person's — through the one door that
+    takes a name read off the page (`seen_people.name_them`, since 2026-10-03; it was
+    `judgement.apply_introductions`' patterns before)."""
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+
+    reading = stub.read(text, scene, names={ref: name})
+    return seen_people.name_them(stub.ctx(scene, reading, text=text, world=world), reading)
+
 @pytest.fixture
 def step():
     """A scene with one nameless stranger in it, as the play-test had."""
@@ -192,10 +204,10 @@ def test_the_panel_takes_the_name_from_the_person_who_was_asked(step):
     scene.add(other)
     beat = ("'Names are heavy things to carry in a place like this,' she says, her voice a "
             "low, resonant grind. 'But if you must have one, you may call me Gorvothor.'")
-    renamed = judgement.apply_introductions(
-        scene, beat, "I turn to the woman in the corner and ask her what her name is")
-    assert renamed == [(corner.ref, "Gorvothor")]
-    assert corner.name == "Gorvothor"
+    # Whose name it is is the beat reader's answer now (bench: names-the-one-who-was-
+    # asked); taken through the one door, the other woman untouched.
+    (row,) = _named(scene, beat, corner.ref, "Gorvothor")
+    assert row["taken"] and corner.name == "Gorvothor"
     assert other.name == "woman", "the other woman is untouched"
 
 
@@ -232,8 +244,8 @@ def test_the_engines_own_line_is_read_back_as_an_answer(step):
     assert told == ["Gorvothor Kragnir"]
     assert narration.introductions(beat, asked_for_name=True) == [
         ("woman", "Gorvothor Kragnir")]
-    assert judgement.apply_introductions(scene, beat, "I ask the woman in the corner her name") \
-        == [(who.ref, "Gorvothor Kragnir")]
+    (row,) = _named(scene, beat, who.ref, "Gorvothor Kragnir")
+    assert row["taken"] and who.name == "Gorvothor Kragnir"
 
 
 def test_the_turn_path_asks_for_the_name_and_grooms_the_answer():

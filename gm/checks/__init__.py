@@ -70,6 +70,15 @@ class BeatContext:
     was_at: str                       # scene.at when plan_turn began (agent._was_at)
     acting: str                       # the NPC ref on an NPC's turn, else ""
     turn: int
+    # An intimate scene between adults at an explicit table (`GMAgent._intimate_beat`):
+    # the one beat the owner's ruling of 2026-10-01 lets the narrator speak for the
+    # player's character, so `speaks_for_player` stands aside. Defaulted so a context
+    # built before the field existed still means "an ordinary table".
+    intimate: bool = False
+    # Where a member that reads the beat back with a model sends its call
+    # (`beat_verified`): {"model", "host", "provider", "api_key"}, the narrator's own
+    # route. None — a test, a tool — and that member reads nothing.
+    reader: Mapping | None = None
 
 
 class CheckContractError(TypeError):
@@ -164,7 +173,8 @@ def _drop_covered(found: list["Finding"]) -> list["Finding"]:
     return [f for i, f in enumerate(found) if i not in dropped]
 
 
-def run(ctx: BeatContext, *, errors: list | None = None) -> list["Finding"]:
+def run(ctx: BeatContext, *, errors: list | None = None,
+        covered: list | None = None) -> list["Finding"]:
     """Every member that opted in to `ctx.door`, in order; their findings, overlaps dropped.
 
     `errors=None` lets a member's exception (or a finding of a kind it did not declare)
@@ -189,4 +199,10 @@ def run(ctx: BeatContext, *, errors: list | None = None) -> list["Finding"]:
                            "error": f"{type(exc).__name__}: {str(exc)[:200]}"})
             continue
         found.extend(out)
-    return _drop_covered(found)
+    kept = _drop_covered(found)
+    # The findings dropped as covered, for a caller that must still ask their members
+    # once the heavier repair has run (`GMAgent._repair_sentences`): one repair per
+    # sentence, but not one fault per sentence.
+    if covered is not None:
+        covered.extend(f for f in found if f not in kept)
+    return kept

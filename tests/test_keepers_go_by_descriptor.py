@@ -85,9 +85,11 @@ def test_asked_their_name_a_keeper_gives_it_and_the_panel_learns_it():
     assert asked == {barkeep.ref: barkeep.true_name}
     given = barkeep.true_name
     beat = f"He sets the tankard down. \"{given},\" he says. \"And you are?\""
-    judgement.apply_introductions(scene, beat, "What's your name, barkeep?",
-                                  said=[{"who": barkeep.ref, "to": "you",
-                                         "line": f"{given},"}])
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+
+    reading = stub.read(beat, scene, names={barkeep.ref: given})
+    seen_people.name_them(stub.ctx(scene, reading, text=beat), reading)
     assert barkeep.name == given
 
 

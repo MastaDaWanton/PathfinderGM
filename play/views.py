@@ -2988,7 +2988,10 @@ def _ask_the_gm(c, engine, question: str) -> str:
         here=engine.here(), known=engine.places(), reading=None, player_text=question,
         report=report)
     agent.brief_facts = dict(report.get("facts") or {})
-    found = "\n".join(gm_answers.look_up(c, engine, question))
+    # The story's own use of a word before the rulebook's, as `answer` does: handed the
+    # spell *Veil* as grounding, the model answers about the spell (2026-10-03).
+    found = "\n".join(gm_answers.story_first(c, engine, question)
+                      or gm_answers.look_up(c, engine, question))
     # What the character would know (2026-09-18, item 9). Public facts are answered.
     # Rumour-grade facts ride ONE secret Knowledge (local) roll per place — DC 15, the
     # Core Rulebook's "common rumour", "Try Again: No" — recorded on the scene so
@@ -3158,6 +3161,16 @@ def _advance(c, agent, narration, plan, player_input):
         from rules import cards as cards_mod
 
         cards_mod.touch_from_outcomes(c.scene, resolution.outcomes, turn=len(c.transcript))
+        # And an errand's need, from the player's own words, the purse and where they
+        # stand: the bed card that never moved (2026-10-03, item 25). Not the author's
+        # cheat line and not Continue, which carry no words of the player's.
+        said = ("" if player_input == CARRY_ON
+                or str(player_input or "").startswith("(the author writes") else player_input)
+        moved = cards_mod.errand_progress(c.scene, engine.places(), player_text=said or "",
+                                          outcomes=resolution.outcomes,
+                                          turn=len(c.transcript))
+        if moved:
+            c.turn_log.append({"kind": "errand", "facts": moved})
     except (IntentError, ValueError, KeyError) as exc:
         c.scene.restore(undo)
         # Validation is meant to cover everything resolution accepts, so reaching here
@@ -3570,24 +3583,15 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                    "in_prose": [bool(judgement._role_head(w)) and
                                                 judgement._role_head(w) in text.lower()
                                                 for w in booked_in]})
-            introduced = judgement.note_cast(c.scene, text, turn=len(c.transcript))
-            # And every one of them into the population, located and with a life rolled —
-            # a RECORD, which the player can find later (the user's question of
-            # 2026-09-25: "there is nothing left of her?"). Never a body any more: ruled
-            # 2026-09-27, option (a) of the declared-not-guessed review. A hand check of
-            # the prose door found 11 of 30 booked people wrong (the "elder" out of "the
-            # elder-quarter" in a quote, a second old man, "man in a stained leather", a
-            # thug named "weapon"), and a body is what a misread turned into a phantom in
-            # a fight. Bodies come from the plan (`introduce`) or from the player engaging
-            # somebody (`judgement.embody_sought`); a misread now leaves a stray record.
-            # Overturned in part by the owner on 2026-10-01: somebody the beat SHOWS here
-            # is a full person at once. The beat goes along so each person is read as seen
-            # or only heard of; the bodies are made in the "people" stage below
-            # (play/aftermath/seen_people.py), after a speaker has been made real.
+            # The ledger the brief reads ("ALSO PRESENT"). Not who is new or here: since
+            # 2026-10-03 that is the beat reader's answer (gm/beat_reader.py), recorded and
+            # given bodies in the "people" stage below (play/aftermath/seen_people.py).
+            # `record_people` used to do it here from this ledger's phrases, deciding seen
+            # or heard with `seen_in_beat`'s cue words and `only_a_predicate` — and "He is
+            # a large man" made a second smith the day the last of those rules was written.
+            judgement.note_cast(c.scene, text, turn=len(c.transcript))
             from rules import population
 
-            judgement.record_people(c.scene, introduced, turn=len(c.transcript),
-                                    world=c.world, beat=text)
             # Every search for somebody that found nobody this turn, so the synonym table
             # (content/people/synonyms.json) grows from what real play missed.
             c.turn_log.extend(population.drain_misses())
@@ -3604,19 +3608,19 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 c.turn_log.append({"kind": "manner", "quirks_shown": shown,
                                    "traits_named": named})
             _log_mentions(c, agent)
-            # A name given in play renames the panel: "call me Kael" from an unnamed
-            # person here makes him Kael from now on (2026-09-18: he called himself
-            # "the stranger", our placeholder, because nothing held a name).
-            refused_names: list = []
             attribution = getattr(agent, "attribution", None)
-            whose = attribution.who if attribution is not None else None
-            for ref, given in judgement.apply_introductions(c.scene, text, player_input,
-                                                             said=agent.last_said,
-                                                             refused=refused_names,
-                                                             whose=whose):
-                repairs.append(f"{ref} gave the name {given}: the panel shows it now")
-            for ref, given, whose in refused_names:
-                repairs.append(f"{ref} was not renamed {given}: {whose} answers to it")
+            # A speaker tag the beat reader contradicts is withdrawn before anything reads
+            # it — the bodies of the "people" stage and the hails after it (item 15,
+            # 2026-10-03: six beats of "the man" tagged to the servant, each one opening a
+            # conversation with him). Where `judgement.doubt_tags` ran its patterns.
+            from gm import beat_reader
+
+            if isinstance(attribution, beat_reader.Reading):
+                c.turn_log.extend(beat_reader.reconcile_tags(attribution, agent.last_said))
+            # A name given in play renames the panel ("call me Kael", 2026-09-18) — read
+            # by the beat reader and taken in the "people" stage, after the newcomers it
+            # names have bodies (play/aftermath/seen_people.py). `apply_introductions`
+            # read it here by pattern until 2026-10-03.
             # The after-the-beat steps' "people" stage (play/aftermath, §2.3): here, and
             # not with the "beat" stage below, because a speaker the page made real has to
             # exist before `hailed_by` reads who spoke to the player. `said` is the live
@@ -3675,7 +3679,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 # 2026-09-22: "the description of Ashla is tagged to the end as an after
                 # thought ... if she was next to drenn she should have been described
                 # right after i saw drenn."
-                text = narration_mod.place_the_face(text, who.name, line)
+                text = narration_mod.place_the_face(text, who.name, line, ref=ref,
+                                                    attribution=attribution)
                 ours.append(line)
                 who.described = True
                 repairs.append(f"nobody stands here undescribed: added {who.name}'s "
@@ -3725,9 +3730,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             c.transcript.append({"who": "gm", "text": text, "kind": "setup",
                                  **({"added": added} if added else {}),
                                  **({"said": said} if said else {})})
-            # The measurement the tags are judged by: a valid ref on the wrong line looks
-            # fine to the parser, so the tagged hails are logged beside what the old
-            # guess would have said, and a disagreement means one of them is wrong.
+            # The measurement the tags are judged by: how many lines the prose call tagged,
+            # how many were booked from the page, and who hailed the player.
             c.turn_log.append({"kind": "speech-tags",
                                # The model's tags only: a line `speaker_real` read off
                                # the page (`"from": "page"`) is counted apart, so the
@@ -3745,8 +3749,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                                        if not r["who"]}),
                                "on_the_page": len(said),
                                "lines": len(speech_mod.lines(text)),
-                               "hails_tagged": judgement.hailed_by(c.scene, text, said=said),
-                               "hails_guessed": judgement.hailed_by(c.scene, text)})
+                               # Every hail is a booked line now (the tags, and the beat
+                               # reader's speakers); `hails_guessed`, the untagged-line
+                               # pattern it was measured against, retired with it.
+                               "hails_tagged": judgement.hailed_by(c.scene, text, said=said)})
             # The "beat" stage: the beat is on the transcript now, with the lines kept on
             # it, so a step can index it (the conversation log, F) and `c.suggestions` is
             # already this turn's (D).
@@ -4414,21 +4420,49 @@ def _remember(c, resolution, player_input: str) -> None:
     (35.3% against 94.4% for full context), and the cause named is detail lost through
     repeated re-compression. See gm/ledger.py.
     """
+    # Who was spoken to: the person the words name, else the conversation the engine
+    # holds (`states.TALKING`), else the one person here. Never "someone" — measured
+    # 2026-10-03 (item 22), "you spoke with someone" was a ledger line that remembered
+    # nothing, written while the engine knew exactly who the player was talking to.
+    from rules import states
+
     spoke = ""
     if judgement.was_speech(player_input):
-        here = [a.name for a in c.scene.actors.values() if not a.is_pc]
-        spoke = next(
-            (n for n in here
-             if len(str(n).split()[-1]) > 2
-             and str(n).split()[-1].lower() in (player_input or "").lower()),
-            "someone")
+        here = [a for a in c.scene.actors.values() if not a.is_pc]
+        named = next(
+            (a.name for a in here
+             if len(str(a.name).split()[-1]) > 2
+             and str(a.name).split()[-1].lower() in (player_input or "").lower()), "")
+        talking = [a.name for a in here if a.has_state(states.TALKING)]
+        spoke = (named or (talking[0] if len(talking) == 1 else "")
+                 or (here[0].name if len(here) == 1 else ""))
+    # Places by the names the player read, and where the party stood by its own name
+    # within the settlement — "the smithy, Zhilvarnia", not the settlement alone for
+    # every entry, and never an id (item 22: "you went to ca~urban:the-docks").
+    try:
+        known = places_mod.for_scene(c.location, c.scene.at,
+                                     founded=getattr(c.scene, "founded", ()) or ())
+    except Exception:  # noqa: BLE001 — a memory line is never worth the turn
+        known = ()
+    place_names = {p.id: p.name for p in known if getattr(p, "id", "")}
+    for p in getattr(c.scene, "founded", ()) or ():
+        pid, pname = getattr(p, "id", ""), getattr(p, "name", "")
+        if pid and pname:
+            place_names.setdefault(pid, pname)
+    settlement = getattr(c.location, "name", "") or ""
+    spot = place_names.get(str(getattr(c.scene, "at", "") or ""), "")
+    where = ", ".join(x for x in (spot, settlement) if x)
     ledger_mod.keep(c.ledger, ledger_mod.note(
         resolution.outcomes,
         turn=len(c.transcript),
         hist=len(c.history),
         spoke_with=spoke,
-        where=getattr(c.location, "name", "") or "",
-        names={r: a.name for r, a in c.scene.actors.items()}))
+        where=where,
+        # Everybody the scene holds, not only who stands here now: a turn that spoke to
+        # somebody and then walked away has left them behind by the time it is written.
+        names={r: a.name for r, a in (getattr(c.scene, "people", None)
+                                      or c.scene.actors).items()},
+        places=place_names))
 
 
 def _log_turn(c, plan, resolution, replace: bool = False):

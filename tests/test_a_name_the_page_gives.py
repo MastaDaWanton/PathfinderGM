@@ -12,6 +12,11 @@ the man SAID "Korgath Varn", `settle_introductions` would have swapped it for th
 name, contradicting the beat two turns earlier in which Drenn Ironvale named Korgath
 Varn as the man to find. A name the story has established wins, and becomes the one the
 world holds.
+
+Who the name in the page is FOR was read by `narration.named_in_apposition` and
+`judgement.apply_introductions` until 2026-10-03; it is the beat reader's answer now (its
+"names"), taken through `seen_people.name_them`. The shapes the patterns were tested on
+are on the bench (tests/beat_reader/gold.py, the "names-" cases).
 """
 from __future__ import annotations
 
@@ -35,31 +40,27 @@ def _scene():
     return s, pc, man
 
 
-class TestTheShape:
-    def test_the_reported_sentence(self):
-        assert narration.named_in_apposition(BEAT) == [("man", "Korgath Varn")]
+def _named(s, text, ref, name):
+    """The beat reader's answer — this name is this person's — through the one door."""
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
 
-    def test_commas_and_named(self):
-        assert narration.named_in_apposition(
-            "The woman, Marra Tull, looks up from the ledger.") == [("woman", "Marra Tull")]
-        assert narration.named_in_apposition(
-            "A guard named Osric waves you through.") == [("guard", "Osric")]
+    reading = stub.read(text, s, names={ref: name})
+    return seen_people.name_them(stub.ctx(s, reading, text=text), reading)
 
-    def test_a_place_in_apposition_is_not_a_person(self):
-        assert narration.named_in_apposition(
-            "You cross the market, Vormoor's heart, at a walk.") == []
 
-    def test_speech_is_not_read_here(self):
-        assert narration.named_in_apposition(
-            'Drenn says, "the man, Korgath Varn, sits in the back corner."') == []
+def test_the_shapes_are_on_the_bench():
+    from tests.beat_reader.gold import CASES
+
+    ids = {c["id"] for c in CASES}
+    assert {"names-the-man-korgath-varn", "names-a-place-in-apposition"} <= ids
 
 
 class TestThePanel:
     def test_the_man_becomes_korgath_varn(self):
         s, pc, man = _scene()
-        got = judgement.apply_introductions(s, BEAT, "I ask him to point me the right way")
-        assert got == [(man.ref, "Korgath Varn")]
-        assert man.name == "Korgath Varn"
+        (row,) = _named(s, BEAT, man.ref, "Korgath Varn")
+        assert row["taken"] and man.name == "Korgath Varn"
         assert man.true_name == "Korgath Varn", "the world holds the story's name now"
         assert s.cast[-1]["who"] == "Korgath Varn"
 
@@ -67,8 +68,8 @@ class TestThePanel:
         s, pc, man = _scene()
         drenn = instantiate("guildhand", scene=s, name="Korgath Varn")
         s.add(drenn)
-        assert judgement.apply_introductions(s, BEAT) == []
-        assert man.name == "man"
+        (row,) = _named(s, BEAT, man.ref, "Korgath Varn")
+        assert not row["taken"] and man.name == "man"
 
 
 class TestTheStorysNameWins:
@@ -85,5 +86,5 @@ class TestTheStorysNameWins:
     def test_and_then_he_is_korgath_varn_to_the_world_as_well(self):
         s, pc, man = _scene()
         beat = "The man shrugs. 'The name's Korgath Varn,' he says. 'You found me.'"
-        judgement.apply_introductions(s, beat, "I ask the man his name")
+        _named(s, beat, man.ref, "Korgath Varn")
         assert man.name == "Korgath Varn" and man.true_name == "Korgath Varn"

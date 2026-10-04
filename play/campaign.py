@@ -341,6 +341,9 @@ class Campaign:
                      [self.scene.at] if self.scene.at else []),
             # Notes and maps written with ink and paper (2026-10-01).
             "writings": ([dict(w) for w in self.scene.writings], []),
+            # Places somebody named that the town does not have yet (2026-10-03,
+            # rules/heard_places.py): a conversation made them, so nothing derives them.
+            "heard_places": ([dict(h) for h in self.scene.heard_places], []),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -444,6 +447,7 @@ class Campaign:
             settled=int(s.get("settled") or 0),
             came_along=list(s.get("came_along") or []),
             founded=[dict(f) for f in (s.get("founded") or [])],
+            heard_places=[dict(h) for h in (s.get("heard_places") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
@@ -539,6 +543,17 @@ class Campaign:
         person_words.record_peoples(self.scene, world)
         # And a person an older build named with a ref ("c8", item 7) gets words back.
         person_words.heal_ref_names(self.scene)
+        # Or named with the player's quoted words, or with a people's name (2026-10-03,
+        # items 13 and 14). The ledger's own lines carried the phrase as a person ("you
+        # told say \"just trying…\""), so they are respelled with the new words — the
+        # one edit to the ledger this lane makes; what the ledger records is lane D's.
+        for _ref, old, new in person_words.heal_phrase_names(self.scene, world,
+                                                             self.transcript):
+            for entry in self.ledger or []:
+                if isinstance(entry, dict) and old in str(entry.get("text") or ""):
+                    entry["text"] = str(entry["text"]).replace(old, new)
+        # And the goods an older build minted from words (2026-10-03, items 1 and 3).
+        _heal_minted_goods(self.scene)
 
     def _heal_places(self, stored_biome: str, unplaced: list[str]) -> None:
         """A save from before actors had a place, stood somewhere real.
@@ -670,6 +685,23 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     # The clock starts at the hour the opening names ("Mid-morning, in the market row"),
     # not at midnight: the hour now decides who is where and which counters are open.
     scene.clock_minutes = opening.hour_of(here.when) * 60
+    # And the party stands where the row's own words are set (playtest 2026-10-03, item
+    # 12): "a lit doorway with a room's noise behind it" is a tavern's or an inn's door,
+    # not the market `place_party` chose. Before the watcher is added — `Scene.add` stands
+    # them wherever the party is. A town with none of the row's kinds keeps the way in.
+    if town is not None and here.kinds:
+        spot = openings.spot_for(world, town, {"where": {"at": "place",
+                                                         "kinds": list(here.kinds)}})
+        if spot is not None:
+            from rules import places as places_mod
+
+            # By name, as `openings.stage` stands a document's party: the engine's own
+            # id for that place, which the start's derivation does not promise.
+            eng = Engine(scene, Dice(seed), world=world)
+            target = places_mod.find(eng.places(), spot.name)
+            if target is not None and target.id != scene.at:
+                eng.place_party(target.id)
+                scene.begin_here()
     # Where they stand is what their own description says, read by the same cues the
     # prose is read by: "the stranger sharing the step" and "the neighbour beside you"
     # were added `near` and laid fifteen feet off (measured 2026-09-28), which the map
@@ -717,6 +749,18 @@ def _open_the_world(c: Campaign, world, here, watcher_ref: str, seed, town) -> N
     pc = scene.pc()
     cards_mod.open_card(scene, cards_mod.from_opening(
         here, scene.at, watcher_ref, pc.name if pc is not None else ""))
+    # The way to meet the errand, within reach from the first beat: "Beds are let at the
+    # tavern" on the bed card, from this settlement's own places (item 25, 2026-10-03).
+    # Through the one derivation directly, not `c.engine().places()`: building an Engine
+    # here re-seats `scene._dice`, and measured on test_blows_declared that alone moved
+    # a later roll and opened a fight. The ring outside the walls is never a bed.
+    opening_card = cards_mod.find(scene, "opening")
+    if opening_card is not None and cards_mod.need_of(opening_card):
+        from rules import places as places_mod
+
+        cards_mod.ground_the_errand(scene, places_mod.for_scene(
+            world.get(scene.location_id) or scene.location_id, scene.at,
+            founded=scene.founded))
     for card in cards_mod.from_world(world, scene.at):
         cards_mod.open_card(scene, card)
     # The campaign's opening undercurrent — the first world-state this app has ever
@@ -1088,6 +1132,33 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     open_the_story(c, written=False)
     c.save()
     return c
+
+
+def _heal_minted_goods(scene) -> None:
+    """Goods lines an older build minted from words, put right on load.
+
+    The owner's items save (2026-10-03) carried `{"brunt of the weight": 1, "coins": 1}`
+    in Kesst's pack, both written by `inject_goods` before it knew better: a figure of
+    speech taken for a thing, and coin taken for an item. The fixes stop new ones; this
+    clears the ones already saved, by the same two judges the planner now uses —
+    `judgement._is_a_thing` for the words, `holding.is_money` for the coin. Coin is
+    credited the way the engine credits coin no record vouches for (one copper piece a
+    line, `Engine._give_money`), because no amount was ever recorded and law 3 forbids
+    inventing one. A pouch stays: it was a real pouch, only empty."""
+    from gm.judgement import _is_a_thing
+    from rules import goods as goods_mod
+    from rules import holding
+
+    for actor in list(getattr(scene, "actors", {}).values()):
+        store = getattr(actor, "goods", None)
+        if not isinstance(store, dict):
+            continue
+        for name in list(store):
+            if holding.is_money(name):
+                n = max(1, int(store.pop(name) or 1))
+                actor.purse = goods_mod.credit(actor.purse, n)
+            elif not _is_a_thing(name) and not holding.is_container(name):
+                store.pop(name)
 
 
 def _heal_background(c) -> None:

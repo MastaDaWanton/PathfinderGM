@@ -159,14 +159,32 @@ def _scene_with_a_satchel():
     return scene
 
 
+def _read(said, scene, *actions, plan=None, question=False):
+    """The turn's goods door with this reading (gm/acts_to_ops.py). Since 2026-10-03 the
+    reading drives a sale; `inject_sale`, the regex these tests first pinned, is retired
+    (docs/structured-turn.md). The thing sold is still grounded in the satchel."""
+    from gm import acts_to_ops
+
+    frame = {"question": question, "claims": [], "actions": [dict(a) for a in actions]}
+    rows = acts_to_ops.table(frame, scene, sentence=said)
+    return acts_to_ops.apply(list(plan or [{"op": "narrate_only", "params": {}}]),
+                             rows, frame, scene)
+
+
+def _with_her(scene):
+    """The stallholder the player is selling to: "to her" names the one person here."""
+    from rules.bestiary import instantiate
+
+    scene.add(instantiate("guildhand", scene=scene, name="the stallholder"))
+    return scene
+
+
 def test_a_declared_sale_reaches_the_engine_whatever_the_gm_proposed():
     """The ninth injector, and the same measurement every time: the op exists, the prompt
     carries it, the model does not emit it. Four turns of haggling over a satchel of
     tinctures produced four `narrate_only` and nothing else."""
-    from gm import judgement
-
-    raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}],
-                                "I sell the Yarow Elixir to her", _scene_with_a_satchel())
+    raw = _read("I sell the Yarow Elixir to her", _with_her(_scene_with_a_satchel()),
+                {"act": "sell", "object": "the Yarow Elixir", "target": "her"})
     assert [r["op"] for r in raw] == ["narrate_only", "sell"]
     assert raw[-1]["params"]["item"] == "yarow-elixir#1"
 
@@ -175,45 +193,49 @@ def test_asking_the_price_is_not_selling():
     """A haggle is full of statements that are still questions. "twenty gold coins" has no
     question mark in it at all, and the turn before it was "I ask her to name a price for
     all my tinctures and elixirs" — if either of those moved goods, the player would have
-    sold the satchel by opening their mouth."""
-    from gm import judgement
-
-    scene = _scene_with_a_satchel()
-    for said in ("I ask her to name a price for all my tinctures and elixirs",
-                 "how much will you give me for the Yarow Elixir",
-                 "what is the Blackthorn Draught worth to you"):
-        raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}], said, scene)
+    sold the satchel by opening their mouth. The reading reads them as talk (or, since
+    2026-10-03, an `offer`, which a stall with a counter alone turns into a sale)."""
+    scene = _with_her(_scene_with_a_satchel())
+    for said, says in (
+            ("I ask her to name a price for all my tinctures and elixirs",
+             "to name a price for all my tinctures and elixirs"),
+            ("how much will you give me for the Yarow Elixir",
+             "how much will you give me for the Yarow Elixir"),
+            ("what is the Blackthorn Draught worth to you",
+             "what is the Blackthorn Draught worth to you")):
+        raw = _read(said, scene, {"act": "talk", "target": "her", "says": says})
         assert [r["op"] for r in raw] == ["narrate_only"], said
 
 
 def test_selling_something_you_do_not_have_injects_nothing():
-    """Grounded in the satchel rather than in the sentence, which is the whole difference
-    between this and `inject_goods`. "I sell my soul" finds no jar and stays out of it."""
-    from gm import judgement
+    """Grounded in the satchel rather than in the sentence. "I sell my soul" finds no jar,
+    builds nothing, and the turn says what was not found (`acts_to_ops.refusal`)."""
+    from gm import acts_to_ops
 
-    scene = _scene_with_a_satchel()
-    for said in ("I sell my soul to the winged man", "I sell the warhorse"):
-        raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}], said, scene)
+    scene = _with_her(_scene_with_a_satchel())
+    for said, obj in (("I sell my soul to the winged man", "my soul"),
+                      ("I sell the warhorse", "the warhorse")):
+        frame = {"actions": [{"act": "sell", "object": obj}]}
+        raw = _read(said, scene, *frame["actions"])
         assert [r["op"] for r in raw] == ["narrate_only"], said
+        rows = acts_to_ops.table(frame, scene, sentence=said)
+        assert acts_to_ops.refusal(rows).startswith("Kesst Vayr is not carrying")
 
 
-def test_a_sale_the_gm_already_proposed_is_left_alone():
-    """The same guard every injector has: never a second copy of what is already there."""
-    from gm import judgement
-
+def test_a_sale_the_gm_already_proposed_is_not_made_twice():
+    """The same guard every injector had: never a second copy of what is already there.
+    The plan's sell of the same jar is replaced by the reading's, once."""
     already = [{"op": "sell", "actor": "pc", "params": {"item": "yarow-elixir#1"}}]
-    raw = judgement.inject_sale(already, "I sell the Yarow Elixir", _scene_with_a_satchel())
-    assert raw == already
+    raw = _read("I sell the Yarow Elixir", _with_her(_scene_with_a_satchel()),
+                {"act": "sell", "object": "the Yarow Elixir"}, plan=already)
+    assert [(r["op"], r["params"]["item"]) for r in raw] == [("sell", "yarow-elixir#1")]
 
 
 def test_the_longest_matching_name_wins():
     """A jar merely called "Elixir" must not beat "Yarow Elixir" to the sale."""
-    from gm import judgement
-
-    scene = _scene_with_a_satchel()
+    scene = _with_her(_scene_with_a_satchel())
     scene.pc().add_stock(jar(base="Elixir", tier="common", potency=1.0))
-    raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}],
-                                "I sell the Yarow Elixir", scene)
+    raw = _read("I sell the Yarow Elixir", scene, {"act": "sell", "object": "the Yarow Elixir"})
     assert raw[-1]["params"]["item"] == "yarow-elixir#1"
 
 
@@ -308,53 +330,56 @@ def test_a_richer_house_stocks_what_a_stall_cannot():
 
 # --- required up front rather than injected afterwards -----------------------------------
 
-def test_a_declared_sale_is_required_by_the_schema_not_bolted_on():
-    """Nine injectors now, one per feature, growing forever — and each one is a repair
-    applied after the model failed to propose something the player plainly said.
+def test_a_declared_sale_is_built_whole_not_asked_of_the_model():
+    """Nine injectors, one per feature, growing forever — and each one a repair applied
+    after the model failed to propose something the player plainly said. The schema then
+    REQUIRED the op the words declared, and the model picked the item and the target.
 
-    The fight schema already shows the better shape: in combat `narrate_only` is not in
-    the op enum, so proposing nothing is not a reply the sampler can produce. The same
-    trick generalises. When a declaration is detected the schema requires that op, and the
-    model then picks the item and the target with the scene in front of it — which an
-    injector guessing afterwards cannot."""
-    from gm import judgement, prompts
+    Since 2026-10-03 a sale is the reading's, built whole by the act→op table: the jar by
+    its id off the shelf, the buyer by the engine's finders. It is not asked of the model
+    at all — a required `sell` body in the `declared` block would be merged in beside the
+    table's (`GMAgent._merge_declared`), the elixir sold twice. The schema's requirement
+    machinery stays for the ops the model still writes (a travel, a say)."""
+    from gm import acts_to_ops, judgement, prompts
 
-    scene = _scene_with_a_satchel()
-    assert judgement.declared_ops("I sell the Yarow Elixir to her", scene) == ["sell"]
+    scene = _with_her(_scene_with_a_satchel())
+    said = "I sell the Yarow Elixir to her"
+    assert "sell" not in judgement.declared_ops(said, scene)
+    frame = {"actions": [{"act": "sell", "object": "the Yarow Elixir", "target": "her"}]}
+    rows = acts_to_ops.table(frame, scene, sentence=said)
+    assert acts_to_ops.declared(rows) == [] and acts_to_ops.built_ops(rows) == ["sell"]
 
-    schema = prompts.turn_schema(refs=("pc",), must_contain=("sell",))
+    schema = prompts.turn_schema(refs=("pc",), must_contain=("travel",))
     required = schema["properties"]["intents"]["allOf"]
-    assert required[0]["contains"]["properties"]["op"]["const"] == "sell"
+    assert required[0]["contains"]["properties"]["op"]["const"] == "travel"
     assert schema["properties"]["intents"]["minItems"] >= 1
 
 
 def test_selling_is_not_also_giving_it_away():
     """Found by building `declared_ops`, in code committed hours earlier the same day.
 
-    "I sell the Yarow Elixir" matches `_HANDS_OVER`, so `inject_goods` ran first and wrote
+    "I sell the Yarow Elixir" matched `_HANDS_OVER`, so `inject_goods` ran first and wrote
     a `give` — the elixir left the satchel for nothing — and `inject_sale` then bowed out
     because a `give` was already present. A declared sale paid the player zero gold, and
     the entire trade feature was invisible behind it.
 
-    Sale first, and `inject_goods` bows out to it. One sentence, one item, one op."""
-    from gm import judgement
-
-    scene = _scene_with_a_satchel()
+    One reading, one act, one op: the reading says `sell`, and a sale is all that is
+    built. The plan's own give of the same jar is replaced by it."""
+    scene = _with_her(_scene_with_a_satchel())
     said = "I sell the Yarow Elixir to her"
-
-    raw = judgement.inject_sale([{"op": "narrate_only", "params": {}}], said, scene)
-    raw = judgement.inject_goods(raw, said, scene)
-    assert [r["op"] for r in raw] == ["narrate_only", "sell"]
-    assert judgement.declared_ops(said, scene) == ["sell"]
+    raw = _read(said, scene, {"act": "sell", "object": "the Yarow Elixir", "target": "her"},
+                plan=[{"op": "give", "params": {"item": "Yarow Elixir", "from_": "pc"}}])
+    assert [r["op"] for r in raw] == ["sell"]
 
 
 def test_handing_something_over_is_still_a_give():
     """The narrower reading must not swallow the wider one — "I hand over the brass key"
     is not a sale and there is no key in the satchel to sell."""
-    from gm import judgement
-
-    scene = _scene_with_a_satchel()
-    assert judgement.declared_ops("I hand over the brass key", scene) == ["give"]
+    scene = _with_her(_scene_with_a_satchel())
+    scene.pc().goods["brass key"] = 1
+    raw = _read("I hand over the brass key", scene,
+                {"act": "give", "object": "the brass key"})
+    assert [r["op"] for r in raw] == ["narrate_only", "give"]
 
 
 def test_a_turn_that_declares_nothing_constrains_nothing():
@@ -384,8 +409,10 @@ def test_two_declarations_both_have_to_be_there():
 
 # --- the chain, not the links ------------------------------------------------------------
 
-def _chain(said, scene, world=None):
-    """Every injector `agent.plan_turn` runs, in the order it runs them.
+def _chain(said, scene, world=None, frame=None):
+    """Every injector `agent.plan_turn` runs, in the order it runs them — and the act→op
+    table's door (`acts_to_ops.apply`) where it stands among them, with `frame` as the
+    turn's reading.
 
     Read out of the agent's own source rather than rewritten here, because a copy of an
     ordering is an ordering that can drift — and this whole test file exists because one
@@ -394,16 +421,22 @@ def _chain(said, scene, world=None):
     import inspect
     import re
 
-    from gm import agent as agent_mod, judgement
+    from gm import acts_to_ops, agent as agent_mod, judgement
 
     src = inspect.getsource(agent_mod.GMAgent.plan_turn)
-    names = re.findall(r"judgement\.(\w+)\(raw", src)
+    names = [m.group(1) or "acts_to_ops.apply" for m in
+             re.finditer(r"judgement\.(\w+)\(raw|acts_to_ops\.apply\(raw", src)]
+    rows = acts_to_ops.table(frame, scene, sentence=said)
     raw = [{"op": "narrate_only", "params": {}}]
     for name in names:
+        if name == "acts_to_ops.apply":
+            raw = acts_to_ops.apply(raw, rows, frame, scene)
+            continue
         fn = getattr(judgement, name)
         if name in ("inject_travel", "inject_introduce"):
             raw = fn(raw, said, scene, world)
-        elif name in ("fill_obvious_targets", "fill_introduce_templates"):
+        elif name in ("fill_obvious_targets", "fill_introduce_templates",
+                      "resolve_sold_items"):
             raw = fn(raw, scene)
         elif name == "fill_bare_checks":
             raw = fn(raw)
@@ -424,21 +457,27 @@ def _chain(said, scene, world=None):
     return raw, names
 
 
+SELL_ELIXIR = {"actions": [{"act": "sell", "object": "the Yarow Elixir", "target": "her"}]}
+
+
 def test_the_injectors_run_in_an_order_that_does_not_give_the_goods_away():
     """The bug this file exists for, and the reason it survived a green suite.
 
-    "I sell the Yarow Elixir" matches `_HANDS_OVER`. `inject_goods` ran first and wrote a
+    "I sell the Yarow Elixir" matched `_HANDS_OVER`. `inject_goods` ran first and wrote a
     `give` — the elixir left the satchel for nothing — and `inject_sale` then bowed out,
     because a `give` was already present. A declared sale paid zero gold.
 
     Every test of the sale passed, because every one of them called `inject_sale`
-    directly. The order only exists in `plan_turn`, and nothing ran the chain."""
-    scene = _scene_with_a_satchel()
-    raw, names = _chain("I sell the Yarow Elixir to her", scene)
+    directly. The order only exists in `plan_turn`, and nothing ran the chain. Since
+    2026-10-03 the goods door is the reading's table, and the coin door after it only
+    straightens the model's own coin ops — so the table must run before it."""
+    scene = _with_her(_scene_with_a_satchel())
+    raw, names = _chain("I sell the Yarow Elixir to her", scene, frame=SELL_ELIXIR)
 
-    assert "inject_sale" in names and "inject_goods" in names
-    assert names.index("inject_sale") < names.index("inject_goods"), \
-        f"goods runs before sale: {names}"
+    assert "acts_to_ops.apply" in names and "inject_payment" in names
+    assert names.index("acts_to_ops.apply") < names.index("inject_payment"), \
+        f"coin runs before the table: {names}"
+    assert "inject_sale" not in names and "inject_goods" not in names
 
     ops = [r["op"] for r in raw]
     assert "sell" in ops, f"the declared sale never reached the engine: {ops}"
@@ -447,18 +486,22 @@ def test_the_injectors_run_in_an_order_that_does_not_give_the_goods_away():
 
 def test_one_sentence_produces_one_op_for_the_thing_it_names():
     """The general form. Whatever the chain does, an item may leave the satchel once."""
-    scene = _scene_with_a_satchel()
-    for said in ("I sell the Yarow Elixir to her",
-                 "I hand over the Yarow Elixir",
-                 "I buy a lantern"):
-        raw, _ = _chain(said, scene)
+    scene = _with_her(_scene_with_a_satchel())
+    scene.pc().goods["brass key"] = 1
+    for said, frame in (
+            ("I sell the Yarow Elixir to her", SELL_ELIXIR),
+            ("I hand over the Yarow Elixir",
+             {"actions": [{"act": "give", "object": "the Yarow Elixir"}]}),
+            ("I buy a lantern", {"actions": [{"act": "buy", "object": "a lantern"}]})):
+        raw, _ = _chain(said, scene, frame=frame)
         moving = [r["op"] for r in raw if r["op"] in {"sell", "buy", "give"}]
         assert len(moving) <= 1, f"{said!r} moved goods {len(moving)} times: {moving}"
 
 
 def test_the_chain_leaves_a_quiet_turn_quiet():
     scene = _scene_with_a_satchel()
-    raw, _ = _chain("I look around the square", scene)
+    raw, _ = _chain("I look around the square", scene,
+                    frame={"actions": [{"act": "look", "place": "the square"}]})
     assert [r["op"] for r in raw] == ["narrate_only"]
 
 
@@ -477,9 +520,6 @@ def test_what_the_chain_produces_is_what_the_schema_asked_for():
         for op in wanted:
             assert op in got, f"{said!r}: schema wants {op}, chain gives {sorted(got)}"
 
-
-
-# --- one rule, four doors ----------------------------------------------------------------
 
 def test_an_unconscious_character_cannot_trade_use_items_or_swing():
     """Found in the first minute of a play session, in code committed the same day.
@@ -718,14 +758,15 @@ def test_the_model_names_the_jar_the_way_a_person_would():
     `must_contain` gets the op proposed and leaves its params to chance, and the injector
     had stood down because a `sell` was already present — so the one piece of code that
     knows the ids was the one piece not looking. It corrects the params now instead of
-    bowing to them."""
+    bowing to them. Since 2026-10-03 that half is `resolve_sold_items`, the plan's op against the
+    shelf; the player's words are the reading's."""
     from gm import judgement
 
     scene = _scene_with_a_satchel()
     scene.pc().add_stock(jar(base="Sweetspire Tea", tier="common", potency=1.25), 4)
 
     model = [{"op": "sell", "actor": "pc", "params": {"item": "sweetspire tea"}}]
-    fixed = judgement.inject_sale(model, "I sell the Sweetspire Tea at a premium", scene)
+    fixed = judgement.resolve_sold_items(model, scene)
     assert fixed[0]["params"]["item"] == "sweetspire-tea#1"
 
 
@@ -736,7 +777,7 @@ def test_an_item_the_satchel_never_heard_of_is_left_for_the_engine():
 
     scene = _scene_with_a_satchel()
     model = [{"op": "sell", "actor": "pc", "params": {"item": "moon cheese"}}]
-    assert judgement.inject_sale(model, "I sell the moon cheese", scene) == model
+    assert judgement.resolve_sold_items(model, scene) == model
 
 
 def test_an_id_that_is_already_right_is_not_touched():
@@ -744,7 +785,7 @@ def test_an_id_that_is_already_right_is_not_touched():
 
     scene = _scene_with_a_satchel()
     model = [{"op": "sell", "actor": "pc", "params": {"item": "yarow-elixir#1"}}]
-    assert judgement.inject_sale(model, "I sell the Yarow Elixir", scene) == model
+    assert judgement.resolve_sold_items(model, scene) == model
 
 
 

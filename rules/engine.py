@@ -17,6 +17,7 @@ from typing import Any
 
 from . import biomes
 from . import goods
+from . import holding
 from . import ontheway
 from . import casting
 from . import compulsion
@@ -325,6 +326,11 @@ class Scene:
     # with a parent and an owner; `places.with_founded` grafts them onto the derived
     # set by parent at read time. `Engine.found`/`Engine.venture` are the doors.
     founded: list[dict] = field(default_factory=list)
+    # Places a person named that the settlement does not have yet (`rules/heard_places.py`):
+    # heard of, not been to — Inform's *familiar*. Stored because a conversation made
+    # them; each becomes a place through `found`, under the landmark the speaker gave,
+    # the first time the player goes there (`judgement.go_to_heard_place`).
+    heard_places: list[dict] = field(default_factory=list)
     # The schemes running in this campaign (rules/schemes.py): one instance per opened
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.
@@ -2400,7 +2406,18 @@ class Engine:
                             )
             return
 
-        needs_actor = intent.op in ("check", "save", "attack", "move")
+        # A trade or an item used with nobody named doing it is the player's own: the
+        # handlers read `self.scene.actors[intent.actor]`, and measured live on the
+        # 2026-10-03 batch, "I agree to sell the crate to the smith for whatever it is
+        # worth" came back as a `sell` with no actor — `KeyError: None`, and the player
+        # read "The engine refused the GM's intents: None" with their turn lost. `cast`
+        # is refused instead of defaulted: an NPC's turn casts too, and guessing the
+        # caster is the one thing this must not do.
+        if not intent.actor and intent.op in ("sell", "buy", "use_item"):
+            pc = self.scene.pc()
+            if pc is not None:
+                intent.actor = pc.ref
+        needs_actor = intent.op in ("check", "save", "attack", "move", "cast")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
         for t in intent.targets():
@@ -2569,11 +2586,7 @@ class Engine:
             # The open ground outside the walls answers by name too — the region
             # places a scheme's card names ("the approach", "the edge") — the same
             # lookup `_op_travel` makes, so validate and run agree.
-            outside = ()
-            if self.world is not None:
-                terrain = self._terrain_hint(self.world.get(self.scene.location_id)) or ""
-                if terrain:
-                    outside = places_mod.region_set(self.scene.location_id, terrain)
+            outside = self.open_ground()
             planned = _place_key(intent.params["place"]) in getattr(self, "_planned_places", ())
             if known and not planned \
                     and places_mod.find(known, str(intent.params["place"])) is None \
@@ -2592,7 +2605,10 @@ class Engine:
                     f"\"<the place above it stands in or off>\"}}}} (kind: what it is; "
                     f"parent: the place from that list it is in or off — where the "
                     f"player's words or the people here put it; leave parent out only "
-                    f"when it opens off where the party stands), then travel to it.",
+                    f"when it opens off where the party stands), then travel to it. "
+                    f"But a thing in the place the party stands — a door, a counter, a "
+                    f"corner, an area of it — is not a place: walking to it is "
+                    f"{{\"op\": \"narrate_only\"}}, and nothing is founded.",
                     "schema", code="no_such_place")
         if intent.op == "hazard":
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
@@ -4336,7 +4352,8 @@ class Engine:
 
             resolved_dc = dc_mod.ResolvedDC(
                 value=(attitude_mod.influence_dc(swayed) if skill == "diplomacy"
-                       else attitude_mod.intimidate_dc(swayed)), band=None)
+                       else attitude_mod.intimidate_dc(swayed)), band=None,
+                basis=attitude_mod.dc_basis(swayed, skill))
         else:
             resolved_dc = dc_mod.resolve(
                 intent.params.get("dc"), level, intent.params.get("circumstance")
@@ -7781,6 +7798,18 @@ class Engine:
             return next((b for b in found_biomes if b != places_mod.URBAN), "grassland")
         return ""
 
+    def open_ground(self) -> tuple:
+        """The region places outside the walls ("the approach", "the edge") that a
+        `travel` answers to by name beside `places()` — one reader, shared by the
+        validator's no-such-place refusal and `judgement.keep_movement_in_the_scene`,
+        so the two can never disagree about whether a destination exists."""
+        from . import places as places_mod
+
+        if self.world is None:
+            return ()
+        terrain = self._terrain_hint(self.world.get(self.scene.location_id)) or ""
+        return places_mod.region_set(self.scene.location_id, terrain) if terrain else ()
+
     def places(self) -> tuple:
         """Every place the party can name from where they stand — derived, never stored.
 
@@ -9098,8 +9127,9 @@ class Engine:
             # The road remembers only while you are on it.
             if self.scene.road and places_mod.setting_of(going_to.id) == "in":
                 self.scene.road = {}
-            # Walking out is walking away: the conversation ends, and the tell says
-            # they were left mid-sentence if no leave was taken (2026-09-24).
+            # Walking out is walking away: the conversation ends, and the tell says the
+            # party walked away from it if no leave was taken (2026-09-24; reworded
+            # 2026-10-03, see `end_talk`).
             parted = self.end_talk("walked away")
             # And whoever keeps the room they have just walked into, if it is a room
             # somebody keeps and nobody has kept it yet.
@@ -10464,7 +10494,15 @@ class Engine:
             return ""
         names = ", ".join(a.name for a in gone)
         if why == "walked away":
-            return f"You leave {names} mid-sentence."
+            # Not "mid-sentence". That was a claim about speech the engine never had:
+            # `states.TALKING` is sticky by the 2026-09-24 ruling, so it is held by whoever
+            # the player EVER spoke with here, and the owner's save of 2026-10-03 printed
+            # "You leave the servant carrying jugs two at a time, …, the figure, the man
+            # mid-sentence" for four people, three of whom had not spoken for turns. Every
+            # one of the save's five travel tells said it. What the engine knows is that a
+            # conversation was open and walking off closed it, so that is what it says.
+            return (f"You walk away from {_and_list(a.name for a in gone)}, and the "
+                    f"conversation is over.")
         if why == "a fight starts":
             return f"The talk with {names} is over: it has come to blows."
         return f"The conversation with {names} is over."
@@ -11124,12 +11162,19 @@ class Engine:
 
         held = actor.stock.get(item_id)
         if held is None or held.count < 1:
+            # Not a jar: a thing out of the pack (item 2 of 2026-10-03). The crate
+            # Kesst carried to the counting house was haggled over for four turns and
+            # never sold, because this op only knew the crafting shelf.
+            key = holding.key_in(actor.goods, intent.params["item"])
+            if key is not None:
+                return self._sell_goods(intent, actor, key, count)
             # Printed, and also checked at validate time so the model can name the
             # thing they do carry — see `_refuse` for why a raise here reached the
             # player as a 502 with their sentence deleted.
+            carried = sorted(actor.stock) + sorted(actor.goods)
             return self._refuse(
                 intent, f"{actor.name} is not carrying {item_id}. They have: "
-                        f"{', '.join(sorted(actor.stock)) or 'nothing crafted'}.")
+                        f"{', '.join(carried) or 'nothing to sell'}.")
         count = min(count, held.count)
 
         buyer = intent.params.get("to")
@@ -11179,10 +11224,13 @@ class Engine:
         cp = int(round(paid * 100))
         actor.purse = goods.credit(actor.purse, cp)
         market_mod.mark_spent(self.scene.market_taken, paid, place, stall, day)
+        self._mark_payment(actor, buyer or "", cp)
 
         coins = goods.coinage()
         short = paid < asking
-        tell = (f"{actor.name} hands over {sold}x {held.name} and takes "
+        # Who bought it, said: "hands over 1x Yarow Elixir" named the thing and not the
+        # stallholder, and the ledger then remembered the sale as made to the player.
+        tell = (f"{actor.name} hands {sold}x {held.name} to {who} and takes "
                 f"{goods.purse_line(goods.coins_for(cp), coins)}")
         if short:
             # Said out loud, because a silent shortfall reads as a bad price rather than
@@ -11194,9 +11242,88 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="sell",
             effects=[{"ref": actor.ref, "kind": "sold", "item": held.name,
-                      "count": sold, "paid_cp": cp, "left": left}],
+                      "count": sold, "paid_cp": cp, "left": left, "to": buyer or ""}],
             tell=tell, because=intent.because,
         )
+
+    def _sell_goods(self, intent: Intent, actor: Actor, key: str, count: int) -> Outcome:
+        """Sell a thing out of the pack: it leaves, the coin arrives, at the book's half.
+
+        Core Rulebook p.140: an item sells for "half its listed price". The listed price
+        is `pricing.goods_worth` — the Core tables where they list the thing, and the
+        app's own bottom rung where nothing does (no rule for an unlisted thing could be
+        found; docs/items-have-owners.md). The player's own figure ("75% of the crate's
+        value") arrives as `accept` and, like the jar's, can only LOWER the price: the
+        2026-10-03 haggle agreed 75% and the book pays 50%. The buyer's till caps it the
+        way a stall's does, and the thing goes into the buyer's hands — sold, not
+        vanished."""
+        from . import keepers as keepers_mod
+        from . import market as market_mod
+        from . import pricing
+
+        count = min(max(1, count), int(actor.goods.get(key, 0)))
+        buyer_ref = intent.params.get("to")
+        if buyer_ref and buyer_ref not in self.scene.actors:
+            return self._refuse(intent, self._elsewhere(buyer_ref)
+                                or f"There is no {buyer_ref} here to sell to.")
+        buyer = self.scene.actors[buyer_ref] if buyer_ref else None
+        shut = keepers_mod.shut_here(self.scene, buyer)
+        if shut:
+            return self._refuse(intent, shut)
+        who = buyer.name if buyer is not None else "the stallholder"
+        place = str(self.scene.location_id or "nowhere")
+        stall = str(intent.params.get("stall") or buyer_ref or "market")
+        day = market_mod.day_of(self.scene.clock_minutes)
+
+        asking = round(pricing.what_a_shop_pays_for_goods(key, seller=actor, town=place)
+                       * count, 2)
+        agreed = intent.params.get("accept")
+        if agreed is not None:
+            try:
+                asking = min(asking, max(0.0, float(agreed)))
+            except (TypeError, ValueError):
+                pass
+        paid = market_mod.can_pay(self.scene.market_taken, asking, place, stall, day)
+        if paid <= 0:
+            return Outcome(
+                intent_id=intent.id, op="sell", effects=[],
+                tell=f"{who} has no coin to spare today. Nothing changes hands.",
+                because=intent.because)
+
+        actor.goods[key] -= count
+        if actor.goods[key] <= 0:
+            del actor.goods[key]
+        left = int(actor.goods.get(key, 0))
+        rec = self.scene.prop_named(key)
+        if buyer is not None:
+            buyer.goods[key] = int(buyer.goods.get(key, 0)) + count
+            if rec is not None and rec.get("held_by") == actor.ref:
+                # Into the buyer's hands, and theirs if it was the seller's to sell; a
+                # stolen thing sold on stays its owner's (a fence's problem, recorded).
+                self.scene.hold_prop(key, buyer.ref,
+                                     owner=(buyer.ref if rec.get("owner")
+                                            in ("", actor.ref) else ""),
+                                     turn=int(self.scene.clock_minutes))
+        cp = int(round(paid * 100))
+        actor.purse = goods.credit(actor.purse, cp)
+        market_mod.mark_spent(self.scene.market_taken, paid, place, stall, day)
+        self._mark_payment(actor, buyer_ref or "", cp)
+
+        coins = goods.coinage()
+        what = f"{count} × {key}" if count != 1 else self._the(key)
+        tell = (f"{actor.name} sells {what} to {who} for "
+                f"{goods.purse_line(goods.coins_for(cp), coins)}")
+        if paid < asking:
+            tell += (f" — all {who} can raise today, against "
+                     f"{pricing.as_text(asking)} asked")
+        tell += f". ({goods.purse_line(actor.purse, coins)} in hand.)"
+        effects = [{"ref": actor.ref, "kind": "sold", "item": key, "count": count,
+                    "paid_cp": cp, "left": left, "to": buyer_ref or ""}]
+        if rec is not None and rec.get("stolen") and rec.get("owner") \
+                and rec.get("owner") != actor.ref:
+            effects[0]["owner"] = rec["owner"]
+        return Outcome(intent_id=intent.id, op="sell", effects=effects, tell=tell,
+                       because=intent.because)
 
     def _op_buy(self, intent: Intent, partial: dict) -> Outcome:
         """Buy something off the stall in front of you.
@@ -11291,7 +11418,11 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="buy",
             effects=[{"ref": actor.ref, "kind": "bought", "item": found.name,
-                      "count": count, "paid_cp": cp}] + arrived,
+                      "count": count, "paid_cp": cp,
+                      # Who sold it, for the ledger's "bought rope from Azhil Vex".
+                      "from": seller or (here_keeper.ref if here_keeper is not None
+                                         and here_keeper.ref in self.scene.actors
+                                         and who == here_keeper.name else "")}] + arrived,
             tell=f"{actor.name} pays {who} {pricing.as_text(price)} for "
                  + (f"{goods.measure(count * per, found.unit)} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
@@ -13485,6 +13616,175 @@ class Engine:
         self.scene.guarded_finds = kept
         return "".join(lines)
 
+    # --- where a thing is: the holders a handover asks (rules/holding.py) ----------------
+    #
+    # Lane A of the 2026-10-03 playtest (docs/items-have-owners.md). A take with no
+    # `from_` used to mean "from the world, which never runs out", so "I take the crate"
+    # beside the man carrying it copied the crate, and "I pocket the coins" minted an
+    # item. These are the places a handover now looks first, in Inform's order: what is
+    # in the taker's own containers, what lies here (the existing ground door), and who
+    # here is holding it.
+
+    # How long after being paid the coins the narration shows changing hands are still
+    # THAT payment, in minutes. Measured on the items save: paid at clock 80 (the sale),
+    # "I take the pouch and count the coins" at 80, "I pocket the coins" at 88. An hour
+    # covers a counter's worth of fuss; the next scene's coins are new coins.
+    PAYMENT_FRESH_MINUTES = 60
+
+    def _container_named(self, name: str, taker) -> dict | None:
+        """The props record of a container called `name` the taker can reach: in their
+        own hands, lying here, or in the hands of somebody here. A pouch carried only as
+        a goods line gets its record now, empty — that is what it holds."""
+        if not holding.is_container(name):
+            return None
+        want = holding.head_of(name)
+        recs = [r for r in self.scene.props
+                if holding.is_container(r.get("name"))
+                and (holding.same(r.get("name"), name)
+                     or holding.head_of(r.get("name")) == want)]
+        ref = getattr(taker, "ref", "") or ""
+        for fits in (lambda r: ref and r.get("held_by") == ref,
+                     lambda r: r.get("at") == self.scene.at and not r.get("held_by"),
+                     lambda r: r.get("held_by") in self.scene.actors):
+            for rec in recs:
+                if fits(rec):
+                    return rec
+        key = holding.key_in(getattr(taker, "goods", None) or {}, name)
+        if key is None and taker is not None:
+            key = next((k for k in taker.goods if holding.head_of(k) == want), None)
+        if key is not None:
+            return self.scene.hold_prop(key, taker.ref, owner=taker.ref,
+                                        turn=int(self.scene.clock_minutes))
+        return None
+
+    def _box_holding(self, item: str, taker) -> dict | None:
+        """A container in the taker's own hands whose contents hold `item`."""
+        ref = getattr(taker, "ref", "")
+        for rec in self.scene.props:
+            if rec.get("held_by") == ref and holding.key_in(
+                    ((rec.get("contents") or {}).get("goods") or {}), item):
+                return rec
+        return None
+
+    def _holder_of(self, item: str, taker) -> tuple[Actor, str] | None:
+        """Somebody here holding this thing, and its name as they hold it: on record
+        (their goods), else by their own label ("the merchant with a heavy pack"). None
+        when it lies on the ground — that record is the ground door's — or nobody here
+        holds it.
+
+        The label is the one statement about a person's hands the engine can read
+        without a model. The narration of 2026-10-03 hauled "the heavy pack onto your
+        own shoulders… the merchant's eyes widen", and nothing anywhere said the pack
+        had been his."""
+        if self.scene.prop_on_the_ground(item) is not None:
+            return None
+        ref = getattr(taker, "ref", "")
+        others = [a for r, a in self.scene.actors.items() if r != ref and not a.is_pc]
+        for actor in others:
+            key = holding.key_in(actor.goods, item)
+            if key:
+                return actor, key
+        for actor in others:
+            thing = holding.label_carries(actor.name, item)
+            if thing and not any(rec.get("owner") == actor.ref
+                                 and holding.same(rec.get("name"), thing)
+                                 and rec.get("held_by") != actor.ref
+                                 for rec in self.scene.props):
+                return actor, thing
+        return None
+
+    def _coin_lying_here(self) -> dict | None:
+        """A record lying here with coin in it — a pile somebody set down, a dropped
+        purse — or None."""
+        return next((r for r in self.scene.props_here() if holding.coin_in(r) > 0), None)
+
+    def _mark_payment(self, taker: Actor, payer_ref: str, cp: int) -> None:
+        """Remember that `taker` was just paid, so the coins the narration then shows
+        changing hands are recognised as THIS money and never counted twice.
+
+        Measured on the items save: the clerk "produces a small, leather pouch… The
+        payment is yours", and the next three player lines took the pouch, counted the
+        coins, pocketed the coins and tipped them into the purse. Each was a fresh
+        `give`. Once the sale pays the purse (it does now), each of those would pay it
+        again unless the payment is on the props ledger, which the save keeps."""
+        rec = self.scene.hold_prop("the payment", taker.ref, owner=taker.ref,
+                                   turn=int(self.scene.clock_minutes))
+        rec.update({"kind": "payment", "paid_by": str(payer_ref or ""),
+                    "paid_cp": int(cp), "turn": int(self.scene.clock_minutes)})
+
+    def _recent_payment(self, taker: Actor) -> dict | None:
+        for rec in self.scene.props:
+            if rec.get("kind") == "payment" and rec.get("held_by") == taker.ref:
+                age = int(self.scene.clock_minutes) - int(rec.get("turn", 0) or 0)
+                return rec if 0 <= age <= self.PAYMENT_FRESH_MINUTES else None
+        return None
+
+    def _give_money(self, intent: Intent, item: str, taker, giver, source) -> Outcome:
+        """Coin with no amount named — "the coins", "the payment", "the money".
+
+        The amount is the records': the coin in a pouch or a pile (Circle's money object:
+        picked up, it is the number again), or the payment the player was just made,
+        which is already in the purse and is said to be. Nothing else is money. When no
+        record vouches for any coin at all, the engine counts the one coin it can — a
+        single copper piece — rather than a number a model wrote (law 3), and rather
+        than the goods line "coins" that this door exists to end."""
+        coins = goods.coinage(getattr(self, "world", None), None)
+        if taker is None or (giver is not None and giver.is_pc and taker is not giver):
+            who = giver if giver is not None else taker
+            if who is None:
+                return self._refuse(intent, "Nobody is here to take the coin.")
+            return self._refuse(
+                intent, f"How much? {who.name} carries "
+                        f"{goods.purse_line(who.purse, coins)}; name the coin and the "
+                        f"amount, and it changes hands.")
+        box = source if (source is not None and holding.coin_in(source) > 0) else None
+        if box is None and source is None:
+            box = next((r for r in self.scene.props
+                        if r.get("held_by") == taker.ref and holding.coin_in(r) > 0),
+                       None) or self._coin_lying_here()
+        if box is not None:
+            got = holding.empty_coin(box)
+            cp = goods.in_copper(got)
+            taker.purse = goods.credit(taker.purse, cp)
+            how, frm = "emptied", self._the(str(box.get("name") or "a pouch"))
+            if box.get("kind") == "coins" and box in self.scene.props:
+                self.scene.props.remove(box)   # a pile picked up is not a pile any more
+                how, frm = "took", ""
+                tell = (f"{taker.name} picks up the coin: "
+                        f"{goods.purse_line(got, coins)}.")
+            else:
+                tell = (f"{taker.name} empties {self._the(box['name'])} into their purse: "
+                        f"{goods.purse_line(got, coins)}.")
+            return Outcome(
+                intent_id=intent.id, op="give", tell=tell, because=intent.because,
+                effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": cp,
+                          "how": how, "from": frm, "to": taker.ref,
+                          "purse": dict(taker.purse), "goods": dict(taker.goods)}])
+        paid = self._recent_payment(taker)
+        if paid is not None:
+            payer = self.scene.people.get(str(paid.get("paid_by") or ""))
+            return Outcome(
+                intent_id=intent.id, op="give", because=intent.because,
+                tell=(f"The payment is already in {taker.name}'s purse: "
+                      f"{goods.purse_line(goods.coins_for(int(paid.get('paid_cp', 0))), coins)}"
+                      + (f", counted out by {payer.name}" if payer is not None else "")
+                      + ". Nothing more changes hands."),
+                effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": 0,
+                          "how": "already", "to": taker.ref, "purse": dict(taker.purse),
+                          "goods": dict(taker.goods)}])
+        taker.purse = goods.credit(taker.purse, 1)
+        # And remembered as this hour's coin, so "I count the coins… I pocket the coins…
+        # I tip them into my purse" is one copper and not three.
+        self._mark_payment(taker, getattr(giver, "ref", "") or "", 1)
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            tell=(f"{taker.name} pockets {self._the(item)}: a single copper piece, all "
+                  f"anybody counted out."),
+            effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": 1,
+                      "how": "took", "from": getattr(giver, "ref", "") or "",
+                      "to": taker.ref, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods)}])
+
     def _op_give(self, intent: Intent, partial: dict) -> Outcome:
         """Something changes hands.
 
@@ -13505,10 +13805,27 @@ class Engine:
 
         to_ref = intent.params.get("to") or intent.target or intent.actor
         from_ref = intent.params.get("from_")
+        # The actor of a give that goes to somebody else is the one handing it over.
+        # Measured 2026-10-03: "I drop the Brunt of the weight on the ground" was planned
+        # as `give actor=pc target=c13`, which this read as the smith taking a new one
+        # out of the air — the smith gained a "Brunt of the weight" and the player kept
+        # theirs. Whoever acts, gives (Inform's giving action: the actor is the giver).
+        inferred = False
+        if (not from_ref and intent.actor and to_ref and intent.actor != to_ref
+                and intent.actor in self.scene.actors):
+            from_ref, inferred = intent.actor, True
+        if from_ref and to_ref == from_ref:
+            to_ref = None                   # handed to themselves: set down, not a loop
         if not to_ref and not from_ref:
             to_ref = pc.ref if pc else None
         taker = self.scene.actors.get(to_ref) if to_ref else None
         giver = self.scene.actors.get(from_ref) if from_ref else None
+        # `from_` may name a container rather than a person: "the coins from the pouch"
+        # (item 4). Found on the props ledger, in the taker's hands or lying here.
+        source = (self._container_named(str(from_ref), taker)
+                  if from_ref and giver is None else None)
+        if source is not None and taker is None and pc is not None:
+            taker = pc                      # "I empty the pouch": into the player's hands
         # A gift is remembered. Something handed to a person by the player with no
         # price on it moves their regard (`rules/attitude.py`); recorded here, once,
         # and carried on the outcome so the log sees it. Nothing in the fiction is
@@ -13524,7 +13841,9 @@ class Engine:
         # instead of inventing an object called stuff.
         if re.search(r"\b(stuff|everything|belongings|wares|inventory|"
                      r"all (?:of )?(?:it|his|her|their|the) ?\w*)\b", item, re.I):
-            if giver is None:
+            # A giver only the actor implied is not a whole pack offered up: "the
+            # merchant's stuff" with the player acting was never the player's own.
+            if giver is None or (inferred and giver.is_pc):
                 return Outcome(
                     intent_id=intent.id, op="give", effects=[],
                     tell=(f"{item!r} is a word, not a thing. Name the item, or "
@@ -13558,6 +13877,14 @@ class Engine:
         coins = goods.coinage(getattr(self, "world", None), None)
         denom = goods.coin_named(item, coins)
 
+        # Coin with no amount and no denomination — "the coins", "the payment" — is
+        # money, never a goods line. Measured 2026-10-03 (item 3): "I pocket the coins"
+        # left `goods: {"coins": 1}` beside an empty purse, and the next turn's
+        # `give gp 1 from pc` found "no gp to give". Its own door, because what it is
+        # worth is the whole question and only the records can answer it.
+        if not denom and holding.is_money(item):
+            return self._give_money(intent, item, taker, giver, source)
+
         paid = ""
         price = intent.params.get("price")
         if price and taker is not None:
@@ -13581,21 +13908,116 @@ class Engine:
         moved = 0
         note = ""
         from_ground = False
-        if giver is not None:
-            held = (giver.purse if denom else giver.goods)
-            moved = min(count, int(held.get(denom or item, 0)))
+        # Who it was taken from without being handed over, when the holder search
+        # below finds it in somebody's hands. Their name stays on it (`owner`, with the
+        # props ledger's `stolen` flag, Creation Kit's shape): Inform reads ownership
+        # off the holder chain and refuses the take outright; here the narrator stages
+        # hand-overs the plan cannot see, so the take goes through and the owner stays.
+        taken_from: Actor | None = None
+        if giver is None and taker is not None and source is None and not denom:
+            source = self._box_holding(item, taker)
+        if giver is None and taker is not None and source is None and not denom:
+            found = self._holder_of(item, taker)
+            if found is not None:
+                giver, item = found
+                # Paid for is handed over: a price is the holder's consent.
+                taken_from = None if intent.params.get("price") else giver
+        if source is not None and not denom:
+            # Out of a container the taker can reach: the thing leaves its contents.
+            box = holding.contents(source)
+            key = holding.key_in(box["goods"], item)
+            if key is None:
+                return self._refuse(
+                    intent, f"There is no {item} in {self._the(source['name'])}.")
+            moved = min(count, int(box["goods"][key]))
+            box["goods"][key] -= moved
+            if box["goods"][key] <= 0:
+                del box["goods"][key]
+            item = key
+        elif giver is not None:
+            if denom:
+                held, key = giver.purse, denom
+            else:
+                # By name the way people say it: "the Brunt of the weight" is the
+                # "brunt of the weight" in the pack (2026-10-03: the capital B missed
+                # it, and the drop handed the smith a second one instead).
+                held = giver.goods
+                key = holding.key_in(held, item) or item
+                item = key
+            moved = min(count, int(held.get(key, 0)))
             if moved:
-                held[denom or item] -= moved
-                if held[denom or item] <= 0:
-                    del held[denom or item]
+                held[key] -= moved
+                if held[key] <= 0:
+                    del held[key]
+            elif not denom and getattr(giver, "stock", None):
+                # A jar or a bought coil of rope lives on the shelf (`stock`), not in
+                # the goods, and is handed over from there. Exact by id, base or name
+                # only — `consumables.resolve_stock` guesses by content words, and a
+                # handover by guess hands over the wrong jar.
+                sid = next((iid for iid, s in giver.stock.items()
+                            if any(holding.same(n, item) for n in (
+                                getattr(s, "base", ""), getattr(s, "name", ""),
+                                str(iid).split("#")[0].replace("-", " ")))), None)
+                if sid is not None:
+                    item = str(getattr(giver.stock[sid], "name", "") or item)
+                    moved = giver.take_stock(sid, count)
+            if not moved and not giver.is_pc and not denom and (
+                    taker is not None or taken_from is not None):
+                # Somebody else's pockets are open the way the world is: the clerk
+                # who slides a pouch across was holding one, whether or not anything
+                # wrote it down (`bestiary.collapse_kit` is the same rule for a body).
+                # Coin is not — a number nobody counted out is not money (law 3).
+                moved = count
+            if moved and taken_from is None and taker is not None and not denom:
+                # Handed over: if the giver owned it, it is the taker's now; a thing
+                # the giver was only holding (stolen, borrowed) keeps its owner.
+                rec = self.scene.prop_named(item)
+                if rec is not None and rec.get("held_by") == giver.ref:
+                    self.scene.hold_prop(item, taker.ref,
+                                         owner=(taker.ref if rec.get("owner")
+                                                in ("", giver.ref) else ""),
+                                         turn=int(self.scene.clock_minutes))
+            if moved and taken_from is not None and taker is not None:
+                rec = self.scene.hold_prop(item, taker.ref, owner=taken_from.ref,
+                                           turn=int(self.scene.clock_minutes))
+                rec["owner"] = taken_from.ref
+                rec["stolen"] = True
         else:
             moved = count           # it came from the world, which never runs out
+            # Coin lying here is THAT coin: a pile somebody set down holds its amount,
+            # and a denomination picked up comes off it first.
+            pile = self._coin_lying_here() if taker is not None and denom else None
+            if pile is not None and int(holding.contents(pile)["purse"].get(denom, 0)):
+                box = holding.contents(pile)["purse"]
+                moved = min(count, int(box[denom]))
+                box[denom] -= moved
+                if box[denom] <= 0:
+                    del box[denom]
+                if not holding.coin_in(pile):
+                    self.scene.props.remove(pile)
             # Unless it is lying right here with a record: then THAT thing is picked
             # up, and its owner and provenance come with it. "I pick up a chunk of
             # wood" after a sunder is the fragments of the challenger's club, his
             # still, and never a second piece of wood from nowhere.
             if taker is not None and not denom:
                 rec = self.scene.prop_on_the_ground(item)
+                if rec is None:
+                    # The world never runs out of a stone or a stick nobody recorded —
+                    # but a thing the engine HAS a record of, lying somewhere else, is
+                    # that thing, and it is not here. Measured live on the merged
+                    # structured-turn branch: the crate set down on the smithy floor,
+                    # then "I pick the crate back up and head to the old tannery" ran the
+                    # pick-up after the walk, and at the tannery a second crate came out
+                    # of the world while the first still lay in the smithy.
+                    away = next((r for r in self.scene.props
+                                 if not r.get("held_by") and r.get("at")
+                                 and r.get("at") != self.scene.at
+                                 and holding.same(r.get("name"), item)), None)
+                    if away is not None:
+                        return self._refuse(
+                            intent, f"{self._the(str(away['name']))} is not here: it lies "
+                                    f"at {self._place_name(str(away['at']))}. Go back for "
+                                    f"it first.")
                 if rec is not None:
                     # Picking a thing up is done with a hand, from where you stand
                     # (natural reach; 1e Table 7-2: a move action). A thing lying
@@ -13684,29 +14106,63 @@ class Engine:
                     taker.add_stock(Stock(base=item, tier="common"), moved)
 
         what = f"{moved} × {item}" if moved != 1 else item
-        if giver is not None and taker is not None:
+        how = "took"
+        if source is not None and taker is not None:
+            how = "took_out"
+            tell = (f"{taker.name} takes {self._the(what)} out of "
+                    f"{self._the(source['name'])}.")
+        elif taken_from is not None and taker is not None:
+            # Said with the owner, so the narrator writes a thing lifted out of
+            # somebody's hands, and the world has the name to notice it by.
+            how = "took_from"
+            tell = (f"{taker.name} takes {self._the(what)} from {taken_from.name}, who "
+                    f"did not hand it over; it is still theirs.")
+        elif giver is not None and taker is not None:
+            how = "handed"
             tell = f"{giver.name} hands {taker.name} {what}{paid}."
         elif taker is not None and note.startswith("back up"):
             tell = f"{taker.name} takes {self._the(what)} {note}."
         elif taker is not None:
-            tell = f"{taker.name} takes {what}{paid}{note}."
+            tell = (f"{taker.name} takes {self._the(what) if moved == 1 else what}"
+                    f"{paid}{note}.")
         elif giver is not None:
+            how = "set_down"
             tell = f"{giver.name} parts with {what}."
             # Dropped, not vanished: the thing lies here with its record, the
             # giver's still (Inform: a dropped thing lands on the room's floor).
             if moved and not denom:
                 rec = self.scene.prop_named(item)
-                self.scene.place_prop(item, owner=giver.ref,
+                self.scene.place_prop(item, owner=(rec or {}).get("owner") or giver.ref,
                                       from_=(rec or {}).get("from_", ""),
                                       state=(rec or {}).get("state", "intact"),
                                       turn=int(self.scene.clock_minutes))
                 tell = f"{giver.name} sets down {what}; it lies here."
+            elif moved and denom:
+                # Coin set down is a pile on the floor holding its amount — Circle's
+                # money object — and picking it up again is the number again. It
+                # used to vanish: the purse went down and nothing lay anywhere.
+                pile = self.scene.place_prop(f"{giver.name}'s {goods.METALS[denom]} coins",
+                                             owner=giver.ref, state="intact",
+                                             turn=int(self.scene.clock_minutes))
+                pile["kind"] = "coins"
+                box = holding.contents(pile)
+                box["purse"][denom] = int(box["purse"].get(denom, 0)) + moved
+                tell = (f"{giver.name} sets down "
+                        f"{goods.purse_line({denom: moved}, coins)}; the coin lies here.")
         else:
             tell = f"{what} changes hands."
         if giver is not None and not moved:
-            tell = f"{giver.name} has no {item} to give."
+            # A refusal, not an event: nothing moved, so nothing is remembered. The
+            # wink of 2026-10-03 resolved as "Kesst Vayr has no friendly wink to give"
+            # and the ledger kept "handed something to Kesst Vayr".
+            return self._refuse(intent, f"{giver.name} has no {item} to give.")
         effects = [{"ref": (taker or giver).ref if (taker or giver) else "",
                     "kind": "give", "item": denom or item, "count": moved,
+                    "how": how,
+                    "from": (giver.ref if giver is not None
+                             else self._the(str(source["name"])) if source is not None
+                             else ""),
+                    "to": (taker.ref if taker is not None else ""),
                     "purse": dict(taker.purse) if taker else {},
                     "goods": dict(taker.goods) if taker else {}}]
         if a_gift and moved:
@@ -14369,8 +14825,8 @@ class Engine:
         talking = self.talking_to()
         if talking and actor.is_pc:
             return self._refuse(
-                intent, f"You are mid-sentence with "
-                        f"{', '.join(a.name for a in talking)}. Take your leave first.")
+                intent, f"You are still in conversation with "
+                        f"{_and_list(a.name for a in talking)}. Take your leave first.")
 
         # Sleeping on enough experience is how a level arrives: "once i have enough
         # Exp sleeping should initiate the leveling process." Before the rest itself,
@@ -15060,10 +15516,15 @@ class Engine:
             )
         # "I ask her name." came back as `introduce who="her name"` (live, 2026-09-27).
         if not population.names_a_person(who):
+            from .names import not_a_name
+
+            why = not_a_name(who)
             return self._refuse(
-                intent, f"introduce brings in a PERSON, and {who!r} is not somebody. "
-                        f"Asking a name, a price or a question of somebody here is `say` "
-                        f"to them, or narrate_only.")
+                intent, f"introduce brings in a PERSON, and {who!r} is not somebody"
+                        + (f" ({why})" if why else "") + ". "
+                        f"Words the player says are a `say` (its `words`), never who is "
+                        f"spoken to; asking a name, a price or a question of somebody "
+                        f"here is `say` to them, or narrate_only.")
         n = int(intent.params.get("count", 1) or 1)
         how = intent.params.get("how") or "already_here"
         template = intent.params.get("template") or "guildhand"

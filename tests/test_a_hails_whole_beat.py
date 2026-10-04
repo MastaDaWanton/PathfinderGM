@@ -85,14 +85,24 @@ def test_a_tagged_line_rewritten_off_the_page_hails_nobody():
     assert judgement.hailed_by(scene, "The carter says nothing at all.", said=said) == []
 
 
-def test_an_untagged_line_across_a_full_stop_is_still_read_with_its_narration():
-    """The guess, for lines the prose did not tag: found over the whole beat, and the
-    speaker read from the narration around the line — here the sentence after it."""
+def test_an_untagged_line_across_a_full_stop_is_booked_by_the_reader_and_hails():
+    """A line the prose did not tag, across a full stop ("'You! Yes, you. Come here,' the
+    carter calls"). It was guessed here from the narration round the line until
+    2026-10-03; the beat reader books it now (`speaker_real`), and the booked line hails.
+    With no reading it hails nobody: nothing guesses in the reader's place."""
+    from play.aftermath import speaker_real
+    from tests.beat_reader import stub
+
     agent, _ = scene_at(MARKET, [("the carter", "guildhand")])
-    scene = agent.engine.scene
+    engine, scene = agent.engine, agent.engine.scene
     carter = next(r for r, a in scene.actors.items() if a.name == "the carter")
     text = "'You! Yes, you. Come here,' the carter calls."
-    assert judgement.hailed_by(scene, text) == [carter]
+    assert judgement.hailed_by(scene, text) == []
+    said: list = []
+    reading = stub.read(text, scene, engine=engine, who={"the carter": carter},
+                        lines={"You! Yes": (carter, "you")})
+    speaker_real.step(stub.ctx(scene, reading, text=text, engine=engine, said=said))
+    assert judgement.hailed_by(scene, text, said=said) == [carter]
 
 
 def test_a_name_given_in_the_second_sentence_of_a_tagged_line_keeps_its_tag():

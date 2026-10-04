@@ -744,6 +744,12 @@ _READS_MECHANICS = {
         "speech had an op the call became unnecessary, because the words are already "
         "a fact the engine holds. Reading them here is cheaper, has no latency, and "
         "cannot invent a promise nobody made.",
+    "gm/ledger.py:_moved":
+        "what changed hands and between whom — the item, the giver and the taker the "
+        "engine wrote into a give, sell or buy effect — said as a numberless line "
+        "(`_DIGIT` still strips any digit). Item 7 of 2026-10-03: the template read the "
+        "first ref in the effect and remembered a wink that never left the player as "
+        "'handed something to Kesst Vayr'. Engine reporting to itself, as `_named`.",
     "gm/ledger.py:_named":
         "the ledger is the engine reporting to itself what it did in the turns that "
         "have since fallen out of the context window, and an effect is where the "
@@ -753,6 +759,15 @@ _READS_MECHANICS = {
         "tell, not a bypass of one. Building it from tell TEXT instead would mean "
         "parsing names back out of English in the presentation layer, which is the "
         "second vocabulary _deaths_from is allowed here to avoid.",
+    "gm/ledger.py:_flag":
+        "which of an op's two meanings the engine resolved — a `company` joining or "
+        "parting (`travels`), a `talk` ending (`left`) — read for the same numberless "
+        "ledger line as `_named`, for the same reason: the alternative is parsing the "
+        "tell's English back into a flag (item 22, 2026-10-03).",
+    "gm/ledger.py:_introduced":
+        "who an `introduce` made, by the names the engine gave them, for the ledger's "
+        "\"met …\" line; the same reasoning as `_named`. The plan's `who` is a "
+        "description and not a name, so it is not what the ledger may say.",
 }
 
 

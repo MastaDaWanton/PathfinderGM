@@ -109,7 +109,9 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     monkeypatch.setattr(schemes_mod, "ENABLED", False)
     # And the interpreter's reading of the player's sentence (gm/interpret.py): a turn
     # test that scripts the model's replies in order would have one spent on it.
-    # tests/test_interpreter_in_the_turn.py turns it back on.
+    # tests/test_interpreter_in_the_turn.py turns it back on. Off, a reading handed in
+    # with `interpret.remember` is the turn's (`GMAgent.plan_turn`): since 2026-10-03 the
+    # reading drives the goods ops and declares, and with none the plan stands alone.
     from gm import interpret as interpret_mod
 
     monkeypatch.setattr(interpret_mod, "ENABLED", False)
@@ -120,6 +122,19 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from gm import mentions as mentions_mod
 
     monkeypatch.setattr(mentions_mod, "ENABLED", False)
+    # And the beat read back (gm/beat_verify.py): one read per groomed beat, and one
+    # closed question per contradiction it finds. tests/test_beat_verify.py scripts its
+    # replies; with it off the `beat_verified` check finds nothing.
+    from gm import beat_verify as beat_verify_mod
+
+    monkeypatch.setattr(beat_verify_mod, "ENABLED", False)
+    beat_verify_mod.clear_cache()
+    # And the beat reader (gm/beat_reader.py), which grew out of that labeller and makes
+    # up to two calls per groomed beat. A test that needs a reading builds one with a
+    # stubbed reply (tests/beat_reader/stub.py); an explicit `chat=` runs even when off.
+    from gm import beat_reader as beat_reader_mod
+
+    monkeypatch.setattr(beat_reader_mod, "ENABLED", False)
 
 
 @pytest.fixture(autouse=True)
@@ -145,6 +160,10 @@ def _the_model_gate_is_open_unless_a_test_shuts_it(monkeypatch):
         return gm_client.Probe(True, installed=tuple(n.model for n in preflight.needs()))
 
     monkeypatch.setattr(gm_client, "probe", answers_with_whatever_is_configured)
+    # `has_model` remembers what `/api/tags` said for a minute; a test's stub must not be
+    # answered from the last test's.
+    monkeypatch.setattr(gm_client, "_tags_cache", {})
+    monkeypatch.setattr(gm_client, "_said_missing", set())
 
 
 # --- the three fixtures pytest-django used to lend -----------------------------------------

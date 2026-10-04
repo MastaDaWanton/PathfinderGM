@@ -368,7 +368,7 @@ def test_a_throwaway_member_finding_reaches_the_repair_through_a_real_door(
         f"You shove past. {sentence} Nobody moves."))
     handed = []
 
-    def repair(self, text, findings, ctx):
+    def repair(self, text, findings, ctx, **_kw):
         handed.append((text, list(findings), ctx))
         return text.replace(sentence, "The guard steps back."), ["repaired one"], []
 

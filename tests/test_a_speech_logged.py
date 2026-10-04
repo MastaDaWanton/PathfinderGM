@@ -77,16 +77,37 @@ def sam(tmp_path):
         yield {"c": c, "owner": owner, "fighter": fighter}
 
 
-def _people(c, text, said):
-    return speaker_real.step(aftermath.context("people", "turn", c, text=text, said=said))
+def _read(c, text, said=(), **answers):
+    """The beat reader's answer, stubbed with what a careful reader says of the save's own
+    beat (tests/beat_reader/stub.py). The rules this file first pinned — the clause beside
+    a line, rule 2's carry-on, rule 3's sentence-initial "They" — were the page read in
+    code (`speaker_real._from_the_page`), retired with the reader on 2026-10-03; the cases
+    stay, and pin that the reader's answer books the lines."""
+    from tests.beat_reader import stub
+
+    return stub.read(text, c.scene, engine=c.engine(), said=said, **answers)
+
+
+def _people(c, text, said, reading):
+    return speaker_real.step(aftermath.context("people", "turn", c, text=text, said=said,
+                                               attribution=reading))
 
 
 def test_the_openings_untagged_lines_are_the_cage_owners_and_are_logged(sam):
     """Beat 0: two lines, "'…,' the cage owner says" and its run-on. Neither holds "you",
-    so the old reader returned before reading them; now both are booked and logged."""
+    so the old reader returned before reading them; now the opening is read too
+    (`aftermath.after_opening`), and both are booked and logged."""
+    from tests.beat_reader import stub
+
     c, owner = sam["c"], sam["owner"]
     c.transcript.append({"who": "gm", "kind": "setup", "text": BEAT_0})
-    aftermath.after_opening(c)
+    answer = stub.people_answer(BEAT_0, c.scene,
+                                who={"the cage owner": owner, "the cage owner#2": owner,
+                                     "the cage owner#3": owner,
+                                     "a fighter": sam["fighter"]},
+                                lines={"Went down": (owner, "you"),
+                                       "The last one": (owner, "you")})
+    aftermath.after_opening(c, chat=stub.chat(answer))
     log = [e for e in c.scene.conversation_log if e["kind"] == "line"]
     assert [(e["who"], e["src"]) for e in log] == [(owner, "page"), (owner, "page")]
     assert [e["text"] for e in log] == [ln.strip() for ln in speech.lines(BEAT_0)]
@@ -122,35 +143,44 @@ def test_the_openings_own_speaker_tags_are_kept(sam, monkeypatch):
     assert (entry["who"], entry["src"]) == (owner, "tag")
 
 
-def test_a_sentence_initial_they_carries_the_cage_owner(sam):
+def test_a_line_after_they_lean_in_is_the_cage_owners(sam):
     """Beat 3: the line stands in its own paragraph after "They lean in slightly…", which
-    names nobody; the "They" carries the nearest person described before it."""
+    names nobody. The reader gives it to the cage owner, and it is booked as hers."""
     c, owner = sam["c"], sam["owner"]
     said: list = []
-    _people(c, BEAT_3, said)
+    reading = _read(c, BEAT_3, who={"The cage owner": owner},
+                    lines={"He's still with us": (owner, "you")})
+    _people(c, BEAT_3, said, reading)
     assert [(r["who"], r["to"], r["from"]) for r in said] == [(owner, "you", "page")]
 
 
 def test_a_run_on_after_a_tagged_line_is_the_same_speaker(sam):
     """Beat 49: "'A brothel, eh?'" was tagged to the guard, and his two lines after it in
-    the same paragraph were not — rule 2 read only untagged lines before."""
+    the same paragraph were not. The reader gives all three to him; the tagged one keeps
+    its tag, the other two are booked from the page."""
     from rules.bestiary import instantiate
 
     c = sam["c"]
     guard = c.scene.add(instantiate("guildhand", scene=c.scene, name="guard")).ref
     said = [{"who": guard, "to": "you", "line": "A brothel, eh?"}]
-    rows = _people(c, BEAT_49, said)
+    reading = _read(c, BEAT_49, said=said, who={"The Ratfolk guard": guard},
+                    lines={"A brothel": (guard, "you"), "There’s a place": (guard, "you"),
+                           "If you're looking": (guard, "you")})
+    rows = _people(c, BEAT_49, said, reading)
     assert [r["who"] for r in said] == [guard, guard, guard]
     assert [r.get("from") for r in said[1:]] == ["page", "page"]
-    assert any(r.get("booked") == guard and r.get("lines") == 2 for r in rows)
+    assert {"kind": "speaker-read", "booked": guard, "lines": 2} in rows
 
 
 def test_in_a_fight_a_board_line_is_still_booked_and_nobody_is_made(sam, monkeypatch):
+    """What somebody on the board said is what they said, fight or no fight."""
     c, owner = sam["c"], sam["owner"]
     monkeypatch.setattr(type(c.scene), "in_encounter", property(lambda self: True))
     said: list = []
     before = set(c.scene.actors)
-    _people(c, BEAT_0, said)
+    reading = _read(c, BEAT_0, who={"The cage owner": owner},
+                    lines={"Went down": (owner, "you"), "The last one": (owner, "you")})
+    _people(c, BEAT_0, said, reading)
     assert [r["who"] for r in said] == [owner, owner]
     assert set(c.scene.actors) == before
 

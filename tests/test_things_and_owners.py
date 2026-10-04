@@ -211,18 +211,31 @@ def test_paying_in_coin_is_a_give_of_the_denomination_to_the_person_paid(ring):
     res = engine.run(engine.validate(raw))
     assert pc.purse["gp"] == 221 and woman.purse.get("gp") == 10
     assert "hands the woman 10 × gp" in res.outcomes[0].tell
-    # Said in words, with nobody named: the one other person here is paid.
-    raw = judgement.inject_payment([{"op": "narrate_only", "params": {}}],
-                                   "I toss her five silver", ring)
-    assert raw[-1]["params"] == {"item": "sp", "count": 5, "from_": "pc", "to": woman.ref} \
-        or raw[-1]["params"]["item"] == "sp"
+    # Said in words, with "her" the one other person here: the reading's give of an
+    # amount (`acts_to_ops.coin_amount`) since 2026-10-03, where `_PAYS` read the sentence.
+    from gm import acts_to_ops
+
+    frame = {"actions": [{"act": "give", "object": "five silver", "target": "her"}]}
+    rows = acts_to_ops.table(frame, ring, sentence="I toss her five silver")
+    # Two people here and the engine holding "they/them" for both: "her" is nobody it can
+    # name, and nothing is guessed — the turn says so.
+    assert not rows[0].intents and rows[0].missing == "there is nobody here who is her"
+    # Once the engine holds her pronouns (the beat that showed her adopts them,
+    # play/aftermath), "her" is her.
+    woman.pronouns = "she/her"
+    rows = acts_to_ops.table(frame, ring, sentence="I toss her five silver")
+    raw = acts_to_ops.apply([{"op": "narrate_only", "params": {}}], rows, frame, ring)
+    assert raw[-1]["params"] == {"item": "sp", "count": 5, "from_": "pc", "to": woman.ref}
 
 
 def test_words_for_what_is_happening_are_not_things(ring):
     from gm import prompts
 
-    raw = judgement.inject_goods([{"op": "narrate_only", "params": {}}], prompts.CARRY_ON, ring)
-    assert [r["op"] for r in raw] == ["narrate_only"], "the Continue directive buys nothing"
+    # The Continue directive never reaches the reader (`plan_turn` returns before it), so
+    # there is no reading of it and the table builds nothing: it buys nothing.
+    from gm import acts_to_ops, interpret
+
+    assert acts_to_ops.table(interpret.reading_of(prompts.CARRY_ON), ring) == []
     assert not judgement._is_a_thing("scene on")
     assert not judgement._is_a_thing("satisfaction")
     assert judgement._is_a_thing("chunk of wood")

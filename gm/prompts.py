@@ -731,6 +731,8 @@ keeps it for good, with that description, and refuses a kind that makes no sense
 words: market, smithy, mill, workshops, tannery, brewery, warehouses, guildhall, library,
 keep, gaol, barracks, shrine, temple, graveyard, inn, tavern, bathhouse, theatre, arena,
 gardens, well, granary, stables, docks, bridge, lane, back streets, warrens.
+Never for a thing in the place the party stands — a door, a counter, a corner, a storage
+area: walking over to it is {"op": "narrate_only"}, and nothing is founded.
 Ground the player goes INTO that is not a named place yet —
 the sewers, a cellar, a crypt, the rooftops, an alley, a cave, a mine, ruins, a tower —
 is {"op": "venture", "actor": "pc", "params": {"kind": "sewers", "parent": "the
@@ -1412,6 +1414,19 @@ def pack(head: list[dict], examples: list[dict], history: list[dict],
     pinned = [m for m in history if str(m.get("content", "")).startswith(NOTE_PREFIX)]
     if pinned:
         history = [m for m in history if not str(m.get("content", "")).startswith(NOTE_PREFIX)]
+    # The opening frame is pinned the same way: the campaign's first GM message, written
+    # before the player has said anything. It was never in the prompt at all — the kept
+    # stretch must open on a player's line (`_from_a_user`), so the one reply with nothing
+    # before it was dropped on the FIRST turn and every turn after: measured 2026-10-03,
+    # every turn of both owner saves logged "dropped the oldest 1 message(s)" from the
+    # first, and that one was "Evening in Zhilvarnia. You are in a lit doorway… You came
+    # in out of the weather to find a bed you can pay for." The ledger cannot carry it —
+    # it is written from turns' outcomes, and the opening is no turn. KoboldAI's Memory
+    # and MemGPT's read-only system block are the same answer: the frame the story began
+    # in rides in its own slot, never a candidate for the cut.
+    if history and history[0].get("role") == "assistant":
+        pinned = pinned + [history[0]]
+        history = history[1:]
     # The last `keep` EXCHANGES, counted from the player's lines. It was
     # `history[-(keep * 2):]`, but a turn writes three messages (the player's line, the
     # plan, the prose — play/views.py), so "three exchanges" kept two (2026-09-25).

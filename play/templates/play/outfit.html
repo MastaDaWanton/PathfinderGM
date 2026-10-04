@@ -59,6 +59,13 @@
   input[type=text] { width: 100%; margin-top: 4px; padding: 7px 9px; border-radius: 2px;
     border: 1px solid rgba(150,120,60,.35); background: var(--sunk); color: var(--ink);
     font: 400 14px/1.4 var(--body); }
+  .sortbar { display: flex; align-items: baseline; gap: 10px; margin: 14px 0 0; }
+  .sortbar label { color: var(--dim); font: italic 13px/1 var(--body); }
+  select { padding: 5px 8px; border-radius: 2px; border: 1px solid rgba(150,120,60,.35);
+    background: var(--sunk); color: var(--ink); font: 400 13.5px/1.3 var(--body); cursor: pointer; }
+  select:hover, select:focus { border-color: var(--gold-dim); outline: none; }
+  /* A row the character is not trained in: still for sale, said plainly. */
+  tr.unprof td:first-child { color: var(--dim); }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
   @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
   .banner { margin: 10px 0 0; padding: 9px 12px; border-radius: 2px; font-size: 13.5px; }
@@ -67,6 +74,25 @@
   .pack { padding: 10px 14px; border: 1px solid rgba(150,120,60,.25); border-radius: 3px;
     background: rgba(0,0,0,.25); font-size: 13.5px; }
   .pack b { color: var(--gold); font-weight: 400; }
+  /* The wait between "Begin the sandbox" and the table. The opening scene is written
+     on that click, which on a local model is tens of seconds, and the page used to sit
+     unchanged with the button still live — so it read as broken and got pressed again.
+     A veil over the page, a gilt ring turning, and words for what is happening. */
+  .loading { position: fixed; inset: 0; z-index: 50; display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+    background: rgba(10, 8, 6, .88); }
+  .loading.on { display: flex; }
+  .loading .ring { width: 54px; height: 54px; border-radius: 50%;
+    border: 3px solid rgba(217, 192, 138, .18); border-top-color: var(--gold);
+    box-shadow: 0 0 18px rgba(201, 162, 39, .25);
+    animation: outfit-turn 1.1s linear infinite; }
+  .loading p { margin: 0; color: var(--gold); font: 400 15px/1.3 var(--display);
+    letter-spacing: .14em; text-transform: uppercase; }
+  .loading small { color: var(--dim); font: italic 13px/1.4 var(--body); }
+  @keyframes outfit-turn { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .loading .ring { animation-duration: 3.5s; }
+  }
 </style>
 
 <header>
@@ -89,6 +115,14 @@
     </div>
     <div id="banner"></div>
 
+    <div class="sortbar">
+      <label for="sort">Sort weapons, armour and shields</label>
+      <select id="sort">
+        <option value="type">by type — simple, martial, exotic</option>
+        <option value="prof">proficient first</option>
+      </select>
+    </div>
+
     <div class="cols">
       <div>
         <h2 class="sect">Carrying</h2>
@@ -109,6 +143,12 @@
     </div>
   </div>
 </main>
+
+<div class="loading" id="loading" role="status" aria-live="polite" hidden>
+  <div class="ring" aria-hidden="true"></div>
+  <p>Setting the scene</p>
+  <small>The GM is writing your first moments in the world. This can take a minute on a local model.</small>
+</div>
 
 <script>
 const STATE = {{ state_json|safe }};
@@ -132,7 +172,25 @@ function basketTotal() {
   return t;
 }
 
+// Which catalogue rows this character is trained in, as the sheet answers it
+// (`outfit_views.proficient_keys`). Gear has no proficiency.
+function proficient(kind, key) {
+  const keys = ME && ME.proficient_keys && ME.proficient_keys[kind];
+  return keys ? keys.includes(key) : true;
+}
+// "proficient first" keeps the shelf's own order inside each half (a stable sort),
+// so a fighter still sees simple before martial among the weapons they can use.
+let SORT = "type";
+try { SORT = localStorage.getItem("outfit.sort") === "prof" ? "prof" : "type"; } catch (e) {}
+
+function sorted(kind, rows) {
+  if (SORT !== "prof" || kind === "gear" || !ME) return rows;
+  return [...rows.filter(r => proficient(kind, r.key)),
+          ...rows.filter(r => !proficient(kind, r.key))];
+}
+
 function rowsFor(kind, rows, filter) {
+  rows = sorted(kind, rows);
   const list = filter ? rows.filter(r => r.name.toLowerCase().includes(filter)) : rows;
   const shown = list.slice(0, 80);
   return `<table><tr><th>Item</th><th>Detail</th><th class="n">Price</th><th class="n">Basket</th></tr>${shown.map(r => {
@@ -142,7 +200,9 @@ function rowsFor(kind, rows, filter) {
       : kind === "shield" ? `+${r.ac} AC · check ${r.acp}`
       : (r.unit ? `${r.per} ${r.unit}` : "");
     const have = ME && (kind === "weapon" ? ME.weapons.includes(r.key) : kind === "armour" ? ME.armour === r.key : kind === "shield" ? ME.shield === r.key : false);
-    return `<tr class="${have ? "have" : ""}"><td>${esc(r.name)}${have ? " · carried" : ""}</td><td class="note">${esc(detail)}</td>
+    const unprof = kind !== "gear" && ME && !proficient(kind, r.key);
+    const cls = [have ? "have" : "", unprof ? "unprof" : ""].filter(Boolean).join(" ");
+    return `<tr class="${cls}"><td>${esc(r.name)}${have ? " · carried" : ""}</td><td class="note">${esc(detail)}${unprof ? " · not proficient" : ""}</td>
       <td class="n">${Number(r.cost_gp) ? gp(r.cost_gp) : "free"}</td>
       <td class="n"><button class="tiny" data-less="${esc(id)}">−</button> ${n} <button class="tiny" data-more="${esc(id)}">+</button></td></tr>`;
   }).join("")}</table>${list.length > shown.length ? `<p class="note">${list.length - shown.length} more — narrow the search.</p>` : ""}`;
@@ -177,6 +237,12 @@ document.addEventListener("click", async e => {
   if (less) { const id = less.dataset.less; BASKET[id] = Math.max(0, (BASKET[id] || 0) - 1); if (!BASKET[id]) delete BASKET[id]; draw(); return; }
 });
 document.addEventListener("input", e => { if (e.target.closest("#wfind")) draw(); });
+$("#sort").value = SORT;
+$("#sort").addEventListener("change", e => {
+  SORT = e.target.value === "prof" ? "prof" : "type";
+  try { localStorage.setItem("outfit.sort", SORT); } catch (err) {}
+  draw();
+});
 
 $("#buy").addEventListener("click", async () => {
   const buys = Object.entries(BASKET).map(([id, count]) => { const [kind, key] = id.split(":"); return { kind, key, count }; });
@@ -198,14 +264,34 @@ async function go(begin) {
     return;
   }
   if (!begin) { location.href = "/"; return; }
-  const r = await fetch("/api/resume", {
-    method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
-    body: JSON.stringify({ id: STATE.character }),
-  });
-  const d = await r.json();
-  if (!r.ok) { $("#banner").innerHTML = `<div class="banner bad">${esc(d.error || "HTTP " + r.status)}</div>`; return; }
+  // Up until the table replaces this page: the veil stays through the navigation too,
+  // because /play/ takes its own moment to arrive.
+  busy(true);
+  let r, d;
+  try {
+    r = await fetch("/api/resume", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrf() },
+      body: JSON.stringify({ id: STATE.character }),
+    });
+    d = await r.json();
+  } catch (err) {
+    busy(false);
+    $("#banner").innerHTML = `<div class="banner bad">The game did not answer: ${esc(err.message || err)}</div>`;
+    return;
+  }
+  if (!r.ok) { busy(false); $("#banner").innerHTML = `<div class="banner bad">${esc(d.error || "HTTP " + r.status)}</div>`; return; }
   location.href = "/play/";
 }
+
+function busy(on) {
+  const veil = $("#loading");
+  veil.hidden = !on;
+  veil.classList.toggle("on", on);
+  for (const b of document.querySelectorAll("#begin, #buy, #shelf")) b.disabled = on;
+}
+// Back from the table by the browser's Back button: a page restored from the cache
+// would come back still veiled.
+window.addEventListener("pageshow", e => { if (e.persisted) busy(false); });
 $("#begin").addEventListener("click", () => go(true));
 $("#shelf").addEventListener("click", () => go(false));
 

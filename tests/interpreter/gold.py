@@ -19,7 +19,12 @@ facts the player asserts rather than attempts ("I am the lost heir").
 
 Conventions, so labels are consistent:
   * a purpose clause is an action: "I head for the stables to ask about a horse" is go,
-    then talk. What the player intends is what the turn must carry.
+    then talk — and since 2026-10-03 the talk is `commit="intended"`: what the player
+    means to do next is context the plan is shown, never an op of this turn.
+  * commitment (`A(act, commit, …)`): done; tried ("I try to…", an attempt with a roll);
+    intended (a purpose clause, "who will…", "I'm going to…", "I want to…"); asked ("would
+    you buy it?"). "I'm going to the chapel" is going, done; "I'm going to light a candle"
+    is intended.
   * looking for a PERSON is `seek` (target); for a thing or a place, `search` (object).
   * asking somebody something is `talk` with the question in `says`; `target` only when
     the sentence names who ("her", "the guard"), never guessed.
@@ -29,14 +34,19 @@ Conventions, so labels are consistent:
 from __future__ import annotations
 
 
-def A(act: str, **slots) -> dict:
-    return {"act": act, **{k: v for k, v in slots.items() if v is not None}}
+def A(act: str, commit: str = "done", **slots) -> dict:
+    """One action. `commit` is how far it is done (gm/interpret.py `COMMITS`): done,
+    tried, intended or asked — labelled on every line since 2026-10-03 (round 2 of lane F);
+    "done" unless the line says otherwise."""
+    return {"act": act, "commit": commit, **{k: v for k, v in slots.items() if v is not None}}
 
 
 def G(text: str, actions: list, source: str, *, question: bool = False,
-      claims: tuple = ()) -> dict:
+      claims: tuple = (), dev: bool = False) -> dict:
+    """`dev`: a line the reader's fixes may be written from (with the first 60). Every
+    other line is held out: its misses are never printed (tools/interpreter_bench.py)."""
     return {"text": text, "actions": actions, "source": source, "question": question,
-            "claims": list(claims)}
+            "claims": list(claims), "dev": dev}
 
 
 GOLD = [
@@ -46,7 +56,8 @@ GOLD = [
       [A("talk", target="the nearest stallholder", says="what work there is")], "script:town"),
     G("I ask them who runs this quarter.", [A("talk", target="them", says="who runs this quarter")], "script:town"),
     G("I head for the smith to see what he has on the rack.",
-      [A("seek", target="the smith"), A("look", object="what he has on the rack")], "script:town"),
+      [A("seek", target="the smith"),
+       A("look", "intended", object="what he has on the rack")], "script:town"),
     G("I ask the smith about the ore he uses.",
       [A("talk", target="the smith", says="about the ore he uses")], "script:town"),
     G("I leave the shop and walk out towards the gate.",
@@ -104,7 +115,8 @@ GOLD = [
     G("I find a quiet shrine and sit a while.",
       [A("search", object="a quiet shrine"), A("wait", time="a while")], "script:discover"),
     G("I head for the stables to ask about a horse.",
-      [A("go", place="the stables"), A("talk", says="about a horse")], "script:discover"),
+      [A("go", place="the stables"), A("talk", "intended", says="about a horse")],
+      "script:discover"),
     G("I look for a pawnbroker who asks no questions.",
       [A("seek", target="a pawnbroker who asks no questions")], "script:discover"),
     G("I ask around for the best cook in town and go to where they work.",
@@ -113,7 +125,7 @@ GOLD = [
     G("I look for a bookseller.", [A("seek", target="a bookseller")], "script:discover"),
     G("I find a back alley where nobody will see me count my coin.",
       [A("search", object="a back alley where nobody will see me count my coin"),
-       A("other", object="my coin")], "script:discover"),
+       A("other", "intended", object="my coin")], "script:discover"),
     G("I head out of town to wherever the charcoal burners work.",
       [A("go", place="wherever the charcoal burners work")], "script:discover"),
     # --- script:return / calling / homes / buying ----------------------------------------------
@@ -128,7 +140,8 @@ GOLD = [
     G("I ask around for the woman who sold me bread.",
       [A("seek", target="the woman who sold me bread")], "failure"),
     G("I find somewhere to sleep until morning.",
-      [A("search", object="somewhere to sleep"), A("rest", time="until morning")], "failure"),
+      [A("search", object="somewhere to sleep"), A("rest", "intended", time="until morning")],
+      "failure"),
     G("I go to the market and look for the bread seller.",
       [A("go", place="the market"), A("seek", target="the bread seller")], "failure"),
     G("I take the road to the nearest town.", [A("journey", place="the nearest town")], "script:return"),
@@ -145,15 +158,17 @@ GOLD = [
     G("I thank her, say goodnight and leave.",
       [A("talk", target="her", says="goodnight"), A("leave")], "script:calling"),
     G("I go to the market.", [A("go", place="the market")], "script:calling"),
-    G("I try to buy a coil of rope.", [A("buy", object="a coil of rope")], "failure"),
+    G("I try to buy a coil of rope.", [A("buy", "tried", object="a coil of rope")], "failure"),
     G("I go to the market and buy a coil of rope.",
       [A("go", place="the market"), A("buy", object="a coil of rope")], "failure"),
     G("I wait at the well until two in the morning.",
       [A("wait", place="the well", time="until two in the morning")], "script:homes"),
     G("I pick the lock on her door.", [A("break_in", target="her", object="the lock on her door")], "script:homes"),
     G("I kick in her door.", [A("break_in", target="her", object="her door")], "script:homes"),
-    G("I try to buy a loaf of bread.", [A("buy", object="a loaf of bread")], "script:buying"),
-    G("I want to buy some torches.", [A("buy", object="some torches")], "script:buying"),
+    G("I try to buy a loaf of bread.", [A("buy", "tried", object="a loaf of bread")],
+      "script:buying"),
+    G("I want to buy some torches.", [A("buy", "intended", object="some torches")],
+      "script:buying"),
     G("I buy a dragon's egg.", [A("buy", object="a dragon's egg")], "script:buying"),
     # --- script:fight / kills ------------------------------------------------------------------
     G("I walk into the worst tavern on the street.",
@@ -209,7 +224,7 @@ GOLD = [
     G("I follow the tracks a while.", [A("follow", object="the tracks", time="a while")], "script:long"),
     G("I stop and listen.", [A("look")], "script:long"),
     G("I climb the nearest rise to see further.",
-      [A("athletics", place="the nearest rise"), A("look")], "script:long"),
+      [A("athletics", place="the nearest rise"), A("look", "intended")], "script:long"),
     G("I look back the way I came.", [A("look", place="the way I came")], "script:long"),
     G("I keep walking north until the light starts to go.",
       [A("go", place="north", time="until the light starts to go")], "script:long"),
@@ -304,7 +319,7 @@ GOLD = [
       [A("talk", target="the captain", says="to let us through")], "authored"),
     G("I wait until the guard falls asleep, then slip past him.",
       [A("wait", time="until the guard falls asleep"), A("stealth", target="him")], "authored"),
-    G("If he draws steel, I run.", [A("leave")], "authored"),
+    G("If he draws steel, I run.", [A("leave", "intended")], "authored"),
     G("I look for the man who was following me earlier.",
       [A("seek", target="the man who was following me earlier")], "authored"),
     G("I go to the tavern where the dockhands drink.",
@@ -349,7 +364,9 @@ GOLD = [
       [A("other", object="a healing salve")], "authored"),
     G("I read the letter she gave me.", [A("look", object="the letter she gave me")], "authored"),
     G("I put on the chain shirt.", [A("use", object="the chain shirt")], "authored"),
-    G("I drop the stolen purse in the well.", [A("give", object="the stolen purse", place="the well")],
+    # `drop` since 2026-10-03 (lane F): the act the vocabulary gained for exactly this. The
+    # label was `give`, when give's line read "drop something somewhere".
+    G("I drop the stolen purse in the well.", [A("drop", object="the stolen purse", place="the well")],
       "authored"),
     G("I introduce myself to the woman at the loom.",
       [A("talk", target="the woman at the loom")], "authored"),
@@ -382,4 +399,192 @@ GOLD = [
       "authored"),
     G("I go to the smithy and sell my old sword.",
       [A("go", place="the smithy"), A("sell", object="my old sword")], "authored"),
+    # --- commitment, dev (lane F round 2, 2026-10-03) ------------------------------------------
+    # Written while the reader's commitment was built; the reader may be tuned on these.
+    G("I try to haggle the cobbler down to five silver.",
+      [A("talk", "tried", target="the cobbler", says="down to five silver")],
+      "authored:commit", dev=True),
+    G("I'm going to the chapel to light a candle.",
+      [A("go", place="the chapel"), A("use", "intended", object="a candle")],
+      "authored:commit", dev=True),
+    G("I want to buy a warm cloak.", [A("buy", "intended", object="a warm cloak")],
+      "authored:commit", dev=True),
+    G("I try to sell my old boots to the cobbler.",
+      [A("sell", "tried", object="my old boots", target="the cobbler")],
+      "authored:commit", dev=True),
+    G("I hand the fisherman the net, which he will mend for me.",
+      [A("give", object="the net", target="the fisherman")], "authored:commit", dev=True),
+    G("Would the baker sell me a loaf if I asked nicely?", [], "authored:commit",
+      question=True, dev=True),
+    G("I sit down to wait for the ferry.", [A("wait", target="the ferry")],
+      "authored:commit", dev=True),
+    G("I plan to leave town at first light.", [A("leave", "intended", place="town")],
+      "authored:commit", dev=True),
+    G("I try to climb the garden wall.", [A("athletics", "tried", place="the garden wall")],
+      "authored:commit", dev=True),
+    G("I agree to sell the goat to the herder for six silver.",
+      [A("sell", object="the goat", target="the herder")], "authored:commit", dev=True),
+    # --- one deed or two, dev (lane F round 2) ------------------------------------------------
+    # Written after an act-level count of the held-out flips (act names only, no sentence
+    # read) showed acts-in-order falling on extra actions: a time clause read as a second
+    # `wait`, a swing read as `use` before the `attack`, a search or a gesture read as
+    # `take`. These are new sentences of those KINDS, for tuning; the held-out ones stay
+    # unread.
+    G("I keep walking east until the sun goes down.",
+      [A("go", time="until the sun goes down")], "authored:segment", dev=True),
+    G("I lie back against the wall and rest for a bit.",
+      [A("rest", time="for a bit")], "authored:segment", dev=True),
+    G("I swing my hammer and break his jaw.",
+      [A("attack", target="his", object="my hammer")], "authored:segment", dev=True),
+    G("I raise my bow and loose an arrow at the wolf.",
+      [A("attack", target="the wolf", object="my bow")], "authored:segment", dev=True),
+    G("I search the cupboard for anything worth stealing.",
+      [A("search", object="the cupboard")], "authored:segment", dev=True),
+    G("I kneel at the altar and pray.", [A("other", place="the altar")],
+      "authored:segment", dev=True),
+    G("I lean on the counter and ask the clerk about the crate.",
+      [A("talk", target="the clerk", says="about the crate")], "authored:segment", dev=True),
+    G("I wander through the market until noon.",
+      [A("go", place="the market", time="until noon")], "authored:segment", dev=True),
+    G("I grab the thief by the collar.", [A("attack", target="the thief")],
+      "authored:segment", dev=True),
+    G("I nod to the guard and walk on.", [A("other", target="the guard"), A("go")],
+      "authored:segment", dev=True),
+    G("I go over to the well and drink.", [A("go", place="the well"), A("consume")],
+      "authored:segment", dev=True),
+    G("I tell the boy to fetch the healer.",
+      [A("talk", target="the boy", says="to fetch the healer")], "authored:segment", dev=True),
+    G("I check the body for wounds.", [A("look", object="the body")],
+      "authored:segment", dev=True),
+    G("I stand at the rail and watch the gulls.", [A("look", object="the gulls")],
+      "authored:segment", dev=True),
+    # --- commitment, held out (lane F round 2) -------------------------------------------------
+    # Written after the reader was frozen (commit e9d63ee's demonstrations), and never used
+    # to write a fix. The first five are the owner's own lines from 2026-10-03, the first
+    # two the replay regressions of round 1.
+    # `object` on a walk since 2026-10-03 (round 2): what is carried along.
+    G("I take the crate to the man in the counting house who will buy it from me.",
+      [A("seek", target="the man in the counting house", object="the crate")],
+      "playtest:2026-10-03"),
+    G("I try to sell the crate to the smith for coin",
+      [A("sell", "tried", object="the crate", target="the smith")], "playtest:2026-10-03"),
+    G("I try to sell the crate to Korvu for coin",
+      [A("sell", "tried", object="the crate", target="Korvu")], "playtest:2026-10-03"),
+    G("I agree to sell the crate to the smith for whatever it is worth",
+      [A("sell", object="the crate", target="the smith")], "playtest:2026-10-03"),
+    G("I tell the smith, \"It's a deal. You can have the crate.\"",
+      [A("talk", target="the smith", says="It's a deal. You can have the crate."),
+       A("sell", object="the crate", target="the smith")], "playtest:2026-10-03"),
+    G("I go to the market to buy some bread.",
+      [A("go", place="the market"), A("buy", "intended", object="some bread")],
+      "authored:commit"),
+    G("I'm going to ask the guard about the road.",
+      [A("talk", "intended", target="the guard", says="about the road")], "authored:commit"),
+    G("I want to see the captain.", [A("seek", "intended", target="the captain")],
+      "authored:commit"),
+    G("I'd like to rent a room for the night.",
+      [A("rest", "intended", time="for the night")], "authored:commit"),
+    G("I try to persuade the guard to let me in.",
+      [A("talk", "tried", target="the guard", says="to let me in")], "authored:commit"),
+    G("I try to climb the cliff.", [A("athletics", "tried", place="the cliff")],
+      "authored:commit"),
+    G("I try to sneak past the dogs.", [A("stealth", "tried", target="the dogs")],
+      "authored:commit"),
+    G("I hand the letter to the courier, who will take it to the capital.",
+      [A("give", object="the letter", target="the courier")], "authored:commit"),
+    G("I walk to the docks to find a ship.",
+      [A("go", place="the docks"), A("search", "intended", object="a ship")],
+      "authored:commit"),
+    G("I plan to rob the counting house tonight.",
+      [A("steal", "intended", target="the counting house")], "authored:commit"),
+    G("Would the smith buy my old sword?", [], "authored:commit", question=True),
+    G("I ask the smith if he would buy my old sword.",
+      [A("talk", target="the smith", says="if he would buy my old sword"),
+       A("sell", "asked", object="my old sword", target="the smith")], "authored:commit"),
+    G("I'm going to the stables.", [A("go", place="the stables")], "authored:commit"),
+    G("Tomorrow I will travel to Dustgate.", [A("journey", "intended", place="Dustgate")],
+      "authored:commit"),
+    G("I pick up the lantern to light my way.",
+      [A("take", object="the lantern"), A("use", "intended")], "authored:commit"),
+    G("I offer the merchant my silver ring for a good price.",
+      [A("sell", "tried", object="my silver ring", target="the merchant")],
+      "authored:commit"),
+    G("I set off to find the healer.",
+      [A("go"), A("seek", "intended", target="the healer")], "authored:commit"),
+    G("I try to pick his pocket.", [A("steal", "tried", target="his")], "authored:commit"),
+    G("I mean to kill him if he comes back.", [A("attack", "intended", target="him")],
+      "authored:commit"),
+    G("I ask the innkeeper whether I can sleep in the stable.",
+      [A("talk", target="the innkeeper", says="whether I can sleep in the stable"),
+       A("rest", "asked", place="the stable")], "authored:commit"),
+    G("I drop my pack and run.", [A("drop", object="my pack"), A("leave")],
+      "authored:commit"),
+    G("I buy a rope to climb the well.",
+      [A("buy", object="a rope"), A("athletics", "intended", place="the well")],
+      "authored:commit"),
+    G("I head to the temple to pray.",
+      [A("go", place="the temple"), A("other", "intended")], "authored:commit"),
+    # --- clean held out (lane F round 2) -------------------------------------------------------
+    # Written after the reader was frozen at 2c8b72b, and never looked at in any form —
+    # not even as act counts — before the gate was run: the act-level counts consulted on
+    # the held-out lines above make those a less clean measure, and this set is the clean
+    # one. Ordinary lines of every kind, not chosen for any one defect.
+    G("I walk to the fountain and fill my waterskin.",
+      [A("go", place="the fountain"), A("gather", object="my waterskin")], "authored:clean"),
+    G("I ask the woman at the stall what she wants for the apples.",
+      [A("talk", target="the woman at the stall", says="what she wants for the apples")],
+      "authored:clean"),
+    G("I try to bribe the gatekeeper with a silver coin.",
+      [A("give", "tried", object="a silver coin", target="the gatekeeper")], "authored:clean"),
+    G("I want to speak to the harbourmaster.",
+      [A("talk", "intended", target="the harbourmaster")], "authored:clean"),
+    G("I sell the antlers to the furrier.",
+      [A("sell", object="the antlers", target="the furrier")], "authored:clean"),
+    G("I pick up the dagger from the floor.", [A("take", object="the dagger")],
+      "authored:clean"),
+    G("I put the lantern down on the table.",
+      [A("drop", object="the lantern", place="the table")], "authored:clean"),
+    G("I punch the drunk in the stomach.", [A("attack", target="the drunk")],
+      "authored:clean"),
+    G("I sneak along the wall to the back door.", [A("stealth", place="the back door")],
+      "authored:clean"),
+    G("I'm going to the tavern to find a guide.",
+      [A("go", place="the tavern"), A("seek", "intended", target="a guide")],
+      "authored:clean"),
+    G("I hand the guard five silver.", [A("give", object="five silver", target="the guard")],
+      "authored:clean"),
+    G("I sleep under the cart until dawn.",
+      [A("rest", place="the cart", time="until dawn")], "authored:clean"),
+    G("I tell the innkeeper the stew was good.",
+      [A("talk", target="the innkeeper", says="the stew was good")], "authored:clean"),
+    G("I offer the hunter my knife for his furs.",
+      [A("sell", "tried", object="my knife", target="the hunter")], "authored:clean"),
+    G("Can I climb that tower?", [], "authored:clean", question=True),
+    G("I climb the tower to get a better look.",
+      [A("athletics", place="the tower"), A("look", "intended")], "authored:clean"),
+    G("I drink from the stream.", [A("consume", object="the stream")], "authored:clean"),
+    G("I knock on the miller's door.", [A("call_on", target="the miller")], "authored:clean"),
+    G("I follow the cart out of the gate.", [A("follow", object="the cart")],
+      "authored:clean"),
+    G("I cast light on my staff.", [A("cast", object="light", target="my staff")],
+      "authored:clean"),
+    G("I hope to reach the river by nightfall.",
+      [A("go", "intended", place="the river", time="by nightfall")], "authored:clean"),
+    G("I take the coin purse from the dead man.",
+      [A("take", object="the coin purse", target="the dead man")], "authored:clean"),
+    G("I give the child an apple and ask her name.",
+      [A("give", object="an apple", target="the child"), A("talk", says="her name")],
+      "authored:clean"),
+    G("I spit in his ale.", [A("insult", target="his")], "authored:clean"),
+    G("I try to calm the horse.", [A("other", "tried", target="the horse")],
+      "authored:clean"),
+    G("I tell the captain I'm going to report him.",
+      [A("talk", target="the captain", says="I'm going to report him")], "authored:clean"),
+    G("I wait for the rain to stop.", [A("wait", time="for the rain to stop")],
+      "authored:clean"),
+    G("I drop the torch and draw my sword.",
+      [A("drop", object="the torch"), A("use", object="my sword")], "authored:clean"),
+    G("I leave the inn before dawn.", [A("leave", place="the inn")], "authored:clean"),
+    G("I agree to buy the mule for twelve silver.", [A("buy", object="the mule")],
+      "authored:clean"),
 ]

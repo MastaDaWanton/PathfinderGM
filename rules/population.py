@@ -555,6 +555,13 @@ def names_a_person(phrase: str) -> bool:
     if " ".join(str(phrase or "").lower().split()) in ("somewhere", "anywhere", "nowhere",
                                                         "everywhere", "someplace"):
         return False
+    # Quoted words, "say …", a sentence (2026-10-03, item 13): `introduce who='say "just
+    # trying to start a conversation…"'` minted c4 under that phrase. The shape rule is
+    # `names.not_a_name`, shared with every door that names somebody.
+    from .names import not_a_name
+
+    if not_a_name(phrase):
+        return False
     if not _POSSESSIVE.match(str(phrase or "")):
         return True
     rest = _POSSESSIVE.sub("", str(phrase))

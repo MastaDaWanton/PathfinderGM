@@ -696,11 +696,11 @@ def _apply_cards(c, p: dict) -> bool:
             # transaction is a private matter", and again on "the warrior's blade is
             # shattered", and paid 200 XP each time. A watcher that can advance any card
             # on any sentence is a card that advances every turn.
+            # The test lives in `cards.about`, which also knows an errand's need: "he
+            # considers the offer of work" was refused for "Find a bed you can pay for"
+            # while the player's purse was empty (2026-10-03, item 25).
             fact = str(ch.get("fact") or "")
-            names = cards_mod._card_names(card, c.scene)
-            about = (cards_mod._hits(card, fact) >= 1 or cards_mod._names_in(names, fact)
-                     or cards_mod._identity_hits(cards_mod.identity_keys(card, names), fact) >= 1)
-            if not about:
+            if not cards_mod.about(card, fact, c.scene):
                 c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
                                    "action": "refused", "fact": fact[:200],
                                    "why": "the fact is not about this card"})

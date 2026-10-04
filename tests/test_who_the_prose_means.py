@@ -163,9 +163,10 @@ def test_the_beast_is_swapped_for_the_player_only_when_it_means_the_player():
     assert kept == text and beasts == []
 
 
-def test_an_apposition_names_the_man_the_attribution_says_it_is():
+def test_an_apposition_names_the_man_the_reading_says_it_is():
     """The head word "man" belongs to two unnamed men; the head-word guess took the
-    first. The attribution names the right one."""
+    first. The reading names the right one (bench: names-two-men-one-named), and the name
+    goes to him alone."""
     from gm import judgement
     from rules.bestiary import instantiate
     from rules.engine import Scene
@@ -179,9 +180,13 @@ def test_an_apposition_names_the_man_the_attribution_says_it_is():
     s.add(first)
     s.add(second)
     beat = "The man—Korgath Varn—takes a slow pull of his ale."
-    got = judgement.apply_introductions(s, beat, "I look at him",
-                                        whose=lambda sentence, words: second.ref)
-    assert got == [(second.ref, "Korgath Varn")]
+    from play.aftermath import seen_people
+    from tests.beat_reader import stub
+
+    reading = stub.read(beat, s, who={"The man": second.ref},
+                        names={second.ref: "Korgath Varn"})
+    seen_people.name_them(stub.ctx(s, reading, text=beat), reading)
+    assert second.name == "Korgath Varn"
     assert first.name == "man by the door"
 
 

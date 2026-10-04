@@ -96,3 +96,32 @@ def test_the_outfit_page_carries_the_catalogue(client):
     page = r.content.decode("utf-8")
     assert '"weapons"' in page and "Begin the sandbox" in page
     assert client.get("/api/outfit/nobody").status_code == 404
+
+
+def test_the_outfitter_knows_what_the_character_is_trained_in(client):
+    """The owner's ask, 2026-10-03: a sort for the outfitting that sorts by proficiency.
+    The page sorts on `proficient_keys`, so it must be the sheet's own answer — the one
+    the dice apply (−4 on an unproficient weapon, the check penalty on attacks in
+    unproficient armour) — not a second reading of the class list. A fighter is trained
+    in every simple and martial weapon, all armour, and all shields "including tower
+    shields" (CRB p.55); an exotic weapon is the one thing they are not."""
+    cid = _make(client)
+    keys = client.get(f"/api/outfit/{cid}").json()["proficient_keys"]
+    cat = outfit_views.catalogue()
+    by = {r["key"]: r["prof"] for r in cat["weapons"]}
+    assert "longsword" in keys["weapon"] and "dagger" in keys["weapon"]
+    assert not [k for k in keys["weapon"] if by[k] == "exotic"]
+    assert {r["key"] for r in cat["armour"]} == set(keys["armour"])
+    assert set(keys["shield"]) == {r["key"] for r in cat["shields"]}
+
+
+def test_a_rogue_is_trained_in_light_armour_and_the_rogues_own_weapons():
+    """Rogue (CRB p.66): simple weapons plus hand crossbow, rapier, sap, shortbow and
+    short sword; light armour; no shields. Read off the fixture's Kesst Vayr."""
+    from rules.sheet import load_pc
+
+    keys = outfit_views.proficient_keys(load_pc("fixtures/pc-kesst.json"))
+    assert {"rapier", "dagger", "shortbow"} <= set(keys["weapon"])
+    assert "longsword" not in keys["weapon"]
+    assert set(keys["armour"]) == {"padded", "leather", "studded leather", "chain shirt"}
+    assert keys["shield"] == []

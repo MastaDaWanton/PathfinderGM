@@ -188,45 +188,63 @@ def _scene():
     return scene
 
 
-@pytest.mark.parametrize("said,item", [
-    ("I buy a lantern", "lantern"),
-    ("I pick up the brass key", "brass key"),
-    ("I take a loaf of bread from the stall", "loaf of bread"),
+def _read(said, scene, *actions, plan=None, question=False):
+    """The turn's goods door with this reading (gm/acts_to_ops.py). Since 2026-10-03 the
+    reading drives these ops; `inject_goods`, the regex these tests first pinned, is
+    retired (docs/structured-turn.md)."""
+    from gm import acts_to_ops
+
+    frame = {"question": question, "claims": [], "actions": [dict(a) for a in actions]}
+    rows = acts_to_ops.table(frame, scene, sentence=said)
+    return acts_to_ops.apply(list(plan or [{"op": "narrate_only"}]), rows, frame, scene)
+
+
+@pytest.mark.parametrize("said,frame,item", [
+    ("I pick up the brass key", {"act": "take", "object": "the brass key"}, "brass key"),
+    ("I take a loaf of bread from the stall",
+     {"act": "take", "object": "a loaf of bread", "target": "the stall"}, "loaf of bread"),
 ])
-def test_a_declared_purchase_reaches_the_engine_whatever_the_gm_proposed(said, item):
+def test_a_declared_pick_up_reaches_the_engine_whatever_the_gm_proposed(said, frame, item):
     """The same shape and the same reason as `inject_survival`: the prompt already
     carries the op and the model does not use it. Fifty-four turns, fifty-four
-    narrate_only."""
-    from gm import judgement
-
-    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+    narrate_only. A purchase ("I buy a lantern") is the counter's since 2026-09-27
+    (`strip_counter_buys`), and no give is built for it."""
+    out = _read(said, _scene(), frame)
     give = next(i for i in out if i["op"] == "give")
     assert give["params"]["item"] == item
     assert give["params"]["to"] == "pc"
+    assert not [i for i in _read("I buy a lantern", _scene(),
+                                 {"act": "buy", "object": "a lantern"}) if i["op"] == "give"]
 
 
 def test_handing_something_over_takes_it_from_the_player():
-    from gm import judgement
-
-    out = judgement.inject_goods([{"op": "narrate_only"}], "I hand over the brass key",
-                                 _scene())
+    """To the one person here, when the words name nobody (`acts_to_ops.addressed`)."""
+    scene = _scene()
+    scene.add(_guard(scene))
+    scene.pc().goods["brass key"] = 1
+    out = _read("I hand over the brass key", scene,
+                {"act": "give", "object": "the brass key"})
     assert next(i for i in out if i["op"] == "give")["params"]["from_"] == "pc"
 
 
-def test_asking_about_a_thing_is_not_taking_it():
-    """A question mark anywhere skips it, the same rule the survival injection uses."""
-    from gm import judgement
+def _guard(scene):
+    from rules.bestiary import instantiate
 
+    return instantiate("guildhand", scene=scene, name="the guard")
+
+
+def test_asking_about_a_thing_is_not_taking_it():
+    """A question asked of the game is no act: the reading says `question`, and nothing
+    is built."""
     said = "Can I buy a lantern here?"
-    assert judgement.inject_goods([{"op": "narrate_only"}], said, _scene()) == \
-        [{"op": "narrate_only"}]
+    assert _read(said, _scene(), question=True) == [{"op": "narrate_only"}]
 
 
 def test_the_gm_naming_its_own_give_is_left_alone():
-    from gm import judgement
-
+    """A give to the player under an act that can get something (a purchase) stands."""
     raw = [{"op": "give", "params": {"item": "rope", "to": "pc"}}]
-    assert judgement.inject_goods(raw, "I buy a lantern", _scene()) == raw
+    assert _read("I buy a lantern", _scene(), {"act": "buy", "object": "a lantern"},
+                 plan=raw) == raw
 
 
 # --- and being unhurt must not stop you sleeping ------------------------------------
@@ -419,42 +437,47 @@ def test_every_class_walks_out_dressed():
 # --- an abstract noun is not a thing you can carry -------------------------------------
 #
 # Found in a live save: the Inventory tab listed "offer" and "scene on" beside a
-# traveller's outfit. `inject_goods` builds a `give` intent from a regex over the player's
+# traveller's outfit. `inject_goods` built a `give` intent from a regex over the player's
 # own sentence — the GM never proposed either of them — and "I accept the offer" and
-# "I take in the scene on the ridge" both parse as somebody picking something up.
+# "I take in the scene on the ridge" both parsed as somebody picking something up.
 #
-# Two gates, both mechanical. The verb is not acquisition when an idiom follows it, and
-# the head noun has to be something a satchel could hold.
+# Since 2026-10-03 the reading decides whether anything is taken, and the head noun of a
+# take's object still has to be something a satchel could hold: the stop-list is now the
+# validator on the reading's slot (`acts_to_ops._take`), for the reading that says `take`
+# of a phrase like these.
 
-@pytest.mark.parametrize("said", [
-    "I accept the offer",                       # the exact sentence, from the save
-    "I take in the scene on the ridge",         # the other one
-    "I take a moment to breathe",
-    "I take cover behind the wall",
-    "I take note of the door",
-    "I take a seat by the fire",
-    "I take a look at the map",
-    "I take stock of the situation",
-    "I take charge of the group",
-    "I take my leave of the innkeeper",
-    "I accept the risk",
-    "I take the lead",
+@pytest.mark.parametrize("said,obj", [
+    ("I accept the offer", "the offer"),                       # the exact sentence
+    # The other one. A head noun read from the end is "ridge", which a satchel could hold;
+    # this one is the READING's to get right — "take in" is looking — and the validator
+    # alone would let it through, so the reading's act is what is pinned.
+    ("I take in the scene on the ridge", "look:the scene on the ridge"),
+    ("I take a moment to breathe", "a moment"),
+    ("I take cover behind the wall", "cover"),
+    ("I take note of the door", "note"),
+    ("I take a seat by the fire", "a seat"),
+    ("I take a look at the map", "a look"),
+    ("I take stock of the situation", "stock"),
+    ("I take charge of the group", "charge"),
+    ("I take my leave of the innkeeper", "my leave"),
+    ("I accept the risk", "the risk"),
+    ("I take the lead", "the lead"),
 ])
-def test_an_abstract_noun_never_becomes_an_item(said):
-    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+def test_an_abstract_noun_never_becomes_an_item(said, obj):
+    act, _, obj = obj.rpartition(":")
+    out = _read(said, _scene(), {"act": act or "take", "object": obj})
     assert not [i for i in out if i.get("op") == "give"], said
 
 
-@pytest.mark.parametrize("said,item", [
-    ("I take the brass key", "brass key"),
-    ("I buy a lantern", "lantern"),
-    ("I pick up the leather satchel", "leather satchel"),
-    ("I pocket the silver ring", "silver ring"),
+@pytest.mark.parametrize("said,obj,item", [
+    ("I take the brass key", "the brass key", "brass key"),
+    ("I pick up the leather satchel", "the leather satchel", "leather satchel"),
+    ("I pocket the silver ring", "the silver ring", "silver ring"),
 ])
-def test_a_real_object_still_reaches_the_engine(said, item):
+def test_a_real_object_still_reaches_the_engine(said, obj, item):
     """The control. The stop-list must not turn the feature off — an inventory nothing
     ever writes to is a field on a sheet, not a game."""
-    out = judgement.inject_goods([{"op": "narrate_only"}], said, _scene())
+    out = _read(said, _scene(), {"act": "take", "object": obj})
     give = [i for i in out if i.get("op") == "give"]
     assert give and give[0]["params"]["item"] == item
 

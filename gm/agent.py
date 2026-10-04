@@ -312,7 +312,7 @@ class GMAgent:
         # docs/the-interpreter.md): the readers below consult it before their regex, and
         # the planner is shown it. A reading that fails costs nothing but the reading —
         # the turn goes on exactly as it did before the interpreter existed.
-        from . import interpret
+        from . import acts_to_ops, interpret
 
         self.reading = None
         if interpret.ENABLED:
@@ -321,6 +321,38 @@ class GMAgent:
                 interpret.remember(player_input, self.reading)
             except Exception as exc:  # noqa: BLE001 — never a reason to lose the turn
                 self.reading = {"error": str(exc)[:200]}
+        else:
+            # Off (the test suite): a reading handed in through `interpret.remember` is
+            # the turn's, so a test pins what the READING does with a sentence — the
+            # retired regex readers' tests moved here (docs/structured-turn.md).
+            self.reading = interpret.reading_of(player_input)
+        # A failed reading is a missing one: the plan alone, never the retired regex
+        # readers behind it. Measured 2026-10-03: 0 failed calls in 220 bench lines and
+        # in every turn row of both owner saves, so the fallback is for an Ollama that
+        # stopped between the reader's call and the planner's — and Rasa's CALM answers
+        # its own failed command generation with a "cannot handle" pattern, not a
+        # second parser.
+        read_ok = (self.reading if isinstance(self.reading, dict)
+                   and "error" not in self.reading else None)
+        # The act→op table (gm/acts_to_ops.py): one row per action of the reading.
+        self.rows = acts_to_ops.table(read_ok, self.engine.scene,
+                                      places=self.engine.places(), sentence=player_input,
+                                      recent=getattr(self, "recent", ()))
+        # A sale to somebody with no counter is asked again on its own before the engine
+        # is committed to it (`acts_to_ops.confirm_sales`); off with the reader.
+        held_back = acts_to_ops.confirm_sales(
+            self.rows, read_ok, self.engine.scene, sentence=player_input,
+            ask=interpret.confirm_sale if interpret.ENABLED else None)
+        if read_ok is not None:
+            read_ok["table"] = [r.record() for r in self.rows]
+            if held_back:
+                read_ok["sales_held_back"] = held_back
+        # Every deed the words declared moves a thing and not one of them can — "I sell
+        # the crate" with no crate: the turn is the refusal, and no model is asked.
+        stop = acts_to_ops.refusal(self.rows)
+        if stop:
+            return self._refused_plan({"text": stop, "code": "not_found", "fix": None},
+                                      [], [f"the reading's table found nothing: {stop}"])
         judgement.embody_sought(self.engine.scene, player_input, self.world)
         # The plan sees the situation cards — the GM's secret ones included — keyed
         # off the last few beats the view hands over (`self.recent`).
@@ -330,10 +362,15 @@ class GMAgent:
                                     turn=getattr(self, "turn", 0),
                                     reading=getattr(self, "reading", None),
                                     player_text=player_input)
-        read = interpret.brief_lines(self.reading if isinstance(self.reading, dict)
-                                     and "error" not in self.reading else None)
+        read = interpret.brief_lines(read_ok)
         if read:
             brief += "\n\n" + read
+        # What the words named that the engine does not have, as fact: the planner says
+        # so and makes nothing up (a give of a pint nobody carries is never minted).
+        missing = acts_to_ops.unresolved(self.rows)
+        if missing:
+            brief += ("\n\nNOT HERE (fact — the turn says so, and nothing is made to fill "
+                      "it): " + "; ".join(missing) + ".")
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first
@@ -352,20 +389,35 @@ class GMAgent:
         # What the player's own words already commit this turn to, read by asking the
         # injectors what they would add. Computed once: it depends on the player's text
         # and the scene, and neither moves between attempts.
-        declared = judgement.declared_ops(player_input, self.engine.scene, self.world,
-                                          attached=getattr(self, "attachments", ()))
-        # And what the reading grounds, joined — the detectors stay a second opinion
-        # until each is retired on a measured comparison (docs/the-interpreter.md).
-        if isinstance(self.reading, dict) and "error" not in self.reading:
-            by_reading = interpret.ops_for(self.reading, self.engine.scene,
-                                           self.engine.places())
+        #
+        # Since 2026-10-03 (docs/structured-turn.md) the reading is what declares: the
+        # act→op table's op names, in the words' order. The declarers left in
+        # `judgement.declared_ops` are the ones that read a CLOSED vocabulary the reading
+        # does not — a spell's name against the catalogue, a jar against the satchel, a
+        # skill — and each of their ops stands only where an act of the reading stands
+        # behind it (`interpret.supported`). The goods declarers (`inject_goods`,
+        # `inject_sale`, `declare_drop`, `declare_emptying`) are gone: the table builds
+        # those ops whole (`acts_to_ops.apply`, below).
+        attached = getattr(self, "attachments", ())
+        if read_ok is not None:
+            detectors = judgement.declared_ops(player_input, self.engine.scene, self.world,
+                                               attached=attached)
+            by_reading = acts_to_ops.declared(self.rows)
             self.reading["ops"] = by_reading
-            self.reading["detectors"] = list(declared)
+            self.reading["built"] = acts_to_ops.built_ops(self.rows)
+            self.reading["detectors"] = list(detectors)
             # The reading decides where the two disagree (`interpret.supported`); the
             # overruled op is kept on the record.
-            declared, overruled = interpret.supported(declared, self.reading)
+            declared, overruled = interpret.supported(detectors, self.reading)
             self.reading["overruled"] = overruled
             declared = list(dict.fromkeys([*declared, *by_reading]))
+        else:
+            # No reading: the plan alone. Only a chip the player attached declares (a
+            # spell or a place picked from a list is not English), so the words are read
+            # by nobody but the planner — never by the retired regexes behind its back.
+            declared = judgement.declared_ops("", self.engine.scene, self.world,
+                                              attached=attached)
+        if read_ok is not None:
             # Where the reading says the named place is the one the party stands in, no
             # walk is owed. Measured live 2026-09-27: at the market already, "I go to the
             # market and buy a coil of rope" had a detector require `travel`, and with a
@@ -375,6 +427,7 @@ class GMAgent:
 
             here_named = [a for a in self.reading.get("actions") or []
                           if a.get("act") in ("go", "leave") and a.get("place")
+                          and interpret.acting(a)
                           and getattr(places_mod.find(self.engine.places(), a["place"]),
                                       "id", None) == self.engine.scene.at]
             if here_named and "travel" not in by_reading:
@@ -384,11 +437,30 @@ class GMAgent:
 
         schedule = [(self.model, self.host, self.provider, self.api_key)] * max_attempts
         spare = modelcfg.for_role("fallback") or {}
+        # The backup narrator is optional (the manual says "you can play perfectly well
+        # without it"), and one that was never pulled is not a model to hand a turn to.
+        # Measured 2026-10-03 (item 18): "handing the turn to richardyoung/qwen3-4b-…",
+        # then a 404 reported as "cannot reach Ollama", on both lost turns. Asked of
+        # Ollama's own list, cached (`client.has_model`), so it costs one cheap call a
+        # minute at most; a hosted fallback is never second-guessed.
+        missing_spare = ""
         if spare.get("model") and spare["model"] != self.model:
-            schedule += [(spare["model"], spare.get("host", self.host),
-                          spare.get("provider", "ollama"),
-                          spare.get("api_key", ""))] * 2
+            spare_host = spare.get("host", self.host)
+            spare_provider = spare.get("provider", "ollama")
+            if client.has_model(spare["model"], spare_host, spare_provider) is False:
+                missing_spare = spare["model"]
+                client.say_missing_once(spare["model"], spare_host, role="fallback")
+            else:
+                schedule += [(spare["model"], spare_host, spare_provider,
+                              spare.get("api_key", ""))] * 2
         last = len(schedule) - 1
+        # The repeat guard spends ONE retry a turn (item 17). Measured: five attempts
+        # of five came back as the same plan after being told, 76 s and 85 s, and then
+        # the turn was lost anyway — a rejection that teaches nothing the first time
+        # teaches nothing the fourth. CrewAI refuses a repeated call once; SWE-agent
+        # salvages instead of retrying forever (docs/turn-pipeline-2026-10-03.md).
+        repeat_told = False
+        tried = 0
 
         # A model that could not be reached is not asked again this turn. Measured
         # 2026-09-25: a `ModelUnavailable` inside this loop — a timeout, Ollama restarting
@@ -443,11 +515,20 @@ class GMAgent:
                                     if "cast" in declared else ()))
             except client.ModelUnavailable as exc:
                 down.add(model)
-                rejections.append(f"attempt {n + 1}: {model} could not be reached: {exc}")
+                # A wedged Ollama is wedged for every model it serves: the backup on the
+                # same host would only stall again, another two minutes of the player's
+                # turn (`client.ModelStalled`, measured 2026-10-03).
+                if isinstance(exc, client.ModelStalled):
+                    down |= {m for m, h, *_ in schedule if h == host}
+                rejections.append(f"attempt {n + 1}: {exc}"
+                                  if isinstance(exc, client.ModelNotInstalled)
+                                  else f"attempt {n + 1}: {model} could not be reached: "
+                                       f"{exc}")
                 if all(m in down for m, *_ in schedule):
                     raise
                 continue
             attempts.append(Attempt("plan", reply.seconds, reply.model, reply.text))
+            tried += 1
             # What `own_words_only` changed on this attempt, for the turn log.
             own_words: list[str] = []
 
@@ -550,17 +631,20 @@ class GMAgent:
                 # narrator's guess at what the leaf does (herbalism plan §8.2).
                 raw = judgement.declare_taste(raw, player_input, self.engine.scene)
                 raw = judgement.inject_survival(raw, player_input, self.engine.scene)
-                # Sale first, then goods. Selling is the more specific reading of handing
-                # something over and it is the one that pays — and the order was the other
-                # way round for exactly as long as it took `declared_ops` to notice: "I
-                # sell the Yarow Elixir" matched `_HANDS_OVER`, became a `give`, and the
-                # elixir left the satchel for nothing.
-                # Coin first: "I pay her ten gold" is a give of gp out of the purse,
-                # and a `sell gold_coins_10` the model wrote is the same give — before
-                # the sale injector can read "pay" as a sale of stock.
+                # Things changing hands are the reading's (gm/acts_to_ops.py): the table's
+                # take, drop, give, sell and offer, built whole, replace the plan's op for
+                # the same thing — the words settle which way it goes and to whom — and a
+                # plan op that moves a thing no act of the reading stands behind is
+                # overruled. This is where five sentence readers stood until 2026-10-03
+                # (`declare_emptying`, `declare_drop`, `inject_sale`, `inject_goods`, and
+                # `inject_payment`'s "I pay her ten gold"); each was a regex taught one more
+                # phrasing per live bug (docs/structured-turn.md).
+                raw = acts_to_ops.apply(raw, self.rows, read_ok, self.engine.scene,
+                                        notes=own_words)
+                # The model's own coin op as a give of a denomination, and its sell
+                # pointed at the jar's id: the PLAN's shapes straightened, no words read.
                 raw = judgement.inject_payment(raw, player_input, self.engine.scene)
-                raw = judgement.inject_sale(raw, player_input, self.engine.scene)
-                raw = judgement.inject_goods(raw, player_input, self.engine.scene)
+                raw = judgement.resolve_sold_items(raw, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a
                 # printed refusal, never the model's guess at what it does.
@@ -608,6 +692,9 @@ class GMAgent:
                 # default band" the old docstring promised never existed.
                 raw = judgement.drop_premature_end(raw)
                 raw = judgement.drop_stray_checks(raw, player_input)
+                # Before the band fill: a Diplomacy check at a person is priced by
+                # their attitude, never by a band (the clerk's DC 8, 2026-10-03).
+                raw = judgement.aim_the_sway(raw, player_input, self.engine.scene)
                 raw = judgement.fill_bare_checks(raw)
                 raw = judgement.inject_travel(raw, player_input, self.engine.scene,
                                               self.world)
@@ -619,6 +706,14 @@ class GMAgent:
                 # A travel the model wrote with nowhere in it takes the place the
                 # player named, so validation can find it or name "found it first".
                 raw = judgement.fill_empty_travel(raw, player_input, self.engine.scene)
+                # And a walk toward a thing in this room is no journey at all: a travel
+                # or an undeclared found the words only aim across the room is dropped
+                # here, before validation's "found it first" teaches the retry to mint a
+                # place (playtest 2026-10-03 item 9: *the storage area*, *the smithy*).
+                raw = judgement.keep_movement_in_the_scene(
+                    raw, player_input, self.engine.scene,
+                    known=tuple(self.engine.places()) + tuple(self.engine.open_ground()),
+                    notes=own_words)
                 # A departure that names the room the party is in is asked again with
                 # the rooms that would have worked; raises into the correction path.
                 raw = judgement.refuse_leaving_in_place(raw, player_input,
@@ -629,6 +724,13 @@ class GMAgent:
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
                 raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
+                # A place somebody named and the player now goes to: founded under the
+                # landmark the speaker gave, then walked into (rules/heard_places.py).
+                # After the within-scene filter, so a walk across the room stays one.
+                raw = judgement.go_to_heard_place(
+                    raw, player_input, self.engine.scene,
+                    known=tuple(self.engine.places()) + tuple(self.engine.open_ground()),
+                    reading=read_ok)
                 raw = judgement.inject_found(raw, player_input, self.engine.scene, self.world)
                 raw = judgement.inject_venture(raw, player_input, self.engine.scene)
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
@@ -684,6 +786,11 @@ class GMAgent:
                     raw, player_input,
                     self.reading if isinstance(self.reading, dict) else None,
                     notes=own_words)
+                # The ops the reading owes, in the order the words do them — after every
+                # injector has appended its own, and before a chip's op is put where the
+                # words put it (which then has the last word on order).
+                if not getattr(self, "attachments", ()):
+                    raw = acts_to_ops.order(raw, self.rows)
                 # And the attached spell or place put where the words do it, after
                 # every injector above has appended its own (gm/sequence.py).
                 raw = judgement.order_the_attached(
@@ -696,7 +803,12 @@ class GMAgent:
                     # A refusal only the player can fix, on an op the player declared,
                     # ends the turn here: shown to them once, never retried (item 21.3).
                     # One the plan invented is dropped and the rest validated again.
-                    stop, raw = self._players_refusal(exc, raw, declared, player_input)
+                    # The table's built ops are the player's declaration as much as the
+                    # schema's required ones: "I sell the crate to the smith" refused by
+                    # the engine is the player's to hear, not the plan's to retry.
+                    stop, raw = self._players_refusal(
+                        exc, raw, [*declared, *acts_to_ops.built_ops(self.rows)],
+                        player_input)
                     if stop is not None:
                         rejections.append(f"attempt {n + 1} [{exc.check}, "
                                           f"{exc.code}]: {exc} — the player's to fix")
@@ -756,7 +868,25 @@ class GMAgent:
             # should have done.
             verdict = judgement.review(player_input, intents, self.engine.scene,
                                         previous=previous_intents)
-            repairs = list(verdict.as_log()) + self._context_note() + own_words
+            accepted_repeat = []
+            if any(o.kind == "repeats-the-last-turn" for o in verdict.objections):
+                if repeat_told:
+                    verdict.objections = [o for o in verdict.objections
+                                          if o.kind != "repeats-the-last-turn"]
+                    if not judgement.is_quiet(intents):
+                        # Mechanics proposed again after being told: rolling the last
+                        # turn's check a second time is resolving something the player
+                        # did not ask for, so the turn degrades now rather than in four
+                        # more attempts.
+                        rejections.append(
+                            f"attempt {n + 1} [judgement]: the same plan as last turn "
+                            f"again after being told once — not retried")
+                        break
+                    accepted_repeat = ["the same quiet plan as last turn, twice: "
+                                       "accepted, since nothing in it rolls"]
+                repeat_told = True
+            repairs = (list(verdict.as_log()) + accepted_repeat + self._context_note()
+                       + own_words)
             if not verdict.ok and n < last:
                 complaint = " ".join(o.message for o in verdict.objections)
                 rejections.append(f"attempt {n + 1} [judgement]: {complaint}")
@@ -815,6 +945,9 @@ class GMAgent:
         # red: a narrate_only plan with an honest sentence, and the full rejection
         # log kept in the plan for the turn ledger, not the transcript.
         asked = " ".join((player_input or "").split())
+        if missing_spare:
+            rejections.append(f"— no handoff: the backup narrator {missing_spare} is not "
+                              f"installed on that Ollama")
         return TurnPlan(
             narration=(f"You try — “{asked}” — but the moment does not "
                        f"answer: whatever you were reaching for is not here to be "
@@ -822,8 +955,8 @@ class GMAgent:
             intents=self.engine.validate([{"op": "narrate_only",
                                            "because": "the turn could not be shaped"}]),
             suggestions=[], attempts=attempts,
-            repairs=[f"turn degraded to narration after {len(schedule)} failed "
-                     f"attempts"],
+            repairs=[f"turn degraded to narration after {tried} failed "
+                     f"attempt{'s' if tried != 1 else ''}"],
             rejections=rejections)
 
     # --- A refusal the player has to fix ---------------------------------------------
@@ -1358,6 +1491,10 @@ class GMAgent:
                 f"kept {packed['kept']}")
         if not packed.get("examples"):
             note += "; the worked examples did not fit either"
+        # Whether anything stood in for what was cut (item 22): the log said how much
+        # went and never whether the ledger carried it, so "28 of 64 dropped" could not
+        # be told apart from "28 dropped and nothing remembered".
+        note += f"; the ledger carried {int(packed.get('remembered') or 0)} line(s)"
         return [note]
 
     def _current_enemy(self) -> str | None:
@@ -1649,6 +1786,35 @@ class GMAgent:
                   if not a.is_pc and not a.is_down]
         return not others
 
+    def _page_pass(self, text: str, earlier: list[str] | None = None, *,
+                   repeats: bool = True) -> tuple[str, list[str]]:
+        """The deterministic page checks, the same for every passage a model writes: the
+        first draft, each polish candidate, and the beat again after the repairs.
+
+        The schema cut, the brief's refs, the stutter, a sentence the grammar closed
+        mid-word, and (with `repeats`) beats copied from the earlier ones. Returns (text,
+        notes). Before item 19 these ran once, on the first draft, and a rewrite went
+        straight to the page: Guardrails' sequential validators have the same hole — a
+        `fix` flows on to later validators and is never shown to the earlier ones
+        (docs/turn-pipeline-2026-10-03.md); Instructor re-validates the whole model on
+        every attempt, which is the shape adopted here."""
+        notes: list[str] = []
+        text, bled = narration_mod.cut_schema_bleed(text)
+        if bled:
+            notes.append(f"schema bled into the prose: cut from {bled[0]!r}")
+        text, tagged = narration_mod.strip_ref_tags(text)
+        if tagged:
+            notes.append(f"the brief's refs on the page: stripped {tagged}")
+        text = narration_mod.destutter(text)
+        text, gone = narration_mod.trim_unfinished(text)
+        if gone:
+            notes.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")
+        if repeats:
+            text, cut = narration_mod.drop_repeated_beats(text, earlier)
+            if cut:
+                notes.append(f"repeated beats: cut {cut}")
+        return text, notes
+
     def _groom(self, text: str, *, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                brief: str = "", hand_back: bool = True, claims: bool = True,
@@ -1700,16 +1866,8 @@ class GMAgent:
         if not text:
             return text or "", repairs, attempts
 
-        text, bled = narration_mod.cut_schema_bleed(text)
-        if bled:
-            repairs.append(f"schema bled into the prose: cut from {bled[0]!r}")
-        text, tagged = narration_mod.strip_ref_tags(text)
-        if tagged:
-            repairs.append(f"the brief's refs on the page: stripped {tagged}")
-        text = narration_mod.destutter(text)
-        text, cut = narration_mod.drop_repeated_beats(text, earlier)
-        if cut:
-            repairs.append(f"repeated beats: cut {cut}")
+        text, page_notes = self._page_pass(text, earlier)
+        repairs += page_notes
         text = judgement.name_refs(text, self.engine.scene)
         cast = " ".join(a.name for a in self.engine.scene.actors.values())
         text = narration_mod.strip_example_cast(text, f"{player_input} {cast}")
@@ -1726,7 +1884,7 @@ class GMAgent:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
                 player_input=player_input, scene_brief=brief, extra_known=extra,
-                facts=facts,
+                facts=facts, ctx=ctx,
                 deaths=deaths, pull=pull, claim=claim, blows=blows,
                 # What could have lit anything: the place's brief and the recent
                 # beats. None when the caller had no brief (a consequence line),
@@ -1736,12 +1894,19 @@ class GMAgent:
             repairs += p_repairs
             attempts += p_attempts
 
-        # Who every person the beat mentions is, declared once for the checks below to
-        # read instead of guessing from names (gm/mentions.py). After the rewrite, which
-        # is the last thing to change most of the text; a sentence cut or rewritten
-        # after this is not in the attribution, and the checks fall back to their guess.
-        self.attribution = mentions_mod.attribute(
-            text, self.engine.scene, acting=acting, facts=facts,
+        # The beat read once, into closed answers (gm/beat_reader.py, docs/beat-reader.md):
+        # who every person mention is — declared for the checks below to read instead of
+        # guessing from names, as gm/mentions.py's labeller did — who speaks each line,
+        # who is new and whether they are here, the names the page gives, and the places
+        # and people a speaker told of. After the rewrite, which is the last thing to
+        # change most of the text; a sentence cut or rewritten after this is not in the
+        # reading, and the checks fall back to their guess. The aftermath applies the
+        # rest (play/aftermath), reading it as `ctx.attribution`.
+        from . import beat_reader
+
+        self.attribution = beat_reader.read(
+            text, self.engine.scene, engine=self.engine, said=self.last_said,
+            acting=acting, facts=facts,
             model=self.prose_model, host=self.prose_host,
             provider=self.prose_provider, api_key=self.prose_key)
         if self.attribution.mentions:
@@ -1942,6 +2107,15 @@ class GMAgent:
             text, lit = narration_mod.cut_fire_from_nowhere(text, lit_by)
             if lit:
                 repairs.append(f"fire from nowhere: cut {len(lit)} sentence(s)")
+        # Every model call above this line wrote words onto the page after the page
+        # checks ran: the rewrite, the sentence repairs, the answer, the deeds, the
+        # renamed and the restated. Item 19 (2026-10-03) shipped a polish with "(c1)" and
+        # "(c4)" on it and "…sell you a'. What do you do?" — both cut from a first draft
+        # without a thought, neither looked for again. So the page pass runs once more,
+        # before the hand-back is judged (the repeat cut is the draft's alone: a repair
+        # that names what an earlier beat named is not a replayed beat).
+        text, late = self._page_pass(text, repeats=False)
+        repairs += [f"after the repairs, {n}" for n in late]
         text, outsourced = narration_mod.fix_hand_back(text)
         if outsourced:
             repairs.append(f"asked the player to narrate: replaced {outsourced!r}")
@@ -2015,7 +2189,13 @@ class GMAgent:
             brief_facts=dict(getattr(self, "brief_facts", None) or {}),
             pull=pull,
             was_at=str(getattr(self, "_was_at", None) or getattr(scene, "at", "") or ""),
-            acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0))
+            acting=str(acting or ""), turn=int(getattr(self, "turn", 0) or 0),
+            intimate=self._intimate_beat(),
+            # The beat read back (gm/beat_verify.py) goes to the narrator's own model:
+            # measured on the bench against the 0.6B structure model, which could not
+            # keep its quotes on the page (docs/beat-verify.md).
+            reader={"model": self.prose_model, "host": self.prose_host,
+                    "provider": self.prose_provider, "api_key": self.prose_key})
 
     def _ref_named(self, name: str) -> str:
         """The ref of the one person here called `name`; "" when none or several are."""
@@ -2037,11 +2217,15 @@ class GMAgent:
         from . import checks
 
         errors: list[dict] = []
-        findings = checks.run(ctx, errors=errors)
+        covered: list = []
+        findings = checks.run(ctx, errors=errors, covered=covered)
         self.mention_rows.extend(dict(e, door=ctx.door) for e in errors)
+        self._log_beat_read(ctx.door)
         if not findings:
             return ctx.text, [], []
-        text, notes, attempts = self._repair_sentences(ctx.text, findings, ctx)
+        text, notes, attempts = self._repair_sentences(ctx.text, findings, ctx,
+                                                       covered=covered)
+        self._log_beat_read(ctx.door)
         self.mention_rows.append({
             "kind": "truth-checks", "door": ctx.door,
             "findings": [{"kind": f.kind, "detail": f.detail,
@@ -2049,7 +2233,18 @@ class GMAgent:
             "repairs": list(notes)})
         return text, list(notes), list(attempts)
 
-    def _repair_sentences(self, text: str, findings: list, ctx
+    def _log_beat_read(self, door: str) -> None:
+        """The beat as `beat_verified` read it back, one `beat-verify` row per call that
+        was made (gm/beat_verify.py): the claims, what validation dropped, the seconds,
+        and the error when the read failed — how the read's failure rate is measured
+        from real turn logs (docs/beat-verify.md)."""
+        from . import beat_verify
+
+        row = beat_verify.take_last()
+        if row:
+            self.mention_rows.append(dict(row, door=door))
+
+    def _repair_sentences(self, text: str, findings: list, ctx, *, covered=()
                           ) -> tuple[str, list[str], list[Attempt]]:
         """Repair what the narrator checks found, sentence by sentence.
 
@@ -2152,6 +2347,18 @@ class GMAgent:
                 notes.append(f"{f.kind}: {sentence[:80]!r} -> {fixed[:80]!r}")
         # The backstops, over the beat as it now stands: only a member that still finds
         # something is asked, so a rewrite that held costs nothing here.
+        #
+        # And the members whose findings `_drop_covered` set aside. Measured live on the
+        # 2026-10-03 batch: "Korvu takes the crate with a grunt" was flagged by
+        # `thing_kept` (weight 3) and `peoples_name` (weight 2); the lighter finding was
+        # dropped as covered, the rewrite fixed the crate ("Korvu eyes the crate"), and
+        # the people's name shipped, because its member was never asked again. The
+        # covering rule is one repair per sentence, not one fault per sentence. `find`
+        # is mechanical, so asking again costs no model call.
+        for g in covered or ():
+            member = checks.owner_of(g.kind)
+            if member is not None and member not in members:
+                members.append(member)
         for member in members:
             if not callable(getattr(member, "backstop", None)):
                 continue
@@ -2219,8 +2426,17 @@ class GMAgent:
                 claim: str = "",
                 blows: list[dict] | None = None,
                 fire_context: str | None = None,
-                facts: list[str] | None = None) -> tuple[str, list[str], list[Attempt]]:
+                facts: list[str] | None = None,
+                ctx: "BeatContext | None" = None) -> tuple[str, list[str], list[Attempt]]:
         """A targeted rewrite when the prose breaks a rule about prose.
+
+        Every candidate goes through the page pass (`_page_pass`) before it is judged,
+        and is judged by the same review AND the same registered checks (gm/checks, when
+        `ctx` is given) as the draft: a candidate that brings in a kind of fault the
+        draft did not have is refused, whichever list found it. When no candidate holds,
+        the draft stands — the best earlier candidate, never merely the last one written
+        (item 19, 2026-10-03: the second rewrite shipped with refs, "midnight", and a
+        sentence cut off mid-word, because nothing looked at it after it was written).
 
         Same shape as every fix that has held here: detect mechanically, then ask the
         model to repair only what was found. If the rewrite is no better the original is
@@ -2323,11 +2539,13 @@ class GMAgent:
                 schema=prompts.prose_schema(max_chars=prompts.GRAMMAR_MAXLENGTH_CEILING,
                                             unbounded=intimate),
             )
-            # Cut back to its last whole sentence, as the prose call's reply is.
-            fixed, _gone = narration_mod.trim_unfinished(
-                self._lift(str(reply.json().get("narration", "")).strip()))
+            # The same page pass as the first draft: refs, schema, stutter, a sentence
+            # cut off, beats copied from earlier ones.
+            fixed, page = self._page_pass(
+                self._lift(str(reply.json().get("narration", "")).strip()), earlier)
             return (fixed,
-                    Attempt("polish", reply.seconds, reply.model, reply.text, note=note))
+                    Attempt("polish", reply.seconds, reply.model, reply.text,
+                            note=note + (f" — page: {'; '.join(page)}" if page else "")))
 
         attempts: list[Attempt] = []
         try:
@@ -2346,6 +2564,21 @@ class GMAgent:
         # far better than the plagiarism and is very much worse. So a repair may not
         # introduce a kind of problem the original did not have.
         was = {f.kind for f in review.findings}
+        # The registered checks' view of the draft, for the same "no new kind of fault"
+        # test the review gets. Read once, lazily, and only with a beat to read it in.
+        checked: dict[str, set[str]] = {}
+
+        def _check_kinds(t: str) -> set[str]:
+            if ctx is None:
+                return set()
+            from dataclasses import replace as _replace
+
+            from . import checks
+
+            try:
+                return {f.kind for f in checks.run(_replace(ctx, text=t), errors=[])}
+            except Exception:  # noqa: BLE001 — an unjudgeable candidate is judged by review
+                return set()
 
         def _accept(candidate: str) -> bool:
             after = _review(candidate)
@@ -2354,10 +2587,16 @@ class GMAgent:
             # measured in the brothel, and it is refused here whatever its score.
             # Nor may it stop mid-sentence: a rewrite the grammar closed mid-word is
             # never better than the draft it was asked to mend (item 6, 2026-09-30).
-            return bool(candidate) and not narration_mod.ends_unfinished(candidate) \
-                and after.score < review.score \
-                and not ({f.kind for f in after.findings} - was) \
-                and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6
+            if not (bool(candidate) and not narration_mod.ends_unfinished(candidate)
+                    and after.score < review.score
+                    and not ({f.kind for f in after.findings} - was)
+                    and narration_mod.actions_kept(text, candidate, cast_names) >= 0.6):
+                return False
+            if ctx is None:
+                return True
+            if "draft" not in checked:
+                checked["draft"] = _check_kinds(text)
+            return not (_check_kinds(candidate) - checked["draft"])
 
         if _accept(fixed):
             return fixed, made + review.as_log(), attempts
@@ -2859,9 +3098,15 @@ class GMAgent:
                      self.prose_key)]
         spare = modelcfg.for_role("fallback") or {}
         if spare.get("model") and spare["model"] != self.prose_model:
-            schedule.append((spare["model"], spare.get("host", self.prose_host),
-                             spare.get("provider", "ollama"),
-                             spare.get("api_key", "")))
+            # Not handed a beat it cannot write because it was never pulled (item 18;
+            # the same check as the plan's schedule).
+            spare_host = spare.get("host", self.prose_host)
+            spare_provider = spare.get("provider", "ollama")
+            if client.has_model(spare["model"], spare_host, spare_provider) is False:
+                client.say_missing_once(spare["model"], spare_host, role="fallback")
+            else:
+                schedule.append((spare["model"], spare_host, spare_provider,
+                                 spare.get("api_key", "")))
 
         attempts: list[Attempt] = []
         text, reply = "", None

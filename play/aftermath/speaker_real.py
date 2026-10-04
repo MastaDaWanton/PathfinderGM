@@ -1,394 +1,97 @@
-"""A speaker the prose introduced, who spoke to the player, is made real (item 20.4).
+"""Every quoted line of the beat is booked to who said it — as the beat reader read it.
 
-Measured on the Bobby playtest, 2026-09-28, turn 9: in the woods "a man in a stained
-leather jerkin" sharpened a skinning knife and spoke three lines to the player — "The road
-to Grotburrow isn't for the faint of heart", "You looking for a shortcut, or just lost?".
-The prose call tagged them to `new1`, a ref nobody held: `speech-tags` logged
-`unknown_refs: ["new1"]`, 3 lines, 0 attributed. The man existed as a population record
-only; nobody was hailed, no conversation opened, and he became an actor (c8) one turn
-later, only because the player turned to him.
+Measured before this, each on the owner's or a playtest's save:
 
-The owner's ruling (Q5, 2026-09-28): a speaker addressing the player gets a body through
-the arrival door — but only when matched to the record this beat wrote. So, before the
-hails are read (the "people" stage runs just before `hailed_by`):
+  * Bobby, 2026-09-28, turn 9: "a man in a stained leather jerkin" spoke three lines to the
+    player, tagged to `new1`, a ref nobody held — 3 lines, 0 attributed, nobody hailed;
+  * the Phase-2 live gate, 2026-09-29: "a man in a stained leather apron" spoke twice with
+    no tags at all, and the conversation log stayed empty;
+  * the 2026-09-30 playtest (item 1): 6 of 43 real NPC lines missing from the log, the
+    page having said who spoke ("'…,' the cage owner says");
+  * the owner's save, 2026-10-03 (item 15): six beats of "the man" tagged to the servant
+    carrying jugs, and the player's own line ("'…,' you say") booked to the clerk.
 
-  * the lines whose tag named nobody here (`who` empty, the claim kept in `was`), and to
-    the player (`to` "you", or no `to` with "you" in the words);
-  * the people this beat recorded at the party's spot with no body yet, whose words the
-    page uses (`checks._people.names_person`) — PDNC's lesson (Vishnubhotla et al. 2023):
-    attribution restricted to people already resolved went from 0.40 to 0.62;
-  * exactly one such person, one claimed speaker: they walk on through the one door
-    (`judgement.embody` → `Scene.arrive`, a square with it — the item-14 ruling), wearing
-    the face their record rolled, and the lines are re-tagged to them (`"made": ref`).
+Each was answered with a rule over the page — a clause pattern, a carry-on from the line
+before, the nearest person described before a pronoun, a gender check — in `_Room`,
+`_whose`, `_speaker` and `_from_the_page` here, `doubt_tags` and `hailed_by`'s untagged
+half in `gm/judgement.py`. Every one of them was a reading of English in code, and every
+new phrasing needed one more (docs/beat-reader.md). They are gone. The reader answers,
+for each line, who says it — a ref present, "you", or a newcomer the same reading made —
+from a closed list (Michel et al. 2024 measured an LLM given the character list at 89-91%
+on PDNC novels; the pipeline tools with candidates restricted, 62%).
 
-**And the lines nobody tagged at all** (the Phase-2 live gate, G2, 2026-09-29, gemma-4-12B
-in Halhollow): a beat brought on "a man in a stained leather apron" who said "'That's a
-long way to sit and watch a man work,' he says… 'You looking for something specific, or
-just waiting for the world to start?'" — `speech-tags {tagged: 0, lines: 2}`, `mentions
-{unknown: 2}`, the scene's people stayed pc, c1, c2, and the conversation log stayed empty.
-The path above never saw him: it starts from a tag, and tagging is all or nothing per
-beat (4 of 8 beats tagged, 2026-09-25). So the page is read the way the tagless tradition
-reads it — the quote-attribution cues of He et al. 2013 and Muzny et al. 2017, in their
-cheapest code form, over `checks._people.spans_in_context`:
+This step books what the reader said, through the two changes the "people" stage may make
+to `said` (`play.aftermath._said_kept`):
 
-  1. an explicit clause beside the line — "…,' he says", "…,' the woman adds", "says the
-     carter", "The carter turns and asks, '…";
-  2. else the speaker of the line before it in the same paragraph, when this one has no
-     clause (a speech run on after "he says, nodding at the lock-keeper.");
-  3. else the one person the sentence before names.
+  * a record whose `who` is empty (a tag naming nobody here, or a tag the reader
+    contradicted — `beat_reader.reconcile_tags`, run where `doubt_tags` ran) is given the
+    reader's speaker, with `"made"`;
+  * a line with no record at all gains one, `"from": "page"` (and `"made"` when the speaker
+    is a newcomer this beat made a body for: `seen_people`, ORDER 10, ran first).
 
-A pronoun is carried to the nearest person described before it in the narration. The
-answer must be one of THIS beat's population records at the party's spot with no body —
-the Q5 limit — and each of these refuses rather than guesses:
-
-  * a pronoun with nobody described before it ("…,' he says" and no man anywhere) makes
-    nobody: a body out of a bare "he" is the phantom this project keeps paying for;
-  * a person already on the board — by the words of their name, or by the attribution's
-    own answer — is attribution, not embodiment: `hailed_by`'s guess has them;
-  * a pronoun whose gender the nearest person contradicts ("she says" after "a man")
-    makes nobody;
-  * a person none of whose lines addresses the player makes nobody (the ruling is about
-    being spoken TO); one who did is given every line of theirs in the beat;
-  * one body per record per beat, however many lines and descriptions.
-
-A line so resolved gains a record in `said` (`"made": ref, "from": "page"`), the one
-addition the "people" stage may make (`play.aftermath._said_kept`), so `hailed_by` reads a
-hail from it and the "beat" stage's conversation log keeps the lines.
-
-Anything less certain changes nothing and says why in a row. In a fight the prose makes
-no bodies at all (`GMAgent._undeclared_arrivals` rewrites the newcomer out), so this step
-stands aside.
+A line the reader gave to the player's character, or to nobody, books nobody. A newcomer
+who spoke but was given no body (in a fight, or over the cap) books nobody either, and the
+row says so. No reading books nothing beyond the prose call's own tags.
 """
 from __future__ import annotations
 
-import re
-
 STAGE = "people"
-ORDER = 10
+ORDER = 20
+# The opening too: its lines are read by the reader in `aftermath.after_opening`.
 DOORS = frozenset({"turn", "carry_on", "opening"})
-
-_YOU = re.compile(r"\b(?:you|your|you're|you've|you'll|yours|yourself)\b", re.I)
-
-
-def _to_the_player(rec: dict) -> bool:
-    to = str(rec.get("to") or "")
-    return to == "you" or (not to and bool(_YOU.search(str(rec.get("line") or ""))))
 
 
 def step(ctx) -> list[dict]:
-    rows = _from_tags(ctx)
-    return rows + _from_the_page(ctx)
+    from gm import beat_reader, speech
 
-
-def _from_tags(ctx) -> list[dict]:
-    """The lines the prose call tagged to a ref nobody held (the Bobby turn 9 path)."""
-    scene = ctx.scene
-    lines = [r for r in (ctx.said or []) if not r.get("who") and _to_the_player(r)]
-    if not lines:
+    reading = ctx.attribution
+    if not isinstance(reading, beat_reader.Reading) or not reading.read:
+        if isinstance(reading, beat_reader.Reading) and reading.asked and reading.lines:
+            return [reading.unread_row("speaker_real")]
         return []
-    if getattr(scene, "in_encounter", False):
-        return [{"kind": "speaker-real", "made": "", "lines": len(lines),
-                 "why": "in a fight the prose brings nobody in"}]
-    claimed = {str(r.get("was") or "") for r in lines}
-    if len(claimed) != 1:
-        return [{"kind": "speaker-real", "made": "", "lines": len(lines),
-                 "why": f"lines claimed for {len(claimed)} different speakers"}]
-    from gm.checks._people import names_person
-    from gm.narration import unquoted
-
-    narration = unquoted(ctx.text)
-    here = getattr(scene, "at", None)
-    held = set(getattr(scene, "actors", {}) or {})
-    candidates = [rec for rec in (getattr(scene, "population", None) or {}).values()
-                  if rec.get("spot") == here
-                  and not (rec.get("ref") and rec["ref"] in held)
-                  and names_person(narration, str(rec.get("phrase") or ""))]
-    # One person, however many phrases the page recorded them under: two records whose
-    # head words agree ("man in a stained leather jerkin", "man with the whetstone") are
-    # the same man described twice; two different heads are two people.
-    from gm.checks._people import head_of
-
-    heads = {head_of(str(r.get("phrase") or "")) for r in candidates}
-    if len(heads) != 1:
-        return [{"kind": "speaker-real", "made": "", "lines": len(lines),
-                 "why": f"{len(candidates)} people this beat could mean"}]
-    rec = min(candidates, key=lambda r: int(re.sub(r"\D", "", str(r.get("id"))) or 0))
-    actor = _embody(ctx, rec)
-    for r in lines:
-        r["who"] = actor.ref
-        r["made"] = actor.ref
-    return [{"kind": "speaker-real", "made": actor.ref, "phrase": rec["phrase"],
-             "record": rec.get("id", ""), "lines": len(lines),
-             "square": list(scene.positions.get(actor.ref) or [])
-             if getattr(scene, "positions", None) else []}]
-
-
-def _embody(ctx, rec: dict):
-    """Through the one door (`judgement.embody` → `population.embody` → `Scene.add`, a
-    square with it), wearing the face the record rolled; onto the ledger with its ref."""
-    from gm import judgement
-
-    scene = ctx.scene
-    actor = judgement.embody(scene, str(rec["phrase"]), world=ctx.world, rec=rec)
-    if not any(e.get("ref") == actor.ref for e in getattr(scene, "cast", []) or []):
-        scene.cast.append({"who": rec["phrase"], "turn": int(rec.get("turn", 0) or 0),
-                           "ref": actor.ref})
-    return actor
-
-
-# --- the lines nobody tagged ------------------------------------------------------------------
-
-# The clause patterns live in `gm.checks._quotes`, shared with the sentence repair and the
-# cut-only backstops of keeper-forward and master-approaches (item 12, 2026-09-30): the
-# repair has to find the same "…,' he says" this attribution reads, or it cuts the quote
-# and leaves the clause claiming somebody said it.
-from gm.checks._quotes import clause as _shared_clause  # noqa: E402
-
-
-def _clause(blank: str, qa: int, qb: int) -> str:
-    """The subject of the speech clause beside the quotation at [qa, qb), or ""."""
-    return _shared_clause(blank, qa, qb)
-
-
-def _words_re(words) -> re.Pattern | None:
-    words = sorted({w for w in words if w}, key=len, reverse=True)
-    if not words:
-        return None
-    return re.compile(r"\b(?:" + "|".join(re.escape(w) for w in words) + r")(?:s|es)?\b",
-                      re.I)
-
-
-class _Room:
-    """Who the narration can mean: this beat's bodiless records here, and the board."""
-
-    def __init__(self, ctx, narration: str):
-        from gm.checks._people import head_of, name_words
-        from rules import population
-
-        scene = ctx.scene
-        here = getattr(scene, "at", None)
-        held = set(getattr(scene, "actors", {}) or {})
-        low = " ".join(narration.lower().split())
-        # This beat's records (Q5): at the party's spot, no body, and described by the
-        # words they were recorded under somewhere in this beat's narration.
-        self.records = [
-            rec for rec in (getattr(scene, "population", None) or {}).values()
-            if rec.get("spot") == here and not (rec.get("ref") and rec["ref"] in held)
-            and population._norm(rec.get("phrase", ""))
-            and population._norm(rec.get("phrase", "")) in population._norm(low)]
-        self.head = {rec["id"]: head_of(str(rec.get("phrase") or "")).lower()
-                     for rec in self.records}
-        self.board: dict[str, set[str]] = {}
-        for ref, a in (getattr(scene, "actors", {}) or {}).items():
-            if getattr(a, "is_pc", False):
-                continue
-            words = set(name_words(str(a.name or "")))
-            words |= set(name_words(str(getattr(a, "true_name", "") or "")))
-            self.board[ref] = {w.lower() for w in words}
-        self.att = getattr(ctx, "attribution", None)
-
-    def by_head(self, head: str) -> tuple[list[dict], list[str]]:
-        head = head.lower()
-        recs = [r for r in self.records if self.head[r["id"]] == head]
-        board = [ref for ref, words in self.board.items() if head in words]
-        return recs, board
-
-    def mentions(self, narration: str) -> list[tuple[int, int, str, str]]:
-        """(start, end, "record"|"board"|"other", id) for every person the narration
-        names, the longest words winning where two overlap."""
-        from gm.checks._people import _PERSON
-        from gm import speech
-
-        found: list[tuple[int, int, str, str]] = []
-        for rec in self.records:
-            words = [re.escape(w) for w in re.findall(r"[a-z']+", str(rec["phrase"]).lower())]
-            if words:
-                pat = re.compile(r"\b" + r"[\s,-]+".join(words) + r"\b", re.I)
-                found += [(m.start(), m.end(), "record", rec["id"])
-                          for m in pat.finditer(narration)]
-        for ref, words in self.board.items():
-            pat = _words_re(words)
-            if pat:
-                found += [(m.start(), m.end(), "board", ref) for m in pat.finditer(narration)]
-        # Anybody else the narration describes — with a determiner, the way the
-        # attribution's own finder reads a description (`mentions.find`): "wiping his
-        # hands on a rag" is a body part, and `_PERSON` holds "hand" for the farmhand.
-        heads = set(_PERSON) - set(speech._COLLECTIVE)
-        alt = "|".join(sorted((re.escape(h) for h in heads), key=len, reverse=True))
-        pat = re.compile(r"\b(?:the|a|an|this|that|another|one)\s+(?:[a-z'’]+[\s-]+){0,3}?"
-                         r"(?P<head>" + alt + r")\b(?!-)", re.I)
-        for m in pat.finditer(narration):
-            found.append((m.start("head"), m.end("head"), "other", m.group("head").lower()))
-        # Longest first at each place; drop what a longer match already covers.
-        found.sort(key=lambda f: (f[0], -(f[1] - f[0])))
-        kept: list[tuple[int, int, str, str]] = []
-        for f in found:
-            if kept and f[0] < kept[-1][1]:
-                continue
-            kept.append(f)
-        return kept
-
-    def settle(self, kind: str, ident: str) -> tuple[str, str]:
-        """A mention as ("record", id) | ("board", ref) | ("", why)."""
-        if kind in ("record", "board"):
-            return kind, ident
-        recs, board = self.by_head(ident)
-        if board:
-            return "board", board[0]
-        if len(recs) == 1:
-            return "record", recs[0]["id"]
-        if recs:
-            return "", f"{len(recs)} people here are a {ident}"
-        return "", f"the {ident} is nobody this beat recorded"
-
-
-def _gender_of(word: str) -> str:
-    from gm import speech
-
-    word = word.lower()
-    return "f" if word in speech._FEMALE else "m" if word in speech._MALE else ""
-
-
-def _speaker(room: _Room, blank: str, subj: str, qa: int) -> tuple[str, str]:
-    """Who a clause's subject is: ("record", id) | ("board", ref) | ("", why)."""
-    from gm.checks._people import head_of
-
-    words = subj.split()
-    if words and words[0].lower() in ("he", "she", "they") and len(words) == 1:
-        before = room.mentions(blank[:qa])
-        if not before:
-            return "", f"'{subj}' with nobody described before it"
-        kind, ident = before[-1][2], before[-1][3]
-        settled = room.settle(kind, ident)
-        if settled[0] == "record":
-            rec = next(r for r in room.records if r["id"] == settled[1])
-            said = {"he": "m", "she": "f"}.get(words[0].lower(), "")
-            has = _gender_of(room.head[rec["id"]])
-            if said and has and said != has:
-                return "", f"'{subj}' after a {room.head[rec['id']]}"
-        return settled
-    # A description. The record whose words it holds; else its head word.
-    low = " ".join(subj.lower().split())
-    for rec in room.records:
-        from rules import population
-
-        if population._norm(rec["phrase"]) in population._norm(low):
-            return "record", rec["id"]
-    head = head_of(subj).lower()
-    if not head or " " in head:
-        return "", f"'{subj}' is not a description of a person"
-    return room.settle("other", head)
-
-
-def _from_the_page(ctx) -> list[dict]:
-    """The untagged lines, attributed by the three rules of the module docstring.
-
-    **A line attributed to somebody on the board is booked as theirs** (2026-09-30
-    playtest, item 1): 37 of 43 real NPC lines reached the conversation log, and of the 6
-    that did not, the page had already said who spoke — "'…,' the cage owner says" at the
-    opening, "They lean in slightly… 'He's still with us…'" at beat 3, the guard running
-    on after his tagged "A brothel, eh?" at beat 49. The rules found them, then wrote
-    only a miss row ("on the board: attribution, not a body") and no `said` record, and
-    returned early before reading any beat whose lines held no "you". So a ("board",
-    ref) answer appends `{"who": ref, "to": …, "line": …, "from": "page"}` — with no
-    "you" gate and in a fight too, because what somebody said is what they said. The Q5
-    limits stay on MAKING a body (owner's ruling A1): only a line to the player, out of
-    a fight, embodies a record.
-
-    Rule 2 now carries the speaker of a TAGGED line before as well (beat 49's run-on),
-    and rule 3 carries a sentence-initial He/She/They through `_speaker`'s nearest
-    mention (beat 3's "They lean in slightly"): Muzny et al. 2017's sieve order, where
-    the conversation-run and the pronoun-subject sieves come after the explicit clause."""
-    from gm import speech
-
-    scene = ctx.scene
-    text = str(ctx.text or "")
     said = ctx.said if isinstance(ctx.said, list) else []
-    fighting = bool(getattr(scene, "in_encounter", False))
-    # Every quotation in order, the tagged ones included, so rule 2 can carry a tag on:
-    # (qa, qb, line, tagged ref or None).
-    every = []
-    for qa, qb in speech.spans(text):
-        line = text[qa + 1:qb - 1] if qb - qa >= 2 else ""
-        if not line.strip():
-            continue
-        rec = speech.speaker(said, line)
-        every.append((qa, qb, line,
-                      str(rec.get("who") or "") if rec is not None else None))
-    quotes = [(qa, qb, line) for qa, qb, line, tag in every if tag is None]
-    if not quotes:
-        return []
-    blank = speech.blanked(text)
-    room = _Room(ctx, speech.unquoted(text))
-    # 1-3 of the docstring: each untagged line's speaker, as ("record", id) |
-    # ("board", ref) | ("", why).
-    whose: list[tuple[str, str]] = []
-    prev: tuple[int, tuple[str, str]] | None = None     # (end of the line before, whose)
-    for qa, qb, line, tag in every:
-        if tag is not None:
-            prev = (qb, ("board", tag) if tag in room.board else ("", "tagged"))
-            continue
-        w = _whose(room, blank, text, qa, qb, prev)
-        whose.append(w)
-        prev = (qb, w)
-    rows: list[dict] = []
-    misses: dict[str, int] = {}
-    made: dict[str, object] = {}
-    for rid in dict.fromkeys(ident for kind, ident in whose if kind == "record"):
-        mine = [q for q, w in zip(quotes, whose) if w == ("record", rid)]
-        if fighting or not any(_YOU.search(line) for _qa, _qb, line in mine):
-            continue            # the fight's rule; or spoke, but not to the player
-        rec = next(r for r in room.records if r["id"] == rid)
-        actor = _embody(ctx, rec)
-        made[rid] = actor
-        for _qa, _qb, line in mine:
-            said.append({"who": actor.ref, "to": "you", "line": line.strip(),
-                         "made": actor.ref, "from": "page"})
-        rows.append({"kind": "speaker-real", "made": actor.ref, "phrase": rec["phrase"],
-                     "record": rid, "lines": len(mine), "untagged": len(mine),
-                     "square": list(scene.positions.get(actor.ref) or [])
-                     if getattr(scene, "positions", None) else []})
+    actors = getattr(ctx.scene, "actors", {}) or {}
     booked: dict[str, int] = {}
-    for (qa, qb, line), (kind, ident) in zip(quotes, whose):
-        if kind == "board":
-            said.append({"who": ident, "to": "you" if _YOU.search(line) else "",
-                         "line": line.strip(), "from": "page"})
-            booked[ident] = booked.get(ident, 0) + 1
+    filled: dict[str, int] = {}
+    misses: dict[str, int] = {}
+    for ln in reading.lines:
+        who = _person(reading, ln.speaker(reading))
+        if not who or who == beat_reader.YOU or who not in actors \
+                or getattr(actors[who], "is_pc", False):
+            if ln.by and ln.by not in (beat_reader.YOU, beat_reader.NOBODY) and not who:
+                misses["a newcomer with no body"] = misses.get("a newcomer with no body", 0) + 1
             continue
-        if not _YOU.search(line) or (kind == "record" and ident in made):
+        to = _person(reading, str(ln.to or ""))
+        to = "you" if to in (beat_reader.YOU, "pc") else (to if to in actors else "")
+        rec = speech.speaker(said, ln.words)
+        if rec is not None:
+            if not rec.get("who"):
+                rec["who"] = who
+                rec["made"] = who
+                filled[who] = filled.get(who, 0) + 1
             continue
-        why = ("in a fight the prose brings nobody in" if fighting and kind == "record"
-               else ident if not kind else "")
-        if why:
-            misses[why] = misses.get(why, 0) + 1
-    rows += [{"kind": "speaker-real", "made": "", "booked": ref, "lines": n,
-              "why": "on the board: the line is theirs, attribution, not a body"}
-             for ref, n in booked.items()]
-    rows += [{"kind": "speaker-real", "made": "", "untagged": n, "why": why}
+        new = {"who": who, "to": to, "line": ln.words, "from": "page"}
+        if any(n.ref == who for n in reading.newcomers):
+            new["made"] = who
+        said.append(new)
+        booked[who] = booked.get(who, 0) + 1
+    rows = [{"kind": "speaker-read", "booked": ref, "lines": n} for ref, n in booked.items()]
+    rows += [{"kind": "speaker-read", "filled": ref, "lines": n} for ref, n in filled.items()]
+    rows += [{"kind": "speaker-read", "booked": "", "lines": n, "why": why}
              for why, n in misses.items()]
     return rows
 
 
-def _whose(room: _Room, blank: str, text: str, qa: int, qb: int,
-           prev: tuple[int, tuple[str, str]] | None) -> tuple[str, str]:
-    """One untagged line's speaker, by rules 1-3 of the module docstring."""
-    subj = _clause(blank, qa, qb)
-    if subj:
-        return _speaker(room, blank, subj, qa)
-    # 2: the line before in the same paragraph, tagged or not, when it had a speaker.
-    if prev is not None and prev[1][0] and "\n\n" not in text[prev[0]:qa]:
-        return prev[1]
-    # 3: the sentence before, alone — exactly one person named in it; or, naming nobody,
-    # opened by a He/She/They that carries the nearest person described before it.
-    head = blank[:qa].rstrip()
-    cut = max(head[:-1].rfind("."), head[:-1].rfind("!"), head[:-1].rfind("?"),
-              head[:-1].rfind("\n"))
-    sentence = blank[cut + 1:qa]
-    named = room.mentions(sentence)
-    settled = {room.settle(k, ident) for _a, _b, k, ident in named}
-    if len(settled) == 1 and next(iter(settled))[0]:
-        return next(iter(settled))
-    lead = re.match(r"\s*(He|She|They)\b", sentence)
-    if not named and lead:
-        return _speaker(room, blank, lead.group(1), cut + 1 + lead.start(1))
-    return "", "no speaker named beside the line"
+def _person(reading, who: str) -> str:
+    """A ref, "you", or "" — a newcomer's root mention id is their body's ref, if made."""
+    if not who:
+        return ""
+    if who in reading.refs or who == "you" or any(n.ref == who for n in reading.newcomers):
+        return who
+    n = reading.newcomer(who)
+    if n is not None:
+        return n.ref
+    m = reading.mention(who)
+    if m is not None:
+        return _person(reading, reading.person_of(m))
+    return ""

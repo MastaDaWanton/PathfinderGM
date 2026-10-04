@@ -286,16 +286,81 @@ class Review:
 # `who`: two people introduced are two turns. Measured live 2026-09-25: the introduce net
 # writes the same `because` every time, so a baker introduced after a guide read as "the
 # same thing as last turn", was refused five times, and the turn was lost.
-_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone", "who")
+# `to`, and the words of a `say` (the last element of each row): a conversation turn is
+# `narrate_only` + `say` every time, legitimately, so with only the op, the `because`
+# ("the player said it") and these params compared, every talk turn read as the turn
+# before it. Measured 2026-10-03 (docs/playtest-2026-10-03.md item 17): "about the docks"
+# then "I ask him who the master of the docks is", both `say` to c4, refused five times
+# running (76 s), and "Is there anything I can do to earn some coin?" five times (85 s);
+# both turns were then lost. Tool-loop detectors learned the same thing: matching on the
+# call alone stopped legitimate edit-and-rerun loops, and "same call, different result is
+# progress" was the fix (docs/turn-pipeline-2026-10-03.md).
+_IDENTIFYING = ("skill", "manoeuvre", "template", "save", "condition", "zone", "who", "to")
+
+
+def _words_of(text) -> str:
+    """Speech compared by its words: case, punctuation and spacing are not new words."""
+    return " ".join(re.findall(r"[a-z0-9']+", str(text or "").lower().replace("’", "'")))
 
 
 def _signature(intents) -> list[tuple]:
     """What a turn's intents amount to, for comparing one turn against the last."""
     return [
         (i.op, i.actor, str(i.target), (i.because or "").strip().lower(),
-         tuple(str(i.params.get(k, "")).lower() for k in _IDENTIFYING))
+         tuple(str(i.params.get(k, "")).lower() for k in _IDENTIFYING),
+         _words_of(i.params.get("words", "")) if i.op == "say" else "")
         for i in intents
     ]
+
+
+def _frozen(value):
+    """Lists to tuples, all the way down: a signature read back from a save is JSON, and
+    `["", ""] != ("", "")`, so a reloaded campaign's previous turn never compared equal."""
+    if isinstance(value, (list, tuple)):
+        return tuple(_frozen(v) for v in value)
+    return value
+
+
+# Ops that resolve nothing the dice or the books would remember. A plan made only of
+# these, proposed twice, is two quiet turns at worst — accepting it costs the player
+# nothing, where refusing it again costs them the turn (`GMAgent.plan_turn`).
+QUIET_OPS = frozenset({"narrate_only", "say"})
+
+
+def is_quiet(intents) -> bool:
+    return all(getattr(i, "op", "") in QUIET_OPS for i in intents or ())
+
+
+def _says_the_players_words(intents, player_text: str) -> bool:
+    """Every `say` in the plan carries words the player wrote THIS turn, and nothing but
+    talk is in it. Then the plan has read the player, whatever the last turn was: a player
+    who says the same thing twice is answered the same way twice, on purpose."""
+    said = [i for i in intents if i.op == "say"]
+    if not said or not is_quiet(intents):
+        return False
+    line = _words_of(player_text)
+    return all(_words_of(i.params.get("words", "")) and
+               _words_of(i.params.get("words", "")) in line for i in said)
+
+
+def _does_what_was_declared(intents, player_text: str) -> bool:
+    """Every op in the plan that does something is one the player's own words declared
+    THIS turn, by the reading (`interpret._OP_NEEDS`). Then a repeat of last turn's plan
+    is the player asking again, not the planner failing to read them.
+
+    Measured live on the 2026-10-03 batch: the smith's counter was shut, the sale of the
+    crate was refused, and the player asked again — "I offer the smith the crate and
+    agree to sell it to him for whatever it is worth". The planner's `sell crate to c13`
+    was exactly last turn's, which is exactly right; the guard refused it twice, the turn
+    degraded to narration, and the engine never got to say why the sale could not happen.
+    """
+    from . import interpret
+
+    frame = interpret.reading_of(player_text) or {}
+    acts = {str(a.get("act") or "") for a in frame.get("actions") or [] if isinstance(a, dict)}
+    need = dict(interpret._OP_NEEDS, give={"give", "take"}, buy={"buy"})
+    loud = [i for i in intents if i.op not in QUIET_OPS]
+    return bool(loud) and all(need.get(i.op, set()) & acts for i in loud)
 
 
 def review(player_text: str, intents, scene=None, previous=None) -> Review:
@@ -317,8 +382,13 @@ def review(player_text: str, intents, scene=None, previous=None) -> Review:
     #    politely declined a trainer and the GM's "same" turn was the same *nothing*.
     #    Rolling the same check again is the GM not reading; saying nothing twice is
     #    just two quiet turns.
-    if (previous and _signature(intents) == list(previous)
-            and any(i.op != "narrate_only" for i in intents)):
+    #    And not when the plan's only content is the player's own words of this turn
+    #    (`_says_the_players_words`): that is the plan reading them, the opposite of the
+    #    failure this guards against.
+    if (previous and _frozen(_signature(intents)) == _frozen(list(previous))
+            and any(i.op != "narrate_only" for i in intents)
+            and not _says_the_players_words(intents, text)
+            and not _does_what_was_declared(intents, text)):
         out.objections.append(Finding(
             "repeats-the-last-turn",
             f"you have proposed exactly the same thing as last turn, but the player "
@@ -2200,9 +2270,6 @@ def inject_survival(raw_intents, player_text: str, scene) -> list:
 _ACQUIRES = re.compile(
     r"\bi\s+(?:take|takes|pick(?:\s+up)?|buy|buys|purchase|purchases|grab|grabs"
     r"|pocket|pockets|accept|accepts|collect|collects|claim|claims)\b", re.I)
-_HANDS_OVER = re.compile(
-    r"\bi\s+(?:give|gives|hand(?:\s+over)?|hands|pay|pays|drop|drops|sell|sells"
-    r"|offer|offers|leave behind)\b", re.I)
 # What was taken: the noun phrase after the verb, stopped at a clause boundary. Small
 # and greedy-free on purpose — a whole sentence is not an item.
 _THING = re.compile(
@@ -2233,8 +2300,14 @@ initiative action reaction move measure account stance grip liberty leave offenc
 umbrage pride solace revenge vengeance revenge stock example lesson point issue matter
 scene action satisfaction job patience services service pleasure attention silence
 fight fistfight brawl quarrel argument feud duel dispute grudge
+brunt wink smile nod grin shrug glare wave salute kiss hug laugh hint nudge hand thanks
+compliment regards greeting apology promise warning signal gesture try go
 on off up in out over under away back down
 """.split())
+# "brunt" and the faces: measured 2026-10-03. "I take the brunt of the weight and move it"
+# put an item called "brunt of the weight" in the pack (and the player later dropped it
+# on a smithy floor), and "I give a friendly wink" planned a `give` of "friendly wink"
+# whose refusal reached the narrator and the ledger. A wink is given; it is not handed.
 # "fight" and its kin: "I pick a fight with the biggest man in the room" put a "fight" in
 # the goods on every recorded turn that sentence resolved — four in the committed fight
 # recordings (2026-09-25), one in the 2026-09-27 audit ("Kesst Vayr takes fight.").
@@ -2273,216 +2346,120 @@ def _is_a_thing(item: str) -> bool:
 
     The head noun is the one that decides — "the offer of a room" is an offer, and
     "a leather satchel" is a satchel. Read from the end, because English puts the head
-    last: adjectives pile up in front of it.
+    last: adjectives pile up in front of it — except before "of", where it comes
+    first (`holding.head_of`). Read from the end, "the brunt of the weight" was a
+    weight and became an item on 2026-10-03; "the offer of a room" this docstring
+    always called an offer was a room. A word that only measures ("a chunk of wood")
+    still hands the head to what follows it.
     """
+    from rules import holding
+
     words = [w for w in str(item or "").lower().replace("-", " ").split() if w]
     if not words:
         return False
-    head = words[-1]
+    head = holding.head_of(" ".join(words)) or words[-1]
     if head.endswith("s") and head[:-1] in _NOT_A_THING:
         return False
     return head not in _NOT_A_THING
 
 
-def inject_goods(raw_intents, player_text: str, scene) -> list:
-    """Make a declared purchase or pick-up reach the engine.
-
-    Same shape and the same reason as `inject_survival`. Fifty-four turns of one live
-    game produced fifty-four `narrate_only` and a single `check`: the GM narrated a
-    pouch of crystals, a room paid for and a key handed over, and not one of them
-    existed anywhere the engine could see. An inventory nothing ever writes to is a
-    field on a sheet, not a game.
-
-    Conservative in the same way: a question is not a purchase, and only the player's
-    own declaration counts — what the GM says is lying on the table is not something
-    the player picked up.
-    """
-    if not isinstance(raw_intents, list) or not player_text or scene is None:
-        return raw_intents
-    if "?" in player_text:
-        return raw_intents
-    # The Continue directive is not the player's sentence: "I take no action. Carry
-    # the scene on" put "scene on" into the goods three times (2026-09-18).
-    if re.match(r"\s*I take no action\b", player_text, re.I):
-        return raw_intents
-    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
-    # `sell` too, and that is not symmetry for its own sake. "I sell the Yarow Elixir"
-    # matches `_HANDS_OVER`, so this fired first and wrote a `give` — the elixir left the
-    # satchel for nothing, and `inject_sale` then bowed out because a `give` was already
-    # present. A declared sale paid the player zero gold for as long as the order was the
-    # other way round, and the whole trade feature was invisible behind it.
-    if present & {"sell"}:
-        return raw_intents
-
-    pc = scene.pc()
-    if pc is None:
-        return raw_intents
-    # One acquisition per DIRECTION, not one per turn (item 13, 2026-09-30). "I pocket the
-    # coin and give them a piece of paper with my name on it" planned a give of the paper
-    # to the cage owner, and this door bowed out because a `give` was present — so the
-    # lead coin Sam pocketed was never recorded. A give TO the player (or a purchase)
-    # covers what comes in; a give FROM the player covers what goes out; each direction
-    # is filled only where the plan left it empty. A give with neither `to` nor `from_`
-    # is the player's, as `interpret.drop_unread_gifts` reads it.
-    # A purchase covers both: the thing comes in and the price goes out, and "I pay the
-    # merchant for the rope" is the purchase's coin, not a merchant handed over.
-    coming_in = going_out = "buy" in present
-    for r in raw_intents:
-        if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "give"):
-            continue
-        p = r.get("params") or {}
-        to = str(p.get("to") or "").strip().lower()
-        frm = str(p.get("from_") or p.get("from") or "").strip().lower()
-        if to in (pc.ref, "pc", "you", "player") or not (to or frm):
-            coming_in = True
-        else:
-            going_out = True
-    # The reading's rule, at this door too. `interpret.drop_unread_gifts` takes the
-    # plan's own give out when no act of the reading can leave the player holding
-    # anything — and this ran after it and put one straight back: 2026-09-27, "I pick a
-    # fight" was read as an insult, the reading overruled the required `give`, and the
-    # turn still ended "Kesst Vayr takes fight." The detector stays the judge only when
-    # there is no reading.
-    from . import interpret as _interpret
-
-    reads_no_gain = _interpret.gets_nothing(_interpret.reading_of(player_text))
-
-    added: list[dict] = []
-    for pattern, gains in ((_ACQUIRES, True), (_HANDS_OVER, False)):
-        if gains and (reads_no_gain or coming_in):
-            continue
-        if not gains and going_out:
-            continue
-        found = pattern.search(player_text)
-        if not found:
-            continue
-        rest = player_text[found.end():]
-        # "I take in the scene", "I take a moment", "I take cover". The verb is not
-        # acquisition when these follow it, and reading on for a noun phrase is how an
-        # afternoon's reflection became a line in the inventory.
-        if _IDIOM.match(rest):
-            continue
-        if gains and found.group(0).split()[-1].lower() == "pick" \
-                and _PICK_IS_NOT_TAKING.match(rest):
-            continue
-        thing = _OBJECT.match(rest)
-        if not thing:
-            continue
-        item = " ".join(thing.group(1).split()).strip(" -'")
-        if not item or len(item) < 3:
-            continue
-        # And the noun itself has to be something a satchel could hold.
-        if not _is_a_thing(item):
-            continue
-        params = {"item": item}
-        if gains:
-            params["to"] = pc.ref
-        else:
-            params["from_"] = pc.ref
-        added.append({
-            "op": "give", "params": params,
-            "because": f"the player said they {'took' if gains else 'handed over'} it",
-        })
-    return list(raw_intents) + added if added else raw_intents
-
-
-# --- selling something -----------------------------------------------------------------
-#
-# The ninth of these, and the reason is the usual one: the op exists, the prompt carries
-# it, and the model does not emit it. Measured before the op existed at all — a whole
-# haggle over a satchel of tinctures, four turns, every one of them `narrate_only`.
-#
-# Deliberately narrower than `inject_goods`. That one reads a noun phrase out of the
-# sentence; this one does not have to, because what is being sold has to be something the
-# character is actually carrying — so the *satchel* is the vocabulary, and a name that
-# does not match a jar on the shelf is not a sale.
 # --- Coin by amount, out of the purse ------------------------------------------------------
+#
+# The player's own "I pay her ten gold" is the reading's now: a `give` whose object is an
+# amount, built by `acts_to_ops` (`coin_amount`: a number and a denomination). What is left
+# here is the plan's half — the model's own coin op, whatever shape it took, straightened
+# into a give of a denomination. The regex that read "I pay|give|hand|toss … <n> gold" out
+# of the sentence (`_PAYS`) retired with the rest of the sentence readers, 2026-10-03
+# (docs/structured-turn.md).
 
-_NUMBERS = {"one": 1, "a": 1, "an": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-            "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
-            "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40,
-            "fifty": 50, "hundred": 100}
-_PAYS = re.compile(
-    r"\bI\s+(?:pay|pays|give|gives|hand|hands|toss|tosses|slide|slides|throw|throws|"
-    r"leave|leaves|offer|offers|put down|drop|drops|count out)\s+(?:(?:him|her|them|"
-    r"the\s+\w+|\w+)\s+)?(?:over\s+)?"
-    r"(\d+|" + "|".join(_NUMBERS) + r")\s+(gold|gp|silver|sp|copper|cp|platinum|pp|coins?)"
-    r"(?:\s+(?:pieces?|coins?))?\b", re.I)
 _COIN_ITEM = re.compile(r"(?:^|_|\b)(gold|silver|copper|platinum|gp|sp|cp|pp|coins?)(?:_|\b)",
                         re.I)
 
 
 def inject_payment(raw_intents, player_text: str, scene) -> list:
-    """Coin the player counts out leaves the purse, by amount, to the person paid.
+    """The model's coin op leaves the purse, by amount, as a `give` of a denomination.
 
     Measured in the brothel (2026-09-18): "I pay her ten gold" reached the engine as
     `sell gold_coins_10 to c16` — a sale of a stock item nobody carries — and was refused
     ("Masta is not carrying gold_coins_10") while the prose took the coin. The purse
     never moved. Money is a `give` of a denomination (`_op_give` already spends it and
-    refuses a purse that cannot cover it); the player's own number is the amount and the
-    addressee is who is paid. A `sell` or `give` the model wrote for coins is turned into
-    the same op rather than left to be refused.
+    refuses a purse that cannot cover it). A `sell` or `give` the model wrote for coins
+    is turned into that op rather than left to be refused; the amount is the item's own
+    number, else the op's count. `player_text` is unread since 2026-10-03: the player's
+    amount is the reading's (`acts_to_ops`), which replaces the model's coin op whole.
     """
-    if not isinstance(raw_intents, list) or scene is None or not player_text:
+    if not isinstance(raw_intents, list) or scene is None:
         return raw_intents
     pc = scene.pc()
     if pc is None:
         return raw_intents
-    text = redact_speech(player_text)
-    m = _PAYS.search(text)
     out: list = []
     changed = False
-    # The model's own coin op, whatever shape it took, becomes the give.
-    said_n = None
-    if m:
-        n = m.group(1).lower()
-        said_n = int(n) if n.isdigit() else _NUMBERS.get(n, 1)
     for raw in raw_intents:
         if isinstance(raw, dict) and str(raw.get("op", "")).lower() in ("sell", "give"):
             params = dict(raw.get("params") or {})
             item = str(params.get("item") or "")
             coin = _COIN_ITEM.search(item)
             bare_denom = re.fullmatch(r"(?i)gp|sp|cp|pp", item.strip())
-            if coin and (str(raw.get("op", "")).lower() == "sell" or not bare_denom):
-                # "gold_coins_10", "10 gold", "gold coins": the amount is the
-                # player's own number first, then the item's, then the op's count.
+            # Coin coming IN is not a payment. Measured 2026-10-03: "I transfer the
+            # coins from the pouch into my coin purse" carried the model's coin give,
+            # and this rewrote it as `give gp 1 from pc` — the coins would have left the
+            # purse they were going into ("Kesst Vayr has no gp to give"). A give to the
+            # player, or one with no direction at all (the player's, as
+            # `interpret.drop_unread_gifts` reads it), stays a gain.
+            to = str(params.get("to") or "").strip().lower()
+            frm = str(params.get("from_") or params.get("from") or "").strip().lower()
+            coming_in = (str(raw.get("op", "")).lower() == "give"
+                         and (to in (pc.ref, "pc", "you", "player") or not (to or frm)))
+            # A give that came from somebody else's hands is theirs to make.
+            theirs = frm not in ("", pc.ref, "pc") and str(raw.get("op", "")).lower() == "give"
+            if coin and not coming_in and not theirs and (
+                    str(raw.get("op", "")).lower() == "sell" or not bare_denom):
+                # "gold_coins_10", "10 gold", "gold coins": the item's own number first,
+                # then the op's count.
                 in_item = re.search(r"\d+", item)
-                count = said_n or (int(in_item.group(0)) if in_item else 0) \
+                count = (int(in_item.group(0)) if in_item else 0) \
                     or int(params.get("count") or 0) or 1
                 word = coin.group(1).lower()
                 denom = {"gold": "gp", "silver": "sp", "copper": "cp",
-                         "platinum": "pp"}.get(word, word if word in ("gp", "sp", "cp", "pp") else "gp")
+                         "platinum": "pp"}.get(word, word if word in ("gp", "sp", "cp", "pp")
+                                               else "gp")
                 params = {"item": denom, "count": max(1, count), "from_": pc.ref}
                 if raw.get("params", {}).get("to") in scene.actors:
                     params["to"] = raw["params"]["to"]
                 raw = {"op": "give", "because": "the player paid in coin", "params": params}
                 changed = True
         out.append(raw)
-    if m is None:
-        return out if changed else raw_intents
-    if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "give"
-           and str((r.get("params") or {}).get("item", "")) in ("gp", "sp", "cp", "pp")
-           for r in out):
-        return out
-    n = m.group(1).lower()
-    count = int(n) if n.isdigit() else _NUMBERS.get(n, 1)
-    word = m.group(2).lower()
-    denom = {"gold": "gp", "silver": "sp", "copper": "cp", "platinum": "pp",
-             "coin": "gp", "coins": "gp"}.get(word, word)
-    # Who is paid: the person the sentence names, else the one the player is
-    # engaged with, else the only other person here.
-    outside = text.lower()
-    to = next((ref for ref, a in scene.actors.items() if not a.is_pc
-               and (str(a.name).split() or [""])[-1].lower() in outside
-               and len((str(a.name).split() or [""])[-1]) > 2), None)
-    if not to:
-        engaged = engaged_refs(scene)
-        others = [r for r, a in scene.actors.items() if not a.is_pc and not a.is_down]
-        to = engaged[0] if len(engaged) == 1 else (others[0] if len(others) == 1 else None)
-    params = {"item": denom, "count": count, "from_": pc.ref}
-    if to:
-        params["to"] = to
-    return out + [{"op": "give", "because": "the player paid in coin", "params": params}]
+    return out if changed else raw_intents
+
+
+def resolve_sold_items(raw_intents, scene) -> list:
+    """Point the plan's `sell` at a jar the character is actually holding.
+
+    The model writes what a person would say — "sweetspire tea" — and the engine wants
+    `sweetspire-tea#1`. Measured in play, the turn after the schema started requiring a
+    `sell`: "sell: Thessaly Corr is not carrying 'sweetspire tea'. They have: beeswax#1,
+    betony-tea#1, ... sweetspire-tea#1, ..." — the thing she was selling sat in that very
+    list. Only exact-ish matches are taken: the id itself, the jar's name, or its base
+    (`acts_to_ops._stock_id`). A sell naming something the satchel has never heard of is
+    left alone, so the engine's own refusal still names what she does have. Structure
+    only: the model's op against the shelf, never the player's sentence (which was
+    `inject_sale`'s, retired 2026-10-03 for the reading's `sell`)."""
+    from .acts_to_ops import _stock_id
+
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    if not isinstance(raw_intents, list) or pc is None or not getattr(pc, "stock", None):
+        return raw_intents
+    out = []
+    for entry in raw_intents:
+        if isinstance(entry, dict) and str(entry.get("op", "")).lower() == "sell":
+            params = dict(entry.get("params") or {})
+            said = str(params.get("item") or "")
+            found = _stock_id(pc, said) if said not in pc.stock else ""
+            if found:
+                entry = dict(entry, params=dict(params, item=found))
+        out.append(entry)
+    return out
 
 
 # --- A thing swung or thrown ----------------------------------------------------------------
@@ -2698,110 +2675,6 @@ def declare_lethality(raw_intents, player_text: str, scene) -> list:
     return raw_intents
 
 
-_SELLS = re.compile(
-    r"\b(?:i\s+)?(?:sell|sells|selling|offer\s+to\s+sell|hand\s+over|trade\s+away|"
-    r"part\s+with|flog|pawn|barter\s+away)\b", re.I)
-
-# "how much for", "what will you give me for", "name a price for" — asking is not selling
-# and must not move anything. This is the guard `inject_goods` gets from its "?" check,
-# and it is written out here because a haggle is full of statements that are still
-# questions: "twenty gold coins" ends in no question mark at all.
-_JUST_HAGGLING = re.compile(
-    r"\b(?:how\s+much|what\s+(?:will|would|can)\s+you|name\s+a\s+price|"
-    r"what'?s?\s+it\s+worth|price\s+(?:for|these|this|them)|appraise)\b", re.I)
-
-
-def _resolve_sold_item(raw_intents, pc) -> list:
-    """Point a `sell` at a jar the character is actually holding.
-
-    The model writes what a person would say — "sweetspire tea" — and the engine wants
-    `sweetspire-tea#1`. Only exact-ish matches are taken: the id itself, the jar's name,
-    or its base. A sell naming something the satchel has never heard of is left alone, so
-    the engine's own refusal still names what she does have.
-    """
-    if not isinstance(raw_intents, list):
-        return raw_intents
-    stock = getattr(pc, "stock", {}) or {}
-    if not stock:
-        return raw_intents
-
-    def _find(said: str) -> str:
-        said = " ".join(str(said or "").split()).lower()
-        if not said or said in stock:
-            return ""
-        for item in sorted(stock.values(),
-                           key=lambda s: len(getattr(s, "name", "")), reverse=True):
-            for candidate in (str(getattr(item, "name", "")),
-                              str(getattr(item, "base", "")),
-                              str(item.id).split("#")[0].replace("-", " ")):
-                if candidate and candidate.lower() == said:
-                    return item.id
-        return ""
-
-    out = []
-    for entry in raw_intents:
-        if isinstance(entry, dict) and str(entry.get("op", "")).lower() == "sell":
-            params = dict(entry.get("params") or {})
-            found = _find(params.get("item"))
-            if found:
-                entry = dict(entry, params=dict(params, item=found))
-        out.append(entry)
-    return out
-
-
-def inject_sale(raw_intents, player_text: str, scene) -> list:
-    """Make a declared sale reach the engine.
-
-    Grounded in the satchel rather than in the sentence, which is the difference between
-    this and `inject_goods`: the thing being sold has to be a jar the character is holding
-    right now, so "I sell the draught" finds the draught and "I sell my soul" finds
-    nothing and stays out of the way.
-    """
-    if not isinstance(raw_intents, list) or not player_text or scene is None:
-        return raw_intents
-    if "?" in player_text or _JUST_HAGGLING.search(player_text):
-        return raw_intents
-
-    pc = scene.pc()
-    if pc is None or not getattr(pc, "stock", None):
-        return raw_intents
-
-    # Repair before deciding whether to inject. Measured in play, the turn after the
-    # schema started *requiring* a `sell` when the player declares one: the model duly
-    # emitted the op and named the jar the way a person would —
-    #
-    #     sell: Thessaly Corr is not carrying 'sweetspire tea'. They have:
-    #     beeswax#1, betony-tea#1, ... sweetspire-tea#1, ...
-    #
-    # — with the thing she was selling sitting in that very list. The engine refused, the
-    # turn died, and this injector had stood down because a `sell` was already present.
-    #
-    # Requiring the op and leaving its params to chance is half a fix. The injector is the
-    # only thing here that knows the ids, so it corrects one rather than bowing to it.
-    raw_intents = _resolve_sold_item(raw_intents, pc)
-
-    present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
-    if "sell" in present or "give" in present:
-        return raw_intents
-    if not _SELLS.search(player_text):
-        return raw_intents
-
-    said = player_text.lower()
-    # Longest name first, so "Yarow Elixir" wins over a jar merely called "Elixir".
-    for item in sorted(pc.stock.values(),
-                       key=lambda s: len(getattr(s, "name", "")), reverse=True):
-        name = str(getattr(item, "name", "")).lower()
-        base = str(getattr(item, "base", "")).lower()
-        for candidate in (name, base):
-            if candidate and len(candidate) > 3 and candidate in said:
-                return list(raw_intents) + [{
-                    "op": "sell", "actor": pc.ref,
-                    "params": {"item": item.id},
-                    "because": "the player said they were selling it",
-                }]
-    return raw_intents
-
-
 # A declared risky action, by the verb that declares it. The same shape as the goods
 # and survival injections and for the same reason: "I was able to sneak out of the
 # tavern without a roll" — the narrator narrated the slipping-out and emitted
@@ -2960,6 +2833,95 @@ def fill_bare_checks(raw_intents) -> list:
                 raw["params"] = params
         out.append(raw)
     return out
+
+
+def _sway_candidates(scene) -> list[str]:
+    """The people here a word could change the mind of: conscious, not the player."""
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    alive = getattr(scene, "conscious", None)
+    return [r for r, a in actors.items()
+            if not getattr(a, "is_pc", False) and (pc is None or r != pc.ref)
+            and (alive is None or alive(r))]
+
+
+def aim_the_sway(raw_intents, player_text: str, scene) -> list:
+    """A Diplomacy (or, out of a fight, Intimidate) check at somebody is aimed at them,
+    so the book's attitude DC prices it and never a band the plan named.
+
+    Measured on the owner's save of 2026-10-03 (items, turn-log rows 78 and 84): "I smile
+    and flirt with the clerk and offer the crate for coin" came back as
+    `check diplomacy` with NO target and `dc: {band: average}`. The clerk (c12) was in
+    conversation with the player, Cha 14, indifferent at regard 39 — the Core Rulebook's
+    DC is 15 + 2 = 17. The plan's "average" made it 10, a favourable circumstance made it
+    8, and a natural 4 (total 10) succeeded by 2. `Engine._sway_subject` reads only the
+    intent's `target`, and validation refuses a targeted social check that carries a dc
+    (`intents._check_params`), so a plan that drops the target to get past that refusal
+    has written its own price for changing a mind — law three.
+
+    Who it is aimed at, most certain first, and never a guess between two:
+      1. the one person here whose name the player's own words use ("the clerk");
+      2. else the one person the player is in conversation with (`states.TALKING`);
+      3. else the one conscious person here at all.
+    Then the plan's `dc` and `circumstance` are dropped: the attitude table is the price,
+    and `_op_check`'s influence branch never read a circumstance anyway — leaving it on
+    the record made the turn log claim a +2 that did nothing. A check already aimed at
+    somebody keeps its target and loses only the dc, which would otherwise have been
+    refused and retried (a model round trip) to reach the same intent.
+
+    Intimidate in a fight is Demoralize (CRB p.99), not a change of attitude, and is left
+    exactly as written. Nobody to aim at leaves the check alone: talking to a crowd is
+    still a check, at whatever band the plan named.
+    """
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    from rules import states as _states
+
+    actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    pc_ref = getattr(pc, "ref", "pc")
+    fighting = bool(getattr(scene, "in_encounter", False))
+    out = []
+    changed = False
+    for raw in raw_intents:
+        if not (isinstance(raw, dict) and str(raw.get("op", "")).lower() == "check"):
+            out.append(raw)
+            continue
+        params = dict(raw.get("params") or {})
+        skill = str(params.get("skill", "")).strip().lower()
+        if skill not in ("diplomacy", "intimidate") or params.get("opposed_by"):
+            out.append(raw)
+            continue
+        if skill == "intimidate" and fighting:
+            out.append(raw)
+            continue
+        if (raw.get("actor") or pc_ref) != pc_ref:
+            out.append(raw)                       # an NPC's own talk is not the track
+            continue
+        target = raw.get("target")
+        if isinstance(target, list):
+            target = next((t for t in target if isinstance(t, str) and t), None)
+        if not (isinstance(target, str) and target in actors and target != pc_ref):
+            here = _sway_candidates(scene)
+            said = _name_words(redact_speech(player_text or ""))
+            named = [r for r in here if _name_words(actors[r].name) & said]
+            talking = [r for r in here if actors[r].has_state(_states.TALKING)]
+            if len(named) > 1:
+                named = [r for r in named if r in talking] or named
+            target = (named[0] if len(named) == 1 else
+                      None if named else
+                      talking[0] if len(talking) == 1 else
+                      here[0] if len(here) == 1 else None)
+            if target is None:
+                out.append(raw)
+                continue
+        raw = dict(raw, target=target)
+        params.pop("dc", None)
+        params.pop("circumstance", None)
+        raw["params"] = params
+        changed = True
+        out.append(raw)
+    return out if changed else raw_intents
 
 
 def inject_checks(raw_intents, player_text: str, scene) -> list:
@@ -3506,8 +3468,12 @@ def _acquired_words(reading=None, plan=None, pc_ref: str = "pc") -> set[str]:
     the way the sheet is (`_vouched_for`)."""
     phrases: list[str] = []
     if isinstance(reading, dict) and not reading.get("error"):
+        from . import interpret as _interpret
+
         for a in reading.get("actions") or []:
-            if isinstance(a, dict) and a.get("act") in _ACQUIRING_ACTS and a.get("object"):
+            # A thing only meant to be got ("I want to buy a crown") is not got.
+            if isinstance(a, dict) and a.get("act") in _ACQUIRING_ACTS and a.get("object") \
+                    and _interpret.acting(a):
                 phrases.append(str(a["object"]))
     for r in plan or ():
         if not isinstance(r, dict) or str(r.get("op", "")).lower() != "give":
@@ -4676,6 +4642,154 @@ def _approach_fix(scene, who) -> str:
             "({\"op\": \"narrate_only\"}).")
 
 
+# --- walking toward a thing here is not a journey (playtest 2026-10-03, item 9) ----------
+#
+# Measured on the owner's save (items, turn_log rows 52 and 106). "I take the brunt of
+# the weight and move it toward the storage area": the plan's `travel` was refused
+# ("there is no 'the storage area' here. Name one of: …"), the retry planned `found` +
+# `travel`, and a new place *the storage area* opened off the docks with the player
+# walked into it. "I pocket the coins and head for the side door" (the clerk had said
+# "through the side door, past the smithy") founded *the smithy* off the counting house
+# the same way. Both times the founding was the planner's way out of a refused travel —
+# the refusal's own hint ("found it first in the same plan") taught it.
+#
+# Inform's world model is the line (WI §3.1, RB §6.9): only `going` changes the room, and
+# a room's things — a door, a counter, a corner — are reached without leaving it. MUDs
+# draw the same line by enumerating exits (Diku's exit list; Evennia's `dig` makes a room
+# only by command, docs/place-doors.md). So a movement verb aimed TOWARD something
+# ("toward the storage area", "in the direction of the cranes") or at a fixture of a room
+# ("head for the side door", "walk over to the counter") is moving within the scene, and
+# a `travel` or `found` the plan wrote for it is dropped before validation can refuse it
+# and teach the retry to found. A place the player's own words set out to FIND or go TO
+# is left to the existing doors: "I head toward the back streets to find the Velvet
+# Veil" still founds the Veil (2026-09-30 item 9, the owner's "go anywhere" ruling).
+
+_TOWARD = re.compile(
+    r"\b(?:toward|towards|in\s+the\s+direction\s+of)\s+"
+    r"(?P<obj>(?:the|a|an|that|this|those|these|some)\s+[\w'’-]+(?:\s+[\w'’-]+){0,3}?)"
+    r"(?=\s*[.,;!?]|\s+(?:and|to|for|with|then|where|so|while|before|after|as|but)\b|$)",
+    re.I)
+# A room's furniture and fittings: things in a place, never places (Inform's `thing`,
+# against its `room`). Closed, and the reason for each family is the same — it is part of
+# the room the party stands in. A door is here as a thing to walk to; going THROUGH one is
+# another sentence (`_THROUGH`), left to the doors places come in by.
+_FIXTURES = (r"door|doors|doorway|archway|exit|window|windows|corner|counter|bar|table|"
+             r"tables|bench|benches|desk|wall|walls|hearth|fireplace|stall|stalls|crate|"
+             r"crates|cart|carts|wagon|ramp|post|pillar|shelf|shelves|scale|scales|"
+             r"pile|stack|area|end|spot|side|back|front|middle|centre|center")
+_TO_A_FIXTURE = re.compile(
+    r"\b(?:head|heads|heading|move|moves|moving|walk|walks|walking|go|goes|going|step|"
+    r"steps|stepping|make|makes|making|edge|edges|sidle|sidles|stride|strides|wander|"
+    r"wanders|slip|slips|carry|carries|carrying|drag|drags|haul|hauls|run|runs|hurry|"
+    r"hurries|cross|crosses|back|backs|retreat|retreats|approach|approaches|lean|leans)\b"
+    r"(?:\s+(?:it|them|him|her|this|that|back|over|across|up|down|my\s+way|our\s+way|"
+    r"straight|quietly|slowly|quickly)){0,3}"
+    r"(?:\s+(?:to|toward|towards|for|at|into|up\s+to|over\s+to|across\s+to|by))?\s+"
+    r"(?P<obj>(?:the|a|an|that|this|those|these)\s+(?:[\w'’-]+\s+){0,3}?"
+    r"(?:" + _FIXTURES + r"))\b"
+    # The fixture ends the phrase: "the front gate" is a gate, not "the front", and "the
+    # side of the square" is the square.
+    r"(?=\s*[.,;!?\"”]|\s+(?:and|to|for|with|then|where|so|while|before|after|as|but|in|"
+    r"on|at|near|by|beside|behind|across)\b|$)", re.I)
+# Going THROUGH the door is leaving by it — a journey, not a step across the room.
+_THROUGH = re.compile(r"\b(?:through|out\s+(?:of|through)|past)\s+(?:the|a|that)\s+"
+                      r"(?:[\w'’-]+\s+){0,2}?(?:door|doorway|archway|gate|exit)\b", re.I)
+
+
+def _core(name: str) -> str:
+    return re.sub(r"^(?:the|a|an)\s+", "", " ".join(str(name or "").split()).lower())
+
+
+def movement_within(player_text: str, known=()) -> list[tuple[int, int, str]]:
+    """The spans of the player's own words that move within the scene: a movement aimed
+    toward something that is not a place here, or at a fixture of the room. `(start,
+    end, object)`; empty when the sentence is a journey or names no such thing."""
+    from rules import places as places_mod
+
+    text = redact_speech(str(player_text or ""))
+    if not text or _THROUGH.search(text):
+        return []
+    out: list[tuple[int, int, str]] = []
+    for rx in (_TOWARD, _TO_A_FIXTURE):
+        for m in rx.finditer(text):
+            obj = " ".join(m.group("obj").split())
+            # "toward the docks" is a journey when the docks are a place here.
+            if places_mod.find(known, obj) is not None:
+                continue
+            if any(a <= m.start("obj") < b for a, b, _o in out):
+                continue
+            out.append((m.start("obj"), m.end("obj"), obj))
+    return out
+
+
+def keep_movement_in_the_scene(raw_intents, player_text: str, scene, known=(),
+                               notes: list | None = None) -> list:
+    """A `travel` to a place that is not here, and a `found` the player never declared,
+    are dropped when the player's words only move within the scene (`movement_within`);
+    the turn becomes the narrated walk across the room.
+
+    Kept: a travel to any place `known` answers to; a `found` the player declared
+    (`_FOUNDS` / `_FOUNDS_AS`: "we make this our base"); and any travel or found whose
+    name the player's words say OUTSIDE the within-scene span ("toward the back streets
+    to find the Velvet Veil" keeps the Veil). `known` is the engine's places and open
+    ground (`Engine.places()` + `Engine.open_ground()`); with none, nothing is judged."""
+    from rules import places as places_mod
+
+    if not isinstance(raw_intents, list) or not player_text or not known:
+        return raw_intents
+    if "?" in str(player_text):
+        return raw_intents
+    spans = movement_within(player_text, known)
+    if not spans:
+        return raw_intents
+    declared = bool(_FOUNDS_AS.search(player_text) or _FOUNDS.search(player_text))
+    text = redact_speech(str(player_text)).lower()
+
+    def said_elsewhere(name: str) -> bool:
+        core = _core(name)
+        if len(core) < 3:
+            return False
+        for m in re.finditer(r"(?<![\w'])" + re.escape(core) + r"(?![\w'])", text):
+            if not any(a <= m.start() < b for a, b, _o in spans):
+                return True
+        return False
+
+    dropped: list[str] = []
+    out = []
+    for r in raw_intents:
+        op = str(r.get("op", "")).lower() if isinstance(r, dict) else ""
+        params = (r.get("params") or {}) if isinstance(r, dict) else {}
+        if op == "travel":
+            where = str(params.get("place") or "")
+            # A travel with nowhere in it is the schema's insistence on one for a
+            # sentence that only crosses the room; it goes too.
+            if params.get("biome") or (where and (places_mod.find(known, where) is not None
+                                                  or said_elsewhere(where))):
+                out.append(r)
+                continue
+            dropped.append(f"travel to {where!r}" if where else "a travel to nowhere")
+            continue
+        if op == "found" and not declared:
+            name = str(params.get("name") or "")
+            if said_elsewhere(name):
+                out.append(r)
+                continue
+            dropped.append(f"found {name!r}")
+            continue
+        out.append(r)
+    if not dropped:
+        return raw_intents
+    toward = spans[0][2]
+    if not any(isinstance(r, dict) and str(r.get("op", "")).lower() == "narrate_only"
+               for r in out):
+        out.append({"op": "narrate_only",
+                    "because": f"the player moves within the scene, toward {toward}"})
+    if notes is not None:
+        notes.append(f"movement within the scene (toward {toward}): dropped "
+                     + ", ".join(dropped))
+    return out
+
+
 def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
                             reading=None, attached=()) -> list:
     """Told to leave, the model may not name the room the party is standing in.
@@ -5474,6 +5588,15 @@ def found_parent(name: str, player_text: str, scene, known, kind: str = ""):
         mine = places_mod.find(known, name)
         if mine is not None:
             skip.add(mine.id)
+        # Somebody told the player where it is (`rules/heard_places.py`): the landmark
+        # they gave, after the player's own "the X in Y" and before any guess.
+        from rules import heard_places
+
+        heard = heard_places.named_in(name, scene, known)
+        if heard is not None and heard.get("landmark"):
+            p = places_mod.find(known, heard["landmark"])
+            if p is not None:
+                return p
     p = _place_said(text, known, skip=skip)
     if p is not None:
         return p
@@ -5533,11 +5656,113 @@ def fill_found_parent(raw_intents, player_text: str, scene, world=None) -> list:
         p = found_parent(str(params.get("name") or ""), player_text, scene, known,
                          kind=str(params.get("kind") or ""))
         here = places_mod.find(known, getattr(scene, "at", "") or "")
+        # A landmark a speaker gave is kept by name even when it is here: the engine's
+        # default for an unnamed parent climbs out of a building to the street, and "the
+        # smithy through the side door" of the counting house is off the counting house.
+        from rules import heard_places
+
+        heard = heard_places.named_in(str(params.get("name") or ""), scene, known)
+        if p is not None and heard is not None and heard.get("landmark") == p.id:
+            params["parent"] = p.name
+            out[i] = dict(out[i], params=params)
+            continue
         if p is None or (here is not None and p.id == here.id):
             params.pop("parent", None)
         else:
             params["parent"] = p.name
         out[i] = dict(out[i], params=params)
+    return out
+
+
+def go_to_heard_place(raw_intents, player_text: str, scene, known=(), reading=None) -> list:
+    """Going to a place somebody named becomes that place, under the landmark they gave.
+
+    The owner's ruling (2026-10-03): places are creatable. What this adds is WHERE: the
+    clerk's "through the side door, past the smithy" puts the smithy off the counting
+    house, and the player who then says "I go to the smithy" stands there, with the
+    smithy now a place for every later turn. Before this the same walk was a `travel` the
+    engine refused ("there is no 'the smithy' here") and a retry that founded it wherever
+    the planner could reach — measured on the owner's items save, where *the smithy* and
+    *the storage area* came into being exactly that way (docs/playtest-2026-10-03.md).
+
+    Fires when the reading goes to a heard-of place this settlement does not have yet —
+    the `place` of a go, journey, seek or call_on, through `heard_places.named_in` — or
+    the plan already travels there. Any `found` the plan wrote for it is replaced by one
+    with the record's kind and landmark; a travel is added if the plan had none. A place
+    already on the map is `known`'s and left alone, and a question is never a journey.
+
+    The reading's slot, since 2026-10-03 (docs/structured-turn.md), where a regex of
+    going verbs over the sentence (`_GOES_TO`) stood: "head for that smithy" and "make my
+    way past the smithy" were the same words to it. With no reading, only the plan's own
+    travel is asked about — the words are nobody's to read but the planner's."""
+    from rules import heard_places
+    from rules import places as places_mod
+
+    if not isinstance(raw_intents, list) or scene is None:
+        return raw_intents
+    if not getattr(scene, "heard_places", None):
+        return raw_intents
+    if isinstance(reading, dict) and reading.get("question") and not reading.get("actions"):
+        return raw_intents
+    rec = None
+    from . import interpret as _interpret
+
+    for a in (reading or {}).get("actions") or []:
+        # Only a walk done now: "I mean to go to the smithy tomorrow" founds nothing yet.
+        if not _interpret.acting(a):
+            continue
+        if a.get("act") in ("go", "journey", "seek", "call_on") and a.get("place"):
+            rec = heard_places.named_in(str(a["place"]), scene, known)
+            if rec is not None:
+                break
+    if rec is None:
+        for r in raw_intents:
+            if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel":
+                rec = heard_places.named_in(str((r.get("params") or {}).get("place") or ""),
+                                            scene, known)
+                if rec is not None:
+                    break
+    if rec is None:
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    params = {"name": rec["name"]}
+    if rec.get("kind"):
+        params["kind"] = rec["kind"]
+    landmark = places_mod.find(known, rec.get("landmark") or "") if rec.get("landmark") \
+        else None
+    # Named even when it is where the party stands: left out, `fill_found_parent` would
+    # look for evidence of its own and could put a smithy on its trade street, over the
+    # clerk's "through the side door".
+    if landmark is not None:
+        params["parent"] = landmark.name
+    core = re.sub(r"^the\s+", "", rec["name"].lower())
+    out, travelled = [], False
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            out.append(r)
+            continue
+        op = str(r.get("op", "")).lower()
+        p = r.get("params") or {}
+        if op == "found" and core in str(p.get("name") or "").lower():
+            continue                       # replaced below, with the speaker's landmark
+        if op == "travel" and core in str(p.get("place") or "").lower():
+            travelled = True
+            r = dict(r, params=dict(p, place=rec["name"]))
+        out.append(r)
+    found = {"op": "found", "params": params,
+             "because": f"the player went to {rec['name']}, which they had heard of"}
+    if pc is not None:
+        found["actor"] = pc.ref
+    # The found first: validation projects a founded name for the travel after it.
+    at = next((i for i, r in enumerate(out) if isinstance(r, dict)
+               and str(r.get("op", "")).lower() == "travel"), len(out))
+    out.insert(at, found)
+    if not travelled:
+        travel = {"op": "travel", "params": {"place": rec["name"]},
+                  "because": f"the player went to {rec['name']}"}
+        if pc is not None:
+            travel["actor"] = pc.ref
+        out.append(travel)
     return out
 
 
@@ -5718,8 +5943,7 @@ _DECLARERS = (
     # Sale before goods, the same order the live chain runs them in — and asking them in
     # the wrong order here is what surfaced the bug: "I sell the Yarow Elixir" came back
     # as both `give` and `sell`, which is one item leaving twice.
-    ("sale", lambda raw, text, scene, world: inject_sale(raw, text, scene)),
-    ("goods", lambda raw, text, scene, world: inject_goods(raw, text, scene)),
+    # The live chain's order: where the words send a thing, before coin and sale.
     ("ability", lambda raw, text, scene, world: inject_ability(raw, text, scene)),
     ("cast", lambda raw, text, scene, world: inject_cast(raw, text, scene)),
     ("checks", lambda raw, text, scene, world: inject_checks(raw, text, scene)),
@@ -5915,9 +6139,14 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
     mine = _content_words(player_text)
     says = ""
     if isinstance(reading, dict):
+        from . import interpret as _interpret
+
+        # Words said now, never words the player means to say later ("I head for the
+        # stables to ask about a horse": the asking is intended, `interpret.COMMITS`).
         says = next((str(a.get("says") or "").strip()
                      for a in reading.get("actions") or []
-                     if isinstance(a, dict) and str(a.get("says") or "").strip()), "")
+                     if isinstance(a, dict) and _interpret.acting(a)
+                     and str(a.get("says") or "").strip()), "")
     out: list = []
     for entry in raw_intents:
         if not (isinstance(entry, dict) and str(entry.get("op", "")).lower() == "say"
@@ -7957,8 +8186,13 @@ def _introducible(player_text: str, phrase: str | None = None) -> str:
     """
     from rules import population
 
+    from rules.names import not_a_name
+
     phrase = phrase if phrase is not None else person_sought(player_text)
     if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
+        return ""
+    # Quoted words or "say …" are speech, never somebody (2026-10-03, item 13).
+    if not_a_name(phrase):
         return ""
     if not population._tokens(phrase):
         m = re.search(re.escape(phrase) + r"\s+(who\s+[^,.;!?]+?)(?=\s+and\b|[,.;!?]|$)",
@@ -8013,8 +8247,10 @@ def inject_introduce(raw_intents, player_text: str, scene, world=None) -> list:
     # never a stranger to introduce.
     if called_on(player_text)[0]:
         return raw_intents
+    from rules.names import not_a_name
+
     phrase = person_sought(player_text)
-    if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE:
+    if not phrase or phrase.lower() in _NOBODY_TO_INTRODUCE or not_a_name(phrase):
         return raw_intents
     # "The nearest person" is somebody standing here, never a newcomer — and a person the
     # sentence only asks ABOUT is not the one looked for (G3, 2026-09-29, market-seek
@@ -8489,117 +8725,20 @@ def names_asked_for(scene, player_text: str = "") -> dict[str, str]:
     return {a.ref: (a.true_name if attitude_mod.tells_their_name(a) else "") for a in asked}
 
 
-def apply_introductions(scene, beat: str, player_text: str = "",
-                        said=None, refused: list | None = None,
-                        whose=None) -> list[tuple[str, str]]:
-    """A name given in play becomes the panel's name for that person.
+# `apply_introductions` stood here until 2026-10-03: it read a name given in speech
+# (`narration.introduced_by`) or in apposition, and chose whose it was by the speaker's
+# tag, the person asked, the world's true name, a head word, the one unnamed person.
+# Who a name on the page belongs to is the beat reader's answer now (its "names");
+# the engine's refusals below stay, asked by `beat_reader.name_refusal`.
 
-    From `narration.introductions`: the speaker's head word finds the unnamed actor
-    here (a descriptor name — lowercase, or "the …"); their display name becomes the
-    name given, their true name too if none was held. A named person "introducing"
-    themselves again changes nothing. Returns [(ref, name)] for the log; a name refused
-    because somebody else here already answers to it goes into `refused` as
-    (ref, name, whose) when a list is passed."""
-    from .narration import introduced_by
 
-    if scene is None or not beat:
-        return []
-    out: list[tuple[str, str]] = []
-    # The raw line, not the redacted one: "I ask the stranger for his name" is reported
-    # speech, and the redactor blanks exactly the words that ask.
-    asked = bool(_ASKS_A_NAME.search(player_text or ""))
-    actors = getattr(scene, "actors", {}) or {}
+def _a_people(given: str, peoples_names) -> str:
+    """"a people of this world" when `given` is what a people is called, else "" — in the
+    shape `_answers_to` returns, so the refusal is logged the same way."""
+    from rules import names as names_mod
 
-    def _unnamed(a) -> bool:
-        name = str(a.name or "")
-        return not (name[:1].isupper() and not name.lower().startswith(("the ", "a ", "an ")))
-
-    asked_words = _name_words(redact_speech(player_text or ""))
-    # The person the player asked, if they asked anybody: the most certain answer there is,
-    # and the one that was missing. Measured live 2026-09-19: asked for her name, the woman
-    # in the corner said "you may call me Gorvothor" — and the panel kept "woman in the
-    # corner". `introductions` read the speaker's head word as "low" (out of "a low,
-    # resonant grind"), her true name is "Gorvothor Kragnir" so the equality below missed
-    # the partial, and both women here answered to "woman", so every remaining branch
-    # declined. The ref was known all along; nothing asked for it.
-    was_asked = [actors[r] for r in names_asked_for(scene, player_text) if r in actors]
-    for head, given, tagged in introduced_by(beat, asked_for_name=asked, said=said):
-        # Whose name it is, in order of certainty: the speaker the prose tagged (the
-        # model wrote who was talking — `speech.lift`); the person the player asked; the
-        # one the world holds THIS
-        # name for (the brief gave it to them); the unnamed person the speaker's
-        # head word names; the unnamed person the player addressed; the only unnamed
-        # person here. Measured on the second group-3 replay (2026-09-18): six
-        # descriptor-named people in the room, "'Gorvothor Kragnir,' he says" with no
-        # role word in the sentence, and the panel kept "stranger".
-        who = (actors[tagged] if tagged in actors and not actors[tagged].is_pc
-               else None)
-        if who is None:
-            who = was_asked[0] if len(was_asked) == 1 else None
-        if who is None:
-            who = next((a for a in actors.values() if not a.is_pc
-                        and str(getattr(a, "true_name", "")).lower() == given.lower()), None)
-        if who is None and head:
-            who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
-                        and head in _name_words(a.name)), None)
-        if who is None:
-            addressed = [a for a in actors.values() if not a.is_pc and _unnamed(a)
-                         and asked_words & _name_words(a.name)]
-            if len(addressed) == 1:
-                who = addressed[0]
-        if who is None:
-            unnamed = [a for a in actors.values() if not a.is_pc and _unnamed(a)]
-            if len(unnamed) == 1:
-                who = unnamed[0]
-        if who is None or not _unnamed(who):
-            continue
-        taken_by = _answers_to(actors, who, given)
-        if taken_by:
-            if refused is not None:
-                refused.append((who.ref, given, taken_by))
-            continue
-        _take_the_name(scene, who, given)
-        out.append((who.ref, given))
-    # And the narrator's own naming in passing — "The man—Korgath Varn—takes a slow
-    # pull of his ale" (2026-09-24). Outside speech, so `introductions` skips it by
-    # design; the head word finds the unnamed person the same way. A name somebody
-    # here already carries is not taken twice.
-    from .narration import named_in_apposition
-
-    for head, given in named_in_apposition(beat):
-        if any(str(a.name).lower() == given.lower() for a in actors.values()):
-            continue
-        # Who the head noun means, from the attribution when it has an answer
-        # (gm/mentions.py): the head word alone picked whichever unnamed person owned
-        # the word, and the one-unnamed-person fallback picked whoever was left.
-        who = None
-        if whose is not None:
-            from .narration import _sentences
-
-            for sentence in _sentences(speech.unquoted(beat)):
-                if given in sentence:
-                    ref = whose(sentence, head)
-                    cand = actors.get(ref) if ref else None
-                    if cand is not None and not cand.is_pc and _unnamed(cand):
-                        who = cand
-                    break
-        if who is None:
-            who = next((a for a in actors.values() if not a.is_pc and _unnamed(a)
-                        and head in _name_words(a.name)), None)
-        if who is None:
-            unnamed = [a for a in actors.values() if not a.is_pc and _unnamed(a)]
-            if len(unnamed) == 1:
-                who = unnamed[0]
-        if who is None:
-            continue
-        taken_by = _answers_to(actors, who, given)
-        if taken_by:
-            if refused is not None:
-                refused.append((who.ref, given, taken_by))
-            continue
-        _take_the_name(scene, who, given)
-        out.append((who.ref, given))
-    return out
+    return ("a people of this world" if names_mod.is_a_peoples_name(
+        given, known=peoples_names) else "")
 
 
 def _answers_to(actors, who, given: str) -> str:
@@ -8638,19 +8777,20 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
     player. "'You're a long way from the interior,' he says" is a hail; "'Fine weather,'
     the carter tells the drover" is not.
 
-    **Tags first, then spans over the whole beat** (item 13, 2026-09-28). The prose call
-    tags who said each line and to whom (`speech.lift`), and a tagged `to=you` line by a
-    living person here is a hail with no reading of the page at all — only the check that
-    the line is still on it. Before this the tags were read inside a per-sentence span
-    loop, and on Drenn's beat no sentence held a whole quotation ("'You!" ends one), so
-    two correct `to=you` tags were never read: 0 hails where there were 2. Untagged lines
-    are then found over the whole beat (`checks._people.spans_in_context`), each read with
-    the narration around it, and attributed by the name and head-word matching the
-    introductions use. Tags are per line: one speaker is never given every line in a
-    stretch (Muzny et al. 2017 report "one speaker per paragraph" only to refute it).
-    """
-    from .checks._people import name_words, spans_in_context
+    **The booked lines only** (item 13, 2026-09-28, and the beat reader, 2026-10-03). The
+    prose call tags who said each line and to whom (`speech.lift`), the beat reader books
+    every line the tags left out (`play/aftermath/speaker_real.py`), and a booked `to=you`
+    line by a living person here is a hail with no reading of the page at all — only the
+    check that the line is still on it. Before item 13 the tags were read inside a
+    per-sentence span loop, and on Drenn's beat no sentence held a whole quotation ("'You!"
+    ends one), so two correct `to=you` tags were never read: 0 hails where there were 2.
 
+    Until 2026-10-03 the untagged lines were then guessed over the whole beat: the
+    narration round each line read for a word of somebody's name, else a role word
+    ("the man", "the woman in the corner") — and "the man" was the servant carrying jugs
+    for six beats of the owner's save (item 15). That reading is the beat reader's now;
+    with no reading, an untagged line hails nobody.
+    """
     if scene is None or not beat:
         return []
     actors = getattr(scene, "actors", {}) or {}
@@ -8676,43 +8816,6 @@ def hailed_by(scene, beat: str, said=None) -> list[str]:
         aimed = str(rec.get("to") or "")
         if aimed == "you" or (not aimed and you.search(str(rec.get("line") or ""))):
             out.append(who)
-    # 2. The untagged lines, over the whole beat.
-    for qa, qb, outside in spans_in_context(beat):
-        line = beat[qa + 1:qb - 1] if qb - qa >= 2 else ""
-        tagged = speech.speaker(said, line)
-        if tagged is not None and tagged.get("who") in actors:
-            continue          # decided by its tag above, hail or not
-        if not you.search(line):
-            continue
-        words = _name_words(outside)
-        # Half of a hyphenated noun is not that noun: "nodding at the lock-keeper" is not
-        # the keeper of the general store. Harmless while keepers carried proper names;
-        # since they go by their descriptor (owner ruling F1, 2026-09-30) the store's
-        # keeper took the apron man's hail in the G2 case below on the word "keeper".
-        compounds = re.findall(r"[A-Za-z]+(?:-[A-Za-z]+)+", outside)
-        if compounds:
-            parts = {p.lower() for c in compounds for p in c.split("-")}
-            alone = _name_words(re.sub(r"[A-Za-z]+(?:-[A-Za-z]+)+", " ", outside))
-            words = words - (parts - alone)
-        speaker = None
-        # A named person first, by any word of their name, a descriptor by its head
-        # noun (never "through" for the watchman waving traffic through); then by the
-        # role word the narration uses ("the man", "the woman in the corner").
-        for ref, a in people:
-            mine = set(name_words(a.name))
-            if mine and mine & words:
-                speaker = ref
-                break
-        if speaker is None:
-            role = _ROLE_WORD.search(outside)
-            if role:
-                head = role.group(0).lower()
-                for ref, a in people:
-                    if head in _name_words(a.name):
-                        speaker = ref
-                        break
-        if speaker and speaker not in out:
-            out.append(speaker)
     return out
 
 
@@ -8745,33 +8848,22 @@ def a_child_in(scene, beat: str) -> bool:
     return bool(_CHILD_WORDS.search(str(beat or "")))
 
 
-def record_people(scene, introduced, *, turn: int = 0, world=None,
-                  beat: str = "") -> list[dict]:
-    """Everyone a beat introduced goes into the population, located, with a life rolled —
-    before promotion, so a promoted person wears the face their record rolled and one who
-    is not is still somebody the player can find later (the user's question of
-    2026-09-25: "there is nothing left of her?"). Returns the records.
+def record_people(scene, introduced, *, turn: int = 0, world=None) -> list[dict]:
+    """Phrases into the population, located where the party stands and with a life rolled
+    — records the player can find later (the user's question of 2026-09-25: "there is
+    nothing left of her?"). Returns the records. A plural or a counted group is not one
+    person with one life (measured live 2026-09-25: "neighboring merchants" was rolled a
+    work, a face and a quirk of its own), and somebody heard of a beat or two ago whom
+    these words describe is that record, not a second (`population.heard_of_match`).
 
-    A plural or a counted group is not one person with one life. Measured live
-    2026-09-25: "neighboring merchants" was rolled a work, a face and a quirk of its own.
-    `promote_cast` already treats a bare plural as scenery; a group's members are recorded
-    when the prose singles one of them out.
-
-    With the beat in hand (`beat`), each person is read for HOW the beat has them
-    (`seen_in_beat`), after the owner's ruling of 2026-10-01 — "show described people in
-    the scene. if i can see them they should be in the scene as a fully made person ready
-    to be interacted with and saved if not already existing":
-
-      * **seen** here, now: recorded at the party's place and marked `shown` with this
-        turn, which `embody_seen` (the "people" stage, `play/aftermath/seen_people.py`)
-        reads to give them a body;
-      * **heard** of only (the narration reports somebody's words about them): recorded
-        with NO place (`spot=""`), heard from the one person the player is talking with —
-        never at the place the talk happened. Measured on the owner's save: the woman
-        Gorm said lives "three streets over" was recorded twice, both in the tavern;
-      * either way, somebody heard of in the last beat or two whom these words describe
-        is that same person, not a second record (`population.heard_of_match`).
-    """
+    **It no longer reads the beat.** Until 2026-10-03 it took the beat as well and decided
+    for each phrase whether the page SHOWED the person here (a body, the owner's ruling of
+    2026-10-01) or only spoke of them, with `seen_in_beat`'s cue words, `_gendered`'s "It
+    is a woman", `_said_to_live`, `_shown_again` and `only_a_predicate` — code reading
+    English, one rule per phrasing. The last of them was written the day "He is a large
+    man" made a second smith (c15). Who is new, and whether they are here, is the beat
+    reader's answer now (gm/beat_reader.py), applied by `play/aftermath/seen_people.py`;
+    this stays as the plain recorder the batch doors and the tests stand people up with."""
     from rules import names as names_mod
     from rules import population
 
@@ -8782,226 +8874,15 @@ def record_people(scene, introduced, *, turn: int = 0, world=None,
     for phrase in introduced or []:
         if _plural_role(phrase) or counts.get(phrase, 1) > 1:
             continue
-        how = seen_in_beat(beat, phrase) if beat else ""
-        said_as = phrase
-        if how == SEEN:
-            phrase = _gendered(beat, phrase)
         heard = population.heard_of_match(scene, phrase, turn=turn)
-        if heard is not None:
-            if how == SEEN:
-                # Heard of a moment ago and now standing here: the same person, seen.
-                heard["spot"] = getattr(scene, "at", None)
-                population.seen(scene, heard)
-                heard["last_seen"] = int(getattr(scene, "clock_minutes", 0) or 0)
-                heard["shown"] = int(turn)
-                heard["said_as"] = said_as
-            out.append(heard)
-            continue
-        if how == HEARD:
-            rec = population.note(scene, phrase, turn=turn, body=body, spot="",
-                                  heard_from=_the_one_talking(scene))
-            if _said_to_live(beat, phrase) and isinstance(rec.get("life"), dict):
-                # "a woman lives there": a resident, whatever the roll said of roads.
-                rec["life"]["mobility"] = "resident"
-                rec.pop("anchor", None)
-        else:
-            rec = population.note(scene, phrase, turn=turn, body=body)
-            if how == SEEN:
-                rec["shown"] = int(turn)
-                rec["said_as"] = said_as
-        out.append(rec)
-    if beat:
-        out += _shown_again(scene, beat, set(introduced or []), turn=turn)
+        out.append(heard if heard is not None
+                   else population.note(scene, phrase, turn=turn, body=body))
     return out
 
 
-def _shown_again(scene, beat: str, introduced: set, *, turn: int) -> list[dict]:
-    """Somebody the ledger booked on an earlier beat, without a body, whom THIS beat shows
-    here: `note_cast` books a definite "the woman" as somebody already booked and returns
-    nothing for her, so the loop above never sees her. Replayed 2026-10-01 on the owner's
-    save: "there is no sign of the woman" booked her (heard of), and the next beat's "You
-    find the woman standing in the entryway" made nobody — the ruling's own case, a woman
-    the player can see, left as prose."""
-    from rules import population
-
-    out = []
-    bodies = getattr(scene, "people", {}) or {}
-    for e in list(getattr(scene, "cast", None) or []):
-        who = str(e.get("who") or "")
-        if (not who or who in introduced or (e.get("ref") and e["ref"] in bodies)
-                or int(e.get("count", 1) or 1) > 1 or _plural_role(who)):
-            continue
-        if seen_in_beat(beat, who) != SEEN:
-            continue
-        # The ledger keeps twelve turns; the transcript counts two entries a turn.
-        rec = population.heard_of_match(scene, who, turn=turn, within=24)
-        if rec is not None:
-            rec["spot"] = getattr(scene, "at", None)
-            population.seen(scene, rec)
-            rec["last_seen"] = int(getattr(scene, "clock_minutes", 0) or 0)
-        else:
-            rec = population.at_spot(scene, who) or population.here_as(scene, who)
-        if rec is None or (rec.get("ref") and rec["ref"] in bodies):
-            continue
-        rec["shown"] = int(turn)
-        rec["said_as"] = who
-        out.append(rec)
-    return out
-
-
-# --- seen, or only heard of -----------------------------------------------------------
-#
-# The owner's ruling of 2026-10-01 overturns the 2026-09-27 one ("the prose records people;
-# engagement or the plan makes them actors"): a person the player can SEE is in the scene
-# as a full person at once. The ruling turns on seeing, so the test is whether the beat
-# shows them here and now — not whether it names them. Interactive fiction's rule is the
-# same one: "if an object is mentioned in the room description, it should probably be
-# implemented" (the Inform 7 Handbook, "Scenery"), because a player who reads a thing in
-# the room will try to touch it; the owner's "/cheat the woman … pounces on me" was that,
-# refused as "unknown ref 'woman'" because she was prose and nothing else. And the same
-# tradition keeps the opposite case apart: somebody merely spoken of is *familiar*, not
-# *seen* (Eric Eve's Epistemology, Inform Recipe Book §5.5) — a woman a barkeep says lives
-# across town is a record, not a body in the tavern.
-#
-# Seen needs positive evidence, because a body is what a misread turns into a phantom in a
-# fight (the 2026-09-27 hand check: 11 of 30 prose-booked people wrong). A sentence about
-# the person that places or acts them here, and that is no report of somebody's words.
-
-SEEN = "seen"
-HEARD = "heard"
-
-# The person is the object of telling: "he had told you that a woman lives there",
-# "the elder Gorm spoke of". Not a bare "says": the man who says something is here.
-_HEARSAY = re.compile(
-    r"\b(?:told|tells\s+you|tell\s+you|spoke\s+(?:of|about)|speaks\s+(?:of|about)|"
-    r"spoken\s+(?:of|about)|mention\w*|rumou?r\w*|heard\s+(?:of|about|that|tell)|"
-    r"word\s+is|according\s+to|talk(?:ed|s)?\s+(?:of|about)|lives?\s+(?:there|in|at|over|"
-    r"across|on|by|near|out|beyond|up|down)|who\s+lives|resides?|dwells?)\b", re.I)
-_IF = re.compile(r"^\W*(?:if|unless|should|perhaps|maybe|when(?:ever)?)\b", re.I)
-# What the eye does, beside `_PLACES_THEM_HERE`'s being-here verbs.
-_SEEN_HERE = re.compile(
-    r"\b(?:you\s+(?:see|notice|spot|glimpse|make\s+out)|catch\s+sight|silhouett\w*|"
-    r"visible|framed|perched|seated|lounging|hunched|loom(?:s|ing)|hovers?|hovering|"
-    r"behind\s+the\s+(?:counter|bar|desk|stall)|at\s+the\s+top\s+of|at\s+the\s+foot\s+of|"
-    r"polish\w*|wip(?:es|ing)|tend(?:s|ing)|look(?:s|ing)\s+(?:at|up|over|down)|stares?|"
-    r"staring|glances?|nods?|smiles?|frowns?|shrugs?|gestures?|beckons?|waves?)\b", re.I)
-
-
-def seen_in_beat(beat: str, phrase: str) -> str:
-    """SEEN, HEARD or "" — how this beat has the person: shown here and now, only spoken
-    of, or neither clearly (recorded where the party is, as before, and given no body)."""
-    from .narration import _sentences, unquoted
-
-    if not beat or not phrase:
-        return ""
-    plain = unquoted(beat)
-    head = _role_head(phrase)
-    if not head:
-        return ""
-    about = [s for s in _sentences(plain)
-             if re.search(rf"\b{re.escape(head)}s?\b", s, re.I)]
-    if not about:
-        return HEARD                       # only ever inside somebody's speech
-    told = [s for s in about if _HEARSAY.search(s) or _IF.match(s)]
-    plain_about = [s for s in about if s not in told]
-    for s in plain_about:
-        if _shown_in(s, head):
-            return SEEN
-    if not plain_about or not present_in_scene(beat, phrase):
-        return HEARD
-    # Only ever the object of a question or a search: "the question you posed — concerning
-    # the woman three streets over — hangs in the air" (replayed 2026-10-01) is talk of her,
-    # and recorded her where the party stood, on the outskirts.
-    if all(_OBJECT_OF.search(s[:m.start()][-70:])
-           for s in plain_about
-           for m in re.finditer(rf"\b{re.escape(head)}s?\b", s, re.I)):
-        return HEARD
-    return ""
-
-
-# The cue must be THEIRS. Replayed 2026-10-01 on the owner's save: "You are still standing
-# before him, and the search for the woman has just become…" read as the woman standing
-# here (the player was), and `action_sentences` counted "a woman who exists in the stories
-# of the desperate" as somebody acting — a phantom woman walked on with a Ratfolk face.
-# So the verb must follow the person within a clause ("a figure IS SILHOUETTED", "a boy
-# STANDS in the doorway"), or the person must follow the eye ("you see a man …", "at the
-# top of the stairs, a figure").
-_CUE_RX: list = []
-
-
-def _cue() -> re.Pattern:
-    """Being here or being looked at, as one pattern (built late: `_PLACES_THEM_HERE` is
-    defined further down, beside `present_in_scene`)."""
-    if not _CUE_RX:
-        _CUE_RX.append(re.compile(r"(?:" + _PLACES_THEM_HERE.pattern + r")|(?:"
-                                  + _SEEN_HERE.pattern + r")", re.I))
-    return _CUE_RX[0]
-_LOOKED_AT = re.compile(
-    r"(?:\byou\s+(?:see|notice|spot|glimpse|make\s+out)|\bthere\s+(?:is|stands|sits|waits)|"
-    r"^\W*(?:at|in|on|behind|beside|by|near|across)\s+[^,]{1,40},)\s*(?:\w+\s+){0,4}$", re.I)
-_OBJECT_OF = re.compile(r"\b(?:for|of|about|after|from|like|than|concerning|regarding)\s+"
-                        r"(?:the|a|an|that|this)"
-                        r"\s+(?:\w+\s+){0,2}$", re.I)
-
-
-def _shown_in(sentence: str, head: str) -> bool:
-    """Whether this sentence shows the person its `head` names here, by a cue of theirs."""
-    for m in re.finditer(rf"\b{re.escape(head)}s?\b", sentence, re.I):
-        before = sentence[max(0, m.start() - 70):m.start()]
-        if _OBJECT_OF.search(before):
-            continue                       # "the search for the woman", "the memory of a man"
-        after = sentence[m.end():m.end() + 70]
-        clause = re.split(r"[,;:—–]|\bwho\b|\bthat\b|\bwhich\b|\band\b", after, maxsplit=1)[0]
-        if _cue().search(" ".join(clause.split()[:6])):
-            return True
-        # "a man who stands in the doorway": the relative clause is still his.
-        rel = re.match(r"\s*,?\s*(?:who|that)\s+((?:\w+\s+){0,4})", after, re.I)
-        if rel and _cue().search(rel.group(1)):
-            return True
-        if _LOOKED_AT.search(before):
-            return True
-    return False
-
-
-# A head that says nothing of who: the prose's word for somebody not yet made out.
+# A head that says nothing of who: the prose's word for somebody not yet made out. Read by
+# `_householder`: in somebody's own house, "a figure at the top of the stairs" is them.
 _VAGUE_HEADS = frozenset({"figure", "shape", "silhouette", "form", "person"})
-
-
-def _gendered(beat: str, phrase: str) -> str:
-    """"figure" → "woman" when the beat goes on to say so ("a figure is silhouetted … It
-    is a woman"): the owner's next words were "the woman", and every "her" after it went to
-    the only woman the engine held (Quin Nutmeg, in another room). Only a vague head, and
-    only an explicit "it is a woman" within the next two sentences — a pronoun guess would
-    hand the figure somebody else's "she"."""
-    from .narration import _sentences, unquoted
-
-    head = _role_head(phrase)
-    if head not in _VAGUE_HEADS:
-        return phrase
-    sentences = _sentences(unquoted(beat))
-    for i, s in enumerate(sentences):
-        if not re.search(rf"\b{re.escape(head)}\b", s, re.I):
-            continue
-        window = " ".join(sentences[i:i + 3])
-        m = re.search(rf"\b(?:it|they|the\s+(?:\w+\s+)?{re.escape(head)})\s+(?:is|was|turns\s+"
-                      rf"out\s+to\s+be|proves\s+to\s+be)\s+(?:a|an)\s+(?:[a-z]+\s+){{0,2}}?"
-                      rf"(woman|man|girl|boy)\b", window, re.I)
-        if m:
-            return re.sub(rf"\b{re.escape(head)}\b", m.group(1).lower(), phrase, count=1,
-                          flags=re.I)
-        break
-    return phrase
-
-
-def _said_to_live(beat: str, phrase: str) -> bool:
-    """Whether the beat says this person lives somewhere: "a human woman lives there"."""
-    from .narration import _sentences, unquoted
-
-    head = _role_head(phrase)
-    return bool(head) and any(
-        re.search(rf"\b{re.escape(head)}\b.*\b(?:lives?|dwells?|resides?)\b", s, re.I)
-        or re.search(rf"\bwho\s+lives\b.*\b{re.escape(head)}\b", s, re.I)
-        for s in _sentences(unquoted(beat or "")))
 
 
 def _the_one_talking(scene) -> str:

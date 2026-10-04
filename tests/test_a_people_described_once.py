@@ -64,7 +64,7 @@ class TestOnceIsRead_OffWhoHasBeenDescribed:
             b.appearance, faces.people_seen_before(b, s.people.values())))
         # Lower-cased after the colon: the age line is ours, and its capital was read as
         # an invented name ("Somewhere", three faults in one live run, 2026-09-25).
-        assert said == ("Ashla is an Orc: old enough to have stopped counting; a fringe "
+        assert said == ("Ashla is of the Orc people: old enough to have stopped counting; a fringe "
                         "cut straight across, badly.")
         assert "Powerfully built" not in said
 

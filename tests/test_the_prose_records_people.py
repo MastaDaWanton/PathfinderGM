@@ -15,8 +15,10 @@ and a newcomer only the prose describes is rewritten out.
 
 Overturned in part on 2026-10-01 by the owner: somebody the prose SHOWS here and now is a
 full person at once ("if i can see them they should be in the scene"). The misread risk
-above is why that door reads strictly (`judgement.seen_in_beat`) and caps a beat at three
-(tests/test_seen_people.py). Somebody only spoken of stays a record.
+above is why that door caps a beat at three (tests/test_seen_people.py). Somebody only
+spoken of stays a record. Who is shown and who only spoken of was read here by
+`judgement.seen_in_beat`'s cue words until 2026-10-03; it is the beat reader's answer now
+(gm/beat_reader.py), stubbed in these tests with what a careful reader says.
 """
 from __future__ import annotations
 
@@ -80,6 +82,22 @@ def test_somebody_the_prose_shows_here_is_a_record_with_a_body(live, monkeypatch
     beat = ("The square is busy with the noon trade. A woman watching from a doorway "
             "follows you with her eyes and does not look away when you notice. " * 3
             + "What do you do?")
+    from gm import beat_reader
+    from tests.beat_reader import stub
+
+    real_read = beat_reader.read
+
+    def read(text, scene, **kw):
+        # Every "A woman" of the beat as it stands after grooming: the first new and here,
+        # the rest the same woman.
+        n = stub._mention_ids(text, scene).get("a woman", [])
+        who = {"A woman": "new", **{f"A woman#{i}": "same as A woman"
+                                    for i in range(2, len(n) + 1)}}
+        kw["chat"] = stub.chat(stub.people_answer(
+            text, scene, who=who, new=[("A woman", "here", "woman watching from a doorway")]))
+        return real_read(text, scene, **kw)
+
+    monkeypatch.setattr(beat_reader, "read", read)
     c = _turn(live, monkeypatch, beat)
     her = [r for r in c.scene.population.values() if "woman" in r["phrase"]]
     assert len(her) == 1, [r["phrase"] for r in c.scene.population.values()]
