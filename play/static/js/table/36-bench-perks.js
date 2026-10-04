@@ -55,7 +55,7 @@
         { id: "quality", name: "Quality", words: "Your ceiling rises one rung." },
         { id: "yield", name: "Extra yield", words: "A chance of one more ingot or blank from each Smelt or Forge." },
       ],
-      icon: { potency: "anvil", hardening: "quench", quality: "whetstone", yield: "ingot" },
+      icon: { potency: "anvil", hardening: "quench", quality: "hone", yield: "ingot" },
     },
   };
 
