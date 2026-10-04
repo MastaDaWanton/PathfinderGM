@@ -51,6 +51,35 @@
   var METHODS = ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep",
     "neutralize"];
 
+  // THE FORGE'S GAMES (docs/blacksmithing-contracts.md §11, UI plan §6.4, added 2026-10-04).
+  // The ten smithing games under js/forge-games/ plug in exactly as the herb games do, on the
+  // same registry. METHODS above stays the herb bench's fixed list (its vocabulary is
+  // herbalism-contracts §2); any other definition on the registry is a method by
+  // registration, and `BenchGames.methods` lists both, herbs first. A definition may carry:
+  //   track:  "forge" (so `BenchGames.methodsFor("forge")` finds it);
+  //   HEAT:   the metal's default heat {label, band, hearth_c, cool_rate, burn_c?, start_c?,
+  //           steadyBand?, reheat?, coldHint?}. The frame then owns the heat: it builds it
+  //           from this and the server's `opts.heat` {start_c, hearth_c, band, cool_rate,
+  //           narrow}, cools it every frame, takes R (and a Reheat button) as the reheat,
+  //           draws the gauge under the game's meter, shows the number in °C in the hint
+  //           column, and puts "Reheat: R" in the hint, in words, while the metal is too cold.
+  //           Heat colour is content: the blackbody colours appear on the gauge's scale only;
+  //           its needle and outline are the chrome's gold and ink (UI plan §4).
+  //   SOUNDS: names on the `forge` bus the frame plays instead of `bench.*` (UI plan §11),
+  //           {hit, miss, reheat, ...}; a game asks for one by key through `ctx.cue(key)`.
+  // Every rule above holds for them unchanged: one loop, no release in Steady mode, no repeat.
+
+  // Every method a game is registered for: the herb list first, in its fixed order, then any
+  // other definition on the registry in the order it registered. Read at call time, so a game
+  // file loaded after this one is still found (the registry is one shared object).
+  function allMethods() {
+    var out = METHODS.slice();
+    Object.keys(DEFS).forEach(function (m) {
+      if (out.indexOf(m) < 0 && DEFS[m] && typeof DEFS[m].create === "function") out.push(m);
+    });
+    return out;
+  }
+
   // theme-v2.css values, used only when a token cannot be read (a page without the theme,
   // a detached mount). tests/test_bench_games.py checks every one is the theme's own.
   var FALLBACK = {
@@ -494,6 +523,25 @@
     var help = el("button", "bench-game__help", "?");
     help.type = "button";
     help.setAttribute("aria-label", "How to play");
+    // A forge game's heat: the number in °C above the hint (the gauge itself is drawn on the
+    // canvas), the hint spoken when it changes (it changes only for heat and the end), and a
+    // Reheat button for a player without a keyboard (UI plan §7.2: "R, or click the hearth";
+    // the strip has no hearth to click, so the button is the hearth).
+    var heatNum = null, reheat = null;
+    if (def.HEAT) {
+      root.classList.add("has-heat");
+      heatNum = el("p", "bench-game__heat-num");
+      heatNum.setAttribute("aria-label", (def.HEAT.label || "Heat") + " in degrees");
+      hint.appendChild(heatNum);
+      hintText.setAttribute("aria-live", "polite");
+      if (def.HEAT.reheat !== false) {
+        reheat = el("button", "bench-game__act bench-game__reheat", "Reheat");
+        reheat.type = "button";
+        reheat.setAttribute("aria-keyshortcuts", "R");
+        tools.appendChild(reheat);
+      }
+    }
+    if (def.track) root.classList.add("bench-game--" + def.track);
     tools.appendChild(help);
     hint.appendChild(hintText);
     hint.appendChild(tools);
@@ -526,7 +574,7 @@
 
     return { root: root, thread: thread, meter: meter, canvas: canvas, hint: hint, tier: tier,
       hintText: hintText, tools: tools, help: help, word: word, band: band, live: live,
-      card: card, cardText: cardText, cardSub: cardSub };
+      card: card, cardText: cardText, cardSub: cardSub, heatNum: heatNum, reheat: reheat };
   }
 
   // --- the loop ---------------------------------------------------------------------------
@@ -546,7 +594,10 @@
     g.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
     g.clearRect(0, 0, r.W, r.H);
     if (r.W < 2 || r.H < 2) return;
-    r.game.draw(g, r.W, r.H);
+    // A heat game draws in the meter above the gauge; the gauge takes the foot.
+    var gh = r.heat ? GAUGE_H : 0;
+    r.game.draw(g, r.W, r.H - gh);
+    if (r.heat) drawGauge(r, g, r.W, r.H - gh);
     if (r.particles.length) drawParticles(r, g);
     var p = r.game.progress ? r.game.progress(r.t) : r.t / r.game.duration;
     r.dom.thread.style.transform = "scaleX(" + clamp(p, 0, 1).toFixed(4) + ")";
@@ -558,13 +609,21 @@
     if (!r || r.phase !== "play") { if (r) r.raf = 0; return; }
     var dt = clamp((now - r.last) / 1000, 0, 0.05);
     r.last = now;
-    r.t += dt;
-    r.game.tick(dt, r.t);
+    advance(r, dt);
     stepParticles(r, dt);
     paint(r);
     feed(r);
     if (r.game.done() || r.t >= r.game.duration) { finish(r, false); return; }
     r.raf = window.requestAnimationFrame(loop);
+  }
+
+  // One step of game time, shared by the loop and the headless `simulate` (so what the node
+  // tests drive is what the strip plays): the heat cools or reheats first, then the game reads
+  // it on the same frame.
+  function advance(r, dt) {
+    r.t += dt;
+    if (r.heat) r.heat.step(dt);
+    r.game.tick(dt, r.t);
   }
 
   function start(r) {
@@ -578,15 +637,43 @@
   // Hand the stage its state, the page its score, the listener its band.
   function feed(r) {
     if (r.stage) {
-      try { r.stage.update(r.game.state()); }
+      // The forge's stage (contracts §11, `ForgeStage`) takes `heat(celsius)` and may have no
+      // `update`; a missing method is skipped, never a throw that drops the stage.
+      try {
+        if (typeof r.stage.update === "function") r.stage.update(r.game.state());
+        if (r.heat && typeof r.stage.heat === "function") r.stage.heat(r.heat.c);
+      }
       catch (e) { r.stage = null; if (window.console) console.warn("bench stage update failed; the strip plays on", e); }
     }
+    if (r.heat) showHeat(r);
+    else if (r.game.hint) setHint(r, hintNow(r));
     var s = clamp(r.game.score(), 0, 1);
     if (Math.abs(s - r.lastScore) >= 0.004) {
       r.lastScore = s;
       if (r.onScore) { try { r.onScore(s); } catch (e) { if (window.console) console.warn(e); } }
     }
     showBand(r, s);
+  }
+
+  // The hint's words change only when they really change: the hint is a live region on a
+  // heat game, and a region rewritten every frame would be read out every frame.
+  function setHint(r, text) {
+    if (r.phase === "done" || text === r.hintShown) return;
+    r.hintShown = text;
+    r.dom.hintText.textContent = text;
+  }
+  // The number in °C (rounded to 5, so it reads instead of flickering), the hint, and a class
+  // on the strip naming the heat's state for the stylesheet.
+  function showHeat(r) {
+    var n = degrees(r.heat.c), s = r.heat.status();
+    if (r.dom.heatNum && n !== r.heatShown) { r.heatShown = n; r.dom.heatNum.textContent = n; }
+    if (s !== r.heatState) {
+      if (r.heatState) r.dom.root.classList.remove("heat-" + r.heatState);
+      r.heatState = s;
+      r.dom.root.classList.add("heat-" + s);
+      if (r.dom.reheat) r.dom.reheat.disabled = s === "reheating";
+    }
+    setHint(r, hintNow(r));
   }
 
   // The live band. Bounds come from `tuning.bands` (ascending lower bounds) when the
@@ -673,8 +760,35 @@
     var baseWin = lerp(1.35, 0.85, d);
     var baseSpeed = lerp(0.85, 1.15, d);
     var seed = tuning.seed != null ? (tuning.seed | 0) : ((Math.random() * 1e9) | 0);
+    // The forge's window (contracts §11). The server's `tuning.band_scale` already folds in
+    // the working traits (forgiving 1.2, narrow_window 0.8, rules/blacksmith.py tuning_for);
+    // `opts.heat.narrow` says "better metal narrows the window" (Giants' Foundry, prior art
+    // §5.4) and counts only when the band scale has not already counted narrow_window, so a
+    // narrow metal is never narrowed twice (0.64 where the rule says 0.8).
+    var heatIn = opts.heat && typeof opts.heat === "object" ? opts.heat : null;
+    var traits = Array.isArray(tuning.traits) ? tuning.traits : [];
+    var narrow = !!(heatIn && heatIn.narrow) || traits.indexOf("narrow_window") >= 0;
+    var bs = +tuning.band_scale;
+    var bandScale = finite(bs) && bs > 0 ? clamp(bs, 0.5, 1.6) : 1;
+    if (heatIn && heatIn.narrow && traits.indexOf("narrow_window") < 0) bandScale *= NARROW;
+    r.bandScale = bandScale;
+    r.heat = r.def.HEAT ? makeHeat(r.def.HEAT, heatIn, steady, baseWin * bandScale, narrow) : null;
+    var voice = { hardness: tuning.hardness, bath: tuning.bath };
     return {
       method: r.def.id,
+      // The forge's additions: the heat the frame owns (null for a game without one), the
+      // band scale, and `band(steadyFactor)`, the window multiplier a forge game uses: the
+      // generous start times the band scale, times the game's own Steady factor from the UI
+      // plan §9 table (they differ by game: x1.5 for Alloy, x1.6 for Forge's ring).
+      heat: r.heat,
+      narrow: narrow,
+      bandScale: bandScale,
+      band: function (steadyFactor) { return baseWin * bandScale * (steady ? (steadyFactor || 1) : 1); },
+      // A named sound from the game's own SOUNDS (the forge bus); an unknown key is silent.
+      cue: function (key, o) {
+        var name = r.def.SOUNDS && r.def.SOUNDS[key];
+        if (name) sound(name, Object.assign({}, voice, o || {}));
+      },
       tuning: tuning,
       part: opts.part || tuning.part || "leaf",
       steady: steady,
@@ -699,8 +813,9 @@
       hit: function (strength, x, y, kind, index) {
         var s = clamp(strength == null ? 1 : strength, 0, 1);
         r.hits++;
-        sound("bench.hit." + r.def.id, { volume: 0.5 + 0.5 * s });
-        if (r.stage) {
+        var hs = r.def.SOUNDS && r.def.SOUNDS.hit;
+        sound(hs || "bench.hit." + r.def.id, Object.assign({}, voice, { volume: 0.5 + 0.5 * s }));
+        if (r.stage && typeof r.stage.hit === "function") {
           try { if (typeof index === "number") r.stage.hit(s, index); else r.stage.hit(s); }
           catch (e) { r.stage = null; }
         }
@@ -709,13 +824,15 @@
       },
       miss: function (index) {
         r.misses++;
-        sound("bench.miss." + r.def.id);
-        if (r.stage) {
+        var ms = r.def.SOUNDS && r.def.SOUNDS.miss;
+        sound(ms || "bench.miss." + r.def.id, voice);
+        if (r.stage && typeof r.stage.miss === "function") {
           try { if (typeof index === "number") r.stage.miss(index); else r.stage.miss(); }
           catch (e) { r.stage = null; }
         }
       },
       tick: function () {
+        if (typeof performance === "undefined") return;
         var now = performance.now();
         if (now - tickSoundAt < 400) return;
         tickSoundAt = now;
@@ -728,7 +845,22 @@
   function keyName(e) {
     if (e.key === " " || e.key === "Spacebar") return "Space";
     if (/^Numpad[0-9]$/.test(e.code || "")) return e.code.slice(6);
+    // A letter is its capital, so R reheats with or without Shift or Caps Lock (the forge's
+    // R and T; no herb game uses a letter).
+    if (e.key && e.key.length === 1 && /[a-z]/i.test(e.key)) return e.key.toUpperCase();
     return e.key;
+  }
+
+  // R is the frame's, not the game's, in a game with heat it can reheat: one reheat path for
+  // all five heat games, counted once, and the same as the Reheat button. Answers whether it
+  // took the key.
+  function reheatKey(r, key) {
+    if (key !== "R" || !r.heat || !r.heat.canReheat) return false;
+    if (r.heat.reheat()) {
+      var rs = r.def.SOUNDS && r.def.SOUNDS.reheat;
+      if (rs) sound(rs, {});
+    }
+    return true;
   }
   function typing(t) {
     if (!t || !t.tagName) return false;
@@ -754,6 +886,7 @@
     swallow(e);
     if (e.repeat || r.held.keys[key]) return;   // auto-repeat is a hold, not a run of presses
     r.held.keys[key] = true;
+    if (reheatKey(r, key)) return;
     r.game.down({ src: "key", key: key });
   }
 
@@ -836,6 +969,10 @@
       button: function (e) {
         e.preventDefault();
         if (r.phase === "play" && r.game.button) r.game.button.press();
+      },
+      reheat: function (e) {
+        e.preventDefault();
+        if (r.phase === "play") reheatKey(r, "R");
       }
     };
     window.addEventListener("keydown", onKeyDown, true);
@@ -848,6 +985,7 @@
     r.dom.root.addEventListener("pointerdown", r.on.down);
     r.dom.help.addEventListener("click", r.on.help);
     if (r.dom.button) r.dom.button.addEventListener("click", r.on.button);
+    if (r.dom.reheat) r.dom.reheat.addEventListener("click", r.on.reheat);
     if (window.ResizeObserver) {
       // A resize repaints once; it never starts a loop.
       r.ro = new ResizeObserver(function () { if (r.phase !== "play") { paint(r); } });
@@ -867,6 +1005,7 @@
       r.dom.root.removeEventListener("pointerdown", r.on.down);
       r.dom.help.removeEventListener("click", r.on.help);
       if (r.dom.button) r.dom.button.removeEventListener("click", r.on.button);
+      if (r.dom.reheat) r.dom.reheat.removeEventListener("click", r.on.reheat);
     }
     if (r.ro) { r.ro.disconnect(); r.ro = null; }
   }
@@ -912,13 +1051,20 @@
     Array.prototype.forEach.call(r.dom.band.children, function (p) { p.className = ""; });
     r.dom.hintText.textContent = stopped ? "Stopped" : "Done";
     if (r.dom.button) r.dom.button.disabled = true;
+    if (r.dom.reheat) r.dom.reheat.disabled = true;
     if (r.stage) {
-      try { r.stage.update(r.game.state()); r.stage.end(); } catch (e) { /* the result still stands */ }
+      try {
+        if (typeof r.stage.update === "function") r.stage.update(r.game.state());
+        if (typeof r.stage.end === "function") r.stage.end();
+      } catch (e) { /* the result still stands */ }
     }
     if (r.onScore) { try { r.onScore(score); } catch (e) { if (window.console) console.warn(e); } }
     if (!stopped && score >= 0.6) seenSet(r.def.id);
     if (run === r) run = null;
-    r.resolve({ score: score, stopped: !!stopped, hits: r.hits, misses: r.misses });
+    // `reheats` is what /api/forge/finish charges world minutes for (forge_views, plan §11);
+    // 0 for a game without heat, so the herb bench's result only gains a zero.
+    r.resolve({ score: score, stopped: !!stopped, hits: r.hits, misses: r.misses,
+      reheats: r.heat ? r.heat.reheats : 0 });
   }
 
   // --- the API ----------------------------------------------------------------------------
@@ -964,7 +1110,11 @@
       bind(r);
       paint(r);
       showBand(r, 0);
-      if (r.stage) { try { r.stage.update(r.game.state()); } catch (e) { r.stage = null; } }
+      if (r.heat) showHeat(r);
+      if (r.stage) {
+        try { if (typeof r.stage.update === "function") r.stage.update(r.game.state()); }
+        catch (e) { r.stage = null; }
+      }
       // The first-time card: two seconds, then the game starts by itself; Space or a click
       // starts it sooner. Shown until the player scores 0.6 or better in this game.
       if (!seenGet(def.id)) {
@@ -980,13 +1130,66 @@
   function pause() { if (run) pauseRun(run, "Paused. Press Space to carry on."); }
   function resume() { if (run && (run.phase === "paused" || run.phase === "card")) carryOn(run); }
 
+  // A game with no strip: the same ctx, heat, R and Steady rules as `play`, stepped by the
+  // caller instead of the loop, and nothing drawn. For tests and tuning (tests/
+  // test_forge_games.py drives every game through it in node), so what is measured is the
+  // frame's own path: `advance` is the loop's step, `reheatKey` the keyboard's R, and a
+  // release in Steady mode is dropped here exactly as onKeyUp drops it.
+  function simulate(opts) {
+    opts = opts || {};
+    var def = DEFS[opts.method];
+    if (!def) throw new Error("No minigame for the method " + opts.method);
+    var C = Object.assign({}, FALLBACK, { display: "serif", body: "serif" });
+    var r = {
+      def: def, dom: null, stage: null, onScore: null, steady: !!opts.steady, reduced: true,
+      t: 0, hits: 0, misses: 0, phase: "play", particles: [], rng: KIT.rng(7), C: C,
+      held: { keys: {}, pointer: false }, pointer: { x: -1, y: -1, inside: false, down: false }
+    };
+    var ctx = makeCtx(r, opts);
+    r.game = def.create(ctx);
+    return {
+      game: r.game, heat: r.heat, ctx: ctx,
+      t: function () { return r.t; },
+      step: function (dt) { advance(r, dt); return !!(r.game.done() || r.t >= r.game.duration); },
+      press: function (key) { if (!reheatKey(r, key)) r.game.down({ src: "key", key: key }); },
+      release: function (key) {
+        if (r.steady || !r.game.up) return;   // STEADY-NO-RELEASE, as onKeyUp
+        r.game.up({ src: "key", key: key });
+      },
+      pointer: function (kind, x, y) {
+        r.pointer.x = x; r.pointer.y = y; r.pointer.inside = true;
+        var inp = { src: "pointer", x: x, y: y, inside: true, down: r.pointer.down };
+        if (kind === "down") { r.pointer.down = true; inp.down = true; r.game.down(inp); }
+        else if (kind === "move") { if (r.game.move) r.game.move(inp); }
+        else if (kind === "up") {
+          r.pointer.down = false;
+          if (r.steady || !r.game.up) return;   // STEADY-NO-RELEASE, as onPointerUp
+          r.game.up(inp);
+        }
+      },
+      button: function () { if (r.game.button) r.game.button.press(); },
+      hint: function () { return hintNow(r); },
+      result: function () {
+        return { score: clamp(+r.game.score() || 0, 0, 1), hits: r.hits, misses: r.misses,
+          reheats: r.heat ? r.heat.reheats : 0 };
+      }
+    };
+  }
+
   window.BenchGames = {
     play: play,
     stop: stop,
     pause: pause,
     resume: resume,
-    methods: METHODS.slice(),
+    methodsFor: function (track) {
+      return allMethods().filter(function (m) { return (DEFS[m] && DEFS[m].track || "herb") === track; });
+    },
+    simulate: simulate,
+    gauge: { names: HEAT_NAMES.map(function (b) { return b.name; }), degrees: degrees },
     running: function () { return !!run; },
     kit: KIT
   };
+  // `methods` is read when asked, so a game registered after this file loaded is listed too
+  // (contracts §11: the method list is extensible by registration). Herbs first, unchanged.
+  Object.defineProperty(window.BenchGames, "methods", { get: allMethods, enumerable: true });
 })();
