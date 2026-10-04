@@ -38,8 +38,10 @@
      the scene (UI plan §4); the chrome never sees it. Patterns are the herb shader's own:
      1 grain, 2 stone, 3 clay, 4 lumps (a bent normal), 5 iron blotch, 6 leather, 7 char. */
   var BASE = {
-    anvil: { color: [0.11, 0.105, 0.1], spec: 0.7, shin: 30, pattern: 5, metal: 0.45 },
-    face: { color: [0.36, 0.35, 0.34], spec: 1.3, shin: 64, metal: 0.7 },
+    // Measured in the scratch harness: at 0.11 the anvil read as a black hole under a cherry
+    // blank even with the blank's light on it; 0.2 lets the heat show on its body.
+    anvil: { color: [0.2, 0.19, 0.18], spec: 0.8, shin: 30, pattern: 5, metal: 0.45 },
+    face: { color: [0.45, 0.44, 0.43], spec: 1.4, shin: 64, metal: 0.7 },
     iron: { color: [0.16, 0.15, 0.14], spec: 0.55, shin: 22, pattern: 5, metal: 0.3 },
     steel: { color: [0.6, 0.6, 0.62], spec: 1.2, shin: 60, metal: 0.6 },
     brass: { color: [0.78, 0.6, 0.32], spec: 1.0, shin: 26, metal: 1 },
@@ -208,6 +210,26 @@
     return { node: node(weld(parts), m, { glint: false }), mat: m };
   }
 
+  /* Flame: a few small additive tongues of different heights rather than one cone. The first
+     pass was a single cone 0.26 tall, and in the harness it read as a yellow paper triangle
+     stood on the coals. set(k) follows the hearth's heat. */
+  function tongues(parent, at, size) {
+    var shape = G.lathe([[0, 0], [0.035, 0.02], [0.026, 0.07], [0.01, 0.12], [0, 0.14]], 9, 70);
+    var outer = mat("flame", { alpha: 0.3 }), inner = mat("flame", { color: [1.0, 0.78, 0.4], alpha: 0.3 });
+    var spots = [[0, 0, 0, 1.2], [0.07, 0, 0.03, 0.8], [-0.06, 0, -0.04, 0.95], [0.02, 0, -0.08, 0.7], [-0.04, 0, 0.07, 0.75]];
+    var nodes = spots.map(function (s, i) {
+      return add(parent, node(shape, i ? outer : inner, { pos: [at[0] + s[0] * size, at[1], at[2] + s[2] * size],
+                                                         rot: [0, i * 1.3, 0], glint: false, base: s[3] * size }));
+    });
+    return {
+      nodes: nodes,
+      set: function (k) {
+        outer.alpha = 0.06 + 0.3 * k; inner.alpha = 0.08 + 0.35 * k;
+        nodes.forEach(function (n) { var h = n.base * (0.5 + 0.9 * k); n.scl = [n.base, h, n.base]; });
+      }
+    };
+  }
+
   /* The field hearth: a ring of stones round a coal bed in a scorch, with the glow above it.
      setHeat(k) is 0 (banked) .. 1 (white under the bellows). */
   function fieldHearth() {
@@ -222,14 +244,12 @@
     add(g, coals.node);
     var glowM = mat("glow", { alpha: 0.4 });
     var glow = add(g, node(G.disc(0.45, 32), glowM, { pos: [0, 0.07, 0], glint: false }));
-    var flameM = mat("flame", { alpha: 0.5 });
-    var flame = add(g, node(G.lathe([[0, 0], [0.1, 0.02], [0.06, 0.12], [0, 0.26]], 10, 70), flameM, { pos: [0, 0.03, 0], glint: false }));
+    var flame = tongues(g, [0, 0.03, 0], 1);
     function setHeat(k) {
       k = Math.max(0, Math.min(1.3, k));
       coals.mat.emit = [0.5 * k + 0.08, 0.13 * k + 0.012, 0.02 * k];
       glowM.alpha = 0.12 + 0.38 * k;
-      flameM.alpha = 0.15 + 0.5 * k;
-      flame.scl = [1, 0.6 + 0.8 * k, 1];
+      flame.set(k);
     }
     setHeat(0.5);
     return { root: g, setHeat: setHeat, fire: [0, 0.12, 0], flame: flame, glow: glow, coals: coals.node };
@@ -246,32 +266,37 @@
       [G.box(1.0, 0.16, 0.8), [0, 1.28, -0.06]]
     ]);
     add(g, node(brick, mat("brick")));
-    // The hood: a square frustum (a four-step lathe), turned square to the wall.
-    add(g, node(G.lathe([[0.62, 0], [0.3, 0.75], [0.22, 1.6]], 4, 10), mat("brick", { color: [0.3, 0.16, 0.11] }),
-                { pos: [0, 1.36, -0.12], rot: [0, Math.PI / 4, 0], scl: [1, 1, 0.8] }));
+    // The hood: a straight square frustum (a four-step lathe turned square to the wall) and a
+    // chimney. A curved three-point profile was tried first and read as a wine bottle. The
+    // hood is left out of the camera's fit (`noFit`): it is tall, and fitting it framed the
+    // whole room with the anvil a speck in the middle.
+    add(g, node(weld([[G.lathe([[0.7, 0], [0.3, 0.55]], 4, 10), [0, 0, 0], [0, Math.PI / 4, 0], [1, 1, 0.8]],
+                      [G.box(0.36, 1.2, 0.3), [0, 1.15, -0.04]]]),
+                mat("brick", { color: [0.3, 0.16, 0.11] }), { pos: [0, 1.36, -0.12], noFit: true }));
     add(g, node(G.box(1.04, 0.05, 0.84), mat("stone", { color: [0.33, 0.31, 0.29] }), { pos: [0, 0.72, 0] }));
-    // The mouth: a soot-black recess with the fire's heart inside it.
-    add(g, node(G.box(0.36, 0.5, 0.5), mat("soot"), { pos: [0, 0.95, 0.12] }));
+    // The mouth: a sooted recess lit from within by the fire, and the fire's heart in front of
+    // it. The first harness capture had the heart disc INSIDE the recess box (hidden) and the
+    // mouth read as a black hole; the recess now glows with the hearth's heat itself.
+    var recessM = mat("soot", { emit: [0.2, 0.05, 0.01] });
+    add(g, node(G.box(0.36, 0.5, 0.5), recessM, { pos: [0, 0.95, 0.1] }));
     var heartM = mat("glow", { radial: 0.9, alpha: 0.9 });
-    var heart = add(g, node(G.disc(0.24, 28), heartM, { pos: [0, 0.92, 0.34], rot: [Math.PI / 2, 0, 0], glint: false }));
+    var heart = add(g, node(G.disc(0.22, 28), heartM, { pos: [0, 0.9, 0.37], rot: [Math.PI / 2, 0, 0], glint: false }));
     var coals = coalBed(0.2, 30, 11);
     coals.node.pos = [0, 0.745, 0.12];
     coals.node.scl = [1.1, 1, 0.8];
     add(g, coals.node);
     var glowM = mat("glow", { alpha: 0.35 });
     add(g, node(G.disc(0.42, 28), glowM, { pos: [0, 0.8, 0.14], glint: false }));
-    var flameM = mat("flame", { alpha: 0.5 });
-    var flame = add(g, node(G.lathe([[0, 0], [0.12, 0.02], [0.07, 0.15], [0, 0.32]], 10, 70), flameM,
-                            { pos: [0, 0.76, 0.1], glint: false }));
+    var flame = tongues(g, [0, 0.76, 0.1], 1.1);
     add(g, shadow(0.8, 0.5, { scl: [1.2, 1, 0.8] }));
     function setHeat(k) {
       k = Math.max(0, Math.min(1.3, k));
       coals.mat.emit = [0.55 * k + 0.1, 0.15 * k + 0.015, 0.025 * k];
+      recessM.emit = [0.12 + 0.45 * k, 0.03 + 0.16 * k * k, 0.005 + 0.04 * k * k];
       heartM.color = [1.0, 0.36 + 0.4 * k, 0.1 + 0.25 * k * k];
       heartM.alpha = 0.35 + 0.6 * k;
       glowM.alpha = 0.12 + 0.36 * k;
-      flameM.alpha = 0.15 + 0.5 * k;
-      flame.scl = [1, 0.6 + 0.8 * k, 1];
+      flame.set(k);
     }
     setHeat(0.5);
     return { root: g, setHeat: setHeat, fire: [0, 0.85, 0.15], flame: flame, heart: heart };
