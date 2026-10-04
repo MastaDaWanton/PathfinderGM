@@ -4762,9 +4762,16 @@ def keep_movement_in_the_scene(raw_intents, player_text: str, scene, known=(),
         if op == "travel":
             where = str(params.get("place") or "")
             # A travel with nowhere in it is the schema's insistence on one for a
-            # sentence that only crosses the room; it goes too.
-            if params.get("biome") or (where and (places_mod.find(known, where) is not None
-                                                  or said_elsewhere(where))):
+            # sentence that only crosses the room; it goes too. And a travel to a place
+            # the town has stands only when the words name it: measured on the merged
+            # 0.2.7 master, once forge lane G gave every settlement its smithy, "I pocket
+            # the coins and head for the side door" kept the plan's walk to the smithy —
+            # a real place now, and still a place the player never said. On a turn whose
+            # words only cross the room, a walk to an unnamed place is the planner's.
+            kp = places_mod.find(known, where) if where else None
+            named = bool(where) and (said_elsewhere(where) or
+                                     (kp is not None and said_elsewhere(str(kp.name))))
+            if params.get("biome") or named:
                 out.append(r)
                 continue
             dropped.append(f"travel to {where!r}" if where else "a travel to nowhere")

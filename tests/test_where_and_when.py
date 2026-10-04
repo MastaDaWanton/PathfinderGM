@@ -71,7 +71,9 @@ def test_heading_for_the_side_door_does_not_found_the_smithy():
     smithy"; the player wrote only "head for the side door", and the plan founded *the
     smithy* off the counting house and walked into it — the turn after, the prose had
     them at the forge. A door is a thing in the room (Inform's `thing`, not its
-    `room`), so walking to it is no journey."""
+    `room`), so walking to it is no journey. Since forge lane G every settlement has a
+    smithy, so the plan's walk there is to a real place now — and it still goes: the
+    words never named it."""
     s, e = _at("the counting house")
     plan = [{"op": "found", "actor": "pc", "params": {"name": "the smithy", "kind": "smithy",
                                                       "parent": "the counting house"}},
