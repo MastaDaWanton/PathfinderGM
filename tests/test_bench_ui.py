@@ -218,7 +218,9 @@ def test_motion_is_transform_and_opacity_and_reduced_motion_is_honoured():
             assert prop in ("opacity", "transform"), prop
     assert "@media (prefers-reduced-motion: reduce)" in css
     assert ".bench.bench-still" in css
-    shell = _src(STATIC / "js" / "table" / "30-bench-shell.js")
+    # The preferences and providers moved into 29-bench-core.js with the core split
+    # (lane U1, 2026-10-03), which the herb shell runs on: both files are the shell now.
+    shell = _src(STATIC / "js" / "table" / "29-bench-core.js") + _src(STATIC / "js" / "table" / "30-bench-shell.js")
     assert 'PGMPrefs.get("flourishes") === "short"' in shell
     assert "prefers-reduced-motion: reduce" in shell
 
@@ -231,7 +233,9 @@ def test_the_bench_runs_with_no_stage_no_games_and_no_sound():
     stage falls back to the tool's icon at 160px (UI plan §6.3), the games to a middling
     score so a reserved craft is never stranded, and sound and prefs to nothing and to the
     page's own `pgm.steady` key."""
-    shell = _src(STATIC / "js" / "table" / "30-bench-shell.js")
+    # The preferences and providers moved into 29-bench-core.js with the core split
+    # (lane U1, 2026-10-03), which the herb shell runs on: both files are the shell now.
+    shell = _src(STATIC / "js" / "table" / "29-bench-core.js") + _src(STATIC / "js" / "table" / "30-bench-shell.js")
     assert "window.BenchStage" in shell and "s.available()" in shell
     assert 'BenchIcons.el(m, { size: 160 })' in shell
     assert "games && typeof games.play === \"function\"" in shell
