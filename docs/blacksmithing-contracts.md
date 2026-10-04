@@ -241,3 +241,72 @@ player's words.
 - **Live checks** only on scratch data (`PATHFINDER_GM_DATA`), never `%LOCALAPPDATA%\PathfinderGM`.
 - Commit on your lane branch with named paths (`git add <file>`, never `-a`), and report: what was
   built, the test counts, anything measured, anything not done.
+
+---
+
+# Wave 2 (written 2026-10-04, after wave 1 merged at d3d89a4, 8487 passed)
+
+## 10. File ownership (wave 2)
+
+Every lane starts with `git switch -c lane/forge-<id> forge/revamp`.
+
+| Lane | Owns | Reads only |
+|---|---|---|
+| **U2: forge shell + old tab** | NEW `play/static/js/table/40-forge-shell.js`, `41-forge-rack.js`, `43-forge-order.js`; NEW `play/static/css/forge.css`; `play/templates/play/table.html` (the `#forge` layer markup, its script and link tags, the Smithing button); `play/templates/play/craft.html` (the Blacksmithing card); `play/static/js/table/29-bench-core.js` (move the roll's Dice3D ask/land/verdict sequence in from the herb shell, and fix the two bugs lane F found: Esc ignored when focus is on `<body>` during a game, and focus lost after a finish); `play/static/js/table/30-bench-shell.js` (only to call the moved roll sequence); `play/forge_views.py` (any response field the page needs); `tests/test_forge_ui.py` | `42-forge-stage.js`, `44-forge-ledger.js`, `forge-games/` (call their §11 interfaces if present, flat fallback if not) |
+| **U3: forge games** | NEW `play/static/js/forge-games/*.js` (smelt, alloy, forge, quench, temper, fold, hone, assemble, finish, strengthen); `play/static/js/table/33-bench-games.js` (make `METHODS` extensible by registration and add the heat gauge to the strip frame; herb games unchanged); NEW `play/static/css/forge-games.css`; `tests/test_forge_games.py` | `bench-games/` |
+| **U4: forge stage** | NEW `play/static/js/forge-stage/*.js`, NEW `play/static/js/table/42-forge-stage.js` (the adapter, global `window.ForgeStage`); `tests/test_forge_stage.py` | `bench-stage/` (reuse 00-04 as is) |
+| **U5: ledger and perks** | NEW `play/static/js/table/44-forge-ledger.js`; `play/static/js/table/21-tab-journal.js` (the materials ledger section beside the herbarium); `play/static/js/table/36-bench-perks.js` (parameterise by track); `tests/test_forge_ledger_ui.py` | |
+| **U6: sound** | `play/static/js/sound.js` (the `forge` bus and its synthesised events), `play/static/js/prefs.js`, `play/templates/play/home.html` (the Forge volume in Sound settings); `tests/test_forge_sound.py` | |
+| **H: engine follow-ups, migration, World Bible** | `rules/armour.py`, `rules/gear.py`, `rules/intents.py`, `rules/keepers.py`, `rules/sheet.py`, `rules/engine.py`, `rules/forge_items.py`, `rules/effectspec.py`, `content/materials/*.json`, `rules/materials.py`, `rules/blacksmith.py` (old-item migration only), `docs/campaign-format.md`, `docs/from-world-bible.md`; `tests/test_forge_followups.py`, `tests/test_forge_migration.py` | |
+
+Script and link tags for U3, U4, U5 go in `table.html`, which U2 owns: those lanes report the
+exact tags they need and U2 (or the lead at merge) adds them. Until then a lane proves its
+module with its own test page or node tests.
+
+## 11. Interfaces between the UI lanes
+
+**Games (U3 provides, U2 calls).** Each forge game registers on `window.BenchGameDefs[method]`
+exactly as the herb games do (33-bench-games.js header), and the frame's `BenchGames.play(method,
+opts)` runs it. Forge games receive `opts.heat`: `{start_c, hearth_c, band: [lo_c, hi_c],
+cool_rate, narrow: bool}` from the server's check response, and report the score 0..1 as today.
+The heat gauge is part of the strip frame (UI plan §6.4): named bands, a needle, the number in
+°C, the target band outlined; "Reheat: R" in words when out of band.
+
+**Stage (U4 provides, U2 calls).** `window.ForgeStage` mirrors `BenchStage`:
+`available() mount(host) unmount() setScene({kind: "kit"|"town"|"owned", biome, roofed, minute})
+setTool(method) setWork({gear, base, pieces: {slot: {material, color, passes, folded}},
+quality_index, hot_c}) heat(celsius) game(method) flourish(kind) productRect()
+reducedMotion(bool)`. Without WebGL every call is a no-op and `available()` is false; U2 then
+shows the flat icon stage. Material colours come from the server (`color` per material in the
+state response, U2 adds it to forge_views).
+
+**Ledger (U5 provides, U2 calls).** `window.ForgeLedger.card(materialId, anchorEl)` opens the
+ledger card beside the rack; `ForgeLedger.journal(host)` renders the Journal section. Both read
+`GET api/forge/ledger` and `GET api/forge/material/<id>`.
+
+**Sound (U6 provides).** `Sound.play("forge.<event>", {hardness, bath})` for every event in UI
+plan §11; unknown events are silent, so callers never guard.
+
+## 12. Lane H scope
+
+From the wave-1 reports, each confirmed in their code:
+1. `rules/armour.py` `spell_failure` and `attack_penalties`, and `rules/gear.py` weight, read the
+   base table row; they must read `actor.armour_stats()` so a forged suit's ASF, ACP and weight
+   count (casting with a mithral shirt).
+2. `rules/intents.py` `_known_weapon` refuses an attack naming a forged record id at parse.
+3. `rules/keepers.py` `staff` stands a hired smith inside the PC's own smithy; skip places with a
+   holder.
+4. `when` clauses lane C's data uses and lane B does not yet evaluate: `target.subtype` (list =
+   any), `armour.weight` (at build), `attacker.type` (elysian bronze DR), `against: "spell"`
+   (noqual), `weapon.slashing_or_piercing` (silver's −1), `target.armour_metal` (inubrix). An
+   unevaluated clause is dropped today (safe, but the effect never fires): make each fire, with a
+   test per clause.
+5. `strikes_as: ghost_touch` (ghost salt blanching: full damage to incorporeal), replacing lane
+   C's house stand-in.
+6. Forged shields: lane B refuses them with a sentence; make them wearable (shield slot, shield
+   bonus folding as armour does).
+7. Plan §14 old-item migration: old "Iron Work" records (flat `specs`, no `pieces`) re-derived on
+   load into a §4 record (main material inferred from name and specs, plain haft and fittings,
+   masterwork kept), the old record kept beside it for one version.
+8. Plan §15.1: the material fields as optional, defaulted fields in `docs/campaign-format.md`,
+   and what the next export should carry in `docs/from-world-bible.md`.
