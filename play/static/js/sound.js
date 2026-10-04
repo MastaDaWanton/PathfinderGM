@@ -910,9 +910,11 @@
   });
   def("forge.grind", 4, function (c) {
     // A stroke on the stone: a rasp that brightens as the edge bites, grit under it.
+    // Rendered offline in Chromium at 0.06/0.025 it peaked at 0.011, half the herb
+    // bench's grind hit (0.021): lost under the smithy bed. Raised to sit beside it.
     noise(c, { f: k(c, [2200, 2500, 2000, 2350]), f2: k(c, [3600, 4000, 3300, 3800]),
-               q: 2.2, peak: 0.06, a: 0.04, d: 0.16 });
-    return grains(c, { n: 8, span: 0.2, f: 3000, q: 1.2, peak: 0.025, d: 0.008,
+               q: 2.2, peak: 0.11, a: 0.04, d: 0.16 });
+    return grains(c, { n: 8, span: 0.2, f: 3000, q: 1.2, peak: 0.045, d: 0.008,
                        even: true, fade: false });
   });
   def("forge.rivet", 3, function (c) {

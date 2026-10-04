@@ -215,7 +215,10 @@ def test_a_strike_rings_higher_on_harder_metal_and_a_miss_does_not_ring(tmp_path
       console.log(JSON.stringify(out));""")
     bronze, steel, adamantine = got["nums"]
     assert bronze < steel < adamantine, got["nums"]
-    assert got["names"] == got["nums"], "a material name should ring as its hardness"
+    # Each play takes a different take (the same take never plays twice in a row), and
+    # the strike's takes detune the ring by up to 2%; so equal within 3%.
+    assert all(abs(a / b - 1) < 0.03 for a, b in zip(got["names"], got["nums"])), \
+        f"a material name should ring as its hardness: {got['names']} vs {got['nums']}"
     # A difference the ear hears through the ±5% jitter: at least a fifth apart.
     assert steel / bronze > 1.2 and adamantine / steel > 1.2, got["nums"]
     assert bronze < got["fallback"] < steel, "no hardness given should ring as iron (10)"
@@ -338,7 +341,9 @@ def test_the_forge_bank_cites_what_it_is_grounded_in():
     and a later edit that drops the sources loses the reason the numbers are what they are.
     sound.js may not hold a URL scheme (test_sound.py bans http:// and https://), so the
     sources are named by host and title."""
-    head = _forge_bodies()
+    # The comment's line breaks and leading asterisks folded away, so a title wrapped
+    # across two comment lines still reads as one phrase.
+    head = re.sub(r"\s*\n\s*\*?\s*", " ", _forge_bodies())
     for cite in ("blacksmithtalk.com", "laopera.org", "engineeringtoolbox.com",
                  "Investigation of sound phenomena during quenching process",
                  "Combustion roar of premix burners"):
