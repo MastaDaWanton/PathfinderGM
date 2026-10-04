@@ -452,6 +452,24 @@
       onEscape(e);
     });
 
+    // Enter and Space on a button of the layer's own modal belong to that button (seen
+    // live, 2026-10-04). The games' frame (33) listens on window in the capture phase and
+    // takes Enter and Space as "carry on" while a game is paused, so with "Stop and keep
+    // what you have?" up, Enter on Keep playing never pressed it: the game resumed under
+    // the confirm, finished, and left the confirm on the screen with nothing behind it.
+    // This listener is registered at load, before the frame binds its own when a game
+    // starts, so it runs first on the same target and phase, and stops the key reaching
+    // the frame while leaving the button's own default (the press) alone.
+    // Keyup too: a button is pressed by Space on its release, which the frame also takes.
+    var modalKey = function (e) {
+      if (!h.open || (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar")) return;
+      var t = e.target;
+      if (!t || !t.closest || !layer.contains(t) || !t.closest(".bench-modal")) return;
+      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+    };
+    window.addEventListener("keydown", modalKey, true);
+    window.addEventListener("keyup", modalKey, true);
+
     // Where the keyboard goes after a step (lane F's second found bug, fixed 2026-10-04):
     // a finish asked the Roll button to take focus while the check after it still had it
     // disabled, and a disabled button refuses focus, so the keyboard fell to <body> and the
@@ -515,6 +533,8 @@
         wrap.querySelector("[data-yes]").addEventListener("click", function () { finish(true); });
         wrap.querySelector(".bench-scrim").addEventListener("click", function () { finish(false); });
         wrap.querySelector("[data-no]").focus();
+        // A way to take it down from outside, as the safe answer (`endGame` below).
+        if (typeof c.onOpen === "function") c.onOpen(function () { finish(false); });
       });
     };
 
@@ -522,6 +542,13 @@
     // Stopping scores the run so far, through BenchGames.stop(), which resolves the game's
     // promise; the bench's own finish then runs as for any ending. Materials are never lost
     // to a stop (revamp plan §3), whichever bench it is.
+    // A game that ended while "Stop and keep what you have?" was up (it ran out under the
+    // confirm) leaves nothing for the confirm to stop: the bench calls this as its finish
+    // starts, and the confirm goes as if Keep playing had been pressed, which does nothing
+    // once the game is over.
+    var stopClose = null;
+    h.endGame = function () { if (stopClose) stopClose(); };
+
     h.askStop = function () {
       if (stopAsking || !live()) return;
       stopAsking = true;
@@ -531,8 +558,10 @@
         title: "Stop and keep what you have?",
         body: "The run so far is scored. No materials are lost to a stop.",
         ok: "Stop", cancel: "Keep playing",
+        onOpen: function (close) { stopClose = close; },
       }).then(function (yes) {
         stopAsking = false;
+        stopClose = null;
         if (!live()) return;
         if (yes) {
           if (games && typeof games.stop === "function") { try { games.stop(); } catch (err) { /* */ } }

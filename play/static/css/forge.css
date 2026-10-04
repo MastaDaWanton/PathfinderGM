@@ -43,6 +43,10 @@
   box-shadow: 0 0 0 1px rgba(8, 6, 4, .85), 0 0 0 2px var(--edge);
 }
 .fr-icon { position: relative; display: inline-grid; place-items: center; }
+/* A rack name may take two lines: at 1280 wide the rack is 240px, and "Brass G..." and
+   "Leather ..." were all the row said (seen live). The reason line under it already
+   wraps; the name is the one thing a row must say whole. */
+.forge .fr .bt-name { white-space: normal; overflow: visible; }
 .fr-icon .fr-swatch { position: absolute; right: -2px; bottom: -1px; z-index: 1; }
 .forge .bench-chip { gap: 7px; }
 
@@ -93,8 +97,8 @@
 .forge .fo-part .tb-step { display: inline-flex; align-items: center; gap: 3px; }
 .forge .fo-part .tb-step .v2-btn { min-width: 32px; justify-content: center; }
 
-.fo-make { display: grid; gap: 10px; }
-.fo-make:empty { display: none; }
+.fo-make, .fo-make > div { display: grid; gap: 10px; }
+.fo-make:empty, .fo-make > div:empty { display: none; }
 .fo-field { display: grid; gap: 6px; }
 .forge .fo-shape { width: 100%; min-height: 36px; padding: 6px 26px 6px 10px; font: 15px/1.2 var(--body); color: var(--bench-ink); }
 .forge .fo-shape optgroup { background: var(--panel); color: var(--bench-quiet); font-style: normal; }
@@ -133,7 +137,9 @@
   .forge { --bench-satchel-w: 240px; --bench-tag-w: 300px; --bench-gap: 28px; }
   .forge .bench-frame { grid-template-columns: var(--bench-satchel-w) minmax(520px, 1fr) var(--bench-tag-w); }
   .forge .bm.is-locked { display: inline-flex; }
-  .fo-slot.is-full, .forge .fo-slot-b { grid-template-columns: 70px minmax(0, 1fr) auto; }
+  /* "Quenchant" at 15px ran into its swatch in a 70px column (seen live at 1280). */
+  .fo-slot.is-full, .forge .fo-slot-b { grid-template-columns: 78px minmax(0, 1fr) auto; }
+  .fo-label { font-size: 13px; letter-spacing: .03em; }
 }
 @media (max-width: 1179px) {
   .forge .bench-frame { grid-template-columns: minmax(0, 1fr); }

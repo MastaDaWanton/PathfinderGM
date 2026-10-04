@@ -154,22 +154,44 @@
   });
 
   // --- what is being made: shape, ambition, batch ------------------------------------------------
+  // The shape picker is built once per method and redrawn only when its list changes;
+  // after that only its value follows the order. Rebuilt on every check (as it first
+  // was), a keyboard player's type-ahead died at the first letter: "l" chose a light
+  // hammer, the check's answer replaced the select, and "o" began a new search (seen
+  // live, 2026-10-04, at 1280x720 with the keyboard only).
+  var shapeSig = "";
   function drawMake() {
-    var o = F.order, m = o.method, c = F.check || {};
-    if (!m || F.loading || F.error) { makeEl.innerHTML = ""; return; }
-    var keep = document.activeElement && makeEl.contains(document.activeElement) ? document.activeElement.id : null;
-    var html = "";
-    if (m === "forge") {
-      var fams = (F.state && F.state.shapes) || [];
-      html += '<div class="fo-field"><label class="bs-label" for="forge-shape">What to forge</label>' +
-        '<select id="forge-shape" class="v2-well bs-show fo-shape"><option value="">Choose from the list</option>' +
-        fams.map(function (f) {
-          return '<optgroup label="' + esc(f.family) + '">' + (f.shapes || []).map(function (s) {
-            return '<option value="' + esc(s.id) + '"' + (s.id === o.shape ? " selected" : "") + '>' + esc(s.name) +
-              ', ' + esc(s.bars) + (s.bars === 1 ? " bar" : " bars") + ', DC ' + esc(s.dc) + '</option>';
-          }).join("") + '</optgroup>';
-        }).join("") + '</select></div>';
+    var o = F.order, m = o.method;
+    if (!m || F.loading || F.error) { makeEl.innerHTML = ""; shapeSig = ""; return; }
+    var fams = (F.state && F.state.shapes) || [];
+    var sig = m === "forge" ? "forge:" + fams.length : "none";
+    var rest = makeEl.querySelector(".fo-rest");
+    if (sig !== shapeSig || !rest) {
+      makeEl.innerHTML = '<div class="fo-shapebox">' + (m === "forge" ? shapeHtml(fams, o.shape) : "") +
+        '</div><div class="fo-rest"></div>';
+      shapeSig = sig;
+      rest = makeEl.querySelector(".fo-rest");
+    } else if (m === "forge") {
+      var sel = document.getElementById("forge-shape");
+      if (sel && sel.value !== (o.shape || "")) sel.value = o.shape || "";
     }
+    drawRest(rest);
+  }
+  function shapeHtml(fams, shape) {
+    return '<div class="fo-field"><label class="bs-label" for="forge-shape">What to forge</label>' +
+      '<select id="forge-shape" class="v2-well bs-show fo-shape"><option value="">Choose from the list</option>' +
+      fams.map(function (f) {
+        return '<optgroup label="' + esc(f.family) + '">' + (f.shapes || []).map(function (s) {
+          return '<option value="' + esc(s.id) + '"' + (s.id === shape ? " selected" : "") + '>' + esc(s.name) +
+            ', ' + esc(s.bars) + (s.bars === 1 ? " bar" : " bars") + ', DC ' + esc(s.dc) + '</option>';
+        }).join("") + '</optgroup>';
+      }).join("") + '</select></div>';
+  }
+  function drawRest(host) {
+    var o = F.order, m = o.method, c = F.check || {};
+    var keep = document.activeElement && host.contains(document.activeElement) ? document.activeElement.id : null;
+    var keepBatch = document.activeElement && host.contains(document.activeElement) ? document.activeElement.dataset.batch : null;
+    var html = "";
     if (m === "assemble") {
       var mw = c.masterwork || null;
       html += '<div class="fo-field fo-aim"><label class="fo-check"><input type="checkbox" id="forge-aim"' +
@@ -189,8 +211,11 @@
         (most > 1 ? '<button type="button" class="v2-btn is-small is-quiet" data-batch="all">All ' + esc(most) + '</button>' : "") + '</div>' +
         (n > 1 ? '<p class="tb-say">One roll and one game for all ' + esc(n) + '; they share one result.</p>' : "") + '</div>';
     }
-    makeEl.innerHTML = html;
-    if (keep) { var again = document.getElementById(keep); if (again) again.focus(); }
+    host.innerHTML = html;
+    var again = keep ? document.getElementById(keep)
+      : keepBatch ? host.querySelector('[data-batch="' + keepBatch + '"]') : null;
+    if (again && !again.disabled) again.focus();
+    else if (keepBatch) F.refocus(["forge-batch"]);
   }
   function capital(t) { t = String(t || ""); return t.charAt(0).toUpperCase() + t.slice(1); }
   makeEl.addEventListener("change", function (e) {
@@ -383,7 +408,7 @@
       going.then(function () {
         if (F.item(carry)) F.addItem(carry);
         return F.runCheck();
-      }).then(function () { F.refocus(["forge-roll", '#forge-list .fr-add[tabindex="0"]', ".bm[aria-checked='true']"]); });
+      }).then(function () { F.refocus(["forge-roll", F.FITS, '#forge-list .fr-add[tabindex="0"]', ".bm[aria-checked='true']"]); });
     }
   });
 

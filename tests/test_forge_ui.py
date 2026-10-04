@@ -304,6 +304,31 @@ def core_run():
     return json.loads(done.stdout)
 
 
+def test_a_confirms_buttons_take_their_own_keys_while_a_game_is_paused():
+    """Seen live at the forge, 2026-10-04: with "Stop and keep what you have?" up, Enter
+    on Keep playing never pressed it. The games' frame listens on window in the capture
+    phase and takes Enter and Space as "carry on" while paused, so the game resumed under
+    the confirm, ran out, and left the confirm on the screen over nothing. The core now
+    stops those keys reaching the frame when they are on a button of the layer's modal
+    (registered at load, so before the frame's own listener), and takes down a stop
+    confirm whose game has ended."""
+    core = _code(_src(CORE))
+    assert 'window.addEventListener("keydown", modalKey, true)' in core
+    assert 'window.addEventListener("keyup", modalKey, true)' in core
+    assert "stopImmediatePropagation" in core and 't.closest(".bench-modal")' in core
+    assert "h.endGame = function" in core
+    assert "core.endGame();" in _code(_src(TABLE_JS / "40-forge-shell.js"))
+
+
+def test_the_shape_picker_survives_the_checks_it_causes():
+    """Seen live, keyboard only at 1280x720: typing "longs" into the shape picker chose a
+    light hammer, because each letter's change ran a check whose answer rebuilt the
+    select and threw away the type-ahead. The picker is built once per method and list;
+    after that only its value follows the order."""
+    order = _code(_src(TABLE_JS / "43-forge-order.js"))
+    assert "sig !== shapeSig" in order and "sel.value = o.shape" in order
+
+
 def test_esc_with_focus_on_the_body_still_asks_to_stop_a_game(core_run):
     """Lane F's first found bug: the core heard Esc only on the layer, so with a game live
     and the keyboard fallen to <body> (the Roll button that held it went disabled) Esc
@@ -417,8 +442,17 @@ def test_the_whole_chain_and_what_the_work_order_is_sent(forge):
     f = _step(forge, body)
     blank = f["products"][0]
     assert blank["next"] == "quench" and blank["color"]
-    blank = _step(forge, {"method": "quench", "slots": {"piece": blank["key"], "quenchant": "inv:water"}})["products"][0]
+    quench = {"method": "quench", "slots": {"piece": blank["key"], "quenchant": "inv:water"}}
+    rolled = _post(forge, "/api/forge/roll", {**quench, "face": 20}).json()
+    # Lane U3's games read the bath and the work's metal from `tuning` (contracts §11).
+    assert rolled["tuning"]["bath"] == "water" and rolled["tuning"]["bath_id"] == "water"
+    assert rolled["tuning"]["hardness"] == "iron" and rolled["heat"]["band_name"] == "plunge"
+    blank = _post(forge, "/api/forge/finish", {"token": rolled["token"], "score": 1.0}).json()["products"][0]
     assert blank["next"] == "temper"
+    # Seen live: Temper's plan names no gear, and a longsword blank was tempered "blue,
+    # for a spring". The piece's own shape decides: an edge wants straw.
+    t = _post(forge, "/api/forge/check", {"method": "temper", "slots": {"piece": blank["key"]}}).json()
+    assert t["heat"]["target"] == "edge" and t["heat"]["band"] == [205, 260]
     blank = _step(forge, {"method": "temper", "slots": {"piece": blank["key"]}})["products"][0]
     assert blank["next"] == "hone"
     blank = _step(forge, {"method": "hone", "slots": {"piece": blank["key"]}})["products"][0]
@@ -475,11 +509,13 @@ def test_an_assay_of_abysium_sickens_the_assayer_for_real(forge):
     its caller in so many words. The danger goes through the engine as an effect, and the
     response carries the DC and the verdict the ledger card shows."""
     pc = cm.current().scene.pc()
-    pc.carry("abysium-ore", 1)
+    pc.carry("abysium", 1)
     cm.current().save()
-    card = forge.get("/api/forge/material/abysium-ore").json()
-    assert card["assay_danger"] and card["color"] and "smiths_here" in card
-    r = _post(forge, "/api/forge/assay", {"material": "abysium-ore", "face": 10}).json()
+    card = forge.get("/api/forge/material/abysium").json()
+    assert card["assay_danger"].startswith("Causes sickened") and card["color"] and "smiths_here" in card
+    # Iron harms nobody: no `assay_danger` at all, so lane U5's card asks nothing.
+    assert "assay_danger" not in forge.get("/api/forge/material/iron").json()
+    r = _post(forge, "/api/forge/assay", {"material": "abysium", "face": 10}).json()
     assert r["danger"] and r["danger_applied"] is True, r
     assert "dc" in r and isinstance(r["success"], bool)
     pc = cm.current().scene.pc()

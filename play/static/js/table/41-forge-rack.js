@@ -133,7 +133,13 @@
       var fits = shown.filter(function (it) { return !why(it) && amount(it) > 0; });
       var not = shown.filter(function (it) { return !!why(it) || amount(it) <= 0; });
       var m = F.order.method;
-      if (!fits.length && m && !find) {
+      // "Nothing you carry can be tempered" only while the work still wants something:
+      // with the one piece Temper takes already on the anvil, the rack said it over a
+      // work ready to roll (seen live, 2026-10-04).
+      var wanting = m === "alloy" ? F.order.parts.length < 2 : F.slots().some(function (s) {
+        return !s.optional && !F.order.slots[s.id];
+      });
+      if (!fits.length && m && !find && wanting) {
         html += '<div class="bs-state"><p>Nothing you carry can be ' + esc(F.DONE[m] || "worked") + '.</p>' +
           '<div class="bs-acts">' + market +
           '<button type="button" class="v2-btn is-small is-quiet" data-forge-everything>Everything I carry</button></div></div>';

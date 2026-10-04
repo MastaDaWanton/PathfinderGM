@@ -119,6 +119,11 @@
     });
   };
   F.rowIcon = rowIcon;
+  // The rack's first row that goes on the work now: where the keyboard goes when the next
+  // piece is wanted. The rack's roving row (the last one visited) was the first answer,
+  // and after "Next: Quench" it put the keyboard on the charcoal just used, with the
+  // water two rows up (seen live, 2026-10-04).
+  var FITS = F.FITS = '#forge-list .fr-add[data-add]:not([aria-disabled="true"])';
   F.api = C.api; F.minutes = C.minutes; F.sign = C.sign; F.sound = C.sound;
   F.reduced = C.reduced; F.steady = C.steady;
   function remember(key, value) { try { window.localStorage.setItem(key, value); } catch (err) { /* */ } }
@@ -738,7 +743,7 @@
   };
   // Never <body>: Roll Craft if it can roll again, else the rack's row, else Close.
   function focusAfterRoll() {
-    core.refocus(["forge-roll", '#forge-rack .fr-add[tabindex="0"]', "forge-close"]);
+    core.refocus(["forge-roll", FITS, '#forge-rack .fr-add[tabindex="0"]', "forge-close"]);
   }
 
   function tickClock(minutes, clock) {
@@ -763,6 +768,7 @@
 
   // --- the game (contracts §11) ----------------------------------------------------------------
   function play(r, heat, order) {
+    heat = r.heat || heat;
     F.live = { token: r.token, tuning: r.tuning || {}, heat: heat };
     var strip = $id("forge-game");
     strip.hidden = false;
@@ -776,7 +782,11 @@
     var method = order.method;
     var game;
     if (games && typeof games.play === "function" && defs[method]) {
+      // The stage's view of the game (lane U4's `game(method)`); a stage that offers none
+      // still gets the frame's heat every frame (`stage.heat(c)`, the metal glowing as it
+      // cools), through a view that forwards only that.
       var view = stageCall("game", method) || null;
+      if (!view && stageMounted) view = { update: function () {}, heat: function (c) { stageCall("heat", c); } };
       game = Promise.resolve(games.play({
         method: method, tuning: r.tuning || {}, heat: heat, mount: strip, stage: view,
         steady: F.steady(), reducedMotion: F.reduced(),
@@ -803,6 +813,7 @@
   function finish(score, stopped, reheats, flat, order) {
     var live = F.live;
     var strip = $id("forge-game");
+    core.endGame();
     strip.classList.remove("is-up");
     layer.classList.remove("is-playing");
     F.busy = true;
@@ -828,7 +839,7 @@
         stageWork();
         renderStage();
         F.runCheck();
-        core.refocus(["forge-next", "forge-roll", '#forge-rack .fr-add[tabindex="0"]']);
+        core.refocus(["forge-next", "forge-roll", FITS, '#forge-rack .fr-add[tabindex="0"]']);
       }).catch(function (err) {
         F.live = null;
         F.busy = false;

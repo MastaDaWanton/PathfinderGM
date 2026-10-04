@@ -309,16 +309,58 @@ def _heat(plan) -> dict | None:
                                                                    "strengthen")
                       else "kit"]
     if band_name == "oxide":
-        edged = plan.gear == "weapon" and bool((bs.shape_info(plan.shape) or {}).get("edged"))
-        lo, hi = _OXIDE["edge" if edged or not plan.gear else "spring"]
+        # The piece's own gear and shape: Temper's plan names neither (only Forge, Assemble
+        # and Finish set them), and read off the plan a longsword blank was tempered "blue,
+        # for a spring" (seen live, 2026-10-04).
+        piece = (plan.slots.get("piece") or (None,))[0]
+        work = getattr(piece, "work", None)
+        gear = plan.gear or getattr(work, "gear", "") or ""
+        shape = plan.shape or getattr(work, "shape", "") or ""
+        edged = gear == "weapon" and bool((bs.shape_info(shape) or {}).get("edged"))
+        lo, hi = _OXIDE["edge" if edged or not gear else "spring"]
         return {"band_name": "oxide", "band": [lo, hi], "start_c": 20, "hearth_c": 400,
-                "cool_rate": 0, "narrow": narrow, "target": "edge" if edged else "spring"}
+                "cool_rate": 0, "narrow": narrow, "target": "edge" if edged or not gear else "spring"}
     if band_name not in _HEAT_BANDS:
         return None
     lo, hi = _HEAT_BANDS[band_name]
     rate = _COOL_C_PER_S * (_NARROW_COOL if narrow else 1.0)
     return {"band_name": band_name, "band": [lo, hi], "start_c": hearth, "hearth_c": hearth,
             "cool_rate": round(rate, 2), "narrow": narrow}
+
+
+def _game_tuning(plan) -> dict:
+    """What lane U3's games read from `tuning` beyond lane D's numbers (contracts §11, the
+    lead's note of 2026-10-04): the bath a Quench plunges into (the game's three holds,
+    brine, water and oil, by the quenchant's own id; `bath_id` is the id itself, which the
+    sound bus voices), the temper colour the piece wants (an edge's straw, armour's blue),
+    the alloy's window as the minor metal's share of the melt, and the work's material for
+    the strike's pitch. Every value is the plan's; nothing here is a new rule."""
+    out: dict = {}
+    if plan.lead is not None:
+        out["hardness"] = plan.lead.parent or plan.lead.id
+    if plan.method == "quench":
+        q = (plan.slots.get("quenchant") or (None,))[0]
+        qid = str(getattr(q, "material", "") or "")
+        out["bath_id"] = qid
+        out["bath"] = "brine" if "brine" in qid else "oil" if "oil" in qid else "water"
+    if plan.method == "temper":
+        heat = _heat(plan) or {}
+        out["temper"] = heat.get("target") or "edge"
+    if plan.method == "alloy" and plan.lead is not None:
+        recipe = (bs.bench_rules().get("alloys") or {}).get(plan.lead.id) or {}
+        parts = recipe.get("parts") or []
+        if len(parts) == 2 and parts[1].get("min") is not None and parts[1].get("max") is not None:
+            lo, hi = float(parts[1]["min"]), float(parts[1]["max"])
+
+            def label(part):
+                if part.get("as"):
+                    return str(part["as"])
+                m = bs.metal(part.get("id"))
+                return (m.name if m else str(part.get("id") or "")).lower()
+
+            out["ratio"] = {"lo": lo, "hi": hi, "target": round((lo + hi) / 2, 1),
+                            "of": [label(parts[0]), label(parts[1])]}
+    return out
 
 
 # Slot words for the work order (UI plan §6.5). The slot ids are lane D's
@@ -799,7 +841,8 @@ def forge_roll(request):
         token = secrets.token_urlsafe(16)
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll}
         out["token"] = token
-        out["tuning"] = bs.tuning_for(plan)
+        out["tuning"] = dict(bs.tuning_for(plan), **_game_tuning(plan))
+        out["heat"] = _heat(plan)
     else:
         miss = -margin
         losses = bs.failure_losses(plan, miss)
@@ -1114,7 +1157,7 @@ def forge_material(request, material_id: str):
             "obtain": str(m.doc.get("obtain") or ""), "source": str(m.doc.get("source") or ""),
             "biomes": list(m.doc.get("biomes") or []),
             "assay_minutes": int((bs.method_row("assay") or {}).get("minutes", 10)),
-            "assay_cost": None, "assay_danger": "",
+            "assay_cost": None,
             "smiths_here": smiths_here(c, pc)}
     if kn is not None:
         try:
@@ -1126,11 +1169,13 @@ def forge_material(request, material_id: str):
             rules = kn.lore(kn.BLACKSMITH)["assay"]
             card["assay_minutes"] = int(rules["minutes"])
             card["assay_cost"] = kn.assay_cost(m.doc)
+            # `assay_danger` only when the metal's own effect says what testing does (lane
+            # U5's contract, 44-forge-ledger.js `needsConfirm`): absent, the card falls back
+            # on `reactive` and warns in general words, so a reactive metal whose effect is
+            # not yet written (noqual, until lane H adds §13.2's recoil) still asks first.
             found = kn.danger_of(m.doc)
             if found:
                 card["assay_danger"] = _danger_words(found[1])
-            elif card["reactive"]:
-                card["assay_danger"] = f"{m.name} reacts badly to testing."
         except Exception:      # noqa: BLE001
             pass
     return JsonResponse(card)
