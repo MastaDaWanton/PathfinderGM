@@ -487,7 +487,7 @@ def chain_from_body(body: dict) -> Chain:
 
     return Chain(
         track=TRACK_ID,
-        methods=_list("methods"),
+        methods=migrate_methods(_list("methods")),
         material_ids=_list("materials") or _list("material_ids"),
         base=base,
         name=str(body.get("name") or "").strip(),
@@ -1010,6 +1010,140 @@ def old_method(name: str) -> str:
     Smelt ingredient, rivet -> assemble), for an old recipe or chain naming it."""
     key = str(name or "").strip().lower()
     return str((wc.get(TRACK_ID).data.get("old_methods") or {}).get(key, key))
+
+
+def migrate_methods(methods) -> list[str]:
+    """An old recipe's method list with the removed methods mapped onto the new (plan §14).
+
+    Before this (measured 2026-10-04, lane H) a saved recipe naming draw or polish was
+    loaded as written and refused by `preview` — "Blacksmith has no method called 'draw':
+    Draw became Forge." — a sentence telling the player what the code already knew. Now
+    the step is the new one: draw -> forge, polish -> hone, rivet -> assemble, and flux,
+    which became an ingredient of Smelt, is the Smelt step (the flux stays in the charge,
+    where Smelt reads it). A step the map produces twice in a row is one step: "forge,
+    draw" was always one shaping, and is now "forge"."""
+    out: list[str] = []
+    for m in methods or ():
+        new = old_method(str(m))
+        if new and (not out or out[-1] != new) and not (new == "smelt" and "smelt" in out):
+            out.append(new)
+    return out
+
+
+# The record an old "Iron Work" is re-derived into (plan §14). Its haft and fittings the
+# old bench never recorded: they default to plain ash and iron, "value 0" — named so the
+# card can say what it is made of, marked `plain` so `forge_items.build` counts nothing
+# for them. A suit's fastenings are plain iron; it never had a lining.
+MIGRATED_PLAIN = {"weapon": {"haft": "ash-haft", "fittings": "iron"},
+                  "armour": {"fastenings": "iron"}}
+MIGRATION_STAMP = "plan-14"
+_OLD_QUALITY_INDEX = {"plain": 1, "fine": 2, "masterwork": 3}
+
+
+def is_old_record(d) -> bool:
+    """An old forge record: made by the one-shot chain, a weapon or a suit with flat
+    `specs` and no `pieces` (contracts §4 has pieces; the step bench writes `forge.*`
+    tags). The thing plan §14 converts on load."""
+    if not isinstance(d, dict) or isinstance(d.get("pieces"), dict):
+        return False
+    if str(d.get("craft") or "") not in BENCH_CRAFTS:
+        return False
+    if any(str(p).startswith("forge.") for p in d.get("properties") or ()):
+        return False
+    return bool(d.get("weapon") or d.get("armour"))
+
+
+def _main_material_of(d: dict) -> str:
+    """The metal an old record was made of, inferred: its own `from_materials` first (the
+    charge it was smelted from: a metal or alloy before an ore, an ore read as its metal),
+    then the `from` its specs carry, then the longest metal name inside its own name
+    ("Masterwork Cold Iron Longsword" is cold iron, not iron), and iron when nothing
+    says. Only a material that can fill the main piece is an answer."""
+    gear = "weapon" if d.get("weapon") else "armour"
+    main = "head" if gear == "weapon" else "body"
+    mats = _lane("materials")
+    shelf = mats.all() if mats is not None else {}
+
+    def fills(mid: str) -> str:
+        mid = str(mid or "").strip().lower()
+        doc = shelf.get(mid)
+        if doc is None:
+            return ""
+        if doc.get("kind") == "ore" and doc.get("material") and doc["material"] != mid:
+            return fills(doc["material"])
+        if main in (doc.get("pieces") or {}).get(gear, ()):
+            return mid
+        return ""
+
+    tried = list(d.get("from_materials") or ())
+    tried.sort(key=lambda m: 0 if (shelf.get(str(m).lower()) or {}).get("kind")
+               in ("metal", "alloy") else 1)
+    for mid in tried:
+        got = fills(mid)
+        if got:
+            return got
+    by_name = {str(doc.get("name") or "").lower(): mid for mid, doc in shelf.items()}
+    for spec in d.get("specs") or ():
+        said = str((spec or {}).get("from") or "").strip().lower()
+        got = fills(by_name.get(said, said))
+        if got:
+            return got
+    name = " ".join(str(d.get("name") or d.get("base") or "").lower().split())
+    for label in sorted(by_name, key=len, reverse=True):
+        if label and f" {label} " in f" {name} ":
+            got = fills(by_name[label])
+            if got:
+                return got
+    return "iron"
+
+
+def migrate_old_record(d: dict) -> dict | None:
+    """An old "Iron Work" record re-derived as a contracts §4 record, or None when `d` is
+    not one (plan §14, the owner's "convert").
+
+    The id and name are kept, so `equipped`, a worn slot and the shelf key still find it.
+    The main piece is the material inferred by `_main_material_of`; the haft and fittings
+    (fastenings for a suit) are plain (`MIGRATED_PLAIN`). Masterwork stays masterwork:
+    the old quality becomes the index (masterwork 3, the Superior that is masterwork at
+    the new bench; fine 2; plain 1) and the flag is kept. The smith is level 1 with no
+    perks — the old record never said, and level 1 cuts nothing from a negative.
+
+    **The old record is kept beside the new one, for one version** (`migrated_from`), so
+    a bad inference can be undone (`undo_migration`). Remove the field in the release
+    after the one that ships this."""
+    if not is_old_record(d):
+        return None
+    gear = "weapon" if d.get("weapon") else "armour"
+    base = str(d.get("weapon") or d.get("armour") or "")
+    main = "head" if gear == "weapon" else "body"
+    quality = str(d.get("quality") or ("masterwork" if d.get("masterwork") else "plain"))
+    q = _OLD_QUALITY_INDEX.get(quality.lower(), 1)
+    pieces = {main: {"material": _main_material_of(d), "passes": 0}}
+    for slot, mid in MIGRATED_PLAIN[gear].items():
+        pieces[slot] = {"material": mid, "passes": 0, "plain": True}
+    name = str(d.get("name") or d.get("base") or "Iron Work")
+    # A shelf entry's id carries the jar's concentration ("...-longsword#1"), which is the
+    # shelf key and not the thing's name; the item's own id is the slug, as the old
+    # bench's output wrote it, so `item:<id>` names the blade and not the jar.
+    rid = str(d.get("id") or _slug(name)).split("#", 1)[0] or _slug(name)
+    return {
+        "id": rid, "name": name,
+        "kind": "crafted", "craft": TRACK_ID, "count": int(d.get("count", 1) or 1),
+        "gear": gear, "base": base,
+        "slot": str(d.get("slot") or ("hands" if gear == "weapon" else "armor")),
+        "quality": wc.quality_name(q).lower(), "quality_index": q,
+        "masterwork": bool(d.get("masterwork")) or quality == "masterwork",
+        "pieces": pieces, "quench": None, "finish": [], "flaws": [],
+        "smith": {"level": 1, "perks": {}},
+        "schema": RECORD_SCHEMA, "migrated": MIGRATION_STAMP,
+        "migrated_from": _copy.deepcopy(d),
+    }
+
+
+def undo_migration(rec: dict) -> dict | None:
+    """The old record a migrated one was made from, while it is still kept."""
+    old = (rec or {}).get("migrated_from")
+    return _copy.deepcopy(old) if isinstance(old, dict) else None
 
 
 def _mw_index() -> int:

@@ -53,7 +53,9 @@ def test_the_lists_are_exactly_what_the_contract_names():
     renamed here ('hot-short' for 'hot_short') would refuse every material that uses it."""
     assert set(es.GEAR_TARGETS) == {"acp", "max_dex", "asf", "weight_pct", "hardness",
                                     "hp_per_inch", "category", "speed_penalty"}
-    assert es.STRIKES_AS == ["cold_iron", "silver", "adamantine"]
+    # `ghost_touch` joined in wave 2 (contracts §12 item 5): ghost salt blanching's book
+    # clause, which lane C had to stand in a +2 against undead for.
+    assert es.STRIKES_AS == ["cold_iron", "silver", "adamantine", "ghost_touch"]
     assert es.WORKING_TRAITS == [
         "easily_worked", "flawless", "malleable", "pure", "slaggy", "sulfurous",
         "clean_heat", "quench_sensitive", "narrow_window", "forgiving", "reactive",

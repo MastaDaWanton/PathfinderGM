@@ -159,6 +159,51 @@ def _detrimental(spec: dict, value: float) -> bool:
     return value < 0
 
 
+def _base_weight(gear: str, base: str) -> str:
+    """The weight class of the suit the item is built on ("light", "medium", "heavy"), or
+    "" — a shield has none in CRB Table 6-6, and a weapon is not armour."""
+    if gear != "armour" or not base:
+        return ""
+    from . import armour as armour_mod
+    from .tables import ARMOUR
+
+    kind, key = armour_mod.key_for(base)
+    row = ARMOUR.get(key or str(base).strip().lower())
+    return str((row or {}).get("weight") or "")
+
+
+def at_build(eff: dict, gear: str, base: str) -> dict | None:
+    """An effect with the clauses the BUILD can answer answered, or None when they fail.
+
+    `when: {"armour": {"weight": "light"}}` is a question about the suit, not about the
+    roll: adamantine's book DR is 1/— on light armour, 2/— on medium, 3/— on heavy, and the
+    suit's weight class is fixed the moment it is assembled. Measured 2026-10-04 (lane H):
+    no reader asked it, so `damage_reduction` met all three rows on an adamantine chain
+    shirt and took the best — DR 3/— on a light suit. Answered here, once, so the clause
+    is gone from the spec every reader sees: a row that holds keeps the rest of its `when`
+    (elysian bronze's attacker clause is the roll's to ask); a row that fails is not on
+    the item at all. A shield has no weight class, so an armour-weight row is not on one.
+    """
+    when = eff.get("when")
+    if not isinstance(when, dict) or "armour" not in when:
+        return eff
+    want = when.get("armour")
+    have = _base_weight(gear, base)
+    if not isinstance(want, dict) or not have:
+        return None
+    for field_name, value in want.items():
+        if field_name != "weight":
+            return None                     # a clause nothing can answer is dropped
+        wanted = value if isinstance(value, (list, tuple)) else [value]
+        if have not in [str(v).strip().lower() for v in wanted]:
+            return None
+    rest = {k: v for k, v in when.items() if k != "armour"}
+    out = {k: v for k, v in eff.items() if k != "when"}
+    if rest:
+        out["when"] = rest
+    return out
+
+
 def _key(spec: dict) -> tuple:
     """What two modifiers must share to be summed as one target: the same type and target,
     the same channel, the same bypass and the same `when`. "+2 attack against fey" is not
@@ -185,6 +230,7 @@ def build(record: dict) -> dict:
         gear = "weapon"
     item_id = str(rec.get("id") or rec.get("name") or "forged").strip()
     origin = f"item:{item_id}"
+    base_key = str(rec.get("base") or rec.get(gear) or "")
     main = MAIN_PIECE[gear]
     smith = rec.get("smith") if isinstance(rec.get("smith"), dict) else {}
     perks = smith.get("perks") if isinstance(smith.get("perks"), dict) else {}
@@ -214,6 +260,12 @@ def build(record: dict) -> dict:
         mid = str(spec.get("material") or "").strip()
         if not mid or mid.lower() == "none":
             continue
+        if spec.get("plain"):
+            # A piece the record names and the item does not count: plan §14's migrated
+            # "Iron Work", whose haft and fittings the old bench never recorded and which
+            # default to plain ash and iron "at value 0". Named so the card can say what
+            # it is made of; not summed, because nobody chose those pieces.
+            continue
         doc = material(mid)
         if doc is None:
             problems.append(f"{slot}: no material called {mid!r}.")
@@ -221,6 +273,9 @@ def build(record: dict) -> dict:
         passes = max(0, int(spec.get("passes", 0) or 0))
         mult = (MAIN_WEIGHT if slot == main else OTHER_WEIGHT) * STRENGTHEN_PER_PASS ** passes
         for eff in _effects_for(doc, gear):
+            eff = at_build(eff, gear, base_key)
+            if eff is None:
+                continue
             kind = str(eff.get("type") or "")
             if eff.get("book"):
                 # The book is the main piece's alone, and never scaled (§6.3).
@@ -306,6 +361,9 @@ def build(record: dict) -> dict:
             gear_out["acp"] += 1
 
     def _unscaled(eff: dict, source: str) -> None:
+        eff = at_build(eff, gear, base_key)
+        if eff is None:
+            return
         kind = str(eff.get("type") or "")
         stamped = dict(eff, origin=origin, source=source)
         if eff.get("trigger"):
@@ -528,7 +586,9 @@ def stock_item(record: dict, count: int | None = None) -> ForgedStock:
         base=str(rec.get("name") or rec.get("id") or "Forged item"),
         count=n, craft=str(rec.get("craft") or "blacksmith"), kind="crafted",
         tier=str(rec.get("tier") or "common"),
-        slot=str(rec.get("slot") or ("hands" if gear == "weapon" else "armor")),
+        # A shield goes in the shield slot (contracts §12 item 6): the old default put a
+        # forged buckler in the armour slot, where it would have been read as a suit.
+        slot=str(rec.get("slot") or {"weapon": "hands", "shield": "shield"}.get(gear, "armor")),
         wearable=True,
         weapon=base if gear == "weapon" else None,
         armour=base if gear == "armour" else None,

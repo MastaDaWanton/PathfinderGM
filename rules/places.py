@@ -1080,6 +1080,62 @@ def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Pl
     return (first,) + tuple(authored[1:]) + (way,)
 
 
+# What an authored settlement of a scale is given when its author listed none of it. One
+# row today, the owner's ruling of 2026-10-04 (blacksmithing contracts §13.3): "every city
+# gets a smithy, even when the world's author did not list one". Published in
+# docs/place-vocabulary.json (`appended_to_authored`) so the author can see it happen and
+# write their own instead.
+APPENDED_TO_AUTHORED = {"city": ("the smithy",)}
+
+
+def _with_a_smithy(authored: tuple[Place, ...], here: str,
+                   location) -> tuple[Place, ...]:
+    """An authored city that lists no smithy gets one appended — the second amendment to
+    "an author who listed six rooms has said what the town has", after the way in, and for
+    the same kind of reason: it is what the city is FOR in a rule the app runs, not a
+    flourish.
+
+    Measured 2026-10-04 on the shipped exports: a smithy in 5 of Aurvantis's 64 authored
+    settlements (4 of its 16 cities, 1 of 32 towns, 0 of 16 villages) and in 0 of
+    Pangrella's 12 (0 of its 6 cities). The forge's furnace work (Smelt, Alloy, Fold,
+    Strengthen, rare metal) needs a smithy (`smithy_here`), so a player in eighteen of
+    those twenty-two cities had no town forge to rent. A generated city already has one
+    (`ALWAYS_BY_SCALE`); this gives an authored one the same. Towns and villages get one
+    only when their own words imply it (`IMPLIED`) or through the `found` door — the
+    owner's line, not this function's.
+
+    Attached as the way in is: its exits run to the first place, and the first place
+    gains it, so it is reachable (an exit is adjacency, and adjacency runs both ways). In
+    a quartered city (`within`), it hangs off the first place's own quarter.
+    """
+    wanted = APPENDED_TO_AUTHORED.get(scale_of(location), ())
+    if not wanted or not _settled(location, "") or not authored:
+        return authored
+    from dataclasses import replace
+
+    from . import floorplan as floorplan_mod
+
+    out = list(authored)
+    for label in wanted:
+        row = next((r for r in SETTLEMENT_PLACES if r[0] == label), None)
+        if row is None:
+            continue
+        probe = Place(id="", name=label, about="", terrain=URBAN, exits=())
+        tags = place_tags(probe)
+        if any(tags & place_tags(p) for p in out if tags):
+            continue                        # the author wrote one: theirs stands
+        place_id = f"{here}~{URBAN}:{_slug(label)}"
+        if any(p.id == place_id for p in out):
+            continue
+        anchor = out[0]
+        out[0] = replace(anchor, exits=tuple(anchor.exits or ()) + (place_id,))
+        out.append(Place(id=place_id, name=label, about=row[1], terrain=URBAN,
+                         exits=(anchor.id,), within=anchor.within or "",
+                         origin="generated",
+                         shape=floorplan_mod.shape_for(place_id, URBAN)))
+    return tuple(out)
+
+
 def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     """The location's own places — a settlement's rooms, or a wild site's reaches.
 
@@ -1102,7 +1158,7 @@ def home_set(location, terrain_hint: str = "") -> tuple[Place, ...]:
     # and nothing else changes.
     authored = _authored(location)
     if authored:
-        return _with_a_way_in(authored, here, location)
+        return _with_a_smithy(_with_a_way_in(authored, here, location), here, location)
     hint = str(terrain_hint or "").strip().lower()
     if _settled(location, hint):
         return _settlement_set(here, scale_of(location), location)

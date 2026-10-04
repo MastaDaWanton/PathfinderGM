@@ -170,6 +170,14 @@ def build() -> dict:
         "scales": list(places.SCALES),
         "population_by_scale": {k: list(v) for k, v in places.POPULATION_BY_SCALE.items()},
         "always_by_scale": {k: list(v) for k, v in places.ALWAYS_BY_SCALE.items()},
+        # What this app appends to an AUTHORED settlement that lists none of it — beside
+        # the way in, which any settlement naming no entrance is given. Published
+        # 2026-10-04 with the owner's ruling "every city gets a smithy, even when the
+        # world's author did not list one": a smithy was in 4 of Aurvantis's 16 authored
+        # cities and 0 of Pangrella's 6. An author who writes their own (a forge, an
+        # armoury, a smithy by any name whose keeper is a smith) gets nothing appended.
+        "appended_to_authored": {k: list(v)
+                                 for k, v in places.APPENDED_TO_AUTHORED.items()},
         # The great square and its crossings, which a city has ON TOP of its rooms and
         # which are not counted against its size. Published 2026-09-16 because a checker
         # on either side cannot work out what a legal total is without it — and because

@@ -69,6 +69,12 @@ HOUSE_FLOOR = 2
 # steps in the book, weight in tenths, and speed in 5-foot squares.
 POINT = {"weight_pct": 10, "asf": 5, "speed_penalty": 5}
 
+# What an assay danger may be, beyond a reactive metal's own carrier effect. One kind:
+# `suppress_magic`, the owner's house rule for noqual (2026-10-04, contracts §13.2) —
+# "magic recoils": the assayer's active magical effects (buffs, wards) are suppressed for
+# the duration. Applied by `knowledge.apply_danger` through the one applicator.
+ASSAY_DANGERS = ("suppress_magic",)
+
 # Effect types whose `amount` is a house number the ceiling governs.
 _AMOUNTED = ("combat_mod", "save_mod", "skill_mod", "ability_mod", "gear_mod",
              "resistance", "damage_reduction", "fast_healing")
@@ -157,6 +163,12 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         # Noqual's "any magic item incorporating noqual costs +5,000 gp to create" is a
         # price, not an effect, so it is a field the enchanter can read.
         "enchant_surcharge_gp": int(raw.get("enchant_surcharge_gp") or 0),
+        # What handling a sliver does to the assayer, for a reactive metal whose harm is
+        # not a carrier effect (abysium's is: its sickness is what carrying it does).
+        # Noqual's is the owner's HOUSE RULE of 2026-10-04, "magic recoils"
+        # (`ASSAY_DANGERS`); read by `knowledge.danger_of`. None when it has none.
+        "assay_danger": (dict(raw["assay_danger"])
+                         if isinstance(raw.get("assay_danger"), dict) else None),
         "price_gp": raw.get("price_gp"),
         "text": str(raw.get("text") or ""),
         "biomes": [str(b) for b in _list(raw.get("biomes"))],
@@ -493,6 +505,23 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
                 say(f"has {gear} effects, but {what}. Remove them.")
         if any(doc["pieces"].get(g) for g in GEARS):
             say(f"is a {kind} and fills a piece. Remove \"pieces\".")
+
+    danger = doc.get("assay_danger")
+    if danger:
+        if danger.get("type") not in ASSAY_DANGERS:
+            say(f"assay danger {danger.get('type')!r} is not one the assay can apply. One "
+                f"of: {', '.join(ASSAY_DANGERS)}.")
+        dur = danger.get("duration")
+        if not (isinstance(dur, dict) and dur.get("amount") and dur.get("unit")):
+            say("assay danger has no duration. Give it {\"amount\": \"1d4\", \"unit\": "
+                "\"round\"}.")
+        if not any(str(w.get("trait") or "") == "reactive" for w in doc.get("working") or []):
+            say("has an assay danger but is not reactive; only a reactive metal is "
+                "dangerous to assay (the owner's ruling). Add the `reactive` trait or "
+                "remove the danger.")
+        if not danger.get("house") and not danger.get("book"):
+            say("assay danger says neither \"house\": true nor \"book\": true. Say whose "
+                "rule it is.")
 
     if kind == "quenchant" and not doc.get("quench_mark"):
         say("is a quenchant with no quench mark. Give it one small executable effect it "

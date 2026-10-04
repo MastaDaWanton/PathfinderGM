@@ -70,7 +70,11 @@ def test_every_authored_place_carries_its_own_shape():
     # law can never watch (items 45 and 46), so `home_set` appends one. It carries its own
     # shape like everything else here — which is what this test is actually about, and the
     # reason the eight are counted rather than excluded.
-    assert len(got) == 939, len(got)
+    #
+    # 957 since 2026-10-04: every city gets a smithy when its author listed none (the
+    # owner's ruling, blacksmithing contracts §13.3) — 12 of Aurvantis's 16 cities and all
+    # 6 of Pangrella's, 18 more places, each laid out like the rest.
+    assert len(got) == 957, len(got)
     assert all(p.shape is not None for p in got), [
         p.id for p in got if p.shape is None][:5]
 
