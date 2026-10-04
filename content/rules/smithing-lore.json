@@ -1,0 +1,71 @@
+{
+  "_about": [
+    "How a character learns what a metal does (docs/blacksmithing-revamp-plan.md §9; the",
+    "API is docs/blacksmithing-contracts.md §6). Read by rules/knowledge.py, beside",
+    "content/rules/herb-lore.json, whose shape this mirrors so one module answers both.",
+    "Words, prices and times only: every number here is the rules' own, so no model ever",
+    "authors one, and every one can be tuned in play without a code change.",
+    "",
+    "Prices are in copper (Core Rulebook Table 6-1). A smith's lesson is priced as a",
+    "healer's is: a skilled hireling's hour. The safe routes are meant to be the sensible",
+    "ones, and assaying a reactive metal the dangerous one (the owner's ruling, plan §2)."
+  ],
+  "assay": {
+    "minutes": 10,
+    "_sliver": "The owner's ruling (plan §2): a sliver is a tenth of a bar, or one ore.",
+    "bar_sliver": 0.1,
+    "ore_sliver": 1,
+    "_comparison": "Plan §9.2 (proposed, accepted with the plan): -1 DC for each other known material of the same kind, at most -4. Assaying is comparison against known references: touchstone needles of known fineness, spark charts (docs/blacksmithing-prior-art.md §3.8).",
+    "comparison_per_known": 1,
+    "comparison_max": 4,
+    "_danger_duration": "A carrier effect lasts while carried and states no length of its own. Pathfinder #61 (via the sweep's §1.4 table): abysium's carrier is sickened while carrying it 'and for 1d4 hours after'. A sliver is put down when the assay ends, so the assay's danger is the after.",
+    "danger_duration": {"amount": "1d4", "unit": "hour"}
+  },
+  "study": {
+    "minutes": 10,
+    "_dc": "10 + 5 per rarity band, as herbs (herb-lore.json): the plan's 'DC by rarity, as study is' (§9.2).",
+    "dc_base": 10,
+    "dc_per_band": 5,
+    "reveal_per_margin": 5
+  },
+  "teacher": {
+    "price_cp": 20,
+    "minutes": 10,
+    "_works": "Occupation ids (content/people/occupations.json) whose people know metals: the smith and the smith's apprentice, both of the forge. The words name the trade when no population record carries one. 'smith' alone never matches 'goldsmith' (the match needs a word boundary), so the metalworking smiths are listed by name.",
+    "works": ["smith", "smith-apprentice"],
+    "words": ["smith", "blacksmith", "weaponsmith", "armorer", "armourer", "bladesmith",
+              "swordsmith", "farrier", "goldsmith", "silversmith", "metalsmith",
+              "ironmonger", "smelter", "founder", "metallurgist", "assayer"],
+    "_teaches": "Properties taught per lesson by attitude step (rules/attitude.py), the herb teacher's rows: below indifferent they refuse in words.",
+    "teaches": {"indifferent": 1, "friendly": 2, "helpful": 2}
+  },
+  "library": {
+    "price_cp": 50,
+    "minutes": 60,
+    "words": ["library", "scriptorium", "archive", "archives", "guildhall"],
+    "_common": "What the world writes down about metals: the benefits of common and uncommon ones. A rare metal's secrets and every drawback stay unwritten, as for herbs.",
+    "tiers": ["common", "uncommon"],
+    "reveals": ["benefit", "neutral"]
+  },
+  "manual": {
+    "mastery": 5
+  },
+  "_working_words": "A working trait's line on a card, until the effect vocabulary renders the type itself (rules/effectspec.py, lane A). Taken from plan §5.5's table: what the trait does at the bench, in words; the numbers are the bench's rules, not this file's.",
+  "working_words": {
+    "easily_worked": "each step takes half the time",
+    "flawless": "no harder to make masterwork",
+    "malleable": "a bad miss ruins nothing",
+    "pure": "the Craft check is rolled twice, the better kept",
+    "slaggy": "work from it cannot reach the best quality until it is folded",
+    "sulfurous": "a wider heat band, but crude work turns hot-short",
+    "clean_heat": "burns without leaving a flaw",
+    "quench_sensitive": "a narrow quench, and brine cracks it on a miss",
+    "narrow_window": "narrow heat bands",
+    "forgiving": "wide heat bands",
+    "reactive": "dangerous to handle and to assay",
+    "cleans_slag": "cleans slag out of a melt",
+    "weld_aid": "folding and strengthening are easier",
+    "brittle": "brittle until tempered",
+    "hot_short": "cracks when worked too hot"
+  }
+}
