@@ -613,6 +613,20 @@ def _preview(plan, pc) -> dict | None:
                    f"{_a(bs._shape_name(base).lower())}, at {top}")}
 
 
+def _product_name(w) -> str:
+    """The work order's name for what the step makes. Before the roll a finished item has
+    no quality yet, and `work_name` read that as Crude: the tag said "Crude Iron Longsword"
+    over a ladder whose ceiling was Superior (seen live, 2026-10-04). Named without the
+    quality word, which the tier the server gives at the finish supplies."""
+    if w.name:
+        return w.name
+    if w.form == "item" and w.quality is None:
+        bare = w.copy()
+        bare.quality = 1
+        return bs.work_name(bare)
+    return bs.work_name(w)
+
+
 def _a(noun: str) -> str:
     return ("an " if noun[:1] in "aeiou" else "a ") + noun
 
@@ -628,21 +642,27 @@ def _check_body(plan, items, rent, pc) -> dict:
                default=0)
     gear = plan.gear
     fits = bs.fits_for(plan.method, items, gear=gear)
-    if plan.method == "assemble" and not plan.slots:
-        # Before a main piece is on the anvil the gear is not known, so both sets of
-        # slots are answered: a plate clicked in the rack goes to Body and turns the work
-        # order to armour, a blank goes to Head (UI plan §6.5, "the labels follow the
-        # shape"). Lane D's check answers one gear; asking it twice is the page's map.
-        for g in ("armour",):
-            for slot, row in bs.fits_for("assemble", items, gear=g).items():
-                fits.setdefault(slot, row)
+    problems = list(plan.problems)
+    if plan.method == "assemble" and not ({"head", "body"} & set(plan.slots)):
+        # Before a main piece is on the anvil the gear is not known (lane D's plan reads
+        # an empty order as armour), so both sets of slots are answered: a plate clicked
+        # in the rack goes to Body and turns the work order to armour, a blank goes to
+        # Head (UI plan §6.5, "the labels follow the shape"). Seen live: answered for
+        # armour alone, a finished blade could not be put on the anvil at all.
+        fits = {}
+        for g in ("weapon", "armour"):
+            fits.update(bs.fits_for("assemble", items, gear=g))
+        gear = ""
+        problems = ["Put a blank in the head slot, or a plate in the body slot."] + [
+            p for p in problems if p not in (bs._MISSING.get("body"), bs._MISSING.get("head"),
+                                             bs._MISSING.get("fastenings"))]
     return {
         "fits": fits,
         "slots": _slot_view(plan.method, gear),
         "gear": gear,
         "shape": plan.shape,
         "heat": _heat(plan) if plan.units or plan.method else None,
-        "problems": list(plan.problems),
+        "problems": problems,
         "can_roll": plan.can_roll,
         "info": plan.info,
         "minutes": plan.minutes, "units": plan.units, "batch": plan.batch,
@@ -657,7 +677,7 @@ def _check_body(plan, items, rent, pc) -> dict:
         # "all" (the herb bench learned a player made to count finds out halfway).
         "max_batch": most if (method_bulk(plan.method) and plan.consumes) else
         min(1, most),
-        "product": [{"name": w.name or bs.work_name(w), "form": w.form, "count": n,
+        "product": [{"name": _product_name(w), "form": w.form, "count": n,
                      "material": w.material, "tier": w.tier}
                     for w, n in plan.outputs],
         "preview": _preview(plan, pc) if not plan.problems else None,

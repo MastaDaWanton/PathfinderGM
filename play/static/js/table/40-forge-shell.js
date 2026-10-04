@@ -58,21 +58,45 @@
   // Keys 1-9, 0 and - pick the eleven methods in order (UI plan §6.1).
   var KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"];
 
-  // Icons (UI plan §4). The forge set from game-icons.net is approved but not yet in the
-  // build (contracts §13: the lead downloads it). Each name here is the one the lead will
-  // add to bench-icons.js; until then BenchIcons draws its lettered brass roundel for an
-  // unknown name. Three names already have art that fits: ore is the rock, a quenchant
-  // the water drop, an assay the magnifier.
-  var ICON = { smelt: "furnace", alloy: "crucible", forge: "anvil", quench: "quench",
-               temper: "temper", fold: "fold", hone: "whetstone", assemble: "assemble",
-               finish: "brush", strengthen: "strengthen", assay: "study",
-               ore: "mineral", ingot: "ingot", bar: "bar", blank: "blank", plate: "plate",
-               fitting: "haft", fuel: "coal", flux: "flux", quenchant: "liquid",
-               treatment: "treatment", item: "item", old: "item" };
-  // Two letters on a method's roundel while it has no art: Forge, Fold and Finish all
-  // begin with F, and at 1280 wide the strip is icons only.
+  // Icons (UI plan §4): the forge's 35 engraved icons from game-icons.net (CC BY 3.0,
+  // downloaded by the lead with the owner's approval, contracts §13, 86b537c), drawn as
+  // the herb icons are: a gilt mask over the brass grain (bench.css `.bicon.is-mask`).
+  // The stamped URLs come from the table's `window.FORGE_ICON_URLS`, a registry of the
+  // forge's own beside bench-icons.js's: that file pins its 46 herb names to the table's
+  // BENCH_ICON_URLS (tests/test_bench_ui.py) and is no lane's this wave. A name with no
+  // stamped file falls back to BenchIcons (whose `lock` serves the locks), and a name
+  // neither knows to the lettered roundel, two letters for a method (Forge, Fold and
+  // Finish all begin with F, and at 1280 wide the strip is icons only).
   var ABBR = { smelt: "Sm", alloy: "Al", forge: "Fo", quench: "Qu", temper: "Te", fold: "Fd",
                hone: "Ho", assemble: "As", finish: "Fi", strengthen: "St", assay: "Ay" };
+  var RIMS = { common: "r0", uncommon: "r1", rare: "r2", exotic: "r3", legendary: "r4" };
+  function forgeUrl(name) {
+    var map = window.FORGE_ICON_URLS;
+    var u = map && typeof map === "object" ? map[name] : "";
+    return typeof u === "string" && u.indexOf("?v=") > 0 ? u : "";
+  }
+  // The icon for a rack row: its form, and for a fitting, fuel or finished piece the word
+  // in its id or shape that says which ("ash-haft" is a haft, "steel-crossguard" a guard,
+  // a chain shirt mail). Words only pick a picture; the name beside it carries the meaning.
+  function rowIcon(it) {
+    var f = it.form || "", id = String(it.material || it.key || "") + " " + String(it.shape || "");
+    if (f === "fitting") {
+      if (/haft|core|stave/.test(id)) return "haft";
+      if (/guard/.test(id)) return "guard";
+      if (/grip|wrap|binding|hilt/.test(id)) return "grip";
+      return "rivets";
+    }
+    if (f === "fuel") return /charcoal/.test(id) ? "charcoal" : "coal";
+    if (f === "plate" || f === "item") {
+      if (it.gear === "shield" || /shield|buckler/.test(id)) return "shield";
+      if (/chain|mail/.test(id) && !/scale/.test(id)) return "mail";
+      if (/scale/.test(id)) return "scale-mail";
+      if (it.gear === "armour" || /plate|banded|splint/.test(id)) return f === "plate" ? "plate" : "breastplate";
+      return f === "item" ? "grip" : "plate";
+    }
+    if (f === "old") return "anvil";
+    return f || "bar";
+  }
 
   var F = window.Forge = {
     TOOL: TOOL, DONE: DONE, esc: esc,
@@ -94,23 +118,35 @@
       try { fn(data); } catch (err) { console.error("forge " + ev + " handler failed:", err); }
     });
   };
+  F.rowIcon = rowIcon;
   F.api = C.api; F.minutes = C.minutes; F.sign = C.sign; F.sound = C.sound;
   F.reduced = C.reduced; F.steady = C.steady;
   function remember(key, value) { try { window.localStorage.setItem(key, value); } catch (err) { /* */ } }
   function recall(key) { try { return window.localStorage.getItem(key); } catch (err) { return null; } }
   F.cssEsc = function (s) { return window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/"/g, '\\"'); };
 
-  // An engraved icon, or the lettered roundel while the forge art is not in the build.
+  // An engraved icon (aria-hidden: the words beside it carry it).
   F.icon = function (name, opts) {
     opts = opts || {};
-    var key = ICON[name] || name;
-    if (!window.BenchIcons) {
-      var s = document.createElement("span");
-      s.className = "bicon";
-      s.setAttribute("aria-hidden", "true");
-      return s;
+    var url = forgeUrl(name);
+    var el;
+    if (url || !window.BenchIcons) {
+      el = document.createElement("span");
+      el.className = "bicon" + (opts.tier && RIMS[opts.tier] ? " " + RIMS[opts.tier] : "");
+      el.setAttribute("aria-hidden", "true");
+      el.dataset.icon = name;
+      if (opts.size) el.style.setProperty("--bi", Math.round(opts.size) + "px");
+      if (url) {
+        el.classList.add("is-mask");
+        el.style.setProperty("--bi-mask", 'url("' + url.replace(/"/g, "%22") + '")');
+      }
+      var letter = document.createElement("span");
+      letter.className = "bicon-l";
+      letter.textContent = String(opts.label || name || "?").charAt(0).toUpperCase();
+      el.appendChild(letter);
+    } else {
+      el = BenchIcons.el(name, opts);
     }
-    var el = BenchIcons.el(key, opts);
     if (ABBR[name] && !el.classList.contains("is-mask")) {
       var l = el.querySelector(".bicon-l");
       if (l) { l.textContent = ABBR[name]; l.classList.add("is-two"); }
@@ -815,7 +851,7 @@
     if (row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
     var to = row.getBoundingClientRect();
     if (F.reduced() || !from || !to.width || typeof document.body.animate !== "function") { pulse(); return; }
-    var el = F.icon((made.item && made.item.form) || made.form || "bar", { size: 44, label: made.name });
+    var el = F.icon(F.rowIcon(made.item || made), { size: 44, label: made.name });
     C.fly(el, from, to).then(pulse);
   }
 

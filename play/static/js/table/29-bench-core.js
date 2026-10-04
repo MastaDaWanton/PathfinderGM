@@ -583,6 +583,10 @@
       var steady = C.steady();
       foot.innerHTML =
         '<span class="bf-clock" id="' + esc(o.clockId || o.layer + "-clock") + '">' + esc(f.clock || "") + '</span>' +
+        // Where the bench stands, when the bench says (the forge's "At the field kit",
+        // blacksmithing UI plan §6.8). Nothing at all when it does not, so a bench without
+        // a place line draws the footer it always drew.
+        (f.place ? '<span class="bf-place">' + esc(f.place) + '</span>' : "") +
         '<span class="bf-track" role="group" aria-label="' + esc(f.trackLabel || "") + '">' + prog + '</span>' + picks +
         '<span class="bf-gap"></span>' + (f.buttons || "") +
         '<button type="button" class="bf-btn bf-steady" role="switch" aria-checked="' + steady +
