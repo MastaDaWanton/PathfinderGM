@@ -276,7 +276,12 @@ def test_the_confirm_says_what_the_server_says_the_assay_does(ledger):
     words). With `assay_danger` sent, its words are the second --alarm line; a card that
     says `assay_danger: null` (a reactive ore that harms nobody) asks nothing."""
     assert f'<p class="fl-alarm">{RECOIL}</p>' in ledger["confirmWords"]
-    assert '<p class="fl-alarm">Testing it can turn on you, whatever the roll says.</p>' in ledger["confirm"]
+    # The real server's noqual card now carries the recoil in words (effectspec renders
+    # `suppress_magic` since the 2026-10-04 merge); before that it sent nothing and the
+    # confirm fell back on the general warning, which this line used to pin.
+    assert '<p class="fl-alarm">Suppresses your active magic for 1d4 rounds</p>' \
+        in ledger["confirm"], ledger["confirm"]
+    assert "Testing it can turn on you" not in ledger["confirm"]
     assert ledger["quietOre"] is False
     js = _src(LEDGER)
     assert "noqual" not in re.sub(r"//.*", "", js).lower(), "the page names a metal"

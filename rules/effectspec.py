@@ -1216,6 +1216,13 @@ def render(spec: dict) -> str:
     """
     found = find(str(spec.get("type", "")))
     if found is None:
+        # Noqual's assay recoil (`materials.ASSAY_DANGERS`, the owner's house rule of
+        # 2026-10-04) is not an authorable effect, but it reaches a card: without words
+        # here the assay confirm printed nothing of its own and fell back on a general
+        # warning, because `knowledge.danger_of` hands over the effect without its note.
+        if spec.get("type") == "suppress_magic":
+            dur = _duration(spec.get("duration"))
+            return "Suppresses your active magic" + (f" for {dur}" if dur else "")
         return str(spec.get("note") or spec.get("type") or "?")
     _, etype = found
     t = etype.id

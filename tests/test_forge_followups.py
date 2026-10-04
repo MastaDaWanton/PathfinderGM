@@ -495,3 +495,16 @@ def test_the_campaign_format_documents_every_material_field():
     for name in MATERIAL_FIELDS:
         assert f"`{name}`" in section, name
     assert "materials" in handoff.lower() and "quench_mark" in handoff
+
+
+def test_noqual_assay_warns_in_words_not_an_id():
+    """Merged 2026-10-04: noqual's recoil reached the card as the bare id `suppress_magic`
+    (`effectspec.render` had no line for it and `knowledge.danger_of` drops the note), so
+    the forge's `_danger_words` sent nothing and the confirm fell back on a general warning.
+    The owner's ruling is that the warning says what happens: your magic is suppressed."""
+    from play import forge_views
+    from rules import knowledge, materials
+
+    found = knowledge.danger_of(materials.get("noqual"))
+    words = forge_views._danger_words(found[1])
+    assert "magic" in words.lower() and "1d4 rounds" in words, words
