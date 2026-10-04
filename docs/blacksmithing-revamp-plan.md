@@ -380,7 +380,7 @@ nothing, which made those pieces pointless. At ±2 every piece moves a number. (
 | **Alloy** | 2+ ingots in a ratio window | named alloy bar (steel, bronze, brass...) | 2 | smithy | A recipe table names every alloy and its window (Vintage Story's model). An unlisted pair still gives the "novel alloy" rank step, but under a real name. |
 | **Forge** | bar + fuel | blank (blade, head) or plate | 1 | kit | The shape is **picked from the engine's list** of weapon and armour families, never typed. Draw merges in here. |
 | **Quench** | blank + quenchant | hardened blank | 1 | kit | Applies the quench mark. Brine, water, oil: hard to soft, risky to safe. |
-| **Temper** | hardened blank | tempered blank | 2 | kit | Removes the brittleness a quench leaves. Without it, a quenched item keeps `brittle` (−1 hardness, a natural 1 against it risks breaking). **(proposed)** |
+| **Temper** | hardened blank | tempered blank | 2 | kit | Removes the brittleness a quench leaves. Without it, a quenched item keeps `brittle` (−1 hardness, a natural 1 against it risks breaking). (Accepted 2026-10-03.) |
 | **Fold** | bar or blank | folded bar | 2 | smithy | Cancels `slaggy`; on clean metal, only +1 hardness. Makes pattern steel from two steels. |
 | **Hone** | blank | honed blank | 2 | kit | The edge. Polish merges in here. Required for Superior and up on edged weapons. |
 | **Assemble** | head + haft + fittings (or body + fastenings + lining) | the finished item | 1 | kit | Where pieces join and the item's numbers are computed (§6.2). |
