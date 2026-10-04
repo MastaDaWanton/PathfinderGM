@@ -8,36 +8,6 @@
       "port": 8731
     },
     {
-      "name": "playtest-1003",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "C:\\Users\\natha\\AppData\\Local\\Temp\\claude\\H--coding-PathfinderGM\\e91ee25f-7ee6-4228-b07a-f8d0fe4e44e4\\scratchpad\\serve-live.cmd"],
-      "port": 8977
-    },
-    {
-      "name": "playtest-1003-market",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "C:\\Users\\natha\\AppData\\Local\\Temp\\claude\\H--coding-PathfinderGM\\e91ee25f-7ee6-4228-b07a-f8d0fe4e44e4\\scratchpad\\serve-live2.cmd"],
-      "port": 8978
-    },
-    {
-      "name": "outfit-check",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "C:\\Users\\natha\\AppData\\Local\\Temp\\claude\\H--coding-PathfinderGM\\e91ee25f-7ee6-4228-b07a-f8d0fe4e44e4\\scratchpad\\serve-live3.cmd"],
-      "port": 8979
-    },
-    {
-      "name": "final-items",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "C:\\Users\\natha\\AppData\\Local\\Temp\\claude\\H--coding-PathfinderGM\\e91ee25f-7ee6-4228-b07a-f8d0fe4e44e4\\scratchpad\\serve-final-items.cmd"],
-      "port": 8981
-    },
-    {
-      "name": "final-market",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "C:\\Users\\natha\\AppData\\Local\\Temp\\claude\\H--coding-PathfinderGM\\e91ee25f-7ee6-4228-b07a-f8d0fe4e44e4\\scratchpad\\serve-final-market.cmd"],
-      "port": 8982
-    },
-    {
       "name": "dice-bench",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8732"],
