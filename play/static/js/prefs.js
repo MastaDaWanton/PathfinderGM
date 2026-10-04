@@ -40,6 +40,9 @@
     "sound.ui": 0.6,
     "sound.dice": 0.8,
     "sound.bench": 0.8,
+    // The Blacksmithing bench's anvil, bellows and quench (sound.js's `forge` bus,
+    // blacksmithing UI plan §6.8), at the herb bench's level so neither bench is louder.
+    "sound.forge": 0.8,
     "sound.ambience": 0.4,
     "sound.combat": 0.7,
     "sound.mute": false,

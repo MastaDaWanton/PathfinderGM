@@ -1,6 +1,7 @@
 /* The app's sound: `window.Sound` (docs/herbalism-contracts.md §5.3, revamp plan §11).
  *
  *   Sound.play(name, {volume, rate, delay})   one-shot; unknown names are a silent no-op
+ *                                             (forge sounds also read {hardness, bath})
  *   Sound.loop(name)                          -> {stop()}, for the ambience beds
  *   Sound.unlock()                            resume the context on a user gesture
  *
@@ -12,7 +13,7 @@
  * took for its clack ("a dozen lines of Web Audio and no asset in the installer").
  *
  * NAMES are `<bus>.<what>[.<which>]`; the first segment picks the bus. Buses (ui, dice,
- * bench, ambience, combat, verdict) feed one master gain, then a gentle limiter, then the
+ * bench, forge, ambience, combat, verdict) feed one master gain, then a gentle limiter, then the
  * speakers. Each bus gain follows its PGMPrefs volume live, so a Settings slider moved in
  * another window changes this one's mix too. `verdict` has no slider of its own in the
  * contract's key list; it rides on `sound.dice`, because a verdict only ever follows a die.
@@ -36,12 +37,15 @@
 (function () {
   "use strict";
 
-  var BUSES = ["ui", "dice", "bench", "ambience", "combat", "verdict"];
+  // `forge` is the Blacksmithing bench's own bus (blacksmithing UI plan §11, §6.8), beside
+  // the herb bench's, so a player can hear the anvil louder or quieter than the mortar.
+  var BUSES = ["ui", "dice", "bench", "forge", "ambience", "combat", "verdict"];
   var BUS_PREF = {
-    ui: "sound.ui", dice: "sound.dice", bench: "sound.bench",
+    ui: "sound.ui", dice: "sound.dice", bench: "sound.bench", forge: "sound.forge",
     ambience: "sound.ambience", combat: "sound.combat", verdict: "sound.dice",
   };
-  var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, ambience: 0.4, combat: 0.7, verdict: 0.8 };
+  var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, forge: 0.8, ambience: 0.4, combat: 0.7,
+                      verdict: 0.8 };
   // Simultaneous one-shots allowed before new ones are dropped. A grind game at full tilt
   // plus a verdict plus ambience events is well under this; a runaway caller is not.
   var MAX_VOICES = 28;
@@ -618,6 +622,356 @@
     return end;
   });
 
+  /* --- forge: the Blacksmithing bench (blacksmithing UI plan §11, contracts §11) ------ *
+   * `Sound.play("forge.<event>", {hardness, bath})`. Grounded in how the real things sound,
+   * rather than in what an anvil sounds like in films:
+   *
+   * THE ANVIL. A good anvil "will ring like a bell"; a soft, cast or cracked one gives "a
+   * dull thud" and the hammer "will feel dead on impact" (the smiths' ring and rebound
+   * tests, blacksmithtalk.com/threads/quick-test-for-anvil-rebound.480 and the bushcraftuk
+   * anvil buyers' guide). And it is not an orchestra's anvil: a real one has "a remarkably
+   * high-pitched ping" and does not "vibrate very long because of how large they are"
+   * (LA Opera's percussionist on the Anvil Chorus, laopera.org "Secret Sounds: Inside the
+   * Anvil Chorus"). So a strike in band is a short, high, inharmonic ping over the dull
+   * squash of hot iron, and a strike out of band is the thud with no ping at all.
+   *
+   * PITCH BY HARDNESS. A struck body's modes scale with its speed of sound, c = sqrt(E/rho):
+   * a thin rod carries sound at 5180 m/s in 1%-carbon steel, 3480 in brass, 2030 in gold
+   * (engineeringtoolbox.com/sound-speed-solids-d_713.html), and bell bronze 3400 (KIT,
+   * ifm.kit.edu 2006_AS_GB_KS_1). Same shape, softer metal, lower ring. The game has no
+   * modulus for adamantine, but it has hardness, which orders the metals the same way, so
+   * the ring's fundamental is a hundred hertz per point: bronze (8) 800 Hz, steel (12)
+   * 1200, mithral (15) 1500, adamantine (20) 2000. The partials are a free bar's (bell()).
+   *
+   * THE QUENCH. The noise of a quench is loudest where the vapour film breaks into
+   * nucleate boiling, bubbles forming and collapsing (researchgate "Investigation of
+   * sound phenomena during quenching process"); boiling noise moves from about 200-250 Hz
+   * to 400-500 Hz as the heat flux climbs (the RIT boiling-sound thesis). Brine's salt
+   * nucleates boiling and breaks the vapour blanket at once, a loud crackling discharge,
+   * while oil holds a longer vapour stage and boils slower and gentler (heat-treat
+   * references: fractory.com "Quenching Explained", paulo.com on oil quenching). So: brine
+   * is the brightest hiss with the most crackle, water a little softer, oil a low,
+   * muffled seethe with a burble and almost no crackle.
+   *
+   * THE FIRE. Combustion roar is continuous broadband noise peaking low, around 250-500 Hz
+   * for open turbulent flames (Combustion and Flame, "Combustion roar of premix burners";
+   * the IFRF handbook on combustion noise). The smithy bed and the bellows sit there.
+   *
+   * LEVELS. The owner asked device sounds to be "not too loud", then "a bit louder"
+   * (2026-10-02). A strike is heard dozens of times a craft, so every forge peak stays
+   * under combat.hit's body (0.24) and the loudest is the dead thud of a miss. */
+
+  // Hardness by material, for a caller that has the material and not the number. The
+  // game's house model is PF1's base hardness 10 plus the material's own `hardness`
+  // gear_mod (content/materials/blacksmith-materials.json), which lands on the rulebook's
+  // own figures where it has them: mithral 15, adamantine 20. A number is always better;
+  // this table is only the fallback, and a name it lacks is iron.
+  var HARDNESS = {
+    iron: 12, "wrought-iron": 8, copper: 9, tin: 8, lead: 10, zinc: 10, bismuth: 10,
+    silver: 8, gold: 5, platinum: 10, "cold-iron": 8, "star-iron": 12, viridium: 5,
+    mithral: 15, adamantine: 20, abysium: 12, djezet: 10, inubrix: 5, noqual: 10,
+    siccatite: 10, horacalcum: 15, steel: 12, bronze: 8, brass: 8, pewter: 8, electrum: 8,
+    "bell-bronze": 12, "high-carbon-steel": 12, "pattern-steel": 8, "nexavaran-steel": 8,
+    "elysian-bronze": 8, "living-steel": 15, "fire-forged-steel": 8,
+    "frost-forged-steel": 8, "singing-steel": 10, wyrmsteel: 10,
+  };
+  function hardnessOf(c) {
+    try {
+      var o = c.o || {}, h = o.hardness != null ? o.hardness : o.material;
+      if (typeof h === "string") {
+        var key = h.trim().toLowerCase();
+        h = HARDNESS[key] != null ? HARDNESS[key] : Number(key);
+      }
+      h = Number(h);
+      return isFinite(h) && h > 0 ? clamp(h, 3, 30) : 10;
+    } catch (e) { return 10; }
+  }
+  // The anvil's ping for this work: the fundamental (100 Hz per point of hardness) and a
+  // ring a little longer on harder work, still well under a second (the anvil is massive).
+  function ping(c, o) {
+    var h = hardnessOf(c);
+    return bell(c, { at: o.at, f: 100 * h * (o.mul || 1), peak: o.peak,
+                     d: (o.d || 0.3) + 0.012 * h });
+  }
+
+  // Quench baths. The id is the quenchant's (content/materials: water, quenching-brine,
+  // quenching-oil, whale-oil, glacier-melt, mercury-bath, blessed-water, troll-blood,
+  // wyvern-blood, dragon-blood, styx-water), read by the word in it, so a homebrew
+  // "sea-brine" or "linseed-oil" is heard as its family. Unknown or none is water.
+  //   hiss   the steam's band, falling as the film collapses
+  //   crack  grains of vapour discharge (brine's "explosive" breakup)
+  //   burble low bubbles (a thick bath boiling slowly)
+  var BATH = {
+    brine:   { hiss: 5200, q: 0.8, crack: 14, crackF: 4400, peak: 0.075, d: 0.9, burble: 0,
+               splash: 2200 },
+    water:   { hiss: 4000, q: 0.7, crack: 8, crackF: 3400, peak: 0.065, d: 1.1, burble: 0,
+               splash: 1900 },
+    blood:   { hiss: 2800, q: 0.9, crack: 5, crackF: 2400, peak: 0.055, d: 1.2, burble: 3,
+               splash: 1400 },
+    mercury: { hiss: 2200, q: 1.2, crack: 4, crackF: 1900, peak: 0.045, d: 0.8, burble: 2,
+               splash: 900 },
+    oil:     { hiss: 1500, q: 0.6, crack: 2, crackF: 1300, peak: 0.05, d: 1.6, burble: 5,
+               splash: 1100 },
+  };
+  function bathOf(c) {
+    try {
+      var b = String((c.o || {}).bath || "").toLowerCase();
+      if (b.indexOf("brine") >= 0 || b.indexOf("salt") >= 0) return BATH.brine;
+      if (b.indexOf("oil") >= 0) return BATH.oil;
+      if (b.indexOf("blood") >= 0) return BATH.blood;
+      if (b.indexOf("mercury") >= 0) return BATH.mercury;
+    } catch (e) { /* water */ }
+    return BATH.water;
+  }
+
+  def("forge.open", 3, function (c) {
+    // The hearth flaring from embers (UI plan §10): a low whump of air catching, then
+    // the anvil's quiet ping as it comes into the light.
+    noise(c, { src: "brown", type: "lowpass", f: 220, f2: k(c, [700, 640, 760]), q: 0.7,
+               peak: 0.12, a: 0.12, d: 0.5 });
+    noise(c, { at: 0.05, src: "pink", type: "highpass", f: 2800, q: 0.6, peak: 0.012,
+               a: 0.15, d: 0.4 });
+    return ping(c, { at: 0.32, peak: 0.022, d: 0.25 });
+  });
+
+  // Choosing a method: the tool coming off the rack (UI plan §10, "tools swap").
+  var FORGE_METHOD = {
+    smelt: function (c) {        // the clay crucible pushed into the coals
+      knock(c, { f: k(c, [240, 220, 260]), peak: 0.08, lp: 1300, d: 0.05, wave: "sine" });
+      return grains(c, { at: 0.03, n: 6, span: 0.15, f: 1600, q: 1.5, peak: 0.05,
+                         d: 0.012 });
+    },
+    alloy: function (c) {        // the ladle against the crucible's lip, then a heavy slosh
+      bell(c, { f: k(c, [620, 590, 660]), peak: 0.03, d: 0.25 });
+      return noise(c, { at: 0.1, src: "pink", f: 380, f2: 700, q: 1.6, peak: 0.07, a: 0.06,
+                        d: 0.16 });
+    },
+    forge: function (c) {        // the hammer set down on the anvil face: a light ping
+      knock(c, { f: k(c, [170, 160, 185]), peak: 0.05, lp: 900, d: 0.03 });
+      return ping(c, { at: 0.005, peak: 0.03, d: 0.2 });
+    },
+    quench: function (c) {       // a hand in the slack tub: wood and a slap of water
+      knock(c, { f: k(c, [150, 140, 165]), peak: 0.06, lp: 700, d: 0.05 });
+      return noise(c, { at: 0.04, f: 1200, f2: 600, q: 1, peak: 0.05, a: 0.01, d: 0.14 });
+    },
+    temper: function (c) {       // the tongs: two small iron clicks
+      noise(c, { f: k(c, [3400, 3100, 3700]), q: 4, peak: 0.05, d: 0.01 });
+      return bell(c, { at: 0.09, f: k(c, [2100, 1980, 2250]), peak: 0.018, d: 0.12 });
+    },
+    fold: function (c) {         // the hot-cut chisel seated in the hardy hole
+      knock(c, { f: k(c, [210, 195, 230]), peak: 0.07, lp: 1400, d: 0.035 });
+      return bell(c, { at: 0.01, f: k(c, [1650, 1560, 1750]), peak: 0.025, d: 0.18 });
+    },
+    hone: function (c) {         // the whetstone laid down and drawn once
+      knock(c, { f: k(c, [200, 185, 215]), peak: 0.06, lp: 1100, d: 0.03 });
+      return noise(c, { at: 0.08, f: 3200, f2: 4200, q: 2, peak: 0.035, a: 0.03, d: 0.12 });
+    },
+    assemble: function (c) {     // the rivet tin shaken
+      return grains(c, { n: k(c, [7, 9, 8]), span: 0.2, f: 3800, q: 5, peak: 0.05,
+                         d: 0.02 });
+    },
+    finish: function (c) {       // the file picked up: one short rasp
+      return grains(c, { n: 14, span: 0.18, f: 2600, q: 1.4, peak: 0.035, d: 0.01,
+                         even: true, fade: false });
+    },
+    strengthen: function (c) {   // the sledge leaned on the anvil: a low, heavy ring
+      knock(c, { f: k(c, [110, 100, 120]), peak: 0.09, lp: 600, d: 0.06 });
+      return ping(c, { at: 0.01, mul: 0.5, peak: 0.025, d: 0.3 });
+    },
+    assay: function (c) {        // the touchstone and the balance pan
+      return bell(c, { f: k(c, [2640, 2790, 2490]), peak: 0.022, d: 0.25 });
+    },
+  };
+  Object.keys(FORGE_METHOD).forEach(function (m) {
+    def("forge.method." + m, 3, FORGE_METHOD[m]);
+  });
+
+  // A piece landing in a slot on the anvil (UI plan §10, "a metal clink"), by its rack
+  // form (rules/blacksmith.py GROUPS and Material.rack_form). Metal forms clink at the
+  // pitch of their hardness when the caller says it.
+  var FORGE_DROP = {
+    ore: function (c) {          // a lump of rock: stone, gritty
+      knock(c, { f: k(c, [180, 165, 200]), peak: 0.09, lp: 1200, d: 0.04 });
+      return grains(c, { n: 4, span: 0.06, f: 2200, q: 2, peak: 0.04, d: 0.01 });
+    },
+    bar: function (c) {          // a bar on the anvil: a clank and a short ring
+      knock(c, { f: k(c, [190, 175, 205]), peak: 0.07, lp: 1000, d: 0.035 });
+      return ping(c, { at: 0.004, mul: 0.8, peak: 0.03, d: 0.18 });
+    },
+    ingot: function (c) {        // heavier and shorter than a bar
+      knock(c, { f: k(c, [150, 140, 160]), peak: 0.09, lp: 800, d: 0.045 });
+      return ping(c, { at: 0.004, mul: 0.65, peak: 0.022, d: 0.12 });
+    },
+    blank: function (c) {
+      knock(c, { f: k(c, [210, 200, 225]), peak: 0.06, lp: 1200, d: 0.03 });
+      return ping(c, { at: 0.004, mul: 1.1, peak: 0.028, d: 0.2 });
+    },
+    plate: function (c) {        // a sheet: a flat slap with a wobbling shimmer
+      noise(c, { f: k(c, [2400, 2200, 2600]), q: 1.2, peak: 0.05, a: 0.002, d: 0.08 });
+      return ping(c, { at: 0.006, mul: 0.6, peak: 0.025, d: 0.35 });
+    },
+    item: function (c) {         // finished work laid down with care
+      knock(c, { f: k(c, [230, 215, 245]), peak: 0.05, lp: 1400, d: 0.03 });
+      return ping(c, { at: 0.005, peak: 0.024, d: 0.25 });
+    },
+    fitting: function (c) {      // a haft, a grip, a guard: wood and leather, a soft knock
+      return knock(c, { f: k(c, [320, 295, 345]), peak: 0.07, lp: 1800, d: 0.035,
+                        wave: "sine" });
+    },
+    fuel: function (c) {         // a shovel of charcoal: dry crunch
+      return grains(c, { n: k(c, [6, 8, 7]), span: 0.12, f: 1500, q: 1.2, peak: 0.06,
+                         d: 0.014 });
+    },
+    flux: function (c) {         // borax sprinkled: a fine patter
+      return grains(c, { n: k(c, [8, 10, 9]), span: 0.18, f: 4800, q: 1, type: "highpass",
+                         peak: 0.025, d: 0.006 });
+    },
+    quenchant: function (c) {    // a stoppered jug set down: ceramic and a slosh
+      knock(c, { f: k(c, [280, 260, 300]), peak: 0.06, lp: 1400, d: 0.04, wave: "sine" });
+      return noise(c, { at: 0.05, src: "pink", f: 600, f2: 1100, q: 1.4, peak: 0.035,
+                        a: 0.04, d: 0.1 });
+    },
+    treatment: function (c) {    // a small pot or packet
+      return knock(c, { f: k(c, [360, 340, 390]), peak: 0.05, lp: 1800, d: 0.03,
+                        wave: "sine" });
+    },
+    old: function (c) {          // pre-revamp work: an iron clunk, nothing fancy
+      return knock(c, { f: k(c, [160, 150, 170]), peak: 0.08, lp: 900, d: 0.05 });
+    },
+  };
+  // The fittings' own words (rules/blacksmith.py _FITTING_FORMS) all sound as a fitting.
+  ["haft", "grip", "guard", "binding", "core", "lining", "fastening", "fastenings",
+   "wrap"].forEach(function (f) { FORGE_DROP[f] = FORGE_DROP.fitting; });
+  Object.keys(FORGE_DROP).forEach(function (f) {
+    def("forge.drop." + f, 3, FORGE_DROP[f]);
+  });
+
+  def("forge.roll", 3, function (c) {          // the step's d20, rattled on the anvil face
+    rattle(c, k(c, [2600, 3000, 2800]), k(c, [5, 7, 6]), 0.12);
+    return bell(c, { at: 0.24, f: k(c, [2900, 3100, 2750]), peak: 0.01, d: 0.12 });
+  });
+
+  def("forge.strike.hit", 4, function (c) {
+    // The hammer face meeting the work: a bright contact click, the dull squash of hot
+    // iron, and the anvil's ping at the pitch of the work's hardness.
+    noise(c, { type: "highpass", f: k(c, [3400, 3800, 3100, 3600]), q: 0.7, peak: 0.06,
+               a: 0.001, d: 0.012 });
+    knock(c, { f: k(c, [140, 128, 152, 135]), peak: 0.1, lp: 900, d: 0.045 });
+    return ping(c, { at: 0.002, mul: k(c, [1, 1.02, 0.98, 1.01]), peak: 0.05, d: 0.28 });
+  });
+  def("forge.strike.miss", 4, function (c) {
+    // Out of band: the work too cold to move, a dead thud and no ring at all (a soft or
+    // cracked anvil's "dull thud", the hammer "dead on impact"). Nothing above 400 Hz is
+    // tuned; a miss that pinged would read as a hit.
+    noise(c, { type: "lowpass", f: k(c, [500, 450, 560, 480]), q: 0.6, peak: 0.1,
+               a: 0.002, d: 0.07 });
+    return tone(c, { type: "sine", f: k(c, [96, 88, 104, 92]), f2: 58, glide: 0.1,
+                     peak: 0.13, a: 0.003, d: 0.12 });
+  });
+
+  def("forge.bellows", 3, function (c) {
+    // One pump of a leather bellows: the breath through the tuyere (a swell of band-passed
+    // noise that rises and falls), the fire roaring up under it at the combustion peak,
+    // and the faint creak of the board.
+    noise(c, { src: "pink", f: 500, f2: k(c, [1300, 1150, 1450]), q: 1.1, peak: 0.07,
+               a: 0.25, d: 0.35 });
+    noise(c, { at: 0.12, src: "brown", type: "lowpass", f: 280, f2: 420, q: 0.7,
+               peak: 0.1, a: 0.2, d: 0.5 });
+    return tone(c, { type: "sawtooth", f: k(c, [130, 120, 145]), f2: 112, glide: 0.25,
+                     lp: 500, peak: 0.006, a: 0.06, d: 0.22 });
+  });
+
+  def("forge.quench", 3, function (c) {
+    var b = bathOf(c), end;
+    // The plunge.
+    noise(c, { f: b.splash, f2: b.splash * 0.5, q: 0.9, peak: 0.06, a: 0.003, d: 0.1 });
+    // The hiss: steam off the film, falling as the film collapses into boiling.
+    end = noise(c, { at: 0.02, type: "bandpass", f: b.hiss, f2: b.hiss * 0.6, q: b.q,
+                     peak: b.peak, a: 0.03, d: b.d * k(c, [1, 0.92, 1.08]) });
+    // The vapour discharge: brine crackles, oil barely does.
+    end = Math.max(end, grains(c, { at: 0.04, n: b.crack, span: b.d * 0.6, f: b.crackF,
+                                    q: 1.5, peak: b.peak * 0.7, d: 0.008, bunch: 1.6 }));
+    // A thick bath boils slowly: low bubbles under the seethe.
+    for (var i = 0; i < b.burble; i++) {
+      end = Math.max(end, drop(c, { at: 0.1 + i * b.d / (b.burble + 1),
+                                    f: 160 + Math.random() * 90, rise: 1.6,
+                                    peak: 0.03, d: 0.06 }));
+    }
+    return end;
+  });
+
+  def("forge.temper", 3, function (c) {
+    // Tempering is gentle heat: a soft sizzle as oil is wiped on warm steel, and the
+    // small ticks of the metal moving as it cools.
+    noise(c, { type: "highpass", f: k(c, [3600, 3300, 3900]), q: 0.6, peak: 0.022,
+               a: 0.05, d: 0.45 });
+    return grains(c, { at: 0.1, n: k(c, [3, 4, 2]), span: 0.5, f: 5200, q: 6,
+                       peak: 0.035, d: 0.01 });
+  });
+  def("forge.grind", 4, function (c) {
+    // A stroke on the stone: a rasp that brightens as the edge bites, grit under it.
+    // Rendered offline in Chromium at 0.06/0.025 it peaked at 0.011, half the herb
+    // bench's grind hit (0.021): lost under the smithy bed. Raised to sit beside it.
+    noise(c, { f: k(c, [2200, 2500, 2000, 2350]), f2: k(c, [3600, 4000, 3300, 3800]),
+               q: 2.2, peak: 0.11, a: 0.04, d: 0.16 });
+    return grains(c, { n: 8, span: 0.2, f: 3000, q: 1.2, peak: 0.045, d: 0.008,
+                       even: true, fade: false });
+  });
+  def("forge.rivet", 3, function (c) {
+    // Peening a rivet: three quick light taps, each a small tight ring.
+    var end = c.t, gaps = [0, 0.11, 0.2];
+    for (var i = 0; i < gaps.length; i++) {
+      noise(c, { at: gaps[i], type: "highpass", f: 3000, q: 0.8, peak: 0.035, a: 0.001,
+                 d: 0.008 });
+      end = Math.max(end, bell(c, { at: gaps[i], f: k(c, [2300, 2180, 2420]) * (1 + i * 0.02),
+                                    peak: 0.022, d: 0.08 }));
+    }
+    return end;
+  });
+  def("forge.weld", 3, function (c) {
+    // A forge weld: a heavy blow at white heat and the flux and scale spitting off it.
+    knock(c, { f: k(c, [105, 96, 114]), peak: 0.13, lp: 600, d: 0.07 });
+    noise(c, { at: 0.01, type: "highpass", f: 3200, q: 0.6, peak: 0.03, a: 0.005, d: 0.3 });
+    return grains(c, { at: 0.01, n: k(c, [12, 15, 10]), span: 0.35, f: 4200, q: 1.3,
+                       type: "highpass", peak: 0.04, d: 0.006, bunch: 1.8 });
+  });
+
+  def("forge.tier.up", 3, function (c) {       // the work glints: two rising steel pings
+    var root = k(c, [1568, 1661, 1480]);
+    bell(c, { f: root, peak: 0.032, d: 0.35 });
+    return bell(c, { at: 0.09, f: root * 1.4983, peak: 0.036, d: 0.5 });
+  });
+  def("forge.flawless", 3, function (c) {
+    // The anvil rung on purpose: a struck chord of steel pings, then the gilt shimmer.
+    var root = k(c, [1175, 1109, 1245]);
+    var steps = [1, 1.2599, 1.4983, 2], end = c.t;
+    knock(c, { f: 150, peak: 0.07, lp: 900, d: 0.04 });
+    for (var i = 0; i < steps.length; i++) {
+      end = Math.max(end, bell(c, { at: 0.01 + i * 0.07, f: root * steps[i], peak: 0.035,
+                                    d: 0.9 + i * 0.15 }));
+    }
+    noise(c, { at: 0.1, type: "highpass", f: 7500, q: 0.5, peak: 0.01, a: 0.12, d: 0.6 });
+    return end;
+  });
+  def("forge.fail", 3, function (c) {
+    // A quench crack: the sharp "tink" smiths dread, then the work falling dull.
+    noise(c, { type: "highpass", f: 4200, q: 0.8, peak: 0.06, a: 0.001, d: 0.012 });
+    bell(c, { f: k(c, [3300, 3100, 3500]), peak: 0.02, d: 0.06 });
+    knock(c, { at: 0.08, f: k(c, [80, 74, 86]), peak: 0.15, lp: 320, d: 0.12, drop: 0.6,
+               wave: "sine" });
+    return grains(c, { at: 0.1, n: 4, span: 0.08, f: 2600, q: 2, peak: 0.03, d: 0.01 });
+  });
+  def("forge.land", 3, function (c) {          // onto the rack: wood under, a short clink
+    knock(c, { f: k(c, [210, 195, 225]), peak: 0.08, lp: 1100, d: 0.05 });
+    return ping(c, { at: 0.01, mul: 0.9, peak: 0.018, d: 0.15 });
+  });
+  def("forge.assay", 3, function (c) {
+    // The touchstone: the metal drawn across black stone, then the balance's small tink.
+    noise(c, { f: k(c, [3000, 3300, 2800]), f2: 2200, q: 1.8, peak: 0.035, a: 0.03,
+               d: 0.14 });
+    return bell(c, { at: 0.22, f: k(c, [2640, 2790, 2490]), peak: 0.02, d: 0.3 });
+  });
+
   /* --- ambience: beds that loop ----------------------------------------------------- *
    * A bed is continuous noise through a filter whose level breathes on a slow LFO (wind
    * gusts), plus scheduled one-shots (a bird, a cricket's chirp, a crackle, a drip) at
@@ -701,6 +1055,10 @@
       tone(c, { type: "sawtooth", f: 140, f2: 120, glide: 0.4, lp: 600, peak: 0.006,
                 a: 0.1, d: 0.35 });
     },
+    coals: function (c) {        // the bed of coals settling: a few dry, glassy clinks
+      grains(c, { n: 3 + (Math.random() * 3 | 0), span: 0.25, f: 2000, q: 3,
+                  peak: 0.014, d: 0.015 });
+    },
   };
 
   // Each ambience: its beds and its events ([name, min seconds, max seconds] apart).
@@ -740,6 +1098,18 @@
              events: [["bird", 10, 25]] },
     cave: { beds: [{ src: "brown", type: "lowpass", f: 140, level: 0.06 }],
             events: [["drip", 1.5, 5]] },
+    // The smithy (blacksmithing UI plan §11): a furnace's low roar. Combustion roar is
+    // broadband and peaks around 250-500 Hz (see the forge bank's header), so the body is
+    // brown noise low-passed there, breathing slowly as the draw rises and falls; a pink
+    // band at the peak flutters faster, the flames themselves; a thread of hiss on top.
+    // Events: the fire's crackle, a coal popping, the coals settling. It rides the
+    // ambience bus like every bed (the Ambience slider), not the forge bus: a player who
+    // turns the anvil down has not asked for a quieter room.
+    smithy: { beds: [{ src: "brown", type: "lowpass", f: 320, q: 0.7, level: 0.07,
+                       gust: 0.07, gustDepth: 0.35 },
+                     { f: 420, q: 0.9, level: 0.022, gust: 0.8, gustDepth: 0.5 },
+                     { type: "highpass", f: 3500, level: 0.003, gust: 0.2 }],
+              events: [["crackle", 0.4, 1.6], ["pop", 3, 9], ["coals", 6, 15]] },
   };
   // The app's canonical biomes (rules/biomes.py BIOMES) onto the nearest bed, so
   // `ambience.<biome>` for any ground the bench reports is never silent by accident.
@@ -818,8 +1188,10 @@
       var out = x.createGain();
       out.gain.value = vol;
       out.connect(bus);
+      // `o` is the caller's options as given: the forge's sounds read `hardness` and
+      // `bath` from it (contracts §11), everything else ignores it.
       var c = { x: x, out: out, t: x.currentTime + 0.005 + delay,
-                p: rate * (0.95 + Math.random() * 0.1), v: pickTake(name, s.n) };
+                p: rate * (0.95 + Math.random() * 0.1), v: pickTake(name, s.n), o: opts };
       var end = s.fn(c);
       var life = Math.max(0.05, (isFinite(end) ? end : c.t + 1) - x.currentTime) + 0.3;
       voices += 1;
