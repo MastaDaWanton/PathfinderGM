@@ -72,3 +72,15 @@ def test_a_peoples_name_given_to_a_person_is_caught_and_respelled(sentence, fixe
 ])
 def test_the_people_themselves_are_not_flagged(sentence):
     assert peoples_name.find(_ctx(sentence)) == []
+
+
+def test_a_peoples_name_is_cut_never_rewritten():
+    """Measured live on the merged structured-turn branch: the rewrite turned "The smith,
+    Korvu, leans over the crate" into "The smith, the man in the heavy coat, leans…" —
+    another person's description, copied from the check's own fix hint. The backstop's
+    respelling is exact, so the model is never asked."""
+    assert peoples_name.REWRITE is False
+    ctx = _ctx("The smith, Korvu, leans over the crate you just set down.")
+    found = peoples_name.find(ctx)
+    kept, _ = peoples_name.backstop(ctx, ctx.text, found)
+    assert kept == "The smith leans over the crate you just set down."

@@ -32,6 +32,13 @@ from ._page import page_sentences
 ORDER = 23
 KINDS = frozenset({"peoples-name-as-name"})
 DOORS = frozenset({"plan", "turn", "npc", "outcome"})
+# Cut-only: the backstop's respelling is exact ("the smith, Korvu, leans" → "the smith
+# leans") and the rewrite is not. Measured live on the merged structured-turn branch,
+# 2026-10-03: the rewrite turned "The smith, Korvu, leans over the crate" into "The
+# smith, the man in the heavy coat, leans…" — another person's description, copied from
+# this module's own fix hint, which listed it as an example (CLAUDE.md: the shape of the
+# prompt becomes the shape of the output).
+REWRITE = False
 
 
 def _names(ctx) -> tuple[list[str], list[str]]:
@@ -87,7 +94,7 @@ def find(ctx) -> list:
         "peoples-name-as-name",
         f"a people's name used as a person's name: {flagged[0][:90]!r}",
         "That is the name of a people of this world, not anyone's own name. Call the "
-        "person by what they are — the smith, the laborer, the man in the heavy coat — or "
+        "person by what the sentence already calls them, or "
         "by a name they have given; never 'named <people>' or '<people>' alone as a name.",
         weight=2, sentences=tuple(flagged))]
 
