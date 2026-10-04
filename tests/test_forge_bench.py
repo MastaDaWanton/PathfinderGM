@@ -722,6 +722,36 @@ def test_prospected_ore_reaches_the_rack_under_either_craft_id(pc):
     assert [(p.material, p.count) for p in ore] == [("iron-ore", 3)]
 
 
+def test_the_bench_reads_lane_gs_real_smithy_kit_and_rent():
+    """Contracts §8 against lane G's merged code, not a stand-in: standing in Caddonbury's
+    smithy the bench finds a town smithy, Smelt unlocks, and two hours of smelting cost
+    what `market.forge_rent` says (1 sp an hour). Outside it, with no kit carried, every
+    kit method is locked with the reason in words; carrying "Smith's Field Kit" opens
+    them. Measured on this branch before lane G merged: there was no smithy anywhere."""
+    from tests.test_forge_places import SYNTHETIC, _table
+    from rules import places
+
+    city = next(SYNTHETIC.get(r["id"]) for r in SYNTHETIC.play["settlements"]
+                if SYNTHETIC.get(r["id"]).name == "Caddonbury")
+    smithy = next(p for p in places.home_set(city) if p.name == "the smithy")
+    scene, engine = _table(SYNTHETIC, city.id)
+    pc = scene.pc()
+    pc.goods.clear()
+    pc.stock.clear()
+    outside = bs.where_here(scene, pc, engine.places())
+    assert outside == {"smithy": None, "kit": False}
+    locks = {m["id"]: m["lock_reason"] for m in bs.methods_view(1, outside)}
+    assert locks["forge"] == "Needs a field kit or a smithy"
+    pc.goods["Smith's Field Kit"] = 1
+    assert bs.where_here(scene, pc, engine.places())["kit"] is True
+
+    engine.place_party(smithy.id)
+    here = bs.where_here(scene, pc, engine.places())
+    assert here["smithy"]["kind"] == "town"
+    assert {m["id"]: m["lock_reason"] for m in bs.methods_view(1, here)}["smelt"] == ""
+    assert bs.rent_cp(scene, here["smithy"], 120, engine.places()) == 20
+
+
 def test_assay_cuts_a_tenth_of_a_bar(pc):
     """Plan §9.2: "bars track tenths". The assay's sliver is a tenth of a carried bar; ten
     of them use the bar up."""
