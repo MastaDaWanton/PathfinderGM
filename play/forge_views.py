@@ -114,14 +114,21 @@ def _track(track, progress) -> dict:
     ceiling = int(out.get("ceiling", worldclass.ceiling_index(progress)))
     out["tiers"] = [worldclass.quality_name(i) for i in range(ceiling + 1)]
     out["masterwork_at"] = worldclass.quality_name(bs._mw_index())
+    # The rung the work order's ladder marks "Superior · masterwork" (UI plan §4), by
+    # index, so the page compares no names.
+    out["masterwork_index"] = bs._mw_index()
     sizes = (track.endless or {}).get("perks") or {}
     info = {}
     for perk in track.perks:
         size, n = float(sizes.get(perk, 0) or 0), int(progress.perks.get(perk, 0))
         if perk == "quality":
             step = int(size) or 1
-            nxt = (f"+{step} to your quality ceiling: "
-                   f"{worldclass.quality_name(ceiling + step)}")
+            # Said as the rung it reaches, without a second "+1" beside the rung's own
+            # name: at Blacksmith 3 and up the ceiling is Flawless and the next rung is
+            # "Flawless +1", which read "+1 to your quality ceiling: Flawless +1" (lane
+            # U5's report, 2026-10-04). The rung's name is quality_name's, the one copy.
+            nxt = (f"Your quality ceiling rises {'one step' if step == 1 else f'{step} steps'}, "
+                   f"to {worldclass.quality_name(ceiling + step)}")
         elif perk == "yield":
             nxt = (f"+{_pct(size)} chance per Smelt or Forge of one more ingot or blank, "
                    f"total {_pct(size * (n + 1))}")
@@ -496,7 +503,6 @@ def _state_body(c, pc) -> dict:
     where["line"] = _place_line(c, where)
     rack = _rack_items(c, pc)
     summary = _track(track, progress)
-    summary["masterwork_index"] = bs._mw_index()
     return {
         "track": summary,
         "level": int(progress.level),
@@ -1021,10 +1027,19 @@ def forge_assay(request):
                                      else f"learned: {m.name}")
         lines.extend(res.get("reasons") or [])
         levelled.extend(res.get("levelled") or [])
-    # The danger of a reactive metal is applied by lane E's assay, which holds the actor
-    # (contracts §6: "reactive metals apply their carrier effect for real"); it is shown
-    # here, never applied a second time.
+    # The danger of a reactive metal, applied for real (contracts §6): lane E's assay
+    # only NAMES it ("the caller runs it through the engine with `apply_danger`", its own
+    # docstring), and until 2026-10-04 this view showed it and applied nothing, so
+    # assaying abysium never sickened anyone (lane U5's report). Through the engine, so it
+    # lands as an ActiveEffect through the one applicator and is told (laws 2 and 3).
     danger = got.get("danger")
+    applied = []
+    if danger and hasattr(kn, "apply_danger"):
+        try:
+            applied = list(kn.apply_danger(engine, pc, mid, danger,
+                                           because=f"assaying {m.name}") or [])
+        except Exception:      # noqa: BLE001 - lane E's own contract: never crash the turn
+            applied = []
     said = (f"{pc.name} assays {m.name} (d20 {face}{bonus_v:+d} = {total}): "
             + (", ".join(f["text"] or f["key"] for f in found) if found
                else "nothing new."))
@@ -1032,9 +1047,12 @@ def forge_assay(request):
     c.save()
     return JsonResponse({
         "material": mid, "name": m.name,
-        "roll": {"face": face, "bonus": bonus_v, "total": total, "terms": terms},
+        "roll": {"face": face, "bonus": bonus_v, "total": total, "terms": terms,
+                 "dc": got.get("dc"), "success": got.get("success")},
+        "dc": got.get("dc"), "success": got.get("success"),
         "revealed": found, "cost": got.get("cost"), "paid": paid, "minutes": minutes,
-        "danger": danger,
+        "danger": danger, "danger_text": _danger_words(danger) if danger else "",
+        "danger_applied": bool(applied),
         "mastery": {"lines": lines, "total": progress.mp, "level": progress.level,
                     "levelled": levelled},
         "clock": _clock(c),
@@ -1089,11 +1107,138 @@ def forge_material(request, material_id: str):
             "glyph": bs.KIND_GLYPH.get(m.kind, "🪨"), "carried": round(carried, 1),
             "reactive": m.has("reactive"),
             "pieces": m.pieces, "properties": None, "assay_dc": None,
-            "unknown": bs.unknown_count(pc, m)}
+            "unknown": bs.unknown_count(pc, m),
+            # Lane U5's card (UI plan §6.7): the swatch, where it is found or bought, what
+            # an assay costs and does, and who here could be asked.
+            "color": material_color(m.id),
+            "obtain": str(m.doc.get("obtain") or ""), "source": str(m.doc.get("source") or ""),
+            "biomes": list(m.doc.get("biomes") or []),
+            "assay_minutes": int((bs.method_row("assay") or {}).get("minutes", 10)),
+            "assay_cost": None, "assay_danger": "",
+            "smiths_here": smiths_here(c, pc)}
     if kn is not None:
         try:
             card["properties"] = list(kn.properties(pc, m.doc))
             card["assay_dc"] = int(kn.assay_dc(m.doc, pc))
         except Exception:      # noqa: BLE001 - the card shows what it can
             pass
+        try:
+            rules = kn.lore(kn.BLACKSMITH)["assay"]
+            card["assay_minutes"] = int(rules["minutes"])
+            card["assay_cost"] = kn.assay_cost(m.doc)
+            found = kn.danger_of(m.doc)
+            if found:
+                card["assay_danger"] = _danger_words(found[1])
+            elif card["reactive"]:
+                card["assay_danger"] = f"{m.name} reacts badly to testing."
+        except Exception:      # noqa: BLE001
+            pass
     return JsonResponse(card)
+
+
+def _danger_words(effect: dict | None) -> str:
+    """What an assay's danger does to the assayer, in words: the effect's own line and
+    its note ("Sickened, for 1d4 hours: while carried and for 1d4 hours after")."""
+    if not effect:
+        return ""
+    line = _render(effect)
+    note = str(effect.get("note") or "")
+    return f"{line}: {note}" if note else line
+
+
+def smiths_here(c, pc) -> list[dict]:
+    """Everybody standing here who knows metals (UI plan §6.7, "Ask a smith"): a smith by
+    trade, or somebody whose own words say so (lane E's `knowledge.teaches`, the herb
+    bench's `teachers_here` for the forge). Named, never reffed on the page; the ref is
+    what the browser posts back."""
+    kn = bs._lane("knowledge")
+    if kn is None or not hasattr(kn, "teaches"):
+        return []
+    from rules import population
+
+    try:
+        price = _coins(int(kn.lore(kn.BLACKSMITH)["teacher"]["price_cp"]))
+    except Exception:      # noqa: BLE001
+        price = ""
+    out = []
+    for ref, a in (getattr(c.scene, "actors", None) or {}).items():
+        if a is pc or getattr(a, "is_pc", False) or getattr(a, "is_down", False):
+            continue
+        try:
+            if kn.teaches(a, population.of_ref(c.scene, ref), kn.BLACKSMITH):
+                out.append({"ref": ref, "name": a.name, "price": price})
+        except Exception:      # noqa: BLE001 - one odd record is no reason to lose the card
+            continue
+    return out
+
+
+@require_POST
+def forge_ask(request):
+    """Show a material to a smith and pay them to tell you about it (UI plan §6.7), the
+    herb bench's Ask (play/herb_views.py `herb_ask`) for metals: lane E's lesson path
+    (`teaches`, `lesson_size`, `lesson_order`). Their regard decides how much: below
+    indifferent they refuse in words; friendlier, they tell more. Dangers first."""
+    from rules import attitude, goods
+
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    kn = bs._lane("knowledge")
+    if kn is None or not hasattr(kn, "lesson_order"):
+        return _err("Asking a smith is not available in this build yet.", 501)
+    body = read_body(request)
+    m = bs.metal(str(body.get("material") or "").strip().lower())
+    if m is None:
+        return _err("There is no such material.", 404)
+    ref = str(body.get("ref") or "")
+    if not any(t["ref"] == ref for t in smiths_here(c, pc)):
+        return _err("Nobody here by that name knows metals.", 400)
+    person = c.scene.actors[ref]
+    who = person.name[:1].upper() + person.name[1:]
+    rules = kn.lore(kn.BLACKSMITH)["teacher"]
+    size = kn.lesson_size(person, kn.BLACKSMITH)
+    if not size:
+        hostile = attitude.of(person) == attitude.HOSTILE
+        said = (f"{who} wants nothing to do with you and will not say a word about "
+                f"{m.name}." if hostile else
+                f"{who} has no wish to help you, and keeps what they know of {m.name} "
+                f"to themselves.")
+        c.transcript.append({"who": "gm", "kind": "consequence", "text": said})
+        c.save()
+        return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})
+    order = kn.lesson_order(pc, m.doc)[:size]
+    if not order:
+        return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
+                             "refused": f"{who} has nothing to tell you about {m.name} "
+                                        f"you do not know."})
+    cp = int(rules["price_cp"])
+    purse, ok = goods.spend(pc.purse, cp)
+    if not ok:
+        return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
+                             "refused": f"{who} asks {_coins(cp)}, and you cannot pay it."})
+    pc.purse = purse
+    person.purse = goods.credit(getattr(person, "purse", None) or {}, cp)
+    minutes = int(rules["minutes"])
+    c.scene.advance(minutes)
+    keys = kn.reveal(pc, m.id, kn.with_gates(m.doc, order),
+                     f"taught by {person.name}, day {kn.day_of(c.scene.clock_minutes)}")
+    rows = {r.get("key"): r for r in kn.properties(pc, m.doc)}
+    revealed = [{"key": k, "text": str((rows.get(k) or {}).get("text") or ""), "row": rows.get(k)}
+                for k in keys]
+    track, progress = _progress(pc)
+    lines: list[dict] = []
+    levelled: list[int] = []
+    for f in revealed:
+        res = worldclass.award_bonus(track, progress, mp=worldclass.FIRST_MP,
+                                     why=f"learned: {m.name}, {f['text']}" if f["text"]
+                                     else f"learned: {m.name}")
+        lines.extend(res.get("reasons") or [])
+        levelled.extend(res.get("levelled") or [])
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": (
+        f"{who} looks over the {m.name} and tells you: "
+        + "; ".join(f["text"] or f["key"] for f in revealed) + f". ({_coins(cp)} paid.)")})
+    c.save()
+    return JsonResponse({"revealed": revealed, "paid": _coins(cp), "minutes": minutes,
+                         "refused": "", "clock": _clock(c),
+                         "mastery": {"lines": lines, "total": progress.mp,
+                                     "level": progress.level, "levelled": levelled}})

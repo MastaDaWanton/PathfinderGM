@@ -3865,8 +3865,9 @@ one printed itself at the foot of the table (seen live, 2026-10-02).{% endcommen
 <script src="{% asset 'js/table/36-bench-perks.js' %}"></script>
 <!-- The forge (docs/blacksmithing-contracts.md §10): its icon art with the content stamp,
      a registry of its own beside BENCH_ICON_URLS (whose 46 herb names bench-icons.js pins);
-     lane U4's stage parts and adapter; then 40 to 44 in number order. 42 and 44 (lanes U4
-     and U5) are optional providers (§11), named only once in the build. -->
+     lane U4's stage parts and adapter; then 40 to 44 in number order. 42 (lane U4) is an
+     optional provider (§11), named only once it is in the build; 44 (lane U5's ledger
+     card, merged 2026-10-04) always is. -->
 <script>
 window.FORGE_ICON_URLS = {
   smelt: "{% asset 'img/icons/smelt.svg' %}", alloy: "{% asset 'img/icons/alloy.svg' %}",
@@ -3899,7 +3900,7 @@ window.FORGE_ICON_URLS = {
 <script src="{% asset 'js/table/41-forge-rack.js' %}"></script>
 {% asset 'js/table/42-forge-stage.js' as forge_stage_js %}{% if '?v=' in forge_stage_js %}<script src="{% asset 'js/table/42-forge-stage.js' %}"></script>{% endif %}
 <script src="{% asset 'js/table/43-forge-order.js' %}"></script>
-{% asset 'js/table/44-forge-ledger.js' as forge_ledger_js %}{% if '?v=' in forge_ledger_js %}<script src="{% asset 'js/table/44-forge-ledger.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/44-forge-ledger.js' %}"></script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>

@@ -229,13 +229,26 @@
     if (!L || typeof L.card !== "function" || !mid) return;
     try { L.card(mid, el); } catch (err) { console.error("forge ledger card failed:", err); }
   }
+  // Hover and focus PEEK (an unpinned card that goes when the pointer or focus leaves,
+  // lane U5's `peek`/`unpeek`); "?" opens it pinned.
   var hoverT = 0;
+  function peek(li, now) {
+    var L = window.ForgeLedger;
+    clearTimeout(hoverT);
+    if (!L || typeof L.peek !== "function") return;
+    if (!li) { if (L.unpeek) L.unpeek(); return; }
+    var info = li.querySelector(".bt-info");
+    var go = function () { try { L.peek(info.dataset.material, li); } catch (err) { /* */ } };
+    if (now) go(); else hoverT = setTimeout(go, 280);
+  }
   list.addEventListener("mouseover", function (e) {
     var li = e.target.closest(".fr.has-info");
-    clearTimeout(hoverT);
-    if (!li) return;
-    var info = li.querySelector(".bt-info");
-    hoverT = setTimeout(function () { openCard(info.dataset.material, li); }, 280);
+    if (li) peek(li, false);
   });
-  list.addEventListener("mouseleave", function () { clearTimeout(hoverT); });
+  list.addEventListener("mouseleave", function () { peek(null); });
+  list.addEventListener("focusin", function (e) {
+    var li = e.target.closest(".fr-add") && e.target.closest(".fr.has-info");
+    if (li) peek(li, true);
+  });
+  list.addEventListener("focusout", function (e) { if (!list.contains(e.relatedTarget)) peek(null); });
 })();

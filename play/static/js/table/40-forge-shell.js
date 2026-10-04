@@ -154,6 +154,19 @@
     return el;
   };
   F.iconHtml = function (name, opts) { return F.icon(name, opts).outerHTML; };
+  // The perk picker (36, "anvil", "quench", "hone", "ingot") and lane U5's ledger card
+  // (44, a material's form) ask BenchIcons for forge names, which its 46-name registry
+  // does not hold, so they drew lettered roundels beside the forge's own engraved art.
+  // BenchIcons is taught the forge's names here, for a name it has no art for and the
+  // forge has: bench-icons.js and its pinned herb list stay as they are.
+  if (window.BenchIcons && !BenchIcons.forgeNames) {
+    var herbEl = BenchIcons.el;
+    BenchIcons.el = function (name, opts) {
+      return forgeUrl(name) && !BenchIcons.has(name) ? F.icon(name, opts) : herbEl(name, opts);
+    };
+    BenchIcons.html = function (name, opts) { return BenchIcons.el(name, opts).outerHTML; };
+    BenchIcons.forgeNames = true;
+  }
 
   // --- lookups ------------------------------------------------------------------------------
   F.item = function (key) {
@@ -804,6 +817,10 @@
         F.order.slots = {}; F.order.parts = []; F.order.batch = 1; F.slotHint = null;
         if (F.order.method === "assemble") F.order.gear = "weapon";
         F.result = { finished: true, finish: f, stopped: stopped, flat: flat, method: order.method };
+        // Working a metal reveals its working traits: the ledger's cached cards are stale.
+        if ((f.discoveries || []).length && window.ForgeLedger && ForgeLedger.forget) {
+          try { ForgeLedger.forget(); } catch (err) { /* */ }
+        }
         if (f.state) adopt(f.state);
         tickClock(0, f.state && f.state.clock);
         F.emit("result", F.result);
@@ -975,15 +992,48 @@
         if (F.open) return;
         if (typeof Shell === "object" && Shell && Shell.show) Shell.show("journal");
         document.dispatchEvent(new CustomEvent("forge:ledger"));
+        setTimeout(function () {
+          var at = $id("jr-ledger");
+          if (at && at.scrollIntoView) at.scrollIntoView({ block: "start" });
+        }, 120);
         return;
       }
-      if (e.target.closest("[data-bench-perks]")) {
-        var L = window.ForgeLedger;
-        if (L && typeof L.perks === "function") { try { L.perks(e.target.closest("[data-bench-perks]")); } catch (err) { /* */ } }
-        else F.say("The perk picker for the forge is not in this build yet.");
-      }
+      if (e.target.closest("[data-bench-perks]")) F.openPerks();
     });
   }
+
+  // An assay or a lesson from the ledger card (lane U5's 44) took a sliver and passed
+  // time: the rack, the clock and the footer are the server's, so they are read again.
+  document.addEventListener("forge:learned", function (e) {
+    if (!F.open) return;
+    var r = e.detail && e.detail.response;
+    if (r && r.clock) tickClock(0, r.clock);
+    F.refresh();
+  });
+
+  // The perk picker (lane U5's 36-bench-perks.js, parameterised by track): the herb
+  // picker with the forge's four perks, inside this layer so the trap holds it.
+  F.openPerks = function () {
+    var t = F.state && F.state.track;
+    var P = window.BenchPerks;
+    if (!t || !t.picks_banked) return;
+    if (!P || typeof P.open !== "function") { F.say("The perk picker is not in this build."); return; }
+    P.open({
+      track: "blacksmith", state: t, pops: $id("forge-pops"), esc: esc,
+      pushEsc: core.pushEsc, dropEsc: core.dropEsc, sound: F.sound, api: F.api,
+      home: function () {
+        var foot = $id("forge-foot-in");
+        return (foot && foot.querySelector("[data-bench-perks]")) || $id("forge-close");
+      },
+      saved: function (track, picks) {
+        if (F.state) F.state.track = track;
+        F.emit("state", F.state);
+        renderFoot();
+        F.say("Perks taken: " + picks.join(", ") + ".");
+      },
+      afterClose: function () { F.runCheck(); },
+    });
+  };
 
   // Buy at the market (the rack's empty state): the table's Trade tab, in place of the forge.
   F.market = function () {
