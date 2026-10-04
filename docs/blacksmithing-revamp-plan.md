@@ -32,7 +32,7 @@ well-formed documents that do nothing.
 | Area | Decision |
 |---|---|
 | Book or ours | **The book's effects**, in the correct (typed, executable) format. And **more** from each material: at least 3 modifiers for weapons and 3 for armour, so where the book gives fewer, house modifiers make up the rest and "both win". |
-| Every material | Gets **at least one negative**. Example given: iron is heavy and slow, so +1 damage, −1 to hit, and one more positive. Keep the numbers **small**, so the materials can be worked up without becoming overpowered. |
+| Every material | Gets **at least one negative**. Example given: iron is heavy and slow, so +1 damage, −1 to hit, and one more positive. Keep the numbers **small**, so the materials can be worked up without becoming overpowered. (The base was later set at ±2; see "Base value" below.) |
 | How many | **3 weapon modifiers + 3 armour modifiers** per structural material. |
 | Pieces | Weapons: **head, haft, fittings**. Armour: **body, fastenings, lining**. Each piece is one material and adds its modifiers. |
 | Weighting | The **main piece counts in full**, the other two count **half**, before rounding. The book's special powers (adamantine through hardness, cold iron against fey, silver against lycanthropes) come **only from the main piece**, as the book says ("only the most prevalent material"). |
@@ -53,6 +53,8 @@ well-formed documents that do nothing.
 | Old saves | **Convert**, as Herbalism did. |
 | Shared metals | **One material, many shelves.** Mithral is one document; the leatherworker's mithral fittings and the enchanter's mithral filings are forms of it. Learning mithral at the forge teaches it everywhere. |
 | UI | Its **own bench**, built from the herb bench's parts. The stage shows the kit on the ground or a smithy; the work is **built from its pieces** in 3D; **engraved icons** as for herbs. See the UI plan. |
+| Base value | **House modifiers start at ±2, not ±1** (ruled after the first draft). A half-weight piece then gives ±1 instead of rounding to nothing. |
+| The five open points | All accepted as proposed: negatives round **toward zero**; **no bulk at Assemble** for finished weapons and armour; skymetal names **wait on the licensing decision**; skipping Temper **leaves a real flaw** (`brittle`). |
 
 ---
 
@@ -175,14 +177,14 @@ Every field defaults, so an old file still loads (the same rule as `herbprep.Pre
   "id": "iron", "name": "Iron", "kind": "metal", "form": "bar", "tier": "common",
   "pieces": {"weapon": ["head", "fittings"], "armour": ["body", "fastenings"]},
   "weapon": [
-    {"type": "combat_mod", "target": "damage", "amount": 1, "bonus_type": "material"},
-    {"type": "combat_mod", "target": "attack", "amount": -1, "bonus_type": "material"},
-    {"type": "gear_mod",   "target": "hardness", "amount": 1}
+    {"type": "combat_mod", "target": "damage", "amount": 2, "bonus_type": "material"},
+    {"type": "combat_mod", "target": "attack", "amount": -2, "bonus_type": "material"},
+    {"type": "gear_mod",   "target": "hardness", "amount": 2}
   ],
   "armour": [
-    {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "material"},
-    {"type": "gear_mod",   "target": "acp", "amount": -1},
-    {"type": "gear_mod",   "target": "hardness", "amount": 1}
+    {"type": "combat_mod", "target": "ac", "amount": 2, "bonus_type": "material"},
+    {"type": "gear_mod",   "target": "acp", "amount": -2},
+    {"type": "gear_mod",   "target": "hardness", "amount": 2}
   ],
   "working": [
     {"type": "working", "trait": "forgiving", "note": "wide heat band"}
@@ -228,13 +230,13 @@ as `"book": true` effects. Then house modifiers top each list up to 3. Examples:
 | Material | Book effects (main piece only, fixed) | House top-up to 3 (scaled) |
 |---|---|---|
 | **Mithral** (armour) | `gear_mod` acp −3 (min 0), max_dex +2, asf −10, weight_pct −50, category −1 (movement only) | already ≥3; house negative: `gear_mod` hardness −5 vs steel (book hardness 15) |
-| **Mithral** (weapon) | `strikes_as` silver, `gear_mod` weight_pct −50 | +1 `combat_mod` attack (light in the hand); negative: −1 damage |
-| **Adamantine** (weapon) | `strikes_as` adamantine (ignores hardness < 20) | +1 damage; negative: `gear_mod` weight_pct +10 |
-| **Adamantine** (armour) | `damage_reduction` 1/2/3 by armour weight | +1 AC; negative: ACP −1 (it does not flex) |
-| **Cold iron** (weapon) | `strikes_as` cold_iron | +1 attack vs fey (`when`); negative: −1 hardness (forged low, it is softer) |
-| **Alchemical silver** (weapon, Finish) | `strikes_as` silver, `combat_mod` damage −1 (slashing and piercing only, min 1) | it is a treatment, not a piece: one house mod, +1 damage vs lycanthropes |
+| **Mithral** (weapon) | `strikes_as` silver, `gear_mod` weight_pct −50 | +2 `combat_mod` attack (light in the hand); negative: −2 damage |
+| **Adamantine** (weapon) | `strikes_as` adamantine (ignores hardness < 20) | +2 damage; negative: `gear_mod` weight_pct +10 |
+| **Adamantine** (armour) | `damage_reduction` 1/2/3 by armour weight | +2 AC; negative: ACP −2 (it does not flex) |
+| **Cold iron** (weapon) | `strikes_as` cold_iron | +2 attack vs fey (`when`); negative: −2 hardness (forged low, it is softer) |
+| **Alchemical silver** (weapon, Finish) | `strikes_as` silver, `combat_mod` damage −1 (slashing and piercing only, min 1) | it is a treatment, not a piece: one house mod, +2 damage vs lycanthropes |
 | **Noqual** (armour) | asf **+20** (all casting), save +2 vs spells, object +4 vs magic, weight −50, category −1, max_dex +2, acp −3; **+5,000 gp to enchant** | already ≥3 |
-| **Abysium** | carrier `apply_condition` sickened while carried and 1d4 hours after (no save) | +1 damage (it burns); negative: the carrier effect *is* the negative |
+| **Abysium** | carrier `apply_condition` sickened while carried and 1d4 hours after (no save) | +2 damage (it burns); negative: the carrier effect *is* the negative |
 
 The book's prices (+3,000 gp for an adamantine weapon, ×2 for cold iron, and so on) go into
 `price_gp` per form so the market and the Appraise check agree with the book.
@@ -284,8 +286,9 @@ brine: hard but `quench_sensitive` risk; oil: soft and safe).
   quenchants need at least 3 between working traits and the mark.
 - **No narrative effects.** Every effect is executable (herbalism's
   `test_herb_effects_are_documents.py`).
-- **Small numbers.** A ceiling per tier for any one house modifier: common ±1, uncommon ±1,
-  rare ±2, exotic ±2, legendary ±3. **(proposed)** Book effects are exempt, being the book.
+- **Small numbers, base 2.** House modifiers start at ±2 (the owner's ruling). A ceiling per tier
+  for any one house modifier: common ±2, uncommon ±2, rare ±3, exotic ±3, legendary ±4.
+  **(proposed: the ceilings above 2)** Book effects are exempt, being the book.
 
 ### 5.8 How the pass is done
 
@@ -333,8 +336,7 @@ final    = round each target's total down to a whole number
 ```
 
 **"Rounded down"** is read as **toward zero**, so −1.5 becomes −1, not −2. That is the reading
-that keeps the owner's "small numbers" intent for negatives. **(proposed: needs the owner's
-nod)**
+that keeps the owner's "small numbers" intent for negatives. (Accepted 2026-10-03.)
 
 Quality multipliers on bonuses **(proposed)**: Crude ×0.75, Sound ×1, Fine ×1.25, Superior ×1.5,
 Flawless ×1.75, each +N another ×0.25.
@@ -352,18 +354,21 @@ Flawless ×1.75, each +N another ×0.25.
 
 A Fine longsword. Head: iron, Strengthened once. Haft: ash. Fittings: brass. Smith level 2.
 
-| Target | Iron head (×1, ×1.5) | Ash haft (×0.5) | Brass fittings (×0.5) | Raw | After quality / cut | Final |
+At the owner's base of ±2:
+
+| Target | Iron head (×1, ×1.5) | Ash haft (×0.5) | Brass fittings (×0.5) | Bonus / negative | After quality (×1.25) and cut (×0.9) | Final |
 |---|---|---|---|---|---|---|
-| damage | +1 × 1.5 = +1.5 | 0 | 0 | +1.5 | ×1.25 = +1.875 | **+1** |
-| attack | −1 × 1.5 = −1.5 | +1 × 0.5 = +0.5 | 0 | −1.5 / +0.5 | −1.5 × 0.9 = −1.35; +0.5 × 1.25 = +0.625 | **−1 +0 → −1** |
-| hardness | +1 × 1.5 | 0 | +1 × 0.5 | +2.0 | ×1.25 = +2.5 | **+2** |
+| damage | +2 × 1.5 = +3 | 0 | 0 | +3 / 0 | +3.75 | **+3** |
+| attack | −2 × 1.5 = −3 | +2 × 0.5 = +1 | 0 | +1 / −3 | +1.25 − 2.7 = −1.45 | **−1** |
+| hardness | +2 × 1.5 = +3 | 0 | +2 × 0.5 = +1 | +4 / 0 | +5 | **+5** |
 
-Shown on the item card exactly like this (UI plan §6.6), so the rounding is never a mystery.
+Bonuses and negatives are summed separately per target, scaled (quality on bonuses, the cut on
+negatives), then added and rounded toward zero once. Shown on the item card exactly like this
+(UI plan §6.6), so the rounding is never a mystery.
 
-**Open point for tuning:** with values of ±1 and weights of 0.5, the half-weight pieces often
-round to nothing. If that makes hafts and fittings feel pointless in playtest, the first lever
-is to sum bonuses and negatives *separately per target* before rounding (as above) and the
-second is to give haft and fitting materials values of ±2 at 0.5 weight.
+**Why the base is 2:** at ±1, a half-weight haft or fitting gave ±0.5 and usually rounded to
+nothing, which made those pieces pointless. At ±2 every piece moves a number. (Ruled
+2026-10-03.)
 
 ---
 
@@ -400,9 +405,9 @@ each step is its own roll now, so stacking DCs across a chain no longer means an
 - **Hafts, grips, guards**: bought or carved (woodworking stays outside this plan; bought for
   now).
 - **Finished weapons, armour and shields**: one item each. **No bulk at Assemble** for weapons
-  and armour **(proposed)**: the owner chose bulk for herbalism, and Smelt, Alloy, Forge and
-  Strengthen keep it for bars and ingots, but a stack of ten identical longswords from one
-  minigame is the Bannerlord exploit shape. Flag for the owner.
+  and armour (accepted 2026-10-03): Smelt, Alloy, Forge and Strengthen keep bulk for bars and
+  ingots, but a stack of ten identical longswords from one minigame is the Bannerlord exploit
+  shape.
 
 Every product records its build (`pieces`, materials, passes, quality, mark, finish) so the
 item card can show the sum, and so an old item can be re-derived if a material document changes
@@ -639,12 +644,16 @@ Each names the defect it prevents in its docstring:
 
 ---
 
-## 17. Open points for the owner
+## 17. The owner's answers to the open points (2026-10-03)
 
-1. **Rounding direction for negatives**: toward zero (−1.5 → −1) as proposed, or strictly down
-   (−1.5 → −2)?
-2. **Bulk at Assemble**: off for finished weapons and armour, as proposed?
-3. **Half-weight pieces rounding to nothing** (§6.4): accept, or start haft and fitting
-   values at ±2?
-4. **Skymetal names** (§15.2): wait on the bestiary licensing decision, or decide now?
-5. **Temper's brittleness** (§7): should skipping Temper leave a real flaw, as proposed?
+All five were accepted as proposed, with one change:
+1. **Rounding:** negatives round **toward zero** (−1.5 → −1).
+2. **Bulk at Assemble:** off for finished weapons and armour; bars and ingots still batch.
+3. **Half-weight pieces:** solved by a different lever: **every house modifier starts at ±2**
+   instead of ±1, so a half-weight piece gives ±1 (§5.7, §6.4).
+4. **Skymetal names:** wait on the bestiary licensing decision (§15.2).
+5. **Temper:** skipping it leaves a real flaw, `brittle` (§7).
+
+Still proposed and open to tuning in playtest: the tier ceilings above ±2, the quality
+multipliers, the negative-cut floor of 50%, the band percentages of the working traits, and the
+quench marks' sizes.
