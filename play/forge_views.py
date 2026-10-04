@@ -190,6 +190,11 @@ def material_color(material_id: str) -> str:
     parent = str((doc or {}).get("material") or "").strip().lower()
     if parent in _COLOUR:
         return _COLOUR[parent]
+    # A fitting named for its metal ("brass-guard", "steel-crossguard", "cold-iron-studs"):
+    # the longest metal id it starts with, so cold iron is not read as plain iron.
+    for key in sorted(_COLOUR, key=len, reverse=True):
+        if mid.startswith(key + "-"):
+            return _COLOUR[key]
     for word, colour in _WORD_COLOUR:
         if word in mid:
             return colour
@@ -440,6 +445,30 @@ def _card(build: dict | None, pieces: dict | None, gear: str, quality: str = "")
     }
 
 
+def _next_step(w) -> str:
+    """The step a product most likely goes to next, for the result's "Next: Quench"
+    button (the herb tag's `next`, UI plan §5 step 6). Read off the work itself: a bar
+    is forged; a blank is quenched, then tempered, then honed if it has an edge, then
+    assembled; a finished item takes a finish. A suggestion only: the player may pick
+    any open method, and the server still checks whatever they pick."""
+    form = getattr(w, "form", "")
+    worked = list(getattr(w, "worked", []) or [])
+    if form in bs.BAR_FORMS:
+        return "forge"
+    if form in bs.PIECE_FORMS:
+        if not getattr(w, "quench", ""):
+            return "quench"
+        if "temper" not in worked:
+            return "temper"
+        if getattr(w, "gear", "") == "weapon" and bs._edged(getattr(w, "shape", "")) \
+                and "hone" not in worked:
+            return "hone"
+        return "assemble"
+    if form == "item":
+        return "finish"
+    return ""
+
+
 def _alloys() -> list[dict]:
     """The recipe table, for the page to show beside the crucible (Vintage Story shows
     its alloy windows; the window is a fact, not a secret)."""
@@ -476,7 +505,10 @@ def _state_body(c, pc) -> dict:
         "methods": bs.methods_view(progress.level, where),
         "rack": rack,
         "colors": _colors(rack),
-        "slots": {m: _slot_view(m) for m in bs.METHODS if m != "assay"},
+        # Each method's work-order slots before anything is checked, and Assemble's for
+        # armour beside its weapon set, so a plate clicked first finds the Body slot.
+        "slots": dict({m: _slot_view(m) for m in bs.METHODS if m != "assay"},
+                      **{"assemble:armour": _slot_view("assemble", "armour")}),
         "where": where,
         "shapes": bs.shapes()["families"],
         "alloys": _alloys(),
@@ -572,7 +604,17 @@ def _preview(plan, pc) -> dict | None:
             return None
         by_tier[worldclass.quality_name(t)] = got
     top = worldclass.quality_name(max(0, plan.step_ceiling))
-    return {"at": top, "build": by_tier.get(top), "by_tier": by_tier}
+    return {"at": top, "build": by_tier.get(top), "by_tier": by_tier,
+            # The card and the summary line the work order draws (UI plan §6.5, §6.6),
+            # at the step's ceiling, formatted here so the page adds nothing.
+            "card": _card(by_tier.get(top), pieces, gear, top),
+            "as": ("" if out_w.form == "item" else
+                   f"As the {bs.PIECES.get(gear, bs.PIECES['weapon'])[0]} of "
+                   f"{_a(bs._shape_name(base).lower())}, at {top}")}
+
+
+def _a(noun: str) -> str:
+    return ("an " if noun[:1] in "aeiou" else "a ") + noun
 
 
 def method_bulk(method: str) -> bool:
@@ -585,8 +627,21 @@ def _check_body(plan, items, rent, pc) -> dict:
     most = min((p.count // max(1, n // per_unit) for p, n in plan.consumes if n > 0),
                default=0)
     gear = plan.gear
+    fits = bs.fits_for(plan.method, items, gear=gear)
+    if plan.method == "assemble" and not plan.slots:
+        # Before a main piece is on the anvil the gear is not known, so both sets of
+        # slots are answered: a plate clicked in the rack goes to Body and turns the work
+        # order to armour, a blank goes to Head (UI plan §6.5, "the labels follow the
+        # shape"). Lane D's check answers one gear; asking it twice is the page's map.
+        for g in ("armour",):
+            for slot, row in bs.fits_for("assemble", items, gear=g).items():
+                fits.setdefault(slot, row)
     return {
-        "fits": bs.fits_for(plan.method, items, gear=gear),
+        "fits": fits,
+        "slots": _slot_view(plan.method, gear),
+        "gear": gear,
+        "shape": plan.shape,
+        "heat": _heat(plan) if plan.units or plan.method else None,
         "problems": list(plan.problems),
         "can_roll": plan.can_roll,
         "info": plan.info,
@@ -874,6 +929,10 @@ def forge_finish(request):
             rec = bs.record(w, n)
             entry["record"] = rec
             entry["build"] = bs.build_of(rec)
+            entry["card"] = _card(entry["build"], (rec or {}).get("pieces"),
+                                  (rec or {}).get("gear") or w.gear, tier_name)
+        entry["color"] = material_color(w.material)
+        entry["next"] = _next_step(w)
         products.append(entry)
     return JsonResponse({
         "tier": tier, "tier_name": tier_name, "score": score,
@@ -959,7 +1018,7 @@ def forge_assay(request):
         "mastery": {"lines": lines, "total": progress.mp, "level": progress.level,
                     "levelled": levelled},
         "clock": _clock(c),
-        "rack": [p.as_item(pc) for p in _rack(c, pc)],
+        "rack": _rack_items(c, pc),
     })
 
 

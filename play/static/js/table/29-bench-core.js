@@ -138,6 +138,56 @@
     }, 40);
   };
 
+  // --- the roll: the table's d20, asked, thrown and judged (moved here from 30) ------------
+  // Every bench throws the same die the same way (lane U2, 2026-10-04: the forge is the
+  // second bench to roll Craft, and two copies of this sequence would drift exactly as two
+  // Esc handlers would). Dice3D.ask winds the die up and holds the mat open (`hold`); the
+  // bench's own `post(face)` sends the face to its server (a null face when the mat had
+  // none, the old bench's convention) and resolves with the server's answer; Dice3D.land
+  // throws the die onto the face the SERVER names (`face(answer)`), and showVerdict
+  // (22-roll-verdict.js) plays the engine's word (`verdict(answer)`) once the die is at
+  // rest. Exactly the path 04's sendRoll takes. `landed(answer)` runs as soon as the answer
+  // is in, before the mat closes (the bench's clock moves then). Resolves with the answer
+  // once the player has closed the mat, so nothing starts under a mat still being read;
+  // on any failure the mat is closed and the error passed on.
+  //   o.shown    what the mat shows: {title, why, sides, lo, hi, die, terms}
+  C.rollD20 = function (o) {
+    var dice = window.Dice3D;
+    var asking = dice ? dice.ask(Object.assign({ hold: true }, o.shown)) : Promise.resolve(null);
+    if (dice) C.focusMat();
+    var answer = null;
+    return asking.then(function (face) {
+      return o.post(face == null ? null : face);
+    }).then(function (r) {
+      answer = r;
+      if (o.landed) o.landed(r);
+      if (!dice) return null;
+      var closing = dice.land(Object.assign({}, o.shown, { result: o.face(r) }));
+      var rest = typeof dice.settled === "function" ? dice.settled() : null;
+      if (typeof showVerdict === "function") showVerdict(o.verdict(r), rest);
+      if (rest) rest.then(C.focusMat);
+      // The mat is the player's to close (dice3d.js: `land` resolves on Close).
+      return closing;
+    }).then(function () { return answer; }, function (err) {
+      C.closeMat();
+      throw err;
+    });
+  };
+  C.closeMat = function () {
+    var dice = window.Dice3D;
+    if (dice && typeof dice.close === "function") { try { dice.close(); } catch (err) { /* */ } }
+  };
+  // The mat's terms, from a check's own: each term signed, the total when there is more
+  // than one, and the DC to beat. Every number is the server's; this only lays them out.
+  C.rollTerms = function (c) {
+    var terms = (c.terms || []).map(function (t) { return { label: t.label, value: C.sign(t.value) }; });
+    if (c.terms && c.terms.length !== 1 && c.bonus != null) {
+      terms.push({ label: "your modifier", value: C.sign(c.bonus), total: true });
+    }
+    if (c.dc != null) terms.push({ label: "beat", value: c.dc });
+    return terms;
+  };
+
   // --- the scene clock --------------------------------------------------------------------
   // A step of an hour or more turns the table's clock face (09-clock.js) with its own
   // animation, which waits for the dice mat to close before it shows. 09 keeps its own rule
@@ -370,24 +420,56 @@
     h.dropEsc = function (fn) { escStack = escStack.filter(function (f) { return f !== fn; }); };
     h.escOpen = function () { return escStack.length > 0; };
 
+    function onEscape(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (escStack.length) { escStack[escStack.length - 1](); return; }
+      if (live()) { h.askStop(); return; }
+      if (document.querySelector("#d3d-mat.on")) return;
+      h.closeLayer();
+    }
     layer && layer.addEventListener("keydown", function (e) {
       var tag = e.target && e.target.tagName;
       var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(tag);
-      if (e.key === "Escape") {
-        e.preventDefault();
-        e.stopPropagation();
-        if (escStack.length) { escStack[escStack.length - 1](); return; }
-        if (live()) { h.askStop(); return; }
-        if (document.querySelector("#d3d-mat.on")) return;
-        h.closeLayer();
-        return;
-      }
+      if (e.key === "Escape") { onEscape(e); return; }
       if (o.keys && !typing && !live() && !escStack.length) o.keys(e);
       // The table's own shortcuts listen on the document ("m" opens the map, Esc closes the
       // sheet's details): none of them may act on a table that is behind the bench. While a
       // game is live its keys go through, because the games frame may listen on the document.
       if (!live()) e.stopPropagation();
     });
+    // Esc with the keyboard on <body> (lane F's first found bug, fixed 2026-10-04). The
+    // listener above is the layer's, so a key pressed while focus is on nothing never
+    // reaches it: during a game the Roll button that held focus goes disabled and focus
+    // falls to <body>, and Esc then did nothing at all, with "Stop and keep what you
+    // have?" never asked. Here the document hears what the layer could not, for this
+    // bench only while it is open, never over the dice mat (dice3d.js answers its own Esc)
+    // or the deathveil, and never for a key already inside the layer.
+    document.addEventListener("keydown", function (e) {
+      if (!h.open || e.key !== "Escape" || C.current !== h) return;
+      if (layer.contains(e.target)) return;
+      if (document.querySelector("#d3d-mat.on") || document.querySelector("#deathveil.on")) return;
+      onEscape(e);
+    });
+
+    // Where the keyboard goes after a step (lane F's second found bug, fixed 2026-10-04):
+    // a finish asked the Roll button to take focus while the check after it still had it
+    // disabled, and a disabled button refuses focus, so the keyboard fell to <body> and the
+    // next Tab started from the top of the page. `refocus` takes candidates in order (an
+    // element, an id, or a selector inside the layer) and gives focus to the first that
+    // can hold it now, else the bench's `first`, else Close: never <body>.
+    h.refocus = function (list) {
+      var pick = null;
+      (list || []).some(function (x) {
+        var el = typeof x === "string" ? ($id(x) || (layer && layer.querySelector(x))) : x;
+        if (el && !el.disabled && !el.closest("[hidden]") && el.getClientRects().length &&
+            typeof el.focus === "function") { pick = el; return true; }
+        return false;
+      });
+      if (pick) { pick.focus(); return pick; }
+      h.focusFirst();
+      return document.activeElement;
+    };
 
     // A game running while the player's attention is elsewhere would score time they were
     // not there for: it pauses on blur. It does NOT carry on by itself on focus: the line is
