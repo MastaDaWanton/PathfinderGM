@@ -112,7 +112,7 @@ reply, `tests/beat_reader/stub.py`) with its measurement docstring kept.
 | `play/aftermath/speaker_real.py`'s `_from_tags`, `_from_the_page`, `_Room`, `_whose`, `_speaker`, `_clause` use | who said an untagged line: clause, carry-on, nearest person, pronoun gender | the people call's `by` for each line (`speaker_real.py`, rewritten) |
 | `judgement.doubt_tags` | a tag the page contradicts, by `pc_spoken` and a speaker head noun | `beat_reader.reconcile_tags`: the reader's speaker against the tag |
 | `judgement.hailed_by`'s untagged half | who hailed the player in an untagged line, by name words and role words | every line is booked first; `hailed_by` reads booked lines only |
-| `judgement.apply_introductions` (the live call) | a name given in speech or in apposition | the people call's `names`, checked by `beat_reader.name_refusal` (`seen_people.name_them`) |
+| `judgement.apply_introductions`, `narration.named_in_apposition` (deleted) | a name given in speech or in apposition, and whose it is | the people call's `names`, checked by `beat_reader.name_refusal` (`seen_people.name_them`) |
 | `rules/heard_places.heard_in`, `_phrases`, `_whose`, `_TIE`, `_HERE`, `_SOMEBODYS`, `_place_at` | places in a line, their landmark, a person's house | the places call's `places` (`play/aftermath/places_heard.py`) |
 | `play/aftermath/mentioned_elsewhere.py`'s `phrases_at`, `_PRONOUN_AT`, `_place_at`, `_person_words` | "<person> in/at/near <place>", and "She's in the market" | the places call's `people` (`mentioned_elsewhere.py`, rewritten) |
 | `play/aftermath/pronouns_adopted.py`'s `_from_mentions`, `_from_tags`, `_ATTRIBUTING`, `_LEADING` | a gendered noun or "he says" beside a they/them person's line | the people call's `pronoun cN` answers |
@@ -124,3 +124,86 @@ brief handed over, found on the page); `heard_places.record`/`of_here`; `populat
 `heard_of_match` and `find`; `judgement.embody_seen`'s limits (fight, cap, householder,
 known person walked in). `note_cast` still books the brief's ledger; who is new and who is
 here no longer comes from it.
+
+## Measured: the bench
+
+`tools/beat_reader_bench.py` over `tests/beat_reader/gold.py`: 52 hand-labelled beats —
+25 from the owner's two 2026-10-03 saves (short excerpts), 7 from the Bobby corpus (read
+from disk, never committed), 11 from the committed narrator-audit recordings, 3 of Sam's
+2026-10-01 replay cases, the 5 name shapes the retired name patterns were tested on, and
+one synthetic sergeant giving his name. gemma-4-12B heretic
+(Ollama, temperature 0); the regex column is the harvesters as they stood at fceeb44, on
+the same beats and the same scenes. Other sessions were using the same Ollama throughout
+(lanes F and V), so the timings carry their contention: the same configuration measured
+5.7 s median in one run and 3.5 s in the next.
+
+| question | regex (before) | beat reader, final (2 runs) | one call (1 run) | Osmosis-Structure-0.6B |
+|---|---|---|---|---|
+| whole beat right (strict) | 22 / 52 | 45 / 52 per run | 33 / 52 | 4 / 44 |
+| who each mention is (ref or nobody) | 75 / 76 | 150 / 154 | 75 / 77 | 34 / 71 |
+| who each mention is (all, newcomers too) | 87 / 99 | 204 / 208 | 101 / 104 | 45 / 93 |
+| bodies made: right / made | 6 / 17 | 20 / 23 | 10 / 11 | 4 / 14 |
+| bodies wanted: found | 4 / 9 | 18 / 18 | 8 / 9 | 4 / 8 |
+| who speaks each line | 80 / 109 | 216 / 218 | 107 / 109 | 55 / 105 |
+| places the town lacks: found | 2 / 5 | 8 / 10 | 5 / 5 | 1 / 5 |
+| places: wrong + duplicate | 1 + 1 | 2 + 0 | 11 + 1 | 6 + 0 |
+| place kind right | 1 / 2 | 6 / 6 | 4 / 4 | 0 / 1 |
+| place landmark right | 2 / 3 | 4 / 6 | 4 / 5 | 0 / 1 |
+| people placed: found, wrong | 2 / 2, 0 | 4 / 4, 2 | 2 / 2, 3 | 0 / 2, 5 |
+| pronouns settled right | 19 / 24 | 47 / 48 | 20 / 24 | 8 / 24 |
+| names taken right, wrong | 2 / 5, 1 | 10 / 10, 0 | 5 / 5, 0 | 0 / 1, 0 |
+| seconds per beat, median / max | 0.51 / 3.87 (one label call) | 3.54 / 13.59 | 6.08 / 18.32 | 9.82 / 30.58 |
+| failed calls | 0 | 0 of 104 reads | 0 of 52 | 0 of 44 |
+
+The regex column's "who" is the old labeller, which could only answer refs and nobody;
+its bodies and speakers are the harvesters'. The beats the harvesters failed are the
+day's defects: "He is a large man" (a second smith), the quoted player line made a person,
+the merchant who moved on given a body, the man on the stool's lines booked to the
+servant, the clerk's own keeper recorded as a stranger, the forge as two places.
+
+**Decisions taken on these numbers:**
+
+- **Two calls, not one.** One call answering everything scored 33 beats strict against
+  45, and listed 11 wrong places against 2: asked for people and places at once, it
+  listed the quay and "the turn for the wharf" as places. CLAUDE.md's "a model asked for N
+  things answers in parallel", measured.
+- **The places call lists only what the town lacks** (`LIST_TOWN_PLACES = False`). Asked
+  to list every place including the town's own (code sorting them), it scored the same
+  strict (42 against 42.5 a run) with twice the wrong places and two duplicates.
+- **The kind is the model's own word, mapped by the engine's table** (`_kind_of`,
+  `places.KIND_WORDS`). As an enum it scored 1 kind of 3: constrained decoding forced
+  "tunnels" to "tannery" and "the main thoroughfare" to "theatre", sharing first letters.
+- **"also called", not "same as entry N".** The link choice was never taken (the forge and
+  the smithy came back unlinked twice at temperature 0); the other name in the same
+  entry is.
+- **The reader is shown the people known elsewhere in town**, after the first run made 6
+  bodies of 14 out of people the engine already held (the merchant and the man left at the
+  docks, the clerk behind the shut door).
+- **Osmosis-Structure-0.6B is not the reader.** On the first full run (44 beats, the same
+  prompts but before the last three changes above) it was strict on 4, read who a mention
+  is right 45 of 93 and who speaks a line 55 of 105, and was slower than gemma (median
+  9.8 s), because it is a second model to keep loaded beside the 12B. A rerun on the final
+  configuration could not be made: with the other lanes' calls keeping gemma busy, Ollama
+  left a request to Osmosis waiting for five minutes without loading it, twice.
+
+**Remaining misses, by kind** (final run, both runs): "the merchant with a heavy pack …
+walks a pace beside you … and moves on" still made a body (the reader says here); "The
+man is a Korvu" once given to the figure c5; "the wharf" listed as a place (it is the
+docks'); "Korgath Varn" placed somewhere by a line that names no town place; "the man at
+the bar, a sturdy woman" (self-contradicting prose) answered nobody.
+
+**Failure rate.** 0 failed calls in 364 bench reads (about 650 calls) across the four
+gemma configurations, and 0 in the live turns below. When a call does fail nothing reads
+the beat in its place: no newcomer, no booked line, no place, and a `beat-unread` row per
+step (tests/test_beat_reader.py pins it).
+
+## Measured: in the running game
+
+Two turns through `/api/say` on a copy of the owner's live-data2 save (a throwaway data
+root; the real %LOCALAPPDATA% untouched), gemma-4-12B: asked where to sharpen a rapier, the
+man in the heavy coat answered with "a smithy … Or … The Forge"; the reader booked both
+lines to c4 (the prose call had tagged neither), recorded both places with his own spot as
+landmark, made nobody, and opened the conversation with him. 6.7 s and 4.0 s for the two
+reads. The second turn's prose arrived with a broken `<say who=man in the heavy coat
+to=you,"…` tag on the page — a prose-call fault the lifter does not catch, and not this
+lane's; it is recorded for the narrator's owner.

@@ -425,15 +425,24 @@ def places_schema(line_ids: list[str], place_names: list[str]) -> dict:
             "type": "object", "properties": {
                 "line": {"type": "string", "enum": line_ids},
                 "words": {"type": "string"},
-                "at": {"type": "string", "enum": list(place_names)}},
+                # "none of them" is a choice: measured on the bench, 2026-10-03, with
+                # only the town's places to choose from, "the foreman is in the back
+                # office" put the foreman at the counting house, and "the man, Korgath
+                # Varn, sits in the back corner" put him somewhere — the enum forced a
+                # place. Code drops "none".
+                "at": {"type": "string", "enum": list(place_names) + [NONE]}},
             "required": ["line", "words", "at"]}}},
         "required": ["places", "people"]}
 
 
 # Whether the places call lists the town's own places too (code sorts them out) or only
 # the ones the town lacks (the model judges "not on the list"). Measured both ways on the
-# bench, docs/beat-reader.md.
-LIST_TOWN_PLACES = True
+# bench, 2026-10-03 (docs/beat-reader.md), two runs of 52 beats each: the same strict
+# score (42 and 42.5 a run), and listing the town's own gave 4 wrong places and 2
+# duplicates against 2 and 0 — the more it lists, the more it lists wrongly ("the
+# wharf", "the turn for the wharf"). So only what the town lacks; `places.find` still
+# refuses a town place the model lists anyway.
+LIST_TOWN_PLACES = False
 
 _PLACES_ALL = (
     "\"places\": every place a speaker names or points the player to, the town's own "
@@ -462,7 +471,7 @@ def _places_system() -> str:
 _PLACES_TAIL = (
     "\"people\": each single person (not a group) a speaker says is at one of the town's "
     "places — the speaker's own words for the person (never just \"he\" or \"she\"), and "
-    "the place.\n"
+    "the place (\"none\" when it is not one of the town's places).\n"
     "Answer with empty lists when there are none.")
 
 _PLACES_EXAMPLE_USER = (
@@ -621,6 +630,10 @@ def read(text: str, scene, *, engine=None, said=(), acting: str = "",
     # tagged to the player, and what came from a line the people call then gives to the
     # player or to nobody is dropped after. Two calls in flight cost one wait when Ollama
     # serves them together, and no more than two in a row when it does not.
+    if ONE_CALL and places and ask_l:
+        return _read_in_one_call(reading, scene, engine, chat, model, host, provider,
+                                 api_key, text, ask_m, ask_l, cast, vague, away, acting,
+                                 facts, refs)
     worker = None
     if places and ask_l:
         worker = threading.Thread(
@@ -649,6 +662,75 @@ def read(text: str, scene, *, engine=None, said=(), acting: str = "",
     if worker is not None:
         worker.join()
         _places_from_npcs(reading, scene)
+    return reading
+
+
+# Both questions in ONE call, for the bench only (`tools/beat_reader_bench.py --one-call`):
+# CLAUDE.md's "a model asked for N things answers in parallel" says to measure it rather
+# than assume it. The live reader is two calls; docs/beat-reader.md has the comparison.
+ONE_CALL = False
+
+_ONE_CALL_EXAMPLE_USER = _PEOPLE_EXAMPLE_USER.replace(
+    "{q1}'Not today,' he says.",
+    "{q1}'Not today. Try the Salt Sheds past the docks,' he says.") + (
+    "\n\nThe town's places: the gate; the market; the docks; the tavern\n"
+    "The speakers are at: the market\n"
+    "Kinds of place (words for the \"kind\" answer — NOT places this town has): docks, "
+    "gate, house, market, smithy, tavern, warehouses, well, other")
+
+
+def _one_call_example() -> str:
+    ans = json.loads(_PEOPLE_EXAMPLE_ASSISTANT)
+    ans["places"] = [{"line": "q1", "words": "the Salt Sheds", "also called": "",
+                      "kind": "warehouses", "near": "the docks"},
+                     {"line": "q1", "words": "the docks", "also called": "",
+                      "kind": "docks", "near": "none"}]
+    ans["people placed"] = []
+    return json.dumps(ans)
+
+
+def _read_in_one_call(reading, scene, engine, chat, model, host, provider, api_key, text,
+                      ask_m, ask_l, cast, vague, away, acting, facts, refs) -> Reading:
+    town = _town_for(reading, scene, engine)
+    away_refs = [p["ref"] for p in away]
+    schema = people_schema([m.id for m in ask_m], refs, [ln.id for ln in ask_l], vague,
+                           away=away_refs)
+    msgs = people_messages(text, ask_m, ask_l, cast, vague, acting, facts, away)
+    if town is not None:
+        known, here, by_name, npc_lines, _names = town
+        pl = places_schema([ln.id for ln in npc_lines], list(by_name))["properties"]
+        schema["properties"]["places"] = pl["places"]
+        schema["properties"]["people placed"] = pl["people"]
+        schema["required"] = list(schema["properties"])
+        msgs[0] = {"role": "system", "content": msgs[0]["content"] + "\n\nAnd for the "
+                   "lines: " + _places_system().split("\n", 1)[1].replace(
+                       "\"people\":", "\"people placed\":")}
+        msgs[1] = {"role": "user", "content": _ONE_CALL_EXAMPLE_USER}
+        msgs[2] = {"role": "assistant", "content": _one_call_example()}
+        msgs[3] = {"role": "user", "content": msgs[3]["content"] + (
+            "\n\nThe town's places: " + "; ".join(by_name) + f"\nThe speakers are at: "
+            f"{getattr(here, 'name', 'here')}\nKinds of place (words for the \"kind\" "
+            "answer — NOT places this town has): " + ", ".join(place_kinds()))}
+    started = time.monotonic()
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=180 + 14 * len(ask_m) + 22 * len(ask_l) + 12 * len(vague)
+                     + 60 * (MAX_PLACES + MAX_PLACED),
+                     provider=provider, api_key=api_key, schema=schema)
+        reading.raw = reply.text
+        ans = reply.json() or {}
+        _apply_people(reading, ans, ask_m, ask_l, refs, vague, text, away=away_refs)
+        reading.read = reading.labelled = True
+        if town is not None:
+            _apply_places(reading, {"places": ans.get("places") or [],
+                                    "people": ans.get("people placed") or []},
+                          known, here, by_name, npc_lines)
+            reading.places_read = True
+            _places_from_npcs(reading, scene)
+    except Exception as exc:  # noqa: BLE001
+        reading.error = f"one call: {type(exc).__name__}: {str(exc)[:160]}"
+    reading.timings["people"] = round(time.monotonic() - started, 2)
+    reading.seconds = reading.timings["people"]
     return reading
 
 
@@ -800,25 +882,10 @@ def _read_places(reading: Reading, scene, engine, chat, model, host, provider,
     player, each shown with its tag's speaker or "somebody". It runs beside the people
     call, so it cannot wait for that call's speakers; `_places_from_npcs` keeps, after
     both, only what came from a line an NPC spoke."""
-    from rules import places as places_mod
-
-    known, here = town_places(engine)
-    actors = getattr(scene, "actors", {}) or {}
-    names: dict[str, str] = {}
-    npc_lines = []
-    for ln in reading.lines[:MAX_LINES]:
-        a = actors.get(ln.tag)
-        if a is not None and getattr(a, "is_pc", False):
-            continue
-        names[ln.id] = str(a.name) if a is not None else "somebody"
-        npc_lines.append(ln)
-    if not known or not npc_lines:
+    town = _town_for(reading, scene, engine)
+    if town is None:
         return
-    by_name: dict[str, object] = {}
-    for p in known:
-        nm = " ".join(str(p.name).split())
-        if nm and nm.lower() not in {k.lower() for k in by_name}:
-            by_name[nm] = p
+    known, here, by_name, npc_lines, names = town
     place_names = list(by_name)
     here_name = str(getattr(here, "name", "") or "here")
     started = time.monotonic()
@@ -836,6 +903,37 @@ def _read_places(reading: Reading, scene, engine, chat, model, host, provider,
         reading.timings["places"] = round(time.monotonic() - started, 2)
         return
     reading.timings["places"] = round(time.monotonic() - started, 2)
+    _apply_places(reading, ans, known, here, by_name, npc_lines)
+
+
+def _town_for(reading: Reading, scene, engine):
+    """(known places, here, {name: place}, the lines asked about, {line id: speaker's
+    name}) — or None with no town to compare against or no line to read."""
+    known, here = town_places(engine)
+    actors = getattr(scene, "actors", {}) or {}
+    names: dict[str, str] = {}
+    npc_lines = []
+    for ln in reading.lines[:MAX_LINES]:
+        a = actors.get(ln.tag)
+        if a is not None and getattr(a, "is_pc", False):
+            continue
+        names[ln.id] = str(a.name) if a is not None else "somebody"
+        npc_lines.append(ln)
+    if not known or not npc_lines:
+        return None
+    by_name: dict[str, object] = {}
+    for p in known:
+        nm = " ".join(str(p.name).split())
+        if nm and nm.lower() not in {k.lower() for k in by_name}:
+            by_name[nm] = p
+    return known, here, by_name, npc_lines, names
+
+
+def _apply_places(reading: Reading, ans: dict, known, here, by_name: dict,
+                  npc_lines: list) -> None:
+    """Take the places answer's entries that pass their checks; drop the rest with why."""
+    from rules import places as places_mod
+
     lines = {ln.id: ln for ln in npc_lines}
     kinds = set(place_kinds()) - {OTHER}
     seen: set[str] = set()

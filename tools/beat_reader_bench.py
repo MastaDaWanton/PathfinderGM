@@ -358,7 +358,13 @@ def main() -> None:
     ap.add_argument("--places-new-only", action="store_true",
                     help="the places call lists only places the town lacks "
                          "(beat_reader.LIST_TOWN_PLACES off)")
+    ap.add_argument("--one-call", action="store_true",
+                    help="ask both questions in one call (beat_reader.ONE_CALL)")
     args = ap.parse_args()
+    if args.one_call:
+        from gm import beat_reader
+
+        beat_reader.ONE_CALL = True
     if args.places_new_only:
         from gm import beat_reader
 
