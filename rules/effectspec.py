@@ -28,6 +28,68 @@ from .tables import (
     SKILLS,
 )
 
+# --- what a forged thing is made of ---------------------------------------------------------
+#
+# The blacksmithing revamp (docs/blacksmithing-revamp-plan.md §5.3–5.5, contract §2). Before
+# these, a metal's whole character was prose: 40 of the 63 material effects were `narrative`,
+# and mithral's "−3 armour check penalty, +2 max Dex, −10% spell failure, half weight, one
+# category lighter for movement" was one sentence nothing could execute. Each is now a
+# document a reader can apply and a validator can count.
+#
+# `gear_mod` changes the item's *own* numbers, which are on no character sheet. The amount is
+# **added to the number as `tables.ARMOUR` stores it**, and that one convention decides every
+# sign: the table keeps armour check penalty negative (a chain shirt is -2) and spell failure
+# as a positive percentage, so mithral's lighter penalty is acp **+3** and noqual's heavier
+# spell failure is asf +20. The alternative — "the size of the change, sign meaning better or
+# worse" — reads naturally for one target and backwards for the next, and plan §5.4 already
+# wrote mithral's acp as -3 and adamantine's as -2 meaning opposite things. `better` records
+# which way helps, so "is this the drawback?" is a lookup (`is_drawback`), not a guess.
+GEAR_TARGETS: dict[str, dict] = {
+    "acp": {"name": "Armour check penalty", "better": +1},
+    "max_dex": {"name": "Maximum Dexterity bonus", "better": +1},
+    "asf": {"name": "Arcane spell failure", "better": -1},
+    "weight_pct": {"name": "Weight (percent)", "better": -1},
+    "hardness": {"name": "Hardness", "better": +1},
+    "hp_per_inch": {"name": "Hit points per inch", "better": +1},
+    # Armour weight class *for movement only*, as mithral's rule says: a mithral breastplate
+    # moves like light armour and is still medium armour for proficiency. Negative is lighter.
+    "category": {"name": "Weight class for movement", "better": -1},
+    # Feet of speed lost to the armour. Positive is more lost.
+    "speed_penalty": {"name": "Speed penalty (feet)", "better": -1},
+}
+
+# What a weapon counts as against damage reduction and hardness. A list, and meant to grow:
+# `Reduction.bypassed_by` has existed on the sheet since stage 2 and nothing ever passed it a
+# trait, because there was no way to say a blade *was* cold iron.
+STRIKES_AS: list[str] = ["cold_iron", "silver", "adamantine"]
+
+# How a material behaves while it is being worked. Read by the bench only; none of them
+# reaches the finished item (plan §5.5). The first four are Pathfinder Unchained's, the rest
+# grounded in the prior-art sweep. `brittle` and `hot_short` are flaws a bad step leaves
+# behind, and they are traits because the bench reads them the same way.
+WORKING_TRAITS: list[str] = [
+    "easily_worked", "flawless", "malleable", "pure", "slaggy", "sulfurous", "clean_heat",
+    "quench_sensitive", "narrow_window", "forgiving", "reactive", "cleans_slag", "weld_aid",
+    "brittle", "hot_short",
+]
+
+# Triggers that belong to an *item* rather than to a spell's lifetime: a blade's venom on
+# the hit, viridium's leprosy on the crit, wyvern blood on the first wound each day,
+# abysium sickening whoever carries it. The item is their window, which is why they are
+# excused the duration a spell's `each_round` needs — and why the engine's ward path
+# (`Engine._executes`, which treats any non-`on_cast` trigger as a ward) must not be the
+# thing that runs them. Lane B's riders do (contract §5).
+ITEM_TRIGGERS: tuple[str, ...] = ("hit", "crit", "first_wound_daily", "carried")
+
+# Carrying a thing can sicken you, poison you or eat at a score — not swing a sword or
+# grant a sense. The contract names these three and the validator holds to them.
+CARRIED_TYPES: tuple[str, ...] = ("apply_condition", "save_gate", "ability_damage")
+
+# A standing property of the item has no moment to fire in. "Strikes as silver on a crit"
+# and "-2 armour check penalty every round" are not rules; refused rather than ignored.
+_STANDING_TYPES = ("gear_mod", "strikes_as", "working")
+
+
 # --- the vocabularies a dropdown can be filled from ---------------------------------------
 #
 # Named rather than inlined so two types that pick from the same list cannot drift apart,
@@ -54,8 +116,14 @@ VOCAB: dict[str, list[dict]] = {
         # `bonus_type: "armor"` that failed validation outright. "natural armour" was
         # here from the start, which is what made the gap easy to miss — they are
         # different bonuses that stack with each other and not with themselves.
+        #
+        # "material" is not a printed 1e type; it is what a forged item's metal adds
+        # (plan §5.2). It stacks with every other type and never with itself, which is
+        # what `dice.stack` already does with any named type it is not told is
+        # self-stacking — so the vocabulary entry is the whole change.
         "alchemical", "armour", "circumstance", "competence", "deflection", "dodge",
-        "enhancement", "inherent", "insight", "luck", "morale", "natural armour",
+        "enhancement", "inherent", "insight", "luck", "material", "morale",
+        "natural armour",
         "profane", "racial", "resistance", "sacred", "shield", "size", "untyped")],
     "combat_target": [{"id": k, "name": n} for k, n in (
         ("attack", "Attack rolls"), ("damage", "Damage rolls"), ("ac", "Armour class"),
@@ -123,7 +191,18 @@ VOCAB: dict[str, list[dict]] = {
         ("when_struck", "When struck in melee"),
         ("when_grappled", "When grappled"),
         ("on_enter", "When something enters the area"),
-        ("on_expiry", "When it ends"))],
+        ("on_expiry", "When it ends"),
+        # An item's own moments (`ITEM_TRIGGERS`): the forge's riders and carrier effects.
+        ("hit", "When the weapon hits"), ("crit", "When the weapon crits"),
+        ("first_wound_daily", "The first wound it deals each day"),
+        ("carried", "While it is carried"))],
+
+    # The forge's three lists, as dropdowns. Built from the constants above so the editor
+    # and the validator cannot offer different sets.
+    "gear_target": [{"id": k, "name": v["name"]} for k, v in GEAR_TARGETS.items()],
+    "strikes_as": [{"id": k, "name": k.replace("_", " ").capitalize()} for k in STRIKES_AS],
+    "working_trait": [{"id": k, "name": k.replace("_", " ").capitalize()}
+                      for k in WORKING_TRAITS],
 
     # What a manifested thing does to the squares it covers. Every one of these is a set
     # the `Grid` already keeps and the map already draws and routes around — which is the
@@ -476,6 +555,46 @@ CATEGORIES: list[Category] = [
                 Field("item", "Which item", "text", required=False,
                       hint="By name. Empty means everything the target carries."),
             ]),
+            # The item's own numbers, and the first of the forge's two types. Here rather
+            # than under "Modifier" because it is not a modifier in that category's sense:
+            # it has no bonus type (a heavier suit is not a "penalty" that stacks with
+            # anything, it is a different suit) and it touches nobody's sheet directly —
+            # the armour's numbers change, and the sheet reads the armour.
+            EffectType("gear_mod", "The item's own numbers",
+                       "Armour check penalty 3 lighter, +2 maximum Dexterity", [
+                Field("target", "Changes", "choice", vocab="gear_target"),
+                Field("amount", "By", "signed",
+                      hint="Added to the number as the armour table keeps it. Armour "
+                           "check penalty is negative there, so +3 is lighter and -2 "
+                           "heavier; spell failure is a percentage, so -10 is better."),
+            ], blocked="Read from a forged item's build while it is worn or wielded. "
+                       "Drunk or cast it changes nothing, and the card says so rather "
+                       "than pretending."),
+            # What a weapon counts as for damage reduction and hardness. The DR on the
+            # sheet has carried a `bypassed_by` since stage 2 with nothing ever passing it
+            # a trait; this is the trait.
+            EffectType("strikes_as", "Counts as a material", "Strikes as cold iron", [
+                Field("target", "Strikes as", "choice", vocab="strikes_as"),
+            ], blocked="Read from a forged weapon's build and passed to the damage path "
+                       "as a trait, where damage reduction and hardness ask for it."),
+        ]),
+
+    Category(
+        "forge", "At the forge",
+        "How a material behaves while it is being worked. The bench reads these; none of "
+        "them reaches the finished item.",
+        [
+            # Pathfinder Unchained's material traits plus the sweep's grounded ones
+            # (`WORKING_TRAITS`). A trait rather than a number because the bench decides
+            # what each one does — a wider heat band, a second roll, a step that cannot
+            # ruin anything — and those sizes are still being tuned in playtest (plan §17).
+            EffectType("working", "Working trait", "Works easily at the forge", [
+                Field("trait", "Trait", "choice", vocab="working_trait"),
+                Field("amount", "Strength", "signed", required=False,
+                      hint="Only where the bench reads a size for this trait. Usually "
+                           "empty."),
+            ], blocked="Read by the forge bench while the material is worked. It never "
+                       "reaches the finished item, so a sheet never sees it."),
         ]),
 
     Category(
@@ -939,12 +1058,37 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
     # duration `each_round` has no rounds and `when_struck` has no window to be struck
     # in, so the effect would be authored, accepted, and never fire once — the silent
     # failure docs/homebrew-rules.md §1 exists to prevent, arriving by a new route.
+    #
+    # An item's triggers are excused: the item is the window. A blade's venom fires on
+    # every hit for as long as the blade exists, and asking it for a duration would make
+    # the author invent one.
     trigger = str(spec.get("trigger") or "on_cast")
-    if trigger not in ("on_cast", "") and not inherits_window \
-            and not _lasts(spec.get("duration")):
+    if trigger not in ("on_cast", "") and trigger not in ITEM_TRIGGERS \
+            and not inherits_window and not _lasts(spec.get("duration")):
         problems.append(
             f"{path}: '{_vocab_name('trigger', trigger)}' needs a duration — without one "
             f"there is no window for it to fire in and it would never happen.")
+    if trigger == "carried" and type_id not in CARRIED_TYPES:
+        problems.append(
+            f"{path}: '{_vocab_name('trigger', trigger)}' works only on "
+            f"{', '.join(CARRIED_TYPES)} — carrying a thing can sicken you or eat at a "
+            f"score, and that is all. Use a different trigger or one of those types.")
+    elif trigger not in ("on_cast", "") and type_id in _STANDING_TYPES:
+        problems.append(
+            f"{path}: {type_id} is a standing property of the item and has no "
+            f"moment to fire in. Remove the trigger.")
+
+    # `book` marks a printed PF1e number: applied from the main piece only, never scaled
+    # (plan §6.3). A boolean and nothing else, and it has no field on the form for that
+    # reason — the form has no checkbox, and a "yes" typed into a text box would put two
+    # spellings of one fact into the data for every reader to handle.
+    if "book" in spec and not isinstance(spec["book"], bool):
+        problems.append(
+            f"{path}: book must be true or false, not {spec['book']!r}. Write "
+            f"\"book\": true on a printed rule's number, or leave it out.")
+
+    if type_id == "gear_mod":
+        problems.extend(_gear_problems(spec, path))
 
     if type_id == "choose_one":
         options = spec.get("options") or []
@@ -964,6 +1108,53 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
                 f"without one there is nothing to write onto the map.")
 
     return problems
+
+
+def _gear_problems(spec: dict, path: str) -> list[str]:
+    """The limits a gear number has that a dropdown and an int cannot say."""
+    try:
+        amount = int(spec.get("amount"))
+    except (TypeError, ValueError):
+        return []                       # already reported as "must be a number"
+    target = str(spec.get("target") or "")
+    if amount == 0:
+        # An effect that is authored and does nothing — the failure this module's header
+        # exists for, arriving as a zero.
+        return [f"{path}: a gear change of 0 changes nothing. Give it a size or remove it."]
+    if target == "category" and abs(amount) > 2:
+        return [f"{path}: armour has three weight classes, so a shift of {amount} is "
+                f"more than there are. Use -2 to +2."]
+    if target == "weight_pct" and amount <= -100:
+        return [f"{path}: {amount}% would weigh nothing. Mithral, the lightest metal, is "
+                f"-50."]
+    if target == "asf" and abs(amount) > 100:
+        return [f"{path}: spell failure is a percentage; {amount} is past it. Use -100 "
+                f"to +100."]
+    return []
+
+
+def is_drawback(spec: dict) -> bool:
+    """Whether this effect leaves its holder worse off.
+
+    The forge's validators need "at least one negative in each list" (plan §5.7), and for
+    a modifier that is the sign of its amount. For a gear number it is not: an acp of -2
+    is the drawback and an asf of -10 is the benefit, because the armour table stores the
+    two the opposite way round. `GEAR_TARGETS[...]["better"]` carries the direction, so
+    the answer is looked up here once rather than re-derived by each reader. A formula,
+    or a type with no number, is not called a drawback — it cannot be told from the page.
+    """
+    t = str(spec.get("type") or "")
+    try:
+        amount = int(spec.get("amount"))
+    except (TypeError, ValueError):
+        return False
+    if t == "gear_mod":
+        better = GEAR_TARGETS.get(str(spec.get("target") or ""), {}).get("better", 0)
+        return amount * better < 0
+    if t in ("ability_mod", "skill_mod", "save_mod", "combat_mod", "situational_mod",
+             "speed"):
+        return amount < 0
+    return False
 
 
 def _lasts(duration) -> bool:
@@ -1145,6 +1336,16 @@ def render(spec: dict) -> str:
     elif t == "object_damage":
         what = str(spec.get("item") or "").strip() or "everything carried"
         body = f"{dice} {spec.get('damage_type', 'untyped')} damage to {what}"
+    elif t == "gear_mod":
+        body = _gear_line(str(target or ""), amount)
+    elif t == "strikes_as":
+        body = f"Strikes as {_label(etype, target).lower()}"
+    elif t == "working":
+        body = _WORKING_PHRASE.get(str(spec.get("trait") or ""),
+                                   str(spec.get("trait") or "a working trait"))
+        if amount not in (None, ""):
+            body += f" ({_signed(amount)})"
+        body = body[:1].upper() + body[1:]
     else:
         body = str(target or spec.get("note") or etype.name)
         body = body[:1].upper() + body[1:]
@@ -1183,6 +1384,66 @@ _TRIGGER_PHRASE = {
     "on_cast": "", "each_round": "every round", "when_struck": "when struck in melee",
     "when_grappled": "when grappled", "on_enter": "on entering it",
     "on_expiry": "when it ends",
+    "hit": "on a hit", "crit": "on a critical hit",
+    "first_wound_daily": "on the first wound it deals each day",
+    "carried": "while carried",
+}
+
+
+def _gear_line(target: str, amount) -> str:
+    """"-2 armour check penalty", "weighs 50% less", "moves as one class lighter".
+
+    Worded per target because the sign means different things on each (see
+    `GEAR_TARGETS`): "+3 armour check penalty" would read as a heavier suit to every
+    player who has seen a printed one, when it is mithral making the suit lighter.
+    """
+    try:
+        n = int(amount)
+    except (TypeError, ValueError):
+        return f"{_signed(amount)} {GEAR_TARGETS.get(target, {}).get('name', target).lower()}"
+    size = abs(n)
+    if target == "acp":
+        return f"{n:+d} armour check penalty" if n < 0 \
+            else f"Armour check penalty {size} lighter"
+    if target == "max_dex":
+        return f"{n:+d} maximum Dexterity bonus"
+    if target == "asf":
+        return f"{n:+d}% arcane spell failure"
+    if target == "weight_pct":
+        return f"Weighs {size}% {'less' if n < 0 else 'more'}"
+    if target == "hardness":
+        return f"{n:+d} hardness"
+    if target == "hp_per_inch":
+        return f"{n:+d} hit points per inch"
+    if target == "category":
+        word = {1: "one", 2: "two"}.get(size, str(size))
+        plural = "" if size == 1 else "es"
+        return (f"Moves as {word} weight class{plural} "
+                f"{'lighter' if n < 0 else 'heavier'}")
+    if target == "speed_penalty":
+        return f"{size} ft {'less' if n < 0 else 'more'} speed penalty"
+    return f"{n:+d} {target}"
+
+
+# Each trait as the card says it. Plain words for what the smith notices, not the bench's
+# numbers: the band percentages are still proposed (plan §17), and a card that printed
+# "20% wider" would be wrong the first time playtest moved them.
+_WORKING_PHRASE = {
+    "easily_worked": "works easily at the forge",
+    "flawless": "takes masterwork with no extra difficulty",
+    "malleable": "forgiving of a bad blow: a badly missed step ruins nothing",
+    "pure": "pure: the Craft check is rolled twice and the better kept",
+    "slaggy": "slaggy: the best it can reach drops a step until it is folded",
+    "sulfurous": "burns sulfurous: a wider heat band, but a crude result runs hot-short",
+    "clean_heat": "burns clean: no risk of a flaw from the fire",
+    "quench_sensitive": "quench-sensitive: a narrow quench, and brine cracks it on a miss",
+    "narrow_window": "a narrow working window: the heat bands are tight",
+    "forgiving": "forgiving: the heat bands are wide",
+    "reactive": "reactive: assaying it is dangerous",
+    "cleans_slag": "cleans the slag out of a smelt",
+    "weld_aid": "aids a weld: folding and strengthening come easier",
+    "brittle": "brittle: it cracks under a hard blow",
+    "hot_short": "hot-short: it cracks when worked hot",
 }
 
 
