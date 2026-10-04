@@ -262,6 +262,7 @@
     },
     {
       "id": "iron-filings",
+      "material": "iron",
       "name": "Iron Filings",
       "kind": "reagent",
       "tier": "common",
@@ -277,6 +278,7 @@
     },
     {
       "id": "lead-dust",
+      "material": "lead",
       "name": "Lead Dust",
       "kind": "reagent",
       "tier": "common",
@@ -912,6 +914,7 @@
     },
     {
       "id": "cinnabar",
+      "material": "quicksilver",
       "name": "Cinnabar",
       "kind": "reagent",
       "tier": "uncommon",
@@ -1295,6 +1298,7 @@
     },
     {
       "id": "iron-flask",
+      "material": "iron",
       "name": "Iron Flask",
       "kind": "vessel",
       "tier": "uncommon",
@@ -1325,6 +1329,7 @@
     },
     {
       "id": "brass-casing",
+      "material": "brass",
       "name": "Brass Casing",
       "kind": "vessel",
       "tier": "uncommon",
@@ -1767,6 +1772,7 @@
     },
     {
       "id": "mithral-dust",
+      "material": "mithral",
       "name": "Mithral Dust",
       "kind": "catalyst",
       "tier": "rare",
@@ -2227,6 +2233,7 @@
     },
     {
       "id": "star-iron-dust",
+      "material": "star-iron",
       "name": "Star-Iron Dust",
       "kind": "reagent",
       "tier": "exotic",
@@ -2325,6 +2332,7 @@
     },
     {
       "id": "adamantine-crucible",
+      "material": "adamantine",
       "name": "Adamantine Crucible",
       "kind": "vessel",
       "tier": "exotic",
@@ -2677,6 +2685,7 @@
     },
     {
       "id": "powdered-silver",
+      "material": "silver",
       "name": "Powdered Silver",
       "kind": "reagent",
       "tier": "uncommon",

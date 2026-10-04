@@ -2943,6 +2943,7 @@
   },
   {
    "id": "iron-buckle",
+   "material": "iron",
    "name": "Iron Buckle",
    "kind": "fitting",
    "tier": "common",
@@ -2958,6 +2959,7 @@
   },
   {
    "id": "brass-buckle",
+   "material": "brass",
    "name": "Brass Buckle",
    "kind": "fitting",
    "tier": "common",
@@ -2973,6 +2975,7 @@
   },
   {
    "id": "steel-studs",
+   "material": "steel",
    "name": "Steel Studs",
    "kind": "fitting",
    "tier": "common",
@@ -2996,6 +2999,7 @@
   },
   {
    "id": "bronze-rings",
+   "material": "bronze",
    "name": "Bronze Rings",
    "kind": "fitting",
    "tier": "common",
@@ -3011,6 +3015,7 @@
   },
   {
    "id": "silver-clasps",
+   "material": "silver",
    "name": "Silver Clasps",
    "kind": "fitting",
    "tier": "uncommon",
@@ -3031,6 +3036,7 @@
   },
   {
    "id": "cold-iron-studs",
+   "material": "cold-iron",
    "name": "Cold Iron Studs",
    "kind": "fitting",
    "tier": "uncommon",
@@ -3051,6 +3057,7 @@
   },
   {
    "id": "mithral-fittings",
+   "material": "mithral",
    "name": "Mithral Fittings",
    "kind": "fitting",
    "tier": "rare",
@@ -3071,6 +3078,7 @@
   },
   {
    "id": "adamantine-buckles",
+   "material": "adamantine",
    "name": "Adamantine Buckles",
    "kind": "fitting",
    "tier": "exotic",

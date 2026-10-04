@@ -1984,6 +1984,7 @@
   },
   {
    "id": "silver-ink",
+   "material": "silver",
    "name": "Silver Ink",
    "kind": "ink",
    "tier": "common",
@@ -2006,6 +2007,7 @@
   },
   {
    "id": "quicksilver-ink",
+   "material": "quicksilver",
    "name": "Quicksilver Ink",
    "kind": "ink",
    "tier": "rare",
@@ -2017,6 +2019,7 @@
   },
   {
    "id": "auric-ink",
+   "material": "gold",
    "name": "Auric Ink",
    "kind": "ink",
    "tier": "exotic",
@@ -2194,6 +2197,7 @@
   },
   {
    "id": "true-silver-shavings",
+   "material": "mithral",
    "name": "True-Silver Shavings",
    "kind": "catalyst",
    "tier": "uncommon",
@@ -2218,6 +2222,7 @@
   },
   {
    "id": "mithral-filings",
+   "material": "mithral",
    "name": "Mithral Filings",
    "kind": "catalyst",
    "tier": "rare",
@@ -2230,6 +2235,7 @@
   },
   {
    "id": "adamantine-dust",
+   "material": "adamantine",
    "name": "Adamantine Dust",
    "kind": "catalyst",
    "tier": "exotic",
