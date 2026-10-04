@@ -114,6 +114,25 @@ class Track:
     # §4.2).
     endless: dict = field(default_factory=dict)
 
+    # Everything else the track's JSON declares, as written: a bench's rule rows (the
+    # Blacksmith's `bench` block, docs/blacksmithing-revamp-plan.md §7), method help, old
+    # method names. Kept on the track rather than re-read from disk by each bench, so a
+    # homebrew track that overrides the shipped one overrides its rules too, and the one
+    # cache `tests/conftest.py` already clears covers it.
+    data: dict = field(default_factory=dict)
+
+    @property
+    def perks(self) -> tuple[str, ...]:
+        """The perks this track's endless levels offer, in the order its JSON lists them.
+
+        The Herbalist offers potency, duration, quality and yield; the Blacksmith
+        potency, hardening, quality and yield (plan §4.2). A track with no `endless.perks`
+        falls back on the Herbalist's four, which is what every caller saw before the
+        list was per track.
+        """
+        sizes = self.endless.get("perks") or {}
+        return tuple(str(k) for k in sizes) or PERKS
+
     @property
     def max_level(self) -> int:
         return max((l.level for l in self.levels), default=1)
@@ -223,6 +242,8 @@ class Progress:
 # track. The signatures of `perk_picks_banked`, `ceiling_index` and `award_bonus` are the
 # lead's contract with the other lanes and do not change without the lead.
 
+# The Herbalist's perks, and the fallback for a track that names none. A track's own list
+# is `Track.perks` (the Blacksmith swaps duration for hardening, plan §4.2).
 PERKS = ("potency", "duration", "quality", "yield")
 # Fallbacks for a progress whose track cannot be found (a homebrew track the user since
 # removed). A known track answers from its own written table and `endless` block.
@@ -243,6 +264,8 @@ MANUAL_MP = 5               # an unread herbalism manual, once per manual
 
 # The stamp `migrate_herbalist` writes. 0 is every save from before the revamp.
 HERBALISM_SCHEMA = 2
+# The stamp `migrate_blacksmith` writes (docs/blacksmithing-revamp-plan.md §14).
+BLACKSMITH_SCHEMA = 2
 
 
 def quality_name(index: int) -> str:
@@ -313,14 +336,21 @@ def perk_multipliers(progress: Progress) -> dict:
     {"potency": 1.10, "duration": 1.2, "yield_chance": 0.05} for two Potency picks, two
     Duration and one Yield. Rounded, because 1 + 0.05 * 3 is 1.1500000000000001 and a
     number shown to the player should not be.
+
+    A track that offers Hardening (the Blacksmith) also gets `hardening`: what its
+    negatives are multiplied by, 0.95 per pick, compounding (plan §4.3: "0.9^5 x 0.95^2"
+    at level 6 with two picks). Only then, so the Herbalist's answer keeps its four keys.
     """
     track = _track_of(progress)
-    n = {p: int(progress.perks.get(p, 0)) for p in PERKS}
-    return {
+    n = {p: int(progress.perks.get(p, 0)) for p in set(PERKS) | {"hardening"}}
+    out = {
         "potency": round(1 + _perk_size(track, "potency") * n["potency"], 4),
         "duration": round(1 + _perk_size(track, "duration") * n["duration"], 4),
         "yield_chance": round(_perk_size(track, "yield") * n["yield"], 4),
     }
+    if track is not None and "hardening" in track.perks:
+        out["hardening"] = round((1 - _perk_size(track, "hardening")) ** n["hardening"], 4)
+    return out
 
 
 def _next_rung(track: Track, progress: Progress, ceiling: int) -> str:
@@ -353,7 +383,7 @@ def track_summary(track: Track, progress: Progress) -> dict:
         "to_next": None if need is None else {"need": int(need), "have": int(progress.mp)},
         "ceiling": ceiling,
         "ceiling_name": quality_name(ceiling),
-        "perks": {p: int(progress.perks[p]) for p in PERKS if progress.perks.get(p)},
+        "perks": {p: int(progress.perks[p]) for p in track.perks if progress.perks.get(p)},
         "picks_banked": _banked(track, progress),
         "next_rung": _next_rung(track, progress, ceiling),
     }
@@ -369,10 +399,11 @@ def pick_perks(track: Track, progress: Progress, picks: list[str]) -> dict:
     chosen = [str(p).strip().lower() for p in (picks or [])]
     if not chosen:
         raise ValueError("Choose at least one perk.")
-    unknown = [p for p in chosen if p not in PERKS]
+    offered = track.perks
+    unknown = [p for p in chosen if p not in offered]
     if unknown:
         raise ValueError(f"There is no perk called {unknown[0]!r}. The perks are "
-                         f"{', '.join(PERKS[:-1])} and {PERKS[-1]}.")
+                         f"{', '.join(offered[:-1])} and {offered[-1]}.")
     banked = _banked(track, progress)
     if len(chosen) > banked:
         have = "no perk picks" if not banked else \
@@ -461,9 +492,28 @@ def migrate_herbalist(progress: Progress) -> bool:
     return True
 
 
+def migrate_blacksmith(progress: Progress) -> bool:
+    """Settle a pre-revamp Blacksmith under the 2026-10-03 rules, once (plan §14). True if
+    it ran.
+
+    The Herbalist's conversion, for the same reason it needs no arithmetic: the unlocks
+    now stop at 3 and the perk bank is counted from the level, so an old Blacksmith 4
+    already holds one pick-pair and an old 5 two, waiting for the player at the forge.
+    Banked mastery is untouched. An old `legendary-metal` in `milestones` is inert: no
+    level waits on it any more. Old recipes naming draw, polish, flux or rivet are read
+    through `rules/blacksmith.py` (`old_method`), not rewritten here.
+
+    Idempotent by the stamp, so running it on every load is safe.
+    """
+    if int(progress.schema) >= BLACKSMITH_SCHEMA:
+        return False
+    progress.schema = BLACKSMITH_SCHEMA
+    return True
+
+
 # Load-time migrations by track id. The one place a track is named in this module, and
 # only because a migration is by definition about one track's own history.
-MIGRATIONS = {"herbalist": migrate_herbalist}
+MIGRATIONS = {"herbalist": migrate_herbalist, "blacksmith": migrate_blacksmith}
 
 
 def migrate(progress: Progress) -> bool:
@@ -564,6 +614,7 @@ def from_dict(data: dict) -> Track:
         # Author's notes (`_..._note`) inside the block are documentation, not rules.
         endless={k: v for k, v in (data.get("endless") or {}).items()
                  if not str(k).startswith("_")},
+        data={k: v for k, v in data.items() if not str(k).startswith("_")},
     )
 
 
