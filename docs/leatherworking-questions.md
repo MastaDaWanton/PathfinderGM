@@ -575,3 +575,11 @@ catalogue or code, whatever the owner rules above.
 | Q4.2 How the beast died | **No effect**: grade from skinning only, the beast sets the tier (recommended). |
 | Q4.3 Which creatures | **By the bestiary's type, subtype, size and CR**, never names; named hides win; humanoids never skinned (recommended). |
 | Q4.4 Spoilage | **Keep 48 hours, actually start it, salt in the pack stops it** (recommended). |
+
+### Round 5 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q5.1 One carcass, four crafts | **One "Harvest the carcass" action** listing every part for every craft the character has, each part taken once (recommended). |
+| Q5.2 Sentient creatures | **Allowed by the book, marked as a deed**: dragons and the book's named exceptions yes, humanoids never, a good outsider's harvest recorded for renown and alignment (recommended). |
+| Q5.3 Yield | **By size, the book's dragonhide ratio** (recommended). |
