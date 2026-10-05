@@ -20,3 +20,12 @@ on master e028885). Nothing is designed yet; these rulings bind the plan.
 | Minigames | **Order, matching and timed windows.** Lay components in order, match essence to vessel, bind at timed windows (e.g. planetary hours computed from the game clock). No freehand drawing. |
 | Engine | **Every book property works.** A magic-weapon property vocabulary (flaming, frost, shock, keen, ghost touch, bane vs a chosen foe, holy, speed, defending ...), readers for every effect type, and "counts as magic" for DR, through the one applicator with tells. |
 | Levels | **Same as the others.** L1 common/uncommon, L2 rare/exotic, L3 legendary, then endless perks: potency, quality, yield, and an enchanting perk such as capacity (+1 to what an item holds, within +10). |
+
+## Round 3 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Products | **Arms, armour, wondrous items, rings** on one bench, on vessels from the forge and the leatherworker. Wands, staves and scrolls wait for a later pass (charges and spell use). |
+| Two modes | **One craft, essences feed both.** A catalogue item is a known recipe of essences and a vessel; free-form binding makes your own. Same bench, rules and curses. |
+| Bench | **Its own bench, built from the shared parts** (the bench core), with a 3D stage: the item on a circle of chalk and inks, lit by candles and the essence's glow. |
+| Old saves | **Convert.** Levels above 3 become endless levels with perks picked on first load; old enchanted items keep their +N and specs, re-derived onto the new layer where possible, the old record kept beside them for one version. |
