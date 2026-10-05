@@ -148,16 +148,15 @@ def test_a_trivial_craft_still_counts_as_known(per_recipe):
     assert p.knows("basic tea")
 
 
-def test_a_factory_line_stops_paying(per_recipe):
-    """The stated purpose of the award table is to stop players "spamming 100 basic
-    health potions". Diminishing returns alone do not, because they only begin at level 3
-    — at level 1 a production run of twenty-five teas is still a level."""
+def test_every_repeat_craft_pays(per_recipe):
+    """Owner, 2026-10-05: "batch of 10 should pay 10". Under the old repeat limit a
+    production run of one tea paid [3, 1, 1, 0, 0, ...] — the fourth tea and every one
+    after taught nothing, and a batch of ten paid what three did. Every successful craft
+    now pays: the first-time award once, then the repeat award each time."""
     p = wc.Progress(track="alchemist")
     earned = [wc.award(per_recipe, p, recipe_id="same tea", tier="common")["mp"]
-              for _ in range(20)]
-    assert earned[:5] == [3, 1, 1, 0, 0]
-    assert sum(earned) < per_recipe.to_next(1)
-    assert p.level == 1
+              for _ in range(5)]
+    assert earned == [3, 1, 1, 1, 1]
 
 
 def test_failure_teaches_something_the_first_time_and_not_the_fifth(per_recipe):

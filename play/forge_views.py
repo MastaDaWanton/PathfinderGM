@@ -778,7 +778,8 @@ def _step_units(plan) -> tuple[int, str]:
     The owner, 2026-10-05: "batch crafting does not give equivalent experience". Measured
     before this: a smelt of 5 iron ingots paid 1 step MP where five single smelts paid 3.
     A batch of N at Smelt, Alloy, Forge or Strengthen (the bulk rows, plan §4.5) is now N
-    steps through `award_step`, against the repeat limit exactly as N singles would be.
+    steps through `award_step`, paid exactly as N singles would be (every success pays
+    since the owner's "batch of 10 should pay 10", the same day).
     The unit is the batch's own (`plan.units`): one per ingot smelted, blank or plate
     forged and bar strengthened, which is also one unit of the rule's inputs. Every other
     method works one piece at a time and is 1.

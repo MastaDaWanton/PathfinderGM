@@ -153,7 +153,9 @@ material modifier, so it never scales with Strengthen.
 As herbalism §4.4: each successful step (1, +1 per rarity band above common), the quality
 bonus (+1 at Superior, +2 at Flawless or higher), firsts (learn a property, make a product
 kind, work a new material: +3 each), and reading an unread smithing manual (+5 once each).
-`REPEAT_LIMIT` and `MISHAP_LIMIT` stay, keyed on (method, material).
+`REPEAT_LIMIT` and `MISHAP_LIMIT` stay, keyed on (method, material). (Superseded 2026-10-05
+for successes: the owner ruled "batch of 10 should pay 10", so every successful step pays;
+the mishap limit stays.)
 
 ---
 

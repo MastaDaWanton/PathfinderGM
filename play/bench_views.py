@@ -479,8 +479,8 @@ def bench_finish(request):
     # Mastery: the step, the quality bonus (inside the step award), then firsts.
     #
     # A batch pays as its doses made one at a time would (owner, 2026-10-05: "batch
-    # crafting does not give equivalent experience"): one step per dose against the
-    # repeat limit, each with its bands and the stack's one quality bonus. Doses, not
+    # crafting does not give equivalent experience"): one step per dose, every one paid
+    # ("batch of 10 should pay 10"), each with its bands and the stack's one quality bonus. Doses, not
     # `plan.batch`: three Mint on the mortar at batch 1 is three grinds as surely as one
     # Mint at batch 3, and the smallest craft any method allows is one dose. The yield
     # perk's extra dose is a gift of the perk, not a step worked, so it is not counted.

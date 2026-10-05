@@ -12,11 +12,14 @@ one step whatever N was, and moved the anti-grind counter by one:
   smelt iron ore at the forge            1   1   1   1   batch
                                          1   3   3   3   singles
 
-(Singles stop at 3 because `REPEAT_LIMIT` is 3 per (method, ingredient), the plans'
+(Singles stopped at 3 because `REPEAT_LIMIT` was 3 per (method, ingredient), the plans'
 anti-grind rule, §4.4 and §4.5.) The ruling the fix follows: a batch of N counts as N
 successive steps for the per-step MP, the rarity bands, the quality bonus and the repeat
-counter, so the limit applies exactly as it would to N singles. A batch must neither pay
-less than the singles nor become a way round the limit. Firsts count once.
+counter. A batch must never pay less than the singles. Firsts count once.
+
+The owner's second ruling the same day: "batch of 10 should pay 10". The repeat limit no
+longer caps a success, for singles or batches, so a batch of 10 pays what ten singles
+pay and both pay for all ten. The mishap limit stays.
 """
 from __future__ import annotations
 
@@ -75,36 +78,35 @@ def test_a_failed_batch_is_that_many_failures(n):
     assert many.mishaps == one.mishaps == {"grind:comfrey": n}
 
 
-def test_a_batch_is_not_a_way_round_the_repeat_limit():
-    """Before the fix a batch of ten moved the counter by one, so ten doses spent one of
-    the three paid repeats and the next two singles still paid. After a batch of ten the
-    step has been done ten times, and a single pays nothing more."""
+def test_a_batch_of_10_pays_10():
+    """Owner, 2026-10-05: "batch of 10 should pay 10". Under the repeat limit a batch of
+    ten Mint paid 3 step MP; now every dose pays, the counter says ten, and the next
+    single pays too."""
     herbalist = wc.get("herbalist")
     p = _at()
-    wc.award_step(herbalist, p, method="grind", ingredient_id="mint", rarity_rank=1,
-                  quality_index=2, count=10, noun="dose")
+    got = wc.award_step(herbalist, p, method="grind", ingredient_id="mint", rarity_rank=1,
+                        quality_index=0, count=10, noun="dose")
+    assert got["mp"] == 10
     assert p.crafted["grind:mint"] == 10
     after = wc.award_step(herbalist, p, method="grind", ingredient_id="mint",
-                          rarity_rank=1, quality_index=2)
-    assert after["mp"] == 0
+                          rarity_rank=1, quality_index=0)
+    assert after["mp"] == 1
 
 
-def test_a_batch_itemises_its_doses_and_says_where_the_cap_bit():
-    """The lines the page already shows: "Grind, Comfrey: 3 doses +3", the bands and the
-    quality bonus for the same three, and a line of its own for the doses the repeat
-    limit did not pay, so a batch of five never reads as if two doses went missing."""
+def test_a_batch_itemises_its_doses():
+    """The lines the page already shows: "Grind, Comfrey: 5 doses +5", and the bands and
+    the quality bonus for the same five. (Before the second ruling the repeat limit paid
+    three and a fourth line said the other two taught nothing.)"""
     herbalist = wc.get("herbalist")
     got = wc.award_step(herbalist, _at(), method="grind", ingredient_id="comfrey",
                         rarity_rank=3, quality_index=3, name="Comfrey", count=5,
                         noun="dose")
     assert got["reasons"] == [
-        {"why": "Grind, Comfrey: 3 doses", "mp": 3},
-        {"why": "rare material: 3 doses", "mp": 6},
-        {"why": "Superior work: 3 doses", "mp": 3},
-        {"why": "Grind, Comfrey: 2 doses past the repeat limit, nothing new to learn "
-                "(a step pays 3 times)", "mp": 0},
+        {"why": "Grind, Comfrey: 5 doses", "mp": 5},
+        {"why": "rare material: 5 doses", "mp": 10},
+        {"why": "Superior work: 5 doses", "mp": 5},
     ]
-    assert got["mp"] == 12
+    assert got["mp"] == 20
 
 
 def test_a_single_step_reads_as_it_always_did():
@@ -130,8 +132,9 @@ def _fresh_herbalist(level: int = 1) -> None:
 def test_a_batch_of_5_ground_mint_pays_what_five_grinds_pay(bench):
     """Measured on master a77f5f9 at Herbalist 2 with Superior hands: a batch of 5
     Ground Mint paid 2 step MP (1 grind, 1 Superior); five single grinds paid 6 (the
-    repeat limit stops the singles at three). Now both pay 6, and the firsts (first
-    powder, first work with Mint, two properties learned) are paid once either way."""
+    repeat limit stopped the singles at three). Now both pay 10, every dose paying since
+    the owner's "batch of 10 should pay 10", and the firsts (first powder, first work
+    with Mint, two properties learned) are paid once either way."""
     _fresh_herbalist(2)
     herb_carry(mint=5)
     done = _craft(bench, "grind", [{"key": _key(bench, "Mint"), "count": 1}], batch=5,
@@ -147,12 +150,12 @@ def test_a_batch_of_5_ground_mint_pays_what_five_grinds_pay(bench):
                      batch=1, score=1.0)
         singles += one["mastery"]["lines"]
 
-    assert _steps(batch_lines) == _steps(singles) == 6
+    assert _steps(batch_lines) == _steps(singles) == 10
     firsts = lambda ls: sum(l["mp"] for l in ls if l["why"].startswith(("first", "learned")))
     assert firsts(batch_lines) == firsts(singles)
     whys = [l["why"] for l in batch_lines]
-    assert "Grind, Mint: 3 doses" in whys and "Superior work: 3 doses" in whys
-    assert any("2 doses past the repeat limit" in w for w in whys)
+    assert "Grind, Mint: 5 doses" in whys and "Superior work: 5 doses" in whys
+    assert not any("repeat limit" in w for w in whys)
     assert herb_pc().track("herbalist").crafted["grind:mint"] == 5
 
 
@@ -220,16 +223,15 @@ def test_a_smelt_of_3_ingots_pays_what_three_smelts_pay(forge, where):
     assert forge_pc().track("blacksmith").crafted["smelt:iron-ore"] == 3
 
 
-def test_a_forge_batch_past_the_limit_says_so(forge, where):
-    """A smelt of five pays three and says the other two ingots taught nothing new,
-    rather than showing three and leaving the player to wonder about two."""
+def test_a_forge_batch_of_five_pays_five(forge, where):
+    """Under the repeat limit a smelt of five paid three and said the other two ingots
+    taught nothing new; since the owner's "batch of 10 should pay 10" all five pay."""
     where["smithy"] = TOWN["smithy"]
     _fresh_smith()
     forge_carry(iron_ore=10, charcoal=10)
     lines = do_step(forge, {**SMELT, "batch": 5}, score=0.5)["mastery"]["lines"]
-    assert _steps(lines) == 3
-    assert any(l["why"].startswith("Smelt, Iron Ore: 2 ingots past the repeat limit")
-               and l["mp"] == 0 for l in lines)
+    assert _steps(lines) == 5
+    assert {"why": "Smelt, Iron Ore: 5 ingots", "mp": 5} in lines
 
 
 def test_the_forge_counts_a_batch_by_its_units():
