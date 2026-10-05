@@ -413,6 +413,13 @@ def test_saying_it_and_staying_out_of_it_are_both_endings(monkeypatch):
     _run(e, "travel", {"place": inst["slots"]["road"]["name"]})
     _wait(e)
     for _ in range(3):
+        # Three days on the road with water: since thirst's damage stopped mending by the
+        # hour (CRB p.444, 2026-10-05), a first-level Kesst left dry for 72 hours lay
+        # senseless at the market and heard nothing — this is a test of the scheme.
+        from rules import survival
+
+        survival.drink(pc)
+        survival.eat(pc)
         _run(e, "advance_time", {"amount": 24 * 60, "unit": "minutes"})
     _run(e, "travel", {"place": inst["slots"]["market"]["name"]})
     _wait(e)

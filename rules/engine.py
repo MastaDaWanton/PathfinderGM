@@ -102,6 +102,11 @@ def _and_list(names) -> str:
     return ", ".join(got[:-1]) + " and " + got[-1]
 
 
+def _also(sentence: str) -> str:
+    """A further sentence for a tell, or nothing — with its space when there is one."""
+    return f" {sentence}" if sentence else ""
+
+
 def _drowning_ground(actor) -> bool:
     """Whether this creature is under water it cannot breathe.
 
@@ -1251,10 +1256,21 @@ class Scene:
             # does not knock them out on damage the same wait would have healed.
             if hours and a.nonlethal and not rolls:
                 out_cold = a.has_state("state.down.unconscious")
-                a.heal_nonlethal(hours * max(1, int(getattr(a, "level", 1) or 1)))
+                wanted, had = hours * max(1, int(getattr(a, "level", 1) or 1)), a.nonlethal
+                a.heal_nonlethal(wanted)
                 a.apply_nonlethal_state()
                 if out_cold and not a.has_state("state.down.unconscious"):
                     ended.append(f"{a.name} comes round")
+                # What thirst or hunger holds does not mend with the hours (CRB p.444).
+                # Said as a body record, the way the checks are, so it is told once behind
+                # the op that spent the hours — a night's `rest`, a day's foraging — and
+                # not as one of the expiries.
+                if survival.refused(a, wanted, had):
+                    record = {"ref": a.ref, "kind": "body",
+                              **survival.Toll(unmended=1).as_dict(),
+                              "said": [survival.unmended_said(a)]}
+                    body.append(record)
+                    self._body_said.append(record)
             # The breath they are holding, for anybody under the surface who does not
             # breathe water. A counter, like hunger above it and for the same reason:
             # the Constitution check that follows it rolls dice and belongs to the
@@ -1438,9 +1454,16 @@ class Scene:
             if saved and save_effect == "half":
                 rolled //= 2
             if kind == "heal":
-                return [{"kind": "heal", "ref": victim.ref,
-                         "amount": victim.heal(rolled), "source": ward.source,
-                         "origin": f"ward:{ward.source}"}]
+                had = victim.nonlethal
+                healed = victim.heal(rolled)
+                rec = {"kind": "heal", "ref": victim.ref, "amount": healed,
+                       "source": ward.source, "origin": f"ward:{ward.source}"}
+                # Not even magic mends what thirst or hunger holds (CRB p.444); the
+                # sentence rides on the record so `_ward_tell` says it.
+                held = survival.unmended(victim, rolled, had)
+                if held:
+                    rec["unmended"] = held
+                return [rec]
             d = victim.take_damage(rolled, str(spec.get("damage_type") or "untyped"),
                                    (), str(spec.get("lethality") or "lethal"))
             out.append({"kind": "damage", "ref": victim.ref, "amount": d["taken"],
@@ -3318,14 +3341,11 @@ class Engine:
             who = self.scene.people.get(ref)
             if who is not None and len(rows) > 1:
                 toll = survival.Toll()
+                # `Toll.from_record` is the one reader of the record: this list was a
+                # copy of its fields, and a field added to the toll (what thirst holds,
+                # the night a collapse woke into) was dropped here in silence.
                 for r in rows:
-                    toll.absorb(survival.Toll(
-                        checks=list(r.get("checks") or []),
-                        nonlethal=int(r.get("nonlethal") or 0),
-                        conditions=list(r.get("conditions") or []),
-                        **{k: bool(r.get(k)) for k in ("collapsed", "fell_asleep", "woke",
-                                                       "knocked_out", "came_round")},
-                        lethal=int(r.get("lethal") or 0)))
+                    toll.absorb(survival.Toll.from_record(r))
                 said = survival.said(who, toll)
             else:
                 said = [s for r in rows for s in r.get("said") or []]
@@ -7328,6 +7348,15 @@ class Engine:
         # entitled to remove it, and one shared list either breaks that or lets cure
         # light wounds raise a corpse.
         lifted = target.clear_states("recovery.hit-points") if target.hp > 0 else []
+        # ...unless the non-lethal still has them down. A cure cannot take off what thirst
+        # or hunger holds (CRB p.444), so the hit points it raises may still sit under
+        # the non-lethal — and a sweep that woke them anyway would be the cure healing
+        # the withheld damage by another name. The ladder is asked again, and what it
+        # puts back was never lifted.
+        if lifted:
+            again = target.apply_nonlethal_state()
+            lifted = [k for k in lifted if k not in again]
+        held = survival.unmended(target, amount, nl_before)
 
         # The tell owns everything the cure did. "Already unhurt" used to be the whole
         # sentence for a Blood Bender at full hit points, while the same drink was
@@ -7344,7 +7373,10 @@ class Engine:
         if temp_banked:
             parts.append(f"banks {temp_banked} as temporary vitality")
         tell = (f"{target.name} " + ", ".join(parts) + self._by(intent) + "."
-                if parts else f"{target.name} is already unhurt.")
+                if parts else
+                "" if held else f"{target.name} is already unhurt.")
+        if held:
+            tell = f"{tell} {held}".strip()
         # Coming back is the half a cure is FOR, and it was silent in both channels: the
         # effects list said `heal` and nothing else, and the tell counted hit points
         # while saying nothing about the dying stopping. Law 3 asks a removal to emit
@@ -7363,7 +7395,8 @@ class Engine:
             effects=[{"ref": target.ref, "kind": "heal", "amount": healed,
                       "nonlethal_healed": nl_healed, "temp_banked": temp_banked,
                       "hp_after": target.hp, "hp_max": target.hp_max,
-                      "origin": intent.origin}]
+                      "origin": intent.origin}
+                     | ({"nonlethal_withheld": target.withheld_nonlethal()} if held else {})]
                     + [{"ref": target.ref, "kind": "condition", "condition": k,
                         "ends": True} for k in lifted],
             tell=tell,
@@ -8494,9 +8527,12 @@ class Engine:
                 return False, "; ".join(told)
             left_to_walk -= today
             if left_to_walk > 0:
-                # Camp. The rest of the day passes and the traveller takes it.
-                survival.eat(pc)
-                survival.drink(pc)
+                # Camp. The rest of the day passes and the traveller takes it — and
+                # what thirst and hunger were holding can mend from here (CRB p.444).
+                for need, freed in (("hunger", survival.eat(pc)),
+                                    ("thirst", survival.drink(pc))):
+                    if freed:
+                        told.append(survival.released_said(pc, need, freed))
                 survival.sleep(pc)
                 self.scene.advance((24 - day) * survival.MINUTES_PER_HOUR,
                                    charge_body=False)
@@ -12389,6 +12425,7 @@ class Engine:
                        if saved and plan["save_effect"] == "partial" else "."))
 
             if plan["kind"] == "heal":
+                had = target.nonlethal
                 healed = target.heal(amount)
                 state["effects"].append({
                     "ref": target.ref, "kind": "heal", "amount": healed,
@@ -12396,6 +12433,10 @@ class Engine:
                     "origin": f"spell:{spell.id}"})
                 state["tells"].append(
                     f"{target.name} recovers {healed} hit points.")
+                # Not even magic (CRB p.444): what thirst or hunger holds stays.
+                held = survival.unmended(target, amount, had)
+                if held:
+                    state["tells"].append(held)
             elif amount > 0:
                 # A crowd is immune to a spell that picks out a number of creatures and
                 # takes half again from one that fills an area — both troop rules, both
@@ -14990,7 +15031,7 @@ class Engine:
                 because=intent.because)
 
         target = self.scene.actors.get(intent.params.get("to") or "") or actor
-        done, narrated, rolls = [], [], []
+        done, narrated, rolls, held_back = [], [], [], []
         # Everyone this ability actually hurt, so the hit-point ladder runs on them at
         # the end. It never did: measured, a level-12 blood bender's Blood Spike
         # Projectile took a thug to -22 of 13 against Constitution 13 — nine hit points
@@ -15027,11 +15068,17 @@ class Engine:
                 roll = self.dice.roll(str(spec["dice"]), label=found,
                                       visibility="player")
                 rolls.append(roll)
+                had = actor.nonlethal
                 if spec.get("lethality") == "nonlethal":
-                    actor.heal_nonlethal(roll.total)
-                    done.append(f"{roll.total} non-lethal healed")
+                    # What came off, not what was rolled: thirst and hunger hold theirs
+                    # (CRB p.444), and "6 non-lethal healed" over a floor that took none
+                    # of it is the tell lying.
+                    done.append(f"{actor.heal_nonlethal(roll.total)} non-lethal healed")
                 else:
                     done.append(f"{actor.heal(roll.total)} hit points healed")
+                held = survival.unmended(actor, roll.total, had)
+                if held and held not in held_back:
+                    held_back.append(held)
             elif kind == "temp_hp":
                 roll = self.dice.roll(str(spec["dice"]), label=found,
                                       visibility="player")
@@ -15066,6 +15113,7 @@ class Engine:
         bits = [f"{actor.name} uses {found.title()}."]
         if done:
             bits.append("The engine resolves: " + "; ".join(done) + ".")
+        bits.extend(held_back)
         if narrated:
             bits.append(f"{len(narrated)} part(s) of it are yours to narrate.")
         return Outcome(
@@ -15437,28 +15485,45 @@ class Engine:
                         as_ = "heal"
                         tells.append(f"The energy mends {other.name} instead of harming "
                                      f"them.")
+                    # Thirst and hunger hold theirs against any cure (CRB p.444): said
+                    # in place of "had no non-lethal" or "already unhurt", which would
+                    # each be false of a body still carrying it.
+                    had = other.nonlethal
                     if as_ == "heal_nonlethal":
                         back = other.heal_nonlethal(share)
+                        held = survival.unmended(other, share, had)
                         records.append({"ref": other.ref, "kind": "heal_nonlethal",
                                         "amount": back, "rolled": share,
                                         "nonlethal_after": other.nonlethal, "origin": origin})
-                        tells.append(f"{other.name} recovers {back} non-lethal damage."
-                                     if back else
-                                     f"{other.name} had no non-lethal damage to recover.")
+                        if back or not held:
+                            tells.append(f"{other.name} recovers {back} non-lethal damage."
+                                         if back else
+                                         f"{other.name} had no non-lethal damage to "
+                                         f"recover.")
+                        if held:
+                            tells.append(held)
                     elif as_ == "heal":
                         # Never below 0: a body standing over its maximum (a scratch
                         # sheet did, live 2026-10-05) "recovered -1 hit points".
                         healed = max(0, other.heal(share))
+                        held = survival.unmended(other, share, had)
                         records.append({"ref": other.ref, "kind": "heal", "amount": healed,
                                         "rolled": share, "hp_after": other.hp,
                                         "hp_max": other.hp_max, "origin": origin})
-                        tells.append(f"{other.name} recovers {healed} hit points "
-                                     f"({other.hp}/{other.hp_max})." if healed else
-                                     f"{other.name} was already unhurt.")
+                        if healed or not held:
+                            tells.append(f"{other.name} recovers {healed} hit points "
+                                         f"({other.hp}/{other.hp_max})." if healed else
+                                         f"{other.name} was already unhurt.")
+                        if held:
+                            tells.append(held)
                         # Back above 0, the dying and the unconscious wake — the same
-                        # sweep the `heal` op makes, by the one family that says so.
+                        # sweep the `heal` op makes, by the one family that says so —
+                        # unless the non-lethal still has them down (`_op_heal`).
                         woke = other.clear_states("recovery.hit-points") if other.hp > 0 \
                             else []
+                        if woke:
+                            again = other.apply_nonlethal_state()
+                            woke = [k for k in woke if k not in again]
                         if woke:
                             records.append({"ref": other.ref, "kind": "condition_removed",
                                             "conditions": woke, "origin": origin})
@@ -16649,13 +16714,6 @@ class Engine:
                 intent, f"You are still in conversation with "
                         f"{_and_list(a.name for a in talking)}. Take your leave first.")
 
-        # Sleeping on enough experience is how a level arrives: "once i have enough
-        # Exp sleeping should initiate the leveling process." Before the rest itself,
-        # so the new hit die is part of the night's recovery rather than after it.
-        levelled = None
-        from . import leveling as leveling_mod
-        from . import xp as xp_mod
-
         # The camp (the owner, 2026-10-01: "a tent should decrease the chance of being
         # attacked in my sleep and protect me from the elements to a degree. A bedroll
         # should negate the negative of waking up fatigued after sleeping on the floor or
@@ -16672,20 +16730,18 @@ class Engine:
                 # sleep again once it is dealt with.
                 return self._broken_night(intent, actor, camp, met)
 
-        if kind == "night" and actor.is_pc and xp_mod.ready_to_level(actor):
-            levelled = leveling_mod.level_up(actor, dice=self.dice)
-
-        result = actor.rest(kind)
-        refilled = actor.refresh_pools("rest.night", self.dice)
-        # The morning's preparation (item 21.4): what was not cast is still prepared, and
-        # the empty slots refill from the player's last loadout — or, for a wizard who has
-        # never prepared, from the book in its own order. A cleric with nothing chosen is
+        # The whole night through one door (`Actor.sleep_through`), shared with the sleep
+        # a body drops into when it will not be refused any longer (`survival._wake`):
+        # the level the experience has earned ("once i have enough Exp sleeping should
+        # initiate the leveling process"), the body's rest, the pools and slots, and the
+        # morning's preparation (item 21.4) — what was not cast is still prepared, the
+        # empty slots refill from the player's last loadout or, for a wizard who has
+        # never prepared, from the book in its own order; a cleric with nothing chosen is
         # left empty and told so (owner, Q39). No study hour is added (Q40): the night
         # already runs to dawn.
-        prep_said = ""
-        if casting.is_caster(actor):
-            got = casting.ensure_prepared(actor, reason="rest")
-            prep_said = casting.prepared_said(actor, got)
+        result = actor.sleep_through(kind, self.dice)
+        levelled, refilled, prep_said = (result["levelled"], result["refilled"],
+                                         result["prepared"])
         # Everyone, not only the sleeper. Rest ticked the resting actor alone, so an
         # NPC standing in the same scene kept every timed buff through an eight-hour
         # night. `advance` also leaves the body alone: `Actor.rest` has already called
@@ -17021,33 +17077,48 @@ class Engine:
             n = int((c["row"].get("eat") or {}).get("spends", 1) or 1)
             left = gear_mod.spend(actor, c, n)
             was = int(getattr(actor, "fed_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
-            survival.eat(actor)
+            freed = survival.eat(actor)
             return Outcome(
                 intent_id=intent.id, op="eat",
                 effects=[{"ref": actor.ref, "kind": "eat", "item": c["name"], "spent": n,
-                          "left": left, "origin": f"item:{c['id']}"}],
+                          "left": left, "origin": f"item:{c['id']}"}]
+                        + self._released(actor, "hunger", freed),
                 tell=(f"{actor.name} eats from the {c['name']} ({left} left). "
                       f"{was} hour{'s' if was != 1 else ''} since the last meal; hunger is "
-                      f"put back to nothing."),
+                      f"put back to nothing."
+                      + _also(survival.released_said(actor, "hunger", freed))),
                 because=intent.because,
             )
-        survival.eat(actor)
+        freed = survival.eat(actor)
         return Outcome(
             intent_id=intent.id, op="eat",
-            effects=[{"ref": actor.ref, "kind": "eat"}],
-            tell=f"{actor.name} eats.", because=intent.because,
+            effects=[{"ref": actor.ref, "kind": "eat"}]
+                    + self._released(actor, "hunger", freed),
+            tell=f"{actor.name} eats." + _also(survival.released_said(actor, "hunger", freed)),
+            because=intent.because,
         )
 
     def _op_drink(self, intent: Intent, partial: dict) -> Outcome:
         from . import survival
 
         actor = self._eater(intent)
-        survival.drink(actor)
+        freed = survival.drink(actor)
         return Outcome(
             intent_id=intent.id, op="drink",
-            effects=[{"ref": actor.ref, "kind": "drink"}],
-            tell=f"{actor.name} drinks.", because=intent.because,
+            effects=[{"ref": actor.ref, "kind": "drink"}]
+                    + self._released(actor, "thirst", freed),
+            tell=f"{actor.name} drinks." + _also(survival.released_said(actor, "thirst", freed)),
+            because=intent.because,
         )
+
+    @staticmethod
+    def _released(actor, need: str, points: int) -> list[dict]:
+        """The record of a need met over the damage it held (CRB p.444): the `withheld`
+        effect is gone, and law 3 asks a removal to be told as an application is."""
+        if not points:
+            return []
+        return [{"ref": actor.ref, "kind": "withheld_released", "need": need,
+                 "amount": points, "origin": "rule:survival"}]
 
     def _op_taste(self, intent: Intent, partial: dict) -> Outcome:
         """A nibble of a raw herb, to learn what it does (docs/herbalism-revamp-plan.md
@@ -18109,7 +18180,13 @@ def _ward_tell(scene: Scene, e: dict) -> str:
         return (f"{name} takes {e['amount']} {e['type']} damage from {source}{half} "
                 f"({e.get('hp_after')}/{e.get('hp_max')}).")
     if kind == "heal":
-        return f"{source} restores {e['amount']} hit points to {name}."
+        # A cure that met thirst's or hunger's hold carries the sentence saying so
+        # (`survival.unmended`), and may have restored nothing else at all.
+        held = str(e.get("unmended") or "")
+        if held and not e.get("amount"):
+            return held
+        return (f"{source} restores {e['amount']} hit points to {name}."
+                + (f" {held}" if held else ""))
     if kind == "ward_saved":
         nat = f"{e['natural']}, " if e.get("natural") else ""
         return f"{name} rides out {source} ({nat}{e.get('roll')} against DC {e.get('dc')})."
