@@ -1,0 +1,152 @@
+{
+  "id": "arcane-schools",
+  "name": "Arcane Schools",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/wizard.html, https://www.d20pfsrd.com/classes/core-classes/wizard/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/abjuration/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/conjuration/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/divination/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/enchantment/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/evocation/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/illusion/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/necromancy/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/transmutation/, https://www.d20pfsrd.com/classes/core-classes/wizard/arcane-schools/paizo-arcane-schools/classic-arcane-schools/universalist/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "opposition_schools": 2,
+    "opposition_cost": "Preparing an opposition-school spell uses two slots of that level.",
+    "specialist_bonus_slot": "One extra slot per spell level, for a spell of the specialist school."
+  },
+  "options": [
+    {
+      "id": "abjuration",
+      "name": "Abjuration",
+      "text": "Specialists in wards and protection; they shrug off energy and shield allies nearby.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Resistance",
+          "Protective Ward"
+        ],
+        "6": [
+          "Energy Absorption"
+        ]
+      }
+    },
+    {
+      "id": "conjuration",
+      "name": "Conjuration",
+      "text": "Specialists in summoning and creation; their summons linger longer and they step through space.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Summoner's Charm",
+          "Acid Dart"
+        ],
+        "8": [
+          "Dimensional Steps"
+        ]
+      }
+    },
+    {
+      "id": "divination",
+      "name": "Divination",
+      "text": "Specialists in foresight; they are never caught off guard and sense when they are watched.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Forewarned",
+          "Diviner's Fortune"
+        ],
+        "8": [
+          "Scrying Adept"
+        ]
+      }
+    },
+    {
+      "id": "enchantment",
+      "name": "Enchantment",
+      "text": "Specialists in the mind; charming in conversation, able to daze with a touch and spread despair.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Enchanting Smile",
+          "Dazing Touch"
+        ],
+        "8": [
+          "Aura of Despair"
+        ]
+      }
+    },
+    {
+      "id": "evocation",
+      "name": "Evocation",
+      "text": "Specialists in raw energy; their damaging evocations hit harder and they can raise walls of energy.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Intense Spells",
+          "Force Missile"
+        ],
+        "8": [
+          "Elemental Wall"
+        ]
+      }
+    },
+    {
+      "id": "illusion",
+      "name": "Illusion",
+      "text": "Specialists in deception; their illusions outlast concentration, and they can blind or vanish.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Extended Illusions",
+          "Blinding Ray"
+        ],
+        "8": [
+          "Invisibility Field"
+        ]
+      }
+    },
+    {
+      "id": "necromancy",
+      "name": "Necromancy",
+      "text": "Specialists in death; they command or turn undead, frighten with a touch and sense life.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Power over Undead",
+          "Grave Touch"
+        ],
+        "8": [
+          "Life Sight"
+        ]
+      },
+      "power_over_undead_feats": [
+        "command-undead",
+        "turn-undead"
+      ]
+    },
+    {
+      "id": "transmutation",
+      "name": "Transmutation",
+      "text": "Specialists in change; they boost their own body, strike from afar and later change shape.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Physical Enhancement",
+          "Telekinetic Fist"
+        ],
+        "8": [
+          "Change Shape"
+        ]
+      }
+    },
+    {
+      "id": "universalist",
+      "name": "Universalist",
+      "text": "No specialty: no bonus school slot, but no opposition schools; prepares spells of every school freely.",
+      "requires": [],
+      "powers": {
+        "1": [
+          "Hand of the Apprentice"
+        ],
+        "8": [
+          "Metamagic Mastery"
+        ]
+      },
+      "opposable": false
+    }
+  ]
+}

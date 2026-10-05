@@ -61,6 +61,26 @@
    "_note": "Rounds per day, Core p.36: 4 + Cha mod at 1st, +2 per level."
   }
  ],
+ "choices": [
+  {
+   "id": "versatile performance",
+   "name": "Versatile performance",
+   "at_levels": [
+    2,
+    6,
+    10,
+    14,
+    18
+   ],
+   "text": "At 2nd level and every four levels after, a bard picks a type of Perform; its bonus stands in for two related skills (Core Rulebook, Bard).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "perform-types"
+    }
+   ]
+  }
+ ],
  "levels": [
   {
    "level": 1,

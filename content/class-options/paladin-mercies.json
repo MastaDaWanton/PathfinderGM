@@ -1,0 +1,149 @@
+{
+  "id": "paladin-mercies",
+  "name": "Paladin Mercies",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/paladin.html, https://www.d20pfsrd.com/classes/core-classes/paladin/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "mercies_at": [
+      3,
+      6,
+      9,
+      12,
+      15,
+      18
+    ],
+    "applies": "Every mercy the paladin knows applies whenever lay on hands heals a target.",
+    "permanent": "Each choice is permanent."
+  },
+  "options": [
+    {
+      "id": "fatigued",
+      "name": "Fatigued",
+      "text": "Lay on hands also ends the target's fatigue.",
+      "min_level": 3,
+      "requires": [],
+      "condition": "fatigued"
+    },
+    {
+      "id": "shaken",
+      "name": "Shaken",
+      "text": "Lay on hands also ends the target's shaken condition.",
+      "min_level": 3,
+      "requires": [],
+      "condition": "shaken"
+    },
+    {
+      "id": "sickened",
+      "name": "Sickened",
+      "text": "Lay on hands also ends the target's sickened condition.",
+      "min_level": 3,
+      "requires": [],
+      "condition": "sickened"
+    },
+    {
+      "id": "dazed",
+      "name": "Dazed",
+      "text": "Lay on hands also ends the target's dazed condition.",
+      "min_level": 6,
+      "requires": [],
+      "condition": "dazed"
+    },
+    {
+      "id": "diseased",
+      "name": "Diseased",
+      "text": "Lay on hands also works as remove disease at your paladin level.",
+      "min_level": 6,
+      "requires": [],
+      "condition": "diseased",
+      "acts_as": "remove disease"
+    },
+    {
+      "id": "staggered",
+      "name": "Staggered",
+      "text": "Lay on hands also ends staggering, unless the target sits at exactly 0 hit points.",
+      "min_level": 6,
+      "requires": [],
+      "condition": "staggered"
+    },
+    {
+      "id": "cursed",
+      "name": "Cursed",
+      "text": "Lay on hands also works as remove curse at your paladin level.",
+      "min_level": 9,
+      "requires": [],
+      "condition": "cursed",
+      "acts_as": "remove curse"
+    },
+    {
+      "id": "exhausted",
+      "name": "Exhausted",
+      "text": "Lay on hands also ends exhaustion.",
+      "min_level": 9,
+      "requires": [
+        "fatigued"
+      ],
+      "condition": "exhausted"
+    },
+    {
+      "id": "frightened",
+      "name": "Frightened",
+      "text": "Lay on hands also ends the frightened condition.",
+      "min_level": 9,
+      "requires": [
+        "shaken"
+      ],
+      "condition": "frightened"
+    },
+    {
+      "id": "nauseated",
+      "name": "Nauseated",
+      "text": "Lay on hands also ends nausea.",
+      "min_level": 9,
+      "requires": [
+        "sickened"
+      ],
+      "condition": "nauseated"
+    },
+    {
+      "id": "poisoned",
+      "name": "Poisoned",
+      "text": "Lay on hands also works as neutralize poison at your paladin level.",
+      "min_level": 9,
+      "requires": [],
+      "condition": "poisoned",
+      "acts_as": "neutralize poison"
+    },
+    {
+      "id": "blinded",
+      "name": "Blinded",
+      "text": "Lay on hands also cures blindness.",
+      "min_level": 12,
+      "requires": [],
+      "condition": "blinded"
+    },
+    {
+      "id": "deafened",
+      "name": "Deafened",
+      "text": "Lay on hands also cures deafness.",
+      "min_level": 12,
+      "requires": [],
+      "condition": "deafened"
+    },
+    {
+      "id": "paralyzed",
+      "name": "Paralyzed",
+      "text": "Lay on hands also ends paralysis.",
+      "min_level": 12,
+      "requires": [],
+      "condition": "paralyzed"
+    },
+    {
+      "id": "stunned",
+      "name": "Stunned",
+      "text": "Lay on hands also ends the stunned condition.",
+      "min_level": 12,
+      "requires": [],
+      "condition": "stunned"
+    }
+  ]
+}

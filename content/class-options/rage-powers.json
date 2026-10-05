@@ -1,0 +1,204 @@
+{
+  "id": "rage-powers",
+  "name": "Rage Powers",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/barbarian.html, https://www.d20pfsrd.com/classes/core-classes/barbarian/rage-powers/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "powers_from": 2,
+    "power_every": 2,
+    "no_repeats": "A rage power cannot be taken twice unless it says otherwise."
+  },
+  "options": [
+    {
+      "id": "animal-fury",
+      "name": "Animal Fury",
+      "text": "While raging you gain a bite attack (1d4 for Medium) usable alongside your other attacks.",
+      "requires": []
+    },
+    {
+      "id": "clear-mind",
+      "name": "Clear Mind",
+      "text": "Once per rage, reroll a failed Will save.",
+      "min_level": 8,
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "fearless-rage",
+      "name": "Fearless Rage",
+      "text": "While raging you cannot be shaken or frightened.",
+      "min_level": 12,
+      "requires": []
+    },
+    {
+      "id": "guarded-stance",
+      "name": "Guarded Stance",
+      "text": "As a move action, gain a dodge bonus to AC against melee attacks for a few rounds.",
+      "requires": []
+    },
+    {
+      "id": "increased-damage-reduction",
+      "name": "Increased Damage Reduction",
+      "text": "Your damage reduction rises by 1/- while raging.",
+      "min_level": 8,
+      "requires": [],
+      "repeatable": true,
+      "max_times": 3
+    },
+    {
+      "id": "internal-fortitude",
+      "name": "Internal Fortitude",
+      "text": "While raging you cannot be sickened or nauseated.",
+      "min_level": 8,
+      "requires": []
+    },
+    {
+      "id": "intimidating-glare",
+      "name": "Intimidating Glare",
+      "text": "As a move action, try to demoralize an adjacent foe with Intimidate.",
+      "requires": []
+    },
+    {
+      "id": "knockback",
+      "name": "Knockback",
+      "text": "Once a round, swap a melee attack for a bull rush that also deals Strength-based damage.",
+      "requires": []
+    },
+    {
+      "id": "low-light-vision",
+      "name": "Low-Light Vision",
+      "text": "While raging you gain low-light vision.",
+      "requires": []
+    },
+    {
+      "id": "mighty-swing",
+      "name": "Mighty Swing",
+      "text": "Once per rage, automatically confirm a critical threat.",
+      "min_level": 12,
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "moment-of-clarity",
+      "name": "Moment of Clarity",
+      "text": "Once per rage, set aside rage's benefits and penalties for one round.",
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "night-vision",
+      "name": "Night Vision",
+      "text": "While raging you gain darkvision 60 feet. Needs low-light vision: the rage power, or a race that sees in dim light.",
+      "requires": [],
+      "_requires_note": "The book accepts the Low-Light Vision rage power OR the racial trait. `requires` is strict, so an elf barbarian would be refused; the either-or is left to the text until the race's senses can be asked."
+    },
+    {
+      "id": "no-escape",
+      "name": "No Escape",
+      "text": "Once per rage, when a foe withdraws, move up to double speed after it.",
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "powerful-blow",
+      "name": "Powerful Blow",
+      "text": "Once per rage, add a level-scaled bonus to one damage roll.",
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "quick-reflexes",
+      "name": "Quick Reflexes",
+      "text": "While raging you may take one extra attack of opportunity each round.",
+      "requires": []
+    },
+    {
+      "id": "raging-climber",
+      "name": "Raging Climber",
+      "text": "While raging add your barbarian level to Climb checks.",
+      "requires": []
+    },
+    {
+      "id": "raging-leaper",
+      "name": "Raging Leaper",
+      "text": "While raging add your barbarian level to Acrobatics checks for jumping.",
+      "requires": []
+    },
+    {
+      "id": "raging-swimmer",
+      "name": "Raging Swimmer",
+      "text": "While raging add your barbarian level to Swim checks.",
+      "requires": []
+    },
+    {
+      "id": "renewed-vigor",
+      "name": "Renewed Vigor",
+      "text": "Once a day while raging, heal a few dice plus Constitution as a standard action.",
+      "min_level": 4,
+      "requires": []
+    },
+    {
+      "id": "rolling-dodge",
+      "name": "Rolling Dodge",
+      "text": "As a move action, gain a dodge bonus to AC against ranged attacks for a few rounds.",
+      "requires": []
+    },
+    {
+      "id": "roused-anger",
+      "name": "Roused Anger",
+      "text": "You may rage while fatigued; you are exhausted when the rage ends.",
+      "requires": []
+    },
+    {
+      "id": "scent",
+      "name": "Scent",
+      "text": "While raging you gain the scent ability.",
+      "requires": []
+    },
+    {
+      "id": "strength-surge",
+      "name": "Strength Surge",
+      "text": "Once per rage, add your barbarian level to one Strength check, combat maneuver check or CMD.",
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "superstition",
+      "name": "Superstition",
+      "text": "While raging you gain a morale bonus on saves against spells and spell-like abilities, but refuse allies' magic.",
+      "requires": []
+    },
+    {
+      "id": "surprise-accuracy",
+      "name": "Surprise Accuracy",
+      "text": "Once per rage, add a level-scaled morale bonus to one attack roll.",
+      "requires": [],
+      "once_per_rage": true
+    },
+    {
+      "id": "swift-foot",
+      "name": "Swift Foot",
+      "text": "While raging your speed rises by 5 feet.",
+      "requires": [],
+      "repeatable": true,
+      "max_times": 3
+    },
+    {
+      "id": "terrifying-howl",
+      "name": "Terrifying Howl",
+      "text": "As a standard action, howl to panic shaken enemies within 30 feet who fail a Will save.",
+      "min_level": 8,
+      "requires": [
+        "intimidating-glare"
+      ]
+    },
+    {
+      "id": "unexpected-strike",
+      "name": "Unexpected Strike",
+      "text": "Once per rage, take an attack of opportunity when a foe moves into your threatened area.",
+      "min_level": 8,
+      "requires": [],
+      "once_per_rage": true
+    }
+  ]
+}

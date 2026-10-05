@@ -38,6 +38,31 @@
    "_note": "Rounds per day, Core p.31: 4 + Con mod at 1st, +2 per level after."
   }
  ],
+ "choices": [
+  {
+   "id": "rage power",
+   "name": "Rage powers",
+   "at_levels": [
+    2,
+    4,
+    6,
+    8,
+    10,
+    12,
+    14,
+    16,
+    18,
+    20
+   ],
+   "text": "At 2nd level and every two levels after, a barbarian learns a rage power: something she can do while raging. Some need an earlier power or a higher level (Core Rulebook, Barbarian).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "rage-powers"
+    }
+   ]
+  }
+ ],
  "levels": [
   {
    "level": 1,

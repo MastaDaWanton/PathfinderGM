@@ -48,6 +48,7 @@ CONTENT_DIRS = [
     "domains",     # the domains' granted powers (content/domains, rules/domains.py)
     "companions",  # the animal companion table and animals (rules/animal_companion.py)
     "class-features",  # classes' passive numbers as documents (rules/classfeatures.py)
+    "class-options",  # bloodlines, schools, rage powers… (rules/classes.py catalogues)
 ]
 
 datas = [(f"content/{name}", f"content/{name}") for name in CONTENT_DIRS]

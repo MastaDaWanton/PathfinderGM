@@ -13,6 +13,25 @@
     "knowledge (engineering)", "profession", "ride", "survival", "swim"
   ],
   "summary": "A bonus feat at first level and every even level, and training that makes armour and one weapon group his own.",
+  "choices": [
+    {
+      "id": "weapon training",
+      "name": "Weapon training",
+      "at_levels": [
+        5,
+        9,
+        13,
+        17
+      ],
+      "text": "At 5th level and every four levels after, a fighter picks a weapon group to train in; each earlier group's bonus rises by one (Core Rulebook, Fighter).",
+      "options": [
+        {
+          "kind": "class option",
+          "from": "weapon-groups"
+        }
+      ]
+    }
+  ],
   "levels": [
     {"level": 1, "grants": ["bonus feat"]},
     {"level": 2, "grants": ["bonus feat", "bravery +1"]},

@@ -1,0 +1,64 @@
+{
+  "id": "combat-styles",
+  "name": "Ranger Combat Styles",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/ranger.html, https://www.d20pfsrd.com/classes/core-classes/ranger/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "feats_at": [
+      2,
+      6,
+      10,
+      14,
+      18
+    ],
+    "lists_cumulative": "The 6 and 10 lists are additions; a ranger of that level may pick from every earlier list too.",
+    "ignore_prerequisites": "Style feats may be taken without their normal prerequisites.",
+    "armor": "Style feats work only in light, medium or no armor."
+  },
+  "options": [
+    {
+      "id": "archery",
+      "name": "Archery",
+      "text": "Ranged fighting with bows; later choices add accuracy and volleys.",
+      "requires": [],
+      "bonus_feats": {
+        "2": [
+          "far-shot",
+          "point-blank-shot",
+          "precise-shot",
+          "rapid-shot"
+        ],
+        "6": [
+          "improved-precise-shot",
+          "manyshot"
+        ],
+        "10": [
+          "pinpoint-targeting",
+          "shot-on-the-run"
+        ]
+      }
+    },
+    {
+      "id": "two-weapon-combat",
+      "name": "Two-Weapon Combat",
+      "text": "Fighting with a weapon in each hand, or weapon and shield.",
+      "requires": [],
+      "bonus_feats": {
+        "2": [
+          "double-slice",
+          "improved-shield-bash",
+          "quick-draw",
+          "two-weapon-fighting"
+        ],
+        "6": [
+          "improved-two-weapon-fighting",
+          "two-weapon-defense"
+        ],
+        "10": [
+          "greater-two-weapon-fighting",
+          "two-weapon-rend"
+        ]
+      }
+    }
+  ]
+}

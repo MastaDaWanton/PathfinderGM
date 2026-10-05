@@ -272,7 +272,9 @@ GUEST_WRITES = frozenset({
     "/api/forage", "/api/forage/table", "/api/level-up", "/api/slots",
     "/api/spells/prepare", "/api/spells/learn",
     # The Class tab's owed picks: the same footing as the spells owed above.
-    "/api/level/feats/take", "/api/level/points", "/api/sheet", "/api/feats", "/api/state", "/api/revision",
+    "/api/level/feats/take", "/api/level/points", "/api/sheet",
+    # And the skill ranks, class choices and second path, on the same footing (lane 1).
+    "/api/level/skills", "/api/level/choose", "/api/level/path", "/api/feats", "/api/state", "/api/revision",
     "/api/characters", "/api/character/gender", "/api/character/new",
     "/api/character/switch", "/api/resurrect", "/api/resume", "/api/start",
     "/api/character/create", "/api/character/choices",

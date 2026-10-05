@@ -504,6 +504,11 @@ class Campaign:
         from rules import animal_companion
 
         animal_companion.sync(scene)
+        # NOT here: the feats a class grants outright (`leveling.grant_class_feats`).
+        # Tried 2026-10-05 and measured against the owner's own saves: Bobby, a 1st-level
+        # wizard, gained Scribe Scroll on load and four saves stopped round-tripping byte
+        # for byte (test_s4_state_and_arrival). A character made before then receives
+        # them at the next level instead, where the same idempotent call catches up.
         campaign = cls(
             id=data["id"], world_source=data["world_source"], scene=scene,
             history=data.get("history", []), transcript=data.get("transcript", []),

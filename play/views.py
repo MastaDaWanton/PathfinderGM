@@ -1759,6 +1759,16 @@ def level_up(request):
             + f" = {result['hp']} ({pc.hp}/{pc.hp_max})."]
     if result["grants"]:
         bits.append("Gains: " + ", ".join(result["grants"]) + ".")
+    # An animal companion grows with the level it is bound to. `sync` ran only when a
+    # campaign was loaded, so a druid's wolf stayed at 2 Hit Dice from 1st to 7th until
+    # the next reload (audit D6: EDL 1, 13 hp live; EDL 7, 51 hp after dropping the
+    # cached campaign). Said on the same line, so the player sees the wolf grow.
+    from rules import animal_companion
+
+    grew = animal_companion.sync(c.scene)
+    if grew:
+        bits.append(" ".join(grew))
+        result["companions"] = grew
     c.transcript.append({"who": "gm", "text": " ".join(bits), "kind": "consequence"})
     # The row the docstring above has always promised and nothing wrote until 2026-10-01:
     # the level, the roll and what it granted — and the Journal's history reads it.
@@ -1851,6 +1861,105 @@ def level_take_points(request):
         roster.record(c.character_id, pc)
     c.save()
     return JsonResponse({**full_sheet(pc), "raised": changes})
+
+
+def _level_write(c, pc, said: str):
+    """The tail every level-pick endpoint shares: the line in the transcript, the roster
+    copy, the save."""
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": said})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+
+
+@require_POST
+def level_take_skills(request):
+    """Place owed skill ranks: `{"ranks": {"perception": 2, "stealth": 1}}`.
+
+    Audit D1: nothing owed, offered or wrote a skill rank after the forge, so a
+    20th-level barbarian had 5 against the book's 100. What is owed is the budget less
+    the ranks held (`leveling.skill_ranks`); no skill above the character's level.
+    """
+    from rules import leveling
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    placed, problems = leveling.take_ranks(pc, body.get("ranks"))
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    _level_write(c, pc, f"{pc.name} trains: " + ", ".join(
+        f"{k.title()} to {v} rank{'s' if v != 1 else ''}" for k, v in placed.items()) + ".")
+    return JsonResponse({**full_sheet(pc), "placed": placed})
+
+
+@require_GET
+def level_choice_menu(request):
+    """One owed class choice's options and entries: `?choice=rage power`."""
+    from rules import classes as classes_mod
+
+    pc = campaign_mod.current().scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    menu = classes_mod.choice_menu(pc, str(request.GET.get("choice") or ""))
+    if not menu:
+        return JsonResponse({"error": f"{pc.char_class} makes no choice called "
+                                      f"{request.GET.get('choice')!r}"}, status=404)
+    return JsonResponse(menu)
+
+
+@require_POST
+def level_take_choice(request):
+    """Answer an owed class choice: `{"choice": "bloodline", "picks": [{"pick":
+    "draconic", "variant": "red"}]}`, or `"option"` with `"pick"` (an animal) or
+    `"domains"`. Every reason refused at once, nothing written unless all pass
+    (`classes.take_choice`). A companion chosen here arrives at once.
+    """
+    from rules import animal_companion, classes as classes_mod
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    which = str(body.get("choice") or "")
+    taken, problems = classes_mod.take_choice(pc, which, body)
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    title = classes_mod.choice(pc.char_class or "", which).get("name") or which
+    said = f"{pc.name}, {title.lower()}: {', '.join(taken)}."
+    came = animal_companion.arrive_with(c.scene, pc)
+    if came is not None:
+        said += f" {came.name} joins {pc.name}."
+    pc.rebuild_pools()
+    _level_write(c, pc, said)
+    return JsonResponse({**full_sheet(pc), "taken": taken})
+
+
+@require_POST
+def level_take_path(request):
+    """Follow Blood Bending's second path once its track opens: `{"path": "..."}`
+    (audit D8 — nothing offered Path B after the forge)."""
+    from rules import leveling
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    path, problems = leveling.take_path(pc, read_body(request).get("path"))
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    pc.rebuild_pools()
+    _level_write(c, pc, f"{pc.name} follows a second path: {path} (Path B).")
+    return JsonResponse({**full_sheet(pc), "path": path})
 
 
 @require_GET

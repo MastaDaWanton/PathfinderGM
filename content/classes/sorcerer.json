@@ -23,6 +23,20 @@
  ],
  "summary": "Magic as blood rather than study: few spells known, any slot casts any of them, and a bloodline that grows with the levels.",
  "starting_wealth": "2d6 x 10 gp",
+ "choices": [
+  {
+   "id": "bloodline",
+   "name": "Bloodline",
+   "level": 1,
+   "text": "A sorcerer's magic comes from her blood. The bloodline gives a class skill, powers at 1st, 3rd, 9th, 15th and 20th, a spell at every odd level from 3rd and a bonus feat from its list at 7th, 13th and 19th (Core Rulebook, Sorcerer).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "sorcerer-bloodlines"
+    }
+   ]
+  }
+ ],
  "levels": [
   {
    "level": 1,

@@ -15,6 +15,55 @@
     "spellcraft"
   ],
   "summary": "Prepares from the book she carries, bonded to an object or a creature, and specialised in one school.",
+  "choices": [
+    {
+      "id": "arcane school",
+      "name": "Arcane school",
+      "level": 1,
+      "text": "A wizard specialises in one school, for an extra spell slot and the school's powers, or stays a universalist (Core Rulebook, Wizard).",
+      "options": [
+        {
+          "kind": "class option",
+          "from": "arcane-schools"
+        }
+      ]
+    },
+    {
+      "id": "opposition schools",
+      "name": "Opposition schools",
+      "level": 1,
+      "when": {
+        "choice": "arcane school",
+        "not": [
+          "universalist"
+        ]
+      },
+      "distinct_from": "arcane school",
+      "text": "A specialist names two other schools as opposition; preparing their spells takes two slots.",
+      "options": [
+        {
+          "kind": "class option",
+          "from": "arcane-schools",
+          "how_many": 2,
+          "exclude": [
+            "universalist"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "arcane bond",
+      "name": "Arcane bond",
+      "level": 1,
+      "text": "A wizard bonds to an object, which lets her cast one spell from her book each day, or to a familiar (Core Rulebook, Wizard).",
+      "options": [
+        {
+          "kind": "class option",
+          "from": "arcane-bonds"
+        }
+      ]
+    }
+  ],
   "levels": [
     {"level": 1, "grants": ["arcane bond", "arcane school", "cantrips", "scribe scroll"]},
     {"level": 2, "grants": []},

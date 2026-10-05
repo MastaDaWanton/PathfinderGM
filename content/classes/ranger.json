@@ -34,6 +34,132 @@
  ],
  "summary": "The wild as a profession: favoured enemies and ground, a combat style, and four spell levels off Wisdom from 4th.",
  "starting_wealth": "5d6 x 10 gp",
+ "choices": [
+  {
+   "id": "favored enemy",
+   "name": "Favored enemy",
+   "at_levels": [
+    1,
+    5,
+    10,
+    15,
+    20
+   ],
+   "text": "At 1st level and every five levels after, a ranger names a kind of creature he has studied (Core Rulebook, Ranger).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "favored-enemies"
+    }
+   ]
+  },
+  {
+   "id": "favored enemy bonus",
+   "name": "Favored enemy, +2",
+   "at_levels": [
+    5,
+    10,
+    15,
+    20
+   ],
+   "text": "At each new favored enemy the bonus against any one of them, the new one included, rises by 2.",
+   "options": [
+    {
+     "kind": "class option",
+     "from_choice": "favored enemy",
+     "raise": {
+      "field": "bonus",
+      "base": 2,
+      "step": 2
+     }
+    }
+   ]
+  },
+  {
+   "id": "combat style",
+   "name": "Combat style",
+   "level": 2,
+   "text": "At 2nd level a ranger picks a combat style; his combat-style feats come from its list, prerequisites waived (Core Rulebook, Ranger).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "combat-styles"
+    }
+   ]
+  },
+  {
+   "id": "favored terrain",
+   "name": "Favored terrain",
+   "at_levels": [
+    3,
+    8,
+    13,
+    18
+   ],
+   "text": "At 3rd level and every five levels after, a ranger names a terrain he knows (Core Rulebook, Ranger).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "favored-terrains"
+    }
+   ]
+  },
+  {
+   "id": "favored terrain bonus",
+   "name": "Favored terrain, +2",
+   "at_levels": [
+    8,
+    13,
+    18
+   ],
+   "text": "At each new favored terrain the bonus in any one of them, the new one included, rises by 2.",
+   "options": [
+    {
+     "kind": "class option",
+     "from_choice": "favored terrain",
+     "raise": {
+      "field": "bonus",
+      "base": 2,
+      "step": 2
+     }
+    }
+   ]
+  },
+  {
+   "id": "hunter's bond",
+   "name": "Hunter's bond",
+   "level": 4,
+   "text": "At 4th level a ranger forms a bond: with his companions, sharing his favored-enemy bonus, or with an animal companion (Core Rulebook, Ranger).",
+   "options": [
+    {
+     "id": "companions",
+     "kind": "feature",
+     "name": "Bond with companions",
+     "text": "As a move action, allies within 30 ft gain half your favored-enemy bonus against one target for rounds equal to your Wisdom."
+    },
+    {
+     "id": "animal companion",
+     "kind": "animal companion",
+     "name": "An animal companion",
+     "from": [
+      "badger",
+      "bird",
+      "camel",
+      "small cat",
+      "dog",
+      "horse",
+      "pony",
+      "constrictor snake",
+      "viper",
+      "wolf",
+      "shark"
+     ],
+     "level_offset": -3,
+     "text": "An animal from the druid's list, at your ranger level less 3."
+    }
+   ]
+  }
+ ],
  "levels": [
   {
    "level": 1,

@@ -16,6 +16,31 @@
     "swim", "use magic device"
   ],
   "summary": "Sneak attack every other level, a talent every other level, and the skills to find what is not offered.",
+  "choices": [
+    {
+      "id": "rogue talent",
+      "name": "Rogue talents",
+      "at_levels": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20
+      ],
+      "text": "At 2nd level and every two levels after, a rogue learns a talent. From 10th level an advanced talent may be taken in place of one (Core Rulebook, Rogue).",
+      "options": [
+        {
+          "kind": "class option",
+          "from": "rogue-talents"
+        }
+      ]
+    }
+  ],
   "levels": [
     {"level": 1, "grants": ["sneak attack 1d6", "trapfinding"]},
     {"level": 2, "grants": ["evasion", "rogue talent"]},

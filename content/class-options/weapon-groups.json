@@ -1,0 +1,312 @@
+{
+  "id": "weapon-groups",
+  "name": "Fighter Weapon Groups",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/fighter.html, https://www.d20pfsrd.com/classes/core-classes/fighter/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "training_at": [
+      5,
+      9,
+      13,
+      17
+    ],
+    "bonus": "+1 attack and damage with the new group; each earlier group's bonus rises by +1 at each later step."
+  },
+  "options": [
+    {
+      "id": "axes",
+      "name": "Axes",
+      "text": "Fighter weapon group: axes.",
+      "requires": [],
+      "examples": [
+        "battleaxe",
+        "dwarven waraxe",
+        "greataxe",
+        "handaxe"
+      ],
+      "weapons": [
+        "battleaxe",
+        "dwarven waraxe",
+        "greataxe",
+        "handaxe",
+        "heavy pick",
+        "light pick",
+        "orc double axe",
+        "throwing axe"
+      ]
+    },
+    {
+      "id": "blades-heavy",
+      "name": "Blades, Heavy",
+      "text": "Fighter weapon group: blades, heavy.",
+      "requires": [],
+      "examples": [
+        "bastard sword",
+        "elven curve blade",
+        "falchion",
+        "greatsword"
+      ],
+      "weapons": [
+        "bastard sword",
+        "elven curve blade",
+        "falchion",
+        "greatsword",
+        "longsword",
+        "scimitar",
+        "scythe",
+        "two-bladed sword"
+      ]
+    },
+    {
+      "id": "blades-light",
+      "name": "Blades, Light",
+      "text": "Fighter weapon group: blades, light.",
+      "requires": [],
+      "examples": [
+        "dagger",
+        "kama",
+        "kukri",
+        "rapier"
+      ],
+      "weapons": [
+        "dagger",
+        "kama",
+        "kukri",
+        "rapier",
+        "sickle",
+        "starknife",
+        "short sword"
+      ]
+    },
+    {
+      "id": "bows",
+      "name": "Bows",
+      "text": "Fighter weapon group: bows.",
+      "requires": [],
+      "examples": [
+        "composite longbow",
+        "composite shortbow",
+        "longbow",
+        "shortbow"
+      ],
+      "weapons": [
+        "composite longbow",
+        "composite shortbow",
+        "longbow",
+        "shortbow"
+      ]
+    },
+    {
+      "id": "close",
+      "name": "Close",
+      "text": "Fighter weapon group: close.",
+      "requires": [],
+      "examples": [
+        "gauntlet",
+        "heavy shield",
+        "light shield",
+        "punching dagger"
+      ],
+      "weapons": [
+        "gauntlet",
+        "heavy shield",
+        "light shield",
+        "punching dagger",
+        "sap",
+        "spiked armor",
+        "spiked gauntlet",
+        "spiked shield",
+        "unarmed strike"
+      ]
+    },
+    {
+      "id": "crossbows",
+      "name": "Crossbows",
+      "text": "Fighter weapon group: crossbows.",
+      "requires": [],
+      "examples": [
+        "hand crossbow",
+        "heavy crossbow",
+        "light crossbow",
+        "heavy repeating crossbow"
+      ],
+      "weapons": [
+        "hand crossbow",
+        "heavy crossbow",
+        "light crossbow",
+        "heavy repeating crossbow",
+        "light repeating crossbow"
+      ]
+    },
+    {
+      "id": "double",
+      "name": "Double",
+      "text": "Fighter weapon group: double.",
+      "requires": [],
+      "examples": [
+        "dire flail",
+        "dwarven urgrosh",
+        "gnome hooked hammer",
+        "orc double axe"
+      ],
+      "weapons": [
+        "dire flail",
+        "dwarven urgrosh",
+        "gnome hooked hammer",
+        "orc double axe",
+        "quarterstaff",
+        "two-bladed sword"
+      ]
+    },
+    {
+      "id": "flails",
+      "name": "Flails",
+      "text": "Fighter weapon group: flails.",
+      "requires": [],
+      "examples": [
+        "dire flail",
+        "flail",
+        "heavy flail",
+        "morningstar"
+      ],
+      "weapons": [
+        "dire flail",
+        "flail",
+        "heavy flail",
+        "morningstar",
+        "nunchaku",
+        "spiked chain",
+        "whip"
+      ]
+    },
+    {
+      "id": "hammers",
+      "name": "Hammers",
+      "text": "Fighter weapon group: hammers.",
+      "requires": [],
+      "examples": [
+        "club",
+        "greatclub",
+        "heavy mace",
+        "light hammer"
+      ],
+      "weapons": [
+        "club",
+        "greatclub",
+        "heavy mace",
+        "light hammer",
+        "light mace",
+        "warhammer"
+      ]
+    },
+    {
+      "id": "monk",
+      "name": "Monk",
+      "text": "Fighter weapon group: monk.",
+      "requires": [],
+      "examples": [
+        "kama",
+        "nunchaku",
+        "quarterstaff",
+        "sai"
+      ],
+      "weapons": [
+        "kama",
+        "nunchaku",
+        "quarterstaff",
+        "sai",
+        "shuriken",
+        "siangham",
+        "unarmed strike"
+      ]
+    },
+    {
+      "id": "natural",
+      "name": "Natural",
+      "text": "Fighter weapon group: natural.",
+      "requires": [],
+      "examples": [
+        "unarmed strike",
+        "bite",
+        "claw",
+        "gore"
+      ],
+      "weapons": [
+        "unarmed strike",
+        "bite",
+        "claw",
+        "gore",
+        "tail",
+        "wing"
+      ]
+    },
+    {
+      "id": "pole-arms",
+      "name": "Pole Arms",
+      "text": "Fighter weapon group: pole arms.",
+      "requires": [],
+      "examples": [
+        "glaive",
+        "guisarme",
+        "halberd",
+        "ranseur"
+      ],
+      "weapons": [
+        "glaive",
+        "guisarme",
+        "halberd",
+        "ranseur"
+      ]
+    },
+    {
+      "id": "spears",
+      "name": "Spears",
+      "text": "Fighter weapon group: spears.",
+      "requires": [],
+      "examples": [
+        "javelin",
+        "lance",
+        "longspear",
+        "shortspear"
+      ],
+      "weapons": [
+        "javelin",
+        "lance",
+        "longspear",
+        "shortspear",
+        "spear",
+        "trident"
+      ]
+    },
+    {
+      "id": "thrown",
+      "name": "Thrown",
+      "text": "Fighter weapon group: thrown.",
+      "requires": [],
+      "examples": [
+        "blowgun",
+        "bolas",
+        "club",
+        "dagger"
+      ],
+      "weapons": [
+        "blowgun",
+        "bolas",
+        "club",
+        "dagger",
+        "dart",
+        "halfling sling staff",
+        "javelin",
+        "light hammer",
+        "net",
+        "shortspear",
+        "shuriken",
+        "sling",
+        "spear",
+        "starknife",
+        "throwing axe",
+        "trident"
+      ]
+    }
+  ]
+}

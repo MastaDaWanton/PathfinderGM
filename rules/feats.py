@@ -28,13 +28,13 @@ from pathfindergm import files
 # rather than ignored — see the module docstring.
 CHECKABLE = {
     "ability", "bab", "caster_level", "character_level", "class_level", "skill_ranks",
-    "feat", "race", "race_any", "size", "alignment",
+    "feat", "race", "race_any", "size", "alignment", "class_feature",
 }
 
 # Kinds the extractor types but the sheet cannot answer yet. Listed separately from the
 # genuinely unparsed text so it is clear which is a gap in the data and which is a gap in
-# the character model.
-NOT_YET = {"proficiency", "class_feature", "first_level_only", "mythic_tier"}
+# the character model. `class_feature` left this list 2026-10-05 (`classes.has_feature`).
+NOT_YET = {"proficiency", "first_level_only", "mythic_tier"}
 
 SIZE_ORDER = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
               "gargantuan", "colossal")
@@ -326,6 +326,14 @@ def _check(actor, cond: dict) -> bool | None:
         # The sheet has no alignment field. Answering False would refuse every
         # alignment-gated feat outright, which is a worse lie than admitting the gap.
         return None
+    if kind == "class_feature":
+        # 207 prerequisites name one, and every one answered "cannot tell" until
+        # 2026-10-05: a 3rd-level wizard took Extra Rage Power (docs/class-audit.md D5).
+        # Asked of what the character has — the class table's grants, the choices made —
+        # and still "cannot tell" for a clause that is not a feature's name.
+        from . import classes
+
+        return classes.has_feature(actor, str(cond.get("text") or ""))
 
     return None
 
