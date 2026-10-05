@@ -1126,6 +1126,22 @@ def _sheet_payload(pc) -> dict:
     # (content/rules/gear.json). Shown, not enforced: encumbrance is the owner's later
     # batch (E9), and the Equipment tab says so in words.
     out["equipment"]["load"] = gear_mod.load(pc)
+    # The Companions line on the Background card: an animal companion made by nature
+    # bond, its numbers derived from the druid's level (rules/animal_companion.py). The
+    # sheet printed "No animal companion, familiar, cohort or mount" as a fixed sentence
+    # until 2026-10-04, whatever the character had. And the domain powers had, with
+    # what each one does not do yet, said out loud.
+    from rules import animal_companion, domains as domains_mod
+
+    try:
+        scene = campaign_mod.current().scene
+    except Exception:  # noqa: BLE001 — a sheet with no campaign still draws
+        scene = None
+    out["companions"] = {
+        "animals": animal_companion.sheet_lines(scene, pc),
+        "absent": animal_companion.wanted_but_absent(scene, pc),
+        "not_yet": list(animal_companion.document().get("not_yet") or [])}
+    out["domain_powers"] = domains_mod.power_lines(pc)
     return out
 
 

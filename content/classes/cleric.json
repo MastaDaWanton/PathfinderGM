@@ -13,6 +13,11 @@
     "knowledge (religion)", "linguistics", "profession", "sense motive", "spellcraft"
   ],
   "summary": "Prepares from the whole cleric list, channels energy, and takes two domains.",
+  "choices": [
+    {"id": "domains", "name": "Domains", "level": 1,
+     "text": "A cleric picks two domains. No deity is asked for: what she believes is read from the world and her own people (the ruling, 2026-09-19).",
+     "options": [{"kind": "domain", "name": "Two domains", "from": "all", "how_many": 2}]}
+  ],
   "levels": [
     {"level": 1, "grants": ["aura", "channel energy 1d6", "domains", "orisons",
                             "spontaneous casting"]},

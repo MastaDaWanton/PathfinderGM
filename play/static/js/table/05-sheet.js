@@ -1933,6 +1933,48 @@ document.addEventListener("change", e => {
 });
 
 // --- Background, notes, companions ---
+// The Companions line: an animal companion made by nature bond, every number the server's
+// (`rules/animal_companion.py:sheet_lines`, derived from the druid's level — the page
+// computes nothing), and a domain bond's powers with what each does not do yet. Until
+// 2026-10-04 this was one fixed sentence, "No animal companion, familiar, cohort or
+// mount", whatever the character had.
+function companionsBlock(s) {
+  const c = s.companions || {};
+  const animals = c.animals || [];
+  const powers = s.domain_powers || [];
+  const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+  let html = animals.map(a => `
+    <div class="terms" data-page="companions">
+      <div class="t"><span>${esc(a.name)}</span><b>${esc(a.animal)}${a.dead ? " (dead)" : ""}</b></div>
+      <div class="t"><span>Bond</span><b>druid level ${a.edl} · ${a.hd} HD · ${esc(a.size)}</b></div>
+      <div class="t"><span>Hit points</span><b>${a.hp} / ${a.hp_max}</b></div>
+      <div class="t"><span>AC · BAB</span><b>${a.ac} · ${sign(a.bab)}</b></div>
+      <div class="t"><span>Saves</span><b>Fort ${sign(a.saves.fort)} · Ref ${sign(a.saves.ref)} · Will ${sign(a.saves.will)}</b></div>
+      <div class="t"><span>Scores</span><b>${["str","dex","con","int","wis","cha"].map(k =>
+        `${k.toUpperCase()} ${a.abilities[k]}`).join(" · ")}</b></div>
+      <div class="t"><span>Attacks</span><b>${esc((a.attacks || []).join(", ") || "none")}</b></div>
+      <div class="t"><span>Tricks</span><b>${esc((a.tricks || []).join(", ") || "none yet")}</b></div>
+      ${(a.specials || []).length ? `<div class="t"><span>Bond gives</span><b>${esc(a.specials.join(", "))}</b></div>` : ""}
+      ${(a.special || []).length ? `<div class="t"><span>Its own</span><b>${esc(a.special.join("; "))}</b></div>` : ""}
+    </div>
+    <p class="why">Speak to ${esc(a.name)} as you would to any companion: it hears your
+      voice and the tricks it knows, and does what an animal bound to you would.</p>`).join("");
+  if (c.absent) html += `<p class="why">${esc(c.absent)}</p>`;
+  if (animals.length && (c.not_yet || []).length) {
+    html += `<details><summary class="why">Not built yet for companions</summary>${
+      c.not_yet.map(n => `<p class="why">${esc(n)}</p>`).join("")}</details>`;
+  }
+  if (powers.length) {
+    html += `<div class="terms">${powers.map(p => `
+      <div class="t"><span>${esc(p.domain)} domain</span><b>${esc(p.name)}${
+        p.kind ? ` (${esc(p.kind)})` : ""}</b></div>`).join("")}</div>
+      ${powers.map(p => `<p class="why"><b>${esc(p.name)}.</b> ${esc(p.line)}${
+        (p.not_yet || []).length ? ` <i>Not yet: ${esc(p.not_yet.join(" "))}</i>` : ""}</p>`).join("")}`;
+  }
+  return html || `<p class="why" data-page="companions">No animal companion, familiar,
+    cohort or mount.</p>`;
+}
+
 function backgroundCard(s) {
   const b = s.background, i = s.identity;
   // The identity line the old sheet's header carried, gender and pronouns included,
@@ -1958,7 +2000,7 @@ function backgroundCard(s) {
         : `<p class="why">Chosen, but this world has not filled it in yet: the names arrive
              when the campaign begins.</p>`}` : ""}
       <h3 class="cardsub">Companions</h3>
-      <p class="why" data-page="companions">No animal companion, familiar, cohort or mount.</p>
+      ${companionsBlock(s)}
     </div>
     <div>
       <h3 class="cardsub">Notes</h3>

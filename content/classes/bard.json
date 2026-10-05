@@ -93,13 +93,15 @@
   {
    "level": 5,
    "grants": [
-    "lore master 1/day"
+    "lore master 1/day",
+    "inspire courage +2"
    ]
   },
   {
    "level": 6,
    "grants": [
-    "suggestion"
+    "suggestion",
+    "versatile performance"
    ]
   },
   {
@@ -123,14 +125,16 @@
   {
    "level": 10,
    "grants": [
-    "jack-of-all-trades"
+    "jack-of-all-trades",
+    "versatile performance"
    ]
   },
   {
    "level": 11,
    "grants": [
     "inspire competence +4",
-    "inspire courage +2"
+    "inspire courage +3",
+    "lore master 2/day"
    ]
   },
   {
@@ -146,7 +150,8 @@
   {
    "level": 14,
    "grants": [
-    "frightening tune"
+    "frightening tune",
+    "versatile performance"
    ]
   },
   {
@@ -158,24 +163,29 @@
   },
   {
    "level": 16,
-   "grants": []
+   "grants": [
+    "jack-of-all-trades (all skills are class skills)"
+   ]
   },
   {
    "level": 17,
    "grants": [
-    "inspire courage +3"
+    "inspire courage +4",
+    "lore master 3/day"
    ]
   },
   {
    "level": 18,
    "grants": [
-    "mass suggestion"
+    "mass suggestion",
+    "versatile performance"
    ]
   },
   {
    "level": 19,
    "grants": [
-    "inspire competence +6"
+    "inspire competence +6",
+    "jack-of-all-trades (take 10 on any skill)"
    ]
   },
   {

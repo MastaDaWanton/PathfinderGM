@@ -1,0 +1,170 @@
+{
+ "_source": "Core Rulebook, Cleric: Domains (d20pfsrd.com/classes/core-classes/cleric/domains/paizo-domains, read 2026-10-04). A druid who takes a domain through nature bond uses her druid level as her cleric level for these powers (Core Rulebook, Druid: Nature Bond).",
+ "_grammar": "Each power is a document in the class `grants` vocabulary: `level` is the class level it arrives at; `pool` declares uses per day (a resources pool row: max formula, refresh), spent through `cost`; `tags` hold while the power is had, and `by_level` swaps in the rung for a higher level, the way `by_tier` does on a path; `not_yet` says, out loud, what the engine has no reader for. Validated on load by rules/domains.py:validate_powers.",
+ "domains": {
+  "Air": {
+   "powers": [
+    {
+     "key": "lightning arc",
+     "name": "Lightning Arc",
+     "level": 1,
+     "kind": "Sp",
+     "line": "A ranged touch at a foe within 30 ft: 1d6 electricity + 1 per two levels, 3 + Wis times a day.",
+     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
+     "cost": {"pool": "lightning arc", "amount": 1},
+     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+    },
+    {
+     "key": "electricity resistance",
+     "name": "Electricity Resistance",
+     "level": 6,
+     "kind": "Ex",
+     "line": "Resist electricity 10, 20 from 12th, immunity at 20th.",
+     "tags": ["resist.electricity.10"],
+     "by_level": {"12": {"tags": ["resist.electricity.20"]}, "20": {"tags": ["immune.electricity"]}}
+    }
+   ]
+  },
+  "Animal": {
+   "powers": [
+    {
+     "key": "speak with animals",
+     "name": "Speak with Animals",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Speak with animals, as the spell, for 3 + your level rounds a day.",
+     "pool": {"max": "3 + level", "refresh": "rest.night"},
+     "cost": {"pool": "speak with animals", "amount": 1},
+     "not_yet": ["Spending a round: there is no op that runs a spell-like ability by rounds, so the pool is counted and the talking is the GM's."]
+    },
+    {
+     "key": "animal companion",
+     "name": "Animal Companion",
+     "level": 4,
+     "kind": "Ex",
+     "line": "An animal companion from 4th level, at an effective druid level of your level - 3.",
+     "companion_offset": -3,
+     "not_yet": ["The companion arriving at 4th: it comes at level-up, and the level-up writer belongs to another lane. rules/animal_companion.py derives its numbers at any effective druid level, the -3 included, once it has arrived."]
+    }
+   ],
+   "not_yet": ["Knowledge (nature) as a class skill (Core Rulebook text for the Animal domain): class skills are read off the class document only."]
+  },
+  "Earth": {
+   "powers": [
+    {
+     "key": "acid dart",
+     "name": "Acid Dart",
+     "level": 1,
+     "kind": "Sp",
+     "line": "A ranged touch at a foe within 30 ft: 1d6 acid + 1 per two levels, 3 + Wis times a day.",
+     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
+     "cost": {"pool": "acid dart", "amount": 1},
+     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+    },
+    {
+     "key": "acid resistance",
+     "name": "Acid Resistance",
+     "level": 6,
+     "kind": "Ex",
+     "line": "Resist acid 10, 20 from 12th, immunity at 20th.",
+     "tags": ["resist.acid.10"],
+     "by_level": {"12": {"tags": ["resist.acid.20"]}, "20": {"tags": ["immune.acid"]}}
+    }
+   ]
+  },
+  "Fire": {
+   "powers": [
+    {
+     "key": "fire bolt",
+     "name": "Fire Bolt",
+     "level": 1,
+     "kind": "Sp",
+     "line": "A ranged touch at a foe within 30 ft: 1d6 fire + 1 per two levels, 3 + Wis times a day.",
+     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
+     "cost": {"pool": "fire bolt", "amount": 1},
+     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+    },
+    {
+     "key": "fire resistance",
+     "name": "Fire Resistance",
+     "level": 6,
+     "kind": "Ex",
+     "line": "Resist fire 10, 20 from 12th, immunity at 20th.",
+     "tags": ["resist.fire.10"],
+     "by_level": {"12": {"tags": ["resist.fire.20"]}, "20": {"tags": ["immune.fire"]}}
+    }
+   ]
+  },
+  "Plant": {
+   "powers": [
+    {
+     "key": "wooden fist",
+     "name": "Wooden Fist",
+     "level": 1,
+     "kind": "Su",
+     "line": "Fists hard as wood for 3 + Wis rounds a day: lethal, no attack of opportunity, + half your level to damage (min +1).",
+     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
+     "cost": {"pool": "wooden fist", "amount": 1},
+     "not_yet": ["Turning the fists on: a toggled power needs a `toggles` row, and those are read off a class path only (rules/leveling.py, another lane's file). The rounds are counted; the damage bonus does not land yet."]
+    },
+    {
+     "key": "bramble armor",
+     "name": "Bramble Armor",
+     "level": 6,
+     "kind": "Su",
+     "line": "Thorns for your level in rounds a day: a foe striking you unarmed or without reach takes 1d6 piercing + 1 per two levels.",
+     "pool": {"max": "level", "refresh": "rest.night"},
+     "cost": {"pool": "bramble armor", "amount": 1},
+     "not_yet": ["The thorns striking back: there is no on-being-hit trigger to hang the damage from."]
+    }
+   ]
+  },
+  "Water": {
+   "powers": [
+    {
+     "key": "icicle",
+     "name": "Icicle",
+     "level": 1,
+     "kind": "Sp",
+     "line": "A ranged touch at a foe within 30 ft: 1d6 cold + 1 per two levels, 3 + Wis times a day.",
+     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
+     "cost": {"pool": "icicle", "amount": 1},
+     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+    },
+    {
+     "key": "cold resistance",
+     "name": "Cold Resistance",
+     "level": 6,
+     "kind": "Ex",
+     "line": "Resist cold 10, 20 from 12th, immunity at 20th.",
+     "tags": ["resist.cold.10"],
+     "by_level": {"12": {"tags": ["resist.cold.20"]}, "20": {"tags": ["immune.cold"]}}
+    }
+   ]
+  },
+  "Weather": {
+   "powers": [
+    {
+     "key": "storm burst",
+     "name": "Storm Burst",
+     "level": 1,
+     "kind": "Sp",
+     "line": "A ranged touch at a foe within 30 ft: 1d6 nonlethal + 1 per two levels and -2 to its attacks for a round, 3 + Wis times a day.",
+     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
+     "cost": {"pool": "storm burst", "amount": 1},
+     "not_yet": ["The ranged touch attack and its -2 rider: no engine op resolves a domain power as an attack yet."]
+    },
+    {
+     "key": "lightning lord",
+     "name": "Lightning Lord",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Your level in bolts a day, as call lightning, any number in one standard action.",
+     "pool": {"max": "level", "refresh": "rest.night"},
+     "cost": {"pool": "lightning lord", "amount": 1},
+     "not_yet": ["The bolts themselves: call lightning's damage is not resolved from a domain power yet."]
+    }
+   ]
+  }
+ }
+}

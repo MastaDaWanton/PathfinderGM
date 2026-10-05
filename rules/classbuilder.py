@@ -328,6 +328,42 @@ PATH_FIELDS = (
 )
 
 
+# One option of a class choice (`rules/classes.py`, the druid's nature bond).
+CHOICE_OPTION_ROW = (
+    ClassField("kind", "Kind", type="choice", required=True,
+               choices=("domain", "animal companion"),
+               consumer="rules/classes.py:check_choices",
+               help="What is picked. A domain is read by rules/domains.py and fills the "
+                    "domain slots; an animal companion is made by "
+                    "rules/animal_companion.py and travels with the character."),
+    ClassField("name", "Name", consumer="play/templates/play/home.html (forge)",
+               help="What the forge's button says: 'A cleric domain'."),
+    ClassField("text", "Text", type="textarea",
+               consumer="play/templates/play/home.html (forge)"),
+    ClassField("from", "Offered", type="list", consumer="rules/classes.py:check_choices",
+               help="The domains or animals offered, by name; 'all' for every domain."),
+    ClassField("how_many", "How many", type="number", consumer="rules/domains.py:rule_for",
+               help="Domains taken. The cleric 2, the druid 1."),
+    ClassField("level_offset", "Level offset", type="number",
+               consumer="rules/animal_companion.py:effective_level",
+               help="Added to the class level to read the companion table: 0 for nature "
+                    "bond, -3 for the Animal domain's companion."),
+)
+
+CHOICE_ROW = (
+    ClassField("id", "Choice id", required=True, consumer="rules/classes.py:choices_for",
+               help="The key the sheet stores the answer under: 'nature bond'."),
+    ClassField("name", "Name", consumer="play/templates/play/home.html (forge)"),
+    ClassField("level", "At level", type="number", consumer="rules/classes.py:choices_for"),
+    ClassField("text", "Text", type="textarea",
+               consumer="play/templates/play/home.html (forge)"),
+    ClassField("options", "Options", type="group", of=CHOICE_OPTION_ROW,
+               consumer="rules/classes.py:option_taken",
+               help="One option needs no answer (the cleric's domains); two or more are "
+                    "a choice the forge asks and the build refuses without."),
+)
+
+
 # --- the classification ---------------------------------------------------------------------
 
 CLASS_SCHEMA: list[Section] = [
@@ -520,6 +556,21 @@ CLASS_SCHEMA: list[Section] = [
                                 "rules/creation.py:check_paths",
                        help="Left out, it is counted from the tracks the level table "
                             "grants: one for the a-track, two if there is a b-track."),
+        ], advanced=True),
+
+    Section(
+        "choices", "Class choices",
+        "Choices the class makes at a level — the druid's nature bond (a domain or an "
+        "animal companion), the cleric's two domains. The forge asks them and the build "
+        "refuses a character made without them.",
+        [
+            ClassField("choices", "Choices", type="group", of=CHOICE_ROW, advanced=True,
+                       consumer="rules/classes.py:check_choices, choices_for; "
+                                "rules/domains.py:rule_for; "
+                                "rules/animal_companion.py:wanted",
+                       help="Validated on load by rules/classes.py:validate_choices: a "
+                            "domain the corpus lacks or an animal the companion document "
+                            "lacks is refused with the fix named."),
         ], advanced=True),
 ]
 
@@ -1441,6 +1492,11 @@ def validate_class(d: dict) -> list[str]:
         problems.append("max_paths: 1 or more, or leave it out and it is counted from the "
                         "tracks the level table grants.")
     _validate_paths(d, columns, problems)
+
+    # --- class choices ------------------------------------------------------------
+    from . import classes as _classes
+
+    problems.extend(_classes.validate_choices(d))
 
     return problems
 
