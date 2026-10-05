@@ -99,6 +99,112 @@ and the repair, offered "close by, farmland, mountain, desert", wrote a desert s
   whenever it is not the streets; the absent-ground repair names the ground underfoot and
   no longer offers the whole land list.
 
+## The hinterland (2026-10-05)
+
+The owner: "in the campaign im playing everywhere has been farmland i have not found a
+single place that wasnt farmland outside of the urban city. this makes gathering tha
+materials i need for crafting impossible."
+
+**Measured.** On the click path (the Places row, `outskirts.ring` walked from the
+outskirts by `places.route` and `outskirts.hop_minutes`), from Vormoor every place was
+farmland or the shore: the outskirts, three road heads, the crossroads and the fields.
+There was no forest and no hills. The nearest other ground was the badlands, 8 hours
+out, and the mountain, 16. Settlements listing no open ground but farmland and the shore
+within four hours:
+
+| World | Settlements with none |
+|---|---|
+| Aurvantis | 15 of 64 |
+| Pangrella | 0 of 12 |
+| synthetic | 4 of 6 |
+| the owner's Fantasia | 7 of 36 |
+
+The cause was `geography.land_around`. `near` held only the first ground each road
+crosses (farmland, on every Drossakar road) and the settlement's own land facts. Every
+word of the region the settlement sits in went to `beyond`, at twelve miles: Drossakar's
+"iron-rich badlands" and "volcanic ridgelines". The village was treated as standing
+outside its own continent.
+
+**Prior art.**
+- Chisholm, *Rural Settlement and Land Use*: arable falls off from about a kilometre and is
+  "exceptional" beyond three or four. Settlements of more than 5,000 farm out to 6–11 km
+  (after Morgan 1969).
+- Vita-Finzi and Higgs (1970), via secondary summaries: farmers' site catchments are drawn
+  at 5 km, about an hour's walk.
+- Inside that hour lay more than fields. Domesday England was about a third arable (this
+  figure is attributed to Rackham; the attribution is not confirmed). Urchfont's pasture,
+  coppice, arable and sheep down all lie within about 2.5 miles of the village (VCH Wilts
+  10). Von Thünen puts wood in the second ring.
+- Hexcrawls:
+  - The Alexandrian wants "two or three different types of terrain immediately adjacent to
+    the home base".
+  - *Ultimate Campaign* counts a mixed 12-mile hex as its commonest terrain. That is this
+    defect, one level down.
+  - Welsh Piper's terrain-affinity table makes neighbouring ground mostly the same, then
+    a secondary type. It is a generator; this app has a world to read instead.
+- Games: Dwarf Fortress players embark where biomes meet. Valheim's Meadows always has the
+  Black Forest within walking range.
+
+**Rule.** `Land.reaches` (`geography.Reach`) is a settlement's hinterland: at most four
+named stretches of open ground, each a ring place `{loc}~{ground}:@{slug}` with its own
+ground and its own `Place.miles`.
+- Its own close ground (roads' first ground, its own facts) lies at 3 miles, the hour
+  `travel` always charged.
+- The ground its **nearest** region's land facts name lies at 4 (village), 5 (town) or
+  7 (city) miles.
+- Reaches hang off the fields where there are fields (the waste lies past the
+  ploughland), otherwise off the outskirts.
+- `hop_minutes` prices a reach at its miles over its ground's road column. Vormoor's
+  ridgelines are about two hours away and the badlands nearly three.
+- `travel biome=hills` goes to the reach of that ground, so the spoken path and the
+  clicked path land on one place.
+- The Places row lists the reaches with their times, and the brief prints them under
+  "within a walk".
+- `terrain_of` is unchanged: the ground is in the head of the id, as for every place.
+
+**What the world says, and nothing else.**
+- Every reach's ground is a word the world wrote. Nothing is added because villages
+  usually had a wood, so a desert world stays desert.
+- Ground a road crosses only after other ground stays where the road puts it. Vormoor's
+  mountain is still 16 hours away. Further out stays further.
+- Three readings of the world's sentences keep ground the world put somewhere else out of
+  the hinterland:
+  - A clause that localises its ground: "salt marsh along the southern shore".
+  - Ground qualified by another people's proper name: "Kyropticus deserts".
+  - A list that spans a whole climate: "scorched badlands, … arctic tundras". Neither side
+    is near.
+- "ridgeline", "ridge", "foothill" (hills) and "hanger" (forest) joined the ground
+  lexicon. "Canyon" did not, because the book has no canyon terrain.
+- An export's `landforms` (docs/from-world-bible.md) replaces the derivation outright.
+
+**After.** Settlements listing no open ground but farmland and the shore within four
+hours:
+
+| World | Before | After |
+|---|---|---|
+| Aurvantis | 15 of 64 | 3 of 64 |
+| Pangrella | 0 of 12 | 0 of 12 |
+| synthetic | 4 of 6 | 1 of 6 |
+| Fantasia | 7 of 36 | 0 of 36 |
+
+The mean number of distinct herbs and mined materials on that ground also rose, against
+master 68a7758:
+
+| World | Herbs before | Herbs after | Mined before | Mined after |
+|---|---|---|---|---|
+| Aurvantis | 41.0 | 64.4 | 8.0 | 13.0 |
+| Pangrella | 59.7 | 77.8 | 2.3 | 10.2 |
+| synthetic | 25.7 | 81.2 | 1.2 | 4.8 |
+| Fantasia | 78.9 | 99.6 | 0.9 | 5.9 |
+
+The settlements still without are honest. Their roads cross farmland first and the
+hills or the woods only after, and their region names nothing else. Kestwick's downs, for
+example, are half its road to Brindle Ford away.
+
+**Still thin.** Drossakar is badlands and ridges, and the forage tables give hills and
+desert 5 and 1 herbs against forest's 106. Vormoor's crafter now finds ore within a walk.
+Herbs there are thin because the herb tags are, not because the ground is.
+
 ## Heard of: the state between a name and a place (2026-10-03)
 
 The owner's ruling of 2026-10-03, asked how a place an NPC names should be handled:

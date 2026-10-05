@@ -664,6 +664,13 @@ class Place:
     # is shaped, staffed and judged as its kind rather than as an unknown word. Empty
     # for a generated or authored place, whose name is its kind already.
     kind: str = ""
+    # How far out a reach of a settlement's hinterland lies past the ring, in miles
+    # (`geography.Reach`, `outskirts.hop_minutes`); 0 for every other place. A distance,
+    # not a weight on an exit: Fate's deleted weighted borders priced crossing a line,
+    # and this is the walk to ground three miles off, which the rules price already
+    # (Table 7-8). Derived with the ring every time and NOT in `as_dict`, for the reason
+    # `shape` is not: the world owns it.
+    miles: float = 0.0
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "about": self.about,

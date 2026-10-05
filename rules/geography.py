@@ -53,7 +53,15 @@ _CLIMATE_KEYS = ("climate",)
 # the downs in `biomes.ALIASES`, and "streams running down to the sea" is not hill country.
 # The downs themselves are kept through their own two words below.
 _NOT_GROUND = frozenset({"down"})
-_EXTRA_GROUND = {"downs": "hills", "downland": "hills"}
+# Landform nouns the bestiary's vocabulary never needed and the exports' prose uses.
+# Measured 2026-10-05: Drossakar's Terrain is "volcanic ridgelines, black-rock canyons, a
+# few fertile crater basins", and the ridgelines read as nothing, so the only upland near
+# Vormoor was the mountain half-way along every road. A ridge is upland: `hills`. The
+# synthetic world's "beech hangers" are hanging woods on a scarp (OED "hanger", 2), and read
+# as nothing too. "Canyon" is left out on purpose: the book has no canyon terrain, and the
+# app would be choosing between hills, mountain and desert for the world.
+_EXTRA_GROUND = {"downs": "hills", "downland": "hills", "ridge": "hills",
+                 "ridgeline": "hills", "foothill": "hills", "hanger": "forest"}
 
 _GROUND_WORDS: dict[str, str] = {
     **{w: b for w, b in biomes_mod._LOOKUP.items() if w not in _NOT_GROUND},
@@ -97,6 +105,30 @@ def ground_in(text: str) -> tuple[str, ...]:
     for _pos, biome in sorted(hits):
         if biome not in out:
             out.append(biome)
+    return tuple(out)
+
+
+def ground_phrases(text: str) -> tuple[tuple[str, str, str], ...]:
+    """(biome, the word as the world wrote it, the clause it stands in), in the prose's
+    order, first mention of each biome only. What `ground_in` reads, with the words kept:
+    a reach of the hinterland is named "the badlands" because Drossakar said badlands."""
+    said = str(text or "")
+    low = said.lower()
+    hits: list[tuple[int, int, str]] = []
+    for pattern, biome in _GROUND_PATTERNS:
+        m = pattern.search(low)
+        if m:
+            hits.append((m.start(), m.end(), biome))
+    out: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for start, end, biome in sorted(hits):
+        if biome in seen:
+            continue
+        seen.add(biome)
+        left = max(said.rfind(c, 0, start) for c in ",;.") + 1
+        rights = [i for i in (said.find(c, end) for c in ",;.") if i >= 0]
+        clause = " ".join(said[left:min(rights) if rights else len(said)].split())
+        out.append((biome, low[start:end], clause))
     return tuple(out)
 
 
@@ -162,6 +194,24 @@ def _water_phrase(entity) -> str:
 # --- the land around a settlement ---------------------------------------------------------
 
 @dataclass(frozen=True)
+class Reach:
+    """One named stretch of the hinterland: ground of its own a short walk out, past the
+    fields, that a party can go to, stand on, and gather from.
+
+    `ground` is a biome word, `name` is what the Places row says ("the badlands", in the
+    world's own word when it wrote one), `words` the world's clause it came from ("" for a
+    stock name), `miles` how far out from the outskirts it lies, and `source` how the app
+    knows: `stated` (the export's own `landforms`), `near` (the roads' first ground or the
+    settlement's own words) or `region` (the land the settlement sits in).
+    """
+    ground: str
+    name: str
+    words: str
+    miles: float
+    source: str
+
+
+@dataclass(frozen=True)
 class Land:
     """What ground lies around one settlement, nearest first, in the world's own words.
 
@@ -170,6 +220,8 @@ class Land:
     brief can quote the world rather than paraphrase it. `source` is three-way, as
     `journey.pace` is: `exact` when the export stated the ground around this settlement,
     `derived` when it was read off routes and ancestors, `unknown` when nothing was said.
+    `reaches` is the hinterland: the named open ground a short walk out (see `Reach` and
+    `_hinterland`), nearest first; every reach's ground is in `near`.
     """
     settlement_id: str
     near: tuple[str, ...]
@@ -179,6 +231,191 @@ class Land:
     water: str
     coast: bool
     source: str
+    reaches: tuple[Reach, ...] = ()
+
+
+# --- the hinterland ---------------------------------------------------------------------
+#
+# The owner, 2026-10-05: "in the campaign im playing everywhere has been farmland i have
+# not found a single place that wasnt farmland outside of the urban city. this makes
+# gathing tha materials i need for crafting impossible." Measured the same day: from
+# Vormoor the Places row offered the outskirts, three road heads, the crossroads and the
+# fields — all farmland — and the shore; the nearest other ground was the badlands eight
+# hours out and the mountain sixteen. 15 of Aurvantis's 64 settlements listed no ground
+# but farmland and the shore. The land the world says Vormoor sits in ("ash-fields,
+# iron-rich badlands, geothermal vents"; "volcanic ridgelines, black-rock canyons, a few
+# fertile crater basins") was all filed `beyond`, twelve miles out, as if the village stood
+# outside its own continent.
+#
+# What the traditions measured (sources in docs/place-doors.md, "The hinterland"):
+# - A farming village's land is about an hour's walk across. Arable falls off from about
+#   a kilometre and is rare past three or four (Chisholm, *Rural Settlement and Land
+#   Use*); farmers' site catchments are drawn at five kilometres, an hour (Vita-Finzi and
+#   Higgs 1970); towns of more than five thousand farm out to six to eleven (Chisholm,
+#   after Morgan 1969).
+# - Inside that hour lay more than fields. Domesday England was about a third arable;
+#   English parishes were drawn long and thin so that each held every kind of ground —
+#   Urchfont's pasture, coppice, arable and sheep down all lie within about two and a half
+#   miles of the village (VCH Wilts 10). Von Thünen puts wood in the second ring.
+# - Hexcrawls say the same at their scale. The Alexandrian wants "two or three different
+#   types of terrain immediately adjacent to the home base", and a 12-mile hex has "a lot
+#   of local variation within it"; Ultimate Campaign counts a mixed hex as its commonest
+#   terrain, which is the defect here, one level down.
+#
+# So a settlement's hinterland is a short list of reaches: the ground its own words and its
+# roads put close by, at an hour's walk (the hour `travel` always charged for open ground),
+# then the ground of the land it sits in, at the edge of its own territory — further for a
+# town than a village, as Chisholm measured. Only the world's words make a reach. A desert
+# world's village gets badlands and dunes, never woods, and nothing here invents a meadow
+# because villages usually had one.
+#
+# Ground a road the world wrote crosses only AFTER other ground stays where the road puts
+# it (`outskirts.beyond_miles`): further out stays further. Vormoor's roads all cross
+# farmland and then mountain, so the mountain stays half a road away; the ridgelines and
+# the badlands, which no road puts further, are reaches.
+
+# The ground a reach can be: open land a party walks onto and gathers from. Farmland is
+# the fields and the coast is the shore (both already ring places); water, underground and
+# ruins are entered by other doors (the water, `venture`).
+REACH_GROUND = ("forest", "jungle", "swamp", "hills", "grassland", "desert", "tundra",
+                "mountain")
+
+# Fate's two to four zones; the Alexandrian's two or three kinds of ground beside the base.
+# With the fields and the outskirts that keeps every ring place at six ways on or fewer.
+MOST_REACHES = 4
+
+# How far out a reach lies, in miles from the outskirts. Ground the settlement's own words
+# or roads put close by is the hour the travel door always charged (three miles at a
+# walk). The land it sits in starts where its own farmed land gives out, which grows with
+# the settlement: a village's hour (Vita-Finzi and Higgs's five kilometres, a little past
+# Chisholm's three or four), a town's further, a city's six to eleven kilometres
+# (Chisholm, after Morgan) — the miles, rounded, at the far side of each.
+NEAR_REACH_MILES = 3
+REGION_REACH_MILES = {"village": 4, "town": 5, "city": 7}
+
+# A clause that puts its ground somewhere in particular: "with salt marsh along the
+# southern shore" is the south coast, not every village in Lathwe (the synthetic world
+# would otherwise have given an inland combe a salt marsh). Read off the clause, as the
+# rest of this module reads the world: mechanically, nothing guessed.
+_LOCALISED = re.compile(
+    r"\b(?:north|south|east|west|northern|southern|eastern|western|north-?east|"
+    r"north-?west|south-?east|south-?west|along the|at the edges?|far|distant|remote|"
+    r"interior|inland)\b")
+
+# Stock names for a reach the world gave no landform noun for ("arid", "wooded", the
+# road's bare biome word). None of them is a ring name or one of `places._WILD`'s reaches
+# ("the high ground", "the edge"), so a name resolves to one place.
+STOCK_NAMES = {"forest": "the woods", "jungle": "the jungle", "swamp": "the marsh",
+               "hills": "the hills", "grassland": "the grasslands", "desert": "the desert",
+               "tundra": "the snowfields", "mountain": "the heights"}
+# Words the lexicon matches that are not a landform a place can be named after: an
+# adjective ("arid", "volcanic"), a material, a single tree.
+_NOT_A_NAME = frozenset({"arid", "volcanic", "volcano", "frozen", "icy", "snow", "frost",
+                         "polar", "arctic", "alpine", "tropic", "cultivated", "grown by",
+                         "tree", "trees", "timber", "wood", "grass", "field", "fields",
+                         "open field", "garden", "gardens", "farm", "farms", "summit",
+                         "cliff", "cliffs", "peak", "oasis", "lowland", "lowlands",
+                         "northern climate", "plain"})
+
+
+def _reach_name(ground: str, surface: str, taken: set) -> str:
+    """"the badlands" when the world said badlands; the stock name otherwise."""
+    word = " ".join(str(surface or "").split()).lower()
+    adjective = word.endswith(("ed", "y", "ic", "al", "ous")) and not word.endswith("lands")
+    name = (f"the {word}" if word and word not in _NOT_A_NAME and not adjective
+            else STOCK_NAMES.get(ground, f"the {ground}"))
+    return name if name not in taken else STOCK_NAMES.get(ground, f"the {ground}")
+
+
+def _proper_elsewhere(value: str, surface: str, own_stems: set) -> bool:
+    """Whether the ground word is qualified by somebody else's proper name: "Kyropticus
+    deserts" in Kaelinora's "Pangrellan grasslands, Kyropticus deserts". The word straight
+    before the ground word is capitalised and is not the first word of the fact (where
+    capitals say nothing), and it is not this settlement's or an ancestor's own name —
+    "Pangrellan grasslands" round the town of Pangrella are its own."""
+    low = str(value or "").lower()
+    at = low.find(str(surface or "").lower())
+    if at <= 0:
+        return False
+    # A fact written in Title Case ("Khra'gix Deltaic Plain", "Winding Deltas and
+    # Saltwater Lakes") capitalises everything, so its capitals say nothing either.
+    long_words = [w for w in str(value).split() if len(w) > 3]
+    if long_words and all(w[:1].isupper() for w in long_words):
+        return False
+    before = str(value)[:at].split()
+    if len(before) < 2:
+        return False
+    word = re.sub(r"'s$", "", before[-1].strip(",;:"))
+    return word[:1].isupper() and word.lower()[:5] not in own_stems
+
+
+def _region_ground(world, entity) -> list[tuple[str, str, str]]:
+    """(biome, word, clause) for the ground of the land a settlement sits in: the NEAREST
+    ancestor whose land facts name open ground (a nation's Region before its continent's
+    Terrain), climate left out, clauses that put their ground somewhere in particular
+    left out. A wider ancestor's ground stays `beyond`: Terraverde's continent lists
+    "scorched badlands, temperate savannas, arctic tundras", and a town in its central
+    highlands does not have tundra and badlands both within a walk."""
+    own_stems = {str(getattr(entity, "name", "") or "").lower()[:5]}
+    ancestors = list(world.ancestors(str(getattr(entity, "id", "") or ""))) \
+        if world is not None else []
+    for a in ancestors:
+        own_stems.add(str(getattr(a, "name", "") or "").lower()[:5])
+    own_stems.discard("")
+    for ancestor in ancestors:
+        found: list[tuple[str, str, str]] = []
+        for key, value in _land_facts(ancestor):
+            if key.strip().lower() in _CLIMATE_KEYS:
+                continue
+            for biome, surface, clause in ground_phrases(value):
+                if biome not in REACH_GROUND or any(b == biome for b, _s, _c in found):
+                    continue
+                if _LOCALISED.search(clause.lower()):
+                    continue
+                if _proper_elsewhere(value, surface, own_stems):
+                    continue
+                found.append((biome, surface, clause))
+        if found:
+            # A land that names both sides of a climate is a continent's whole span, not
+            # one walk: Terraverde's "scorched badlands, temperate savannas, arctic
+            # tundras" put tundra and badlands within five miles of each other round
+            # three of the owner's towns. Neither side is near; the rest stands.
+            biomes_found = {b for b, _s, _c in found}
+            for hot, cold in _CLIMATE_OPPOSED:
+                if biomes_found & hot and biomes_found & cold:
+                    found = [f for f in found if f[0] not in hot | cold]
+            return found
+    return []
+
+
+# Ground that cannot lie within one walk of the other: hot and dry against frozen.
+_CLIMATE_OPPOSED = ((frozenset({"desert", "jungle"}), frozenset({"tundra"})),)
+
+
+def _stated_reaches(row: dict) -> list[Reach]:
+    """The export's own `landforms` on the settlement row (docs/from-world-bible.md):
+    `[{"name", "terrain", "miles", "words"}]`. A row the app cannot read is dropped, not
+    guessed at; a missing distance is the hour."""
+    out: list[Reach] = []
+    for item in row.get("landforms") or ():
+        if not isinstance(item, dict):
+            continue
+        ground = _canon(item.get("terrain") or item.get("ground") or "")
+        name = " ".join(str(item.get("name") or "").split())
+        if ground not in REACH_GROUND or not name:
+            continue
+        try:
+            miles = float(item.get("miles"))
+        except (TypeError, ValueError):
+            miles = float(NEAR_REACH_MILES)
+        if not 0 < miles <= 24:
+            continue
+        if any(r.ground == ground or r.name.lower() == name.lower() for r in out):
+            continue
+        out.append(Reach(ground=ground, name=name,
+                         words=" ".join(str(item.get("words") or "").split()),
+                         miles=miles, source="stated"))
+    return out[:MOST_REACHES]
 
 
 def _canon(word: str) -> str:
@@ -277,6 +514,25 @@ def _land_around(world, entity, settlement) -> Land:
     if coast:
         add(near, "coast")
 
+    # The land it sits in (`_region_ground`), promoted from `beyond` to `near` — unless a
+    # road the world wrote crosses that ground only after other ground, which puts it
+    # further out (the roads win on distance; further stays further). A stated `near`
+    # is the export's whole answer and is not added to.
+    stated_reaches = _stated_reaches(row)
+    further_by_road = {_canon(g) for leg in walked for g in leg.crosses[1:]}
+    region: list[tuple[str, str, str]] = []
+    if not stated_near:
+        for biome, surface, clause in _region_ground(world, entity):
+            if biome in near or biome in further_by_road:
+                continue
+            region.append((biome, surface, clause))
+    # Only what becomes a reach is promoted: ground past the cap stays `beyond`, or a
+    # `travel` onto it would cost the open-ground hour with no reach to stand on.
+    reaches = tuple(stated_reaches) if stated_reaches else _hinterland(
+        entity, tuple(near), region, _land_facts(entity))
+    for r in reaches:
+        add(near, r.ground)
+
     for leg in walked:
         for ground in leg.crosses[1:]:
             add(beyond, _canon(ground))
@@ -292,7 +548,8 @@ def _land_around(world, entity, settlement) -> Land:
                 add(beyond, biome)
 
     water = _water_phrase(entity) or (said_water or "")
-    if stated_near or isinstance(said_coast, bool) or said_water is not None:
+    if stated_near or isinstance(said_coast, bool) or said_water is not None \
+            or stated_reaches:
         source = "exact"
     elif near or beyond or words or climate or water:
         source = "derived"
@@ -300,7 +557,38 @@ def _land_around(world, entity, settlement) -> Land:
         source = "unknown"
     return Land(settlement_id=sid, near=tuple(near), beyond=tuple(beyond),
                 words=tuple(words), climate=climate, water=water, coast=coast,
-                source=source)
+                source=source, reaches=reaches)
+
+
+def _hinterland(entity, near: tuple, region: list, own_facts: list) -> tuple:
+    """The reaches of one settlement, nearest first, at most `MOST_REACHES`: its own
+    close ground (the roads' first ground, its own land facts) at the hour, then the land
+    it sits in at the edge of its territory. Named in the world's word where it wrote a
+    landform noun for that ground, and carrying the world's clause as what it is like."""
+    from . import places as places_mod
+
+    scale = places_mod.scale_of(entity) if entity is not None else "town"
+    region_miles = REGION_REACH_MILES.get(scale, REGION_REACH_MILES["town"])
+    own: dict[str, tuple[str, str]] = {}
+    for _key, value in own_facts:
+        for biome, surface, clause in ground_phrases(value):
+            own.setdefault(biome, (surface, clause))
+    out: list[Reach] = []
+    taken: set[str] = set()
+    for ground in near:
+        if ground not in REACH_GROUND:
+            continue
+        surface, clause = own.get(ground, ("", ""))
+        name = _reach_name(ground, surface, taken)
+        taken.add(name)
+        out.append(Reach(ground=ground, name=name, words=clause,
+                         miles=float(NEAR_REACH_MILES), source="near"))
+    for ground, surface, clause in region:
+        name = _reach_name(ground, surface, taken)
+        taken.add(name)
+        out.append(Reach(ground=ground, name=name, words=clause,
+                         miles=float(region_miles), source="region"))
+    return tuple(out[:MOST_REACHES])
 
 
 def _listed(items) -> str:
