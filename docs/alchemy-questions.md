@@ -540,3 +540,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q5.2 Learning formulae | **Books and experiment**; a fixed table, never secret per world (recommended). |
 | Q5.3 Hints | **A count of possible formulae, never their names** (recommended). |
 | Q5.4 Starting knowledge | **Homeland reagents and the four book classics** as formulae (recommended). |
+
+### Round 6 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q6.1 Levels 1-3 | **Classics, then distilling, then transmuting** (asked reworded to fit the owner's Q4.3 potion rule): L1 Dissolve, Calcine, Bottle, common/uncommon, the four classics, 1st-level potions; L2 Distill, Filter, React, rare/exotic; L3 Sublime, Transmute, legendary. Spell level grows by the Q4.3 rule. |
+| Q6.2 Perks | **Herbalism's four plus Containment** (-1 DC a pick on volatile steps, a smaller mishap) (recommended). |
+| Q6.3 Where | **Field kit plus a laboratory** (town by the hour, or owned) for rare+ and for Distill and Sublime (recommended). |
+| Q6.4 Quality on book items | **Stronger, longer, softer drawbacks, worth more; each tier above Sound adds +1 caster level** to a spell potion (recommended). |
