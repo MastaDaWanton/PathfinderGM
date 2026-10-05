@@ -212,13 +212,75 @@ def starter_domains(cid: str) -> list[str]:
     """
     from . import domains as domains_mod
 
-    if str(cid or "").strip().lower() != "cleric":
+    rule = domains_mod.offered(cid)
+    if rule is None:
         return []
-    names = domains_mod.names()
-    # Two that the corpus definitely carries, by name rather than by position, so a corpus
-    # that grows or reorders does not change what a default cleric gets.
-    wanted = [n for n in ("Healing", "Protection", "War", "Good") if n in names]
-    return (wanted + names)[:domains_mod.HOW_MANY]
+    names = rule["from"] or domains_mod.names()
+    # Named rather than by position, so a corpus that grows or reorders does not change
+    # what a default character gets: the cleric's two, then the druid's — a druid handed
+    # a domain here has taken the domain bond (`classes.check_choices` reads a domain sent
+    # with no answer as that answer).
+    wanted = [n for n in ("Healing", "Protection", "War", "Good", "Plant", "Animal")
+              if n in names]
+    return (wanted + [n for n in names if n not in wanted])[:rule["how_many"]]
+
+
+def class_choice_menu(cid: str) -> list[dict]:
+    """What the forge's class-choice section draws for this class: each choice it asks at
+    1st level, each option with what can be picked under it.
+
+    The domain option carries the domains it allows (all 153 for the cleric, seven for the
+    druid) with each one's spells and its documented powers; the companion option carries
+    each animal with the line the book gives it. All of it read off documents, so the
+    forge is a view of the class file, never a second copy of the druid.
+    """
+    from . import animal_companion, domains as domains_mod
+
+    out = []
+    for choice in classes_mod.choices_for(cid, 1):
+        options = []
+        for option in choice.get("options") or []:
+            entry = {"kind": option.get("kind"), "name": option.get("name") or
+                     option.get("kind"), "text": option.get("text", "")}
+            if option.get("kind") == "domain":
+                pool = option.get("from")
+                names = (domains_mod.names() if pool in (None, "all") else
+                         [" ".join(str(d).split()).title() for d in pool])
+                entry["how_many"] = int(option.get("how_many", 1))
+                entry["all"] = pool in (None, "all")
+                entry["domains"] = [
+                    {"name": n, "spells": len(domains_mod.spells_of(n)),
+                     "first": (domains_mod.spells_of(n, 1) or [""])[0].replace("-", " "),
+                     "powers": [f"{p['name']} ({p.get('kind', '')}, {p.get('level', 1)}"
+                                f"{'st' if p.get('level', 1) == 1 else 'th'}): "
+                                f"{p.get('line', '')}"
+                                for p in domains_mod.powers_of(n)]}
+                    for n in names] if pool not in (None, "all") else []
+            elif option.get("kind") == "animal companion":
+                entry["animals"] = []
+                for key in option.get("from") or []:
+                    b = animal_companion.body(key, max(1, 1 + int(
+                        option.get("level_offset", 0) or 0)))
+                    a = animal_companion.animals().get(animal_companion.key_for(key)) or {}
+                    adv = a.get("advances") or {}
+                    entry["animals"].append({
+                        "key": animal_companion.key_for(key),
+                        "name": animal_companion.name_of(key),
+                        "line": (f"{b['size'].title()}, speed {b['speed']} ft"
+                                 + "".join(f", {m} {f} ft" for m, f in
+                                           (a.get("moves") or {}).items())
+                                 + "; " + ", ".join(
+                                     f"{x['name']}{' x' + str(x['count']) if x.get('count', 1) > 1 else ''}"
+                                     f" {(x.get('damage') or {}).get(b['size'], '')}"
+                                     for x in b["attacks"])),
+                        "grows": (f"grows at {adv.get('at')}th"
+                                  + (f" to {adv['size'].title()}" if adv.get("size") else "")
+                                  if adv else ""),
+                    })
+            options.append(entry)
+        out.append({"id": choice.get("id"), "name": choice.get("name") or choice.get("id"),
+                    "text": choice.get("text", ""), "options": options})
+    return out
 
 
 def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list[str]:
@@ -381,6 +443,9 @@ def options(world_id: str = "") -> dict:
                      "caster": bool(casting.CASTERS.get(cid) or c.get("casting")),
                      "features": classes_mod.features_at(cid, 1),
                      "paths": leveling.paths_for(cid),
+                     # What the class asks at 1st level besides paths — the druid's
+                     # nature bond (`class_choice_menu`).
+                     "choices": class_choice_menu(cid),
                      "max_paths": leveling.max_paths(cid),
                      "unlocks_b": leveling.unlocks_at(cid, 1)}
                     for cid, c in sorted(classes_mod.all_classes().items())
@@ -395,7 +460,9 @@ def options(world_id: str = "") -> dict:
         # (`rules/domains.py`). The forge offers them on the same screen as the spells and
         # one step ahead, because a domain decides part of what can be prepared (item 27).
         "domains": _domain_menu(),
-        "domains_wanted": _domains_mod().HOW_MANY,
+        # The cleric's number, from her document's choice; the druid's one is on her
+        # class entry's `choices`. Kept for the cleric's picker, which reads it.
+        "domains_wanted": (_domains_mod().offered("cleric") or {}).get("how_many", 2),
         "point_costs": point_costs_to(_reachable_cap()),
         "point_budget": houserules.point_budget(),
         "ability_cap": houserules.ability_cap(),
@@ -486,7 +553,9 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # `classes_mod.get` answers an unknown class with an empty dict rather than raising,
     # which is right for a sheet loading a retired homebrew class and wrong here: a
     # creation form naming a class that does not exist is a mistake to report.
-    cls = classes_mod.get(cid) or None
+    # `all_classes`, not `get`: `get` also answers the animal companion's progression,
+    # which a wolf follows and a player cannot.
+    cls = classes_mod.all_classes().get(cid) or None
     if cls is None:
         problems.append(f"Pick a class: {', '.join(sorted(classes_mod.all_classes()))}.")
 
@@ -648,7 +717,16 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
 
     picked_domains = [" ".join(str(d).split()).title()
                       for d in (payload.get("domains") or []) if str(d).strip()]
-    problems += domains_mod.problems(picked_domains, cid)
+    # --- class choices ------------------------------------------------------------
+    # What the class document asks at 1st level (`classes.check_choices`): the druid's
+    # nature bond, a domain from seven or an animal companion. Reported 2026-10-04: "The
+    # druid class does not work I was given no choice for my natures bond" — the forge
+    # offered nothing and the build accepted a druid with no bond at all. Asked before
+    # the domains are judged, because which bond she took decides whether she takes one.
+    class_choices, choice_problems = classes_mod.check_choices(
+        cid, payload.get("class_choices"), picked_domains) if cls else ({}, [])
+    problems += choice_problems
+    problems += domains_mod.problems(picked_domains, cid, class_choices)
 
     # --- spells known ----------------------------------------------------------------
     spellbook = [str(s).strip().lower() for s in (payload.get("spellbook") or [])]
@@ -783,6 +861,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         sheet["spellbook"] = spellbook
     if picked_domains:
         sheet["domains"] = picked_domains
+    if class_choices:
+        sheet["class_choices"] = class_choices
 
     # The proof of the whole exercise: the dict must load as an Actor before anything is
     # saved, so a creation bug is a refusal here rather than a corrupt file on disk.

@@ -1,0 +1,217 @@
+{
+ "_source": "Core Rulebook, Druid: Animal Companions — the base statistics table and the sixteen core companions' starting statistics and 4th/7th-level advancement (d20pfsrd.com/classes/core-classes/druid/animal-companions, read 2026-10-04). Hit points are the Pathfinder Society FAQ's average, 4.5 per Hit Die rounded down, quoted on the same page, because a companion's Hit Dice grow with its druid and a rolled number would need storing.",
+ "_why_not_the_bestiary": "A companion is NOT the bestiary's animal. The bestiary wolf is a 2 HD stat block with its numbers printed flat; a druid's wolf is a Medium body with Str 13 that gains Hit Dice, natural armour and Strength as the druid levels. So its body is written here from the companion section and its numbers are derived (rules/animal_companion.py), never printed.",
+ "progression": [
+  {"level": 1, "hd": 2, "skills": 2, "feats": 1, "natural_armour": 0, "str_dex": 0, "tricks": 1, "special": ["link", "share spells"]},
+  {"level": 2, "hd": 3, "skills": 3, "feats": 2, "natural_armour": 0, "str_dex": 0, "tricks": 1, "special": []},
+  {"level": 3, "hd": 3, "skills": 3, "feats": 2, "natural_armour": 2, "str_dex": 1, "tricks": 2, "special": ["evasion"]},
+  {"level": 4, "hd": 4, "skills": 4, "feats": 2, "natural_armour": 2, "str_dex": 1, "tricks": 2, "special": ["ability score increase"]},
+  {"level": 5, "hd": 5, "skills": 5, "feats": 3, "natural_armour": 2, "str_dex": 1, "tricks": 2, "special": []},
+  {"level": 6, "hd": 6, "skills": 6, "feats": 3, "natural_armour": 4, "str_dex": 2, "tricks": 3, "special": ["devotion"]},
+  {"level": 7, "hd": 6, "skills": 6, "feats": 3, "natural_armour": 4, "str_dex": 2, "tricks": 3, "special": []},
+  {"level": 8, "hd": 7, "skills": 7, "feats": 4, "natural_armour": 4, "str_dex": 2, "tricks": 3, "special": []},
+  {"level": 9, "hd": 8, "skills": 8, "feats": 4, "natural_armour": 6, "str_dex": 3, "tricks": 4, "special": ["ability score increase", "multiattack"]},
+  {"level": 10, "hd": 9, "skills": 9, "feats": 5, "natural_armour": 6, "str_dex": 3, "tricks": 4, "special": []},
+  {"level": 11, "hd": 9, "skills": 9, "feats": 5, "natural_armour": 6, "str_dex": 3, "tricks": 4, "special": []},
+  {"level": 12, "hd": 10, "skills": 10, "feats": 5, "natural_armour": 8, "str_dex": 4, "tricks": 5, "special": []},
+  {"level": 13, "hd": 11, "skills": 11, "feats": 6, "natural_armour": 8, "str_dex": 4, "tricks": 5, "special": []},
+  {"level": 14, "hd": 12, "skills": 12, "feats": 6, "natural_armour": 8, "str_dex": 4, "tricks": 5, "special": ["ability score increase"]},
+  {"level": 15, "hd": 12, "skills": 12, "feats": 6, "natural_armour": 10, "str_dex": 5, "tricks": 6, "special": ["improved evasion"]},
+  {"level": 16, "hd": 13, "skills": 13, "feats": 7, "natural_armour": 10, "str_dex": 5, "tricks": 6, "special": []},
+  {"level": 17, "hd": 14, "skills": 14, "feats": 7, "natural_armour": 10, "str_dex": 5, "tricks": 6, "special": []},
+  {"level": 18, "hd": 15, "skills": 15, "feats": 8, "natural_armour": 12, "str_dex": 6, "tricks": 7, "special": []},
+  {"level": 19, "hd": 15, "skills": 15, "feats": 8, "natural_armour": 12, "str_dex": 6, "tricks": 7, "special": []},
+  {"level": 20, "hd": 16, "skills": 16, "feats": 8, "natural_armour": 12, "str_dex": 6, "tricks": 7, "special": ["ability score increase"]}
+ ],
+ "special_tags": {
+  "link": "companion.link",
+  "share spells": "companion.share-spells",
+  "evasion": "class.evasion",
+  "improved evasion": "class.improved-evasion",
+  "devotion": "companion.devotion",
+  "multiattack": "companion.multiattack",
+  "ability score increase": "companion.ability-score-increase"
+ },
+ "tricks": ["attack", "come", "defend", "down", "fetch", "guard", "heel", "perform", "seek", "stay", "track", "work"],
+ "not_yet": [
+  "Ability score increase (4th, 9th, 14th, 20th): +1 to a score of the druid's choosing; nothing asks the druid which yet, so none is applied.",
+  "Skill ranks and feats: the table's counts are shown, but there is no picker for a companion's ranks or feats, so it rolls on its scores alone.",
+  "Share spells: a spell with a range of you cast on the companion — the cast op does not yet re-target a personal spell.",
+  "Devotion: +4 morale on Will saves against enchantment needs a save that knows its descriptor, which no save carries yet (rules/classfeatures.py says the same of bravery).",
+  "Multiattack at 9th: no bonus feat or second bite is added yet.",
+  "A lost companion replaced after 24 hours of prayer: a companion that dies stays dead; nothing makes a new one yet.",
+  "Teaching tricks beyond the bonus tricks with Handle Animal."
+ ],
+ "animals": {
+  "ape": {
+   "name": "Ape", "size": "medium", "speed": 30, "moves": {"climb": 30}, "natural_armour": 1,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"medium": "1d4", "large": "1d6"}},
+    {"key": "claws", "name": "claws", "type": "slashing", "count": 2, "damage": {"medium": "1d4", "large": "1d6"}}
+   ],
+   "abilities": {"str": 13, "dex": 17, "con": 10, "int": 2, "wis": 12, "cha": 7},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "large", "natural_armour": 2, "abilities": {"str": 8, "dex": -2, "con": 4}}
+  },
+  "badger": {
+   "name": "Badger", "size": "small", "speed": 30, "moves": {"burrow": 10, "climb": 10}, "natural_armour": 2,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d4", "medium": "1d6"}},
+    {"key": "claws", "name": "claws", "type": "slashing", "count": 2, "damage": {"small": "1d3", "medium": "1d4"}}
+   ],
+   "abilities": {"str": 10, "dex": 17, "con": 15, "int": 2, "wis": 12, "cha": 10},
+   "senses": ["low-light-vision", "scent"],
+   "special": ["rage (as a barbarian, 6 rounds a day)"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}}
+  },
+  "bird": {
+   "name": "Bird (eagle, hawk or owl)", "size": "small", "speed": 10, "moves": {"fly": 80}, "natural_armour": 1,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d4"}},
+    {"key": "talons", "name": "talons", "type": "slashing", "count": 2, "damage": {"small": "1d4"}}
+   ],
+   "abilities": {"str": 10, "dex": 15, "con": 12, "int": 2, "wis": 14, "cha": 6},
+   "senses": ["low-light-vision"],
+   "advances": {"at": 4, "abilities": {"str": 2, "con": 2}}
+  },
+  "boar": {
+   "name": "Boar", "size": "small", "speed": 40, "natural_armour": 6,
+   "attacks": [
+    {"key": "gore", "name": "gore", "type": "piercing", "damage": {"small": "1d6", "medium": "1d8"}}
+   ],
+   "abilities": {"str": 13, "dex": 12, "con": 15, "int": 2, "wis": 13, "cha": 4},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}, "tags": ["ferocity"]}
+  },
+  "camel": {
+   "name": "Camel", "size": "large", "speed": 50, "natural_armour": 1,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"large": "1d4"}}
+   ],
+   "abilities": {"str": 18, "dex": 16, "con": 14, "int": 2, "wis": 11, "cha": 4},
+   "senses": ["low-light-vision", "scent"],
+   "special": ["spit (ranged touch, sickened 1d4 rounds, 10 ft) — not resolved yet"],
+   "advances": {"at": 4, "abilities": {"str": 2, "con": 2}}
+  },
+  "big cat": {
+   "name": "Big cat (lion or tiger)", "size": "medium", "speed": 40, "natural_armour": 1,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"medium": "1d6", "large": "1d8"}},
+    {"key": "claws", "name": "claws", "type": "slashing", "count": 2, "damage": {"medium": "1d4", "large": "1d6"}}
+   ],
+   "abilities": {"str": 13, "dex": 17, "con": 13, "int": 2, "wis": 15, "cha": 10},
+   "senses": ["low-light-vision", "scent"],
+   "special": ["rake (1d4, 1d6 from 7th)"],
+   "advances": {"at": 7, "size": "large", "natural_armour": 2, "abilities": {"str": 8, "dex": -2, "con": 4}, "special": ["grab", "pounce"]}
+  },
+  "small cat": {
+   "name": "Small cat (cheetah or leopard)", "size": "small", "speed": 50, "natural_armour": 1,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d4", "medium": "1d6"}, "rider": "trip"},
+    {"key": "claws", "name": "claws", "type": "slashing", "count": 2, "damage": {"small": "1d2", "medium": "1d3"}}
+   ],
+   "abilities": {"str": 12, "dex": 21, "con": 13, "int": 2, "wis": 12, "cha": 6},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}, "special": ["sprint (once an hour, ten times its speed on a charge)"]}
+  },
+  "crocodile": {
+   "name": "Crocodile (alligator)", "size": "small", "speed": 20, "moves": {"swim": 30}, "natural_armour": 4,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d6", "medium": "1d8"}, "rider": "grab"},
+    {"key": "tail slap", "name": "tail slap", "type": "bludgeoning", "damage": {"medium": "1d12"}, "from_level": 4}
+   ],
+   "abilities": {"str": 15, "dex": 14, "con": 15, "int": 1, "wis": 12, "cha": 2},
+   "senses": ["low-light-vision"],
+   "special": ["hold breath"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}, "special": ["death roll", "sprint"]}
+  },
+  "deinonychus": {
+   "name": "Deinonychus (velociraptor)", "size": "small", "speed": 60, "natural_armour": 1,
+   "attacks": [
+    {"key": "talons", "name": "talons", "type": "slashing", "count": 2, "damage": {"small": "1d6", "medium": "1d8"}},
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d4", "medium": "1d6"}},
+    {"key": "claws", "name": "claws", "type": "slashing", "count": 2, "damage": {"medium": "1d4"}, "from_level": 7}
+   ],
+   "abilities": {"str": 11, "dex": 17, "con": 17, "int": 2, "wis": 12, "cha": 14},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 7, "size": "medium", "natural_armour": 2, "abilities": {"str": 4, "dex": -2, "con": 2}, "special": ["pounce"]}
+  },
+  "dog": {
+   "name": "Dog", "size": "small", "speed": 40, "natural_armour": 2,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d4", "medium": "1d6"}}
+   ],
+   "abilities": {"str": 13, "dex": 17, "con": 15, "int": 2, "wis": 12, "cha": 6},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}}
+  },
+  "horse": {
+   "name": "Horse", "size": "large", "speed": 50, "natural_armour": 4,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"large": "1d4"}},
+    {"key": "hooves", "name": "hooves", "type": "bludgeoning", "count": 2, "damage": {"large": "1d6"}, "secondary": true}
+   ],
+   "abilities": {"str": 16, "dex": 13, "con": 15, "int": 2, "wis": 12, "cha": 6},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "abilities": {"str": 2, "con": 2}, "special": ["combat trained"]}
+  },
+  "pony": {
+   "name": "Pony", "size": "medium", "speed": 40, "natural_armour": 2,
+   "attacks": [
+    {"key": "hooves", "name": "hooves", "type": "bludgeoning", "count": 2, "damage": {"medium": "1d3"}}
+   ],
+   "abilities": {"str": 13, "dex": 13, "con": 12, "int": 2, "wis": 11, "cha": 4},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "abilities": {"str": 2, "con": 2}, "special": ["combat trained"]}
+  },
+  "shark": {
+   "name": "Shark", "size": "small", "speed": 0, "moves": {"swim": 60}, "natural_armour": 4,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d4", "medium": "1d6"}}
+   ],
+   "abilities": {"str": 13, "dex": 15, "con": 15, "int": 1, "wis": 12, "cha": 2},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}, "senses": ["blindsense.30"]}
+  },
+  "constrictor snake": {
+   "name": "Constrictor snake", "size": "medium", "speed": 20, "moves": {"climb": 20, "swim": 20}, "natural_armour": 2,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"medium": "1d3", "large": "1d4"}, "rider": "grab"}
+   ],
+   "abilities": {"str": 15, "dex": 17, "con": 13, "int": 1, "wis": 12, "cha": 2},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "large", "natural_armour": 1, "abilities": {"str": 8, "dex": -2, "con": 4}, "special": ["constrict (1d4)"]}
+  },
+  "viper": {
+   "name": "Viper", "size": "small", "speed": 20, "moves": {"climb": 20, "swim": 20}, "natural_armour": 2,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"small": "1d3", "medium": "1d4"}, "rider": "poison (1 Con damage a round for 6 rounds, cure 1 save)"}
+   ],
+   "abilities": {"str": 8, "dex": 17, "con": 11, "int": 1, "wis": 12, "cha": 2},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 4, "size": "medium", "abilities": {"str": 4, "dex": -2, "con": 2}}
+  },
+  "wolf": {
+   "name": "Wolf", "size": "medium", "speed": 50, "natural_armour": 2,
+   "attacks": [
+    {"key": "bite", "name": "bite", "type": "piercing", "damage": {"medium": "1d6", "large": "1d8"}, "rider": "trip"}
+   ],
+   "abilities": {"str": 13, "dex": 15, "con": 15, "int": 2, "wis": 12, "cha": 6},
+   "senses": ["low-light-vision", "scent"],
+   "advances": {"at": 7, "size": "large", "natural_armour": 2, "abilities": {"str": 8, "dex": -2, "con": 4}}
+  }
+ },
+ "progression_class": {
+  "id": "animal companion",
+  "name": "Animal companion",
+  "member": "animal companion",
+  "hit_die": 8,
+  "bab": "three_quarter",
+  "good_saves": ["fort", "ref"],
+  "skill_ranks": 0,
+  "class_skills": ["acrobatics", "climb", "fly", "perception", "stealth", "swim"],
+  "proficiencies": [],
+  "levels": [],
+  "_note": "Read at the companion's Hit Dice, which is its `level`: three-quarter base attack, good Fortitude and Reflex at that many Hit Dice IS the table's BAB and save columns, row for row (checked all twenty)."
+ }
+}

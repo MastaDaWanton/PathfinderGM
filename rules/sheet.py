@@ -537,6 +537,12 @@ class Actor:
     # else, and for a cleric made before this existed. Asked for 2026-09-19: "oh i had
     # forgotten domains those need chosen at creation as well."
     domains: list = field(default_factory=list)
+    # The answers to the class document's `choices` (`rules/classes.py`), by choice id:
+    # {"nature bond": {"option": "animal companion", "pick": "wolf"}}. A domain taken
+    # through a choice still lives in `domains` above — that is the store casting reads;
+    # this records which option was taken. Added 2026-10-04 for the druid, who was made
+    # with no nature's bond at all. Empty for every class that asks nothing.
+    class_choices: dict = field(default_factory=dict)
     # Whether a beat has ever said what this person looks like. Reported 2026-09-19:
     # "Drenn Ironvale and the merchant are in scene without having been described." Four
     # writers put people into a scene — the opening companion, the keeper behind a
@@ -2118,7 +2124,12 @@ class Actor:
         """
         from . import weapons as weapons_mod
 
-        doc = self._race_doc()
+        # An animal companion's body is its own document, in the same shape — a wolf's
+        # bite with its die by size (`rules/animal_companion.py`) — and it is asked first,
+        # because a body with no race reads as the default one.
+        from . import animal_companion
+
+        doc = animal_companion.natural_weapon_doc(self) or self._race_doc()
         if not doc:
             return None
         want = " ".join(str(key or "").split()).lower()
@@ -3386,6 +3397,13 @@ class Actor:
 
         out.extend(_classfeatures.tags_for(str(self.char_class or ""),
                                            int(getattr(self, "level", 1) or 1)))
+        # What this character's domains' powers hold (content/domains/powers.json) —
+        # Fire Resistance's `resist.fire.10` from 6th — read off the domain list live,
+        # like the feats above, so `resistance()` and `immune_to()` answer from them.
+        if self.domains:
+            from . import domains as _domains
+
+            out.extend(_domains.standing_tags(self))
         # A stat block's own tags — the watchman's `role.guard` — read live off the
         # template the creature came from, the way a feat's are read off its document.
         if self.from_template:
@@ -5039,6 +5057,10 @@ def to_dict(actor: Actor) -> dict:
     # as a world's race has one, and every older save reads back byte for byte.
     if actor.race_world:
         d["race_world"] = str(actor.race_world)
+    # The class choices, on the same rule: only a character whose class asked something.
+    if actor.class_choices:
+        d["class_choices"] = {str(k): dict(v) if isinstance(v, dict) else v
+                              for k, v in actor.class_choices.items()}
     return d
 
 
@@ -5451,6 +5473,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         loadout={str(k): int(v) for k, v in (data.get("loadout") or {}).items()
                  if int(v) > 0},
         domains=list(data.get("domains") or []),
+        class_choices={str(k): dict(v) if isinstance(v, dict) else v
+                       for k, v in (data.get("class_choices") or {}).items()},
         troop=_troops.Troop.from_dict(data.get("troop")),
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),

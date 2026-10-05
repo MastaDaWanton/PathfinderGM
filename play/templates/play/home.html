@@ -2404,7 +2404,7 @@ function paneForgeChoices() {
     <h2 class="sect">What ${esc(f.name || "they")} can take</h2>
     <div id="choicesbody">
       ${featPicker()}
-      ${(opts.domains || []).length && f.class === "cleric" ? `
+      ${(opts.domains || []).length && takesAllDomains(f) ? `
         <h2 class="sect">Domains</h2>
         <div class="budget ${(f.domains || []).length !== (opts.domains_wanted || 2) ? "over" : ""}">
           <span>a cleric takes ${opts.domains_wanted || 2}</span>
@@ -2428,6 +2428,65 @@ function paneForgeChoices() {
       <button class="quiet" data-crsubmit="">Create for the roster</button>
     </div>
   </div>`;
+}
+
+// Whether this class picks from every domain with nothing else to choose — the cleric's
+// one-option choice — which is what the search box on the next page is for. Asked of the
+// class document's choices, not of the class's name (`f.class === "cleric"` was this).
+function takesAllDomains(f) {
+  const cls = (FORGE.opts.classes || []).find(c => c.id === f.class);
+  return !!cls && (cls.choices || []).some(ch => (ch.options || []).length === 1
+    && ch.options[0].kind === "domain" && ch.options[0].all);
+}
+
+// The class's own choices at 1st level, drawn from its document (`creation.class_choice_menu`)
+// — the druid's nature bond. Reported 2026-10-04: "The druid class does not work I was given
+// no choice for my natures bond". A choice with ONE option is not drawn here: the cleric's
+// two domains have nothing to choose between and keep their search box on the next page.
+// The answer goes in `f.class_choices` ({id: {option, pick, name}}), and a domain taken
+// here goes in `f.domains`, the list the server and casting already read.
+function classChoiceSection(cls, f) {
+  if (!cls) return "";
+  const asked = (cls.choices || []).filter(c => (c.options || []).length > 1);
+  if (!asked.length) return "";
+  f.class_choices = f.class_choices || {};
+  return asked.map(ch => {
+    const said = f.class_choices[ch.id] || {};
+    const opt = (ch.options || []).find(o => o.kind === said.option);
+    const pickDomain = opt && opt.kind === "domain" ? `
+      <div class="cards tight">${(opt.domains || []).map(d => `
+        <button class="card pick ${(f.domains || []).includes(d.name) ? "on" : ""}"
+                data-crbonddomain="${esc(d.name)}" data-crchoice="${esc(ch.id)}">
+          <h3>${esc(d.name)}</h3>
+          <div class="stat">${d.spells} spell${d.spells === 1 ? "" : "s"}${
+            d.first ? ` · ${esc(d.first)} at 1st` : ""}</div>
+          <div class="traits">${(d.powers || []).map(esc).join(" · ")
+            || "Its spells and slot; its powers are not written down yet."}</div>
+        </button>`).join("")}</div>` : "";
+    const pickAnimal = opt && opt.kind === "animal companion" ? `
+      <div class="cards tight">${(opt.animals || []).map(a => `
+        <button class="card pick ${said.pick === a.key ? "on" : ""}"
+                data-crbondanimal="${esc(a.key)}" data-crchoice="${esc(ch.id)}">
+          <h3>${esc(a.name)}</h3>
+          <div class="stat">${esc(a.line)}</div>
+          ${a.grows ? `<div class="traits">${esc(a.grows)}</div>` : ""}
+        </button>`).join("")}</div>
+      ${said.pick ? `<p class="note">Call it something, if you like — or leave it and it is
+        simply your ${esc(((opt.animals || []).find(a => a.key === said.pick) || {}).name || "animal")}.</p>
+        <input type="text" data-cr="bondname" data-crchoice="${esc(ch.id)}"
+               value="${esc(said.name || "")}" maxlength="40" placeholder="A name for it">` : ""}` : "";
+    return `
+      <h2 class="sect">${esc(ch.name)}</h2>
+      ${ch.text ? `<p class="note">${esc(ch.text)}</p>` : ""}
+      <div class="cards tight">${(ch.options || []).map(o => `
+        <button class="card pick ${said.option === o.kind ? "on" : ""}"
+                data-crbond="${esc(o.kind)}" data-crchoice="${esc(ch.id)}">
+          <h3>${esc(o.name || o.kind)}</h3>
+          ${o.text ? `<div class="traits">${esc(o.text)}</div>` : ""}
+        </button>`).join("")}</div>
+      ${!opt ? `<p class="note">Not chosen yet — a ${esc(cls.name.toLowerCase())} must take one.</p>` : ""}
+      ${pickDomain}${pickAnimal}`;
+  }).join("");
 }
 
 function domainMatches() {
@@ -2461,6 +2520,8 @@ function forgeDefaults(opts) {
     background: "",
     class: "", abilities: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
     skills: [], feats: [], spellbook: [], domains: [], paths: [],
+    // The answers to the class's own choices (`classChoiceSection`).
+    class_choices: {},
   };
 }
 
@@ -2690,6 +2751,8 @@ function paneForgeWho() {
         </button>`;
       }).join("")}</div>` : ""}
 
+    ${classChoiceSection(cls, f)}
+
     <h2 class="sect">Abilities</h2>
     <p class="note">Point buy, ${opts.point_budget ? `${opts.point_budget} points — the Rulesets bench under Homebrew sets the tier, Unlimited included` : "unlimited"}. The race lands after.
       ${opts.ability_cap
@@ -2799,6 +2862,13 @@ document.addEventListener("input", e => {
   if (!FORGE || !e.target.dataset) return;
   const f = FORGE.form, key = e.target.dataset.cr;
   if (key === "name" || key === "heritage") { f[key] = e.target.value; return; }
+  // The companion's name: kept on the choice's answer, no repaint (the caret stays put).
+  if (key === "bondname") {
+    const id = e.target.dataset.crchoice;
+    const was = (f.class_choices || {})[id] || {};
+    f.class_choices = { ...(f.class_choices || {}), [id]: { ...was, name: e.target.value } };
+    return;
+  }
   // Repaints only the results box: a full render on every keystroke would throw the
   // caret out of the very input being typed in.
   if (key === "featsearch") {
@@ -2991,8 +3061,39 @@ document.addEventListener("click", async e => {
     const bg = e.target.closest("[data-crbackground]");
     if (bg) { f.background = bg.dataset.crbackground || ""; render(); return; }
     const cls = e.target.closest("[data-crclass]");
-    // Paths belong to the class that offers them, so changing class drops them.
-    if (cls) { f.class = cls.dataset.crclass; f.paths = []; render(); return; }
+    // Paths belong to the class that offers them, so changing class drops them — and so
+    // do its choices and the domains taken through them: a cleric's two carried over to
+    // a druid were a druid the server refused with two domains she could never take.
+    if (cls) {
+      if (f.class !== cls.dataset.crclass) { f.class_choices = {}; f.domains = []; }
+      f.class = cls.dataset.crclass; f.paths = []; render(); return;
+    }
+    // Nature's bond and its kin (`classChoiceSection`): the option first, then what is
+    // picked under it. Changing the option clears what the other option had picked.
+    const bond = e.target.closest("[data-crbond]");
+    if (bond) {
+      const id = bond.dataset.crchoice, kind = bond.dataset.crbond;
+      const was = (f.class_choices || {})[id] || {};
+      f.class_choices = { ...(f.class_choices || {}), [id]: was.option === kind ? was : { option: kind } };
+      if (kind !== "domain") f.domains = [];
+      render(); return;
+    }
+    const bonddomain = e.target.closest("[data-crbonddomain]");
+    if (bonddomain) {
+      const name = bonddomain.dataset.crbonddomain;
+      // One domain through nature bond: picking another replaces it, picking it again
+      // takes it back off.
+      f.domains = (f.domains || []).includes(name) ? [] : [name];
+      render(); return;
+    }
+    const bondanimal = e.target.closest("[data-crbondanimal]");
+    if (bondanimal) {
+      const id = bondanimal.dataset.crchoice, key = bondanimal.dataset.crbondanimal;
+      const was = (f.class_choices || {})[id] || {};
+      f.class_choices = { ...(f.class_choices || {}),
+        [id]: { option: "animal companion", pick: was.pick === key ? "" : key, name: was.name || "" } };
+      render(); return;
+    }
     const path = e.target.closest("[data-crpath]");
     if (path) {
       const name = path.dataset.crpath;
