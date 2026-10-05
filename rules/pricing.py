@@ -168,6 +168,230 @@ def _open_worth(item) -> float:
     return round(price, 2)
 
 
+# --- what a raw material may cost: one rule over every catalogue ---------------------------
+#
+# The owner, 2026-10-05, after the shops lane had priced 22 unpriced staples at their
+# nearest priced sibling (1 gp, water 1 cp): "probably most are fine until we get to
+# enchanting essences, catalysts, and neutralizers and those should cost more. Also if
+# something is legendary or gives better multipliers it should cost more".
+#
+# Measured before this, over the 434 authored prices in content/materials: the alchemist's
+# three common catalysts (brewer's yeast, mother of vinegar, rennet) and its three
+# neutralizers sat at 1-2 gp beside the water and the oak bark, slaked lime (neutralizer
+# strength 2) cost exactly what the strength-1 neutralizers did, two rare dyes cost less
+# than an uncommon one, and two rare enchanting vessels cost a third of a common one.
+#
+# **Authored prices stay authored.** `worth` above keeps reading `price_gp` outright: a
+# catalogue price is a fact somebody wrote down, and the book's (mithral, adamantine, the
+# masterwork surcharges) are facts the book wrote down. So the rule does not derive
+# prices over the top of them; it CHECKS them, on load, and refuses an out-of-line one
+# with the fix named (`material_price_problems`). Deriving was the rejected option: it
+# would have rewritten 300-odd prices the owner had just called fine to fix a dozen, and
+# it would have put every unpriced row on a counter — `price_gp` absent means "the world
+# does not sell this" (`play/craft_views._price_cp`), and a derived price would erase that.
+#
+# **The rule: floor = rung × kind × strength step.**
+# - The rung, `MATERIAL_FLOOR_GP`, steps ×5. PF1e's own tier ladder is the Core
+#   Rulebook's gem grades (10 / 50 / 100 / 500 / 1,000 / 5,000 gp, alternating ×5 and ×2)
+#   and its trade-goods metals step ×5 then ×10 (iron 1 sp, copper 5 sp, silver 5 gp, gold
+#   50 gp, platinum 500 gp a pound); Monster Hunter World's same-rarity ores step about ×3.
+#   ×5 is the middle of what the traditions publish, and it sits under this catalogue's
+#   own step (its plain medians run 1 / 25 / 200 / 1,350 / 6,000), so a floor refuses the
+#   outlier and not the shelf. Measured against the 434 prices as the owner saw them: ×10
+#   refused 62 (adamantine dust, the diamond focus, every greater resistance essence...);
+#   ×√10 refused 9 but put the legendary floor at 100 gp, under the rare median; ×5
+#   refuses 11, every one of them the owner's list or a near neighbour of it.
+# - The kind factor, `POWER_KIND_FACTOR`, is 5: Ultimate Campaign's downtime capital
+#   prices Magic at 100 gp against Goods at 20 (Table 2-1, p. 77), the one published
+#   PF1e ratio between "a thing that does magic" and "a thing". It applies to essences,
+#   catalysts, inks, chalks, foci and anything that carries `neutralizer` — what the
+#   owner named — and to nothing else, so water, vinegar, charcoal and bark stay cheap.
+# - The strength step is how far a row's own number (`plus`, `capacity`, `neutralizer`,
+#   a catalyst's `dc_mod`) runs above what its rung already pays for, and it multiplies
+#   LINEARLY. Squared was tried first, because the book squares a magic bonus (Table
+#   15-29: bonus² × 1,000): it put slaked lime, a common strength-2 neutralizer, at 20 gp
+#   — above sal ammoniac and every other uncommon salt (15 gp), the very inversion this
+#   rule exists to refuse. A neutralizer's strength is not a magic bonus, and the
+#   no-inversions check below already makes each step cost strictly more than the last.
+#   Nothing else in a row is a multiplier the bench reads; a quench mark's amount is a
+#   small fixed mark, not a step.
+#
+# **And no inversions** (`_inversions`): within one catalogue and one kind, a rarer row is
+# never cheaper than a commoner one, and a stronger row at the same or a higher rung costs
+# strictly more than a weaker one. This is THIS APP'S invariant, not the traditions':
+# Skyrim prices the one Jarrin Root in the world at 10 and Monster Hunter's rarity 5
+# Rathalos Plate outsells its rarity 6 Scale+ — rarity there is a band, not a price. Here
+# the owner ruled it ("if something is legendary ... it should cost more"), so it holds.
+#
+# Exempt, each for a stated reason: `book: true` rows (printed PF1e prices, which measure
+# a per-item surcharge rather than the house rung — cold iron is ×2 iron and so cheaper
+# than copper by the book); the book-faithful magic-item catalogue (`magic-items.json`,
+# every price computed by the book's own formulas, `rules/magicitem.py`); and the free
+# token, `goods.FREE_AT_A_COUNTER_GP` (1 cp), on a plain common row — water is given away,
+# and a copper is the nearest a counter comes to free.
+MATERIAL_FLOOR_GP: dict[str, float] = {
+    "common": 1.0,
+    "uncommon": 5.0,
+    "rare": 25.0,
+    "exotic": 125.0,
+    "legendary": 625.0,
+}
+POWER_KINDS = frozenset({"essence", "catalyst", "ink", "chalk", "focus"})
+POWER_KIND_FACTOR = 5.0
+_RUNGS = tuple(MATERIAL_FLOOR_GP)
+
+
+def _rank(tier) -> int:
+    t = str(tier or "common").strip().lower()
+    return _RUNGS.index(t) if t in _RUNGS else 0
+
+
+def is_power_kind(row: dict) -> bool:
+    """An essence, a catalyst, an ink, a chalk, a focus, or anything that neutralizes —
+    what the owner named as costing more than the plain consumables."""
+    try:
+        neutral = int(row.get("neutralizer") or 0)
+    except (TypeError, ValueError):
+        neutral = 0
+    return str(row.get("kind") or "") in POWER_KINDS or neutral > 0
+
+
+def _strengths(row: dict) -> dict[str, int]:
+    """The numbers a bench reads as "how strong", each as a step count from 1, by the
+    group it can be compared within."""
+    out: dict[str, int] = {}
+    for field in ("plus", "capacity", "neutralizer"):
+        try:
+            n = int(row.get(field) or 0)
+        except (TypeError, ValueError):
+            n = 0
+        if n > 0:
+            out[field] = n
+    try:
+        dc = int(row.get("dc_mod") or 0)
+    except (TypeError, ValueError):
+        dc = 0
+    if dc < 0:
+        # −2 is a catalyst's ordinary help and −3 the strong one: one step and two.
+        out["dc_mod"] = -dc - 1
+    return out
+
+
+def strength_step(row: dict) -> int:
+    """How far a row's strongest number runs above what its rung already pays for.
+
+    `plus` and `capacity` climb with the rung on purpose (Arcane Essence I is common, V
+    legendary; a quartz focus holds one rank, a diamond five), so a rung-1 +1 or a
+    rung-5 capacity 5 is step 1 — the rung has priced it. Slaked lime is a strength-2
+    neutralizer on the common rung, and that extra strength is what the step charges."""
+    rank = _rank(row.get("tier")) + 1
+    return max([1] + [n - rank + 1 for n in _strengths(row).values()])
+
+
+def material_floor(row: dict) -> float:
+    """The least a raw material of this rung, kind and strength may be priced at, in gold."""
+    floor = MATERIAL_FLOOR_GP[_RUNGS[_rank(row.get("tier"))]]
+    if is_power_kind(row):
+        floor *= POWER_KIND_FACTOR
+    return round(floor * strength_step(row), 2)
+
+
+def _authored(row: dict):
+    raw = row.get("obtain")
+    nested = raw if isinstance(raw, dict) else {}
+    value = row.get("price_gp", nested.get("price_gp"))
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _exempt(row: dict) -> bool:
+    return bool(row.get("book"))
+
+
+def _a(word: str) -> str:
+    return ("an " if word[:1].lower() in "aeiou" else "a ") + word
+
+
+def _why_floor(row: dict) -> str:
+    bits = [f"{_RUNGS[_rank(row.get('tier'))]} rung "
+            f"{MATERIAL_FLOOR_GP[_RUNGS[_rank(row.get('tier'))]]:g} gp"]
+    if is_power_kind(row):
+        bits.append(f"x{POWER_KIND_FACTOR:g} for {_a(str(row.get('kind')))}"
+                    + (" that neutralizes" if row.get("neutralizer") else ""))
+    step = strength_step(row)
+    if step > 1:
+        bits.append(f"x{step} for its strength")
+    return ", ".join(bits)
+
+
+def material_price_problems(rows, source: str = "") -> list[str]:
+    """Every authored price in one catalogue that breaks the rule, each with its fix named;
+    [] when sound. `source` names the file in the message."""
+    from . import goods
+
+    where = f"{source}: " if source else ""
+    priced = []
+    out: list[str] = []
+    for row in rows or ():
+        if not isinstance(row, dict) or not row.get("id"):
+            continue
+        price = _authored(row)
+        if price is None or price <= 0 or _exempt(row):
+            continue
+        priced.append((row, price))
+        if price == goods.FREE_AT_A_COUNTER_GP and _rank(row.get("tier")) == 0 \
+                and not is_power_kind(row):
+            continue    # the free token: water, given away
+        floor = material_floor(row)
+        if price < floor:
+            out.append(f"{where}{row['id']} is {_a(row.get('tier') or 'common')} "
+                       f"{row.get('kind')} at {price:g} gp, under its floor of {floor:g} gp "
+                       f"({_why_floor(row)}): raise its price_gp to at least {floor:g}.")
+    out.extend(_inversions(priced, where))
+    return out
+
+
+def _inversions(priced, where: str) -> list[str]:
+    out: list[str] = []
+    by_kind: dict[str, list] = {}
+    for row, price in priced:
+        by_kind.setdefault(str(row.get("kind") or ""), []).append((row, price))
+    # A rarer row never cheaper than a commoner one of its kind. Ties are allowed: a rung
+    # is a coarse label, and the book itself puts gold and mithral at one price a bar.
+    for kind, rows in by_kind.items():
+        for row, price in rows:
+            dearer = [(r, p) for r, p in rows
+                      if _rank(r.get("tier")) < _rank(row.get("tier")) and p > price]
+            if dearer:
+                top, top_price = max(dearer, key=lambda x: x[1])
+                out.append(f"{where}{row['id']} is {_a(str(row.get('tier')))} {kind} at "
+                           f"{price:g} gp, cheaper than the {top.get('tier')} {top['id']} "
+                           f"at {top_price:g} gp: a rarer {kind} never costs less. Raise "
+                           f"{row['id']} to at least {top_price:g} gp, or, if a price is "
+                           f"the book's, mark that row book: true.")
+    # A stronger row at the same or a higher rung costs strictly more — slaked lime at 1 gp
+    # neutralized twice what fuller's earth did at 1 gp. Compared across kinds: a
+    # neutralizer is a neutralizer whether it is filed as a salt or a reagent.
+    for row, price in priced:
+        mine = _strengths(row)
+        for other, other_price in priced:
+            if other is row or _rank(row.get("tier")) < _rank(other.get("tier")):
+                continue
+            theirs = _strengths(other)
+            for field in sorted(set(mine) & set(theirs)):
+                if field == "plus" and row.get("family") != other.get("family"):
+                    continue
+                if mine[field] > theirs[field] and price <= other_price:
+                    out.append(f"{where}{row['id']} has {field} {mine[field]} against "
+                               f"{other['id']}'s {theirs[field]} and costs no more "
+                               f"({price:g} gp against {other_price:g}): raise "
+                               f"{row['id']} above {other_price:g} gp.")
+                    break
+    return out
+
+
 # What a carried thing nobody priced is worth, in gold: THIS APP'S number, not the book's.
 # The Core Rulebook prices what its tables list and says an item sells for "half its
 # listed price" (p.140); for a thing with no listed price at all — a crate of somebody's

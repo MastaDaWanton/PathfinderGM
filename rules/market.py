@@ -347,8 +347,31 @@ def lines_doc() -> dict:
         if problems:
             raise ValueError("content/rules/stall-lines.json is refused: "
                              + " ".join(problems))
+        # The counters sell at the catalogues' own prices, so the catalogues are held to
+        # the one price rule before any counter opens (`pricing.material_price_problems`).
+        problems = price_problems()
+        if problems:
+            raise ValueError("content/materials is refused: " + " ".join(problems))
         _LINES = doc
     return _LINES
+
+
+def price_problems() -> list[str]:
+    """Every shipped craft catalogue's authored prices against the one rule — rung, kind
+    and strength, and no inversions (`pricing.material_price_problems`); [] when sound.
+
+    Shipped catalogues only, as `consumable_problems` is: a homebrew price is the
+    player's own to set, and refusing the app over one would lock them out of the very
+    page that edits it. A world's `play.materials[]` rows go through the same function
+    the day they have a reader (docs/from-world-bible.md)."""
+    from . import materials as materials_mod
+    from . import pricing
+
+    out: list[str] = []
+    for stem in materials_mod.CATALOGUES:
+        craft = stem.removesuffix("-materials")
+        out.extend(pricing.material_price_problems(_catalogue_rows(craft), f"{stem}.json"))
+    return out
 
 
 @_dataclass(frozen=True)
