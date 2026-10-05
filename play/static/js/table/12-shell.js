@@ -186,3 +186,40 @@ shellPaint(SHELL_MODE, false);
     paint();
   }
 })();
+
+// Settings without leaving the table (the owner, 2026-10-05: "as it is now i have to go to
+// the main page then to settings"). The panel holds the shelf's own Settings page in a frame
+// (`/?tab=settings&embed=1`), loaded fresh on each open, so there is one Settings page and
+// it always shows what is set now. Sound and music levels changed in it reach this window
+// at once through the `storage` event prefs.js already listens to.
+(function () {
+  const btn = document.getElementById("settingsbtn");
+  const layer = document.getElementById("settingslayer");
+  const frame = document.getElementById("settingsframe");
+  const close = document.getElementById("settingsclose");
+  if (!btn || !layer || !frame || !close) return;
+  function open() {
+    frame.src = "/?tab=settings&embed=1";
+    layer.hidden = false;
+    close.focus();
+  }
+  function shut() {
+    if (layer.hidden) return;
+    layer.hidden = true;
+    frame.src = "about:blank";
+    btn.focus();
+  }
+  btn.addEventListener("click", open);
+  close.addEventListener("click", shut);
+  // Esc on the panel's own bar; inside the frame the page posts `close-settings`, because a
+  // key pressed in a frame never reaches the page around it.
+  layer.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); shut(); }
+    // The panel is modal: Tab from Close goes into the frame and back, never to the table.
+    if (e.key === "Tab" && e.target === close) { e.preventDefault(); frame.focus(); }
+  });
+  window.addEventListener("message", e => {
+    if (e.origin === location.origin && e.data && e.data.pgm === "close-settings") shut();
+  });
+  layer.addEventListener("click", e => { if (e.target === layer) shut(); });
+})();

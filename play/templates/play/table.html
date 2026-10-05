@@ -3136,6 +3136,23 @@
                                 #7d3527 62%, #b55a47 84%, #d98c78 96%);
     -webkit-background-clip: text; background-clip: text; }
   .rv-word.is-bad .rv-sub { color: #e7b2a2; }
+
+  /* Settings over the table (12-shell.js): z 58, above the benches (35) and popovers,
+     under the dice mat (60), so a roll still lands over it. The frame holds the shelf's own
+     Settings page (`/?tab=settings&embed=1`), so nothing here duplicates a setting. */
+  .settingslayer { position: fixed; inset: 0; z-index: 58; display: grid;
+    place-items: center; padding: 28px; background: rgba(8, 6, 4, .72); }
+  .settingslayer[hidden] { display: none; }
+  .settingsframe { width: min(1100px, 100%); height: min(860px, 100%); display: grid;
+    grid-template-rows: auto 1fr; border-radius: 3px; overflow: hidden; }
+  .settingsbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border-bottom: 1px solid var(--gold-dim, #7d6845); }
+  .settingsbar h2 { margin: 0; flex: 1; color: var(--gold, #ddc48e);
+    font: 400 18px/1 var(--display, Cinzel, serif); letter-spacing: .12em;
+    font-variant: small-caps; }
+  .settingsframe iframe { width: 100%; height: 100%; border: 0; background: #0d0b09; }
+  @media (max-width: 760px) { .settingslayer { padding: 0; }
+    .settingsframe { height: 100%; } }
 </style>
 <!-- The herbalism bench (docs/herbalism-ui-plan.md), after the page's own styles so its
      rules win where a name meets one of the table's global ones (`details`, `summary`).
@@ -3221,6 +3238,11 @@
          the Settings page's Music slider. -->
     <button type="button" id="musictoggle" class="v2-btn is-quiet" aria-pressed="true"
             title="Background music">Music</button>
+    <!-- Settings without leaving the table (the owner, 2026-10-05: "i have to go to the
+         main page then to settings"). It opens the shelf's own Settings page in a panel
+         over the game (12-shell.js), so there is one Settings page, not two that drift. -->
+    <button type="button" id="settingsbtn" class="v2-btn is-quiet" aria-haspopup="dialog"
+            aria-controls="settingslayer" title="Settings">Settings</button>
     <button type="button" id="sheettoggle" class="v2-btn is-quiet" aria-expanded="true"
             aria-controls="sheet">Hide sheet</button>
   </div>
@@ -3621,6 +3643,19 @@
 <section class="modepage" id="mode-journal" role="tabpanel" aria-labelledby="tab-journal"
          hidden>
 </section>
+
+<!-- Settings, over the table (the Settings button in the top bar; 12-shell.js). The frame's
+     page is loaded when the panel opens, so it always shows the current settings. -->
+<div id="settingslayer" class="settingslayer" role="dialog" aria-modal="true"
+     aria-labelledby="settings-title" hidden>
+  <div class="settingsframe v2-card-leather v2-gilt-edge">
+    <div class="settingsbar">
+      <h2 id="settings-title">Settings</h2>
+      <button type="button" id="settingsclose" class="v2-btn">Close</button>
+    </div>
+    <iframe id="settingsframe" title="Settings"></iframe>
+  </div>
+</div>
 
 <!-- The herbalism bench (docs/herbalism-ui-plan.md §4): a full-window layer over the
      table at z-index 35, above the popovers (30) and under the deathveil (40), the dice

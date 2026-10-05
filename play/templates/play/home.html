@@ -593,6 +593,12 @@
       var(--tex-card-leather) #1d1710;
     background-size: auto, 340px auto;
   }
+  /* Opened from the table's Settings button (`?tab=settings&embed=1`): the table's panel
+     has its own title and Close, so the shelf's header, tabs and embers are hidden and the
+     settings fill the frame. */
+  body.embedded > header, body.embedded #embers,
+  body.embedded #cursorshade, body.embedded #cursorlight { display: none; }
+  body.embedded main { padding-top: 14px; }
   /* 4. Embers, third generation: thicker and deeper. Four layers now — a new
      nearest sheet of big soft coals drifting fast in front, then the bright
      motes, the mid-field, and the far dust behind its half-pixel blur. Every
@@ -852,7 +858,23 @@ let SETUP_ERR = "";
 // model. Landing on the shelf would leave the player looking at the page they just came
 // from with no idea why, so the redirect names where the fix is and this opens it.
 const SENT_TO_SETUP = new URLSearchParams(location.search).get("setup") === "1";
-let TAB = SENT_TO_SETUP ? "settings" : (MADE ? "characters" : "worlds");
+// `?tab=settings&embed=1` is the table's Settings button (12-shell.js): the same page in a
+// panel over the game, so the player no longer leaves the table, opens the shelf and then
+// Settings (the owner, 2026-10-05). Embedded, the shelf's own header and tabs are hidden and
+// Esc asks the table to close the panel, because a key pressed inside a frame never reaches
+// the page around it.
+const QUERY = new URLSearchParams(location.search);
+const EMBEDDED = QUERY.get("embed") === "1";
+if (EMBEDDED) document.body.classList.add("embedded");
+let TAB = (SENT_TO_SETUP || QUERY.get("tab") === "settings") ? "settings"
+  : (MADE ? "characters" : "worlds");
+if (EMBEDDED) {
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && window.parent !== window) {
+      window.parent.postMessage({ pgm: "close-settings" }, location.origin);
+    }
+  });
+}
 let WORLD = null;        // the world card opened, if any
 let DETAIL = null;       // its campaigns and characters
 let BENCH = null;        // the homebrew bench opened, if any
@@ -3604,9 +3626,14 @@ refreshSetup();
 // Settings is rendered from SETTINGS, which is otherwise only fetched when the tab is
 // clicked. Arriving on it by redirect skips that click, and the pane would sit on
 // "Reading the model settings…" forever.
-if (SENT_TO_SETUP && !SETTINGS) {
+// Any arrival on Settings, not only the redirect: the table's Settings button opens
+// `?tab=settings&embed=1`, and with the old `SENT_TO_SETUP` test that panel showed only
+// "Sound and motion" for good (seen live, 2026-10-05). The phone section's socket state is
+// asked the same way the tab click asks it.
+if (TAB === "settings" && !SETTINGS) {
   fetch("/api/settings/models").then(r => r.json()).then(d => { SETTINGS = d; render(); });
 }
+if (TAB === "settings" && !LAN) lanFetch("/api/lan");
 </script>
 <!-- The build the player is actually running, so a finding is never filed
      against a version that no longer exists. Stamped at package time. -->

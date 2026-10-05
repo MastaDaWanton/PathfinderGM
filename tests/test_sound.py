@@ -472,3 +472,19 @@ def test_the_home_page_renders_and_loads_prefs_then_sound_before_its_own_script(
     assert "Sound and motion" in html
     for src in ("/static/js/prefs.js", "/static/js/sound.js"):
         assert Client().get(src).status_code == 200
+
+
+def test_the_mix_has_makeup_gain_so_maxed_sliders_are_audible():
+    """The owner, 2026-10-05: "make all the sounds except for music louder, right now they
+    are maxxed out and i can barely hear them." Measured with every slider at its top:
+    combat.hit peaked at 0.043 of full scale, a forge strike 0.031-0.037, a herb grind hit
+    0.021 (about -28 dBFS), against music's mastered tracks. A makeup gain of at least x4
+    sits between the master volume and the limiter, so the limiter still guards clipping."""
+    import re
+    from pathlib import Path
+
+    src = Path("play/static/js/sound.js").read_text(encoding="utf-8")
+    m = re.search(r"var MAKEUP = (\d+(?:\.\d+)?);", src)
+    assert m and float(m.group(1)) >= 4, "the makeup gain is missing or too small"
+    assert "master.connect(makeup);" in src and "makeup.connect(limiter);" in src
+    assert "master.connect(limiter);" not in src, "the makeup stage was bypassed"

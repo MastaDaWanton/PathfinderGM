@@ -256,8 +256,10 @@ def test_the_forge_volume_pref_scales_the_forge_bus_live(tmp_path):
       Sound.unlock();
       const ctx = FakeContext.last;
       const out = { default: PGMPrefs.defaults()["sound.forge"] };
+      // bus -> master -> makeup (x6, 2026-10-05: "i can barely hear them") -> limiter.
       const buses = nodes.filter(n => n.kind === "gain" && n.to && n.to.kind === "gain"
-                                      && n.to.to && n.to.to.kind === "compressor");
+                                      && n.to.to && n.to.to.kind === "gain"
+                                      && n.to.to.to && n.to.to.to.kind === "compressor");
       const forge = buses.filter(n => n.gain.value === 0.3);
       out.forgeBuses = forge.length;
       Sound.play("forge.strike.hit", { hardness: 12 });

@@ -49,6 +49,16 @@
   // Simultaneous one-shots allowed before new ones are dropped. A grind game at full tilt
   // plus a verdict plus ambience events is well under this; a runaway caller is not.
   var MAX_VOICES = 28;
+  // Makeup gain between the master volume and the limiter, for every sound here (music is
+  // music.js's own <audio> and is not touched). The owner, 2026-10-05: "make all the sounds
+  // except for music louder, right now they are maxxed out and i can barely hear them."
+  // Measured offline by the forge sound lane with every slider at its top: combat.hit peaked
+  // at 0.043 of full scale, a forge strike 0.031-0.037, a quench 0.040-0.044, a herb grind
+  // hit 0.021 — about 28 dB under full scale, against music's mastered tracks. x6 (+15.6 dB)
+  // puts a hit near 0.26; the limiter after it (threshold -10 dB) still catches a crit, a
+  // verdict and a flourish landing together, so the louder mix cannot clip. The sliders keep
+  // their meaning: this multiplies whatever they set.
+  var MAKEUP = 6;
 
   var ctx = null, failed = false, master = null, limiter = null;
   var buses = {}, buffers = {}, lastTake = {}, voices = 0, gestured = false;
@@ -105,7 +115,10 @@
       limiter.release.value = 0.2;
       master = ctx.createGain();
       master.gain.value = masterLevel();
-      master.connect(limiter);
+      var makeup = ctx.createGain();
+      makeup.gain.value = MAKEUP;
+      master.connect(makeup);
+      makeup.connect(limiter);
       limiter.connect(ctx.destination);
       BUSES.forEach(function (b) {
         var g = ctx.createGain();
