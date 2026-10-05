@@ -2778,7 +2778,7 @@
    "effects_converted": true,
    "source": "bought",
    "obtain": "bought",
-   "price_gp": 90
+   "price_gp": 140
   },
   {
    "id": "dragons-blood-crimson",
@@ -2798,7 +2798,7 @@
    "effects_converted": true,
    "source": "bought",
    "obtain": "bought",
-   "price_gp": 75
+   "price_gp": 120
   },
   {
    "id": "moonlight-silver",

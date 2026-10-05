@@ -2046,7 +2046,7 @@
    "kind": "chalk",
    "tier": "common",
    "consumed": true,
-   "obtain": "mined", "biomes": ["coast", "hills"], "price_gp": 2,
+   "obtain": "mined", "biomes": ["coast", "hills"], "price_gp": 5,
    "text": "Plain cliff chalk, and nothing wrong with it: half the circles ever drawn were drawn in this. Consumed — a circle is swept away when the working ends, whichever way it ended.",
    "effects": [],
    "drawbacks": []
@@ -2068,7 +2068,7 @@
    "kind": "chalk",
    "tier": "rare",
    "consumed": true,
-   "obtain": "harvested", "biomes": ["ruins", "underground"], "price_gp": 60,
+   "obtain": "harvested", "biomes": ["ruins", "underground"], "price_gp": 125,
    "text": "Burnt bone, ground and pressed. Rare circle work; ghost and shadow essences read a bone circle as home ground and fight the binding less.",
    "effects": [],
    "drawbacks": []
@@ -2112,7 +2112,7 @@
    "kind": "vessel",
    "tier": "common",
    "requires": "a masterwork weapon, from the smith",
-   "obtain": "bought", "price_gp": 300,
+   "obtain": "bought", "price_gp": 300, "book": true,
    "text": "The book's own gate, kept: only a masterwork weapon can hold an enchantment. An ordinary blade has nowhere in it for the essence to live — the binding runs off it like water. This is the cross-craft handoff: the smith's masterwork output is the enchanter's raw material.",
    "effects": [],
    "drawbacks": []
@@ -2123,7 +2123,7 @@
    "kind": "vessel",
    "tier": "common",
    "requires": "masterwork armour, from the smith",
-   "obtain": "bought", "price_gp": 150,
+   "obtain": "bought", "price_gp": 150, "book": true,
    "text": "Masterwork armour, as the book requires for any armour enchantment. The smith's finishing marks are, to an enchanter's eye, half a sigil already.",
    "effects": [],
    "drawbacks": []
@@ -2134,7 +2134,7 @@
    "kind": "vessel",
    "tier": "uncommon",
    "requires": "a masterwork shield, from the smith",
-   "obtain": "bought", "price_gp": 150,
+   "obtain": "bought", "price_gp": 150, "book": true,
    "text": "A masterwork shield, taking armour essences by the armour rules.",
    "effects": [],
    "drawbacks": []
@@ -2156,7 +2156,7 @@
    "kind": "vessel",
    "tier": "rare",
    "requires": "a masterwork ring blank, from the jeweller",
-   "obtain": "bought", "price_gp": 100,
+   "obtain": "bought", "price_gp": 200,
    "text": "A masterwork ring blank. Small vessels are honest vessels: a ring holds what its focus holds and nothing rides along.",
    "effects": [],
    "drawbacks": []
@@ -2167,7 +2167,7 @@
    "kind": "vessel",
    "tier": "rare",
    "requires": "a masterwork wand blank of coldwood or bone",
-   "obtain": "bought", "price_gp": 100,
+   "obtain": "bought", "price_gp": 200,
    "text": "A masterwork wand blank. Wand work leans on the spell side of the craft, which this bench does not model yet; the vessel is listed so the material exists when it does.",
    "effects": [],
    "drawbacks": []
