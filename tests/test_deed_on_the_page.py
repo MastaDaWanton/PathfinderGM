@@ -408,3 +408,58 @@ def test_the_bench_loads_and_its_labels_are_what_the_doc_says():
         assert player and text, source
         labelled += [lab for _s, lab in deeds if lab is not None]
     assert (len(labelled), labelled.count(False)) == (64, 46)
+
+
+# --- the player under at the end of the turn stays under (gm/checks/sleep_kept.py) --------
+
+NAP = ("You sway on your feet, and the ground comes up to meet you; sleep takes you where "
+       "you stand. When you open your eyes the sky has gone the colour of a bruise. You sit "
+       "up, stiff, and rub your face. That was a long nap. What do you do?")
+
+
+def _sleeper(monkeypatch, answer, *, asleep=True):
+    from gm.checks import sleep_kept
+    from rules import survival
+
+    monkeypatch.setattr(deed_reader, "ENABLED", True)
+    s = Scene()
+    pc = load_pc("fixtures/pc-kesst.json")
+    s.add(pc)
+    if asleep:
+        pc.add_condition("unconscious", source=survival.SLEEP_SOURCE)
+    seen = []
+
+    def chat(messages, *a, **k):
+        seen.append(messages)
+        return _Reply({"sentence": str(answer)})
+
+    monkeypatch.setattr(deed_reader, "read_under",
+                        _read_through(deed_reader.read_under, chat))
+    ctx = SimpleNamespace(scene=s, text=NAP, reader={"model": "stub", "host": "h"})
+    return sleep_kept, ctx, seen
+
+
+def test_a_player_the_engine_put_to_sleep_does_not_wake_on_the_page(monkeypatch):
+    """The survival lane's live run, 2026-10-05: the tell said Sammy "cannot stay awake any
+    longer and falls asleep where they stand"; the prose had them waking at twilight —
+    "that was a long nap". The waking sentence is found and the beat cut from it."""
+    check, ctx, seen = _sleeper(monkeypatch, 2)
+    found = check.find(ctx)
+    assert [f.kind for f in found] == ["player-up-while-under"]
+    assert found[0].sentences == ("When you open your eyes the sky has gone the colour of "
+                                  "a bruise.",)
+    assert "ASLEEP" in seen[0][0]["content"]
+    out, notes = check.backstop(ctx, NAP, found)
+    assert out.startswith("You sway on your feet") and "long nap" not in out
+    assert out.endswith(check.POOL["asleep"][0]) and notes
+    assert check.authored_in(out) == [check.POOL["asleep"][0]]
+
+
+def test_a_player_who_is_up_is_never_read(monkeypatch):
+    check, ctx, seen = _sleeper(monkeypatch, 2, asleep=False)
+    assert check.find(ctx) == [] and seen == []
+
+
+def test_nothing_named_nothing_cut(monkeypatch):
+    check, ctx, _ = _sleeper(monkeypatch, 0)
+    assert check.find(ctx) == []

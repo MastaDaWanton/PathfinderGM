@@ -3394,9 +3394,10 @@ class GMAgent:
         self.last_added = narration_mod.added_sentences(before, text)
         # And the body's authored lines, which the truth pass's backstop put on inside the
         # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
-        from .checks import body_shown
+        from .checks import body_shown, sleep_kept
 
-        self.last_added += [s for s in body_shown.authored_in(text)
+        self.last_added += [s for s in (*body_shown.authored_in(text),
+                                        *sleep_kept.authored_in(text))
                             if s not in self.last_added]
         # And the deeds backstop's opening built from the player's own line
         # (`_show_declared`): ours too.

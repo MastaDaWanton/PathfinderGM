@@ -761,3 +761,64 @@ when they did not — and invents no new lines or choices.
   on the cup in flight, the quay example never asked. Each now opens on (or shows) the
   player's act, reported. The formulaic-opening repair said "do not begin it with the
   player"; it now says to keep what the player does.
+- **Judge each deed on its own** was added to the reader's instruction after the live check
+  below found "ask him who in town is hiring" read as shown on the strength of "You thank
+  the smith…" in the same line. Re-benched after: P 0.95, R 0.98, 3 of 26 false alarms
+  (two runs, identical) — the same as before; the live miss is caught 3 of 3. That case
+  is now a dev case, not a held-out one.
+
+**After, on fresh beats.** `tools/narrator_audit.py`'s "strangers" script and a ten-line
+"deeds" script (ask, flirt, pick up and toss an apple, tell, whistle, thank and shake
+hands, ask the smith, pick up a hammer), gemma-4-12B, the shared Ollama contended
+(turns took 30–180 s):
+
+| | owed turns | deeds missing from the draft | deeds missing from the page |
+|---|---|---|---|
+| old prompts, new check ("deeds") | 8 | 9 of 12, in 8 of 8 turns; 0 drafts opened on the player | 0 of 12 (8 repairs) |
+| new prompts, new check ("deeds") | 7 | 4 of 10, in 4 of 7 turns; 3 opened on the player | 0 of 10 (3 repairs) |
+| new prompts, new check ("strangers") | 6 | 4 of 6, in 4 of 6 turns | 0 of 6 (4 repairs) |
+
+"Missing from the page" is the reader's word on the shipped beat and was checked by hand:
+every one shows the act. No backstop line was needed in these runs; every repair was the
+model's passage. Small samples; the prompt halved the drafts' misses and the repair carried
+the rest. One repair passage repeated the beat's own next clause ("You whistle a tune that
+hangs in the humid air. The tune you whistle hangs in the humid air…") — the reader had
+called "The tune you whistle hangs" not shown; borderline, and not guarded against.
+
+**Live, on a scratch copy of the owner's save** (Sammy in the smithy, the server from this
+branch on a scratch data directory):
+1. "I flirt with the smith" — the draft opened "You offer him a playful wink and a charming
+   grin, leaning against the heavy workbench…"; read shown; no repair.
+2. "I pick up the ceramic jug from the stool and take a long drink from it." — "You reach
+   for the jug on the stool… as you take a long, desperate pull…"; both shown; no repair.
+3. "I thank the smith and ask him who in town is hiring." — "You thank the smith for the
+   information and the direction…", then his answer; the asking itself was not written and
+   the reader (before the line above) called it shown. The miss that changed the prompt.
+4. "I nod to the apprentice and ask the smith what the night watch pays." — the draft
+   opened "The smith listens to your question about the night watch" (read: after); the
+   repair passage went first: "You nod your head toward the apprentice and ask the smith
+   what the night watch pays." Two reads of about 1.2 s and a 1.4 s call.
+5. "…refusing to sleep." (twice) — no rest op injected (the `_WONT_SLEEP` fix below);
+   "refusing to sleep" read absent and written in: "You keep your eyes open and your
+   posture rigid, refusing to sleep."
+
+**Also in this lane.**
+- `judgement._WONT_SLEEP` had no "refus" form: the survival lane's live run sent "refusing
+  to sleep" and a rest op was injected. Refuse, resist, fight off, stave off, keep from,
+  try not to, avoid now count.
+- `gm/checks/sleep_kept.py`: the survival lane's run had the tell "cannot stay awake any
+  longer and falls asleep where they stand" and prose already waking at twilight ("that
+  was a long nap"). When the engine holds the player asleep or out cold at the end of the
+  turn, one closed question (`deed_reader.read_under`) names the first sentence where they
+  are up again; one rewrite, then cut from it and an authored line (LRU, marked added).
+  Unit-tested on that shape; **not measured on a bench and not seen live** — two attempts
+  to make Sammy fall asleep in the scratch save passed eight hours without a sleep check.
+
+**Not done.**
+- The reader judges deeds; it does not judge the player's words when the player quoted
+  them — whether the page has them exactly is `speaks_for_player`'s, and reported speech
+  is allowed by design.
+- Moves, looks, searches, waits, casts and checks are not owed (the engine's tells or the
+  dice write them); a fight's blows are the blow checks'; the intimate beat is exempt.
+- The reader's 3 false alarms in 26 each cost one sentence restating the act.
+- Latency: one read per owed turn (~0.8–1.3 s), plus a call and a read per repair.

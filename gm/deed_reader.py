@@ -165,7 +165,8 @@ _SYSTEM = (
     "doing it.\n"
     "  absent - nothing about it at all.\n"
     "Give the sentence number where it is shown, or 0 when it is not. Judge each deed "
-    "on its own.")
+    "on its own: the player doing one deed is not the player doing another, and "
+    "someone answering a question is not the player asking it.")
 
 # Two demonstrations, written for this call and taken from no bench or save: one beat that
 # opens on the other person and one that shows the player first. Balanced on purpose — a
@@ -253,6 +254,60 @@ def about_the_player(written: str, narration: str, player_line: str = "",
         return True
     low = _words(written)
     return any(q in low for q in _quoted(player_line))
+
+
+# --- the player still under at the end of the turn -----------------------------------------
+#
+# The survival lane's live run, 2026-10-05: the engine's tell said Sammy "cannot stay awake
+# any longer and falls asleep where they stand", and the prose already had them waking at
+# twilight — "that was a long nap". The page ran past the state the engine left the player
+# in. One closed question, the same shape as the deeds: which sentence, if any, has the
+# player awake or acting AFTER they go under. Code holds the answer to the page (a sentence
+# about the player) and the check (gm/checks/sleep_kept.py) cuts from it.
+
+_UNDER_SYSTEM = (
+    "You check one passage of a tabletop game, narrated to the player as \"you\". The "
+    "rules say the player's character is {state} at the END of this passage, and stays "
+    "that way. Find the first sentence where, after going under, the player is awake "
+    "again or doing things — waking, getting up, speaking, walking, looking around. "
+    "Sentences BEFORE they go under do not count, and neither does dreaming or lying "
+    "still. Answer its number, or 0 when there is none.")
+
+
+def read_under(text: str, state: str, *, chat=None, model: str = "", host: str = "",
+               provider: str = "ollama", api_key: str = "",
+               pc_name: str = "") -> tuple[str, str]:
+    """(the first page sentence that has the player up again after going under, an error).
+    "" when there is none, when the reader names a sentence not about the player, or when
+    the read fails (the error says so)."""
+    from .checks._page import page_sentences
+
+    pairs = page_sentences(text)
+    if not pairs:
+        return "", ""
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    written = [w for w, _n in pairs]
+    page = "\n".join(f"{i}. {s}" for i, s in enumerate(written, 1))
+    schema = {"type": "object",
+              "properties": {"sentence": {"type": "string",
+                                          "enum": [str(i) for i in range(len(written) + 1)]}},
+              "required": ["sentence"]}
+    try:
+        reply = chat([{"role": "system", "content": _UNDER_SYSTEM.format(state=state)},
+                      {"role": "user", "content": f"PASSAGE, BY SENTENCE:\n{page}"}],
+                     model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=24, provider=provider, api_key=api_key, schema=schema)
+        at = int(str((reply.json() or {}).get("sentence") or "0"))
+    except Exception as exc:  # noqa: BLE001 — a failed read must never lose the turn
+        return "", f"{type(exc).__name__}: {str(exc)[:120]}"
+    if not 1 <= at <= len(written):
+        return "", ""
+    if not about_the_player(written[at - 1], pairs[at - 1][1], "", pc_name):
+        return "", ""
+    return written[at - 1], ""
 
 
 def read(text: str, deeds: list[str], player_line: str, *, chat=None, model: str = "",
