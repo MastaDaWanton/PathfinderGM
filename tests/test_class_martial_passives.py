@@ -26,6 +26,7 @@ import pytest
 
 from rules import classes, classfeatures, states, weapons as weapons_mod
 from rules.activeeffect import ActiveEffect
+from rules.states import type_tags
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -408,6 +409,31 @@ class TestRanger:
         # At 1st only the first pick is paid for.
         r1 = _pc("ranger", 1, class_choices=picks)
         assert not _named(r1.attack_modifiers("longsword", defender=dead), "favored")
+
+    def test_favoured_enemy_as_the_sheet_picker_stores_it(self):
+        """The picker (lane 1) stores catalogue ids — "humanoid-orc" — with the level the
+        slot opened at, where the test above writes the table's words. Merged as built,
+        the id was read as the creature type "humanoid-orc", so a favoured enemy picked
+        on the sheet granted +0 against every orc: measured at the 2026-10-05 merge."""
+        picks = {"favored enemy": {"option": "class option", "picks": [
+            {"pick": "humanoid-orc", "level": 1, "bonus": 4},
+            {"pick": "magical-beast", "level": 5, "bonus": 2}]}}
+        r = _pc("ranger", 5, class_choices=picks)
+        orc = _body("type.humanoid", "subtype.orc")
+        beast = _body(*type_tags("magical beast"))
+        assert _total(_named(r.attack_modifiers("longsword", defender=orc), "favored")) == 4
+        assert _total(_named(r.attack_modifiers("longsword", defender=beast), "favored")) == 2
+
+    def test_weapon_training_as_the_sheet_picker_stores_it(self):
+        """Same merge, same defect for the fighter: the picker stores "blades-heavy" and
+        "pole-arms", the weapon table's groups are "heavy blades" and "polearms", and a
+        longsword got no weapon training at all."""
+        picks = {"weapon training": {"option": "class option", "picks": [
+            {"pick": "blades-heavy", "level": 5}, {"pick": "pole-arms", "level": 9}]}}
+        f9 = _pc("fighter", 9, class_choices=picks)
+        assert _named(f9.attack_modifiers("longsword"), "weapon training")
+        assert _named(f9.attack_modifiers("glaive"), "weapon training")
+        assert not _named(f9.attack_modifiers("dagger"), "weapon training")
 
     def test_favoured_terrain_where_she_stands(self):
         r = _pc("ranger", 3, class_choices={"favoured terrain": ["forest"]})

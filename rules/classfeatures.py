@@ -560,9 +560,34 @@ def _picks(actor, leaf: str, doc: dict) -> list[tuple[str, int]]:
     return out
 
 
+def _group_word(word: str) -> str:
+    """A weapon group as `weapons.groups_of` spells it. The picker stores the catalogue's
+    id ("blades-heavy", "pole-arms") and the book prints "Blades, Heavy"; the weapon
+    table says "heavy blades" and "polearms". Read as written, a fighter who picked heavy
+    blades on the sheet got no weapon training with a longsword (measured at the
+    2026-10-05 merge). Same words in any order, or the same letters run together."""
+    from . import weapons as weapons_mod
+
+    words = re.findall(r"[a-z]+", str(word or "").lower())
+    for group in weapons_mod.GROUPS:
+        if sorted(words) == sorted(group.split()) or "".join(words) == group.replace(" ", ""):
+            return group
+    return " ".join(words)
+
+
 def _enemy_clause(pick: str) -> dict:
     """"humanoid (human)" -> {"type": "humanoid", "subtype": "human"}; "undead" ->
-    {"type": "undead"}. The book's table writes a subtype in brackets after its type."""
+    {"type": "undead"}. The book's table writes a subtype in brackets after its type.
+
+    The picker stores the catalogue's id ("humanoid-orc", "magical-beast"), not the
+    table's words; read as written, the id became the type "humanoid-orc", which no
+    creature has, and every favoured enemy picked through the sheet granted nothing. The
+    id is turned back into the catalogue's name before the brackets are read."""
+    from . import classes as classes_mod
+
+    named = classes_mod.entry("favored-enemies", str(pick or "")).get("name")
+    if named:
+        pick = str(named).lower()
     m = re.match(r"^\s*([^()]+?)\s*(?:\((.+)\))?\s*$", str(pick or ""))
     if not m:
         return {}
@@ -647,8 +672,8 @@ def holds(when, actor, ctx: dict | None, pick: str = "") -> bool:
         from . import weapons as weapons_mod
 
         held_key = str(((ctx or {}).get("weapon") or {}).get("key") or "")
-        word = pick if group == "$pick" else str(group)
-        if not held_key or word.strip().lower() not in weapons_mod.groups_of(held_key):
+        word = _group_word(pick if group == "$pick" else str(group))
+        if not held_key or word not in weapons_mod.groups_of(held_key):
             return False
     if rest.get("target") == "$pick":
         rest["target"] = _enemy_clause(pick)
