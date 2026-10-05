@@ -2542,7 +2542,12 @@ class Engine:
         if intent.op == "found" and str(intent.params.get("kind") or "").strip():
             from . import places as places_mod
 
-            if not places_mod.known_kind(str(intent.params["kind"])):
+            # A kind of ground ("mountain") is not a kind of place but is no mistake
+            # either: `_op_found` stands the place on that ground. Refused here until
+            # 2026-10-05, and the retry founded the owner's mountain with no kind, on
+            # the farmland of the road it was founded off.
+            if not places_mod.known_kind(str(intent.params["kind"])) \
+                    and not places_mod.ground_kind(str(intent.params["kind"])):
                 raise IntentError(
                     f"found: there is no kind of place called "
                     f"{intent.params['kind']!r}. Use one of: {places_mod.kinds_said()} "
@@ -9081,8 +9086,16 @@ class Engine:
         found_loc = self.world.get(self.scene.location_id) if self.world else None
         scale = places_mod.scale_of(found_loc) if found_loc is not None else "town"
         speed = int(getattr(pc, "speed_feet", 30) or 30) if pc is not None else 30
-        if moved and want and places_mod.setting_of(going_to.id) == "outside" \
-                and not places_mod.is_ring(going_to.id) and found_loc is not None \
+        # A place founded off the ring on ground of its own (the mountain off the road to
+        # Grotburrow) is as far as that ground is, not a ring hop: Vormoor's mountain is
+        # BEYOND its farmland, and was a seven-minute walk on 2026-10-05.
+        ring_parent = places_mod.find(known, going_to.parent) if going_to.parent else None
+        own_ground = places_mod.is_ring(going_to.id) and ring_parent is not None \
+            and ring_parent.terrain != going_to.terrain \
+            and going_to.terrain in places_mod.OPEN_GROUND
+        if moved and (want or own_ground) and places_mod.setting_of(going_to.id) == "outside" \
+                and (not places_mod.is_ring(going_to.id) or own_ground) \
+                and found_loc is not None \
                 and places_mod._settled(found_loc, ""):
             from . import geography
 
@@ -10352,6 +10365,13 @@ class Engine:
         # that makes sense here (`places.fits_here`). A name that is itself a kind —
         # "the docks" — needs no `kind` to say so.
         kind = places_mod.kind_named(str(intent.params.get("kind") or ""))
+        # A kind that is a kind of GROUND, not of place: "mountain". The owner's save of
+        # 2026-10-05 planned `kind="mountain"` first, was refused, and founded "the
+        # mountain" with no kind on farmland. The word is read through the closed biome
+        # list (`places.ground_kind`) and becomes the place's ground; the place has no kind.
+        ground = places_mod.ground_kind(kind)
+        if ground:
+            kind = ""
         # Through the same word table as `kind` (`places.kind_named`): "the forge" is a
         # smithy (lane G's KIND_WORDS). This asked for the name EXACTLY in `KINDS`, so a
         # `found` of "the forge" with no kind made a place with no kind — not a smithy,
@@ -10406,29 +10426,67 @@ class Engine:
                       and places_mod.setting_of(parent.id) != "outside")
                 return self._refuse(intent, why, fix={"kind": "go", "place": outskirts.name}
                                     if go else None)
+        # Its own ground, by its own words: "the mountain" off the road to Grotburrow is a
+        # mountain, not the farmland the road crosses ("on a mountain still considered
+        # farmland", the owner, 2026-10-05). Read from the closed biome list, never
+        # written by a model; a place whose words name no ground — and every building —
+        # stands on its parent's (`places.own_ground`).
+        about = str(intent.params.get("about") or "")
+        ground = ground or places_mod.own_ground(name, about, kind)
+        if ground and ground in places_mod.OPEN_GROUND \
+                and places_mod.setting_of(parent.id) != "outside":
+            # Open ground is outside the town, so it hangs off the way out, as a
+            # building hangs off the street: a mountain founded off the market would
+            # put a mountain one step from the stalls. Without a ring (no world to
+            # build one) it stays off the parent, which `setting_of` still reads as
+            # outside.
+            outskirts = next((p for p in known if p.name == "the outskirts"
+                              and places_mod.is_ring(p.id)), None)
+            if outskirts is not None:
+                parent = outskirts
+                if len(places_mod.children_of(self.scene.founded, parent.id)) \
+                        >= places_mod.MOST_CHILDREN:
+                    return self._refuse(
+                        intent, f"{parent.name} already has as many places hanging off "
+                                f"it as one place can hold; found it off somewhere else.")
+        if ground == parent.terrain:
+            ground = ""
+        if ground in places_mod.OPEN_GROUND:
+            # Only ground the world has around this settlement, as a travel onto open
+            # ground is (`_absent_ground`, 20.2): a founded "the woods" would otherwise be
+            # the way to stand in the forest Vormoor does not have. Caves and ruins are
+            # not land cover and are not asked.
+            refused = self._absent_ground(intent, ground, known)
+            if refused is not None:
+                return refused
         # A road's kind stands on its parent's ground and is shaped as open ground; it is
         # not a settlement kind, so it carries no `kind` to shape it as a room.
         road_kind = kind in places_mod.OUTSIDE_KINDS and \
             places_mod.setting_of(parent.id) == "outside"
         place = self.found_place(name, parent,
-                                 about=str(intent.params.get("about") or "")
+                                 about=about
                                  or (places_mod.OUTSIDE_KINDS[kind] if road_kind else ""),
                                  owner=owner, origin="found",
-                                 kind="" if road_kind else kind)
+                                 kind="" if road_kind else kind, terrain=ground)
         pc = self.scene.pc()
         held = f", held by {owner.name}" if owner is not None else ""
         what = f" It is a {kind}." if kind else ""
+        if ground:
+            # The ground as a fact in the tell, since the narrator is fed tells: the
+            # owner's mountain was written onto desert because nothing said mountain.
+            what += f" The ground there is {ground}: {biomes.BIOMES[ground].lower()}."
         return Outcome(
             intent_id=intent.id, op="found",
             effects=[{"kind": "place", "id": place.id, "name": name,
                       "parent": parent.id, "owner": place.owner, "is": kind,
+                      "terrain": place.terrain,
                       "setting": places_mod.setting_of(place.id)}],
             tell=f"{name} is a place now, off {parent.name}{held}.{what} "
                  f"{pc.name if pc else 'The party'} can go there from {parent.name}.",
             because=intent.because)
 
     def found_place(self, name: str, parent, about: str = "", owner=None,
-                    origin: str = "found", kind: str = ""):
+                    origin: str = "found", kind: str = "", terrain: str = ""):
         """Mint a place off `parent` and remember it: the one door a place is made by.
 
         Pulled out of `_op_found` when the page was given leave to make places too, so
@@ -10442,7 +10500,7 @@ class Engine:
 
         place = places_mod.mint(parent, name, str(about or "")[:120],
                                 owner=owner.ref if owner is not None else "",
-                                origin=origin, kind=kind)
+                                origin=origin, kind=kind, terrain=terrain)
         self.scene.founded.append(place.as_dict())
         slug = place.id.rsplit("/", 1)[-1]
         if owner is not None:

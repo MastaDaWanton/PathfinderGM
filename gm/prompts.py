@@ -731,6 +731,8 @@ keeps it for good, with that description, and refuses a kind that makes no sense
 words: market, smithy, mill, workshops, tannery, brewery, warehouses, guildhall, library,
 keep, gaol, barracks, shrine, temple, graveyard, inn, tavern, bathhouse, theatre, arena,
 gardens, well, granary, stables, docks, bridge, lane, back streets, warrens.
+Out in the land, a place on other ground takes the ground as its kind — {"name": "the
+mountain", "kind": "mountain"} — and the engine stands it on that ground.
 Never for a thing in the place the party stands — a door, a counter, a corner, a storage
 area: walking over to it is {"op": "narrate_only"}, and nothing is founded.
 Ground the player goes INTO that is not a named place yet —

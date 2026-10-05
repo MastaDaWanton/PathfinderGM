@@ -778,8 +778,9 @@ def setting_of(place_id: str) -> str:
     3. a spot with no `/` at all → outside: an authored non-urban place, open ground;
     4. otherwise the place was minted under a town room on other ground, and it is
        outside when any step of its path is a venture that lies out of the settlement
-       (`VENTURES` with hours: the cave, the old mine, the ruins, the tower), and under
-       it otherwise (the sewers, the cellars, the crypt).
+       (`VENTURES` with hours: the cave, the old mine, the ruins, the tower), or when its
+       ground is open ground (`OPEN_GROUND`: a mountain is never under a town), and
+       under it otherwise (the sewers, the cellars, the crypt).
 
     An id that says nothing about its ground (an old save's `at == ""`, the world-less
     `here`) is `in`: that is where every campaign started before places had ground.
@@ -796,6 +797,12 @@ def setting_of(place_id: str) -> str:
     if len(path) == 1:
         return "outside"
     if any(step in _AWAY_SLUGS for step in path[1:]):
+        return "outside"
+    # Open ground is never under a town. A mountain founded off a town room or off a
+    # place the world authored out in the land has a long path with no ring at its root,
+    # and read "under Vormoor" until 2026-10-05; what lies under a town is underground,
+    # ruins, or water (`OPEN_GROUND` is the rest).
+    if ground in OPEN_GROUND:
         return "outside"
     return "under"
 
@@ -1592,6 +1599,129 @@ def children_of(founded, parent_id: str) -> list[Place]:
     return [p for p in minted if p.parent == parent_id]
 
 
+# --- a place's own ground ----------------------------------------------------------------
+#
+# "on a mountain still considered farmland" (the owner, 2026-10-05). "i go up the
+# mountain" from the road to Grotburrow planned `found name="the mountain"` (its first try,
+# `kind="mountain"`, was refused as no kind of place) and then `travel`; `mint` gave the
+# child its parent's ground, so the id read `~farmland`, the header said "Farmland", the
+# UNDERFOOT line said "open, with a wall or a hedge to it", and the narrator — told nothing
+# about a mountain — wrote boulders "weathered by the desert sun".
+#
+# How the traditions do it: a DikuMUD/CircleMUD room carries its own sector type, one
+# required number from a closed list, per room and never inherited from its zone (CircleMUD
+# Builder's Manual, World Files: "A single number ... defining the type of terrain in the
+# room"). Hexcrawl generators give a sub-hex the parent hex's dominant terrain as the
+# default and let a feature inside it differ (DIY & Dragons, "Sub-Hex Crawling Mechanics
+# part 2": roll the dominant terrain first, then the sub-hexes off a menu for it; Lesserton
+# & Mor's seven independent rolls per sept-hex were the variability it set out to remove).
+# Fate puts aspects on each zone, not on the scene alone. So: the place's own words name
+# its ground from the closed biome list, and only a place whose words name none takes its
+# parent's.
+#
+# A lexicon of its own rather than `biomes._LOOKUP`: that table reads bestiary and world
+# prose, where "garden" is farmland, "market" is urban and "graveyard" is ruins — words
+# that in a place's NAME mean a building in town. These are nouns a place out in the land
+# is called by, and nothing else.
+#
+# Water is the bank of it. A place called "the river" is where the party stands beside the
+# river, not in it: `water` is a place you swim in (biomes.py), and the move into it is a
+# move between two places, as a storey is.
+PLACE_GROUND: dict[str, str] = {
+    "mountain": "mountain", "mountains": "mountain", "mountainside": "mountain",
+    "peak": "mountain", "peaks": "mountain", "crag": "mountain", "crags": "mountain",
+    "cliff": "mountain", "cliffs": "mountain", "summit": "mountain",
+    "scree": "mountain", "volcano": "mountain",
+    "hill": "hills", "hills": "hills", "hillside": "hills", "hilltop": "hills",
+    "foothills": "hills", "downs": "hills", "moor": "hills", "moors": "hills",
+    "moorland": "hills", "upland": "hills", "uplands": "hills", "highlands": "hills",
+    "tor": "hills", "knoll": "hills",
+    "forest": "forest", "forests": "forest", "woods": "forest", "woodland": "forest",
+    "woodlands": "forest", "grove": "forest", "glade": "forest", "copse": "forest",
+    "thicket": "forest", "treeline": "forest",
+    "jungle": "jungle", "rainforest": "jungle",
+    "swamp": "swamp", "swamps": "swamp", "marsh": "swamp", "marshes": "swamp",
+    "bog": "swamp", "fen": "swamp", "fens": "swamp", "mire": "swamp",
+    "wetland": "swamp", "wetlands": "swamp", "quagmire": "swamp",
+    "desert": "desert", "dunes": "desert", "dune": "desert", "badlands": "desert",
+    "wastes": "desert", "wasteland": "desert", "sands": "desert", "hardpan": "desert",
+    "tundra": "tundra", "snowfield": "tundra", "icefield": "tundra", "glacier": "tundra",
+    "coast": "coast", "shore": "coast", "shoreline": "coast", "beach": "coast",
+    "strand": "coast", "cove": "coast", "riverbank": "coast", "riverside": "coast",
+    "lakeside": "coast", "lakeshore": "coast", "waterside": "coast", "river": "coast",
+    "stream": "coast", "brook": "coast", "creek": "coast", "lake": "coast",
+    "pond": "coast", "tarn": "coast", "waterfall": "coast",
+    "plains": "grassland", "plain": "grassland", "meadow": "grassland",
+    "meadows": "grassland", "steppe": "grassland", "prairie": "grassland",
+    "heath": "grassland", "heathland": "grassland", "grassland": "grassland",
+    "grasslands": "grassland", "savanna": "grassland", "scrub": "grassland",
+    "scrubland": "grassland",
+    "farmland": "farmland", "fields": "farmland", "field": "farmland",
+    "orchard": "farmland", "orchards": "farmland", "pasture": "farmland",
+    "pastures": "farmland", "vineyard": "farmland", "farm": "farmland",
+    "cave": "underground", "caves": "underground", "cavern": "underground",
+    "caverns": "underground", "grotto": "underground", "tunnel": "underground",
+    "tunnels": "underground", "mine": "underground", "mineshaft": "underground",
+    "underground": "underground",
+    "ruin": "ruins", "ruins": "ruins", "barrow": "ruins", "barrows": "ruins",
+    "tomb": "ruins", "crypt": "ruins", "catacombs": "ruins", "battlefield": "ruins",
+}
+# Compound-aware, as `geography.ground_in` is: "Grotburrow" holds no burrow and the
+# "mine head" no mine, because a letter or a hyphen either side refuses the match.
+_PLACE_GROUND_RE = _re.compile(
+    r"(?<![\w-])(" + "|".join(sorted(map(_re.escape, PLACE_GROUND), key=len, reverse=True))
+    + r")(?![\w-])")
+# The ground a place is OUTSIDE, as opposed to under a town: what lets an id with other
+# ground and a long spot path still parse as outside (`setting_of`).
+OPEN_GROUND = frozenset({"grassland", "farmland", "forest", "jungle", "swamp", "hills",
+                         "mountain", "desert", "tundra", "coast"})
+
+
+# Kind words that are as often an adjective or a landform in a name: "the green hills",
+# "the sand bar", "the salt flat".
+_NOT_A_BUILDING = frozenset({"green", "bar", "flat"})
+
+
+def _building_named(text: str) -> bool:
+    """Whether a name is a building's: the settlement table's kinds, a house, and every
+    word people say for one. "the Forest Inn" is an inn, not a forest; "the hut on the
+    hill" is a house."""
+    words = {*KINDS, *DWELLINGS, *KIND_WORDS} - _NOT_A_BUILDING
+    low = " ".join(str(text or "").lower().split())
+    return any(_re.search(r"(?<![\w-])" + _re.escape(w) + r"(?![\w-])", low)
+               for w in words if w)
+
+
+def ground_named(text: str) -> str:
+    """The ground a place's own words name, from the closed biome list, or "".
+
+    The first ground word in the text wins, because a place's head noun comes first: "the
+    cave in the hills" is a cave. A building's name names no ground (`_building_named`),
+    and nothing here is ever `urban` — a settlement's ground is urban by construction.
+    """
+    low = " ".join(str(text or "").lower().split())
+    if not low or _building_named(low):
+        return ""
+    m = _PLACE_GROUND_RE.search(low)
+    return PLACE_GROUND[m.group(1)] if m else ""
+
+
+def own_ground(name: str, about: str = "", kind: str = "") -> str:
+    """The ground a place made in play stands on by its own words, or "" to take its
+    parent's: its kind when the kind names ground ("mountain"), else its name, else what
+    it was said to be. A place with a building's kind is a building and names none."""
+    k = kind_named(kind)
+    if k and (k in KINDS or k in DWELLINGS or k in OUTSIDE_KINDS):
+        return ""
+    return ground_named(k) or ground_named(name) or ground_named(about)
+
+
+def ground_kind(kind: str) -> str:
+    """The ground a plan's `kind` names when it is not a kind of place: "mountain"."""
+    k = kind_named(kind)
+    return "" if known_kind(k) else PLACE_GROUND.get(k, "")
+
+
 def child_id(parent_id: str, label: str) -> str:
     """`{parent}/{slug}`: the id of a place made from another. The ground stays the
     parent's unless the child says otherwise — `terrain_of` reads the head."""
@@ -1604,7 +1734,20 @@ def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
     parent's unless given. `exits` are wired by `with_founded` at read time."""
     ground = str(terrain or "").strip().lower() or parent.terrain
     pid = child_id(parent.id, label)
-    if ground and ground != parent.terrain:
+    if ground and ground != parent.terrain and origin != "venture" \
+            and setting_of(parent.id) == "outside":
+        # Other ground out past the edge: the mountain off the road to Grotburrow. The
+        # head carries the new ground and the spot keeps the parent's whole path, so
+        # the id still parses as outside (`@` at its root, or a reach of open ground),
+        # a road's stretch still reads as that road, and `for_scene` does not graft a
+        # second wilderness of that ground beside it.
+        #
+        # Not for a venture, whose ids are seeded and saved: the cave off the outskirts
+        # is `~underground:the-outskirts/the-cave` in every save that went in, and
+        # minting it under a new id would make a second cave the next time.
+        spot = "/".join(_spot_path(parent.id))
+        pid = f"{region_key(location_of(parent.id), ground)}:{spot}/{_slug(label)}"
+    elif ground and ground != parent.terrain:
         # A different ground under the same roof: the sewers under a town. The head of
         # the id says so, so `scene.biome` parses right when the party is down there.
         pid = f"{region_key(location_of(parent.id), ground)}:{_slug(parent.name)}/{_slug(label)}"

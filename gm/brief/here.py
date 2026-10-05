@@ -27,9 +27,11 @@ SCAFFOLD = (
     "place between, in one turn. Never plan the route yourself.",
     "UNDERFOOT at",
     "(what is physically here, and what the map is drawn from):",
+    "This is the ground underfoot, and no other.",
 )
-# Printed only when the party stands outside the settlement (Lane B, 20.1).
-SOMETIMES = ("and not anywhere else;",)
+# Printed only when the party stands outside the settlement (Lane B, 20.1), and the
+# ground line only off the streets.
+SOMETIMES = ("and not anywhere else;", "This is the ground underfoot, and no other.")
 
 
 def section(ctx) -> tuple[str, dict]:
@@ -59,6 +61,24 @@ def section(ctx) -> tuple[str, dict]:
     else:
         lines = [f"\nHERE: {location.name}, {scale}."]
     facts: dict = {"settlement": location.name, "scale": scale, "setting": setting}
+    # The ground the party stands on, as a fact, whenever it is not the streets. The
+    # owner's mountain (2026-10-05) had none of its own to state, and the narrator, given
+    # "near Vormoor" and a land list of farmland, mountain and desert, wrote its boulders
+    # "weathered by the desert sun". Read off the place id (`places.terrain_of`, the one
+    # spatial authority), worded from the closed biome list, never from a model.
+    here_now = ctx.here
+    ground = ""
+    if here_now is not None:
+        from rules import biomes as _biomes
+        from rules import places as _places_ground
+
+        ground = str(getattr(here_now, "terrain", "") or "") \
+            or _places_ground.terrain_of(getattr(here_now, "id", ""))
+        if ground and ground != _places_ground.URBAN and ground in _biomes.BIOMES:
+            lines.append(f"  GROUND at {here_now.name}: {ground} — "
+                         f"{_biomes.BIOMES[ground].lower()}. This is the ground "
+                         f"underfoot, and no other.")
+            facts["ground"] = ground
     # Which part of it, and what leads out — stated the same way the cast is, because
     # it is the same rule. "WHO IS HERE (these refs are the only ones that exist)"
     # has grounded people since it was written; this file's own docstring has asked
