@@ -558,3 +558,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q7.2 Inheritance | **Atelier's model**: family slots, the player picks, traits travel through intermediates, same-named traits add capped by level, finished goods are dead ends (recommended). |
 | Q7.3 Apparatus | **Working traits only; vessels decide the product family**; catalysts never spent (recommended). |
 | Q7.4 Inert and legendary | **Three traits each; prima materia a wild trait, philosopher's mercury a catalyst never spent** (recommended). |
+
+### Round 8 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q8.1 Throwing | **The book's splash rules**: ranged touch attack, 1 splash within 5 ft, a miss lands nearby (recommended). |
+| Q8.2 Effect types | **All of them** become executable (speed, senses, light, area clouds, burning next round, glued/entangled, "against X only") (recommended). |
+| Q8.3 Shop items | **The same documents as the crafted ones**, bought at Sound quality (recommended). |
+| Q8.4 Stacking | **The owner's answer: "Normally no but if you have the stacking house rule switched on then yes."** By the book alchemical bonuses take the highest; with the existing `magic_stacking` house rule (rules/houserules.py DEFAULTS) on, they stack. One switch, read by the stacking funnel, not a second rule. |
