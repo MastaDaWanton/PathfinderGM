@@ -264,16 +264,20 @@ def test_a_paladin_smite_counts_against_its_target_and_nobody_else():
     assert any(b["source"].startswith("Smite Evil") for b in attack["breakdown"])
 
 
-def test_a_smite_on_a_printed_neutral_is_wasted_and_rest_ends_one():
-    """"If the paladin targets a creature that is not evil, the smite is wasted with no
-    effect." A wolf's block prints N: the use is spent and nothing lands. A thug prints
-    nothing, and the app records no alignment, so the smite holds and the tell says why.
-    A night's rest ends it (tag `recovery.rest`)."""
+def test_a_smite_works_on_any_foe_until_alignment_is_tracked_and_rest_ends_one():
+    """Owner, 2026-10-05: no alignment tracking yet, so smite evil works on anyone, with
+    a note that it will be limited later. Built first by the book, a smite at a wolf
+    (its block prints N) was wasted while one at the world's people, who print nothing,
+    held — the same ability answering two ways for a reason the player could not see.
+    The ability's own text says alignment is not tracked yet. A night's rest ends it
+    (tag `recovery.rest`)."""
     pc = _pc("paladin", 4)
     _scene, e = _fight(pc, "wolf")
     out = _use(e, "Smite Evil", to="c1")
-    assert "wasted" in out.tell and not any(x.name == "Smite Evil" for x in pc.effects)
+    assert "wasted" not in out.tell and any(x.name == "Smite Evil" for x in pc.effects)
     assert pc.pool("smite evil").current == pc.pool("smite evil").maximum - 1
+    smite = next(d for d in ca.documents()["paladin"]["abilities"] if d["key"] == "smite evil")
+    assert "Alignment isn't tracked yet" in smite["text"]
 
     pc2 = _pc("paladin", 4)
     scene2 = Scene()
@@ -283,7 +287,8 @@ def test_a_smite_on_a_printed_neutral_is_wasted_and_rest_ends_one():
     e2.scene.sides = {"pc": ["pc"], "them": ["c1"]}
     pc2.apply_effect  # noqa: B018 — the door below is the real one
     held = _use(e2, "Smite Evil", to="c1")
-    assert "Nothing records" in held.tell or "Battle is joined" in held.tell
+    assert "Nothing records" not in held.tell and "wasted" not in held.tell
+    assert any(x.name == "Smite Evil" for x in pc2.effects)
     pc2.rest("night")
     assert not any(x.name == "Smite Evil" for x in pc2.effects)
 
@@ -369,6 +374,35 @@ def test_channel_energy_harms_undead_with_a_will_save_for_half_and_no_dr():
     assert hit["reduced"] == 0
     assert hit["rolled"] == (rolled // 2 if save["saved"] else rolled)
     assert scene.actors["c2"].hp == thug_hp, "harm mode leaves the living alone"
+
+
+def test_a_cleric_chooses_negative_energy_at_each_use():
+    """Owner, 2026-10-05: with no alignment tracked yet, the cleric chooses which energy
+    to channel at each use. Before, only positive was on the menu ("Channel Energy (heal)"
+    and "(harm)") and negative needed a class choice the sheet never offered. Harming the
+    living is negative energy with a Will save for half and leaves the undead alone;
+    healing undead mends the skeleton and not the thug."""
+    pc = _pc("cleric", 5)
+    scene, e = _fight(pc, "thug", "skeleton")
+    thug, skel = scene.actors["c1"], scene.actors["c2"]
+    skel_hp = skel.hp
+    out = _use(e, "Channel Energy (harm the living)")
+    hit = next(r for r in out.effects if r.get("kind") == "damage" and r.get("ref") == thug.ref)
+    assert hit.get("type", "negative") == "negative" or "negative" in out.tell
+    assert thug.hp < thug.hp_max
+    assert skel.hp == skel_hp, "negative energy does not harm the undead"
+    assert pc.hp == pc.hp_max, ("the cleric leaves herself out of her own harmful burst: "
+                                "built without it, she fell unconscious with the thug")
+    assert any(r.get("kind") == "save" and r.get("ref") == thug.ref for r in out.effects)
+
+    pc2 = _pc("cleric", 5)
+    scene2, e2 = _fight(pc2, "thug", "skeleton")
+    thug2, skel2 = scene2.actors["c1"], scene2.actors["c2"]
+    thug2.hp, skel2.hp = thug2.hp_max - 3, skel2.hp_max - 3
+    _use(e2, "Channel Energy (heal undead)")
+    assert skel2.hp > skel2.hp_max - 3 and thug2.hp == thug2.hp_max - 3
+    names = [c for c in ca.documents()["cleric"]["abilities"][0]["choice"]["options"]]
+    assert {"heal", "harm", "harm the living", "heal undead"} <= set(names)
 
 
 def test_the_burst_is_thirty_feet_on_a_map():

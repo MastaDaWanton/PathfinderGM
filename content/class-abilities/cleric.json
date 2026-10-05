@@ -2,7 +2,7 @@
   "class": "cleric",
   "_source": "Core Rulebook, Cleric (d20pfsrd.com/classes/core-classes/cleric/, read 2026-10-05).",
   "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
-  "_energy_note": "Positive or negative energy follows alignment in the book, and the app has no alignment (the 2026-09-19 ruling). Positive is the default; a cleric whose `class_choices` say \"channel energy\": \"negative\" channels negative, which swaps who is healed and who is harmed.",
+  "_energy_note": "Positive or negative energy follows alignment in the book, and the app has no alignment yet. Owner ruling 2026-10-05: until it does, the cleric chooses at each use: heal the living or harm undead (positive), harm the living or heal undead (negative). When alignment tracking is added, this is where the choice is narrowed. The older `class_choices` \"channel energy\": \"negative\" swap still applies to the first two modes.",
   "abilities": [
     {
       "key": "channel energy",
@@ -10,7 +10,7 @@
       "aliases": ["channel", "channel positive energy", "channel divine energy"],
       "level": 1,
       "source": "CRB p.40 Channel Energy: 3 + Cha a day; 1d6 + 1d6 per two levels beyond 1st; 30-ft radius on the cleric; standard action; positive heals the living or harms undead (Will DC 10 + 1/2 level + Cha for half); the cleric may include herself.",
-      "text": "Heal the living or harm the undead in a 30-ft burst.",
+      "text": "A 30-ft burst of positive energy (heal the living or harm undead) or negative energy (harm the living or heal undead), chosen at each use. Alignment isn't tracked yet, so any cleric may channel either for now.",
       "action": "standard",
       "pool": {"id": "channel energy", "max": "3 + cha_mod", "refresh": "rest.night"},
       "cost": {"pool": "channel energy", "amount": 1},
@@ -27,7 +27,12 @@
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
                    "damage_type": "positive",
                    "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
-                            "success": "half"}}
+                            "success": "half"}},
+          "harm the living": {"living": true, "undead_only": false, "roll_as": "damage",
+                              "harmful": true, "damage_type": "negative",
+                              "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
+                                       "success": "half"}},
+          "heal undead": {"living": false, "undead_only": true, "roll_as": "heal"}
         }
       },
       "negative": {

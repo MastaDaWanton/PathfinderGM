@@ -15327,7 +15327,11 @@ class Engine:
         elif affects == "enemies":
             pool = [a for a in here if self._against(actor, a) and not a.is_down]
         else:
-            pool = list(here)
+            # "A cleric can choose whether or not to include herself in this effect" (CRB
+            # p.40). Nobody chooses to be in their own harmful burst: built without this,
+            # a negative channel to harm the living put the cleric unconscious and dying
+            # alongside the thug (2026-10-05). A burst that heals keeps her in it.
+            pool = [a for a in here if not (doc.get("harmful") and a is actor)]
         pool = [a for a in pool if near(a, radius) and fits(a)]
         count = ca.amount(doc.get("count"), actor) if doc.get("count") else 0
         if count > 0:
