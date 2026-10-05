@@ -531,3 +531,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q4.2 Spell potions | **A formula plus reagents that carry the right trait** (recommended). |
 | Q4.3 Which spells | **The owner's own rule: "I want potions to hold any spell and the max spell level should be 1/2 alchemy level with a minimum of 1. I understand that this allows personal range spells to become ranged, i am okay with this."** So: any spell, including personal range (it then works on whoever drinks it); highest spell level = max(1, floor(Alchemist level / 2)), which the endless levels carry to 9th at Alchemist 18. The book's 3rd-level cap and personal-range ban are deliberately overruled. Open for the plan: the caster level a potion is priced and resolved at (the book's minimum caster level for the spell level is the natural default). |
 | Q4.4 Prices | **Book prices for book items**, the tier ladder for house products, quality multiplying both, material prices checked against them (recommended). |
+
+### Round 5 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q5.1 Learning reagents | **Assay at the bench plus the herb routes**; volatile/toxic assays are dangerous for real (recommended). |
+| Q5.2 Learning formulae | **Books and experiment**; a fixed table, never secret per world (recommended). |
+| Q5.3 Hints | **A count of possible formulae, never their names** (recommended). |
+| Q5.4 Starting knowledge | **Homeland reagents and the four book classics** as formulae (recommended). |
