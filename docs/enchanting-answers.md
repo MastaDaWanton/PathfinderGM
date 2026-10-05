@@ -29,3 +29,21 @@ on master e028885). Nothing is designed yet; these rulings bind the plan.
 | Two modes | **One craft, essences feed both.** A catalogue item is a known recipe of essences and a vessel; free-form binding makes your own. Same bench, rules and curses. |
 | Bench | **Its own bench, built from the shared parts** (the bench core), with a 3D stage: the item on a circle of chalk and inks, lit by candles and the essence's glow. |
 | Old saves | **Convert.** Levels above 3 become endless levels with perks picked on first load; old enchanted items keep their +N and specs, re-derived onto the new layer where possible, the old record kept beside them for one version. |
+
+## Round 4: the plan's open points (2026-10-05)
+
+These settle `docs/enchanting-revamp-plan.md` §22. Where an answer differs from what the plan
+took, **the answer wins** and the plan section named must be built to it.
+
+| Open point | Owner's answer |
+|---|---|
+| 1. Capacity (§6.3) | **Uncapped, half the Enchanter level, quality adds on top.** An item holds floor(Enchanter level / 2) worth of enhancement-equivalent bonus, with no +10 ceiling (Enchanter 20 = +10, Enchanter 30 = +15). The smith's quality adds a little more room on top (proposed: +1 per quality step above Superior, and the Capacity perk +1 each). *Replaces the plan's Superior +8 / Flawless +9 / +10 cap.* |
+| 2. Curse visibility (§11.1) | **Know it is flawed, not which curse.** The d20 and margin are shown, the verdict says FLAWED; which curse stays hidden until identified. (As taken.) |
+| 3. Curse rows (§11.2) | **Drop all of them**: change of gender, race and alignment; polymorph; incurable disease; compulsion to attack. The d% is re-scaled over the rest. (As taken.) |
+| 4. Caster level (§4.2) | **+5 DC per missing requirement, never a refusal.** (As taken.) |
+| 5. Countdowns (§6.8, §15) | **Runs on the calendar, and no limit to how many things are in progress at once**, in every craft. They sit in the In progress section/sidebar the other crafts use, with countdowns on game time. *Replaces "one binding in progress at a time".* |
+| 6. Unbind (§13) | **The item stays, a quarter of the motes come back.** (As taken.) |
+| 7. Alignment | Waived: the app tracks no alignment yet (owner ruling of the same day for smite and channel energy). Holy and its kin neither check the maker's alignment nor give the wielder a negative level until alignment exists. |
+| 8. Bane and DR (§9) | **Yes**: bane's +2 against its foe counts toward the +3/+4/+5 DR thresholds. (As taken.) |
+| 9. Numbers | **Use the proposed numbers, tune in play**: 1 mote = 100 gp; cold iron +2,000 gp = 20 motes; affinity −1 DC, max −2; favourable-time windows ×1.5; residue a quarter; attuned vessels hold a day; perk sizes as proposed. |
+| 10. Planetary hours (§17) | **Not Earth's planets: "this is not earth", and named planets would not be world-agnostic.** Replaced by **phases of the day only**: dawn, morning, noon, dusk, night and midnight each favour some essence families (e.g. fire at noon, the dead at midnight, frost before dawn). Needs nothing from the world. `rules/sky.py` becomes day phases from the game clock; each essence family names its phase (`phase`, not `planet`) in data; the bench says "Noon, 42 minutes left" / "Midnight in 3 hours 10 minutes" with **Wait for it**. |
