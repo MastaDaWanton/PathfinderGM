@@ -273,6 +273,19 @@ def find_ability(actor, wanted: str) -> tuple[str, str, list[dict]]:
                      if n.lower() == listed))
             specs = (det.get("effects") or {}).get(key or "", [])
             return path, listed, [resolve_effect(s, actor, path) for s in specs]
+    # Then the core classes' documents (rules/class_abilities.py), so one lookup answers
+    # "do they have it" for both kinds. Measured 2026-10-05: the GM's doors in
+    # gm/judgement.py asked only this function, so "use my Fire Bolt on the cutpurse" from
+    # a Fire-domain cleric found nothing, no `use_ability` was declared, and the narration
+    # described a hit while the pool stayed 6/6. A class ability answers with path "" and
+    # no effects — its document is the engine's to execute (`Engine._use_class_ability`),
+    # and nothing here applies it. `usable_names` stays the path half on purpose: its two
+    # readers (the brief, the engine's refusal) already add `class_abilities` beside it.
+    from . import class_abilities
+
+    doc, _choice = class_abilities.find(actor, wanted)
+    if doc is not None:
+        return "", str(doc.get("name") or ""), []
     return "", "", []
 
 

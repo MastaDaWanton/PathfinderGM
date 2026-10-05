@@ -25,15 +25,21 @@
         "kind": "condition",
         "default": "stunned",
         "options": {
-          "stunned": {"level": 1, "charge_condition": "stunned", "charge_rounds": 1},
-          "fatigued": {"level": 4, "charge_condition": "fatigued"},
-          "sickened": {"level": 8, "charge_condition": "sickened", "charge_rounds": 10},
+          "stunned": {"level": 1, "charge_condition": "stunned", "charge_rounds": 1,
+                      "aliases": ["stun", "stuns"]},
+          "fatigued": {"level": 4, "charge_condition": "fatigued",
+                       "aliases": ["fatigue", "tire", "exhaust"]},
+          "sickened": {"level": 8, "charge_condition": "sickened", "charge_rounds": 10,
+                       "aliases": ["sicken", "sick", "nauseate"]},
           "staggered": {"level": 12, "charge_condition": "staggered",
-                        "charge_rounds_dice": "1d6+1"},
-          "blinded": {"level": 16, "charge_condition": "blinded"},
-          "deafened": {"level": 16, "charge_condition": "deafened"},
+                        "charge_rounds_dice": "1d6+1", "aliases": ["stagger"]},
+          "blinded": {"level": 16, "charge_condition": "blinded",
+                      "aliases": ["blind"]},
+          "deafened": {"level": 16, "charge_condition": "deafened",
+                       "aliases": ["deafen", "deaf"]},
           "paralyzed": {"level": 20, "charge_condition": "paralyzed",
-                        "charge_rounds_dice": "1d6+1"}
+                        "charge_rounds_dice": "1d6+1",
+                        "aliases": ["paralyze", "paralyse", "paralysed"]}
         }
       },
       "tell": "{name} gathers ki into the next blow.",

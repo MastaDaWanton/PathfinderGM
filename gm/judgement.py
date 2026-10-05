@@ -3048,7 +3048,9 @@ def manner_checks(player_text: str, scene) -> list[dict]:
 _USES_A_NAMED_THING = re.compile(
     r"\bI\s+(?:use|activate|unleash|trigger|invoke|channel)\s+(?:my\s+)?"
     r"((?:[A-Z][\w'-]*)(?:\s+(?:(?:on|of|the|and|in|to)\s+)?[A-Z][\w'-]*){0,4})"
-    r"(?=\s+(?:on|at|against|upon|toward|towards)\b|[.,!;]|\s*$)")
+    # A bracketed choice may follow: "I use Channel Energy (harm the living)" fell out of
+    # this door until 2026-10-05 because "(" was not an ending it knew.
+    r"(?=\s+(?:on|at|against|upon|toward|towards)\b|[.,!;]|\s*\(|\s*$)")
 
 
 def refuse_unknown_ability(raw_intents, player_text: str, scene) -> list:
@@ -3081,9 +3083,22 @@ def refuse_unknown_ability(raw_intents, player_text: str, scene) -> list:
         return raw_intents
     from rules import leveling
 
+    # `find_ability` answers for the core classes' documents too since 2026-10-05; before
+    # that, "I use Smite Evil" resolved only by accident — refused here as unknown, and
+    # rescued by the `use_ability` put in its place, which the engine's own lookup found.
     _path, found, _fx = leveling.find_ability(pc, name)
     if found:
-        return raw_intents
+        if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "use_ability"
+               for r in raw_intents):
+            return raw_intents
+        # Theirs, named with a using verb, and nothing routed it: route it, with the
+        # bracketed choice when one follows the name.
+        rest = str(player_text)[m.end():]
+        bracket = re.match(r"\s*(\([^)]*\))", rest)
+        named = f"{name} {bracket.group(1)}" if bracket else name
+        return list(raw_intents) + [{"op": "use_ability", "actor": pc.ref,
+                                     "because": f"the player used {name}",
+                                     "params": {"ability": named}}]
     stock = getattr(pc, "stock", None) or {}
     low = name.lower()
     jar = next((k for k, v in stock.items()
@@ -3338,7 +3353,12 @@ def _sheet_vocabulary(pc) -> set[str]:
     try:
         from rules import leveling
 
+        from rules import class_abilities
+
+        # Both halves: the paths' abilities and the core classes' documents (a cleric's
+        # "channel", a Fire domain's "fire bolt") are the sheet's words too.
         bits.extend(str(n) for n in leveling.usable_names(pc))
+        bits.extend(str(n) for n in class_abilities.names(pc))
     except Exception:  # noqa: BLE001 — an unreadable sheet vouches for nothing extra
         pass
     try:
@@ -4902,6 +4922,282 @@ def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
     return raw_intents
 
 
+# --- a class ability typed at the table ----------------------------------------------
+#
+# The NAMES are the sheet's, a closed vocabulary: `class_abilities.vocabulary` gives every
+# name and alias the documents print for this character, and a mode's words are the
+# document's own (`options.<key>.aliases`, read by `class_abilities.option_for`). What
+# code decides here is only whether the name sits in the sentence as a thing being DONE —
+# the grammar, never the ability. Three shapes do that, the same three a MUD parser
+# accepts for a skill (a verb with the skill as its object, the skill as the verb, the
+# skill as the instrument):
+#
+#   "I use my Fire Bolt on him", "hurl a fire bolt at", "spend ki for speed"   (object)
+#   "I rage", "I channel to heal", "Rage, then I swing", "I lay hands on her"  (verb)
+#   "I punch him with a stunning fist", "attack with my claws"              (instrument)
+#
+# And the name as a verb is held to what follows it, because English owns most of these
+# words first. Measured on the corpus (scratchpad typed_corpus.py, 20 lines that must not
+# fire): "I rage at the merchant's prices" is the idiom for anger, "I channel my anger
+# into my swing" is not channel energy, "I smite the table with my fist" is a punch. So
+# after a name used as a verb, the clause must end, join on, or carry a preposition —
+# "about"/"over" never, and "at" only for an ability that reaches somebody (raging at a
+# merchant reaches nobody) — or its object must be the ability's own words ("my divine
+# energy") or somebody here ("I smite the cutpurse": decided, a paladin's "smite" at a
+# creature is Smite Evil — the document lists "smite" as its alias).
+_ABILITY_VERBS = (
+    r"use|activate|invoke|unleash|trigger|call\s+(?:on|upon|up)|draw\s+(?:on|upon)|"
+    r"perform|start|begin|strike\s+up|enter|go\s+into|fly\s+into|"
+    r"fire|cast|hurl|throw|launch|loose|shoot|spend|grow|extend|bare|unsheathe")
+_AS_OBJECT = re.compile(
+    r"(?:^|[^\w'])(?:" + _ABILITY_VERBS + r")\s+(?:(?:my|a|an|the|our|some)\s+)?$")
+_AS_INSTRUMENT = re.compile(r"(?:^|[^\w'])with\s+(?:my|a|an|the)\s+$")
+# The name as the verb: right after "I" (an adverb may sit between), at the start of a
+# sentence (the imperative a player types — "Rage!"), or joined to an earlier deed of
+# the same "I" ("I draw my axe and rage").
+_AS_VERB = re.compile(
+    r"(?:^|[^\w'])i\s+(?:(?:then|now|quickly|immediately|instantly|also|just|first|"
+    r"swiftly|promptly)\s+)?(?:(?:begin|start|try|attempt)\s+to\s+)?$")
+_JOINED_ON = re.compile(r"(?:^|[^\w'])(?:and|then|and\s+then)\s+$")
+_NEGATED_USE = re.compile(r"n't\s+(?:\w+\s+)?$|\b(?:not|never|no\s+longer|without)\s+"
+                          r"(?:\w+\s+){0,2}$")
+# Wanting is not doing: "I want to use my fire bolt later" fired on the held-out lines.
+# "I'll" is left alone on purpose — at a table "I'll rage and hit him" is the declaration.
+_INTENDED_USE = re.compile(r"\b(?:want|wants|plan|intend|hope|wish|should|could|would|"
+                           r"might|may)\s+(?:to\s+)?(?:\w+\s+){0,3}$")
+# Prepositions that point the deed at a THING: after a name used as a verb, what follows
+# them must be somebody here, a pronoun or the ability's own words. Held-out lines: "I lay
+# hands on the altar and pray" and "I rage against the dying of the light" both fired
+# while every preposition was accepted.
+_POINTING = frozenset({"on", "upon", "onto", "at", "against", "toward", "towards"})
+_THEN_ON = frozenset({"and", "then", "so", "before", "while", "now", "again", "first",
+                      "immediately", "quickly", "as", "until"})
+_PREPOSITIONS = frozenset({"on", "upon", "against", "into", "to", "for", "towards",
+                           "toward", "in", "with", "at", "onto", "across", "around",
+                           "through", "from"})
+_DETERMINERS = frozenset({"my", "a", "an", "the", "our", "his", "her", "their", "its",
+                          "some", "all", "every", "this", "that"})
+_SELF_WORDS = frozenset({"myself", "me", "self"})
+_PRONOUNS = frozenset({"him", "her", "them", "it", "us", "everyone", "everybody",
+                       "myself", "me"})
+
+
+@dataclass
+class _TypedAbility:
+    doc: dict
+    choice: str
+    after: str
+
+
+def _people_named(text: str, scene, pc) -> list[str]:
+    """The refs of everybody here whose name the words carry — word-bounded, articles
+    ignored, so "the cutpurse" finds the man named "the cutpurse"."""
+    low = " " + re.sub(r"[^a-z0-9' ]+", " ", str(text or "").lower()) + " "
+    out: list[str] = []
+    for ref, actor in (getattr(scene, "actors", {}) or {}).items():
+        if actor is pc or not getattr(actor, "name", ""):
+            continue
+        name = re.sub(r"^(?:the|a|an)\s+", "", actor.name.lower()).strip()
+        name = " ".join(re.sub(r"[^a-z0-9' ]+", " ", name).split())
+        if name and f" {name} " in low:
+            out.append(ref)
+    return out
+
+
+def _follows_as_a_use(after: str, doc: dict, scene, pc) -> bool:
+    """Whether the words after a name used as a VERB make it the ability — see above."""
+    a = after.lstrip()
+    if not a or a[0] in ",.;:!()[]—–-":
+        return True
+    words = re.findall(r"[a-z][a-z']*", a.lower())
+    if not words:
+        return True
+    first = words[0]
+    if first in _THEN_ON:
+        return True
+    if first in ("about", "over"):
+        return False
+    if first in ("at", "against") and str(doc.get("affects") or "self") == "self":
+        return False                # raging at a merchant reaches nobody
+    if first in _PREPOSITIONS and first not in _POINTING:
+        return True
+    from rules import class_abilities
+
+    if first in _POINTING:
+        words = words[1:]
+    obj = []
+    for w in words[:4]:
+        if w in _PREPOSITIONS or w in _THEN_ON:
+            break
+        if w not in _DETERMINERS:
+            obj.append(w)
+    if any(w in _PRONOUNS for w in obj):
+        return True
+    if set(obj) & class_abilities.words_of(doc):
+        return True
+    return bool(_people_named(" ".join(obj), scene, pc))
+
+
+def _choice_said(pc, doc: dict, after: str) -> str:
+    """The bracketed or spoken choice for this document, in its own vocabulary: a
+    mode's or condition's words (`option_for`), or one of the forms or skills
+    `choices_of` lists for this character. "" when the words name none — the engine
+    then takes the document's default or says which choices exist."""
+    from rules import class_abilities
+
+    kind = (doc.get("choice") or {}).get("kind")
+    if not kind:
+        return ""
+    m = re.match(r"\s*[(\[]([^)\]]+)[)\]]", after)
+    if m:
+        return " ".join(m.group(1).split())
+    if kind in ("mode", "condition"):
+        return class_abilities.option_for(doc, after)
+    low = " " + re.sub(r"[^a-z0-9' ]+", " ", after.lower()) + " "
+    best = ""
+    for option in class_abilities.choices_of(pc, doc):
+        o = " ".join(str(option).lower().replace("-", " ").split())
+        if o and f" {o} " in low and len(o) > len(best):
+            best = str(option)
+    return best
+
+
+def _typed_class_ability(player_text: str, scene, pc) -> _TypedAbility | None:
+    """The core-class ability (rules/class_abilities.py) the player's own words declare
+    using, or None. Speech is redacted first: "I rage at the gods!" said aloud is a line.
+
+    Decided over every document the class prints, had or not — a 2nd-level druid's
+    "I wild shape into a wolf" must reach the engine's refusal that names 4th level, not
+    the narrator, who would write the wolf.
+    """
+    from rules import class_abilities
+
+    said = redact_speech(str(player_text or "")).replace("’", "'")
+    low = said.lower()
+    if not low.strip():
+        return None
+    for phrase, doc in class_abilities.vocabulary(pc):
+        for m in re.finditer(r"(?<![\w'])" + re.escape(phrase) + r"(?![\w'])", low):
+            start = max(low.rfind(c, 0, m.start()) for c in ".!?;\n") + 1
+            before = low[start:m.start()]
+            stop = min([i for i in (low.find(c, m.end()) for c in ".!?;\n") if i != -1]
+                       or [len(low)])
+            after = low[m.end():stop]
+            if _NEGATED_USE.search(before[-40:]) or _INTENDED_USE.search(before[-40:]):
+                continue
+            if _AS_OBJECT.search(before) or _AS_INSTRUMENT.search(before):
+                pass
+            elif (_AS_VERB.search(before) or not before.strip()
+                  or (_JOINED_ON.search(before)
+                      and re.match(r"\s*i\b", before))):
+                if not _follows_as_a_use(after, doc, scene, pc):
+                    continue
+            else:
+                continue
+            return _TypedAbility(doc=doc, choice=_choice_said(pc, doc, after), after=after)
+    return None
+
+
+def _same_doc(a: dict | None, b: dict) -> bool:
+    return a is not None and (str(a.get("name")), str(a.get("class"))) == (
+        str(b.get("name")), str(b.get("class")))
+
+
+def _with_class_ability(raw_intents, typed: _TypedAbility, scene, pc) -> list:
+    """The plan with the typed class ability in it as the one `use_ability` for it.
+
+    The model's guesses at what the ability does go: a `damage`, `heal`, `condition` or
+    `save` it wrote is a number nothing granted (the stage-8 gate refuses an unstamped one
+    anyway, and the refusal reads as the ability failing), and an `attack` goes when the
+    ability is itself the attack roll (a ray, a touch). An attack that is a separate deed —
+    "I rage and attack the cutpurse", the blow a stunning fist charges — stays, and the
+    ability is put in front of it so the blow feels it. A model `use_ability` naming the
+    same ability is replaced (its target kept if ours has none); one naming another ability
+    the character really has stays.
+    """
+    from rules import class_abilities, leveling
+    from rules.intents import AMOUNT_OPS
+
+    doc = typed.doc
+    name = str(doc.get("name"))
+    params: dict = {"ability": f"{name} ({typed.choice})" if typed.choice else name}
+
+    affects = str(doc.get("affects") or "self")
+    aim = str(doc.get("aim") or ("self" if affects in ("self", "allies") else "foe"))
+    model_to = None
+    kept = []
+    for r in raw_intents:
+        if not isinstance(r, dict):
+            continue
+        op = str(r.get("op", "")).lower()
+        if op == "use_ability":
+            named = str((r.get("params") or {}).get("ability", "")).strip()
+            other, _c = class_abilities.find(pc, named)
+            if other is None or _same_doc(other, doc):
+                if other is None and leveling.find_ability(pc, named)[1]:
+                    kept.append(r)          # a path ability they really have
+                    continue
+                model_to = (r.get("params") or {}).get("to") or model_to
+                continue
+            kept.append(r)
+            continue
+        if op in AMOUNT_OPS or op in ("condition", "save"):
+            continue
+        if op == "attack" and doc.get("attack"):
+            model_to = r.get("target") or model_to
+            continue
+        if op == "cast":
+            spell = str((r.get("params") or {}).get("spell", "")).strip().lower()
+            if spell and spell in {p for p, d in class_abilities.vocabulary(pc)
+                                   if _same_doc(d, doc)}:
+                continue
+        kept.append(r)
+
+    if affects in ("target", "ally"):
+        here = getattr(scene, "actors", {}) or {}
+        to = None
+        if re.search(r"(?<![\w'])(?:myself|me)(?![\w'])", typed.after):
+            to = pc.ref
+        named = _people_named(typed.after, scene, pc)
+        if to is None and named:
+            to = named[0]
+        if to is None and isinstance(model_to, str) and model_to in here:
+            to = model_to
+        if to is None:
+            mine = _sides_of(scene, pc)
+            pool = [r for r, a in here.items() if a is not pc and _can_be_fought(a)]
+            if aim == "foe":
+                pool = [r for r in pool if r not in mine]
+            elif affects == "ally":
+                pool = [r for r in pool if r in mine]
+            else:
+                pool = []
+            # One and nobody named is not a guess — `fill_obvious_targets`' rule.
+            if len(pool) == 1:
+                to = pool[0]
+        if to:
+            params["to"] = to
+
+    op = {"op": "use_ability", "actor": pc.ref, "params": params,
+          "because": f"the player used {name}"}
+    at = next((i for i, r in enumerate(kept)
+               if str(r.get("op", "")).lower() in ("attack", "maneuver", "coup_de_grace")),
+              len(kept))
+    return kept[:at] + [op] + kept[at:]
+
+
+def _sides_of(scene, pc) -> set[str]:
+    """The refs on the PC's side: the fight's sides when there is one, else whoever
+    travels with them — `Engine._against`'s rule, read from the scene."""
+    from rules import states
+
+    for refs in (getattr(scene, "sides", None) or {}).values():
+        if pc.ref in refs:
+            return set(refs)
+    return {r for r, a in (getattr(scene, "actors", {}) or {}).items()
+            if a is pc or a.has_state(states.TRAVELS_WITH_YOU)}
+
+
 def inject_ability(raw_intents, player_text: str, scene) -> list:
     """A named class ability the player reached for reaches the engine.
 
@@ -4912,17 +5208,29 @@ def inject_ability(raw_intents, player_text: str, scene) -> list:
     Matched on the ability's own name appearing in what the player typed, longest
     first so "Blood Pool Manifestation" is not read as "Blood Pool". A question is not
     a use.
+
+    The core classes' documents come first (`_typed_class_ability`). Measured 2026-10-05:
+    this door returned at "no paths" before looking at anything else, so every typed
+    rage, channel, smite and domain bolt fell through it — "use my Fire Bolt on the
+    cutpurse" declared nothing, the narrator wrote the bolt hitting, and the pool stayed
+    6 of 6. Over 41 typed lines across eight classes, 4 reached the right ability before.
     """
     if not isinstance(raw_intents, list) or not player_text or scene is None:
         return raw_intents
     if "?" in player_text:
         return raw_intents
+    pc = scene.pc()
+    if pc is None:
+        return raw_intents
+
+    typed = _typed_class_ability(player_text, scene, pc)
+    if typed is not None:
+        return _with_class_ability(raw_intents, typed, scene, pc)
+
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if "use_ability" in present:
         return raw_intents
-
-    pc = scene.pc()
-    if pc is None or not getattr(pc, "paths", None):
+    if not getattr(pc, "paths", None):
         return raw_intents
 
     from rules import leveling
