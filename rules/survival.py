@@ -103,16 +103,23 @@ def hardship(biome: str) -> int:
     return BIOME_HARDSHIP.get((biome or "").strip().lower(), 0)
 
 
-def awake_dc(hours_awake: int, biome: str = "") -> int:
-    """DC 10 at the first hour past the grace, and one harder every hour after.
+def awake_dc(checks_made: int, biome: str = "") -> int:
+    """DC 10 for the first Will save past the grace, and one harder for every save made
+    since the last sleep — the book's "+1 for each previous check", as thirst and hunger
+    already count it.
 
-    The rise is what makes a long night a decision rather than a single gamble: hour
-    twenty-five is trivial and hour forty is not, and the character can always stop.
+    It counted HOURS AWAKE until 2026-10-05, and the two are not the same number: the
+    owner's panel read "past a day awake — Will save every active hour, DC 107" (Sammy,
+    day 6, 121 hours awake). Hours reach the awake counter by two doors — `pass_hours`,
+    which rolls a save for each one, and `Scene.advance`, which moves the counters and
+    rolls nothing — so ninety-seven hours that had never been asked raised the DC as if
+    each had been passed. 107 is past any Will save a character can make: only a natural
+    20 (`dice.d20_succeeds`) ever passes it. Counted by checks made, the rise is the one
+    the design asked for — inside one long `pass_hours` stretch a check IS an hour, so
+    hour twenty-five is still trivial and hour forty still is not — and it cannot run
+    away on hours nobody rolled for.
     """
-    over = max(0, int(hours_awake) - AWAKE_GRACE_HOURS)
-    if over <= 0:
-        return 0
-    return BASE_DC + over + hardship(biome)
+    return BASE_DC + max(0, int(checks_made)) + hardship(biome)
 
 
 def thirst_dc(checks_made: int) -> int:
@@ -227,8 +234,10 @@ def pass_hours(actor, hours: int, dice, biome: str = "") -> Toll:
                     toll.conditions.append("fatigued")
 
         if not exempt(actor, NO_SLEEP) and awake_hours > AWAKE_GRACE_HOURS:
-            dc = awake_dc(awake_hours, biome)
+            made = int(getattr(actor, "awake_checks", 0))
+            dc = awake_dc(made, biome)
             got = _check(actor, "Exhaustion", dc, dice, save="will")
+            actor.awake_checks = made + 1
             toll.checks.append(got)
             if not got["passed"]:
                 taken = dice.roll(PARCHED_DAMAGE, label="exhaustion",
@@ -249,10 +258,74 @@ def pass_hours(actor, hours: int, dice, biome: str = "") -> Toll:
     return toll
 
 
+_NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight",
+                 "nine", "ten", "eleven", "twelve")
+
+
+def _days(hours: int) -> str:
+    """Whole days in words, for the narrator: "five days", "more than a day"."""
+    days = int(hours) // HOURS_PER_DAY
+    if days <= 1:
+        return "more than a day"
+    word = _NUMBER_WORDS[days] if days < len(_NUMBER_WORDS) else "many"
+    return f"{word} days"
+
+
+@dataclass(frozen=True)
+class Strain:
+    """One thing the body is carrying that the page should show (`strains`)."""
+    key: str        # hunger | thirst | sleep | wounds | fatigue
+    words: str      # the fact, in words for the brief — never a number the model could copy
+    severe: bool = True
+
+
+def strains(actor) -> list[Strain]:
+    """What the player's body is carrying right now, worst first, in words.
+
+    The owner, 2026-10-05: *"prose acts like im okay but im literally starving and days
+    past the last rest. the prose should reflect this."* The panel said Life 18 of 73,
+    starving, past a day awake; the brief said "18/73 hp" and nothing else — hunger,
+    thirst and wakefulness reached the sidebar (`Actor._needs_summary`) and never the
+    narrator. This is the one derivation both the brief (`gm.prompts.scene_now`) and the
+    check that holds the page to it (`gm/checks/body_shown.py`) read, so the two cannot
+    disagree, and it reads the same counters and graces the panel reads.
+
+    Only what 1e itself treats as a cost: a need past its grace (the hour the checks
+    start), a fatigue condition (asked as a tag, `has_state`), and wounds at half or
+    worse. "Hungry since lunch" is not a fact the page owes the player. A body that is
+    down is the fight's business, not this line's.
+    """
+    out: list[Strain] = []
+    if actor is None or getattr(actor, "is_down", False):
+        return out
+    hp, top = int(getattr(actor, "hp", 0) or 0), int(getattr(actor, "hp_max", 0) or 0)
+    left = hp - int(getattr(actor, "nonlethal", 0) or 0)
+    if top > 0 and left * 4 <= top:
+        out.append(Strain("wounds", "gravely hurt, with little strength left in them"))
+    elif top > 0 and left * 2 <= top:
+        out.append(Strain("wounds", "badly hurt"))
+    fed = int(getattr(actor, "fed_minutes", 0) or 0) // MINUTES_PER_HOUR
+    if not exempt(actor, NO_FOOD) and fed > hours_until_hungry(actor):
+        out.append(Strain("hunger", f"starving — {_days(fed)} without food"))
+    wet = int(getattr(actor, "watered_minutes", 0) or 0) // MINUTES_PER_HOUR
+    if not exempt(actor, NO_WATER) and wet > hours_until_thirsty(actor):
+        out.append(Strain("thirst", f"parched — {_days(wet)} without water"))
+    awake = int(getattr(actor, "awake_minutes", 0) or 0) // MINUTES_PER_HOUR
+    if not exempt(actor, NO_SLEEP) and awake > AWAKE_GRACE_HOURS:
+        out.append(Strain("sleep", f"{_days(awake)} without sleep"))
+    has = getattr(actor, "has_state", None)
+    if callable(has) and has("state.impaired.exhausted"):
+        out.append(Strain("fatigue", "exhausted — every movement is an effort"))
+    elif callable(has) and has("state.impaired.fatigued"):
+        out.append(Strain("fatigue", "fatigued — heavy-limbed and slow"))
+    return out
+
+
 def sleep(actor, hours: int = 8) -> None:
     """A night resets the clock. Called by `rest`, which already does the healing."""
     if int(hours) >= 6:
         actor.awake_minutes = 0
+        actor.awake_checks = 0
         actor.thirst_checks = 0
         actor.hunger_checks = 0
 
@@ -268,6 +341,6 @@ def drink(actor) -> None:
 
 
 __all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "NO_FOOD", "NO_SLEEP", "NO_WATER",
-           "Toll", "awake_dc", "drink", "eat", "exempt", "hardship", "hours_until_hungry",
-           "hours_until_thirsty", "hunger_dc", "pass_hours", "sleep", "state",
-           "thirst_dc"]
+           "Strain", "Toll", "awake_dc", "drink", "eat", "exempt", "hardship",
+           "hours_until_hungry", "hours_until_thirsty", "hunger_dc", "pass_hours", "sleep",
+           "state", "strains", "thirst_dc"]

@@ -97,6 +97,46 @@ def lexicon_words(ctx, land) -> set[str]:
     return out
 
 
+# A sentence that looks out at the far ring rather than standing in it.
+_FAR = re.compile(r"\b(?:distance|distant|horizon|far|farther|further|beyond|away|afar|"
+                  r"skyline|miles|leagues|ahead|yonder|off to)\b", re.I)
+
+
+def ground_here(ctx) -> set[str]:
+    """The ground the party stands on, as far as the engine can say: the place id's own
+    terrain (`places.terrain_of`, the parse that IS `scene.biome`) and whatever land the
+    place's own name says ("the mountain"). The one reader of it here, so the day a place
+    carries its own terrain (lane fix/ventured-place-terrain) this picks it up in one spot."""
+    from rules import biomes, places
+
+    here = str(getattr(ctx.scene, "at", "") or "")
+    out = {places.terrain_of(here)} - {""}
+    try:
+        name = str(getattr(ctx.engine.here(), "name", "") or "")
+    except Exception:  # noqa: BLE001 — a scene with no place still has its id's ground
+        name = ""
+    out |= set(biomes.detect(name))
+    return out
+
+
+def far_ground_put_here(ctx, land, sentence: str) -> set[str]:
+    """Land the settlement's FAR ring holds, put on the ground the party stands on.
+
+    `present` in `find` counts the far ring as present everywhere outside, so "boulders
+    weathered by the desert sun" passed on the mountain off the road to Grotburrow
+    (sammy.json, beat 71, 2026-10-05: the place's own ground is not desert; the desert is
+    Vormoor's far ring). A desert in the distance is a view; a desert sun on the stones
+    beside the path is a place the party is not in. So a far-ring land word counts as here
+    unless the sentence looks out at it ("in the distance", "on the horizon", "beyond").
+    The ground here and the near ring stay allowed: the near ring is what the party can
+    see close by, and allowing it is the precision-first side of the line."""
+    allowed = set(land.near) | ground_here(ctx)
+    words = _ground_of(sentence) & set(JUDGED) & set(land.beyond)
+    if not words or _FAR.search(_space.unquoted(sentence)):
+        return set()
+    return {b for b in words if b not in allowed}
+
+
 def _went_out(ctx) -> bool:
     return any(e.get("direction") == "out" for e in _space.effects(ctx, "travel", "biome"))
 
@@ -135,6 +175,7 @@ def find(ctx) -> list[Finding]:
         flagged = []
         for s in _space.sentences(ctx.text):
             absent = sorted(b for b in _ground_of(s) & set(JUDGED) if b not in present)
+            absent = sorted(set(absent) | far_ground_put_here(ctx, land, s))
             if absent:
                 flagged.append((s, absent))
         if flagged:

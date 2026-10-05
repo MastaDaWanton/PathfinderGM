@@ -184,16 +184,20 @@ def test_the_forager_stops_at_the_hour_they_fell_over(wood):
     assert scene.clock_minutes == effect["hours"] * 60
 
 
-def test_the_will_save_gets_harder_every_hour():
+def test_the_will_save_gets_harder_with_every_save_made():
     """The project owner's choice over 1e's Constitution check, and the rise is what makes
-    a long night a decision rather than one gamble: hour 25 is trivial, hour 40 is not."""
-    assert survival.awake_dc(24) == 0
-    assert survival.awake_dc(25) == 11
-    assert survival.awake_dc(40) == 26
+    a long night a decision rather than one gamble: the first save (hour 25 of a long
+    stretch) is trivial, the sixteenth (hour 40) is not.
+
+    Counted by saves made since 2026-10-05, the book's "+1 for each previous check":
+    counted by hours awake, the owner's panel read DC 107 after five days whose hours the
+    clock had charged and no save had asked (tests/test_prose_body_and_clock.py)."""
+    assert survival.awake_dc(0) == 10
+    assert survival.awake_dc(15) == 25
 
 
 def test_hard_ground_makes_it_worse():
-    assert survival.awake_dc(30, "desert") > survival.awake_dc(30, "forest")
+    assert survival.awake_dc(5, "desert") > survival.awake_dc(5, "forest")
 
 
 def test_the_check_is_a_will_save_and_not_a_constitution_check(wood):

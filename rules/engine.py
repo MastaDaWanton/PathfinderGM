@@ -1849,6 +1849,11 @@ class Outcome:
 class Resolution:
     outcomes: list[Outcome] = field(default_factory=list)
     awaiting: dict | None = None
+    # The scene clock when `run` began this batch, so the prose can be told the turn
+    # carried the party into another part of the day (`prompts.hour_now`): the owner's
+    # "I sleep" at 09:49 woke at 17:49 to "The morning air is cold" (2026-10-05). None on
+    # a resumed batch, which says nothing rather than guess.
+    clock_before: int | None = None
 
     @property
     def status(self) -> str:
@@ -2944,8 +2949,11 @@ class Engine:
         self._provoked = set()
         # Homes whose door opened to the party this batch (`_op_call_on`, `_knock`).
         self._let_in = set()
-        return self._tick_schemes(self._their_first_blow(
+        before = int(getattr(self.scene, "clock_minutes", 0) or 0)
+        resolution = self._tick_schemes(self._their_first_blow(
             self._drive([i.as_dict() for i in intents], [], {})))
+        resolution.clock_before = before
+        return resolution
 
     def _their_first_blow(self, resolution: "Resolution") -> "Resolution":
         """Somebody else opened the fight: their blow is rolled now, in this batch.
@@ -7959,6 +7967,7 @@ class Engine:
             # month would otherwise come back into the room a month hungry. NetHack's
             # catch-up is the shape: settled once, when they are next reckoned.
             a.awake_minutes = a.fed_minutes = a.watered_minutes = 0
+            a.awake_checks = a.thirst_checks = a.hunger_checks = 0
             scene.move(ref, target)
             moved.append(ref)
             if a.at == scene.at:

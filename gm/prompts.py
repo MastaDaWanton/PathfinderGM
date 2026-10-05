@@ -1831,7 +1831,7 @@ EARLIER_BEATS = 2
 EARLIER_CHARS = 1400
 
 
-def scene_now(scene) -> str:
+def scene_now(scene, was_clock: int | None = None) -> str:
     """The scene as it stands this moment, derived from engine state, for the END of
     the prose prompt.
 
@@ -1905,10 +1905,69 @@ def scene_now(scene) -> str:
     if thread.get("subject"):
         facts.append(f"the player is {thread.get('doing', 'engaged with')} "
                      f"{thread['subject']}")
-    if not facts:
+    out = []
+    if facts:
+        out.append("THE SCENE AS IT STANDS NOW (engine facts, this moment — the passage "
+                   "describes this, not an ordinary day here): " + "; ".join(facts) + ".")
+    hour = hour_now(scene, was_clock)
+    if hour:
+        out.append(hour)
+    body = body_now(scene.pc() if hasattr(scene, "pc") else None)
+    if body:
+        out.append(body)
+    return "\n\n".join(out)
+
+
+def hour_now(scene, was_clock: int | None) -> str:
+    """The hour, last in the prompt, on the beat the turn carried it into another part of
+    the day — and only then.
+
+    The owner, 2026-10-05: *"says its afternoon but prose says morning."* The player slept
+    at "Day 6, 9h 49m in. Morning"; the engine rested eight hours; the brief's top line
+    said "WHEN (fact): day 6, afternoon (about 5 in the afternoon)"; and the beat opened
+    "The morning air is cold" — waking is morning in every story the model was trained
+    on, and one line at the top of a long brief lost to it. Last in the prompt is where
+    the shipped narrators put what must not be got wrong (docs/narrator-guards.md D6).
+
+    Not every beat: a line that is always there is a formula the prose copies (the shape
+    of a prompt is the shape of its output), and a beat that stays in one part of the
+    day is not in danger of this. Derived from the clock alone — `residency.day_part`,
+    the panel's own words — before the turn and after it.
+    """
+    if was_clock is None or scene is None:
         return ""
-    return ("THE SCENE AS IT STANDS NOW (engine facts, this moment — the passage "
-            "describes this, not an ordinary day here): " + "; ".join(facts) + ".")
+    from rules import residency as _residency
+
+    now = int(getattr(scene, "clock_minutes", 0) or 0)
+    if _residency.day_part(int(was_clock)) == _residency.day_part(now) \
+            and now - int(was_clock) < 12 * 60:
+        return ""
+    return (f"TIME PASSED THIS TURN (engine fact): it was "
+            f"{_residency.day_part(int(was_clock))} when the player spoke; it is now "
+            f"{_residency.time_words(now)}. The light, the sky and the air are this "
+            f"hour's, not the hour the turn began in.")
+
+
+def body_now(pc) -> str:
+    """What the player's body is carrying, as engine facts in words, last in the prompt.
+
+    The owner, 2026-10-05: *"prose acts like im okay but im literally starving and days
+    past the last rest."* Measured on the save: Sammy at 18 of 73 hit points, five days
+    without food or sleep, and the beat was a calm walk — the brief carried "18/73 hp"
+    in the middle of the cast list and not one word of hunger or sleep, which lived only
+    on the sidebar. `survival.strains` is the one derivation (the check that holds the
+    page to it reads the same list). Words, never numbers: law 3, and a number in the
+    author's-note slot is a number the prose prints.
+    """
+    if pc is None:
+        return ""
+    from rules import survival as _survival
+
+    said = [s.words for s in _survival.strains(pc)]
+    if not said:
+        return ""
+    return ("THE PLAYER'S BODY (engine facts, this moment — it shows in how they move, "
+            "feel and look; never a number): " + "; ".join(said) + ".")
 
 
 def false_claim_block(claim: str) -> str:

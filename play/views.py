@@ -3524,7 +3524,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 resolution.outcomes, player_input, brief, earlier,
                 # On Continue the standing action is a fact of the beat, last in the
                 # prompt with the scene as it stands (the ruling, 2026-09-18).
-                scene_now=(prompts.scene_now(c.scene)
+                scene_now=(prompts.scene_now(
+                               c.scene, was_clock=getattr(resolution, "clock_before", None))
                            + (("\n\n" + judgement.standing_action(c.scene))
                               if player_input == CARRY_ON and judgement.standing_action(c.scene)
                               else "")
