@@ -1,0 +1,93 @@
+{
+  "id": "favored-terrains",
+  "name": "Ranger Favored Terrains",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/ranger.html, https://www.d20pfsrd.com/classes/core-classes/ranger/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "first_at": 3,
+    "more_at": [
+      8,
+      13,
+      18
+    ],
+    "bonus": 2,
+    "increase": "At each later step the ranger picks a new terrain AND raises one existing terrain's bonus (the new one allowed) by +2.",
+    "applies_to": [
+      "initiative",
+      "knowledge (geography)",
+      "perception",
+      "stealth",
+      "survival"
+    ],
+    "also": "In a favored terrain the ranger normally leaves no trail and cannot be tracked."
+  },
+  "options": [
+    {
+      "id": "cold",
+      "name": "Cold",
+      "text": "Ice, glaciers, snow and tundra.",
+      "requires": []
+    },
+    {
+      "id": "desert",
+      "name": "Desert",
+      "text": "Sand and wastelands.",
+      "requires": []
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "text": "Coniferous and deciduous woodland.",
+      "requires": []
+    },
+    {
+      "id": "jungle",
+      "name": "Jungle",
+      "text": "Jungle.",
+      "requires": []
+    },
+    {
+      "id": "mountain",
+      "name": "Mountain",
+      "text": "Mountains, including hills.",
+      "requires": []
+    },
+    {
+      "id": "plains",
+      "name": "Plains",
+      "text": "Plains.",
+      "requires": []
+    },
+    {
+      "id": "planes",
+      "name": "Planes",
+      "text": "One chosen plane other than the Material Plane.",
+      "requires": [],
+      "choose_plane": true
+    },
+    {
+      "id": "swamp",
+      "name": "Swamp",
+      "text": "Swamp.",
+      "requires": []
+    },
+    {
+      "id": "underground",
+      "name": "Underground",
+      "text": "Caves and dungeons.",
+      "requires": []
+    },
+    {
+      "id": "urban",
+      "name": "Urban",
+      "text": "Buildings, streets and sewers.",
+      "requires": []
+    },
+    {
+      "id": "water",
+      "name": "Water",
+      "text": "On and under the water's surface.",
+      "requires": []
+    }
+  ]
+}

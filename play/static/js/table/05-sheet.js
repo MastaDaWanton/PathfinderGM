@@ -315,9 +315,14 @@ function owedFor(pick) {
 
 function owedPicksBlock(s) {
   const o = s.progression && s.progression.owed;
-  if (!o || !o.total) {
+  // `outstanding` is everything the levels owe — feats, points, skill ranks and class
+  // choices; `total` is the feats and points alone (rules/leveling.py `owed`). Path B is
+  // offered, never owed, so it opens the block on its own.
+  if (!o || !((o.outstanding ?? o.total) || (o.paths && o.paths.open))) {
     LVFEAT = { pool: "", list: null, picked: [], targets: {}, find: "", shut: false, busy: false };
     LVPTS = { spread: {}, busy: false };
+    LVSK = { spread: {}, busy: false };
+    LVCH = lvchFresh();
     return "";
   }
   const house = o.house || {};
@@ -336,9 +341,239 @@ function owedPicksBlock(s) {
     ${o.bonus.owed ? lvFeatBlock("bonus", o.bonus, "Bonus feats",
         `The class's own: ${o.bonus.rule}.`) : ""}
     ${o.points.owed ? lvPointsBlock(s, o.points) : ""}
+    ${o.choices && o.choices.owed ? lvChoicesBlock(o.choices) : ""}
+    ${o.skills && o.skills.owed ? lvSkillsBlock(o.skills) : ""}
+    ${o.paths && o.paths.open ? lvPathBlock(o.paths) : ""}
     <p class="why" id="lvsay" role="status" aria-live="polite"></p>
   </section>`;
 }
+
+// --- Class choices a level owes (rules/classes.py `owed_rows`, `choice_menu`) ---
+// Rage powers, talents, mercies, a bloodline, a school… counted from the class level and
+// chosen here whenever the player likes, the way every PF1 builder does it (docs/
+// class-audit.md §5): nothing is forced at the moment of the level. The server judges
+// every pick (`/api/level/choose`); this page only gathers them.
+let LVSK = { spread: {}, busy: false };
+function lvchFresh() {
+  return { choice: "", menu: null, option: "", picked: [], variants: {}, animal: "",
+           name: "", domains: [], busy: false };
+}
+let LVCH = lvchFresh();
+
+function lvChoicesBlock(due) {
+  const groups = [];
+  for (const r of due.picks) {
+    let g = groups.find(x => x.choice === r.choice);
+    if (!g) { g = { choice: r.choice, name: r.name, levels: [] }; groups.push(g); }
+    g.levels.push(r.for_level);
+  }
+  return groups.map(g => {
+    const open = LVCH.choice === g.choice && LVCH.menu;
+    return `<div class="lvchoice" data-lvchoicebox="${esc(g.choice)}">
+      <p><b>${esc(g.name)}: ${g.levels.length} to choose</b>
+        <small class="why">for level ${esc(g.levels.join(", "))}</small></p>
+      ${open ? lvChoicePicker(g.levels.length) : `<button type="button" class="v2-btn is-go"
+          data-lvchoice="${esc(g.choice)}">Choose ${esc(g.name.toLowerCase())}</button>`}
+    </div>`;
+  }).join("");
+}
+
+function lvChoicePicker(n) {
+  const m = LVCH.menu;
+  const opts = m.options || [];
+  const opt = opts.length === 1 ? opts[0] : opts.find(o => o.key === LVCH.option);
+  const head = m.choice.text ? `<p class="why">${esc(m.choice.text)}</p>` : "";
+  const pickOpt = opts.length > 1 ? `<div class="terms">${opts.map(o => `
+      <button type="button" class="spbtn${LVCH.option === o.key ? "" : " quiet"}"
+        data-lvchopt="${esc(o.key)}" aria-pressed="${LVCH.option === o.key}">${esc(o.name)}</button>`).join("")}</div>
+      ${opt && opt.text ? `<p class="why">${esc(opt.text)}</p>` : ""}` : "";
+  let body = "";
+  if (opt && opt.kind === "class option") {
+    const rows = opt.entries.map(e => {
+      const on = LVCH.picked.includes(e.id);
+      const verdict = e.open ? ["ok", "can take"] : ["no", e.why];
+      const variant = on && e.variants.length ? `<label class="why">${esc(e.variant_name || "Which")}:
+        <select data-lvvariant="${esc(e.id)}">
+          <option value="">choose</option>
+          ${e.variants.map(v => `<option value="${esc(v)}" ${LVCH.variants[e.id] === v ? "selected" : ""}>${esc(title(v))}</option>`).join("")}
+        </select></label>` : "";
+      return `<div class="featrow ${verdict[0]}">
+        <div><b>${esc(e.name)}</b>${e.min_level > 1 ? ` <small>from level ${e.min_level}</small>` : ""}</div>
+        <div class="why">${esc(e.text || "")}</div>
+        <div class="verdict ${verdict[0]}">${esc(verdict[1])}
+          ${e.open ? `<button type="button" class="spbtn${on ? "" : " quiet"}"
+            data-lventry="${esc(e.id)}" aria-pressed="${on}">${on ? "Chosen" : "Choose"}</button>` : ""}
+          ${variant}</div>
+      </div>`;
+    }).join("");
+    body = `<p class="why" id="lvchcount">${LVCH.picked.length} of ${n} chosen</p>
+      <div id="lvchlist" style="max-height:340px;overflow:auto">${rows || `<div class="empty">Nothing to pick from yet.</div>`}</div>`;
+  } else if (opt && opt.kind === "animal companion") {
+    body = `<div class="terms">${opt.animals.map(a => `
+      <button type="button" class="spbtn${LVCH.animal === a.key ? "" : " quiet"}"
+        data-lvanimal="${esc(a.key)}" aria-pressed="${LVCH.animal === a.key}">${esc(a.name)}</button>`).join("")}</div>
+      <label class="why" style="display:block">A name for it, if you like:
+        <input type="text" class="v2-well" id="lvanimalname" maxlength="40" value="${esc(LVCH.name)}"></label>`;
+  } else if (opt && opt.kind === "domain") {
+    body = `<div class="terms">${opt.domains.map(d => `
+      <button type="button" class="spbtn${LVCH.domains.includes(d) ? "" : " quiet"}"
+        data-lvdomain="${esc(d)}" aria-pressed="${LVCH.domains.includes(d)}">${esc(d)}</button>`).join("")}</div>`;
+  }
+  const ready = opt && (opt.kind === "feature" || (opt.kind === "class option" && LVCH.picked.length)
+    || (opt.kind === "animal companion" && LVCH.animal) || (opt.kind === "domain" && LVCH.domains.length));
+  return `${head}${pickOpt}${body}
+    <button type="button" class="v2-btn is-go" id="lvchtake"${ready && !LVCH.busy ? "" : " disabled"}>Take</button>
+    <button type="button" class="v2-btn" id="lvchclose">Put the list away</button>`;
+}
+
+// --- Skill ranks a level owes (rules/leveling.py `skill_ranks`) ---
+// Audit D1: none were owed after 1st level, so a 20th-level barbarian had 5 of the
+// book's 100. Owed = (class ranks + Int, at least 1, + the race's) × level, less the
+// ranks held — so a raised Intelligence pays for every level at once, as the book says.
+function lvSkillsBlock(due) {
+  const placed = Object.values(LVSK.spread).reduce((a, b) => a + b, 0);
+  const why = `${due.class_ranks} class ${due.int_mod >= 0 ? "+" : "−"} ${Math.abs(due.int_mod)} Int${
+    due.race_ranks ? ` + ${due.race_ranks} race` : ""} = ${due.per_level} a level, × ${due.max_rank}`;
+  return `<div class="lvskills">
+    <p><b>Skill ranks: ${due.owed} to place</b> <small class="why">${esc(why)}; ${due.spent} placed of ${due.total}</small></p>
+    <p class="why">No skill holds more ranks than your level (${due.max_rank}). A class skill
+      with a rank adds +3.</p>
+    <dl class="skills">${due.skills.map(k => {
+      const add = LVSK.spread[k.name] || 0;
+      return `<div><dt>${esc(title(k.name))}${k.class_skill ? ` <small class="cls">class</small>` : ""}</dt>
+        <dd>${k.rank}${add ? ` → ${k.rank + add}` : ""}
+          <button type="button" class="spbtn quiet" data-lvskdn="${esc(k.name)}"
+            aria-label="One rank fewer in ${esc(k.name)}" ${add ? "" : "disabled"}>−</button>
+          <button type="button" class="spbtn quiet" data-lvskup="${esc(k.name)}"
+            aria-label="One rank more in ${esc(k.name)}" ${
+              placed < due.owed && k.rank + add < due.max_rank ? "" : "disabled"}>+</button></dd></div>`;
+    }).join("")}</dl>
+    <button type="button" class="v2-btn is-go" id="lvskplace"${
+      placed && !LVSK.busy ? "" : " disabled"}>Place ${placed || ""} rank${placed === 1 ? "" : "s"}</button>
+  </div>`;
+}
+
+function lvPathBlock(p) {
+  return `<div class="lvpath">
+    <p><b>Path B is open</b> <small class="why">from level ${p.at}</small></p>
+    <p class="why">You may follow a second path now; its abilities run on the b-track.
+      It is never owed — one path is a whole character.</p>
+    <div class="terms">${p.offered.map(x => `<button type="button" class="v2-btn"
+      data-lvpath="${esc(x)}">Follow ${esc(x)}</button>`).join("")}</div>
+  </div>`;
+}
+
+// The choices already made, always on the Class tab: "Bloodline: Draconic (red)".
+function choicesMadeBlock(s) {
+  const made = ((s.progression || {}).owed || {}).choices;
+  const list = (made && made.made) || [];
+  if (!list.length) return "";
+  return `<h3 class="cardsub">Your class choices</h3>
+    <div class="terms">${list.map(c => `<div class="t"><span>${esc(c.name)}</span>
+      <b>${esc(c.picks.map(title).join(", "))}</b></div>`).join("")}</div>`;
+}
+
+async function lvAfter(d, say) {
+  SHEET = d;
+  drawSheet(true);
+  redrawLvPicks(say);
+  render(await getState());
+}
+
+document.addEventListener("click", async e => {
+  const opener = e.target.closest("#sheetbody [data-lvchoice]");
+  if (opener) {
+    const id = opener.dataset.lvchoice;
+    try {
+      const d = await readJSON(await fetch(`/api/level/choices?choice=${encodeURIComponent(id)}`,
+                                          { cache: "no-store" }));
+      if (d.error) throw new Error(d.error);
+      LVCH = { ...lvchFresh(), choice: id, menu: d,
+               option: (d.options || []).length === 1 ? d.options[0].key : "" };
+      redrawLvPicks();
+    } catch (err) { redrawLvPicks(String(err.message || err)); }
+    return;
+  }
+  if (e.target.closest("#sheetbody #lvchclose")) { LVCH = lvchFresh(); redrawLvPicks(); return; }
+  const optBtn = e.target.closest("#sheetbody [data-lvchopt]");
+  if (optBtn) {
+    LVCH = { ...LVCH, option: optBtn.dataset.lvchopt, picked: [], variants: {}, animal: "", domains: [] };
+    redrawLvPicks();
+    return;
+  }
+  const ent = e.target.closest("#sheetbody [data-lventry]");
+  if (ent) {
+    const id = ent.dataset.lventry;
+    const n = SHEET.progression.owed.choices.picks.filter(r => r.choice === LVCH.choice).length;
+    let say = "";
+    if (LVCH.picked.includes(id)) LVCH.picked = LVCH.picked.filter(x => x !== id);
+    else if (LVCH.picked.length >= n) say = `${n} chosen already; set one aside first.`;
+    else LVCH.picked.push(id);
+    redrawLvPicks(say);
+    return;
+  }
+  const an = e.target.closest("#sheetbody [data-lvanimal]");
+  if (an) { LVCH.animal = LVCH.animal === an.dataset.lvanimal ? "" : an.dataset.lvanimal; redrawLvPicks(); return; }
+  const dm = e.target.closest("#sheetbody [data-lvdomain]");
+  if (dm) {
+    const d = dm.dataset.lvdomain;
+    LVCH.domains = LVCH.domains.includes(d) ? LVCH.domains.filter(x => x !== d) : [...LVCH.domains, d];
+    redrawLvPicks();
+    return;
+  }
+  if (e.target.closest("#sheetbody #lvchtake")) {
+    if (LVCH.busy) return;
+    LVCH.busy = true;
+    const body = { choice: LVCH.choice, option: LVCH.option,
+                   picks: LVCH.picked.map(id => LVCH.variants[id] ? { pick: id, variant: LVCH.variants[id] } : id),
+                   pick: LVCH.animal, name: LVCH.name, domains: LVCH.domains };
+    try {
+      const d = await post("/api/level/choose", body);
+      LVCH = lvchFresh();
+      await lvAfter(d, `Taken: ${(d.taken || []).join(", ")}.`);
+    } catch (err) { LVCH.busy = false; redrawLvPicks(String(err.message || err)); }
+    return;
+  }
+  const up = e.target.closest("#sheetbody [data-lvskup]");
+  const dn = e.target.closest("#sheetbody [data-lvskdn]");
+  if (up || dn) {
+    const sk = (up || dn).dataset[up ? "lvskup" : "lvskdn"];
+    const due = SHEET.progression.owed.skills;
+    const placed = Object.values(LVSK.spread).reduce((a, b) => a + b, 0);
+    const row = due.skills.find(k => k.name === sk) || { rank: 0 };
+    if (up && placed < due.owed && row.rank + (LVSK.spread[sk] || 0) < due.max_rank)
+      LVSK.spread[sk] = (LVSK.spread[sk] || 0) + 1;
+    if (dn && LVSK.spread[sk]) LVSK.spread[sk] -= 1;
+    redrawLvPicks();
+    return;
+  }
+  if (e.target.closest("#sheetbody #lvskplace")) {
+    const ranks = Object.fromEntries(Object.entries(LVSK.spread).filter(([, n]) => n));
+    if (!Object.keys(ranks).length || LVSK.busy) return;
+    LVSK.busy = true;
+    try {
+      const d = await post("/api/level/skills", { ranks });
+      LVSK = { spread: {}, busy: false };
+      await lvAfter(d, `Placed: ${Object.entries(d.placed || {}).map(([k, v]) => `${title(k)} ${v}`).join(", ")}.`);
+    } catch (err) { LVSK.busy = false; redrawLvPicks(String(err.message || err)); }
+    return;
+  }
+  const pathBtn = e.target.closest("#sheetbody [data-lvpath]");
+  if (pathBtn) {
+    try {
+      const d = await post("/api/level/path", { path: pathBtn.dataset.lvpath });
+      await lvAfter(d, `Path B: ${d.path}.`);
+    } catch (err) { redrawLvPicks(String(err.message || err)); }
+  }
+});
+document.addEventListener("change", e => {
+  const v = e.target.closest("#sheetbody [data-lvvariant]");
+  if (v) { LVCH.variants[v.dataset.lvvariant] = v.value; return; }
+});
+document.addEventListener("input", e => {
+  const n = e.target.closest("#sheetbody #lvanimalname");
+  if (n) LVCH.name = n.value;
+});
 
 function lvFeatBlock(pool, due, title, rule) {
   const open = LVFEAT.pool === pool && LVFEAT.list;
@@ -437,9 +672,15 @@ function redrawLvPicks(say = "") {
   if (!box || !SHEET) return;
   const keep = document.getElementById("lvlist");
   const top = keep ? keep.scrollTop : 0;
+  // The class-choice list too: measured live, choosing the second rage power in a list
+  // of 28 threw the list back to the top after the first.
+  const keepCh = document.getElementById("lvchlist");
+  const topCh = keepCh ? keepCh.scrollTop : 0;
   box.outerHTML = owedPicksBlock(SHEET);
   const list = document.getElementById("lvlist");
   if (list) list.scrollTop = top;
+  const chList = document.getElementById("lvchlist");
+  if (chList) chList.scrollTop = topCh;
   const out = document.getElementById("lvsay");
   if (out && say) out.textContent = say;
 }
@@ -633,6 +874,7 @@ function tabClass(s) {
           <b>control blood 1a</b> through <b>5b</b> on the table means. The text is the
           class document's own; the rules do not run these yet, so they are yours to
           invoke at the table.</p>` : ""}
+      ${choicesMadeBlock(s)}
       ${owedPicksBlock(s)}
       ${learnOwedLine(s)}
       ${p.next ? `

@@ -277,9 +277,28 @@ def class_choice_menu(cid: str) -> list[dict]:
                                   + (f" to {adv['size'].title()}" if adv.get("size") else "")
                                   if adv else ""),
                     })
+            elif option.get("kind") == "class option":
+                # A catalogue's entries open at 1st level — a sorcerer's bloodlines, a
+                # wizard's schools — with any variant each needs (a draconic sorcerer's
+                # dragon), all read off content/class-options/.
+                entry["key"] = classes_mod.option_key(option)
+                entry["how_many"] = classes_mod._per_level(option)
+                entry["entries"] = [
+                    {"id": str(e.get("id")), "name": str(e.get("name") or e.get("id")),
+                     "text": str(e.get("text") or ""),
+                     "variants": classes_mod._variants(e),
+                     "variant_name": str((e.get("variants") or {}).get("name") or "")
+                     if isinstance(e.get("variants"), dict) else ""}
+                    for e in classes_mod.candidates(cid, option, {})
+                    if int(e.get("min_level", 1) or 1) <= 1]
+            entry["key"] = classes_mod.option_key(option)
             options.append(entry)
         out.append({"id": choice.get("id"), "name": choice.get("name") or choice.get("id"),
-                    "text": choice.get("text", ""), "options": options})
+                    "text": choice.get("text", ""), "options": options,
+                    # The page needs these two to ask in the right order: a universalist
+                    # takes no opposition schools, and an opposition school is not your own.
+                    "when": choice.get("when") or None,
+                    "distinct_from": choice.get("distinct_from") or ""})
     return out
 
 
@@ -774,6 +793,15 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"That is {len(feat_ids)} feats against {feat_budget} "
                         f"(one, plus one for a human, plus a class's 1st-level bonus "
                         f"feat{', plus the house rule' if house_feats else ''}).")
+    # Feats the class hands over at 1st level (`leveling.granted_feats`): a monk's Improved
+    # Unarmed Strike and Stunning Fist, a wizard's Scribe Scroll. Written for them, so one
+    # of the player's own picks spent on one would be a feat thrown away.
+    class_feats = leveling.granted_feats(cid, 1) if cls else []
+    for fid in feat_ids:
+        if fid in class_feats:
+            problems.append(f"{feats_mod.get(fid).name} comes with the "
+                            f"{(classes_mod.member_noun(cid) or cid).lower()} class at 1st "
+                            f"level; choose another feat.")
 
     # --- domains ----------------------------------------------------------------------
     # A cleric picks two, on the same screen that prepares her spells and one step ahead of
@@ -908,7 +936,7 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "size": race["size"], "speed": race["speed"],
         "abilities": abilities,
         "ranks": {s: 1 for s in picked},
-        "feats": feats_named,
+        "feats": feats_named + [feats_mod.get(fid).name.lower() for fid in class_feats],
         "weapons": weapons,
         "equipped": weapons[0],
         # Unarmoured and unshielded out of the forge. Both are bought at the outfitter now,
@@ -959,9 +987,42 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # named nothing.
     warnings = []
     actor = from_dict(sheet)
+    verdicts = {fid: feats_mod.meets(actor, feats_mod.get(fid)) for fid in feat_ids}
+    # The class's 1st-level bonus feat, held to the class's rule the way a level-up's is
+    # (audit D3: a fighter was made with Toughness, Iron Will and Great Fortitude, a monk
+    # with Toughness — 200 each — and a monk's Improved Grapple was refused for a
+    # prerequisite the book waives for his bonus feat). The page sends one flat list, so
+    # the feats past the general budget are the bonus ones, and any assignment of them
+    # that satisfies the rule is accepted: the player need not say which is which.
+    bonus_rule = leveling.bonus_feat_rule(cid)
+    general = max(0, feat_budget - class_bonus)
+    need = min(class_bonus, max(0, len(feat_ids) - general))
+    as_bonus: tuple = ()
+    if need and bonus_rule:
+        from itertools import combinations
+
+        allow = [fid for fid in feat_ids
+                 if leveling._bonus_allows(actor, feats_mod.get(fid), bonus_rule, 1)]
+        waive = bool(bonus_rule.get("ignore_prereqs"))
+
+        def cost(bonus: tuple) -> int:
+            return sum(1 for fid in feat_ids if verdicts[fid].get("unmet")
+                       and not (waive and fid in bonus))
+
+        options_ = list(combinations(allow, need))
+        if not options_:
+            noun = (classes_mod.member_noun(cid) or cid).lower()
+            problems.append(
+                f"A {noun}'s 1st-level bonus feat must be "
+                f"{bonus_rule.get('say', 'from the class list')}; none of "
+                f"{', '.join(feats_mod.get(f).name for f in feat_ids)} is. Swap one.")
+        else:
+            as_bonus = min(options_, key=cost)
     for fid in feat_ids:
         feat = feats_mod.get(fid)
-        verdict = feats_mod.meets(actor, feat)
+        verdict = verdicts[fid]
+        if fid in as_bonus and bonus_rule.get("ignore_prereqs"):
+            continue                      # the monk's waiver, as at every later level
         if verdict.get("unmet"):
             problems.append(
                 f"{feat.name} requires {', '.join(verdict['unmet'])}; this character "
@@ -1023,7 +1084,10 @@ def _provisional(payload: dict):
             "size": race["size"], "speed": race["speed"],
             "abilities": abilities,
             "ranks": {s: 1 for s in picked if s in SKILLS},
-            "feats": [str(f) for f in (payload.get("feats") or [])],
+            # With what the class hands over, so a monk's Improved Grapple reads its
+            # Improved Unarmed Strike as held, the way the built sheet will.
+            "feats": [str(f) for f in (payload.get("feats") or [])]
+            + [feats_mod.get(fid).name.lower() for fid in leveling.granted_feats(cid, 1)],
             "background": str(payload.get("background", "")).strip().lower(),
             "hp": 1, "hp_max": 1,
         }), ""
@@ -1050,8 +1114,10 @@ def feat_choices(payload: dict) -> dict:
     """
     actor, why = _provisional(payload)
     if actor is None:
-        return {"ready": False, "why": why, "open": [], "shut": []}
-    return {"ready": True, "why": "", **feat_rows(actor, held_out=False)}
+        return {"ready": False, "why": why, "open": [], "shut": [], "granted": []}
+    # `granted`: what the class writes at 1st level and so is not offered as a pick.
+    return {"ready": True, "why": "", **feat_rows(actor, held_out=False),
+            "granted": leveling.granted_feats(actor.char_class or "", 1)}
 
 
 def feat_rows(actor, allow=None, waive: bool = False, held_out: bool = True) -> dict:

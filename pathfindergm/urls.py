@@ -63,6 +63,12 @@ urlpatterns = [
     path("api/level/feats", views.level_feat_menu, name="level_feat_menu"),
     path("api/level/feats/take", views.level_take_feats, name="level_take_feats"),
     path("api/level/points", views.level_take_points, name="level_take_points"),
+    # Skill ranks, class choices and Blood Bending's Path B, owed by level and chosen on
+    # the Class tab (docs/class-audit.md, lane 1).
+    path("api/level/skills", views.level_take_skills, name="level_take_skills"),
+    path("api/level/choices", views.level_choice_menu, name="level_choice_menu"),
+    path("api/level/choose", views.level_take_choice, name="level_take_choice"),
+    path("api/level/path", views.level_take_path, name="level_take_path"),
     path("api/feats", views.feat_search, name="feat_search"),
     path("licence", views.licence, name="licence"),
     # The manual, served from inside the app because that is where the player is: this

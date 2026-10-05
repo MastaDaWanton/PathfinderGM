@@ -907,3 +907,140 @@ option-kind registry the others plug into. After that, 2–4 can run in parallel
 **Shared-file warning:** `play/views.py` is split by function between lanes 1 and 4, and
 `content/classes/*.json` between lanes 1 (`choices` stanzas) and 3 (table rows). Keep each
 lane to its named keys and functions, or serialise those two files.
+
+---
+
+## 9. Lane 1, built: choices at any level, skill ranks, and the read API
+
+Built 2026-10-05 on `fix/class-choices-and-levelup`. Storing each choice is this lane's
+job; making it *do* something is lanes 2-4's. Everything below is what they build on.
+
+### What a class document can now say
+
+The `choices` grammar (`rules/classes.py`, header comment) gained:
+
+| Field | Meaning | Used by |
+|---|---|---|
+| `at_levels: [2, 4 …]` | one pick owed at each listed level (`level` still reads as `[level]`) | rage powers, rogue talents, mercies, favored enemy/terrain, weapon training, versatile performance |
+| option `kind: "class option"`, `from: "<catalogue>"` | the picks come from `content/class-options/<catalogue>.json` | every catalogue choice |
+| option `kind: "feature"` | an option with nothing further to pick | paladin's bonded weapon, ranger's bond with companions |
+| option `id` | tells two options of one kind apart; answers name it in `option` | divine bond `weapon`/`mount` |
+| option `from_choice: "<choice id>"` | the picks are another choice's picks (repeats allowed) | favored enemy +2, favored terrain +2 |
+| option `raise: {"field", "base", "step"}` | on a `from_choice` option: write `base + step × times raised` onto each source pick (`classes.sync_raises`, on every write) | the ranger's `bonus` on each favored enemy / terrain |
+| option `exclude: [ids]` | entries this option never offers | opposition schools exclude universalist |
+| `when: {"choice", "not"}` | owed only once that choice is answered, and not with those picks | opposition schools (not for a universalist) |
+| `distinct_from: "<choice id>"` | may not repeat that choice's picks | opposition schools are not your own school |
+
+A catalogue entry is `{"id", "name", "text", "min_level"?, "requires"?: [ids],
+"repeatable"?, "variants"?: {"name", "from": [{"id", ...}]}}`, plus whatever the lane that
+gives it mechanics needs (a bloodline's `class_skill`, `bonus_feats`, `bonus_spells`,
+`powers`, `arcana`; a mercy's `condition`; a perform type's `skills`; a weapon group's
+`weapons`). `classes.validate_catalogue` judges only the fields lane 1 reads; the rest are
+yours to validate. A homebrew catalogue of the same id in the data directory's
+`homebrew/class-options/` adds and replaces entries by id.
+
+The eleven catalogues (`content/class-options/`, gathered from the Core Rulebook
+reference at legacy.aonprd.com and d20pfsrd, 2026-10-05; Core Rulebook only):
+`sorcerer-bloodlines` (10), `arcane-schools` (9), `arcane-bonds` (bonded object with 5
+objects, familiar with 11 animals), `rogue-talents` (15 + 8 advanced at `min_level` 10),
+`rage-powers` (28), `paladin-mercies` (15), `favored-enemies` (32), `favored-terrains`
+(11), `combat-styles` (2), `weapon-groups` (14), `perform-types` (9).
+
+### The read API (the only door — never read `class_choices` directly)
+
+```python
+from rules import classes
+
+classes.chosen(actor, "bloodline")
+# -> [{"id": "draconic", "name": "Draconic", "level": 1, "variant": "red",
+#      "option": "class option", "entry": {...the catalogue's whole document...}}]
+classes.chosen_ids(actor, "rage power")      # -> ["intimidating-glare", "scent", ...]
+classes.has_chosen(actor, "mercy", "sickened")
+classes.catalogue("sorcerer-bloodlines")     # the whole file, merged with homebrew
+classes.entry("weapon-groups", "blades-heavy")
+classes.has_feature(actor, "Rage power class feature")   # True / False / None
+```
+
+`chosen` returns `[]` both for "not chosen yet" and for "this class asks no such thing";
+treat them alike. Picks are in the order taken, repeats kept (a favoured enemy raised twice
+appears twice in `favored enemy bonus`). For an animal companion option the one pick's `id`
+is the animal; for a `feature` option it is the option's id (`weapon`, `companions`); for a
+domain option, one pick per domain held.
+
+**What each lane reads:**
+
+- **Lane 2 (spellcasting).** `chosen(a, "bloodline")[0]` — `entry.bonus_spells` (by level,
+  spell names), `entry.powers` (names by level), `entry.arcana`, `entry.class_skill`
+  (Arcane has `class_skill_from`, the ten knowledges: the player's pick is not modelled
+  yet), `variant` for Draconic's dragon (`entry.variants.from[].energy`, `.breath`) and
+  Elemental's element. `chosen(a, "arcane school")` (`universalist` is an entry, with
+  `opposable: false`), `chosen_ids(a, "opposition schools")`, `chosen(a, "arcane bond")`
+  — `id` `bonded-object` or `familiar`, `variant` the object or animal
+  (`entry.variants.from[].grants` is the familiar's gift to its master).
+- **Lane 3 (martial passives).** `chosen_ids(a, "weapon training")` in order (the first
+  group gets +1 more at every later pick: the book's "+1 to each previous group");
+  `chosen(a, "favored enemy")` — each pick carries `bonus` (+2, plus +2 for each raise
+  the player gave it; also stored on the pick in `class_choices["favored enemy"]["picks"]`
+  as `{"pick", "level", "bonus"}`, the shape lane 3's `classfeatures.chosen` reads); the
+  raises themselves are `chosen_ids(a, "favored enemy bonus")`. The same for
+  `favored terrain` / `favored terrain bonus`; `chosen(a, "versatile performance")`
+  `entry.skills` for the substitution. Weapon mastery (fighter 20) is NOT a choice yet: it
+  needs a weapon-kind option reading the weapons table, which is yours.
+- **Lane 4 (actives).** `chosen_ids(a, "rage power")`, `chosen_ids(a, "rogue talent")`,
+  `chosen_ids(a, "mercy")` (`entry.condition` names the condition removed; `acts_as` on
+  Diseased/Cursed/Poisoned), `chosen(a, "divine bond")` (`weapon`, or the mount, which
+  already arrives as an animal companion). Rage-power entries carry `once_per_rage`;
+  rogue talents carry `sneak_attack: true` on those that ride a sneak attack. Talents that
+  grant a feat (Combat Trick: a combat feat; Finesse Rogue: Weapon Finesse; Weapon Training:
+  Weapon Focus; the advanced Feat) store the talent only — the feat is NOT owed or written
+  yet, and should feed the bonus-feat pool when it is (PCGen's bug DATA-211, §5).
+
+### Skill ranks (D1)
+
+`leveling.skill_ranks(actor)` → `{"owed", "per_level", "total", "spent", "max_rank",
+"class_ranks", "int_mod", "race_ranks", "class_skills", "skills": [...]}`. No counter is
+stored: owed is `(max(1, class + Int mod) + race ranks) × level − ranks held`, the same
+arithmetic `sheet.validate` refuses an over-spent sheet with. It reads the BASE Int, so a
+permanent increase pays a rank for every level already taken (Pathfinder dropped 3.5's
+"not retroactive"; d20pfsrd Ability Scores, fetched 2026-10-05) and a temporary
+ActiveEffect never does. `POST /api/level/skills {"ranks": {...}}`; no skill above the
+character's level. Not modelled: the favoured-class bonus (+1 hp or +1 rank a level), and
+a bloodline's or a perform type's class skill (lane 2/3).
+
+### Endpoints
+
+| Endpoint | Body | Does |
+|---|---|---|
+| `POST /api/level/skills` | `{"ranks": {skill: n}}` | places owed ranks |
+| `GET /api/level/choices?choice=<id>` | — | the picker: options, entries with `open`/`why` |
+| `POST /api/level/choose` | `{"choice", "option"?, "picks"?: [id \| {"pick","variant"}], "pick"?, "name"?, "domains"?}` | answers an owed choice; a companion chosen here arrives at once |
+| `POST /api/level/path` | `{"path"}` | Blood Bending's Path B once its track opens (D8) |
+
+`leveling.owed(actor)` gained `skills`, `choices` (`owed`, `picks`: one row per pick owed,
+`made`: what is chosen, for the Class tab), `paths` (`open`, `at`, `offered`) and
+`outstanding` (everything; `total` still means feats and points alone). The level-up line
+says each of them.
+
+### The rest of the lane
+
+- **D2.** `BONUS_FEAT_RULES` gained `ranger` (`grant: "combat style feat"`, the chosen
+  style's `bonus_feats` by level, prerequisites waived) and `sorcerer` (`grant:
+  "bloodline feat"`, the bloodline's eight, prerequisites kept). Owed at 2/6/10/14/18 and
+  7/13/19; a pool whose choice is unmade says "Choose your combat style first".
+- **D3.** The forge holds the 1st-level class bonus feat to the class rule: the feats past
+  the general budget are the bonus ones, and any assignment that satisfies the rule is
+  accepted; a monk's bonus feat has its prerequisites waived there too.
+- **D4.** `leveling.granted_feats`: a class-table row that IS a feat's name (Scribe
+  Scroll, Endurance, Eschew Materials, Stunning Fist, Blood Bending's Combat Expertise and
+  Combat Reflexes), plus the monk's Improved Unarmed Strike. Written at the forge and at
+  each level (idempotent), so an older character gets them at the next level. Not on a
+  campaign load: tried, and the owner's Bobby (a wizard) gained Scribe Scroll on reading,
+  which broke the byte-for-byte round trip of four real saves.
+- **D5.** `classes.has_feature` answers the 207 "X class feature" prerequisites from the
+  class table's tags, the choices made and the domains held. A clause that is not a
+  feature's name stays unknown.
+- **D6.** `/api/level-up` calls `animal_companion.sync` and says the growth on the line.
+- **Not done here.** D7 (the Animal domain's companion), D9, D10 (lane 2). The per-rung
+  duplicate tags (`class.smite-evil-1-day`) are lane 3's slug fix; `has_feature` reads a
+  rung as its ladder meanwhile. Fighter weapon mastery (a weapon pick). Rogue-talent and
+  rage-power feat grants (above).

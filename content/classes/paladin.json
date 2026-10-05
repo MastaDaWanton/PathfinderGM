@@ -49,6 +49,55 @@
    "_note": "Core p.61: half level + Cha mod uses; heals level/2 d6."
   }
  ],
+ "choices": [
+  {
+   "id": "mercy",
+   "name": "Mercies",
+   "at_levels": [
+    3,
+    6,
+    9,
+    12,
+    15,
+    18
+   ],
+   "text": "At 3rd level and every three levels after, a paladin's lay on hands also removes a condition she chooses (Core Rulebook, Paladin).",
+   "options": [
+    {
+     "kind": "class option",
+     "from": "paladin-mercies"
+    }
+   ]
+  },
+  {
+   "id": "divine bond",
+   "name": "Divine bond",
+   "level": 5,
+   "text": "At 5th level a paladin forms a divine bond: with her weapon, which a celestial spirit can enhance, or with a mount that serves her (Core Rulebook, Paladin).",
+   "options": [
+    {
+     "id": "weapon",
+     "kind": "feature",
+     "name": "A bonded weapon",
+     "text": "A celestial spirit enhances your weapon for a minute, once a day at 5th and more often as you rise."
+    },
+    {
+     "id": "mount",
+     "kind": "animal companion",
+     "name": "A mount",
+     "from": [
+      "horse",
+      "pony",
+      "boar",
+      "camel",
+      "dog"
+     ],
+     "level_offset": 0,
+     "text": "A loyal mount that grows with your paladin level as a druid's companion does."
+    }
+   ]
+  }
+ ],
  "levels": [
   {
    "level": 1,

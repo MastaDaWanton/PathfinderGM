@@ -1,0 +1,221 @@
+{
+  "id": "favored-enemies",
+  "name": "Ranger Favored Enemies",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/ranger.html, https://www.d20pfsrd.com/classes/core-classes/ranger/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "first_at": 1,
+    "more_at": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "bonus": 2,
+    "increase": "At each later step the ranger picks a new enemy AND raises one existing bonus (the new one allowed) by +2.",
+    "applies_to": [
+      "bluff",
+      "knowledge",
+      "perception",
+      "sense motive",
+      "survival",
+      "weapon attack rolls",
+      "weapon damage rolls"
+    ]
+  },
+  "options": [
+    {
+      "id": "aberration",
+      "name": "Aberration",
+      "text": "Creatures of the aberration type.",
+      "requires": []
+    },
+    {
+      "id": "animal",
+      "name": "Animal",
+      "text": "Creatures of the animal type.",
+      "requires": []
+    },
+    {
+      "id": "construct",
+      "name": "Construct",
+      "text": "Creatures of the construct type.",
+      "requires": []
+    },
+    {
+      "id": "dragon",
+      "name": "Dragon",
+      "text": "Creatures of the dragon type.",
+      "requires": []
+    },
+    {
+      "id": "fey",
+      "name": "Fey",
+      "text": "Creatures of the fey type.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-aquatic",
+      "name": "Humanoid (aquatic)",
+      "text": "Creatures of the humanoid (aquatic) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-dwarf",
+      "name": "Humanoid (dwarf)",
+      "text": "Creatures of the humanoid (dwarf) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-elf",
+      "name": "Humanoid (elf)",
+      "text": "Creatures of the humanoid (elf) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-giant",
+      "name": "Humanoid (giant)",
+      "text": "Creatures of the humanoid (giant) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-goblinoid",
+      "name": "Humanoid (goblinoid)",
+      "text": "Creatures of the humanoid (goblinoid) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-gnoll",
+      "name": "Humanoid (gnoll)",
+      "text": "Creatures of the humanoid (gnoll) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-gnome",
+      "name": "Humanoid (gnome)",
+      "text": "Creatures of the humanoid (gnome) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-halfling",
+      "name": "Humanoid (halfling)",
+      "text": "Creatures of the humanoid (halfling) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-human",
+      "name": "Humanoid (human)",
+      "text": "Creatures of the humanoid (human) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-orc",
+      "name": "Humanoid (orc)",
+      "text": "Creatures of the humanoid (orc) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-reptilian",
+      "name": "Humanoid (reptilian)",
+      "text": "Creatures of the humanoid (reptilian) subtype.",
+      "requires": []
+    },
+    {
+      "id": "humanoid-other",
+      "name": "Humanoid (other subtype)",
+      "text": "Humanoids of any one other subtype, chosen when the enemy is picked.",
+      "requires": [],
+      "choose_subtype": true
+    },
+    {
+      "id": "magical-beast",
+      "name": "Magical beast",
+      "text": "Creatures of the magical beast type.",
+      "requires": []
+    },
+    {
+      "id": "monstrous-humanoid",
+      "name": "Monstrous humanoid",
+      "text": "Creatures of the monstrous humanoid type.",
+      "requires": []
+    },
+    {
+      "id": "ooze",
+      "name": "Ooze",
+      "text": "Creatures of the ooze type.",
+      "requires": []
+    },
+    {
+      "id": "outsider-air",
+      "name": "Outsider (air)",
+      "text": "Creatures of the outsider (air) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-chaotic",
+      "name": "Outsider (chaotic)",
+      "text": "Creatures of the outsider (chaotic) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-earth",
+      "name": "Outsider (earth)",
+      "text": "Creatures of the outsider (earth) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-evil",
+      "name": "Outsider (evil)",
+      "text": "Creatures of the outsider (evil) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-fire",
+      "name": "Outsider (fire)",
+      "text": "Creatures of the outsider (fire) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-good",
+      "name": "Outsider (good)",
+      "text": "Creatures of the outsider (good) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-lawful",
+      "name": "Outsider (lawful)",
+      "text": "Creatures of the outsider (lawful) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-native",
+      "name": "Outsider (native)",
+      "text": "Creatures of the outsider (native) subtype.",
+      "requires": []
+    },
+    {
+      "id": "outsider-water",
+      "name": "Outsider (water)",
+      "text": "Creatures of the outsider (water) subtype.",
+      "requires": []
+    },
+    {
+      "id": "plant",
+      "name": "Plant",
+      "text": "Creatures of the plant type.",
+      "requires": []
+    },
+    {
+      "id": "undead",
+      "name": "Undead",
+      "text": "Creatures of the undead type.",
+      "requires": []
+    },
+    {
+      "id": "vermin",
+      "name": "Vermin",
+      "text": "Creatures of the vermin type.",
+      "requires": []
+    }
+  ]
+}

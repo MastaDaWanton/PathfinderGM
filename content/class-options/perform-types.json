@@ -1,0 +1,108 @@
+{
+  "id": "perform-types",
+  "name": "Bard Versatile Performance",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/bard.html, https://www.d20pfsrd.com/classes/core-classes/bard/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "rules": {
+    "choices_at": [
+      2,
+      6,
+      10,
+      14,
+      18
+    ],
+    "substitution": "The bard may use the total Perform bonus in place of each associated skill's bonus."
+  },
+  "options": [
+    {
+      "id": "act",
+      "name": "Act",
+      "text": "Stage acting.",
+      "requires": [],
+      "skills": [
+        "bluff",
+        "disguise"
+      ]
+    },
+    {
+      "id": "comedy",
+      "name": "Comedy",
+      "text": "Jokes and comic routines.",
+      "requires": [],
+      "skills": [
+        "bluff",
+        "intimidate"
+      ]
+    },
+    {
+      "id": "dance",
+      "name": "Dance",
+      "text": "Dancing.",
+      "requires": [],
+      "skills": [
+        "acrobatics",
+        "fly"
+      ]
+    },
+    {
+      "id": "keyboard-instruments",
+      "name": "Keyboard Instruments",
+      "text": "Keyboard instruments.",
+      "requires": [],
+      "skills": [
+        "diplomacy",
+        "intimidate"
+      ]
+    },
+    {
+      "id": "oratory",
+      "name": "Oratory",
+      "text": "Speeches and recitation.",
+      "requires": [],
+      "skills": [
+        "diplomacy",
+        "sense motive"
+      ]
+    },
+    {
+      "id": "percussion",
+      "name": "Percussion",
+      "text": "Drums and other percussion.",
+      "requires": [],
+      "skills": [
+        "handle animal",
+        "intimidate"
+      ]
+    },
+    {
+      "id": "sing",
+      "name": "Sing",
+      "text": "Singing.",
+      "requires": [],
+      "skills": [
+        "bluff",
+        "sense motive"
+      ]
+    },
+    {
+      "id": "string",
+      "name": "String",
+      "text": "String instruments.",
+      "requires": [],
+      "skills": [
+        "bluff",
+        "diplomacy"
+      ]
+    },
+    {
+      "id": "wind",
+      "name": "Wind",
+      "text": "Wind instruments.",
+      "requires": [],
+      "skills": [
+        "diplomacy",
+        "handle animal"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,190 @@
+{
+  "id": "rogue-talents",
+  "name": "Rogue Talents",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/rogue.html, https://www.d20pfsrd.com/classes/core-classes/rogue/, https://www.d20pfsrd.com/classes/core-classes/rogue/rogue-talents/, https://www.d20pfsrd.com/classes/core-classes/rogue/rogue-talents/paizo-rogue-advanced-talents/, https://aonprd.com/RogueTalents.aspx, fetched 2026-10-05",
+  "_unconfirmed": [
+    "feat: whether the Feat advanced talent may be taken more than once; the CRB says no talent may be taken twice and the Feat entry does not state an exception, so 'repeatable' is omitted"
+  ],
+  "rules": {
+    "talents_from": 2,
+    "talent_every": 2,
+    "advanced_from": 10,
+    "sneak_attack_limit": "Only one talent marked sneak_attack may apply to a given attack, chosen before the roll.",
+    "no_repeats": "A talent cannot be taken twice unless it says otherwise."
+  },
+  "options": [
+    {
+      "id": "bleeding-attack",
+      "name": "Bleeding Attack",
+      "text": "Your sneak attacks open wounds that bleed each round for as many points as you have sneak attack dice.",
+      "requires": [],
+      "sneak_attack": true
+    },
+    {
+      "id": "combat-trick",
+      "name": "Combat Trick",
+      "text": "You gain one bonus combat feat.",
+      "requires": [],
+      "grants_feat": "combat"
+    },
+    {
+      "id": "fast-stealth",
+      "name": "Fast Stealth",
+      "text": "You can move at full speed while using Stealth with no penalty.",
+      "requires": []
+    },
+    {
+      "id": "finesse-rogue",
+      "name": "Finesse Rogue",
+      "text": "You gain Weapon Finesse as a bonus feat.",
+      "requires": [],
+      "bonus_feat": "weapon-finesse"
+    },
+    {
+      "id": "ledge-walker",
+      "name": "Ledge Walker",
+      "text": "You cross narrow surfaces at full speed with Acrobatics and stay ready to defend while doing so.",
+      "requires": []
+    },
+    {
+      "id": "minor-magic",
+      "name": "Minor Magic",
+      "text": "Pick a 0-level sorcerer/wizard spell; cast it three times a day as a spell-like ability.",
+      "requires": [],
+      "ability": {
+        "int": 10
+      }
+    },
+    {
+      "id": "major-magic",
+      "name": "Major Magic",
+      "text": "Pick a 1st-level sorcerer/wizard spell; cast it twice a day as a spell-like ability.",
+      "requires": [
+        "minor-magic"
+      ],
+      "ability": {
+        "int": 11
+      }
+    },
+    {
+      "id": "quick-disable",
+      "name": "Quick Disable",
+      "text": "Disabling a trap takes you half the usual time.",
+      "requires": []
+    },
+    {
+      "id": "resiliency",
+      "name": "Resiliency",
+      "text": "Once a day, when dropped below 0 hit points, gain temporary hit points equal to your rogue level for a minute.",
+      "requires": []
+    },
+    {
+      "id": "rogue-crawl",
+      "name": "Rogue Crawl",
+      "text": "You can crawl at half speed while prone, even taking a 5-foot step.",
+      "requires": []
+    },
+    {
+      "id": "slow-reactions",
+      "name": "Slow Reactions",
+      "text": "Foes hurt by your sneak attack cannot make attacks of opportunity for 1 round.",
+      "requires": [],
+      "sneak_attack": true
+    },
+    {
+      "id": "stand-up",
+      "name": "Stand Up",
+      "text": "You rise from prone as a free action, though doing so still provokes as usual.",
+      "requires": []
+    },
+    {
+      "id": "surprise-attack",
+      "name": "Surprise Attack",
+      "text": "In a surprise round, foes count as flat-footed to you even if they have already acted.",
+      "requires": []
+    },
+    {
+      "id": "trap-spotter",
+      "name": "Trap Spotter",
+      "text": "Coming within 10 feet of a trap earns you an automatic, secret Perception check to notice it.",
+      "requires": []
+    },
+    {
+      "id": "weapon-training",
+      "name": "Weapon Training",
+      "text": "You gain Weapon Focus as a bonus feat.",
+      "requires": [],
+      "bonus_feat": "weapon-focus"
+    },
+    {
+      "id": "crippling-strike",
+      "name": "Crippling Strike",
+      "text": "Your sneak attacks also deal 2 points of Strength damage.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true,
+      "sneak_attack": true
+    },
+    {
+      "id": "defensive-roll",
+      "name": "Defensive Roll",
+      "text": "Once a day, against a blow that would drop you to 0 or less, a Reflex save halves the damage.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true
+    },
+    {
+      "id": "dispelling-attack",
+      "name": "Dispelling Attack",
+      "text": "Sneak attack damage also targets the foe with dispel magic against its lowest-level active spell.",
+      "min_level": 10,
+      "requires": [
+        "major-magic"
+      ],
+      "advanced": true,
+      "sneak_attack": true
+    },
+    {
+      "id": "feat",
+      "name": "Feat",
+      "text": "Take any feat you qualify for instead of a talent.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true,
+      "grants_feat": "any"
+    },
+    {
+      "id": "improved-evasion",
+      "name": "Improved Evasion",
+      "text": "As evasion, and you now take only half damage even when the Reflex save fails.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true
+    },
+    {
+      "id": "opportunist",
+      "name": "Opportunist",
+      "text": "Once a round, take an attack of opportunity against a foe an ally has just hit in melee.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true
+    },
+    {
+      "id": "skill-mastery",
+      "name": "Skill Mastery",
+      "text": "Choose 3 + Int modifier skills; you can always take 10 on them, even under stress.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true,
+      "repeatable": true
+    },
+    {
+      "id": "slippery-mind",
+      "name": "Slippery Mind",
+      "text": "After failing a save against an enchantment, you get one more save a round later at the same DC.",
+      "min_level": 10,
+      "requires": [],
+      "advanced": true
+    }
+  ]
+}

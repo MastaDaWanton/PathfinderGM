@@ -1,0 +1,516 @@
+{
+  "id": "sorcerer-bloodlines",
+  "name": "Sorcerer Bloodlines",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/sorcerer.html, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/aberrant-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/abyssal-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/arcane-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/celestial-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/destined-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/draconic-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/elemental-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/fey-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/infernal-bloodline/, https://www.d20pfsrd.com/classes/core-classes/sorcerer/bloodlines/bloodlines-from-paizo/undead-bloodline/, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Aberrant, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Abyssal, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Arcane, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Celestial, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Destined, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Draconic, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Elemental, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Fey, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Infernal, https://aonprd.com/BloodlineDisplay.aspx?ItemName=Undead, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "options": [
+    {
+      "id": "aberrant",
+      "name": "Aberrant",
+      "text": "Something alien twists your lineage; your body stretches and warps in ways no natural creature's should.",
+      "requires": [],
+      "class_skill": "knowledge (dungeoneering)",
+      "bonus_feats": [
+        "combat-casting",
+        "improved-disarm",
+        "improved-grapple",
+        "improved-initiative",
+        "improved-unarmed-strike",
+        "iron-will",
+        "silent-spell",
+        "skill-focus"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (dungeoneering)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "enlarge person",
+        "5": "see invisibility",
+        "7": "tongues",
+        "9": "black tentacles",
+        "11": "feeblemind",
+        "13": "veil",
+        "15": "plane shift",
+        "17": "mind blank",
+        "19": "shapechange"
+      },
+      "powers": {
+        "1": "Acidic Ray",
+        "3": "Long Limbs",
+        "9": "Unusual Anatomy",
+        "15": "Alien Resistance",
+        "20": "Aberrant Form"
+      },
+      "arcana": "Your polymorph-subschool spells last half again as long, never less than one round."
+    },
+    {
+      "id": "abyssal",
+      "name": "Abyssal",
+      "text": "A demon's taint runs in your family; rage and brute strength surface as your power grows.",
+      "requires": [],
+      "class_skill": "knowledge (planes)",
+      "bonus_feats": [
+        "augment-summoning",
+        "cleave",
+        "empower-spell",
+        "great-fortitude",
+        "improved-bull-rush",
+        "improved-sunder",
+        "power-attack",
+        "skill-focus"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (planes)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "cause fear",
+        "5": "bull's strength",
+        "7": "rage",
+        "9": "stoneskin",
+        "11": "dismissal",
+        "13": "transformation",
+        "15": "greater teleport",
+        "17": "unholy aura",
+        "19": "summon monster ix"
+      },
+      "powers": {
+        "1": "Claws",
+        "3": "Demon Resistances",
+        "9": "Strength of the Abyss",
+        "15": "Added Summonings",
+        "20": "Demonic Might"
+      },
+      "arcana": "Creatures you summon gain DR/good equal to half your sorcerer level, at least 1."
+    },
+    {
+      "id": "arcane",
+      "name": "Arcane",
+      "text": "Your family has long worked wizardry; magic comes to you as naturally as study comes to others.",
+      "requires": [],
+      "class_skill_from": [
+        "knowledge (arcana)",
+        "knowledge (dungeoneering)",
+        "knowledge (engineering)",
+        "knowledge (geography)",
+        "knowledge (history)",
+        "knowledge (local)",
+        "knowledge (nature)",
+        "knowledge (nobility)",
+        "knowledge (planes)",
+        "knowledge (religion)"
+      ],
+      "bonus_feats": [
+        "combat-casting",
+        "improved-counterspell",
+        "improved-initiative",
+        "iron-will",
+        "scribe-scroll",
+        "skill-focus",
+        "spell-focus",
+        "still-spell"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (arcana)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "identify",
+        "5": "invisibility",
+        "7": "dispel magic",
+        "9": "dimension door",
+        "11": "overland flight",
+        "13": "true seeing",
+        "15": "greater teleport",
+        "17": "power word stun",
+        "19": "wish"
+      },
+      "powers": {
+        "1": "Arcane Bond",
+        "3": "Metamagic Adept",
+        "9": "New Arcana",
+        "15": "School Power",
+        "20": "Arcane Apotheosis"
+      },
+      "arcana": "A metamagic feat that raises a spell's slot by one or more levels also raises its save DC by 1."
+    },
+    {
+      "id": "celestial",
+      "name": "Celestial",
+      "text": "Holy blood from a good outsider marks your ancestry, lending you radiance and eventually wings.",
+      "requires": [],
+      "class_skill": "heal",
+      "bonus_feats": [
+        "dodge",
+        "extend-spell",
+        "iron-will",
+        "mobility",
+        "mounted-combat",
+        "ride-by-attack",
+        "skill-focus",
+        "weapon-finesse"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (religion)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "bless",
+        "5": "resist energy",
+        "7": "magic circle against evil",
+        "9": "remove curse",
+        "11": "flame strike",
+        "13": "greater dispel magic",
+        "15": "banishment",
+        "17": "sunburst",
+        "19": "gate"
+      },
+      "powers": {
+        "1": "Heavenly Fire",
+        "3": "Celestial Resistances",
+        "9": "Wings of Heaven",
+        "15": "Conviction",
+        "20": "Ascension"
+      },
+      "arcana": "Creatures you summon gain DR/evil equal to half your sorcerer level, at least 1."
+    },
+    {
+      "id": "destined",
+      "name": "Destined",
+      "text": "Your line is bound to some great fate; luck and providence bend around you.",
+      "requires": [],
+      "class_skill": "knowledge (history)",
+      "bonus_feats": [
+        "arcane-strike",
+        "diehard",
+        "endurance",
+        "leadership",
+        "lightning-reflexes",
+        "maximize-spell",
+        "skill-focus",
+        "weapon-focus"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (history)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "alarm",
+        "5": "blur",
+        "7": "protection from energy",
+        "9": "freedom of movement",
+        "11": "break enchantment",
+        "13": "mislead",
+        "15": "spell turning",
+        "17": "moment of prescience",
+        "19": "foresight"
+      },
+      "powers": {
+        "1": "Touch of Destiny",
+        "3": "Fated",
+        "9": "It Was Meant To Be",
+        "15": "Within Reach",
+        "20": "Destiny Realized"
+      },
+      "arcana": "Casting a personal-range spell grants a luck bonus on all saves equal to its level for 1 round."
+    },
+    {
+      "id": "draconic",
+      "name": "Draconic",
+      "text": "A dragon stands somewhere in your family tree; scales, claws and a breath weapon emerge as you rise.",
+      "requires": [],
+      "class_skill": "perception",
+      "bonus_feats": [
+        "blind-fight",
+        "great-fortitude",
+        "improved-initiative",
+        "power-attack",
+        "quicken-spell",
+        "skill-focus",
+        "skill-focus",
+        "toughness"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "fly",
+          "knowledge (arcana)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "mage armor",
+        "5": "resist energy",
+        "7": "fly",
+        "9": "fear",
+        "11": "spell resistance",
+        "13": "form of the dragon i",
+        "15": "form of the dragon ii",
+        "17": "form of the dragon iii",
+        "19": "wish"
+      },
+      "powers": {
+        "1": "Claws",
+        "3": "Dragon Resistances",
+        "9": "Breath Weapon",
+        "15": "Wings",
+        "20": "Power of Wyrms"
+      },
+      "arcana": "Spells whose energy descriptor matches your dragon's energy deal +1 damage per die.",
+      "variants": {
+        "name": "Dragon type",
+        "from": [
+          {
+            "id": "black",
+            "energy": "acid",
+            "breath": "60-foot line"
+          },
+          {
+            "id": "blue",
+            "energy": "electricity",
+            "breath": "60-foot line"
+          },
+          {
+            "id": "green",
+            "energy": "acid",
+            "breath": "30-foot cone"
+          },
+          {
+            "id": "red",
+            "energy": "fire",
+            "breath": "30-foot cone"
+          },
+          {
+            "id": "white",
+            "energy": "cold",
+            "breath": "30-foot cone"
+          },
+          {
+            "id": "brass",
+            "energy": "fire",
+            "breath": "60-foot line"
+          },
+          {
+            "id": "bronze",
+            "energy": "electricity",
+            "breath": "60-foot line"
+          },
+          {
+            "id": "copper",
+            "energy": "acid",
+            "breath": "60-foot line"
+          },
+          {
+            "id": "gold",
+            "energy": "fire",
+            "breath": "30-foot cone"
+          },
+          {
+            "id": "silver",
+            "energy": "cold",
+            "breath": "30-foot cone"
+          }
+        ]
+      }
+    },
+    {
+      "id": "elemental",
+      "name": "Elemental",
+      "text": "Elemental power from the Inner Planes flows in you, tying your magic to air, earth, fire or water.",
+      "requires": [],
+      "class_skill": "knowledge (planes)",
+      "bonus_feats": [
+        "dodge",
+        "empower-spell",
+        "great-fortitude",
+        "improved-initiative",
+        "lightning-reflexes",
+        "power-attack",
+        "skill-focus",
+        "weapon-finesse"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (planes)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "burning hands",
+        "5": "scorching ray",
+        "7": "protection from energy",
+        "9": "elemental body i",
+        "11": "elemental body ii",
+        "13": "elemental body iii",
+        "15": "elemental body iv",
+        "17": "summon monster viii",
+        "19": "elemental swarm"
+      },
+      "bonus_spell_notes": {
+        "17": "elementals only"
+      },
+      "powers": {
+        "1": "Elemental Ray",
+        "3": "Elemental Resistance",
+        "9": "Elemental Blast",
+        "15": "Elemental Movement",
+        "20": "Elemental Body"
+      },
+      "arcana": "You may change the energy type of a damaging energy spell to your element's energy.",
+      "variants": {
+        "name": "Element",
+        "from": [
+          {
+            "id": "air",
+            "energy": "electricity",
+            "movement": "fly 60 feet (average)"
+          },
+          {
+            "id": "earth",
+            "energy": "acid",
+            "movement": "burrow 30 feet"
+          },
+          {
+            "id": "fire",
+            "energy": "fire",
+            "movement": "+30 feet base speed"
+          },
+          {
+            "id": "water",
+            "energy": "cold",
+            "movement": "swim 60 feet"
+          }
+        ]
+      }
+    },
+    {
+      "id": "fey",
+      "name": "Fey",
+      "text": "Fey mischief touched your forebears; your magic laughs, beguiles and slips from sight.",
+      "requires": [],
+      "class_skill": "knowledge (nature)",
+      "bonus_feats": [
+        "dodge",
+        "improved-initiative",
+        "lightning-reflexes",
+        "mobility",
+        "point-blank-shot",
+        "precise-shot",
+        "quicken-spell",
+        "skill-focus"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (nature)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "entangle",
+        "5": "hideous laughter",
+        "7": "deep slumber",
+        "9": "poison",
+        "11": "tree stride",
+        "13": "mislead",
+        "15": "phase door",
+        "17": "irresistible dance",
+        "19": "shapechange"
+      },
+      "powers": {
+        "1": "Laughing Touch",
+        "3": "Woodland Stride",
+        "9": "Fleeting Glance",
+        "15": "Fey Magic",
+        "20": "Soul of the Fey"
+      },
+      "arcana": "Your compulsion-subschool spells have their save DC raised by 2."
+    },
+    {
+      "id": "infernal",
+      "name": "Infernal",
+      "text": "A devil's bargain in your family's past left hellish blood and a talent for persuasion.",
+      "requires": [],
+      "class_skill": "diplomacy",
+      "bonus_feats": [
+        "blind-fight",
+        "combat-expertise",
+        "deceitful",
+        "extend-spell",
+        "improved-disarm",
+        "iron-will",
+        "skill-focus",
+        "spell-penetration"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (planes)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "protection from good",
+        "5": "scorching ray",
+        "7": "suggestion",
+        "9": "charm monster",
+        "11": "dominate person",
+        "13": "planar binding",
+        "15": "greater teleport",
+        "17": "power word stun",
+        "19": "meteor swarm"
+      },
+      "bonus_spell_notes": {
+        "13": "devils and fiendish creatures only"
+      },
+      "powers": {
+        "1": "Corrupting Touch",
+        "3": "Infernal Resistances",
+        "9": "Hellfire",
+        "15": "On Dark Wings",
+        "20": "Power of the Pit"
+      },
+      "arcana": "Your charm-subschool spells have their save DC raised by 2."
+    },
+    {
+      "id": "undead",
+      "name": "Undead",
+      "text": "The grave's chill has a claim on your bloodline; death's power answers when you call.",
+      "requires": [],
+      "class_skill": "knowledge (religion)",
+      "bonus_feats": [
+        "combat-casting",
+        "diehard",
+        "endurance",
+        "iron-will",
+        "skill-focus",
+        "spell-focus",
+        "still-spell",
+        "toughness"
+      ],
+      "bonus_feat_subjects": {
+        "skill-focus": [
+          "knowledge (religion)"
+        ]
+      },
+      "bonus_spells": {
+        "3": "chill touch",
+        "5": "false life",
+        "7": "vampiric touch",
+        "9": "animate dead",
+        "11": "waves of fatigue",
+        "13": "undeath to death",
+        "15": "finger of death",
+        "17": "horrid wilting",
+        "19": "energy drain"
+      },
+      "powers": {
+        "1": "Grave Touch",
+        "3": "Death's Gift",
+        "9": "Grasp of the Dead",
+        "15": "Incorporeal Form",
+        "20": "One of Us"
+      },
+      "arcana": "Corporeal undead that were once humanoid count as humanoid for which spells affect them."
+    }
+  ]
+}

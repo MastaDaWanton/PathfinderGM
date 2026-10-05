@@ -2238,7 +2238,10 @@ function featMatches() {
   const q = (FORGE.featq || "").trim().toLowerCase();
   const pool = (FORGE.showShutFeats
     ? [...got.open, ...got.shut].sort((a, b) => a.name.localeCompare(b.name))
-    : got.open).filter(x => !FORGE.form.feats.includes(x.id));
+    : got.open).filter(x => !FORGE.form.feats.includes(x.id)
+      // What the class hands over (a monk's Improved Unarmed Strike) is not a pick: the
+      // server writes it and refuses it as one (`creation.build`, `granted`).
+      && !(got.granted || []).includes(x.id));
   // Counted over everything this character could reach, so the chip numbers do not
   // shuffle about as the search narrows — a count that moves is not a landmark.
   const counts = {};
@@ -2504,12 +2507,57 @@ function takesAllDomains(f) {
 // two domains have nothing to choose between and keep their search box on the next page.
 // The answer goes in `f.class_choices` ({id: {option, pick, name}}), and a domain taken
 // here goes in `f.domains`, the list the server and casting already read.
+// A catalogue choice at 1st level — the sorcerer's bloodline, the wizard's school, its
+// opposition and its bond, the ranger's first favored enemy — is one option with entries
+// to pick (`creation.class_choice_menu`, content/class-options/). Measured before
+// 2026-10-05: no field for any of them, and the server refused "'bloodline' is not a
+// choice a sorcerer makes". Left unpicked it is not refused: it waits on the Class tab,
+// the way every PF1 builder nags rather than blocks (docs/class-audit.md §5).
+function catalogueChoice(ch, f) {
+  const opt = ch.options[0];
+  const said = f.class_choices[ch.id] || {};
+  const picks = said.picks || [];
+  const n = opt.how_many || 1;
+  if (ch.when) {
+    const gate = ((f.class_choices[ch.when.choice] || {}).picks || []).map(p => p.pick);
+    if (!gate.length) return `<h2 class="sect">${esc(ch.name)}</h2>
+      <p class="note">Chosen after ${esc(ch.when.choice)}.</p>`;
+    if (gate.some(g => (ch.when.not || []).includes(g))) return "";
+  }
+  const other = ch.distinct_from
+    ? ((f.class_choices[ch.distinct_from] || {}).picks || []).map(p => p.pick) : [];
+  const cards = (opt.entries || []).map(e => {
+    const on = picks.find(p => p.pick === e.id);
+    const shut = other.includes(e.id);
+    return `<button class="card pick ${on ? "on" : ""}" data-crentry="${esc(e.id)}"
+        data-crchoice="${esc(ch.id)}" ${shut ? "disabled style=opacity:.4" : ""}>
+      <h3>${esc(e.name)}</h3>
+      <div class="traits">${shut ? "already taken above" : esc(e.text || "")}</div>
+    </button>`;
+  }).join("");
+  const variants = picks.map(p => {
+    const e = (opt.entries || []).find(x => x.id === p.pick);
+    if (!e || !(e.variants || []).length) return "";
+    return `<p class="note">${esc(e.name)} — ${esc((e.variant_name || "which").toLowerCase())}:</p>
+      <div class="cards tight">${e.variants.map(v => `<button class="card pick ${p.variant === v ? "on" : ""}"
+        data-crvariant="${esc(v)}" data-crentryof="${esc(e.id)}" data-crchoice="${esc(ch.id)}">
+        <h3>${esc(v)}</h3></button>`).join("")}</div>`;
+  }).join("");
+  return `<h2 class="sect">${esc(ch.name)}</h2>
+    ${ch.text ? `<p class="note">${esc(ch.text)}</p>` : ""}
+    <p class="note">${picks.length} of ${n} chosen${picks.length < n
+      ? " — or leave it, and it waits on the sheet's Class tab." : "."}</p>
+    <div class="cards tight">${cards}</div>${variants}`;
+}
+
 function classChoiceSection(cls, f) {
   if (!cls) return "";
-  const asked = (cls.choices || []).filter(c => (c.options || []).length > 1);
-  if (!asked.length) return "";
   f.class_choices = f.class_choices || {};
-  return asked.map(ch => {
+  const catalogued = (cls.choices || []).filter(c => (c.options || []).length === 1
+    && c.options[0].kind === "class option");
+  const asked = (cls.choices || []).filter(c => (c.options || []).length > 1);
+  if (!asked.length && !catalogued.length) return "";
+  return catalogued.map(ch => catalogueChoice(ch, f)).join("") + asked.map(ch => {
     const said = f.class_choices[ch.id] || {};
     const opt = (ch.options || []).find(o => o.kind === said.option);
     const pickDomain = opt && opt.kind === "domain" ? `
@@ -2864,7 +2912,13 @@ function paneForgeWho() {
 
     <h2 class="sect">Skills</h2>
     <div class="budget ${f.skills.length > rb ? "over" : ""}">
-      <span>ranks${cls ? ` (${cls.skill_ranks} class${f.race === "human" ? " +1 human" : ""} + Int)` : ""}</span>
+      <span>ranks${cls ? ` (${cls.skill_ranks} class${(() => {
+        // Asked of the race document, as `ranksBudget` is — `f.race === "human"` named
+        // one race and a world's own skilled people never showed their rank here.
+        const r = opts.races.find(x => x.id === f.race);
+        const n = (r && r.budget && r.budget.ranks) || 0;
+        return n ? ` +${n} ${esc((r.name || "race").toLowerCase())}` : "";
+      })()} + Int)` : ""}. More arrive with every level, on the Class tab.</span>
       <b>${f.skills.length} / ${rb}</b></div>
     <div class="skillgrid">${opts.skills.map(s => `
       <label class="${cls && cls.class_skills.includes(s) ? "classskill" : ""}">
@@ -3172,6 +3226,32 @@ document.addEventListener("click", async e => {
       // One domain through nature bond: picking another replaces it, picking it again
       // takes it back off.
       f.domains = (f.domains || []).includes(name) ? [] : [name];
+      render(); return;
+    }
+    // A catalogue entry (`catalogueChoice`): toggled, up to the choice's number; picking
+    // a school again clears the opposition that may now name it.
+    const centry = e.target.closest("[data-crentry]");
+    if (centry) {
+      const id = centry.dataset.crchoice, pick = centry.dataset.crentry;
+      const ch = ((FORGE.opts.classes || []).find(c => c.id === f.class) || { choices: [] })
+        .choices.find(c => c.id === id);
+      const n = (ch && ch.options[0].how_many) || 1;
+      const was = ((f.class_choices || {})[id] || {}).picks || [];
+      let picks = was.some(p => p.pick === pick) ? was.filter(p => p.pick !== pick)
+        : n === 1 ? [{ pick }] : was.length >= n ? was : [...was, { pick }];
+      const next = { ...(f.class_choices || {}), [id]: { option: "class option", picks } };
+      for (const other of ((FORGE.opts.classes || []).find(c => c.id === f.class) || { choices: [] }).choices) {
+        if ((other.when && other.when.choice === id) || other.distinct_from === id) delete next[other.id];
+      }
+      f.class_choices = next;
+      render(); return;
+    }
+    const cvariant = e.target.closest("[data-crvariant]");
+    if (cvariant) {
+      const id = cvariant.dataset.crchoice, of = cvariant.dataset.crentryof;
+      const was = (f.class_choices || {})[id] || { option: "class option", picks: [] };
+      f.class_choices = { ...(f.class_choices || {}), [id]: { ...was,
+        picks: (was.picks || []).map(p => p.pick === of ? { ...p, variant: cvariant.dataset.crvariant } : p) } };
       render(); return;
     }
     const bondanimal = e.target.closest("[data-crbondanimal]");

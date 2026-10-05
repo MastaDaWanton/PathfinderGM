@@ -1,0 +1,91 @@
+{
+  "id": "arcane-bonds",
+  "name": "Arcane Bonds",
+  "source": "https://legacy.aonprd.com/corerulebook/classes/wizard.html, https://www.d20pfsrd.com/classes/core-classes/wizard/, https://www.d20pfsrd.com/bestiary/monster-listings/animals/familiar/, fetched 2026-10-05",
+  "_unconfirmed": [],
+  "options": [
+    {
+      "id": "bonded-object",
+      "name": "Bonded Object",
+      "text": "A cherished item channels your magic: once a day cast any spellbook spell through it; casting without it risks failure.",
+      "requires": [],
+      "variants": {
+        "name": "Object",
+        "from": [
+          {
+            "id": "amulet"
+          },
+          {
+            "id": "ring"
+          },
+          {
+            "id": "staff"
+          },
+          {
+            "id": "wand"
+          },
+          {
+            "id": "weapon"
+          }
+        ]
+      },
+      "notes": "A bonded weapon must be masterwork. Casting without the object needs a concentration check (DC 20 + spell level)."
+    },
+    {
+      "id": "familiar",
+      "name": "Familiar",
+      "text": "A magically bonded animal companion-in-miniature that aids your spellcasting and grants you a small boon.",
+      "requires": [],
+      "variants": {
+        "name": "Familiar",
+        "from": [
+          {
+            "id": "bat",
+            "grants": "+3 Fly"
+          },
+          {
+            "id": "cat",
+            "grants": "+3 Stealth"
+          },
+          {
+            "id": "hawk",
+            "grants": "+3 sight-based and opposed Perception in bright light"
+          },
+          {
+            "id": "lizard",
+            "grants": "+3 Climb"
+          },
+          {
+            "id": "monkey",
+            "grants": "+3 Acrobatics"
+          },
+          {
+            "id": "owl",
+            "grants": "+3 sight-based and opposed Perception in shadows or darkness"
+          },
+          {
+            "id": "rat",
+            "grants": "+2 Fortitude saves"
+          },
+          {
+            "id": "raven",
+            "grants": "+3 Appraise",
+            "note": "can speak one language of the master's choice (Su)"
+          },
+          {
+            "id": "toad",
+            "grants": "+3 hit points"
+          },
+          {
+            "id": "viper",
+            "grants": "+3 Bluff"
+          },
+          {
+            "id": "weasel",
+            "grants": "+2 Reflex saves"
+          }
+        ]
+      }
+    }
+  ]
+}

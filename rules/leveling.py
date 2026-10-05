@@ -691,13 +691,104 @@ BONUS_FEAT_RULES: dict[str, dict] = {
         10: ["improved-critical", "medusa-s-wrath", "snatch-arrows", "spring-attack"]},
         "ignore_prereqs": True,
         "say": "one of the monk's bonus feats, prerequisites waived"},
+    # The two pools the table names as something other than "bonus feat", so nothing owed
+    # them (audit D2: 0 owed at ranger 2/6/10/14/18 and sorcerer 7/13/19). `grant` is the
+    # row's own word; `ids_from_choice` reads the list off the CHOICE the feats belong to
+    # — the ranger's combat style, the sorcerer's bloodline (content/class-options/) — so
+    # a homebrew style or bloodline brings its own feats with it.
+    #   ranger   "He can choose feats from his selected combat style, even if he does not
+    #            have the normal prerequisites"; the 6th- and 10th-level lists open in turn
+    #   sorcerer "chosen from a list specific to each bloodline. The sorcerer must meet
+    #            the prerequisites for these bonus feats"
+    "ranger": {"grant": "combat style feat",
+               "ids_from_choice": {"choice": "combat style", "field": "bonus_feats"},
+               "ignore_prereqs": True,
+               "say": "a feat of your combat style, prerequisites waived"},
+    "sorcerer": {"grant": "bloodline feat",
+                 "ids_from_choice": {"choice": "bloodline", "field": "bonus_feats"},
+                 "say": "one of your bloodline's bonus feats"},
+}
+
+# Feats a class grants outright, beyond what its table names. The table's own rows are
+# read first (`granted_feats_at`: a grant that IS a feat's name — the wizard's Scribe
+# Scroll, the ranger's Endurance, the sorcerer's Eschew Materials, the monk's Stunning
+# Fist, Blood Bending's Combat Expertise and Combat Reflexes). The monk's Improved Unarmed
+# Strike is the one the table spells as a column ("unarmed strike (1d6)") rather than a
+# feat, so it is named here: "At 1st level, a monk gains Improved Unarmed Strike as a
+# bonus feat" (Core Rulebook, Monk). Audit D4 measured a 1st-level monk holding only the
+# three feats the player chose.
+GRANTED_FEATS: dict[str, dict[int, list[str]]] = {
+    "monk": {1: ["improved-unarmed-strike"]},
 }
 
 
 def class_bonus_feats_at(class_id: str, level: int) -> int:
-    """How many bonus feats the class table grants on this row."""
+    """How many bonus feats the class table grants on this row — "bonus feat", or the
+    word the class's own bonus pool uses ("combat style feat", "bloodline feat")."""
+    words = {"bonus feat"}
+    grant = str(bonus_feat_rule(class_id).get("grant") or "").strip().lower()
+    if grant:
+        words.add(grant)
     return sum(1 for g in classes_mod.table_at(class_id, int(level)).get("grants") or []
-               if str(g).strip().lower() == "bonus feat")
+               if str(g).strip().lower() in words)
+
+
+def granted_feats_at(class_id: str, level: int) -> list[str]:
+    """Feat ids the class hands over at exactly this level, not chosen: a table row that
+    names a feat (exactly, never a mythic twin), and `GRANTED_FEATS`."""
+    from . import feats as feats_mod
+
+    names: dict[str, str] = {}
+    for f in feats_mod.all_feats().values():
+        if "mythic" in {str(t).lower() for t in f.types or ()}:
+            continue
+        names.setdefault(f.name.strip().lower(), f.id)
+    out: list[str] = []
+    for g in classes_mod.table_at(class_id, int(level)).get("grants") or []:
+        fid = names.get(str(g).strip().lower())
+        if fid and fid not in out:
+            out.append(fid)
+    for fid in (GRANTED_FEATS.get(str(class_id or "").strip().lower()) or {}).get(
+            int(level), []):
+        if fid not in out:
+            out.append(fid)
+    return out
+
+
+def granted_feats(class_id: str, level: int) -> list[str]:
+    """Every feat id the class has handed over by this level."""
+    out: list[str] = []
+    for n in range(1, int(level) + 1):
+        out += [f for f in granted_feats_at(class_id, n) if f not in out]
+    return out
+
+
+def grant_class_feats(actor) -> list[str]:
+    """Write onto the sheet any feat the class has granted by now and the sheet lacks.
+
+    Idempotent, so it runs at the forge and at every level — the second is how a monk made
+    before 2026-10-05 gets the Improved Unarmed Strike the book always gave him, at his
+    next level. Not on a campaign load: that changed the owner's saves on reading them
+    (see play/campaign.py). A feat already held (picked by hand, or written before) is not
+    added twice. Returns the lines added.
+    """
+    from . import feats as feats_mod
+
+    added: list[str] = []
+    before = getattr(actor, "hp_max", None)
+    for fid in granted_feats(getattr(actor, "char_class", "") or "",
+                             int(getattr(actor, "level", 1) or 1)):
+        if fid in feats_mod._held(actor):
+            continue
+        try:
+            line = feats_mod.get(fid).name.lower()
+        except LookupError:
+            continue
+        actor.feats.append(line)
+        added.append(line)
+    if added and before is not None and hasattr(actor, "_follow_con"):
+        actor._follow_con(before)
+    return added
 
 
 def bonus_feat_rule(class_id: str) -> dict:
@@ -774,13 +865,196 @@ def owed(actor, rules: dict | None = None) -> dict:
         "house": dict(rules),
     }
     out["total"] = out["feats"]["owed"] + out["bonus"]["owed"] + out["points"]["owed"]
+    # Skill ranks and class choices ride with the picks (2026-10-05, docs/class-audit.md
+    # D1 and the A list) but are counted apart: `total` stays the feats and points it has
+    # always meant, and `outstanding` is everything the Class tab has to ask for.
+    out["skills"] = skill_ranks(actor)
+    rows = classes_mod.owed_rows(cid, level, dict(getattr(actor, "class_choices", None)
+                                                  or {}),
+                                 list(getattr(actor, "domains", None) or []))
+    out["choices"] = {"owed": len(rows), "picks": rows, "made": choices_made(actor)}
+    out["paths"] = path_b_offer(actor)
+    out["outstanding"] = out["total"] + out["skills"]["owed"] + out["choices"]["owed"]
     return out
+
+
+# --- skill ranks a level owes ---------------------------------------------------------------
+#
+# Audit D1, the largest number missing from any sheet: nothing owed, offered or wrote a
+# skill rank after the forge, so a 20th-level human barbarian had the 5 ranks she was made
+# with against the book's 100. The book: "At each level, your character gains a number of
+# skill ranks dependent upon your class plus your Intelligence modifier … always at least 1
+# rank per level", and "the maximum number of ranks you can have in a skill is equal to your
+# number of Hit Dice". A race's own ranks (a human's Skilled) ride on every level.
+#
+# No counter is stored, unlike feats: what is owed is the budget less the ranks on the
+# sheet, so it can never drift from what the sheet holds. That is also what makes the Int
+# rule fall out by itself. Pathfinder dropped 3.5's "not retroactive" sentence, so a
+# permanent Intelligence increase pays its rank for every level already taken (d20pfsrd,
+# Ability Scores; the Paizo FAQ on the headband reads the same way, fetched 2026-10-05);
+# a TEMPORARY bonus never does, which is why this reads the base score — an ActiveEffect
+# raising Int never touches `abilities`. The same arithmetic `sheet.validate` refuses an
+# over-spent sheet with, so the two cannot disagree about the budget.
+
+def skill_ranks(actor) -> dict:
+    """`{"owed", "per_level", "total", "spent", "max_rank", "class_ranks", "int_mod",
+    "race_ranks", "class_skills", "skills": [{"name", "rank", "class_skill", "room"}]}`."""
+    from . import races as races_mod
+    from .tables import SKILLS
+
+    cls = classes_mod.get(getattr(actor, "char_class", "") or "")
+    level = max(1, int(getattr(actor, "level", 1) or 1))
+    class_ranks = int(cls.get("skill_ranks", 2) or 0)
+    int_mod = ability_modifier(int((getattr(actor, "abilities", None) or {}).get("int", 10)))
+    try:
+        race_ranks = int(races_mod.budget(getattr(actor, "race", ""), "ranks"))
+    except Exception:       # noqa: BLE001 - a race the registry does not know adds none
+        race_ranks = 0
+    per_level = max(1, class_ranks + int_mod) + race_ranks
+    ranks = {str(k).lower(): int(v) for k, v in (getattr(actor, "ranks", None) or {}).items()}
+    spent = sum(ranks.values())
+    total = per_level * level
+    class_skills = [str(s).lower() for s in cls.get("class_skills") or ()]
+    return {
+        "owed": max(0, total - spent), "per_level": per_level, "total": total,
+        "spent": spent, "max_rank": level, "class_ranks": class_ranks, "int_mod": int_mod,
+        "race_ranks": race_ranks, "class_skills": class_skills,
+        "skills": [{"name": s, "rank": ranks.get(s, 0), "class_skill": s in class_skills,
+                    "room": max(0, level - ranks.get(s, 0))} for s in sorted(SKILLS)],
+    }
+
+
+def rank_problems(actor, spread) -> list[str]:
+    """Every reason these ranks cannot be placed, with the fix named. Empty means
+    `take_ranks` may write them."""
+    from .tables import SKILLS
+
+    name = str(getattr(actor, "name", "") or "This character")
+    parsed = _parse_points(spread)
+    if parsed is None:
+        return ["Send the ranks as an object of skill to ranks, like "
+                "{\"perception\": 1, \"stealth\": 2}."]
+    if not parsed:
+        return ["Place at least one rank."]
+    due = skill_ranks(actor)
+    problems = []
+    for skill, n in parsed.items():
+        if skill not in SKILLS:
+            problems.append(f"{skill!r} is not a skill.")
+        elif n < 0:
+            problems.append(f"{skill.title()}: ranks are only ever added.")
+        elif int((actor.ranks or {}).get(skill, 0)) + n > due["max_rank"]:
+            problems.append(
+                f"{skill.title()} would have {int((actor.ranks or {}).get(skill, 0)) + n} "
+                f"ranks; no skill holds more than your level ({due['max_rank']}).")
+    total = sum(n for n in parsed.values() if n > 0)
+    if not due["owed"]:
+        problems.append(f"{name} has no skill ranks to place.")
+    elif total > due["owed"]:
+        problems.append(f"That is {total} ranks against {due['owed']} owed. "
+                        f"Place {due['owed']}.")
+    return problems
+
+
+def take_ranks(actor, spread) -> tuple[dict, list[str]]:
+    """Place owed skill ranks. `({skill: new rank}, [])`, or `({}, problems)` and nothing
+    written."""
+    problems = rank_problems(actor, spread)
+    if problems:
+        return {}, problems
+    out = {}
+    for skill, n in _parse_points(spread).items():
+        actor.ranks[skill] = int(actor.ranks.get(skill, 0)) + n
+        out[skill] = actor.ranks[skill]
+    return out, []
+
+
+# --- class choices on the sheet, and Blood Bending's second path ----------------------------
+
+def choices_made(actor) -> list[dict]:
+    """Every class choice answered so far, for the Class tab to show: `[{"choice", "name",
+    "picks": [words]}]` — "Bloodline: Draconic (red)"."""
+    out = []
+    for ch in classes_mod.choices_for(getattr(actor, "char_class", "") or "",
+                                      int(getattr(actor, "level", 1) or 1)):
+        got = classes_mod.chosen(actor, str(ch.get("id")))
+        if got:
+            out.append({"choice": str(ch.get("id")), "name": str(ch.get("name") or ch["id"]),
+                        "picks": [p["name"] + (f" ({p['variant']})" if p["variant"] else "")
+                                  for p in got]})
+    return out
+
+
+def path_b_offer(actor) -> dict:
+    """Whether a second path may be taken now: `{"open", "at", "offered"}`.
+
+    Audit D8: a Blood Bender who took one path at the forge reached 11th — where the
+    table opens the b-track — and nothing offered the second; the line read "control
+    blood 1b" with no branch behind it. Optional, as the class says ("a path or both
+    paths"), so it is offered and never owed.
+    """
+    cid = getattr(actor, "char_class", "") or ""
+    offered = paths_for(cid)
+    taken = [str(p).lower() for p in (getattr(actor, "paths", None) or [])]
+    at = unlocks_at(cid, 1)
+    is_open = bool(offered) and max_paths(cid) >= 2 and len(taken) == 1 and bool(at) \
+        and int(getattr(actor, "level", 1) or 1) >= at
+    return {"open": is_open, "at": at,
+            "offered": [p for p in offered if p not in taken] if is_open else []}
+
+
+def take_path(actor, name: str) -> tuple[str, list[str]]:
+    """Follow a second path once its track is open. `(path, [])` or `("", problems)`."""
+    offer = path_b_offer(actor)
+    key = " ".join(str(name or "").split()).strip().lower()
+    who = str(getattr(actor, "name", "") or "This character")
+    if not offer["open"]:
+        if len(getattr(actor, "paths", None) or []) >= 2:
+            return "", [f"{who} already follows two paths."]
+        if not paths_for(getattr(actor, "char_class", "") or ""):
+            return "", [f"{who}'s class follows no paths."]
+        return "", [f"Path B opens at {offer['at']}th level; {who} is "
+                    f"{int(getattr(actor, 'level', 1) or 1)}."]
+    if key not in offer["offered"]:
+        return "", [f"{name!r} is not a path to take: {', '.join(offer['offered'])}."]
+    actor.paths = list(actor.paths) + [key]
+    return key, []
+
+
+def choice_feat_ids(actor, rule: dict, for_level: int) -> set[str]:
+    """The feat ids a choice-bound bonus pool allows at this level: the chosen style's or
+    bloodline's own list (`ids_from_choice`). A list may be flat (a bloodline's nine) or by
+    level (a combat style's 2nd/6th/10th, each opening on top of the last)."""
+    spec = rule.get("ids_from_choice") or {}
+    if not spec:
+        return set()
+    out: set[str] = set()
+    for pick in classes_mod.chosen(actor, str(spec.get("choice") or "")):
+        got = (pick.get("entry") or {}).get(str(spec.get("field") or "bonus_feats"))
+        if isinstance(got, dict):
+            for at, names in got.items():
+                if int(at) <= int(for_level):
+                    out |= {str(n).strip().lower() for n in names}
+        elif isinstance(got, list):
+            out |= {str(n).strip().lower() for n in got}
+    return out
+
+
+def _bonus_waits_on(actor, rule: dict) -> str:
+    """Why a choice-bound bonus pool cannot be chosen from yet, or "" — a ranger with no
+    combat style has no list to take his combat-style feat from."""
+    spec = (rule or {}).get("ids_from_choice") or {}
+    if not spec or classes_mod.chosen(actor, str(spec.get("choice") or "")):
+        return ""
+    ch = classes_mod.choice(getattr(actor, "char_class", "") or "", str(spec.get("choice")))
+    return (f"Choose your {str(ch.get('name') or spec.get('choice')).lower()} first "
+            f"(Class tab): the bonus feat comes from its list.")
 
 
 def _bonus_allows(actor, feat, rule: dict, for_level: int) -> bool:
     if not rule:
         return True
-    ids = set(rule.get("ids") or [])
+    ids = set(rule.get("ids") or []) | choice_feat_ids(actor, rule, for_level)
     by_level = rule.get("ids_by_level") or {}
     for at, names in by_level.items():
         if int(at) <= int(for_level):
@@ -810,7 +1084,8 @@ def feat_menu(actor, pool: str = "feats") -> dict:
         waive=bool(rule.get("ignore_prereqs")))
     return {"pool": pool, "owed": due[pool]["owed"],
             "rule": due["bonus"]["rule"] if pool == "bonus" else
-            "any feat they qualify for", **rows}
+            "any feat they qualify for",
+            "waits": _bonus_waits_on(actor, rule) if pool == "bonus" else "", **rows}
 
 
 def _parse_feats(raw) -> list[tuple[str, str]]:
@@ -844,6 +1119,9 @@ def feat_problems(actor, raw, pool: str = "feats") -> list[str]:
         problems.append(f"That is {len(picks)} feats against {due['owed']} owed. "
                         f"Choose {due['owed']}.")
     rule = bonus_feat_rule(actor.char_class or "") if pool == "bonus" else {}
+    waits = _bonus_waits_on(actor, rule)
+    if waits:
+        return [waits]
     kept = list(actor.feats)
     try:
         for (fid, target), pick in zip(picks, due["picks"]):
@@ -977,6 +1255,18 @@ def owed_lines(due: dict) -> list[str]:
     n = due["points"]["owed"]
     if n:
         out.append(f"{n} ability point{'s' if n != 1 else ''} to place (Class tab)")
+    n = (due.get("skills") or {}).get("owed", 0)
+    if n:
+        out.append(f"{n} skill rank{'s' if n != 1 else ''} to place (Class tab)")
+    rows = (due.get("choices") or {}).get("picks") or []
+    if rows:
+        names: dict[str, int] = {}
+        for r in rows:
+            names[r["name"]] = names.get(r["name"], 0) + 1
+        out.append("to choose: " + ", ".join(
+            f"{k}{f' ({v})' if v > 1 else ''}" for k, v in names.items()) + " (Class tab)")
+    if (due.get("paths") or {}).get("open"):
+        out.append("a second path may be followed now (Class tab)")
     return out
 
 
@@ -1052,6 +1342,10 @@ def level_up(actor, dice=None) -> dict:
             if got["hp_change"]:
                 grown.append(f"{got['hp_change']:+d} hit points "
                              f"({ab.title()} raised every Hit Die)")
+    # Feats the class hands over at this level, written onto the sheet like any other
+    # (audit D4: a ranger reached 3rd with no Endurance, though his table names it).
+    for line in grant_class_feats(actor):
+        grown.append(f"{line.title()} (a feat the class grants)")
     # Pools are formulas in the class file, so they resize themselves against the new
     # level rather than being recomputed here — the whole reason they were written as
     # formulas in the first place.
