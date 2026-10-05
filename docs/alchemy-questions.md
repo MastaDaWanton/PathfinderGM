@@ -567,3 +567,23 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q8.2 Effect types | **All of them** become executable (speed, senses, light, area clouds, burning next round, glued/entangled, "against X only") (recommended). |
 | Q8.3 Shop items | **The same documents as the crafted ones**, bought at Sound quality (recommended). |
 | Q8.4 Stacking | **The owner's answer: "Normally no but if you have the stacking house rule switched on then yes."** By the book alchemical bonuses take the highest; with the existing `magic_stacking` house rule (rules/houserules.py DEFAULTS) on, they stack. One switch, read by the stacking funnel, not a second rule. |
+
+### Round 9 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q9.1 Bench | **Its own bench**, built from the herb bench's parts; the old /craft/ Alchemy tab retires (recommended). |
+| Q9.2 Stage | **Field kit and laboratory, with procedural 3D glassware whose liquid colour and level are live** (recommended). |
+| Q9.3 Minigames | **Real operations, each a band you stop inside**, generous, numbers and bars as well as colour (recommended). |
+| Q9.4 Volatile work | **A visible reaction gauge and a real flare on a failed roll**, reduced motion respected (recommended). |
+
+### Round 10 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q10.1 Old saves | **Convert** (recommended). |
+| Q10.2 Old potions | **Keep every potion id and `holds_spell` exactly** (recommended). |
+
+All ten rounds answered (2026-10-05). Cross-craft rulings made during the leatherworking rounds
+also bind alchemy: an "In progress" section for every craft with game-time countdowns until
+collected; a metal tag on armour and weapons. The plan can be written.
