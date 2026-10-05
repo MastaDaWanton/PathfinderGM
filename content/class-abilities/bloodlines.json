@@ -1,0 +1,304 @@
+{
+ "class": "bloodline",
+ "_source": "Core Rulebook, Sorcerer: Bloodlines (legacy.aonprd.com/coreRulebook/classes/sorcerer.html, raw HTML read 2026-10-05; cross-checked against d20pfsrd's bloodline pages). The bloodline's class skill, bonus spells, bonus feats and arcana are the catalogue's (content/class-options/sorcerer-bloodlines.json); this file is what the powers DO.",
+ "_grammar": "rules/class_abilities.py, module docstring. `power` is the key of a power in content/bloodlines/powers.json; a character has the ability exactly when rules/grantedpowers.py lists that power as had (the choice made, the level reached), and spends the pool that file defines. `$energy` and the other variant fields are filled from the variant picked with the choice.",
+ "abilities": [
+  {
+   "key": "acidic ray",
+   "power": "acidic ray",
+   "entry": "aberrant",
+   "name": "Acidic Ray",
+   "level": 1,
+   "source": "aberrant bloodline: Ranged touch, 30 ft: 1d6 acid + 1 per two levels, 3 + Cha times a day.",
+   "text": "Ranged touch, 30 ft: 1d6 acid + 1 per two levels, 3 + Cha times a day.",
+   "action": "standard",
+   "attack": "ranged touch",
+   "range_ft": 30,
+   "affects": "target",
+   "aim": "foe",
+   "harmful": true,
+   "roll": {
+    "count": 1,
+    "die": 6,
+    "bonus": "floor(level / 2)",
+    "as": "damage",
+    "type": "acid"
+   },
+   "tell": "{name} spits a ray of acid.",
+   "cost": {
+    "pool": "acidic ray",
+    "amount": 1
+   }
+  },
+  {
+   "key": "claws",
+   "power": "claws",
+   "entry": "abyssal",
+   "name": "Claws",
+   "level": 1,
+   "source": "abyssal bloodline: Two claws, 1d4 + Str each (1d3 if Small), at your full attack bonus, for 3 + Cha rounds a day.",
+   "text": "Two claws, 1d4 + Str each (1d3 if Small), at your full attack bonus, for 3 + Cha rounds a day.",
+   "action": "free",
+   "toggle": {
+    "key": "claws"
+   },
+   "drain": {
+    "pool": "claws",
+    "amount": 1
+   },
+   "self": {
+    "tags": [
+     "buff.claws"
+    ],
+    "natural_weapons": [
+     {
+      "key": "claw",
+      "name": "claw",
+      "type": "slashing",
+      "count": 2,
+      "damage": {
+       "small": "1d3",
+       "medium": "1d4"
+      }
+     }
+    ]
+   },
+   "tell": "{name}'s hands twist into claws.",
+   "tell_off": "{name}'s claws draw back.",
+   "cost": {
+    "pool": "claws",
+    "amount": 1
+   },
+   "by_level": {
+    "7": {
+     "self": {
+      "tags": [
+       "buff.claws"
+      ],
+      "natural_weapons": [
+       {
+        "key": "claw",
+        "name": "claw",
+        "type": "slashing",
+        "count": 2,
+        "damage": {
+         "small": "1d4",
+         "medium": "1d6"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "key": "touch of destiny",
+   "power": "touch of destiny",
+   "entry": "destined",
+   "name": "Touch of Destiny",
+   "level": 1,
+   "source": "destined bloodline: Touch: + half your level (min +1) insight bonus on attacks, saves, skill and ability checks for a round, 3 + Cha times a day.",
+   "text": "Touch: + half your level (min +1) insight bonus on attacks, saves, skill and ability checks for a round, 3 + Cha times a day.",
+   "action": "standard",
+   "affects": "target",
+   "aim": "ally",
+   "effect": {
+    "rounds": 1,
+    "modifiers": [
+     {
+      "type": "combat_mod",
+      "target": "attack",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "save_mod",
+      "target": "fort",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "save_mod",
+      "target": "ref",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "save_mod",
+      "target": "will",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     }
+    ]
+   },
+   "tell": "{name} touches the target, and fate leans their way.",
+   "cost": {
+    "pool": "touch of destiny",
+    "amount": 1
+   }
+  },
+  {
+   "key": "claws",
+   "power": "claws",
+   "entry": "draconic",
+   "name": "Claws",
+   "level": 1,
+   "source": "draconic bloodline: Two claws, 1d4 + Str each (1d3 if Small), at your full attack bonus, for 3 + Cha rounds a day.",
+   "text": "Two claws, 1d4 + Str each (1d3 if Small), at your full attack bonus, for 3 + Cha rounds a day.",
+   "action": "free",
+   "toggle": {
+    "key": "claws"
+   },
+   "drain": {
+    "pool": "claws",
+    "amount": 1
+   },
+   "self": {
+    "tags": [
+     "buff.claws"
+    ],
+    "natural_weapons": [
+     {
+      "key": "claw",
+      "name": "claw",
+      "type": "slashing",
+      "count": 2,
+      "damage": {
+       "small": "1d3",
+       "medium": "1d4"
+      }
+     }
+    ]
+   },
+   "tell": "{name}'s hands twist into claws.",
+   "tell_off": "{name}'s claws draw back.",
+   "cost": {
+    "pool": "claws",
+    "amount": 1
+   },
+   "by_level": {
+    "7": {
+     "self": {
+      "tags": [
+       "buff.claws"
+      ],
+      "natural_weapons": [
+       {
+        "key": "claw",
+        "name": "claw",
+        "type": "slashing",
+        "count": 2,
+        "damage": {
+         "small": "1d4",
+         "medium": "1d6"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "key": "elemental ray",
+   "power": "elemental ray",
+   "entry": "elemental",
+   "name": "Elemental Ray",
+   "level": 1,
+   "source": "elemental bloodline: Ranged touch, 30 ft: 1d6 $energy + 1 per two levels, 3 + Cha times a day.",
+   "text": "Ranged touch, 30 ft: 1d6 $energy + 1 per two levels, 3 + Cha times a day.",
+   "action": "standard",
+   "attack": "ranged touch",
+   "range_ft": 30,
+   "affects": "target",
+   "aim": "foe",
+   "harmful": true,
+   "roll": {
+    "count": 1,
+    "die": 6,
+    "bonus": "floor(level / 2)",
+    "as": "damage",
+    "type": "$energy"
+   },
+   "tell": "{name} looses a ray of raw $energy.",
+   "cost": {
+    "pool": "elemental ray",
+    "amount": 1
+   }
+  },
+  {
+   "key": "fleeting glance",
+   "power": "fleeting glance",
+   "entry": "fey",
+   "name": "Fleeting Glance",
+   "level": 9,
+   "source": "fey bloodline: Greater invisibility for your level in rounds a day.",
+   "text": "Greater invisibility for your level in rounds a day.",
+   "action": "standard",
+   "toggle": {
+    "key": "fleeting glance"
+   },
+   "drain": {
+    "pool": "fleeting glance",
+    "amount": 1
+   },
+   "self": {
+    "tags": [
+     "state.hidden.invisible"
+    ]
+   },
+   "tell": "{name} flickers and is gone from sight.",
+   "tell_off": "{name} can be seen again.",
+   "cost": {
+    "pool": "fleeting glance",
+    "amount": 1
+   }
+  },
+  {
+   "key": "corrupting touch",
+   "power": "corrupting touch",
+   "entry": "infernal",
+   "name": "Corrupting Touch",
+   "level": 1,
+   "source": "infernal bloodline: Melee touch: the target is shaken for half your level in rounds (min 1), 3 + Cha times a day.",
+   "text": "Melee touch: the target is shaken for half your level in rounds (min 1), 3 + Cha times a day.",
+   "action": "standard",
+   "attack": "melee touch",
+   "affects": "target",
+   "aim": "foe",
+   "harmful": true,
+   "effect": {
+    "condition": "shaken",
+    "rounds": "max(1, floor(level / 2))"
+   },
+   "tell": "{name}'s touch fills the target with dread.",
+   "cost": {
+    "pool": "corrupting touch",
+    "amount": 1
+   }
+  },
+  {
+   "key": "grave touch",
+   "power": "grave touch",
+   "entry": "undead",
+   "name": "Grave Touch",
+   "level": 1,
+   "source": "undead bloodline: Melee touch: a living creature is shaken for half your level in rounds (min 1); one already shaken with fewer Hit Dice than your level is frightened for a round, 3 + Cha times a day.",
+   "text": "Melee touch: a living creature is shaken for half your level in rounds (min 1); one already shaken with fewer Hit Dice than your level is frightened for a round, 3 + Cha times a day.",
+   "action": "standard",
+   "attack": "melee touch",
+   "affects": "target",
+   "aim": "foe",
+   "harmful": true,
+   "living": true,
+   "effect": {
+    "condition": "shaken",
+    "rounds": "max(1, floor(level / 2))"
+   },
+   "tell": "{name}'s touch carries the cold of the grave to the target.",
+   "cost": {
+    "pool": "grave touch",
+    "amount": 1
+   }
+  }
+ ]
+}

@@ -174,17 +174,6 @@
       "pool": "dazing touch",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "living": true,
-     "effect": {
-      "condition": "dazed",
-      "rounds": 1
-     },
-     "tell": "{name} lays a dazing hand on {target}.",
      "not_yet": [
       "Sparing a creature with more Hit Dice than your level: no field compares Hit Dice yet."
      ]
@@ -431,16 +420,6 @@
       "pool": "touch of evil",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "effect": {
-      "condition": "sickened",
-      "rounds": "max(1, floor(level / 2))"
-     },
-     "tell": "{name}'s touch leaves {target} queasy and sick.",
      "not_yet": [
       "Counting the target as good for spells with the evil descriptor: no spell reads an alignment, by the 2026-09-19 ruling."
      ]
@@ -575,39 +554,6 @@
       "pool": "touch of good",
       "amount": 1
      },
-     "action": "standard",
-     "affects": "target",
-     "aim": "ally",
-     "effect": {
-      "rounds": 1,
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "attack",
-        "bonus_type": "sacred",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "fort",
-        "bonus_type": "sacred",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "ref",
-        "bonus_type": "sacred",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "will",
-        "bonus_type": "sacred",
-        "formula": "max(1, floor(level / 2))"
-       }
-      ]
-     },
-     "tell": "{name} lays a blessing on {target}.",
      "not_yet": [
       "The bonus on skill and ability checks: an effect's modifier names one skill, and there is no 'every skill' target yet."
      ]
@@ -862,28 +808,6 @@
       "pool": "aura of madness",
       "amount": 1
      },
-     "action": "standard",
-     "toggle": {
-      "key": "aura of madness"
-     },
-     "drain": {
-      "pool": "aura of madness",
-      "amount": 1
-     },
-     "affects": "enemies",
-     "radius_ft": 30,
-     "aim": "self",
-     "harmful": true,
-     "save": {
-      "save": "will",
-      "dc": "10 + floor(level / 2) + wis_mod",
-      "success": "negates"
-     },
-     "effect": {
-      "condition": "confused"
-     },
-     "tell": "Madness spreads from {name} like a stain.",
-     "tell_off": "{name}'s aura of madness fades.",
      "not_yet": [
       "The day's immunity for a creature that saved, and confusion ending when it leaves the aura: no aura tracks who stands in it."
      ]
@@ -946,40 +870,6 @@
       "pool": "inspiring word",
       "amount": 1
      },
-     "action": "standard",
-     "affects": "target",
-     "aim": "ally",
-     "range_ft": 30,
-     "effect": {
-      "rounds": "max(1, floor(level / 2))",
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "attack",
-        "bonus_type": "morale",
-        "amount": 2
-       },
-       {
-        "type": "save_mod",
-        "target": "fort",
-        "bonus_type": "morale",
-        "amount": 2
-       },
-       {
-        "type": "save_mod",
-        "target": "ref",
-        "bonus_type": "morale",
-        "amount": 2
-       },
-       {
-        "type": "save_mod",
-        "target": "will",
-        "bonus_type": "morale",
-        "amount": 2
-       }
-      ]
-     },
-     "tell": "{name}'s words lift {target}'s heart.",
      "not_yet": [
       "The bonus on skill and ability checks: no 'every skill' target yet."
      ]
@@ -1100,91 +990,6 @@
       "pool": "aura of protection",
       "amount": 1
      },
-     "action": "standard",
-     "toggle": {
-      "key": "aura of protection"
-     },
-     "drain": {
-      "pool": "aura of protection",
-      "amount": 1
-     },
-     "affects": "allies",
-     "radius_ft": 30,
-     "aim": "self",
-     "self": {
-      "tags": [
-       "resist.acid.5",
-       "resist.cold.5",
-       "resist.electricity.5",
-       "resist.fire.5",
-       "resist.sonic.5"
-      ],
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "ac",
-        "bonus_type": "deflection",
-        "formula": "1 + floor((level - 8) / 4)"
-       }
-      ]
-     },
-     "effect": {
-      "tags": [
-       "resist.acid.5",
-       "resist.cold.5",
-       "resist.electricity.5",
-       "resist.fire.5",
-       "resist.sonic.5"
-      ],
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "ac",
-        "bonus_type": "deflection",
-        "formula": "1 + floor((level - 8) / 4)"
-       }
-      ]
-     },
-     "by_level": {
-      "14": {
-       "self": {
-        "tags": [
-         "resist.acid.10",
-         "resist.cold.10",
-         "resist.electricity.10",
-         "resist.fire.10",
-         "resist.sonic.10"
-        ],
-        "modifiers": [
-         {
-          "type": "combat_mod",
-          "target": "ac",
-          "bonus_type": "deflection",
-          "formula": "1 + floor((level - 8) / 4)"
-         }
-        ]
-       },
-       "effect": {
-        "tags": [
-         "resist.acid.10",
-         "resist.cold.10",
-         "resist.electricity.10",
-         "resist.fire.10",
-         "resist.sonic.10"
-        ],
-        "modifiers": [
-         {
-          "type": "combat_mod",
-          "target": "ac",
-          "bonus_type": "deflection",
-          "formula": "1 + floor((level - 8) / 4)"
-         }
-        ]
-       }
-      }
-     },
-     "tell": "A shimmering ward spreads from {name}.",
-     "tell_off": "{name}'s aura of protection fades.",
      "not_yet": [
       "The book names no action to raise the aura; a standard action is assumed."
      ]
@@ -1207,16 +1012,6 @@
       "pool": "gentle rest",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "effect": {
-      "condition": "staggered",
-      "rounds": 1
-     },
-     "tell": "{name}'s touch drags at {target} like sleep.",
      "not_yet": [
       "Sleep for a creature already staggered, and Wis rounds against undead: the touch lands its one-round stagger only."
      ]
@@ -1299,32 +1094,6 @@
       "pool": "strength surge",
       "amount": 1
      },
-     "action": "standard",
-     "affects": "target",
-     "aim": "ally",
-     "effect": {
-      "rounds": 1,
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "attack",
-        "bonus_type": "enhancement",
-        "formula": "max(1, floor(level / 2))",
-        "when": {
-         "weapon": {
-          "category": "melee"
-         }
-        }
-       },
-       {
-        "type": "combat_mod",
-        "target": "cmb",
-        "bonus_type": "enhancement",
-        "formula": "max(1, floor(level / 2))"
-       }
-      ]
-     },
-     "tell": "Strength floods into {target} at {name}'s touch.",
      "not_yet": [
       "Strength-based skills and checks: an effect's modifier names one skill, and there is no 'Strength skills' target yet."
      ]
@@ -1496,27 +1265,7 @@
      "cost": {
       "pool": "battle rage",
       "amount": 1
-     },
-     "action": "standard",
-     "affects": "target",
-     "aim": "ally",
-     "effect": {
-      "rounds": 1,
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "damage",
-        "bonus_type": "untyped",
-        "formula": "max(1, floor(level / 2))",
-        "when": {
-         "weapon": {
-          "category": "melee"
-         }
-        }
-       }
-      ]
-     },
-     "tell": "A battle fury takes {target} at {name}'s touch."
+     }
     },
     {
      "key": "weapon master",

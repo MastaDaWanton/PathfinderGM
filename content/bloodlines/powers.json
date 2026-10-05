@@ -19,21 +19,7 @@
      "cost": {
       "pool": "acidic ray",
       "amount": 1
-     },
-     "action": "standard",
-     "attack": "ranged touch",
-     "range_ft": 30,
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "roll": {
-      "count": 1,
-      "die": 6,
-      "bonus": "floor(level / 2)",
-      "as": "damage",
-      "type": "acid"
-     },
-     "tell": "{name} looses a acidic ray at {target}."
+     }
     },
     {
      "key": "long limbs",
@@ -93,56 +79,12 @@
       "pool": "claws",
       "amount": 1
      },
-     "action": "free",
-     "toggle": {
-      "key": "claws"
-     },
-     "drain": {
-      "pool": "claws",
-      "amount": 1
-     },
-     "self": {
-      "tags": [
-       "buff.claws"
-      ],
-      "natural_weapons": [
-       {
-        "key": "claw",
-        "name": "claw",
-        "type": "slashing",
-        "count": 2,
-        "damage": {
-         "small": "1d3",
-         "medium": "1d4"
-        }
-       }
-      ]
-     },
-     "tell": "{name}'s hands twist into claws.",
-     "tell_off": "{name}'s claws draw back.",
      "by_level": {
       "5": {
        "line": "Two claws, 1d4 + Str each (1d3 if Small), counting as magic, for 3 + Cha rounds a day."
       },
       "7": {
-       "line": "Two claws, 1d6 + Str each (1d4 if Small), counting as magic, for 3 + Cha rounds a day.",
-       "self": {
-        "tags": [
-         "buff.claws"
-        ],
-        "natural_weapons": [
-         {
-          "key": "claw",
-          "name": "claw",
-          "type": "slashing",
-          "count": 2,
-          "damage": {
-           "small": "1d4",
-           "medium": "1d6"
-          }
-         }
-        ]
-       }
+       "line": "Two claws, 1d6 + Str each (1d4 if Small), counting as magic, for 3 + Cha rounds a day."
       },
       "11": {
        "line": "Two claws, 1d6 + Str each (1d4 if Small), magic, and +1d6 fire on a hit, for 3 + Cha rounds a day.",
@@ -443,39 +385,6 @@
       "pool": "touch of destiny",
       "amount": 1
      },
-     "action": "standard",
-     "affects": "target",
-     "aim": "ally",
-     "effect": {
-      "rounds": 1,
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "attack",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "fort",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "ref",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "will",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       }
-      ]
-     },
-     "tell": "{name} touches {target}, and fate leans their way.",
      "not_yet": [
       "The bonus on skill and ability checks: no 'every skill' target yet."
      ]
@@ -562,56 +471,12 @@
       "pool": "claws",
       "amount": 1
      },
-     "action": "free",
-     "toggle": {
-      "key": "claws"
-     },
-     "drain": {
-      "pool": "claws",
-      "amount": 1
-     },
-     "self": {
-      "tags": [
-       "buff.claws"
-      ],
-      "natural_weapons": [
-       {
-        "key": "claw",
-        "name": "claw",
-        "type": "slashing",
-        "count": 2,
-        "damage": {
-         "small": "1d3",
-         "medium": "1d4"
-        }
-       }
-      ]
-     },
-     "tell": "{name}'s hands twist into claws.",
-     "tell_off": "{name}'s claws draw back.",
      "by_level": {
       "5": {
        "line": "Two claws, 1d4 + Str each (1d3 if Small), counting as magic, for 3 + Cha rounds a day."
       },
       "7": {
-       "line": "Two claws, 1d6 + Str each (1d4 if Small), counting as magic, for 3 + Cha rounds a day.",
-       "self": {
-        "tags": [
-         "buff.claws"
-        ],
-        "natural_weapons": [
-         {
-          "key": "claw",
-          "name": "claw",
-          "type": "slashing",
-          "count": 2,
-          "damage": {
-           "small": "1d4",
-           "medium": "1d6"
-          }
-         }
-        ]
-       }
+       "line": "Two claws, 1d6 + Str each (1d4 if Small), counting as magic, for 3 + Cha rounds a day."
       },
       "11": {
        "line": "Two claws, 1d6 + Str each (1d4 if Small), magic, and +1d6 $energy on a hit, for 3 + Cha rounds a day.",
@@ -740,21 +605,7 @@
      "cost": {
       "pool": "elemental ray",
       "amount": 1
-     },
-     "action": "standard",
-     "attack": "ranged touch",
-     "range_ft": 30,
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "roll": {
-      "count": 1,
-      "die": 6,
-      "bonus": "floor(level / 2)",
-      "as": "damage",
-      "type": "$energy"
-     },
-     "tell": "{name} looses a elemental ray at {target}."
+     }
     },
     {
      "key": "elemental resistance",
@@ -890,22 +741,7 @@
      "cost": {
       "pool": "fleeting glance",
       "amount": 1
-     },
-     "action": "standard",
-     "toggle": {
-      "key": "fleeting glance"
-     },
-     "drain": {
-      "pool": "fleeting glance",
-      "amount": 1
-     },
-     "self": {
-      "tags": [
-       "state.invisible"
-      ]
-     },
-     "tell": "{name} flickers and is gone from sight.",
-     "tell_off": "{name} can be seen again."
+     }
     },
     {
      "key": "fey magic",
@@ -947,17 +783,7 @@
      "cost": {
       "pool": "corrupting touch",
       "amount": 1
-     },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "effect": {
-      "condition": "shaken",
-      "rounds": "max(1, floor(level / 2))"
-     },
-     "tell": "{name}'s touch fills {target} with dread."
+     }
     },
     {
      "key": "infernal resistances",
@@ -1076,17 +902,6 @@
       "pool": "grave touch",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "living": true,
-     "effect": {
-      "condition": "shaken",
-      "rounds": "max(1, floor(level / 2))"
-     },
-     "tell": "{name}'s touch carries the cold of the grave to {target}.",
      "not_yet": [
       "Frightened for one already shaken: the touch lands its shaken only."
      ]

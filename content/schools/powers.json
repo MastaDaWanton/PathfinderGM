@@ -29,34 +29,7 @@
      "cost": {
       "pool": "protective ward",
       "amount": 1
-     },
-     "action": "standard",
-     "affects": "allies",
-     "radius_ft": 10,
-     "aim": "self",
-     "self": {
-      "rounds": "max(1, int_mod)",
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "ac",
-        "bonus_type": "deflection",
-        "formula": "1 + floor(level / 5)"
-       }
-      ]
-     },
-     "effect": {
-      "rounds": "max(1, int_mod)",
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "ac",
-        "bonus_type": "deflection",
-        "formula": "1 + floor(level / 5)"
-       }
-      ]
-     },
-     "tell": "A shimmering ward rises around {name}."
+     }
     },
     {
      "key": "energy absorption",
@@ -103,21 +76,7 @@
      "cost": {
       "pool": "acid dart",
       "amount": 1
-     },
-     "action": "standard",
-     "attack": "ranged touch",
-     "range_ft": 30,
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "roll": {
-      "count": 1,
-      "die": 6,
-      "bonus": "floor(level / 2)",
-      "as": "damage",
-      "type": "acid"
-     },
-     "tell": "{name} looses a acid dart at {target}."
+     }
     },
     {
      "key": "dimensional steps",
@@ -173,39 +132,6 @@
       "pool": "diviner's fortune",
       "amount": 1
      },
-     "action": "standard",
-     "affects": "target",
-     "aim": "ally",
-     "effect": {
-      "rounds": 1,
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "attack",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "fort",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "ref",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       },
-       {
-        "type": "save_mod",
-        "target": "will",
-        "bonus_type": "insight",
-        "formula": "max(1, floor(level / 2))"
-       }
-      ]
-     },
-     "tell": "{name} touches {target} with a glimpse of what is coming.",
      "not_yet": [
       "The bonus on skill and ability checks: no 'every skill' target yet."
      ]
@@ -265,17 +191,6 @@
       "pool": "dazing touch",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "living": true,
-     "effect": {
-      "condition": "dazed",
-      "rounds": 1
-     },
-     "tell": "{name} lays a dazing hand on {target}.",
      "not_yet": [
       "Sparing a creature with more Hit Dice than your level: no field compares Hit Dice yet."
      ]
@@ -294,54 +209,6 @@
       "pool": "aura of despair",
       "amount": 1
      },
-     "action": "standard",
-     "toggle": {
-      "key": "aura of despair"
-     },
-     "drain": {
-      "pool": "aura of despair",
-      "amount": 1
-     },
-     "affects": "enemies",
-     "radius_ft": 30,
-     "aim": "self",
-     "harmful": true,
-     "effect": {
-      "modifiers": [
-       {
-        "type": "combat_mod",
-        "target": "attack",
-        "bonus_type": "untyped",
-        "amount": -2
-       },
-       {
-        "type": "combat_mod",
-        "target": "damage",
-        "bonus_type": "untyped",
-        "amount": -2
-       },
-       {
-        "type": "save_mod",
-        "target": "fort",
-        "bonus_type": "untyped",
-        "amount": -2
-       },
-       {
-        "type": "save_mod",
-        "target": "ref",
-        "bonus_type": "untyped",
-        "amount": -2
-       },
-       {
-        "type": "save_mod",
-        "target": "will",
-        "bonus_type": "untyped",
-        "amount": -2
-       }
-      ]
-     },
-     "tell": "Despair spreads from {name}.",
-     "tell_off": "{name}'s aura of despair lifts.",
      "not_yet": [
       "The -2 on ability and skill checks: no 'every skill' target yet."
      ]
@@ -373,20 +240,7 @@
      "cost": {
       "pool": "force missile",
       "amount": 1
-     },
-     "action": "standard",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "range_ft": 110,
-     "roll": {
-      "count": 1,
-      "die": 4,
-      "bonus": "max(1, floor(level / 2))",
-      "as": "damage",
-      "type": "force"
-     },
-     "tell": "A bolt of force leaps from {name} to {target}."
+     }
     },
     {
      "key": "elemental wall",
@@ -434,17 +288,6 @@
       "pool": "blinding ray",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "ranged touch",
-     "range_ft": 30,
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "effect": {
-      "condition": "blinded",
-      "rounds": 1
-     },
-     "tell": "A shimmering ray strikes {target}'s eyes.",
      "not_yet": [
       "Dazzled instead of blinded for a creature of more Hit Dice than your level: no field compares Hit Dice yet."
      ]
@@ -462,22 +305,7 @@
      "cost": {
       "pool": "invisibility field",
       "amount": 1
-     },
-     "action": "swift",
-     "toggle": {
-      "key": "invisibility field"
-     },
-     "drain": {
-      "pool": "invisibility field",
-      "amount": 1
-     },
-     "self": {
-      "tags": [
-       "state.invisible"
-      ]
-     },
-     "tell": "{name} fades from sight.",
-     "tell_off": "{name} can be seen again."
+     }
     }
    ]
   },
@@ -515,17 +343,6 @@
       "pool": "grave touch",
       "amount": 1
      },
-     "action": "standard",
-     "attack": "melee touch",
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "living": true,
-     "effect": {
-      "condition": "shaken",
-      "rounds": "max(1, floor(level / 2))"
-     },
-     "tell": "{name}'s touch carries the cold of the grave to {target}.",
      "not_yet": [
       "Frightened for one already shaken: the touch lands its shaken only."
      ]
@@ -575,21 +392,7 @@
      "cost": {
       "pool": "telekinetic fist",
       "amount": 1
-     },
-     "action": "standard",
-     "attack": "ranged touch",
-     "range_ft": 30,
-     "affects": "target",
-     "aim": "foe",
-     "harmful": true,
-     "roll": {
-      "count": 1,
-      "die": 4,
-      "bonus": "floor(level / 2)",
-      "as": "damage",
-      "type": "bludgeoning"
-     },
-     "tell": "A fist of force strikes {target}."
+     }
     },
     {
      "key": "change shape",

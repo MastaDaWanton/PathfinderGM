@@ -19,16 +19,16 @@ document corrects every character, and a power lost leaves nothing behind.
 Where the documents are, and which choice each hangs on, is the documents' own business:
 
     content/domains/powers.json       the character's `domains` (cleric, druid's bond)
-    content/bloodlines/powers.json    {"choice": "bloodline", "entries": {...}}
-    content/schools/powers.json       {"choice": "arcane school", ...}
-    content/schools/bonds.json        {"choice": "arcane bond", ...}
+    content/bloodlines/powers.json    {"choice": "bloodline", "label": "bloodline", ...}
+    content/schools/powers.json       {"choice": "arcane school", "label": "school", ...}
+    content/schools/bonds.json        {"choice": "arcane bond", "label": "arcane bond", ...}
 
 So no class and no choice is named in this code: a file says which class choice it
 answers (`classes.chosen` is the one door to it, lane 1's read API), and a homebrew class
 with a choice of its own gets powers by shipping a file.
 
-A power is a document in the class `grants` vocabulary (the domains file's original
-grammar, widened):
+**Having a power and using it are two documents.** This module reads the HAVING half — a
+power document in the class `grants` vocabulary:
 
     key, name, level, kind, line   the power; `level` is the class level it arrives at
     pool, cost                     uses per day (a `resources.define` row) and the spend
@@ -37,21 +37,21 @@ grammar, widened):
                                    class-feature grammar (`type`, `target`, `amount` |
                                    `formula`, `bonus_type`, `when`); read by
                                    `Actor._class_mods`, never stored
-    class_skills, feats            what the power makes a class skill / hands over as a feat
+    class_skills, feats            what it makes a class skill / hands over as a feat
     by_level                       {"9": {...}} rungs laid over the power at that level
     by_variant                     {"red": {...}} laid over by the variant picked with the
                                    choice (a dragon, an element, a familiar)
     not_yet                        what the book says that nothing here does yet, out loud
-    action, attack, range_ft, roll, save, effect, self, affects, aim, toggle, drain,
-    tell, tell_off, text, source, radius_ft, count, charge, aliases
-                                   USING the power: the activation grammar of
-                                   rules/class_abilities.py (lane 4 of the audit). This
-                                   module validates and serves them (`ability_documents`)
-                                   and applies none of them — the engine's one executor
-                                   does, so the engine still names no class.
 
-`$energy`, `$breath`, `$movement`, `$object`, `$element` in any string are the variant's
-own fields (the catalogue's `variants.from[]`: a red dragon's `energy` is "fire").
+The USING half — a ranged touch, a toggled aura, claws — is a document in
+content/class-abilities/ (`domains.json`, `bloodlines.json`, `schools.json`), in lane 4's
+grammar, executed by `Engine._use_class_ability`, linked to its power by `power`: the
+character has the ability exactly when `had` lists the power (`class_abilities._docs_for`
+asks this module). One executor; the engine still names no class.
+
+`$energy`, `$breath`, `$movement`, `$object`, `$element`, `$familiar` in any string are the
+variant's own fields (the catalogue's `variants.from[]`: a red dragon's `energy` is
+"fire"), filled in both halves.
 """
 from __future__ import annotations
 
@@ -65,25 +65,12 @@ from pathlib import Path
 _FILES: dict[str, dict] = {}
 
 FOLDERS = ("bloodlines", "schools")
+DOMAIN = "domain"
 
-POWER_KEYS = frozenset({
-    "key", "name", "level", "kind", "line", "pool", "cost", "tags", "by_level", "by_variant",
-    "not_yet", "modifiers", "class_skills", "feats",
-    # the activation grammar (rules/class_abilities.py, lane 4) — served, never applied here
-    "action", "attack", "range_ft", "reach_ft", "roll", "save", "effect", "self", "affects",
-    "aim", "toggle", "drain", "tell", "tell_off", "text", "source", "radius_ft", "count",
-    "charge", "aliases", "harmful", "living", "undead_only", "choice", "after",
-})
-ENTRY_KEYS = frozenset({"powers", "class_skills", "not_yet", "spells", "note", "replaces",
-                        "parent"})
-ACTIVATION = ("action", "attack", "roll", "save", "effect", "self", "affects", "toggle",
-              "charge")
-# The activation vocabulary lane 4's executor reads (rules/class_abilities.py: ACTIONS,
-# AFFECTS, `attack`). Repeated here, not imported, because that module is on another lane's
-# unmerged branch; tests/test_granted_powers.py compares the two when both are present.
-ACTIONS = ("free", "swift", "immediate", "move", "standard", "full-round")
-AFFECTS = ("self", "target", "ally", "allies", "enemies", "all")
-ATTACKS = ("ranged touch", "melee touch")
+POWER_KEYS = frozenset({"key", "name", "level", "kind", "line", "pool", "cost", "tags",
+                        "by_level", "by_variant", "not_yet", "modifiers", "class_skills",
+                        "feats"})
+ENTRY_KEYS = frozenset({"powers", "class_skills", "not_yet", "note"})
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when", "note"})
 _PLACEHOLDER = re.compile(r"\$([a-z_]+)")
@@ -119,6 +106,34 @@ def files() -> dict[str, dict]:
     return _FILES
 
 
+def label_of(doc: dict) -> str:
+    return _norm(doc.get("label") or doc.get("choice"))
+
+
+def kinds() -> set[str]:
+    """Every kind of granted power: "domain" and each file's label ("bloodline", "school",
+    "arcane bond") — the `class` a content/class-abilities file names to hang its
+    abilities on these powers."""
+    return {DOMAIN} | {label_of(doc) for doc in files().values() if doc.get("choice")}
+
+
+def power_named(kind: str, key, entry=None) -> bool:
+    """Whether an entry of this kind (that one entry, when named) has a power with this
+    key — a validator's question."""
+    want = _norm(key)
+    if _norm(kind) == DOMAIN:
+        from . import domains as domains_mod
+
+        entries = dict((domains_mod.powers_doc().get("domains") or {}))
+    else:
+        entries = {k: e for doc in files().values() if label_of(doc) == _norm(kind)
+                   for k, e in (doc.get("entries") or {}).items()}
+    if entry:
+        entries = {k: e for k, e in entries.items() if _norm(k) == _norm(entry)}
+    return any(_norm(p.get("key")) == want for e in entries.values() if isinstance(e, dict)
+               for p in e.get("powers") or () if isinstance(p, dict))
+
+
 # --- where a character's powers come from ---------------------------------------------------
 
 def level_of(actor) -> int:
@@ -135,16 +150,16 @@ def _variant_fields(pick: dict) -> dict:
     if not want:
         return {}
     spec = (pick.get("entry") or {}).get("variants") or {}
+    out = {"id": want}
     for v in spec.get("from") or ():
         if isinstance(v, dict) and _norm(v.get("id")) == want:
-            out = {k: v[k] for k in v if isinstance(v[k], (str, int))}
-            # `$element` names an elemental bloodline's element and `$object` a bonded
-            # object: both are the variant's id.
-            out.setdefault("element", v.get("id"))
-            out.setdefault("object", v.get("id"))
-            out.setdefault("familiar", v.get("id"))
-            return out
-    return {"id": want, "element": want, "object": want, "familiar": want}
+            out.update({k: v[k] for k in v if isinstance(v[k], (str, int))})
+            break
+    # `$element` names an elemental bloodline's element, `$object` a bonded object and
+    # `$familiar` a familiar: each is the variant's id.
+    for alias in ("element", "object", "familiar"):
+        out.setdefault(alias, want)
+    return out
 
 
 def sources(actor) -> list[dict]:
@@ -155,9 +170,8 @@ def sources(actor) -> list[dict]:
 
     out: list[dict] = []
     for name in domains_mod.of(actor):
-        entry = domains_mod.entry_of(name)
-        out.append({"label": f"{name} domain", "kind": "domain", "id": name,
-                    "entry": entry, "pick": {}, "vars": {}})
+        out.append({"label": f"{name} domain", "kind": DOMAIN, "id": name,
+                    "entry": domains_mod.entry_of(name), "pick": {}, "vars": {}})
     if not getattr(actor, "char_class", ""):
         return out
     from . import classes as classes_mod
@@ -166,7 +180,7 @@ def sources(actor) -> list[dict]:
         choice = str(doc.get("choice") or "")
         if not choice:
             continue
-        noun = str(doc.get("label") or choice)
+        noun = label_of(doc)
         entries = {_norm(k): v for k, v in (doc.get("entries") or {}).items()}
         for pick in classes_mod.chosen(actor, choice):
             entry = entries.get(_norm(pick.get("id")))
@@ -188,28 +202,29 @@ def _substitute(value, vars_: dict):
     return value
 
 
-def resolve(power: dict, level: int, vars_: dict | None = None) -> dict:
-    """The power as it stands at this level for this variant: the highest `by_level` rung
-    at or below the level laid over it, then the variant's overlay, then `$energy` and its
-    kind filled in."""
-    out = {k: v for k, v in power.items() if k not in ("by_level", "by_variant")}
-    best = 0
-    for at, rung in sorted(((int(a), r) for a, r in (power.get("by_level") or {}).items()
-                            if str(a).isdigit()), key=lambda p: p[0]):
-        if best < at <= level and isinstance(rung, dict):
-            best = at
+def resolve(doc: dict, level: int, vars_: dict | None = None) -> dict:
+    """A document as it stands at this level for this variant: the highest `by_level`
+    rung at or below the level laid over it field by field, then the variant's
+    `by_variant` overlay, then `$energy` and its kind filled in. Used for both halves —
+    the power, and its class-ability document."""
+    out = {k: v for k, v in doc.items() if k not in ("by_level", "by_variant")}
+    rungs = sorted((int(a), r) for a, r in (doc.get("by_level") or {}).items()
+                   if str(a).isdigit() and isinstance(r, dict))
+    for at, rung in rungs:
+        if at <= level:
             out.update(rung)
     vars_ = vars_ or {}
     variant = _norm(vars_.get("id"))
-    overlay = {_norm(k): v for k, v in (power.get("by_variant") or {}).items()}.get(variant)
+    overlay = {_norm(k): v for k, v in (doc.get("by_variant") or {}).items()}.get(variant)
     if isinstance(overlay, dict):
         out.update(overlay)
     return _substitute(out, vars_) if vars_ else out
 
 
 def had(actor) -> list[dict]:
-    """Every power this character has right now, resolved: `{"label", "kind", "power"}`.
-    A power whose `level` the class level has not reached is not had."""
+    """Every power this character has right now, resolved:
+    `{"label", "kind", "id", "power", "vars"}`. A power whose `level` the class level has
+    not reached is not had."""
     level = level_of(actor)
     out = []
     for src in sources(actor):
@@ -217,7 +232,7 @@ def had(actor) -> list[dict]:
             if not isinstance(power, dict) or int(power.get("level", 1) or 1) > level:
                 continue
             out.append({"label": src["label"], "kind": src["kind"], "id": src["id"],
-                        "power": resolve(power, level, src["vars"])})
+                        "power": resolve(power, level, src["vars"]), "vars": src["vars"]})
     return out
 
 
@@ -317,9 +332,23 @@ def granted_feats(actor) -> list[str]:
     return out
 
 
+def usable_keys(actor) -> set[tuple[str, str]]:
+    """(kind, power key) for every power that has a class-ability document to use it by."""
+    from . import class_abilities
+
+    out = set()
+    for kind, file in class_abilities.documents().items():
+        if kind in kinds():
+            out |= {(kind, _norm(d.get("power") or d.get("key")))
+                    for d in file.get("abilities") or ()}
+    return out
+
+
 def power_lines(actor) -> list[dict]:
-    """What the sheet shows: each power had, where it comes from, its line, its uses, and
-    what is not built yet. `domain` is kept for the domain rows the page drew first."""
+    """What the sheet shows: each power had, where it comes from, its line, its uses
+    today, whether the ability bar can use it, and what is not built yet. `domain` is kept
+    for the domain rows the page drew first."""
+    usable = usable_keys(actor)
     out = []
     for row in had(actor):
         p = row["power"]
@@ -328,41 +357,13 @@ def power_lines(actor) -> list[dict]:
         line = {"source": row["label"], "kind_of": row["kind"],
                 "name": str(p.get("name") or p.get("key")), "kind": str(p.get("kind") or ""),
                 "line": str(p.get("line") or ""),
-                "usable": bool(p.get("action")),
+                "usable": (row["kind"], pid) in usable,
                 "not_yet": [str(n) for n in p.get("not_yet") or ()]}
-        if row["kind"] == "domain":
+        if row["kind"] == DOMAIN:
             line["domain"] = row["id"]
         if pool is not None and isinstance(p.get("pool"), dict):
             line.update({"uses": pool.current, "max": pool.maximum})
         out.append(line)
-    return out
-
-
-def ability_documents(actor) -> list[dict]:
-    """The powers USED as actions, as rules/class_abilities.py documents: `class` is the
-    kind ("domain", "bloodline", "school", "arcane bond") so the provenance stem reads
-    `ability:bloodline/claws`; `pool` carries the id the cost spends. The executor is lane
-    4's; this is the list it would read beside the class's own documents."""
-    out = []
-    seen: set[str] = set()
-    for row in had(actor):
-        p = row["power"]
-        if not p.get("action"):
-            continue
-        key = _norm(p.get("key") or p.get("name"))
-        if key in seen:
-            continue
-        seen.add(key)
-        doc = {k: v for k, v in p.items() if k not in ("pool", "tags", "modifiers",
-                                                        "class_skills", "feats", "line",
-                                                        "kind")}
-        doc.update({"key": key, "name": str(p.get("name") or key), "level": 1,
-                    "class": row["kind"], "power_of": row["label"]})
-        doc.setdefault("text", str(p.get("line") or ""))
-        doc.setdefault("source", f"{row['label']}: {p.get('line') or ''}".strip())
-        if isinstance(p.get("pool"), dict):
-            doc["pool"] = {"id": key, **p["pool"]}
-        out.append(doc)
     return out
 
 
@@ -374,13 +375,14 @@ def validate_power(power, at: str, variants: set[str] | None = None) -> list[str
     why, and a modifier aimed at a kind nobody reads is a number shown and never rolled."""
     from . import classfeatures, resources
 
-    problems: list[str] = []
     if not isinstance(power, dict):
         return [f"{at}: a power is an object."]
+    problems: list[str] = []
     extra = sorted(set(power) - POWER_KEYS)
     if extra:
         problems.append(f"{at}: unknown field(s) {', '.join(extra)}; the reader would ignore "
-                        f"them. A power carries: {', '.join(sorted(POWER_KEYS))}.")
+                        f"them. A power carries: {', '.join(sorted(POWER_KEYS))} — and what "
+                        f"USING it does goes in content/class-abilities/.")
     key = _norm(power.get("key"))
     if not key:
         problems.append(f"{at}: needs a key — the pool's id and the power's name in lower "
@@ -404,6 +406,9 @@ def validate_power(power, at: str, variants: set[str] | None = None) -> list[str
         if not isinstance(layer, dict):
             problems.append(f"{at}{where}: an object of fields to lay over the power.")
             continue
+        if where and sorted(set(layer) - POWER_KEYS):
+            problems.append(f"{at}{where}: unknown field(s) "
+                            f"{', '.join(sorted(set(layer) - POWER_KEYS))}.")
         pool = layer.get("pool")
         if pool is not None and (not isinstance(pool, dict)
                                  or resources.check(pool.get("max"))):
@@ -433,28 +438,11 @@ def validate_power(power, at: str, variants: set[str] | None = None) -> list[str
                     problems.append(f"{mat}.formula: {bad}")
             elif not isinstance(m.get("amount"), int):
                 problems.append(f"{mat}: an `amount` (a whole number) or a `formula`.")
-        for field_name in ("tags", "not_yet", "class_skills", "feats", "aliases"):
+        for field_name in ("tags", "not_yet", "class_skills", "feats"):
             got = layer.get(field_name)
             if got is not None and (not isinstance(got, list)
                                     or any(not str(t).strip() for t in got)):
                 problems.append(f"{at}{where}.{field_name}: a list of strings.")
-        act = layer.get("action")
-        if act is not None:
-            for a in (act.values() if isinstance(act, dict) else [act]):
-                if a not in ACTIONS:
-                    problems.append(f"{at}{where}.action: {a!r} is not one of "
-                                    f"{', '.join(ACTIONS)}.")
-        if layer.get("affects") is not None and layer["affects"] not in AFFECTS:
-            problems.append(f"{at}{where}.affects: one of {', '.join(AFFECTS)}.")
-        if layer.get("attack") is not None and layer["attack"] not in ATTACKS:
-            problems.append(f"{at}{where}.attack: {' or '.join(ATTACKS)}.")
-    used = any(power.get(k) is not None for k in ACTIVATION if k != "action")
-    if used and not power.get("action"):
-        problems.append(f"{at}: an attack, roll, save or effect with no `action` is never "
-                        f"offered — say what action using it takes.")
-    if power.get("action") and not power.get("tell"):
-        problems.append(f"{at}: a power used as an action needs a `tell` (the third law: "
-                        f"every application says what happened).")
     return problems
 
 
@@ -499,6 +487,6 @@ def validate(doc_files: dict | None = None) -> list[str]:
     return problems
 
 
-__all__ = ["ability_documents", "class_skills", "granted_feats", "had",
-           "modifiers", "pool_specs", "power_lines", "resolve", "sources", "standing_tags",
-           "validate", "validate_power"]
+__all__ = ["class_skills", "granted_feats", "had", "kinds", "modifiers", "pool_specs",
+           "power_lines", "power_named", "resolve", "sources", "standing_tags", "validate",
+           "validate_power"]

@@ -243,14 +243,32 @@ def _docs_for(actor) -> list[dict]:
     own = documents().get(cid) or {}
     for doc in own.get("abilities") or ():
         out.append({**doc, "class": cid})
-    domain_doc = documents().get("domain") or {}
-    if domain_doc:
-        from . import domains
+    # A file whose `class` is a kind of granted power — "domain", "bloodline", "school",
+    # "arcane bond" (rules/grantedpowers.py) — holds documents a character has exactly when
+    # that power is had: the choice made, the level reached. Domains only until lane 2
+    # (2026-10-05), which wrote the bloodlines' and schools' attacks the same way rather
+    # than gating each document a second time with `requires_choice` and `level` (two
+    # copies of the power's own arrival that could drift). The power's variant fills
+    # `$energy` and its kind (a red dragon's claws burn with fire), and its `by_level`
+    # rungs are laid over the document (claws grow at 7th).
+    from . import grantedpowers
 
-        had = {_norm(p.get("key") or p.get("name")) for _d, p in domains.powers_had(actor)}
-        for doc in domain_doc.get("abilities") or ():
-            if _norm(doc.get("power") or doc.get("key")) in had:
-                out.append({**doc, "class": "domain"})
+    kinds = grantedpowers.kinds()
+    if any(k in kinds for k in documents()):
+        rows = {(row["kind"], _norm(row["power"].get("key") or row["power"].get("name"))): row
+                for row in grantedpowers.had(actor)}
+        for kind, file in documents().items():
+            if kind not in kinds:
+                continue
+            for doc in file.get("abilities") or ():
+                row = rows.get((kind, _norm(doc.get("power") or doc.get("key"))))
+                # `entry` names whose power it is when two share a key: the abyssal and
+                # the draconic bloodline both have Claws (measured: a red-dragon sorcerer
+                # was offered "Claws" twice, the second with the demon's fire rider).
+                if row is not None and (not doc.get("entry")
+                                        or _norm(doc["entry"]) == _norm(row["id"])):
+                    out.append({**grantedpowers.resolve(doc, level_of(actor), row["vars"]),
+                                "class": kind})
     return out
 
 
@@ -534,13 +552,24 @@ def validate_documents(docs: dict | None = None) -> list[str]:
     reason anybody could act on; a modifier aimed at a kind the effect store has no reader
     for is a number that is shown and never rolled.
     """
-    from . import classes as classes_mod, resources
+    from . import classes as classes_mod, grantedpowers, resources
 
     docs = documents() if docs is None else docs
     problems: list[str] = []
+    kinds = grantedpowers.kinds()
     for cid, file in docs.items():
         class_pools: set[str] = set()
-        if cid != "domain":
+        if cid in kinds:
+            # A granted power's ability spends the pool its power declares, and names a
+            # power (and, where two entries share a key, the entry) that exists.
+            for d in file.get("abilities") or ():
+                key = d.get("power") or d.get("key")
+                if not grantedpowers.power_named(cid, key, d.get("entry")):
+                    problems.append(f"{cid}: no {cid} power called {_norm(key)!r}"
+                                    + (f" in {d['entry']!r}" if d.get("entry") else "")
+                                    + " — `power` names a key in that kind's powers file "
+                                      "(rules/grantedpowers.py).")
+        else:
             cls = classes_mod.all_classes().get(cid)
             if not cls:
                 problems.append(f"{cid}: no class called {cid!r} — name the file's "
@@ -567,7 +596,7 @@ def validate_documents(docs: dict | None = None) -> list[str]:
                     bad = resources.check(doc["pool"]["max"])
                     if bad:
                         problems.append(f"{at}: pool max — {bad}")
-            if cid == "domain":
+            if cid in kinds:
                 pools.add(_norm(doc.get("power") or doc.get("key")))
             for side in ("cost", "drain"):
                 pid = _norm((doc.get(side) or {}).get("pool"))
