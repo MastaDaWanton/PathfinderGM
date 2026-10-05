@@ -504,3 +504,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q1.2 Which alchemies | **Craft (alchemy) items and potions**; bombs, mutagens and extracts wait for a PF1e alchemist class (recommended). |
 | Q1.3 Who brews spell potions | **Anyone, through a learned formula**: formula and reagents stand in for the spell, as the enchanter's rule (recommended). |
 | Q1.4 Where the numbers come from | **The book's numbers win, with house top-ups**, as the forge (recommended). |
+
+### Round 2 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q2.1 Hybrid herbs | **Make the door two-way**: hybrid herbs sit on the alchemy shelf and alchemy carries their external effects (recommended). |
+| Q2.2 Potions vs magic items | **Single-use is alchemy's** (potions, oils, elixirs, bombs); anything that keeps working is enchanting's (recommended). |
+| Q2.3 Poisons | **Split by route**: herbalism the body's own, alchemy the ones that reach outside (recommended). |
+| Q2.4 Transmutation | **A Transmute method**: a material to another of its kind, one band rarer, at a cost; level 3 (recommended). |
