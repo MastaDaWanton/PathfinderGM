@@ -82,6 +82,22 @@ def _talk_state(c) -> list[dict]:
         return []
 
 
+def _shown_conditions(a) -> list[str]:
+    """The words the panel prints after a person's hit points, and the book's head and the
+    combat bar beside them: their conditions, with how they stand towards the player
+    taken from the one reader (`attitude.word_for_panel`) rather than from whichever
+    attitude CONDITION happens to be on them. The two used to differ: a standing regard
+    that put somebody at hostile with no step held showed nothing here while the brief
+    and the map read hostile."""
+    from rules import attitude as attitude_mod
+    from rules import states
+
+    shown = [x.name for x in a.conditions
+             if not any(states.matches(t, "attitude") for t in states.tags_for(x.key))]
+    word = attitude_mod.word_for_panel(a)
+    return shown + ([word] if word else [])
+
+
 def _busy_state(c) -> str:
     pc = c.scene.pc()
     if pc is None:
@@ -519,6 +535,7 @@ def _usable_abilities(pc) -> list[dict]:
 
 def _state(c) -> dict:
     pc = c.scene.pc()
+    from rules import attitude as attitude_mod
     from rules import cards as cards_mod
     from rules import goods as goods_mod
     from rules import houserules as houserules_mod
@@ -595,6 +612,11 @@ def _state(c) -> dict:
                  # touched — the map paints foes red and bystanders white.
                  "side": next((s for s, refs in (c.scene.sides or {}).items()
                                if r in refs), ""),
+                 # How the map paints them — pc, ally, foe or "" — from the attitude
+                 # track, the one source the panel's word and the brief read too
+                 # (`attitude.stance`). The map used to paint from `side`, which a
+                 # fight's end empties: an hour after the robbers won, neither was red.
+                 "stance": attitude_mod.stance(c.scene, a),
                  "size": a.size, "squares": grid.size_squares(a.size),
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
@@ -608,7 +630,7 @@ def _state(c) -> dict:
                  # are past finishing.
                  "helpless": bool(a.is_helpless
                                   and not a.has_state("state.down.dead")),
-                 "conditions": [x.name for x in a.conditions]}
+                 "conditions": _shown_conditions(a)}
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
             ],
@@ -2056,6 +2078,18 @@ def say(request):
         outcome = downed.resolve(c)
         for line in outcome.lines:
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+        # On the record, which this path never was: the owner's save of 2026-10-04 has
+        # the bleeding, the hour and "whoever was standing over you has gone" in its
+        # transcript and not one turn-log entry for any of it, so nothing said which
+        # door had moved the clock or what the winners did.
+        c.turn_log.append(history_mod.stamp(c, {
+            "kind": "downed", "state": outcome.state, "lines": list(outcome.lines),
+            "effects": list(outcome.effects)}))
+        # The last beat's offers were written for a fight the player is no longer in a
+        # state to take part in, and after the hour they are offers about people who
+        # have gone: the 2026-10-04 screenshot read "I focus on the first robber" an
+        # hour after the robbers won. The next narrated beat writes new ones.
+        c.suggestions = []
         if outcome.died:
             _end_campaign(c, pc)
             c.save()

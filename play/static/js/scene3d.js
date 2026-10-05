@@ -431,8 +431,9 @@
       if (!a.at) return;
       var ax = a.at[0], ay = a.at[1], az = a.at.length > 2 ? a.at[2] : 0;
       var n = a.squares || 1;
-      var side = a.is_pc ? "pc" : (a.side === "pc" || a.side === "you") ? "ally"
-                 : a.side ? "foe" : "bystander";
+      /* The server's `stance` (attitude.stance), the one answer the flat map and the
+         panel read too; never worked out here from a fight's side name. */
+      var side = a.stance || "bystander";
       var cls = "fig " + side + (a.hp <= 0 ? " down" : "");
       if (az !== level) cls += " offlevel";
       /* Eight feet of a Medium creature is 1.6 levels — "their height contained within

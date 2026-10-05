@@ -67,16 +67,26 @@ def _same_side(scene, a: str, b: str) -> bool:
     """Whether these two are fighting together.
 
     Allegiance lives on the scene, not the actor — `Scene.sides` maps a side's name to
-    the refs on it — and it is only populated inside an encounter. Outside one, or for a
-    creature nobody has assigned, the answer is "yes": a scene with no declared sides is
+    the refs on it — and it is only populated inside an encounter. Outside one, or for an
+    attacker nobody has assigned, the answer is "yes": a scene with no declared sides is
     one where the engine has not been told otherwise, and refusing every flank there
     would silently switch the rule off for every fight that started without `sides`.
+    Inside one, a would-be ally on no side is a bystander and the answer is "no".
     """
     sides = getattr(scene, "sides", None) or {}
     mine = next((s for s, refs in sides.items() if a in refs), None)
     theirs = next((s for s, refs in sides.items() if b in refs), None)
-    if mine is None or theirs is None:
+    if mine is None:
         return True
+    if theirs is None:
+        # A fight with declared sides, and this one is in none of them: a bystander,
+        # who is helping nobody. Measured 2026-10-04 (the robbers in the warrens): the
+        # second robber's natural 20 was confirmed at 17 against AC 17 only because the
+        # +2 read "flanking with the basket carrier" — the robbers' own VICTIM, pressed
+        # to the wall and on no side — and the confirmed critical put the player at -2.
+        # The "unassigned is an ally" answer above was written for a scene with no
+        # sides at all, and it still holds there.
+        return False
     return mine == theirs
 
 

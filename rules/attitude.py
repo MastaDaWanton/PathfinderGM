@@ -158,6 +158,49 @@ def of(actor, default: str = DEFAULT) -> str:
     return default
 
 
+def word_for_panel(actor) -> str:
+    """How this person stands towards the player, as the panel prints it ("Hostile"), or
+    "" when nobody has said. `of()` underneath, so the panel cannot disagree with the
+    brief, the map's colour (`stance`) or any rule that asks the track."""
+    if actor is None or getattr(actor, "is_pc", False):
+        return ""
+    step = of(actor, default="")
+    return step.capitalize() if step else ""
+
+
+def stance(scene, actor) -> str:
+    """Where a token stands as the map paints it: "pc", "ally", "foe" or "".
+
+    ONE answer for every surface, read from the attitude track. Measured 2026-10-04, the
+    robbers in the warrens, an hour after they won: the map (which read `Scene.sides`)
+    painted neither robber as a foe, because `end_encounter` had emptied the sides; the
+    panel (which printed the attitude condition) read "the second robber · Hostile" and
+    nothing beside the first; the brief told the narrator the second robber was hostile.
+    Three surfaces, three sources. A foe is somebody hostile to the player — the track
+    outlives a fight, and `Engine._foes_settle` writes everybody who fights the player
+    into it — so the map's red and the panel's word now come from the same `of()`.
+
+    An ally is somebody travelling with the player or on the player's side of a running
+    fight, whatever that side is called: the browser used to test the side's NAME for
+    "pc" or "you", and the opening's fights name it "party", so a companion fighting
+    beside the player there would have been painted as a foe."""
+    if actor is None:
+        return ""
+    if getattr(actor, "is_pc", False):
+        return "pc"
+    if of(actor, default="") == HOSTILE:
+        return "foe"
+    if actor.has_state(states.TRAVELS_WITH_YOU):
+        return "ally"
+    pc = scene.pc() if scene is not None else None
+    sides = (getattr(scene, "sides", None) or {}) if scene is not None else {}
+    if pc is not None:
+        mine = next((refs for refs in sides.values() if pc.ref in refs), None)
+        if mine and actor.ref in mine:
+            return "ally"
+    return ""
+
+
 def _regard_effect(actor):
     for e in getattr(actor, "effects", None) or ():
         if getattr(e, "key", "") == REGARD_KEY and states.REGARD in (getattr(e, "tags", ()) or ()):
@@ -584,10 +627,23 @@ def harmed(engine, victim, by, source: str, *, seen: bool | None = None,
         return {"kind": "attitude", "ref": victim.ref, "from": was, "to": of(victim),
                 "why": "harmed", "regard": [before, after], "source": source}
     if was == HOSTILE:
+        # Hostile already — but perhaps only for the fight (`Engine._foes_settle` writes
+        # everybody on the other side hostile for a while). A blow is a grudge, so it is
+        # made one for good; nothing the player could see has moved, so nothing is said.
+        if not _hostile_for_good(victim):
+            engine._set_attitude(victim, HOSTILE, None, source)
         return None
     engine._set_attitude(victim, HOSTILE, None, source)
     return {"kind": "attitude", "ref": victim.ref, "from": was, "to": HOSTILE,
             "why": "harmed", "source": source}
+
+
+def _hostile_for_good(actor) -> bool:
+    """Whether a hostile step on this creature has no end — harm's grudge, a warrant read —
+    rather than the fight's while (`Engine._foes_settle`)."""
+    return any(states.matches(t, f"attitude.{HOSTILE}") and e.rounds_left is None
+               for e in getattr(actor, "effects", None) or ()
+               for t in (getattr(e, "tags", ()) or ()))
 
 
 def harm_said(record: dict | None, name: str) -> str:
