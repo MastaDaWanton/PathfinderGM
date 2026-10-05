@@ -32,6 +32,9 @@ class Outcome:
     state: str                       # fine | disabled | dying | stable | dead | held
     lines: list[str] = field(default_factory=list)
     playable: bool = True
+    # What the winners did while the player was down (`rules/defeat.py`), as records
+    # for the turn log: who took what, who went where.
+    effects: list[dict] = field(default_factory=list)
 
     @property
     def died(self) -> bool:
@@ -132,17 +135,21 @@ def resolve(campaign) -> Outcome:
             and not pc.has_state("state.down.stable")):
         if scene.in_encounter:
             scene.end_encounter()
+        # The winners act while the player lies there, before the clock moves.
+        effects, after = _the_winners_act(campaign, pc)
         per_hour = max(1, int(getattr(pc, "level", 1) or 1))
         hours = max(1, -(-(pc.nonlethal - pc.nonlethal_threshold) // per_hour))
         scene.advance(hours * 60)
         lines.append(
             f"You come round {'about an hour' if hours == 1 else f'{hours} hours'} "
-            f"later, aching, where you were knocked down. Whoever did it has gone.")
-        return Outcome(state="stable", playable=True, lines=lines)
+            f"later, aching, where you were knocked down.")
+        lines.extend(after)
+        return Outcome(state="stable", playable=True, lines=lines, effects=effects)
 
     # Stable, one way or the other: the fight is long over and the character wakes.
     if scene.in_encounter:
         scene.end_encounter()
+    effects, after = _the_winners_act(campaign, pc)
     # An hour used to pass with nothing ticking at all — not conditions, not buffs,
     # not pools, not compulsions.
     scene.advance(HOURS_UNTIL_CONSCIOUS * 60)
@@ -150,10 +157,32 @@ def resolve(campaign) -> Outcome:
     pc.clear_states("recovery.hit-points")
     lines.append(
         f"You come round about an hour later, face down where you fell, on "
-        f"{pc.hp} hit point{'s' if pc.hp != 1 else ''}. Whoever was standing over you "
-        f"has gone."
+        f"{pc.hp} hit point{'s' if pc.hp != 1 else ''}."
     )
-    return Outcome(state="stable", playable=True, lines=lines)
+    lines.extend(after)
+    return Outcome(state="stable", playable=True, lines=lines, effects=effects)
+
+
+def _the_winners_act(campaign, pc) -> tuple[list[dict], list[str]]:
+    """Whoever beat the player acts on it (`rules/defeat.py`): robs them and goes.
+
+    Both wake-up lines used to END with a claim — "Whoever was standing over you has
+    gone", "Whoever did it has gone" — that nothing made true. Measured 2026-10-04 on
+    the owner's save: an hour after that line both robbers stood on the squares they
+    had fought from, the player's purse untouched, and the panel, the map and the
+    narration each said something different about them. The sentence about the winners
+    is now built from what they actually did, and says nothing when nobody was there.
+    """
+    from rules import defeat, goods
+
+    coins = None
+    world = getattr(campaign, "world", None)
+    if world is not None:
+        try:
+            coins = goods.coinage(world, getattr(campaign, "location", None))
+        except Exception:      # noqa: BLE001 — the coin's name is never worth the turn
+            coins = None
+    return defeat.aftermath(campaign.scene, pc, coins)
 
 
 def _wait_it_out(campaign, pc) -> Outcome:

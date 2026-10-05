@@ -261,7 +261,9 @@ def test_a_player_knocked_out_cold_wakes_when_the_rules_say_and_keeps_their_hp()
     out = downed.resolve(camp)
     assert out.playable and not kesst.has_condition("unconscious")
     assert kesst.hp == 9 and kesst.nonlethal <= kesst.hp
-    assert "11 hours later" in out.lines[-1]
+    # The wake line; since 2026-10-04 what the thug who did it did next follows it
+    # (`rules/defeat.py`), so it is no longer the last line.
+    assert any("11 hours later" in line for line in out.lines), out.lines
 
 
 # --- the words -----------------------------------------------------------------------

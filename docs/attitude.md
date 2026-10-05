@@ -79,8 +79,31 @@ Through the one applicator and the one vocabulary, like everything else:
   towards you" is a thing a character notices; "attitude +1" is a number the narrator would
   start doing arithmetic with.
 
+### Fighting the player is hostility (2026-10-04)
+
+Two doors write hostile without a check. **Harm** (`attitude.harmed`): a stranger the
+player strikes is hostile until dismissed. **Fighting** (`Engine._foes_settle`, one pass at
+the end of every batch): everybody on a side against the player's is hostile for
+`Engine.FIGHT_HOSTILE_MINUTES` (eight hours, provocation's `COOL_MINUTES`). Timed, because a
+step with no end floors the standing regard and wiped a baited brawler's outburst
+bookkeeping; a blow on a fight-hostile foe turns it into harm's permanent grudge. Companions
+and anybody at the step that comes along are spared, as harm spares them. No tell of its
+own: the fight's tell already says who is fighting the player.
+
+Measured on the owner's save: two robbers fought the player, only the one the player hit
+was ever on the track, and an hour later the panel, the map and the brief each said
+something different about them.
+
 ## What reads an attitude
 
+- **The map and the panel** (`attitude.stance`, `attitude.word_for_panel`, both over
+  `attitude.of`): a foe is painted red because they are hostile, not because a fight's
+  sides list them — the sides go with the fight, the track does not. An ally is somebody
+  travelling with the player or on the player's side of a running fight, whatever the
+  side is called.
+- **The winners of a fight** (`rules/defeat.py`): whoever is hostile and standing over a
+  beaten player robs them of their coin (a person, not the law) and leaves for somewhere
+  off stage in the town, before the player comes round.
 - **The narrator's brief** (`gm/prompts.py`) — "X is friendly towards the player", stated
   as fact, so the prose plays the person the engine is holding. This has existed since the
   spell import and had nothing to read.
