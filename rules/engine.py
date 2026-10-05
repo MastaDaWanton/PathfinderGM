@@ -10,6 +10,7 @@ same list from exactly where it stopped.
 """
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -3025,6 +3026,14 @@ class Engine:
         # What the pack grants after this batch moved things in and out of it — the
         # abysium bar just bought, the cursed blade just sold (`_carried_settles`).
         resolution.outcomes.extend(self._carried_settles())
+        # What robbers took from a beaten player, measured against who holds it now
+        # (rules/defeat.py): the hideout filled once it is a place, and the quest's
+        # objectives ticked by holdings, whatever the means — a looted body, a payment, a
+        # word, a theft. One pass here rather than a hook in each of those ops, for the
+        # reason `_carried_settles` gives.
+        from . import defeat as defeat_mod
+
+        resolution.outcomes.extend(self._articled(o) for o in defeat_mod.settle(self))
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -9711,6 +9720,9 @@ class Engine:
 
         taken: list[str] = []
         effects: list[dict] = []
+        # What the weapons list and the worn suit already hand over, by key, so the pack
+        # below does not hand the same sword over twice: a bought sword sits on both.
+        listed: dict[str, int] = {}
         for w in list(body.weapons):
             if w and w != "unarmed":
                 # Through the one router: a weapon by its key, ammunition as rounds.
@@ -9718,6 +9730,7 @@ class Engine:
                 if not stowed:
                     looter.weapons.append(w)
                 taken.append(w if not stowed or n == 1 else f"{n} {w}")
+                listed[goods.canonical(w)] = listed.get(goods.canonical(w), 0) + 1
         body.weapons = []
         # Armour and a shield into `goods` by their table key, where `wear` and the
         # Equipment tab both read them. Measured 2026-09-30: the watchman's chain shirt
@@ -9731,7 +9744,28 @@ class Engine:
                 if not stowed:
                     looter.goods[worn] = looter.goods.get(worn, 0) + 1
                 taken.append(worn)
+                listed[goods.canonical(worn)] = listed.get(goods.canonical(worn), 0) + 1
                 setattr(body, attr, "none")
+        # The pack. "Everything it carried" left the goods behind until 2026-10-05: a
+        # thing a robber had taken off the player and carried in his goods stayed on his
+        # body when the player beat him and stripped it, so the way back from a robbery
+        # (rules/defeat.py) could not be walked by the commonest road there is.
+        for name, n in dict(body.goods).items():
+            n = int(n or 0)
+            canon = goods.canonical(name)
+            already = min(n, listed.get(canon, 0))
+            listed[canon] = listed.get(canon, 0) - already
+            n -= already
+            if n <= 0:
+                continue
+            # A weapon onto the list it is swung from; everything else stays the goods
+            # line it was — rounds already counted as rounds, a suit by its table key.
+            if goods.kind_of(name) == "weapon":
+                goods.stow(looter, name, n)
+            else:
+                looter.goods[name] = looter.goods.get(name, 0) + n
+            taken.append(f"{n} × {name}" if n != 1 else str(name))
+        body.goods = {}
         for coin, n in dict(body.purse).items():
             looter.purse[coin] = looter.purse.get(coin, 0) + n
             taken.append(f"{n} {coin}")
@@ -14222,6 +14256,8 @@ class Engine:
         moved = 0
         note = ""
         from_ground = False
+        # A record off somebody's shelf, kept whole for the taker (below).
+        shelf_item = None
         # Who it was taken from without being handed over, when the holder search
         # below finds it in somebody's hands. Their name stays on it (`owner`, with the
         # props ledger's `stolen` flag, Creation Kit's shape): Inform reads ownership
@@ -14274,7 +14310,27 @@ class Engine:
                                 str(iid).split("#")[0].replace("-", " ")))), None)
                 if sid is not None:
                     item = str(getattr(giver.stock[sid], "name", "") or item)
+                    # The record itself goes into the taker's hands, not its name: a
+                    # forged blade handed over as a goods line "Fine Iron Longsword"
+                    # came back as a word with no pieces, no working and no enchantment.
+                    # Found 2026-10-05 building the way back from a robbery
+                    # (rules/defeat.py): the thing taken must be got back intact.
+                    shelf_item = copy.deepcopy(giver.stock[sid])
                     moved = giver.take_stock(sid, count)
+            if not moved and not giver.is_pc and not denom \
+                    and goods.kind_of(item) == "weapon":
+                # A weapon lives on the weapons list (`goods.stow`, what the loot files
+                # it under), and a handover read only the goods: "the robber hands the
+                # rapier back" moved a rapier out of the air below while the robber kept
+                # his, on the list. Taken off the list, it is the robber's no longer.
+                canon = goods.canonical(item)
+                for i, w in enumerate(giver.weapons):
+                    if goods.canonical(str(w)) == canon and moved < count:
+                        del giver.weapons[i]
+                        moved = 1
+                        break
+                if moved and goods.canonical(str(giver.equipped or "")) == canon:
+                    giver.equipped = "unarmed"
             if not moved and not giver.is_pc and not denom and (
                     taker is not None or taken_from is not None):
                 # Somebody else's pockets are open the way the world is: the clerk
@@ -14379,6 +14435,8 @@ class Engine:
         if taker is not None and moved:
             if denom:
                 taker.purse[denom] = taker.purse.get(denom, 0) + moved
+            elif shelf_item is not None:
+                taker.add_stock(shelf_item, moved)
             else:
                 # Routed by what the thing is, so a bought sword is swingable, a bought
                 # chain shirt wearable and a bought potion drinkable through the
