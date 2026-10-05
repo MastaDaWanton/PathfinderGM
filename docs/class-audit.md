@@ -1044,3 +1044,85 @@ says each of them.
   duplicate tags (`class.smite-evil-1-day`) are lane 3's slug fix; `has_feature` reads a
   rung as its ladder meanwhile. Fighter weapon mastery (a weapon pick). Rogue-talent and
   rage-power feat grants (above).
+
+---
+
+## 10. Lane 2, built: what the spellcasting choices do
+
+Built 2026-10-05 on `fix/class-spellcasting` (off `integrate/2026-10-05`, lanes 1, 3 and 4
+merged in). Research before design: Foundry PF1's `spellcasting-model.mjs`/`spell-model.mjs`
+and PCGen's `SpellSupportForPCClass.java` and core-rulebook data were read directly; the
+CRB text of every domain, bloodline and school power was read from
+legacy.aonprd.com (raw HTML) and spot-checked against d20pfsrd; the subdomain map is AoN's
+Cleric Domains.
+
+### Having a power and using it are two documents
+
+- **Having** (`rules/grantedpowers.py`): one reader for domains (`content/domains/powers.json`,
+  now all 33 core domains), bloodlines (`content/bloodlines/powers.json`, all 10), schools
+  (`content/schools/powers.json`, all 9) and arcane bonds (`content/schools/bonds.json`). A
+  file names the class choice it answers; the code names no class and no choice. Pools,
+  tags (`resist.$energy.5`), passive `modifiers` through the funnel (`Actor._class_mods`),
+  `class_skills` (`Actor.class_skills`), `feats` (written by the forge and
+  `leveling.grant_class_feats`), `by_level` rungs and `by_variant` (the dragon, the element,
+  the familiar). `$energy` and the other variant fields are filled from the catalogue's
+  variant.
+- **Using** (`content/class-abilities/domains.json`, `bloodlines.json`, `schools.json`): lane
+  4's grammar and executor. `class_abilities._docs_for` now joins any file whose `class` is a
+  granted-power kind to the powers `grantedpowers.had` lists (`power`, and `entry` where two
+  bloodlines share a key — Claws), resolving `by_level` and `$energy`.
+
+### Casting
+
+- **Domain and school slots** are one mechanism (Foundry's "Domain/School Slots"; its 0.75.11
+  "free, uncapped" version was replaced by a counted pool a week later): pools `domain slot N`
+  / `school slot N`, copies held as `domain:<id>` / `school:<id>`, prepared through
+  `/api/spells/prepare` with `slot`, cast by `_op_cast` from whichever slot holds the copy
+  (`casting.cast_source`). A domain spell off the class list (a Fire cleric's fireball) goes
+  only in the domain slot. Before: the domain slot was a number nothing could fill or spend.
+- **Opposition schools** cost two slots to prepare and to cast (`casting.slot_cost`, read by
+  every slot count; Foundry's `restrictedSpellSlotMultiplier`).
+- **Bloodline spells** are known on top of the table (PCGen's SPELLKNOWN) at 3rd and every
+  odd level: derived, never written into `spellbook`, never counted against Spells Known,
+  never exchanged. Catalogue names resolve to corpus ids (`casting.spell_named`: "greater
+  teleport" → `teleport-greater`, 6 of 90 needed it).
+- **D9**: the paladin/ranger table tells "—" (`NO`) from "0" (bonus only), as PCGen's -1/0 does.
+- **D10**: `casting.swaps` / `/api/spells/swap` — sorcerer at 4, 6, 8…, bard at 5, 8, 11…
+  (bard: a level below his best; the sorcerer has no such limit in PF1 — that was 3.5), one per
+  level, offered until used (`Actor.spell_swaps`).
+- **Subdomains** (`content/domains/subdomains.json`): a subdomain's gaps fill from its parent,
+  it may not be taken with its parent, and the parent's powers stand in for its own (said on
+  the sheet). Ruins and Creation (no parent, spells at few levels) are no longer offered.
+- **D7**: the cleric's and druid's class documents ask a "domain companion" at 4th, gated by
+  a new `when.only` (owed only with Animal), `level_offset: -3` — `animal_companion.wanted`
+  reads it with no change.
+
+### Measured
+
+- `tests/test_caster_climb.py`: cleric (Animal + Sun), druid (Air bond), sorcerer (red
+  draconic), wizard (evoker, cat familiar), bard, paladin, ranger, 1→20 through
+  `/api/level-up` and the Class tab's endpoints, every pick made: slots per day equal the
+  book's table plus the bonus of the score as it stands at every level (the paladin/ranger
+  table typed apart from the code's), one domain or school slot per castable level, spells
+  known equal to the table with the bloodline's on top, the wizard's two a level, the
+  bloodline's and school's powers at their levels. 7 of 7 pass.
+- Live (scratch data, port 8817): a Fire/Charm cleric prepared Fireball into her 3rd-level
+  domain slot from the Spells tab; at the table Fire Bolt (lane 4's document, this lane's
+  pool) hit for 5 and Dazing Touch (this lane's document) dazed the cutpurse, each spending
+  one of 6 uses, and the sheet showed "5 / 6 today".
+
+### Not done
+
+- Powers whose effect needs a reader nobody has are counted and said in `not_yet`: d20
+  rerolls (Luck, Chaos, Law, Destined), miss chance laid on an attacker (Darkness), auras that
+  move with the bearer (Destruction, Liberation, Repose, Sun), periodic damage (Death), shaped
+  areas (breath weapon, the 9th-level bursts), flight/burrow/swim speeds, spell resistance,
+  metamagic, a channel reading the cleric's tags (Sun, Glory, Death), cast-op hooks (Healer's
+  Blessing, Intense Spells), morning picks (Abjuration's energy, Transmutation's score).
+- The familiar is its gift to the master only; no familiar creature is made. The bonded
+  object's daily spell is a counted use; the cast op still asks for a prepared copy.
+- Subdomains' own replacement powers are not written (the parent's stand in).
+- The Arcane bloodline's own arcane bond is not a choice the sorcerer document asks yet.
+- The narrator, asked in words to "use my Fire Bolt", described a hit with no
+  `use_ability` emitted (live, 2026-10-05): the declaration side (`gm/judgement.py`) still
+  knows path abilities only. The combat bar's route works.

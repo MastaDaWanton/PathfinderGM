@@ -1398,7 +1398,7 @@ function specialSlotsBlock(sp) {
             <button type="button" class="spbtn" data-sslot="${esc(kind)}" data-slevel="${r.level}"
               data-saction="prepare"${r.blocked ? ` disabled title="${esc(r.blocked)}"` : ""}>Prepare</button>`
           : `<b>no spell for it</b>`;
-        return `<div class="t"><span>Level ${r.level}</span>${pick}</div>`;
+        return `<div class="t sx-sslot"><span>Level ${r.level}</span>${pick}</div>`;
       }).join("")}</div>
       <p class="note">${kind === "domain" ? "One a level, and only a domain spell goes in it."
         : `One a level, and only ${/^[aeiou]/i.test(school.specialist || "") ? "an" : "a"}

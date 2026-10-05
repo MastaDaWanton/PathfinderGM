@@ -161,8 +161,9 @@ def get(class_id: str) -> dict:
 #   "from_choice": "<id>"      the picks are earlier picks of another choice — the ranger's
 #                              +2 to "any one favored enemy (including the one just selected)"
 #   "when": {"choice", "not"}  owed only once another choice is answered, and not with these
-#                              picks; `"only": [...]` owes it only WITH one of them (lane 2)
-#                              picks (a universalist takes no opposition schools)
+#                              picks (a universalist takes no opposition schools);
+#                              `"only": [...]` owes it only WITH one of them (lane 2: the
+#                              Animal domain's companion)
 #   "distinct_from": "<id>"    may not repeat another choice's picks (opposition schools are
 #                              not your own school)
 #

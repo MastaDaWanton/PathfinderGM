@@ -255,8 +255,8 @@ def _docs_for(actor) -> list[dict]:
 
     kinds = grantedpowers.kinds()
     if any(k in kinds for k in documents()):
-        rows = {(row["kind"], _norm(row["power"].get("key") or row["power"].get("name"))): row
-                for row in grantedpowers.had(actor)}
+        rows = {(row["kind"], _norm(row["power"].get("key") or row["power"].get("name"))):
+                row for row in grantedpowers.had(actor)}
         for kind, file in documents().items():
             if kind not in kinds:
                 continue
