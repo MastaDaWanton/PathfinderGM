@@ -37,6 +37,84 @@ const DEVICE_IMG_BASE = (() => {
   catch { return "/static/img/v2/"; }
 })();
 
+// --- The gear train ----------------------------------------------------------------------
+// The owner, 2026-10-05: "the gears are not synced correctly and are often spinning the
+// same direction instead of how they should." The angles were never the fault: the large
+// gear's was already derived from the small one's, at -10/16, half a tooth out of phase at
+// the mesh (the drawn outlines touch by 0.05 photo px at worst over a full pitch). What
+// the eye saw was the wagon wheel. A gear is a pattern that repeats every tooth, so a frame
+// that moves it half a tooth or more is read as moving the other way (sampling below twice
+// per period reverses apparent motion). At 1.4 turns a second the large gear's 16 teeth
+// pass 22.4 a second: 0.37 of a tooth per 60 Hz frame, 0.56 on a frame that caught three
+// 1/120 s model steps, 0.75 at 30 fps. Measured in the running app before this fix: frames
+// of 20 ms on median, 0.56 of a tooth a frame, 54 of 85 at half a tooth or more. The small
+// gear had no lightening holes, so its teeth were its only cue and it read as turning the
+// large one's way.
+//
+// So the gears are drawn from one driver angle that is never allowed to move more than a
+// third of a tooth in a frame (a slow frame slows the drawing, it can never reverse it),
+// smoothed between model steps (Fiedler's "Fix Your Timestep!": draw the state
+// interpolated by the accumulator's remainder, or a 60 Hz frame alternates two steps and
+// three), and every gear's angle is derived from it by the train's own ratios: meshing
+// with another is -z_other/z and half a tooth of phase so tooth meets gap; on another's
+// axle is the same angle. Nothing else turns a gear, so they cannot drift apart.
+//
+// One entry per gear in DEVICE_GEOMETRY.gears (prepare.py's GEAR_SMALL, GEAR_LARGE): the
+// first is the driver; `meshes: i` or `axle: i` names the gear it is driven from.
+const DEVICE_TRAIN = [
+  { holes: 4, hub: 0.9 },              // the small gear, above: the driver
+  { meshes: 0, holes: 5, hub: 1.1 },   // the large gear, below, meshing with it
+];
+// The most any gear may turn in one drawn frame, in its own teeth. Half a tooth is where
+// the motion reverses; a third leaves the forward reading twice as near as the backward.
+const DEVICE_MAX_TEETH_PER_FRAME = 1 / 3;
+
+// The train as a table: each gear's centre in the device's box, tooth count, pitch (deg a
+// tooth), and its angle as `phase + ratio * driver` (ratio signed: + turns with the driver,
+// - against it).
+function deviceGears(G, train = DEVICE_TRAIN) {
+  const [ox, oy] = G.origin;
+  const frac = v => ((v % 1) + 1) % 1;
+  const gears = [];
+  G.gears.forEach(([x, y, z], i) => {
+    const t = train[i] || {};
+    const g = { i, x: x - ox, y: y - oy, z, pitch: 360 / z, holes: t.holes || 0,
+                hub: t.hub || 1, meshes: t.meshes ?? null, axle: t.axle ?? null,
+                ratio: 1, phase: 0 };
+    if (g.meshes != null) {
+      const p = gears[g.meshes];
+      g.ratio = -p.ratio * p.z / g.z;
+      // Where they touch, on the line between the centres: a tooth of one must sit in a
+      // gap of the other. Angles run clockwise on screen, so at the contact point the two
+      // gears' angles run opposite ways along the tangent: the fraction of a pitch past a
+      // tooth on one is half a pitch less that fraction on the other.
+      const toward = Math.atan2(g.y - p.y, g.x - p.x) * 180 / Math.PI;
+      const fP = frac((toward - p.phase) / p.pitch);
+      g.phase = (frac((toward + 180) / g.pitch) - frac(0.5 - fP)) * g.pitch;
+    } else if (g.axle != null) {
+      const p = gears[g.axle];
+      g.ratio = p.ratio; g.phase = p.phase;
+    }
+    gears.push(g);
+  });
+  return gears;
+}
+// Each gear's angle, in degrees, for one driver angle.
+function deviceGearAngles(gears, driver) {
+  return gears.map(g => g.phase + g.ratio * driver);
+}
+// The most the driver may turn in a frame so that no gear turns more than the cap.
+function deviceFrameCap(gears) {
+  return Math.min(...gears.map(g => DEVICE_MAX_TEETH_PER_FRAME * g.pitch / Math.abs(g.ratio)));
+}
+// One drawn frame: the model's driver angle (`target`, interpolated) moves the drawn one
+// on by what it moved since the last frame, capped, never back. `shown` is {from, angle}.
+function deviceShow(shown, target, cap) {
+  shown.angle += Math.max(0, Math.min(cap, target - shown.from));
+  shown.from = target;
+  return shown.angle;
+}
+
 (function buildDevice() {
   const G = window.DEVICE_GEOMETRY;
   const el = document.getElementById("device");
@@ -62,20 +140,15 @@ const DEVICE_IMG_BASE = (() => {
     TRICKLE: 950, TRICKLE_LIFE: 2300,    // waiting on a die: a lazy thread, by the clock
     BURST: 4, BURST_GAP: 70, BURST_LIFE: 2100,   // the halt: a cloud, just before the lever
   };
-  const [zS, zL] = [G.gears[0][2], G.gears[1][2]];
-  const RATIO = zL / zS;                               // the small gear turns this much faster
+  // The train (deviceGears, above): gear 0 drives, the large gear is the last. M.aS is the
+  // driver's angle in the model; the drawing derives every gear's from it.
+  const GEARS = deviceGears(G);
+  const LARGEST = GEARS.reduce((a, g) => (g.z > a.z ? g : a));
+  const RATIO = 1 / Math.abs(LARGEST.ratio);           // the driver turns this much faster
   const LARGE_RPS = 1.4;                               // large gear, turns a second, at speed
-  const OMEGA = LARGE_RPS * 360 * RATIO;               // small gear, degrees a second
+  const OMEGA = LARGE_RPS * 360 * RATIO;               // the driver, degrees a second
+  const FRAME_CAP = deviceFrameCap(GEARS);             // driver degrees a drawn frame, at most
   const LEVER_UP = -46, LEVER_DOWN = 34;               // degrees, about the knob
-  // Mesh: where the gears touch (straight below the small one, straight above the large),
-  // a tooth of one must sit in a gap of the other. Worked out from the tooth counts, so
-  // other counts mesh too.
-  const MESH = (() => {
-    const pS = 360 / zS, pL = 360 / zL;
-    const fS = ((90 / pS) % 1 + 1) % 1;
-    const want = ((0.5 - fS) % 1 + 1) % 1, have = ((270 / pL) % 1 + 1) % 1;
-    return (have - want) * pL;
-  })();
 
   // --- Drawing: the gears, procedurally, from tooth count and module ------------------
   function gearPath(cx, cy, z, m, holes) {
@@ -117,19 +190,19 @@ const DEVICE_IMG_BASE = (() => {
         <stop offset="0" stop-color="#dcbc7c"/><stop offset=".4" stop-color="#a47d3e"/>
         <stop offset=".75" stop-color="#6a4c20"/><stop offset="1" stop-color="#34240e"/></linearGradient>`;
   }
+  // Every gear of the table, the largest underneath; then the hubs over them all. The small
+  // gear had no lightening holes until 2026-10-05: its teeth were all that showed it turn.
   const gears = svg("dv-gears");
-  const [[sx, sy], [lx, ly]] = [P(G.gears[0][0], G.gears[0][1]), P(G.gears[1][0], G.gears[1][1])];
-  gears.innerHTML = `<defs>${brass("dvgS", sx, sy, G.m * zS / 2)}${brass("dvgL", lx, ly, G.m * zL / 2)}
-      <radialGradient id="dvhub"><stop offset="0" stop-color="#1a1209"/><stop offset="1" stop-color="#3a2a14"/></radialGradient></defs>
-    <g id="dvL"><path d="${gearPath(lx, ly, zL, G.m, 5)}" fill="url(#dvgL)" fill-rule="evenodd"
-      stroke="#2a1c0a" stroke-width="1.6" stroke-linejoin="round"/></g>
-    <g id="dvS"><path d="${gearPath(sx, sy, zS, G.m, 0)}" fill="url(#dvgS)" fill-rule="evenodd"
-      stroke="#2a1c0a" stroke-width="1.6" stroke-linejoin="round"/></g>
-    <circle cx="${lx}" cy="${ly}" r="${G.m * 1.1}" fill="#6e5226" stroke="#2a1c0a" stroke-width="1.2"/>
-    <circle cx="${sx}" cy="${sy}" r="${G.m * 0.9}" fill="#6e5226" stroke="#2a1c0a" stroke-width="1.2"/>`;
+  const under = [...GEARS].sort((a, b) => b.z - a.z);
+  gears.innerHTML = `<defs>${GEARS.map(g => brass(`dvbrass${g.i}`, g.x, g.y, G.m * g.z / 2)).join("")}</defs>
+    ${under.map(g => `<g id="dvgear${g.i}"><path d="${gearPath(g.x, g.y, g.z, G.m, g.holes)}"
+      fill="url(#dvbrass${g.i})" fill-rule="evenodd" stroke="#2a1c0a" stroke-width="1.6"
+      stroke-linejoin="round"/></g>`).join("")}
+    ${under.map(g => `<circle cx="${g.x}" cy="${g.y}" r="${G.m * g.hub}" fill="#6e5226"
+      stroke="#2a1c0a" stroke-width="1.2"/>`).join("")}`;
   el.querySelector(".dv-chamber").after(gears);
-  const gS = gears.querySelector("#dvS"), gL = gears.querySelector("#dvL");
-  const gradS = gears.querySelector("#dvgS"), gradL = gears.querySelector("#dvgL");
+  const gearEls = GEARS.map(g => gears.querySelector(`#dvgear${g.i}`));
+  const gradEls = GEARS.map(g => gears.querySelector(`#dvbrass${g.i}`));
 
   // The lamp in the top plate's socket, its bloom on the brass, and the lever on the knob.
   const top = svg("dv-top");
@@ -204,7 +277,7 @@ const DEVICE_IMG_BASE = (() => {
 
   // --- The model ---------------------------------------------------------------------
   const fresh = () => ({
-    t: 0, mode: "idle", omega: 0, aS: 0, largeTurns: 0, nextPuff: T.PUFF_EVERY, nextTick: 0,
+    t: 0, mode: "idle", omega: 0, aS: 0, aPrev: 0, largeTurns: 0, nextPuff: T.PUFF_EVERY, nextTick: 0,
     halt: null, stopAt: null, leverAt: null, readyAt: null,
     lever: LEVER_UP, leverV: 0, leverTarget: LEVER_UP,
     tab: 0, tabV: 0, tabTarget: 0,                       // 0 in, 1 out
@@ -290,6 +363,7 @@ const DEVICE_IMG_BASE = (() => {
         }
       }
     }
+    M.aPrev = M.aS;                                     // for drawing between steps
     M.aS += M.omega * dt / 1000;
     M.largeTurns += M.omega * dt / 1000 / RATIO / 360;
     if (M.omega > 1 && M.largeTurns >= M.nextTick) {
@@ -362,12 +436,17 @@ const DEVICE_IMG_BASE = (() => {
     draw();
   }
   if (phone.addEventListener) phone.addEventListener("change", place);
+  // The drawn driver (deviceShow): it follows the model's, a third of a tooth a frame at
+  // most. `alpha` is how far the clock is into the next model step (the loop's remainder).
+  const shown = { from: 0, angle: 0 };
+  let alpha = 0;
   function draw() {
-    const aL = MESH - M.aS / RATIO;                     // turned so tooth meets gap
-    gS.setAttribute("transform", `rotate(${M.aS.toFixed(2)} ${sx} ${sy})`);
-    gL.setAttribute("transform", `rotate(${aL.toFixed(2)} ${lx} ${ly})`);
-    gradS.setAttribute("gradientTransform", `rotate(${(-M.aS).toFixed(2)} ${sx} ${sy})`);
-    gradL.setAttribute("gradientTransform", `rotate(${(-aL).toFixed(2)} ${lx} ${ly})`);
+    const driver = deviceShow(shown, M.aPrev + (M.aS - M.aPrev) * alpha, FRAME_CAP);
+    deviceGearAngles(GEARS, driver).forEach((a, i) => {
+      const g = GEARS[i];
+      gearEls[i].setAttribute("transform", `rotate(${a.toFixed(2)} ${g.x} ${g.y})`);
+      gradEls[i].setAttribute("gradientTransform", `rotate(${(-a).toFixed(2)} ${g.x} ${g.y})`);
+    });
     lever.setAttribute("transform", `rotate(${M.lever.toFixed(2)} ${kx} ${ky})`);
     if (footEl) footEl.style.transform = `translateY(${(M.foot * px()).toFixed(2)}px)`;
     bedFollow();
@@ -418,6 +497,7 @@ const DEVICE_IMG_BASE = (() => {
     // not replay minutes of steam on return.
     acc += Math.min(1000, now - last); last = now;
     while (acc >= T.STEP) { step(T.STEP); acc -= T.STEP; }
+    alpha = acc / T.STEP;
     draw();
     const moving = M.mode !== "idle" || M.omega > 0.01 || M.puffs.length || M.halt
       || Math.abs(M.lever - M.leverTarget) > 0.05 || Math.abs(M.leverV) > 0.05
