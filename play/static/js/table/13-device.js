@@ -440,15 +440,34 @@ function deviceShow(shown, target, cap) {
   // most. `alpha` is how far the clock is into the next model step (the loop's remainder).
   const shown = { from: 0, angle: 0 };
   let alpha = 0;
+  // Reduced motion (the owner, 2026-10-05: "gears still turn on reduced motion"). The OS
+  // setting or the player's Short flourishes, the same test the benches use (29-bench-core
+  // `C.reduced`, which loads after this file, so it is asked here directly). Under it the
+  // gears hold where they are, no steam rises and the foot does not bob; the lever and the
+  // tab still show the game's state but jump to it instead of swinging (motion that carries
+  // information is the one kind WCAG 2.3.3 lets stay). JS transforms are not touched by the
+  // CSS media query, which is why this was missed. The machine's sound is not motion and
+  // keeps playing.
+  const STILL = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  function still() {
+    try {
+      if (STILL && STILL.matches) return true;
+      return !!(window.PGMPrefs && PGMPrefs.get("flourishes") === "short");
+    } catch (err) { return false; }
+  }
   function draw() {
-    const driver = deviceShow(shown, M.aPrev + (M.aS - M.aPrev) * alpha, FRAME_CAP);
-    deviceGearAngles(GEARS, driver).forEach((a, i) => {
-      const g = GEARS[i];
-      gearEls[i].setAttribute("transform", `rotate(${a.toFixed(2)} ${g.x} ${g.y})`);
-      gradEls[i].setAttribute("gradientTransform", `rotate(${(-a).toFixed(2)} ${g.x} ${g.y})`);
-    });
-    lever.setAttribute("transform", `rotate(${M.lever.toFixed(2)} ${kx} ${ky})`);
-    if (footEl) footEl.style.transform = `translateY(${(M.foot * px()).toFixed(2)}px)`;
+    const quiet = still();
+    if (!quiet) {
+      const driver = deviceShow(shown, M.aPrev + (M.aS - M.aPrev) * alpha, FRAME_CAP);
+      deviceGearAngles(GEARS, driver).forEach((a, i) => {
+        const g = GEARS[i];
+        gearEls[i].setAttribute("transform", `rotate(${a.toFixed(2)} ${g.x} ${g.y})`);
+        gradEls[i].setAttribute("gradientTransform", `rotate(${(-a).toFixed(2)} ${g.x} ${g.y})`);
+      });
+    }
+    const leverAt = quiet ? M.leverTarget : M.lever;
+    lever.setAttribute("transform", `rotate(${leverAt.toFixed(2)} ${kx} ${ky})`);
+    if (footEl) footEl.style.transform = quiet ? "" : `translateY(${(M.foot * px()).toFixed(2)}px)`;
     bedFollow();
     const green = M.leverTarget === LEVER_UP && M.mode !== "running" && M.mode !== "waiting";
     el.style.setProperty("--lamp", green ? "#8ef07e" : "#ffb23c");
@@ -456,8 +475,9 @@ function deviceShow(shown, target, cap) {
     bloom.style.opacity = (Math.min(1.3, M.lampLevel) * (green ? 0.8 : 0.9)).toFixed(3);
     // The tab: out is 0 offset (where prepare.py put it), in is TAB_TRAVEL to the right.
     // Its glow follows how far out it is, so it dims as it goes in and never shows inside.
-    const out = Math.max(0, Math.min(1, M.tab));
-    tabMove.setAttribute("transform", `translate(${(TAB_TRAVEL * (1 - M.tab)).toFixed(2)} 0)`);
+    const tabAt = quiet ? M.tabTarget : M.tab;
+    const out = Math.max(0, Math.min(1, tabAt));
+    tabMove.setAttribute("transform", `translate(${(TAB_TRAVEL * (1 - tabAt)).toFixed(2)} 0)`);
     tabLit.setAttribute("opacity", (0.9 * out).toFixed(3));
     halo.style.opacity = (out * out).toFixed(3);
     el.dataset.state = M.mode;
@@ -475,7 +495,7 @@ function deviceShow(shown, target, cap) {
     sprites.forEach((sp, i) => {
       const p = M.puffs[i];
       const u = p ? (M.t - p.t0) / p.life : -1;
-      if (u < 0) { sp.style.opacity = "0"; return; }
+      if (u < 0 || quiet) { sp.style.opacity = "0"; return; }
       const sdx = -w * (F.drift * (1 - (1 - u) * (1 - u)) + 0.06 * Math.sin(u * 5.2 + p.seed * 6));
       const sdy = -w * F.rise * Math.pow(u, 0.85);
       const [ldx, ldy] = turned ? [sdy, -sdx] : [sdx, sdy];

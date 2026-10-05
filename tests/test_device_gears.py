@@ -144,3 +144,21 @@ def test_the_drawing_turns_every_gear_from_one_driver():
     assert "deviceGearAngles(GEARS, driver)" in draw
     assert "MESH" not in DEVICE
     assert "alpha = acc / T.STEP;" in DEVICE
+
+
+def test_reduced_motion_holds_the_gears_still():
+    """The owner, 2026-10-05: "gears still turn on reduced motion." The device turns its
+    gears with JS transforms, which the CSS prefers-reduced-motion rule never touches, and
+    13-device.js had no reduced-motion handling at all. Under the OS setting or Short
+    flourishes the gears now hold, no steam rises, the foot does not bob, and the lever and
+    tab jump to the state they show."""
+    from pathlib import Path
+
+    src = Path("play/static/js/table/13-device.js").read_text(encoding="utf-8")
+    assert 'matchMedia("(prefers-reduced-motion: reduce)")' in src
+    assert 'PGMPrefs.get("flourishes") === "short"' in src
+    draw = src[src.index("function draw()"):src.index("// --- The live loop")]
+    assert "const quiet = still();" in draw
+    assert "if (!quiet) {" in draw and draw.index("if (!quiet) {") < draw.index("deviceGearAngles(")
+    assert "if (u < 0 || quiet)" in draw
+    assert "quiet ? M.leverTarget : M.lever" in draw and "quiet ? M.tabTarget : M.tab" in draw
