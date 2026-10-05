@@ -30,19 +30,73 @@
     "(5 cp a mount a day) are not sold here: the engine charges them itself, feed per day",
     "travelled or rested and stabling per night rested where there are stables",
     "(rules/engine.py, the journey and the rest), so a counter row would charge the keep",
-    "twice."
+    "twice.",
+    "",
+    "CONSUMABLES are what a craft burns, pours or uses up in the working rather than what",
+    "the thing is made from: the forge's fuel, flux and quench, the alchemist's solvents,",
+    "salts and vials, the tanner's bark, oil, wax, thread and curing salt, the enchanter's",
+    "ink, chalk and seal. `consumables` on a shop, a stall line or a place names the crafts",
+    "whose consumables that counter ALWAYS carries, at the material's own `price_gp`,",
+    "outside the rarity quota and the daily draw (rules/market.py `consumables_at`). Which",
+    "kinds count is the `consumables` block below, by `kind` in content/materials/*.json,",
+    "never by name, so a new charcoal added to a catalogue tomorrow is on the smith's",
+    "counter tomorrow. Every kind a catalogue uses must be filed as consumed or made_from,",
+    "every common consumable must carry a `price_gp`, and every craft must be named by",
+    "some market counter: rules/market.py refuses the document otherwise, with the fix",
+    "named. Measured 2026-10-05 before this, over 60 days at a smithy counter seeded on Panthcove: charcoal",
+    "on the shelf 30 days, quenching oil 29; curing salt and oak bark at the tannery 0."
   ],
+  "consumables": {
+    "_about": [
+      "`kinds` is what is consumed by the working, per craft catalogue",
+      "(content/materials/<craft>-materials.json); `made_from` is everything else that",
+      "catalogue files, so a kind nobody has classified fails on load instead of silently",
+      "landing on no counter. The enchanter's own `consumed: true` rows (ink, chalk, salt,",
+      "catalyst, treatment) agree with its list, and the check holds them to it. `tiers` is",
+      "which rarities are staples: a common fuel is on every forge's shelf, a skymetal fire",
+      "(dwarven hearthcoal and up) stays in the daily draw where a rarity belongs. `places`",
+      "is the settlement places whose keeper sells over a counter (rules/places.py STAFFED)",
+      "and what they carry and draw; a place named nowhere keeps the general draw.",
+      "Prior art (2026-10-05): Skyrim's blacksmith chest always holds 10 iron ingots and",
+      "leather strips and its apothecary a salt pile, with only the rest drawn (UESP",
+      "Skyrim:Leveled_Lists); Stardew Valley's Clint always sells coal and ore, Pierre",
+      "always sells vinegar and oil, and randomness lives in the Traveling Cart alone;",
+      "the Core Rulebook's 75% roll is for magic items only, 'nonmagical items and gear",
+      "are generally available' (aonprd Rules ID 374)."
+    ],
+    "tiers": ["common"],
+    "kinds": {
+      "blacksmith": ["fuel", "flux", "quenchant", "treatment"],
+      "alchemist": ["solvent", "salt", "catalyst", "vessel", "treatment"],
+      "leatherworker": ["tannin", "oil", "wax", "thread", "treatment"],
+      "enchanter": ["ink", "chalk", "salt", "catalyst", "treatment"]
+    },
+    "made_from": {
+      "blacksmith": ["ore", "metal", "alloy", "fitting"],
+      "alchemist": ["reagent", "gland", "essence"],
+      "leatherworker": ["hide", "dye", "fitting"],
+      "enchanter": ["essence", "focus", "vessel"]
+    },
+    "places": {
+      "smithy": {"consumables": ["blacksmith"], "draw": ["blacksmith"]},
+      "workshops": {"consumables": ["blacksmith", "leatherworker"],
+                    "draw": ["blacksmith", "leatherworker"]},
+      "tannery": {"consumables": ["leatherworker"], "draw": ["leatherworker"]}
+    }
+  },
   "shops": [
     {"id": "general", "label": "the general store", "title": "the keeper of the general store",
      "words": ["shopkeeper", "merchant", "trader"], "smallest": "village",
      "gear": ["backpack", "bedroll", "blanket", "rope", "torch", "lantern", "oil",
               "rations", "waterskin", "flint and steel", "grappling hook", "crowbar",
               "chalk", "sack", "whetstone", "tent", "shovel", "hammer", "pitons",
-              "candle", "caltrops"]},
+              "candle", "caltrops"],
+     "consumables": ["alchemist"]},
     {"id": "armorer", "label": "the armorer", "title": "the armorer",
      "words": ["armorer", "blacksmith", "smith"], "smallest": "town",
      "gear": ["smith's field kit"],
-     "tables": ["armour", "shields", "smithing-manuals"]},
+     "tables": ["armour", "shields", "smithing-manuals"],
+     "consumables": ["blacksmith"]},
     {"id": "weaponsmith", "label": "the weaponsmith", "title": "the weaponsmith",
      "words": ["weaponsmith", "blacksmith", "smith"], "smallest": "town",
      "tables": ["weapons"]},
@@ -50,7 +104,8 @@
      "words": ["alchemist", "apothecary", "herbalist"], "smallest": "town",
      "gear": ["alchemist's fire", "antitoxin", "sunrod"],
      "tables": ["herbal-manuals"],
-     "draw": ["alchemist", "herbalist"]}
+     "draw": ["alchemist", "herbalist"],
+     "consumables": ["alchemist"]}
   ],
   "stalls": [
     {"id": "provisions", "noun": "provisions", "says": "bread, cheese and meat",
@@ -65,7 +120,8 @@
     {"id": "curios", "noun": "curio", "says": "odds and ends, and what the crafts sell",
      "gear": ["ink and paper", "signal whistle", "mirror", "holy symbol",
               "spell component pouch", "healer's kit", "thieves' tools", "manacles"],
-     "draw": ["blacksmith", "leatherworker", "enchanter"], "catch_all": true}
+     "draw": ["blacksmith", "leatherworker", "enchanter"], "catch_all": true,
+     "consumables": ["blacksmith", "leatherworker", "enchanter"]}
   ],
   "holders": {"village": 2, "town": 4, "city": 5},
   "stables": {
