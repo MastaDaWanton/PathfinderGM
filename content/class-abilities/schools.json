@@ -107,10 +107,17 @@
       "target": "will",
       "bonus_type": "insight",
       "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "skill_mod",
+      "target": "all",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
      }
     ]
    },
-   "tell": "{name} touches the target with a glimpse of what is coming.",
+   "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
+   "tell": "{name} touches {target} with a glimpse of what is coming.",
    "cost": {
     "pool": "diviner's fortune",
     "amount": 1
@@ -134,7 +141,8 @@
     "condition": "dazed",
     "rounds": 1
    },
-   "tell": "{name} lays a dazing hand on the target.",
+   "hit_dice": {"max": "level"},
+   "tell": "{name} lays a dazing hand on {target}.",
    "cost": {
     "pool": "dazing touch",
     "amount": 1
@@ -191,9 +199,16 @@
       "target": "will",
       "bonus_type": "untyped",
       "amount": -2
+     },
+     {
+      "type": "skill_mod",
+      "target": "all",
+      "bonus_type": "untyped",
+      "amount": -2
      }
     ]
    },
+   "not_yet": ["The -2 on ability checks: no roll reads an ability check yet (skills, saves, attacks and damage take it)."],
    "tell": "Despair spreads from {name}.",
    "tell_off": "{name}'s aura of despair lifts.",
    "cost": {
@@ -221,7 +236,7 @@
     "as": "damage",
     "type": "force"
    },
-   "tell": "A bolt of force leaps from {name} to the target.",
+   "tell": "A bolt of force leaps from {name} to {target}.",
    "cost": {
     "pool": "force missile",
     "amount": 1
@@ -245,7 +260,8 @@
     "condition": "blinded",
     "rounds": 1
    },
-   "tell": "A shimmering ray strikes the target's eyes.",
+   "hit_dice": {"max": "level", "over": {"effect": {"condition": "dazzled", "rounds": 1}}},
+   "tell": "A shimmering ray strikes at {target}'s eyes.",
    "cost": {
     "pool": "blinding ray",
     "amount": 1
@@ -297,7 +313,7 @@
     "condition": "shaken",
     "rounds": "max(1, floor(level / 2))"
    },
-   "tell": "{name}'s touch carries the cold of the grave to the target.",
+   "tell": "{name}'s touch carries the cold of the grave to {target}.",
    "cost": {
     "pool": "grave touch",
     "amount": 1
@@ -324,7 +340,7 @@
     "as": "damage",
     "type": "bludgeoning"
    },
-   "tell": "A fist of force strikes the target.",
+   "tell": "A fist of force strikes {target}.",
    "cost": {
     "pool": "telekinetic fist",
     "amount": 1

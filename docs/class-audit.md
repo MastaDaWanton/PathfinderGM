@@ -1126,3 +1126,46 @@ Cleric Domains.
 - The narrator, asked in words to "use my Fire Bolt", described a hit with no
   `use_ability` emitted (live, 2026-10-05): the declaration side (`gm/judgement.py`) still
   knows path abilities only. The combat bar's route works.
+
+---
+
+## 11. The executor fields, built
+
+Built 2026-10-05 on `fix/class-ability-executor` (off `integrate/2026-10-05`). Prior art
+read first: Foundry PF1's action model (`areaTemplate` type/size/origin, `range`, `save`,
+`touch`) and change targets (`skills` = "All Skills", `strSkills`, `allChecks`); PCGen's
+pattern of a power bonusing a variable the channel reads; GAS's removal tag requirements.
+Neither Foundry nor PCGen gates a power by the target's Hit Dice or creature type in data,
+so `hit_dice` and `only` are this grammar's own. The grammar is in the module docstring of
+`rules/class_abilities.py`; every field is validated on load with the fix named.
+
+| Field | Powers it unblocked |
+|---|---|
+| `area` (cone, line, burst at range; `"$breath"`) laid by `areas.lay_shape` | Breath Weapon (all ten dragons), Elemental Blast, Hellfire, Grasp of the Dead |
+| `only` (creature type) and `roll.ignores_dr` | Artificer's Touch (constructs; DR up to level) |
+| `target_requires` | Rebuke Death (below 0 hp) |
+| `roll.as: heal_nonlethal`, `lifts` | Calming Touch |
+| `hit_dice` (`max`, `over`), read off the printed stat block (`hit_dice_of`) | Dazing Touch (Charm, Enchantment), Blinding Ray |
+| `charge.category` / `modifiers` / `spent_on` | Destructive Smite; Stunning Fist wasted on a miss |
+| skill_mod target `all` (`Actor.skill_modifiers`) | Touch of Good, Inspiring Word, Touch of Destiny, Diviner's Fortune, Aura of Despair; Strength Surge got Climb and Swim |
+| `bonus_from`, `healed_instead` | Sun's Blessing (+level), Glory (+2 DC), Death's Embrace |
+| modifier `first_hit`, `self.strikes_as` | Smite's doubled first hit vs outsiders/dragons/undead (type, not alignment), DR bypass |
+| `self.ends_when` (swept once per batch) | Smite ends on its mark's death; rage ends when the barbarian falls |
+| `self.forbids` | Rage refuses Cha/Dex/Int skills but Acrobatics, Fly, Intimidate, Ride |
+| `{target}` in tells | sixteen tells that said "the target" |
+
+Measured live (scratch data, port 8857, the combat bar): a 9th-level red draconic
+sorcerer's Breath Weapon aimed at the near thug — "The 30-ft cone catches the near thug and
+the far thug", both failed DC 16 and took 23 fire, the thug behind untouched at 13/13; the
+narrator then wrote the thug behind "thrown back by the heat", so the area tell now names
+who is outside it. A 1st-level Charm cleric's Dazing Touch hit the ogre and "the ogre has
+4 Hit Dice, more than 1: Dazing Touch has no hold on them". A Death/Sun cleric's harm
+channel: "4d6 — 22. Sun's Blessing adds +8 (30)"; her negative channel: "The energy mends
+Morwen instead of harming them. Morwen recovers 6 hit points".
+
+Still not_yet (each said in its document): ability checks (no roller reads one), Hellfire's
+shaken on the good (no alignment), Grasp of the Dead's hold (no move-only condition),
+objects and hardness for Artificer's Touch, rage's "patience or concentration" beyond
+skills, the shaped-area overlay on the map (`play/views.py:_latest_areas` reads `cast`
+outcomes only), and an imported monster's `Actor.hit_dice` (still 1; the Intimidate DC in
+`rules/attitude.py` reads it).

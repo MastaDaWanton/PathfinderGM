@@ -623,7 +623,15 @@ def lay(scene, caster_ref: str, spell, caster_level: int, aim: Aim) -> Area:
     corner) whose area contains it, nearest the bearing first; a burst aimed at a creature
     centres on the corner of its space nearest the caster. With no map the area is not
     measured and holds no cells."""
-    shape = shape_of(spell, caster_level)
+    return lay_shape(scene, caster_ref, shape_of(spell, caster_level), aim)
+
+
+def lay_shape(scene, caster_ref: str, shape: dict, aim: Aim) -> Area:
+    """`lay` for a shape already known — `{"shape": "cone", "length_ft": 30}` — rather
+    than read off a spell's printed area line. A class ability's breath weapon or burst
+    states its shape in its document (rules/class_abilities.py `area`), and laying it a
+    second way would be the second copy of the corner rule this module exists to hold
+    once (2026-10-05, the class-ability executor)."""
     if not shape:
         return Area(aim=aim)
     kind, length = shape["shape"], int(shape["length_ft"])
@@ -864,6 +872,6 @@ def legal_aims(scene, caster_ref: str, spell=None) -> list[str]:
 __all__ = [
     "AIM_PATTERN", "Aim", "Area", "CANOPY_FROM", "FEATURES", "aim_from_words", "aim_of",
     "burst_cells", "caught", "cone_cells", "features_here", "find_object", "lay",
-    "legal_aims", "line_cells", "objects_caught", "objects_here", "parse_aim", "shape_of",
+    "lay_shape", "legal_aims", "line_cells", "objects_caught", "objects_here", "parse_aim", "shape_of",
     "valid",
 ]

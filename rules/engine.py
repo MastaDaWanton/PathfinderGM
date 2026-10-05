@@ -3126,6 +3126,9 @@ class Engine:
         # `_drive`; what is left here is the clock moved outside an op — a bench or a
         # forge view before this batch, or anything the settles below were handed.
         resolution.outcomes.extend(self._body_settles())
+        # An ability's effect that a state ends: a rage when its barbarian falls, a smite
+        # when its mark dies (`_ability_ends_settle`).
+        resolution.outcomes.extend(self._ability_ends_settle())
         # A creature holding its ground answers what this batch did: struck, closed on,
         # or gone — and a find it was sitting on is paid once it has gone.
         resolution.outcomes.extend(self._holding_ground_settles())
@@ -3249,6 +3252,47 @@ class Engine:
                                    self.FIGHT_HOSTILE_MINUTES * Scene.ROUNDS_PER_MINUTE,
                                    source)
                 out.append(ref)
+        return out
+
+    def _ability_ends_settle(self) -> list:
+        """End every ability effect whose `ends_when` now holds, and tell it.
+
+        GAS's removal tag requirements ("once applied, if the target meets these
+        requirements, the effect is removed"), for the two the book writes into class
+        abilities: rage ends "if the barbarian falls unconscious" (CRB p.31) and a smite
+        lasts "until the target of the smite is dead" (CRB p.61). Before this (lane 4's
+        not_yet, 2026-10-05) nothing ended a rage but its toggle or its pool, so a
+        barbarian on the floor kept her +4 Strength and Constitution, and a smite stayed
+        on a corpse until the paladin's next night's rest.
+
+        One pass at the end of every batch, for `_carried_settles`'s reason — damage,
+        a sleep spell and a coup de grâce all put people down through different doors,
+        and a sweep here cannot be forgotten by the next one. A stance ends by the
+        stance's own door (`_end_class_stance`: what it lent others goes, and what it
+        leaves — rage's fatigue — is left)."""
+        out = []
+        for actor in list(self.scene.actors.values()):
+            for e in list(actor.effects):
+                p = e.payload if isinstance(e.payload, dict) else {}
+                ends = p.get("ends_when")
+                if not ends:
+                    continue
+                why = ""
+                if any(actor.has_state(q) for q in ends.get("holder") or ()):
+                    why = f"{actor.name} has fallen"
+                mark = self.scene.actors.get(str(p.get("ends_when_ref") or ""))
+                if not why and ends.get("target") and p.get("ends_when_ref"):
+                    if mark is None or any(mark.has_state(q) for q in ends["target"]):
+                        why = f"{mark.name if mark else 'its mark'} is down for good"
+                if not why:
+                    continue
+                records, said = self._end_class_stance(actor, e)
+                records.insert(0, {"ref": actor.ref, "kind": "effect_ended",
+                                   "what": e.name, "why": why, "origin": e.origin})
+                out.append(self._articled(Outcome(
+                    intent_id="", op="effect_ended", effects=records,
+                    tell=" ".join([f"{why}, and {actor.name}'s {e.name} ends."] + said),
+                    because="")))
         return out
 
     def _body_settles(self) -> list:
@@ -4587,6 +4631,15 @@ class Engine:
 
         actor = self.scene.actors[intent.actor]
         skill = intent.params["skill"]
+        # A skill an effect on them forbids (`self.forbids`): "While in rage, a barbarian
+        # cannot use any Charisma-, Dexterity-, or Intelligence-based skills (except
+        # Acrobatics, Fly, Intimidate, and Ride)" (CRB p.31). Before this nothing read the
+        # clause (rage's own not_yet), and a raging barbarian's Diplomacy rolled as if
+        # she were calm.
+        barred = _forbidden_skill(actor, str(skill))
+        if barred:
+            return Outcome(intent_id=intent.id, op="check", effects=[], tell=barred,
+                           because=intent.because)
         # A trained-only skill the character has no ranks in resolves as a refusal, not
         # an exception. Measured live: a player toggled their class's blood armament out
         # of combat, the spoken path invited the model to dress it as a Knowledge
@@ -5415,6 +5468,7 @@ class Engine:
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
+                    state["tells"].extend(self._charges_missed(actor, weapon_key, weapon))
                     # A round that misses lies somewhere out there, to be looked for
                     # when the fight is over (`_recover_ammunition`); one that hits is
                     # spent ("destroyed or rendered useless", CRB "Ammunition").
@@ -5427,6 +5481,7 @@ class Engine:
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} misses "
                         f"{defender.name} ({atk.total} against {swing_note}).")
+                    state["tells"].extend(self._charges_missed(actor, weapon_key, weapon))
                     if counts_ammo:
                         state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                     state["i"] += 1
@@ -5454,6 +5509,8 @@ class Engine:
                         state["tells"].append(
                             f"{actor.name} finds nothing there — {why}, {chance}% miss "
                             f"chance ({miss.total}).")
+                        state["tells"].extend(
+                            self._charges_missed(actor, weapon_key, weapon))
                         if counts_ammo:
                             state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                         state["i"] += 1
@@ -5622,6 +5679,21 @@ class Engine:
                         said = " and ".join(s.replace("_", " ") for s in struck_as)
                         state["tells"].append(
                             f"The {said} bites past {defender.name}'s {would.label}.")
+                # What an effect lends the blow against this defender (`self.strikes_as`):
+                # a smite "bypasses any DR the creature might possess" (CRB p.61). Said
+                # by the effect's name when it mattered, never as a trait word.
+                lent = self._effect_strikes(actor, defender)
+                if lent:
+                    before_dr = defender.damage_reduction(weapon["type"], struck_as,
+                                                          lethality)
+                    struck_as = struck_as + tuple(t for t, _ in lent)
+                    after_dr = defender.damage_reduction(weapon["type"], struck_as,
+                                                         lethality)
+                    if before_dr is not None and (after_dr is None
+                                                  or after_dr.amount < before_dr.amount):
+                        state["tells"].append(
+                            f"{_and_list(sorted({n for _, n in lent}))} carries the blow "
+                            f"past {defender.name}'s {before_dr.label}.")
                 # An incorporeal defender "takes only half damage from a corporeal
                 # source" (Bestiary, Incorporeal), and a ghost touch weapon is the book's
                 # exception: "An incorporeal creature's 50% reduction in damage from
@@ -5694,7 +5766,7 @@ class Engine:
                 # A blow charged before the roll — stunning fist's save — spends itself on
                 # the first hit with the weapon it names (`_deliver_charges`).
                 for extra in self._deliver_charges(actor, defender, weapon_key,
-                                                   intent.visibility or "player"):
+                                                   intent.visibility or "player", weapon):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # A forged blade's own riders — a wyvern-blood quench on the first wound
@@ -15220,12 +15292,20 @@ class Engine:
         if refused:
             return self._refuse(intent, f"Nothing takes hold. {refused}", code="ability_refused")
 
-        # 3. Who it reaches.
-        who, problem = self._class_ability_reach(intent, actor, doc, name)
+        # 3. Who it reaches — a shaped area laid on the map, or the grammar's `affects`.
+        area = None
+        if doc.get("area"):
+            who, problem, area = self._class_ability_area(intent, actor, doc, name)
+        else:
+            who, problem = self._class_ability_reach(intent, actor, doc, name)
         if problem:
             return self._refuse(intent, problem, code="ability_reach")
         target = who[0] if (doc.get("affects") or "self") in ("target", "ally") and who \
             else None
+        aimed = target
+        if aimed is None:
+            to = intent.params.get("to") or next(iter(intent.targets()), None)
+            aimed = self.scene.actors.get(str(to)) if to else None
         if target is not None and doc.get("undead") and target.has_state("type.undead"):
             # Lay on hands turned on the undead: the same dice, as harm, on a touch.
             u = doc["undead"]
@@ -15241,8 +15321,14 @@ class Engine:
 
         # 5. The price, paid.
         records: list[dict] = []
-        tells: list[str] = [_doc_tell(doc.get("tell"), actor) or f"{actor.name} uses {shown}."]
+        tells: list[str] = [_doc_tell(doc.get("tell"), actor, aimed)
+                            or f"{actor.name} uses {shown}."]
         rolls: list[Roll] = []
+        if area is not None:
+            records.append({"ref": actor.ref, "kind": "area", "ability": shown,
+                            **area.as_dict(), "caught": [a.ref for a in who],
+                            "origin": origin})
+            tells.append(self._area_said(area, actor, who, aimed))
         cost = doc.get("cost") or {}
         pool_start = None
         if cost.get("pool"):
@@ -15276,6 +15362,10 @@ class Engine:
             spec = doc.get("roll") or {}
             notation = ca.dice(spec, actor) if spec else ""
             flat = ca.amount(spec.get("flat"), actor) if spec else 0
+            # What the user's own powers add to this use, through the funnel (`bonus_from`):
+            # Sun's Blessing's level on a channel that harms undead, Glory's +2 DC. Read as
+            # modifiers, never as a domain's name, so the channel document names no domain.
+            extra_dmg, extra_dc = self._bonus_from(actor, doc)
             total = None
             if notation or flat:
                 total = flat
@@ -15284,10 +15374,41 @@ class Engine:
                     rolls.append(r)
                     total += r.total
                     tells.append(f"{notation}{f' + {flat}' if flat else ''} — {total}.")
+                for m in extra_dmg:
+                    total += m.value
+                    tells.append(f"{m.source} adds {m.value:+d} ({total}).")
             saving = doc.get("save") or {}
             dc = ca.amount(saving.get("dc"), actor) if saving else 0
+            if saving and extra_dc:
+                dc += sum(m.value for m in extra_dc)
+                tells.append(", ".join(f"{m.source} {m.value:+d}" for m in extra_dc)
+                             + f" to the DC ({dc}).")
+            # Damage reduction a blow passes by rule (Artificer's Touch: its user's level).
+            passes = ca.amount(spec.get("ignores_dr"), actor) if spec.get("ignores_dr") else 0
+            traits: tuple[str, ...] = (f"ignores_dr:{passes}",) if passes > 0 else ()
+            if (doc.get("radius_ft") or area is not None) and len(who) > 1:
+                traits += ("area",)
+            hd_rule = doc.get("hit_dice") or {}
+            hd_cap = ca.amount(hd_rule.get("max"), actor) if hd_rule else 0
             for other in who:
                 share = total
+                each = doc
+                # "Creatures with more Hit Dice than your level are unaffected" — read off
+                # the printed stat block (`class_abilities.hit_dice_of`), since every
+                # imported monster's sheet level is 1.
+                if hd_rule and other is not actor and ca.hit_dice_of(other) > hd_cap:
+                    hd = ca.hit_dice_of(other)
+                    over = hd_rule.get("over")
+                    records.append({"kind": "unaffected", "ref": other.ref,
+                                    "hit_dice": hd, "max": hd_cap, "origin": origin})
+                    if not isinstance(over, dict):
+                        tells.append(f"{other.name} has {hd} Hit Dice, more than {hd_cap}: "
+                                     f"{shown} has no hold on them.")
+                        continue
+                    tells.append(f"{other.name} has {hd} Hit Dice, more than {hd_cap}, "
+                                 f"and {shown} takes a lesser hold.")
+                    each = {**doc, **over}
+                failed = False
                 if saving and other is not actor:
                     sv = str(saving.get("save", "will"))
                     sroll = self.dice.d20(other.save_modifiers(sv),
@@ -15301,6 +15422,7 @@ class Engine:
                                  f"{sroll.total} against DC {dc}).")
                     records.append({"kind": "save", "ref": other.ref, "save": sv,
                                     "saved": bool(made), "dc": dc, "origin": origin})
+                    failed = not made
                     if made and saving.get("success", "negates") == "negates":
                         continue
                     if made and share is not None:
@@ -15308,8 +15430,25 @@ class Engine:
                 landed.append(other)
                 if share is not None:
                     as_ = doc.get("roll_as") or spec.get("as") or "heal"
-                    if as_ == "heal":
-                        healed = other.heal(share)
+                    # Death's Embrace: a creature answering `healed_instead` is healed by
+                    # this energy where it would be harmed.
+                    if as_ == "damage" and doc.get("healed_instead") \
+                            and other.has_state(str(doc["healed_instead"])):
+                        as_ = "heal"
+                        tells.append(f"The energy mends {other.name} instead of harming "
+                                     f"them.")
+                    if as_ == "heal_nonlethal":
+                        back = other.heal_nonlethal(share)
+                        records.append({"ref": other.ref, "kind": "heal_nonlethal",
+                                        "amount": back, "rolled": share,
+                                        "nonlethal_after": other.nonlethal, "origin": origin})
+                        tells.append(f"{other.name} recovers {back} non-lethal damage."
+                                     if back else
+                                     f"{other.name} had no non-lethal damage to recover.")
+                    elif as_ == "heal":
+                        # Never below 0: a body standing over its maximum (a scratch
+                        # sheet did, live 2026-10-05) "recovered -1 hit points".
+                        healed = max(0, other.heal(share))
                         records.append({"ref": other.ref, "kind": "heal", "amount": healed,
                                         "rolled": share, "hp_after": other.hp,
                                         "hp_max": other.hp_max, "origin": origin})
@@ -15329,7 +15468,7 @@ class Engine:
                         hit = self._apply_damage(
                             other, share,
                             str(doc.get("damage_type") or spec.get("type") or "untyped"),
-                            traits=("area",) if doc.get("radius_ft") and len(who) > 1 else (),
+                            traits=traits,
                             lethality=str(spec.get("lethality") or "lethal"))
                         hit["origin"] = origin
                         records.append(hit)
@@ -15340,7 +15479,18 @@ class Engine:
                             + f"{hit['type']}"
                             + (" energy" if hit["type"] in ("positive", "negative") else "")
                             + (f" ({hit['note']})." if hit["note"] else "."))
-                records.extend(self._class_effect_on(actor, other, doc, origin, shown, tells))
+                if (each.get("effect") or {}).get("on") == "failed" and not failed:
+                    continue
+                records.extend(self._class_effect_on(actor, other, each, origin, shown, tells))
+            # Whatever the document lifts, by tag query through the one door that ends
+            # states (`Actor.clear_states`): Calming Touch's fatigue, fear and nausea.
+            for other in landed:
+                for q in doc.get("lifts") or ():
+                    gone = other.clear_states(str(q))
+                    if gone:
+                        records.append({"ref": other.ref, "kind": "condition_removed",
+                                        "conditions": gone, "origin": origin})
+                        tells.append(f"{other.name} is no longer {_and_list(gone)}.")
             removes = doc.get("removes") or {}
             if removes:
                 lifts = _mercy_lifts(actor, removes, ca)
@@ -15408,13 +15558,7 @@ class Engine:
             gap = self.scene.distance_between(actor.ref, other.ref)
             return gap is None or gap <= int(feet)
 
-        def fits(other: Actor) -> bool:
-            undead = other.has_state("type.undead")
-            if doc.get("undead_only") and not undead:
-                return False
-            if doc.get("living") and (undead or other.has_state("type.construct")):
-                return False
-            return True
+        fits = self._class_ability_fits(doc)
 
         if affects == "self":
             return [actor], ""
@@ -15430,6 +15574,11 @@ class Engine:
                            f"{other.name} is not one."
             if other.has_state("state.down.dead"):
                 return [], f"{other.name} is dead."
+            # Refused before the price, with what it works on named: an Artificer's
+            # Touch at a man, a Rebuke Death at somebody standing.
+            wrong = self._class_ability_wrong_target(doc, name, other)
+            if wrong:
+                return [], wrong
             feet = doc.get("range_ft") or doc.get("reach_ft") or doc.get("radius_ft")
             if not near(other, feet):
                 gap = self.scene.distance_between(actor.ref, other.ref)
@@ -15445,8 +15594,12 @@ class Engine:
             # "A cleric can choose whether or not to include herself in this effect" (CRB
             # p.40). Nobody chooses to be in their own harmful burst: built without this,
             # a negative channel to harm the living put the cleric unconscious and dying
-            # alongside the thug (2026-10-05). A burst that heals keeps her in it.
-            pool = [a for a in here if not (doc.get("harmful") and a is actor)]
+            # alongside the thug (2026-10-05). A burst that heals keeps her in it — and so
+            # does one that would heal HER (Death's Embrace, `healed_instead`).
+            pool = [a for a in here if not (
+                doc.get("harmful") and a is actor
+                and not (doc.get("healed_instead")
+                         and actor.has_state(str(doc["healed_instead"]))))]
         pool = [a for a in pool if near(a, radius) and fits(a)]
         count = ca.amount(doc.get("count"), actor) if doc.get("count") else 0
         if count > 0:
@@ -15455,6 +15608,135 @@ class Engine:
                                      self.scene.distance_between(actor.ref, a.ref) or 0))
             pool = pool[:count]
         return pool, ""
+
+    @staticmethod
+    def _class_ability_fits(doc: dict):
+        """The filter a document puts on who it reaches: `undead_only`, `living`, `only`
+        (a creature type), with `healed_instead` letting through whoever this energy heals
+        (Death's Embrace: "if the channeled negative energy targets undead, you heal hit
+        points just like undead in the area")."""
+        from .sheet import _is_of_kind
+
+        only = doc.get("only") or {}
+        mends = str(doc.get("healed_instead") or "")
+
+        def fits(other: Actor) -> bool:
+            if mends and other.has_state(mends):
+                return True
+            undead = other.has_state("type.undead")
+            if doc.get("undead_only") and not undead:
+                return False
+            if doc.get("living") and (undead or other.has_state("type.construct")):
+                return False
+            if only and not any(_is_of_kind(other, k, v) for k, v in only.items()):
+                return False
+            return True
+        return fits
+
+    def _class_ability_wrong_target(self, doc: dict, name: str, other: Actor) -> str:
+        """Why the creature aimed at is not one this works on, or "" — `only` and
+        `target_requires`, each refusal naming what it does work on (the fix)."""
+        from .sheet import _is_of_kind
+
+        only = doc.get("only") or {}
+        if only and not any(_is_of_kind(other, k, v) for k, v in only.items()):
+            kinds = [str(x) for v in only.values()
+                     for x in (v if isinstance(v, (list, tuple)) else [v])]
+            return (f"{name} works only on {_and_list([k + 's' for k in kinds])}, and "
+                    f"{other.name} is not one. Nothing is spent.")
+        need = doc.get("target_requires") or ()
+        if need and not any(other.has_state(str(q)) for q in need):
+            said = doc.get("target_requires_said") or "a creature answering " + " or ".join(
+                str(q) for q in need)
+            return f"{name} works only on {said}, and {other.name} is not. Nothing is spent."
+        return ""
+
+    def _class_ability_area(self, intent: Intent, actor: Actor, doc: dict, name: str):
+        """Who a shaped area catches — a breath weapon's cone, a line, a burst laid away
+        from the user — as `(who, problem, area)`.
+
+        Laid by `areas.lay_shape`, the one place an area is laid, so the corner rule a
+        cone starts from and the intersection a burst counts from are the cast door's own.
+        The direction of a cone or line is the creature aimed at (`to`): the corner whose
+        cone holds them, nearest the bearing first (`areas.lay`). A burst with a
+        `range_ft` centres on the creature aimed at and is refused past its range. Every
+        creature caught is reached, allies included — the book's breath weapon does not
+        ask whose side anyone is on. With no map nothing can be measured, so the creature
+        aimed at is the one caught, and the tell says so."""
+        from . import areas
+        from . import class_abilities as ca
+
+        shape = ca.area_of(doc, actor)
+        if shape is None:
+            return [], (f"{name}'s area could not be read ({doc.get('area')!r}); the "
+                        f"document needs fixing, and nothing is spent."), None
+        aim = areas.Aim()
+        raw = intent.params.get("aim")
+        if raw:
+            try:
+                aim = areas.parse_aim(raw)
+            except ValueError:
+                aim = areas.Aim()
+        if aim.kind == "none":
+            to = intent.params.get("to") or next(iter(intent.targets()), None)
+            if to and str(to) in self.scene.actors and str(to) != actor.ref:
+                aim = areas.Aim("ref", str(to))
+        if aim.kind == "none":
+            word = {"cone": "a cone", "line": "a line", "burst": "a burst"}[shape["shape"]]
+            return [], (f"{name} is {word}: name a creature to aim it at "
+                        f"(use_ability ability={name!r} to=<ref>), or a direction "
+                        f"(aim=dir:n)."), None
+        reach = int(shape.get("range_ft") or 0)
+        if reach and aim.kind == "ref":
+            gap = self.scene.distance_between(actor.ref, aim.value)
+            if gap is not None and gap > reach:
+                other = self.scene.actors[aim.value]
+                return [], (f"{other.name} is {gap} ft away, and {name} reaches "
+                            f"{reach} ft. Nothing is spent."), None
+        area = areas.lay_shape(self.scene, actor.ref,
+                               {"shape": shape["shape"], "length_ft": shape["length_ft"]},
+                               aim)
+        refs = areas.caught(self.scene, area)
+        if shape["shape"] in ("cone", "line"):
+            # Drawn from the user's own corner outwards: they are never in it.
+            refs = [r for r in refs if r != actor.ref]
+        fits = self._class_ability_fits(doc)
+        who = [self.scene.actors[r] for r in refs if r in self.scene.actors
+               and fits(self.scene.actors[r])]
+        return who, "", area
+
+    def _area_said(self, area, actor: Actor, who: list[Actor], aimed: Actor | None) -> str:
+        """The area in a tell: its shape and size, and who it caught — so the narrator
+        is told who is in the fire and never has to guess from a map it cannot see."""
+        word = {"cone": "cone", "line": "line", "burst": "burst"}.get(area.shape, "area")
+        caught = _and_list([a.name for a in who]) if who else "nobody"
+        if not area.measured:
+            return (f"There is no map to lay the {area.length_ft}-ft {word} on, so only "
+                    f"{aimed.name if aimed else 'the one aimed at'} is caught.")
+        # The fighters it missed are named too. Measured live 2026-10-05: told only "the
+        # 30-ft cone catches the near thug and the far thug", the narrator wrote the
+        # thug behind "thrown back by the heat ... reeling" — a third victim the engine
+        # never touched. A fact the narrator needs becomes part of the tell.
+        missed = [a.name for a in self.scene.actors.values()
+                  if a is not actor and a not in who and not a.is_down
+                  and self._against(actor, a) and a.ref in self.scene.positions]
+        said = f"The {area.length_ft}-ft {word} catches {caught}."
+        if missed:
+            said += f" {_and_list(missed)} {'is' if len(missed) == 1 else 'are'} outside it."
+        return said
+
+    def _bonus_from(self, actor: Actor, doc: dict) -> tuple[list[Modifier], list[Modifier]]:
+        """(damage terms, DC terms) the user's own powers lend this use, read through the
+        funnel at `<bonus_from>.damage` and `<bonus_from>.dc` and stacked by type."""
+        from .dice import stack
+
+        prefix = str(doc.get("bonus_from") or "").strip()
+        if not prefix:
+            return [], []
+        dmg = [m for m in stack(actor._buff_mods("combat_mod", f"{prefix}.damage"))
+               if m.value]
+        dc = [m for m in stack(actor._buff_mods("combat_mod", f"{prefix}.dc")) if m.value]
+        return dmg, dc
 
     def _ability_gate(self, intent: Intent, actor: Actor, shown: str,
                       foes: list[Actor]) -> Outcome | None:
@@ -15565,6 +15847,16 @@ class Engine:
                         "rounds": rounds, "from": shown, "origin": origin})
             tells.append(_ward_tell(self.scene, {"kind": "condition", "ref": other.ref,
                                                  "condition": cond, "from": shown}))
+        if spec.get("vulnerable"):
+            # Elemental Blast: "vulnerable to your energy type until the end of your
+            # next turn" — a timed defence through the one door all four go by.
+            dtype = str(spec["vulnerable"])
+            other.grant_defence("vulnerability", dtype, source=source,
+                                rounds=rounds or 1, origin=origin)
+            out.append({"ref": other.ref, "kind": "vulnerability", "against": dtype,
+                        "rounds": rounds or 1, "from": shown, "origin": origin})
+            tells.append(f"{other.name} is left vulnerable to {dtype} for "
+                         f"{rounds or 1} round{'s' if (rounds or 1) != 1 else ''}.")
         temp = spec.get("temp_hp") or {}
         if temp.get("dice"):
             r = self.dice.roll(str(temp["dice"]), label=f"{shown}: bonus Hit Dice",
@@ -15645,6 +15937,28 @@ class Engine:
             payload["charge"] = self._resolve_charge(actor, doc, charge)
             rounds = 1
             tags += ("buff.charged",)
+            # A damage-only charge (Destructive Smite): its terms ride the one effect and
+            # are read by the damage roll's funnel, scoped to the weapons it names; the
+            # swing spends it (`_deliver_charges`, `_charges_missed`).
+            for m in ca.modifiers(charge.get("modifiers"), actor):
+                if charge.get("category") and "when" not in m:
+                    m["when"] = {"weapon": {"category": str(charge["category"])}}
+                mods.append(m)
+        # What the effect itself watches for and forbids, in its payload so it goes with
+        # the effect: the end a tag brings (`ends_when`, swept by
+        # `_ability_ends_settle`), the checks it refuses (`forbids`, read by `_op_check`),
+        # and the traits its holder's blows carry (`strikes_as`, read by the attack op).
+        if spec.get("ends_when"):
+            payload["ends_when"] = {k: [str(q) for q in v]
+                                    for k, v in dict(spec["ends_when"]).items()}
+            if target is not None:
+                payload["ends_when_ref"] = target.ref
+        if spec.get("forbids"):
+            payload["forbids"] = dict(spec["forbids"])
+        if spec.get("strikes_as"):
+            payload["strikes_as"] = [str(t) for t in spec["strikes_as"]]
+            if spec.get("vs_target") and target is not None:
+                payload["strikes_vs"] = target.ref
         periodic = []
         drain = doc.get("drain") or {}
         if drain.get("pool") and key:
@@ -15697,8 +16011,15 @@ class Engine:
             line += " With " + ", ".join(said) + "."
         if charge:
             c = payload["charge"]
-            line += (f" The next {' or '.join(c['weapons'][:1])} hit this round: "
-                     f"{SAVES.get(c['save'], c['save'])} DC {c['dc']} or {c['condition']}.")
+            what = (" or ".join(c["weapons"][:1]) if c.get("weapons")
+                    else str(c.get("category") or "") or "")
+            swing = f"{what} blow" if what else "blow"
+            if c.get("save"):
+                line += (f" The next {swing} this round, if it hits: "
+                         f"{SAVES.get(c['save'], c['save'])} DC {c['dc']} or "
+                         f"{c['condition']}.")
+            else:
+                line += f" It rides the next {swing} this round, hit or miss."
         return {"records": records, "said": line.strip()}
 
     def _resolve_charge(self, actor: Actor, doc: dict, charge: dict) -> dict:
@@ -15707,8 +16028,10 @@ class Engine:
 
         save = charge.get("save") or {}
         return {"weapons": [str(w).lower() for w in charge.get("weapons") or ()],
-                "save": str(save.get("save", "fort")),
-                "dc": ca.amount(save.get("dc"), actor),
+                "category": str(charge.get("category") or ""),
+                "spent_on": str(charge.get("spent_on") or "swing"),
+                "save": str(save.get("save", "fort")) if save else "",
+                "dc": ca.amount(save.get("dc"), actor) if save else 0,
                 "condition": str(doc.get("charge_condition") or charge.get("condition")
                                  or "stunned"),
                 "rounds": doc.get("charge_rounds"),
@@ -15717,8 +16040,79 @@ class Engine:
                 "immune_subtypes": list(charge.get("immune_subtypes") or ()),
                 "immune_crit": bool(charge.get("immune_crit"))}
 
+    @staticmethod
+    def _charges_for(actor: Actor, weapon_key: str, weapon: dict | None = None
+                     ) -> list[ActiveEffect]:
+        """The charged effects this swing spends: those naming the weapon (stunning fist:
+        unarmed), or its category (Destructive Smite: any melee weapon), or neither."""
+        key = (weapon_key or "").strip().lower()
+        category = str((weapon or {}).get("category") or "").lower()
+        out = []
+        for e in actor.effects:
+            c = (e.payload or {}).get("charge") if isinstance(e.payload, dict) else None
+            if not c:
+                continue
+            if c.get("weapons") and key not in c["weapons"]:
+                continue
+            if c.get("category") and category and c["category"] != category:
+                continue
+            out.append(e)
+        return out
+
+    def _charges_missed(self, actor: Actor, weapon_key: str, weapon: dict | None = None
+                        ) -> list[str]:
+        """A swing that missed spends the charges it carried — "if the attack roll misses,
+        the attempt is wasted" (Stunning Fist) and Destructive Smite's "single melee
+        attack". Before this (lane 4's own not_yet) a monk's missed punch left the charge
+        armed and a second unarmed hit that round still stunned. A charge `spent_on`
+        "hit" waits for the hit. Returns the sentences for the swing's tell."""
+        said = []
+        for e in self._charges_for(actor, weapon_key, weapon):
+            if e.payload["charge"].get("spent_on", "swing") != "swing":
+                continue
+            actor.remove_effects(match=lambda x, e=e: x is e)
+            said.append(f"{e.name} is spent on the miss.")
+        return said
+
+    def _first_hits_spent(self, actor: Actor, defender: Actor) -> list[dict]:
+        """A smite's doubled damage counts on "the first successful attack" (CRB p.61):
+        the modifiers marked `first_hit` against this defender leave the effect after the
+        hit that used them. Told when they counted."""
+        from .sheet import _effect_scope_holds
+
+        out: list[dict] = []
+        for e in actor.effects:
+            first = [m for m in e.modifiers
+                     if m.get("first_hit") and (not m.get("vs") or m["vs"] == defender.ref)]
+            if not first:
+                continue
+            counted = [m for m in first
+                       if _effect_scope_holds(m, {"target_actor": defender})]
+            e.modifiers = [m for m in e.modifiers if m not in first]
+            if counted:
+                out.append({"effect": {"ref": actor.ref, "kind": "first_hit_spent",
+                                       "what": e.name, "against": defender.ref,
+                                       "amount": sum(int(m.get("amount", 0)) for m in counted),
+                                       "origin": e.origin},
+                            "tell": f"The first blow of {e.name} on {defender.name} "
+                                    f"strikes doubly hard."})
+        return out
+
+    def _effect_strikes(self, actor: Actor, defender: Actor) -> list[tuple[str, str]]:
+        """(trait, effect name) for every trait an effect lends its holder's blows against
+        this defender (`self.strikes_as`): a smite's `ignores_dr`, against its mark only."""
+        out = []
+        for e in actor.effects:
+            p = e.payload if isinstance(e.payload, dict) else {}
+            if not p.get("strikes_as"):
+                continue
+            if p.get("strikes_vs") and p["strikes_vs"] != defender.ref:
+                continue
+            out += [(str(t), e.name) for t in p["strikes_as"]]
+        return out
+
     def _deliver_charges(self, actor: Actor, defender: Actor, weapon_key: str,
-                         visibility: str = "player") -> list[dict]:
+                         visibility: str = "player", weapon: dict | None = None) -> list[dict]:
         """Spend a charged blow on the hit that just landed — stunning fist's save.
 
         Read off the effect's payload, not a name: any document that arms the next hit
@@ -15726,13 +16120,16 @@ class Engine:
         `_deliver_coating` does."""
         from . import coup_de_grace as coup_mod
 
-        out: list[dict] = []
-        key = (weapon_key or "").strip().lower()
-        for e in list(actor.effects):
-            c = (e.payload or {}).get("charge") if isinstance(e.payload, dict) else None
-            if not c or (c.get("weapons") and key not in c["weapons"]):
-                continue
+        out: list[dict] = self._first_hits_spent(actor, defender)
+        for e in self._charges_for(actor, weapon_key, weapon):
+            c = e.payload["charge"]
             actor.remove_effects(match=lambda x, e=e: x is e)
+            if not c.get("save"):
+                # A damage-only charge has done its work in the roll's funnel already.
+                out.append({"effect": {"ref": actor.ref, "kind": "charge_spent",
+                                       "what": e.name, "origin": e.origin},
+                            "tell": f"{e.name} lands with the blow."})
+                continue
             immune = ""
             for t in c.get("immune_types") or ():
                 if defender.has_state(f"type.{t}"):
@@ -17628,18 +18025,47 @@ def _sized_weapon(w: dict, size: str) -> dict:
     return out
 
 
-def _doc_tell(template, actor) -> str:
-    """An ability document's own tell, with the actor's name in it.
+def _forbidden_skill(actor, skill: str) -> str:
+    """The sentence refusing a skill an effect forbids (`payload.forbids`), or ""."""
+    from .tables import ABILITY_FULL, SKILLS
 
-    The document writes `{name}` and nothing else — a template that names a number
-    would be a mechanic authored into prose, which is exactly what the severed-tells
-    rule exists to stop. A malformed template falls back to its literal text rather
-    than crashing the turn.
+    row = SKILLS.get(str(skill).strip().lower())
+    if row is None:
+        return ""
+    for e in actor.effects:
+        p = e.payload if isinstance(e.payload, dict) else {}
+        rule = (p.get("forbids") or {}).get("skills") or {}
+        if not rule:
+            continue
+        spared = [str(s) for s in rule.get("except") or ()]
+        if row[0] in (rule.get("abilities") or ()) and skill.strip().lower() not in spared:
+            return (f"{actor.name} is in the grip of {e.name}, and no "
+                    f"{ABILITY_FULL.get(row[0], row[0]).title()}-based skill can be used "
+                    f"while it holds"
+                    + (f" (of those, only {_and_list([s.title() for s in spared])})"
+                       if spared else "")
+                    + f". Nothing is rolled for {skill.title()}.")
+    return ""
+
+
+def _doc_tell(template, actor, target=None) -> str:
+    """An ability document's own tell, with the actor's name in it — and `{target}`, the
+    creature it was aimed at ("them" when there is none).
+
+    The document writes `{name}` and `{target}` and nothing else — a template that names
+    a number would be a mechanic authored into prose, which is exactly what the
+    severed-tells rule exists to stop (the validator refuses any other field). Until
+    2026-10-05 only `{name}` was filled: `{target}` raised KeyError, the fallback printed
+    the literal braces, and sixteen tells said "the target" to dodge it — so
+    the narrator was told "Hale lays a dazing hand on the target" with the thug's name
+    nowhere in the sentence. A malformed template still falls back to its literal text
+    rather than crashing the turn.
     """
     if not template:
         return ""
     try:
-        return str(template).format(name=actor.name)
+        return str(template).format(
+            name=actor.name, target=getattr(target, "name", None) or "them")
     except (KeyError, IndexError, ValueError):
         return str(template)
 

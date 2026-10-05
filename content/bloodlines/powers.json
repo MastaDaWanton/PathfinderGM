@@ -386,7 +386,7 @@
       "amount": 1
      },
      "not_yet": [
-      "The bonus on skill and ability checks: no 'every skill' target yet."
+      "The bonus on ability checks: no roll reads an ability check yet (attacks, saves and skills take it)."
      ]
     },
     {
@@ -561,10 +561,7 @@
         "refresh": "rest.night"
        }
       }
-     },
-     "not_yet": [
-      "The line or cone: the class-ability grammar has no shaped area yet, so the uses are counted and the GM narrates the breath."
-     ]
+     }
     },
     {
      "key": "wings",
@@ -652,10 +649,7 @@
         "refresh": "rest.night"
        }
       }
-     },
-     "not_yet": [
-      "The burst itself: an area centred away from you has no field in the class-ability grammar (its `radius_ft` is measured around the user), so the uses are counted and the GM narrates the blast with the save the engine rolls."
-     ]
+     }
     },
     {
      "key": "elemental movement",
@@ -857,8 +851,7 @@
       }
      },
      "not_yet": [
-      "The burst itself: an area centred away from you has no field in the class-ability grammar (its `radius_ft` is measured around the user), so the uses are counted and the GM narrates the blast with the save the engine rolls.",
-      "Who counts as good: the app has no alignment."
+      "The shaken rider on a good creature that fails: the app has no alignment (owner ruling 2026-10-05), so the fire burns and nobody is shaken."
      ]
     },
     {
@@ -956,7 +949,7 @@
       }
      },
      "not_yet": [
-      "The burst itself: an area centred away from you has no field in the class-ability grammar (its `radius_ft` is measured around the user), so the uses are counted and the GM narrates the blast with the save the engine rolls."
+      "Held in place for a round on a failed save: no condition stops moving alone yet, so the arms only cut."
      ]
     },
     {

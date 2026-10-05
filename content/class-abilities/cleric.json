@@ -25,19 +25,25 @@
         "options": {
           "heal": {"living": true, "roll_as": "heal"},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
-                   "damage_type": "positive",
+                   "damage_type": "positive", "bonus_from": "channel.harm-undead",
                    "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
                             "success": "half"}},
           "harm the living": {"living": true, "undead_only": false, "roll_as": "damage",
                               "harmful": true, "damage_type": "negative",
+                              "healed_instead": "channel.negative.heals",
                               "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
                                        "success": "half"}},
-          "heal undead": {"living": false, "undead_only": true, "roll_as": "heal"}
+          "heal undead": {"living": false, "undead_only": true, "roll_as": "heal",
+                          "healed_instead": "channel.negative.heals"}
         }
       },
+      "_bonus_from_note": "The harm mode reads `channel.harm-undead.damage` and `.dc` through the funnel: Sun's Blessing puts the cleric's level on the first and the Glory domain +2 on the second (content/domains/powers.json, each a passive modifier of its power). Negative energy reads `channel.negative.heals` off whoever it reaches: Death's Embrace grants that tag, and the energy heals them instead.",
       "negative": {
-        "heal": {"living": false, "undead_only": true, "roll_as": "heal"},
-        "harm": {"undead_only": false, "living": true, "damage_type": "negative"}
+        "heal": {"living": false, "undead_only": true, "roll_as": "heal",
+                 "healed_instead": "channel.negative.heals"},
+        "harm": {"undead_only": false, "living": true, "damage_type": "negative",
+                 "bonus_from": "channel.harm-living",
+                 "healed_instead": "channel.negative.heals"}
       },
       "tell": "{name} channels divine energy.",
       "not_yet": [

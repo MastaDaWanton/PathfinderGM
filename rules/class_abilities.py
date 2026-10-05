@@ -60,6 +60,55 @@ The grammar, one ability:
   "natural_weapons": [...]}]` — what a chosen rage power adds to the stance it rides.
 - `not_yet`: what the book says that nothing here does yet, said out loud.
 
+The fields added 2026-10-05 for the powers lane 2 wrote and could not run (each read by
+the one executor, each validated below). Prior art, read before any of it was written:
+Foundry PF1's action model (`module/models/components/action.mjs`: `areaTemplate` with
+`type`, `size` and `origin.self`/`center`, `range.value`, `save.dc`, `touch`) and its
+change targets (`module/config.mjs`: `skills` — "All Skills" — `strSkills`, `allChecks`);
+GAS's "removal tag requirements" for an effect that ends when its holder gains a tag. No
+builder read (Foundry, PCGen) gates a power by the target's Hit Dice or creature type in
+data — both leave it to the table — so `hit_dice` and `only` are this grammar's own:
+
+- `area`: a shaped area laid on the map by `rules/areas.py`, the one place areas are
+  laid — `{"shape": "cone"|"line"|"burst", "ft": 30, "range_ft": 60}`, or the compact
+  `"30-foot cone"` a catalogue variant carries (`"$breath"`). A cone or line takes its
+  direction from the creature aimed at (`to`); a burst with a `range_ft` centres on the
+  creature aimed at, within that range. Everyone caught is reached — allies too.
+- `only`: `{"type": [...], "subtype": [...]}` — the only creatures it works on
+  (Artificer's Touch: constructs). An aimed one that is not is refused before the price.
+- `target_requires`: tag queries the creature aimed at must answer one of (Rebuke Death:
+  `state.down.dying`, `state.down.stable` — "below 0 hit points"), said by
+  `target_requires_said`.
+- `hit_dice`: `{"max": <formula>, "over": {...}}` — a creature with more Hit Dice than
+  `max` is unaffected (Dazing Touch), or gets `over` laid over the document instead
+  (Blinding Ray: dazzled, not blinded). Hit Dice are the printed stat block's
+  (`hit_dice_of`), not the sheet's level.
+- `roll.as`: `"heal_nonlethal"` heals non-lethal damage only (Calming Touch).
+  `roll.ignores_dr`: a formula — that many points of damage reduction passed.
+- `lifts`: tag queries; whatever answers them is ended on everyone healed or reached
+  (Calming Touch's fatigued, shaken, sickened), through `Actor.clear_states`.
+- `bonus_from`: a funnel target prefix; the roll adds `<prefix>.damage` and the DC adds
+  `<prefix>.dc`, read through `Actor._buff_mods` — where a domain power's passive
+  modifier lands (Sun's Blessing: `channel.harm-undead.damage` = level). PCGen's way
+  (the power bonuses a variable the channel reads), so the channel names no domain.
+- `healed_instead`: a tag query; a creature answering it is healed by this energy where
+  it would be harmed, and counts among the undead it heals (Death's Embrace).
+- `effect.on`: `"failed"` — the effect lands only on those who failed the save.
+  `effect.vulnerable`: a damage type the creature is vulnerable to for `rounds`.
+- `charge` gained `category` ("melee"), `modifiers` (a damage-only charge: Destructive
+  Smite), `spent_on` ("swing", the default — a miss ruins it — or "hit"); `save` is
+  optional now.
+- `self.modifiers[].first_hit`: counts until the first hit against the marked creature,
+  then leaves the effect (smite's doubled damage).
+- `self.strikes_as`: traits the user's blows carry (`"ignores_dr"`), against the
+  marked creature only when `vs_target`.
+- `self.ends_when`: `{"holder": [tag queries], "target": [tag queries]}` — the effect
+  ends when its holder (rage: `state.down`) or its marked creature (smite:
+  `state.down.dead`) answers one. Swept once per batch (`Engine._ability_ends_settle`).
+- `self.forbids`: `{"skills": {"abilities": ["cha", ...], "except": [...]}}` — checks
+  refused while it holds (rage).
+- Tells may say `{target}`: the creature aimed at, else "them".
+
 A number anywhere is `amount` (an int), `formula` (the restricted parser in
 `rules/resources.py`, over `level`, `<ab>_mod` and the rest), or `by_level` rungs
 (`{"1": 4, "11": 6, "20": 8}` — greater and mighty rage are rungs, not code).
@@ -217,8 +266,72 @@ def modifiers(specs, actor) -> list[dict]:
              "amount": n, "bonus_type": str(spec.get("bonus_type") or "untyped")}
         if spec.get("when"):
             m["when"] = dict(spec["when"])
+        if spec.get("first_hit"):
+            m["first_hit"] = True
         out.append(m)
     return out
+
+
+AREA_SHAPES = ("cone", "line", "burst")
+_AREA_WORDS = re.compile(r"^\s*(\d+)\s*-?\s*(?:foot|feet|ft\.?)\s*-?\s*(?:radius\s+)?"
+                         r"(cone|line|burst)\s*$", re.I)
+
+
+def area_of(doc: dict, actor) -> dict | None:
+    """The shaped area a document lays, as `rules/areas.py` takes it —
+    `{"shape": "cone", "length_ft": 30, "range_ft": 0}` — or None when it has none (or
+    one nobody can read, which the validator refuses on load).
+
+    The compact "30-foot cone" is the catalogue's own field for a dragon's breath
+    (content/class-options/sorcerer-bloodlines.json `variants.from[].breath`), filled in
+    by `$breath`; the ten dragons are read off it rather than written ten times."""
+    spec = doc.get("area")
+    if not spec:
+        return None
+    if isinstance(spec, str):
+        m = _AREA_WORDS.match(spec)
+        if not m:
+            return None
+        return {"shape": m.group(2).lower(), "length_ft": int(m.group(1)), "range_ft": 0}
+    if isinstance(spec, dict) and str(spec.get("shape") or "").lower() in AREA_SHAPES:
+        ft = amount(spec.get("ft"), actor)
+        if ft <= 0:
+            return None
+        return {"shape": str(spec["shape"]).lower(), "length_ft": ft,
+                "range_ft": amount(spec.get("range_ft"), actor)}
+    return None
+
+
+_HD_WORDS = re.compile(r"(\d+)\s*HD\b", re.I)
+_DICE_WORDS = re.compile(r"(\d+)d\d+")
+
+
+def hit_dice_of(actor) -> int:
+    """Hit Dice as an effect counts them — "creatures with more Hit Dice than your level
+    are unaffected" — which for a monster is its printed stat block's, not its level.
+
+    Measured 2026-10-05: every imported creature stood at level 1 and `Actor.hit_dice` 1
+    (an ogre, printed "4d8+12", answered 1), so a Hit Dice clause read off the sheet would
+    have spared nobody. `Actor.hit_dice` is not changed to read the block: it is also the
+    Constitution multiplier behind every saved creature's `hp_max`, and moving it would
+    move the hit points of every monster in every save. Read here instead, from the
+    block's own words: "(5 HD; 2d8+3d6+17)" says it outright, "(4d8+12)" by its dice
+    counted. A character, or a creature whose block prints none, is `Actor.hit_dice`."""
+    doc = None
+    try:
+        doc = actor._creature_doc()
+    except Exception:  # noqa: BLE001 — no stat block is the ordinary case
+        doc = None
+    text = str((doc or {}).get("hit_dice") or "")
+    if text:
+        m = _HD_WORDS.search(text)
+        if m:
+            return max(1, int(m.group(1)))
+        body = text.split("plus")[0]
+        n = sum(int(x) for x in _DICE_WORDS.findall(body))
+        if n:
+            return n
+    return max(1, int(getattr(actor, "hit_dice", 1) or 1))
 
 
 def dice(spec: dict, actor) -> str:
@@ -613,4 +726,128 @@ def validate_documents(docs: dict | None = None) -> list[str]:
             if doc.get("attack") not in (None, "ranged touch", "melee touch"):
                 problems.append(f"{at}: attack {doc.get('attack')!r} must be 'ranged "
                                 f"touch' or 'melee touch'.")
+            problems += _shape_problems(at, doc)
+            overlays = [((doc.get("choice") or {}).get("options") or {}).get(k) or {}
+                        for k in ((doc.get("choice") or {}).get("options") or {})]
+            overlays += [v for v in (doc.get("negative") or {}).values()
+                         if isinstance(v, dict)]
+            for layer in overlays:
+                problems += _shape_problems(at + " (a choice's overlay)", layer)
     return problems
+
+
+_TELL_FIELDS = re.compile(r"\{([^{}]*)\}")
+_ROLL_AS = ("heal", "damage", "heal_nonlethal")
+
+
+def _shape_problems(at: str, doc: dict) -> list[str]:
+    """The 2026-10-05 fields, each refused with the fix named when it could not be read —
+    an area nobody can lay is a breath weapon that spends its use and reaches nobody."""
+    from . import resources
+    from .tables import ABILITIES as _ABS, SKILLS
+
+    out: list[str] = []
+
+    def formula_ok(where, spec):
+        if isinstance(spec, (int, float)) and not isinstance(spec, bool):
+            return
+        if isinstance(spec, dict) and ("by_level" in spec or "amount" in spec):
+            return
+        if isinstance(spec, dict) and "formula" in spec:
+            spec = spec["formula"]
+        bad = resources.check(spec) if isinstance(spec, str) else "a number or a formula"
+        if bad:
+            out.append(f"{at}: {where} — {bad}")
+
+    def tag_list(where, got):
+        if got is not None and (not isinstance(got, list)
+                                or any(not str(t).strip() for t in got)):
+            out.append(f"{at}: {where} is a list of tag queries "
+                       f"(\"state.down.dying\"), asked with has_state.")
+
+    area = doc.get("area")
+    if area is not None:
+        if isinstance(area, str):
+            if not area.startswith("$") and not _AREA_WORDS.match(area):
+                out.append(f"{at}: area {area!r} — write \"30-foot cone\", \"60-foot line\" "
+                           f"or \"20-foot burst\", or {{\"shape\": \"cone\", \"ft\": 30}}.")
+        elif not isinstance(area, dict) or str(area.get("shape") or "").lower() \
+                not in AREA_SHAPES or area.get("ft") in (None, ""):
+            out.append(f"{at}: area needs a `shape` ({', '.join(AREA_SHAPES)}) and `ft`, "
+                       f"with `range_ft` for a burst laid away from the user.")
+        else:
+            formula_ok("area.ft", area["ft"])
+            if area.get("range_ft") not in (None, ""):
+                formula_ok("area.range_ft", area["range_ft"])
+    only = doc.get("only")
+    if only is not None and (not isinstance(only, dict) or not only
+                             or set(only) - {"type", "subtype"}):
+        out.append(f"{at}: only names `type` and/or `subtype` lists "
+                   f"({{\"type\": [\"construct\"]}}).")
+    tag_list("target_requires", doc.get("target_requires"))
+    tag_list("lifts", doc.get("lifts"))
+    hd = doc.get("hit_dice")
+    if hd is not None:
+        if not isinstance(hd, dict) or hd.get("max") in (None, ""):
+            out.append(f"{at}: hit_dice is {{\"max\": \"level\"}}, with `over` the overlay "
+                       f"for a creature above it (none: it is unaffected).")
+        else:
+            formula_ok("hit_dice.max", hd["max"])
+            if hd.get("over") is not None and not isinstance(hd["over"], dict):
+                out.append(f"{at}: hit_dice.over is an object laid over the document.")
+    roll = doc.get("roll") or {}
+    for where, as_ in (("roll.as", roll.get("as")), ("roll_as", doc.get("roll_as"))):
+        if as_ is not None and as_ not in _ROLL_AS:
+            out.append(f"{at}: {where} {as_!r} is one of {', '.join(_ROLL_AS)}.")
+    if roll.get("ignores_dr") is not None:
+        formula_ok("roll.ignores_dr", roll["ignores_dr"])
+    for key in ("bonus_from", "healed_instead"):
+        if doc.get(key) is not None and not str(doc.get(key) or "").strip():
+            out.append(f"{at}: {key} is a non-empty string.")
+    effect = doc.get("effect") or {}
+    if effect.get("on") not in (None, "failed"):
+        out.append(f"{at}: effect.on is \"failed\" (lands only on a failed save) or absent.")
+    if effect.get("on") == "failed" and not doc.get("save"):
+        out.append(f"{at}: effect.on \"failed\" needs a `save` to fail.")
+    charge = doc.get("charge") or {}
+    if charge.get("spent_on") not in (None, "swing", "hit"):
+        out.append(f"{at}: charge.spent_on is \"swing\" (a miss ruins it) or \"hit\".")
+    if charge.get("category") not in (None, "melee", "ranged"):
+        out.append(f"{at}: charge.category is \"melee\" or \"ranged\".")
+    if charge and not charge.get("save") and not charge.get("modifiers"):
+        out.append(f"{at}: a charge carries a `save` (and its condition) or `modifiers`; "
+                   f"with neither it arms nothing.")
+    for m in charge.get("modifiers") or ():
+        if str(m.get("type") or "combat_mod") not in _KINDS:
+            out.append(f"{at}: charge modifier type {m.get('type')!r} is not one of "
+                       f"{', '.join(_KINDS)}.")
+    mine = doc.get("self") or {}
+    ends = mine.get("ends_when")
+    if ends is not None:
+        if not isinstance(ends, dict) or not ends or set(ends) - {"holder", "target"}:
+            out.append(f"{at}: self.ends_when is {{\"holder\": [...], \"target\": [...]}}.")
+        else:
+            for k, v in ends.items():
+                tag_list(f"self.ends_when.{k}", v)
+    forbids = mine.get("forbids")
+    if forbids is not None:
+        skills = (forbids or {}).get("skills") if isinstance(forbids, dict) else None
+        if not isinstance(skills, dict) or not skills.get("abilities"):
+            out.append(f"{at}: self.forbids is {{\"skills\": {{\"abilities\": [\"cha\"], "
+                       f"\"except\": [\"intimidate\"]}}}}.")
+        else:
+            bad = [a for a in skills["abilities"] if a not in _ABS]
+            bad += [s for s in skills.get("except") or () if s not in SKILLS]
+            if bad:
+                out.append(f"{at}: self.forbids names {', '.join(map(str, bad))}, which "
+                           f"are not abilities or skills.")
+    strikes = mine.get("strikes_as")
+    if strikes is not None and (not isinstance(strikes, list) or not strikes):
+        out.append(f"{at}: self.strikes_as is a list of traits (\"ignores_dr\").")
+    for side in ("tell", "tell_off"):
+        for f in _TELL_FIELDS.findall(str(doc.get(side) or "")):
+            if f not in ("name", "target"):
+                out.append(f"{at}: {side} says {{{f}}}; a tell may say {{name}} and "
+                           f"{{target}} and nothing else — a number in a tell is a "
+                           f"mechanic authored into prose.")
+    return out

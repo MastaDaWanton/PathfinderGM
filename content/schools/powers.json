@@ -143,7 +143,7 @@
       "amount": 1
      },
      "not_yet": [
-      "The bonus on skill and ability checks: no 'every skill' target yet."
+      "The bonus on ability checks: no roll reads an ability check yet (attacks, saves and skills take it)."
      ]
     },
     {
@@ -200,10 +200,7 @@
      "cost": {
       "pool": "dazing touch",
       "amount": 1
-     },
-     "not_yet": [
-      "Sparing a creature with more Hit Dice than your level: no field compares Hit Dice yet."
-     ]
+     }
     },
     {
      "key": "aura of despair",
@@ -220,7 +217,7 @@
       "amount": 1
      },
      "not_yet": [
-      "The -2 on ability and skill checks: no 'every skill' target yet."
+      "The -2 on ability checks: no roll reads an ability check yet (attacks, damage, saves and skills take it)."
      ]
     }
    ]
@@ -297,10 +294,7 @@
      "cost": {
       "pool": "blinding ray",
       "amount": 1
-     },
-     "not_yet": [
-      "Dazzled instead of blinded for a creature of more Hit Dice than your level: no field compares Hit Dice yet."
-     ]
+     }
     },
     {
      "key": "invisibility field",

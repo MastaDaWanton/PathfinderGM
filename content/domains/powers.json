@@ -17,10 +17,7 @@
      "cost": {
       "pool": "lightning arc",
       "amount": 1
-     },
-     "not_yet": [
-      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
-     ]
+     }
     },
     {
      "key": "electricity resistance",
@@ -95,7 +92,7 @@
       "amount": 1
      },
      "not_yet": [
-      "The touch itself: it harms only objects and constructs and ignores their hardness, and no field yet limits an attack to a creature type or bypasses hardness, so the uses are counted and the GM narrates the blow."
+      "Objects and their hardness: nothing in a scene but a creature has hit points yet, so the touch reaches constructs only (content/class-abilities/domains.json)."
      ]
     },
     {
@@ -173,10 +170,7 @@
      "cost": {
       "pool": "dazing touch",
       "amount": 1
-     },
-     "not_yet": [
-      "Sparing a creature with more Hit Dice than your level: no field compares Hit Dice yet."
-     ]
+     }
     },
     {
      "key": "charming smile",
@@ -213,10 +207,7 @@
      "cost": {
       "pool": "calming touch",
       "amount": 1
-     },
-     "not_yet": [
-      "Healing nonlethal damage alone and lifting the three conditions: the executor heals hit points; a heal aimed only at nonlethal damage has no field yet."
-     ]
+     }
     },
     {
      "key": "unity",
@@ -314,8 +305,8 @@
      "level": 8,
      "kind": "Ex",
      "line": "Channelled negative energy heals you instead of harming you.",
-     "not_yet": [
-      "Read by nothing yet: a channel's executor heals the living and harms the undead, and asks no tag of the cleric herself."
+     "tags": [
+      "channel.negative.heals"
      ]
     }
    ]
@@ -335,10 +326,7 @@
      "cost": {
       "pool": "destructive smite",
       "amount": 1
-     },
-     "not_yet": [
-      "Arming the next blow: the damage-only charge on a single attack has no field yet (stunning fist's charge carries a save, not a bonus)."
-     ]
+     }
     },
     {
      "key": "destructive aura",
@@ -375,10 +363,7 @@
      "cost": {
       "pool": "acid dart",
       "amount": 1
-     },
-     "not_yet": [
-      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
-     ]
+     }
     },
     {
      "key": "acid resistance",
@@ -459,10 +444,7 @@
      "cost": {
       "pool": "fire bolt",
       "amount": 1
-     },
-     "not_yet": [
-      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
-     ]
+     }
     },
     {
      "key": "fire resistance",
@@ -496,8 +478,14 @@
      "level": 1,
      "kind": "Su",
      "line": "When you channel positive energy to harm undead, the save DC to halve it rises by 2.",
-     "not_yet": [
-      "Raising the channel's DC: the channel document's DC formula reads no tag of the cleric's yet."
+     "modifiers": [
+      {
+       "type": "combat_mod",
+       "target": "channel.harm-undead.dc",
+       "bonus_type": "untyped",
+       "amount": 2,
+       "note": "read by Channel Energy's harm mode (`bonus_from`)"
+      }
      ]
     },
     {
@@ -555,7 +543,7 @@
       "amount": 1
      },
      "not_yet": [
-      "The bonus on skill and ability checks: an effect's modifier names one skill, and there is no 'every skill' target yet."
+      "The bonus on ability checks: no roll reads an ability check yet (attacks, saves and skills take it)."
      ]
     },
     {
@@ -593,10 +581,7 @@
      "cost": {
       "pool": "rebuke death",
       "amount": 1
-     },
-     "not_yet": [
-      "Healing only a creature below 0 hit points: no field limits a heal to the dying yet, so the uses are counted and the GM narrates the heal."
-     ]
+     }
     },
     {
      "key": "healer's blessing",
@@ -871,7 +856,7 @@
       "amount": 1
      },
      "not_yet": [
-      "The bonus on skill and ability checks: no 'every skill' target yet."
+      "The bonus on ability checks: no roll reads an ability check yet (attacks, saves and skills take it)."
      ]
     },
     {
@@ -1095,7 +1080,7 @@
       "amount": 1
      },
      "not_yet": [
-      "Strength-based skills and checks: an effect's modifier names one skill, and there is no 'Strength skills' target yet."
+      "Strength checks: no roll reads an ability check yet. Melee attacks, CMB, Climb and Swim take the bonus."
      ]
     },
     {
@@ -1127,7 +1112,16 @@
      "kind": "Su",
      "line": "When you channel positive energy to harm undead, add your level to the damage; undead add no channel resistance.",
      "not_yet": [
-      "Adding to the channel's damage: the channel document reads no tag of the cleric's yet."
+      "Channel resistance: no creature in the app carries any yet, so there is none for undead to lose."
+     ],
+     "modifiers": [
+      {
+       "type": "combat_mod",
+       "target": "channel.harm-undead.damage",
+       "bonus_type": "untyped",
+       "formula": "level",
+       "note": "read by Channel Energy's harm mode (`bonus_from`)"
+      }
      ]
     },
     {
@@ -1302,10 +1296,7 @@
      "cost": {
       "pool": "icicle",
       "amount": 1
-     },
-     "not_yet": [
-      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
-     ]
+     }
     },
     {
      "key": "cold resistance",
@@ -1346,10 +1337,7 @@
      "cost": {
       "pool": "storm burst",
       "amount": 1
-     },
-     "not_yet": [
-      "The ranged touch attack and its -2 rider: no engine op resolves a domain power as an attack yet."
-     ]
+     }
     },
     {
      "key": "lightning lord",
