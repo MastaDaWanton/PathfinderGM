@@ -3,6 +3,7 @@
   "_source": "Core Rulebook, Cleric (d20pfsrd.com/classes/core-classes/cleric/, read 2026-10-05).",
   "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
   "_energy_note": "Positive or negative energy follows alignment in the book, and the app has no alignment yet. Owner ruling 2026-10-05: until it does, the cleric chooses at each use: heal the living or harm undead (positive), harm the living or heal undead (negative). When alignment tracking is added, this is where the choice is narrowed. The older `class_choices` \"channel energy\": \"negative\" swap still applies to the first two modes.",
+  "_aliases_note": "Each option's `aliases` are the words a player types for that mode — \"channel negative energy to harm them\" is harm the living. Read by class_abilities.option_for, longest phrase first (so \"negative energy to heal\" beats \"negative energy\"). Data, not a list in code: measured 2026-10-05, the bracketed key was the only spelling that worked and \"to harm them\" was refused as a mode.",
   "abilities": [
     {
       "key": "channel energy",
@@ -23,18 +24,31 @@
         "kind": "mode",
         "default": "heal",
         "options": {
-          "heal": {"living": true, "roll_as": "heal"},
+          "heal": {"living": true, "roll_as": "heal",
+                   "aliases": ["heal", "healing", "heal the living", "heal the wounded",
+                               "positive energy to heal", "mend", "restore"]},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
                    "damage_type": "positive", "bonus_from": "channel.harm-undead",
                    "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
-                            "success": "half"}},
+                            "success": "half"},
+                   "aliases": ["harm", "hurt", "harm undead", "harm the undead",
+                               "hurt the undead", "damage the undead", "burn the undead",
+                               "positive energy to harm", "positive energy to hurt",
+                               "positive energy at the undead"]},
           "harm the living": {"living": true, "undead_only": false, "roll_as": "damage",
                               "harmful": true, "damage_type": "negative",
                               "healed_instead": "channel.negative.heals",
                               "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
-                                       "success": "half"}},
+                                       "success": "half"},
+                              "aliases": ["harm the living", "hurt the living",
+                                          "negative energy", "negative energy to harm",
+                                          "negative energy to hurt",
+                                          "negative energy to damage", "inflict"]},
           "heal undead": {"living": false, "undead_only": true, "roll_as": "heal",
-                          "healed_instead": "channel.negative.heals"}
+                          "healed_instead": "channel.negative.heals",
+                          "aliases": ["heal undead", "heal the undead", "mend the undead",
+                                      "negative energy to heal",
+                                      "negative energy to mend"]}
         }
       },
       "_bonus_from_note": "The harm mode reads `channel.harm-undead.damage` and `.dc` through the funnel: Sun's Blessing puts the cleric's level on the first and the Glory domain +2 on the second (content/domains/powers.json, each a passive modifier of its power). Negative energy reads `channel.negative.heals` off whoever it reaches: Death's Embrace grants that tag, and the energy heals them instead.",

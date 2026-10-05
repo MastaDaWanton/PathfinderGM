@@ -18,8 +18,12 @@ numbers for one character, and answers "what can they use, and how many are left
 **Why a module and not `leveling.find_ability`.** That function searches the paths a
 character follows and only those; a fighter has none. It lives in `rules/leveling.py`,
 which another lane owns while class choices are rebuilt, so the core classes' lookup is
-said here and the engine asks both. `leveling.usable_names` and `find_ability` stay the
-path half (gm/judgement.py still asks only them — see the report of 2026-10-05).
+said here and the engine asks both. `leveling.usable_names` stays the path half (its
+readers add `names`/`usable` from here beside it); `leveling.find_ability` asks `find`
+after the paths since fix/typed-class-abilities (2026-10-05), because gm/judgement.py
+asked only it and every TYPED class ability fell out of the GM's doors — "use my Fire
+Bolt" narrated a hit with the pool still 6/6. The table's reader of typed lines matches
+`vocabulary` (gm/judgement.py `_typed_class_ability`).
 
 The grammar, one ability:
 
@@ -54,7 +58,9 @@ The grammar, one ability:
   chosen mercies lift from whoever is healed.
 - `choice`: what the player names in brackets — "Wild Shape (wolf)", "Channel Energy
   (harm)", "Inspire Competence (diplomacy)". `{"kind": "mode", "options": {<name>:
-  <overlay>}}` lays an overlay over the document; `"kind": "form"` reads the animal
+  <overlay>}}` lays an overlay over the document — an option's `aliases` are the words a
+  player types for it ("negative energy to harm" is harm the living; `option_for`), never
+  laid over; `"kind": "form"` reads the animal
   catalogue; `"kind": "skill"` aims a skill modifier; `"kind": "condition"` picks a rung.
 - `addons`: `[{"choice": "rage power", "pick": ..., "modifiers": [...],
   "natural_weapons": [...]}]` — what a chosen rage power adds to the stance it rides.
@@ -443,7 +449,67 @@ def find(actor, wanted: str) -> tuple[dict | None, str]:
     # "competence" read as its choice.
     if best is None or not _has_it(actor, best[1]):
         return None, ""
-    return best[1], best[2]
+    doc, choice = best[1], best[2]
+    # "channel energy to harm them" names the mode in the player's words, not the key.
+    # Measured 2026-10-05: the rest after the name ("harm them") went to `with_choice`
+    # as the mode itself and was refused — only the bracketed key ever worked. The words
+    # each option answers to are the document's (`options.<key>.aliases`); a rest that
+    # names none of them is left as said, so the refusal quotes it and lists the options.
+    if choice and (doc.get("choice") or {}).get("kind") in ("mode", "condition"):
+        choice = option_for(doc, choice) or choice
+    return doc, choice
+
+
+def option_for(doc: dict, words: str) -> str:
+    """The mode or condition option the words name, or "".
+
+    Read off the document: an option answers to its own key and to each of its
+    `aliases`, word-bounded, and the LONGEST phrase found wins — "negative energy to
+    heal" is heal undead even though "negative energy" alone is harm the living, the
+    maximal-munch rule every command parser since the MUDs has used for the same
+    collision. A choice with no options (a form, a skill) has nothing to read here.
+    """
+    spec = doc.get("choice") or {}
+    if spec.get("kind") not in ("mode", "condition"):
+        return ""
+    said = " " + re.sub(r"[^a-z0-9' ]+", " ", _norm(words)) + " "
+    best: tuple[int, str] | None = None
+    for key, option in (spec.get("options") or {}).items():
+        for phrase in [key] + list((option or {}).get("aliases") or ()):
+            p = " ".join(re.sub(r"[^a-z0-9' ]+", " ", _norm(phrase)).split())
+            if p and f" {p} " in said and (best is None or len(p) > best[0]):
+                best = (len(p), _norm(key))
+    return best[1] if best else ""
+
+
+def vocabulary(actor) -> list[tuple[str, dict]]:
+    """Every (phrase, document) a player may call one of this character's abilities by —
+    the name and each alias, longest first — INCLUDING the ones printed at a level they
+    have not reached, so a 1st-level druid's "wild shape" reaches the engine's refusal
+    that says 4th, rather than prose that writes the wolf.
+
+    The table's reader of typed lines (`gm/judgement.py`, `inject_ability`) matches these
+    phrases; the documents own the words, so a new ability's aliases need no code.
+    """
+    out: list[tuple[str, dict]] = []
+    for doc in _docs_for(actor):
+        for phrase in _names_of(doc):
+            if phrase and (phrase, doc) not in out:
+                out.append((phrase, doc))
+    out.sort(key=lambda pd: -len(pd[0]))
+    return out
+
+
+def words_of(doc: dict) -> set[str]:
+    """Every word the document answers to — its names, aliases, and its options' keys and
+    aliases. "I channel my divine energy" is still the ability; "I channel my anger" is
+    the English idiom, and this set is how a reader tells the two apart without a list of
+    idioms."""
+    bits = list(_names_of(doc))
+    for key, option in ((doc.get("choice") or {}).get("options") or {}).items():
+        bits.append(_norm(key))
+        bits.extend(_norm(a) for a in (option or {}).get("aliases") or ())
+    return {w for b in bits for w in re.findall(r"[a-z][a-z']+", b)}
 
 
 def arrives_at(actor, wanted: str) -> int:
@@ -645,7 +711,9 @@ def with_choice(actor, doc: dict, choice: str) -> tuple[dict, str]:
                          + ", ".join(f"{name} ({o})" for o in options) + ".")
         return doc, (f"{name} has no {kind} called {choice!r}: "
                      + ", ".join(f"{name} ({o})" for o in options) + ".")
-    overlay = {k: v for k, v in (table[pick] or {}).items() if k != "level"}
+    # `aliases` are the words that NAME the option, not part of what it does: laid over
+    # the document they would replace the ability's own aliases.
+    overlay = {k: v for k, v in (table[pick] or {}).items() if k not in ("level", "aliases")}
     out = {**doc, **overlay}
     # The energy a cleric channels is a choice of hers (the app has no alignment to read
     # it off): negative swaps who the burst heals and who it harms, as the book's
@@ -723,6 +791,22 @@ def validate_documents(docs: dict | None = None) -> list[str]:
                     if str(m.get("type") or "combat_mod") not in _KINDS:
                         problems.append(f"{at}: {where} modifier type {m.get('type')!r} "
                                         f"is not one of {', '.join(_KINDS)}.")
+            # An option's words must name it alone: a phrase two options both answer to
+            # is decided by whichever the dict happens to list first, which is a coin
+            # flip nobody can see from the table.
+            named: dict[str, str] = {}
+            for key, option in ((doc.get("choice") or {}).get("options") or {}).items():
+                said = (option or {}).get("aliases") or []
+                if not isinstance(said, list) or not all(isinstance(a, str) for a in said):
+                    problems.append(f"{at}: option {key!r} aliases must be a list of "
+                                    f"phrases.")
+                    continue
+                for phrase in [key] + said:
+                    p = _norm(phrase)
+                    if p in named and named[p] != _norm(key):
+                        problems.append(f"{at}: {p!r} names both option {named[p]!r} and "
+                                        f"{key!r} — give it to one of them.")
+                    named.setdefault(p, _norm(key))
             if doc.get("attack") not in (None, "ranged touch", "melee touch"):
                 problems.append(f"{at}: attack {doc.get('attack')!r} must be 'ranged "
                                 f"touch' or 'melee touch'.")

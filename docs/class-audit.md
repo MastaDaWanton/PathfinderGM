@@ -1126,6 +1126,22 @@ Cleric Domains.
 - The narrator, asked in words to "use my Fire Bolt", described a hit with no
   `use_ability` emitted (live, 2026-10-05): the declaration side (`gm/judgement.py`) still
   knows path abilities only. The combat bar's route works.
+  **Fixed on fix/typed-class-abilities (2026-10-05).** Where it fell out: `inject_ability`
+  returned at "no paths" before looking at anything else, `refuse_unknown_ability` needed
+  "I use <Capitalised Name>" (so "use my Fire Bolt" with no "I", any lowercase name, and
+  any "(bracket)" after the name missed it), and `leveling.find_ability` searched paths
+  only. Now `find_ability` asks `class_abilities.find` after the paths; `inject_ability`
+  reads a typed class ability first (`_typed_class_ability`: the documents' names and
+  aliases, in three grammatical shapes — object of a using verb, the verb itself, the
+  instrument after "with"), aims it, drops the model's guessed numbers and puts it before
+  the blow it serves; a mode is named in the player's words through each option's
+  `aliases` in the document (`class_abilities.option_for`, longest phrase wins).
+  Measured on typed lines with the model's reply at `narrate_only`: 4/41 before,
+  59/59 after (18 of them written after the first pass); named-but-not-yet 0/3 → 3/3;
+  false alarms 0/33 (3/13 on the held-out lines' first run, answered). Not done: the
+  reader (`gm/interpret.py`) has no ability slot, so this is still code reading the
+  sentence's grammar — the structured-turn direction would add the sheet's ability names
+  as an enum to the reading instead (tests/test_typed_class_abilities.py).
 
 ---
 

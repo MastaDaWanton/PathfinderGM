@@ -91,11 +91,17 @@
         "kind": "mode",
         "default": "heal",
         "options": {
-          "heal": {"living": true, "roll_as": "heal"},
+          "heal": {"living": true, "roll_as": "heal",
+                   "aliases": ["heal", "healing", "heal the living", "heal the wounded",
+                               "positive energy to heal", "mend", "restore"]},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
                    "damage_type": "positive",
                    "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
-                            "success": "half"}}
+                            "success": "half"},
+                   "aliases": ["harm", "hurt", "harm undead", "harm the undead",
+                               "hurt the undead", "damage the undead", "burn the undead",
+                               "positive energy to harm", "positive energy to hurt",
+                               "positive energy at the undead"]}
         }
       },
       "tell": "{name} channels positive energy.",
