@@ -3280,6 +3280,12 @@ class GMAgent:
         text, pressed = narration_mod.press_the_death(text, deaths,
                                                       said=self.engine.scene.said)
         self.last_added = narration_mod.added_sentences(before, text)
+        # And the body's authored lines, which the truth pass's backstop put on inside the
+        # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
+        from .checks import body_shown
+
+        self.last_added += [s for s in body_shown.authored_in(text)
+                            if s not in self.last_added]
         if pressed:
             repairs.append(f"a kill left off the page: wrote the death of "
                            f"{', '.join(pressed)}")

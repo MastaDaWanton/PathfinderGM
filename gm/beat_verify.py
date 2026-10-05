@@ -281,9 +281,13 @@ def schema(facts: Facts) -> dict:
                        "how": {"type": "string", "enum": list(HOW)}}),
         "arrived": lst({"who": {"type": "string", "enum": _who(facts)}}),
         "left": lst({"who": {"type": "string", "enum": _who(facts)}}),
-        "time_of_day": {"type": "object", "properties": {
-            "part": {"type": "string", "enum": [*PARTS, UNSTATED]}, "quote": s},
-            "required": ["part", "quote"]},
+        # A LIST, one entry per sentence that says the hour. It was one object until
+        # 2026-10-05, and one object is one claim: the owner's beat at 17:49 said "The
+        # morning air is cold" and, a sentence later, "the gray morning"; the reader
+        # reported the second, its repair held, and the first shipped untouched because
+        # the slot had no room for it (sammy.json's beat-verify rows: 2 of 2 beats with a
+        # wrong "morning" kept it in a sentence the reader never named).
+        "time_of_day": lst({"part": {"type": "string", "enum": list(PARTS)}}),
     }, "required": ["player_ends_at", "changed_hands", "trades", "harmed", "arrived",
                     "left", "time_of_day"]}
 
@@ -309,8 +313,10 @@ _SYSTEM = (
     "being tired or afraid is not harm.\n"
     "arrived / left: somebody who comes into, or goes out of, the place during the "
     "passage. Not the player.\n"
-    "time_of_day: the time of day the narrator says it is NOW — the light, the sky, the "
-    "hour. \"unstated\" when it does not say; never a time somebody mentions or plans for.")
+    "time_of_day: EVERY sentence in which the narrator says what time of day it is NOW "
+    "— the light, the sky, the hour — one entry per sentence, even when two sentences "
+    "say different hours. Empty when it never says; never a time somebody mentions or "
+    "plans for.")
 
 _DEMO_USER = (
     "The player began this passage at: the toll house\n"
@@ -336,7 +342,7 @@ _DEMO_ANSWER = {
     "harmed": [], "arrived": [],
     "left": [{"who": "someone not listed",
               "quote": "a boy in a wet cap slips out into the rain"}],
-    "time_of_day": {"part": "dawn", "quote": "gutter in the dawn wind"}}
+    "time_of_day": [{"part": "dawn", "quote": "gutter in the dawn wind"}]}
 
 _DEMO2_USER = (
     "The player began this passage at: the fish market\n"
@@ -351,7 +357,7 @@ _DEMO2_USER = (
     "of rope and shakes his head: he will not buy it, not tonight. 'Tomorrow morning, "
     "maybe,' he says. Dunmar Oake staggers back as the drover's fist cracks into his jaw, "
     "and drops senseless to the cobbles. A watchman comes in from the street. Overhead the "
-    "stars are out.")
+    "stars are out. The evening chill comes up off the river.")
 _DEMO2_ANSWER = {
     "player_ends_at": {"place": "the fish market", "quote": ""},
     "changed_hands": [{"item": "eel basket", "from": "the floor", "to": "pc",
@@ -364,7 +370,8 @@ _DEMO2_ANSWER = {
     "arrived": [{"who": "someone not listed",
                  "quote": "A watchman comes in from the street"}],
     "left": [],
-    "time_of_day": {"part": "night", "quote": "Overhead the stars are out"}}
+    "time_of_day": [{"part": "night", "quote": "Overhead the stars are out"},
+                    {"part": "evening", "quote": "The evening chill comes up off the river"}]}
 
 
 def _ask(text: str, facts: Facts) -> str:
@@ -425,6 +432,13 @@ def _sentences(text: str) -> list[tuple[str, str]]:
 
 MIN_QUOTE_WORDS = 3
 
+# The words an hour's quote must carry one of (`validate`): the day's parts and the sky's
+# lights. Not "light", "dark" or "gloom", which a cellar has at noon.
+_HOUR_WORD = re.compile(
+    r"\b(?:(?:pre )?dawn\w*|daybreak|sunrise|sun|suns|sunlit|sunlight|sunset|sundown|"
+    r"morning\w*|noon\w*|midday|afternoon\w*|evening\w*|dusk\w*|twilight|gloaming|"
+    r"night\w*|midnight|moon\w*|stars?|starlight|starlit|first light|daylight|day)\b")
+
 
 def place_quote(quote: str, sentences: list[tuple[str, str]]) -> str:
     """The page sentence a quote stands in — narration only — or "" when it is nowhere on
@@ -470,9 +484,13 @@ def claims_of(answer: dict, facts: Facts) -> list[Claim]:
             if isinstance(row, dict) and all(s in row for s in slots):
                 out.append(Claim(cat, {s: row[s] for s in slots},
                                  str(row.get("quote") or "")))
-    hour = answer.get("time_of_day") or {}
-    if isinstance(hour, dict) and str(hour.get("part") or "") in PARTS:
-        out.append(Claim("hour", {"part": str(hour["part"])}, str(hour.get("quote") or "")))
+    # A list now; a single object is still read, so an answer recorded before the list
+    # (the bench's gold file, a test's scripted reply) means what it meant.
+    hours = answer.get("time_of_day") or []
+    for hour in ([hours] if isinstance(hours, dict) else hours):
+        if isinstance(hour, dict) and str(hour.get("part") or "") in PARTS:
+            out.append(Claim("hour", {"part": str(hour["part"])},
+                             str(hour.get("quote") or "")))
     return out
 
 
@@ -502,6 +520,16 @@ def validate(claims: list[Claim], text: str, facts: Facts) -> tuple[list[Claim],
         # failure in a model's clothes.
         if len(_norm(c.quote).split()) < MIN_QUOTE_WORDS:
             c.why = "the quote is too short to say anything"
+            dropped.append(c)
+            continue
+        # An hour's quote names the hour or the sky. Offered a LIST for the hour
+        # (2026-10-05), the reader filled it with weak cues: "the dim light around him"
+        # came back as evening and cost a clean beat a false alarm on the bench (1 of 36
+        # clean beats; 0 before the list). A closed vocabulary, checked the way the quote's
+        # presence is checked: it decides whether the quote could say the hour at all, and
+        # leaves what it says to the reader.
+        if c.category == "hour" and not _HOUR_WORD.search(_norm(c.quote)):
+            c.why = "the quote names no hour and no sky"
             dropped.append(c)
             continue
         c.sentence = place_quote(c.quote, sentences)

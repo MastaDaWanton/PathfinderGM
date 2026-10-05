@@ -589,3 +589,89 @@ Intimacy, under the table's explicit setting, is written vividly and in the body
 adults only. The brief marks children. After the prose, a beat that reads as sexual while
 a child is in the scene or the beat is discarded whole for the holding line, in either
 setting (`narration.intimate`, `judgement.a_child_in`, `views._finish`).
+
+## The body and the clock (2026-10-05)
+
+Two reports from the owner on the same save (Sammy, a Kasatha, Aurvantis):
+
+> "prose acts like im okay but im literally starving and days past the last rest. the
+> prose should reflect this."
+
+> "says its afternoon but prose says morning."
+
+**What was measured.** The sidebar read Life 18 of 73, Hunger "starving", Rest "past a day
+awake — Will save every active hour, DC 107". On the five beats played in that state
+(transcript 63-71) hunger was on the page 0 times in 5, the wounds 0 in 5, the five
+sleepless days 0 in 1. The brief said "18/73 hp" in the middle of the cast list and
+nothing at all of hunger, thirst or sleep: those lived only on the panel
+(`Actor._needs_summary`). The clock *was* in the brief — "WHEN (fact): day 6, afternoon"
+as its first line — and "I sleep" at 09:49 woke at 17:49 to "The morning air is cold"
+anyway: waking is morning in the model's training, and one line at the top lost to it.
+The beat reader caught "the gray morning" a sentence later and its repair held; "The
+morning air" shipped, because the reader's hour was ONE object and so one claim per beat
+(turn log rows 41-45; the same happened on the next beat's draft).
+
+**What other traditions do.** The engine says it, not the narrator: CircleMUD's
+`gain_condition` sends "You are hungry." from `point_update` every game hour, and its
+weather code sends the sunrise to the rooms outdoors (both in `limits.c`/`weather.c`).
+AI Dungeon's Author's Note sits "immediately before the most recent AI response", the
+slot this file already uses for D6. NCP-Bench (arXiv 2608.08160) measured fact conflicts
+in 40-68% of narrator runs and found memory architectures did not fix them; Orchestrated
+Reality (2606.16014) anchors each turn to "location, time of day, and the player's HP"
+held outside the prose. PF1e has no sleep-deprivation rule in the Core Rulebook (the
+forum consensus and one Adventure Path's "operating on no sleep and become fatigued");
+starvation, thirst and the forced march all rise "+1 [or +2] for each previous check".
+
+**What changed.**
+
+- **The facts reach the prompt, last.** `prompts.scene_now` ends with the player's body
+  (`body_now`, from `survival.strains`: wounds at half or worse, hunger and thirst past
+  their grace, more than a day awake, a fatigue condition asked as a tag) and, on a turn
+  that carried the party into another part of the day, the hour now (`hour_now`, from
+  `Resolution.clock_before` — the engine stamps the clock when `run` begins). Words,
+  never numbers. The hour line is absent on a turn that stays in its part of the day: a
+  line that is always there is a formula.
+- **The hour is read back sentence by sentence.** `beat_verify`'s `time_of_day` is a
+  list now. On the owner's drafted beat, master's reader found 1 of the 2 wrong mornings
+  in 3 of 3 runs; the list finds 2 of 2 in 3 of 3. Offered a list, the reader also filled
+  it with weak cues ("the dim light around him" as evening): 1 false alarm on the bench's
+  36 clean beats where there had been 0. An hour's quote must now name the hour or the sky
+  (`_HOUR_WORD`, a closed vocabulary checked like the quote's presence); with it the bench
+  is back to hour alarms P 1.00 R 1.00 and no clean beat alarmed.
+- **The body is held to the page** (`gm/checks/body_shown.py`): a severe strain with no
+  word of its family in a narration sentence about the player is a finding; one targeted
+  rewrite of one sentence names only what is missing; the backstop is an authored line
+  per strain, least-recently-used per campaign, marked added so it is never shown back as
+  the model's own prose (D4). Families tuned on the owner's 28 long beats: "heavy",
+  "scrape" and "throb" were scenery and left.
+- **The awake DC counts saves made**, not hours awake (`survival.awake_dc`). Hours reach
+  the awake counter through `Scene.advance` without a save, and each of ninety-seven such
+  hours had raised the DC: 107, which only a natural 20 passes. The same sheet reads DC 10
+  now; inside one long `pass_hours` stretch a save is an hour, so the owner's climb is
+  unchanged there.
+- **Far ground put here** (`land_described.far_ground_put_here`): "boulders weathered by
+  the desert sun" on the mountain by Vormoor passed because the settlement's far ring
+  counted as present everywhere outside. A far-ring word counts as here unless the
+  sentence looks out at it.
+
+**Live, on a scratch copy of the save** (day 6, 09:49, 18 of 73, five days unfed and
+unslept; "I sleep", then "I walk on down the road toward Grotburrow"):
+
+1. Before the anchor fix: the model wrote the hunger itself ("the lack of food makes your
+   head swim"), the family missed "food", and the backstop added a second hunger line
+   under it with the wound line. No morning: "The sun is low in the sky now", "The air of
+   the afternoon is hot and dry".
+2. "The sun is low in the sky now … the persistent, gnawing ache of hunger in your stomach
+   has become a constant, dull throb … You need to move, and you need to find something
+   to eat soon." No repair; "throb" had counted as the wound shown, which is why it left
+   the family.
+3. The walk: "every step toward Grotburrow is a battle against the exhaustion in your
+   limbs and the hollow, gnawing ache of a stomach that hasn't known fullness in days";
+   the wounds were missing, the rewrite folded an ache into one sentence, and the
+   backstop wrote "The pain of your injuries flares whenever you turn too quickly."
+
+**Not done.** "your many feet" on a Kasatha (beat 71) is a body-plan contradiction nothing
+judges yet; the race's body line is in the brief. Hours charged by `Scene.advance` still
+roll no Will save at all — the panel shows the danger and nothing asks it. `survival.sleep`
+clears the hunger and thirst check counts, which the book does not (they clear on food
+and water).

@@ -417,6 +417,10 @@ class Actor:
     # one per check made rather than per hour elapsed.
     thirst_checks: int = 0
     hunger_checks: int = 0
+    # And staying awake, which rose by the HOUR until 2026-10-05 (rules/survival.py,
+    # `awake_dc`): the owner's panel read "DC 107" after five days whose hours were
+    # charged by the clock and never rolled.
+    awake_checks: int = 0
     # The experience ledger. `xp` is what this character has earned; `xp_value` is what
     # defeating them awards — the bestiary's own column, carried onto the actor so a
     # finished fight can settle up without a lookup into a book the scene may not have.
@@ -4134,7 +4138,7 @@ class Actor:
             "sleep", "Rest", survival.NO_SLEEP, awake_h,
             survival.AWAKE_GRACE_HOURS,
             f"past a day awake — Will save every active hour, "
-            f"DC {survival.awake_dc(awake_h)}",
+            f"DC {survival.awake_dc(self.awake_checks)}",
             "Past twenty-four hours awake: a Will save every hour spent working. "
             "Failure deals non-lethal damage and fatigues, then exhausts — and the "
             "hour you fail badly is the hour you fall where you stand."))
@@ -4979,6 +4983,10 @@ def to_dict(actor: Actor) -> dict:
         "awake_minutes": actor.awake_minutes, "fed_minutes": actor.fed_minutes,
         "watered_minutes": actor.watered_minutes,
         "thirst_checks": actor.thirst_checks, "hunger_checks": actor.hunger_checks,
+        # Only when a save has been made: a sheet that never wrote it reads back as zero,
+        # and the owner's saves round-trip byte for byte
+        # (`test_the_owners_real_saves_round_trip_byte_identically`).
+        **({"awake_checks": int(actor.awake_checks)} if actor.awake_checks else {}),
         "xp": actor.xp, "xp_value": actor.xp_value,
         "from_template": actor.from_template,
         "pristine": {k: int(v) for k, v in actor.pristine.items() if int(v) > 0},
@@ -5455,6 +5463,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         watered_minutes=int(data.get("watered_minutes", 0) or 0),
         thirst_checks=int(data.get("thirst_checks", 0) or 0),
         hunger_checks=int(data.get("hunger_checks", 0) or 0),
+        awake_checks=int(data.get("awake_checks", 0) or 0),
         xp=int(data.get("xp", 0) or 0),
         xp_value=int(data.get("xp_value", 0) or 0),
         from_template=str(data.get("from_template", "") or ""),
