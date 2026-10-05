@@ -592,3 +592,12 @@ catalogue or code, whatever the owner rules above.
 | Q6.2 Levels 1-3 | **Field work, then the tannery, then legendary** (recommended). |
 | Q6.3 Perks | **The forge's four, Yield moved to skinning** (recommended). |
 | Q6.4 Where | **Field kit plus a tannery** (town or founded) (recommended). |
+
+### Round 7 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q7.1 Worn leather | **As the forge's armour record** (recommended). |
+| Q7.2 Dragonhide | **Book first plus a house top-up** (recommended). |
+| Q7.3 Druid metal rule | **Yes, and wider: "yes armor and weapons both need a metal tag because there are spells that affect metal."** Both armour and weapons carry a metal tag from their pieces (heat metal, chill metal, rusting grasp, shocking grasp's +3 vs metal armour all read it); the druid's no-metal-armour rule (spells and supernatural abilities lost until 24 h after removing it) is one reader of that tag. |
+| Q7.4 Grips | **The leatherworker makes the haft piece** and the forge's Assemble takes it (recommended). |
