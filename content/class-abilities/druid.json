@@ -1,0 +1,53 @@
+{
+  "class": "druid",
+  "_source": "Core Rulebook, Druid (d20pfsrd.com/classes/core-classes/druid/, read 2026-10-05) and Beast Shape I and II (d20pfsrd.com/magic/all-spells/b/beast-shape/, read 2026-10-05).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "wild shape",
+      "name": "Wild Shape",
+      "aliases": ["wildshape", "shapeshift", "change shape"],
+      "level": 4,
+      "source": "CRB p.51 Wild Shape: from 4th, as beast shape I (a Small or Medium animal); from 6th as beast shape II (Tiny or Large too); 1 hour per druid level; a standard action to change or change back. Beast shape I: Small +2 size Dex and +1 natural armour, Medium +2 size Str and +2 natural armour. Beast shape II: Tiny +4 size Dex, -2 Str, +1 natural armour; Large +4 size Str, -2 Dex, +4 natural armour. The form's natural attacks.",
+      "text": "Become an animal for an hour a level — name it in brackets.",
+      "action": "standard",
+      "cost": {"pool": "wild shape", "amount": 1},
+      "toggle": {"key": "wild shape"},
+      "self": {"tags": ["buff.form.wild-shape"], "rounds": "600 * level"},
+      "choice": {
+        "kind": "form",
+        "from": "animal companions",
+        "sizes": {"4": ["small", "medium"], "6": ["tiny", "small", "medium", "large"]},
+        "by_size": {
+          "tiny": [
+            {"type": "ability_mod", "target": "dex", "bonus_type": "size", "amount": 4},
+            {"type": "ability_mod", "target": "str", "bonus_type": "untyped", "amount": -2},
+            {"type": "combat_mod", "target": "ac", "bonus_type": "natural armour", "amount": 1}
+          ],
+          "small": [
+            {"type": "ability_mod", "target": "dex", "bonus_type": "size", "amount": 2},
+            {"type": "combat_mod", "target": "ac", "bonus_type": "natural armour", "amount": 1}
+          ],
+          "medium": [
+            {"type": "ability_mod", "target": "str", "bonus_type": "size", "amount": 2},
+            {"type": "combat_mod", "target": "ac", "bonus_type": "natural armour", "amount": 2}
+          ],
+          "large": [
+            {"type": "ability_mod", "target": "str", "bonus_type": "size", "amount": 4},
+            {"type": "ability_mod", "target": "dex", "bonus_type": "untyped", "amount": -2},
+            {"type": "combat_mod", "target": "ac", "bonus_type": "natural armour", "amount": 4}
+          ]
+        }
+      },
+      "tell": "{name}'s body folds into the shape of an animal.",
+      "tell_off": "{name} returns to their own shape.",
+      "not_yet": [
+        "Elemental body (6th, 8th, 10th, 12th), plant shape (8th on), and beast shape III's Diminutive and Huge animals (8th).",
+        "The form's movement (climb, fly, swim) and senses (darkvision, low-light vision, scent).",
+        "Gear melding: worn armour still counts while the shape holds.",
+        "Casting while shaped is not refused (the book needs Natural Spell for it).",
+        "At will at 20th: the pool still counts uses."
+      ]
+    }
+  ]
+}

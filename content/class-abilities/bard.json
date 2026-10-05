@@ -1,0 +1,155 @@
+{
+  "class": "bard",
+  "_source": "Core Rulebook, Bard (d20pfsrd.com/classes/core-classes/bard/, read 2026-10-05).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "_performance_note": "Every performance shares the toggle key `bardic performance` with `exclusive: true`: the book allows one at a time, and starting another ends the one playing. Each costs a round of the bardic performance pool to start and a round each round it holds. Starting is a standard action, a move action from 7th, a swift action from 13th. What it lays on others is linked to the bard's own stance and evaporates with it.",
+  "abilities": [
+    {
+      "key": "inspire courage",
+      "name": "Inspire Courage",
+      "aliases": ["inspire", "courage"],
+      "level": 1,
+      "source": "CRB p.36 Inspire Courage: allies who can hear the bard gain +1 competence on attack and weapon damage rolls (and +1 morale on saves against charm and fear), +2 at 5th, +3 at 11th, +4 at 17th.",
+      "text": "Allies: +1 competence on attack and weapon damage (+2 at 5th, +3 at 11th, +4 at 17th).",
+      "action": {"1": "standard", "7": "move", "13": "swift"},
+      "cost": {"pool": "bardic performance", "amount": 1},
+      "drain": {"pool": "bardic performance", "amount": 1},
+      "toggle": {"key": "bardic performance", "exclusive": true},
+      "self": {"tags": ["buff.performance"]},
+      "affects": "allies",
+      "effect": {
+        "modifiers": [
+          {"type": "combat_mod", "target": "attack", "bonus_type": "competence",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}},
+          {"type": "combat_mod", "target": "damage", "bonus_type": "competence",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}}
+        ]
+      },
+      "tell": "{name} strikes up a rousing performance.",
+      "tell_off": "{name}'s performance ends.",
+      "not_yet": [
+        "The morale bonus on saves against charm and fear: saves carry no charm or fear descriptor yet.",
+        "Hearing: everyone on the bard's side in the scene is inspired; distance and deafness are not read."
+      ]
+    },
+    {
+      "key": "inspire competence",
+      "name": "Inspire Competence",
+      "level": 3,
+      "source": "CRB p.37 Inspire Competence: one ally within 30 ft gains +2 competence on one skill, +1 for every four levels after 3rd (+3 at 7th, +4 at 11th, +5 at 15th, +6 at 19th). The bard cannot inspire competence in herself.",
+      "text": "One ally: +2 competence on one skill (name it in brackets).",
+      "action": {"1": "standard", "7": "move", "13": "swift"},
+      "cost": {"pool": "bardic performance", "amount": 1},
+      "drain": {"pool": "bardic performance", "amount": 1},
+      "toggle": {"key": "bardic performance", "exclusive": true},
+      "self": {"tags": ["buff.performance"]},
+      "affects": "ally",
+      "radius_ft": 30,
+      "aim": "ally",
+      "choice": {"kind": "skill"},
+      "effect": {
+        "skill_modifiers": [
+          {"type": "skill_mod", "bonus_type": "competence",
+           "by_level": {"3": 2, "7": 3, "11": 4, "15": 5, "19": 6}}
+        ]
+      },
+      "tell": "{name} coaches an ally through the work.",
+      "tell_off": "{name}'s performance ends."
+    },
+    {
+      "key": "fascinate",
+      "name": "Fascinate",
+      "level": 1,
+      "source": "CRB p.36 Fascinate: one creature within 90 ft, +1 for every three levels beyond 1st; Will save DC 10 + 1/2 bard level + Cha negates; fascinated while the bard performs.",
+      "text": "Will save or fascinated while you play — one creature, more as you rise.",
+      "action": {"1": "standard", "7": "move", "13": "swift"},
+      "cost": {"pool": "bardic performance", "amount": 1},
+      "drain": {"pool": "bardic performance", "amount": 1},
+      "toggle": {"key": "bardic performance", "exclusive": true},
+      "self": {"tags": ["buff.performance"]},
+      "affects": "enemies",
+      "radius_ft": 90,
+      "count": "1 + floor((level - 1) / 3)",
+      "aim": "foe",
+      "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "negates"},
+      "effect": {"condition": "fascinated"},
+      "tell": "{name} begins a captivating performance.",
+      "tell_off": "{name}'s performance ends.",
+      "not_yet": ["A threat breaking the fascination early: the condition holds until the performance ends."]
+    },
+    {
+      "key": "dirge of doom",
+      "name": "Dirge of Doom",
+      "aliases": ["dirge"],
+      "level": 8,
+      "source": "CRB p.37 Dirge of Doom: enemies within 30 ft are shaken while they hear the performance (mind-affecting, no save).",
+      "text": "Enemies within 30 ft are shaken while you play.",
+      "action": {"1": "standard", "7": "move", "13": "swift"},
+      "cost": {"pool": "bardic performance", "amount": 1},
+      "drain": {"pool": "bardic performance", "amount": 1},
+      "toggle": {"key": "bardic performance", "exclusive": true},
+      "self": {"tags": ["buff.performance"]},
+      "affects": "enemies",
+      "radius_ft": 30,
+      "aim": "self",
+      "effect": {"condition": "shaken"},
+      "tell": "{name} plays a dirge of doom.",
+      "tell_off": "{name}'s performance ends."
+    },
+    {
+      "key": "inspire greatness",
+      "name": "Inspire Greatness",
+      "level": 9,
+      "source": "CRB p.37 Inspire Greatness: one willing ally within 30 ft, +1 for every three levels beyond 9th: 2 bonus Hit Dice (d10) as temporary hit points with Con applied, +2 competence on attack rolls, +1 competence on Fortitude saves.",
+      "text": "One ally (more as you rise): 2d10 temporary hp, +2 attack, +1 Fortitude.",
+      "action": {"1": "standard", "7": "move", "13": "swift"},
+      "cost": {"pool": "bardic performance", "amount": 1},
+      "drain": {"pool": "bardic performance", "amount": 1},
+      "toggle": {"key": "bardic performance", "exclusive": true},
+      "self": {"tags": ["buff.performance"]},
+      "affects": "allies",
+      "radius_ft": 30,
+      "count": "1 + floor((level - 9) / 3)",
+      "effect": {
+        "temp_hp": {"dice": "2d10", "con_per_die": 2},
+        "modifiers": [
+          {"type": "combat_mod", "target": "attack", "bonus_type": "competence", "amount": 2},
+          {"type": "save_mod", "target": "fort", "bonus_type": "competence", "amount": 1}
+        ]
+      },
+      "tell": "{name}'s performance swells with greatness.",
+      "tell_off": "{name}'s performance ends.",
+      "not_yet": ["The two bonus Hit Dice counting as Hit Dice for effects like sleep."]
+    },
+    {
+      "key": "inspire heroics",
+      "name": "Inspire Heroics",
+      "level": 15,
+      "source": "CRB p.37 Inspire Heroics: one ally within 30 ft, +1 for every three levels beyond 15th: +4 morale on saving throws and +4 dodge AC.",
+      "text": "One ally (more as you rise): +4 morale on saves, +4 dodge AC.",
+      "action": {"1": "standard", "7": "move", "13": "swift"},
+      "cost": {"pool": "bardic performance", "amount": 1},
+      "drain": {"pool": "bardic performance", "amount": 1},
+      "toggle": {"key": "bardic performance", "exclusive": true},
+      "self": {"tags": ["buff.performance"]},
+      "affects": "allies",
+      "radius_ft": 30,
+      "count": "1 + floor((level - 15) / 3)",
+      "effect": {
+        "modifiers": [
+          {"type": "save_mod", "target": "fort", "bonus_type": "morale", "amount": 4},
+          {"type": "save_mod", "target": "ref", "bonus_type": "morale", "amount": 4},
+          {"type": "save_mod", "target": "will", "bonus_type": "morale", "amount": 4},
+          {"type": "combat_mod", "target": "ac", "bonus_type": "dodge", "amount": 4}
+        ]
+      },
+      "tell": "{name}'s performance rises to the heroic.",
+      "tell_off": "{name}'s performance ends."
+    }
+  ],
+  "_not_yet": [
+    "Countersong and distraction (a Perform check standing in for saves against sonic and illusion effects): saves carry no sonic or pattern descriptor.",
+    "Suggestion, mass suggestion, soothing performance, frightening tune and deadly performance: each works as a spell the cast door would have to run on the bard's behalf.",
+    "Versatile performance: a Perform bonus standing in for two skills is a skill reader on the sheet, and the Perform type is a class choice lane 1 has not stored yet."
+  ]
+}

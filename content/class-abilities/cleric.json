@@ -1,0 +1,44 @@
+{
+  "class": "cleric",
+  "_source": "Core Rulebook, Cleric (d20pfsrd.com/classes/core-classes/cleric/, read 2026-10-05).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "_energy_note": "Positive or negative energy follows alignment in the book, and the app has no alignment (the 2026-09-19 ruling). Positive is the default; a cleric whose `class_choices` say \"channel energy\": \"negative\" channels negative, which swaps who is healed and who is harmed.",
+  "abilities": [
+    {
+      "key": "channel energy",
+      "name": "Channel Energy",
+      "aliases": ["channel", "channel positive energy", "channel divine energy"],
+      "level": 1,
+      "source": "CRB p.40 Channel Energy: 3 + Cha a day; 1d6 + 1d6 per two levels beyond 1st; 30-ft radius on the cleric; standard action; positive heals the living or harms undead (Will DC 10 + 1/2 level + Cha for half); the cleric may include herself.",
+      "text": "Heal the living or harm the undead in a 30-ft burst.",
+      "action": "standard",
+      "pool": {"id": "channel energy", "max": "3 + cha_mod", "refresh": "rest.night"},
+      "cost": {"pool": "channel energy", "amount": 1},
+      "affects": "all",
+      "radius_ft": 30,
+      "aim": "self",
+      "roll": {"count": "floor((level + 1) / 2)", "die": 6},
+      "energy_choice": "channel energy",
+      "choice": {
+        "kind": "mode",
+        "default": "heal",
+        "options": {
+          "heal": {"living": true, "roll_as": "heal"},
+          "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
+                   "damage_type": "positive",
+                   "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
+                            "success": "half"}}
+        }
+      },
+      "negative": {
+        "heal": {"living": false, "undead_only": true, "roll_as": "heal"},
+        "harm": {"undead_only": false, "living": true, "damage_type": "negative"}
+      },
+      "tell": "{name} channels divine energy.",
+      "not_yet": [
+        "With no map, everyone in the scene is in the burst.",
+        "Excluding chosen creatures (Selective Channeling): the burst takes everyone it reaches, as the book does."
+      ]
+    }
+  ]
+}

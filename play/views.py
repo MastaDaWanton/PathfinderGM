@@ -504,12 +504,22 @@ def _usable_abilities(pc) -> list[dict]:
     because the class prints it somewhere — and a button for one they cannot use is a
     button that exists to be refused.
     """
-    if pc is None or not getattr(pc, "paths", None):
+    if pc is None:
         return []
-    from rules import leveling
+    from rules import class_abilities, leveling
 
     out = []
-    for path in pc.paths:
+    # The core classes' documents (rules/class_abilities.py), with what is left to spend.
+    # Measured 2026-10-05 (docs/class-audit.md): this bar returned [] for every class
+    # without paths, so a barbarian's rage, a paladin's smite and a cleric's channel had
+    # no button anywhere. Each entry says its action (the panel's free/swift/standard
+    # menus read it), its uses left and the most there can be, whether a stance holds,
+    # and what may go in its brackets.
+    classes_name = (pc.char_class or "").title()
+    for entry in class_abilities.usable(pc):
+        out.append({**entry, "path": classes_name if entry.get("class") != "domain"
+                    else "domain power", "tier": None})
+    for path in getattr(pc, "paths", None) or ():
         det = leveling.path_detail(pc.char_class or "", path)
         reached = leveling.control_blood_for(pc, path)
         passives = {str(n).lower() for n in (det.get("passive") or [])}
