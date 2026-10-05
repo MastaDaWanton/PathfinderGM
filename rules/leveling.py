@@ -776,8 +776,13 @@ def grant_class_feats(actor) -> list[str]:
 
     added: list[str] = []
     before = getattr(actor, "hp_max", None)
+    from . import grantedpowers
+
+    # ...and the feats a granted power hands over (Darkness's Blind-Fight, Rune's Scribe
+    # Scroll, Nobility's Leadership at 8th: rules/grantedpowers.py, lane 2).
     for fid in granted_feats(getattr(actor, "char_class", "") or "",
-                             int(getattr(actor, "level", 1) or 1)):
+                             int(getattr(actor, "level", 1) or 1)) \
+            + grantedpowers.granted_feats(actor):
         if fid in feats_mod._held(actor):
             continue
         try:
@@ -914,7 +919,7 @@ def skill_ranks(actor) -> dict:
     ranks = {str(k).lower(): int(v) for k, v in (getattr(actor, "ranks", None) or {}).items()}
     spent = sum(ranks.values())
     total = per_level * level
-    class_skills = [str(s).lower() for s in cls.get("class_skills") or ()]
+    class_skills = [str(s).lower() for s in actor.class_skills]
     return {
         "owed": max(0, total - spent), "per_level": per_level, "total": total,
         "spent": spent, "max_rank": level, "class_ranks": class_ranks, "int_mod": int_mod,

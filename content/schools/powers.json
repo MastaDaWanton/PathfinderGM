@@ -1,0 +1,469 @@
+{
+ "choice": "arcane school",
+ "label": "school",
+ "specialist_slot": {
+  "holds": "school",
+  "from": "spellbook",
+  "note": "Wizard: \"an additional spell slot of each spell level he can cast, from 1st on up\", filled each day with a spell of the specialty school from the spellbook. An entry with slot: false (the universalist) has none."
+ },
+ "opposition": {
+  "choice": "opposition schools",
+  "slots": 2,
+  "note": "Wizard: an opposition-school spell can be prepared, but takes two slots of its level (a cantrip, two cantrip slots)."
+ },
+ "_source": "Core Rulebook, Wizard: Arcane Schools (legacy.aonprd.com/coreRulebook/classes/wizard.html, raw HTML read 2026-10-05; d20pfsrd's classic arcane schools cross-checked). The specialist's extra slot and the opposition schools' double cost are rules/casting.py's; this file is what the school powers DO.",
+ "_grammar": "rules/grantedpowers.py, module docstring.",
+ "entries": {
+  "abjuration": {
+   "powers": [
+    {
+     "key": "resistance",
+     "name": "Resistance",
+     "level": 1,
+     "kind": "Ex",
+     "line": "Resist 5 against one energy, chosen each morning (10 at 11th, immunity at 20th).",
+     "not_yet": [
+      "Choosing the energy each morning: no daily pick is asked yet, so the resistance does not land."
+     ]
+    },
+    {
+     "key": "protective ward",
+     "name": "Protective Ward",
+     "level": 1,
+     "kind": "Su",
+     "line": "A 10-ft ward for Int rounds: you and allies inside gain +1 deflection to AC (+1 per five levels), 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "protective ward",
+      "amount": 1
+     }
+    },
+    {
+     "key": "energy absorption",
+     "name": "Energy Absorption",
+     "level": 6,
+     "kind": "Su",
+     "line": "Absorb three times your level in energy damage a day, after resistance and immunity.",
+     "pool": {
+      "max": "3 * level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "energy absorption",
+      "amount": 1
+     },
+     "not_yet": [
+      "Absorbing damage from the pool: the damage path spends no pool yet."
+     ]
+    }
+   ]
+  },
+  "conjuration": {
+   "powers": [
+    {
+     "key": "summoner's charm",
+     "name": "Summoner's Charm",
+     "level": 1,
+     "kind": "Su",
+     "line": "Your summonings last + half your level rounds (min 1).",
+     "not_yet": [
+      "Summoning durations: summons are narrated by the cast op."
+     ]
+    },
+    {
+     "key": "acid dart",
+     "name": "Acid Dart",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Ranged touch, 30 ft: 1d6 acid + 1 per two levels, 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "acid dart",
+      "amount": 1
+     }
+    },
+    {
+     "key": "dimensional steps",
+     "name": "Dimensional Steps",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Teleport up to 30 ft per level a day, in 5-ft steps, without provoking.",
+     "pool": {
+      "max": "30 * level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "dimensional steps",
+      "amount": 1
+     },
+     "not_yet": [
+      "Spending feet to move has no op yet."
+     ]
+    }
+   ]
+  },
+  "divination": {
+   "powers": [
+    {
+     "key": "forewarned",
+     "name": "Forewarned",
+     "level": 1,
+     "kind": "Su",
+     "line": "+ half your level (min +1) on initiative, and you always act in a surprise round.",
+     "modifiers": [
+      {
+       "type": "combat_mod",
+       "target": "initiative",
+       "bonus_type": "untyped",
+       "formula": "max(1, floor(level / 2))"
+      }
+     ],
+     "not_yet": [
+      "Acting in every surprise round: surprise is not modelled."
+     ]
+    },
+    {
+     "key": "diviner's fortune",
+     "name": "Diviner's Fortune",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: + half your level (min +1) insight bonus on attacks, saves, skill and ability checks for a round, 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "diviner's fortune",
+      "amount": 1
+     },
+     "not_yet": [
+      "The bonus on skill and ability checks: no 'every skill' target yet."
+     ]
+    },
+    {
+     "key": "scrying adept",
+     "name": "Scrying Adept",
+     "level": 8,
+     "kind": "Su",
+     "line": "Always aware of scrying; your own scrying works as if you knew the subject better.",
+     "not_yet": [
+      "Scrying is narrated, not modelled."
+     ]
+    }
+   ]
+  },
+  "enchantment": {
+   "powers": [
+    {
+     "key": "enchanting smile",
+     "name": "Enchanting Smile",
+     "level": 1,
+     "kind": "Su",
+     "line": "+2 enhancement on Bluff, Diplomacy and Intimidate (+1 per five levels).",
+     "modifiers": [
+      {
+       "type": "skill_mod",
+       "target": "bluff",
+       "bonus_type": "enhancement",
+       "formula": "2 + floor(level / 5)"
+      },
+      {
+       "type": "skill_mod",
+       "target": "diplomacy",
+       "bonus_type": "enhancement",
+       "formula": "2 + floor(level / 5)"
+      },
+      {
+       "type": "skill_mod",
+       "target": "intimidate",
+       "bonus_type": "enhancement",
+       "formula": "2 + floor(level / 5)"
+      }
+     ]
+    },
+    {
+     "key": "dazing touch",
+     "name": "Dazing Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: a living creature is dazed for a round (none with more Hit Dice than your level), 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "dazing touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "Sparing a creature with more Hit Dice than your level: no field compares Hit Dice yet."
+     ]
+    },
+    {
+     "key": "aura of despair",
+     "name": "Aura of Despair",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: enemies inside take -2 on ability checks, attacks, damage, saves and skill checks.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "aura of despair",
+      "amount": 1
+     },
+     "not_yet": [
+      "The -2 on ability and skill checks: no 'every skill' target yet."
+     ]
+    }
+   ]
+  },
+  "evocation": {
+   "powers": [
+    {
+     "key": "intense spells",
+     "name": "Intense Spells",
+     "level": 1,
+     "kind": "Su",
+     "line": "Evocation spells that deal hit point damage deal + half your level (min +1) more, once per spell.",
+     "not_yet": [
+      "Adding to a spell's damage: the cast op rolls the spell's dice as its prose says and reads no tag of the caster's."
+     ]
+    },
+    {
+     "key": "force missile",
+     "name": "Force Missile",
+     "level": 1,
+     "kind": "Sp",
+     "line": "A missile of force that never misses: 1d4 + your Intense Spells bonus, 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "force missile",
+      "amount": 1
+     }
+    },
+    {
+     "key": "elemental wall",
+     "name": "Elemental Wall",
+     "level": 8,
+     "kind": "Sp",
+     "line": "A wall of acid, cold, electricity or fire (as wall of fire) for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "elemental wall",
+      "amount": 1
+     },
+     "not_yet": [
+      "A wall on the map: a lasting area has no op for a power yet."
+     ]
+    }
+   ]
+  },
+  "illusion": {
+   "powers": [
+    {
+     "key": "extended illusions",
+     "name": "Extended Illusions",
+     "level": 1,
+     "kind": "Su",
+     "line": "Your concentration illusions last + half your level rounds after you stop.",
+     "not_yet": [
+      "Spell durations: illusions are narrated by the cast op."
+     ]
+    },
+    {
+     "key": "blinding ray",
+     "name": "Blinding Ray",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Ranged touch, 30 ft: blinded for a round (dazzled instead if it has more Hit Dice than your level), 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "blinding ray",
+      "amount": 1
+     },
+     "not_yet": [
+      "Dazzled instead of blinded for a creature of more Hit Dice than your level: no field compares Hit Dice yet."
+     ]
+    },
+    {
+     "key": "invisibility field",
+     "name": "Invisibility Field",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Swift action: greater invisibility on yourself for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "invisibility field",
+      "amount": 1
+     }
+    }
+   ]
+  },
+  "necromancy": {
+   "powers": [
+    {
+     "key": "power over undead",
+     "name": "Power over Undead",
+     "level": 1,
+     "kind": "Su",
+     "line": "Command Undead or Turn Undead as a bonus feat, channelling 3 + Int times a day for it alone (DC 10 + half your level + Cha).",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "power over undead",
+      "amount": 1
+     },
+     "not_yet": [
+      "Choosing the feat and channelling for it: no pick is asked, and the channel executor serves a cleric's channel only."
+     ]
+    },
+    {
+     "key": "grave touch",
+     "name": "Grave Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: a living creature is shaken for half your level in rounds (min 1), 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "grave touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "Frightened for one already shaken: the touch lands its shaken only."
+     ]
+    },
+    {
+     "key": "life sight",
+     "name": "Life Sight",
+     "level": 8,
+     "kind": "Su",
+     "line": "Blindsight 10 ft that sees the living and the undead (20 ft at 12th, +10 per four levels), for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "life sight",
+      "amount": 1
+     },
+     "not_yet": [
+      "Blindsight from a power: senses are read off race and creature documents only."
+     ]
+    }
+   ]
+  },
+  "transmutation": {
+   "powers": [
+    {
+     "key": "physical enhancement",
+     "name": "Physical Enhancement",
+     "level": 1,
+     "kind": "Su",
+     "line": "+1 enhancement to Strength, Dexterity or Constitution, chosen each morning (+1 per five levels).",
+     "not_yet": [
+      "Choosing the score each morning: no daily pick is asked yet, so the bonus does not land."
+     ]
+    },
+    {
+     "key": "telekinetic fist",
+     "name": "Telekinetic Fist",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Ranged touch, 30 ft: 1d4 bludgeoning + 1 per two levels, 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "telekinetic fist",
+      "amount": 1
+     }
+    },
+    {
+     "key": "change shape",
+     "name": "Change Shape",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Beast shape II or elemental body I (III or II from 12th) for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "change shape",
+      "amount": 1
+     },
+     "not_yet": [
+      "A new body: polymorph has no executor yet."
+     ]
+    }
+   ]
+  },
+  "universalist": {
+   "powers": [
+    {
+     "key": "hand of the apprentice",
+     "name": "Hand of the Apprentice",
+     "level": 1,
+     "kind": "Su",
+     "line": "Your melee weapon flies 30 ft to strike as a thrown weapon, Int instead of Dex on the attack, 3 + Int times a day.",
+     "pool": {
+      "max": "3 + int_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "hand of the apprentice",
+      "amount": 1
+     },
+     "not_yet": [
+      "The flying strike: an attack with a melee weapon at range, rolled off Int, has no field yet."
+     ]
+    },
+    {
+     "key": "metamagic mastery",
+     "name": "Metamagic Mastery",
+     "level": 8,
+     "kind": "Su",
+     "line": "Apply a metamagic feat you know without raising the spell's level, once a day (+1 per two levels beyond 8th).",
+     "pool": {
+      "max": "1 + floor((level - 8) / 2)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "metamagic mastery",
+      "amount": 1
+     },
+     "not_yet": [
+      "Metamagic: the cast op applies no metamagic feat yet."
+     ]
+    }
+   ],
+   "slot": false
+  }
+ }
+}

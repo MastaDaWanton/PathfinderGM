@@ -1355,11 +1355,7 @@ function casterStats(sp) {
     </div>
     <h4 class="sx-sub">Spell slots</h4>
     ${sockets ? `<ul class="sockets">${sockets}</ul>` : tabEmpty("No slots at this level.")}
-    ${(sp.domain_slots || []).length ? `
-      <h4 class="sx-sub">Domain slots</h4>
-      <div class="terms">${sp.domain_slots.map(d => `
-        <div class="t"><span>Level ${d.level}</span><b>${d.max}</b></div>`).join("")}</div>
-      <p class="note">One a level, and only a domain spell goes in it.</p>` : ""}
+    ${specialSlotsBlock(sp)}
     ${(sp.domains || []).length ? `
       <h4 class="sx-sub">Domains</h4>
       <div class="terms">${sp.domains.map(d => `
@@ -1371,6 +1367,107 @@ function casterStats(sp) {
     ${sp.note ? `<p class="sx-note">${esc(sp.note)}</p>` : ""}
   </section>`;
 }
+
+// The domain and school slots (lane 2 of the class audit, 2026-10-05). Until then the
+// cleric's domain slot was a count here with nothing that could be prepared into it, and
+// a specialist wizard had no school slot at all. Each row is the server's
+// (`casting.special_slot_rows`): what the slot holds, what may go in it, and the refusal
+// sentence when nothing can — the page computes nothing. Prepared through the same
+// endpoint as every other spell, with `slot` named.
+function specialSlotsBlock(sp) {
+  const rows = sp.special_slots || [];
+  const school = sp.school || {};
+  const granted = sp.granted || [];
+  const swaps = sp.swaps || {};
+  let html = "";
+  if (rows.length) {
+    const titled = { domain: "Domain slots", school: `School slots (${school.specialist || "specialist"})` };
+    const kinds = [...new Set(rows.map(r => r.kind))];
+    html += kinds.map(kind => `
+      <h4 class="sx-sub">${esc(titled[kind] || kind)}</h4>
+      <div class="terms">${rows.filter(r => r.kind === kind).map(r => {
+        const held = (r.held || [])[0];
+        const spent = r.left < 1 && !held;
+        const pick = held ? `<b>${esc(held.name)}</b>
+            <button type="button" class="spbtn quiet" data-sslot="${esc(kind)}"
+              data-sspell="${esc(held.id)}" data-saction="unprepare">Unprepare</button>`
+          : spent ? `<b>spent today</b>`
+          : (r.choices || []).length ? `<select class="sx-sselect" aria-label="${esc(titled[kind] || kind)}, level ${r.level}"
+              data-sslotsel="${esc(kind)}-${r.level}">${r.choices.map(c =>
+                `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("")}</select>
+            <button type="button" class="spbtn" data-sslot="${esc(kind)}" data-slevel="${r.level}"
+              data-saction="prepare"${r.blocked ? ` disabled title="${esc(r.blocked)}"` : ""}>Prepare</button>`
+          : `<b>no spell for it</b>`;
+        return `<div class="t sx-sslot"><span>Level ${r.level}</span>${pick}</div>`;
+      }).join("")}</div>
+      <p class="note">${kind === "domain" ? "One a level, and only a domain spell goes in it."
+        : `One a level, and only ${/^[aeiou]/i.test(school.specialist || "") ? "an" : "a"}
+           ${esc(school.specialist || "")} spell from your book goes in it.`}</p>`).join("");
+  }
+  if ((school.opposition || []).length) {
+    html += `<p class="note">Opposition schools: ${esc(school.opposition.join(", "))}. A spell
+      of either takes two slots of its level to prepare.</p>`;
+  }
+  if (granted.length) {
+    html += `<h4 class="sx-sub">Bloodline spells</h4>
+      <div class="terms">${granted.map(g => `<div class="t"><span>Level ${g.level}</span>
+        <b>${esc(g.name)}</b></div>`).join("")}</div>
+      <p class="note">Known through your bloodline, on top of your spells known; never exchanged.</p>`;
+  }
+  if ((swaps.open || []).length) {
+    html += `<h4 class="sx-sub">Exchange a spell</h4>
+      <p class="note">Earned at level ${swaps.open.join(", ")}: one known spell may be
+        traded for another of the same level${swaps.below_highest
+          ? `, if it is at least ${swaps.below_highest} below the highest you cast` : ""}.</p>
+      <div class="terms"><div class="t">
+        <select id="sx-swap-old" aria-label="Spell to give up">${(sp.choose_from || [])
+          .flatMap(g => (g.spells || []).filter(s => !(granted.some(x => x.id === s.id)))
+            .map(s => `<option value="${esc(s.id)}" data-level="${g.level}">${esc(s.name)} (${g.level})</option>`)).join("")}</select>
+        <input id="sx-swap-new" list="sx-swap-list" aria-label="Spell to learn instead"
+          placeholder="the spell to learn instead">
+        <datalist id="sx-swap-list"></datalist>
+        <button type="button" class="spbtn" data-sswap="1">Exchange</button></div></div>`;
+  }
+  return html;
+}
+
+document.addEventListener("click", async e => {
+  const b = e.target.closest("#sheetbody [data-saction]");
+  const sw = e.target.closest("#sheetbody [data-sswap]");
+  if (!b && !sw) return;
+  try {
+    if (b && !b.disabled) {
+      let spell = b.dataset.sspell;
+      if (!spell) {
+        const sel = document.querySelector(
+          `#sheetbody [data-sslotsel="${CSS.escape(b.dataset.sslot + "-" + b.dataset.slevel)}"]`);
+        spell = sel ? sel.value : "";
+      }
+      SHEET = await post("/api/spells/prepare", { action: b.dataset.saction, spell,
+                                                   slot: b.dataset.sslot });
+    } else if (sw) {
+      const old = (document.getElementById("sx-swap-old") || {}).value || "";
+      const neu = ((document.getElementById("sx-swap-new") || {}).value || "").trim();
+      SHEET = await post("/api/spells/swap", { old, new: neu });
+    } else return;
+    drawSheet();
+  } catch (err) {
+    spellsSay(err.message || String(err));
+  }
+});
+
+// The exchange's candidates are fetched when the field is first used: a sorcerer's
+// whole list at the levels she knows runs to hundreds of names.
+document.addEventListener("focusin", async e => {
+  if (!e.target.matches || !e.target.matches("#sheetbody #sx-swap-new")) return;
+  const list = document.getElementById("sx-swap-list");
+  if (!list || list.childElementCount) return;
+  try {
+    const d = await readJSON(await fetch("/api/spells/swap"));
+    list.innerHTML = (d.new || []).map(s =>
+      `<option value="${esc(s.name)}">level ${s.level}</option>`).join("");
+  } catch (_) { /* the field still takes a typed name */ }
+});
 
 // A spell level's sockets, one per slot, in three states (owner, 2026-09-29: "perhaps a
 // red bubble instead of a bronze one to indicate a spent slot"):
@@ -2464,8 +2561,8 @@ function companionsBlock(s) {
   }
   if (powers.length) {
     html += `<div class="terms">${powers.map(p => `
-      <div class="t"><span>${esc(p.domain)} domain</span><b>${esc(p.name)}${
-        p.kind ? ` (${esc(p.kind)})` : ""}</b></div>`).join("")}</div>
+      <div class="t"><span>${esc(p.source || `${p.domain} domain`)}</span><b>${esc(p.name)}${
+        p.kind ? ` (${esc(p.kind)})` : ""}${p.max != null ? ` · ${p.uses} / ${p.max} today` : ""}</b></div>`).join("")}</div>
       ${powers.map(p => `<p class="why"><b>${esc(p.name)}.</b> ${esc(p.line)}${
         (p.not_yet || []).length ? ` <i>Not yet: ${esc(p.not_yet.join(" "))}</i>` : ""}</p>`).join("")}`;
   }

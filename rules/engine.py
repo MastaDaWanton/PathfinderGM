@@ -12047,6 +12047,15 @@ class Engine:
         actor = self.scene.actors[intent.actor]
         spell = spells_mod.get(str(intent.params["spell"]))
         level = casting.spell_level_for(actor, spell)
+        # Which slot pays (`casting.cast_source`): the ordinary one, a domain slot or a
+        # specialist's school slot, and two for an opposition-school spell. Decided once,
+        # on the way in, and kept in the state, because on a resume the prepared copy is
+        # already gone and the question can no longer be asked.
+        state = partial.get("cast_state")
+        source = (state or {}).get("source") or casting.cast_source(actor, spell) or {
+            "pool": "" if casting.at_will(level) else casting.slot_pool(level),
+            "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
+        level = int(source.get("level", level))
         dc = casting.save_dc(actor, level)
         cl = casting.caster_level(actor)
         plan = spells_mod.casting_plan(spell, cl)
@@ -12058,9 +12067,9 @@ class Engine:
         # would cost a second slot for one fireball. Everything decided about WHERE the
         # spell went is decided once too, and kept in the state: a resume must not lay the
         # area again after somebody moved, nor roll the Stealth contest twice.
-        state = partial.get("cast_state")
         if state is None:
-            state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": []}
+            state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": [],
+                     "source": source}
             aim = self._cast_aim(intent, actor)
             if aim.kind == "object":
                 # Held by the thing's own name ("canopy"), the player's words kept for
@@ -12112,12 +12121,13 @@ class Engine:
                 if deferred is not None:
                     return deferred
 
-            pool = casting.slot_pool(level)
+            pool = source["pool"] or casting.slot_pool(level)
             # A cantrip or orison is "not expended when cast and may be used again" (AoN,
             # Wizard/Cleric/Druid; "do not consume any slots", Sorcerer/Bard). Measured
             # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
             # went 4, 3, 2, 1, 0 and was then refused. Nothing is spent, nothing unprepared.
-            spent = {"ok": True} if casting.at_will(level) else actor.spend_pool(pool, 1)
+            spent = {"ok": True} if casting.at_will(level) \
+                else actor.spend_pool(pool, max(1, int(source.get("cost", 1) or 1)))
             if not spent["ok"]:
                 # The mid-list case, measured: six casts in one list PASS validation
                 # against two prepared slots, because `_check_cast` reads the count
@@ -12133,8 +12143,9 @@ class Engine:
             # only the ones who prepare from a book (item 25).
             converted = ""
             if casting.caster_data(actor).get("kind") == "prepared" and level > 0:
-                if casting.prepared_count(actor, spell.id) > 0:
-                    casting.unprepare(actor, spell.id, 1)
+                if source.get("key") and casting.prepared_count(actor, source["key"]) > 0:
+                    # The copy in the slot that paid: ordinary, domain or school.
+                    casting.unprepare(actor, source["key"], 1)
                 else:
                     # Spontaneous conversion: the cure is cast and the prepared spell that
                     # paid for it is gone. Said out loud, because a player whose shield of
@@ -12169,7 +12180,7 @@ class Engine:
                                   "spell": spell.id, "name": spell.name, "chance": asf,
                                   "rolled": roll.total, "worn": fouled_by,
                                   "slot": pool,
-                                  "slots_left": casting.slots_left(actor, level)}],
+                                  "slots_left": casting.pool_left(actor, pool)}],
                         tell=(f"{actor.name} begins {spell.name}, and the {fouled_by} "
                               f"fouls the gestures: arcane spell failure, {roll.total} "
                               f"against {asf}%. The spell is lost"
@@ -12179,7 +12190,7 @@ class Engine:
                 state["tells"].append(
                     f"The {fouled_by} does not foul the casting (arcane spell failure "
                     f"{asf}%, rolled {roll.total}).")
-        pool = casting.slot_pool(level)
+        pool = source["pool"] or casting.slot_pool(level)
 
         targets = list(state.get("caught") or [])
         save = (spell.saving_throw or "").strip()
@@ -12210,7 +12221,7 @@ class Engine:
             "duration": spell.duration, "range": spell.range,
             "area": state.get("area") or (spell.area or spell.effect or spell.targets),
             "targets": targets, "slot": pool,
-            "slots_left": casting.slots_left(actor, level),
+            "slots_left": casting.pool_left(actor, pool),
             "at_will": casting.at_will(level),
             "element": spell.element, "dice": dice,
             "range_feet": spells_mod.range_feet(spell, cl),
@@ -13218,7 +13229,11 @@ class Engine:
         # `cast` op was ever emitted, and the nine checks below and above it — including the
         # caster-level one that refuses a level 5 spell to a level 1 cleric — were never
         # reached at all. The gate was working; nothing ever knocked on it.
-        unprepared = casting.prepared_count(actor, spell.id) < 1
+        # A copy in a domain or specialist slot counts (`casting.cast_source`), and only
+        # there: until 2026-10-05 the domain slot was a number on the Spells tab that
+        # nothing could be prepared into or cast from.
+        source = casting.cast_source(actor, spell)
+        unprepared = source is None
         # ...with the one exception the book names: a cure spell may be cast in place of a
         # prepared spell of the same level or higher, which is what keeps a cleric useful
         # when the day's preparation did not anticipate the wound (`casting.CONVERTS_TO`).
@@ -13248,9 +13263,12 @@ class Engine:
                 for_a_person=f"{spell.name} is not prepared. Prepare it in the Spells tab "
                              f"first.",
             )
-        if not casting.at_will(level) and casting.slots_left(actor, level) < 1:
+        paying = (source or {}).get("pool") or casting.slot_pool(level)
+        cost = max(1, int((source or {}).get("cost", 1) or 1))
+        if not casting.at_will(level) and casting.pool_left(actor, paying) < cost:
             raise IntentError(
-                f"cast: {actor.name} has no level {level} slots left.",
+                f"cast: {actor.name} has no level {level} slots left"
+                + (f" (an opposition-school spell takes {cost})." if cost > 1 else "."),
                 "legality", index, code="no_slots",
                 for_a_person=f"{actor.name} has no level {level} spell slots left today. "
                              f"A night's rest brings them back.",

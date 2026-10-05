@@ -99,6 +99,24 @@
      "text": "A loyal animal that travels with you and grows with your druid level. It hears what you say as an animal does: the tricks it knows, and your tone."
     }
    ]
+  },
+  {
+   "id": "domain companion",
+   "name": "Animal Domain Companion",
+   "level": 4,
+   "when": {"choice": "nature bond", "only": ["Animal"]},
+   "text": "The Animal domain's 4th-level power: the service of an animal companion, at an effective druid level of your druid level - 3 (Core Rulebook, Cleric: Animal Domain; a druid who takes the domain through nature bond uses her druid level - 3).",
+   "options": [
+    {
+     "kind": "animal companion",
+     "name": "An animal companion",
+     "from": ["ape", "badger", "bird", "boar", "camel", "big cat", "small cat", "crocodile",
+              "deinonychus", "dog", "horse", "pony", "shark", "constrictor snake", "viper",
+              "wolf"],
+     "level_offset": -3,
+     "text": "A loyal animal that grows with you, three levels behind a druid's."
+    }
+   ]
   }
  ],
  "levels": [

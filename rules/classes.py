@@ -161,7 +161,9 @@ def get(class_id: str) -> dict:
 #   "from_choice": "<id>"      the picks are earlier picks of another choice — the ranger's
 #                              +2 to "any one favored enemy (including the one just selected)"
 #   "when": {"choice", "not"}  owed only once another choice is answered, and not with these
-#                              picks (a universalist takes no opposition schools)
+#                              picks (a universalist takes no opposition schools);
+#                              `"only": [...]` owes it only WITH one of them (lane 2: the
+#                              Animal domain's companion)
 #   "distinct_from": "<id>"    may not repeat another choice's picks (opposition schools are
 #                              not your own school)
 #
@@ -418,6 +420,11 @@ def _when_ok(class_id: str, ch: dict, answers: dict, domains) -> bool:
         return True
     held = _picks_of(class_id, answers, domains, str(gate["choice"]))
     if not held:
+        return False
+    # `only`: owed only WITH one of these picks — the Animal domain's companion at 4th
+    # (lane 2, 2026-10-05), asked of a cleric or druid who holds Animal and nobody else.
+    only = {_norm(x) for x in gate.get("only") or []}
+    if only and not (only & set(held)):
         return False
     return not ({_norm(x) for x in gate.get("not") or []} & set(held))
 
@@ -1245,13 +1252,15 @@ def apply(actor) -> dict:
         resources.define(actor, {**spec,
                                  "source": spec.get("source") or cls.get("name", cid)})
         made.append(str(spec["id"]).strip().lower())
-    # The uses per day a domain's powers declare (content/domains/powers.json) — Lightning
-    # Arc's 3 + Wis — through the same door as the class's own pools, so they refresh on
-    # a night and show on the sheet with no second mechanism. Recomputed on every load,
-    # which is how a Wisdom raised at 4th reaches the pool.
-    from . import domains as domains_mod
+    # The uses per day a granted power declares — a domain's Lightning Arc (3 + Wis), a
+    # bloodline's Claws (3 + Cha rounds), a school's Force Missile (3 + Int), a bonded
+    # object's daily spell (rules/grantedpowers.py) — through the same door as the
+    # class's own pools, so they refresh on a night and show on the sheet with no second
+    # mechanism. Recomputed on every load, which is how a Wisdom raised at 4th reaches
+    # the pool.
+    from . import grantedpowers
 
-    for spec in domains_mod.pool_specs(actor):
+    for spec in grantedpowers.pool_specs(actor):
         resources.define(actor, spec)
         made.append(spec["id"])
 

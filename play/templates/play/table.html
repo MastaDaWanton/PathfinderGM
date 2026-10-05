@@ -292,6 +292,12 @@
   .sx-full { margin: -2px 0 10px; color: var(--dim); font: italic 13.5px/1.5 var(--body); }
   .sx-refused { margin: 8px 12px 0; color: var(--gold); font: italic 13px/1.45 var(--body); }
   .gx-text .sx-refused, .sx-cname .sx-refused { margin: 3px 0 0; }
+  /* A domain or school slot's row: the label above, the spell's picker and its button
+     below. Measured 2026-10-05 in the caster stats card: on one line the Prepare button
+     was cut to "Pre" beside "Burning Hands". */
+  .terms .t.sx-sslot { flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .sx-sslot > span { flex: 1 0 100%; }
+  .sx-sslot select { flex: 1 1 auto; min-width: 0; max-width: 100%; }
 
   /* The glyphs: game-icons.net art, one colour per school. The box has its size before
      the SVG arrives, so the fetch cannot shift anything. */

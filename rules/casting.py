@@ -104,23 +104,31 @@ SIX_LEVEL = [
 ]
 
 # Paladins and rangers (Core Tables 3-12 and 3-13): four spell levels, nothing at all
-# before class level 4. The book's "0" rows at levels 4-6 mean bonus-spells-only; the
-# engine skips a zero base, so those rows are a slot conservative here — the honest
-# alternative was teaching `slots_for` a special case for two rows of two classes.
+# before class level 4. The book prints two different things in this table: "—" (no
+# access to that spell level) and "0" (access, but only the bonus spells a high Charisma
+# or Wisdom gives). Until 2026-10-05 both were stored as 0 and `slots_for` skipped a zero
+# base, so the bonus spell vanished with it: measured, a paladin with Cha 18 had no slot
+# at 4th (the book: one bonus 1st), none at 2nd level at 7th, none at 3rd at 10th — and a
+# 13th-level paladin had a 4th-level slot the book does not give (docs/class-audit.md D9).
+# PCGen and Foundry draw the same line: PCGen's `getNumFromCastList` answers -1 for an
+# absent cell and 0 for a printed 0, adding the ability bonus only to the second;
+# Foundry's table holds a 0 and leaves the absent level undefined. So here "—" is `NO`
+# (-1) and "0" is 0, and `_has_access` is the one place that tells them apart.
+NO = -1
 FOUR_LEVEL = [
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 1, 1, 0, 0, 0, 0, 0, 0],
-    [0, 2, 2, 1, 0, 0, 0, 0, 0, 0],
-    [0, 3, 2, 1, 1, 0, 0, 0, 0, 0],
+    [0, NO, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, NO, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, NO, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 0, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, 0, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, 1, NO, NO, 0, 0, 0, 0, 0],
+    [0, 2, 1, NO, NO, 0, 0, 0, 0, 0],
+    [0, 2, 1, 0, NO, 0, 0, 0, 0, 0],
+    [0, 2, 1, 1, NO, 0, 0, 0, 0, 0],
+    [0, 2, 2, 1, NO, 0, 0, 0, 0, 0],
+    [0, 3, 2, 1, 0, 0, 0, 0, 0, 0],
     [0, 3, 2, 1, 1, 0, 0, 0, 0, 0],
     [0, 3, 2, 2, 1, 0, 0, 0, 0, 0],
     [0, 3, 3, 2, 1, 0, 0, 0, 0, 0],
@@ -129,6 +137,19 @@ FOUR_LEVEL = [
     [0, 4, 3, 3, 2, 0, 0, 0, 0, 0],
     [0, 4, 4, 3, 3, 0, 0, 0, 0, 0],
 ]
+# The tables whose printed 0 means "bonus spells only". Every other table writes a 0 for
+# a level not reached (the wizard's 9th at 1st), and the paladin's 0-level column and its
+# 5th-9th are not spell levels it has at all — so only spell levels 1-4 of this table read
+# a 0 as access.
+_ZERO_IS_ACCESS = {"four_level": range(1, 5)}
+
+
+def _has_access(progression: str, spell_level: int, base: int) -> bool:
+    """Whether a table cell gives this spell level at all: a positive count always; a
+    printed 0 only in a table whose 0 means bonus-spells-only."""
+    if base > 0:
+        return True
+    return base == 0 and spell_level in _ZERO_IS_ACCESS.get(progression, ())
 
 PROGRESSIONS = {"full": FULL_CASTER, "spontaneous_full": SPONTANEOUS_FULL,
                 "six_level": SIX_LEVEL, "four_level": FOUR_LEVEL}
@@ -237,22 +258,28 @@ CASTERS: dict[str, dict] = {
     "sorcerer": {
         "ability": "cha", "kind": "spontaneous", "progression": "spontaneous_full",
         "list": "sorcerer", "prepare_from": "known", "known": "sorcerer",
+        # One known spell exchanged at 4th and every even level after (`swaps`).
+        "swap": {"from": 4, "every": 2},
         "note": "A sorcerer knows few spells and casts any of them from any slot.",
     },
     "bard": {
         "ability": "cha", "kind": "spontaneous", "progression": "six_level",
         "list": "bard", "prepare_from": "known", "known": "bard",
+        # At 5th and every third level after, a spell a level below his best (`swaps`).
+        "swap": {"from": 5, "every": 3, "below_highest": 1},
         "note": "Six spell levels, known rather than prepared, off Charisma.",
     },
     "paladin": {
         "ability": "cha", "kind": "prepared", "progression": "four_level",
         "list": "paladin", "prepare_from": "list",
-        "note": "Four spell levels, nothing before class level 4 (5, as modelled).",
+        "note": ("Four spell levels from class level 4; at 4th, 7th, 10th and 13th a "
+                 "new spell level brings only the bonus spells a high score gives."),
     },
     "ranger": {
         "ability": "wis", "kind": "prepared", "progression": "four_level",
         "list": "ranger", "prepare_from": "list",
-        "note": "Four spell levels, nothing before class level 4 (5, as modelled).",
+        "note": ("Four spell levels from class level 4; at 4th, 7th, 10th and 13th a "
+                 "new spell level brings only the bonus spells a high score gives."),
     },
 }
 
@@ -311,7 +338,8 @@ def highest_spell_level_at(actor, class_level: int) -> int:
     if not table or int(class_level or 0) < 1:
         return 0
     row = table[min(int(class_level), len(table)) - 1]
-    return max((i for i, n in enumerate(row) if n > 0), default=0)
+    progression = str(data.get("progression", "full"))
+    return max((i for i, n in enumerate(row) if _has_access(progression, i, n)), default=0)
 
 
 def bonus_slots(ability_mod: int, spell_level: int) -> int:
@@ -345,14 +373,19 @@ def slots_for(actor) -> dict[int, int]:
         return {}
 
     row = table[min(int(actor.level), len(table)) - 1]
+    progression = str(data.get("progression", "full"))
     mod = actor.ability_mod(data.get("ability", "int"))
     out: dict[int, int] = {}
     for level, base in enumerate(row):
-        if base <= 0:
+        if not _has_access(progression, level, base):
             continue
         if not can_cast_level(actor, level):
             continue
-        out[level] = base + bonus_slots(mod, level)
+        # A bonus-only row (the paladin's printed 0) gives a slot only when the ability
+        # earns one: Cha 10 at 4th casts nothing, Cha 12 casts one.
+        count = max(0, base) + bonus_slots(mod, level)
+        if count > 0:
+            out[level] = count
     return out
 
 
@@ -406,6 +439,275 @@ def domain_slots_for(actor) -> dict[int, int]:
     return {level: 1 for level in slots_for(actor) if level > 0}
 
 
+# --- what a choice adds to casting ----------------------------------------------------------
+#
+# Measured 2026-10-05 (docs/class-audit.md §3): every wizard was an unnamed universalist —
+# no specialist slot, opposition schools free — and a sorcerer's bloodline spells were
+# never known, though the corpus carries all of them. And the cleric's domain slot was a
+# number on the Spells tab with no way to prepare anything into it and no way to cast from
+# it. How the builders do it (searched before this was written; Foundry PF1's
+# spellcasting-model.mjs and PCGen's SpellSupportForPCClass.java, read 2026-10-05):
+#
+#   * the specialist's slot and the cleric's domain slot are ONE mechanism in Foundry —
+#     "Domain/School Slots", a separate count per spell level that only flagged spells
+#     use. Its changelog is the warning: 0.75.11 made domain/school spells "not cost any
+#     spell slots", uncapped, and a week later 0.76.1 replaced that with a counted pool.
+#     So here: a pool per level ("domain slot 3", "school slot 3"), prepared copies kept
+#     under "domain:<id>" / "school:<id>", and only a spell the choice allows goes in.
+#   * opposition schools are a COST, not a ban: Foundry multiplies a restricted spell's
+#     slot cost by 2 (`restrictedSpellSlotMultiplier`); the book: "uses two spell slots
+#     of that level to prepare". So `slot_cost`, read by everything that counts slots.
+#   * bloodline spells are KNOWN without spending a known slot: PCGen's SPELLKNOWN adds
+#     them to the known maximum. So they are derived (never written into `spellbook`)
+#     and not counted against the Spells Known table.
+#
+# Which choice gives which is the powers files' to say (content/schools/powers.json
+# declares `specialist_slot` and `opposition`; a catalogue entry's `bonus_spells` are a
+# bloodline's), so nothing here names a class or a school.
+
+SPECIAL_SLOTS = ("domain", "school")
+_ROMAN = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7",
+          "viii": "8", "ix": "9"}
+_NAMES: dict = {}
+
+
+def spell_named(name: str):
+    """A spell by the name a catalogue prints — "greater teleport", "summon monster ix" —
+    or None. The corpus spells those "Teleport, Greater" and `summon-monster-9`."""
+    from . import spells as spells_mod
+
+    every = spells_mod.all_spells()
+    if _NAMES.get("of") is not every:
+        _NAMES.clear()
+        _NAMES["of"] = every
+        _NAMES["by"] = {" ".join(str(s.name).lower().replace(",", " ").split()): s.id
+                        for s in every.values()}
+    words = " ".join(str(name or "").lower().replace(",", " ").split())
+    tried = [words]
+    parts = words.split()
+    if parts and parts[-1] in _ROMAN:
+        tried.append(" ".join(parts[:-1] + [_ROMAN[parts[-1]]]))
+    if parts and parts[0] in ("greater", "lesser", "mass"):
+        tried += [" ".join(parts[1:] + parts[:1])]
+    for t in tried:
+        sid = _NAMES["by"].get(t) or (t.replace(" ", "-") if t.replace(" ", "-") in every
+                                      else None)
+        if sid:
+            return every[sid]
+    return None
+
+
+def granted_known(actor) -> dict[str, int]:
+    """Spells a choice makes known, by id, with the spell level each is cast at: a
+    sorcerer's bloodline spell at 3rd, 5th … 19th (the catalogue entry's `bonus_spells`,
+    keyed by class level). "These spells are in addition to the number of spells given
+    on Table: Sorcerer Spells Known" (CRB) — so they are never in `spellbook` and never
+    counted against it. The level is the spell's own on the caster's list, else the
+    highest the caster could cast at the class level it arrived (Celestial's bless, a
+    cleric spell, is a 1st-level sorcerer spell for her)."""
+    data = caster_data(actor)
+    if not data or not (getattr(actor, "class_choices", None) or {}):
+        return {}
+    from . import grantedpowers
+
+    level = int(getattr(actor, "level", 1) or 1)
+    out: dict[str, int] = {}
+    for src in grantedpowers.sources(actor):
+        cat = (src.get("pick") or {}).get("entry") or {}
+        for at, name in (cat.get("bonus_spells") or {}).items():
+            if not str(at).isdigit() or int(at) > level:
+                continue
+            spell = spell_named(name)
+            if spell is None:
+                continue
+            on_list = level_on_list(spell, data.get("list", ""))
+            out[spell.id] = on_list if on_list is not None else \
+                highest_spell_level_at(actor, int(at))
+    return out
+
+
+def _domain_levels(actor) -> dict[str, int]:
+    """Every spell this character's domains grant, at its domain level (the lowest)."""
+    from . import domains as domains_mod
+
+    out: dict[str, int] = {}
+    for lvl in range(1, 10):
+        for sid in domains_mod.grants(actor, lvl):
+            out.setdefault(sid, lvl)
+    return out
+
+
+def _school_rules(actor) -> tuple[str, set[str], int]:
+    """(the specialist school whose slot this caster has or "", the opposition schools,
+    what an opposition spell costs in slots)."""
+    from . import classes as classes_mod, grantedpowers
+
+    school, opposed, cost = "", set(), 1
+    for src in grantedpowers.sources(actor):
+        rules = src.get("rules") or {}
+        if rules.get("specialist_slot") and src["entry"].get("slot", True) is not False:
+            school = src["id"]
+        spec = rules.get("opposition") or {}
+        if spec.get("choice"):
+            opposed = set(classes_mod.chosen_ids(actor, spec["choice"]))
+            cost = max(1, int(spec.get("slots", 2) or 2))
+    return school, opposed, cost
+
+
+def specialist_school(actor) -> str:
+    """The school a specialist's extra slot holds, or "" (a universalist, a non-wizard)."""
+    if caster_data(actor).get("kind") != "prepared":
+        return ""
+    return _school_rules(actor)[0]
+
+
+def opposition_schools(actor) -> set[str]:
+    return _school_rules(actor)[1]
+
+
+def slot_cost(actor, spell) -> int:
+    """How many slots of its level this spell takes to prepare: two for an opposition
+    school's (cantrips included: "an opposition cantrip also takes two cantrip slots"),
+    else one."""
+    if spell is None or caster_data(actor).get("kind") != "prepared":
+        return 1
+    school, opposed, cost = _school_rules(actor)
+    return cost if _norm_school(getattr(spell, "school", "")) in opposed else 1
+
+
+def _norm_school(text) -> str:
+    return " ".join(str(text or "").split()).strip().lower()
+
+
+def school_slots_for(actor) -> dict[int, int]:
+    """The specialist's extra slot at each spell level from 1st up — "an additional spell
+    slot of each spell level he can cast, from 1st on up" (CRB, Wizard)."""
+    if not specialist_school(actor):
+        return {}
+    return {level: 1 for level in slots_for(actor) if level > 0}
+
+
+def special_slots(actor) -> dict[str, dict[int, int]]:
+    """Every slot that only some spells may hold: {"domain": {1: 1, ...}, "school": ...}."""
+    out = {}
+    for kind, got in (("domain", domain_slots_for(actor)), ("school", school_slots_for(actor))):
+        if got:
+            out[kind] = got
+    return out
+
+
+def special_pool(kind: str, spell_level: int) -> str:
+    return f"{kind} slot {int(spell_level)}"
+
+
+def special_key(kind: str, spell_id: str) -> str:
+    """How a spell prepared in a special slot is held in `prepared`: "domain:fireball"."""
+    return f"{kind}:{spell_id}"
+
+
+def special_level(actor, kind: str, spell) -> int | None:
+    """The level this spell takes in a slot of this kind, or None if it may not go there:
+    a domain slot takes one of the character's domain spells at its domain level; a
+    school slot takes a spell of the specialist school from the book."""
+    if spell is None:
+        return None
+    if kind == "domain":
+        return _domain_levels(actor).get(spell.id)
+    if kind == "school":
+        school = specialist_school(actor)
+        if not school or _norm_school(spell.school) != school:
+            return None
+        if spell.id not in (getattr(actor, "spellbook", None) or []):
+            return None
+        return level_on_list(spell, caster_data(actor).get("list", ""))
+    return None
+
+
+def special_held(actor, kind: str, spell_level: int) -> int:
+    """How many spells are prepared in this kind's slots at this level."""
+    from . import spells as spells_mod
+
+    prefix = f"{kind}:"
+    n = 0
+    for key, count in (getattr(actor, "prepared", None) or {}).items():
+        if not str(key).startswith(prefix) or int(count or 0) < 1:
+            continue
+        try:
+            spell = spells_mod.get(str(key)[len(prefix):])
+        except KeyError:
+            continue
+        if special_level(actor, kind, spell) == int(spell_level):
+            n += int(count)
+    return n
+
+
+def special_slot_rows(actor) -> list[dict]:
+    """The Spells tab's rows for the domain and school slots: `{"kind", "level", "max",
+    "left", "held": [{id, name}], "choices": [{id, name}], "blocked"}` — every number and
+    sentence the server's, so the page computes nothing."""
+    from . import spells as spells_mod
+
+    every = spells_mod.all_spells()
+    out = []
+    for kind, levels in special_slots(actor).items():
+        if kind == "domain":
+            pool_of = _domain_levels(actor)
+            candidates = {lvl: sorted((sid for sid, at in pool_of.items() if at == lvl),
+                                      key=lambda sid: every[sid].name if sid in every else sid)
+                          for lvl in levels}
+        else:
+            candidates = {}
+            for sid in getattr(actor, "spellbook", None) or []:
+                spell = every.get(sid)
+                at = special_level(actor, kind, spell)
+                if at is not None:
+                    candidates.setdefault(at, []).append(sid)
+        for lvl, most in sorted(levels.items()):
+            pool = actor.pool(special_pool(kind, lvl)) if hasattr(actor, "pool") else None
+            held = [{"id": str(k)[len(kind) + 1:],
+                     "name": every[str(k)[len(kind) + 1:]].name}
+                    for k, n in (actor.prepared or {}).items()
+                    if str(k).startswith(f"{kind}:") and int(n or 0) > 0
+                    and str(k)[len(kind) + 1:] in every
+                    and special_level(actor, kind, every[str(k)[len(kind) + 1:]]) == lvl]
+            choices = [{"id": sid, "name": every[sid].name}
+                       for sid in candidates.get(lvl, []) if sid in every]
+            blocked = ""
+            if choices:
+                blocked = special_refusal(actor, kind, every[choices[0]["id"]])
+            out.append({"kind": kind, "level": lvl, "max": most,
+                        "left": most if pool is None else int(pool.current),
+                        "held": held, "choices": choices, "blocked": blocked})
+    return out
+
+
+def special_refusal(actor, kind: str, spell) -> str:
+    """Why this spell cannot be prepared into a slot of this kind now, in plain words, or
+    "" — the endpoint's rule and the Spells tab's sentence, one source."""
+    name = str(getattr(actor, "name", "") or "They")
+    slots = special_slots(actor).get(kind) or {}
+    what = {"domain": "domain", "school": "school"}.get(kind, kind)
+    if not slots:
+        return f"{name} has no {what} slots."
+    lvl = special_level(actor, kind, spell)
+    if lvl is None:
+        if kind == "domain":
+            return f"{spell.name} is not one of {name}'s domain spells."
+        school = specialist_school(actor)
+        article = "an" if school[:1] in "aeiou" else "a"
+        return (f"{spell.name} is not {article} {school} spell in {name}'s book; only "
+                f"one goes in the school slot.")
+    if lvl not in slots:
+        return f"{name} has no level {lvl} {what} slot yet."
+    pool = actor.pool(special_pool(kind, lvl)) if hasattr(actor, "pool") else None
+    unspent = slots[lvl] if pool is None else max(0, min(int(pool.current), slots[lvl]))
+    if unspent < 1:
+        return (f"The level {lvl} {what} slot is spent for today; it comes back after a "
+                f"long rest.")
+    if special_held(actor, kind, lvl) >= unspent:
+        return f"The level {lvl} {what} slot already holds a spell. Unprepare it first."
+    return ""
+
 def save_dc(actor, spell_level: int) -> int:
     """10 + the spell's level + the caster's ability modifier.
 
@@ -425,7 +727,29 @@ def level_on_list(spell, list_name: str) -> int | None:
 
 
 def spell_level_for(actor, spell) -> int | None:
-    return level_on_list(spell, caster_data(actor).get("list", ""))
+    """The level this caster casts the spell at: its level on their own list; else a
+    choice's — a bloodline spell's (`granted_known`), or a domain spell off the class list
+    at its domain level (a Fire cleric's fireball is a 3rd-level DOMAIN spell; it goes in
+    a domain slot and nowhere else, `on_class_list` says which)."""
+    found = level_on_list(spell, caster_data(actor).get("list", ""))
+    if found is not None or spell is None:
+        return found
+    got = granted_known(actor).get(spell.id)
+    if got is not None:
+        return got
+    if getattr(actor, "domains", None):
+        return _domain_levels(actor).get(spell.id)
+    return None
+
+
+def on_class_list(actor, spell) -> bool:
+    """Whether the spell is on the caster's own class list (or known through a choice) —
+    what an ordinary slot may hold. A domain spell off the list goes in a domain slot."""
+    if spell is None:
+        return False
+    if level_on_list(spell, caster_data(actor).get("list", "")) is not None:
+        return True
+    return spell.id in granted_known(actor)
 
 
 def knows(actor, spell) -> bool:
@@ -433,12 +757,16 @@ def knows(actor, spell) -> bool:
 
     A cleric's list is their whole class list; a wizard's is the book they are carrying.
     Getting this the same for both would let a wizard cast anything a cleric could reach.
+    A bloodline's spells are known without being in the repertoire, and a domain's are
+    reachable through its slot.
     """
     data = caster_data(actor)
     if not data or spell is None:
         return False
     if spell_level_for(actor, spell) is None:
         return False
+    if spell.id in granted_known(actor):
+        return True
     # "spellbook" and "known" both read `actor.spellbook`; the difference is what casting
     # then asks. A wizard must also have prepared the spell today; a sorcerer casts
     # anything known from any slot, and the prepared check never fires for them.
@@ -484,6 +812,21 @@ def known_spells(actor, up_to: int | None = None) -> dict[int, list]:
             lvl = level_on_list(spell, want)
             if lvl is not None and (up_to is None or lvl <= up_to):
                 out.setdefault(lvl, []).append(spell)
+    # And what a choice adds: a bloodline's spells, a domain's spells off the class list
+    # (for its slot) — so the panel shows them and the turn's vocabulary hears them.
+    extra = dict(granted_known(actor))
+    if getattr(actor, "domains", None):
+        for sid, lvl in _domain_levels(actor).items():
+            extra.setdefault(sid, lvl)
+    listed = {s.id for spells in out.values() for s in spells}
+    for sid, lvl in extra.items():
+        spell = everything.get(sid)
+        if spell is None or sid in listed or (up_to is not None and lvl > up_to):
+            continue
+        if data.get("prepare_from") == "list" and level_on_list(
+                spell, data.get("list", "")) is not None:
+            continue                     # on the class list at its own level already
+        out.setdefault(lvl, []).append(spell)
     for lvl in out:
         out[lvl].sort(key=lambda s: str(s.name).lower())
     return dict(sorted(out.items()))
@@ -605,9 +948,13 @@ def learning(actor) -> dict:
         from . import spells as spells_mod
 
         every = spells_mod.all_spells()
+        # A bloodline spell does not fill a known slot ("in addition to the number of
+        # spells given on Table: Sorcerer Spells Known"), even when the player had picked
+        # the same spell before the bloodline gave it: that pick is owed back.
+        granted = granted_known(actor)
         for sid in getattr(actor, "spellbook", None) or []:
             lvl = level_on_list(every.get(sid), data.get("list", ""))
-            if lvl is not None:
+            if lvl is not None and sid not in granted:
                 have[lvl] = have.get(lvl, 0) + 1
         out["by_level"] = {lvl: n - have.get(lvl, 0) for lvl, n in sorted(table.items())
                            if n > have.get(lvl, 0) and can_cast_level(actor, lvl)}
@@ -631,7 +978,7 @@ def learnable(actor) -> list:
         allowed = set(range(max(p["max_level"] for p in owed["picks"]) + 1))
     else:
         allowed = set(owed["by_level"])
-    book = set(getattr(actor, "spellbook", None) or [])
+    book = set(getattr(actor, "spellbook", None) or []) | set(granted_known(actor))
     found = []
     for spell in spells_mod.all_spells().values():
         lvl = level_on_list(spell, owed["list"])
@@ -677,6 +1024,10 @@ def learn_problems(actor, spell_ids) -> list[str]:
             problems.append(f"No spell called {sid!r}.")
             continue
         lvl = level_on_list(spell, owed["list"])
+        if spell.id in granted_known(actor):
+            problems.append(f"{spell.name} is already known through a class choice (a "
+                            f"bloodline spell); choose another.")
+            continue
         if lvl is None:
             problems.append(f"{spell.name} is not on the {owed['list']} list.")
             continue
@@ -772,7 +1123,7 @@ def sacrifice_for(actor, spell_level: int) -> str:
     """
     best, best_level = "", None
     for sid, count in (actor.prepared or {}).items():
-        if int(count) < 1 or str(sid).startswith("domain:"):
+        if int(count) < 1 or _is_special(sid):
             continue
         try:
             from . import spells as spells_mod
@@ -835,7 +1186,7 @@ def remember_loadout(actor) -> None:
     never auto-filled. Cantrips are kept since 2026-09-29 — they are prepared like any
     other spell (`at_will`), so the mornings must refill the ones the player chose."""
     actor.loadout = {str(sid): int(n) for sid, n in (actor.prepared or {}).items()
-                     if int(n or 0) > 0 and not str(sid).startswith("domain:")
+                     if int(n or 0) > 0 and not _is_special(sid)
                      and _level(actor, sid) is not None}
 
 
@@ -865,14 +1216,27 @@ def at_will(spell_level) -> bool:
         return False
 
 
+def _is_special(key) -> bool:
+    """A copy prepared in a domain or school slot ("domain:fireball"), held apart from the
+    ordinary slots it never fills."""
+    return ":" in str(key)
+
+
 def _held_by_level(actor) -> dict[int, int]:
+    """Ordinary slots filled at each level — an opposition-school spell fills two."""
+    from . import spells as spells_mod
+
     held: dict[int, int] = {}
     for sid, n in (actor.prepared or {}).items():
-        if str(sid).startswith("domain:"):
+        if _is_special(sid):
             continue
         lvl = _level(actor, sid)
         if lvl is not None and lvl >= 0:
-            held[lvl] = held.get(lvl, 0) + int(n or 0)
+            try:
+                cost = slot_cost(actor, spells_mod.get(str(sid)))
+            except KeyError:
+                cost = 1
+            held[lvl] = held.get(lvl, 0) + int(n or 0) * cost
     return held
 
 
@@ -931,15 +1295,24 @@ def open_slots(actor, spell_level: int) -> int:
     return max(0, unspent_slots(actor, lvl) - held)
 
 
-def prepare_refusal(actor, spell_level: int, count: int = 1) -> str:
+def prepare_refusal(actor, spell_level: int, count: int = 1, spell=None) -> str:
     """Why preparing `count` more at this level is refused, in plain words, or "".
 
     The Spells tab shows this same sentence beside a disabled Prepare (rules/sheet.py
-    sends it per level), so the page and the endpoint cannot disagree about the rule."""
+    sends it per level), so the page and the endpoint cannot disagree about the rule.
+    With the spell named, an opposition-school spell needs two open slots for each copy
+    ("uses two spell slots of that level to prepare", CRB Wizard)."""
     lvl = int(spell_level)
     room = open_slots(actor, lvl)
-    if room >= max(1, int(count)):
+    cost = slot_cost(actor, spell) if spell is not None else 1
+    if room >= max(1, int(count)) * cost:
         return ""
+    if lvl not in slots_for(actor):
+        return (f"{actor.name} has no level {lvl} slots: at this level only a high enough "
+                f"{casting_ability(actor).title()} gives one.")
+    if cost > 1 and room > 0:
+        return (f"{spell.name} is of an opposition school and takes {cost} level {lvl} "
+                f"slots; {room} {'is' if room == 1 else 'are'} open.")
     if at_will(lvl):
         return (f"No open cantrip slot today: {actor.name} holds "
                 f"{slots_for(actor).get(lvl, 0)} cantrips. Unprepare one first.")
@@ -1000,11 +1373,17 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
     room = {lvl: open_slots(actor, lvl) for lvl in slots_for(actor)}
 
     def add(sid: str, lvl: int) -> bool:
-        if room.get(lvl, 0) <= 0:
+        from . import spells as spells_mod
+
+        try:
+            cost = slot_cost(actor, spells_mod.get(sid))
+        except KeyError:
+            cost = 1
+        if room.get(lvl, 0) < cost:
             return False
         prepare(actor, sid, 1)
         out["added"][sid] = out["added"].get(sid, 0) + 1
-        room[lvl] -= 1
+        room[lvl] -= cost
         return True
 
     loadout = {str(k): int(v) for k, v in (getattr(actor, "loadout", None) or {}).items()}
@@ -1042,10 +1421,12 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
                     if prepared_count(actor, sid) < 1 and not add(sid, lvl):
                         break
                 continue
+            # Round after round of the book until a whole round adds nothing: an
+            # opposition spell needs two open slots, so one slot left over is not filled
+            # by it — and `while room > 0` alone would then loop for ever.
             while room.get(lvl, 0) > 0 and ids:
-                for sid in ids:
-                    if not add(sid, lvl):
-                        break
+                if not [sid for sid in ids if add(sid, lvl)]:
+                    break
     out["empty"] = empty_slots(actor)
     if not out["added"]:
         out["from"] = "none" if not out["kept"] else out["from"]
@@ -1092,12 +1473,156 @@ def define_slots(actor) -> list[str]:
         resources.define(actor, {"id": pool, "max": str(count), "refresh": "rest.night",
                                  "source": "spellcasting"})
         made.append(pool)
+    # The domain and specialist slots, as pools of their own: spent by a cast from them,
+    # refilled on a night, and never the ordinary slots' (`special_slots`).
+    for kind, levels in special_slots(actor).items():
+        for level, count in levels.items():
+            pool = special_pool(kind, level)
+            resources.define(actor, {"id": pool, "max": str(count), "refresh": "rest.night",
+                                     "source": "spellcasting"})
+            made.append(pool)
     return made
 
 
 def slots_left(actor, spell_level: int):
     pool = actor.pool(slot_pool(spell_level))
     return pool.current if pool else 0
+
+
+def pool_left(actor, pool_id: str) -> int:
+    pool = actor.pool(pool_id) if pool_id else None
+    return int(pool.current) if pool else 0
+
+
+def cast_source(actor, spell) -> dict | None:
+    """Where a cast of this spell comes from: `{"pool", "key", "cost", "level"}` — the
+    slot pool to spend, the prepared copy to use up ("" for none), how many slots, the
+    level cast at. None for a prepared caster with no copy of it prepared anywhere.
+
+    A prepared caster's copy is found in the ordinary slots first, then a domain slot,
+    then the specialist's school slot; an opposition-school spell spends the two slots it
+    was prepared into. A spontaneous caster casts from the ordinary slot of its level.
+    """
+    lvl = spell_level_for(actor, spell)
+    if spell is None or lvl is None:
+        return None
+    data = caster_data(actor)
+    if data.get("kind") != "prepared":
+        return {"pool": "" if at_will(lvl) else slot_pool(lvl), "key": "",
+                "cost": 0 if at_will(lvl) else 1, "level": lvl}
+    if prepared_count(actor, spell.id) > 0 and on_class_list(actor, spell):
+        return {"pool": "" if at_will(lvl) else slot_pool(lvl), "key": spell.id,
+                "cost": 0 if at_will(lvl) else slot_cost(actor, spell), "level": lvl}
+    for kind in SPECIAL_SLOTS:
+        key = special_key(kind, spell.id)
+        at = special_level(actor, kind, spell)
+        if prepared_count(actor, key) > 0 and at is not None:
+            return {"pool": special_pool(kind, at), "key": key, "cost": 1, "level": at}
+    return None
+
+
+# --- exchanging a known spell -----------------------------------------------------------------
+#
+# The audit's D10: "Spontaneous casters cannot swap a known spell (sorcerer at 4, 6, 8 …;
+# bard at 5, 8, 11 …). No code path: `learn` only adds." The rules (CRB, read 2026-10-05):
+#
+#   sorcerer  "Upon reaching 4th level, and at every even-numbered sorcerer level after
+#             that... a sorcerer can choose to learn a new spell in place of one she
+#             already knows." The new spell's level must be the old one's. (The "at least
+#             two levels lower" some remember is 3.5's; Pathfinder's sorcerer has none.)
+#   bard      "Upon reaching 5th level, and at every third bard level after that" — the
+#             same, and the old spell "must be at least one level lower than the
+#             highest-level bard spell the bard can cast."
+#
+# One swap per such level, and the book says it is made "at the same time that she gains
+# new spells known". No builder found enforces that moment (Foundry 10.0 added the swap as
+# a text feature; PCGen's data leaves the rule out), and this app never forces a choice
+# at level-up (audit §5), so a swap earned is offered until it is used: the levels it was
+# used for are the record (`Actor.spell_swaps`). Bloodline spells are never swapped
+# ("These spells cannot be exchanged for different spells at higher levels").
+
+
+def swap_levels(actor) -> list[int]:
+    """The class levels at which this caster may exchange a known spell, up to now."""
+    spec = caster_data(actor).get("swap") or {}
+    if not spec:
+        return []
+    start, every = int(spec.get("from", 0) or 0), max(1, int(spec.get("every", 1) or 1))
+    level = int(getattr(actor, "level", 1) or 1)
+    return [n for n in range(start, level + 1, every)] if start else []
+
+
+def swaps(actor) -> dict:
+    """`{"open": [class levels with a swap unused], "used": [...], "below_highest": n,
+    "highest": the best spell level castable}` — what the Spells tab offers."""
+    spec = caster_data(actor).get("swap") or {}
+    used = sorted(int(n) for n in getattr(actor, "spell_swaps", None) or [])
+    return {"open": [n for n in swap_levels(actor) if n not in used], "used": used,
+            "below_highest": int(spec.get("below_highest", 0) or 0),
+            "highest": max(slots_for(actor) or {0: 0})}
+
+
+def swap_problems(actor, old_id: str, new_id: str) -> list[str]:
+    """Every reason this exchange is refused, with the fix named, or []."""
+    from . import spells as spells_mod
+
+    name = str(getattr(actor, "name", "") or "This character")
+    got = swaps(actor)
+    if not caster_data(actor).get("swap"):
+        return [f"{name} does not exchange known spells."]
+    if not got["open"]:
+        nxt = next((n for n in _swap_ladder(actor) if n > int(actor.level)), None)
+        return [f"{name} has no exchange owed now"
+                + (f"; the next comes at level {nxt}." if nxt else ".")]
+    try:
+        old = spells_mod.get(str(old_id))
+        new = spells_mod.get(str(new_id))
+    except KeyError as exc:
+        return [str(exc).strip("'\"")]
+    problems: list[str] = []
+    if old.id not in (getattr(actor, "spellbook", None) or []):
+        problems.append(f"{old.name} is not among the spells {name} knows"
+                        + (" by choice; a bloodline spell is never exchanged."
+                           if old.id in granted_known(actor) else "."))
+    old_level = level_on_list(old, caster_data(actor).get("list", ""))
+    new_level = level_on_list(new, caster_data(actor).get("list", ""))
+    if new_level is None:
+        problems.append(f"{new.name} is not on the {caster_data(actor).get('list')} list.")
+    elif old_level is not None and new_level != old_level:
+        problems.append(f"{new.name} is level {new_level} and {old.name} level {old_level}; "
+                        f"an exchange keeps the level.")
+    if new.id in (getattr(actor, "spellbook", None) or []) or new.id in granted_known(actor):
+        problems.append(f"{name} already knows {new.name}.")
+    if old_level is not None and got["below_highest"] \
+            and old_level > got["highest"] - got["below_highest"]:
+        problems.append(f"Only a spell at least {got['below_highest']} level below the "
+                        f"highest {name} casts ({got['highest']}) may be exchanged; "
+                        f"{old.name} is level {old_level}.")
+    if new_level is not None and not can_cast_level(actor, new_level):
+        problems.append(f"{new.name} needs {casting_ability(actor).title()} "
+                        f"{10 + new_level}.")
+    return problems
+
+
+def _swap_ladder(actor) -> list[int]:
+    spec = caster_data(actor).get("swap") or {}
+    start, every = int(spec.get("from", 0) or 0), max(1, int(spec.get("every", 1) or 1))
+    return list(range(start, 21, every)) if start else []
+
+
+def swap(actor, old_id: str, new_id: str) -> tuple[bool, list[str]]:
+    """Exchange one known spell for another, spending the oldest open swap. Nothing is
+    written unless every check passes."""
+    problems = swap_problems(actor, old_id, new_id)
+    if problems:
+        return False, problems
+    from . import spells as spells_mod
+
+    old, new = spells_mod.get(str(old_id)), spells_mod.get(str(new_id))
+    actor.spellbook = [new.id if s == old.id else s for s in actor.spellbook]
+    actor.spell_swaps = sorted(set(getattr(actor, "spell_swaps", None) or [])
+                               | {swaps(actor)["open"][0]})
+    return True, []
 
 
 __all__ = [

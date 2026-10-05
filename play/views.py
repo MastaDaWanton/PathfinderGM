@@ -2040,11 +2040,31 @@ def prepare_spells(request):
     action = str(body.get("action", "prepare")).strip().lower()
     spell_id = str(body.get("spell", "")).strip().lower()
     count = read_int(body, "count", 1, lo=1)
+    # `slot`: "domain" or "school" prepares into the slot only those spells may hold (a
+    # cleric's domain slot, a specialist's school slot: `casting.special_slots`), kept
+    # under "domain:<id>" in `prepared`. Until 2026-10-05 the domain slot was shown and
+    # nothing could be prepared into it.
+    slot = str(body.get("slot", "") or "").strip().lower()
+    if slot and slot not in casting.SPECIAL_SLOTS:
+        return JsonResponse({"error": f"slot must be one of "
+                                      f"{', '.join(casting.SPECIAL_SLOTS)}"}, status=400)
 
     try:
         spell = spells_mod.get(spell_id)
     except KeyError:
         return JsonResponse({"error": f"no spell {spell_id!r}"}, status=404)
+    if slot and action in ("prepare", "unprepare"):
+        key = casting.special_key(slot, spell.id)
+        if action == "prepare":
+            refused = casting.special_refusal(pc, slot, spell)
+            if refused:
+                return JsonResponse({"error": refused, "spell": spell.id, "slot": slot},
+                                    status=409)
+            casting.prepare(pc, key, 1)
+        else:
+            casting.unprepare(pc, key, count)
+        c.save()
+        return JsonResponse(full_sheet(pc))
 
     level = casting.spell_level_for(pc, spell)
     if action in ("prepare", "learn"):
@@ -2081,6 +2101,13 @@ def prepare_spells(request):
         if not casting.knows(pc, spell):
             return JsonResponse(
                 {"error": f"{spell.name} is not in {pc.name}'s spellbook"}, status=400)
+        if not casting.on_class_list(pc, spell):
+            # A domain spell off the class list (a Fire cleric's fireball) is reachable,
+            # and only through its domain slot.
+            return JsonResponse(
+                {"error": f"{spell.name} is not a {casting.caster_data(pc).get('list')} "
+                          f"spell; it goes in a domain slot.", "slot": "domain",
+                 "spell": spell.id}, status=409)
         # Counted against the OPEN slots of that level (`casting.open_slots`): the ones
         # not spent today, less what is already prepared. A wizard cannot memorise five
         # fireballs into two slots, and cannot refill a slot spent today before a rest
@@ -2088,7 +2115,7 @@ def prepare_spells(request):
         # 2026-09-29, and let Ysolde prepare Burning Hands again into the slot her cast
         # had just spent. The refusal is the sentence the Spells tab shows beside the
         # disabled button, in plain words, with `level` so the page can place it.
-        refused = casting.prepare_refusal(pc, level, count)
+        refused = casting.prepare_refusal(pc, level, count, spell=spell)
         if refused:
             return JsonResponse({"error": refused, "level": level,
                                  "spell": spell.id}, status=409)
@@ -2163,6 +2190,53 @@ def learn_spells(request):
         roster.record(c.character_id, pc)
     c.save()
     return JsonResponse({**full_sheet(pc), "learned": added})
+
+
+def swap_spell(request):
+    """Exchange one known spell for another of its level: POST `{"old": id, "new": id or
+    name}`; GET lists what may be learned instead, by level.
+
+    The audit's D10 (docs/class-audit.md): a sorcerer may do it at 4th and every even
+    level, a bard at 5th and every third — and nothing could. One exchange per such level,
+    offered until used (`casting.swaps`); the server is the rule (`casting.swap_problems`)
+    and nothing is written unless every check passes.
+    """
+    from rules import casting, spells as spells_mod
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    if request.method == "GET":
+        known = set(pc.spellbook) | set(casting.granted_known(pc))
+        wanted = str(casting.caster_data(pc).get("list") or "")
+        levels = {casting.level_on_list(spells_mod.all_spells().get(s), wanted)
+                  for s in pc.spellbook} - {None}
+        return JsonResponse({"swaps": casting.swaps(pc), "new": [
+            {"id": sp.id, "name": sp.name, "level": casting.level_on_list(sp, wanted)}
+            for sp in sorted(spells_mod.all_spells().values(), key=lambda s: s.name)
+            if casting.level_on_list(sp, wanted) in levels and sp.id not in known]})
+    if request.method != "POST":
+        return JsonResponse({"error": "GET or POST"}, status=405)
+    body = read_body(request)
+    old_id = str(body.get("old", "")).strip().lower()
+    new_id = str(body.get("new", "")).strip().lower()
+    if new_id and new_id not in spells_mod.all_spells():
+        named = casting.spell_named(new_id.replace("-", " "))
+        new_id = named.id if named is not None else new_id
+    ok, problems = casting.swap(pc, old_id, new_id)
+    if not ok:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    old, new = spells_mod.get(old_id), spells_mod.get(new_id)
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{pc.name} lets {old.name} go and learns {new.name} "
+                                 f"in its place."})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse(full_sheet(pc))
 
 
 # What the Continue button sends. Written as an instruction to the GM rather than as

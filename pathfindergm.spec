@@ -50,6 +50,8 @@ CONTENT_DIRS = [
     "class-features",  # classes' passive numbers as documents (rules/classfeatures.py)
     "class-options",  # bloodlines, schools, rage powers… (rules/classes.py catalogues)
     "class-abilities",  # the core classes' active abilities (rules/class_abilities.py)
+    "bloodlines",  # what a sorcerer's bloodline powers do (rules/grantedpowers.py)
+    "schools",     # a wizard's school powers and arcane bond (rules/grantedpowers.py)
 ]
 
 datas = [(f"content/{name}", f"content/{name}") for name in CONTENT_DIRS]

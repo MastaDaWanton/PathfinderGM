@@ -460,6 +460,10 @@ class Actor:
     # a spell copied from a scroll is in the book too, and only this says which were the
     # free ones. Settled once for an older save at load (`casting.infer_level_spells_taken`).
     level_spells_taken: int = 0
+    # The class levels at which a spontaneous caster has exchanged a known spell (a
+    # sorcerer at 4, 6, 8…, a bard at 5, 8, 11…: `casting.swaps`). One swap per such
+    # level, so the levels used are the whole record.
+    spell_swaps: list = field(default_factory=list)
     # The feats and ability points a level owes, taken so far (`leveling.owed`). Counts,
     # on the spell counter's pattern: what is OWED is worked out from the level and the
     # house rules every time it is asked, and only what has been TAKEN is stored, so a
@@ -1390,6 +1394,20 @@ class Actor:
 
         return classes.get(self.char_class or "")
 
+    @property
+    def class_skills(self) -> tuple:
+        """The class's skills and the ones a choice adds: a bloodline's ("knowledge
+        (planes)" for an abyssal sorcerer), a domain's (every Knowledge skill for a
+        Knowledge cleric). Measured 2026-10-05: three readers asked the class document
+        alone, so a bloodline's class skill was printed in the catalogue and never got
+        its +3 (`rules/grantedpowers.py:class_skills`)."""
+        own = tuple(self.class_data.get("class_skills", ()) or ())
+        if not (self.domains or self.class_choices):
+            return own
+        from . import grantedpowers
+
+        return own + tuple(s for s in grantedpowers.class_skills(self) if s not in own)
+
     def ability_score(self, ab: str) -> int:
         """The score as it stands, after everything that has happened to it.
 
@@ -1867,7 +1885,7 @@ class Actor:
                 )
             if rank:
                 mods.append(Modifier(rank, "ranks"))
-                if skill in self.class_data.get("class_skills", ()):
+                if skill in self.class_skills:
                     mods.append(Modifier(3, "class skill"))
             am = self.ability_mod(ability)
             if am:
@@ -3551,13 +3569,14 @@ class Actor:
         # has_state half of what `immunities` lists (`immune_to` asks the tag).
         if self.char_class:
             out.extend(_classfeatures.tags(self))
-        # What this character's domains' powers hold (content/domains/powers.json) —
-        # Fire Resistance's `resist.fire.10` from 6th — read off the domain list live,
-        # like the feats above, so `resistance()` and `immune_to()` answer from them.
-        if self.domains:
-            from . import domains as _domains
+        # What this character's granted powers hold — a domain's Fire Resistance
+        # (`resist.fire.10` from 6th), a bloodline's Dragon Resistances, a school's
+        # Resistance — read off the choices live (`rules/grantedpowers.py`), like the
+        # feats above, so `resistance()` and `immune_to()` answer from them.
+        if self.domains or self.class_choices:
+            from . import grantedpowers as _grantedpowers
 
-            out.extend(_domains.standing_tags(self))
+            out.extend(_grantedpowers.standing_tags(self))
         # A stat block's own tags — the watchman's `role.guard` — read live off the
         # template the creature came from, the way a feat's are read off its document.
         if self.from_template:
@@ -3920,9 +3939,15 @@ class Actor:
             return []
         from . import classfeatures
 
+        from . import grantedpowers
+
         self._reading_class = True
         try:
-            return classfeatures.modifiers(self, kind, target, ctx)
+            # The class table's passives, then the passives of what the character chose:
+            # a domain's (Protection's resistance bonus, Travel's +10 ft), a bloodline's
+            # (Dragon Resistances' natural armour), a school's, a familiar's gift.
+            return (classfeatures.modifiers(self, kind, target, ctx)
+                    + grantedpowers.modifiers(self, kind, target, ctx))
         finally:
             self._reading_class = False
 
@@ -4540,14 +4565,14 @@ def full_sheet(actor: Actor) -> dict:
         if trained_only and rank == 0 and name not in actor.flat_skills:
             # Cannot be attempted at all; listed so the absence is visible, not silent.
             skills.append({"name": name, "ability": ability, "rank": 0,
-                           "class_skill": name in cls.get("class_skills", ()),
+                           "class_skill": name in actor.class_skills,
                            "trained_only": True, "usable": False,
                            "total": None, "terms": []})
             continue
         t = _terms(actor.skill_modifiers(name))
         skills.append({
             "name": name, "ability": ability, "rank": rank,
-            "class_skill": name in cls.get("class_skills", ()),
+            "class_skill": name in actor.class_skills,
             "trained_only": trained_only, "armour_check": acp, "usable": True,
             **t,
         })
@@ -4847,6 +4872,19 @@ def _spell_sheet(actor: Actor) -> dict | None:
                     for name in domains_mod.of(actor)],
         "domain_slots": [{"level": lvl, "max": n} for lvl, n
                          in sorted(casting.domain_slots_for(actor).items())],
+        # The domain and specialist slots as the tab prepares into them: each level's
+        # slot, what it holds, what may go in it, and the refusal sentence when nothing
+        # can (`casting.special_slot_rows`); the specialist's school and opposition; a
+        # bloodline's spells known; the spell exchanges a sorcerer or bard has open.
+        "special_slots": casting.special_slot_rows(actor),
+        "school": {"specialist": casting.specialist_school(actor),
+                   "opposition": sorted(casting.opposition_schools(actor))},
+        "granted": [{"id": sid, "level": lvl,
+                     "name": spells_mod.all_spells()[sid].name}
+                    for sid, lvl in sorted(casting.granted_known(actor).items(),
+                                           key=lambda p: (p[1], p[0]))
+                    if sid in spells_mod.all_spells()],
+        "swaps": casting.swaps(actor),
         "known": known,
         # And everything they may CHOOSE from, which for a list-caster is not the same
         # thing at all. Reported 2026-09-19: "this spells panel should show a list of all
@@ -4893,9 +4931,12 @@ def _choosable(actor: Actor) -> list[dict]:
 def _reachable_spells(actor: Actor, data: dict) -> list[str]:
     """What to list. A wizard's book is a handful of ids; a cleric's list is hundreds, so
     for them the sheet shows what is prepared rather than the entire class list."""
+    # A copy in a domain or school slot ("domain:fireball") is listed with its slot
+    # (`spellcasting.special_slots`), not here as a spell id nothing could find.
+    held = [k for k in actor.prepared if ":" not in str(k)]
     if data.get("prepare_from") == "spellbook":
-        return list(dict.fromkeys(list(actor.spellbook) + list(actor.prepared)))
-    return list(actor.prepared)
+        return list(dict.fromkeys(list(actor.spellbook) + held))
+    return held
 
 
 def _document_effect_text(doc: dict) -> str:
@@ -5263,6 +5304,8 @@ def to_dict(actor: Actor) -> dict:
     # book with nothing taken infers nothing again.
     if int(actor.level_spells_taken or 0):
         d["level_spells_taken"] = int(actor.level_spells_taken)
+    if actor.spell_swaps:
+        d["spell_swaps"] = sorted(int(n) for n in actor.spell_swaps)
     # The level-up picks taken, on the same rule: only when some were, so a save from
     # before they existed reads back byte for byte.
     for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
@@ -5297,7 +5340,7 @@ def _progression(actor: Actor) -> dict:
         "hit_die": cls.get("hit_die", 8), "bab": cls.get("bab", ""),
         "good_saves": list(cls.get("good_saves") or []),
         "skill_ranks": cls.get("skill_ranks", 2),
-        "class_skills": list(cls.get("class_skills") or []),
+        "class_skills": list(actor.class_skills),
         "paths_offered": leveling.paths_for(cid),
         # What each branch actually does, as the class file states it. The tab showed
         # four names and a line saying they granted nothing; now it shows the abilities
@@ -5814,6 +5857,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # after creation before these counters existed, so an older save has taken none.
     for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
         setattr(a, key, max(0, int(data.get(key) or 0)))
+    a.spell_swaps = sorted({int(n) for n in data.get("spell_swaps") or []
+                            if str(n).lstrip("-").isdigit()})
     if "level_spells_taken" in data:
         a.level_spells_taken = max(0, int(data.get("level_spells_taken") or 0))
     else:

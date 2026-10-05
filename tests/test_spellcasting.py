@@ -191,8 +191,15 @@ def test_known_spells_answers_for_every_kind_of_caster():
 
 def test_the_domains_are_derived_from_the_corpus_not_authored():
     """153 distinct domain names across 452 spells, carried on the spell as "Luck (2)" —
-    so every domain's list is a query and nothing needed transcribing."""
-    assert len(domains.names()) == 153
+    so every domain's list is a query and nothing needed transcribing.
+
+    The picker offers 151 of them since 2026-10-05: Ruins and Creation have spells at a
+    few levels and no parent to fill the rest, so their domain slots would stand empty
+    (docs/class-audit.md §1: "Ash" had spells at 7 and 9 only — it is Fire's subdomain,
+    and Fire fills it now)."""
+    assert len(domains.index()) == 153
+    assert len(domains.names()) == 151
+    assert set(domains.index()) - set(domains.names()) == {"Ruins", "Creation"}
     assert domains.spells_of("Healing", 1) == ["cure-light-wounds"]
     assert len(domains.spells_of("War")) >= 9
 
