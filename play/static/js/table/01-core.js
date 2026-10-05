@@ -80,6 +80,10 @@ document.addEventListener("click", async e => {
     const r = await fetch("/api/level-up", {
       method: "POST", headers: {"X-CSRFToken":
         document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ""}});
+    // The level moved the game's revision; without noting it, the very next write from
+    // this page — choosing the feat the level owed — was refused as "another device
+    // moved the game on" (measured live 2026-10-04).
+    noteRevision(r);
     const d = await readJSON(r);
     if (!r.ok) { $("#levelerr").textContent = d.error || "could not level"; return; }
     // Shown before the sheet redraws, so the number arrives as a die landing rather than

@@ -1405,6 +1405,14 @@ function paneHomebrew() {
 
 // --- House rules: the toggles the Rulesets bench holds ----------------------------------
 let RULES = null;   // { rules, tiers } while the bench is open
+// The homebrew level-up rhythms, in the order the bench offers them. The values are
+// `houserules.LEVEL_RHYTHMS`; the server refuses anything else.
+const LEVEL_RHYTHMS = [
+  ["off", "Off", ""],
+  ["every", "Every level", "1st, 2nd, 3rd…"],
+  ["odd", "Odd levels", "1st, 3rd, 5th…"],
+  ["even", "Even levels", "2nd, 4th, 6th…"],
+];
 
 function paneRules() {
   if (!RULES) return `<p class="note">Reading the house rules…</p>`;
@@ -1450,6 +1458,31 @@ function paneRules() {
         ? "In a world, the forge offers only the races that world ships."
         : "Human, dwarf, elf, gnome, half-elf, half-orc and halfling, beside the world's own."}</em>
     </button>
+
+    <h2 class="sect">Levelling up</h2>
+    <p class="note">By the book a character gains a feat at every odd level and +1 to one
+      ability score at 4th, 8th, 12th, 16th and 20th; a fighter's bonus feats come on top.
+      These two homebrew rules add to that, never replace it, and are set apart so feats
+      can land on odd levels and ability points on even ones. Level 1 is odd: a rule on
+      every or odd levels grants in the forge too. What a level owes is chosen on the
+      sheet's Class tab, and changing a rule takes back nothing already chosen.</p>
+    <h3 class="sect" style="font-size:1em">Extra feat · homebrew</h3>
+    <p class="note">One extra feat, any you qualify for, on the levels chosen.</p>
+    <div class="cards tight">${LEVEL_RHYTHMS.map(([v, label, em]) => `
+      <button class="card pick ${(r.bonus_feats || "off") === v ? "on" : ""}"
+              data-hbbonusfeats="${v}">
+        <h3>${label}</h3>
+        <em>${v === "off" ? "By the book" : `${em} · homebrew`}</em>
+      </button>`).join("")}</div>
+    <h3 class="sect" style="font-size:1em">Extra ability points · homebrew</h3>
+    <p class="note">Two ability points on the levels chosen, spread however the player
+      likes — both may go on one score.</p>
+    <div class="cards tight">${LEVEL_RHYTHMS.map(([v, label, em]) => `
+      <button class="card pick ${(r.bonus_ability_points || "off") === v ? "on" : ""}"
+              data-hbbonuspoints="${v}">
+        <h3>${label}</h3>
+        <em>${v === "off" ? "By the book" : `${em} · homebrew`}</em>
+      </button>`).join("")}</div>
 
     <h2 class="sect">Magic effect stacking</h2>
     <p class="note">By the book, magical effects from different sources do not stack —
@@ -2219,7 +2252,9 @@ function choicesKey(f) {
   // so the same race id can be legal in one world and unknown in the next. Without it,
   // changing the world reused the previous world's answer.
   return JSON.stringify([FORGE.world, f.race, f.class, f.choices, f.abilities,
-                         [...f.feats].sort(), f.background]);
+                         [...f.feats].sort(), f.background,
+                         // The house rule's 1st-level points raise scores too.
+                         f.house_points || {}]);
 }
 
 async function loadChoices() {
@@ -2262,7 +2297,9 @@ function featPicker() {
   return `
     <div class="budget ${f.feats.length > fb ? "over" : ""}">
       <span>one for everyone${f.race === "human" ? ", one for a human" : ""}${
-        f.class === "fighter" ? ", one for a fighter" : ""}</span>
+        (opts.classes.find(c => c.id === f.class) || {}).bonus_feats_at_1
+          ? ", a 1st-level bonus feat for the class" : ""}${
+        (opts.level_one || {}).feats ? ", one extra (house rule)" : ""}</span>
       <b>${f.feats.length} / ${fb}</b></div>
     <div style="margin:6px 0 10px">${f.feats.map(fid => `
       <button class="quiet" data-crunfeat="${esc(fid)}" title="remove">
@@ -2522,6 +2559,8 @@ function forgeDefaults(opts) {
     skills: [], feats: [], spellbook: [], domains: [], paths: [],
     // The answers to the class's own choices (`classChoiceSection`).
     class_choices: {},
+    // The homebrew 1st-level ability points (`opts.level_one.points`), by score.
+    house_points: {},
   };
 }
 
@@ -2543,7 +2582,8 @@ function finalAbility(f, opts, ab) {
     // Race Builder's standard three a world's people is drafted with.
     (race.choose || []).forEach((c, i) => { if (f.choices[i] === ab) v += c.amount; });
   }
-  return v;
+  // After the race, as `creation.place_house_points` applies them.
+  return v + ((f.house_points || {})[ab] || 0);
 }
 
 // The abilities one `choose` slot may land on.
@@ -2568,9 +2608,20 @@ function ranksBudget(f, opts) {
   return Math.max(1, cls.skill_ranks + intMod) + ((race && race.budget && race.budget.ranks) || 0);
 }
 
+// The same sum as `creation.build`: one, the race's bonus feats, the class's 1st-level
+// bonus feats read off its table (`bonus_feats_at_1` — `f.class === "fighter"` was the
+// question here, and a homebrew class's 1st-level bonus feat was never counted), and the
+// house rule's extra feat when level 1 qualifies (`opts.level_one`).
 function featBudget(f, opts) {
   const race = opts.races.find(r => r.id === f.race);
-  return 1 + ((race && race.budget && race.budget.feats) || 0) + (f.class === "fighter" ? 1 : 0);
+  const cls = opts.classes.find(c => c.id === f.class);
+  return 1 + ((race && race.budget && race.budget.feats) || 0)
+    + ((cls && cls.bonus_feats_at_1) || 0) + ((opts.level_one || {}).feats || 0);
+}
+
+// The house rule's 1st-level ability points, placed after the race and outside point buy.
+function housePointsPlaced(f) {
+  return Object.values(f.house_points || {}).reduce((a, b) => a + (b || 0), 0);
 }
 
 function spellCap(f, opts) {
@@ -2773,6 +2824,21 @@ function paneForgeWho() {
             ...Object.keys(opts.point_costs).map(Number))) ? "disabled" : ""}>+</button>
         <span class="fin">${race ? `becomes ${abfinal(ab)}` : ""}</span>
       </div>`).join("")}
+    ${(opts.level_one || {}).points ? `
+      <h3 class="sect" style="font-size:1em">House rule: ${opts.level_one.points} ability points</h3>
+      <p class="note">The table's homebrew grants ${opts.level_one.points} ability points at
+        1st level (Rulesets bench). They land after the race, cost no point buy, and may
+        be spread however you like — both on one score if you want. Any left unplaced
+        wait on the sheet's Class tab.</p>
+      <div class="budget ${housePointsPlaced(f) > opts.level_one.points ? "over" : ""}">
+        <span>placed</span><b>${housePointsPlaced(f)} / ${opts.level_one.points}</b></div>
+      ${["str","dex","con","int","wis","cha"].map(ab => `
+        <div class="abrow"><b>${ab.toUpperCase()}</b>
+          <button data-hpdn="${ab}" ${(f.house_points || {})[ab] ? "" : "disabled"}>−</button>
+          <span class="val">+${(f.house_points || {})[ab] || 0}</span>
+          <button data-hpup="${ab}" ${
+            housePointsPlaced(f) >= opts.level_one.points ? "disabled" : ""}>+</button>
+        </div>`).join("")}` : ""}
 
     <h2 class="sect">Skills</h2>
     <div class="budget ${f.skills.length > rb ? "over" : ""}">
@@ -3202,6 +3268,21 @@ document.addEventListener("click", async e => {
     if (up) { f.abilities[up.dataset.abup] += 1; render(); return; }
     const dn = e.target.closest("[data-abdn]");
     if (dn) { f.abilities[dn.dataset.abdn] -= 1; render(); return; }
+    // The house rule's 1st-level ability points: counted here, enforced by the server.
+    const hpup = e.target.closest("[data-hpup]");
+    if (hpup) {
+      f.house_points = f.house_points || {};
+      if (housePointsPlaced(f) < ((FORGE.opts.level_one || {}).points || 0)) {
+        f.house_points[hpup.dataset.hpup] = (f.house_points[hpup.dataset.hpup] || 0) + 1;
+      }
+      render(); return;
+    }
+    const hpdn = e.target.closest("[data-hpdn]");
+    if (hpdn) {
+      f.house_points = f.house_points || {};
+      if (f.house_points[hpdn.dataset.hpdn]) f.house_points[hpdn.dataset.hpdn] -= 1;
+      render(); return;
+    }
     const sub = e.target.closest("[data-crsubmit]");
     if (sub) { await forgeSubmit(sub.dataset.crsubmit === "begin"); return; }
   }
@@ -3282,6 +3363,10 @@ document.addEventListener("click", async e => {
   if (gmv) { await setHouseRule({ gm_view: !RULES.rules.gm_view }); return; }
   const know = e.target.closest("[data-hbknow]");
   if (know) { await setHouseRule({ knowledge_offer: !RULES.rules.knowledge_offer }); return; }
+  const bfeats = e.target.closest("[data-hbbonusfeats]");
+  if (bfeats) { await setHouseRule({ bonus_feats: bfeats.dataset.hbbonusfeats }); return; }
+  const bpoints = e.target.closest("[data-hbbonuspoints]");
+  if (bpoints) { await setHouseRule({ bonus_ability_points: bpoints.dataset.hbbonuspoints }); return; }
   const cont = e.target.closest("[data-hbcontent]");
   if (cont) { await setHouseRule({ content: RULES.rules.content === "explicit" ? "fade" : "explicit" }); return; }
   const imp = e.target.closest("[data-importraces]");

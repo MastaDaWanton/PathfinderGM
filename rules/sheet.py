@@ -456,6 +456,18 @@ class Actor:
     # a spell copied from a scroll is in the book too, and only this says which were the
     # free ones. Settled once for an older save at load (`casting.infer_level_spells_taken`).
     level_spells_taken: int = 0
+    # The feats and ability points a level owes, taken so far (`leveling.owed`). Counts,
+    # on the spell counter's pattern: what is OWED is worked out from the level and the
+    # house rules every time it is asked, and only what has been TAKEN is stored, so a
+    # level gained in the night or before this existed is offered the same as one taken
+    # from the Class card. Absent reads as zero, and truthfully: until 2026-10-04 no path
+    # in the app ever added a feat or an ability point after creation.
+    #   level_feats_taken     general feats (odd levels) and homebrew extra feats
+    #   bonus_feats_taken     the class's own bonus feats past 1st (a fighter's 2, 4, 6…)
+    #   ability_points_taken  +1s placed, the book's every fourth level and homebrew's
+    level_feats_taken: int = 0
+    bonus_feats_taken: int = 0
+    ability_points_taken: int = 0
     # What this character has learned about herbs (docs/herbalism-revamp-plan.md §8): an
     # ingredient id to {"keys": [property keys], "how": {key: "tasted, day 14"}}. Owned by
     # `rules/herbknowledge.py`, which is the only thing that reads or writes it, so the
@@ -5047,6 +5059,11 @@ def to_dict(actor: Actor) -> dict:
     # book with nothing taken infers nothing again.
     if int(actor.level_spells_taken or 0):
         d["level_spells_taken"] = int(actor.level_spells_taken)
+    # The level-up picks taken, on the same rule: only when some were, so a save from
+    # before they existed reads back byte for byte.
+    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
+        if int(getattr(actor, key, 0) or 0):
+            d[key] = int(getattr(actor, key))
     # The herbalism revamp's two stores, on the same rule: only when there is something
     # in them, so every save from before the revamp still round-trips byte for byte.
     if actor.herb_known:
@@ -5067,6 +5084,7 @@ def to_dict(actor: Actor) -> dict:
 def _progression(actor: Actor) -> dict:
     from . import leveling
 
+    house = leveling.house_rhythms()      # read once: the rows ask it of twenty levels
     cid = actor.char_class or ""
     cls = _classes_get(cid)
     return {
@@ -5092,9 +5110,16 @@ def _progression(actor: Actor) -> dict:
                                        or {}).items()}
                      for n in actor.paths},
         "paths_taken": list(actor.paths),
-        "rows": leveling.preview(cid, actor.level or 1, actor.paths),
-        "next": (leveling.gains_at(cid, int(actor.level or 1) + 1)
+        # Each row says everything its level is worth (`gains` — base attack, saves,
+        # slots, feats, ability points, pool uses, the class's grants), never "nothing
+        # new": 47 rows of the core classes read that until 2026-10-04.
+        "rows": leveling.preview(cid, actor.level or 1, actor.paths, rules=house),
+        "next": (leveling.gains_at(cid, int(actor.level or 1) + 1, house)
                  if int(actor.level or 1) < leveling.MAX_LEVEL else None),
+        # The feats and ability points the levels so far owe and the player has not yet
+        # chosen (`leveling.owed`), for the Class tab's pickers.
+        "owed": leveling.owed(actor, house),
+        "house": house,
     }
 
 
@@ -5580,6 +5605,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     a.herb_known = {str(k): dict(v) for k, v in (data.get("herb_known") or {}).items()
                     if isinstance(v, dict)}
     a.manuals_read = [str(m) for m in (data.get("manuals_read") or [])]
+    # Absent is zero here, unlike the spells: nothing granted a feat or an ability point
+    # after creation before these counters existed, so an older save has taken none.
+    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
+        setattr(a, key, max(0, int(data.get(key) or 0)))
     if "level_spells_taken" in data:
         a.level_spells_taken = max(0, int(data.get("level_spells_taken") or 0))
     else:

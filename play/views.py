@@ -1772,6 +1772,88 @@ def level_up(request):
 
 
 @require_GET
+def level_feat_menu(request):
+    """The feats this character may take for what their levels owe: `?pool=feats|bonus`.
+
+    The forge's list (`creation.feat_rows`) asked of the living character — open ones
+    first, the shut ones with the missing prerequisite named — narrowed for a class's
+    bonus feats to what they may be (a fighter's combat feats).
+    """
+    from rules import leveling
+
+    pc = campaign_mod.current().scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    pool = str(request.GET.get("pool") or "feats").strip().lower()
+    if pool not in ("feats", "bonus"):
+        return JsonResponse({"error": "pool is 'feats' or 'bonus'"}, status=400)
+    return JsonResponse(leveling.feat_menu(pc, pool))
+
+
+@require_POST
+def level_take_feats(request):
+    """Take owed feats: `{"pool": "feats"|"bonus", "feats": [id | {"id", "target"}]}`.
+
+    The server is the rule — owed, qualified for, not already held, inside a class's
+    bonus-feat list — every reason refused at once and nothing written unless all pass.
+    """
+    from rules import leveling
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    wanted = body.get("feats")
+    if not isinstance(wanted, list):
+        return JsonResponse({"error": "send the chosen feats as a list"}, status=400)
+    pool = str(body.get("pool") or "feats").strip().lower()
+    added, problems = leveling.take_feats(pc, wanted, pool)
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{pc.name} takes {', '.join(a.title() for a in added)}"
+                                 f"{' as a bonus feat' if pool == 'bonus' else ''}."})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({**full_sheet(pc), "taken": added})
+
+
+@require_POST
+def level_take_points(request):
+    """Place owed ability points: `{"points": {"str": 1, "con": 1}}`.
+
+    Through `Actor.grow_ability`, so a Constitution point pays every Hit Die already
+    earned. Both of a house rule's points may land on one score.
+    """
+    from rules import leveling
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    changes, problems = leveling.take_points(pc, body.get("points"))
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    said = ", ".join(f"{ch['ability'].title()} +{ch['amount']} (now {ch['score']})"
+                     for ch in changes)
+    hp = sum(ch["hp_change"] for ch in changes)
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{pc.name}: {said}."
+                                 + (f" {hp:+d} hit points." if hp else "")})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({**full_sheet(pc), "raised": changes})
+
+
+@require_GET
 def feat_search(request):
     """Browse the feat index, ranked by whether this character can actually take it.
 
