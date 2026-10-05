@@ -215,6 +215,24 @@ never given the shipped metal's numbers by guess.
 | `play.materials[].quench_mark` | Absent | Quenchants only: one small effect |
 | `play.materials[].forms`, `feeds`, `finishes`, `not_on`, `book`, `assay_danger` | Absent | As `campaign-format.md` describes; all default sensibly, and `book` stays `false` for a world's own metal |
 
+### What a trade keeps on its counter
+
+Added 2026-10-05 (the owner: "the most important thing for places like the smithy to sell
+are items to use as fuel for the furnace and other things consumed in crafting like water
+vinegar and alcohol"). The app now decides which counters always carry each craft's
+consumables — fuel, flux and quench at the smithy, the armorer and the market's curio
+stall; solvents, salts and vials at the general store and the alchemist; bark, oil, wax,
+thread and curing salt at the tannery — in its own table, `content/rules/stall-lines.json`
+`consumables`. Which materials count is read off their `kind` (`fuel`, `flux`,
+`quenchant`, `solvent`, `tannin`...), common tier only, so nothing here is per-world yet:
+every world's smithy sells the shipped charcoal, coal and peat. A world that wants its own
+says so in two places, both words, never prices.
+
+| Field | Now | Best shape |
+|---|---|---|
+| `play.places[].supplies[]` | Absent. A place's keeper sells what the app's table gives its kind (`smithy`, `tannery`, `workshops`); a world's "Hessa's charcoal yard" is a place with a keeper and sells general goods | The crafts whose working supplies this place's keeper always has, from the app's four: `"supplies": ["blacksmith"]` (also `alchemist`, `leatherworker`, `enchanter`). An empty list is "sells none", absent is "the app's table decides". No reader yet; `market.consumables_at` is where it would go |
+| `play.materials[]` rows of a consumed kind | Absent (the whole of `play.materials[]` is proposed, above) | A world's own fuel or quench as a `play.materials[]` row with `kind` `fuel`, `flux`, `quenchant` (or for the other crafts `solvent`, `salt`, `catalyst`, `vessel`, `tannin`, `oil`, `wax`, `thread`, `ink`, `chalk`, `treatment`) and `tier` `common`. Such a row is a staple on every counter that sells that craft's supplies the day `play.materials[]` has a reader, and it must carry `price_gp` or it is on no counter: the app refuses an unpriced common consumable in its own catalogues for exactly that reason (0 days of 60 for curing salt, measured) |
+
 ## Things worth stealing
 
 Patterns from World Bible that solved problems this app will hit too:

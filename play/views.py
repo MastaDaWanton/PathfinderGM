@@ -5255,6 +5255,12 @@ def _stall_of(c, counter=None) -> tuple[str, str, int]:
     return here[0], stall, here[2]
 
 
+def _craft_material(item) -> bool:
+    from rules import market
+
+    return str(getattr(item, "kind", "")) == "material" or market.is_craft_material(item)
+
+
 def _row(item, price: float, count: int = 1) -> dict:
     from rules import gear as gear_mod
     from rules import pricing
@@ -5268,6 +5274,9 @@ def _row(item, price: float, count: int = 1) -> dict:
             # suit of armour and a horse are all things the engine runs (I2).
             "does_something": bool(getattr(item, "specs", None))
             or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")
+            # A craft's material is worked at a bench — charcoal feeds the forge — and
+            # the panel had labelled it "for show, no effect in play" (live, 2026-10-05).
+            or _craft_material(item)
             # A bedroll, a tent, rations: what they do is their gear row's (2026-10-01).
             or bool(gear_mod.row_for(getattr(item, "base", "")
                                      or getattr(item, "name", ""))[1]),
@@ -5301,6 +5310,10 @@ def _shelf_of(item) -> str:
     name = str(getattr(item, "name", "") or "")
     if kind in ("mount", "tack"):
         return "animals"
+    if kind == "material":
+        # A craft's staple consumable (`market.consumable_goods`): charcoal is what a
+        # workshop works with, filed beside the drawn materials, not among the rope.
+        return "materials"
     if kind == "weapon" or getattr(item, "weapon", None):
         return "weapons"
     if kind in ("armour", "shield") or getattr(item, "armour", None):

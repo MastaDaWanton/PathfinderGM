@@ -1301,8 +1301,15 @@ def craft_excursion(request):
         # contain nothing but nails.
         priced = [m for m in found if _price_cp(m) > 0]
         priced = _sells_its_own_trade(track, priced)
-        shelf = market.stock(priced, place=place, stall=key, day=day)
-        on_shelf = market.remaining(shelf, c.scene.market_taken, place, key, day)
+        # The craft's consumables first, always there and never sold out — the same
+        # list the counters carry (`market.consumables_of`), so the collier's charcoal is
+        # one fact whether it is reached through this errand or across the smithy's
+        # counter. Out of the draw, so they spend none of the quota's slots.
+        staples = market.consumables_of((track,))
+        held = {m.id for m in staples}
+        shelf = market.stock([m for m in priced if m.id not in held],
+                             place=place, stall=key, day=day)
+        on_shelf = staples + market.remaining(shelf, c.scene.market_taken, place, key, day)
         if not on_shelf:
             return JsonResponse({"error": (
                 "The stall is bare. What they had today has been bought — come back "
@@ -1383,7 +1390,8 @@ def craft_excursion(request):
                     continue
                 pc.purse = purse
                 spent_cp += _price_cp(m)
-                market.mark_sold(c.scene.market_taken, m.id, place, key, day)
+                if m.id not in held:
+                    market.mark_sold(c.scene.market_taken, m.id, place, key, day)
                 afforded.append(m)
             unaffordable = left
             picks = afforded

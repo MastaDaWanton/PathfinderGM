@@ -588,7 +588,12 @@ def goods_at(counter_kind: str) -> list[Good]:
         from . import market
 
         return list(market.staples_of(kind))
-    return [g for g in (good(k) for k in stocked_at(counter_kind)) if g is not None]
+    from . import market
+
+    # A place's keeper carries its trade's consumables as well as its gear: the smithy
+    # its fuel, flux and quench (content/rules/stall-lines.json `consumables.places`).
+    return ([g for g in (good(k) for k in stocked_at(counter_kind)) if g is not None]
+            + market.consumable_goods(market.consumables_at(kind)))
 
 
 # --- the rest of the outfit page's catalogue, as goods ------------------------------------------
@@ -764,9 +769,21 @@ def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
                          if len(names) == 1 else
                          f" {', '.join(names)} are {actor.name}'s now, and go where "
                          f"they go.")
+    per = int(getattr(found, "per", 1) or 1)
+    # A craft's material — a counter's staple charcoal, or one drawn onto today's shelf —
+    # goes in the satchel under its own id, where every bench reads it and where the
+    # forge's "Buy from the market" has always put it. Before this it became a pack jar
+    # named "Charcoal" with no craft, which the forge's stock (filtered by craft) never
+    # offered: bought fuel that could not be burned. Herbal reagents had a name-lookup
+    # patch for the same hole (`crafting._reagent_for_stock`), kept for old saves.
+    from . import market
+
+    if kind == "material" or (not isinstance(found, Good) and market.is_craft_material(found)):
+        mid = found.key if isinstance(found, Good) else str(getattr(found, "id", ""))
+        actor.carry(mid, count * per)
+        return [], ""
     from .crafting import Stock
 
-    per = int(getattr(found, "per", 1) or 1)
     actor.add_stock(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
                           potency=1.0, craft=str(getattr(found, "track", "") or "")),
                     count * per)

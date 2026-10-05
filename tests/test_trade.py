@@ -256,6 +256,8 @@ def test_you_can_buy_a_thing_while_standing_in_front_of_it(engine):
     pc = engine.scene.pc()
     pc.purse = {"gp": 50}
     cheapest = min(_counter(), key=pricing.worth)
+    held = dict(pc.inventory)
+    jars = dict(pc.stock)
 
     out = run(engine, {"op": "buy", "actor": "pc",
                        "params": {"item": cheapest.id, "count": 2}})
@@ -263,9 +265,17 @@ def test_you_can_buy_a_thing_while_standing_in_front_of_it(engine):
     assert out[0].effects[0]["kind"] == "bought"
     # Named exactly, not "something in the satchel has a count of 2" — the loose version
     # of this passes even when the wrong thing was bought.
-    assert len(pc.stock) == 1
-    bought = next(iter(pc.stock.values()))
-    assert bought.base == cheapest.name and bought.count == 2
+    if market.is_craft_material(cheapest):
+        # A bench's material lands in the satchel under its id, where the benches read
+        # it (2026-10-05: counter-bought charcoal had been a pack jar the forge never
+        # offered). The cheapest thing on this counter is a craft material since the
+        # consumables were priced — the smith's water, at a copper.
+        assert pc.inventory.get(cheapest.id, 0) - held.get(cheapest.id, 0) == 2
+        assert pc.stock == jars
+    else:
+        assert len(pc.stock) == len(jars) + 1
+        bought = next(v for k, v in pc.stock.items() if k not in jars)
+        assert bought.base == cheapest.name and bought.count == 2
     assert pc.purse != {"gp": 50}, "nothing was paid"
 
 
