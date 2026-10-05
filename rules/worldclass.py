@@ -423,9 +423,14 @@ def _settle(track: Track, progress: Progress, reasons: list[dict]) -> dict:
             "to_next": _remaining(track, progress)}
 
 
+def _units(n: int, noun: str) -> str:
+    """"1 dose", "5 doses", "3 ingots": every noun a bench passes takes a plain s."""
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
 def award_step(track: Track, progress: Progress, *, method: str, ingredient_id: str,
                rarity_rank: int, quality_index: int, success: bool = True,
-               name: str = "") -> dict:
+               name: str = "", count: int = 1, noun: str = "step") -> dict:
     """Score one bench step (§4.4) and advance the track if it is earned.
 
     A success pays `STEP_MP`, one more per rarity band above common, and a quality bonus
@@ -439,29 +444,60 @@ def award_step(track: Track, progress: Progress, *, method: str, ingredient_id: 
     path: past level 3 the levels no longer climb in rarity bands, so "beneath you" has no
     meaning, and at 1-3 the repeat limit already does its job.
 
+    A batch is `count` steps, paid exactly as that many single steps in a row would be
+    (owner, 2026-10-05: "batch crafting does not give equivalent experience"). Measured
+    before this: a batch of 5 Ground Mint paid 1 step MP and five single grinds paid 3;
+    at Herbalist 2 with Superior hands, 2 against 6. The batch also moved the repeat
+    counter by one, so ten doses spent one of the three paid repeats and the next two
+    singles still paid: the batch underpaid *and* walked round the anti-grind rule. Now
+    each of the `count` steps takes its turn against `REPEAT_LIMIT` (or `MISHAP_LIMIT`
+    for a failed batch, whose one roll the whole stack shares, as the owner ruled for the
+    minigame), the per-step MP, the rarity bands and the quality bonus are paid for every
+    step the limit still pays, and the counter moves by `count`. So a batch never pays
+    less than the singles and never more: a batch of 10 pays what 3 singles pay, and
+    says why in a line of its own. Firsts are not steps and stay the caller's, once.
+
     `name` is the ingredient's display name for the line; the id stands in without it.
+    `noun` names one step's unit for a batch's lines ("5 doses: 5", "3 ingots: 3").
     """
     key = f"{method}:{ingredient_id}"
     label = f"{str(method).title()}, {name or str(ingredient_id).replace('-', ' ')}"
+    count = max(1, int(count or 1))
+    # A single step keeps its old lines word for word; a batch says how many it paid for.
+    each = (lambda n: "") if count == 1 else (lambda n: f": {_units(n, noun)}")
     reasons: list[dict] = []
     if not success:
         seen = progress.mishaps.get(key, 0)
-        if seen < MISHAP_LIMIT:
-            reasons.append({"why": f"{label}, a lesson in failure",
-                            "mp": MP_AWARDS["mishap"]})
-        progress.mishaps[key] = seen + 1
+        paid = max(0, min(count, MISHAP_LIMIT - seen))
+        if paid:
+            reasons.append({"why": f"{label}, a lesson in failure{each(paid)}",
+                            "mp": MP_AWARDS["mishap"] * paid})
+        if paid < count:
+            reasons.append({"why": f"{label}: {_units(count - paid, noun)} failed with "
+                                   f"nothing more to teach (a failure teaches "
+                                   f"{MISHAP_LIMIT} times)", "mp": 0})
+        progress.mishaps[key] = seen + count
     else:
         times = progress.crafted.get(key, 0)
-        if times < REPEAT_LIMIT:
-            reasons.append({"why": label, "mp": STEP_MP})
+        paid = max(0, min(count, REPEAT_LIMIT - times))
+        if paid:
+            reasons.append({"why": f"{label}{each(paid)}", "mp": STEP_MP * paid})
             bands = min(len(TIERS) - 1, max(0, int(rarity_rank) - 1))
             if bands:
-                reasons.append({"why": f"{TIERS[bands]} material", "mp": bands})
+                reasons.append({"why": f"{TIERS[bands]} material{each(paid)}",
+                                "mp": bands * paid})
             q = int(quality_index)
             bonus = max((mp for at, mp in QUALITY_MP.items() if q >= at), default=0)
             if bonus:
-                reasons.append({"why": f"{quality_name(q)} work", "mp": bonus})
-        progress.crafted[key] = times + 1
+                reasons.append({"why": f"{quality_name(q)} work{each(paid)}",
+                                "mp": bonus * paid})
+        if paid < count:
+            # The repeat cap, said where it bites. Before, a capped step paid 0 with no
+            # line at all, and the page showed a craft that taught nothing and no reason.
+            reasons.append({"why": f"{label}: {_units(count - paid, noun)} past the repeat "
+                                   f"limit, nothing new to learn (a step pays "
+                                   f"{REPEAT_LIMIT} times)", "mp": 0})
+        progress.crafted[key] = times + count
     return _settle(track, progress, reasons)
 
 
