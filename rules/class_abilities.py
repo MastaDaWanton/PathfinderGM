@@ -125,11 +125,24 @@ def chosen(actor, choice: str) -> list[str]:
     answers = getattr(actor, "class_choices", None) or {}
     if not isinstance(answers, dict):
         return []
+    # Lane 1's picker landed after this was written and stores `{"picks": [{"pick":
+    # "animal-fury", "level": 2}]}` — catalogue ids inside records. Read as below, each
+    # record became the text of a dict and no rage power or mercy picked on the sheet
+    # ever matched (measured at the 2026-10-05 merge). Its own reader comes first, and
+    # each pick answers to both its name and its id with the hyphens as spaces.
+    from . import classes as classes_mod
+
+    out: list[str] = []
+    for p in classes_mod.chosen(actor, choice):
+        for word in (p.get("name"), str(p.get("id") or "").replace("-", " ")):
+            if _norm(word) and _norm(word) not in out:
+                out.append(_norm(word))
+    if out:
+        return out
     want = _norm(choice)
     keys = {want, want + "s", want.replace(" ", "_"), want.replace(" ", "_") + "s"}
     if want.endswith("y"):
         keys.add(want[:-1] + "ies")
-    out: list[str] = []
     for k, v in answers.items():
         if _norm(k) not in keys:
             continue

@@ -188,6 +188,25 @@ def test_greater_mighty_and_tireless_rage_are_rungs_not_code():
         assert pc.has_condition("fatigued") is (level < 17)
 
 
+def test_rage_powers_as_the_sheet_picker_stores_them():
+    """The sheet's picker (class lane 1) stores records holding catalogue ids —
+    `{"picks": [{"pick": "animal-fury", "level": 2}]}` — and this lane's reader, written
+    before it landed, turned each record into the text of a dict: a rage power picked on
+    the sheet granted nothing in a rage (measured at the 2026-10-05 merge). Same for a
+    paladin's mercy."""
+    pc = _pc("barbarian", 6, class_choices={"rage power": {
+        "option": "class option",
+        "picks": [{"pick": "animal-fury", "level": 2}, {"pick": "swift-foot", "level": 4}]}})
+    _scene, e = _fight(pc)
+    speed = pc.speed_feet
+    _use(e, "Rage")
+    assert pc.weapon("bite") and pc.weapon("bite").get("natural")
+    assert pc.speed_feet == speed + 5
+    paladin = _pc("paladin", 6, class_choices={"mercy": {
+        "option": "class option", "picks": [{"pick": "shaken", "level": 3}]}})
+    assert "shaken" in ca.chosen(paladin, "mercy")
+
+
 def test_rage_powers_ride_the_rage_only_when_chosen():
     """Rage powers are lane 1's choice; their effects are documents here. Animal Fury's
     bite and Swift Foot's +5 ft arrive with the rage and leave with it; Renewed Vigor is
