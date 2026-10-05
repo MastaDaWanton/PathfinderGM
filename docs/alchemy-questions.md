@@ -522,3 +522,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q3.2 Volatility | **Make it real**: a 5+ fail on a volatile step applies the promised mishap to the alchemist, stated before the roll (recommended). |
 | Q3.3 Concentration | **As herbalism's**: two make one at x1.5, uncapped, each step harder (recommended). |
 | Q3.4 Handler's tax | **Toxic to handle**: a working trait that hurts the alchemist at the bench unless protected (recommended). |
+
+### Round 4 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q4.1 Product families | **Six families**: potion, oil, splash flask (bomb), cloud (smoke and powder), tool (sunrod, tindertwig, smokestick), and salts and spirits as sellable intermediates (recommended). |
+| Q4.2 Spell potions | **A formula plus reagents that carry the right trait** (recommended). |
+| Q4.3 Which spells | **The owner's own rule: "I want potions to hold any spell and the max spell level should be 1/2 alchemy level with a minimum of 1. I understand that this allows personal range spells to become ranged, i am okay with this."** So: any spell, including personal range (it then works on whoever drinks it); highest spell level = max(1, floor(Alchemist level / 2)), which the endless levels carry to 9th at Alchemist 18. The book's 3rd-level cap and personal-range ban are deliberately overruled. Open for the plan: the caster level a potion is priced and resolved at (the book's minimum caster level for the spell level is the natural default). |
+| Q4.4 Prices | **Book prices for book items**, the tier ladder for house products, quality multiplying both, material prices checked against them (recommended). |
