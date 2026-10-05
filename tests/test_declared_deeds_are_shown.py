@@ -18,7 +18,9 @@ hand count's misses (every in-scope one), 1 a deed written in other words, on an
 beat, where the repair does not run. In-sample: the bounds below were set on this data.
 
 The repair is one small call for the missing deeds alone (`GMAgent._show_declared`), put
-in front of the departure; if it does not hold after one retry, the beat ships as it was.
+in front of the departure; if it does not hold after one retry, the beat shipped as it was
+— until 2026-10-05, when the owner's "narrator does not describe my actions" made the floor
+the player's own line turned onto "you" (tests/test_deed_on_the_page.py).
 
 And the prompt taught the skip: the arrival block began "Walk them in". The owner's turn
 replayed in-process from his save, the prose call's own draft before any grooming: with
@@ -64,6 +66,12 @@ TRAVELLED = [SimpleNamespace(op="travel", status="resolved",
              SimpleNamespace(op="narrate_only", status="resolved", tell="")]
 PASSAGE = ("You thank Quin with a crooked grin, and on your way past you give her backside "
            "a smack that makes her laugh.")
+
+
+# What ships when the passage does not hold (2026-10-05, owner: "narrator does not describe
+# my actions"): it used to be the beat as written, the deeds still missing; now the
+# player's own line opens it (`narration.declared_line`, tests/test_deed_on_the_page.py).
+BACKSTOP = "You thank her smack her butt and then leave."
 
 
 class _World:
@@ -169,15 +177,17 @@ def test_a_departure_in_the_middle_of_the_beat_gets_the_deeds_in_front_of_it(roo
     ("You thank Quin, smack her backside, and wink at Tamsin by the door.", "names Tamsin"),
     ("I thank Quin and smack her backside.", "first person"),
 ])
-def test_a_passage_that_does_not_hold_is_refused_and_the_beat_ships(room, passage, why):
+def test_a_passage_that_does_not_hold_is_refused_and_the_players_line_ships(room, passage,
+                                                                           why):
     gm, _calls, reply = room
     reply["passage"] = passage
     out, repairs, _ = _groom(gm)
-    assert out == BEAT
-    assert any("did not hold" in r and why in r for r in repairs), repairs
+    assert out == f"{BACKSTOP} {BEAT}"
+    assert any("did not hold" in r and why in r and "wrote the player's own line" in r
+               for r in repairs), repairs
 
 
-def test_a_failed_call_keeps_the_beat(room, monkeypatch):
+def test_a_failed_call_still_writes_the_players_line(room, monkeypatch):
     from gm import agent as agent_mod
 
     gm, _calls, _ = room
@@ -187,7 +197,7 @@ def test_a_failed_call_keeps_the_beat(room, monkeypatch):
 
     monkeypatch.setattr(agent_mod.client, "chat", down)
     out, repairs, _ = _groom(gm)
-    assert out == BEAT
+    assert out == f"{BACKSTOP} {BEAT}"
     assert any("the call failed (ConnectionError)" in r for r in repairs), repairs
 
 
@@ -324,7 +334,7 @@ def test_a_deed_already_written_is_named_and_not_written_twice(room):
     out, repairs, _ = _groom(gm, text=beat)
     assert "ALREADY WRITTEN, DO NOT WRITE IT AGAIN:\n- smack her butt" in \
         calls[0][1]["content"]
-    assert out == beat
+    assert out == beat.replace("The door", "You thank her. The door", 1)
     assert any("writes again smack her butt" in r for r in repairs), repairs
     reply["passage"] = "You murmur your thanks against her hair."
     out, _repairs, _ = _groom(gm, text=beat)
@@ -341,7 +351,7 @@ def test_the_example_copied_is_refused(room):
     reply["passage"] = (prompts.deeds_shape(True).replace("him", "her")
                         + " You smack her backside.")
     out, repairs, _ = _groom(gm)
-    assert out == BEAT
+    assert out == f"{BACKSTOP} {BEAT}"
     assert any("copies the example" in r for r in repairs), repairs
 
 

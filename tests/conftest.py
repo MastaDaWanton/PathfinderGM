@@ -135,6 +135,12 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from gm import beat_reader as beat_reader_mod
 
     monkeypatch.setattr(beat_reader_mod, "ENABLED", False)
+    # And the deed reader (gm/deed_reader.py): one read per player turn that declared a
+    # deed, and one per repair passage. Off, the cue words judge as they did before it;
+    # tests/test_deed_on_the_page.py turns it on with scripted replies.
+    from gm import deed_reader as deed_reader_mod
+
+    monkeypatch.setattr(deed_reader_mod, "ENABLED", False)
 
 
 @pytest.fixture(autouse=True)
