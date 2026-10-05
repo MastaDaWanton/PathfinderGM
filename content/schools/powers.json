@@ -1,6 +1,16 @@
 {
  "choice": "arcane school",
  "label": "school",
+ "specialist_slot": {
+  "holds": "school",
+  "from": "spellbook",
+  "note": "Wizard: \"an additional spell slot of each spell level he can cast, from 1st on up\", filled each day with a spell of the specialty school from the spellbook. An entry with slot: false (the universalist) has none."
+ },
+ "opposition": {
+  "choice": "opposition schools",
+  "slots": 2,
+  "note": "Wizard: an opposition-school spell can be prepared, but takes two slots of its level (a cantrip, two cantrip slots)."
+ },
  "_source": "Core Rulebook, Wizard: Arcane Schools (legacy.aonprd.com/coreRulebook/classes/wizard.html, raw HTML read 2026-10-05; d20pfsrd's classic arcane schools cross-checked). The specialist's extra slot and the opposition schools' double cost are rules/casting.py's; this file is what the school powers DO.",
  "_grammar": "rules/grantedpowers.py, module docstring.",
  "entries": {
@@ -452,7 +462,8 @@
       "Metamagic: the cast op applies no metamagic feat yet."
      ]
     }
-   ]
+   ],
+   "slot": false
   }
  }
 }

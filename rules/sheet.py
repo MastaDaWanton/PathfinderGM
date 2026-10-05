@@ -460,6 +460,10 @@ class Actor:
     # a spell copied from a scroll is in the book too, and only this says which were the
     # free ones. Settled once for an older save at load (`casting.infer_level_spells_taken`).
     level_spells_taken: int = 0
+    # The class levels at which a spontaneous caster has exchanged a known spell (a
+    # sorcerer at 4, 6, 8…, a bard at 5, 8, 11…: `casting.swaps`). One swap per such
+    # level, so the levels used are the whole record.
+    spell_swaps: list = field(default_factory=list)
     # The feats and ability points a level owes, taken so far (`leveling.owed`). Counts,
     # on the spell counter's pattern: what is OWED is worked out from the level and the
     # house rules every time it is asked, and only what has been TAKEN is stored, so a
@@ -4867,6 +4871,19 @@ def _spell_sheet(actor: Actor) -> dict | None:
                     for name in domains_mod.of(actor)],
         "domain_slots": [{"level": lvl, "max": n} for lvl, n
                          in sorted(casting.domain_slots_for(actor).items())],
+        # The domain and specialist slots as the tab prepares into them: each level's
+        # slot, what it holds, what may go in it, and the refusal sentence when nothing
+        # can (`casting.special_slot_rows`); the specialist's school and opposition; a
+        # bloodline's spells known; the spell exchanges a sorcerer or bard has open.
+        "special_slots": casting.special_slot_rows(actor),
+        "school": {"specialist": casting.specialist_school(actor),
+                   "opposition": sorted(casting.opposition_schools(actor))},
+        "granted": [{"id": sid, "level": lvl,
+                     "name": spells_mod.all_spells()[sid].name}
+                    for sid, lvl in sorted(casting.granted_known(actor).items(),
+                                           key=lambda p: (p[1], p[0]))
+                    if sid in spells_mod.all_spells()],
+        "swaps": casting.swaps(actor),
         "known": known,
         # And everything they may CHOOSE from, which for a list-caster is not the same
         # thing at all. Reported 2026-09-19: "this spells panel should show a list of all
@@ -4913,9 +4930,12 @@ def _choosable(actor: Actor) -> list[dict]:
 def _reachable_spells(actor: Actor, data: dict) -> list[str]:
     """What to list. A wizard's book is a handful of ids; a cleric's list is hundreds, so
     for them the sheet shows what is prepared rather than the entire class list."""
+    # A copy in a domain or school slot ("domain:fireball") is listed with its slot
+    # (`spellcasting.special_slots`), not here as a spell id nothing could find.
+    held = [k for k in actor.prepared if ":" not in str(k)]
     if data.get("prepare_from") == "spellbook":
-        return list(dict.fromkeys(list(actor.spellbook) + list(actor.prepared)))
-    return list(actor.prepared)
+        return list(dict.fromkeys(list(actor.spellbook) + held))
+    return held
 
 
 def _document_effect_text(doc: dict) -> str:
@@ -5283,6 +5303,8 @@ def to_dict(actor: Actor) -> dict:
     # book with nothing taken infers nothing again.
     if int(actor.level_spells_taken or 0):
         d["level_spells_taken"] = int(actor.level_spells_taken)
+    if actor.spell_swaps:
+        d["spell_swaps"] = sorted(int(n) for n in actor.spell_swaps)
     # The level-up picks taken, on the same rule: only when some were, so a save from
     # before they existed reads back byte for byte.
     for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
@@ -5834,6 +5856,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # after creation before these counters existed, so an older save has taken none.
     for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
         setattr(a, key, max(0, int(data.get(key) or 0)))
+    a.spell_swaps = sorted({int(n) for n in data.get("spell_swaps") or []
+                            if str(n).lstrip("-").isdigit()})
     if "level_spells_taken" in data:
         a.level_spells_taken = max(0, int(data.get("level_spells_taken") or 0))
     else:

@@ -79,11 +79,14 @@ def test_the_bard_stops_at_six_spell_levels():
     assert max(casting.slots_for(bard)) == 6
 
 
-def test_the_paladin_gets_nothing_before_fifth_and_something_after():
-    """The book gives 4th level a bonus-slots-only row; the engine skips a zero base, so
-    the modelled paladin starts casting at 5. Stated in the table's comment, asserted
-    here so the compromise is a decision and not a drift."""
-    assert casting.slots_for(actor("paladin", 4)) == {}
+def test_the_paladin_casts_her_bonus_spell_at_fourth_as_the_book_says():
+    """This pinned a compromise until 2026-10-05: the book's 4th-level "0" (bonus spells
+    only) was stored as no access, so "the modelled paladin starts casting at 5". The
+    class audit measured what that cost (D9): a Cha 18 paladin had no slot at 4th, none at
+    2nd level at 7th, none at 3rd at 10th, and an extra 4th-level slot at 13th. The table
+    now tells "—" from "0", as PCGen's -1/0 and Foundry's undefined/0 do."""
+    assert casting.slots_for(actor("paladin", 4)) == {1: 1}   # 0 base + 1 Cha bonus
+    assert casting.slots_for(actor("paladin", 4, cha=10)) == {}   # no bonus, no slot
     assert casting.slots_for(actor("paladin", 5)) == {1: 2}   # 1 base + 1 Cha bonus
 
 

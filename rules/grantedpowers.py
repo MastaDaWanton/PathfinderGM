@@ -70,7 +70,7 @@ DOMAIN = "domain"
 POWER_KEYS = frozenset({"key", "name", "level", "kind", "line", "pool", "cost", "tags",
                         "by_level", "by_variant", "not_yet", "modifiers", "class_skills",
                         "feats"})
-ENTRY_KEYS = frozenset({"powers", "class_skills", "not_yet", "note"})
+ENTRY_KEYS = frozenset({"powers", "class_skills", "not_yet", "note", "slot"})
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when", "note"})
 _PLACEHOLDER = re.compile(r"\$([a-z_]+)")
@@ -188,7 +188,11 @@ def sources(actor) -> list[dict]:
                 continue
             out.append({"label": f"{pick.get('name') or pick.get('id')} {noun}",
                         "kind": noun, "id": _norm(pick.get("id")), "entry": entry,
-                        "pick": pick, "vars": _variant_fields(pick)})
+                        "pick": pick, "vars": _variant_fields(pick),
+                        # The file's own rules about casting (a school's specialist
+                        # slot, its opposition schools), for rules/casting.py.
+                        "rules": {k: doc[k] for k in ("specialist_slot", "opposition")
+                                  if k in doc}})
     return out
 
 

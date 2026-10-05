@@ -968,6 +968,21 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         sheet["domains"] = picked_domains
     if class_choices:
         sheet["class_choices"] = class_choices
+    # And the feats a chosen domain hands over at 1st (Darkness's Blind-Fight, Rune's
+    # Scribe Scroll: rules/grantedpowers.py, lane 2), which need the choices on the sheet
+    # to be known. Written like the class's own; a level-up writes the later ones.
+    if picked_domains or class_choices:
+        from . import grantedpowers
+
+        held = {str(f).lower() for f in sheet["feats"]}
+        for fid in grantedpowers.granted_feats(from_dict(sheet)):
+            try:
+                name = feats_mod.get(fid).name.lower()
+            except LookupError:
+                continue
+            if name not in held:
+                sheet["feats"].append(name)
+                held.add(name)
 
     # The proof of the whole exercise: the dict must load as an Actor before anything is
     # saved, so a creation bug is a refusal here rather than a corrupt file on disk.

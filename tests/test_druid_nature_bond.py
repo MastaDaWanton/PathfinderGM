@@ -177,11 +177,15 @@ def test_the_power_documents_validate_and_cover_the_seven():
     assert any("unknown field(s) colour" in p for p in found)
     assert any(".level: the class level" in p for p in found)
     assert any(".cost: spends its own pool" in p for p in found)
-    # Every power that cannot be fired by the engine yet says so in its own words.
+    # Every power with uses a day either has a class-ability document the engine fires it
+    # by (content/class-abilities/domains.json) or says, in its own words, why not.
+    from rules import grantedpowers
+
+    usable = {key for kind, key in grantedpowers.usable_keys(None) if kind == "domain"}
     for d in domains.documented():
         for p in domains.powers_of(d):
             if p.get("pool"):
-                assert p.get("not_yet"), (d, p["name"])
+                assert p.get("not_yet") or p["key"] in usable, (d, p["name"])
 
 
 # --- the animal companion ---------------------------------------------------------------------
