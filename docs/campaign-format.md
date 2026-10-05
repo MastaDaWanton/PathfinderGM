@@ -129,7 +129,7 @@ the consuming application's job.
 
 | Key | Each entry |
 |---|---|
-| `settlements` | `{id, name, scale, sells, buys, tension, governed_by, parent_id}` |
+| `settlements` | `{id, name, scale, sells, buys, tension, governed_by, parent_id}`. *(proposed, read today)* `landforms`: `[{name, terrain, miles, words}]`, two to four named stretches of open ground within a short walk (a `crosses` terrain word, miles from the settlement's edge, the world's own clause). Given, it is the settlement's hinterland exactly; absent, the consumer derives one from the routes and the region's prose (docs/from-world-bible.md). |
 | `cast` | `{id, name, role, home_id, home}` |
 | `travel` | `{from_id, to_id, from, to, carrying, friction, by}` — a route is also a road between two places that demonstrably deal with each other. *(1.5)* `by` is `road`, `sea` or `river`, and it **outranks anything a consumer can work out**: a trade route is an economic relationship, and "Brackgate sells tempered steel to Ashwatch" was never a claim that you can walk there. Measured before it existed: 48 of Aurvantis's 48 legs crossed a continent boundary and every one of them was being walked. Aurvantis 1.5 says road 81, sea 38, river 13. |
 | `conflicts` | `{faction, wants, works_by, holds, undone_by}` — an aim plus a weakness is a plot with a way in and a way out. |

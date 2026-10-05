@@ -8904,6 +8904,11 @@ class Engine:
             going_to = next((p for p in known if places_mod.is_ring(p.id)
                              and p.name in (outskirts_mod.FIELDS, outskirts_mod.SHORE)
                              and p.terrain == biome), None)
+            # And the hinterland's reaches are that ground too: "I head into the hills"
+            # from Vormoor is the ridgelines, the place the Places row offers by name at
+            # its own distance — not a second, nameless hills minted an hour out beside
+            # it (2026-10-05, docs/place-doors.md "The hinterland").
+            going_to = going_to or outskirts_mod.reach_of(known, biome)
             if going_to is None:
                 # Is it there at all? The world says what ground lies around a
                 # settlement (`geography.land_around`), and a move onto ground it does not
