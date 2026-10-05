@@ -399,10 +399,13 @@ def bench_roll(request):
             said = f"Missed by {miss}. The time is lost; the materials are kept."
         out["said"] = said
         lead = plan.lead
+        # The whole stack failed on one roll, so it is that many failed steps: see the
+        # finish below for why a batch counts its doses.
         got = worldclass.award_step(track, progress, method=plan.method,
                          ingredient_id=lead.ingredient_id if lead else "",
                          rarity_rank=plan.rank_in, quality_index=0, success=False,
-                         name=crafting._lead_name(lead) if lead else "")
+                         name=crafting._lead_name(lead) if lead else "",
+                         count=plan.doses, noun="dose")
         out["mastery"] = {"lines": list(got.get("reasons") or []),
                           "total": got.get("total", progress.mp),
                           "level": got.get("level", progress.level),
@@ -474,13 +477,22 @@ def bench_finish(request):
     pc.add_stock(made, count)
 
     # Mastery: the step, the quality bonus (inside the step award), then firsts.
+    #
+    # A batch pays as its doses made one at a time would (owner, 2026-10-05: "batch
+    # crafting does not give equivalent experience"): one step per dose against the
+    # repeat limit, each with its bands and the stack's one quality bonus. Doses, not
+    # `plan.batch`: three Mint on the mortar at batch 1 is three grinds as surely as one
+    # Mint at batch 3, and the smallest craft any method allows is one dose. The yield
+    # perk's extra dose is a gift of the perk, not a step worked, so it is not counted.
+    # Firsts and discoveries stay once per finish, however many doses.
     lines: list[dict] = []
     levelled: list[int] = []
     lead = plan.lead
     got = worldclass.award_step(track, progress, method=plan.method,
                      ingredient_id=lead.ingredient_id if lead else "",
                      rarity_rank=plan.rank_in, quality_index=tier, success=True,
-                     name=crafting._lead_name(lead) if lead else "")
+                     name=crafting._lead_name(lead) if lead else "",
+                     count=plan.doses, noun="dose")
     lines += list(got.get("reasons") or [])
     levelled += list(got.get("levelled") or [])
 
