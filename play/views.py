@@ -809,7 +809,12 @@ def resurrect(request):
     # points are restored AFTER it rather than before: an effect holding up the
     # maximum can expire inside those weeks, and setting hp first left a character
     # above a maximum that had since fallen.
-    c.scene.advance(days * 24 * 60)
+    # `charge_body=False` since the clock's door rolls the body's checks (2026-10-05,
+    # rules/survival.py `charge`): `dead` is already lifted above, so the weeks on the
+    # slab were charged to a living body — three weeks without water, rolled hour by
+    # hour, and the character died of thirst inside their own resurrection
+    # (tests/test_roster.py measured it). The weeks are the world's, not the body's.
+    c.scene.advance(days * 24 * 60, charge_body=False)
     pc.hp = pc.hp_max
     pc.add_condition("life debt", source=patron)
 

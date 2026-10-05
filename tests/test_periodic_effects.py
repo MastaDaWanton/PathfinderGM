@@ -86,6 +86,10 @@ def test_a_days_work_runs_once_per_day_crossed_and_never_per_round():
     firing a round's work that often would heal a troll 4,800 points. A `per: day` entry
     runs once per day boundary the clock crosses: three days, three times."""
     scene, pc = _scene()
+    # Three days without water roll thirst checks on the clock's door since 2026-10-05
+    # (rules/survival.py, `charge`); this measures the periodic heal alone.
+    for need in ("needs.no_sleep", "needs.no_food", "needs.no_water"):
+        pc.overrides[need] = True
     pc.hp = pc.hp_max - 10
     pc.apply_effect(ActiveEffect(name="slow mending", kind="buff",
                                  periodic=[{"heal": 2, "per": "day"},

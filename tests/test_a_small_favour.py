@@ -87,6 +87,14 @@ def schemes_on(monkeypatch):
 def _table(seed=3):
     s = Scene(location_id=TOWN)
     pc = load_pc("fixtures/pc-kesst.json")
+    # The line runs over a day and a half of waiting and walking without a meal or a
+    # bed, and since 2026-10-05 the clock's door rolls the body's checks for it
+    # (rules/survival.py, `charge`): Kesst fell asleep where she stood before reaching
+    # the market for justice. These tests are about the schemes, not her stamina.
+    from rules import survival
+
+    for need in (survival.NO_SLEEP, survival.NO_FOOD, survival.NO_WATER):
+        pc.overrides[need] = True
     s.add(pc)
     e = Engine(s, Dice(seed=seed), world=WORLD)
     e.place_party(MARKET)

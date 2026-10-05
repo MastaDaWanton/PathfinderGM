@@ -21,6 +21,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rules import survival
+
 # PF1e: a stable character has a chance each hour of waking. Rolling hour by hour for a
 # solo game is bookkeeping nobody enjoys, so the wait is resolved in one step and the
 # character comes round at 1 hit point.
@@ -102,6 +104,25 @@ def resolve(campaign) -> Outcome:
     engine = campaign.engine()
     lines: list[str] = []
 
+    # Asleep where they fell (rules/survival.py): the third failed save against sleep. Not
+    # a knockout and not stable — the general branch below would wake them after one hour
+    # with their hit points floored, and the awake clock untouched, so the next hour's
+    # save would drop them again, for ever. The body's own sleep runs out on the clock's
+    # door (`survival.charge` wakes them into a night's rest); this only lets it.
+    if survival.asleep(pc) is not None and not scene.in_encounter \
+            and not pc.has_state("state.down.dying"):
+        left = survival.sleep_left(pc)
+        hours = max(1, round(left / 60))
+        scene.advance(left)
+        told = [s for r in scene.take_body_said() for s in r.get("said") or []]
+        woke = survival.asleep(pc) is None and not pc.has_state("state.down")
+        lines.append(
+            f"You sleep on where you dropped, "
+            f"{'about an hour' if hours == 1 else f'{hours} hours'} more"
+            + (", and wake." if woke else ", and do not wake."))
+        lines.extend(told)
+        return Outcome(state="stable", playable=woke, lines=lines)
+
     if state == "dying":
         # Round by round, so the player watches it happen rather than being told the
         # result. This is the most frightening thing that can happen to a character and
@@ -140,9 +161,22 @@ def resolve(campaign) -> Outcome:
         per_hour = max(1, int(getattr(pc, "level", 1) or 1))
         hours = max(1, -(-(pc.nonlethal - pc.nonlethal_threshold) // per_hour))
         scene.advance(hours * 60)
+        # The clock's door rolls the body's checks now (rules/survival.py, `charge`), so
+        # the hours spent out cold can add to what keeps them there — a parched body
+        # keeps failing its thirst checks while it lies senseless. Said as it is, never
+        # "you come round" over a character who has not.
+        told = [s for r in scene.take_body_said() for s in r.get("said") or []]
+        if pc.has_state("state.down"):
+            lines.append(
+                f"{'About an hour' if hours == 1 else f'{hours} hours'} pass"
+                f"{'es' if hours == 1 else ''}, and you do not come round.")
+            lines.extend(told)
+            lines.extend(after)
+            return Outcome(state="stable", playable=False, lines=lines, effects=effects)
         lines.append(
             f"You come round {'about an hour' if hours == 1 else f'{hours} hours'} "
             f"later, aching, where you were knocked down.")
+        lines.extend(told)
         lines.extend(after)
         return Outcome(state="stable", playable=True, lines=lines, effects=effects)
 
@@ -153,12 +187,14 @@ def resolve(campaign) -> Outcome:
     # An hour used to pass with nothing ticking at all — not conditions, not buffs,
     # not pools, not compulsions.
     scene.advance(HOURS_UNTIL_CONSCIOUS * 60)
+    told = [s for r in scene.take_body_said() for s in r.get("said") or []]
     pc.hp = max(pc.hp, 1)
     pc.clear_states("recovery.hit-points")
     lines.append(
         f"You come round about an hour later, face down where you fell, on "
         f"{pc.hp} hit point{'s' if pc.hp != 1 else ''}."
     )
+    lines.extend(told)
     lines.extend(after)
     return Outcome(state="stable", playable=True, lines=lines, effects=effects)
 
