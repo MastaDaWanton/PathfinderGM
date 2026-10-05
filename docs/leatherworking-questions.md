@@ -566,3 +566,12 @@ catalogue or code, whatever the owner rules above.
 | Q3.2 Consumables | **Working traits plus at most one small mark** (recommended). |
 | Q3.3 Carried goods | **A book rule where one exists, flavour otherwise** (recommended). |
 | Q3.4 Masterwork | **The book wins**: dragonhide, eel hide, angelskin, darkleaf are always masterwork; others at Superior+ (recommended). |
+
+### Round 4 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q4.1 Skinning | **One harvest per carcass on the book's numbers** (DC 15 + CR, Survival), yield by size, grade from the skinning minigame (recommended). |
+| Q4.2 How the beast died | **No effect**: grade from skinning only, the beast sets the tier (recommended). |
+| Q4.3 Which creatures | **By the bestiary's type, subtype, size and CR**, never names; named hides win; humanoids never skinned (recommended). |
+| Q4.4 Spoilage | **Keep 48 hours, actually start it, salt in the pack stops it** (recommended). |
