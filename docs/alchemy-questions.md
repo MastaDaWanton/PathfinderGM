@@ -549,3 +549,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q6.2 Perks | **Herbalism's four plus Containment** (-1 DC a pick on volatile steps, a smaller mishap) (recommended). |
 | Q6.3 Where | **Field kit plus a laboratory** (town by the hour, or owned) for rare+ and for Distill and Sublime (recommended). |
 | Q6.4 Quality on book items | **Stronger, longer, softer drawbacks, worth more; each tier above Sound adds +1 caster level** to a spell potion (recommended). |
+
+### Round 7 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q7.1 Traits | **At least three discoverable, one a drawback, in two layers** (product effects, working traits) (recommended). |
+| Q7.2 Inheritance | **Atelier's model**: family slots, the player picks, traits travel through intermediates, same-named traits add capped by level, finished goods are dead ends (recommended). |
+| Q7.3 Apparatus | **Working traits only; vessels decide the product family**; catalysts never spent (recommended). |
+| Q7.4 Inert and legendary | **Three traits each; prima materia a wild trait, philosopher's mercury a catalyst never spent** (recommended). |
