@@ -464,6 +464,14 @@ def _place_for(engine, kind: str, spec: dict) -> dict | None:
         # person put there is met on arrival; the road is the region's edge — the way
         # out — a place apart from it.
         p = region[2] if kind == "road" and len(region) > 2 else region[0]
+        # Where the ground has a reach of the hinterland (`geography.Reach`), a travel by
+        # ground lands THERE now ("the grasslands", 2026-10-05), so the wild is the reach
+        # — a person put at the region's approach would stand in a place nobody arrives at.
+        if kind == "wild" and found is not None:
+            from . import outskirts as outskirts_mod
+
+            reach = outskirts_mod.reach_of(engine._ring(found, scene.at), terrain)
+            p = reach or p
         return {"kind": "place", "id": p.id, "name": p.name, "terrain": p.terrain,
                 "region": True, "hours": int(spec.get("hours", 2) or 2)}
     for name in PLACE_KINDS.get(kind, ()):
