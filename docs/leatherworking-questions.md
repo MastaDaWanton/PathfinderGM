@@ -601,3 +601,12 @@ catalogue or code, whatever the owner rules above.
 | Q7.2 Dragonhide | **Book first plus a house top-up** (recommended). |
 | Q7.3 Druid metal rule | **Yes, and wider: "yes armor and weapons both need a metal tag because there are spells that affect metal."** Both armour and weapons carry a metal tag from their pieces (heat metal, chill metal, rusting grasp, shocking grasp's +3 vs metal armour all read it); the druid's no-metal-armour rule (spells and supernatural abilities lost until 24 h after removing it) is one reader of that tag. |
 | Q7.4 Grips | **The leatherworker makes the haft piece** and the forge's Assemble takes it (recommended). |
+
+### Round 8 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q8.1 Bench | **Its own bench**, built from the herb bench and forge parts (recommended). |
+| Q8.2 Minigames | **The grounded set** (flense, tan, harden, stitch, tool, cut, harvest) (recommended). |
+| Q8.3 Tuning | **Generous, with Steady mode, bands as numbers and bars as well as colour** (recommended). |
+| Q8.4 Old tab | **A "moved" card** when the new bench ships (recommended). |
