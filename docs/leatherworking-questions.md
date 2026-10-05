@@ -548,3 +548,12 @@ catalogue or code, whatever the owner rules above.
 | Q1.2 Armour model | **One armour model**: the forge's body/fastenings/lining and its crafted-item record (recommended). |
 | Q1.3 Who makes the mixed suits | **The owner's own answer: "leatherworking makes the base and the forge uses the base as an item and finishes it."** A leather or hide base (the body) is a finished leatherworker's item that the forge takes as its input and completes (studs, plates, metal fastenings) into studded leather, armoured coat, lamellar and the like. |
 | Q1.4 What it makes | **Armour, shields, worn gear, grips, carried goods** (recommended). |
+
+### Round 2 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q2.1 Methods | **Trim and add**: Flense, Salt, Tan, Curry, Cut, Stitch, Harden, Tool, Dye, Assemble, Grade; Line becomes a piece, Skin becomes the harvest action (recommended). |
+| Q2.2 Tanning time | **Real in-world time by tannage**, a tannery vat holding a hide while you adventure; never real-time waiting (recommended). |
+| Q2.3 Intermediates | **Each real stage** lands on the shelf, each sellable (recommended). |
+| Q2.4 Concentration | **Laminate**: two leathers into one, x1.5, levels cut negatives 10% (recommended). |
