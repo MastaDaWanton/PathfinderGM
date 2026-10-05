@@ -1390,6 +1390,20 @@ class Actor:
 
         return classes.get(self.char_class or "")
 
+    @property
+    def class_skills(self) -> tuple:
+        """The class's skills and the ones a choice adds: a bloodline's ("knowledge
+        (planes)" for an abyssal sorcerer), a domain's (every Knowledge skill for a
+        Knowledge cleric). Measured 2026-10-05: three readers asked the class document
+        alone, so a bloodline's class skill was printed in the catalogue and never got
+        its +3 (`rules/grantedpowers.py:class_skills`)."""
+        own = tuple(self.class_data.get("class_skills", ()) or ())
+        if not (self.domains or self.class_choices):
+            return own
+        from . import grantedpowers
+
+        return own + tuple(s for s in grantedpowers.class_skills(self) if s not in own)
+
     def ability_score(self, ab: str) -> int:
         """The score as it stands, after everything that has happened to it.
 
@@ -1867,7 +1881,7 @@ class Actor:
                 )
             if rank:
                 mods.append(Modifier(rank, "ranks"))
-                if skill in self.class_data.get("class_skills", ()):
+                if skill in self.class_skills:
                     mods.append(Modifier(3, "class skill"))
             am = self.ability_mod(ability)
             if am:
@@ -3512,13 +3526,14 @@ class Actor:
         # has_state half of what `immunities` lists (`immune_to` asks the tag).
         if self.char_class:
             out.extend(_classfeatures.tags(self))
-        # What this character's domains' powers hold (content/domains/powers.json) —
-        # Fire Resistance's `resist.fire.10` from 6th — read off the domain list live,
-        # like the feats above, so `resistance()` and `immune_to()` answer from them.
-        if self.domains:
-            from . import domains as _domains
+        # What this character's granted powers hold — a domain's Fire Resistance
+        # (`resist.fire.10` from 6th), a bloodline's Dragon Resistances, a school's
+        # Resistance — read off the choices live (`rules/grantedpowers.py`), like the
+        # feats above, so `resistance()` and `immune_to()` answer from them.
+        if self.domains or self.class_choices:
+            from . import grantedpowers as _grantedpowers
 
-            out.extend(_domains.standing_tags(self))
+            out.extend(_grantedpowers.standing_tags(self))
         # A stat block's own tags — the watchman's `role.guard` — read live off the
         # template the creature came from, the way a feat's are read off its document.
         if self.from_template:
@@ -3881,9 +3896,15 @@ class Actor:
             return []
         from . import classfeatures
 
+        from . import grantedpowers
+
         self._reading_class = True
         try:
-            return classfeatures.modifiers(self, kind, target, ctx)
+            # The class table's passives, then the passives of what the character chose:
+            # a domain's (Protection's resistance bonus, Travel's +10 ft), a bloodline's
+            # (Dragon Resistances' natural armour), a school's, a familiar's gift.
+            return (classfeatures.modifiers(self, kind, target, ctx)
+                    + grantedpowers.modifiers(self, kind, target, ctx))
         finally:
             self._reading_class = False
 
@@ -4500,14 +4521,14 @@ def full_sheet(actor: Actor) -> dict:
         if trained_only and rank == 0 and name not in actor.flat_skills:
             # Cannot be attempted at all; listed so the absence is visible, not silent.
             skills.append({"name": name, "ability": ability, "rank": 0,
-                           "class_skill": name in cls.get("class_skills", ()),
+                           "class_skill": name in actor.class_skills,
                            "trained_only": True, "usable": False,
                            "total": None, "terms": []})
             continue
         t = _terms(actor.skill_modifiers(name))
         skills.append({
             "name": name, "ability": ability, "rank": rank,
-            "class_skill": name in cls.get("class_skills", ()),
+            "class_skill": name in actor.class_skills,
             "trained_only": trained_only, "armour_check": acp, "usable": True,
             **t,
         })
@@ -5227,7 +5248,7 @@ def _progression(actor: Actor) -> dict:
         "hit_die": cls.get("hit_die", 8), "bab": cls.get("bab", ""),
         "good_saves": list(cls.get("good_saves") or []),
         "skill_ranks": cls.get("skill_ranks", 2),
-        "class_skills": list(cls.get("class_skills") or []),
+        "class_skills": list(actor.class_skills),
         "paths_offered": leveling.paths_for(cid),
         # What each branch actually does, as the class file states it. The tab showed
         # four names and a line saying they granted nothing; now it shows the abilities

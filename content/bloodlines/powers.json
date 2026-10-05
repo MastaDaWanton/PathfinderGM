@@ -1,0 +1,1183 @@
+{
+ "choice": "bloodline",
+ "label": "bloodline",
+ "_source": "Core Rulebook, Sorcerer: Bloodlines (legacy.aonprd.com/coreRulebook/classes/sorcerer.html, raw HTML read 2026-10-05; cross-checked against d20pfsrd's bloodline pages). The bloodline's class skill, bonus spells, bonus feats and arcana are the catalogue's (content/class-options/sorcerer-bloodlines.json); this file is what the powers DO.",
+ "_grammar": "rules/grantedpowers.py, module docstring.",
+ "entries": {
+  "aberrant": {
+   "powers": [
+    {
+     "key": "acidic ray",
+     "name": "Acidic Ray",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Ranged touch, 30 ft: 1d6 acid + 1 per two levels, 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "acidic ray",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "ranged touch",
+     "range_ft": 30,
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "roll": {
+      "count": 1,
+      "die": 6,
+      "bonus": "floor(level / 2)",
+      "as": "damage",
+      "type": "acid"
+     },
+     "tell": "{name} looses a acidic ray at {target}."
+    },
+    {
+     "key": "long limbs",
+     "name": "Long Limbs",
+     "level": 3,
+     "kind": "Ex",
+     "line": "+5 ft reach on melee touch attacks (+10 at 11th, +15 at 17th); what you threaten does not change.",
+     "not_yet": [
+      "Reach on touch attacks: melee reach is read off the weapon, and a touch attack has no reach field yet."
+     ]
+    },
+    {
+     "key": "unusual anatomy",
+     "name": "Unusual Anatomy",
+     "level": 9,
+     "kind": "Ex",
+     "line": "A 25% chance to ignore a critical hit or sneak attack (50% at 13th).",
+     "not_yet": [
+      "Fortification against crits and sneak attack: no damage reader rolls it."
+     ]
+    },
+    {
+     "key": "alien resistance",
+     "name": "Alien Resistance",
+     "level": 15,
+     "kind": "Su",
+     "line": "Spell resistance of your level + 10.",
+     "not_yet": [
+      "Spell resistance: nothing in the app rolls to overcome it yet (stage 9)."
+     ]
+    },
+    {
+     "key": "aberrant form",
+     "name": "Aberrant Form",
+     "level": 20,
+     "kind": "Ex",
+     "line": "Immune to critical hits and sneak attacks; blindsight 60 ft; DR 5/-.",
+     "not_yet": [
+      "Critical-hit and sneak-attack immunity, blindsight and DR from a power: the damage path reads DR off the sheet's reductions only."
+     ]
+    }
+   ]
+  },
+  "abyssal": {
+   "powers": [
+    {
+     "key": "claws",
+     "name": "Claws",
+     "level": 1,
+     "kind": "Su",
+     "line": "Two claws, 1d4 + Str each (1d3 if Small), at your full attack bonus, for 3 + Cha rounds a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "claws",
+      "amount": 1
+     },
+     "action": "free",
+     "toggle": {
+      "key": "claws"
+     },
+     "drain": {
+      "pool": "claws",
+      "amount": 1
+     },
+     "self": {
+      "tags": [
+       "buff.claws"
+      ],
+      "natural_weapons": [
+       {
+        "key": "claw",
+        "name": "claw",
+        "type": "slashing",
+        "count": 2,
+        "damage": {
+         "small": "1d3",
+         "medium": "1d4"
+        }
+       }
+      ]
+     },
+     "tell": "{name}'s hands twist into claws.",
+     "tell_off": "{name}'s claws draw back.",
+     "by_level": {
+      "5": {
+       "line": "Two claws, 1d4 + Str each (1d3 if Small), counting as magic, for 3 + Cha rounds a day."
+      },
+      "7": {
+       "line": "Two claws, 1d6 + Str each (1d4 if Small), counting as magic, for 3 + Cha rounds a day.",
+       "self": {
+        "tags": [
+         "buff.claws"
+        ],
+        "natural_weapons": [
+         {
+          "key": "claw",
+          "name": "claw",
+          "type": "slashing",
+          "count": 2,
+          "damage": {
+           "small": "1d4",
+           "medium": "1d6"
+          }
+         }
+        ]
+       }
+      },
+      "11": {
+       "line": "Two claws, 1d6 + Str each (1d4 if Small), magic, and +1d6 fire on a hit, for 3 + Cha rounds a day.",
+       "not_yet": [
+        "The +1d6 fire on each claw from 11th: a natural weapon's energy rider has no field yet."
+       ]
+      }
+     }
+    },
+    {
+     "key": "demon resistances",
+     "name": "Demon Resistances",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Resist electricity 5 and +2 on saves against poison.",
+     "tags": [
+      "resist.electricity.5"
+     ],
+     "modifiers": [
+      {
+       "type": "save_mod",
+       "target": "fort",
+       "bonus_type": "untyped",
+       "amount": 2,
+       "when": {
+        "against": "poison"
+       }
+      }
+     ],
+     "not_yet": [
+      "The bonus on saves against poison: a save says what it is against only for spells, so the term is written and dropped until a poison's save says so (the same wait as bravery's)."
+     ],
+     "by_level": {
+      "9": {
+       "tags": [
+        "resist.electricity.10"
+       ],
+       "modifiers": [
+        {
+         "type": "save_mod",
+         "target": "fort",
+         "bonus_type": "untyped",
+         "amount": 4,
+         "when": {
+          "against": "poison"
+         }
+        }
+       ],
+       "line": "Resist electricity 10 and +4 on saves against poison."
+      }
+     }
+    },
+    {
+     "key": "strength of the abyss",
+     "name": "Strength of the Abyss",
+     "level": 9,
+     "kind": "Ex",
+     "line": "+2 inherent bonus to Strength (+4 at 13th, +6 at 17th).",
+     "modifiers": [
+      {
+       "type": "ability_mod",
+       "target": "str",
+       "bonus_type": "inherent",
+       "amount": 2
+      }
+     ],
+     "by_level": {
+      "13": {
+       "line": "+4 inherent bonus to Strength (+6 at 17th).",
+       "modifiers": [
+        {
+         "type": "ability_mod",
+         "target": "str",
+         "bonus_type": "inherent",
+         "amount": 4
+        }
+       ]
+      },
+      "17": {
+       "line": "+6 inherent bonus to Strength.",
+       "modifiers": [
+        {
+         "type": "ability_mod",
+         "target": "str",
+         "bonus_type": "inherent",
+         "amount": 6
+        }
+       ]
+      }
+     }
+    },
+    {
+     "key": "added summonings",
+     "name": "Added Summonings",
+     "level": 15,
+     "kind": "Su",
+     "line": "Summon monster calling a demon (or a fiendish creature) calls one more.",
+     "not_yet": [
+      "Summons: the cast op narrates summoning; no extra creature is added."
+     ]
+    },
+    {
+     "key": "demonic might",
+     "name": "Demonic Might",
+     "level": 20,
+     "kind": "Su",
+     "line": "Immune to electricity and poison; resist acid, cold and fire 10; telepathy 60 ft.",
+     "tags": [
+      "immune.electricity",
+      "immune.poison",
+      "resist.acid.10",
+      "resist.cold.10",
+      "resist.fire.10"
+     ]
+    }
+   ]
+  },
+  "arcane": {
+   "powers": [
+    {
+     "key": "bloodline arcane bond",
+     "name": "Arcane Bond",
+     "level": 1,
+     "kind": "Su",
+     "line": "A familiar or a bonded object, as a wizard of your level; the object casts one spell you know once a day.",
+     "not_yet": [
+      "Choosing the bond: the sorcerer's class document asks no arcane-bond choice yet (lane 1's grammar would carry it), so neither the familiar's gift nor the object's daily spell arrives."
+     ]
+    },
+    {
+     "key": "metamagic adept",
+     "name": "Metamagic Adept",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Apply a metamagic feat you know without lengthening the casting, once a day (+1 per four levels after 3rd).",
+     "pool": {
+      "max": "1 + floor((level - 3) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "metamagic adept",
+      "amount": 1
+     },
+     "not_yet": [
+      "Metamagic: the cast op applies no metamagic feat yet."
+     ]
+    },
+    {
+     "key": "new arcana",
+     "name": "New Arcana",
+     "level": 9,
+     "kind": "Ex",
+     "line": "One sorcerer/wizard spell of a level you can cast added to your spells known (again at 13th and 17th).",
+     "not_yet": [
+      "The extra spell known: the Spells Known count does not read it yet; take it through the Spells tab's Learn when a pick is owed."
+     ]
+    },
+    {
+     "key": "school power",
+     "name": "School Power",
+     "level": 15,
+     "kind": "Ex",
+     "line": "+2 to the save DCs of one school's spells (stacks with Spell Focus).",
+     "not_yet": [
+      "Choosing the school, and raising a spell's DC by school: the cast op's DC reads no tag of the caster's yet."
+     ]
+    },
+    {
+     "key": "arcane apotheosis",
+     "name": "Arcane Apotheosis",
+     "level": 20,
+     "kind": "Ex",
+     "line": "Apply any metamagic you know without lengthening the casting; spend spell slots to power charged items.",
+     "not_yet": [
+      "Metamagic and item charges: neither has a reader yet."
+     ]
+    }
+   ]
+  },
+  "celestial": {
+   "powers": [
+    {
+     "key": "heavenly fire",
+     "name": "Heavenly Fire",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Ranged touch, 30 ft: 1d4 + 1 per two levels of divine damage to an evil creature, or the same healed on a good one, 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "heavenly fire",
+      "amount": 1
+     },
+     "not_yet": [
+      "Telling evil from good: the app has no alignment (the 2026-09-19 ruling), so the uses are counted and the GM decides whom the fire harms."
+     ]
+    },
+    {
+     "key": "celestial resistances",
+     "name": "Celestial Resistances",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Resist acid 5 and cold 5.",
+     "tags": [
+      "resist.acid.5",
+      "resist.cold.5"
+     ],
+     "by_level": {
+      "9": {
+       "tags": [
+        "resist.acid.10",
+        "resist.cold.10"
+       ],
+       "line": "Resist acid 10 and cold 10."
+      }
+     }
+    },
+    {
+     "key": "wings of heaven",
+     "name": "Wings of Heaven",
+     "level": 9,
+     "kind": "Su",
+     "line": "Fly 60 ft (good) for your level in minutes a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "wings of heaven",
+      "amount": 1
+     },
+     "not_yet": [
+      "Flight: there is no fly speed on the sheet yet."
+     ]
+    },
+    {
+     "key": "conviction",
+     "name": "Conviction",
+     "level": 15,
+     "kind": "Su",
+     "line": "Once a day, reroll an ability check, attack, skill check or save and take the second.",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "conviction",
+      "amount": 1
+     },
+     "not_yet": [
+      "The reroll: no op takes a roll back."
+     ]
+    },
+    {
+     "key": "ascension",
+     "name": "Ascension",
+     "level": 20,
+     "kind": "Su",
+     "line": "Immune to acid, cold and petrification; resist electricity and fire 10; +4 on saves against poison; unlimited wings; tongues.",
+     "tags": [
+      "immune.acid",
+      "immune.cold",
+      "resist.electricity.10",
+      "resist.fire.10"
+     ],
+     "modifiers": [
+      {
+       "type": "save_mod",
+       "target": "fort",
+       "bonus_type": "untyped",
+       "amount": 4,
+       "when": {
+        "against": "poison"
+       }
+      }
+     ],
+     "not_yet": [
+      "The bonus on saves against poison: a save says what it is against only for spells, so the term is written and dropped until a poison's save says so (the same wait as bravery's)."
+     ]
+    }
+   ]
+  },
+  "destined": {
+   "powers": [
+    {
+     "key": "touch of destiny",
+     "name": "Touch of Destiny",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: + half your level (min +1) insight bonus on attacks, saves, skill and ability checks for a round, 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of destiny",
+      "amount": 1
+     },
+     "action": "standard",
+     "affects": "target",
+     "aim": "ally",
+     "effect": {
+      "rounds": 1,
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "attack",
+        "bonus_type": "insight",
+        "formula": "max(1, floor(level / 2))"
+       },
+       {
+        "type": "save_mod",
+        "target": "fort",
+        "bonus_type": "insight",
+        "formula": "max(1, floor(level / 2))"
+       },
+       {
+        "type": "save_mod",
+        "target": "ref",
+        "bonus_type": "insight",
+        "formula": "max(1, floor(level / 2))"
+       },
+       {
+        "type": "save_mod",
+        "target": "will",
+        "bonus_type": "insight",
+        "formula": "max(1, floor(level / 2))"
+       }
+      ]
+     },
+     "tell": "{name} touches {target}, and fate leans their way.",
+     "not_yet": [
+      "The bonus on skill and ability checks: no 'every skill' target yet."
+     ]
+    },
+    {
+     "key": "fated",
+     "name": "Fated",
+     "level": 3,
+     "kind": "Su",
+     "line": "+1 luck on saves and AC in a surprise round or against an unseen attack (+1 at 7th and every four levels after).",
+     "not_yet": [
+      "Surprise rounds and unseen attacks: neither is a roll context yet."
+     ]
+    },
+    {
+     "key": "it was meant to be",
+     "name": "It Was Meant to Be",
+     "level": 9,
+     "kind": "Su",
+     "line": "Reroll an attack, a critical confirmation or a check against spell resistance, once a day (twice from 17th).",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "it was meant to be",
+      "amount": 1
+     },
+     "by_level": {
+      "17": {
+       "pool": {
+        "max": "2",
+        "refresh": "rest.night"
+       }
+      }
+     },
+     "not_yet": [
+      "The reroll: no op takes a roll back."
+     ]
+    },
+    {
+     "key": "within reach",
+     "name": "Within Reach",
+     "level": 15,
+     "kind": "Su",
+     "line": "Once a day, a blow that would kill you: Will DC 20 to be left at -1 hit points, stable.",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "within reach",
+      "amount": 1
+     },
+     "not_yet": [
+      "Cheating death: the damage path reads no last-chance save."
+     ]
+    },
+    {
+     "key": "destiny realized",
+     "name": "Destiny Realized",
+     "level": 20,
+     "kind": "Su",
+     "line": "Critical threats against you confirm only on a 20; yours confirm automatically.",
+     "not_yet": [
+      "Critical confirmation from a power: the attack op reads no tag for it."
+     ]
+    }
+   ]
+  },
+  "draconic": {
+   "powers": [
+    {
+     "key": "claws",
+     "name": "Claws",
+     "level": 1,
+     "kind": "Su",
+     "line": "Two claws, 1d4 + Str each (1d3 if Small), at your full attack bonus, for 3 + Cha rounds a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "claws",
+      "amount": 1
+     },
+     "action": "free",
+     "toggle": {
+      "key": "claws"
+     },
+     "drain": {
+      "pool": "claws",
+      "amount": 1
+     },
+     "self": {
+      "tags": [
+       "buff.claws"
+      ],
+      "natural_weapons": [
+       {
+        "key": "claw",
+        "name": "claw",
+        "type": "slashing",
+        "count": 2,
+        "damage": {
+         "small": "1d3",
+         "medium": "1d4"
+        }
+       }
+      ]
+     },
+     "tell": "{name}'s hands twist into claws.",
+     "tell_off": "{name}'s claws draw back.",
+     "by_level": {
+      "5": {
+       "line": "Two claws, 1d4 + Str each (1d3 if Small), counting as magic, for 3 + Cha rounds a day."
+      },
+      "7": {
+       "line": "Two claws, 1d6 + Str each (1d4 if Small), counting as magic, for 3 + Cha rounds a day.",
+       "self": {
+        "tags": [
+         "buff.claws"
+        ],
+        "natural_weapons": [
+         {
+          "key": "claw",
+          "name": "claw",
+          "type": "slashing",
+          "count": 2,
+          "damage": {
+           "small": "1d4",
+           "medium": "1d6"
+          }
+         }
+        ]
+       }
+      },
+      "11": {
+       "line": "Two claws, 1d6 + Str each (1d4 if Small), magic, and +1d6 $energy on a hit, for 3 + Cha rounds a day.",
+       "not_yet": [
+        "The +1d6 $energy on each claw from 11th: a natural weapon's energy rider has no field yet."
+       ]
+      }
+     }
+    },
+    {
+     "key": "dragon resistances",
+     "name": "Dragon Resistances",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Resist $energy 5 and +1 natural armour.",
+     "tags": [
+      "resist.$energy.5"
+     ],
+     "modifiers": [
+      {
+       "type": "combat_mod",
+       "target": "ac",
+       "bonus_type": "natural armour",
+       "amount": 1
+      }
+     ],
+     "by_level": {
+      "9": {
+       "tags": [
+        "resist.$energy.10"
+       ],
+       "modifiers": [
+        {
+         "type": "combat_mod",
+         "target": "ac",
+         "bonus_type": "natural armour",
+         "amount": 2
+        }
+       ],
+       "line": "Resist $energy 10 and +2 natural armour."
+      },
+      "15": {
+       "tags": [
+        "resist.$energy.10"
+       ],
+       "modifiers": [
+        {
+         "type": "combat_mod",
+         "target": "ac",
+         "bonus_type": "natural armour",
+         "amount": 4
+        }
+       ],
+       "line": "Resist $energy 10 and +4 natural armour."
+      }
+     }
+    },
+    {
+     "key": "breath weapon",
+     "name": "Breath Weapon",
+     "level": 9,
+     "kind": "Su",
+     "line": "A $breath of $energy: 1d6 per level, Reflex half (DC 10 + half your level + Cha), once a day (twice at 17th, three times at 20th).",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "breath weapon",
+      "amount": 1
+     },
+     "by_level": {
+      "17": {
+       "pool": {
+        "max": "2",
+        "refresh": "rest.night"
+       }
+      },
+      "20": {
+       "pool": {
+        "max": "3",
+        "refresh": "rest.night"
+       }
+      }
+     },
+     "not_yet": [
+      "The line or cone: the class-ability grammar has no shaped area yet, so the uses are counted and the GM narrates the breath."
+     ]
+    },
+    {
+     "key": "wings",
+     "name": "Wings",
+     "level": 15,
+     "kind": "Su",
+     "line": "Leathery wings: fly 60 ft (average).",
+     "not_yet": [
+      "Flight: there is no fly speed on the sheet yet."
+     ]
+    },
+    {
+     "key": "power of wyrms",
+     "name": "Power of Wyrms",
+     "level": 20,
+     "kind": "Su",
+     "line": "Immune to paralysis, sleep and $energy; blindsense 60 ft.",
+     "tags": [
+      "immune.$energy",
+      "immune.paralysis",
+      "immune.sleep"
+     ]
+    }
+   ]
+  },
+  "elemental": {
+   "powers": [
+    {
+     "key": "elemental ray",
+     "name": "Elemental Ray",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Ranged touch, 30 ft: 1d6 $energy + 1 per two levels, 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "elemental ray",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "ranged touch",
+     "range_ft": 30,
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "roll": {
+      "count": 1,
+      "die": 6,
+      "bonus": "floor(level / 2)",
+      "as": "damage",
+      "type": "$energy"
+     },
+     "tell": "{name} looses a elemental ray at {target}."
+    },
+    {
+     "key": "elemental resistance",
+     "name": "Elemental Resistance",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Resist $energy 10.",
+     "tags": [
+      "resist.$energy.10"
+     ],
+     "by_level": {
+      "9": {
+       "tags": [
+        "resist.$energy.20"
+       ],
+       "line": "Resist $energy 20."
+      }
+     }
+    },
+    {
+     "key": "elemental blast",
+     "name": "Elemental Blast",
+     "level": 9,
+     "kind": "Sp",
+     "line": "A 20-ft burst within 60 ft: 1d6 $energy per level, Reflex half (DC 10 + half your level + Cha) — a failed save leaves it vulnerable to $energy for a round; once a day (twice at 17th, three times at 20th).",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "elemental blast",
+      "amount": 1
+     },
+     "by_level": {
+      "17": {
+       "pool": {
+        "max": "2",
+        "refresh": "rest.night"
+       }
+      },
+      "20": {
+       "pool": {
+        "max": "3",
+        "refresh": "rest.night"
+       }
+      }
+     },
+     "not_yet": [
+      "The burst itself: an area centred away from you has no field in the class-ability grammar (its `radius_ft` is measured around the user), so the uses are counted and the GM narrates the blast with the save the engine rolls."
+     ]
+    },
+    {
+     "key": "elemental movement",
+     "name": "Elemental Movement",
+     "level": 15,
+     "kind": "Su",
+     "line": "$movement.",
+     "not_yet": [
+      "Flying, burrowing and swimming speeds: the sheet has a land speed only."
+     ],
+     "by_variant": {
+      "fire": {
+       "modifiers": [
+        {
+         "type": "speed",
+         "target": "land_base",
+         "bonus_type": "untyped",
+         "amount": 30
+        }
+       ],
+       "not_yet": []
+      }
+     }
+    },
+    {
+     "key": "elemental body",
+     "name": "Elemental Body",
+     "level": 20,
+     "kind": "Su",
+     "line": "Immune to sneak attacks, critical hits and $energy.",
+     "tags": [
+      "immune.$energy"
+     ],
+     "not_yet": [
+      "Immunity to critical hits and sneak attack: the attack op does not read it for ordinary blows yet."
+     ]
+    }
+   ]
+  },
+  "fey": {
+   "powers": [
+    {
+     "key": "laughing touch",
+     "name": "Laughing Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: the target laughs for a round and can only move (it defends normally), then is immune for a day, 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "laughing touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "Move-actions only: no condition stops every action but moving, and the day's immunity has no tracker."
+     ]
+    },
+    {
+     "key": "woodland stride",
+     "name": "Woodland Stride",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Move through natural undergrowth at full speed and unharmed.",
+     "tags": [
+      "move.woodland-stride"
+     ],
+     "not_yet": [
+      "Undergrowth on the map: difficult terrain does not read the tag yet."
+     ]
+    },
+    {
+     "key": "fleeting glance",
+     "name": "Fleeting Glance",
+     "level": 9,
+     "kind": "Sp",
+     "line": "Greater invisibility for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "fleeting glance",
+      "amount": 1
+     },
+     "action": "standard",
+     "toggle": {
+      "key": "fleeting glance"
+     },
+     "drain": {
+      "pool": "fleeting glance",
+      "amount": 1
+     },
+     "self": {
+      "tags": [
+       "state.invisible"
+      ]
+     },
+     "tell": "{name} flickers and is gone from sight.",
+     "tell_off": "{name} can be seen again."
+    },
+    {
+     "key": "fey magic",
+     "name": "Fey Magic",
+     "level": 15,
+     "kind": "Su",
+     "line": "Reroll any caster level check to overcome spell resistance.",
+     "not_yet": [
+      "Spell resistance is not rolled yet."
+     ]
+    },
+    {
+     "key": "soul of the fey",
+     "name": "Soul of the Fey",
+     "level": 20,
+     "kind": "Su",
+     "line": "Immune to poison; DR 10/cold iron; animals leave you be; shadow walk once a day.",
+     "tags": [
+      "immune.poison"
+     ],
+     "not_yet": [
+      "DR 10/cold iron from a power: the damage path reads DR off the sheet's reductions only."
+     ]
+    }
+   ]
+  },
+  "infernal": {
+   "powers": [
+    {
+     "key": "corrupting touch",
+     "name": "Corrupting Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: the target is shaken for half your level in rounds (min 1), 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "corrupting touch",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "melee touch",
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "effect": {
+      "condition": "shaken",
+      "rounds": "max(1, floor(level / 2))"
+     },
+     "tell": "{name}'s touch fills {target} with dread."
+    },
+    {
+     "key": "infernal resistances",
+     "name": "Infernal Resistances",
+     "level": 3,
+     "kind": "Ex",
+     "line": "Resist fire 5 and +2 on saves against poison.",
+     "tags": [
+      "resist.fire.5"
+     ],
+     "modifiers": [
+      {
+       "type": "save_mod",
+       "target": "fort",
+       "bonus_type": "untyped",
+       "amount": 2,
+       "when": {
+        "against": "poison"
+       }
+      }
+     ],
+     "not_yet": [
+      "The bonus on saves against poison: a save says what it is against only for spells, so the term is written and dropped until a poison's save says so (the same wait as bravery's)."
+     ],
+     "by_level": {
+      "9": {
+       "tags": [
+        "resist.fire.10"
+       ],
+       "modifiers": [
+        {
+         "type": "save_mod",
+         "target": "fort",
+         "bonus_type": "untyped",
+         "amount": 4,
+         "when": {
+          "against": "poison"
+         }
+        }
+       ],
+       "line": "Resist fire 10 and +4 on saves against poison."
+      }
+     }
+    },
+    {
+     "key": "hellfire",
+     "name": "Hellfire",
+     "level": 9,
+     "kind": "Sp",
+     "line": "A 10-ft burst within 60 ft: 1d6 fire per level, Reflex half (DC 10 + half your level + Cha); a good creature that fails is shaken; once a day (twice at 17th, three times at 20th).",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "hellfire",
+      "amount": 1
+     },
+     "by_level": {
+      "17": {
+       "pool": {
+        "max": "2",
+        "refresh": "rest.night"
+       }
+      },
+      "20": {
+       "pool": {
+        "max": "3",
+        "refresh": "rest.night"
+       }
+      }
+     },
+     "not_yet": [
+      "The burst itself: an area centred away from you has no field in the class-ability grammar (its `radius_ft` is measured around the user), so the uses are counted and the GM narrates the blast with the save the engine rolls.",
+      "Who counts as good: the app has no alignment."
+     ]
+    },
+    {
+     "key": "on dark wings",
+     "name": "On Dark Wings",
+     "level": 15,
+     "kind": "Su",
+     "line": "Bat wings: fly 60 ft (average).",
+     "not_yet": [
+      "Flight: there is no fly speed on the sheet yet."
+     ]
+    },
+    {
+     "key": "power of the pit",
+     "name": "Power of the Pit",
+     "level": 20,
+     "kind": "Su",
+     "line": "Immune to fire and poison; resist acid and cold 10; see in any darkness to 60 ft.",
+     "tags": [
+      "immune.fire",
+      "immune.poison",
+      "resist.acid.10",
+      "resist.cold.10"
+     ]
+    }
+   ]
+  },
+  "undead": {
+   "powers": [
+    {
+     "key": "grave touch",
+     "name": "Grave Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: a living creature is shaken for half your level in rounds (min 1); one already shaken with fewer Hit Dice than your level is frightened for a round, 3 + Cha times a day.",
+     "pool": {
+      "max": "3 + cha_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "grave touch",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "melee touch",
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "living": true,
+     "effect": {
+      "condition": "shaken",
+      "rounds": "max(1, floor(level / 2))"
+     },
+     "tell": "{name}'s touch carries the cold of the grave to {target}.",
+     "not_yet": [
+      "Frightened for one already shaken: the touch lands its shaken only."
+     ]
+    },
+    {
+     "key": "death's gift",
+     "name": "Death's Gift",
+     "level": 3,
+     "kind": "Su",
+     "line": "Resist cold 5 and DR 5/- against nonlethal damage (10 and 10 at 9th).",
+     "tags": [
+      "resist.cold.5"
+     ],
+     "by_level": {
+      "9": {
+       "tags": [
+        "resist.cold.10"
+       ],
+       "line": "Resist cold 10 and DR 10/- against nonlethal damage."
+      }
+     },
+     "not_yet": [
+      "DR against nonlethal damage only: the damage path's DR has no lethality clause yet."
+     ]
+    },
+    {
+     "key": "grasp of the dead",
+     "name": "Grasp of the Dead",
+     "level": 9,
+     "kind": "Sp",
+     "line": "Skeletal arms in a 20-ft burst within 60 ft: 1d6 slashing per level, Reflex half (DC 10 + half your level + Cha), and one that fails cannot move for a round; once a day (twice at 17th, three times at 20th).",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "grasp of the dead",
+      "amount": 1
+     },
+     "by_level": {
+      "17": {
+       "pool": {
+        "max": "2",
+        "refresh": "rest.night"
+       }
+      },
+      "20": {
+       "pool": {
+        "max": "3",
+        "refresh": "rest.night"
+       }
+      }
+     },
+     "not_yet": [
+      "The burst itself: an area centred away from you has no field in the class-ability grammar (its `radius_ft` is measured around the user), so the uses are counted and the GM narrates the blast with the save the engine rolls."
+     ]
+    },
+    {
+     "key": "incorporeal form",
+     "name": "Incorporeal Form",
+     "level": 15,
+     "kind": "Sp",
+     "line": "Once a day, incorporeal for your level in rounds.",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "incorporeal form",
+      "amount": 1
+     },
+     "not_yet": [
+      "Incorporeality for a character: the damage path reads it off a creature's type only."
+     ]
+    },
+    {
+     "key": "one of us",
+     "name": "One of Us",
+     "level": 20,
+     "kind": "Ex",
+     "line": "Immune to cold, nonlethal damage, paralysis and sleep; DR 5/-; mindless undead ignore you.",
+     "tags": [
+      "immune.cold",
+      "immune.paralysis",
+      "immune.sleep"
+     ],
+     "not_yet": [
+      "Immunity to nonlethal damage and DR 5/- from a power: the damage path reads neither from a tag yet."
+     ]
+    }
+   ]
+  }
+ }
+}

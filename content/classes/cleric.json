@@ -16,7 +16,16 @@
   "choices": [
     {"id": "domains", "name": "Domains", "level": 1,
      "text": "A cleric picks two domains. No deity is asked for: what she believes is read from the world and her own people (the ruling, 2026-09-19).",
-     "options": [{"kind": "domain", "name": "Two domains", "from": "all", "how_many": 2}]}
+     "options": [{"kind": "domain", "name": "Two domains", "from": "all", "how_many": 2}]},
+    {"id": "domain companion", "name": "Animal Domain Companion", "level": 4,
+     "when": {"choice": "domains", "only": ["Animal"]},
+     "text": "The Animal domain's 4th-level power: the service of an animal companion, at an effective druid level of your cleric level - 3 (Core Rulebook, Cleric: Animal Domain).",
+     "options": [{"kind": "animal companion", "name": "An animal companion",
+                  "from": ["ape", "badger", "bird", "boar", "camel", "big cat", "small cat",
+                           "crocodile", "deinonychus", "dog", "horse", "pony", "shark",
+                           "constrictor snake", "viper", "wolf"],
+                  "level_offset": -3,
+                  "text": "A loyal animal that grows with you, three levels behind a druid's."}]}
   ],
   "levels": [
     {"level": 1, "grants": ["aura", "channel energy 1d6", "domains", "orisons",

@@ -2464,8 +2464,8 @@ function companionsBlock(s) {
   }
   if (powers.length) {
     html += `<div class="terms">${powers.map(p => `
-      <div class="t"><span>${esc(p.domain)} domain</span><b>${esc(p.name)}${
-        p.kind ? ` (${esc(p.kind)})` : ""}</b></div>`).join("")}</div>
+      <div class="t"><span>${esc(p.source || `${p.domain} domain`)}</span><b>${esc(p.name)}${
+        p.kind ? ` (${esc(p.kind)})` : ""}${p.max != null ? ` · ${p.uses} / ${p.max} today` : ""}</b></div>`).join("")}</div>
       ${powers.map(p => `<p class="why"><b>${esc(p.name)}.</b> ${esc(p.line)}${
         (p.not_yet || []).length ? ` <i>Not yet: ${esc(p.not_yet.join(" "))}</i>` : ""}</p>`).join("")}`;
   }

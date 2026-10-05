@@ -1,6 +1,6 @@
 {
- "_source": "Core Rulebook, Cleric: Domains (d20pfsrd.com/classes/core-classes/cleric/domains/paizo-domains, read 2026-10-04). A druid who takes a domain through nature bond uses her druid level as her cleric level for these powers (Core Rulebook, Druid: Nature Bond).",
- "_grammar": "Each power is a document in the class `grants` vocabulary: `level` is the class level it arrives at; `pool` declares uses per day (a resources pool row: max formula, refresh), spent through `cost`; `tags` hold while the power is had, and `by_level` swaps in the rung for a higher level, the way `by_tier` does on a path; `not_yet` says, out loud, what the engine has no reader for. Validated on load by rules/domains.py:validate_powers.",
+ "_source": "Core Rulebook, Cleric: Domains — the seven druid domains from d20pfsrd.com/classes/core-classes/cleric/domains/paizo-domains (read 2026-10-04); the other twenty-six from legacy.aonprd.com/coreRulebook/classes/cleric.html (read 2026-10-05, War checked word for word against d20pfsrd). A druid who takes a domain through nature bond uses her druid level as her cleric level for these powers (Core Rulebook, Druid: Nature Bond).",
+ "_grammar": "Each power is a document read by rules/grantedpowers.py (its module docstring is the grammar): `level` is the class level it arrives at; `pool` declares uses per day, spent through `cost`; `tags` and `modifiers` hold while the power is had, and `by_level` lays the rung for a higher level over it; `feats` and an entry's `class_skills` are handed over; `action`, `attack`, `effect`, `save`, `toggle` and `tell` say what USING it does, in the class-ability grammar (rules/class_abilities.py); `not_yet` says, out loud, what the engine has no reader for. Validated on load by rules/domains.py:validate_powers.",
  "domains": {
   "Air": {
    "powers": [
@@ -10,9 +10,17 @@
      "level": 1,
      "kind": "Sp",
      "line": "A ranged touch at a foe within 30 ft: 1d6 electricity + 1 per two levels, 3 + Wis times a day.",
-     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
-     "cost": {"pool": "lightning arc", "amount": 1},
-     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "lightning arc",
+      "amount": 1
+     },
+     "not_yet": [
+      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
+     ]
     },
     {
      "key": "electricity resistance",
@@ -20,8 +28,21 @@
      "level": 6,
      "kind": "Ex",
      "line": "Resist electricity 10, 20 from 12th, immunity at 20th.",
-     "tags": ["resist.electricity.10"],
-     "by_level": {"12": {"tags": ["resist.electricity.20"]}, "20": {"tags": ["immune.electricity"]}}
+     "tags": [
+      "resist.electricity.10"
+     ],
+     "by_level": {
+      "12": {
+       "tags": [
+        "resist.electricity.20"
+       ]
+      },
+      "20": {
+       "tags": [
+        "immune.electricity"
+       ]
+      }
+     }
     }
    ]
   },
@@ -33,21 +54,322 @@
      "level": 1,
      "kind": "Sp",
      "line": "Speak with animals, as the spell, for 3 + your level rounds a day.",
-     "pool": {"max": "3 + level", "refresh": "rest.night"},
-     "cost": {"pool": "speak with animals", "amount": 1},
-     "not_yet": ["Spending a round: there is no op that runs a spell-like ability by rounds, so the pool is counted and the talking is the GM's."]
+     "pool": {
+      "max": "3 + level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "speak with animals",
+      "amount": 1
+     },
+     "not_yet": [
+      "Spending a round: there is no op that runs a spell-like ability by rounds, so the pool is counted and the talking is the GM's."
+     ]
     },
     {
      "key": "animal companion",
      "name": "Animal Companion",
      "level": 4,
      "kind": "Ex",
-     "line": "An animal companion from 4th level, at an effective druid level of your level - 3.",
-     "companion_offset": -3,
-     "not_yet": ["The companion arriving at 4th: it comes at level-up, and the level-up writer belongs to another lane. rules/animal_companion.py derives its numbers at any effective druid level, the -3 included, once it has arrived."]
+     "line": "An animal companion from 4th level, at an effective druid level of your level - 3: choose it on the Class tab when 4th level asks (the class's \"domain companion\" choice, which holds the -3)."
     }
    ],
-   "not_yet": ["Knowledge (nature) as a class skill (Core Rulebook text for the Animal domain): class skills are read off the class document only."]
+   "not_yet": [
+    "Knowledge (nature) as a class skill (Core Rulebook text for the Animal domain): class skills are read off the class document only."
+   ]
+  },
+  "Artifice": {
+   "powers": [
+    {
+     "key": "artificer's touch",
+     "name": "Artificer's Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Mending at will; or a melee touch against an object or construct for 1d6 + 1 per two levels, ignoring hardness and DR up to your level, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "artificer's touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "The touch itself: it harms only objects and constructs and ignores their hardness, and no field yet limits an attack to a creature type or bypasses hardness, so the uses are counted and the GM narrates the blow."
+     ]
+    },
+    {
+     "key": "dancing weapons",
+     "name": "Dancing Weapons",
+     "level": 8,
+     "kind": "Su",
+     "line": "Touch a weapon: it gains the dancing quality for 4 rounds; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "dancing weapons",
+      "amount": 1
+     },
+     "not_yet": [
+      "A weapon fighting on its own: there is no dancing-weapon actor yet."
+     ]
+    }
+   ]
+  },
+  "Chaos": {
+   "powers": [
+    {
+     "key": "touch of chaos",
+     "name": "Touch of Chaos",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: for a round the target rolls every d20 twice and takes the worse, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of chaos",
+      "amount": 1
+     },
+     "not_yet": [
+      "Rolling twice and keeping the worse: no d20 reader takes a second roll yet, so the touch is counted and the misfortune is the GM's to narrate."
+     ]
+    },
+    {
+     "key": "chaos blade",
+     "name": "Chaos Blade",
+     "level": 8,
+     "kind": "Su",
+     "line": "Touch a weapon: it gains the anarchic quality for half your level in rounds; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "chaos blade",
+      "amount": 1
+     },
+     "not_yet": [
+      "The anarchic quality on the weapon: a weapon property granted for rounds has no reader yet, so the uses are counted and the blade's new edge is the GM's to narrate."
+     ]
+    }
+   ]
+  },
+  "Charm": {
+   "powers": [
+    {
+     "key": "dazing touch",
+     "name": "Dazing Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: a living creature is dazed for a round (none with more Hit Dice than your level), 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "dazing touch",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "melee touch",
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "living": true,
+     "effect": {
+      "condition": "dazed",
+      "rounds": 1
+     },
+     "tell": "{name} lays a dazing hand on {target}.",
+     "not_yet": [
+      "Sparing a creature with more Hit Dice than your level: no field compares Hit Dice yet."
+     ]
+    },
+    {
+     "key": "charming smile",
+     "name": "Charming Smile",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Charm person as a swift action (Will DC 10 + half your level + Wis), one creature at a time, for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "charming smile",
+      "amount": 1
+     },
+     "not_yet": [
+      "The charm itself: a spell-like ability that runs by rounds has no op, so the rounds are counted and the charm is the GM's (the mind gate refuses an attitude change without an origin)."
+     ]
+    }
+   ]
+  },
+  "Community": {
+   "powers": [
+    {
+     "key": "calming touch",
+     "name": "Calming Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: heal 1d6 + your level in nonlethal damage and lift fatigued, shaken and sickened, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "calming touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "Healing nonlethal damage alone and lifting the three conditions: the executor heals hit points; a heal aimed only at nonlethal damage has no field yet."
+     ]
+    },
+    {
+     "key": "unity",
+     "name": "Unity",
+     "level": 8,
+     "kind": "Su",
+     "line": "Immediate action: allies within 30 ft use your saving throw against an effect that targets you all; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "unity",
+      "amount": 1
+     },
+     "not_yet": [
+      "Lending a save: the save op rolls each creature's own."
+     ]
+    }
+   ]
+  },
+  "Darkness": {
+   "powers": [
+    {
+     "key": "darkness bonus feat",
+     "name": "Blind-Fight",
+     "level": 1,
+     "kind": "Ex",
+     "line": "Blind-Fight as a bonus feat.",
+     "feats": [
+      "blind-fight"
+     ]
+    },
+    {
+     "key": "touch of darkness",
+     "name": "Touch of Darkness",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: for half your level in rounds the target treats everyone as having concealment (20% miss chance), 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of darkness",
+      "amount": 1
+     },
+     "not_yet": [
+      "A miss chance laid on the target's own attacks: concealment is read off the defender, and no effect yet makes everyone concealed from one attacker."
+     ]
+    },
+    {
+     "key": "eyes of darkness",
+     "name": "Eyes of Darkness",
+     "level": 8,
+     "kind": "Su",
+     "line": "See normally in any darkness, magical or not, for half your level in rounds a day.",
+     "pool": {
+      "max": "max(1, floor(level / 2))",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "eyes of darkness",
+      "amount": 1
+     },
+     "not_yet": [
+      "Turning the sight on by rounds: no op spends a power by rounds yet."
+     ]
+    }
+   ]
+  },
+  "Death": {
+   "powers": [
+    {
+     "key": "bleeding touch",
+     "name": "Bleeding Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: a living creature takes 1d6 a round for half your level in rounds (until a DC 15 Heal check or any healing), 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "bleeding touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "The bleeding: damage each round is a periodic effect, and periodic damage has no executor yet (docs/states-effects-tells.md, Promised)."
+     ]
+    },
+    {
+     "key": "death's embrace",
+     "name": "Death's Embrace",
+     "level": 8,
+     "kind": "Ex",
+     "line": "Channelled negative energy heals you instead of harming you.",
+     "not_yet": [
+      "Read by nothing yet: a channel's executor heals the living and harms the undead, and asks no tag of the cleric herself."
+     ]
+    }
+   ]
+  },
+  "Destruction": {
+   "powers": [
+    {
+     "key": "destructive smite",
+     "name": "Destructive Smite",
+     "level": 1,
+     "kind": "Su",
+     "line": "Declare before a single melee attack: + half your level (min +1) as a morale bonus on its damage, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "destructive smite",
+      "amount": 1
+     },
+     "not_yet": [
+      "Arming the next blow: the damage-only charge on a single attack has no field yet (stunning fist's charge carries a save, not a bonus)."
+     ]
+    },
+    {
+     "key": "destructive aura",
+     "name": "Destructive Aura",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: every attack against a creature in it gains + half your level morale damage, and its critical threats confirm.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "destructive aura",
+      "amount": 1
+     },
+     "not_yet": [
+      "Attacks against creatures inside an aura: a bonus to the attacker that depends on where the defender stands has no reader yet."
+     ]
+    }
+   ]
   },
   "Earth": {
    "powers": [
@@ -57,9 +379,17 @@
      "level": 1,
      "kind": "Sp",
      "line": "A ranged touch at a foe within 30 ft: 1d6 acid + 1 per two levels, 3 + Wis times a day.",
-     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
-     "cost": {"pool": "acid dart", "amount": 1},
-     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "acid dart",
+      "amount": 1
+     },
+     "not_yet": [
+      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
+     ]
     },
     {
      "key": "acid resistance",
@@ -67,8 +397,71 @@
      "level": 6,
      "kind": "Ex",
      "line": "Resist acid 10, 20 from 12th, immunity at 20th.",
-     "tags": ["resist.acid.10"],
-     "by_level": {"12": {"tags": ["resist.acid.20"]}, "20": {"tags": ["immune.acid"]}}
+     "tags": [
+      "resist.acid.10"
+     ],
+     "by_level": {
+      "12": {
+       "tags": [
+        "resist.acid.20"
+       ]
+      },
+      "20": {
+       "tags": [
+        "immune.acid"
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "Evil": {
+   "powers": [
+    {
+     "key": "touch of evil",
+     "name": "Touch of Evil",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: the target is sickened for half your level in rounds (min 1), 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of evil",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "melee touch",
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "effect": {
+      "condition": "sickened",
+      "rounds": "max(1, floor(level / 2))"
+     },
+     "tell": "{name}'s touch leaves {target} queasy and sick.",
+     "not_yet": [
+      "Counting the target as good for spells with the evil descriptor: no spell reads an alignment, by the 2026-09-19 ruling."
+     ]
+    },
+    {
+     "key": "scythe of evil",
+     "name": "Scythe of Evil",
+     "level": 8,
+     "kind": "Su",
+     "line": "Touch a weapon: it gains the unholy quality for half your level in rounds; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "scythe of evil",
+      "amount": 1
+     },
+     "not_yet": [
+      "The unholy quality on the weapon: a weapon property granted for rounds has no reader yet, so the uses are counted and the blade's new edge is the GM's to narrate."
+     ]
     }
    ]
   },
@@ -80,9 +473,17 @@
      "level": 1,
      "kind": "Sp",
      "line": "A ranged touch at a foe within 30 ft: 1d6 fire + 1 per two levels, 3 + Wis times a day.",
-     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
-     "cost": {"pool": "fire bolt", "amount": 1},
-     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "fire bolt",
+      "amount": 1
+     },
+     "not_yet": [
+      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
+     ]
     },
     {
      "key": "fire resistance",
@@ -90,8 +491,511 @@
      "level": 6,
      "kind": "Ex",
      "line": "Resist fire 10, 20 from 12th, immunity at 20th.",
-     "tags": ["resist.fire.10"],
-     "by_level": {"12": {"tags": ["resist.fire.20"]}, "20": {"tags": ["immune.fire"]}}
+     "tags": [
+      "resist.fire.10"
+     ],
+     "by_level": {
+      "12": {
+       "tags": [
+        "resist.fire.20"
+       ]
+      },
+      "20": {
+       "tags": [
+        "immune.fire"
+       ]
+      }
+     }
+    }
+   ]
+  },
+  "Glory": {
+   "powers": [
+    {
+     "key": "glory channel",
+     "name": "Glorious Channel",
+     "level": 1,
+     "kind": "Su",
+     "line": "When you channel positive energy to harm undead, the save DC to halve it rises by 2.",
+     "not_yet": [
+      "Raising the channel's DC: the channel document's DC formula reads no tag of the cleric's yet."
+     ]
+    },
+    {
+     "key": "touch of glory",
+     "name": "Touch of Glory",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: + your level on one Charisma-based skill or Charisma check within the hour, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of glory",
+      "amount": 1
+     },
+     "not_yet": [
+      "A bonus spent on the next roll of a kind: no effect yet ends itself when it is used."
+     ]
+    },
+    {
+     "key": "divine presence",
+     "name": "Divine Presence",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: allies inside are under sanctuary (Will DC 10 + half your level + Wis).",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "divine presence",
+      "amount": 1
+     },
+     "not_yet": [
+      "Sanctuary on allies: the ward that stops attackers has no reader for an aura yet."
+     ]
+    }
+   ]
+  },
+  "Good": {
+   "powers": [
+    {
+     "key": "touch of good",
+     "name": "Touch of Good",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: + half your level (min +1) sacred bonus on attacks, saves, skill and ability checks for a round, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of good",
+      "amount": 1
+     },
+     "action": "standard",
+     "affects": "target",
+     "aim": "ally",
+     "effect": {
+      "rounds": 1,
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "attack",
+        "bonus_type": "sacred",
+        "formula": "max(1, floor(level / 2))"
+       },
+       {
+        "type": "save_mod",
+        "target": "fort",
+        "bonus_type": "sacred",
+        "formula": "max(1, floor(level / 2))"
+       },
+       {
+        "type": "save_mod",
+        "target": "ref",
+        "bonus_type": "sacred",
+        "formula": "max(1, floor(level / 2))"
+       },
+       {
+        "type": "save_mod",
+        "target": "will",
+        "bonus_type": "sacred",
+        "formula": "max(1, floor(level / 2))"
+       }
+      ]
+     },
+     "tell": "{name} lays a blessing on {target}.",
+     "not_yet": [
+      "The bonus on skill and ability checks: an effect's modifier names one skill, and there is no 'every skill' target yet."
+     ]
+    },
+    {
+     "key": "holy lance",
+     "name": "Holy Lance",
+     "level": 8,
+     "kind": "Su",
+     "line": "Touch a weapon: it gains the holy quality for half your level in rounds; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "holy lance",
+      "amount": 1
+     },
+     "not_yet": [
+      "The holy quality on the weapon: a weapon property granted for rounds has no reader yet, so the uses are counted and the blade's new edge is the GM's to narrate."
+     ]
+    }
+   ]
+  },
+  "Healing": {
+   "powers": [
+    {
+     "key": "rebuke death",
+     "name": "Rebuke Death",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch a living creature below 0 hit points: heal 1d4 + 1 per two levels, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "rebuke death",
+      "amount": 1
+     },
+     "not_yet": [
+      "Healing only a creature below 0 hit points: no field limits a heal to the dying yet, so the uses are counted and the GM narrates the heal."
+     ]
+    },
+    {
+     "key": "healer's blessing",
+     "name": "Healer's Blessing",
+     "level": 6,
+     "kind": "Su",
+     "line": "Your cure spells heal half again as much (as Empower Spell; not against undead, and not stacking with it).",
+     "not_yet": [
+      "Empowering the cure: the cast op rolls a spell's dice as its prose says and reads no tag of the caster's."
+     ]
+    }
+   ]
+  },
+  "Knowledge": {
+   "class_skills": [
+    "knowledge (arcana)",
+    "knowledge (dungeoneering)",
+    "knowledge (engineering)",
+    "knowledge (geography)",
+    "knowledge (history)",
+    "knowledge (local)",
+    "knowledge (nature)",
+    "knowledge (nobility)",
+    "knowledge (planes)",
+    "knowledge (religion)"
+   ],
+   "powers": [
+    {
+     "key": "lore keeper",
+     "name": "Lore Keeper",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch a creature: learn of it as if you made the Knowledge check with a result of 15 + your level + Wis.",
+     "not_yet": [
+      "Learning of the creature: the knowledge check is the GM's; the book gives this touch no limit a day."
+     ]
+    },
+    {
+     "key": "remote viewing",
+     "name": "Remote Viewing",
+     "level": 6,
+     "kind": "Sp",
+     "line": "Clairvoyance/clairaudience at will for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "remote viewing",
+      "amount": 1
+     },
+     "not_yet": [
+      "Scrying by rounds: no op spends a power by rounds yet."
+     ]
+    }
+   ]
+  },
+  "Law": {
+   "powers": [
+    {
+     "key": "touch of law",
+     "name": "Touch of Law",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch a willing creature: for a round every d20 it rolls counts as an 11, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "touch of law",
+      "amount": 1
+     },
+     "not_yet": [
+      "Fixing the d20 at 11: no roll reads a set face yet."
+     ]
+    },
+    {
+     "key": "staff of order",
+     "name": "Staff of Order",
+     "level": 8,
+     "kind": "Su",
+     "line": "Touch a weapon: it gains the axiomatic quality for half your level in rounds; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "staff of order",
+      "amount": 1
+     },
+     "not_yet": [
+      "The axiomatic quality on the weapon: a weapon property granted for rounds has no reader yet, so the uses are counted and the blade's new edge is the GM's to narrate."
+     ]
+    }
+   ]
+  },
+  "Liberation": {
+   "powers": [
+    {
+     "key": "liberation",
+     "name": "Liberation",
+     "level": 1,
+     "kind": "Su",
+     "line": "For your level in rounds a day, move as under freedom of movement; it starts on its own when you are held.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "liberation",
+      "amount": 1
+     },
+     "not_yet": [
+      "Slipping magical holds: freedom of movement has no reader yet, so the rounds are counted and the escape is the GM's."
+     ]
+    },
+    {
+     "key": "freedom's call",
+     "name": "Freedom's Call",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: allies inside ignore confused, grappled, frightened, panicked, paralyzed, pinned and shaken.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "freedom's call",
+      "amount": 1
+     },
+     "not_yet": [
+      "Suppressing conditions for allies in an aura: no aura effect exists yet."
+     ]
+    }
+   ]
+  },
+  "Luck": {
+   "powers": [
+    {
+     "key": "bit of luck",
+     "name": "Bit of Luck",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch a willing creature: for a round it rolls every d20 twice and keeps the better, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "bit of luck",
+      "amount": 1
+     },
+     "not_yet": [
+      "Rolling twice and keeping the better: no d20 reader takes a second roll yet."
+     ]
+    },
+    {
+     "key": "good fortune",
+     "name": "Good Fortune",
+     "level": 6,
+     "kind": "Ex",
+     "line": "Immediate action: reroll a d20 you just rolled and take the second; once a day at 6th, once more for every six levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 6) / 6)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "good fortune",
+      "amount": 1
+     },
+     "not_yet": [
+      "The reroll: an immediate action after a roll has no op yet."
+     ]
+    }
+   ]
+  },
+  "Madness": {
+   "powers": [
+    {
+     "key": "vision of madness",
+     "name": "Vision of Madness",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch for 3 rounds: + half your level on attacks, saves or skill checks (your pick) and - half your level on the other two, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "vision of madness",
+      "amount": 1
+     },
+     "not_yet": [
+      "Choosing which of the three is raised: a choice of overlays on a touch is not written for this power yet."
+     ]
+    },
+    {
+     "key": "aura of madness",
+     "name": "Aura of Madness",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: enemies inside are confused unless they save (Will DC 10 + half your level + Wis); one that saves is immune for a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "aura of madness",
+      "amount": 1
+     },
+     "action": "standard",
+     "toggle": {
+      "key": "aura of madness"
+     },
+     "drain": {
+      "pool": "aura of madness",
+      "amount": 1
+     },
+     "affects": "enemies",
+     "radius_ft": 30,
+     "aim": "self",
+     "harmful": true,
+     "save": {
+      "save": "will",
+      "dc": "10 + floor(level / 2) + wis_mod",
+      "success": "negates"
+     },
+     "effect": {
+      "condition": "confused"
+     },
+     "tell": "Madness spreads from {name} like a stain.",
+     "tell_off": "{name}'s aura of madness fades.",
+     "not_yet": [
+      "The day's immunity for a creature that saved, and confusion ending when it leaves the aura: no aura tracks who stands in it."
+     ]
+    }
+   ]
+  },
+  "Magic": {
+   "powers": [
+    {
+     "key": "hand of the acolyte",
+     "name": "Hand of the Acolyte",
+     "level": 1,
+     "kind": "Su",
+     "line": "Your melee weapon flies 30 ft to strike as a thrown weapon, Wis instead of Dex on the attack, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "hand of the acolyte",
+      "amount": 1
+     },
+     "not_yet": [
+      "The flying strike: an attack with a melee weapon at range, rolled off Wis, has no field yet."
+     ]
+    },
+    {
+     "key": "dispelling touch",
+     "name": "Dispelling Touch",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Melee touch: a targeted dispel magic; once a day at 8th, once more for every four levels beyond.",
+     "pool": {
+      "max": "1 + floor((level - 8) / 4)",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "dispelling touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "The dispel: a caster-level check against a spell's effect has no op for a power yet."
+     ]
+    }
+   ]
+  },
+  "Nobility": {
+   "powers": [
+    {
+     "key": "inspiring word",
+     "name": "Inspiring Word",
+     "level": 1,
+     "kind": "Sp",
+     "line": "One creature within 30 ft: +2 morale on attacks, saves, skill and ability checks for half your level in rounds (min 1), 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "inspiring word",
+      "amount": 1
+     },
+     "action": "standard",
+     "affects": "target",
+     "aim": "ally",
+     "range_ft": 30,
+     "effect": {
+      "rounds": "max(1, floor(level / 2))",
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "attack",
+        "bonus_type": "morale",
+        "amount": 2
+       },
+       {
+        "type": "save_mod",
+        "target": "fort",
+        "bonus_type": "morale",
+        "amount": 2
+       },
+       {
+        "type": "save_mod",
+        "target": "ref",
+        "bonus_type": "morale",
+        "amount": 2
+       },
+       {
+        "type": "save_mod",
+        "target": "will",
+        "bonus_type": "morale",
+        "amount": 2
+       }
+      ]
+     },
+     "tell": "{name}'s words lift {target}'s heart.",
+     "not_yet": [
+      "The bonus on skill and ability checks: no 'every skill' target yet."
+     ]
+    },
+    {
+     "key": "leadership",
+     "name": "Leadership",
+     "level": 8,
+     "kind": "Ex",
+     "line": "Leadership as a bonus feat, +2 to your Leadership score while you keep your faith's tenets.",
+     "feats": [
+      "leadership"
+     ],
+     "not_yet": [
+      "The +2 Leadership score and followers: no cohort is modelled."
+     ]
     }
    ]
   },
@@ -103,9 +1007,17 @@
      "level": 1,
      "kind": "Su",
      "line": "Fists hard as wood for 3 + Wis rounds a day: lethal, no attack of opportunity, + half your level to damage (min +1).",
-     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
-     "cost": {"pool": "wooden fist", "amount": 1},
-     "not_yet": ["Turning the fists on: a toggled power needs a `toggles` row, and those are read off a class path only (rules/leveling.py, another lane's file). The rounds are counted; the damage bonus does not land yet."]
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "wooden fist",
+      "amount": 1
+     },
+     "not_yet": [
+      "Turning the fists on: a toggled power needs a `toggles` row, and those are read off a class path only (rules/leveling.py, another lane's file). The rounds are counted; the damage bonus does not land yet."
+     ]
     },
     {
      "key": "bramble armor",
@@ -113,9 +1025,516 @@
      "level": 6,
      "kind": "Su",
      "line": "Thorns for your level in rounds a day: a foe striking you unarmed or without reach takes 1d6 piercing + 1 per two levels.",
-     "pool": {"max": "level", "refresh": "rest.night"},
-     "cost": {"pool": "bramble armor", "amount": 1},
-     "not_yet": ["The thorns striking back: there is no on-being-hit trigger to hang the damage from."]
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "bramble armor",
+      "amount": 1
+     },
+     "not_yet": [
+      "The thorns striking back: there is no on-being-hit trigger to hang the damage from."
+     ]
+    }
+   ]
+  },
+  "Protection": {
+   "powers": [
+    {
+     "key": "resistance bonus",
+     "name": "Divine Protection",
+     "level": 1,
+     "kind": "Su",
+     "line": "+1 resistance bonus on saving throws, +1 more for every five levels.",
+     "modifiers": [
+      {
+       "type": "save_mod",
+       "target": "fort",
+       "bonus_type": "resistance",
+       "formula": "1 + floor(level / 5)"
+      },
+      {
+       "type": "save_mod",
+       "target": "ref",
+       "bonus_type": "resistance",
+       "formula": "1 + floor(level / 5)"
+      },
+      {
+       "type": "save_mod",
+       "target": "will",
+       "bonus_type": "resistance",
+       "formula": "1 + floor(level / 5)"
+      }
+     ]
+    },
+    {
+     "key": "resistant touch",
+     "name": "Resistant Touch",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch an ally: it takes your resistance bonus for a minute and you lose it, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "resistant touch",
+      "amount": 1
+     },
+     "not_yet": [
+      "Moving your bonus to the ally: suspending one of your own passives for a minute has no field yet."
+     ]
+    },
+    {
+     "key": "aura of protection",
+     "name": "Aura of Protection",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: you and allies inside gain +1 deflection to AC (+1 per four levels beyond 8th) and resist 5 acid, cold, electricity, fire and sonic (10 at 14th).",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "aura of protection",
+      "amount": 1
+     },
+     "action": "standard",
+     "toggle": {
+      "key": "aura of protection"
+     },
+     "drain": {
+      "pool": "aura of protection",
+      "amount": 1
+     },
+     "affects": "allies",
+     "radius_ft": 30,
+     "aim": "self",
+     "self": {
+      "tags": [
+       "resist.acid.5",
+       "resist.cold.5",
+       "resist.electricity.5",
+       "resist.fire.5",
+       "resist.sonic.5"
+      ],
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "ac",
+        "bonus_type": "deflection",
+        "formula": "1 + floor((level - 8) / 4)"
+       }
+      ]
+     },
+     "effect": {
+      "tags": [
+       "resist.acid.5",
+       "resist.cold.5",
+       "resist.electricity.5",
+       "resist.fire.5",
+       "resist.sonic.5"
+      ],
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "ac",
+        "bonus_type": "deflection",
+        "formula": "1 + floor((level - 8) / 4)"
+       }
+      ]
+     },
+     "by_level": {
+      "14": {
+       "self": {
+        "tags": [
+         "resist.acid.10",
+         "resist.cold.10",
+         "resist.electricity.10",
+         "resist.fire.10",
+         "resist.sonic.10"
+        ],
+        "modifiers": [
+         {
+          "type": "combat_mod",
+          "target": "ac",
+          "bonus_type": "deflection",
+          "formula": "1 + floor((level - 8) / 4)"
+         }
+        ]
+       },
+       "effect": {
+        "tags": [
+         "resist.acid.10",
+         "resist.cold.10",
+         "resist.electricity.10",
+         "resist.fire.10",
+         "resist.sonic.10"
+        ],
+        "modifiers": [
+         {
+          "type": "combat_mod",
+          "target": "ac",
+          "bonus_type": "deflection",
+          "formula": "1 + floor((level - 8) / 4)"
+         }
+        ]
+       }
+      }
+     },
+     "tell": "A shimmering ward spreads from {name}.",
+     "tell_off": "{name}'s aura of protection fades.",
+     "not_yet": [
+      "The book names no action to raise the aura; a standard action is assumed."
+     ]
+    }
+   ]
+  },
+  "Repose": {
+   "powers": [
+    {
+     "key": "gentle rest",
+     "name": "Gentle Rest",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Melee touch: a living creature is staggered for a round (asleep if already staggered); undead are staggered for Wis rounds, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "gentle rest",
+      "amount": 1
+     },
+     "action": "standard",
+     "attack": "melee touch",
+     "affects": "target",
+     "aim": "foe",
+     "harmful": true,
+     "effect": {
+      "condition": "staggered",
+      "rounds": 1
+     },
+     "tell": "{name}'s touch drags at {target} like sleep.",
+     "not_yet": [
+      "Sleep for a creature already staggered, and Wis rounds against undead: the touch lands its one-round stagger only."
+     ]
+    },
+    {
+     "key": "ward against death",
+     "name": "Ward Against Death",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft aura for your level in rounds a day: living creatures inside are immune to death effects, energy drain and negative levels.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "ward against death",
+      "amount": 1
+     },
+     "not_yet": [
+      "Immunity granted to others by an aura: no aura effect exists yet."
+     ]
+    }
+   ]
+  },
+  "Rune": {
+   "powers": [
+    {
+     "key": "rune bonus feat",
+     "name": "Scribe Scroll",
+     "level": 1,
+     "kind": "Ex",
+     "line": "Scribe Scroll as a bonus feat.",
+     "feats": [
+      "scribe-scroll"
+     ]
+    },
+    {
+     "key": "blast rune",
+     "name": "Blast Rune",
+     "level": 1,
+     "kind": "Sp",
+     "line": "An invisible rune in an adjacent square: whoever enters it takes 1d6 + 1 per two levels of acid, cold, electricity or fire; lasts your level in rounds, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "blast rune",
+      "amount": 1
+     },
+     "not_yet": [
+      "The rune as a trap on a square: a hazard laid by a power has no op yet."
+     ]
+    },
+    {
+     "key": "spell rune",
+     "name": "Spell Rune",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Attach a spell you cast (a level below your highest) to a blast rune.",
+     "not_yet": [
+      "Waits on the blast rune above."
+     ]
+    }
+   ]
+  },
+  "Strength": {
+   "powers": [
+    {
+     "key": "strength surge",
+     "name": "Strength Surge",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: + half your level (min +1) enhancement on melee attacks, Strength-based combat manoeuvres, skills and checks for a round, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "strength surge",
+      "amount": 1
+     },
+     "action": "standard",
+     "affects": "target",
+     "aim": "ally",
+     "effect": {
+      "rounds": 1,
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "attack",
+        "bonus_type": "enhancement",
+        "formula": "max(1, floor(level / 2))",
+        "when": {
+         "weapon": {
+          "category": "melee"
+         }
+        }
+       },
+       {
+        "type": "combat_mod",
+        "target": "cmb",
+        "bonus_type": "enhancement",
+        "formula": "max(1, floor(level / 2))"
+       }
+      ]
+     },
+     "tell": "Strength floods into {target} at {name}'s touch.",
+     "not_yet": [
+      "Strength-based skills and checks: an effect's modifier names one skill, and there is no 'Strength skills' target yet."
+     ]
+    },
+    {
+     "key": "might of the gods",
+     "name": "Might of the Gods",
+     "level": 8,
+     "kind": "Su",
+     "line": "+ your level as an enhancement bonus to Strength checks and Strength skills, for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "might of the gods",
+      "amount": 1
+     },
+     "not_yet": [
+      "A bonus on Strength checks only (not attacks or damage): the funnel has no 'Strength check' target."
+     ]
+    }
+   ]
+  },
+  "Sun": {
+   "powers": [
+    {
+     "key": "sun's blessing",
+     "name": "Sun's Blessing",
+     "level": 1,
+     "kind": "Su",
+     "line": "When you channel positive energy to harm undead, add your level to the damage; undead add no channel resistance.",
+     "not_yet": [
+      "Adding to the channel's damage: the channel document reads no tag of the cleric's yet."
+     ]
+    },
+    {
+     "key": "nimbus of light",
+     "name": "Nimbus of Light",
+     "level": 8,
+     "kind": "Su",
+     "line": "A 30-ft nimbus of daylight for your level in rounds a day: undead inside take your level in damage each round; darkness spells brought in are dispelled.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "nimbus of light",
+      "amount": 1
+     },
+     "not_yet": [
+      "Damage each round to undead in an aura: periodic damage has no executor yet."
+     ]
+    }
+   ]
+  },
+  "Travel": {
+   "powers": [
+    {
+     "key": "travel speed",
+     "name": "Swift Traveller",
+     "level": 1,
+     "kind": "Ex",
+     "line": "+10 ft base speed.",
+     "modifiers": [
+      {
+       "type": "speed",
+       "target": "land_base",
+       "bonus_type": "untyped",
+       "amount": 10
+      }
+     ]
+    },
+    {
+     "key": "agile feet",
+     "name": "Agile Feet",
+     "level": 1,
+     "kind": "Su",
+     "line": "Free action: ignore difficult terrain for a round, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "agile feet",
+      "amount": 1
+     },
+     "not_yet": [
+      "Ignoring difficult terrain: movement cost on the map does not read a tag yet."
+     ]
+    },
+    {
+     "key": "dimensional hop",
+     "name": "Dimensional Hop",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Move action: teleport up to 10 ft per level a day, in 5-ft steps, without provoking.",
+     "pool": {
+      "max": "10 * level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "dimensional hop",
+      "amount": 1
+     },
+     "not_yet": [
+      "The hop: the pool counts feet, and spending feet to move has no op yet."
+     ]
+    }
+   ]
+  },
+  "Trickery": {
+   "class_skills": [
+    "bluff",
+    "disguise",
+    "stealth"
+   ],
+   "powers": [
+    {
+     "key": "copycat",
+     "name": "Copycat",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Move action: an illusory double, as one mirror image, for your level in rounds, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "copycat",
+      "amount": 1
+     },
+     "not_yet": [
+      "The image soaking an attack: mirror images have no reader yet."
+     ]
+    },
+    {
+     "key": "master's illusion",
+     "name": "Master's Illusion",
+     "level": 8,
+     "kind": "Sp",
+     "line": "Veil yourself and any allies within 30 ft for your level in rounds a day (Will DC 10 + half your level + Wis to disbelieve).",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "master's illusion",
+      "amount": 1
+     },
+     "not_yet": [
+      "The veil: a disguise worn by a group has no reader yet."
+     ]
+    }
+   ]
+  },
+  "War": {
+   "powers": [
+    {
+     "key": "battle rage",
+     "name": "Battle Rage",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Touch: + half your level (min +1) on melee damage for a round, 3 + Wis times a day.",
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "battle rage",
+      "amount": 1
+     },
+     "action": "standard",
+     "affects": "target",
+     "aim": "ally",
+     "effect": {
+      "rounds": 1,
+      "modifiers": [
+       {
+        "type": "combat_mod",
+        "target": "damage",
+        "bonus_type": "untyped",
+        "formula": "max(1, floor(level / 2))",
+        "when": {
+         "weapon": {
+          "category": "melee"
+         }
+        }
+       }
+      ]
+     },
+     "tell": "A battle fury takes {target} at {name}'s touch."
+    },
+    {
+     "key": "weapon master",
+     "name": "Weapon Master",
+     "level": 8,
+     "kind": "Su",
+     "line": "Swift action: the use of one combat feat you qualify for, for your level in rounds a day.",
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "weapon master",
+      "amount": 1
+     },
+     "not_yet": [
+      "Borrowing a feat for rounds: feats are read off the feat list, and a feat lent for a time has no field yet."
+     ]
     }
    ]
   },
@@ -127,9 +1546,17 @@
      "level": 1,
      "kind": "Sp",
      "line": "A ranged touch at a foe within 30 ft: 1d6 cold + 1 per two levels, 3 + Wis times a day.",
-     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
-     "cost": {"pool": "icicle", "amount": 1},
-     "not_yet": ["The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."]
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "icicle",
+      "amount": 1
+     },
+     "not_yet": [
+      "The ranged touch attack itself: no engine op resolves a domain power as an attack yet, so the uses are counted on the sheet and spending one is the GM's to narrate."
+     ]
     },
     {
      "key": "cold resistance",
@@ -137,8 +1564,21 @@
      "level": 6,
      "kind": "Ex",
      "line": "Resist cold 10, 20 from 12th, immunity at 20th.",
-     "tags": ["resist.cold.10"],
-     "by_level": {"12": {"tags": ["resist.cold.20"]}, "20": {"tags": ["immune.cold"]}}
+     "tags": [
+      "resist.cold.10"
+     ],
+     "by_level": {
+      "12": {
+       "tags": [
+        "resist.cold.20"
+       ]
+      },
+      "20": {
+       "tags": [
+        "immune.cold"
+       ]
+      }
+     }
     }
    ]
   },
@@ -150,9 +1590,17 @@
      "level": 1,
      "kind": "Sp",
      "line": "A ranged touch at a foe within 30 ft: 1d6 nonlethal + 1 per two levels and -2 to its attacks for a round, 3 + Wis times a day.",
-     "pool": {"max": "3 + wis_mod", "refresh": "rest.night"},
-     "cost": {"pool": "storm burst", "amount": 1},
-     "not_yet": ["The ranged touch attack and its -2 rider: no engine op resolves a domain power as an attack yet."]
+     "pool": {
+      "max": "3 + wis_mod",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "storm burst",
+      "amount": 1
+     },
+     "not_yet": [
+      "The ranged touch attack and its -2 rider: no engine op resolves a domain power as an attack yet."
+     ]
     },
     {
      "key": "lightning lord",
@@ -160,9 +1608,17 @@
      "level": 8,
      "kind": "Sp",
      "line": "Your level in bolts a day, as call lightning, any number in one standard action.",
-     "pool": {"max": "level", "refresh": "rest.night"},
-     "cost": {"pool": "lightning lord", "amount": 1},
-     "not_yet": ["The bolts themselves: call lightning's damage is not resolved from a domain power yet."]
+     "pool": {
+      "max": "level",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "lightning lord",
+      "amount": 1
+     },
+     "not_yet": [
+      "The bolts themselves: call lightning's damage is not resolved from a domain power yet."
+     ]
     }
    ]
   }

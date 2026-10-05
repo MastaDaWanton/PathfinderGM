@@ -1,0 +1,426 @@
+{
+ "_source": "Archives of Nethys, Cleric Domains (aonprd.com/ClericDomains.aspx, raw HTML read 2026-10-05), each subdomain's 'Associated Domain(s)'; d20pfsrd's list lacks Shadow, Sahkil, Chivalry and Sovereignty and AoN is followed. The rule (APG, Cleric: Subdomains, and Ultimate Magic): a subdomain 'replaces a granted power and a number of spells' of its associated domain; the cleric 'cannot select its associated domain as her other domain choice'; a subdomain with two associated domains is taken for one of them.",
+ "_reading": "rules/domains.py: a subdomain's spell list is its parent's with the levels the corpus gives the subdomain replaced; its powers are the parent's (the one power it replaces is not written yet, and the sheet says so). With two parents, the first named here fills the gaps.",
+ "subdomains": {
+  "Aeon": [
+   "Knowledge"
+  ],
+  "Agathion": [
+   "Good"
+  ],
+  "Alchemy": [
+   "Artifice",
+   "Magic"
+  ],
+  "Ambush": [
+   "Trickery"
+  ],
+  "Ancestors": [
+   "Repose"
+  ],
+  "Arcane": [
+   "Magic"
+  ],
+  "Archon": [
+   "Good",
+   "Law"
+  ],
+  "Aristocracy": [
+   "Nobility"
+  ],
+  "Arson": [
+   "Fire"
+  ],
+  "Ash": [
+   "Fire"
+  ],
+  "Azata": [
+   "Chaos",
+   "Good"
+  ],
+  "Blood": [
+   "War"
+  ],
+  "Cannibalism": [
+   "Evil"
+  ],
+  "Captivation": [
+   "Charm"
+  ],
+  "Catastrophe": [
+   "Destruction"
+  ],
+  "Caves": [
+   "Earth"
+  ],
+  "Chivalry": [
+   "Glory"
+  ],
+  "Cloud": [
+   "Air"
+  ],
+  "Competition": [
+   "Strength"
+  ],
+  "Construct": [
+   "Artifice"
+  ],
+  "Cooperation": [
+   "Community"
+  ],
+  "Corruption": [
+   "Evil"
+  ],
+  "Curse": [
+   "Luck"
+  ],
+  "Daemon": [
+   "Evil"
+  ],
+  "Dark Tapestry": [
+   "Void"
+  ],
+  "Day": [
+   "Sun"
+  ],
+  "Decay": [
+   "Plant"
+  ],
+  "Deception": [
+   "Trickery"
+  ],
+  "Defense": [
+   "Protection"
+  ],
+  "Demodand": [
+   "Chaos",
+   "Evil"
+  ],
+  "Demon": [
+   "Chaos",
+   "Evil"
+  ],
+  "Devil": [
+   "Evil",
+   "Law"
+  ],
+  "Divine": [
+   "Magic"
+  ],
+  "Dragon": [
+   "Scalykind"
+  ],
+  "Duels": [
+   "War"
+  ],
+  "Education": [
+   "Community",
+   "Knowledge"
+  ],
+  "Entropy": [
+   "Chaos"
+  ],
+  "Espionage": [
+   "Knowledge",
+   "Trickery"
+  ],
+  "Exploration": [
+   "Travel"
+  ],
+  "Family": [
+   "Community"
+  ],
+  "Fate": [
+   "Luck"
+  ],
+  "Fear": [
+   "Evil"
+  ],
+  "Feather": [
+   "Animal"
+  ],
+  "Ferocity": [
+   "Strength"
+  ],
+  "Fist": [
+   "Strength"
+  ],
+  "Flotsam": [
+   "Water"
+  ],
+  "Flowing": [
+   "Water"
+  ],
+  "Fortifications": [
+   "Protection"
+  ],
+  "Freedom": [
+   "Liberation"
+  ],
+  "Friendship": [
+   "Good"
+  ],
+  "Fur": [
+   "Animal"
+  ],
+  "Greed": [
+   "Trickery"
+  ],
+  "Growth": [
+   "Plant"
+  ],
+  "Hatred": [
+   "Destruction"
+  ],
+  "Heroism": [
+   "Glory"
+  ],
+  "Home": [
+   "Community"
+  ],
+  "Honor": [
+   "Glory"
+  ],
+  "Hubris": [
+   "Glory",
+   "Nobility"
+  ],
+  "Ice": [
+   "Water"
+  ],
+  "Imagination": [
+   "Luck"
+  ],
+  "Industry": [
+   "Artifice"
+  ],
+  "Inevitable": [
+   "Law"
+  ],
+  "Innuendo": [
+   "Trickery"
+  ],
+  "Insanity": [
+   "Madness"
+  ],
+  "Insect": [
+   "Animal"
+  ],
+  "Isolation": [
+   "Void"
+  ],
+  "Judgment": [
+   "Law"
+  ],
+  "Kyton": [
+   "Evil",
+   "Law"
+  ],
+  "Language": [
+   "Rune"
+  ],
+  "Leadership": [
+   "Nobility"
+  ],
+  "Legend": [
+   "Glory"
+  ],
+  "Legislation": [
+   "Law",
+   "Rune"
+  ],
+  "Leshy": [
+   "Plant"
+  ],
+  "Light": [
+   "Sun"
+  ],
+  "Lightning": [
+   "Air"
+  ],
+  "Loss": [
+   "Darkness"
+  ],
+  "Love": [
+   "Charm"
+  ],
+  "Loyalty": [
+   "Law"
+  ],
+  "Lust": [
+   "Charm"
+  ],
+  "Martyr": [
+   "Nobility"
+  ],
+  "Medicine": [
+   "Healing"
+  ],
+  "Memory": [
+   "Knowledge"
+  ],
+  "Metal": [
+   "Earth"
+  ],
+  "Monsoon": [
+   "Weather"
+  ],
+  "Moon": [
+   "Darkness"
+  ],
+  "Murder": [
+   "Death"
+  ],
+  "Night": [
+   "Darkness"
+  ],
+  "Nightmare": [
+   "Madness"
+  ],
+  "Oceans": [
+   "Water"
+  ],
+  "Petrification": [
+   "Earth"
+  ],
+  "Plague": [
+   "Death",
+   "Evil"
+  ],
+  "Portal": [
+   "Travel"
+  ],
+  "Protean": [
+   "Chaos"
+  ],
+  "Psychopomp": [
+   "Death",
+   "Repose"
+  ],
+  "Purity": [
+   "Protection"
+  ],
+  "Radiation": [
+   "Earth"
+  ],
+  "Rage": [
+   "Destruction"
+  ],
+  "Redemption": [
+   "Good"
+  ],
+  "Resolve": [
+   "Strength"
+  ],
+  "Restoration": [
+   "Healing"
+  ],
+  "Resurrection": [
+   "Healing"
+  ],
+  "Revelation": [
+   "Sun"
+  ],
+  "Revelry": [
+   "Chaos"
+  ],
+  "Revolution": [
+   "Liberation"
+  ],
+  "Riot": [
+   "Chaos"
+  ],
+  "Rites": [
+   "Magic"
+  ],
+  "Rivers": [
+   "Water"
+  ],
+  "Sahkil": [
+   "Evil"
+  ],
+  "Saurian": [
+   "Scalykind"
+  ],
+  "Seasons": [
+   "Weather"
+  ],
+  "Self-Realization": [
+   "Liberation",
+   "Strength"
+  ],
+  "Shadow": [
+   "Darkness",
+   "Death"
+  ],
+  "Slavery": [
+   "Law"
+  ],
+  "Smoke": [
+   "Fire"
+  ],
+  "Solitude": [
+   "Protection"
+  ],
+  "Souls": [
+   "Repose"
+  ],
+  "Sovereignty": [
+   "Law"
+  ],
+  "Stars": [
+   "Void"
+  ],
+  "Storms": [
+   "Weather"
+  ],
+  "Tactics": [
+   "War"
+  ],
+  "Thievery": [
+   "Trickery"
+  ],
+  "Thirst": [
+   "Sun"
+  ],
+  "Thorns": [
+   "Plant"
+  ],
+  "Thought": [
+   "Knowledge"
+  ],
+  "Toil": [
+   "Artifice"
+  ],
+  "Torture": [
+   "Destruction"
+  ],
+  "Trade": [
+   "Travel"
+  ],
+  "Trap": [
+   "Artifice"
+  ],
+  "Truth": [
+   "Madness"
+  ],
+  "Tyranny": [
+   "Law"
+  ],
+  "Undead": [
+   "Death"
+  ],
+  "Venom": [
+   "Scalykind"
+  ],
+  "Wards": [
+   "Rune"
+  ],
+  "Whimsy": [
+   "Chaos"
+  ],
+  "Wind": [
+   "Air"
+  ]
+ }
+}

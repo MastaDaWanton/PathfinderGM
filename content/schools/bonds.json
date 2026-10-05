@@ -1,0 +1,146 @@
+{
+ "choice": "arcane bond",
+ "label": "arcane bond",
+ "_source": "Core Rulebook, Wizard: Arcane Bond and Familiars (legacy.aonprd.com/coreRulebook/classes/wizard.html, read 2026-10-05; d20pfsrd's familiar page cross-checked).",
+ "_grammar": "rules/grantedpowers.py, module docstring.",
+ "entries": {
+  "bonded-object": {
+   "powers": [
+    {
+     "key": "bonded object",
+     "name": "Bonded Object",
+     "level": 1,
+     "kind": "Sp",
+     "line": "Once a day, cast any spell in your book that you can cast, unprepared, through your $object (never an opposition-school spell). Casting without it in hand or worn needs a concentration check, DC 20 + the spell's level.",
+     "pool": {
+      "max": "1",
+      "refresh": "rest.night"
+     },
+     "cost": {
+      "pool": "bonded object",
+      "amount": 1
+     },
+     "not_yet": [
+      "Casting the unprepared spell through the object: the cast op asks for a prepared copy, so the daily use is counted here and the GM lets the spell through; the concentration check without the object is not rolled."
+     ]
+    }
+   ]
+  },
+  "familiar": {
+   "powers": [
+    {
+     "key": "familiar",
+     "name": "Familiar",
+     "level": 1,
+     "kind": "Ex",
+     "line": "Your $familiar familiar: its gift to you, and Alertness while it is within arm's reach.",
+     "by_variant": {
+      "bat": {
+       "modifiers": [
+        {
+         "type": "skill_mod",
+         "target": "fly",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "cat": {
+       "modifiers": [
+        {
+         "type": "skill_mod",
+         "target": "stealth",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "lizard": {
+       "modifiers": [
+        {
+         "type": "skill_mod",
+         "target": "climb",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "monkey": {
+       "modifiers": [
+        {
+         "type": "skill_mod",
+         "target": "acrobatics",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "rat": {
+       "modifiers": [
+        {
+         "type": "save_mod",
+         "target": "fort",
+         "amount": 2,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "raven": {
+       "modifiers": [
+        {
+         "type": "skill_mod",
+         "target": "appraise",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "toad": {
+       "modifiers": [
+        {
+         "type": "combat_mod",
+         "target": "hp_max",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "viper": {
+       "modifiers": [
+        {
+         "type": "skill_mod",
+         "target": "bluff",
+         "amount": 3,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "weasel": {
+       "modifiers": [
+        {
+         "type": "save_mod",
+         "target": "ref",
+         "amount": 2,
+         "bonus_type": "untyped"
+        }
+       ]
+      },
+      "hawk": {
+       "not_yet": [
+        "+3 on sight-based Perception in bright light: a check does not say what light it is made in yet."
+       ]
+      },
+      "owl": {
+       "not_yet": [
+        "+3 on sight-based Perception in shadows or darkness: a check does not say what light it is made in yet."
+       ]
+      }
+     },
+     "not_yet": [
+      "The familiar as a creature at your side (half your hit points, its own turn, share spells, deliver touch spells): it is not made in the scene yet. Alertness within arm's reach is not given either."
+     ]
+    }
+   ]
+  }
+ }
+}

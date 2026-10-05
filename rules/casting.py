@@ -104,23 +104,31 @@ SIX_LEVEL = [
 ]
 
 # Paladins and rangers (Core Tables 3-12 and 3-13): four spell levels, nothing at all
-# before class level 4. The book's "0" rows at levels 4-6 mean bonus-spells-only; the
-# engine skips a zero base, so those rows are a slot conservative here — the honest
-# alternative was teaching `slots_for` a special case for two rows of two classes.
+# before class level 4. The book prints two different things in this table: "—" (no
+# access to that spell level) and "0" (access, but only the bonus spells a high Charisma
+# or Wisdom gives). Until 2026-10-05 both were stored as 0 and `slots_for` skipped a zero
+# base, so the bonus spell vanished with it: measured, a paladin with Cha 18 had no slot
+# at 4th (the book: one bonus 1st), none at 2nd level at 7th, none at 3rd at 10th — and a
+# 13th-level paladin had a 4th-level slot the book does not give (docs/class-audit.md D9).
+# PCGen and Foundry draw the same line: PCGen's `getNumFromCastList` answers -1 for an
+# absent cell and 0 for a printed 0, adding the ability bonus only to the second;
+# Foundry's table holds a 0 and leaves the absent level undefined. So here "—" is `NO`
+# (-1) and "0" is 0, and `_has_access` is the one place that tells them apart.
+NO = -1
 FOUR_LEVEL = [
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 1, 0, 0, 0, 0, 0, 0, 0],
-    [0, 2, 1, 1, 0, 0, 0, 0, 0, 0],
-    [0, 2, 2, 1, 0, 0, 0, 0, 0, 0],
-    [0, 3, 2, 1, 1, 0, 0, 0, 0, 0],
+    [0, NO, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, NO, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, NO, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 0, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, NO, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, 0, NO, NO, 0, 0, 0, 0, 0],
+    [0, 1, 1, NO, NO, 0, 0, 0, 0, 0],
+    [0, 2, 1, NO, NO, 0, 0, 0, 0, 0],
+    [0, 2, 1, 0, NO, 0, 0, 0, 0, 0],
+    [0, 2, 1, 1, NO, 0, 0, 0, 0, 0],
+    [0, 2, 2, 1, NO, 0, 0, 0, 0, 0],
+    [0, 3, 2, 1, 0, 0, 0, 0, 0, 0],
     [0, 3, 2, 1, 1, 0, 0, 0, 0, 0],
     [0, 3, 2, 2, 1, 0, 0, 0, 0, 0],
     [0, 3, 3, 2, 1, 0, 0, 0, 0, 0],
@@ -129,6 +137,19 @@ FOUR_LEVEL = [
     [0, 4, 3, 3, 2, 0, 0, 0, 0, 0],
     [0, 4, 4, 3, 3, 0, 0, 0, 0, 0],
 ]
+# The tables whose printed 0 means "bonus spells only". Every other table writes a 0 for
+# a level not reached (the wizard's 9th at 1st), and the paladin's 0-level column and its
+# 5th-9th are not spell levels it has at all — so only spell levels 1-4 of this table read
+# a 0 as access.
+_ZERO_IS_ACCESS = {"four_level": range(1, 5)}
+
+
+def _has_access(progression: str, spell_level: int, base: int) -> bool:
+    """Whether a table cell gives this spell level at all: a positive count always; a
+    printed 0 only in a table whose 0 means bonus-spells-only."""
+    if base > 0:
+        return True
+    return base == 0 and spell_level in _ZERO_IS_ACCESS.get(progression, ())
 
 PROGRESSIONS = {"full": FULL_CASTER, "spontaneous_full": SPONTANEOUS_FULL,
                 "six_level": SIX_LEVEL, "four_level": FOUR_LEVEL}

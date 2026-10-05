@@ -54,14 +54,69 @@ def index() -> dict[str, dict[int, list[str]]]:
     return out
 
 
+def _title(domain) -> str:
+    return " ".join(str(domain or "").split()).title()
+
+
+# --- subdomains ---------------------------------------------------------------------------
+#
+# Measured 2026-10-05 (docs/class-audit.md §1): the forge offered all 153 names in the
+# corpus, 120 of them not core domains, and 117 of the 153 had no spell at one or more of
+# levels 1-9 — "Ash" has spells at 7 and 9 only, so an Ash cleric's domain slot stood
+# empty at seven of nine levels. The corpus is right: Ash is a SUBDOMAIN of Fire, and a
+# subdomain "replaces a granted power and a number of spells" of its associated domain
+# (APG, Cleric: Subdomains). Its list is Fire's with 7th and 9th swapped, so the parent
+# fills the gaps; a cleric "cannot select its associated domain as her other domain
+# choice". Foundry and PCGen both model it this way (the parent's list with replacements);
+# the map is data, content/domains/subdomains.json, from Archives of Nethys.
+
+@lru_cache(maxsize=1)
+def subdomains() -> dict[str, list[str]]:
+    """Every subdomain and its associated domain(s), as the shipped document names them."""
+    import json
+    from pathlib import Path
+
+    from django.conf import settings
+
+    path = Path(settings.BASE_DIR) / "content" / "domains" / "subdomains.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8")).get("subdomains") or {}
+    except (OSError, ValueError):
+        return {}
+    return {_title(k): [_title(p) for p in v] for k, v in raw.items()}
+
+
+def parents_of(domain: str) -> list[str]:
+    """The domain(s) a subdomain belongs to; [] for a domain that is no subdomain."""
+    return list(subdomains().get(_title(domain), []))
+
+
+def _levels(domain: str) -> dict[int, list[str]]:
+    """The domain's spells by level, a subdomain's gaps filled from its first parent."""
+    own = dict(index().get(_title(domain), {}))
+    for parent in parents_of(domain)[:1]:
+        for lvl, ids in index().get(parent, {}).items():
+            own.setdefault(lvl, ids)
+    return own
+
+
+def is_complete(domain: str) -> bool:
+    """Whether the domain has a spell at every level 1-9 — every domain slot fillable."""
+    levels = _levels(domain)
+    return all(levels.get(lvl) for lvl in range(1, 10))
+
+
 def names() -> list[str]:
-    """Every domain a cleric could pick, alphabetically."""
-    return sorted(index())
+    """Every domain a cleric could pick, alphabetically: the ones whose list is whole,
+    a subdomain's with its parent's filling it. Ruins and Creation (spells at a few
+    levels, no parent in the map) are left out rather than offered with empty slots."""
+    return sorted(n for n in index() if is_complete(n))
 
 
 def spells_of(domain: str, level: int | None = None) -> list[str]:
-    """The spell ids this domain grants, at one level or at every level."""
-    levels = index().get(" ".join(str(domain or "").split()).title(), {})
+    """The spell ids this domain grants, at one level or at every level — a subdomain's
+    own where it has one, its parent's where it does not."""
+    levels = _levels(domain)
     if level is None:
         return sorted({sid for ids in levels.values() for sid in ids})
     return list(levels.get(int(level), []))
@@ -163,6 +218,17 @@ def problems(picked, cid: str, answers=None) -> list[str]:
     unknown = [c for c in chosen if c not in known]
     if unknown:
         return [f"No domain called {u!r}." for u in unknown]
+    whole = [c for c in chosen if not is_complete(c)]
+    if whole:
+        return [f"{c} has spells at levels "
+                f"{', '.join(str(lvl) for lvl in sorted(index().get(c, {})))} only and no "
+                f"parent domain to fill the rest, so its domain slots would stand empty; "
+                f"choose another." for c in whole]
+    for c in chosen:
+        clash = [p for p in parents_of(c) if p in chosen]
+        if clash:
+            return [f"{c} is a subdomain of {clash[0]}: it takes {clash[0]}'s place, so a "
+                    f"{noun.lower()} takes one or the other, not both."]
     if rule["from"] is not None:
         outside = [c for c in chosen if c not in rule["from"]]
         if outside:
@@ -175,15 +241,18 @@ def problems(picked, cid: str, answers=None) -> list[str]:
 #
 # What the corpus does not carry (the module docstring's last paragraph), written as data
 # in content/domains/powers.json: one document per power, in the class `grants`
-# vocabulary — `pool` and `cost` for uses per day, `tags` with `by_level` rungs, `not_yet`
-# for what has no reader. Read LIVE off the character's own domain list, the way a feat
-# is read off the feat list (`Actor._feat_mods`): nothing is copied onto the sheet, so a
-# corrected document corrects every character holding the domain, and a domain lost is a
-# power lost with nothing left behind to clean up.
-
-_POWER_KEYS = frozenset({"key", "name", "level", "kind", "line", "pool", "cost", "tags",
-                         "by_level", "not_yet", "companion_offset"})
-
+# vocabulary — `pool` and `cost` for uses per day, `tags` with `by_level` rungs,
+# `modifiers` for a passive number, `not_yet` for what has no reader. Read LIVE off the
+# character's own domain list, the way a feat is read off the feat list
+# (`Actor._feat_mods`): nothing is copied onto the sheet, so a corrected document corrects
+# every character holding the domain, and a domain lost is a power lost with nothing left
+# behind to clean up.
+#
+# Since 2026-10-05 the reading is `rules/grantedpowers.py`'s, shared with the bloodlines,
+# schools and bonds — the same shape in the book and in the documents. Measured before it:
+# 7 of the 33 core domains had powers (the druid's seven); a Sun cleric got nothing at
+# all. All 33 are written now. The functions below are the domain-only views kept for the
+# callers that ask about domains alone (the forge's picker, the class-ability executor).
 
 @lru_cache(maxsize=1)
 def powers_doc() -> dict:
@@ -201,14 +270,35 @@ def powers_doc() -> dict:
 
 
 def documented() -> list[str]:
-    """The domains whose powers are written down. The rest grant their spells only."""
+    """The domains whose powers are written down."""
     return sorted((powers_doc().get("domains") or {}))
 
 
+def entry_of(domain: str) -> dict:
+    """A domain's whole document — its `powers`, and its `class_skills` — or {}.
+
+    A subdomain with no document of its own reads its parent's: it "replaces a granted
+    power" of the parent and keeps the other (APG), and which one it replaces, with what,
+    is not written yet — so the parent's stand in, and the first says so on the sheet."""
+    own = (powers_doc().get("domains") or {}).get(_title(domain))
+    if own is not None:
+        return dict(own)
+    for parent in parents_of(domain)[:1]:
+        base = (powers_doc().get("domains") or {}).get(parent)
+        if not base:
+            continue
+        powers = [dict(p) for p in base.get("powers") or [] if isinstance(p, dict)]
+        if powers:
+            powers[0]["not_yet"] = list(powers[0].get("not_yet") or []) + [
+                f"{_title(domain)} is a subdomain of {parent}: it swaps one of {parent}'s "
+                f"powers for its own, which is not written yet, so {parent}'s powers "
+                f"stand in."]
+        return {**dict(base), "powers": powers}
+    return {}
+
+
 def powers_of(domain: str) -> list[dict]:
-    entry = (powers_doc().get("domains") or {}).get(
-        " ".join(str(domain or "").split()).title()) or {}
-    return [p for p in entry.get("powers") or [] if isinstance(p, dict)]
+    return [p for p in entry_of(domain).get("powers") or [] if isinstance(p, dict)]
 
 
 def caster_level(actor) -> int:
@@ -218,57 +308,38 @@ def caster_level(actor) -> int:
 
 
 def powers_had(actor) -> list[tuple[str, dict]]:
-    """(domain, power) for every power this character's domains grant at their level."""
-    level = caster_level(actor)
-    return [(d, p) for d in of(actor) for p in powers_of(d)
-            if int(p.get("level", 1) or 1) <= level]
+    """(domain, power) for every power this character's domains grant at their level,
+    each with its rung for that level laid over it."""
+    from . import grantedpowers
 
-
-def _rung(power: dict, level: int) -> dict:
-    """The power with its highest `by_level` rung at or below `level` laid over it."""
-    out = dict(power)
-    best = 0
-    for at, rung in (power.get("by_level") or {}).items():
-        if str(at).isdigit() and best < int(at) <= level and isinstance(rung, dict):
-            best = int(at)
-            out = {**dict(power), **rung}
-    return out
+    return [(row["id"], row["power"]) for row in grantedpowers.had(actor)
+            if row["kind"] == "domain"]
 
 
 def standing_tags(actor) -> list[str]:
-    """The tags this character's domain powers hold right now — `resist.fire.10` — read
-    by `Actor.standing_tags`, so `resistance()` and `immune_to()` answer from them with no
-    second reader (both already ask `resist.*` / `immune.*` of the tag vocabulary)."""
-    level = caster_level(actor)
+    """The tags this character's domain powers hold right now — `resist.fire.10`."""
     out: list[str] = []
     for _domain, power in powers_had(actor):
-        for tag in _rung(power, level).get("tags") or ():
+        for tag in power.get("tags") or ():
             if str(tag).strip() and tag not in out:
                 out.append(str(tag))
     return out
 
 
 def pool_specs(actor) -> list[dict]:
-    """The uses-per-day pools the powers declare, as `resources.define` rows."""
-    out = []
-    for domain, power in powers_had(actor):
-        spec = power.get("pool")
-        if isinstance(spec, dict) and spec.get("max") not in (None, ""):
-            out.append({"id": str(power.get("key") or power.get("name")).lower(),
-                        "max": spec["max"], "starts": "max",
-                        "refresh": spec.get("refresh", "rest.night"),
-                        "source": f"{domain} domain"})
-    return out
+    """The uses-per-day pools the domain powers declare, as `resources.define` rows."""
+    from . import grantedpowers
+
+    return [s for s in grantedpowers.pool_specs(actor) if s["source"].endswith(" domain")]
 
 
 def power_lines(actor) -> list[dict]:
-    """What the sheet shows: each power had, its line, and what is not built yet."""
-    level = caster_level(actor)
-    return [{"domain": d, "name": str(p.get("name") or p.get("key")),
-             "kind": str(p.get("kind") or ""), "line": str(_rung(p, level).get("line")
-                                                           or p.get("line") or ""),
-             "not_yet": [str(n) for n in p.get("not_yet") or ()]}
-            for d, p in powers_had(actor)]
+    """What the sheet shows: every granted power — domains, a bloodline, a school, a
+    bond — with its line and what is not built yet (`grantedpowers.power_lines`). Kept
+    under this name because the sheet's `domain_powers` key was drawn from it first."""
+    from . import grantedpowers
+
+    return grantedpowers.power_lines(actor)
 
 
 def validate_powers(doc: dict | None = None) -> list[str]:
@@ -277,7 +348,7 @@ def validate_powers(doc: dict | None = None) -> list[str]:
     The classbuilder's voice and the reason it has one: a power whose pool has no max is
     a power that is never usable, and nothing on screen would say why.
     """
-    from . import resources
+    from . import grantedpowers
 
     doc = powers_doc() if doc is None else doc
     problems: list[str] = []
@@ -287,39 +358,12 @@ def validate_powers(doc: dict | None = None) -> list[str]:
         if domain not in known:
             problems.append(f"{at}: no domain called {domain!r} in the spell corpus — "
                             f"write it as the corpus does ({', '.join(sorted(known)[:5])}…).")
-        for i, power in enumerate((entry or {}).get("powers") or []):
-            pat = f"{at}.powers[{i}]"
-            if not isinstance(power, dict):
-                problems.append(f"{pat}: a power is an object.")
-                continue
-            extra = sorted(set(power) - _POWER_KEYS)
-            if extra:
-                problems.append(f"{pat}: unknown field(s) {', '.join(extra)}; the reader "
-                                f"would ignore them. A power carries: "
-                                f"{', '.join(sorted(_POWER_KEYS))}.")
-            if not str(power.get("key") or "").strip():
-                problems.append(f"{pat}: needs a key — the pool's id and the power's name "
-                                f"in lower case.")
-            lvl = power.get("level")
-            if not isinstance(lvl, int) or not 1 <= lvl <= 20:
-                problems.append(f"{pat}.level: the class level it arrives at, 1-20.")
-            pool = power.get("pool")
-            if pool is not None:
-                if not isinstance(pool, dict) or resources.check(pool.get("max")):
-                    problems.append(f"{pat}.pool: {{\"max\": \"3 + wis_mod\", \"refresh\": "
-                                    f"\"rest.night\"}} — a formula over the sheet.")
-            cost = power.get("cost")
-            if cost is not None and (not isinstance(cost, dict) or str(cost.get("pool", ""))
-                                     .lower() != str(power.get("key", "")).lower()):
-                problems.append(f"{pat}.cost: spends its own pool — "
-                                f"{{\"pool\": \"{power.get('key', '')}\", \"amount\": 1}}.")
-            for rung_at, rung in (power.get("by_level") or {}).items():
-                if not str(rung_at).isdigit() or not isinstance(rung, dict):
-                    problems.append(f"{pat}.by_level: rungs keyed by class level, "
-                                    f"{{\"12\": {{\"tags\": [...]}}}}.")
-            for field_name in ("tags", "not_yet"):
-                got = power.get(field_name)
-                if got is not None and (not isinstance(got, list)
-                                        or any(not str(t).strip() for t in got)):
-                    problems.append(f"{pat}.{field_name}: a list of strings.")
+        if not isinstance(entry, dict):
+            problems.append(f"{at}: a domain is an object with `powers`.")
+            continue
+        extra = sorted(set(entry) - grantedpowers.ENTRY_KEYS)
+        if extra:
+            problems.append(f"{at}: unknown field(s) {', '.join(extra)}.")
+        for i, power in enumerate(entry.get("powers") or []):
+            problems += grantedpowers.validate_power(power, f"{at}.powers[{i}]")
     return problems
