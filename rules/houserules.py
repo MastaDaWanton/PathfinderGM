@@ -5,7 +5,8 @@ read fresh on every ask. No cache, because the file is a hundred bytes and a cac
 copy of a rule the player just changed is a rule that silently is not in effect: the
 exact staleness trap CLAUDE.md records against derived caches.
 
-Two rules exist today.
+The rules below are the oldest two; the level-up grants (`bonus_feats`,
+`bonus_ability_points`) are described where DEFAULTS declares them.
 
 **Point buy tier.** 1e's own table stops at 25 (Epic Fantasy); the tiers above it are
 homebrew and say so. One is active at a time — a budget is a single number, and the
@@ -85,7 +86,25 @@ DEFAULTS = {"point_buy": 20, "magic_stacking": False, "ability_cap": 18,
             # or "explicit". The app had taken no position (item 22) and the outcome was
             # whatever the guards happened to do. Fade is the default; explicit is the
             # table's to turn on.
-            "content": "fade"}
+            "content": "fade",
+            # Homebrew level-up grants, asked for 2026-10-04: "1 extra feat and 2 ability
+            # points every level, every odd level, or every even level", with the two
+            # pickers separate "so i can assign feats to odd levels and ability points to
+            # even". Each is one of LEVEL_RHYTHMS; "off" is the book. On top of the book,
+            # never instead of it: the general feat at odd levels and the +1 every fourth
+            # level still come (`leveling.owed`).
+            "bonus_feats": "off",
+            "bonus_ability_points": "off"}
+
+# Which levels a homebrew level-up grant lands on. Level 1 is odd: a rule on "every" or
+# "odd" grants at creation too, so the forge's feat budget and its ability-point step
+# follow the setting (`creation.build`) — a character is owed the same thing whether the
+# level was taken in the forge or on the Class tab.
+LEVEL_RHYTHMS = ("off", "every", "odd", "even")
+# What one qualifying level is worth under each rule, said once so the bench, the forge,
+# the level-up line and the owed picks cannot disagree.
+BONUS_FEATS_PER_LEVEL = 1
+BONUS_POINTS_PER_LEVEL = 2
 
 # What the character forge offers everybody. Two, because that is what the table asked
 # for: "male and female should be the only options default".
@@ -147,6 +166,12 @@ def active() -> dict:
         said = str(raw.get("content", "") or "").strip().lower()
         if said in ("fade", "explicit"):
             out["content"] = said
+        # The level-up grants, named here for the reason the two comments above give:
+        # a key this whitelist leaves out is written and silently never read back.
+        for key in ("bonus_feats", "bonus_ability_points"):
+            rhythm = str(raw.get(key, "") or "").strip().lower()
+            if rhythm in LEVEL_RHYTHMS:
+                out[key] = rhythm
         # Re-read the same way it is written. `set_active` validated these on the way in,
         # and a key this function does not name is silently dropped — which is the point
         # of the whitelist and was why a saved set came back as the defaults.
@@ -188,6 +213,16 @@ def set_active(updates: dict) -> tuple[dict, list[str]]:
                             f"'fade' or 'explicit'.")
         else:
             current["content"] = want
+    for key, what in (("bonus_feats", "bonus feat"),
+                      ("bonus_ability_points", "bonus ability point")):
+        if key not in updates:
+            continue
+        want = str(updates[key] or "").strip().lower()
+        if want not in LEVEL_RHYTHMS:
+            problems.append(f"{updates[key]!r} is not a {what} setting; it is one of "
+                            + ", ".join(repr(r) for r in LEVEL_RHYTHMS) + ".")
+        else:
+            current[key] = want
     if "race_rp" in updates:
         from . import races as races_mod
 
@@ -250,6 +285,25 @@ def knowledge_offer() -> bool:
 def content() -> str:
     """"fade" or "explicit": what the narrator does when a scene turns to intimacy."""
     return str(active().get("content", "fade") or "fade")
+
+
+def qualifies(rhythm: str, level: int) -> bool:
+    """Whether a level-up rule set to `rhythm` grants at this character level."""
+    level = int(level or 0)
+    if level < 1:
+        return False
+    return (rhythm == "every" or (rhythm == "odd" and level % 2 == 1)
+            or (rhythm == "even" and level % 2 == 0))
+
+
+def bonus_feats() -> str:
+    """The homebrew extra-feat rhythm: "off", "every", "odd" or "even"."""
+    return str(active().get("bonus_feats", "off") or "off")
+
+
+def bonus_ability_points() -> str:
+    """The homebrew extra-ability-points rhythm: "off", "every", "odd" or "even"."""
+    return str(active().get("bonus_ability_points", "off") or "off")
 
 
 def gm_view() -> bool:

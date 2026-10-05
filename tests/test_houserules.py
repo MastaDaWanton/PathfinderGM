@@ -143,7 +143,10 @@ def test_the_rules_endpoint_round_trips(client):
                           # The 2026-09-18 rulings: the GM does not offer what the
                           # character does not know unless the table says so, and a
                           # scene turning to intimacy fades unless the table says so.
-                          "knowledge_offer": False, "content": "fade"}
+                          "knowledge_offer": False, "content": "fade",
+                          # The homebrew level-up grants (2026-10-04): the book's
+                          # feats and ability increases only, until the table says.
+                          "bonus_feats": "off", "bonus_ability_points": "off"}
     assert d["tiers"][-2]["points"] == 100 and d["tiers"][-1]["points"] == 0   # Unlimited last
     assert [t["rp"] for t in d["race_tiers"]] == [10, 20, 40, 0]   # Unlimited last
 
@@ -157,7 +160,8 @@ def test_the_rules_endpoint_round_trips(client):
                           # The 2026-09-18 rulings: the GM does not offer what the
                           # character does not know unless the table says so, and a
                           # scene turning to intimacy fades unless the table says so.
-                          "knowledge_offer": False, "content": "fade"}
+                          "knowledge_offer": False, "content": "fade",
+                          "bonus_feats": "off", "bonus_ability_points": "off"}
 
     # The race tier and the Core-seven switch come back too. Measured 2026-09-07: the
     # 20 and 40 RP buttons on the Rulesets bench could be pressed and never held,
@@ -341,7 +345,8 @@ def test_no_rule_can_be_written_that_active_refuses_to_read(isolated):
     # A value for each key that is NOT its default, in the shape the rule accepts.
     others = {"point_buy": 100, "magic_stacking": True, "ability_cap": 25,
               "pronoun_sets": ["ze/hir"], "core_races": False, "race_rp": 40,
-              "gm_view": True, "knowledge_offer": True, "content": "explicit"}
+              "gm_view": True, "knowledge_offer": True, "content": "explicit",
+              "bonus_feats": "odd", "bonus_ability_points": "even"}
     assert set(others) == set(houserules.DEFAULTS), (
         "a house rule exists with no round-trip value here; add one")
     for key, value in others.items():

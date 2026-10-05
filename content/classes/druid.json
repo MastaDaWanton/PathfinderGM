@@ -51,6 +51,56 @@
    "_note": "Uses per day, Core p.51: 1 at 4th, +1 every two levels after."
   }
  ],
+ "_note_wild_shape": "Forms and uses per day, Core Rulebook p.51 and the class table (d20pfsrd, checked 2026-10-04): elementals from 6th (Small), plants from 8th (Small or Medium). This table said elemental at 8th and plant at 10th, and named no uses per day after 4th.",
+ "choices": [
+  {
+   "id": "nature bond",
+   "name": "Nature's Bond",
+   "level": 1,
+   "text": "At 1st level a druid forms a bond with nature: either one cleric domain, with its spells and powers at her druid level, or an animal companion that advances as she does (Core Rulebook, Druid).",
+   "options": [
+    {
+     "kind": "domain",
+     "name": "A cleric domain",
+     "from": [
+      "Air",
+      "Animal",
+      "Earth",
+      "Fire",
+      "Plant",
+      "Water",
+      "Weather"
+     ],
+     "how_many": 1,
+     "text": "Its granted powers at your druid level, and one extra domain spell slot at every spell level you can cast, which must hold that domain's spell."
+    },
+    {
+     "kind": "animal companion",
+     "name": "An animal companion",
+     "from": [
+      "ape",
+      "badger",
+      "bird",
+      "boar",
+      "camel",
+      "big cat",
+      "small cat",
+      "crocodile",
+      "deinonychus",
+      "dog",
+      "horse",
+      "pony",
+      "shark",
+      "constrictor snake",
+      "viper",
+      "wolf"
+     ],
+     "level_offset": 0,
+     "text": "A loyal animal that travels with you and grows with your druid level. It hears what you say as an animal does: the tricks it knows, and your tone."
+    }
+   ]
+  }
+ ],
  "levels": [
   {
    "level": 1,
@@ -77,6 +127,7 @@
    "level": 4,
    "grants": [
     "wild shape 1/day",
+    "wild shape (Small or Medium animal)",
     "resist nature's lure"
    ]
   },
@@ -87,7 +138,8 @@
   {
    "level": 6,
    "grants": [
-    "wild shape (Large, Tiny)"
+    "wild shape 2/day",
+    "wild shape (Large or Tiny animal, Small elemental)"
    ]
   },
   {
@@ -97,7 +149,8 @@
   {
    "level": 8,
    "grants": [
-    "wild shape (Huge, Diminutive, elemental)"
+    "wild shape 3/day",
+    "wild shape (Huge or Diminutive animal, Medium elemental, Small or Medium plant)"
    ]
   },
   {
@@ -109,7 +162,8 @@
   {
    "level": 10,
    "grants": [
-    "wild shape (plant)"
+    "wild shape 4/day",
+    "wild shape (Large elemental, Large plant)"
    ]
   },
   {
@@ -119,7 +173,8 @@
   {
    "level": 12,
    "grants": [
-    "wild shape (Huge elemental)"
+    "wild shape 5/day",
+    "wild shape (Huge elemental, Huge plant)"
    ]
   },
   {
@@ -130,7 +185,9 @@
   },
   {
    "level": 14,
-   "grants": []
+   "grants": [
+    "wild shape 6/day"
+   ]
   },
   {
    "level": 15,
@@ -140,7 +197,9 @@
   },
   {
    "level": 16,
-   "grants": []
+   "grants": [
+    "wild shape 7/day"
+   ]
   },
   {
    "level": 17,
@@ -148,7 +207,9 @@
   },
   {
    "level": 18,
-   "grants": []
+   "grants": [
+    "wild shape 8/day"
+   ]
   },
   {
    "level": 19,

@@ -212,13 +212,75 @@ def starter_domains(cid: str) -> list[str]:
     """
     from . import domains as domains_mod
 
-    if str(cid or "").strip().lower() != "cleric":
+    rule = domains_mod.offered(cid)
+    if rule is None:
         return []
-    names = domains_mod.names()
-    # Two that the corpus definitely carries, by name rather than by position, so a corpus
-    # that grows or reorders does not change what a default cleric gets.
-    wanted = [n for n in ("Healing", "Protection", "War", "Good") if n in names]
-    return (wanted + names)[:domains_mod.HOW_MANY]
+    names = rule["from"] or domains_mod.names()
+    # Named rather than by position, so a corpus that grows or reorders does not change
+    # what a default character gets: the cleric's two, then the druid's — a druid handed
+    # a domain here has taken the domain bond (`classes.check_choices` reads a domain sent
+    # with no answer as that answer).
+    wanted = [n for n in ("Healing", "Protection", "War", "Good", "Plant", "Animal")
+              if n in names]
+    return (wanted + [n for n in names if n not in wanted])[:rule["how_many"]]
+
+
+def class_choice_menu(cid: str) -> list[dict]:
+    """What the forge's class-choice section draws for this class: each choice it asks at
+    1st level, each option with what can be picked under it.
+
+    The domain option carries the domains it allows (all 153 for the cleric, seven for the
+    druid) with each one's spells and its documented powers; the companion option carries
+    each animal with the line the book gives it. All of it read off documents, so the
+    forge is a view of the class file, never a second copy of the druid.
+    """
+    from . import animal_companion, domains as domains_mod
+
+    out = []
+    for choice in classes_mod.choices_for(cid, 1):
+        options = []
+        for option in choice.get("options") or []:
+            entry = {"kind": option.get("kind"), "name": option.get("name") or
+                     option.get("kind"), "text": option.get("text", "")}
+            if option.get("kind") == "domain":
+                pool = option.get("from")
+                names = (domains_mod.names() if pool in (None, "all") else
+                         [" ".join(str(d).split()).title() for d in pool])
+                entry["how_many"] = int(option.get("how_many", 1))
+                entry["all"] = pool in (None, "all")
+                entry["domains"] = [
+                    {"name": n, "spells": len(domains_mod.spells_of(n)),
+                     "first": (domains_mod.spells_of(n, 1) or [""])[0].replace("-", " "),
+                     "powers": [f"{p['name']} ({p.get('kind', '')}, {p.get('level', 1)}"
+                                f"{'st' if p.get('level', 1) == 1 else 'th'}): "
+                                f"{p.get('line', '')}"
+                                for p in domains_mod.powers_of(n)]}
+                    for n in names] if pool not in (None, "all") else []
+            elif option.get("kind") == "animal companion":
+                entry["animals"] = []
+                for key in option.get("from") or []:
+                    b = animal_companion.body(key, max(1, 1 + int(
+                        option.get("level_offset", 0) or 0)))
+                    a = animal_companion.animals().get(animal_companion.key_for(key)) or {}
+                    adv = a.get("advances") or {}
+                    entry["animals"].append({
+                        "key": animal_companion.key_for(key),
+                        "name": animal_companion.name_of(key),
+                        "line": (f"{b['size'].title()}, speed {b['speed']} ft"
+                                 + "".join(f", {m} {f} ft" for m, f in
+                                           (a.get("moves") or {}).items())
+                                 + "; " + ", ".join(
+                                     f"{x['name']}{' x' + str(x['count']) if x.get('count', 1) > 1 else ''}"
+                                     f" {(x.get('damage') or {}).get(b['size'], '')}"
+                                     for x in b["attacks"])),
+                        "grows": (f"grows at {adv.get('at')}th"
+                                  + (f" to {adv['size'].title()}" if adv.get("size") else "")
+                                  if adv else ""),
+                    })
+            options.append(entry)
+        out.append({"id": choice.get("id"), "name": choice.get("name") or choice.get("id"),
+                    "text": choice.get("text", ""), "options": options})
+    return out
 
 
 def starter_spells(cid: str, int_mod: int = 0, count: int | None = None) -> list[str]:
@@ -381,7 +443,13 @@ def options(world_id: str = "") -> dict:
                      "caster": bool(casting.CASTERS.get(cid) or c.get("casting")),
                      "features": classes_mod.features_at(cid, 1),
                      "paths": leveling.paths_for(cid),
+                     # What the class asks at 1st level besides paths — the druid's
+                     # nature bond (`class_choice_menu`).
+                     "choices": class_choice_menu(cid),
                      "max_paths": leveling.max_paths(cid),
+                     # Read off row 1 of the class table, so the forge's feat budget is
+                     # the server's (`build`) and not a class name the page tests for.
+                     "bonus_feats_at_1": leveling.class_bonus_feats_at(cid, 1),
                      "unlocks_b": leveling.unlocks_at(cid, 1)}
                     for cid, c in sorted(classes_mod.all_classes().items())
                     if cid != "blood bending" or True],
@@ -395,7 +463,9 @@ def options(world_id: str = "") -> dict:
         # (`rules/domains.py`). The forge offers them on the same screen as the spells and
         # one step ahead, because a domain decides part of what can be prepared (item 27).
         "domains": _domain_menu(),
-        "domains_wanted": _domains_mod().HOW_MANY,
+        # The cleric's number, from her document's choice; the druid's one is on her
+        # class entry's `choices`. Kept for the cleric's picker, which reads it.
+        "domains_wanted": (_domains_mod().offered("cleric") or {}).get("how_many", 2),
         "point_costs": point_costs_to(_reachable_cap()),
         "point_budget": houserules.point_budget(),
         "ability_cap": houserules.ability_cap(),
@@ -413,6 +483,9 @@ def options(world_id: str = "") -> dict:
         # "Dodge" is a coin flip presented as a choice, so a collided name carries
         # its source and only a collided one does.
         "feats": _feat_index(),
+        # What the homebrew level-up rules add at 1st level — an extra feat in the budget
+        # and an ability-point step — so the page draws what `build` will enforce.
+        "level_one": level_one_picks(),
     }
 
 
@@ -454,6 +527,59 @@ def place_racial_adjustments(payload: dict, race, abilities: dict) -> list[str]:
     return problems
 
 
+def level_one_picks() -> dict:
+    """What the homebrew level-up rules add at 1st level: `{"feats", "points"}`.
+
+    Level 1 is odd, so a rule on "every" or "odd" grants at creation too — the forge's
+    feat budget grows by the extra feat and an ability-point step appears. Decided
+    2026-10-04 with the rule: the forge IS the first level, and a character should be
+    owed the same whether a level was taken in the forge or on the Class tab. What the
+    forge leaves unchosen stays owed on the sheet (`leveling.owed`).
+    """
+    got = leveling.picks_at("", 1)
+    return {"feats": got["house_feats"], "points": got["house_points"]}
+
+
+def place_house_points(payload: dict, abilities: dict) -> tuple[int, list[str]]:
+    """Apply the homebrew 1st-level ability points (`house_points`) in place.
+
+    After the race, like a level's increase, and outside point buy: they cost nothing
+    and the ceiling (a point-buy rule, "before race") does not reach them. Both may go
+    on one score. Returns `(points placed, problems)`; nothing is placed unless all of
+    it is legal.
+    """
+    raw = payload.get("house_points") or {}
+    if not isinstance(raw, dict):
+        return 0, ['House-rule ability points are an object, like {"str": 1, "con": 1}.']
+    allowed = level_one_picks()["points"]
+    placed, problems, spread = 0, [], {}
+    for ab, n in raw.items():
+        ab = str(ab).strip().lower()
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            problems.append(f"{ab}: {n!r} is not a number of points.")
+            continue
+        if not n:
+            continue
+        if ab not in abilities:
+            problems.append(f"{ab!r} is not an ability.")
+        elif n < 0:
+            problems.append(f"{ab.upper()}: house-rule points only raise a score.")
+        else:
+            placed += n
+            spread[ab] = spread.get(ab, 0) + n
+    if placed > allowed:
+        problems.append(
+            f"That places {placed} house-rule ability points against {allowed}"
+            + (" — the house rule grants none at 1st level." if not allowed else "."))
+    if problems:
+        return 0, problems
+    for ab, n in spread.items():
+        abilities[ab] += n
+    return placed, []
+
+
 def build(payload: dict) -> tuple[dict | None, list[str]]:
     """One character from one form, or every problem at once.
 
@@ -486,7 +612,9 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # `classes_mod.get` answers an unknown class with an empty dict rather than raising,
     # which is right for a sheet loading a retired homebrew class and wrong here: a
     # creation form naming a class that does not exist is a mistake to report.
-    cls = classes_mod.get(cid) or None
+    # `all_classes`, not `get`: `get` also answers the animal companion's progression,
+    # which a wolf follows and a player cannot.
+    cls = classes_mod.all_classes().get(cid) or None
     if cls is None:
         problems.append(f"Pick a class: {', '.join(sorted(classes_mod.all_classes()))}.")
 
@@ -572,6 +700,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     # +2 mental, -2 any" a world's people is drafted with. `bonus_ability` is the old
     # single-pick spelling and still answers the first slot.
     problems.extend(place_racial_adjustments(payload, race, abilities))
+    house_points, house_problems = place_house_points(payload, abilities)
+    problems.extend(house_problems)
     if race:
         if houserules.race_rp() and races_mod.rp(race) > houserules.race_rp():
             problems.append(
@@ -609,8 +739,14 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     problems.extend(path_problems)
 
     # --- feats ---------------------------------------------------------------------
-    feat_budget = 1 + (int((race.get("budget") or {}).get("feats", 0)) if race else 0) \
-        + (1 if cid == "fighter" else 0)
+    # The class's own 1st-level bonus feats are read off its table ("bonus feat" on row
+    # 1), not off its name: `cid == "fighter"` was the question here, and a homebrew class
+    # with a bonus feat at 1st — Blood Bending has one — was never offered it.
+    class_bonus = leveling.class_bonus_feats_at(cid, 1) if cls else 0
+    house_feats = level_one_picks()["feats"]
+    base_budget = 1 + (int((race.get("budget") or {}).get("feats", 0)) if race else 0) \
+        + class_bonus
+    feat_budget = base_budget + house_feats
     # A feat is a string id, or {"id": ..., "target": ...} for one that binds to a
     # chosen weapon — Weapon Focus, Weapon Specialization, a Weapon Proficiency. The
     # forge used to write every one bare, and a bare Weapon Focus was +1 with every
@@ -636,7 +772,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         feats_named.append(feat.name.lower() + (f" ({target})" if target else ""))
     if len(feat_ids) > feat_budget:
         problems.append(f"That is {len(feat_ids)} feats against {feat_budget} "
-                        f"(one, plus one for a human, plus one for a fighter).")
+                        f"(one, plus one for a human, plus a class's 1st-level bonus "
+                        f"feat{', plus the house rule' if house_feats else ''}).")
 
     # --- domains ----------------------------------------------------------------------
     # A cleric picks two, on the same screen that prepares her spells and one step ahead of
@@ -648,7 +785,16 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
 
     picked_domains = [" ".join(str(d).split()).title()
                       for d in (payload.get("domains") or []) if str(d).strip()]
-    problems += domains_mod.problems(picked_domains, cid)
+    # --- class choices ------------------------------------------------------------
+    # What the class document asks at 1st level (`classes.check_choices`): the druid's
+    # nature bond, a domain from seven or an animal companion. Reported 2026-10-04: "The
+    # druid class does not work I was given no choice for my natures bond" — the forge
+    # offered nothing and the build accepted a druid with no bond at all. Asked before
+    # the domains are judged, because which bond she took decides whether she takes one.
+    class_choices, choice_problems = classes_mod.check_choices(
+        cid, payload.get("class_choices"), picked_domains) if cls else ({}, [])
+    problems += choice_problems
+    problems += domains_mod.problems(picked_domains, cid, class_choices)
 
     # --- spells known ----------------------------------------------------------------
     spellbook = [str(s).strip().lower() for s in (payload.get("spellbook") or [])]
@@ -781,8 +927,19 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
     }
     if spellbook:
         sheet["spellbook"] = spellbook
+    # The homebrew 1st-level picks the forge took, counted against what the house rule
+    # owes (`leveling.owed`), so the sheet does not offer them a second time. Feats past
+    # the book's budget are the house rule's; any it left unchosen stay owed on the sheet.
+    # Written only when there is something to count, like every counter on the sheet.
+    took_house_feats = min(house_feats, max(0, len(feat_ids) - base_budget))
+    if took_house_feats:
+        sheet["level_feats_taken"] = took_house_feats
+    if house_points:
+        sheet["ability_points_taken"] = house_points
     if picked_domains:
         sheet["domains"] = picked_domains
+    if class_choices:
+        sheet["class_choices"] = class_choices
 
     # The proof of the whole exercise: the dict must load as an Actor before anything is
     # saved, so a creation bug is a refusal here rather than a corrupt file on disk.
@@ -857,6 +1014,7 @@ def _provisional(payload: dict):
     # The same adjustment `build` applies, through the same function, so the page and the
     # server can never disagree about the scores a prerequisite is read against.
     place_racial_adjustments(payload, race, abilities)
+    place_house_points(payload, abilities)
     picked = [str(s).strip().lower() for s in (payload.get("skills") or [])]
     try:
         return from_dict({
@@ -893,10 +1051,30 @@ def feat_choices(payload: dict) -> dict:
     actor, why = _provisional(payload)
     if actor is None:
         return {"ready": False, "why": why, "open": [], "shut": []}
+    return {"ready": True, "why": "", **feat_rows(actor, held_out=False)}
+
+
+def feat_rows(actor, allow=None, waive: bool = False, held_out: bool = True) -> dict:
+    """`{"open": [...], "shut": [...]}` for one body — the forge's draft or a living
+    character choosing what a level owes (`leveling.feat_menu`). One loop for both, so
+    the two doors cannot disagree about what a character may take.
+
+    `allow` narrows the list to what a class's bonus feats may be (a fighter's combat
+    feats); `waive` sets the prerequisites aside (a monk's bonus feats, by the book);
+    `held_out` drops feats already on the sheet unless they may be taken twice. The
+    forge leaves held feats in (`held_out=False`): its draft's own picks are filtered by
+    the page, which knows which are only tentative.
+    """
+    held = feats_mod._held(actor) if held_out else set()
     open_: list[dict] = []
     shut: list[dict] = []
     for feat in feats_mod.all_feats().values():
-        verdict = feats_mod.meets(actor, feat)
+        if allow is not None and not allow(feat):
+            continue
+        if held_out and feat.id in held and not feat.multiples:
+            continue
+        verdict = ({"ok": True, "unmet": [], "unknown": []} if waive
+                   else feats_mod.meets(actor, feat))
         types = [str(t) for t in (feat.types or [])]
         # 148 feats share a display name with their mythic namesake — `feats.by_name`
         # already has to prefer the ordinary one for exactly this reason. Listed side by
@@ -905,7 +1083,8 @@ def feat_choices(payload: dict) -> dict:
         name = (f"{feat.name} (mythic)" if "mythic" in {t.lower() for t in types}
                 else feat.name)
         row = {"id": feat.id, "name": name, "types": types,
-               "text": str(feat.benefit or feat.description or "")[:400]}
+               "text": str(feat.benefit or feat.description or "")[:400],
+               "target": feats_mod.needs_target(feats_mod.documents().get(feat.id))}
         # Mythic feats are never open, whatever their prerequisites say. `feats.NOT_YET`
         # already treats a `mythic_tier` condition as uncheckable, so 155 of the 158 are
         # shut for the right reason — but three (Extra Mythic Power, Mythic Paragon,
@@ -927,7 +1106,7 @@ def feat_choices(payload: dict) -> dict:
             shut.append(row)
     open_.sort(key=lambda r: r["name"])
     shut.sort(key=lambda r: r["name"])
-    return {"ready": True, "why": "", "open": open_, "shut": shut}
+    return {"open": open_, "shut": shut}
 
 
 def spell_choices(payload: dict) -> dict:

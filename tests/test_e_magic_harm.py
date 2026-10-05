@@ -198,7 +198,13 @@ def test_e_the_sniping_rule_as_sourced():
 
 def test_e_the_sword_door_obeys_the_same_rule():
     """Owner, Q37: a rapier moved nobody's attitude either. The one `attitude.harmed` call
-    in `_op_attack` makes a stranger struck in a fight hostile, source the weapon."""
+    in `_op_attack` makes a stranger struck in a fight hostile, source the weapon.
+
+    Read off the hostile step itself, not the batch's records: since 2026-10-04 everybody
+    on the side against the player is hostile for the fight from the end of the batch
+    that drew the side (`Engine._foes_settle`, the robbers in the warrens), so after a
+    miss the blow that lands finds him hostile already, and turns the fight's while into
+    harm's grudge for good — silently, since nothing the player could see moved."""
     s, e, man = board(fight=True)
     s.positions[man] = (5, 7)
     victim = s.actors[man]
@@ -211,8 +217,9 @@ def test_e_the_sword_door_obeys_the_same_rule():
     else:
         pytest.skip("six misses in a row on this seed")
     assert attitude.of(victim) == attitude.HOSTILE
-    assert any(x.get("kind") == "attitude" and x.get("source", "").startswith("attack:")
-               for o in res.outcomes for x in o.effects)
+    grudge = [x for x in victim.effects if "attitude.hostile" in x.tags]
+    assert grudge and grudge[0].rounds_left is None, "hostile for good, not for the fight"
+    assert grudge[0].source.startswith("attack:"), grudge[0].source
 
 
 def test_e_a_hidden_sword_in_reach_is_still_seen():

@@ -297,6 +297,261 @@ document.addEventListener("input", e => {
   }, 180);
 });
 
+// --- Feats and ability points a level owes ---
+// The Core Rulebook's feat at every odd level, its +1 to a score at 4, 8, 12, 16 and 20,
+// a class's bonus feats (a fighter's 2, 4, 6…), and the table's house rule on top. What
+// is owed comes computed from the server (`progression.owed`, rules/leveling.py `owed`);
+// this page only counts what the player has picked so far, and the server re-checks
+// every pick (`/api/level/feats/take`, `/api/level/points`). Until 2026-10-04 none of it
+// was granted anywhere: a level-5 fighter had taken nothing past the forge.
+let LVFEAT = { pool: "", list: null, picked: [], targets: {}, find: "", shut: false, busy: false };
+let LVPTS = { spread: {}, busy: false };
+
+const HOUSE_RHYTHM = { every: "every level", odd: "odd levels", even: "even levels" };
+
+function owedFor(pick) {
+  return `level ${pick.for_level}${pick.source === "house" ? " (house rule)" : ""}`;
+}
+
+function owedPicksBlock(s) {
+  const o = s.progression && s.progression.owed;
+  if (!o || !o.total) {
+    LVFEAT = { pool: "", list: null, picked: [], targets: {}, find: "", shut: false, busy: false };
+    LVPTS = { spread: {}, busy: false };
+    return "";
+  }
+  const house = o.house || {};
+  const houseNote = [
+    house.bonus_feats && house.bonus_feats !== "off"
+      ? `1 extra feat at ${HOUSE_RHYTHM[house.bonus_feats]}` : "",
+    house.bonus_ability_points && house.bonus_ability_points !== "off"
+      ? `2 ability points at ${HOUSE_RHYTHM[house.bonus_ability_points]}` : "",
+  ].filter(Boolean).join("; ");
+  return `<section id="lvpicks" aria-labelledby="lvpicks-h">
+    <h3 class="cardsub" id="lvpicks-h">To choose from your levels</h3>
+    ${houseNote ? `<p class="why"><b>House rule</b> (Rulesets bench): ${esc(houseNote)},
+      on top of the book's.</p>` : ""}
+    ${o.feats.owed ? lvFeatBlock("feats", o.feats, "Feats",
+        "Any feat you qualify for. The book's come at every odd level.") : ""}
+    ${o.bonus.owed ? lvFeatBlock("bonus", o.bonus, "Bonus feats",
+        `The class's own: ${o.bonus.rule}.`) : ""}
+    ${o.points.owed ? lvPointsBlock(s, o.points) : ""}
+    <p class="why" id="lvsay" role="status" aria-live="polite"></p>
+  </section>`;
+}
+
+function lvFeatBlock(pool, due, title, rule) {
+  const open = LVFEAT.pool === pool && LVFEAT.list;
+  const fors = due.picks.map(owedFor).join(", ");
+  return `<div class="lvfeat" data-lvpool="${pool}">
+    <p><b>${esc(title)}: ${due.owed} to choose</b> <small class="why">for ${esc(fors)}</small></p>
+    <p class="why">${esc(rule)}</p>
+    ${open ? lvFeatPicker(due) : `<button type="button" class="v2-btn is-go"
+        data-lvopen="${pool}">Choose ${due.owed} ${pool === "bonus" ? "bonus " : ""}feat${
+        due.owed === 1 ? "" : "s"}</button>`}
+  </div>`;
+}
+
+function lvFeatPicker(due) {
+  const n = due.owed;
+  const name = id => ((LVFEAT.list.open.concat(LVFEAT.list.shut)).find(f => f.id === id)
+    || { name: id }).name;
+  const needsTarget = id =>
+    !!(LVFEAT.list.open.concat(LVFEAT.list.shut).find(f => f.id === id) || {}).target;
+  return `<p class="why" id="lvcount">${LVFEAT.picked.length} of ${n} chosen${
+      LVFEAT.picked.length ? ": " + LVFEAT.picked.map(id => esc(name(id))).join(", ") : ""}</p>
+    ${LVFEAT.picked.filter(needsTarget).map(id => `<label class="why" style="display:block">
+      ${esc(name(id))} needs a weapon:
+      <input type="text" class="v2-well" data-lvtarget="${esc(id)}"
+             value="${esc(LVFEAT.targets[id] || "")}" placeholder="longsword"></label>`).join("")}
+    <label class="vh" for="lvfind">Search the feats</label>
+    <input type="search" id="lvfind" class="v2-well" placeholder="Narrow the list"
+           value="${esc(LVFEAT.find)}" autocomplete="off">
+    <label class="why" style="display:block;margin:6px 0">
+      <input type="checkbox" id="lvshut" ${LVFEAT.shut ? "checked" : ""}>
+      Show the ones you cannot take yet, and why</label>
+    <div id="lvlist" style="max-height:340px;overflow:auto">${lvFeatList()}</div>
+    <button type="button" class="v2-btn is-go" id="lvtake"${
+      LVFEAT.picked.length && !LVFEAT.busy ? "" : " disabled"}>Take ${
+      LVFEAT.picked.length || ""} feat${LVFEAT.picked.length === 1 ? "" : "s"}</button>
+    <button type="button" class="v2-btn" id="lvclose">Put the list away</button>`;
+}
+
+function lvFeatList() {
+  const find = LVFEAT.find.trim().toLowerCase();
+  const pool = LVFEAT.list.open.concat(LVFEAT.list.shut.filter(f =>
+    LVFEAT.shut || !(f.unmet && f.unmet.length)));
+  const rows = pool.sort((a, b) => a.name.localeCompare(b.name))
+    .filter(f => !find || f.name.toLowerCase().includes(find)
+      || (f.types || []).join(" ").toLowerCase().includes(find)).slice(0, 120);
+  if (!rows.length) return `<div class="empty">Nothing matches.</div>`;
+  return rows.map(f => {
+    const on = LVFEAT.picked.includes(f.id);
+    // Only a prerequisite READ and NOT MET shuts a feat. One the app cannot read (Weapon
+    // Focus's "proficient with weapon") is the server's warning, not its refusal
+    // (`leveling.feat_problems`, as the forge's `build`), so it stays choosable here.
+    const shut = !!(f.unmet && f.unmet.length);
+    const verdict = shut ? ["no", "needs " + f.unmet.join(", ")]
+      : (f.unknown && f.unknown.length)
+        ? ["maybe", "make sure you qualify: " + f.unknown.join("; ")] : ["ok", "can take"];
+    return `<div class="featrow ${verdict[0]}">
+      <div><b>${esc(f.name)}</b> <small>${esc((f.types || []).join(", "))}</small></div>
+      <div class="why">${esc(f.text || "")}</div>
+      <div class="verdict ${verdict[0]}">${esc(verdict[1])}
+        ${shut ? "" : `<button type="button" class="spbtn${on ? "" : " quiet"}"
+          data-lvfeat="${esc(f.id)}" aria-pressed="${on}">${on ? "Chosen" : "Choose"}</button>`}</div>
+    </div>`;
+  }).join("");
+}
+
+function lvPointsBlock(s, due) {
+  const placed = Object.values(LVPTS.spread).reduce((a, b) => a + b, 0);
+  const hasHouse = due.picks.some(p => p.source === "house");
+  const scores = Object.fromEntries((s.abilities || []).map(a => [a.key, a.score]));
+  const fors = due.picks.map(p => `${p.points} for ${owedFor(p)}`).join(", ");
+  return `<div class="lvpoints">
+    <p><b>Ability points: ${due.owed} to place</b> <small class="why">${esc(fors)}</small></p>
+    <p class="why">Each point raises a score by 1, permanently. The book's come one at a
+      time, at every fourth level.${hasHouse ? ` The <b>house rule's</b> two are yours to
+      spread however you like: both may go on one score.` : ""} A Constitution point
+      raises the hit points of every level you already have.</p>
+    <div class="terms">${["str", "dex", "con", "int", "wis", "cha"].map(ab => {
+      const now = scores[ab];
+      const add = LVPTS.spread[ab] || 0;
+      return `<div class="t"><span>${ab.toUpperCase()}${typeof now === "number"
+          ? ` ${now}${add ? ` → ${now + add}` : ""}` : ""}</span>
+        <b><button type="button" class="spbtn quiet" data-lvdn="${ab}"
+            aria-label="One point fewer on ${ab}" ${add ? "" : "disabled"}>−</button>
+          ${add}
+          <button type="button" class="spbtn quiet" data-lvup="${ab}"
+            aria-label="One point more on ${ab}" ${placed < due.owed ? "" : "disabled"}>+</button></b></div>`;
+    }).join("")}</div>
+    <button type="button" class="v2-btn is-go" id="lvplace"${
+      placed && !LVPTS.busy ? "" : " disabled"}>Place ${placed || ""} point${
+      placed === 1 ? "" : "s"}</button>
+  </div>`;
+}
+
+function redrawLvPicks(say = "") {
+  const box = document.getElementById("lvpicks");
+  if (!box || !SHEET) return;
+  const keep = document.getElementById("lvlist");
+  const top = keep ? keep.scrollTop : 0;
+  box.outerHTML = owedPicksBlock(SHEET);
+  const list = document.getElementById("lvlist");
+  if (list) list.scrollTop = top;
+  const out = document.getElementById("lvsay");
+  if (out && say) out.textContent = say;
+}
+
+document.addEventListener("click", async e => {
+  const opener = e.target.closest("#sheetbody [data-lvopen]");
+  if (opener) {
+    const pool = opener.dataset.lvopen;
+    try {
+      const d = await readJSON(await fetch(`/api/level/feats?pool=${pool}`, { cache: "no-store" }));
+      if (d.error) throw new Error(d.error);
+      LVFEAT = { pool, list: { open: d.open || [], shut: d.shut || [] }, picked: [],
+                 targets: {}, find: "", shut: false, busy: false };
+      redrawLvPicks();
+      const box = document.getElementById("lvfind");
+      if (box) box.focus({ preventScroll: true });
+    } catch (err) { redrawLvPicks(String(err.message || err)); }
+    return;
+  }
+  if (e.target.closest("#sheetbody #lvclose")) {
+    LVFEAT = { pool: "", list: null, picked: [], targets: {}, find: "", shut: false, busy: false };
+    redrawLvPicks();
+    return;
+  }
+  const pick = e.target.closest("#sheetbody [data-lvfeat]");
+  if (pick) {
+    const id = pick.dataset.lvfeat;
+    const o = SHEET.progression.owed;
+    const owedN = (LVFEAT.pool === "bonus" ? o.bonus : o.feats).owed;
+    let say = "";
+    if (LVFEAT.picked.includes(id)) LVFEAT.picked = LVFEAT.picked.filter(x => x !== id);
+    else if (LVFEAT.picked.length >= owedN) say = `${owedN} chosen already; set one aside first.`;
+    else LVFEAT.picked.push(id);
+    redrawLvPicks(say);
+    return;
+  }
+  if (e.target.closest("#sheetbody #lvtake")) {
+    if (!LVFEAT.picked.length || LVFEAT.busy) return;
+    // Said here in the player's words; the server's refusal for the same thing is
+    // written for the API ("send {"id": …, "target": …}"), as the forge's is.
+    const all = LVFEAT.list.open.concat(LVFEAT.list.shut);
+    const bare = LVFEAT.picked.filter(id => (all.find(f => f.id === id) || {}).target
+      && !LVFEAT.targets[id]).map(id => (all.find(f => f.id === id) || { name: id }).name);
+    if (bare.length) { redrawLvPicks(`Name the weapon for ${bare.join(" and ")} first.`); return; }
+    LVFEAT.busy = true;
+    const feats = LVFEAT.picked.map(id => LVFEAT.targets[id]
+      ? { id, target: LVFEAT.targets[id] } : id);
+    try {
+      SHEET = await post("/api/level/feats/take", { pool: LVFEAT.pool, feats });
+      const took = (SHEET.taken || []).join(", ");
+      LVFEAT = { pool: "", list: null, picked: [], targets: {}, find: "", shut: false, busy: false };
+      drawSheet(true);
+      redrawLvPicks(`Taken: ${took}.`);
+      // The table's own panels read the state, not the sheet; without this the side
+      // column kept the old numbers until the next turn.
+      render(await getState());
+    } catch (err) {
+      LVFEAT.busy = false;
+      redrawLvPicks(String(err.message || err));
+    }
+    return;
+  }
+  const up = e.target.closest("#sheetbody [data-lvup]");
+  const dn = e.target.closest("#sheetbody [data-lvdn]");
+  if (up || dn) {
+    const ab = (up || dn).dataset[up ? "lvup" : "lvdn"];
+    const owedN = SHEET.progression.owed.points.owed;
+    const placed = Object.values(LVPTS.spread).reduce((a, b) => a + b, 0);
+    if (up && placed < owedN) LVPTS.spread[ab] = (LVPTS.spread[ab] || 0) + 1;
+    if (dn && LVPTS.spread[ab]) LVPTS.spread[ab] -= 1;
+    redrawLvPicks();
+    return;
+  }
+  if (e.target.closest("#sheetbody #lvplace")) {
+    const spread = Object.fromEntries(Object.entries(LVPTS.spread).filter(([, n]) => n));
+    if (!Object.keys(spread).length || LVPTS.busy) return;
+    LVPTS.busy = true;
+    try {
+      SHEET = await post("/api/level/points", { points: spread });
+      const said = (SHEET.raised || []).map(c => `${c.ability.toUpperCase()} +${c.amount}`).join(", ");
+      LVPTS = { spread: {}, busy: false };
+      drawSheet(true);
+      redrawLvPicks(`Placed: ${said}.`);
+      // Measured live: the side column's ability rings still read Str 16 after two
+      // points had made it 18, because they draw from the state, not the sheet.
+      render(await getState());
+    } catch (err) {
+      LVPTS.busy = false;
+      redrawLvPicks(String(err.message || err));
+    }
+  }
+});
+
+document.addEventListener("input", e => {
+  const find = e.target.closest("#sheetbody #lvfind");
+  if (find) {
+    LVFEAT.find = find.value;
+    const list = document.getElementById("lvlist");
+    if (list) list.innerHTML = lvFeatList();
+    return;
+  }
+  const target = e.target.closest("#sheetbody [data-lvtarget]");
+  if (target) LVFEAT.targets[target.dataset.lvtarget] = target.value.trim();
+});
+document.addEventListener("change", e => {
+  const shut = e.target.closest("#sheetbody #lvshut");
+  if (!shut) return;
+  LVFEAT.shut = shut.checked;
+  const list = document.getElementById("lvlist");
+  if (list) list.innerHTML = lvFeatList();
+});
+
 // --- Class, and taking a level ---
 // Spells a level owes the book, said where the level was taken (the owner, 2026-10-01:
 // "leveled up as a wizard and did not choose new spells"). The choosing is the Spells
@@ -378,6 +633,7 @@ function tabClass(s) {
           <b>control blood 1a</b> through <b>5b</b> on the table means. The text is the
           class document's own; the rules do not run these yet, so they are yours to
           invoke at the table.</p>` : ""}
+      ${owedPicksBlock(s)}
       ${learnOwedLine(s)}
       ${p.next ? `
         <h3 class="cardsub">Next level</h3>
@@ -386,8 +642,8 @@ function tabClass(s) {
           ${p.next.bab ? `<div class="t"><span>Base attack</span><b>+${p.next.bab}</b></div>` : ""}
           ${Object.entries(p.next.saves || {}).map(([k, v]) =>
             `<div class="t"><span>${esc(k)} save</span><b>+${v}</b></div>`).join("")}
-          ${(p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
-            p.next.grants.map(glossify).join(", ")}</b></div>` : ""}
+          ${(p.next.said || p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
+            (p.next.said || p.next.grants).map(glossify).join(", ")}</b></div>` : ""}
         </div>
         <button type="button" class="v2-btn is-go" id="levelup">Take level ${p.next.level}</button>
         <div id="levelerr" class="why" role="status"></div>`
@@ -404,7 +660,7 @@ function tabClass(s) {
             ? `<span class="chip">here</span>` : ""}</td>
           ${cols.map(c => `<td class="n" data-label="${esc(c)}">${esc((r.columns || {})[c] ?? "")}</td>`).join("")}
           <td class="wide" data-label="Grants"><span class="why">${
-            (r.grants || []).map(glossify).join(", ") || "nothing new"}</span></td>
+            (r.gains || r.grants || []).map(glossify).join(", ")}</span></td>
         </tr>`).join("")}</tbody>
       </table></div>
     </div>
@@ -1933,6 +2189,48 @@ document.addEventListener("change", e => {
 });
 
 // --- Background, notes, companions ---
+// The Companions line: an animal companion made by nature bond, every number the server's
+// (`rules/animal_companion.py:sheet_lines`, derived from the druid's level — the page
+// computes nothing), and a domain bond's powers with what each does not do yet. Until
+// 2026-10-04 this was one fixed sentence, "No animal companion, familiar, cohort or
+// mount", whatever the character had.
+function companionsBlock(s) {
+  const c = s.companions || {};
+  const animals = c.animals || [];
+  const powers = s.domain_powers || [];
+  const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+  let html = animals.map(a => `
+    <div class="terms" data-page="companions">
+      <div class="t"><span>${esc(a.name)}</span><b>${esc(a.animal)}${a.dead ? " (dead)" : ""}</b></div>
+      <div class="t"><span>Bond</span><b>druid level ${a.edl} · ${a.hd} HD · ${esc(a.size)}</b></div>
+      <div class="t"><span>Hit points</span><b>${a.hp} / ${a.hp_max}</b></div>
+      <div class="t"><span>AC · BAB</span><b>${a.ac} · ${sign(a.bab)}</b></div>
+      <div class="t"><span>Saves</span><b>Fort ${sign(a.saves.fort)} · Ref ${sign(a.saves.ref)} · Will ${sign(a.saves.will)}</b></div>
+      <div class="t"><span>Scores</span><b>${["str","dex","con","int","wis","cha"].map(k =>
+        `${k.toUpperCase()} ${a.abilities[k]}`).join(" · ")}</b></div>
+      <div class="t"><span>Attacks</span><b>${esc((a.attacks || []).join(", ") || "none")}</b></div>
+      <div class="t"><span>Tricks</span><b>${esc((a.tricks || []).join(", ") || "none yet")}</b></div>
+      ${(a.specials || []).length ? `<div class="t"><span>Bond gives</span><b>${esc(a.specials.join(", "))}</b></div>` : ""}
+      ${(a.special || []).length ? `<div class="t"><span>Its own</span><b>${esc(a.special.join("; "))}</b></div>` : ""}
+    </div>
+    <p class="why">Speak to ${esc(a.name)} as you would to any companion: it hears your
+      voice and the tricks it knows, and does what an animal bound to you would.</p>`).join("");
+  if (c.absent) html += `<p class="why">${esc(c.absent)}</p>`;
+  if (animals.length && (c.not_yet || []).length) {
+    html += `<details><summary class="why">Not built yet for companions</summary>${
+      c.not_yet.map(n => `<p class="why">${esc(n)}</p>`).join("")}</details>`;
+  }
+  if (powers.length) {
+    html += `<div class="terms">${powers.map(p => `
+      <div class="t"><span>${esc(p.domain)} domain</span><b>${esc(p.name)}${
+        p.kind ? ` (${esc(p.kind)})` : ""}</b></div>`).join("")}</div>
+      ${powers.map(p => `<p class="why"><b>${esc(p.name)}.</b> ${esc(p.line)}${
+        (p.not_yet || []).length ? ` <i>Not yet: ${esc(p.not_yet.join(" "))}</i>` : ""}</p>`).join("")}`;
+  }
+  return html || `<p class="why" data-page="companions">No animal companion, familiar,
+    cohort or mount.</p>`;
+}
+
 function backgroundCard(s) {
   const b = s.background, i = s.identity;
   // The identity line the old sheet's header carried, gender and pronouns included,
@@ -1958,7 +2256,7 @@ function backgroundCard(s) {
         : `<p class="why">Chosen, but this world has not filled it in yet: the names arrive
              when the campaign begins.</p>`}` : ""}
       <h3 class="cardsub">Companions</h3>
-      <p class="why" data-page="companions">No animal companion, familiar, cohort or mount.</p>
+      ${companionsBlock(s)}
     </div>
     <div>
       <h3 class="cardsub">Notes</h3>

@@ -456,6 +456,18 @@ class Actor:
     # a spell copied from a scroll is in the book too, and only this says which were the
     # free ones. Settled once for an older save at load (`casting.infer_level_spells_taken`).
     level_spells_taken: int = 0
+    # The feats and ability points a level owes, taken so far (`leveling.owed`). Counts,
+    # on the spell counter's pattern: what is OWED is worked out from the level and the
+    # house rules every time it is asked, and only what has been TAKEN is stored, so a
+    # level gained in the night or before this existed is offered the same as one taken
+    # from the Class card. Absent reads as zero, and truthfully: until 2026-10-04 no path
+    # in the app ever added a feat or an ability point after creation.
+    #   level_feats_taken     general feats (odd levels) and homebrew extra feats
+    #   bonus_feats_taken     the class's own bonus feats past 1st (a fighter's 2, 4, 6…)
+    #   ability_points_taken  +1s placed, the book's every fourth level and homebrew's
+    level_feats_taken: int = 0
+    bonus_feats_taken: int = 0
+    ability_points_taken: int = 0
     # What this character has learned about herbs (docs/herbalism-revamp-plan.md §8): an
     # ingredient id to {"keys": [property keys], "how": {key: "tasted, day 14"}}. Owned by
     # `rules/herbknowledge.py`, which is the only thing that reads or writes it, so the
@@ -537,6 +549,12 @@ class Actor:
     # else, and for a cleric made before this existed. Asked for 2026-09-19: "oh i had
     # forgotten domains those need chosen at creation as well."
     domains: list = field(default_factory=list)
+    # The answers to the class document's `choices` (`rules/classes.py`), by choice id:
+    # {"nature bond": {"option": "animal companion", "pick": "wolf"}}. A domain taken
+    # through a choice still lives in `domains` above — that is the store casting reads;
+    # this records which option was taken. Added 2026-10-04 for the druid, who was made
+    # with no nature's bond at all. Empty for every class that asks nothing.
+    class_choices: dict = field(default_factory=dict)
     # Whether a beat has ever said what this person looks like. Reported 2026-09-19:
     # "Drenn Ironvale and the merchant are in scene without having been described." Four
     # writers put people into a scene — the opening companion, the keeper behind a
@@ -2118,7 +2136,12 @@ class Actor:
         """
         from . import weapons as weapons_mod
 
-        doc = self._race_doc()
+        # An animal companion's body is its own document, in the same shape — a wolf's
+        # bite with its die by size (`rules/animal_companion.py`) — and it is asked first,
+        # because a body with no race reads as the default one.
+        from . import animal_companion
+
+        doc = animal_companion.natural_weapon_doc(self) or self._race_doc()
         if not doc:
             return None
         want = " ".join(str(key or "").split()).lower()
@@ -3386,6 +3409,13 @@ class Actor:
 
         out.extend(_classfeatures.tags_for(str(self.char_class or ""),
                                            int(getattr(self, "level", 1) or 1)))
+        # What this character's domains' powers hold (content/domains/powers.json) —
+        # Fire Resistance's `resist.fire.10` from 6th — read off the domain list live,
+        # like the feats above, so `resistance()` and `immune_to()` answer from them.
+        if self.domains:
+            from . import domains as _domains
+
+            out.extend(_domains.standing_tags(self))
         # A stat block's own tags — the watchman's `role.guard` — read live off the
         # template the creature came from, the way a feat's are read off its document.
         if self.from_template:
@@ -5029,6 +5059,11 @@ def to_dict(actor: Actor) -> dict:
     # book with nothing taken infers nothing again.
     if int(actor.level_spells_taken or 0):
         d["level_spells_taken"] = int(actor.level_spells_taken)
+    # The level-up picks taken, on the same rule: only when some were, so a save from
+    # before they existed reads back byte for byte.
+    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
+        if int(getattr(actor, key, 0) or 0):
+            d[key] = int(getattr(actor, key))
     # The herbalism revamp's two stores, on the same rule: only when there is something
     # in them, so every save from before the revamp still round-trips byte for byte.
     if actor.herb_known:
@@ -5039,12 +5074,17 @@ def to_dict(actor: Actor) -> dict:
     # as a world's race has one, and every older save reads back byte for byte.
     if actor.race_world:
         d["race_world"] = str(actor.race_world)
+    # The class choices, on the same rule: only a character whose class asked something.
+    if actor.class_choices:
+        d["class_choices"] = {str(k): dict(v) if isinstance(v, dict) else v
+                              for k, v in actor.class_choices.items()}
     return d
 
 
 def _progression(actor: Actor) -> dict:
     from . import leveling
 
+    house = leveling.house_rhythms()      # read once: the rows ask it of twenty levels
     cid = actor.char_class or ""
     cls = _classes_get(cid)
     return {
@@ -5070,9 +5110,16 @@ def _progression(actor: Actor) -> dict:
                                        or {}).items()}
                      for n in actor.paths},
         "paths_taken": list(actor.paths),
-        "rows": leveling.preview(cid, actor.level or 1, actor.paths),
-        "next": (leveling.gains_at(cid, int(actor.level or 1) + 1)
+        # Each row says everything its level is worth (`gains` — base attack, saves,
+        # slots, feats, ability points, pool uses, the class's grants), never "nothing
+        # new": 47 rows of the core classes read that until 2026-10-04.
+        "rows": leveling.preview(cid, actor.level or 1, actor.paths, rules=house),
+        "next": (leveling.gains_at(cid, int(actor.level or 1) + 1, house)
                  if int(actor.level or 1) < leveling.MAX_LEVEL else None),
+        # The feats and ability points the levels so far owe and the player has not yet
+        # chosen (`leveling.owed`), for the Class tab's pickers.
+        "owed": leveling.owed(actor, house),
+        "house": house,
     }
 
 
@@ -5451,6 +5498,8 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         loadout={str(k): int(v) for k, v in (data.get("loadout") or {}).items()
                  if int(v) > 0},
         domains=list(data.get("domains") or []),
+        class_choices={str(k): dict(v) if isinstance(v, dict) else v
+                       for k, v in (data.get("class_choices") or {}).items()},
         troop=_troops.Troop.from_dict(data.get("troop")),
         background=data.get("background", ""),
         background_ties=list(data.get("background_ties") or []),
@@ -5556,6 +5605,10 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     a.herb_known = {str(k): dict(v) for k, v in (data.get("herb_known") or {}).items()
                     if isinstance(v, dict)}
     a.manuals_read = [str(m) for m in (data.get("manuals_read") or [])]
+    # Absent is zero here, unlike the spells: nothing granted a feat or an ability point
+    # after creation before these counters existed, so an older save has taken none.
+    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
+        setattr(a, key, max(0, int(data.get(key) or 0)))
     if "level_spells_taken" in data:
         a.level_spells_taken = max(0, int(data.get("level_spells_taken") or 0))
     else:

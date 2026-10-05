@@ -60,6 +60,9 @@ urlpatterns = [
     path("api/spells/learnable", views.learnable_spells, name="learnable_spells"),
     path("api/spells/learn", views.learn_spells, name="learn_spells"),
     path("api/level-up", views.level_up, name="level_up"),
+    path("api/level/feats", views.level_feat_menu, name="level_feat_menu"),
+    path("api/level/feats/take", views.level_take_feats, name="level_take_feats"),
+    path("api/level/points", views.level_take_points, name="level_take_points"),
     path("api/feats", views.feat_search, name="feat_search"),
     path("licence", views.licence, name="licence"),
     # The manual, served from inside the app because that is where the player is: this

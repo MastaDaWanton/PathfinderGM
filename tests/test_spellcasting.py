@@ -207,6 +207,16 @@ def test_a_cleric_takes_two_domains_and_is_refused_without_them():
     assert domains.problems(["Healing", "Healing"], "cleric") == \
         ["The two domains must be different."]
     assert domains.problems(["Healing", "War"], "fighter") == ["A fighter takes no domains."]
+    # Which classes take domains is the class document's to say, not this module's: until
+    # 2026-10-04 every class but the cleric was "takes no domains", and a druid could not
+    # take the domain her nature bond offers (tests/test_druid_nature_bond.py).
+    bond = {"nature bond": {"option": "domain"}}
+    assert domains.problems(["Air"], "druid", bond) == []
+    assert domains.problems(["Air", "Fire"], "druid", bond) == \
+        ["A druid takes 1 domain; that is 2."]
+    assert domains.problems(["Healing"], "druid", bond) == \
+        ["Healing is not one of a druid's domains: Air, Animal, Earth, Fire, Plant, "
+         "Water, Weather."]
     # No deity and no alignment anywhere in it. The ruling, 2026-09-19: "grab whatever the
     # belief system of the world is and let that be enough."
     src = open("rules/domains.py", encoding="utf-8").read()
