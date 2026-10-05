@@ -1,0 +1,92 @@
+{
+  "class": "monk",
+  "_source": "Core Rulebook, Monk (d20pfsrd.com/classes/core-classes/monk/ and aonprd.com ClassDisplay Monk, read 2026-10-05) and the Stunning Fist feat (d20pfsrd.com/feats/combat-feats/stunning-fist-combat/, read 2026-10-05).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "stunning fist",
+      "name": "Stunning Fist",
+      "aliases": ["stunning attack"],
+      "level": 1,
+      "source": "Stunning Fist (feat), Special: a monk may attempt it his monk level times a day. Declared before the attack roll (a miss ruins it); a foe the unarmed strike damages makes a Fortitude save, DC 10 + 1/2 level + Wis, or is stunned 1 round; no more than once a round. Constructs, oozes, plants, undead, incorporeal creatures and those immune to critical hits cannot be stunned. Monk class feature: from 4th he may choose fatigued instead, from 8th sickened for 1 minute, from 12th staggered for 1d6+1 rounds, from 16th blinded or deafened permanently, from 20th paralyzed for 1d6+1 rounds.",
+      "text": "Your next unarmed hit this round: Fortitude save or stunned for a round.",
+      "action": "free",
+      "pool": {"id": "stunning fist", "max": "level", "refresh": "rest.night"},
+      "cost": {"pool": "stunning fist", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "save": {"save": "fort", "dc": "10 + floor(level / 2) + wis_mod"},
+        "immune_types": ["construct", "ooze", "plant", "undead"],
+        "immune_subtypes": ["incorporeal"],
+        "immune_crit": true
+      },
+      "choice": {
+        "kind": "condition",
+        "default": "stunned",
+        "options": {
+          "stunned": {"level": 1, "charge_condition": "stunned", "charge_rounds": 1},
+          "fatigued": {"level": 4, "charge_condition": "fatigued"},
+          "sickened": {"level": 8, "charge_condition": "sickened", "charge_rounds": 10},
+          "staggered": {"level": 12, "charge_condition": "staggered",
+                        "charge_rounds_dice": "1d6+1"},
+          "blinded": {"level": 16, "charge_condition": "blinded"},
+          "deafened": {"level": 16, "charge_condition": "deafened"},
+          "paralyzed": {"level": 20, "charge_condition": "paralyzed",
+                        "charge_rounds_dice": "1d6+1"}
+        }
+      },
+      "tell": "{name} gathers ki into the next blow.",
+      "not_yet": [
+        "The extra use a day for every four levels in classes other than monk: the app's characters have one class.",
+        "A miss spends the use and leaves the charge until the round's end; a second unarmed hit the same round still lands it."
+      ]
+    },
+    {
+      "key": "ki dodge",
+      "name": "Ki Dodge",
+      "aliases": ["ki defense", "ki defence", "ki: dodge", "ki for ac"],
+      "level": 4,
+      "source": "CRB p.58 Ki Pool: spend 1 point (swift action) for a +4 dodge bonus to AC for 1 round.",
+      "text": "+4 dodge AC for a round, for 1 ki.",
+      "action": "swift",
+      "cost": {"pool": "ki", "amount": 1},
+      "self": {
+        "rounds": 1,
+        "modifiers": [{"type": "combat_mod", "target": "ac", "bonus_type": "dodge", "amount": 4}]
+      },
+      "tell": "{name} breathes out, and their body is hard to find."
+    },
+    {
+      "key": "ki speed",
+      "name": "Ki Speed",
+      "aliases": ["ki: speed", "ki for speed", "ki step"],
+      "level": 4,
+      "source": "CRB p.58 Ki Pool: spend 1 point (swift action) to increase his speed by 20 feet for 1 round.",
+      "text": "+20 ft speed for a round, for 1 ki.",
+      "action": "swift",
+      "cost": {"pool": "ki", "amount": 1},
+      "self": {
+        "rounds": 1,
+        "modifiers": [{"type": "speed", "target": "land", "bonus_type": "untyped", "amount": 20}]
+      },
+      "tell": "{name}'s feet blur."
+    },
+    {
+      "key": "wholeness of body",
+      "name": "Wholeness of Body",
+      "level": 7,
+      "source": "CRB p.58 Wholeness of Body: a standard action and 2 ki points heal a number of hit points equal to his monk level, to himself.",
+      "text": "Heal your level in hit points, for 2 ki.",
+      "action": "standard",
+      "cost": {"pool": "ki", "amount": 2},
+      "affects": "self",
+      "roll": {"count": 0, "flat": "level", "as": "heal"},
+      "tell": "{name} turns their ki inward."
+    }
+  ],
+  "_not_yet": [
+    "Ki's extra attack in a flurry of blows: flurry itself is not built (class audit, lane 3), so there is no flurry to add an attack to.",
+    "Ki strike (magic, cold iron and silver, lawful, adamantine): absent from the class table, lane 3's."
+  ]
+}

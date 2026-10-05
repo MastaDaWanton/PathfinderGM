@@ -363,9 +363,11 @@ function renderAbilities(s) {
       data-ability="${esc(a.name)}"
       data-toggle="${a.toggle ? "1" : "0"}"
       data-free="${(a.toggle || actionKind(a.text) === "free") ? "1" : "0"}"
-      title="${esc(a.path)} · Control Blood ${a.tier}${
+      title="${esc(a.path)}${a.tier != null ? ` · Control Blood ${a.tier}` : ""}${
         a.toggle ? (a.active ? " · ACTIVE — click to dismiss" : " · off — click to form") : ""}${
+        a.choices ? " · name one: " + esc(a.choices.join(", ")) : ""}${
         a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}${
+        a.uses != null ? ` (${a.uses}/${a.max})` : ""}${
         a.toggle ? (a.active ? " ●" : " ○") : ""}</button>`).join("");
 }
 

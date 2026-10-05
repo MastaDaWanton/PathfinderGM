@@ -480,6 +480,7 @@ DAMAGE_TYPE_ALIASES = {
     "flame": "fire", "burning": "fire", "heat": "fire",
     "frost": "cold", "ice": "cold", "freezing": "cold",
     "thunder": "sonic", "force": "untyped", "untyped": "untyped",
+    "positive energy": "positive", "negative energy": "negative",
 }
 
 
@@ -518,7 +519,14 @@ def is_physical(dtype: str | None) -> bool:
     catches.
     """
     d = normalise_damage_type(dtype)
-    return d not in ENERGY_DAMAGE
+    return d not in ENERGY_DAMAGE and d not in CHANNELLED_ENERGY
+
+# Positive and negative energy are neither physical nor one of the five energies a creature
+# resists: a cure spell or a channel hurting the undead is not a blow, and DR never touches
+# it (Core Rulebook, Special Abilities, "Damage Reduction": spells, spell-like abilities and
+# energy attacks ignore it). Measured 2026-10-05 building channel energy: a 3d6 burst
+# rolled 6 against a skeleton and landed 1, "less DR 5/bludgeoning".
+CHANNELLED_ENERGY = ("positive", "negative")
 
 # `weight` is the armour category, which is what decides the speed penalty: medium and
 # heavy armour drop a 30-foot speed to 20 and a 20-foot speed to 15. Absent until the grid
