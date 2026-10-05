@@ -318,6 +318,20 @@ def test_a_desert_sun_on_the_mountain_by_vormoor_is_not_here():
     assert land_described.find(land_ctx(view, s, e)) == []
 
 
+def test_a_reach_a_walk_out_is_not_underfoot_until_the_party_is_in_it():
+    """The terrain lane made Vormoor's badlands a reach two hours out and put its ground
+    in the near ring; merged as built, "the desert sun" on the farmland outskirts passed
+    again (2026-10-05). A reach is a place of its own: its ground is not here from the
+    fields, and it is here once the party stands in it."""
+    from tests.test_b_checks import _ctx as land_ctx, _engine
+
+    here = "To your left, the path is bordered by boulders weathered by the desert sun."
+    s, e = _engine(at="bde94b038cba~farmland:@the-outskirts")
+    assert [f.kind for f in land_described.find(land_ctx(here, s, e))] == ["absent-ground"]
+    s, e = _engine(at="bde94b038cba~desert:@the-badlands")
+    assert land_described.find(land_ctx(here, s, e)) == []
+
+
 def test_the_ground_here_reads_the_places_own_words():
     """One reader of the ground here, so a place that carries its own terrain is picked
     up in one spot (lane fix/ventured-place-terrain)."""

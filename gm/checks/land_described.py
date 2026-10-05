@@ -130,8 +130,16 @@ def far_ground_put_here(ctx, land, sentence: str) -> set[str]:
     unless the sentence looks out at it ("in the distance", "on the horizon", "beyond").
     The ground here and the near ring stay allowed: the near ring is what the party can
     see close by, and allowing it is the precision-first side of the line."""
-    allowed = set(land.near) | ground_here(ctx)
-    words = _ground_of(sentence) & set(JUDGED) & set(land.beyond)
+    # A reach of the hinterland (rules/geography.py `Reach`) is a place of its own a walk
+    # out — the badlands two hours from Vormoor's fields — not the ground underfoot. The
+    # terrain lane put the reaches' ground in `near`, and the desert sun on the stones by
+    # the path passed again at the merge (2026-10-05). Only the ground here, and near
+    # ground that is no separate reach (the fields, the settlement's own land), stays
+    # allowed; a reach's ground is judged as the far ring is.
+    here = ground_here(ctx)
+    walked_to = {r.ground for r in getattr(land, "reaches", ()) or ()} - here
+    allowed = (set(land.near) - walked_to) | here
+    words = _ground_of(sentence) & set(JUDGED) & (set(land.beyond) | walked_to)
     if not words or _FAR.search(_space.unquoted(sentence)):
         return set()
     return {b for b in words if b not in allowed}
