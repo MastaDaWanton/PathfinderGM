@@ -69,6 +69,36 @@ bestiary, by the ground's terrain, through `gathering.creature_for`, never inven
   also propose it. Either way the engine validates the name, the parent, the owner and
   the kind, and refuses with the fix named.
 
+## A place's own ground (2026-10-05)
+
+The owner: "on a mountain still considered farmland". `found name="the mountain"` off the
+road to Grotburrow took the road's farmland, because `mint` gave every child its parent's
+ground; the header, UNDERFOOT and the narrator's absent-ground repair all followed the id,
+and the repair, offered "close by, farmland, mountain, desert", wrote a desert sun.
+
+- **Prior art.** A CircleMUD room carries its own sector type, one required value from a
+  closed list, never inherited from its zone (Builder's Manual, World Files). Hexcrawl
+  generators default a sub-hex to its hex's dominant terrain and let a feature inside it
+  differ (DIY & Dragons, "Sub-Hex Crawling Mechanics" part 2). Fate puts aspects on each
+  zone.
+- **Rule.** `found` reads the place's ground from its own words through
+  `places.PLACE_GROUND`, a closed lexicon onto `biomes.BIOMES` (`places.own_ground`): the
+  kind when the kind is ground ("mountain", accepted by the validator now rather than
+  refused), else the name, else `about`. A building's name ("the Forest Inn", "the hut on
+  the hill") and a name with no ground word stand on the parent's ground. Never `urban`.
+- **The id.** Off outside ground, the child keeps the parent's whole spot under its own
+  ground's head — `~mountain:@the-road-to-…/the-mountain` — so it still parses outside, on
+  that road, with no wilderness grafted beside it. Ventures keep their old seeded ids.
+  Open ground is never `under` a town (`setting_of`). Open ground founded off a town room
+  hangs off the outskirts, as a building hangs off the street.
+- **The world decides.** Ground the settlement's land lacks is refused as a travel onto it
+  is (`_absent_ground`); ground beyond the near land is as far as the world puts it, so a
+  founded mountain beyond Vormoor's farmland costs the hours a `travel biome=mountain`
+  would.
+- **The narrator.** The tell states the ground; the brief prints `GROUND at <place>`
+  whenever it is not the streets; the absent-ground repair names the ground underfoot and
+  no longer offers the whole land list.
+
 ## Heard of: the state between a name and a place (2026-10-03)
 
 The owner's ruling of 2026-10-03, asked how a place an NPC names should be handled:

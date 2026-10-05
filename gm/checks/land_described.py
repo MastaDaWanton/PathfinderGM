@@ -141,11 +141,21 @@ def find(ctx) -> list[Finding]:
             names = sorted({b for _s, bs in flagged for b in bs})
             there = ", ".join(land.near) or "open ground"
             further = f"; further out, {', '.join(land.beyond)}" if land.beyond else ""
+            # The ground underfoot first, when the place has its own. The owner's
+            # mountain (2026-10-05): this hint offered "close by, farmland, mountain,
+            # desert" and the repair wrote "boulders weathered by the desert sun" — the
+            # desert came from this list, not from the model's own invention.
+            own = places.terrain_of(here)
+            if own and own != places.URBAN:
+                hint = (f"There is no {' or '.join(names)} here. The party stands on "
+                        f"{own} ground: describe that, and nothing else underfoot.")
+            else:
+                hint = (f"There is no {' or '.join(names)} here. Describe the ground "
+                        f"that is there: close by, {there}{further}.")
             found.append(Finding(
                 kind="absent-ground",
                 detail=f"the page puts {', '.join(names)} where the world has none",
-                fix_hint=(f"There is no {' or '.join(names)} here. Describe the ground "
-                          f"that is there: close by, {there}{further}."),
+                fix_hint=hint,
                 weight=2, sentences=tuple(s for s, _b in flagged)))
     return found
 
