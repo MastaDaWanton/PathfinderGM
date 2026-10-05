@@ -117,11 +117,20 @@ EXAMPLES = [
     },
     # A turn with no mechanics is still a scene. This one used to be 119 characters and
     # taught the model that conversation is where the prose stops.
+    #
+    # The player's own act comes first, in this one and in every talking example below
+    # (owner, 2026-10-05: "narrator does not describe my actions" — "I flirt with Vroka"
+    # opened on Vroka's smile). All three talking examples used to open on the other
+    # person's reaction ("He does not answer straight away", "She lets that sit", "He
+    # does not stop planing"), and the 2026-09-25 recordings' ask turns opened the same
+    # way in 25 of 27: the demonstration was the instruction. Reported, never quoted —
+    # quoted words the player never wrote are the narrator speaking for them.
     {
         "player": "I ask him who pays for the windcatchers.",
         "reply": {
             "narration": (
-                "He does not answer straight away. He turns the cup in his hands instead, "
+                "You lean on the counter and ask him who pays for the windcatchers. He "
+                "does not answer straight away. He turns the cup in his hands instead, "
                 "twice around, and looks at the ring it has left on the counter. Somewhere "
                 "behind him a shutter is banging in the wind off the terraces and nobody "
                 "has got up to fix it. <say who=c1 to=you>'The guild pays,'</say> he says at last, in the flat tone "
@@ -372,7 +381,9 @@ EXAMPLES = [
         "player": "I tell her I can get it for her, but I want the name first.",
         "reply": {
             "narration": (
-                "She lets that sit. The fire has burned down to the point where it is more "
+                "You tell her you can get it for her — but the name comes first, before "
+                "anything else changes hands. She lets that sit. The fire has burned down "
+                "to the point where it is more "
                 "sound than light, and she does not look at you while she thinks — she "
                 "looks at the shutter, which is closed, and at the door, which is not. "
                 "<say who=c1 to=you>'A name,'</say> she says. <say who=c1 to=you>'You understand that a name is the only thing in this "
@@ -403,7 +414,9 @@ EXAMPLES = [
         "player": "I ask the boatwright what the shouting on the water is about.",
         "reply": {
             "narration": (
-                "He does not stop planing. The shaving curls off the strake and drops "
+                "You call the question across the shavings, over the rasp of the plane: "
+                "what is all the shouting on the water about? He does not stop planing. "
+                "The shaving curls off the strake and drops "
                 "onto the pile at his feet, and he watches the river over the top of the "
                 "work rather than you. <say who=c1 to=you>'Tide's wrong for it,'</say> he says. <say who=c1 to=you>'That's the Harrow "
                 "boys trying to bring a barge in on the ebb, and the lock-keeper telling "
@@ -439,7 +452,9 @@ EXAMPLES = [
                 "net across his knees, working a torn mesh closed with a wooden needle. He "
                 "watches you come the whole length of the quay without stopping the "
                 "needle, and when you are close enough he lifts his chin a fraction, which "
-                "on this quay is as good as an invitation. What do you ask him?"
+                "on this quay is as good as an invitation. You crouch by the hull and ask "
+                "him whether he knows the river past the weir; he finishes the knot he is "
+                "on before his eyes come up to yours. What do you tell him you want there?"
             ),
             "suggestions": [
                 "I ask him what lies past the weir",
@@ -464,8 +479,10 @@ EXAMPLES = [
         "player": "I knock the cup out of his hand and laugh in his face.",
         "reply": {
             "narration": (
-                "The cup goes spinning off the end of the bar and the laugh is still in "
-                "your mouth when he comes off the stool. He is bigger standing than he "
+                "You flick the cup out of his hand and laugh in his face, loud enough for "
+                "the next table. The cup goes spinning off the end of the bar and the "
+                "laugh is still in your mouth when he comes off the stool. He is bigger "
+                "standing than he "
                 "looked sitting, and he does not say anything at all: his right hand is "
                 "already a fist and already coming round at the side of your head, and "
                 "the men at the next table push their chairs back to give him the room. "
@@ -605,6 +622,14 @@ COMBAT_EXAMPLES = [
 ]
 
 
+# ANCHOR read "pick up from what just happened, in a clause, not a recap" until 2026-10-05,
+# and the beats did exactly that: they picked up AFTER the player's act ("The words of your
+# challenge hang in the damp air", "The watchman listens to your admission"), and the act
+# was never on the page — the owner's "narrator does not describe my actions". The
+# tradition's order is the other way round: the GM says the declared action back as it
+# happens, then the world's answer (The Angry GM's declare–determine–describe; AI Dungeon
+# writes "> You …" on the page before the model continues). TALKING named only the other
+# person's body for the same reason, and PROSE_AFTER_EXTRA's "what just happened".
 BRIEFING = """You are the Game Master of a Pathfinder 1st Edition game set in a world that
 already exists. You narrate and you voice everyone in the scene.
 
@@ -618,7 +643,9 @@ the landing.
 Build the turn out of four moves. They are not paragraphs and not an order to follow
 slavishly — they are what a turn is made of:
 
-  ANCHOR   pick up from what just happened, in a clause, not a recap
+  ANCHOR   what the player just did, as it happens: their act, their gesture, their
+           words said or reported — in a clause or two, never skipped and never more
+           than they declared
   SENSE    two or three concrete things: what is heard, smelt, felt underfoot, not seen
   PUSH     somebody or something acts — an NPC moves, the weather turns, a door closes
   TURN     hand it back by asking what they DO. Never what they see, notice, feel or
@@ -630,8 +657,8 @@ Which of them carries the weight depends on the situation. Some shapes that work
   ARRIVING SOMEWHERE     heavy SENSE, one detail that is wrong or unexpected, then TURN
   SEARCHING              what they find first, what it implies, what they have not
                          reached yet
-  TALKING                what the body does before the mouth does; the answer; the thing
-                         the answer avoided
+  TALKING                the player's words reaching them; what the other body does
+                         before the mouth does; the answer; the thing the answer avoided
   A DEAL OR A THREAT     what it costs them, what the other side wants, the clock on it
   DISCOVERY              the thing itself, then the detail that makes it worse
   A HAZARD GOING WRONG   the mechanism failing, the change spreading, how long they have
@@ -1715,23 +1742,35 @@ _DEEDS_SHAPE_MOVE = ("You take his hand, thank him, and clap him once on the sho
                      "before you turn away.")
 _DEEDS_SHAPE_HERE = ("You tear the hem from your shirt in two long strips and bind his "
                      "forearm tight, knotting it off with your teeth.")
+# Speech, said or reported, with the body that says it (owner, 2026-10-05: the flirt was
+# never on the page — "not what they said, not how, not a gesture"). Reported, not quoted:
+# quoted words the player never wrote are the narrator speaking for them
+# (gm/checks/speaks_for_player.py), and the play-by-post rule is "you write the attempt".
+# No person, place or furniture of any world in it, for the reason given above.
+_DEEDS_SHAPE_SAID = ("You turn your shoulder to the room and put the question to her "
+                     "plainly, low enough that only she hears it.")
 
 
-def deeds_shape(before_move: bool) -> str:
+def deeds_shape(before_move: bool, spoken: bool = False) -> str:
+    if spoken and not before_move:
+        return _DEEDS_SHAPE_SAID
     return _DEEDS_SHAPE_MOVE if before_move else _DEEDS_SHAPE_HERE
 
 
 def deeds_messages(deeds: list[str], player_line: str, beat: str, where: str,
                    people: list[str], *, before_move: bool,
-                   harmless: bool = False, already: list[str] | None = None) -> list[dict]:
+                   harmless: bool = False, already: list[str] | None = None,
+                   spoken: bool = False) -> list[dict]:
     """Ask for the declared deeds the beat skipped, as they play out, in order.
 
     `already` is what the beat DID write of the player's line. Measured on the owner's
     turn replayed: twice in four the beat had the smack and not the thanks, and the
     passage asked for the thanks wrote the smack again as well — the player's whole line
     is in front of it. Named here, and refused in `GMAgent._deeds_refusal` if it is
-    written anyway."""
-    shape = deeds_shape(before_move)
+    written anyway.
+
+    `spoken`: every deed is speech (talk, insult) — the shape is a line said, reported."""
+    shape = deeds_shape(before_move, spoken)
     system = (
         "You write one short passage of a tabletop game narrated to the player as \"you\", "
         "in the present tense. The player said what their character does, and the scene "
@@ -1741,6 +1780,9 @@ def deeds_messages(deeds: list[str], player_line: str, beat: str, where: str,
         + ("It happens where they are now, before they set off: do not walk them anywhere "
            "and do not describe where they arrive. " if before_move else "")
         + ("It hurts nobody: no wound, no blood, no injury. " if harmless else "")
+        + "What the player says: if they wrote their words in quotation marks, use exactly "
+        "those words; otherwise report what they say, and quote nothing. Add nothing they "
+        "did not declare. "
         + "Name nobody the scene does not name. Do not invent what anyone says back, and "
         "do not ask the player what they do.")
     named = ", ".join(people) if people else "nobody by name"
@@ -1829,8 +1871,8 @@ The tags are taken out before anyone reads the page. The player's own words get 
 
 PROSE_AFTER_EXTRA = """
 THIS TURN: the engine has already resolved it, and what it decided is below. Write the
-turn as prose — the scene, the people in it, what just happened — and put nothing in the
-"intents" list; it must be empty.
+turn as prose — what the player does, as it plays out, then the scene and the people in it
+answering it — and put nothing in the "intents" list; it must be empty.
 
 What the engine decided is what happened. Do not contradict it, do not add a roll, do not
 state a number, and do not invent an outcome it did not give you. If it decided nothing

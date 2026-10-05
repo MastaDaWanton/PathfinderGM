@@ -957,6 +957,92 @@ def put_the_deeds_in(text: str, passage: str, *, before_move: bool) -> str:
     return f"{text[:at]}{passage} {text[at:]}"
 
 
+def to_second_person(line: str) -> str:
+    """The player's own words turned onto "you", the way AI Dungeon's Do mode turns them
+    ("Enter the throne room to tell the king of my discovery" goes to the model as "> You
+    enter the throne room to tell the king of your discovery" — help.aidungeon.com,
+    the-do-mode): I/me/my/myself and the contractions outside the player's quotation
+    marks, with am→are and was→were; what they put in quotes is theirs, untouched."""
+    text = " ".join(str(line or "").split())
+    if not text:
+        return ""
+    spans = speech.spans(text)
+    out, at = [], 0
+    for lo, hi in [*spans, (len(text), len(text))]:
+        part = text[at:lo]
+        part = _FP_TOKEN.sub(lambda m: _FIRST_TO_SECOND[m.group(0).lower()], part)
+        part = re.sub(r"\byou am\b", "you are", part)
+        part = re.sub(r"\byou was\b", "you were", part)
+        out.append(part)
+        out.append(text[lo:hi])
+        at = hi
+    return "".join(out)
+
+
+# The authored openings under the deeds repair (`declared_line`): the player's own words,
+# turned onto "you", in front of the beat. Three frames walked least-recently-used per
+# campaign (D1's rule for any authored line: never the same twice running). Each frame
+# says only WHEN — it adds no manner and no decision of ours to the player's act.
+_DECLARED_FRAMES = ("{s}", "Then and there, {l}", "In that moment, {l}")
+# "you continuing to flirt with her": a span the reader cut at a gerund cannot take "you".
+_GERUND = re.compile(r"you (?!(?:bring|sing|fling|swing|sting|wring|string|ring|cling|"
+                     r"spring)\b)\w+ing\b")
+
+
+def _you_did(words: str, line: str) -> str:
+    """One declared deed as a clause with "you" for its subject: the player's span,
+    turned; their bare quoted words ("how was that?") said, untouched."""
+    words = " ".join(str(words or "").split()).strip(" ,;")
+    if not words:
+        return ""
+    bare = words.strip("\"'“”‘’ ")
+    if _in_quotes(line, bare) or words[:1] in "\"“'‘":
+        said = bare if bare[-1:] in ".!?" else bare + "."
+        return f"you say, “{said[:1].upper()}{said[1:]}”"
+    turned = to_second_person(words)
+    first = turned.split()[0].lower()
+    if first in ("you", "you're", "you've", "you'll", "you'd"):
+        return turned[0].lower() + turned[1:]
+    return f"you {turned}"
+
+
+def declared_line(player_line: str, missing: list[str], *, whole: bool,
+                  said: dict | None = None) -> str:
+    """The backstop under `GMAgent._show_declared`: an opening sentence built from the
+    player's own words, for when the repair call did not hold. `whole` — nothing the
+    player declared is on the page — uses their whole line; otherwise the missing deeds'
+    own spans, joined in order. A span that cannot stand after "you" (a gerund,
+    "continuing to flirt with her") falls back to the whole line. Never a word of ours
+    but the frame."""
+    spans = [" ".join(str(s).split()) for s in missing or () if str(s).strip()]
+    clauses = [] if whole else [_you_did(s, player_line) for s in spans]
+    if whole or not clauses or any(not c or _GERUND.match(c) for c in clauses):
+        line = " ".join(str(player_line or "").split())
+        if not line:
+            return ""
+        if line[:1] in "\"“'‘" and len(speech.spans(line)) == 1 \
+                and speech.spans(line)[0] == (0, len(line)):
+            body = _you_did(line, line)
+        else:
+            turned = to_second_person(line)
+            first = turned.split()[0].lower() if turned.split() else ""
+            body = turned if first.startswith("you") else f"you {turned}"
+            body = body[0].lower() + body[1:]
+    else:
+        rest = [c.removeprefix("you ") for c in clauses[1:]]
+        body = clauses[0] if not rest else (
+            f"{clauses[0]} and {rest[0]}" if len(rest) == 1
+            else ", ".join([clauses[0], *rest[:-1]]) + ", and " + rest[-1])
+    body = body.strip()
+    # A second sentence of the player's line starts with "you" too.
+    body = re.sub(r"([.!?]\s+)you\b", lambda m: m.group(1) + "You", body)
+    if body and body[-1] not in ".!?\"”’'":
+        body += "."
+    frame = _DECLARED_FRAMES[least_recently_used(said, "deeds:declared",
+                                                 len(_DECLARED_FRAMES))]
+    return frame.format(s=body[0].upper() + body[1:], l=body)
+
+
 def settle_introductions(text: str, expected: dict[str, str],
                          established: str = "") -> tuple[str, list[str]]:
     """The name a person gives is the one the world holds for them.
@@ -2548,9 +2634,12 @@ def review(text: str, *, pc_name: str = "", echo_index: set[tuple] | None = None
         if mine and same >= 2 and not the_only_other:
             out.findings.append(Finding(
                 "formulaic-opening", f"{same} recent turns also open {mine!r}",
+                # Not "do not begin it with the player" (until 2026-10-05): a beat owes
+                # the player's own act first (the deed on the page, gm/deed_reader.py),
+                # and this hint was the one instruction telling the model to drop it.
                 f"You have opened {same + 1} turns in a row with {mine!r}. Start this one "
-                f"somewhere else — on a person, on a sound, on the thing that has "
-                f"changed — and do not begin it with the player.",
+                f"in other words — the player's act said another way, or a person, a "
+                f"sound, the thing that has changed — but keep what the player does.",
                 weight=2,
             ))
 

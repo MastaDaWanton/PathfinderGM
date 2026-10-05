@@ -119,6 +119,9 @@ class GMAgent:
         # the turn log by the view.
         self.attribution = None
         self.mention_rows: list[dict] = []
+        # The deeds backstop's authored openings this turn (`_show_declared`): ours, so
+        # marked added and never shown back to the model as its own (narrator-guards D4).
+        self.deed_lines: list[str] = []
         # The experiment. Off by default and read per agent, so a run can be flipped
         # between turns without a restart — see `prompts.INTENTS_ONLY_EXTRA` for what is
         # being tested and why it is measured rather than argued about.
@@ -2034,15 +2037,18 @@ class GMAgent:
         # happened. The same place as the answer and for the same reasons — after every
         # cut, before the un-namer — and only on the player's own turn prose, the one
         # caller that hands over the turn's `outcomes`.
+        # Whether a deed is on the page is the deed reader's to say (gm/deed_reader.py,
+        # owner 2026-10-05: "narrator does not describe my actions"); the cue words below
+        # it judge only when the reader is off or failed.
         if (rewrite and not acting and outcomes is not None and player_input
                 and player_input != prompts.CARRY_ON):
-            owed = self._deeds_owed(player_input, outcomes)
-            unshown = narration_mod.unshown_deeds(text, owed)
+            owed, unshown = self._deeds_unshown(text, player_input, outcomes)
             if unshown:
                 text, deed_notes, deed_attempts = self._show_declared(
                     text, unshown, player_input, earlier=earlier, brief=brief,
                     facts=facts, known=self._known_names() | extra,
-                    shown=[d for d in owed if d not in unshown])
+                    shown=[d for d in owed if d not in unshown],
+                    whole=len(unshown) == len(owed))
                 repairs += deed_notes
                 attempts += deed_attempts
         # A band the ledger booked keeps the word it was booked under: soldiers do not
@@ -2874,21 +2880,88 @@ class GMAgent:
             return []
         return narration_mod.owed_deeds(reading, player_input, outcomes)
 
+    def _deeds_unshown(self, text: str, player_input: str, outcomes
+                       ) -> tuple[list[dict], list[dict]]:
+        """(the deeds the page owes, the ones it does not show).
+
+        The deed reader's (`deed_reader.deeds_of` / `read`): every still act the player
+        committed to — talk and `other` included, which the cue-word check could not
+        judge and so never owed — read back off the page by one enum-constrained call
+        and held to it in code. Measured on tests/deeds/gold.py with the owner's labelled
+        beats (docs/narrator-guards.md, "The deed on the page"): the shipped cue-word
+        check caught 2 of 54 unshown deeds; the reader, 53, with 3 false alarms in 26.
+
+        The same exclusions as `_deeds_owed`: nothing in a fight, nothing in an intimate
+        beat. With the reader off (the test suite) or failed, the cue words judge their
+        own narrower list, as before."""
+        from . import deed_reader
+
+        if deed_reader.ENABLED:
+            owed = self._deeds_for_the_page(player_input, outcomes)
+            if not owed:
+                return [], []
+            got = self._read_deeds(text, [d["span"] for d in owed], player_input)
+            if not got.error:
+                gone = {v.span for v in got.missing}
+                return owed, [d for d in owed if " ".join(d["span"].split()) in gone]
+        owed = self._deeds_owed(player_input, outcomes)
+        return owed, narration_mod.unshown_deeds(text, owed)
+
+    def _deeds_for_the_page(self, player_input: str, outcomes) -> list[dict]:
+        """The deeds the page owes as the player's doing, by the reader's wider list
+        (`deed_reader.deeds_of`) when it is on, else `_deeds_owed`'s; the same exclusions
+        either way — nothing in a fight, nothing in an intimate beat."""
+        from . import deed_reader
+
+        if not deed_reader.ENABLED:
+            return self._deeds_owed(player_input, outcomes)
+        reading = getattr(self, "reading", None)
+        if not isinstance(reading, dict) or reading.get("error"):
+            return []
+        if self.engine.scene.in_encounter:
+            return []
+        mode = str(getattr(getattr(self, "intimate", None), "mode", "") or "")
+        if self._intimate_beat() or mode in ("intimate", "fade"):
+            return []
+        return deed_reader.deeds_of(reading, player_input, outcomes)
+
+    def _read_deeds(self, text: str, spans: list[str], player_input: str):
+        """One deed read, logged as a `deeds-read` row of the turn log."""
+        from . import deed_reader
+
+        pc = self.engine.scene.pc()
+        got = deed_reader.read(text, spans, player_input, model=self.prose_model,
+                               host=self.prose_host, provider=self.prose_provider,
+                               api_key=self.prose_key,
+                               pc_name=str(getattr(pc, "name", "") or ""))
+        self.mention_rows.append(dict(got.as_log(), door="turn"))
+        return got
+
     def _show_declared(self, text: str, unshown: list[dict], player_input: str, *,
                        earlier: list[str] | None, brief: str, facts: list[str] | None,
-                       known: set[str], shown: list[dict] | None = None
-                       ) -> tuple[str, list[str], list[Attempt]]:
+                       known: set[str], shown: list[dict] | None = None,
+                       whole: bool = False) -> tuple[str, list[str], list[Attempt]]:
         """The player declared deeds the beat never wrote (owner, 2026-10-01: "describing
         the action as it plays out instead of picking up after the actions i described
         are finished"). One small call for those deeds alone, in the player's order, put
         where they happened — in front of the departure on a move turn, at the start
         otherwise, before the hand-back for a deed done after arriving.
 
-        Kept only when it shows every deed it was asked for (the same cue words that
-        found them missing), hands nothing back, walks nobody anywhere, names nobody the
-        scene does not, and — for a blow the dice never rolled — hurts nobody. Otherwise
-        the beat stands as written and the repairs say so: the call is a backstop under
-        the prose, and a wrong backstop is worse than none."""
+        Kept only when it shows every deed it was asked for, hands nothing back, walks
+        nobody anywhere, names nobody the scene does not, puts no words in the player's
+        mouth that they did not write, and — for a blow the dice never rolled — hurts
+        nobody. "Shows" is the deed reader's word on the passage (`_read_deeds`), not the
+        cue words: on the owner's 2026-10-05 turn the model wrote the flirt it was asked
+        for twice — "a low, teasing remark about her daring nature" — and the cue word
+        "flirt" refused both.
+
+        When it does not hold after two tries, or the call fails, the BACKSTOP opens the
+        beat with the player's own line turned onto "you" (`narration.declared_line`,
+        AI Dungeon's Do-mode echo), framed least-recently-used and marked ours
+        (`deed_lines` → `last_added`, D4). The tradition's first move on any declared
+        action is to say it back (declare–determine–describe); a page that never shows the
+        player's act is the defect the owner reported, and their own words are the one
+        rendering of it that cannot be wrong about what they did."""
         deeds = [str(d.get("span") or d.get("object") or d.get("act")) for d in unshown]
         before = any(d.get("before_move") for d in unshown)
         moved_first = not before and all(d.get("after_move") for d in unshown)
@@ -2903,11 +2976,13 @@ class GMAgent:
                   if not a.is_pc and a.name and any(
                       re.search(rf"\b{re.escape(w)}\b", lookup)
                       for w in str(a.name).split() if len(w) > 2 and w[:1].isupper())]
+        spoken = all(d.get("act") in ("talk", "insult") for d in unshown)
         messages = prompts.deeds_messages(
             deeds, player_input, text, where, people, before_move=before,
-            harmless=harmless,
+            harmless=harmless, spoken=spoken,
             already=[str(d.get("span") or d.get("act")) for d in shown or ()])
         attempts: list[Attempt] = []
+        why, passage = "", ""
         # Two tries, the second told what was wrong with the first: the shape every
         # retry here has (`narrate_turn`'s re-introduction retry). Measured on the owner's
         # turn: one replay in four wrote the smack again beside the thanks it was asked
@@ -2923,10 +2998,19 @@ class GMAgent:
                                         note=f"unshown: {'; '.join(deeds)}"))
                 passage = " ".join(str((reply.json() or {}).get("passage") or "").split())
             except Exception as exc:  # noqa: BLE001 — a failed repair must not lose the turn
-                return text, [f"declared and not shown: {'; '.join(deeds)} — the call "
-                              f"failed ({type(exc).__name__}); kept as written"], attempts
+                why, passage = f"the call failed ({type(exc).__name__})", ""
+                break
             why = self._deeds_refusal(passage, unshown, known | set(people),
-                                      before_move=before, harmless=harmless, shown=shown)
+                                      before_move=before, harmless=harmless, shown=shown,
+                                      spoken=spoken, player_input=player_input,
+                                      pc=scene.pc(), by_cues=not self._deed_reader_on())
+            if not why and self._deed_reader_on():
+                got = self._read_deeds(passage, deeds, player_input)
+                lost = [v.span for v in got.missing]
+                if got.error:
+                    lost = [str(d.get("span") or d["act"]) for d in unshown
+                            if not narration_mod.shows_deed(passage, d)]
+                why = ("does not show " + ", ".join(lost)) if lost else ""
             if not why:
                 break
             messages = messages + [
@@ -2934,27 +3018,47 @@ class GMAgent:
                 {"role": "user", "content": f"That passage {why}. Write it again: only "
                                             f"{'; '.join(deeds)}, nothing else."}]
         if why:
-            return text, [f"declared and not shown: {'; '.join(deeds)} — the passage did "
-                          f"not hold ({why}: {passage[:60]!r}); kept as written"], attempts
+            line = narration_mod.declared_line(player_input, deeds, whole=whole,
+                                               said=scene.said)
+            if not line:
+                return text, [f"declared and not shown: {'; '.join(deeds)} — the passage "
+                              f"did not hold ({why}); kept as written"], attempts
+            self.deed_lines.append(line)
+            passage, note = line, (f"declared and not shown: {'; '.join(deeds)} — the "
+                                   f"passage did not hold ({why}: {passage[:60]!r}); "
+                                   f"wrote the player's own line {line[:60]!r}")
+        else:
+            note = (f"declared and not shown: wrote {'; '.join(deeds)}"
+                    + (" before the departure" if before else ""))
         if moved_first:
             fixed = narration_mod.put_before_the_hand_back(text, passage)
         else:
             fixed = narration_mod.put_the_deeds_in(text, passage, before_move=before)
-        return fixed, [f"declared and not shown: wrote {'; '.join(deeds)}"
-                       + (" before the departure" if before else "")], attempts
+        return fixed, [note], attempts
+
+    @staticmethod
+    def _deed_reader_on() -> bool:
+        from . import deed_reader
+
+        return deed_reader.ENABLED
 
     @staticmethod
     def _deeds_refusal(passage: str, unshown: list[dict], known: set[str], *,
                        before_move: bool, harmless: bool,
-                       shown: list[dict] | None = None) -> str:
-        """Why the deeds passage cannot go in, or "" when it can."""
+                       shown: list[dict] | None = None, spoken: bool = False,
+                       player_input: str = "", pc=None, by_cues: bool = True) -> str:
+        """Why the deeds passage cannot go in, or "" when it can. `by_cues` judges
+        "does it show the deeds" by cue words — only when the deed reader is off; with it
+        on, `_show_declared` asks the reader after every structural test here passes."""
         if not passage:
             return "empty"
         if len(passage) > prompts.DEEDS_MAX_CHARS + 40:
             return "too long"
-        missing = [d for d in unshown if not narration_mod.shows_deed(passage, d)]
-        if missing:
-            return "does not show " + ", ".join(str(d.get("span") or d["act"]) for d in missing)
+        if by_cues:
+            missing = [d for d in unshown if not narration_mod.shows_deed(passage, d)]
+            if missing:
+                return "does not show " + ", ".join(str(d.get("span") or d["act"])
+                                                    for d in missing)
         # A deed the beat already wrote, written again: measured twice in four replays of
         # the owner's turn before `already` named them (see `prompts.deeds_messages`).
         again = [d for d in shown or () if narration_mod.shows_deed(passage, d)]
@@ -2962,7 +3066,7 @@ class GMAgent:
             return "writes again " + ", ".join(str(d.get("span") or d["act"]) for d in again)
         # The demonstration copied: the arrival block's own copy of it was written word
         # for word as an opening ("You take his hand, thank him…", to a woman).
-        if narration_mod.build_echo_index(prompts.deeds_shape(before_move)) \
+        if narration_mod.build_echo_index(prompts.deeds_shape(before_move, spoken)) \
                 & narration_mod.build_echo_index(passage):
             return "copies the example"
         bare = speech_mod.unquoted(passage)
@@ -2979,6 +3083,13 @@ class GMAgent:
         invented = narration_mod.invented_names(passage, known)
         if invented:
             return "names " + ", ".join(invented)
+        # Only the player speaks for their character (gm/checks/speaks_for_player.py): the
+        # passage says what they said in their own words, or reports it — never new lines.
+        from .checks.speaks_for_player import invented_lines
+
+        if invented_lines(passage, player_input, (), str(getattr(pc, "name", "") or ""),
+                          str(getattr(pc, "ref", "") or "pc")):
+            return "puts words in the player's mouth they never wrote"
         return ""
 
     def _repair_misnamed(self, text: str, attribution) -> tuple[str, list[str], list[Attempt]]:
@@ -3075,7 +3186,7 @@ class GMAgent:
             demonstrations=demos.examples if demos is not None else None,
             # What the player did before setting off, in their words: on an arrival it
             # opens the block, so the beat starts where they were (owner, 2026-10-01).
-            before_leaving=[str(d.get("span")) for d in self._deeds_owed(
+            before_leaving=[str(d.get("span")) for d in self._deeds_for_the_page(
                 player_input, outcomes) if d.get("before_move") and d.get("span")])
         schema = prompts.prose_schema(
             narration_mod.MIN_COMBAT_CHARS if fighting
@@ -3257,6 +3368,7 @@ class GMAgent:
         deaths = self._deaths_from(outcomes)
         # The doors this turn forced or picked, for the review's held-door check.
         self.doors = self._doors_from(outcomes)
+        self.deed_lines = []
         text, repairs, groom_attempts = self._groom(
             text, earlier=earlier or [],
             min_chars=(narration_mod.MIN_COMBAT_CHARS if fighting
@@ -3282,10 +3394,15 @@ class GMAgent:
         self.last_added = narration_mod.added_sentences(before, text)
         # And the body's authored lines, which the truth pass's backstop put on inside the
         # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
-        from .checks import body_shown
+        from .checks import body_shown, sleep_kept
 
-        self.last_added += [s for s in body_shown.authored_in(text)
+        self.last_added += [s for s in (*body_shown.authored_in(text),
+                                        *sleep_kept.authored_in(text))
                             if s not in self.last_added]
+        # And the deeds backstop's opening built from the player's own line
+        # (`_show_declared`): ours too.
+        self.last_added += [s for s in self.deed_lines
+                            if s in text and s not in self.last_added]
         if pressed:
             repairs.append(f"a kill left off the page: wrote the death of "
                            f"{', '.join(pressed)}")

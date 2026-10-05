@@ -675,3 +675,150 @@ judges yet; the race's body line is in the brief. Hours charged by `Scene.advanc
 roll no Will save at all — the panel shows the danger and nothing asks it. `survival.sleep`
 clears the hunger and thirst check counts, which the book does not (they clear on food
 and water).
+
+## The deed on the page (2026-10-05)
+
+The owner:
+
+> "narrator does not describe my actions"
+
+The line was "I flirt with Vroka", at the gate. The beat opened on her — her eyes
+travelling back to the player, an amused smile, "A bold play," she says — and the flirt
+was never written: not what was said, not how, not a gesture.
+
+**Why the declared-deed check (2026-10-01) missed it, on the real turn.** The reader read
+the line `other: flirt with Vroka`. `narration.owed_deeds` owes an `other` only on a move
+turn (on a still turn it was judged the reading's residue, which beats write in their own
+words), and owes talk only without words and without "ask"/"tell"/"say" (the reply was
+assumed to carry it). So a still social turn owed nothing and no check ran; the turn's
+prose row has no deed repair. On the next turn ("…pull Vroka close to me continuing to flirt
+with her") it did fire, and the cue word "flirt" refused both passages the model wrote —
+"a low, teasing remark about her daring nature", "a playful remark about her sharp wit" —
+the flirt, in other words, and the beat shipped without it.
+
+**Measured.** Hand labels over every still player turn with a declared act the engine
+does not narrate for itself (moves, looks, waits, casts and fights left out): the owner's
+saves — 13 beats, 16 deeds, 8 not shown, in 7 of the 13 beats; the 2026-09-25/26
+recordings and the beat-verify bench's excerpts — 64 deeds, 46 not shown (committed as
+`tests/deeds/gold.py`; the owner's rows stay in a scratch file). Across all 80, 54 were
+not on the page. The recordings' ask turns opened on the person asked in 25 of 27.
+
+Labels: shown is the player's character doing it as it happens, in any words ("you ask
+what work is available", "as you mention the girl"); not shown is an answer, a reaction
+or a result only ("He does not look up as you speak", "The words of your challenge hang
+in the damp air", "The transaction is finalized"). "As you speak", with nothing of what
+was said, is not shown — it is the owner's complaint word for word.
+
+| detector, 80 labelled deeds (54 not shown) | precision | recall | false alarms |
+|---|---|---|---|
+| cue words, as shipped (`owed_deeds` scope) | 0.40 | 0.04 | 3 of 26 |
+| cue words, every deed | 0.82 | 0.26 | 3 of 26 |
+| deed reader, gemma-4-12B, 3 runs | 0.93–0.95 | 0.98 | 3–4 of 26 |
+
+The reader's false alarms are all borderline labels: "agree to sell" shown as a
+thrust crate and a nod; "take the crate to the man" shown only as setting it down; an
+offer shown as a gesture at the crate; "as you mention the girl". A false alarm costs one
+sentence restating the act. Median 0.8 s a read (`tools/deed_bench.py`).
+
+**What the traditions do.** Every one puts the player's act on the page first, in the
+player's own terms, and the world's answer after it:
+- The Angry GM's declare–determine–describe: the description is "repeating back the
+  action you already repeated as if it happened as intended"
+  (theangrygm.com/declare-determine-describe).
+- Play-by-post etiquette: "you write the attempt, they write the result"; godmodding is
+  "writing outcomes for someone else's character" (CharHaven, on godmodding). The GM
+  writing the player's declared attempt is not godmodding; inventing their words or
+  choices is.
+- AI Dungeon's Do mode writes "> You …" onto the page, first person outside quotes
+  turned to second, before the model continues (help.aidungeon.com/the-do-mode).
+- Inform's Report rules say what the player's action did once it is carried out
+  (Writing with Inform §12.2).
+
+That settles the tension with `speaks_for_player`: the narration renders the attempt the
+player declared — their gesture, their tone, their words when they gave them, reported
+when they did not — and invents no new lines or choices.
+
+**What changed.**
+- **The reader** (`gm/deed_reader.py`): which declared deeds the page shows, one
+  enum-constrained call — per deed a sentence number from the page's own list and
+  shown / after / absent — then held to the page in code (a `shown` must name a sentence
+  about the player, or carrying their quoted words; otherwise it abstains). Owed: every
+  still act done or tried except moves, looks, searches, waits, rests, buys, casts and
+  checks; nothing in a fight or an intimate beat. Off or failed, the cue words judge their
+  old list.
+- **The repair** (`GMAgent._show_declared`) is held to the same reader instead of the cue
+  words, and to `speaks_for_player` (no quoted words the player never wrote); the prompt
+  says to use the player's quoted words exactly or report them, and has a spoken shape.
+- **The backstop** under it: when the passage fails twice or the call fails, the player's
+  own line turned onto "you" opens the beat (`narration.declared_line`), framed
+  least-recently-used per campaign ("…", "Then and there, …", "In that moment, …") and
+  marked added, so it is never shown back to the model as its own (D4). It used to ship
+  the beat without the deed.
+- **The prompt taught it.** The briefing's ANCHOR read "pick up from what just happened",
+  TALKING named only the listener's body, PROSE_AFTER_EXTRA said "what just happened",
+  and all three talking examples opened on the listener ("He does not answer straight
+  away", "She lets that sit", "He does not stop planing"); the cup-knocking example opened
+  on the cup in flight, the quay example never asked. Each now opens on (or shows) the
+  player's act, reported. The formulaic-opening repair said "do not begin it with the
+  player"; it now says to keep what the player does.
+- **Judge each deed on its own** was added to the reader's instruction after the live check
+  below found "ask him who in town is hiring" read as shown on the strength of "You thank
+  the smith…" in the same line. Re-benched after: P 0.95, R 0.98, 3 of 26 false alarms
+  (two runs, identical) — the same as before; the live miss is caught 3 of 3. That case
+  is now a dev case, not a held-out one.
+
+**After, on fresh beats.** `tools/narrator_audit.py`'s "strangers" script and a ten-line
+"deeds" script (ask, flirt, pick up and toss an apple, tell, whistle, thank and shake
+hands, ask the smith, pick up a hammer), gemma-4-12B, the shared Ollama contended
+(turns took 30–180 s):
+
+| | owed turns | deeds missing from the draft | deeds missing from the page |
+|---|---|---|---|
+| old prompts, new check ("deeds") | 8 | 9 of 12, in 8 of 8 turns; 0 drafts opened on the player | 0 of 12 (8 repairs) |
+| new prompts, new check ("deeds") | 7 | 4 of 10, in 4 of 7 turns; 3 opened on the player | 0 of 10 (3 repairs) |
+| new prompts, new check ("strangers") | 6 | 4 of 6, in 4 of 6 turns | 0 of 6 (4 repairs) |
+
+"Missing from the page" is the reader's word on the shipped beat and was checked by hand:
+every one shows the act. No backstop line was needed in these runs; every repair was the
+model's passage. Small samples; the prompt halved the drafts' misses and the repair carried
+the rest. One repair passage repeated the beat's own next clause ("You whistle a tune that
+hangs in the humid air. The tune you whistle hangs in the humid air…") — the reader had
+called "The tune you whistle hangs" not shown; borderline, and not guarded against.
+
+**Live, on a scratch copy of the owner's save** (Sammy in the smithy, the server from this
+branch on a scratch data directory):
+1. "I flirt with the smith" — the draft opened "You offer him a playful wink and a charming
+   grin, leaning against the heavy workbench…"; read shown; no repair.
+2. "I pick up the ceramic jug from the stool and take a long drink from it." — "You reach
+   for the jug on the stool… as you take a long, desperate pull…"; both shown; no repair.
+3. "I thank the smith and ask him who in town is hiring." — "You thank the smith for the
+   information and the direction…", then his answer; the asking itself was not written and
+   the reader (before the line above) called it shown. The miss that changed the prompt.
+4. "I nod to the apprentice and ask the smith what the night watch pays." — the draft
+   opened "The smith listens to your question about the night watch" (read: after); the
+   repair passage went first: "You nod your head toward the apprentice and ask the smith
+   what the night watch pays." Two reads of about 1.2 s and a 1.4 s call.
+5. "…refusing to sleep." (twice) — no rest op injected (the `_WONT_SLEEP` fix below);
+   "refusing to sleep" read absent and written in: "You keep your eyes open and your
+   posture rigid, refusing to sleep."
+
+**Also in this lane.**
+- `judgement._WONT_SLEEP` had no "refus" form: the survival lane's live run sent "refusing
+  to sleep" and a rest op was injected. Refuse, resist, fight off, stave off, keep from,
+  try not to, avoid now count.
+- `gm/checks/sleep_kept.py`: the survival lane's run had the tell "cannot stay awake any
+  longer and falls asleep where they stand" and prose already waking at twilight ("that
+  was a long nap"). When the engine holds the player asleep or out cold at the end of the
+  turn, one closed question (`deed_reader.read_under`) names the first sentence where they
+  are up again; one rewrite, then cut from it and an authored line (LRU, marked added).
+  Unit-tested on that shape; **not measured on a bench and not seen live** — two attempts
+  to make Sammy fall asleep in the scratch save passed eight hours without a sleep check.
+
+**Not done.**
+- The reader judges deeds; it does not judge the player's words when the player quoted
+  them — whether the page has them exactly is `speaks_for_player`'s, and reported speech
+  is allowed by design.
+- Moves, looks, searches, waits, casts and checks are not owed (the engine's tells or the
+  dice write them); a fight's blows are the blow checks'; the intimate beat is exempt.
+- The reader's 3 false alarms in 26 each cost one sentence restating the act.
+- Latency: one read per owed turn (~0.8–1.3 s), plus a call and a read per repair.
