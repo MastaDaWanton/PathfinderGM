@@ -513,3 +513,12 @@ Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited 
 | Q2.2 Potions vs magic items | **Single-use is alchemy's** (potions, oils, elixirs, bombs); anything that keeps working is enchanting's (recommended). |
 | Q2.3 Poisons | **Split by route**: herbalism the body's own, alchemy the ones that reach outside (recommended). |
 | Q2.4 Transmutation | **A Transmute method**: a material to another of its kind, one band rarer, at a cost; level 3 (recommended). |
+
+### Round 3 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q3.1 Methods | **Trim and add**: Calcine, Dissolve, Distill, Filter, React, Sublime, Bottle; Precipitate folds in, Stabilize becomes an ingredient, Catalyze a catalyst trait; add Transmute (recommended). |
+| Q3.2 Volatility | **Make it real**: a 5+ fail on a volatile step applies the promised mishap to the alchemist, stated before the roll (recommended). |
+| Q3.3 Concentration | **As herbalism's**: two make one at x1.5, uncapped, each step harder (recommended). |
+| Q3.4 Handler's tax | **Toxic to handle**: a working trait that hurts the alchemist at the bench unless protected (recommended). |
