@@ -1,0 +1,119 @@
+{
+  "class": "barbarian",
+  "_source": "Core Rulebook, Barbarian (d20pfsrd.com/classes/core-classes/barbarian/ and legacy.aonprd.com/coreRulebook/classes/barbarian.html, both read 2026-10-05).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "rage",
+      "name": "Rage",
+      "aliases": ["barbarian rage", "raging", "enter a rage", "enter rage"],
+      "level": 1,
+      "source": "CRB p.31 Rage: +4 morale Str and Con, +2 morale Will, -2 AC; free action to enter; cannot enter while fatigued or exhausted; fatigued for 2 rounds per round raged. Greater rage (11th) +6/+3, mighty rage (20th) +8/+4, tireless rage (17th) no fatigue.",
+      "text": "+4 Str and Con, +2 Will, -2 AC; a round a round; fatigued after.",
+      "action": "free",
+      "cost": {"pool": "rage", "amount": 1},
+      "drain": {"pool": "rage", "amount": 1},
+      "toggle": {"key": "rage"},
+      "requires_not": ["state.impaired.fatigued", "state.impaired.exhausted"],
+      "self": {
+        "tags": ["buff.stance.rage"],
+        "modifiers": [
+          {"type": "ability_mod", "target": "str", "bonus_type": "morale",
+           "by_level": {"1": 4, "11": 6, "20": 8}},
+          {"type": "ability_mod", "target": "con", "bonus_type": "morale",
+           "by_level": {"1": 4, "11": 6, "20": 8}},
+          {"type": "save_mod", "target": "will", "bonus_type": "morale",
+           "by_level": {"1": 2, "11": 3, "20": 4}},
+          {"type": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": -2}
+        ]
+      },
+      "after": {"condition": "fatigued", "rounds_per_spent": 2, "until_level": 17},
+      "addons": [
+        {"choice": "rage power", "pick": "animal fury",
+         "_source": "CRB rage power: a bite while raging, 1d4 (1d3 if Small).",
+         "natural_weapons": [{"key": "bite", "name": "bite (animal fury)", "type": "piercing",
+                              "damage": {"small": "1d3", "medium": "1d4"}}]},
+        {"choice": "rage power", "pick": "swift foot",
+         "_source": "CRB rage power: a 5-foot enhancement bonus to speed while raging.",
+         "modifiers": [{"type": "speed", "target": "land", "bonus_type": "enhancement",
+                        "amount": 5}]},
+        {"choice": "rage power", "pick": "raging climber",
+         "_source": "CRB rage power: her level as an enhancement bonus on Climb while raging.",
+         "modifiers": [{"type": "skill_mod", "target": "climb", "bonus_type": "enhancement",
+                        "formula": "level"}]},
+        {"choice": "rage power", "pick": "raging swimmer",
+         "_source": "CRB rage power: her level as an enhancement bonus on Swim while raging.",
+         "modifiers": [{"type": "skill_mod", "target": "swim", "bonus_type": "enhancement",
+                        "formula": "level"}]},
+        {"choice": "rage power", "pick": "superstition",
+         "_source": "CRB rage power: +2 morale on saves against spells, +1 per 4 levels. Only saves made against a spell carry the context (the cast door passes against: spell); supernatural and spell-like abilities do not yet.",
+         "modifiers": [
+           {"type": "save_mod", "target": "fort", "bonus_type": "morale",
+            "formula": "2 + floor(level / 4)", "when": {"against": "spell"}},
+           {"type": "save_mod", "target": "ref", "bonus_type": "morale",
+            "formula": "2 + floor(level / 4)", "when": {"against": "spell"}},
+           {"type": "save_mod", "target": "will", "bonus_type": "morale",
+            "formula": "2 + floor(level / 4)", "when": {"against": "spell"}}
+         ]}
+      ],
+      "tell": "{name} flies into a rage.",
+      "tell_off": "{name}'s rage burns out.",
+      "not_yet": [
+        "The skills rage forbids (Charisma-, Dexterity- and Intelligence-based, but Acrobatics, Fly, Intimidate and Ride) are not refused while it holds.",
+        "Falling unconscious does not end the rage on its own.",
+        "Indomitable will's +4 against enchantment: saves carry no enchantment descriptor yet.",
+        "Rounds only drain in played rounds; a rage begun out of a fight holds until it is ended."
+      ]
+    },
+    {
+      "key": "guarded stance",
+      "name": "Guarded Stance",
+      "level": 2,
+      "requires_choice": {"choice": "rage power", "pick": "guarded stance"},
+      "source": "CRB rage power: +1 dodge AC against melee for Con modifier rounds (minimum 1), +1 for every 6 levels; a move action while raging.",
+      "text": "+1 dodge AC against melee for Con-modifier rounds, while raging.",
+      "action": "move",
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "self": {
+        "rounds": "max(1, con_mod)",
+        "modifiers": [{"type": "combat_mod", "target": "ac", "bonus_type": "dodge",
+                       "formula": "1 + floor(level / 6)", "when": {"attack": "melee"}}]
+      },
+      "tell": "{name} drops into a guarded stance."
+    },
+    {
+      "key": "rolling dodge",
+      "name": "Rolling Dodge",
+      "level": 2,
+      "requires_choice": {"choice": "rage power", "pick": "rolling dodge"},
+      "source": "CRB rage power: +1 dodge AC against ranged attacks for Con modifier rounds, +1 for every 6 levels; a move action while raging.",
+      "text": "+1 dodge AC against ranged attacks for Con-modifier rounds, while raging.",
+      "action": "move",
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "self": {
+        "rounds": "max(1, con_mod)",
+        "modifiers": [{"type": "combat_mod", "target": "ac", "bonus_type": "dodge",
+                       "formula": "1 + floor(level / 6)", "when": {"attack": "ranged"}}]
+      },
+      "tell": "{name} weaves low, hard to draw a bead on."
+    },
+    {
+      "key": "renewed vigor",
+      "name": "Renewed Vigor",
+      "level": 4,
+      "requires_choice": {"choice": "rage power", "pick": "renewed vigor"},
+      "source": "CRB rage power: a standard action while raging, once a day: heal 1d8 + Con modifier, +1d8 for every four levels above 4th (5d8 at 20th).",
+      "text": "Heal 1d8 + Con while raging, once a day.",
+      "action": "standard",
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "pool": {"id": "renewed vigor", "max": "1", "refresh": "rest.night"},
+      "cost": {"pool": "renewed vigor", "amount": 1},
+      "affects": "self",
+      "roll": {"count": "1 + floor((level - 4) / 4)", "die": 8, "bonus": "con_mod", "as": "heal"},
+      "tell": "{name}'s fury closes their wounds."
+    }
+  ]
+}

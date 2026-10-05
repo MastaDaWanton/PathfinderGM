@@ -1,0 +1,107 @@
+{
+  "class": "paladin",
+  "_source": "Core Rulebook, Paladin (d20pfsrd.com/classes/core-classes/paladin/, read 2026-10-05).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "_alignment_note": "The app has no alignment on a sheet (the 2026-09-19 ruling). A smite against a creature whose stat block PRINTS an alignment without E is wasted, as the book says; one with no printed alignment (the world's people) has nothing to read, so the smite holds and the tell says so. `evil_only` is that check.",
+  "abilities": [
+    {
+      "key": "smite evil",
+      "name": "Smite Evil",
+      "aliases": ["smite"],
+      "level": 1,
+      "source": "CRB p.61 Smite Evil: swift action, one target in sight; Cha bonus to attack, paladin level to damage, Cha modifier as a deflection bonus to AC against that target's attacks; until the target is dead or the paladin rests.",
+      "text": "Cha to attack, level to damage and Cha deflection AC against one evil foe.",
+      "action": "swift",
+      "cost": {"pool": "smite evil", "amount": 1},
+      "affects": "target",
+      "aim": "foe",
+      "evil_only": true,
+      "self": {
+        "vs_target": true,
+        "tags": ["buff.smite", "recovery.rest"],
+        "modifiers": [
+          {"type": "combat_mod", "target": "attack", "bonus_type": "untyped",
+           "formula": "max(0, cha_mod)"},
+          {"type": "combat_mod", "target": "damage", "bonus_type": "untyped",
+           "formula": "level"},
+          {"type": "combat_mod", "target": "ac", "bonus_type": "deflection",
+           "formula": "max(0, cha_mod)"}
+        ]
+      },
+      "tell": "{name} calls down a smite.",
+      "not_yet": [
+        "The first hit's doubled damage against evil outsiders, evil dragons and undead.",
+        "Smite attacks bypassing the target's damage reduction.",
+        "Ending on the target's death: the mark stays, inert, until the paladin rests."
+      ]
+    },
+    {
+      "key": "lay on hands",
+      "name": "Lay on Hands",
+      "aliases": ["lay hands", "laying on hands"],
+      "level": 2,
+      "source": "CRB p.61 Lay on Hands: 1d6 per two paladin levels; standard action on another, swift on herself; touch. Against undead: the same dice as damage on a melee touch attack, no save. Mercies (p.62) remove their conditions from whoever is healed.",
+      "text": "Heal 1d6 per two levels by touch; swift on yourself.",
+      "action": "standard",
+      "self_action": "swift",
+      "cost": {"pool": "lay on hands", "amount": 1},
+      "affects": "target",
+      "aim": "self",
+      "reach_ft": 5,
+      "roll": {"count": "floor(level / 2)", "die": 6, "as": "heal"},
+      "undead": {"attack": "melee touch", "as": "damage", "type": "positive"},
+      "removes": {
+        "choice": "mercy",
+        "catalogue": {
+          "fatigued": {"level": 3, "lifts": ["fatigued"]},
+          "shaken": {"level": 3, "lifts": ["shaken"]},
+          "sickened": {"level": 3, "lifts": ["sickened"]},
+          "dazed": {"level": 6, "lifts": ["dazed"]},
+          "staggered": {"level": 6, "lifts": ["staggered"]},
+          "exhausted": {"level": 9, "lifts": ["exhausted"]},
+          "frightened": {"level": 9, "lifts": ["frightened"]},
+          "nauseated": {"level": 9, "lifts": ["nauseated"]},
+          "blinded": {"level": 12, "lifts": ["blinded"]},
+          "deafened": {"level": 12, "lifts": ["deafened"]},
+          "paralyzed": {"level": 12, "lifts": ["paralyzed"]},
+          "stunned": {"level": 12, "lifts": ["stunned"]}
+        }
+      },
+      "tell": "{name} lays hands.",
+      "not_yet": [
+        "The mercies that act through a spell: diseased (remove disease), cursed (remove curse), poisoned (neutralize poison).",
+        "Touch is checked on the map (5 ft); with no map it is taken on trust."
+      ]
+    },
+    {
+      "key": "channel positive energy",
+      "name": "Channel Positive Energy",
+      "aliases": ["channel energy", "channel"],
+      "level": 4,
+      "source": "CRB p.62 Channel Positive Energy: spends two uses of lay on hands; channels as a cleric of her paladin level (CRB p.40: 1d6 + 1d6 per two levels beyond 1st, 30-ft burst, Will DC 10 + 1/2 level + Cha for half).",
+      "text": "Heal the living or harm the undead in a 30-ft burst; two uses of lay on hands.",
+      "action": "standard",
+      "cost": {"pool": "lay on hands", "amount": 2},
+      "affects": "all",
+      "radius_ft": 30,
+      "aim": "self",
+      "roll": {"count": "floor((level + 1) / 2)", "die": 6},
+      "choice": {
+        "kind": "mode",
+        "default": "heal",
+        "options": {
+          "heal": {"living": true, "roll_as": "heal"},
+          "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
+                   "damage_type": "positive",
+                   "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
+                            "success": "half"}}
+        }
+      },
+      "tell": "{name} channels positive energy.",
+      "not_yet": [
+        "With no map, everyone in the scene is in the burst.",
+        "Excluding chosen creatures (Selective Channeling): the burst takes everyone it reaches, as the book does."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "class": "domain",
+  "_source": "Core Rulebook, Cleric: Domains (d20pfsrd.com/classes/core-classes/cleric/domains/paizo-domains). The numbers are the ones content/domains/powers.json already carries for these powers; this file adds what using one DOES. A druid with the domain through nature bond uses her druid level (Core Rulebook, Nature Bond).",
+  "_grammar": "rules/class_abilities.py, module docstring. `power` is the key in content/domains/powers.json; a character has the ability exactly when `domains.powers_had` lists that power, and spends the pool that file already defines.",
+  "abilities": [
+    {
+      "key": "lightning arc", "power": "lightning arc", "name": "Lightning Arc", "level": 1,
+      "source": "Air domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 electricity + 1 per two cleric levels; 3 + Wis times a day.",
+      "text": "Ranged touch, 30 ft: 1d6 electricity + 1 per two levels.",
+      "action": "standard", "cost": {"pool": "lightning arc", "amount": 1},
+      "affects": "target", "aim": "foe", "harmful": true,
+      "attack": "ranged touch", "range_ft": 30,
+      "roll": {"count": 1, "die": 6, "bonus": "floor(level / 2)", "as": "damage",
+               "type": "electricity"},
+      "tell": "Lightning leaps from {name}'s hand."
+    },
+    {
+      "key": "acid dart", "power": "acid dart", "name": "Acid Dart", "level": 1,
+      "source": "Earth domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 acid + 1 per two cleric levels; 3 + Wis times a day.",
+      "text": "Ranged touch, 30 ft: 1d6 acid + 1 per two levels.",
+      "action": "standard", "cost": {"pool": "acid dart", "amount": 1},
+      "affects": "target", "aim": "foe", "harmful": true,
+      "attack": "ranged touch", "range_ft": 30,
+      "roll": {"count": 1, "die": 6, "bonus": "floor(level / 2)", "as": "damage", "type": "acid"},
+      "tell": "{name} flings a dart of acid."
+    },
+    {
+      "key": "fire bolt", "power": "fire bolt", "name": "Fire Bolt", "level": 1,
+      "source": "Fire domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 fire + 1 per two cleric levels; 3 + Wis times a day.",
+      "text": "Ranged touch, 30 ft: 1d6 fire + 1 per two levels.",
+      "action": "standard", "cost": {"pool": "fire bolt", "amount": 1},
+      "affects": "target", "aim": "foe", "harmful": true,
+      "attack": "ranged touch", "range_ft": 30,
+      "roll": {"count": 1, "die": 6, "bonus": "floor(level / 2)", "as": "damage", "type": "fire"},
+      "tell": "{name} hurls a bolt of fire."
+    },
+    {
+      "key": "icicle", "power": "icicle", "name": "Icicle", "level": 1,
+      "source": "Water domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 cold + 1 per two cleric levels; 3 + Wis times a day.",
+      "text": "Ranged touch, 30 ft: 1d6 cold + 1 per two levels.",
+      "action": "standard", "cost": {"pool": "icicle", "amount": 1},
+      "affects": "target", "aim": "foe", "harmful": true,
+      "attack": "ranged touch", "range_ft": 30,
+      "roll": {"count": 1, "die": 6, "bonus": "floor(level / 2)", "as": "damage", "type": "cold"},
+      "tell": "{name} looses a shard of ice."
+    },
+    {
+      "key": "storm burst", "power": "storm burst", "name": "Storm Burst", "level": 1,
+      "source": "Weather domain: a standard action, a ranged touch attack at a foe within 30 ft, 1d6 nonlethal + 1 per two cleric levels, and the target takes -2 on attack rolls for 1 round; 3 + Wis times a day.",
+      "text": "Ranged touch, 30 ft: 1d6 nonlethal + 1 per two levels, and -2 to its attacks for a round.",
+      "action": "standard", "cost": {"pool": "storm burst", "amount": 1},
+      "affects": "target", "aim": "foe", "harmful": true,
+      "attack": "ranged touch", "range_ft": 30,
+      "roll": {"count": 1, "die": 6, "bonus": "floor(level / 2)", "as": "damage",
+               "type": "bludgeoning", "lethality": "nonlethal"},
+      "effect": {"rounds": 1, "tags": ["buff.buffeted"],
+                 "modifiers": [{"type": "combat_mod", "target": "attack", "bonus_type": "untyped",
+                                "amount": -2}]},
+      "tell": "{name} calls a burst of wind and rain."
+    },
+    {
+      "key": "wooden fist", "power": "wooden fist", "name": "Wooden Fist", "level": 1,
+      "source": "Plant domain: a free action, for 3 + Wis rounds a day: unarmed strikes deal lethal damage, provoke no attack of opportunity, and add +1 per two cleric levels (minimum +1) to damage.",
+      "text": "Fists hard as wood: + half your level to unarmed damage (min +1), a round a round.",
+      "action": "free", "cost": {"pool": "wooden fist", "amount": 1},
+      "drain": {"pool": "wooden fist", "amount": 1},
+      "toggle": {"key": "wooden fist"},
+      "self": {"tags": ["buff.stance.wooden-fist"],
+               "modifiers": [{"type": "combat_mod", "target": "damage", "bonus_type": "untyped",
+                              "formula": "max(1, floor(level / 2))",
+                              "when": {"weapon": {"key": "unarmed"}}}]},
+      "tell": "{name}'s hands harden like wood.",
+      "tell_off": "{name}'s hands soften again.",
+      "not_yet": ["Lethal unarmed damage without the -4, and no attack of opportunity for striking unarmed: neither rides the stance yet."]
+    }
+  ]
+}

@@ -13,6 +13,35 @@ function actionKind(text) {
   return m ? m[1].toLowerCase().replace("full ", "full-") : "standard";
 }
 
+// The core classes' abilities (rules/class_abilities.py) say their action outright; a
+// path ability's is read off its author's sentence as it always was. A toggle is free.
+function abilityKind(a) {
+  return a.toggle ? "free" : (a.action || actionKind(a.text));
+}
+
+// The entry an ability name belongs to — "Wild Shape (wolf)" is Wild Shape's.
+function abilityEntry(name) {
+  const list = (STATE && STATE.abilities) || [];
+  return list.find(a => a.name === name) ||
+    list.find(a => name.startsWith(a.name + " ("));
+}
+
+// Who an ability is aimed at from the panel. Only one that reaches a foe takes the
+// target chip: Lay on Hands with the thug's chip lit is a paladin healing the thug
+// (2026-10-05). Aimed at yourself or an ally, it goes with no target and the engine's
+// own default (yourself) holds; an ally is named in words, through Say.
+function abilityTarget(name) {
+  const a = abilityEntry(name);
+  return a && a.aim && a.aim !== "foe" ? null : COMBAT.target;
+}
+
+// "Rage (12/13)" — what is left to spend, beside the name, so a use is never a surprise.
+function abilityLabel(a) {
+  const left = a.uses != null ? ` (${a.uses}/${a.max})` : "";
+  const on = a.toggle ? (a.active ? " ●" : " ○") : "";
+  return `${a.name}${left}${on}`;
+}
+
 function renderCombat(s) {
   const bar = $("#combatbar");
   if (!bar) return;
@@ -167,18 +196,23 @@ async function commitTurn(endOnly) {
     actions.push({ op: "move", params: { zone: "near", square: COMBAT.move } });
     said.push(`move to (${COMBAT.move.join(",")})`);
   }
-  if (COMBAT.standard) {
-    actions.push(...COMBAT.standard.actions);
-    said.push(COMBAT.standard.label.toLowerCase());
-  }
+  // The swift and free actions BEFORE the standard one. Measured live 2026-10-05: "Free:
+  // Rage" and "Strike the thug" committed together sent the strike first, so the swing
+  // was rolled without the rage it was declared with — and a smite (swift) landed after
+  // the blow it was meant for. A rage, a smite or a stunning fist is declared before the
+  // blow it changes; the panel cannot ask which, so it takes the order that table play does.
   if (COMBAT.swift) {
     actions.push({ op: "use_ability",
-                   params: { ability: COMBAT.swift }, target: COMBAT.target });
+                   params: { ability: COMBAT.swift }, target: abilityTarget(COMBAT.swift) });
     said.push(`swift: ${COMBAT.swift}`);
   }
   for (const f of COMBAT.frees) {
-    actions.push({ op: "use_ability", params: { ability: f }, target: COMBAT.target });
+    actions.push({ op: "use_ability", params: { ability: f }, target: abilityTarget(f) });
     said.push(`free: ${f}`);
+  }
+  if (COMBAT.standard) {
+    actions.push(...COMBAT.standard.actions);
+    said.push(COMBAT.standard.label.toLowerCase());
   }
   // Cleared as the spoken turn clears it. A refusal ("…15 ft away… Click square 6,8…")
   // is a normal step since strikes need reach, and it stayed on the page under the
@@ -280,7 +314,7 @@ document.addEventListener("click", async e => {
     // sat in this list as "attacks", and picking one wasted a swing on something the
     // chips row below gives away for nothing.
     const abil = (STATE.abilities || []).filter(a =>
-      !a.toggle && !["swift", "free", "immediate"].includes(actionKind(a.text)));
+      !a.toggle && !["swift", "free", "immediate"].includes(abilityKind(a)));
     const arms = (STATE.attacks || {}).weapons || [];
     const options = (i) => `<option value="">weapon (${seq[i] >= 0 ? "+" : ""}${
       seq[i]})</option>` + (arms.length > 1 ? arms.slice(1).map(w =>
@@ -313,12 +347,20 @@ document.addEventListener("click", async e => {
   const menuFor = (kinds, slot) => {
     // Toggles count as free here too, so the armament reaches the free menu and
     // stays out of the standard one.
-    const list = (STATE.abilities || []).filter(a =>
-      kinds.includes(a.toggle ? "free" : actionKind(a.text)));
+    const list = (STATE.abilities || []).filter(a => kinds.includes(abilityKind(a)));
     if (!list.length) { combatMenu(`<span class="cb-note">Nothing ${
       kinds[0]} to use.</span>`); return; }
-    combatMenu(list.map(a => `<button data-pick="${slot}:${esc(a.name)}"
-      title="${esc((a.text || "").slice(0, 200))}">${esc(a.name)}</button>`).join(""));
+    // An ability with a choice offers each one as its own button — "Channel Energy
+    // (harm)", "Wild Shape (wolf)" — except a stance already held, whose one button ends
+    // it. One spent to nothing is shown and greyed rather than hidden: "why is Smite gone"
+    // is a worse question than "why is it grey".
+    const button = (a, name, label) => `<button data-pick="${slot}:${esc(name)}"
+      ${a.uses === 0 ? "disabled" : ""}
+      title="${esc((a.text || "").slice(0, 200))}">${esc(label)}</button>`;
+    combatMenu(list.map(a => (a.choices && a.choices.length && !(a.toggle && a.active))
+      ? a.choices.map(c => button(a, `${a.name} (${c})`,
+          `${a.name} (${c})${a.uses != null ? ` (${a.uses}/${a.max})` : ""}`)).join("")
+      : button(a, a.name, abilityLabel(a))).join(""));
   };
   // Casting in a fight goes through the one spell picker the footer uses (owner Q47,
   // 10-spells.js), and since 2026-10-01 a spell chosen there in a fight is staged into
@@ -336,7 +378,7 @@ document.addEventListener("click", async e => {
     const name = rest.join(":");
     if (slot === "standard") COMBAT.standard = { label: `Use ${name}`,
       actions: [{ op: "use_ability", params: { ability: name },
-                  target: COMBAT.target }] };
+                  target: abilityTarget(name) }] };
     else if (slot === "swift") COMBAT.swift = name;
     else COMBAT.frees.push(name);
     combatMenu(""); renderPlan(); return;
