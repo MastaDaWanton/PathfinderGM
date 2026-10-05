@@ -610,3 +610,14 @@ catalogue or code, whatever the owner rules above.
 | Q8.2 Minigames | **The grounded set** (flense, tan, harden, stitch, tool, cut, harvest) (recommended). |
 | Q8.3 Tuning | **Generous, with Steady mode, bands as numbers and bars as well as colour** (recommended). |
 | Q8.4 Old tab | **A "moved" card** when the new bench ships (recommended). |
+
+### Round 9 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q9.1 Old saves | **Convert** (recommended). |
+| Q9.2 World Bible | **The owner's own answer: "apply the tags to the beasts and just have a reader in skinning to find the relevant tag with that no list is necessary."** Creatures carry harvest tags (in the one tag vocabulary) and the skinning reader finds the relevant tag; no separate fauna list in the export. World Bible's creature rows carry the tags. |
+| Q9.3 Pacing | **The owner's own answer: "keep both and for all crafts there should be an in progress section where all the crafts sit before they can be collected. they should be displayed in that section with countdown timers that move with game time."** Keep the 48-hour clock and real tanning time, AND a cross-craft "In progress" section (herbalism steeping, tanning, alchemy, enchanting, the forge) where unfinished work sits with countdowns on game time until collected. |
+| Q9.4 Licensing | **Mechanics now, names wait** for the bestiary licensing decision (recommended). |
+
+All nine rounds answered (2026-10-05). The plan can be written.
