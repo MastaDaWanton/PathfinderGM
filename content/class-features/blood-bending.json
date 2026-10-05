@@ -1,0 +1,24 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Blood Bending is",
+    "the owner's homebrew (content/classes/blood-bending.json, imported from the author's",
+    "PDF). Its table prints a `fist` die and \"fast movement 10ft / 20ft\" and says nothing",
+    "more about either; both are written here the monk's way because the class's fist ladder",
+    "is the monk's to the die (1d6 ... 2d10). The PDF was not re-read for this, so the armour",
+    "clause is an inference from that likeness, and the owner may overrule it."
+  ],
+  "unarmed-strike": {
+    "name": "Unarmed strike",
+    "source": "content/classes/blood-bending.json, the level table's `fist` column (1d6 at 1st ... 2d10 at 20th). Measured 2026-10-05: nothing read that column, so a Blood Bender's bare fist was the table's 1d3 at every level.",
+    "weapon": {"applies_to": "unarmed", "damage_column": "fist"}
+  },
+  "fast-movement": {
+    "name": "Fast movement",
+    "source": "content/classes/blood-bending.json: \"fast movement 10ft\" at 3rd and \"fast movement 20ft\" at 13th. The monk's reading (an enhancement bonus, lost in armour or under a medium or heavy load) is assumed — see `_about`.",
+    "modifiers": [
+      {"type": "speed", "target": "land", "formula": "number", "bonus_type": "enhancement",
+       "when": {"bearer": {"armour": ["none"], "shield": false, "load": ["light"]}}}
+    ]
+  }
+}

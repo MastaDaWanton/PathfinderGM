@@ -1,0 +1,13 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Only the druid's",
+    "passive immunity lives here: its spells, nature bond and wild shape are other lanes'",
+    "(docs/class-audit.md §8)."
+  ],
+  "venom-immunity": {
+    "name": "Venom immunity",
+    "source": "CRB, Druid: \"At 9th level, a druid gains immunity to all poisons.\" (d20pfsrd.com/classes/core-classes/druid, checked 2026-10-04.)",
+    "immunities": ["poison"]
+  }
+}

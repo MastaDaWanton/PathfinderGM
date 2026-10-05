@@ -1,0 +1,46 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Rules from the",
+    "Core Rulebook fighter, checked against d20pfsrd.com/classes/core-classes/fighter and",
+    "aonprd.com/FighterWeapons.aspx (fetched 2026-10-05)."
+  ],
+  "bravery": {
+    "name": "Bravery",
+    "source": "CRB, Fighter: \"Starting at 2nd level, a fighter gains a +1 bonus on Will saves against fear. This bonus increases by +1 for every four levels beyond 2nd.\" The table's rungs carry it (+1 ... +5).",
+    "modifiers": [
+      {"type": "save_mod", "target": "will", "formula": "number", "bonus_type": "untyped",
+       "when": {"against": "fear"}}
+    ],
+    "not_yet": [
+      "against: fear — no save yet says it is against fear (spell saves pass only \"spell\"), so the term is dropped, never applied"
+    ]
+  },
+  "armor-training": {
+    "name": "Armour training",
+    "source": "CRB, Fighter: \"Whenever he is wearing armor, he reduces the armor check penalty by 1 (to a minimum of 0) and increases the maximum Dexterity bonus allowed by his armor by 1. Every four levels thereafter (7th, 11th, and 15th), these bonuses increase by +1 each time ... In addition, a fighter can also move at his normal speed while wearing medium armor. At 7th level, a fighter can move at his normal speed while wearing heavy armor.\" The table's rungs are 1 ... 4.",
+    "armour": {"max_dex": "number", "check_penalty": "number",
+               "unhindered": {"medium": 1, "heavy": 2}}
+  },
+  "weapon-training": {
+    "name": "Weapon training",
+    "source": "CRB, Fighter: \"Starting at 5th level, a fighter can select one group of weapons ... Whenever he attacks with a weapon from this group, he gains a +1 bonus on attack and damage rolls. Every four levels thereafter (9th, 13th, and 17th), a fighter becomes further trained in another group of weapons. He gains a +1 bonus on attack and damage rolls when using a weapon from this group. In addition, the bonuses granted by previous weapon groups increase by +1 each.\" So the first group picked is +rank and the last +1: picks - index. \"If a weapon is found in two or more different groups, these bonuses do not stack. Take the highest bonus granted for that weapon\" — the bonus type is named so the funnel takes the best.",
+    "choice": "weapon training",
+    "pick_bonus": "picks - index",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": "$bonus",
+       "bonus_type": "weapon training", "when": {"weapon_group": "$pick"}},
+      {"type": "combat_mod", "target": "damage", "amount": "$bonus",
+       "bonus_type": "weapon training", "when": {"weapon_group": "$pick"}}
+    ],
+    "not_yet": [
+      "the bonus on combat maneuver checks made with a weapon of the group, and to CMD against disarm and sunder: the manoeuvre roll does not say which weapon makes it",
+      "the picks themselves: the class-choice writer is lane 1's (docs/class-audit.md §8); read through classfeatures.chosen"
+    ]
+  },
+  "armor-mastery": {
+    "name": "Armour mastery",
+    "source": "CRB, Fighter: \"At 19th level, a fighter gains damage reduction 5/— whenever he is wearing armor or using a shield.\"",
+    "dr": {"amount": 5, "bypass": "", "when": {"bearer": {"armoured": true}}}
+  }
+}

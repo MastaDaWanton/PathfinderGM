@@ -392,6 +392,141 @@ def lethality_of(weapon: dict) -> str:
     return "nonlethal" if "nonlethal" in traits else "lethal"
 
 
+# --- size and groups: what a class feature asks of a weapon ------------------------------
+
+# A Medium weapon's die at Small and Large size: Core Rulebook Table 6-5 ("Tiny and Large
+# Weapon Damage"), the progression the monk's own table follows for his fists (CRB, Monk,
+# "Table: Small or Large Monk Unarmed Damage": 1d6 -> 1d4 / 1d8 at 1st, 2d10 -> 2d8 / 4d8
+# at 20th — checked row by row against AoN's monk table, 2026-10-05). Only the three sizes
+# the monk table prints; any other size keeps the Medium die rather than inventing a step.
+SIZE_DIE: dict[str, dict[str, str]] = {
+    "1d2": {"small": "1", "large": "1d3"},
+    "1d3": {"small": "1d2", "large": "1d4"},
+    "1d4": {"small": "1d3", "large": "1d6"},
+    "1d6": {"small": "1d4", "large": "1d8"},
+    "1d8": {"small": "1d6", "large": "2d6"},
+    "1d10": {"small": "1d8", "large": "2d8"},
+    "1d12": {"small": "1d10", "large": "3d6"},
+    "2d4": {"small": "1d6", "large": "2d6"},
+    "2d6": {"small": "1d10", "large": "3d6"},
+    "2d8": {"small": "2d6", "large": "3d8"},
+    "2d10": {"small": "2d8", "large": "4d8"},
+}
+
+
+def size_die(medium: str, size: str) -> str:
+    """A Medium die at this body's size: `size_die("1d8", "small")` is "1d6"."""
+    die = " ".join(str(medium or "").split()).lower()
+    return SIZE_DIE.get(die, {}).get(str(size or "medium").strip().lower(), die)
+
+
+# The fighter's weapon groups (CRB, Fighter, "Weapon Training"; the consolidated list at
+# aonprd.com/FighterWeapons.aspx, fetched 2026-10-05, which adds the later books' weapons
+# to the Core groups). Written by NAME, the way the page writes them, and resolved through
+# `key_for` when asked — a name the table does not carry (several later-book exotics) is
+# skipped, never matched to the nearest weapon. "Firearms" is every row the import filed
+# under a Firearms section; siege engines are not weapons in hand and are left out.
+GROUPS: dict[str, tuple[str, ...]] = {
+    "axes": ("bardiche", "battleaxe", "boarding axe", "butchering axe", "dwarven waraxe",
+             "gandasa", "greataxe", "handaxe", "heavy pick", "hooked axe", "knuckle axe",
+             "kumade", "light pick", "mattock", "orc double axe", "pata", "throwing axe",
+             "tongi"),
+    "heavy blades": ("aldori dueling sword", "ankus", "bastard sword", "chakram", "cutlass",
+                     "double chicken saber", "double walking stick katana",
+                     "elven curve blade", "estoc", "falcata", "falchion", "flambard",
+                     "great terbutje", "greatsword", "katana", "khopesh", "klar",
+                     "longsword", "nine-ring broadsword", "nodachi", "rhoka sword",
+                     "sawtooth sabre", "scimitar", "scythe", "seven-branched sword",
+                     "shotel", "sickle-sword", "split-blade sword", "switchscythe",
+                     "temple sword", "terbutje", "two-bladed sword"),
+    "light blades": ("bayonet", "broken-back seax", "butterfly knife", "butterfly sword",
+                     "chakram", "dagger", "deer horn knife", "dogslicer", "dueling dagger",
+                     "gladius", "hunga munga", "kama", "katar", "kerambit", "kukri",
+                     "machete", "manople", "pata", "quadrens", "rapier", "sanpkhang",
+                     "sawtooth sabre", "scizore", "short sword", "sica", "sickle",
+                     "spiral rapier", "starknife", "sword cane", "swordbreaker dagger",
+                     "wakizashi", "war razor"),
+    "bows": ("composite longbow", "composite shortbow", "hornbow (orc)", "longbow",
+             "shortbow"),
+    "close": ("bayonet", "brass knuckles", "cestus", "dan bong", "emei piercer",
+              "fighting fan", "gauntlet", "heavy shield", "iron brush", "katar",
+              "katar (tri-bladed)",
+              "klar", "light shield", "mere club", "punching dagger", "rope gauntlet",
+              "sap", "scizore", "spiked armor", "spiked gauntlet", "spiked heavy shield",
+              "spiked light shield", "tekko-kagi", "tonfa", "unarmed strike",
+              "waveblade", "wooden stake", "wushu dart"),
+    "crossbows": ("double crossbow", "hand crossbow", "heavy crossbow",
+                  "launching crossbow", "light crossbow", "repeating hand crossbow",
+                  "repeating heavy crossbow", "repeating light crossbow",
+                  "tube arrow shooter", "underwater heavy crossbow",
+                  "underwater light crossbow"),
+    "double": ("bo staff", "boarding gaff", "chain spear", "chain-hammer", "dire flail",
+               "double walking stick katana", "double-chained kama", "dwarven urgrosh",
+               "gnome hooked hammer", "kusarigama", "monk's spade", "orc double axe",
+               "quarterstaff", "taiaha", "two-bladed sword", "weighted spear"),
+    "flails": ("battle poi", "bladed scarf", "cat-o'-nine-tails", "chain spear",
+               "dire flail", "double-chained kama", "flying blade", "flying talon",
+               "gnome pincher", "halfling rope-shot", "heavy flail", "kusarigama",
+               "kyoketsu shoge", "light flail", "meteor hammer", "morningstar",
+               "nine-section whip", "nunchaku", "sansetsukon", "scorpion whip",
+               "spiked chain", "urumi", "whip"),
+    "hammers": ("aklys", "battle aspergillum", "chain-hammer", "club", "earth breaker",
+                "greatclub", "heavy mace", "lantern staff", "light hammer", "light mace",
+                "mere club", "planson", "taiaha", "tetsubo", "wahaika", "warhammer"),
+    "monk": ("bo staff", "brass knuckles", "butterfly sword", "cestus", "dan bong",
+             "deer horn knife", "double chicken saber", "double-chained kama",
+             "emei piercer", "fighting fan", "hanbo", "jutte", "kama", "kusarigama",
+             "kyoketsu shoge", "lungchuan tamo", "monk's spade", "nine-ring broadsword",
+             "nine-section whip", "nunchaku", "quarterstaff", "rope dart", "sai",
+             "sanpkhang", "sansetsukon", "seven-branched sword", "shang gou", "shuriken",
+             "siangham", "temple sword", "tiger fork", "tonfa", "traveling kettle",
+             "tri-point double-edged sword", "unarmed strike", "urumi", "wushu dart"),
+    "natural": ("unarmed strike",),
+    "polearms": ("bardiche", "bec de corbin", "bill", "boarding gaff", "crook", "fauchard",
+                 "glaive", "glaive-guisarme", "guisarme", "halberd", "hooked lance",
+                 "horsechopper", "lucerne hammer", "mancatcher", "monk's spade",
+                 "naginata", "nodachi", "ogre hook", "ranseur", "tiger fork"),
+    "spears": ("amentum", "boar spear", "chain spear", "double spear",
+               "elven branched spear", "harpoon", "javelin", "lance", "longspear",
+               "orc skull ram", "pilum", "planson", "shortspear", "sibat", "spear",
+               "stormshaft javelin", "tiger fork", "trident", "weighted spear"),
+    "thrown": ("aklys", "amentum", "atlatl", "blowgun", "bolas", "boomerang",
+               "chain-hammer", "chakram", "club", "dagger", "dart", "deer horn knife",
+               "dueling dagger", "flask thrower", "halfling sling staff", "harpoon",
+               "hunga munga", "javelin", "kestros", "lasso", "light hammer", "net",
+               "pilum", "rope dart", "shoanti bolas", "shortspear", "shuriken", "sibat",
+               "sling", "sling glove", "snag net", "spear", "starknife",
+               "stormshaft javelin", "throwing axe", "throwing shield", "trident",
+               "wushu dart"),
+    "tribal": ("club", "dagger", "greatclub", "handaxe", "heavy shield", "light shield",
+               "shortspear", "spear", "throwing axe", "unarmed strike"),
+    "firearms": (),
+}
+_FIREARM_SECTION = re.compile(r"firearm", re.I)
+_GROUP_INDEX: tuple[int, dict[str, frozenset]] | None = None
+
+
+def groups_of(key: str) -> frozenset:
+    """The fighter weapon groups this weapon is in: `groups_of("longsword")` is
+    {"heavy blades"}. Built once per table, by name through `key_for`."""
+    global _GROUP_INDEX
+    table = all_weapons()
+    if _GROUP_INDEX is None or _GROUP_INDEX[0] != id(table):
+        idx: dict[str, set] = {}
+        for group, names in GROUPS.items():
+            for name in names:
+                k = key_for(name)
+                if k:
+                    idx.setdefault(k, set()).add(group)
+        for k, row in table.items():
+            if _FIREARM_SECTION.search(str(row.get("section") or "")) \
+                    and "siege" not in str(row.get("section") or "").lower() \
+                    and not is_ammunition(k):
+                idx.setdefault(k, set()).add("firearms")
+        _GROUP_INDEX = (id(table), {k: frozenset(v) for k, v in idx.items()})
+    return _GROUP_INDEX[1].get(key_for(key) or str(key or "").lower(), frozenset())
+
+
 def search(text: str = "", prof: str = "", category: str = "", trait: str = "",
            limit: int = 60) -> list[dict]:
     needle = text.strip().lower()

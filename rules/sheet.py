@@ -1192,7 +1192,23 @@ class Actor:
     def immunities(self) -> list[str]:
         """By NAME, not by damage type: most immunities are not damage types — "undead
         traits", "paralysis", "mind-affecting effects" — and `immune_to` answers only
-        the damage question, leaving the rest for the save and condition paths."""
+        the damage question, leaving the rest for the save and condition paths.
+
+        Plus what the class documents grant (divine health's disease, aura of courage's
+        fear, diamond body's poison), read live and never saved — `innate_immunities` is
+        the stored half, and the only one `to_dict` writes, so a level lost is an
+        immunity lost. Measured 2026-10-05: a level-20 paladin and monk had none.
+        """
+        own = self.innate_immunities
+        if not self.char_class:
+            return own
+        from . import classfeatures
+
+        return own + [w for w in classfeatures.immunities(self) if w not in own]
+
+    @property
+    def innate_immunities(self) -> list[str]:
+        """The immunities held as effects — the stat block's line and anything applied."""
         return [str(e.payload.get("against", "")) for e in self._defence("immunity")]
 
     @immunities.setter
@@ -1600,10 +1616,21 @@ class Actor:
         before is the order the book uses.
         """
         base = max(0, int(self.speed))
+        # A class's own speed that comes BEFORE armour: the barbarian's fast movement,
+        # "Apply this bonus before modifying the barbarian's speed because of any load
+        # carried or armor worn" (CRB, Barbarian). Untyped and self-stacking as the book
+        # says ("stacks with any other bonuses"), so it is NOT routed through the
+        # enhancement channel below, where boots would have eaten it. Measured
+        # 2026-10-05: a level-20 barbarian's speed stayed 30 ft.
+        base += sum(m.value for m in self._class_mods("speed", "land_base"))
         # The weight class it MOVES as: a forged suit's build may shift it (mithral's "one
         # category lighter for movement"), which never touches proficiency.
         suit = self.armour_stats()
-        if suit.get("move_weight", suit.get("weight")) in ("medium", "heavy"):
+        moves_as = suit.get("move_weight", suit.get("weight"))
+        # Armour training: "a fighter can also move at his normal speed while wearing
+        # medium armor. At 7th level, ... heavy armor" (CRB, Fighter).
+        unhindered = self._armour_training()["unhindered"]
+        if moves_as in ("medium", "heavy") and moves_as not in unhindered:
             base = ARMOUR_SPEED.get(base, base)
         # A forged suit's own speed penalty, in feet; never faster than unarmoured.
         if suit.get("speed_penalty"):
@@ -1635,9 +1662,24 @@ class Actor:
         # Plus what an effect says about it: plate put on without help is "donned
         # hastily", 1 worse (CRB "Don Hastily"), and that arrives as an ActiveEffect so
         # taking the suit off takes it away (`Engine._op_wear`).
-        return (int(self.armour_stats()["acp"])
+        # Armour training takes its points off the SUIT's penalty, "to a minimum of 0"
+        # (CRB, Fighter) — never off the shield's, and never past zero into a bonus.
+        suit = int(self.armour_stats()["acp"])
+        trained = self._armour_training()["check_penalty"]
+        if suit < 0 and trained:
+            suit = min(0, suit + trained)
+        return (suit
                 + int(self.shield_stats()["acp"])
                 + sum(m.value for m in self._buff_mods("combat_mod", "armour_check")))
+
+    def _armour_training(self) -> dict:
+        """What the class documents loosen about worn armour (`classfeatures.armour_training`):
+        max Dex up, check penalty down, the weights moved in at full speed."""
+        if not self.char_class:
+            return {"max_dex": 0, "check_penalty": 0, "unhindered": set(), "source": ""}
+        from . import classfeatures
+
+        return classfeatures.armour_training(self)
 
     def can_act(self) -> bool:
         """Whether this creature can take any action at all.
@@ -1893,7 +1935,33 @@ class Actor:
         Goes through `rules.weapons` rather than reading `tables.WEAPONS` directly: the
         table holds eleven, the content file holds 456, and a player reaching for a glaive
         used to get `KeyError: no such weapon`.
+
+        Then what the class documents say about it (`classfeatures.weapon_grants`): the
+        monk's fist at the table's die for his level and size, ki strike's materials, the
+        paladin's aura of faith. Measured 2026-10-05: a monk's unarmed strike was 1d3 at
+        every level 1-20 — the weapons table's row for anybody's fist.
         """
+        row = self._weapon_row(key)
+        if not self.char_class or row.get("stat_block") or row.get("natural") \
+                or row.get("granted_by"):
+            return row
+        from . import classfeatures
+
+        wanted = (key or self.wielded_key()).strip().lower()
+        grants = classfeatures.weapon_grants(self, wanted)
+        if not grants:
+            return row
+        row = dict(row)
+        plain_fist = str(row.get("name", "")).lower().startswith("unarmed strike")
+        if grants.get("damage") and plain_fist:
+            row["damage"] = grants["damage"]
+            row["damage_source"] = ", ".join(grants.get("sources") or ())
+        if grants.get("strikes_as"):
+            have = list(row.get("strikes_as") or ())
+            row["strikes_as"] = have + [t for t in grants["strikes_as"] if t not in have]
+        return row
+
+    def _weapon_row(self, key: str | None = None) -> dict:
         from . import weapons as weapons_mod
 
         from . import leveling
@@ -2200,6 +2268,14 @@ class Actor:
         w = weapons_mod.all_weapons().get(key, {})
         if self.flat_attack is not None:
             return True          # an NPC stat block's attack bonus already accounts for it
+        # "All characters are proficient with unarmed strikes and any natural weapons
+        # possessed by their race" (Core Rulebook p.141, two sentences above "Melee and
+        # Ranged Weapons"). The unarmed row is filed `simple`, so every class whose list
+        # names weapons one by one — the monk's, the wizard's, the druid's — was asked
+        # for a `proficient.weapon.unarmed` tag nobody holds. Measured 2026-10-05: the
+        # monk punched at -4 "not proficient with unarmed strike" at every level 1-20.
+        if key == "unarmed":
+            return True
         # Law 1: a permission is a tag. The class list and every proficiency feat
         # answer through `has_state`, never through a suffix match on the feat name.
         return (self.has_state(f"proficient.weapon.{key}")
@@ -2457,7 +2533,10 @@ class Actor:
 
             # A tower shield caps Dex as armour does (CRB Table 6-6: "+2"), and the lower
             # cap is the one that holds.
-            dex = min(self.ability_mod("dex"), armour["max_dex"],
+            # Armour training raises the SUIT's cap (CRB, Fighter: "increases the maximum
+            # Dexterity bonus allowed by his armor"), never the tower shield's.
+            dex = min(self.ability_mod("dex"),
+                      int(armour["max_dex"]) + self._armour_training()["max_dex"],
                       int(shield.get("max_dex", 99)))
             if dex:
                 mods.append(Modifier(dex, "Dex"))
@@ -2853,6 +2932,12 @@ class Actor:
         for d in leveling.standing_dr(self):
             if wants(d):
                 pool.append(Reduction(d["amount"], d["bypass"], d["source"]))
+        # The class table's own DR — the barbarian's 1/— at 7th rising to 5/— at 19th, the
+        # paladin's 5/evil at 17th and 10/evil at 20th, armour mastery's 5/— — read off the
+        # class's feature documents live, so it follows the level. Measured 2026-10-05: a
+        # level-20 barbarian and paladin both had `dr=[]`.
+        for r in self.class_reductions():
+            pool.append(r)
         # The worn forged suit's build: adamantine armour's book DR, read live from the
         # suit while it is worn (contract §5), so taking it off takes the DR with it.
         suit = self.armour_record()
@@ -2886,6 +2971,16 @@ class Actor:
         return max(usable, key=lambda r: r.amount) if usable else None
 
     # --- non-lethal damage ---------------------------------------------------------------
+
+    def class_reductions(self) -> list[Reduction]:
+        """The class documents' damage reduction as it stands (armour mastery only while
+        armour or a shield is on), for the damage path and the sheet alike."""
+        if not self.char_class:
+            return []
+        from . import classfeatures
+
+        return [Reduction(d["amount"], d["bypass"], d["source"])
+                for d in classfeatures.standing_dr(self)]
 
     @property
     def nonlethal_threshold(self) -> int:
@@ -3409,6 +3504,10 @@ class Actor:
 
         out.extend(_classfeatures.tags_for(str(self.char_class or ""),
                                            int(getattr(self, "level", 1) or 1)))
+        # And the class documents' own: `immune.disease` for divine health, the
+        # has_state half of what `immunities` lists (`immune_to` asks the tag).
+        if self.char_class:
+            out.extend(_classfeatures.tags(self))
         # What this character's domains' powers hold (content/domains/powers.json) —
         # Fire Resistance's `resist.fire.10` from 6th — read off the domain list live,
         # like the feats above, so `resistance()` and `immune_to()` answer from them.
@@ -3762,6 +3861,28 @@ class Actor:
             self._reading_feats = False
         return out
 
+    def _class_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
+        """Modifiers from the class's feature documents (content/class-features), read
+        live off the table the way `_feat_mods` reads the feat list.
+
+        The seventh channel. Measured 2026-10-05 before it existed (docs/class-audit.md):
+        a level-20 paladin had no Charisma on any save, a level-20 monk no Wisdom in his
+        AC, and a barbarian moved at 30 ft at every level — because a class table's rows
+        became tags and nothing turned a tag into a number. `rules/classfeatures.py`
+        owns the grammar; this only joins it to the funnel. Same re-entrancy guard as
+        the feats: a formula reads `wis_mod`, and an ability score reads the funnel.
+        """
+        if getattr(self, "_reading_class", False) or self._flat_for(kind, target) \
+                or not self.char_class:
+            return []
+        from . import classfeatures
+
+        self._reading_class = True
+        try:
+            return classfeatures.modifiers(self, kind, target, ctx)
+        finally:
+            self._reading_class = False
+
     def _feat_hp(self) -> int:
         """The `hp_max` channel — feats, buffs, worn gear — read in one place so
         `set_hp_max` can subtract exactly what the read added. Stacked by type like
@@ -3820,7 +3941,7 @@ class Actor:
                                         _bonus_type(m.get("bonus_type"))))
         out += self._standing_mods(kind, target, ctx) + self._feat_mods(kind, target, ctx) \
             + self._race_mods(kind, target, ctx) + self._background_mods(kind, target) \
-            + self._gear_mods(kind, target, ctx)
+            + self._gear_mods(kind, target, ctx) + self._class_mods(kind, target, ctx)
         # 1e: a dodge bonus is lost whenever the Dexterity bonus to AC is lost. Twenty-
         # four shipped dodge feats had no reader for that clause, and nothing on the
         # sheet asked it of buffs either; one generic rule here, not one per feat.
@@ -4156,7 +4277,7 @@ class Actor:
             "temp_hp": self.temp_hp,
             "nonlethal": self.nonlethal,
             "nonlethal_threshold": self.nonlethal_threshold,
-            "dr": [r.label for r in self.reductions],
+            "dr": [r.label for r in self.reductions + self.class_reductions()],
             # A 10 that used to be a 14 is not the same as a 10, and the grid shows only
             # the score. Without this the player sees a number and no reason for it.
             "ability_damage": {a: self.ability_damage.get(a, 0)
@@ -4508,7 +4629,10 @@ def full_sheet(actor: Actor) -> dict:
             "speed": {"base": actor.speed, "current": actor.speed_feet},
             "compulsions": [c.as_dict() for c in actor.compulsions],
             "dr": [{"label": r.label, "amount": r.amount, "bypass": r.bypass,
-                    "source": r.source} for r in actor.reductions],
+                    "source": r.source}
+                   # The class's own DR beside the innate and the applied: a barbarian's
+                   # 4/— at 16th is on her sheet, not only in the damage path.
+                   for r in actor.reductions + actor.class_reductions()],
             "temp_pools": [{"amount": p.amount, "source": p.source,
                             "rounds_left": p.rounds_left} for p in actor.temp_pools],
             # Everything carried that is not a weapon, a herb or a jar: whatever the
@@ -5012,7 +5136,9 @@ def to_dict(actor: Actor) -> dict:
         # creature has no immunities" from "this save predates immunities", and the second
         # would send `from_dict` back to the stat block to re-derive them — undoing an
         # edit made since. Empty is not the same as absent.
-        "immunities": list(actor.immunities),
+        # The stored half only: a class document's immunity is read live off the table
+        # (`Actor.immunities`), and saving it would make it outlive the level it needs.
+        "immunities": list(actor.innate_immunities),
         "resistances": dict(actor.resistances),
         "vulnerabilities": list(actor.vulnerabilities),
         "conditions": [{"key": c.key, "rounds_left": c.rounds_left} for c in actor.conditions],

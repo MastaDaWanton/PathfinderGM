@@ -584,7 +584,14 @@ DONNING: dict[str, dict] = {
 # Core Rulebook table 7-6. A creature slowed by armour keeps the reduced speed until it
 # takes the armour off, which is why this is a lookup rather than a fraction: 30 goes to
 # 20 and 20 goes to 15, and neither is two thirds of the other.
-ARMOUR_SPEED = {30: 20, 20: 15}
+#
+# 40 -> 30 and 50 -> 35 are the small reduced-speed table on CRB p.170 (cited in the
+# paizo.com rules thread "Base speed 50...in armor?", 2026-10-05). Added for the
+# barbarian, whose fast movement comes BEFORE armour: a human barbarian in a breastplate
+# is 30 + 10 = 40, then 30 — and with no 40 row this lookup left her at 40, faster in
+# armour than the book. 60 and above were left out: two secondary sources disagreed on
+# 60 (40 or 45), and nothing in the app reaches it before armour yet.
+ARMOUR_SPEED = {50: 35, 40: 30, 30: 20, 20: 15}
 
 # --- Magic item body slots ---------------------------------------------------------
 
