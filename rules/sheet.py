@@ -1016,10 +1016,21 @@ class Actor:
                 source = e.name or e.source or "an effect"
                 if "heal" in p:
                     total = sum(_amount_of(p.get("heal"), dice) for _ in range(times))
+                    had = self.nonlethal
                     healed = self.heal(total) if total > 0 and not self.is_dead else 0
-                    if healed:
-                        out.append({"kind": "heal", "ref": self.ref, "amount": healed,
-                                    "source": source, "origin": e.origin})
+                    # Fast healing is magic too, and "not even magic" mends what thirst
+                    # or hunger holds (CRB p.444): a refusal is a thing that happened,
+                    # so it is a record even when nothing else was restored.
+                    from . import survival as _survival
+
+                    held = _survival.unmended(self, total, had) \
+                        if total > 0 and not self.is_dead else ""
+                    if healed or held:
+                        rec = {"kind": "heal", "ref": self.ref, "amount": healed,
+                               "source": source, "origin": e.origin}
+                        if held:
+                            rec["unmended"] = held
+                        out.append(rec)
                 elif "damage" in p:
                     dtype = str(p.get("damage_type") or p.get("type") or "untyped")
                     total = sum(_amount_of(p.get("damage"), dice) for _ in range(times))
@@ -3132,9 +3143,85 @@ class Actor:
                 "threshold": self.nonlethal_threshold}
 
     def heal_nonlethal(self, amount: int) -> int:
-        back = min(self.nonlethal, max(0, int(amount)))
+        """Take non-lethal damage off — all of it but what a need is holding.
+
+        The one door non-lethal leaves by: the cure's rider in `heal`, the hour's natural
+        healing, a liniment, Calming Touch. "Nonlethal damage from thirst or starvation
+        cannot be recovered until the character gets food or water, as needed—not even
+        magic that restores hit points heals this damage" (CRB p.444), so the withheld
+        portion (`withheld_nonlethal`) is a floor this cannot go under, and every heal
+        path inherits the rule by passing through here rather than each remembering it.
+        What was refused is the caller's to say (`survival.unmended`); this returns only
+        what came off, as it always has.
+        """
+        held = sum(self.withheld_nonlethal().values())
+        back = min(max(0, self.nonlethal - held), max(0, int(amount)))
         self.nonlethal -= back
         return back
+
+    def withheld_nonlethal(self) -> dict[str, int]:
+        """{need: points} of non-lethal that will not mend until the need is met.
+
+        The one reader of the one store: `withheld` effects, one per need, landed by
+        `survival` with the thirst or hunger damage and lifted by drinking or eating.
+        Clamped to the non-lethal actually carried, so the floor in `heal_nonlethal` can
+        never sit above the damage it is a floor for, whatever wrote `nonlethal` last.
+
+        An effect rather than a counter on the actor, for law 2 and for the shape 1e gives
+        the rule: the damage is ordinary non-lethal (it counts toward the knockout like any
+        other), and what is special is a STATE of the body — "not until you drink" —
+        that ends on an event. That is what an effect is here: remove it and its
+        contribution evaporates, and the non-lethal under it heals by the ordinary clock.
+        Nobody tracks this in a VTT we could find — Foundry's PF1 system keeps one
+        `hp.nonlethal` number — so the prior art is the GAS idiom of a heal-blocking
+        effect read by the heal itself, and Pathfinder 2e saying the same rule outright
+        ("can't be healed until it quenches its thirst").
+        """
+        out: dict[str, int] = {}
+        for e in self.effects:
+            if e.kind == "withheld" and e.amount > 0 and e.key:
+                out[e.key] = out.get(e.key, 0) + int(e.amount)
+        carried = max(0, int(self.nonlethal))
+        total = sum(out.values())
+        if total > carried:
+            # Trimmed largest-first, never below nothing: only reachable when something
+            # wrote `nonlethal` directly (a sheet edited by hand), and the reading must
+            # still be one the floor can stand on.
+            over = total - carried
+            for k in sorted(out, key=lambda k: -out[k]):
+                cut = min(out[k], over)
+                out[k] -= cut
+                over -= cut
+            out = {k: v for k, v in out.items() if v > 0}
+        return out
+
+    def withhold_nonlethal(self, need: str, amount: int) -> int:
+        """Mark `amount` of the non-lethal just taken as `need`'s (thirst, hunger): it
+        will not mend until the need is met. Through the one applicator — the existing
+        record refreshed to the new total, never a second copy. Returns the total held."""
+        from . import states as _states
+
+        amount = max(0, int(amount))
+        need = str(need or "").strip().lower()
+        if not amount or not need:
+            return sum(self.withheld_nonlethal().values())
+        have = next((e for e in self.effects
+                     if e.kind == "withheld" and e.key == need), None)
+        total = (int(have.amount) if have is not None else 0) + amount
+        self.apply_effect(ActiveEffect(
+            name=f"{need} damage", kind="withheld", key=need, source=need,
+            origin="rule:survival", amount=total,
+            tags=(f"{_states.WITHHELD}.{need}",)))
+        return total
+
+    def release_nonlethal(self, need: str | None = None) -> int:
+        """The need is met: what it held mends from now on like any non-lethal. Returns
+        the points released (nothing heals here — eating is not medicine)."""
+        held = self.withheld_nonlethal()
+        gone = self.remove_effects(
+            kind="withheld",
+            match=lambda e: need is None or e.key == str(need).strip().lower())
+        return sum(held.get(e.key, 0) for e in gone)
 
     def take_damage(self, amount: int, dtype: str = "untyped",
                     traits: tuple[str, ...] = (),
@@ -4257,9 +4344,12 @@ class Actor:
         # the same rate rather than taking twice as long.
         # "You heal non-lethal damage at the rate of 1 hit point per hour per character
         # level" — eight hours clears anything a level 1 character could still be standing
-        # under, so a night wipes it rather than pretending to count.
-        nonlethal_gone = self.nonlethal
-        self.nonlethal = 0
+        # under, so a night wipes it rather than pretending to count. All of it but what a
+        # need is holding (CRB p.444): a night is not a drink, and wiping it here was the
+        # one heal path that did not pass through `heal_nonlethal`'s floor.
+        held = sum(self.withheld_nonlethal().values())
+        nonlethal_gone = max(0, self.nonlethal - held)
+        self.nonlethal -= nonlethal_gone
         # A night is what the awake clock is measured against, so a night resets it.
         from . import survival
 
@@ -4280,7 +4370,42 @@ class Actor:
 
         return {"healed": self.hp - before, "hours": hours, "woke": woke,
                 "per_level": per_level, "kind": kind, "ability": restored,
-                "nonlethal_healed": nonlethal_gone}
+                "nonlethal_healed": nonlethal_gone,
+                "nonlethal_withheld": self.withheld_nonlethal()}
+
+    def sleep_through(self, kind: str = "night", dice=None) -> dict:
+        """Everything a full night's sleep gives, through one door.
+
+        `rest` is the body's half — natural healing, the night's conditions, the awake
+        clock. A night gives more than the body: the level the experience has earned
+        settles ("once i have enough Exp sleeping should initiate the leveling process"),
+        the daily pools and spell slots refill (`refresh_pools("rest.night")`), and a
+        prepared caster's empty slots fill from the last loadout (item 21.4). Those three
+        lived inline in `Engine._op_rest`, so the one other way to sleep a night through —
+        dropping asleep where you stand after the third failed save against sleep
+        (`survival._wake`) — called `rest` alone and woke with yesterday's slots spent. The
+        owner, 2026-10-05: "yes if you collapse for 8 hours" gets the full benefit.
+        Both now come here, so a night cannot mean two different things again.
+
+        Only for a night slept THROUGH. A broken night (`Engine._broken_night`) or a
+        collapse cut short calls neither — 1e gives all of this to "a full night's rest
+        (8 hours of sleep or more)".
+        """
+        from . import casting
+        from . import leveling as leveling_mod
+        from . import xp as xp_mod
+
+        levelled = None
+        # Before the rest itself, so the new hit die is part of the night's recovery.
+        if kind == "night" and self.is_pc and xp_mod.ready_to_level(self):
+            levelled = leveling_mod.level_up(self, dice=dice)
+        result = self.rest(kind)
+        refilled = self.refresh_pools("rest.night", dice)
+        prepared = ""
+        if casting.is_caster(self):
+            got = casting.ensure_prepared(self, reason="rest")
+            prepared = casting.prepared_said(self, got)
+        return dict(result, levelled=levelled, refilled=refilled, prepared=prepared)
 
     def bleed_out(self, dice) -> dict | None:
         """One round of dying: lose a hit point, then try to stabilise.
@@ -4364,6 +4489,20 @@ class Actor:
             "each time. Failure deals non-lethal damage and fatigues, then exhausts — "
             "and a failure while exhausted drops you asleep where you stand for eight "
             "hours."))
+        # What thirst and hunger are holding of the non-lethal (CRB p.444), a row each,
+        # only while there is some: the bar above says how much non-lethal there is, and
+        # without this nothing says why a night or a potion left part of it where it was.
+        acts = {need: verb for need, (_said, verb) in survival.WITHHELD_NEEDS.items()}
+        for need, points in self.withheld_nonlethal().items():
+            out.append({
+                "id": f"{need}-held", "label": f"Held by {need}",
+                "state": f"{points} non-lethal — {acts.get(need, 'rest')} to mend it",
+                "danger": True, "withheld": points,
+                "detail": f"Non-lethal damage from {need} cannot be recovered until you "
+                          f"{acts.get(need, 'rest')} — not rest, not a potion, not even "
+                          f"magic that restores hit points (Core Rulebook, Starvation "
+                          f"and Thirst). Once you {acts.get(need, 'rest')} it heals like "
+                          f"any other non-lethal."})
         return out
 
     def summary(self) -> dict:

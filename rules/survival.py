@@ -12,6 +12,14 @@ three days and then asks daily. Both deal non-lethal damage and leave the charac
 fatigued — non-lethal because thirst does not stab you, and because the engine already
 knows that non-lethal drops a character without killing them.
 
+**What thirst and hunger deal does not mend until the need is met** (CRB p.444; the
+owner, 2026-10-05). It is withheld as it lands (`Actor.withhold_nonlethal`, a `withheld`
+effect per need), every heal stops at it (`Actor.heal_nonlethal` is the floor and every
+cure, rest and hour passes through it), a refused heal says why (`unmended`), and eating or
+drinking lifts it (`eat`, `drink`), after which it heals by the ordinary clock. So a
+parched character out cold and alone no longer heals faster than thirst harms them; they
+die of it, which is the book's answer and the owner's.
+
 **Staying awake is a Will save**, not the Constitution check 1e's forced-march rule uses.
 That is the project owner's decision and it is deliberate: the question being asked is
 whether you keep going, not whether your body holds out, and it makes staying up all night
@@ -89,6 +97,10 @@ NO_WATER = "needs.no_water"
 SLEEP_SOURCE = "asleep where they fell"
 COLLAPSE_SLEEP_MINUTES = 8 * MINUTES_PER_HOUR
 
+# The needs whose non-lethal will not mend until they are met (CRB p.444), each with the
+# act that meets it: (third person, as the tells say it; the bare verb).
+WITHHELD_NEEDS = {"thirst": ("drinks", "drink"), "hunger": ("eats", "eat")}
+
 
 @dataclass
 class Toll:
@@ -109,12 +121,37 @@ class Toll:
     came_round: bool = False
     # Past their maximum the rest of it lands as lethal (CRB p.444).
     lethal: int = 0
+    # Of the non-lethal, how much thirst and hunger now hold until they are met (CRB
+    # p.444, `Actor.withhold_nonlethal`), and the most an hour's healing found it could
+    # not touch — the latter is what earns the sentence saying why.
+    withheld: int = 0
+    unmended: int = 0
+    # The night's own sentences when the sleep ended in waking (`Actor.sleep_through`):
+    # pools and slots back, the morning's preparation, a level settled.
+    rested: list[str] = None
 
     def __post_init__(self):
         if self.checks is None:
             self.checks = []
         if self.conditions is None:
             self.conditions = []
+        if self.rested is None:
+            self.rested = []
+
+    @classmethod
+    def from_record(cls, r: dict) -> "Toll":
+        """A toll back from the record `as_dict` wrote — the one reader, so a field added
+        here cannot be dropped by a copy of this list somewhere else (the engine folds
+        several stretches' records into one telling)."""
+        return cls(hours=int(r.get("hours") or 0), checks=list(r.get("checks") or []),
+                   nonlethal=int(r.get("nonlethal") or 0),
+                   conditions=list(r.get("conditions") or []),
+                   **{k: bool(r.get(k)) for k in ("collapsed", "fell_asleep", "woke",
+                                                  "knocked_out", "came_round")},
+                   lethal=int(r.get("lethal") or 0),
+                   withheld=int(r.get("withheld") or 0),
+                   unmended=int(r.get("unmended") or 0),
+                   rested=list(r.get("rested") or []))
 
     @property
     def ok(self) -> bool:
@@ -124,13 +161,16 @@ class Toll:
     def happened(self) -> bool:
         """Anything the player is owed a sentence about."""
         return bool(self.checks or self.fell_asleep or self.woke or self.knocked_out
-                    or self.came_round)
+                    or self.came_round or self.unmended)
 
     def absorb(self, other: "Toll") -> None:
         """Fold one hour's toll into the stretch's."""
         self.checks.extend(other.checks)
         self.nonlethal += other.nonlethal
         self.lethal += other.lethal
+        self.withheld += other.withheld
+        self.unmended = max(self.unmended, other.unmended)
+        self.rested.extend(other.rested)
         self.conditions.extend(c for c in other.conditions if c not in self.conditions)
         for flag in ("collapsed", "fell_asleep", "woke", "knocked_out", "came_round"):
             if getattr(other, flag):
@@ -141,7 +181,9 @@ class Toll:
                 "nonlethal": self.nonlethal, "conditions": self.conditions,
                 "collapsed": self.collapsed, "fell_asleep": self.fell_asleep,
                 "woke": self.woke, "knocked_out": self.knocked_out,
-                "came_round": self.came_round, "lethal": self.lethal}
+                "came_round": self.came_round, "lethal": self.lethal,
+                "withheld": self.withheld, "unmended": self.unmended,
+                "rested": list(self.rested)}
 
 
 def exempt(actor, rule: str) -> bool:
@@ -270,8 +312,16 @@ def _to_hour(counter: int) -> int:
     return MINUTES_PER_HOUR - (int(counter) % MINUTES_PER_HOUR)
 
 
-def _harm(actor, amount: int, toll: Toll) -> None:
+def _harm(actor, amount: int, toll: Toll, need: str = "") -> None:
     """1d6 of a need's non-lethal damage, landed as the book lands it.
+
+    Thirst's and hunger's (`need`) is withheld as it lands: "Nonlethal damage from thirst
+    or starvation cannot be recovered until the character gets food or water, as
+    needed—not even magic that restores hit points heals this damage" (CRB p.444; the
+    owner, 2026-10-05: "yes it should not heal until you eat or drink"). Without it the
+    hourly healing (1 a level) outran 1d6 from about level 4, so thirst only ever
+    fatigued. The lethal overflow is not withheld — the book withholds the non-lethal —
+    and the sleep ladder's damage is not a need's (`need` ""), so a night mends it.
 
     "Characters that take an amount of nonlethal damage equal to their total hit points
     begin to take lethal damage instead" (CRB p.444, Starvation and Thirst; the general
@@ -287,6 +337,9 @@ def _harm(actor, amount: int, toll: Toll) -> None:
     if soft:
         actor.take_nonlethal(soft)
         toll.nonlethal += soft
+        if need in WITHHELD_NEEDS:
+            actor.withhold_nonlethal(need, soft)
+            toll.withheld += soft
     hard = amount - soft
     if hard:
         actor.hp -= hard
@@ -336,17 +389,33 @@ def _fall_asleep(actor, toll: Toll) -> None:
     toll.conditions.append("asleep")
 
 
-def _wake(actor, toll: Toll) -> None:
-    """Eight hours on: they wake, and it was a night's sleep (`Actor.rest`).
+def _wake(actor, toll: Toll, dice=None) -> None:
+    """Eight hours on: they wake, and it was a full night's sleep (`Actor.sleep_through`).
 
-    The night's own door, so a collapse heals, clears and resets exactly what a night in
-    a bed does — exhaustion to fatigue, the awake clock to nothing — and no second copy
-    of what a night is can drift from it. What `Engine._op_rest` adds on top (spells
-    prepared, pools refilled, the camp's cold) is a camp's, and a body that dropped in
-    the street did not make one."""
+    The night's own door — the same one `Engine._op_rest` goes through — so a collapse
+    heals, clears and resets exactly what a night in a bed does, and no second copy of
+    what a night is can drift from it. Until 2026-10-05 this called `Actor.rest` alone,
+    on the argument that the spells, the pools and the level were a camp's; the owner
+    ruled the other way ("yes if you collapse for 8 hours"): the slots, the daily pools,
+    the preparation and an earned level come back with the eight hours. What stays the
+    camp's is only what the ground does (the cold, sleeping rough, the night's check):
+    `_op_rest` asks those of a camp, and nobody made one.
+
+    Reached only when the eight hours have run (`charge`). A sleep cut short — a fight,
+    a cure that wakes them, anything that lifts the condition first — never gets here,
+    and so gets none of it."""
     actor.remove_effects(match=lambda e: e is asleep(actor))
-    actor.rest("night")
+    night = actor.sleep_through("night", dice)
     toll.woke = True
+    if night.get("refilled"):
+        toll.rested.append("Recovered: " + ", ".join(night["refilled"]) + ".")
+    if night.get("prepared"):
+        toll.rested.append(str(night["prepared"]))
+    lv = night.get("levelled") or {}
+    if lv.get("ok"):
+        grants = ", ".join(lv.get("grants") or ())
+        toll.rested.append(f"In the sleep, level {lv['level']} settles: +{lv['hp']} hp"
+                           + (f", {grants}" if grants else "") + ".")
 
 
 def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = None,
@@ -411,7 +480,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
         woke = False
 
         if nap is not None and sleep_left(actor) <= 0:
-            _wake(actor, toll)
+            _wake(actor, toll, dice)
             woke = True
 
         watered = int(actor.watered_minutes)
@@ -423,7 +492,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
             toll.checks.append(got)
             if not got["passed"]:
                 _harm(actor, dice.roll(PARCHED_DAMAGE, label="thirst",
-                                       visibility="player").total, toll)
+                                       visibility="player").total, toll, need="thirst")
                 _tire(actor, toll, "thirst", ladder=False)
 
         fed = int(actor.fed_minutes)
@@ -436,7 +505,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
             toll.checks.append(got)
             if not got["passed"]:
                 _harm(actor, dice.roll(PARCHED_DAMAGE, label="hunger",
-                                       visibility="player").total, toll)
+                                       visibility="player").total, toll, need="hunger")
                 _tire(actor, toll, "hunger", ladder=False)
 
         awake = int(actor.awake_minutes)
@@ -463,7 +532,11 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
         healed = False
         if clock is not None and (int(clock) + spent) % MINUTES_PER_HOUR == 0 \
                 and actor.nonlethal:
+            had = int(actor.nonlethal)
             healed = bool(actor.heal_nonlethal(level))
+            # The hour that could not reach what thirst or hunger holds is said, once a
+            # stretch (`said`): ten hours of the same refusal are one fact.
+            toll.unmended = max(toll.unmended, refused(actor, level, had))
 
         if not (woke or healed or len(toll.checks) > before):
             continue
@@ -543,7 +616,50 @@ def said(actor, toll: Toll) -> list[str]:
         out.append(f"{name} comes round.")
     if toll.woke:
         out.append(f"{name} wakes after eight hours' sleep where they dropped.")
+        out.extend(toll.rested)
+    # What thirst and hunger hold is said where the healing met it, not where it was
+    # dealt: "It costs Sammy 4 non-lethal damage" already told the blow, and the reader
+    # learns the rule the first time an hour's rest does not take it off.
+    if toll.unmended:
+        line = unmended_said(actor)
+        if line:
+            out.append(line)
     return out
+
+
+def refused(actor, wanted: int, had: int) -> int:
+    """Of the non-lethal a heal set out to take off, how much a need's hold refused.
+
+    `wanted` is the cure's points, `had` the non-lethal before it. Whatever the cure did
+    not take off, up to the non-lethal still carried, was stopped by the floor in
+    `Actor.heal_nonlethal` — the only thing that stops a heal short of its amount while
+    there is non-lethal left to take. 0 when nothing is withheld.
+    """
+    if not actor.withheld_nonlethal():
+        return 0
+    mended = max(0, int(had) - int(actor.nonlethal))
+    return max(0, min(int(wanted) - mended, int(actor.nonlethal)))
+
+
+def unmended_said(actor, *, magic: bool = False) -> str:
+    """The sentence a refused heal owes the narrator (law 3): what is held, by which
+    need, and the one thing that frees it. "Not even magic" only where it was magic —
+    an hour's rest that does not touch thirst damage is not a spell failing."""
+    held = actor.withheld_nonlethal()
+    if not held:
+        return ""
+    name = getattr(actor, "name", "") or "They"
+    needs = [n for n in WITHHELD_NEEDS if held.get(n)]
+    what = " and ".join(needs)
+    acts = " and ".join(WITHHELD_NEEDS[n][1] for n in needs)
+    tail = "; not even magic heals it." if magic else "."
+    return (f"{name}'s {what} damage ({sum(held.values())}) will not mend until they "
+            f"{acts}{tail}")
+
+
+def unmended(actor, wanted: int, had: int, *, magic: bool = True) -> str:
+    """The refusal sentence when a heal of `wanted` met a need's hold, else ""."""
+    return unmended_said(actor, magic=magic) if refused(actor, wanted, had) else ""
 
 
 _NUMBER_WORDS = ("no", "one", "two", "three", "four", "five", "six", "seven", "eight",
@@ -624,18 +740,32 @@ def sleep(actor, hours: int = 8) -> None:
         actor.awake_checks = 0
 
 
-def eat(actor) -> None:
+def eat(actor) -> int:
+    """A meal: the hunger clock and its count back to nothing, and whatever hunger held
+    released to heal by the ordinary clock. Returns the points released."""
     actor.fed_minutes = 0
     actor.hunger_checks = 0
+    return actor.release_nonlethal("hunger")
 
 
-def drink(actor) -> None:
+def drink(actor) -> int:
+    """Water: as `eat`, for thirst."""
     actor.watered_minutes = 0
     actor.thirst_checks = 0
+    return actor.release_nonlethal("thirst")
+
+
+def released_said(actor, need: str, points: int) -> str:
+    """The tell for a need met over damage it held: it can mend now — not that it has."""
+    if not points:
+        return ""
+    name = getattr(actor, "name", "") or "They"
+    return f"The {need} damage on {name} ({points}) can mend now."
 
 
 __all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "NO_FOOD", "NO_SLEEP", "NO_WATER",
-           "SLEEP_SOURCE", "Strain", "Toll", "asleep", "awake_dc", "charge", "drink",
-           "eat", "exempt", "hardship", "hours_until_hungry", "hours_until_thirsty",
-           "hunger_dc", "pass_hours", "said", "sleep", "sleep_left", "state", "strains",
-           "thirst_dc"]
+           "SLEEP_SOURCE", "Strain", "Toll", "WITHHELD_NEEDS", "asleep", "awake_dc",
+           "charge", "drink", "eat", "exempt", "hardship", "hours_until_hungry",
+           "hours_until_thirsty", "hunger_dc", "pass_hours", "refused", "released_said",
+           "said", "sleep", "sleep_left", "state", "strains", "thirst_dc", "unmended",
+           "unmended_said"]

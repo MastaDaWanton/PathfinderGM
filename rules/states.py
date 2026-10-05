@@ -158,6 +158,17 @@ GUARD = "role.guard"
 BYSTANDER = "role.bystander"
 KNOWS_YOU = "bond.knows-you"
 TRAVELS_WITH_YOU = "bond.travels-with-you"
+# Non-lethal damage that will not mend until a need is met (CRB p.444, Starvation and
+# Thirst: "cannot be recovered until the character gets food or water, as needed—not even
+# magic that restores hit points heals this damage"). Granted by the `withheld` effect
+# `survival` lands with the damage, one per need, and lifted by eating or drinking:
+#
+#   heal.withheld.thirst   until they drink
+#   heal.withheld.hunger   until they eat
+#
+# Not `state.*` (it stops and impairs nothing — the non-lethal itself does that) and no
+# `recovery.*`: a night's sleep is exactly what it must survive.
+WITHHELD = "heal.withheld"
 # The condition key that grants it — the one name every writer uses, so the tag has
 # one writer's vocabulary and `test_no_new_site_matches_a_condition_by_name` sees no
 # new literal.

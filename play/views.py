@@ -797,6 +797,10 @@ def resurrect(request):
     pc.remove_condition("dead")
     pc.clear_states("recovery.hit-points")
     pc.nonlethal = 0
+    # The return wipes non-lethal, so the record of what thirst or hunger held of it
+    # (CRB p.444) goes with it: left on, it would sit over a non-lethal of nothing and
+    # hold back the next sap's bruise as if it were thirst's.
+    pc.release_nonlethal()
 
     factions = [f.get("name") for f in (c.world.factions or [])
                 if isinstance(f, dict) and f.get("name")]
