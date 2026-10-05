@@ -134,25 +134,27 @@ def test_the_winners_rob_the_player_and_go_before_they_come_round():
     """Measured: "You come round about an hour later ... Whoever was standing over you has
     gone." — and both robbers stood on their squares, the 30 gp in the player's purse. The
     winners now act on it while the player lies there (rules/defeat.py): one robber takes
-    the coin into his own purse, both leave through `Scene.move` to somewhere off stage in
-    the same town, and the sentence about them is built from what they did."""
+    a share of the coin into his own purse — three quarters for two robbers since the
+    owner's ruling of 2026-10-05, the whole purse before it, and the rest of that ruling is
+    tests/test_robbed_retrieval_quest.py — both leave through `Scene.move` to somewhere
+    off stage in the same town, and the sentence about them is built from what they did."""
     s, e, pc, carrier, robber, second = _lane()
     _beaten(s, pc)
     out = downed.resolve(_Campaign(s, e))
     text = " ".join(out.lines)
     assert out.playable and pc.hp == 1
     assert "Whoever was standing over you" not in text
-    assert "Your purse is gone: the robber took 30 gold pieces." in out.lines
+    assert "The robber took 22 of your 30 gold pieces, and your rapier." in out.lines
     assert "The robber and the second robber have gone." in out.lines
-    assert pc.purse == {}
-    assert robber.purse.get("gp", 0) >= 30, "the coin is in his purse, not out of existence"
+    assert pc.purse == {"gp": 8}
+    assert robber.purse.get("gp", 0) >= 22, "the coin is in his purse, not out of existence"
     # Gone from the room, still in the campaign: the people who did it.
     assert robber.ref not in s.actors and second.ref not in s.actors
     assert residency.is_offstage(robber.at) and residency.is_offstage(second.at)
     assert robber.ref in s.people and second.ref in s.people
     # The basket carrier was nobody's winner; she is still here.
     assert carrier.ref in s.actors
-    assert {x["kind"] for x in out.effects} == {"took", "left"}
+    assert {x["kind"] for x in out.effects} == {"took", "left", "quest"}
 
 
 def test_nobody_standing_over_the_player_means_no_sentence_about_them():
@@ -235,9 +237,10 @@ def test_the_aftermath_is_on_the_turn_log_and_the_stale_offers_go(tmp_path):
         body = r.json()
         assert body["suggestions"] == []
         said = " ".join(b["text"] for b in body["transcript"][-4:])
-        assert "the robber took" in said and "have gone" in said
+        assert "The robber took" in said and "have gone" in said
+        assert "Get back what the robber and the second robber took" in said
         names = {a["name"]: a for a in body["scene"]["actors"]}
         assert "the robber" not in names and "the second robber" not in names
         row = next(x for x in reversed(c.turn_log) if x.get("kind") == "downed")
-        assert {x["kind"] for x in row["effects"]} == {"took", "left"}
+        assert {x["kind"] for x in row["effects"]} == {"took", "left", "quest"}
         cm._LIVE.clear()

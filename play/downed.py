@@ -164,7 +164,8 @@ def resolve(campaign) -> Outcome:
 
 
 def _the_winners_act(campaign, pc) -> tuple[list[dict], list[str]]:
-    """Whoever beat the player acts on it (`rules/defeat.py`): robs them and goes.
+    """Whoever beat the player acts on it (`rules/defeat.py`): robs them of a share of
+    the coin and one thing, goes, and leaves a quest in the Journal to get it back.
 
     Both wake-up lines used to END with a claim — "Whoever was standing over you has
     gone", "Whoever did it has gone" — that nothing made true. Measured 2026-10-04 on
@@ -182,7 +183,18 @@ def _the_winners_act(campaign, pc) -> tuple[list[dict], list[str]]:
             coins = goods.coinage(world, getattr(campaign, "location", None))
         except Exception:      # noqa: BLE001 — the coin's name is never worth the turn
             coins = None
-    return defeat.aftermath(campaign.scene, pc, coins)
+    # Where it happened, by the name the party knows it by, for the quest the robbery
+    # opens ("beat you down at the warrens"). The engine's own namer; "" falls back.
+    here = ""
+    try:
+        from rules import places as places_mod
+
+        engine = campaign.engine()
+        p = places_mod.find(engine.places(), str(campaign.scene.at or "")) if engine else None
+        here = p.name if p is not None else ""
+    except Exception:          # noqa: BLE001 — a name is never worth the turn either
+        here = ""
+    return defeat.aftermath(campaign.scene, pc, coins, here_name=here)
 
 
 def _wait_it_out(campaign, pc) -> Outcome:

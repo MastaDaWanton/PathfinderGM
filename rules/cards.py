@@ -34,6 +34,7 @@ Provenance, stage 8's rule: every card says where it came from — `opening`,
 """
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass, field
 
@@ -108,6 +109,12 @@ class Card:
     # the player rests between showings. Written only when there is one (§2.0), so a card
     # from before it existed round-trips byte-identically.
     approaches: list[dict] = field(default_factory=list)
+    # What a quest is to get back, when the engine opened it because something was taken
+    # (`rules/defeat.py`): who holds it, how much coin, which thing, and how much of each
+    # they held before, so `defeat.settle` can tell recovered from merely replaced. The
+    # quest's own record of its target, never a model's. Written only when there is one,
+    # like `approaches`, so every card from before it round-trips unchanged.
+    recover: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
         out = {
@@ -124,6 +131,8 @@ class Card:
         }
         if self.approaches:
             out["approaches"] = [dict(a) for a in self.approaches]
+        if self.recover:
+            out["recover"] = copy.deepcopy(self.recover)
         return out
 
     @classmethod
@@ -151,6 +160,8 @@ class Card:
             approaches=[{"turn": int(a.get("turn", 0) or 0),
                          "approach": str(a.get("approach") or "")}
                         for a in d.get("approaches") or [] if isinstance(a, dict)],
+            recover=(copy.deepcopy(d["recover"])
+                     if isinstance(d.get("recover"), dict) else {}),
         )
 
     def is_(self, query: str) -> bool:
