@@ -557,3 +557,12 @@ catalogue or code, whatever the owner rules above.
 | Q2.2 Tanning time | **Real in-world time by tannage**, a tannery vat holding a hide while you adventure; never real-time waiting (recommended). |
 | Q2.3 Intermediates | **Each real stage** lands on the shelf, each sellable (recommended). |
 | Q2.4 Concentration | **Laminate**: two leathers into one, x1.5, levels cut negatives 10% (recommended). |
+
+### Round 3 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q3.1 Hide modifiers | **3 armour on every hide; 3 weapon only on grip-capable hides** (recommended). |
+| Q3.2 Consumables | **Working traits plus at most one small mark** (recommended). |
+| Q3.3 Carried goods | **A book rule where one exists, flavour otherwise** (recommended). |
+| Q3.4 Masterwork | **The book wins**: dragonhide, eel hide, angelskin, darkleaf are always masterwork; others at Superior+ (recommended). |
