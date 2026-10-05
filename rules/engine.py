@@ -473,6 +473,14 @@ class Scene:
     # round tick, so stabilisation rolls come from the same seeded stream as
     # everything else and a scene stays reproducible.
     _dice: Any = None
+    # What the body's hours did since somebody last told the player (`advance` writes,
+    # `take_body_said` empties): the checks the clock's door rolled, waiting to become an
+    # outcome at the end of the batch (`Engine._body_settles`) or a line on the knockout
+    # path (play/downed.py). Not saved — the save is a hand-written field list in
+    # play/campaign.py, and an untold toll lost to a restart leaves its conditions and
+    # damage on the sheet, where the panel still shows them. Inside `snapshot`, so a
+    # refused turn takes back its tells with its dice.
+    _body_said: list = field(default_factory=list)
 
     def snapshot(self) -> dict:
         """Everything the scene is, deep-copied, so a refused turn can be undone.
@@ -1135,8 +1143,10 @@ class Scene:
         # in ten-minute steps, and flooring each step would never heal anybody.
         hours = (int(self.clock_minutes) + minutes) // 60 - int(self.clock_minutes) // 60
         days = (int(self.clock_minutes) + minutes) // 1440 - int(self.clock_minutes) // 1440
+        started = int(self.clock_minutes)
         self.clock_minutes += minutes
         ended: list[str] = []
+        body: list[dict] = []
         # Everyone the campaign holds: an eight-hour rest expires the buff on the
         # merchant in the next room and advances his hunger, exactly as it does here.
         for a in self.people.values():
@@ -1147,15 +1157,27 @@ class Scene:
             # panel still reported full grace. That is the failure survival.py is named
             # after, arriving by a different route.
             #
-            # The COUNTERS move here and the CHECKS do not. pass_hours rolls dice, can
-            # knock a character unconscious and returns fewer hours than it was asked
-            # for, none of which can live inside a function whose caller has already
-            # decided how far the clock goes. Counters that are right beat counters
-            # that are wrong, and the panel shows the danger either way.
+            # And the CHECKS roll here too, for the player (2026-10-05). This used to
+            # move the counters only, on the argument that a check can knock somebody
+            # out and stop the stretch short, which cannot live inside a function whose
+            # caller already chose how far the clock goes. The cost of that argument was
+            # the owner's Sammy: 121 hours without sleep, food or water in ordinary
+            # play — waiting, walking, the benches — and not one check, so nothing ever
+            # made them collapse and the panel's DC ran to 274. The argument was right
+            # about the stretch and wrong about the conclusion: the stretch is not cut,
+            # the body's hours are walked inside it (`survival.charge`), a collapse is
+            # an hour IN it — the rest of it spent asleep or out cold — and the toll is
+            # told (`take_body_said`). Only the player rolls: nothing feeds, waters or
+            # beds anybody else (see `charge`).
+            rolls = bool(charge_body and minutes and a.is_pc and self._dice is not None)
             if charge_body and minutes:
-                a.awake_minutes += minutes
-                a.fed_minutes += minutes
-                a.watered_minutes += minutes
+                toll = survival.charge(a, minutes, self._dice, biome=self.biome,
+                                       clock=started if rolls else None, roll=rolls)
+                if toll.happened:
+                    record = {"ref": a.ref, "kind": "body", **toll.as_dict(),
+                              "said": survival.said(a, toll)}
+                    body.append(record)
+                    self._body_said.append(record)
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
@@ -1171,8 +1193,10 @@ class Scene:
             # and saps did (2026-09-27), a player knocked out cold woke an hour later
             # still carrying more than their hit points, and the next blow's
             # hit-point check put them straight back down. Deterministic, so it sits
-            # with the counters above rather than with the checks.
-            if hours and a.nonlethal:
+            # with the counters above rather than with the checks. For the player it was
+            # done hour by hour inside `survival.charge`, between the checks, so a wait
+            # does not knock them out on damage the same wait would have healed.
+            if hours and a.nonlethal and not rolls:
                 out_cold = a.has_state("state.down.unconscious")
                 a.heal_nonlethal(hours * max(1, int(getattr(a, "level", 1) or 1)))
                 a.apply_nonlethal_state()
@@ -1205,7 +1229,18 @@ class Scene:
             what = record.get("what") or record.get("kind")
             if what:
                 ended.append(str(what))
-        return {"minutes": minutes, "rounds": rounds, "ended": ended}
+        return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body}
+
+    def take_body_said(self) -> list[dict]:
+        """The body's tolls since they were last told, emptied as they are handed over.
+
+        Two readers and only two: the end of every engine batch (`Engine._body_settles`),
+        which is where a wait, a walk or a repair is told, and the knockout path
+        (play/downed.py), which runs no batch. A bench or a forge view that moves the
+        clock outside a batch leaves its toll here for the next batch to tell, late
+        rather than never."""
+        out, self._body_said = list(self._body_said), []
+        return out
 
     def tick_standing(self, rounds: int = 1, fire: bool = True) -> list[dict]:
         """One round of everything the scene is holding: hazards fire, then clocks run.
@@ -3033,6 +3068,11 @@ class Engine:
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
         resolution.outcomes.extend(self._articled(o) for o in self._settle_talk())
+        # What the hours this batch spent did to the player's body (`Scene.advance`
+        # rolls the checks; this tells them). Each op's toll is told right behind it in
+        # `_drive`; what is left here is the clock moved outside an op — a bench or a
+        # forge view before this batch, or anything the settles below were handed.
+        resolution.outcomes.extend(self._body_settles())
         # A creature holding its ground answers what this batch did: struck, closed on,
         # or gone — and a find it was sitting on is paid once it has gone.
         resolution.outcomes.extend(self._holding_ground_settles())
@@ -3156,6 +3196,49 @@ class Engine:
                                    self.FIGHT_HOSTILE_MINUTES * Scene.ROUNDS_PER_MINUTE,
                                    source)
                 out.append(ref)
+        return out
+
+    def _body_settles(self) -> list:
+        """The body's tolls the clock's door rolled, as outcomes the narrator is fed.
+
+        One pass at the end of every batch, for `_carried_settles`'s reason: the clock
+        moves through a dozen ops (`advance_time`, `travel`, repair, asking around,
+        dressing in armour) and a door added later cannot forget to tell. The ops that
+        spend their hours through `pass_hours` (forage, the crafting trip, venture, a
+        journey) tell their own toll in their own sentence and leave nothing here — they
+        move the clock with `charge_body=False`.
+        """
+        # One outcome per body, not per stretch: a batch that walked half an hour and
+        # then waited three told "holds out against thirst once (DC 10)" and then "holds
+        # out against thirst 3 times (DC 11-13)" as two events (measured live on the
+        # owner's save, 2026-10-05). The stretches' tolls are folded into one and said
+        # once; the records stay whole in the effects for anyone auditing them.
+        records: dict[str, list[dict]] = {}
+        for record in self.scene.take_body_said():
+            records.setdefault(str(record.get("ref") or ""), []).append(record)
+        out = []
+        for ref, rows in records.items():
+            who = self.scene.people.get(ref)
+            if who is not None and len(rows) > 1:
+                toll = survival.Toll()
+                for r in rows:
+                    toll.absorb(survival.Toll(
+                        checks=list(r.get("checks") or []),
+                        nonlethal=int(r.get("nonlethal") or 0),
+                        conditions=list(r.get("conditions") or []),
+                        **{k: bool(r.get(k)) for k in ("collapsed", "fell_asleep", "woke",
+                                                       "knocked_out", "came_round")},
+                        lethal=int(r.get("lethal") or 0)))
+                said = survival.said(who, toll)
+            else:
+                said = [s for r in rows for s in r.get("said") or []]
+            tell = " ".join(said)
+            if not tell:
+                continue
+            fx = [dict({k: v for k, v in r.items() if k != "said"}, origin="rule:survival")
+                  for r in rows]
+            out.append(self._articled(Outcome(intent_id="", op="body", effects=fx,
+                                              tell=tell, because="")))
         return out
 
     def _carried_settles(self) -> list:
@@ -3286,6 +3369,11 @@ class Engine:
             if intent.gate:
                 queue = self._settle_gate(intent, outcome, queue)
             outcomes.append(outcome)
+            # What the hours this op spent did to the body, told right behind it. At the
+            # batch's end only, a wait that put the player to sleep was told AFTER the
+            # `rest` the same plan ran next — "Sammy rests for 8 hours" and then "falls
+            # asleep where they stand" (measured live on the owner's save, 2026-10-05).
+            outcomes.extend(self._body_settles())
             # A single-roll check, save or manoeuvre decided on the player's own d20:
             # its outcome's verdict IS that roll's answer. Anything that judged the roll
             # at its own stage already has (`_judge` keeps the first).
@@ -9282,10 +9370,13 @@ class Engine:
                 # The walk's minutes, charged once (the hop sum above). This was an hour
                 # for a step between the walls and open ground and nothing for anything
                 # else — the playtest measured a two-hour wild place reached in no time,
-                # and then a village crossed twice with the clock still on 08:00. Minutes
-                # are the clock's and not the body's, as the hour was.
+                # and then a village crossed twice with the clock still on 08:00.
+                # Charged to the body as well since 2026-10-05: "the clock's and not the
+                # body's" was inherited from the old free hour with no reason given, and
+                # it made the walk the one place an hour awake was not an hour awake —
+                # the needs panel and the world clock drifted apart by every walk.
                 if minutes:
-                    self.scene.advance(minutes, charge_body=False)
+                    self.scene.advance(minutes)
                 # Ground beyond the near land is hours or days: a march, charged to the
                 # body day by day with a camp between, the rule a journey pays.
                 if far_walked:
@@ -9411,8 +9502,9 @@ class Engine:
                 weathered = self.dice.roll(ontheway.WEATHER_HOURS,
                                            label="how long it holds you",
                                            visibility="hidden").total
-                self.scene.advance(weathered * survival.MINUTES_PER_HOUR,
-                                   charge_body=False)
+                # Charged to the body, as the road's weather is (`_op_journey` adds it
+                # to the march): hours sat out in a storm are hours awake and unfed.
+                self.scene.advance(weathered * survival.MINUTES_PER_HOUR)
                 met_tell += (f" {weathered} hour{'s' if weathered != 1 else ''} go "
                              f"by before it lets you.")
             if met.kind == "cutpurse" and pc is not None and made:
@@ -16736,9 +16828,17 @@ def survival_note(toll) -> str:
     if toll.nonlethal:
         bits.append(f"{toll.nonlethal} non-lethal")
     if toll.conditions:
-        bits.append(", ".join(toll.conditions))
-    if toll.collapsed:
-        bits.append("they went down where they stood")
+        bits.append(", ".join(c for c in toll.conditions if c != "asleep"))
+    # Three different endings since the sleep ladder (survival.py, 2026-10-05): a failed
+    # save stops the work, the third drops them asleep, and non-lethal past their hit
+    # points knocks them out. "They went down where they stood" was said for all three,
+    # and for the first it was false — they stop, fatigued, on their feet.
+    if toll.fell_asleep:
+        bits.append("they fell asleep where they stood")
+    elif toll.knocked_out:
+        bits.append("they collapsed, senseless")
+    elif toll.collapsed:
+        bits.append("they could not keep going")
     failed = sum(1 for c in toll.checks if not c["passed"])
     if failed and not bits:
         bits.append(f"{failed} failed check{'s' if failed != 1 else ''}")

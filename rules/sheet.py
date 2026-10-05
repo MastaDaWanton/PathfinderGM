@@ -4260,9 +4260,10 @@ class Actor:
             survival.AWAKE_GRACE_HOURS,
             f"past a day awake — Will save every active hour, "
             f"DC {survival.awake_dc(self.awake_checks)}",
-            "Past twenty-four hours awake: a Will save every hour spent working. "
-            "Failure deals non-lethal damage and fatigues, then exhausts — and the "
-            "hour you fail badly is the hour you fall where you stand."))
+            "Past twenty-four hours awake: a Will save every waking hour, one harder "
+            "each time. Failure deals non-lethal damage and fatigues, then exhausts — "
+            "and a failure while exhausted drops you asleep where you stand for eight "
+            "hours."))
         return out
 
     def summary(self) -> dict:

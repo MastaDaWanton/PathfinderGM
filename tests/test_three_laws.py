@@ -226,8 +226,11 @@ _LITERAL_KEY_SITES = {
     "play/downed.py": (6, "the four rungs of the hit-point ladder, read where "
                           "apply_hp_state wrote them; the fifth rung asks the "
                           "vocabulary"),
-    "rules/survival.py": (4, "the fatigue ladder: thirst escalates fatigued to "
-                             "exhausted, and asks for the key it is about to write"),
+    # Same four since 2026-10-05, different ones: the questions ask the vocabulary now
+    # and the writers are the sleep ladder's (fatigued off, exhausted on, fatigued on,
+    # and the collapse into sleep as `unconscious`).
+    "rules/survival.py": (4, "the fatigue ladder: going without sleep escalates "
+                             "fatigued to exhausted to asleep where they fall"),
     # 2026-09-28 (Lane C): first aid writes the rung the rulebook names — dying off,
     # stable on — exactly as `bleed_out` does when the patient manages it alone. Its
     # question ("is this one dying?") asks the vocabulary.
