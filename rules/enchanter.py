@@ -84,7 +84,7 @@ class Material:
     obtain: str = "bought"
     biomes: list[str] = field(default_factory=list)
     from_creature: list[str] = field(default_factory=list)
-    price_gp: int = 0
+    price_gp: float = 0
     effects: list = field(default_factory=list)
     drawbacks: list = field(default_factory=list)
 
@@ -124,7 +124,9 @@ def from_dict(d: dict) -> Material:
         obtain=str(d.get("obtain") or "bought").strip().lower(),
         biomes=[str(b).strip().lower() for b in (d.get("biomes") or [])],
         from_creature=[str(c).strip().lower() for c in (d.get("from_creature") or [])],
-        price_gp=int(d.get("price_gp", 0) or 0),
+        # Fractional prices kept (1 cp is 0.01): `int()` made them free. Whole prices
+        # stay ints so nothing that prints them changes.
+        price_gp=(lambda g: int(g) if g.is_integer() else g)(float(d.get("price_gp", 0) or 0)),
         effects=list(d.get("effects") or []),
         drawbacks=list(d.get("drawbacks") or []),
     )

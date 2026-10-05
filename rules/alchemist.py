@@ -135,7 +135,7 @@ class Material:
     # rather than making the hub learn two shapes.
     obtain: str = ""
     market: str = ""
-    price_gp: int | None = None
+    price_gp: float | None = None
     biomes: list[str] = field(default_factory=list)
     # Singular *and* plural: the leatherworker writes `from_creatures` and the enchanter
     # writes `from_creature` for its 17 single-source entries. Reading both here means
@@ -200,11 +200,23 @@ def from_dict(d: dict) -> Material:
         effects_converted=bool(d.get("effects_converted")),
         obtain=how,
         market=str(d.get("market") or nested.get("market") or ""),
-        price_gp=_int_or_none(d.get("price_gp", nested.get("price_gp"))),
+        price_gp=_price_or_none(d.get("price_gp", nested.get("price_gp"))),
         biomes=[str(b) for b in (d.get("biomes") or nested.get("biomes") or [])],
         from_creatures=[str(c) for c in creatures],
         obtain_dc=_int_or_none(d.get("obtain_dc", nested.get("dc"))),
     )
+
+
+def _price_or_none(value) -> float | None:
+    """A price in gp, kept fractional: water is 0.01 (1 cp), and `int()` made it 0 —
+    free — through this loader while the counter, reading another, said 1 cp (found by
+    the pricing lane, 2026-10-05). Whole prices stay ints so saves and lines read as
+    before."""
+    try:
+        got = float(value)
+    except (TypeError, ValueError):
+        return None
+    return int(got) if got.is_integer() else got
 
 
 def _int_or_none(value) -> int | None:
