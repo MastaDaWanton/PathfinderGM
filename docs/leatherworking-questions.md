@@ -583,3 +583,12 @@ catalogue or code, whatever the owner rules above.
 | Q5.1 One carcass, four crafts | **One "Harvest the carcass" action** listing every part for every craft the character has, each part taken once (recommended). |
 | Q5.2 Sentient creatures | **Allowed by the book, marked as a deed**: dragons and the book's named exceptions yes, humanoids never, a good outsider's harvest recorded for renown and alignment (recommended). |
 | Q5.3 Yield | **By size, the book's dragonhide ratio** (recommended). |
+
+### Round 6 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q6.1 Discovery | **Grade, the leather assay**, plus working, teachers, libraries, manuals (recommended). |
+| Q6.2 Levels 1-3 | **Field work, then the tannery, then legendary** (recommended). |
+| Q6.3 Perks | **The forge's four, Yield moved to skinning** (recommended). |
+| Q6.4 Where | **Field kit plus a tannery** (town or founded) (recommended). |
