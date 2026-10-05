@@ -497,6 +497,13 @@ class Campaign:
             if m:
                 highest = max(highest, int(m.group(1)))
         scene.minted = max(scene.minted, highest)
+        # An animal companion's numbers follow its druid's level: re-derived from the
+        # companion table on every load (rules/animal_companion.py:sync), so a level
+        # gained last session is a bigger wolf this one, and a corrected table reaches a
+        # companion already in play. A no-op in every save without one.
+        from rules import animal_companion
+
+        animal_companion.sync(scene)
         campaign = cls(
             id=data["id"], world_source=data["world_source"], scene=scene,
             history=data.get("history", []), transcript=data.get("transcript", []),
@@ -677,6 +684,7 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
                 import logging
 
                 logging.getLogger(__name__).exception("acquainting the start's lead failed")
+        _companion_arrives(scene)
         here = opening.situation_for(c)
         _open_the_world(c, world, here, str((scene.start.get("slots") or {}).get("lead")
                                             or ""), seed, town)
@@ -731,8 +739,27 @@ def new_campaign(campaign_id: str = "slice", seed: int | None = None,
     c = Campaign(
         id=campaign_id, world_source=str(world_source), scene=scene, seed=seed,
     )
+    _companion_arrives(scene)
     _open_the_world(c, world, here, watcher.ref, seed, town)
     return c
+
+
+def _companion_arrives(scene) -> None:
+    """The druid's animal companion, when nature bond took one (rules/animal_companion.py).
+
+    Called at both of `new_campaign`'s returns, after the start has stood the party where
+    it begins and before the world is opened: `place_party` moves only the PC, so a wolf
+    added at the first placement was left at the town's gate (measured: the well against
+    the north crossing), and three doors begin a campaign through here — `begin_with`, a
+    roster character's first `switch_to` (the outfitting page's Begin), and `_begin`. The
+    first live run put it in `begin_with` alone and the outfitting page's druid began with
+    the sheet saying "it is not here".
+    """
+    from rules import animal_companion
+
+    pc = scene.pc()
+    if pc is not None:
+        animal_companion.arrive_with(scene, pc)
 
 
 def _open_the_world(c: Campaign, world, here, watcher_ref: str, seed, town) -> None:

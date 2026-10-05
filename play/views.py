@@ -82,6 +82,22 @@ def _talk_state(c) -> list[dict]:
         return []
 
 
+def _shown_conditions(a) -> list[str]:
+    """The words the panel prints after a person's hit points, and the book's head and the
+    combat bar beside them: their conditions, with how they stand towards the player
+    taken from the one reader (`attitude.word_for_panel`) rather than from whichever
+    attitude CONDITION happens to be on them. The two used to differ: a standing regard
+    that put somebody at hostile with no step held showed nothing here while the brief
+    and the map read hostile."""
+    from rules import attitude as attitude_mod
+    from rules import states
+
+    shown = [x.name for x in a.conditions
+             if not any(states.matches(t, "attitude") for t in states.tags_for(x.key))]
+    word = attitude_mod.word_for_panel(a)
+    return shown + ([word] if word else [])
+
+
 def _busy_state(c) -> str:
     pc = c.scene.pc()
     if pc is None:
@@ -519,6 +535,7 @@ def _usable_abilities(pc) -> list[dict]:
 
 def _state(c) -> dict:
     pc = c.scene.pc()
+    from rules import attitude as attitude_mod
     from rules import cards as cards_mod
     from rules import goods as goods_mod
     from rules import houserules as houserules_mod
@@ -595,6 +612,11 @@ def _state(c) -> dict:
                  # touched — the map paints foes red and bystanders white.
                  "side": next((s for s, refs in (c.scene.sides or {}).items()
                                if r in refs), ""),
+                 # How the map paints them — pc, ally, foe or "" — from the attitude
+                 # track, the one source the panel's word and the brief read too
+                 # (`attitude.stance`). The map used to paint from `side`, which a
+                 # fight's end empties: an hour after the robbers won, neither was red.
+                 "stance": attitude_mod.stance(c.scene, a),
                  "size": a.size, "squares": grid.size_squares(a.size),
                  # A crowd held as one actor: how many are still standing out of how many
                  # arrived, so the token can say "17 of 24" and read as many people rather
@@ -608,7 +630,7 @@ def _state(c) -> dict:
                  # are past finishing.
                  "helpless": bool(a.is_helpless
                                   and not a.has_state("state.down.dead")),
-                 "conditions": [x.name for x in a.conditions]}
+                 "conditions": _shown_conditions(a)}
                 for r, a in c.scene.actors.items()
                 if a.is_pc or not a.has_state("state.hidden")
             ],
@@ -1104,6 +1126,22 @@ def _sheet_payload(pc) -> dict:
     # (content/rules/gear.json). Shown, not enforced: encumbrance is the owner's later
     # batch (E9), and the Equipment tab says so in words.
     out["equipment"]["load"] = gear_mod.load(pc)
+    # The Companions line on the Background card: an animal companion made by nature
+    # bond, its numbers derived from the druid's level (rules/animal_companion.py). The
+    # sheet printed "No animal companion, familiar, cohort or mount" as a fixed sentence
+    # until 2026-10-04, whatever the character had. And the domain powers had, with
+    # what each one does not do yet, said out loud.
+    from rules import animal_companion, domains as domains_mod
+
+    try:
+        scene = campaign_mod.current().scene
+    except Exception:  # noqa: BLE001 — a sheet with no campaign still draws
+        scene = None
+    out["companions"] = {
+        "animals": animal_companion.sheet_lines(scene, pc),
+        "absent": animal_companion.wanted_but_absent(scene, pc),
+        "not_yet": list(animal_companion.document().get("not_yet") or [])}
+    out["domain_powers"] = domains_mod.power_lines(pc)
     return out
 
 
@@ -1734,6 +1772,88 @@ def level_up(request):
 
 
 @require_GET
+def level_feat_menu(request):
+    """The feats this character may take for what their levels owe: `?pool=feats|bonus`.
+
+    The forge's list (`creation.feat_rows`) asked of the living character — open ones
+    first, the shut ones with the missing prerequisite named — narrowed for a class's
+    bonus feats to what they may be (a fighter's combat feats).
+    """
+    from rules import leveling
+
+    pc = campaign_mod.current().scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    pool = str(request.GET.get("pool") or "feats").strip().lower()
+    if pool not in ("feats", "bonus"):
+        return JsonResponse({"error": "pool is 'feats' or 'bonus'"}, status=400)
+    return JsonResponse(leveling.feat_menu(pc, pool))
+
+
+@require_POST
+def level_take_feats(request):
+    """Take owed feats: `{"pool": "feats"|"bonus", "feats": [id | {"id", "target"}]}`.
+
+    The server is the rule — owed, qualified for, not already held, inside a class's
+    bonus-feat list — every reason refused at once and nothing written unless all pass.
+    """
+    from rules import leveling
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    wanted = body.get("feats")
+    if not isinstance(wanted, list):
+        return JsonResponse({"error": "send the chosen feats as a list"}, status=400)
+    pool = str(body.get("pool") or "feats").strip().lower()
+    added, problems = leveling.take_feats(pc, wanted, pool)
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{pc.name} takes {', '.join(a.title() for a in added)}"
+                                 f"{' as a bonus feat' if pool == 'bonus' else ''}."})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({**full_sheet(pc), "taken": added})
+
+
+@require_POST
+def level_take_points(request):
+    """Place owed ability points: `{"points": {"str": 1, "con": 1}}`.
+
+    Through `Actor.grow_ability`, so a Constitution point pays every Hit Die already
+    earned. Both of a house rule's points may land on one score.
+    """
+    from rules import leveling
+    from rules.sheet import full_sheet
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "no character"}, status=404)
+    body = read_body(request)
+    changes, problems = leveling.take_points(pc, body.get("points"))
+    if problems:
+        return JsonResponse({"error": " ".join(problems), "problems": problems},
+                            status=400)
+    said = ", ".join(f"{ch['ability'].title()} +{ch['amount']} (now {ch['score']})"
+                     for ch in changes)
+    hp = sum(ch["hp_change"] for ch in changes)
+    c.transcript.append({"who": "gm", "kind": "consequence",
+                         "text": f"{pc.name}: {said}."
+                                 + (f" {hp:+d} hit points." if hp else "")})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({**full_sheet(pc), "raised": changes})
+
+
+@require_GET
 def feat_search(request):
     """Browse the feat index, ranked by whether this character can actually take it.
 
@@ -2056,6 +2176,18 @@ def say(request):
         outcome = downed.resolve(c)
         for line in outcome.lines:
             c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
+        # On the record, which this path never was: the owner's save of 2026-10-04 has
+        # the bleeding, the hour and "whoever was standing over you has gone" in its
+        # transcript and not one turn-log entry for any of it, so nothing said which
+        # door had moved the clock or what the winners did.
+        c.turn_log.append(history_mod.stamp(c, {
+            "kind": "downed", "state": outcome.state, "lines": list(outcome.lines),
+            "effects": list(outcome.effects)}))
+        # The last beat's offers were written for a fight the player is no longer in a
+        # state to take part in, and after the hour they are offers about people who
+        # have gone: the 2026-10-04 screenshot read "I focus on the first robber" an
+        # hour after the robbers won. The next narrated beat writes new ones.
+        c.suggestions = []
         if outcome.died:
             _end_campaign(c, pc)
             c.save()

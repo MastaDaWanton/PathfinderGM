@@ -270,7 +270,9 @@ GUEST_WRITES = frozenset({
     "/api/travel", "/api/craftaction", "/api/craft/actions", "/api/craft/excursion",
     "/api/craft/do", "/api/craft/preview", "/api/craft/recipes", "/api/craft/ingredients",
     "/api/forage", "/api/forage/table", "/api/level-up", "/api/slots",
-    "/api/spells/prepare", "/api/spells/learn", "/api/sheet", "/api/feats", "/api/state", "/api/revision",
+    "/api/spells/prepare", "/api/spells/learn",
+    # The Class tab's owed picks: the same footing as the spells owed above.
+    "/api/level/feats/take", "/api/level/points", "/api/sheet", "/api/feats", "/api/state", "/api/revision",
     "/api/characters", "/api/character/gender", "/api/character/new",
     "/api/character/switch", "/api/resurrect", "/api/resume", "/api/start",
     "/api/character/create", "/api/character/choices",

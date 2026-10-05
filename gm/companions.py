@@ -234,8 +234,14 @@ def answers_on_the_page(text: str, answered) -> tuple[str, list[str]]:
 def who_they_are(scene, actor) -> str:
     """The companion's character, as facts in words: owned or not, how they feel about
     the player, two or three trait words and how they show. Never a number."""
+    from rules import animal_companion
     from rules import attitude as attitude_mod, population as population_mod
 
+    # A druid's animal companion is not a person who came along: no attitude step, no
+    # trade, no life record. Its character is an animal's bound to its druid — tricks and
+    # tone, not sentences (rules/animal_companion.py:character_words).
+    if animal_companion.is_animal_companion(actor):
+        return animal_companion.character_words(scene, actor)
     name = actor.name
     bits = []
     if owned(actor):

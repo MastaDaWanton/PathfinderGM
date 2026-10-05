@@ -881,15 +881,21 @@ def test_the_shell_shows_its_window_even_when_the_page_never_paints():
 
 def test_the_map_paints_foes_red_and_bystanders_white():
     """"make the bystanders white and the enemies bright red." The page is told each
-    actor's side and paints by it; a bystander is a non-player on no side while a
-    fight is on."""
+    actor's stance and paints by it; a bystander is a non-player with no stance while a
+    fight is on.
+
+    The stance, not the side, since 2026-10-04: the page painted from the fight's side
+    name, which `end_encounter` empties, so an hour after two robbers beat the player
+    neither was red while the panel called one of them Hostile. The stance is read off
+    the attitude track on the server (`attitude.stance`), the source the panel and the
+    brief read too."""
     text = table_source()
     assert "#map .token.foe { fill: #e0261e" in text
     assert "#map .token.bystander { fill: #f2ecdd" in text
     assert "#map .token.ally { fill: #6fc276" in text          # on your side: green
-    assert '" bystander"' in text and '" foe"' in text
+    assert '" bystander"' in text and "a.stance" in text
     views = (ROOT / "play" / "views.py").read_text(encoding="utf-8")
-    assert '"side": next((s for s, refs in (c.scene.sides or {}).items()' in views
+    assert '"stance": attitude_mod.stance(c.scene, a)' in views
 
 
 def test_a_lan_bind_does_not_land_on_top_of_a_loopback_one():

@@ -104,7 +104,226 @@ def _build_classes() -> dict[str, dict]:
 
 
 def get(class_id: str) -> dict:
-    return all_classes().get((class_id or "").strip().lower(), {})
+    """A class by id — a playable one, or a progression only a companion follows.
+
+    The second store exists for the animal companion (`rules/animal_companion.py`): its
+    Hit Dice, base attack and saves are a three-quarter-BAB, good-Fortitude-and-Reflex
+    d8 progression at its Hit Dice, which is exactly what this module already derives
+    for a class. Kept OUT of `all_classes()` on purpose — the forge, the Class tab and
+    thirteen "build every class" tests iterate that dict, and a wolf is not a class a
+    player can be.
+    """
+    key = (class_id or "").strip().lower()
+    found = all_classes().get(key)
+    if found is not None:
+        return found
+    from . import animal_companion
+
+    return animal_companion.progression_classes().get(key, {})
+
+
+# --- class choices ------------------------------------------------------------------------
+#
+# The grammar `paths` was the only instance of: a class document declares a choice made
+# at a level, and the forge asks it, the build refuses without it, the sheet stores the
+# answer. Written 2026-10-04 for the druid's nature bond — the owner: "The druid class
+# does not work I was given no choice for my natures bond" — and shaped to carry the
+# others the table still lists as bare strings (bloodline, arcane school, hunter's bond,
+# divine bond, favoured enemy) once each has an option kind.
+#
+#   "choices": [{"id": "nature bond", "name": "Nature's Bond", "level": 1,
+#                "options": [{"kind": "domain", "from": ["Air", ...], "how_many": 1},
+#                            {"kind": "animal companion", "from": ["wolf", ...]}]}]
+#
+# The ANSWER is `class_choices` on the sheet: {"nature bond": {"option": "domain"}} with
+# the domain itself in `domains` (the store casting already reads), or {"nature bond":
+# {"option": "animal companion", "pick": "wolf"}}. A choice with one option needs no
+# answer: the cleric has nothing to pick between, only her two domains to pick.
+
+CHOICE_KINDS = ("domain", "animal companion")
+_CHOICE_KEYS = frozenset({"id", "name", "level", "text", "options"})
+_OPTION_KEYS = frozenset({"kind", "name", "text", "from", "how_many", "level_offset"})
+
+
+def choices_for(class_id: str, level: int = 20) -> list[dict]:
+    """The choices this class asks for by this level, in document order."""
+    return [c for c in (get(class_id).get("choices") or [])
+            if isinstance(c, dict) and int(c.get("level", 1) or 1) <= int(level or 1)]
+
+
+def option_taken(choice: dict, answers) -> dict | None:
+    """Which of a choice's options the answers took, or None when none was."""
+    options = [o for o in (choice.get("options") or []) if isinstance(o, dict)]
+    if len(options) == 1:
+        return options[0]
+    said = (answers or {}).get(str(choice.get("id"))) if isinstance(answers, dict) else None
+    kind = str((said or {}).get("option", "") if isinstance(said, dict) else said or "")
+    kind = " ".join(kind.split()).lower()
+    return next((o for o in options if str(o.get("kind")).lower() == kind), None)
+
+
+def check_choices(class_id: str, answers, domains_sent=(), level: int = 1) -> tuple[dict, list[str]]:
+    """The answers as the rules will accept them, and every problem at once, with the fix.
+
+    The generalised `leveling.check_paths`. A choice left unanswered is refused — "a druid
+    was made with no nature's bond choice at all" is the defect — except that a domain
+    sent with no answer IS the answer when the choice offers a domain: picking Air from
+    the druid's seven is choosing the domain bond, and saying so twice is not required.
+    The domain list itself is `domains.problems`' to judge; this judges the option.
+    """
+    from . import animal_companion
+
+    cls = get(class_id)
+    name = (member_noun(class_id) or class_id).lower()
+    clean: dict[str, dict] = {}
+    problems: list[str] = []
+    answers = dict(answers or {}) if isinstance(answers, dict) else {}
+    asked = choices_for(class_id, level)
+    known_ids = {str(c.get("id")) for c in asked}
+    for key in answers:
+        if key not in known_ids:
+            problems.append(
+                f"{key!r} is not a choice a {name} makes"
+                + (f": {', '.join(sorted(known_ids))}." if known_ids else "; it makes none."))
+    for choice in asked:
+        cid = str(choice.get("id"))
+        options = [o for o in (choice.get("options") or []) if isinstance(o, dict)]
+        if len(options) == 1:
+            continue                      # nothing to pick between (the cleric's domains)
+        option = option_taken(choice, answers)
+        said = answers.get(cid)
+        if option is None and said in (None, "", {}) and domains_sent and any(
+                o.get("kind") == "domain" for o in options):
+            option = next(o for o in options if o.get("kind") == "domain")
+        title = str(choice.get("name") or cid)
+        if option is None:
+            kinds = " or ".join(str(o.get("name") or o.get("kind")).lower() for o in options)
+            problems.append(
+                f"A {name} chooses {title} at {int(choice.get('level', 1))}"
+                f"{_ordinal(int(choice.get('level', 1)))} level: {kinds}. "
+                f"Pick one in the class step.")
+            continue
+        kind = str(option.get("kind"))
+        entry: dict = {"option": kind}
+        if kind == "animal companion":
+            raw = str((said or {}).get("pick", "") if isinstance(said, dict) else "").strip()
+            pick = animal_companion.key_for(raw) or raw.lower()
+            allowed = [animal_companion.key_for(a) for a in option.get("from") or []]
+            if not pick:
+                problems.append(
+                    f"{title}: an animal companion needs an animal — one of "
+                    f"{', '.join(animal_companion.name_of(a) for a in allowed)}.")
+                continue
+            if pick not in allowed:
+                problems.append(
+                    f"{title}: {pick!r} is not on a {name}'s companion list — one of "
+                    f"{', '.join(animal_companion.name_of(a) for a in allowed)}.")
+                continue
+            entry["pick"] = pick
+            # The player's own name for it, if they gave one. Words only, and short —
+            # it is what the narrator will call the animal.
+            called = " ".join(str((said or {}).get("name") or "").split())[:40] \
+                if isinstance(said, dict) else ""
+            if called:
+                entry["name"] = called
+        clean[cid] = entry
+    _ = cls
+    return clean, problems
+
+
+def _ordinal(n: int) -> str:
+    return "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+
+
+def validate_choices(d: dict) -> list[str]:
+    """Everything wrong with a class document's `choices`, each with the fix named.
+
+    Called by `classbuilder.validate_class` (the bench refuses the class) and by the test
+    that walks every shipped class, so a druid document naming a domain the corpus has
+    never heard of fails on load rather than at the forge.
+    """
+    from . import animal_companion, domains as domains_mod
+
+    raw = d.get("choices")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return ["choices: a list of choices — [{\"id\": \"nature bond\", \"level\": 1, "
+                "\"options\": [...]}]."]
+    problems: list[str] = []
+    seen: set[str] = set()
+    for i, choice in enumerate(raw):
+        at = f"choices[{i}]"
+        if not isinstance(choice, dict):
+            problems.append(f"{at}: a choice is an object.")
+            continue
+        extra = sorted(k for k in set(choice) - _CHOICE_KEYS if not str(k).startswith("_"))
+        if extra:
+            problems.append(f"{at}: unknown field(s) {', '.join(extra)}. A choice carries: "
+                            f"{', '.join(sorted(_CHOICE_KEYS))}.")
+        cid = str(choice.get("id") or "").strip()
+        if not cid:
+            problems.append(f"{at}: needs an id — the name the sheet stores the answer "
+                            f"under, like \"nature bond\".")
+        elif cid in seen:
+            problems.append(f"{at}: a second choice called {cid!r}; ids are unique.")
+        seen.add(cid)
+        lvl = choice.get("level", 1)
+        if not isinstance(lvl, int) or not 1 <= lvl <= 20:
+            problems.append(f"{at}.level: the class level it is chosen at, 1-20.")
+        options = choice.get("options")
+        if not isinstance(options, list) or not options:
+            problems.append(f"{at}.options: at least one option — "
+                            f"{{\"kind\": \"domain\", \"from\": [...]}}.")
+            continue
+        for j, option in enumerate(options):
+            oat = f"{at}.options[{j}]"
+            if not isinstance(option, dict):
+                problems.append(f"{oat}: an option is an object.")
+                continue
+            extra = sorted(k for k in set(option) - _OPTION_KEYS
+                           if not str(k).startswith("_"))
+            if extra:
+                problems.append(f"{oat}: unknown field(s) {', '.join(extra)}. An option "
+                                f"carries: {', '.join(sorted(_OPTION_KEYS))}.")
+            kind = str(option.get("kind") or "")
+            if kind not in CHOICE_KINDS:
+                problems.append(f"{oat}.kind: {kind!r} has no reader. One of: "
+                                f"{', '.join(CHOICE_KINDS)}.")
+                continue
+            pool = option.get("from")
+            if kind == "domain":
+                known = set(domains_mod.names())
+                if pool not in (None, "all"):
+                    if not isinstance(pool, list) or not pool:
+                        problems.append(f"{oat}.from: \"all\", or a list of domain names.")
+                        continue
+                    for name in pool:
+                        if " ".join(str(name).split()).title() not in known:
+                            problems.append(
+                                f"{oat}.from: no domain called {name!r} in the spell "
+                                f"corpus, so it could never be picked. Spell it as the "
+                                f"corpus does (Air, Animal, Earth…).")
+                n = option.get("how_many", 1)
+                size = len(known) if pool in (None, "all") else len(pool or [])
+                if not isinstance(n, int) or not 1 <= n <= max(1, size):
+                    problems.append(f"{oat}.how_many: how many domains, 1 to {size}.")
+            elif kind == "animal companion":
+                if not isinstance(pool, list) or not pool:
+                    problems.append(f"{oat}.from: the animals offered, by key — "
+                                    f"{', '.join(sorted(animal_companion.animals())[:4])}…")
+                    continue
+                for a in pool:
+                    if animal_companion.key_for(a) not in animal_companion.animals():
+                        problems.append(
+                            f"{oat}.from: no companion animal called {a!r} in "
+                            f"content/companions/animal-companions.json. One of: "
+                            f"{', '.join(sorted(animal_companion.animals()))}.")
+                off = option.get("level_offset", 0)
+                if not isinstance(off, int) or off > 0:
+                    problems.append(f"{oat}.level_offset: 0 or negative — the Animal "
+                                    f"domain's companion is -3.")
+    return problems
 
 
 def member_noun(class_id: str) -> str:
@@ -202,6 +421,15 @@ def apply(actor) -> dict:
         resources.define(actor, {**spec,
                                  "source": spec.get("source") or cls.get("name", cid)})
         made.append(str(spec["id"]).strip().lower())
+    # The uses per day a domain's powers declare (content/domains/powers.json) — Lightning
+    # Arc's 3 + Wis — through the same door as the class's own pools, so they refresh on
+    # a night and show on the sheet with no second mechanism. Recomputed on every load,
+    # which is how a Wisdom raised at 4th reaches the pool.
+    from . import domains as domains_mod
+
+    for spec in domains_mod.pool_specs(actor):
+        resources.define(actor, spec)
+        made.append(spec["id"])
 
     # Spell slots are ordinary pools, so they refresh on a night, survive a save and show
     # on the sheet with no second mechanism for any of it.

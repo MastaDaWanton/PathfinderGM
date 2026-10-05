@@ -96,7 +96,8 @@
   {
    "level": 10,
    "grants": [
-    "favored enemy (3rd)"
+    "favored enemy (3rd)",
+    "combat style feat"
    ]
   },
   {
@@ -114,12 +115,14 @@
   {
    "level": 13,
    "grants": [
-    "combat style feat"
+    "favored terrain (3rd)"
    ]
   },
   {
    "level": 14,
-   "grants": []
+   "grants": [
+    "combat style feat"
+   ]
   },
   {
    "level": 15,
@@ -142,7 +145,8 @@
   {
    "level": 18,
    "grants": [
-    "favored terrain (4th)"
+    "favored terrain (4th)",
+    "combat style feat"
    ]
   },
   {

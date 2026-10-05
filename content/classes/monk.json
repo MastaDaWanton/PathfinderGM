@@ -61,6 +61,7 @@
   {
    "level": 1,
    "grants": [
+    "bonus feat",
     "flurry of blows",
     "stunning fist",
     "unarmed strike (1d6)",
@@ -139,7 +140,8 @@
    "level": 12,
    "grants": [
     "abundant step",
-    "unarmed strike 2d6"
+    "unarmed strike 2d6",
+    "slow fall 60 ft"
    ]
   },
   {
@@ -192,7 +194,8 @@
    "level": 20,
    "grants": [
     "perfect self",
-    "unarmed strike 2d10"
+    "unarmed strike 2d10",
+    "slow fall any distance"
    ]
   }
  ]

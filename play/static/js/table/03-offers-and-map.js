@@ -176,8 +176,12 @@ function renderMap(s) {
     const [c, r] = a.at;
     const n = a.squares || 1;
     const down = a.hp <= 0;
-    const side = a.is_pc ? " pc" : a.side ? (a.side === "pc" || a.side === "you" ? " ally" : " foe")
-      : (s.scene.in_encounter ? " bystander" : "");
+    // The server's `stance`, read off the attitude track — the same reader the panel's
+    // "· Hostile" and the narrator's brief use (`attitude.stance`). This used to be
+    // worked out here from the fight's side NAME, so an hour after the robbers won (the
+    // sides gone with the fight) neither was painted a foe while the panel called one of
+    // them Hostile; and a side named "party" painted the player's own companions red.
+    const side = a.stance ? ` ${a.stance}` : (s.scene.in_encounter ? " bystander" : "");
     // Somebody on another floor of the same room is faded, not hidden. Hiding them is
     // how a player is surprised by an archer who was on the map the whole time; this is
     // the level selector saying "not who you are looking at" rather than "not there".

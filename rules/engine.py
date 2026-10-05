@@ -43,6 +43,7 @@ from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from .grid import Grid
 from . import hazards
+from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import MAGIC_SUPPRESSED, Actor, attacker_traits
@@ -3048,7 +3049,92 @@ class Engine:
                                                                    "error": str(exc)}],
                              tell="", because="")]
         resolution.outcomes.extend(self._articled(o) for o in extra)
+        # Last, after anything the schemes brought in on a side: whoever is fighting the
+        # player is hostile to them, on the track every surface reads.
+        self._foes_settle()
         return resolution
+
+    # How long fighting the player keeps somebody hostile to them (`_foes_settle`): the
+    # engine's one measure of a fight's heat cooling, not a second number for it.
+    FIGHT_HOSTILE_MINUTES = _provocation.COOL_MINUTES
+
+    def _foes_settle(self) -> list[str]:
+        """Everybody on a side against the player's is hostile to them, through the one
+        applicator. Returns the refs it moved.
+
+        Measured 2026-10-04, the robbers in the warrens: two robbers opened the fight on
+        the "robbers" side, the player struck only the second, and an hour after the
+        fight the panel read "the robber 16/16" with no attitude beside it, "the second
+        robber 16/16 · Hostile", and the map painted neither of them as a foe. The
+        attitude track had only ever been written by HARM (`attitude.harmed`, the second
+        robber), never by FIGHTING: the first robber, cudgel up and coming on, was
+        "indifferent" to the brief, the panel and every rule that asks `attitude_of`;
+        and the map read `Scene.sides`, which `end_encounter` empties, so once the fight
+        ended nobody on it was anybody's foe.
+
+        The track is the record that outlives the fight, so the side writes into it.
+        One pass at the end of every batch rather than a line at each door a side is
+        drawn by — `begin_encounter`, the first swing (`_ensure_encounter`), `join_fight`
+        (rally, the law, companions), a spawn mid-fight — for the reason
+        `_carried_settles` gives: a door added later cannot forget it. The same people
+        are spared as `attitude.harmed` spares: a companion, or anybody at the step that
+        comes along, is not turned hostile by standing on the wrong side of a line the
+        GM drew; the dead have no attitude to move. A fight between people the player is
+        not in (no side holds the PC) writes nothing: attitudes are towards the party.
+
+        No outcome and no tell of its own, on purpose, for the reason `settle_people`
+        gives for its moves: this is not a new event. The fight's own tell already says
+        these people are fighting the player — "Initiative: …", "battle is joined", "the
+        watch comes in against you" — and the brief's WHO IS HERE states the attitude to
+        the narrator every beat from here on. The first cut emitted `attitude.said`'s
+        "the robber cools: wants you gone" as an outcome of its own, which told a man
+        who had come on with his cudgel up that he had just changed his mind, and added
+        an outcome to every batch that drew a side (32 tests that read a batch's
+        outcomes by position measured the shape change). The record is the effect
+        itself: its source names the side, `fight:<side>`. (A second cut put a row on
+        `Scene.log` as well, and broke a reader of that log's last row — the log is the
+        batch's outcomes, in order, and a row after them is not one.)
+
+        For a while, not for good: `FIGHT_HOSTILE_MINUTES`, the eight hours the engine
+        already takes for a fight's heat to cool (`provocation.COOL_MINUTES`, RimWorld's
+        post-break reset). Long enough to cover everything that follows a fight — the
+        winners standing over a beaten player (`rules/defeat.py`), the hour the player is
+        out — and short of a standing grudge, which is HARM's to make (`attitude.harmed`
+        turns a struck stranger hostile until dismissed, and still does, over this). Timed
+        because a step with no end floors the standing regard to the step's floor
+        (`_set_attitude`), and the first cut, written that way, wiped provocation's
+        bookkeeping off a man the player had baited into a brawl: his outburst was never
+        settled, cathartic or embittered, once the fight ended (test_provocation measured
+        it, 0 against the 8 it settles by).
+        """
+        from . import attitude as attitude_mod
+
+        sides = self.scene.sides or {}
+        pc = self.scene.pc()
+        if not sides or pc is None:
+            return []
+        mine = next((s for s, refs in sides.items() if pc.ref in refs), None)
+        if mine is None:
+            return []
+        out = []
+        for side, refs in sides.items():
+            if side == mine:
+                continue
+            for ref in refs:
+                a = self.scene.actors.get(ref)
+                if a is None or a.is_pc or a.has_state("state.down.dead"):
+                    continue
+                was = attitude_mod.of(a)
+                if (was == attitude_mod.HOSTILE or a.has_state(states.TRAVELS_WITH_YOU)
+                        or attitude_mod.step_of(was)
+                        >= attitude_mod.step_of(attitude_mod.COMES_ALONG)):
+                    continue
+                source = f"fight:{side}"
+                self._set_attitude(a, attitude_mod.HOSTILE,
+                                   self.FIGHT_HOSTILE_MINUTES * Scene.ROUNDS_PER_MINUTE,
+                                   source)
+                out.append(ref)
+        return out
 
     def _carried_settles(self) -> list:
         """Carried effects brought up to date with the packs of everybody here, said.
