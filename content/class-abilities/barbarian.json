@@ -25,7 +25,10 @@
           {"type": "save_mod", "target": "will", "bonus_type": "morale",
            "by_level": {"1": 2, "11": 3, "20": 4}},
           {"type": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": -2}
-        ]
+        ],
+        "ends_when": {"holder": ["state.down"]},
+        "forbids": {"skills": {"abilities": ["cha", "dex", "int"],
+                               "except": ["acrobatics", "fly", "intimidate", "ride"]}}
       },
       "after": {"condition": "fatigued", "rounds_per_spent": 2, "until_level": 17},
       "addons": [
@@ -59,8 +62,7 @@
       "tell": "{name} flies into a rage.",
       "tell_off": "{name}'s rage burns out.",
       "not_yet": [
-        "The skills rage forbids (Charisma-, Dexterity- and Intelligence-based, but Acrobatics, Fly, Intimidate and Ride) are not refused while it holds.",
-        "Falling unconscious does not end the rage on its own.",
+        "\"Any ability that requires patience or concentration\": only skills are refused while it holds; casting and concentration are not.",
         "Indomitable will's +4 against enchantment: saves carry no enchantment descriptor yet.",
         "Rounds only drain in played rounds; a rage begun out of a fight holds until it is ended."
       ]

@@ -24,16 +24,17 @@
            "formula": "max(0, cha_mod)"},
           {"type": "combat_mod", "target": "damage", "bonus_type": "untyped",
            "formula": "level"},
+          {"type": "combat_mod", "target": "damage", "bonus_type": "untyped",
+           "formula": "level", "first_hit": true,
+           "when": {"target": {"type": ["outsider", "dragon", "undead"]}},
+           "_source": "\"If the target of smite evil is an outsider with the evil subtype, an evil-aligned dragon, or an undead creature, the bonus to damage on the first successful attack increases to 2 points of damage per level the paladin possesses.\" Alignment is not tracked (owner ruling 2026-10-05), so the type alone decides; the type is not alignment."},
           {"type": "combat_mod", "target": "ac", "bonus_type": "deflection",
            "formula": "max(0, cha_mod)"}
-        ]
+        ],
+        "strikes_as": ["ignores_dr"],
+        "ends_when": {"target": ["state.down.dead"]}
       },
-      "tell": "{name} calls down a smite.",
-      "not_yet": [
-        "The first hit's doubled damage against evil outsiders, evil dragons and undead.",
-        "Smite attacks bypassing the target's damage reduction.",
-        "Ending on the target's death: the mark stays, inert, until the paladin rests."
-      ]
+      "tell": "{name} calls down a smite on {target}."
     },
     {
       "key": "lay on hands",

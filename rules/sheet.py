@@ -237,6 +237,29 @@ ADAMANTINE_IGNORES_BELOW = 20
 # trait words, and no DR is bypassed by "attacker:...".
 ATTACKER_TRAIT = "attacker:"
 
+# The skill_mod target that reaches every skill (`Actor.skill_modifiers`).
+ALL_SKILLS = "all"
+
+# A blow's trait saying how much damage reduction it passes by rule: `ignores_dr` all of
+# it (a smite), `ignores_dr:5` five points of it (Artificer's Touch at 5th). Read by
+# `Actor.damage_reduction` through `dr_ignored`; never a bypass word.
+IGNORES_DR = "ignores_dr"
+
+
+def dr_ignored(traits) -> int:
+    """How many points of DR a blow with these traits passes: 0, N, or all of it."""
+    most = 0
+    for t in traits or ():
+        t = str(t)
+        if t == IGNORES_DR:
+            return 10 ** 6
+        if t.startswith(IGNORES_DR + ":"):
+            try:
+                most = max(most, int(t.split(":", 1)[1]))
+            except ValueError:
+                continue
+    return most
+
 
 # Magic held off: the tag an effect grants while the bearer's active magic is suppressed
 # (`Actor._buff_mods` skips a magical effect's modifiers, `Engine` skips the bearer's
@@ -1900,6 +1923,11 @@ class Actor:
 
         mods.extend(self._condition_mods("skills"))
         mods.extend(self._buff_mods("skill_mod", skill))
+        # "On all skill checks": a skill_mod aimed at `all` — Touch of Good, Inspiring
+        # Word, Diviner's Fortune, Aura of Despair. Foundry PF1's change target `skills`
+        # ("All Skills") is the same idea. Before it, each of those documents could name
+        # one skill only and the bonus said on the sheet never reached a roll.
+        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS))
         return stack(mods)
 
     # --- saves ----------------------------------------------------------------------
@@ -3029,6 +3057,14 @@ class Actor:
                 pool.append(Reduction(int(d["amount"]), str(d.get("bypass") or ""),
                                       e.source or e.name))
         usable = [r for r in pool if r.amount > 0 and not r.bypassed_by(traits)]
+        # A blow that passes DR by its own rule rather than by what it is made of: a
+        # smite "bypasses any DR the creature might possess" (CRB p.61), Artificer's Touch
+        # "bypasses an amount of damage reduction ... equal to your cleric level" (CRB
+        # Artifice domain). Neither is a material, so neither can be a bypass word.
+        cut = dr_ignored(traits)
+        if cut:
+            usable = [Reduction(r.amount - cut, r.bypass, r.source)
+                      for r in usable if r.amount > cut]
         return max(usable, key=lambda r: r.amount) if usable else None
 
     # --- non-lethal damage ---------------------------------------------------------------

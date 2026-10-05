@@ -56,7 +56,7 @@
       "effect": {"rounds": 1, "tags": ["buff.buffeted"],
                  "modifiers": [{"type": "combat_mod", "target": "attack", "bonus_type": "untyped",
                                 "amount": -2}]},
-      "tell": "{name} calls a burst of wind and rain."
+      "tell": "{name} calls a burst of wind and rain down on {target}."
     },
     {
       "key": "wooden fist", "power": "wooden fist", "name": "Wooden Fist", "level": 1,
@@ -90,7 +90,8 @@
         "condition": "dazed",
         "rounds": 1
       },
-      "tell": "{name} lays a dazing hand on the target.",
+      "hit_dice": {"max": "level"},
+      "tell": "{name} lays a dazing hand on {target}.",
       "cost": {
         "pool": "dazing touch",
         "amount": 1
@@ -112,7 +113,7 @@
         "condition": "sickened",
         "rounds": "max(1, floor(level / 2))"
       },
-      "tell": "{name}'s touch leaves the target queasy and sick.",
+      "tell": "{name}'s touch leaves {target} queasy and sick.",
       "cost": {
         "pool": "touch of evil",
         "amount": 1
@@ -154,10 +155,17 @@
             "target": "will",
             "bonus_type": "sacred",
             "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "skill_mod",
+            "target": "all",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
           }
         ]
       },
-      "tell": "{name} lays a blessing on the target.",
+      "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
+      "tell": "{name} lays a blessing on {target}.",
       "cost": {
         "pool": "touch of good",
         "amount": 1
@@ -234,10 +242,17 @@
             "target": "will",
             "bonus_type": "morale",
             "amount": 2
+          },
+          {
+            "type": "skill_mod",
+            "target": "all",
+            "bonus_type": "morale",
+            "amount": 2
           }
         ]
       },
-      "tell": "{name}'s words lift the target's heart.",
+      "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
+      "tell": "{name}'s words lift {target}'s heart.",
       "cost": {
         "pool": "inspiring word",
         "amount": 1
@@ -356,7 +371,7 @@
         "condition": "staggered",
         "rounds": 1
       },
-      "tell": "{name}'s touch drags at the target like sleep.",
+      "tell": "{name}'s touch drags at {target} like sleep.",
       "cost": {
         "pool": "gentle rest",
         "amount": 1
@@ -391,10 +406,23 @@
             "target": "cmb",
             "bonus_type": "enhancement",
             "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "skill_mod",
+            "target": "climb",
+            "bonus_type": "enhancement",
+            "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "skill_mod",
+            "target": "swim",
+            "bonus_type": "enhancement",
+            "formula": "max(1, floor(level / 2))"
           }
         ]
       },
-      "tell": "Strength floods into the target at {name}'s touch.",
+      "not_yet": ["Strength checks (not attacks, skills or manoeuvres): no roll reads an ability check yet. Climb and Swim are the Strength skills, and take it."],
+      "tell": "Strength floods into {target} at {name}'s touch.",
       "cost": {
         "pool": "strength surge",
         "amount": 1
@@ -426,11 +454,61 @@
           }
         ]
       },
-      "tell": "A battle fury takes the target at {name}'s touch.",
+      "tell": "A battle fury takes {target} at {name}'s touch.",
       "cost": {
         "pool": "battle rage",
         "amount": 1
       }
+    },
+    {
+      "key": "artificer's touch", "power": "artificer's touch", "name": "Artificer's Touch",
+      "level": 1,
+      "source": "Artifice domain (d20pfsrd, read 2026-10-05): \"you can cause damage to objects and construct creatures by striking them with a melee touch attack. Objects and constructs take 1d6 points of damage +1 for every two cleric levels you possess. This attack bypasses an amount of damage reduction and hardness equal to your cleric level.\" 3 + Wis times a day.",
+      "text": "Melee touch, constructs only: 1d6 + 1 per two levels, passing DR up to your level.",
+      "action": "standard", "cost": {"pool": "artificer's touch", "amount": 1},
+      "affects": "target", "aim": "foe", "harmful": true,
+      "attack": "melee touch", "reach_ft": 5,
+      "only": {"type": ["construct"]},
+      "roll": {"count": 1, "die": 6, "bonus": "floor(level / 2)", "as": "damage",
+               "type": "untyped", "ignores_dr": "level"},
+      "tell": "{name} strikes {target} with a hand that knows how it was made.",
+      "not_yet": ["Objects: a struck object and its hardness have no hit points in the scene yet, so only constructs are touched.",
+                  "Mending at will: the cantrip is the cast door's, not this one."]
+    },
+    {
+      "key": "rebuke death", "power": "rebuke death", "name": "Rebuke Death", "level": 1,
+      "source": "Healing domain: touch a living creature below 0 hit points: heal 1d4 + 1 per two cleric levels; 3 + Wis times a day.",
+      "text": "Touch the dying: heal 1d4 + 1 per two levels.",
+      "action": "standard", "cost": {"pool": "rebuke death", "amount": 1},
+      "affects": "target", "aim": "ally", "reach_ft": 5,
+      "living": true,
+      "target_requires": ["state.down.dying", "state.down.stable"],
+      "target_requires_said": "a creature below 0 hit points",
+      "roll": {"count": 1, "die": 4, "bonus": "floor(level / 2)", "as": "heal"},
+      "tell": "{name} lays a hand on {target} and rebukes death."
+    },
+    {
+      "key": "calming touch", "power": "calming touch", "name": "Calming Touch", "level": 1,
+      "source": "Community domain: touch a creature: it heals 1d6 + your cleric level in nonlethal damage, and is no longer fatigued, shaken or sickened (exhausted creatures are not helped); 3 + Wis times a day.",
+      "text": "Touch: heal 1d6 + your level in non-lethal damage, and lift fatigued, shaken and sickened.",
+      "action": "standard", "cost": {"pool": "calming touch", "amount": 1},
+      "affects": "target", "aim": "self", "reach_ft": 5,
+      "roll": {"count": 1, "die": 6, "bonus": "level", "as": "heal_nonlethal"},
+      "lifts": ["state.impaired.fatigued", "state.fear.shaken", "state.impaired.sickened"],
+      "tell": "{name}'s touch settles {target}."
+    },
+    {
+      "key": "destructive smite", "power": "destructive smite", "name": "Destructive Smite",
+      "level": 1,
+      "source": "Destruction domain: declared before a single melee attack: + half your cleric level (minimum +1) as a morale bonus on its damage; 3 + Wis times a day.",
+      "text": "Your next melee attack this round: + half your level (min +1) morale damage.",
+      "action": "free", "cost": {"pool": "destructive smite", "amount": 1},
+      "aim": "foe",
+      "charge": {"category": "melee", "spent_on": "swing",
+                 "modifiers": [{"type": "combat_mod", "target": "damage",
+                                "bonus_type": "morale",
+                                "formula": "max(1, floor(level / 2))"}]},
+      "tell": "{name} gathers destruction into the next blow."
     }
   ]
 }

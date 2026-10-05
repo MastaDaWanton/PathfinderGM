@@ -128,10 +128,17 @@
       "target": "will",
       "bonus_type": "insight",
       "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "skill_mod",
+      "target": "all",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
      }
     ]
    },
-   "tell": "{name} touches the target, and fate leans their way.",
+   "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
+   "tell": "{name} touches {target}, and fate leans their way.",
    "cost": {
     "pool": "touch of destiny",
     "amount": 1
@@ -270,7 +277,7 @@
     "condition": "shaken",
     "rounds": "max(1, floor(level / 2))"
    },
-   "tell": "{name}'s touch fills the target with dread.",
+   "tell": "{name}'s touch fills {target} with dread.",
    "cost": {
     "pool": "corrupting touch",
     "amount": 1
@@ -294,11 +301,62 @@
     "condition": "shaken",
     "rounds": "max(1, floor(level / 2))"
    },
-   "tell": "{name}'s touch carries the cold of the grave to the target.",
+   "tell": "{name}'s touch carries the cold of the grave to {target}.",
    "cost": {
     "pool": "grave touch",
     "amount": 1
    }
+  },
+  {
+   "key": "breath weapon", "power": "breath weapon", "entry": "draconic",
+   "name": "Breath Weapon", "level": 9,
+   "source": "draconic bloodline (d20pfsrd, read 2026-10-05): \"This breath weapon deals 1d6 points of damage of your energy type per sorcerer level. Those caught in the area of the breath receive a Reflex save for half damage. The DC of this save is equal to 10 + 1/2 your sorcerer level + your Charisma modifier. The shape of the breath weapon depends on your dragon type\" — the catalogue's `breath`, a 30-foot cone or a 60-foot line. Once a day; twice at 17th, three times at 20th.",
+   "text": "Your dragon's $breath of $energy: 1d6 per level, Reflex half.",
+   "action": "standard", "cost": {"pool": "breath weapon", "amount": 1},
+   "affects": "all", "aim": "foe", "harmful": true,
+   "area": "$breath",
+   "roll": {"count": "level", "die": 6, "as": "damage", "type": "$energy"},
+   "save": {"save": "ref", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+   "tell": "{name} breathes $energy at {target}."
+  },
+  {
+   "key": "elemental blast", "power": "elemental blast", "entry": "elemental",
+   "name": "Elemental Blast", "level": 9,
+   "source": "elemental bloodline (CRB, as content/bloodlines/powers.json gives it): a 20-foot-radius burst at range 60 ft, 1d6 points of damage of your energy type per sorcerer level, Reflex half (DC 10 + 1/2 sorcerer level + Cha); creatures that fail their save gain vulnerability to your energy type for a round. Once a day; twice at 17th, three times at 20th.",
+   "text": "A 20-ft burst of $energy within 60 ft: 1d6 per level, Reflex half; a failed save leaves it vulnerable to $energy.",
+   "action": "standard", "cost": {"pool": "elemental blast", "amount": 1},
+   "affects": "all", "aim": "foe", "harmful": true,
+   "area": {"shape": "burst", "ft": 20, "range_ft": 60},
+   "roll": {"count": "level", "die": 6, "as": "damage", "type": "$energy"},
+   "save": {"save": "ref", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+   "effect": {"on": "failed", "vulnerable": "$energy", "rounds": 1},
+   "tell": "A blast of raw $energy bursts around {target}."
+  },
+  {
+   "key": "hellfire", "power": "hellfire", "entry": "infernal",
+   "name": "Hellfire", "level": 9,
+   "source": "infernal bloodline (CRB, as content/bloodlines/powers.json gives it): a 10-foot-radius burst at range 60 ft, 1d6 fire per sorcerer level, Reflex half (DC 10 + 1/2 sorcerer level + Cha); good creatures that fail are shaken for your level in rounds. Once a day; twice at 17th, three times at 20th.",
+   "text": "A 10-ft burst of hellfire within 60 ft: 1d6 fire per level, Reflex half.",
+   "action": "standard", "cost": {"pool": "hellfire", "amount": 1},
+   "affects": "all", "aim": "foe", "harmful": true,
+   "area": {"shape": "burst", "ft": 10, "range_ft": 60},
+   "roll": {"count": "level", "die": 6, "as": "damage", "type": "fire"},
+   "save": {"save": "ref", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+   "tell": "Hellfire erupts around {target}.",
+   "not_yet": ["The shaken rider on a good creature that fails: alignment is not tracked (owner ruling 2026-10-05), and shaking everyone would be a rule the book does not write."]
+  },
+  {
+   "key": "grasp of the dead", "power": "grasp of the dead", "entry": "undead",
+   "name": "Grasp of the Dead", "level": 9,
+   "source": "undead bloodline (CRB, as content/bloodlines/powers.json gives it): skeletal arms in a 20-foot-radius burst at range 60 ft, 1d6 slashing per sorcerer level, Reflex half (DC 10 + 1/2 sorcerer level + Cha); a creature that fails cannot move for 1 round. Once a day; twice at 17th, three times at 20th.",
+   "text": "Skeletal arms in a 20-ft burst within 60 ft: 1d6 slashing per level, Reflex half.",
+   "action": "standard", "cost": {"pool": "grasp of the dead", "amount": 1},
+   "affects": "all", "aim": "foe", "harmful": true,
+   "area": {"shape": "burst", "ft": 20, "range_ft": 60},
+   "roll": {"count": "level", "die": 6, "as": "damage", "type": "slashing"},
+   "save": {"save": "ref", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+   "tell": "Skeletal arms claw up from the ground around {target}.",
+   "not_yet": ["Held in place for a round on a failed save: no condition stops moving alone (states.BLOCKS has no such row yet), so the arms only cut."]
   }
  ]
 }

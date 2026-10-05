@@ -16,6 +16,7 @@
       "aim": "foe",
       "charge": {
         "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
         "save": {"save": "fort", "dc": "10 + floor(level / 2) + wis_mod"},
         "immune_types": ["construct", "ooze", "plant", "undead"],
         "immune_subtypes": ["incorporeal"],
@@ -38,8 +39,7 @@
       },
       "tell": "{name} gathers ki into the next blow.",
       "not_yet": [
-        "The extra use a day for every four levels in classes other than monk: the app's characters have one class.",
-        "A miss spends the use and leaves the charge until the round's end; a second unarmed hit the same round still lands it."
+        "The extra use a day for every four levels in classes other than monk: the app's characters have one class."
       ]
     },
     {
