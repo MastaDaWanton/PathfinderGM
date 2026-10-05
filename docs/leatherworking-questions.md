@@ -535,3 +535,16 @@ catalogue or code, whatever the owner rules above.
     (`rules/leatherworker.py:916`). The conservation dictionary says wax filled the tooled
     hollows to preserve the design; the hardening is done by water and heat on
     vegetable-tanned leather (PA §3.5). So the method's one enforced input is the wrong one.
+
+---
+
+## The owner's answers
+
+### Round 1 (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Q1.1 What it is for | **The hunt made wearable** (recommended). |
+| Q1.2 Armour model | **One armour model**: the forge's body/fastenings/lining and its crafted-item record (recommended). |
+| Q1.3 Who makes the mixed suits | **The owner's own answer: "leatherworking makes the base and the forge uses the base as an item and finishes it."** A leather or hide base (the body) is a finished leatherworker's item that the forge takes as its input and completes (studs, plates, metal fastenings) into studded leather, armoured coat, lamellar and the like. |
+| Q1.4 What it makes | **Armour, shields, worn gear, grips, carried goods** (recommended). |
