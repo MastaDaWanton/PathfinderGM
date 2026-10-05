@@ -48,7 +48,8 @@ The research is `docs/alchemy-prior-art.md`; the owner's questions are
    | haste, fly | 60 gp | 750 gp | 1,750 gp |
 
    A potion of haste costs 1,750 gp of azoth and crystal retort and sells for 60 gp.
-   (Book price formula to be confirmed in the prior-art sweep.)
+   The book price is confirmed against the Core Rulebook's potion rules
+   (`docs/alchemy-prior-art.md` §1.2).
 5. **No discovery is possible on any alchemy material.** All 139 alchemist materials
    resolve through the shared material door (`rules/materials.py:43`), and the knowledge
    module counts properties only in the forge's fields (`weapon`, `armour`, `working`,
@@ -74,7 +75,8 @@ The research is `docs/alchemy-prior-art.md`; the owner's questions are
    potion of invisibility; Alchemist 4 brews haste. PF1e's Brew Potion needs the feat,
    caster level 3 and the spell. Five of the 44 are **personal-range** spells
    (longstrider, expeditious retreat, comprehend languages, see invisibility, false
-   life), which PF1e does not allow as potions (rule text to be confirmed in the sweep).
+   life). PF1e bars them: "Spells with a range of personal cannot be made into potions"
+   (`docs/alchemy-prior-art.md` §1.2).
 10. **The PF1e alchemist character class does not exist in the app.** `content/classes/`
     has 12 classes and no alchemist. No code knows bombs, mutagens or extracts. The spell
     corpus does carry the class's extract list: **408 spells** on the `alchemist` list

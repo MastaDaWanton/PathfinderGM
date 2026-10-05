@@ -27,6 +27,19 @@ Where alchemy might need an exception to one of those, the question says so.
 The book-against-catalogue contradictions found on the way are listed at the end (§11).
 They are facts to fix, not questions, except where fixing one forces a choice.
 
+**Urgent, before any round** (a live defect found during the inventory, not a design
+question):
+- **`basilisk-eye` is the id of both a herb** (`content/ingredients/herbs-and-parts.json`)
+  **and an alchemy gland.** `knowledge.resolve("basilisk-eye")` returns the alchemy
+  document, because materials are asked first (`rules/knowledge.py:214-218`).
+- **The guard is a false claim.** `rules/knowledge.py:17` says the two id spaces are
+  disjoint and that `tests/test_alchemist.py` pins it; the test (`:601-617`) compares
+  material files with each other, never with herbs.
+- **No break in play was found today**, because the herbarium passes the ingredient
+  object, not the id. The first caller that passes the id gets the wrong document.
+- **The fix belongs in whatever lane touches the shelf first:** rename one of the two, and
+  widen the test to herbs (inv §3).
+
 ---
 
 ## Round 1: what alchemy is for
@@ -35,12 +48,12 @@ They are facts to fix, not questions, except where fixing one forces a choice.
 1. **Hands-on craft, then discovery, then a way to be seen, as herbalism and the forge
    (Recommended).** The same three in the same order. Alchemy's own flavour is
    *containment*: volatile things handled well.
-2. **Discovery first.** The bench is mostly an experiment table, as in Potion Craft's
-   fogged map or Skyrim's eating. The minigames shrink and the codex becomes the game.
+2. **Discovery first.** The bench is mostly an experiment table, as in Potion Craft's map
+   or Skyrim's eating (art §3). The minigames shrink and the codex becomes the game.
 3. **Utility first.** Alchemy is mainly a supplier of things the party needs in a fight
    (fire, acid, potions). The bench is quick, and the work happens in play.
 
-**Q1.2 PF1e has three alchemies (inv §6). Which does the world class own?**
+**Q1.2 PF1e has three alchemies (inv §6, art §1.3). Which does the world class own?**
 1. **Craft (alchemy) items and potions; the class features stay a class's business
    (Recommended).** The world class makes alchemist's fire, antitoxin, tanglefoot bags
    and spell potions and oils. Bombs, mutagens and extracts wait for a PF1e alchemist
@@ -56,16 +69,16 @@ no spell and no caster level (inv §0.9).
    spell (Recommended).** This is the same house rule the enchanter already uses
    ("a potion stands in for knowing the spell"), stated once for both. The gates are the
    formula, the level and the rarity.
-2. **The book: Brew Potion needs caster level 3 and the spell.** Non-casters cannot brew
-   potions at all, so the enchanter's stand-in would have no supplier in a party with no
-   caster.
+2. **The book: Brew Potion needs caster level 3 and the spell prepared and spent (art
+   §1.2).** Non-casters cannot brew potions at all, so the enchanter's stand-in would have
+   no supplier in a party with no caster.
 3. **Anyone, but the spell must be in hand.** A scroll, or a caster in the party,
    provides it and is spent. It keeps the book's shape at the cost of a supply chain.
 
 **Q1.4 Where do the book items' numbers come from?**
 1. **The book's numbers win, with house top-ups, as the forge (Recommended).** Alchemist's
-   fire is 1d6 plus 1d6 next round with splash, and antitoxin is +5. Materials and quality
-   adjust them around that base.
+   fire is 1d6 plus 1d6 next round with splash, and antitoxin is +5 (art §1.1, §6.2).
+   Materials and quality adjust them around that base.
 2. **The material sum (today).** The product is whatever its materials add up to.
    Alchemist's fire is 2d6 now, and antitoxin +1 (inv §0.2).
 3. **The book's numbers only.** No top-ups, so materials change nothing on a classic
@@ -88,12 +101,14 @@ no spell and no caster level (inv §0.9).
 **Q2.2 Where do potions end and magic items begin (alchemy and enchanting)?**
 1. **Single-use things that are drunk, thrown or poured on (potions, oils, elixirs,
    bombs) are alchemy's; anything that keeps working (wands, scrolls, rings, weapon
-   properties) is enchanting's (Recommended).** This matches PF2e's line between
-   consumables and permanent items. The enchanter keeps consuming potions as stand-ins.
+   properties) is enchanting's (Recommended).** The enchanter keeps consuming potions as
+   stand-ins, which is why the single-use line suits this app better than PF2e's
+   magical-or-not line (art §6.1).
 2. **The book's line: potions are magic items, made by a caster.** Potions move to
-   enchanting, and alchemy is only mundane alchemical goods.
-3. **By magic: anything that holds a spell is enchanting's.** Oils and potions move;
-   elixirs that are purely alchemical stay.
+   enchanting, and alchemy is only mundane alchemical goods (art §1.2).
+3. **PF2e's line: anything magical is enchanting's** (alchemical items "can't be ...
+   affected by *dispel magic*", art §2.1). Potions and oils move; nonmagical elixirs, bombs
+   and tools stay.
 
 **Q2.3 Who owns poisons?**
 1. **Both crafts, split by route: herbalism the body's own (ingested, on a wound),
@@ -106,7 +121,8 @@ no spell and no caster level (inv §0.9).
 **Q2.4 Transmutation ("potions, transmutation" is the owner's own word).**
 1. **A Transmute method that turns a material into another of the same kind, one band
    rarer, at a cost (two for one, or a catalyst) (Recommended).** WoW's transmutes are
-   the model. Level 3 work, and the way legendary catalysts finally do something.
+   the model, costed in materials rather than the real-time cooldowns WoW walked back
+   (art §3, §6.7). Level 3 work, and the way legendary catalysts finally do something.
 2. **Transmutation as product effects only.** Potions that change the drinker (enlarge,
    gaseous form, barkskin). No material ever becomes another.
 3. **Both.**
@@ -119,9 +135,10 @@ no spell and no caster level (inv §0.9).
 1. **Trim and add, as the forge did (Recommended).**
    - **Keep:** Calcine, Dissolve, Distill, Filter, React, Sublime, Bottle.
      - Distill is free again, because herbalism retired it, and it is alchemy's most
-       iconic operation.
+       iconic operation (art §5).
      - Bottle is Seal renamed: it picks the vessel, and the vessel decides drink, throw
-       or coat.
+       or coat. Minecraft's gunpowder and dragon's breath make delivery form a choice
+       (art §4, §6.6).
    - **Fold in:**
      - Precipitate becomes the solid end of Dissolve or Filter.
      - Stabilize becomes a **stabilizer ingredient**, as Flux became an ingredient of
@@ -138,13 +155,16 @@ no spell and no caster level (inv §0.9).
    - A failed roll by 5 or more on a volatile step applies the mishap the preview
      already promises, to the alchemist, through the effect system.
    - A minigame miss still only lowers quality.
+   - Failure that leaves nothing keeps being removed elsewhere (art §4, §6.5). Here the
+     mishap is the cost of a chosen risk, stated in the preview before the roll.
 2. **Keep it as a DC surcharge only (today, in effect).** The written stakes stay words.
 3. **Drop it.** Alchemy loses the one rule herbalism has no counterpart for.
 
 **Q3.3 Concentration in alchemy.**
 1. **Yes, as herbalism's rule: two make one at ×1.5, uncapped, each step harder
    (Recommended).** Distill concentrates liquids and Sublime solids, so depth is a choice
-   the player makes.
+   the player makes. Minecraft's ban on stacking extend with strengthen is the caution
+   (art §4).
 2. **No concentration.** Strength comes only from materials, quality and perks.
 3. **Concentration only through catalysts.** Rare, legendary-gated depth.
 
@@ -165,24 +185,26 @@ product (inv §0.8).
 1. **Potion, oil, splash flask (bomb), cloud (smoke and powder), tool (sunrod,
    tindertwig, smokestick), and salts and spirits as sellable intermediates
    (Recommended).** Each family decides how the thing is used and which effects it can
-   carry, as herbalism's product rows do.
+   carry, as herbalism's product rows do. PF2e's categories are bombs, elixirs, poisons
+   and tools (art §2.1).
 2. **The same, plus elixirs.** Elixirs are body-only alchemical drinks (PF2e's
-   distinction). They overlap herbalism's tinctures on the body side of the boundary.
+   nonmagical liquids, art §2.1). They overlap herbalism's tinctures on the body side of the boundary.
 3. **Potion and splash flask only.** Smallest scope; the CRB tools stay shop goods.
 
 **Q4.2 How does a spell potion get made?**
 1. **A formula plus reagents that carry the right trait: any reagent with the "lightness"
-   trait serves a potion of fly (Recommended).** Witcher 1's substances are the model, and
-   the formula is learned (Round 5). Today's 30 effectless "key" materials gain a real
-   job.
+   trait serves a potion of fly (Recommended).** The model is Witcher 1 and 2's
+   substances (Witcher 3 dropped them) and Noita's tag-keyed reactions (art §3, §4). The
+   formula is learned (Round 5). Today's 30 effectless "key" materials gain a real job.
 2. **The exact recipe (today).** The exact material set and method sequence, and a
    near-miss makes an ordinary preparation.
 3. **The formula alone.** Any reagents of the right tier, so materials matter only by
    rarity.
 
 **Q4.3 Which spells may be potions?**
-1. **The book's rule: 3rd level or lower, targets a creature, not personal range; the
-   five personal-range potions become oils, elixirs or are retired (Recommended).** The
+1. **The book's rule: 3rd level or lower, targets a creature, not personal range (art
+   §1.2); the five personal-range potions become oils, elixirs or are retired
+   (Recommended).** The
    alchemist extract list (408 spells, 273 of levels 1 to 3, in the corpus) can supply
    more later.
 2. **Keep the 44 as they are.**
@@ -193,7 +215,8 @@ product (inv §0.8).
 costs 1,750 gp of materials; the book price is 750 gp (inv §0.4).
 1. **The book's price for book items (CRB alchemical goods, 50 × spell level × caster
    level for potions), the tier ladder for house products, quality multiplying both, and
-   material prices checked against them (Recommended).**
+   material prices checked against them (Recommended).** Book prices are in art §1.1 and
+   §1.2.
 2. **The tier ladder for everything (today).** Brewing potions keeps losing money.
 3. **Book prices only.** House products would need a price rule written for each.
 
@@ -205,7 +228,8 @@ costs 1,750 gp of materials; the book price is 750 gp (inv §0.4).
 1. **Assay at the bench (a pinch, 10 minutes, the player's roll), revealing one positive
    and one negative trait, plus study, teachers, libraries and manuals as the other crafts
    (Recommended).** Volatile and toxic materials make the assay dangerous for real, as
-   noqual and abysium do at the forge.
+   noqual and abysium do at the forge. PF2e's Identify Alchemy is 10 minutes of testing,
+   and Oblivion reveals more effects as skill rises (art §2.1, §3, §6.4).
 2. **Tasting, as herbalism.** Tasting brimstone or alkahest is either lethal or
    meaningless.
 3. **By brewing only.** Effects show when a product carrying them is made, as in Skyrim's
@@ -215,13 +239,21 @@ costs 1,750 gp of materials; the book price is 750 gp (inv §0.4).
 1. **Both ways: from a formula book (manuals, teachers, buying formulae), or by
    experiment (Recommended).** When an experiment first makes a known-to-the-world
    formula, it is written down (Guild Wars 2's discovery: "this looks like something").
+   Precedents for both routes:
+   - Elden Ring's cookbooks, BG3's notes and DOS2's books;
+   - Outward, Tears of the Kingdom and Ars Magica's lab text, where making it right
+     writes it down (art §2.3, §3, §4).
+
+   The formulae are a fixed table, never secret per world: Minecraft dropped that as "not
+   much fun", and Noita's fell to the data files in a week (art §4).
 2. **Experiment only.** As Skyrim and Potion Craft.
-3. **Books and teachers only.** Nothing is found at the bench.
+3. **Books and teachers only.** Nothing is found at the bench (Elden Ring's model).
 
 **Q5.3 How much does the bench hint during an experiment?**
 1. **A count of the formulae the current mix could still become, never their names
-   (Recommended).** GW2's counter tells you how close you are without spoiling it.
-2. **No hints.** Pure trial and error, the Noita and Skyrim end.
+   (Recommended).** GW2's counter tells you how close you are without spoiling it
+   (`docs/herbalism-prior-art.md` §4).
+2. **No hints.** Pure trial and error, the Noita and Skyrim end (art §3, §4).
 3. **Name the nearest formula.** Fast, and discovery stops being discovery.
 
 **Q5.4 What does a new alchemist already know?**
@@ -256,14 +288,15 @@ unread" until property existed (inv §1); property exists now.
 1. **A field kit anywhere for common and uncommon work; a laboratory (a town one rented
    by the hour, or your own) for rare and above and for Distill and Sublime
    (Recommended).** This is the forge's kit-and-smithy rule. The PF1e alchemist's lab
-   gives +2.
+   gives +2 (art §1.1), and Skyrim brews only at a lab (art §3).
 2. **Anywhere (today).** The fixed tools stay words.
 3. **A laboratory for everything.** No field alchemy.
 
 **Q6.4 What does a quality tier do to a book item?**
 1. **Stronger, longer, softer drawbacks, worth more, as herbalism; for a spell potion,
    each tier above Sound adds +1 caster level to the effect (Recommended).** Book potions
-   already scale by caster level.
+   already scale by caster level, and the price follows it (art §1.2). KCD2's four
+   potion tiers are the game precedent (art §3).
 2. **Herbalism's multipliers only.** Dice and durations scale; caster level stays the
    book minimum.
 3. **Price only.** The item does the book's thing at every tier.
@@ -278,26 +311,34 @@ unread" until property existed (inv §1); property exists now.
    - Product effects are what it puts in the bottle.
    - Working traits are how it behaves at the bench: volatile, toxic to handle,
      corrosive, light-sensitive, slow to dissolve.
-   - The forge's split, applied here.
+   - The forge's split, applied here. The apparatus split in Morrowind and Oblivion
+     (positive, negative, both) and Noita's tags are the game precedents (art §3, §4).
 2. **Three product effects each, no working layer.** Volatility stays the only working
    rule.
 3. **Leave the 75 with no executable effect alone and pass only the rest.**
 
 **Q7.2 How do traits carry from reagent to product (trait inheritance)?**
 1. **The product carries the effects of its inputs up to its family's slots (a potion
-   three, a flask two), and the player picks which (Recommended).** Atelier's model:
-   traits travel through intermediates, so a well-made salt carries its traits into the
-   flask.
-2. **Only the effects every input shares.** Skyrim's model: precise, and the
-   combinations become a puzzle.
+   three, a flask two), and the player picks which (Recommended).** Atelier's model
+   (art §3, §6.3):
+   - traits travel through intermediates, so a well-made salt carries its traits into the
+     flask;
+   - same-named traits add their levels, capped by level;
+   - finished goods are dead ends.
+
+   Physick's two tears in one flask are the same cap (art §4).
+2. **Only the effects every input shares.** Skyrim's and Oblivion's model (art §3):
+   precise, and the combinations become a puzzle.
 3. **Everything sums (today).** Effects stack without limit; alchemist's fire becomes
-   2d6.
+   2d6. Unbounded stacking is on the refuse list (art §7).
 
 **Q7.3 Vessels, solvents, stabilizers and catalysts.**
 1. **Working traits only, as the forge's fuels and fluxes; vessels decide the product
    family (Recommended).**
    - A glass vial is drunk, a clay flask thrown, a bladder bursts.
    - A catalyst is never spent.
+   - Minecraft's gunpowder and dragon's breath are vessel-like delivery modifiers
+     (art §4).
 2. **Give them product effects too.** A salamander-glass flask adds fire resistance to
    the drink.
 3. **Retire them.** The bench assumes a vessel, and 13 vessels leave the shelf.
@@ -316,7 +357,7 @@ unread" until property existed (inv §1); property exists now.
 **Q8.1 Throwing a flask.**
 1. **A real ranged touch attack through the attack op, with 1 splash damage to everyone
    within 5 feet, and a miss lands at a nearby square (Recommended).** PF1e's splash
-   rules. Today the damage lands with no roll (inv §0.3).
+   rules (art §1.1). Today the damage lands with no roll (inv §0.3).
 2. **An attack roll, no splash.** Simpler, half the book.
 3. **As today.** No roll.
 
@@ -330,7 +371,8 @@ unread" until property existed (inv §1); property exists now.
    - glued and entangled (tanglefoot);
    - "against X only" damage (holy, sunmetal).
 
-   They go through the forge's periodic executor and item-scoped riders.
+   They go through the forge's periodic executor and item-scoped riders. PF2e's
+   persistent damage is the shape for "burns again next round" (art §2.1, §6.2).
 2. **Speed and senses only now; the rest later.**
 3. **Leave narrative effects narrated.** Breaks "no narrative effects".
 
@@ -341,7 +383,8 @@ unread" until property existed (inv §1); property exists now.
 3. **Leave them inert.**
 
 **Q8.4 Do alchemical bonuses stack?**
-1. **No, PF1e's rule: alchemical bonuses of one type take the highest (Recommended).**
+1. **No, PF1e's rule: alchemical bonuses of one type take the highest (Recommended, art
+   §1.1).**
    That already holds through `bonus_type`. Antitoxin's +5 then matters, and two +1 jars
    do not make +2.
 2. **They stack** (house rule). Drinking six potions becomes a strategy.
@@ -359,7 +402,8 @@ unread" until property existed (inv §1); property exists now.
 **Q9.2 The stage and its mood.**
 1. **A field kit on the ground (crucible, spirit lamp, a few vials) and a laboratory
    (alembic, athanor, retort), with procedural 3D glassware where the liquid's colour
-   and level are live (Recommended).**
+   and level are live (Recommended).** The apparatus is the real alchemist's: alembic,
+   retort, bain-marie (art §5).
 2. **The laboratory only.** Field work shows as a flat panel.
 3. **Flat UI only.** No 3D.
 
@@ -376,11 +420,14 @@ unread" until property existed (inv §1); property exists now.
    - Bottle: stopper timing.
    - Transmute: the colour stages of the Great Work in order.
 
-   Every gauge is a number and a bar as well as a colour.
+   Every gauge is a number and a bar as well as a colour. The bands come from art §5
+   and §6.6; start generous, as both earlier sweeps found every crafting minigame was
+   softened after launch.
 2. **One shared mechanism with different skins.** Less to build, less to learn, and
    less character.
-3. **Potion Craft's map as the single game.** A big build, and it moves alchemy to
-   discovery first (Q1.1).
+3. **Potion Craft's map as the single game** (art §3). A big build; Potion Craft itself
+   reworked its map and ingredients in Early Access, and it moves alchemy to discovery
+   first (Q1.1).
 
 **Q9.4 How volatile work looks on the stage.**
 1. **A visible reaction gauge (number, bar and colour) that climbs while you work, and a
@@ -409,7 +456,7 @@ unread" until property existed (inv §1); property exists now.
 
 ## 11. Book against catalogue: contradictions found
 
-Facts for the materials pass, from inv §0 and art §1 (rule text cited there):
+Facts for the materials pass, from inv §0 and art §1.1-§1.2 (rule text cited there):
 
 1. **Alchemist's fire.**
    - Book: 1d6 fire, then 1d6 the next round, a ranged touch attack, 1 splash.
@@ -417,15 +464,17 @@ Facts for the materials pass, from inv §0 and art §1 (rule text cited there):
    - Book Craft DC 20 against the bench's 24.
 2. **Antitoxin.** Book +5 alchemical on Fortitude against poison for an hour. Catalogue:
    two +1 alchemical bonuses, which do not stack, so +1.
-3. **Sunrod.** Book: a rod lit for hours. Catalogue chain: a blade coating that deals 1d4
-   fire.
-4. **Smokestick.** Book: thrown or lit for a smoke cloud. Catalogue: drinkable, and the
-   smoke is narration.
+3. **Sunrod.** Book: struck, it lights 30 ft for 6 hours (Craft DC 25). Catalogue chain: a
+   blade coating that deals 1d4 fire.
+4. **Smokestick.** Book: lit, it fills a 10-ft cube with smoke for 1 minute (Craft DC 20).
+   Catalogue: drinkable, and the smoke is narration.
 5. **Liquid ice and itching powder.** The recipe table has no vessel, so both come out as
    blade coatings.
 6. **Antiplague.** The recipe table's chain is refused by its own Filter rule.
-7. **Tanglefoot bag.** Pine pitch's entangle lands unconditionally beside the frog
-   mucus's save (check against the book's glued-in-place rule).
+7. **Tanglefoot bag.** The book: a hit entangles (−2 attack, −4 Dex), and a failed DC 15
+   Reflex save also glues the target to the floor (DC 17 Strength or 15 slashing to break
+   free); Craft DC 25. The catalogue gives two entangles, the pitch's unconditional and
+   the mucus's behind the save, and no glue.
 8. **Potions of personal-range spells.** Longstrider, expeditious retreat, comprehend
    languages, see invisibility and false life cannot be potions by the book.
 9. **Potion prices.** Tier-priced at 6 to 60 gp against the book's 50 × spell level ×
