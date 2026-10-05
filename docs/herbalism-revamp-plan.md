@@ -177,7 +177,9 @@ master with eight Quality perks needs a near-perfect run to reach Flawless +8.
 | Foraging and harvesting | unchanged | As it works today. |
 | Reading an unread herbalism manual | +5, once per manual | See §8.4. |
 
-Keep `REPEAT_LIMIT` (3) and `MISHAP_LIMIT` (2), since they are the anti-grind rule, but key
+**Superseded 2026-10-05 for successes:** the owner ruled "batch of 10 should pay 10", so
+every successful step pays and `REPEAT_LIMIT` no longer caps one (rules/worldclass.py).
+As first planned: keep `REPEAT_LIMIT` (3) and `MISHAP_LIMIT` (2), since they are the anti-grind rule, but key
 them on (method, ingredient) instead of the old recipe id. Drop `TRIVIAL_GAP`: the levels no
 longer climb in rarity bands past level 3, so "beneath you" has no meaning in the endless
 levels.

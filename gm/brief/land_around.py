@@ -26,6 +26,7 @@ SCAFFOLD = (
     "(fact; describe from these, in your own words):",
     "underfoot here:",
     "close by:",
+    "within a walk:",
     "further out:",
     "the wider land,",
     "weather:",
@@ -108,6 +109,19 @@ def section(ctx) -> tuple[str, dict]:
         lines.append(f"    underfoot here: {here.terrain}.")
     if land.near:
         lines.append(f"    close by: {', '.join(land.near)}.")
+    # The hinterland by name, so "the badlands" in the Places row and in the prose are
+    # the same place (2026-10-05). The walk in words, never the miles.
+    if land.reaches:
+        from rules import outskirts
+
+        said = []
+        for r in land.reaches:
+            mins = outskirts.hop_minutes(
+                places.Place(id="x~farmland:@the-fields", terrain="farmland"),
+                places.Place(id=f"x~{r.ground}:@reach", terrain=r.ground, miles=r.miles),
+                "town", 30)
+            said.append(f"{r.name} ({r.ground}, {geography.walk_words(mins)} out)")
+        lines.append(f"    within a walk: {'; '.join(said)}.")
     if land.beyond:
         lines.append(f"    further out: {', '.join(land.beyond)}.")
     wider = [(who, words) for who, words in land.words if geography.ground_in(words)]
@@ -124,7 +138,8 @@ def section(ctx) -> tuple[str, dict]:
         lines.append(f"    not here: {word} (there is none near {location.name}).")
     return "\n".join(lines), {
         "near": list(land.near), "beyond": list(land.beyond),
-        "words": [list(w) for w in wider[:3]], "climate": land.climate,
+        "reaches": [r.name for r in land.reaches],
+        "words":[list(w) for w in wider[:3]], "climate": land.climate,
         "water": land.water, "absent": absent, "lexicon": lexicon(land),
         "underfoot": here.terrain if here is not None
         and places.setting_of(getattr(here, "id", "")) == "outside" else ""}

@@ -199,15 +199,15 @@ def test_a_step_pays_one_plus_rarity_plus_quality(herbalist):
     assert sup["mp"] == 2
 
 
-def test_the_repeat_limit_is_per_method_and_ingredient(herbalist):
-    """The anti-grind rule (`REPEAT_LIMIT` 3) keyed on (method, ingredient), not the old
-    recipe id: a production line of one grind stops paying after three, and the same herb
-    under a new method is new work. Without the key, steps would never repeat at all and
-    the limit would be dead code."""
+def test_every_successful_step_pays(herbalist):
+    """Owner, 2026-10-05: "batch of 10 should pay 10". The repeat limit (3 per method and
+    ingredient) made a production line of one grind pay [3, 3, 3, 0, 0]; every successful
+    step now pays its MP and its quality bonus, and the counter, still keyed on (method,
+    ingredient), keeps counting."""
     p = _at(1)
     paid = [wc.award_step(herbalist, p, method="grind", ingredient_id="comfrey",
                           rarity_rank=1, quality_index=4)["mp"] for _ in range(5)]
-    assert paid == [3, 3, 3, 0, 0]
+    assert paid == [3, 3, 3, 3, 3]
     assert p.crafted["grind:comfrey"] == 5
     assert wc.award_step(herbalist, p, method="brew", ingredient_id="comfrey",
                          rarity_rank=1, quality_index=0)["mp"] == 1

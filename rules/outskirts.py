@@ -34,6 +34,10 @@ never a map.
                        second fork, so nothing offers more than six ways on
   the fields           when the land close by is farmland
   the shore            when the settlement is a port or its own words put it on water
+  the reaches          the hinterland (`geography.Reach`, 2026-10-05): up to four named
+                       stretches of open ground a short walk out ("the ridgelines", "the
+                       badlands"), each on its own ground, at its own miles, off the
+                       fields (or the outskirts where there are none)
 
 Ids are `{loc}~{ground}:@{slug}` (`places.RING`), derived and never stored — the same bargain
 every generated place keeps. The ground in the head is a biome word the world gave, so
@@ -129,7 +133,11 @@ def _joined_to(home: tuple) -> "places_mod.Place | None":
 def _ground_of(land) -> str:
     """The outskirts' own ground: the first near ground that is land, else the coast, else
     the generic open ground `region_set` stands on when the world said nothing."""
-    near = [g for g in land.near if g not in ("coast", "water")]
+    # Not the land it sits in: the region's ground is a reach further out, and the
+    # outskirts kept the ground the roads start on before reaches existed, so a save
+    # standing at `…~grassland:@the-outskirts` still stands somewhere that exists.
+    region = {r.ground for r in getattr(land, "reaches", ()) if r.source != "near"}
+    near = [g for g in land.near if g not in ("coast", "water") and g not in region]
     if near:
         return near[0]
     if land.coast or "coast" in land.near:
@@ -187,9 +195,9 @@ def _ring(world, location, at: str) -> tuple:
 
     made: dict[str, dict] = {}
 
-    def add(pid: str, name: str, about: str, terrain: str, exits=()) -> str:
+    def add(pid: str, name: str, about: str, terrain: str, exits=(), miles=0.0) -> str:
         made[pid] = {"name": name, "about": about, "terrain": terrain,
-                     "exits": list(exits)}
+                     "exits": list(exits), "miles": float(miles)}
         return pid
 
     def link(a: str, b: str) -> None:
@@ -239,12 +247,27 @@ def _ring(world, location, at: str) -> tuple:
     elif heads:
         link(out_id, heads[0])
 
+    fields_id = ""
     if "farmland" in land.near:
-        link(out_id, add(ring_id(sid, "farmland", "the-fields"), FIELDS,
-                         f"what {here_name} grows, and whoever is working it", "farmland"))
+        fields_id = add(ring_id(sid, "farmland", "the-fields"), FIELDS,
+                        f"what {here_name} grows, and whoever is working it", "farmland")
+        link(out_id, fields_id)
     if land.coast or land.water or "coast" in land.near:
         link(out_id, add(ring_id(sid, "coast", "the-shore"), SHORE,
                          "where the land stops and the water starts", "coast"))
+
+    # The hinterland (`geography.Reach`): the named open ground a short walk out, each on
+    # its own ground and as far as the world puts it. Through the fields where there are
+    # fields — the waste and the wood lie past the ploughland, as every village plan from
+    # Domesday to von Thünen draws it — and off the outskirts where there are none.
+    # Measured 2026-10-05: before this, 15 of Aurvantis's 64 settlements offered no
+    # ground outside but farmland and the shore, Vormoor and Scrapden among them.
+    for reach in land.reaches:
+        slug = places_mod._slug(reach.name) or reach.ground
+        about = reach.words or biomes_describe(reach.ground)
+        link(fields_id or out_id,
+             add(ring_id(sid, reach.ground, slug), reach.name, about, reach.ground,
+                 miles=reach.miles))
 
     # The stretch of road a stopped journey left the party on: joined while they stand on
     # it, and hung off its own road head, so walking back is walking to the head.
@@ -262,7 +285,7 @@ def _ring(world, location, at: str) -> tuple:
     return tuple(
         places_mod.Place(id=pid, name=row["name"], about=row["about"],
                          terrain=row["terrain"], exits=tuple(row["exits"]),
-                         origin="generated", parent=sid)
+                         origin="generated", parent=sid, miles=row["miles"])
         for pid, row in made.items())
 
 
@@ -270,6 +293,25 @@ def _canon(word: str) -> str:
     from . import biomes
 
     return biomes.canonical(str(word or "")) or ""
+
+
+def biomes_describe(ground: str) -> str:
+    """A stock caption for a reach the world wrote no clause for: "downs, moor and rough
+    upland"."""
+    from . import biomes
+
+    return biomes.describe(ground).lower()
+
+
+def is_reach(place) -> bool:
+    """Whether this is a reach of the hinterland: a ring place with a distance of its own."""
+    return bool(getattr(place, "miles", 0)) and places_mod.is_ring(getattr(place, "id", ""))
+
+
+def reach_of(ring_places, ground: str):
+    """The reach of the hinterland on this ground, or None: where "I head into the hills"
+    goes when the hills are a short walk out."""
+    return next((p for p in ring_places or () if is_reach(p) and p.terrain == ground), None)
 
 
 def road_for(ring_places, to_id: str):
@@ -296,7 +338,9 @@ def hop_minutes(frm, to, scale: str, speed_ft: int = 30) -> int:
     - to or from the outskirts, a road head, the fields: half a mile at local movement,
       over the road column of the ground walked;
     - into a reach of open ground: three miles at the overland rate (an hour at a walk on
-      good going — the hour `_op_travel` always charged for crossing the wall, now derived).
+      good going — the hour `_op_travel` always charged for crossing the wall, now derived);
+    - to or from a reach of the hinterland (`is_reach`): its own miles at the overland
+      rate, over its ground's road column.
     """
     speed = max(5, int(speed_ft or 30))
     a = places_mod.setting_of(getattr(frm, "id", "") or "")
@@ -305,6 +349,19 @@ def hop_minutes(frm, to, scale: str, speed_ft: int = 30) -> int:
         band = HOP_MINUTES.get(scale or "town", HOP_MINUTES["town"])
         return max(1, round(band * 30 / speed))
     far = to if b == "outside" else frm
+    # A reach of the hinterland is as far out as it lies, walked either way: from the
+    # fields to the badlands and back again both cross the badlands' miles, at the
+    # badlands' pace.
+    # Not a step to somewhere founded in the reach itself ("the cave" off the ridgelines),
+    # which is the half-mile ring hop it always was.
+    reach = max((p for p in (frm, to) if is_reach(p)),
+                key=lambda p: float(getattr(p, "miles", 0) or 0), default=None)
+    other = to if reach is frm else frm
+    if reach is not None and str(getattr(other, "id", "")).startswith(reach.id + "/"):
+        reach = None
+    if reach is not None:
+        mph = speed / 10 * _pace(str(reach.terrain or places_mod.terrain_of(reach.id)))
+        return max(1, round(float(reach.miles) / mph * 60))
     ground = str(getattr(far, "terrain", "") or places_mod.terrain_of(far.id))
     pace = _pace(ground)
     if places_mod.is_ring(far.id):

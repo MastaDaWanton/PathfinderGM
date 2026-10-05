@@ -64,6 +64,14 @@ TRIVIAL_GAP = 2
 # health potions". Diminishing returns alone do not, because they only start at level 3 —
 # at level 1 a factory line of twenty-five teas is still a level. A recipe pays repeat
 # mastery a few times and then it is a thing you know how to do.
+#
+# RETIRED for successes by the owner, 2026-10-05: "batch of 10 should pay 10". A batch of
+# N is N single crafts, and every successful craft pays: ten crafts are ten crafts' work.
+# The limit stood behind the batch and the singles alike, so a batch of 10 paid 3 and so
+# did ten singles; lifting it for batches only would have paid batching more than the
+# same work done by hand. Kept as a name for the history; no award reads it. The mishap
+# limit below stays: failing on purpose with cheap ingredients is still not progress, and
+# the ruling was about work that succeeded.
 REPEAT_LIMIT = 3
 
 # A failed craft teaches something the first time and nothing the fourth, for the same
@@ -423,45 +431,74 @@ def _settle(track: Track, progress: Progress, reasons: list[dict]) -> dict:
             "to_next": _remaining(track, progress)}
 
 
+def _units(n: int, noun: str) -> str:
+    """"1 dose", "5 doses", "3 ingots": every noun a bench passes takes a plain s."""
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
 def award_step(track: Track, progress: Progress, *, method: str, ingredient_id: str,
                rarity_rank: int, quality_index: int, success: bool = True,
-               name: str = "") -> dict:
+               name: str = "", count: int = 1, noun: str = "step") -> dict:
     """Score one bench step (§4.4) and advance the track if it is earned.
 
     A success pays `STEP_MP`, one more per rarity band above common, and a quality bonus
     at Superior and up. Itemised exactly as `award` is, so "Grind, comfrey 1; rare
     material 2; Superior work 1" is a sentence the player can check.
 
-    The anti-grind limits are `award`'s, keyed on (method, ingredient) instead of a recipe
-    id: a step pays `REPEAT_LIMIT` times and a mishap `MISHAP_LIMIT` times, then it is
-    something you know how to do. The quality bonus stops with it, or a stack of Flawless
-    grinds of one cheap root would be unlimited mastery. `TRIVIAL_GAP` is dropped on this
-    path: past level 3 the levels no longer climb in rarity bands, so "beneath you" has no
-    meaning, and at 1-3 the repeat limit already does its job.
+    Every successful step pays, every time (owner, 2026-10-05: "batch of 10 should pay
+    10"; `REPEAT_LIMIT` no longer caps a success). A mishap still pays `MISHAP_LIMIT`
+    times per (method, ingredient) and then teaches nothing more. `TRIVIAL_GAP` is
+    dropped on this path: past level 3 the levels no longer climb in rarity bands, so
+    "beneath you" has no meaning.
+
+    A batch is `count` steps, paid exactly as that many single steps in a row would be
+    (owner, 2026-10-05: "batch crafting does not give equivalent experience"). Measured
+    before this: a batch of 5 Ground Mint paid 1 step MP and five single grinds paid 3;
+    at Herbalist 2 with Superior hands, 2 against 6. The batch also moved the repeat
+    counter by one, so ten doses spent one of the three paid repeats and the next two
+    singles still paid: the batch underpaid *and* walked round the anti-grind rule. Now
+    the per-step MP, the rarity bands and the quality bonus are paid for every step, a
+    failed batch's steps (one roll the whole stack shares, as the owner ruled for the
+    minigame) each take their turn against `MISHAP_LIMIT`, and the counter moves by
+    `count`. So a batch never pays less than the singles and never more: a batch of 10
+    pays what 10 singles pay. (Until the owner's second ruling the same day the repeat
+    limit held both to 3.) Firsts are not steps and stay the caller's, once.
 
     `name` is the ingredient's display name for the line; the id stands in without it.
+    `noun` names one step's unit for a batch's lines ("5 doses: 5", "3 ingots: 3").
     """
     key = f"{method}:{ingredient_id}"
     label = f"{str(method).title()}, {name or str(ingredient_id).replace('-', ' ')}"
+    count = max(1, int(count or 1))
+    # A single step keeps its old lines word for word; a batch says how many it paid for.
+    each = (lambda n: "") if count == 1 else (lambda n: f": {_units(n, noun)}")
     reasons: list[dict] = []
     if not success:
         seen = progress.mishaps.get(key, 0)
-        if seen < MISHAP_LIMIT:
-            reasons.append({"why": f"{label}, a lesson in failure",
-                            "mp": MP_AWARDS["mishap"]})
-        progress.mishaps[key] = seen + 1
+        paid = max(0, min(count, MISHAP_LIMIT - seen))
+        if paid:
+            reasons.append({"why": f"{label}, a lesson in failure{each(paid)}",
+                            "mp": MP_AWARDS["mishap"] * paid})
+        if paid < count:
+            reasons.append({"why": f"{label}: {_units(count - paid, noun)} failed with "
+                                   f"nothing more to teach (a failure teaches "
+                                   f"{MISHAP_LIMIT} times)", "mp": 0})
+        progress.mishaps[key] = seen + count
     else:
         times = progress.crafted.get(key, 0)
-        if times < REPEAT_LIMIT:
-            reasons.append({"why": label, "mp": STEP_MP})
+        paid = count
+        if paid:
+            reasons.append({"why": f"{label}{each(paid)}", "mp": STEP_MP * paid})
             bands = min(len(TIERS) - 1, max(0, int(rarity_rank) - 1))
             if bands:
-                reasons.append({"why": f"{TIERS[bands]} material", "mp": bands})
+                reasons.append({"why": f"{TIERS[bands]} material{each(paid)}",
+                                "mp": bands * paid})
             q = int(quality_index)
             bonus = max((mp for at, mp in QUALITY_MP.items() if q >= at), default=0)
             if bonus:
-                reasons.append({"why": f"{quality_name(q)} work", "mp": bonus})
-        progress.crafted[key] = times + 1
+                reasons.append({"why": f"{quality_name(q)} work{each(paid)}",
+                                "mp": bonus * paid})
+        progress.crafted[key] = times + count
     return _settle(track, progress, reasons)
 
 
@@ -552,7 +589,8 @@ def award(track: Track, progress: Progress, *, recipe_id: str, tier: str,
         times = progress.crafted.get(recipe_id, 0)
         if times == 0:
             reasons.append({"why": "first-time recipe", "mp": MP_AWARDS["first_time"]})
-        elif times < REPEAT_LIMIT:
+        else:
+            # Every repeat pays (owner, 2026-10-05): see `REPEAT_LIMIT`.
             reasons.append({"why": "repeat craft", "mp": MP_AWARDS["repeat"]})
         if risky:
             reasons.append({"why": "risky harvest", "mp": MP_AWARDS["risky_harvest"]})

@@ -772,6 +772,28 @@ def _face(body) -> tuple[int | None, JsonResponse | None]:
     return face, None
 
 
+def _step_units(plan) -> tuple[int, str]:
+    """How many steps a forge batch is for mastery, and what one of them is called.
+
+    The owner, 2026-10-05: "batch crafting does not give equivalent experience". Measured
+    before this: a smelt of 5 iron ingots paid 1 step MP where five single smelts paid 3.
+    A batch of N at Smelt, Alloy, Forge or Strengthen (the bulk rows, plan §4.5) is now N
+    steps through `award_step`, paid exactly as N singles would be (every success pays
+    since the owner's "batch of 10 should pay 10", the same day).
+    The unit is the batch's own (`plan.units`): one per ingot smelted, blank or plate
+    forged and bar strengthened, which is also one unit of the rule's inputs. Every other
+    method works one piece at a time and is 1.
+
+    Alloy is counted in pours, not bars: one pour of a 9:1 bronze makes ten bars from a
+    charge the player sized, and the shares' windows decide how small a pour can be, so a
+    pour is the smallest Alloy there is. Batch repeats the pour.
+    """
+    units = max(1, int(getattr(plan, "units", 1) or 1))
+    if plan.method == "alloy":
+        return units, "pour"
+    return units, plan.noun or "piece"
+
+
 def _mastery(got: dict, progress) -> dict:
     return {"lines": list(got.get("reasons") or []),
             "total": got.get("total", progress.mp),
@@ -857,10 +879,13 @@ def forge_roll(request):
             said = f"Missed by {miss}. The time is lost; the materials are kept."
         out["said"] = said
         lead = plan.lead
+        # The whole batch failed on one roll: that many failed steps (`_step_units`).
+        count, noun = _step_units(plan)
         got = worldclass.award_step(track, progress, method=plan.method,
                                     ingredient_id=lead.id if lead else "",
                                     rarity_rank=plan.rank_in, quality_index=0,
-                                    success=False, name=lead.name if lead else "")
+                                    success=False, name=lead.name if lead else "",
+                                    count=count, noun=noun)
         out["mastery"] = _mastery(got, progress)
         line = (f"{plan.method.title()} at the forge: spoiled (d20 {best}{plan.bonus:+d} = "
                 f"{total} vs DC {plan.dc}). {said}")
@@ -934,10 +959,12 @@ def forge_finish(request):
     lines: list[dict] = []
     levelled: list[int] = []
     lead = plan.lead
+    # A batch pays as its units worked one at a time would (`_step_units`).
+    count, noun = _step_units(plan)
     got = worldclass.award_step(track, progress, method=plan.method,
                                 ingredient_id=lead.id if lead else "",
                                 rarity_rank=plan.rank_in, quality_index=tier, success=True,
-                                name=lead.name if lead else "")
+                                name=lead.name if lead else "", count=count, noun=noun)
     lines += list(got.get("reasons") or [])
     levelled += list(got.get("levelled") or [])
 

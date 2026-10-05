@@ -119,11 +119,18 @@ def test_the_land_around_is_the_world_s_own_words_outside():
     text = _brief(AURVANTIS, s, e, report=report)
     block = _block(text, "THE LAND AROUND VORMOOR")
     assert "    underfoot here: farmland." in block
-    assert "    close by: farmland." in block
+    # Since 2026-10-05 the land Vormoor sits in is close by too, and named (the
+    # hinterland, docs/place-doors.md): the badlands and the ridgelines a walk out.
+    assert "    close by: farmland, desert, hills." in block
+    walk = next(ln for ln in block if ln.startswith("    within a walk: "))
+    assert "the badlands (desert, " in walk and "the ridgelines (hills, " in walk
+    assert not any(ch.isdigit() for ch in walk), walk          # words, never numbers
     assert any("ash-fields, iron-rich badlands, geothermal vents" in ln for ln in block)
     assert any(ln.startswith("    weather: hot, dry") for ln in block)
     facts = report["facts"]["land_around"]
-    assert "ash-fields" in facts["lexicon"] and facts["near"] == ["farmland"]
+    assert "ash-fields" in facts["lexicon"]
+    assert facts["near"] == ["farmland", "desert", "hills"]
+    assert facts["reaches"] == ["the badlands", "the ridgelines"]
 
 
 def test_ground_the_player_names_that_is_not_there_is_said_before_the_plan():

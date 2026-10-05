@@ -120,6 +120,19 @@ def fake_forge_items(calls: list) -> types.ModuleType:
         return {"specs": [], "sum": [], "quality_index": quality_index,
                 "masterwork": quality_index >= 3}
 
+    # Everything else the engine asks of the module answers from the real one. The sheet
+    # asks every carried thing whether it is forged and what its material does to the
+    # bearer (`Actor.carried_effects`, reached from `Scene.advance` on a forge roll), and
+    # without this the fake stood in for the whole module whenever this file ran before
+    # anything imported it: a smelt failed with "no attribute 'record_of'", then
+    # 'material_carried_effects' (test_batch_mastery's smelt test, run alone, 2026-10-05).
+    # Imported here, before the fixture puts the fake in `sys.modules`.
+    import importlib
+
+    real = importlib.import_module("rules.forge_items")
+    real = getattr(real, "_real", real)
+    mod._real = real
+    mod.__getattr__ = lambda name: getattr(real, name)
     mod.build, mod.preview = build, preview
     return mod
 

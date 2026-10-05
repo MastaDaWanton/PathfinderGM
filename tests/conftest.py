@@ -57,7 +57,7 @@ from django.test.signals import setting_changed  # noqa: E402
 # same arrangement `test_packaging.py` uses for the spec's content directories.
 _CACHED = (
     "rules.alchemist", "rules.backgrounds", "rules.bestiary", "rules.blacksmith", "rules.bluff",
-    "rules.classes",
+    "rules.class_abilities", "rules.classes",
     "rules.enchanter", "rules.feats", "rules.gear", "rules.hazards", "rules.ingredients",
     "rules.lives",
     "rules.leatherworker",

@@ -1307,18 +1307,38 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
     # Blood Bender throwing spikes it has never heard of and emits `narrate_only`,
     # which is how fifty-four turns produced one mechanical intent between them.
     pc = scene.pc()
-    if pc is not None and getattr(pc, "paths", None):
-        from rules import leveling
+    if pc is not None:
+        from rules import class_abilities, leveling
 
-        # The one list, shared with the engine's own refusal for an unknown ability.
-        usable = leveling.usable_names(pc)
+        # The one list, shared with the engine's own refusal for an unknown ability —
+        # the path abilities and, since 2026-10-05, the core classes' documents with
+        # what is left to spend. Measured (docs/class-audit.md): this line was guarded
+        # by `paths`, so the narrator of a barbarian was never told rage existed, and
+        # "I rage" could only be narrated, never resolved.
+        usable = [(n, "") for n in (leveling.usable_names(pc)
+                                     if getattr(pc, "paths", None) else [])]
+        for entry in class_abilities.usable(pc):
+            bits = [entry.get("action") or ""]
+            if entry.get("uses") is not None:
+                bits.append(f"{entry['uses']} of {entry['max']} {entry['pool']} left"
+                            + (f", costs {entry['cost']}" if entry.get("cost", 1) != 1
+                               else ""))
+            if entry.get("toggle"):
+                bits.append("ACTIVE — using it again ends it" if entry.get("active")
+                            else "a stance")
+            if entry.get("choices"):
+                bits.append("name one in brackets: " + ", ".join(entry["choices"][:8])
+                            + ("…" if len(entry["choices"]) > 8 else ""))
+            elif entry.get("choice_kind"):
+                bits.append(f"name the {entry['choice_kind']} in brackets")
+            usable.append((entry["name"], "; ".join(b for b in bits if b)))
         if usable:
             lines.append(
                 f"\nWHAT {pc.name.upper()} CAN DO (their own class abilities — when they "
                 f'use one, emit {{"op": "use_ability", "params": {{"ability": "<name>", '
                 f'"to": "<ref>"}}}} and let the engine resolve it):')
-            for name in usable:
-                lines.append(f"  {name}")
+            for name, said in usable:
+                lines.append(f"  {name}" + (f" ({said})" if said else ""))
 
     # And what they can cast, which the brief said NOTHING about until 2026-09-19 — not
     # the spells, not the slots, not even that the character is a caster (item 25). With

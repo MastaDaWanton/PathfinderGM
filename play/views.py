@@ -504,12 +504,22 @@ def _usable_abilities(pc) -> list[dict]:
     because the class prints it somewhere — and a button for one they cannot use is a
     button that exists to be refused.
     """
-    if pc is None or not getattr(pc, "paths", None):
+    if pc is None:
         return []
-    from rules import leveling
+    from rules import class_abilities, leveling
 
     out = []
-    for path in pc.paths:
+    # The core classes' documents (rules/class_abilities.py), with what is left to spend.
+    # Measured 2026-10-05 (docs/class-audit.md): this bar returned [] for every class
+    # without paths, so a barbarian's rage, a paladin's smite and a cleric's channel had
+    # no button anywhere. Each entry says its action (the panel's free/swift/standard
+    # menus read it), its uses left and the most there can be, whether a stance holds,
+    # and what may go in its brackets.
+    classes_name = (pc.char_class or "").title()
+    for entry in class_abilities.usable(pc):
+        out.append({**entry, "path": classes_name if entry.get("class") != "domain"
+                    else "domain power", "tier": None})
+    for path in getattr(pc, "paths", None) or ():
         det = leveling.path_detail(pc.char_class or "", path)
         reached = leveling.control_blood_for(pc, path)
         passives = {str(n).lower() for n in (det.get("passive") or [])}
@@ -799,7 +809,12 @@ def resurrect(request):
     # points are restored AFTER it rather than before: an effect holding up the
     # maximum can expire inside those weeks, and setting hp first left a character
     # above a maximum that had since fallen.
-    c.scene.advance(days * 24 * 60)
+    # `charge_body=False` since the clock's door rolls the body's checks (2026-10-05,
+    # rules/survival.py `charge`): `dead` is already lifted above, so the weeks on the
+    # slab were charged to a living body — three weeks without water, rolled hour by
+    # hour, and the character died of thirst inside their own resurrection
+    # (tests/test_roster.py measured it). The weeks are the world's, not the body's.
+    c.scene.advance(days * 24 * 60, charge_body=False)
     pc.hp = pc.hp_max
     pc.add_condition("life debt", source=patron)
 
@@ -5240,6 +5255,12 @@ def _stall_of(c, counter=None) -> tuple[str, str, int]:
     return here[0], stall, here[2]
 
 
+def _craft_material(item) -> bool:
+    from rules import market
+
+    return str(getattr(item, "kind", "")) == "material" or market.is_craft_material(item)
+
+
 def _row(item, price: float, count: int = 1) -> dict:
     from rules import gear as gear_mod
     from rules import pricing
@@ -5253,6 +5274,9 @@ def _row(item, price: float, count: int = 1) -> dict:
             # suit of armour and a horse are all things the engine runs (I2).
             "does_something": bool(getattr(item, "specs", None))
             or str(getattr(item, "kind", "")) in ("weapon", "armour", "shield", "mount")
+            # A craft's material is worked at a bench — charcoal feeds the forge — and
+            # the panel had labelled it "for show, no effect in play" (live, 2026-10-05).
+            or _craft_material(item)
             # A bedroll, a tent, rations: what they do is their gear row's (2026-10-01).
             or bool(gear_mod.row_for(getattr(item, "base", "")
                                      or getattr(item, "name", ""))[1]),
@@ -5286,6 +5310,10 @@ def _shelf_of(item) -> str:
     name = str(getattr(item, "name", "") or "")
     if kind in ("mount", "tack"):
         return "animals"
+    if kind == "material":
+        # A craft's staple consumable (`market.consumable_goods`): charcoal is what a
+        # workshop works with, filed beside the drawn materials, not among the rope.
+        return "materials"
     if kind == "weapon" or getattr(item, "weapon", None):
         return "weapons"
     if kind in ("armour", "shield") or getattr(item, "armour", None):

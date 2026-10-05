@@ -102,28 +102,41 @@ def test_a_material_with_no_rarity_is_shelved_as_common(priced):
     assert market.tier_of(Untiered()) == "common"
 
 
-def test_a_stall_that_sold_out_says_so_rather_than_offering_nothing(client):
-    """The refusal has to name the reason. An empty `within` used to come back as
-    "There is nothing of that kind to be had here", which is what an empty *field*
-    says and reads as a bug in a market."""
+def test_a_stall_whose_draw_sold_out_still_has_the_consumables(client):
+    """Sold out of everything drawn today, the smith's errand still comes back with fuel,
+    flux or quench: the consumables are staples, never sold out (2026-10-05, the owner:
+    "the most important thing for places like the smithy to sell are items to use as fuel
+    for the furnace"). Before, a sold-out draw left the smith with nothing to burn until
+    tomorrow. The old refusal ("The stall is bare … come back tomorrow") still stands in
+    the view for a craft with no consumables; every craft with a buy errand has some."""
     c = cm.current()
     pc = c.scene.pc()
     pc.purse = {"gp": 5000}
+    stand_on(c.scene, "urban")          # in the streets, where the errand can be run
+    c.scene.clock_minutes = 0
     day = market.day_of(c.scene.clock_minutes)
     place = str(c.scene.location_id or c.biome or "nowhere")
     priced_here = [m for m in benches.obtainable("blacksmith", "bought",
                                                  biome=c.biome or None)
                    if getattr(m, "price_gp", None)]
-    shelf = market.stock(priced_here, place=place, stall="blacksmith:buy", day=day)
-    for m in shelf:
+    # Every priced thing marked sold, not one drawn shelf of them: the errand draws from
+    # the pool less its staples, so a shelf drawn here from the whole pool is a different
+    # roll of the same dice.
+    for m in priced_here:
         market.mark_sold(c.scene.market_taken, m.id, place, "blacksmith:buy", day)
     c.save()
 
-    r = client.post("/api/craft/excursion",
-                    data=json.dumps({"action": "blacksmith:buy"}),
-                    content_type="application/json")
-    assert r.status_code == 409
-    assert "bare" in r.json()["error"] or "tomorrow" in r.json()["error"]
+    staples = {m.id for m in market.consumables_of(("blacksmith",))}
+    assert {"charcoal", "coal", "quenching-oil"} <= staples
+    found: set[str] = set()
+    for _ in range(4):
+        r = client.post("/api/craft/excursion",
+                        data=json.dumps({"action": "blacksmith:buy", "hours": 1}),
+                        content_type="application/json")
+        assert r.status_code == 200, r.content[:200]
+        found |= {h["id"] for h in r.json()["found"]}
+    assert found, "four errands and nothing bought"
+    assert found <= staples, f"sold-out draw still sold {sorted(found - staples)}"
 
 
 def test_buying_takes_it_off_the_shelf_for_the_rest_of_the_day(client):
@@ -134,6 +147,7 @@ def test_buying_takes_it_off_the_shelf_for_the_rest_of_the_day(client):
     c.scene.clock_minutes = 0
     c.save()
     bought: set[str] = set()
+    staples = {m.id for m in market.consumables_of(("blacksmith",))}
     # One hour a run, so the twelve runs stay inside one day. Written with 12-hour runs
     # first, this failed on "Bismuth was sold twice" — two of those is twenty-four hours,
     # the day turns over and the shelf is *supposed* to reroll. The bug was in the test.
@@ -144,6 +158,8 @@ def test_buying_takes_it_off_the_shelf_for_the_rest_of_the_day(client):
         if r.status_code != 200:
             break
         for h in r.json()["found"]:
+            if h["id"] in staples:
+                continue        # the charcoal is never sold out (2026-10-05)
             assert h["id"] not in bought, f"{h['name']} was sold twice in one day"
             bought.add(h["id"])
     assert market.day_of(cm.current().scene.clock_minutes) == 0, "the day turned over"
@@ -160,16 +176,22 @@ def test_a_new_day_restocks_the_stall(client):
     priced_here = [m for m in benches.obtainable("blacksmith", "bought",
                                                  biome=c.biome or None)
                    if getattr(m, "price_gp", None)]
-    for m in market.stock(priced_here, place=place, stall="blacksmith:buy", day=day):
+    for m in priced_here:
         market.mark_sold(c.scene.market_taken, m.id, place, "blacksmith:buy", day)
     c.save()
-    assert client.post("/api/craft/excursion",
-                       data=json.dumps({"action": "blacksmith:buy"}),
-                       content_type="application/json").status_code == 409
+    staples = {m.id for m in market.consumables_of(("blacksmith",))}
+    drawn = [m for m in priced_here if m.id not in staples]
+    # Sold out today: nothing drawn is left, only the staples (2026-10-05).
+    today = market.stock(drawn, place=place, stall="blacksmith:buy", day=day)
+    assert not market.remaining(today, cm.current().scene.market_taken, place,
+                                "blacksmith:buy", day)
 
     c = cm.current()
     c.scene.clock_minutes = 24 * 60          # sleep on it
     c.save()
+    tomorrow = market.stock(drawn, place=place, stall="blacksmith:buy", day=day + 1)
+    assert len(market.remaining(tomorrow, c.scene.market_taken, place, "blacksmith:buy",
+                                day + 1)) == len(tomorrow) > 0
     r = client.post("/api/craft/excursion",
                     data=json.dumps({"action": "blacksmith:buy"}),
                     content_type="application/json")

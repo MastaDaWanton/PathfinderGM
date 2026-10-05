@@ -197,6 +197,12 @@ def everything_priced() -> list:
             price = getattr(m, "price_gp", None)
             if mid and mid not in seen and price:
                 seen[mid] = m
+    # The staple consumables are sold too, and some of them are dug or gathered rather
+    # than `obtain: bought` — coal, oak bark, curing salt — so the benches' "bought"
+    # lists do not reach them. Every name a counter sells is a name the narrator and the
+    # watcher must know.
+    for m in consumables_of(tuple((_consumables_block().get("kinds") or {}))):
+        seen.setdefault(str(getattr(m, "id", "")), m)
     _POOL = list(seen.values())
     return _POOL
 
@@ -250,7 +256,12 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
         tracks = draw_of(kind)
         if not tracks:
             return staples
-        affordable = [m for m in priced_from(tracks) if pricing.worth(m) <= till]
+        # A consumable that is a staple here is not drawn as well: it would sit on the
+        # counter twice, and spend one of the quota's slots on a thing that is always
+        # there anyway.
+        held = {str(getattr(g, "id", "")) for g in staples}
+        affordable = [m for m in priced_from(tracks)
+                      if pricing.worth(m) <= till and str(getattr(m, "id", "")) not in held]
         shelf = stock(affordable, place=place, stall=stall, day=day)
         return staples + remaining(shelf, taken or {}, place, stall, day)
 
@@ -265,7 +276,12 @@ def on_sale(place: str, stall: str, day: int, taken: dict | None = None,
         staples = [g for g in goods_mod.goods_at(counter_kind) if pricing.worth(g) <= till]
         if str(counter_kind).lower().removeprefix("the ") in _GOODS_ONLY:
             return staples
-    affordable = [m for m in everything_priced() if pricing.worth(m) <= till]
+    # A place that names its benches (the smithy, the tannery) draws from them alone; any
+    # other counter keeps the general draw.
+    tracks = place_draw(counter_kind)
+    held = {str(getattr(g, "id", "")) for g in staples}
+    affordable = [m for m in (priced_from(tracks) if tracks else everything_priced())
+                  if pricing.worth(m) <= till and str(getattr(m, "id", "")) not in held]
     shelf = stock(affordable, place=place, stall=stall, day=day)
     return staples + remaining(shelf, taken or {}, place, stall, day)
 
@@ -316,7 +332,8 @@ STABLES_KIND = "stables"
 
 
 def lines_doc() -> dict:
-    """`content/rules/stall-lines.json`, read once."""
+    """`content/rules/stall-lines.json`, read once, and refused with the fix named when its
+    consumables block does not account for the catalogues (`consumable_problems`)."""
     global _LINES
     if _LINES is None:
         import json
@@ -325,7 +342,12 @@ def lines_doc() -> dict:
         from django.conf import settings
 
         path = Path(settings.BASE_DIR) / "content" / "rules" / "stall-lines.json"
-        _LINES = json.loads(path.read_text(encoding="utf-8"))
+        doc = json.loads(path.read_text(encoding="utf-8"))
+        problems = consumable_problems(doc)
+        if problems:
+            raise ValueError("content/rules/stall-lines.json is refused: "
+                             + " ".join(problems))
+        _LINES = doc
     return _LINES
 
 
@@ -514,6 +536,7 @@ def staples_of(kind: str) -> list:
         shop = next((s for s in _shops() if s.get("id") == ids[0]), {})
         for table in shop.get("tables") or ():
             out.extend(goods_mod.table_goods(str(table)))
+    out.extend(consumable_goods(consumables_at(kind)))
     return out
 
 
@@ -551,6 +574,231 @@ def priced_from(tracks) -> list:
                     seen[mid] = m
         _POOLS[key] = list(seen.values())
     return _POOLS[key]
+
+
+# --- what the crafts burn: consumables, always on the counter --------------------------------
+#
+# The owner, 2026-10-05: "the most important thing for places like the smithy to sell are
+# items to use as fuel for the furnace and other things consumed in crafting like water
+# vinegar and alcohol". Before this a consumable reached a counter only through the daily
+# draw, competing with every other common material of its bench for thirty slots: over 60
+# days at a smithy's counter seeded on Panthcove, charcoal was on the shelf 30 days and
+# quenching oil 29, the smithy sold silver ink and glass vials besides (its draw was every bench's), the
+# alchemist sold charcoal, and the tannery had curing salt and oak bark on 0 days of 60 —
+# both unpriced, so on no counter anywhere. A smith who could not buy fuel could not work.
+#
+# The traditions agree on the shape (content/rules/stall-lines.json, `consumables`):
+# Skyrim's blacksmith chest always holds iron ingots and leather strips and only the rest
+# is drawn; Stardew's Clint always sells coal and Pierre vinegar and oil, with randomness
+# confined to the travelling cart; the Core Rulebook rolls its 75% for magic items and
+# calls nonmagical goods "generally available". Potion Craft, whose traders' basics are
+# random, is the measured counter-example — threads of players stuck for weeks without a
+# basic ingredient.
+#
+# So the consumables are STAPLES: chosen by `kind` from the catalogues, never by name,
+# common tier only, at the material's own price, never sold out, and out of the draw so
+# the quota keeps all thirty slots for the things a shelf should be surprising about.
+_CATALOGUE_ROWS: dict[str, list[dict]] | None = None
+
+
+def _consumables_block(doc: dict | None = None) -> dict:
+    return dict(((doc if doc is not None else lines_doc()).get("consumables")) or {})
+
+
+def _catalogue_rows(craft: str) -> list[dict]:
+    """The raw rows of one craft's shipped catalogue, `content/materials/<craft>-materials.json`.
+
+    Raw rows rather than the bench's `Material`, because the question is what the document
+    SAYS — its `kind`, its `tier`, its `price_gp` — and a loader that drops a field it has
+    no slot for would answer it wrong. The bench's own object is fetched afterwards."""
+    global _CATALOGUE_ROWS
+    if _CATALOGUE_ROWS is None:
+        _CATALOGUE_ROWS = {}
+    if craft not in _CATALOGUE_ROWS:
+        import json
+        from pathlib import Path
+
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "materials" / f"{craft}-materials.json"
+        try:
+            rows = json.loads(path.read_text(encoding="utf-8")).get("materials") or []
+        except (OSError, ValueError):
+            rows = []
+        _CATALOGUE_ROWS[craft] = [r for r in rows if isinstance(r, dict) and r.get("id")]
+    return _CATALOGUE_ROWS[craft]
+
+
+def _row_price(row: dict):
+    """A row's authored price, in either of the two shapes the shared shelf writes it
+    (flat `price_gp`, or nested under `obtain`), or None."""
+    nested = row.get("obtain") if isinstance(row.get("obtain"), dict) else {}
+    price = row.get("price_gp", nested.get("price_gp"))
+    try:
+        return float(price) if price not in (None, "") and float(price) > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def consumable_kinds(craft: str) -> frozenset:
+    """The `kind`s one craft's working consumes, as the document files them."""
+    return frozenset((_consumables_block().get("kinds") or {}).get(craft) or ())
+
+
+def consumable_problems(doc: dict) -> list[str]:
+    """Everything wrong with the consumables block, each with its fix named; [] when sound.
+
+    Run on load (`lines_doc`): a kind nobody filed, a common consumable with no price, or
+    a craft no market counter sells would each put a consumable on no counter anywhere,
+    silently — the 0-of-60 curing salt was exactly that. Shipped catalogues only: a
+    homebrew row has no craft of its own to be filed under."""
+    block = _consumables_block(doc)
+    kinds = block.get("kinds") or {}
+    made = block.get("made_from") or {}
+    tiers = set(block.get("tiers") or ())
+    out: list[str] = []
+    if not kinds:
+        return ["It has no consumables.kinds: name the kinds each craft's working uses up."]
+    for craft in sorted(set(kinds) | set(made)):
+        rows = _catalogue_rows(craft)
+        if not rows:
+            out.append(f"consumables names {craft!r}, which has no "
+                       f"content/materials/{craft}-materials.json: fix the craft's name.")
+            continue
+        used = set(kinds.get(craft) or ())
+        other = set(made.get(craft) or ())
+        both = used & other
+        if both:
+            out.append(f"{craft} files {sorted(both)} as both consumed and made_from: "
+                       f"choose one.")
+        present = {str(r.get("kind") or "") for r in rows}
+        for k in sorted(present - used - other):
+            out.append(f"{craft}-materials.json uses kind {k!r}, filed under neither "
+                       f"consumables.kinds.{craft} nor consumables.made_from.{craft}: "
+                       f"add it to one.")
+        for k in sorted((used | other) - present):
+            out.append(f"consumables files {craft} kind {k!r}, which no row of "
+                       f"{craft}-materials.json has: remove it or fix the spelling.")
+        for r in rows:
+            kind = str(r.get("kind") or "")
+            if r.get("consumed") and kind not in used:
+                out.append(f"{r['id']} says consumed: true but its kind {kind!r} is not in "
+                           f"consumables.kinds.{craft}: file the kind as consumed.")
+            if kind in used and str(r.get("tier") or "common").lower() in tiers \
+                    and _row_price(r) is None:
+                out.append(f"{r['id']} is a {r.get('tier') or 'common'} {kind}, a staple, "
+                           f"and has no price_gp: give it one in {craft}-materials.json.")
+    sold = set()
+    for row in list(doc.get("shops") or []) + list(doc.get("stalls") or []):
+        sold |= set(row.get("consumables") or ())
+    for craft in sorted(set(kinds) - sold):
+        out.append(f"No shop or stall line sells {craft}'s consumables: add {craft!r} to "
+                   f"some counter's `consumables`.")
+    named = set(sold)
+    for place, row in (block.get("places") or {}).items():
+        named |= set((row or {}).get("consumables") or ())
+    for craft in sorted(named - set(kinds)):
+        out.append(f"A counter sells {craft!r} consumables, a craft consumables.kinds does "
+                   f"not file: add it there or fix the spelling.")
+    return out
+
+
+def consumables_at(kind: str) -> tuple[str, ...]:
+    """The crafts whose consumables this counter always carries: a market counter's from
+    its shop or its stall lines, a place's (the smithy, the tannery) from `places`."""
+    sort, ids = _parts(kind)
+    if sort == "shop":
+        rows = [next((s for s in _shops() if s.get("id") == ids[0]), {})]
+    elif sort == "stall":
+        rows = [_line(x) for x in ids]
+    elif sort == "":
+        place = str(kind or "").lower().removeprefix("the ")
+        rows = [(_consumables_block().get("places") or {}).get(place) or {}]
+    else:
+        rows = []
+    out: list[str] = []
+    for row in rows:
+        for craft in row.get("consumables") or ():
+            if craft not in out:
+                out.append(str(craft))
+    return tuple(out)
+
+
+def place_draw(kind: str) -> tuple[str, ...]:
+    """The benches a settlement place's counter draws its daily shelf from, or () for the
+    general draw. The smithy drew from every bench, and sold silver ink and glass vials."""
+    place = str(kind or "").lower().removeprefix("the ")
+    row = (_consumables_block().get("places") or {}).get(place) or {}
+    return tuple(str(t) for t in row.get("draw") or ())
+
+
+_CONSUMABLES: dict[tuple, list] | None = None
+
+
+def consumables_of(crafts) -> list:
+    """Every staple consumable of these crafts, as the bench's own `Material`s — what the
+    forge's "Buy from the market" puts on its shelf, and what `consumable_goods` wraps for
+    a counter. One answer for both, so the excursion and the trade panel cannot disagree
+    about whether the collier has charcoal."""
+    global _CONSUMABLES
+    if _CONSUMABLES is None:
+        _CONSUMABLES = {}
+    key = tuple(sorted(set(crafts or ())))
+    if key not in _CONSUMABLES:
+        from . import benches
+
+        tiers = {str(t).lower() for t in (_consumables_block().get("tiers") or ())}
+        seen: dict[str, object] = {}
+        for craft in key:
+            kinds = consumable_kinds(craft)
+            try:
+                known = benches.module_for(craft).materials()
+            except Exception:
+                known = {}
+            for row in _catalogue_rows(craft):
+                mid = str(row["id"])
+                if mid in seen or str(row.get("kind") or "") not in kinds:
+                    continue
+                if str(row.get("tier") or "common").lower() not in tiers:
+                    continue
+                m = known.get(mid)
+                if m is None or _row_price(row) is None:
+                    continue
+                seen[mid] = m
+        _CONSUMABLES[key] = sorted(seen.values(), key=lambda m: str(getattr(m, "name", "")))
+    return _CONSUMABLES[key]
+
+
+def consumable_goods(crafts) -> list:
+    """`consumables_of` as goods on a counter: a staple (never sold out, `mark_sold`
+    skipped), filed `kind="material"` so `goods.deliver` puts it in the satchel the
+    benches read — the bare material id, the same key the excursion carries — and the
+    trade window files it under materials."""
+    from . import goods as goods_mod
+
+    out = []
+    for m in consumables_of(crafts):
+        mid = str(getattr(m, "id", ""))
+        out.append(goods_mod.Good(
+            id=mid, name=str(getattr(m, "name", mid)),
+            price_gp=float(getattr(m, "price_gp", 0) or 0) or goods_mod.FREE_AT_A_COUNTER_GP,
+            tier=str(getattr(m, "tier", "common") or "common"), kind="material", key=mid))
+    return out
+
+
+def is_craft_material(item) -> bool:
+    """Whether a thing off a shelf is one of the four crafts' materials — what a bench
+    works from, which belongs in the satchel — rather than gear or a magic item. Read
+    off the shipped catalogues, the ones `consumable_problems` holds to account."""
+    global _CRAFT_IDS
+    if _CRAFT_IDS is None:
+        block = _consumables_block()
+        crafts = set(block.get("kinds") or {}) | set(block.get("made_from") or {})
+        _CRAFT_IDS = frozenset(str(r["id"]) for c in crafts for r in _catalogue_rows(c))
+    return str(getattr(item, "id", "") or "") in _CRAFT_IDS
+
+
+_CRAFT_IDS: frozenset | None = None
 
 
 def till_tier(kind: str, tier: str = DEFAULT_STALL_TIER) -> str:

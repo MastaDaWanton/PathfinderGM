@@ -473,6 +473,14 @@ class Scene:
     # round tick, so stabilisation rolls come from the same seeded stream as
     # everything else and a scene stays reproducible.
     _dice: Any = None
+    # What the body's hours did since somebody last told the player (`advance` writes,
+    # `take_body_said` empties): the checks the clock's door rolled, waiting to become an
+    # outcome at the end of the batch (`Engine._body_settles`) or a line on the knockout
+    # path (play/downed.py). Not saved — the save is a hand-written field list in
+    # play/campaign.py, and an untold toll lost to a restart leaves its conditions and
+    # damage on the sheet, where the panel still shows them. Inside `snapshot`, so a
+    # refused turn takes back its tells with its dice.
+    _body_said: list = field(default_factory=list)
 
     def snapshot(self) -> dict:
         """Everything the scene is, deep-copied, so a refused turn can be undone.
@@ -1026,17 +1034,70 @@ class Scene:
                     # directly and cleared the pool beside it, so a stance ending
                     # because its upkeep ran dry was two silent mutations — the exact
                     # shape law 2 forbids, in the function that enforces upkeep.
+                    before = actor.hp_max
                     actor.remove_effects(name=e.name or e.key, source=e.source)
                     if e.source:
                         actor.clear_temp_hp(source=e.source)
+                    # A rage's +4 Constitution leaves with it, and the hit points it
+                    # lent go too (CRB p.31) — the same rule `tick_effects` follows.
+                    actor._follow_con(before)
                     out.append({"kind": "upkeep_failed", "ref": actor.ref,
                                 "what": e.name or e.key, "pool": str(pool)})
+                    out.extend(self.stance_ended(actor, e)[0])
         # The other periodic work — fast healing, a burn that keeps burning — is the
         # sheet's executor (`Actor.run_periodic`), fired here once per played round. Its
         # records are `heal` / `damage` in the shape `_ward_tell` says, so the round's
         # narration carries them like a cloud's fire.
         out.extend(actor.run_periodic("round", 1, self._dice))
         return out
+
+    def stance_ended(self, actor: "Actor", e: "ActiveEffect") -> tuple[list[dict], list[str]]:
+        """What a document's stance leaves when it ends, however it ended — dismissed,
+        or run dry by its upkeep. Two things, both declared in its payload:
+
+        - `linked`: everyone else holding a piece of it (a bard's inspired allies, a
+          dirge's shaken foes). Their pieces go with it, through the applicator.
+        - `after`: what the end itself does to the user — rage's fatigue, "2 times the
+          number of rounds spent in the rage" (CRB p.31), counted as the pool spent
+          since it began, and none from the level `until_level` names (tireless rage).
+
+        Returns (records, sentences); the records are the round tick's shape, so a rage
+        that runs dry between turns is told by `_ward_tell` like any other expiry.
+        """
+        payload = e.payload if isinstance(e.payload, dict) else {}
+        records: list[dict] = []
+        said: list[str] = []
+        source = str(payload.get("linked_source") or "")
+        for ref in payload.get("linked") or ():
+            other = self.people.get(ref) or self.actors.get(ref)
+            if other is None:
+                continue
+            before = other.hp_max
+            gone = other.remove_effects(
+                match=lambda x: x.origin == e.origin and (not source or x.source == source))
+            if source:
+                other.clear_temp_hp(source=source)
+            other._follow_con(before)
+            for g in gone:
+                records.append({"kind": "effect_ended", "ref": other.ref,
+                                "what": g.name or g.key, "origin": e.origin})
+                said.append(f"{g.name or g.key} leaves {other.name}.")
+        after = payload.get("after") or {}
+        until = int(after.get("until_level", 0) or 0)
+        if after.get("condition") and not actor.is_dead and not (
+                until and int(getattr(actor, "level", 1) or 1) >= until):
+            pool = actor.pool(str(payload.get("pool") or ""))
+            start = payload.get("pool_start")
+            spent = max(1, int(start) - (pool.current if pool else 0)) \
+                if start is not None else 1
+            rounds = int(after.get("rounds_per_spent", 1) or 1) * spent
+            cond = str(after["condition"])
+            actor.add_condition(cond, rounds, source=f"the end of {e.name}", origin=e.origin)
+            records.append({"kind": "condition", "ref": actor.ref, "condition": cond,
+                            "rounds": rounds, "from": f"the end of {e.name}",
+                            "origin": e.origin})
+            said.append(f"{actor.name} is {cond} for {rounds} rounds.")
+        return records, said
 
     # --- things standing in the scene ------------------------------------------------
 
@@ -1135,8 +1196,10 @@ class Scene:
         # in ten-minute steps, and flooring each step would never heal anybody.
         hours = (int(self.clock_minutes) + minutes) // 60 - int(self.clock_minutes) // 60
         days = (int(self.clock_minutes) + minutes) // 1440 - int(self.clock_minutes) // 1440
+        started = int(self.clock_minutes)
         self.clock_minutes += minutes
         ended: list[str] = []
+        body: list[dict] = []
         # Everyone the campaign holds: an eight-hour rest expires the buff on the
         # merchant in the next room and advances his hunger, exactly as it does here.
         for a in self.people.values():
@@ -1147,15 +1210,27 @@ class Scene:
             # panel still reported full grace. That is the failure survival.py is named
             # after, arriving by a different route.
             #
-            # The COUNTERS move here and the CHECKS do not. pass_hours rolls dice, can
-            # knock a character unconscious and returns fewer hours than it was asked
-            # for, none of which can live inside a function whose caller has already
-            # decided how far the clock goes. Counters that are right beat counters
-            # that are wrong, and the panel shows the danger either way.
+            # And the CHECKS roll here too, for the player (2026-10-05). This used to
+            # move the counters only, on the argument that a check can knock somebody
+            # out and stop the stretch short, which cannot live inside a function whose
+            # caller already chose how far the clock goes. The cost of that argument was
+            # the owner's Sammy: 121 hours without sleep, food or water in ordinary
+            # play — waiting, walking, the benches — and not one check, so nothing ever
+            # made them collapse and the panel's DC ran to 274. The argument was right
+            # about the stretch and wrong about the conclusion: the stretch is not cut,
+            # the body's hours are walked inside it (`survival.charge`), a collapse is
+            # an hour IN it — the rest of it spent asleep or out cold — and the toll is
+            # told (`take_body_said`). Only the player rolls: nothing feeds, waters or
+            # beds anybody else (see `charge`).
+            rolls = bool(charge_body and minutes and a.is_pc and self._dice is not None)
             if charge_body and minutes:
-                a.awake_minutes += minutes
-                a.fed_minutes += minutes
-                a.watered_minutes += minutes
+                toll = survival.charge(a, minutes, self._dice, biome=self.biome,
+                                       clock=started if rolls else None, roll=rolls)
+                if toll.happened:
+                    record = {"ref": a.ref, "kind": "body", **toll.as_dict(),
+                              "said": survival.said(a, toll)}
+                    body.append(record)
+                    self._body_said.append(record)
             ended.extend(f"{a.name}: {name}" for name in a.tick_effects(rounds))
             ended.extend(f"{a.name}: {pid} is ready"
                          for pid in a.tick_pools(rounds))
@@ -1171,8 +1246,10 @@ class Scene:
             # and saps did (2026-09-27), a player knocked out cold woke an hour later
             # still carrying more than their hit points, and the next blow's
             # hit-point check put them straight back down. Deterministic, so it sits
-            # with the counters above rather than with the checks.
-            if hours and a.nonlethal:
+            # with the counters above rather than with the checks. For the player it was
+            # done hour by hour inside `survival.charge`, between the checks, so a wait
+            # does not knock them out on damage the same wait would have healed.
+            if hours and a.nonlethal and not rolls:
                 out_cold = a.has_state("state.down.unconscious")
                 a.heal_nonlethal(hours * max(1, int(getattr(a, "level", 1) or 1)))
                 a.apply_nonlethal_state()
@@ -1205,7 +1282,18 @@ class Scene:
             what = record.get("what") or record.get("kind")
             if what:
                 ended.append(str(what))
-        return {"minutes": minutes, "rounds": rounds, "ended": ended}
+        return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body}
+
+    def take_body_said(self) -> list[dict]:
+        """The body's tolls since they were last told, emptied as they are handed over.
+
+        Two readers and only two: the end of every engine batch (`Engine._body_settles`),
+        which is where a wait, a walk or a repair is told, and the knockout path
+        (play/downed.py), which runs no batch. A bench or a forge view that moves the
+        clock outside a batch leaves its toll here for the next batch to tell, late
+        rather than never."""
+        out, self._body_said = list(self._body_said), []
+        return out
 
     def tick_standing(self, rounds: int = 1, fire: bool = True) -> list[dict]:
         """One round of everything the scene is holding: hazards fire, then clocks run.
@@ -3033,6 +3121,11 @@ class Engine:
         # said: a person who walked out, went down or drew is not somebody the player
         # has to take their leave of.
         resolution.outcomes.extend(self._articled(o) for o in self._settle_talk())
+        # What the hours this batch spent did to the player's body (`Scene.advance`
+        # rolls the checks; this tells them). Each op's toll is told right behind it in
+        # `_drive`; what is left here is the clock moved outside an op — a bench or a
+        # forge view before this batch, or anything the settles below were handed.
+        resolution.outcomes.extend(self._body_settles())
         # A creature holding its ground answers what this batch did: struck, closed on,
         # or gone — and a find it was sitting on is paid once it has gone.
         resolution.outcomes.extend(self._holding_ground_settles())
@@ -3156,6 +3249,49 @@ class Engine:
                                    self.FIGHT_HOSTILE_MINUTES * Scene.ROUNDS_PER_MINUTE,
                                    source)
                 out.append(ref)
+        return out
+
+    def _body_settles(self) -> list:
+        """The body's tolls the clock's door rolled, as outcomes the narrator is fed.
+
+        One pass at the end of every batch, for `_carried_settles`'s reason: the clock
+        moves through a dozen ops (`advance_time`, `travel`, repair, asking around,
+        dressing in armour) and a door added later cannot forget to tell. The ops that
+        spend their hours through `pass_hours` (forage, the crafting trip, venture, a
+        journey) tell their own toll in their own sentence and leave nothing here — they
+        move the clock with `charge_body=False`.
+        """
+        # One outcome per body, not per stretch: a batch that walked half an hour and
+        # then waited three told "holds out against thirst once (DC 10)" and then "holds
+        # out against thirst 3 times (DC 11-13)" as two events (measured live on the
+        # owner's save, 2026-10-05). The stretches' tolls are folded into one and said
+        # once; the records stay whole in the effects for anyone auditing them.
+        records: dict[str, list[dict]] = {}
+        for record in self.scene.take_body_said():
+            records.setdefault(str(record.get("ref") or ""), []).append(record)
+        out = []
+        for ref, rows in records.items():
+            who = self.scene.people.get(ref)
+            if who is not None and len(rows) > 1:
+                toll = survival.Toll()
+                for r in rows:
+                    toll.absorb(survival.Toll(
+                        checks=list(r.get("checks") or []),
+                        nonlethal=int(r.get("nonlethal") or 0),
+                        conditions=list(r.get("conditions") or []),
+                        **{k: bool(r.get(k)) for k in ("collapsed", "fell_asleep", "woke",
+                                                       "knocked_out", "came_round")},
+                        lethal=int(r.get("lethal") or 0)))
+                said = survival.said(who, toll)
+            else:
+                said = [s for r in rows for s in r.get("said") or []]
+            tell = " ".join(said)
+            if not tell:
+                continue
+            fx = [dict({k: v for k, v in r.items() if k != "said"}, origin="rule:survival")
+                  for r in rows]
+            out.append(self._articled(Outcome(intent_id="", op="body", effects=fx,
+                                              tell=tell, because="")))
         return out
 
     def _carried_settles(self) -> list:
@@ -3286,6 +3422,11 @@ class Engine:
             if intent.gate:
                 queue = self._settle_gate(intent, outcome, queue)
             outcomes.append(outcome)
+            # What the hours this op spent did to the body, told right behind it. At the
+            # batch's end only, a wait that put the player to sleep was told AFTER the
+            # `rest` the same plan ran next — "Sammy rests for 8 hours" and then "falls
+            # asleep where they stand" (measured live on the owner's save, 2026-10-05).
+            outcomes.extend(self._body_settles())
             # A single-roll check, save or manoeuvre decided on the player's own d20:
             # its outcome's verdict IS that roll's answer. Anything that judged the roll
             # at its own stage already has (`_judge` keeps the first).
@@ -5087,8 +5228,10 @@ class Engine:
         # see the real one.
         wet_defender = defender.water_row()
         flounders = wet_defender and water.loses_dex_to_ac(wet_defender)
+        # The attacker rides along so a term scoped to THIS attacker counts: a smiting
+        # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
-                                flat_footed=flat_footed or bool(flounders))
+                                flat_footed=flat_footed or bool(flounders), attacker=actor)
         worn_ac = target_ac
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
         if wet_defender:
@@ -5224,7 +5367,8 @@ class Engine:
             if printed.get("touch"):
                 # "tongue +7 touch", "incorporeal touch +5": armour, shield and natural
                 # armour do not count. 243 printed attacks say so.
-                swing_ac = defender.touch_ac(flat_footed or bool(flounders)) + footing
+                swing_ac = defender.touch_ac(flat_footed or bool(flounders),
+                                             attacker=actor) + footing
                 swing_note = (f"touch AC {swing_ac}"
                               + (" (flat-footed)" if flat_footed else ""))
             # The defender rides in the roll context, so a term that is "against fey"
@@ -5545,6 +5689,12 @@ class Engine:
                 # is gone. Spent on the hit rather than on the swing: a poison wiped off
                 # by a miss is a dose nobody got.
                 for extra in self._deliver_coating(actor, defender, weapon_key):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
+                # A blow charged before the roll — stunning fist's save — spends itself on
+                # the first hit with the weapon it names (`_deliver_charges`).
+                for extra in self._deliver_charges(actor, defender, weapon_key,
+                                                   intent.visibility or "player"):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # A forged blade's own riders — a wyvern-blood quench on the first wound
@@ -8913,6 +9063,11 @@ class Engine:
             going_to = next((p for p in known if places_mod.is_ring(p.id)
                              and p.name in (outskirts_mod.FIELDS, outskirts_mod.SHORE)
                              and p.terrain == biome), None)
+            # And the hinterland's reaches are that ground too: "I head into the hills"
+            # from Vormoor is the ridgelines, the place the Places row offers by name at
+            # its own distance — not a second, nameless hills minted an hour out beside
+            # it (2026-10-05, docs/place-doors.md "The hinterland").
+            going_to = going_to or outskirts_mod.reach_of(known, biome)
             if going_to is None:
                 # Is it there at all? The world says what ground lies around a
                 # settlement (`geography.land_around`), and a move onto ground it does not
@@ -9282,10 +9437,13 @@ class Engine:
                 # The walk's minutes, charged once (the hop sum above). This was an hour
                 # for a step between the walls and open ground and nothing for anything
                 # else — the playtest measured a two-hour wild place reached in no time,
-                # and then a village crossed twice with the clock still on 08:00. Minutes
-                # are the clock's and not the body's, as the hour was.
+                # and then a village crossed twice with the clock still on 08:00.
+                # Charged to the body as well since 2026-10-05: "the clock's and not the
+                # body's" was inherited from the old free hour with no reason given, and
+                # it made the walk the one place an hour awake was not an hour awake —
+                # the needs panel and the world clock drifted apart by every walk.
                 if minutes:
-                    self.scene.advance(minutes, charge_body=False)
+                    self.scene.advance(minutes)
                 # Ground beyond the near land is hours or days: a march, charged to the
                 # body day by day with a camp between, the rule a journey pays.
                 if far_walked:
@@ -9411,8 +9569,9 @@ class Engine:
                 weathered = self.dice.roll(ontheway.WEATHER_HOURS,
                                            label="how long it holds you",
                                            visibility="hidden").total
-                self.scene.advance(weathered * survival.MINUTES_PER_HOUR,
-                                   charge_body=False)
+                # Charged to the body, as the road's weather is (`_op_journey` adds it
+                # to the march): hours sat out in a storm are hours awake and unfed.
+                self.scene.advance(weathered * survival.MINUTES_PER_HOUR)
                 met_tell += (f" {weathered} hour{'s' if weathered != 1 else ''} go "
                              f"by before it lets you.")
             if met.kind == "cutpurse" and pc is not None and made:
@@ -14638,12 +14797,29 @@ class Engine:
             raise IntentError("use_ability: nobody here to use it", "refs")
 
         wanted = str(intent.params.get("ability", "")).strip()
+        # The core classes' documents first (rules/class_abilities.py). Measured
+        # 2026-10-05 (docs/class-audit.md §4): fourteen names — rage, smite evil, lay on
+        # hands, channel energy, wild shape, stunning fist and the rest — were refused on
+        # every core class with "They can use: nothing yet", because this door only ever
+        # searched the paths a Blood Bender follows.
+        from . import class_abilities
+
+        cdoc, choice = class_abilities.find(actor, wanted)
+        if cdoc is not None:
+            return self._use_class_ability(intent, actor, cdoc, choice)
+        arrives = class_abilities.arrives_at(actor, wanted)
+        if arrives:
+            return self._refuse(
+                intent, f"{wanted.title()} comes to a {actor.char_class or 'character'} "
+                        f"at level {arrives}; {actor.name} is level {actor.level}. They "
+                        f"can use: {', '.join(class_abilities.names(actor)) or 'nothing yet'}.",
+                code="ability_not_yet")
         path, found, effects = leveling.find_ability(actor, wanted)
         if not found:
             # Names the fix, not the fault: this used to print the PATHS ("Their paths
             # are blood spike") when the list the model needed was the abilities — the
             # same list the brief already computes, now from the one helper both use.
-            names = leveling.usable_names(actor)
+            names = leveling.usable_names(actor) + class_abilities.names(actor)
             return self._refuse(
                 intent, f"{actor.name} has no ability called {wanted}. They can use: "
                         f"{', '.join(names) or 'nothing yet'}.")
@@ -14956,6 +15132,644 @@ class Engine:
         actor.remove_condition(key)
         if (doc.get("temp_hp") or {}) and source:
             actor.clear_temp_hp(source=source)
+
+    # --- the core classes' abilities (rules/class_abilities.py) -------------------------
+    #
+    # One executor for every document in content/class-abilities/. It reads the grammar's
+    # fields — `toggle`, `affects`, `attack`, `roll`, `save`, `self`, `effect`, `charge`,
+    # `removes` — and never an ability's name, which is what the law-1 ratchet in
+    # tests/test_three_laws.py holds it to: rage, smite evil and channel energy are three
+    # documents through the same seven steps, not three branches. Every change lands
+    # through `Actor.apply_effect` (law 2), and every one is said in the tell (law 3).
+    #
+    # Rolled by the engine and shown to the player, as the path abilities above are,
+    # rather than suspended for the player's own die: `use_ability` has never suspended,
+    # and a channel that paused mid-burst would need the cast door's resume machinery.
+    # That is a known gap against "the player rolls their own", stated, not hidden.
+
+    def _use_class_ability(self, intent: Intent, actor: Actor, doc: dict,
+                           choice: str) -> Outcome:
+        from . import class_abilities as ca
+
+        name = str(doc.get("name"))
+        origin = ca.origin_of(doc)
+
+        # 1. A stance already held by this document ends — before the choice is read,
+        # because "Wild Shape" said by a wolf means change back, and needs no animal.
+        # One held by ANOTHER document under the same key ends too when the key is
+        # exclusive (one performance at a time), but only once this one is known to start.
+        key = ca.toggle_key(doc)
+        held = ca.holding(actor, doc) if key else None
+        if held is not None and held.origin == origin:
+            ended, said = self._end_class_stance(actor, held)
+            tell = (_doc_tell(doc.get("tell_off"), actor)
+                    or f"{actor.name} lets {name} go.")
+            return Outcome(
+                intent_id=intent.id, op="use_ability",
+                effects=[{"ref": actor.ref, "kind": "toggle", "state": "off",
+                          "condition": key, "ability": name, "origin": origin}] + ended,
+                tell=" ".join([tell] + said), because=intent.because)
+
+        doc, wrong = ca.with_choice(actor, doc, choice)
+        if wrong:
+            return self._refuse(intent, wrong, code="ability_choice")
+        shown = name
+        if doc.get("form"):
+            shown = f"{name} ({doc['form'].get('name') or doc['form']['key']})"
+        elif doc.get("skill"):
+            shown = f"{name} ({doc['skill']})"
+        elif doc.get("picked") and doc.get("picked") != _norm_word(
+                (doc.get("choice") or {}).get("default")):
+            shown = f"{name} ({doc['picked']})"
+
+        swap = None
+        if held is not None:
+            if not (doc.get("toggle") or {}).get("exclusive"):
+                return self._refuse(
+                    intent, f"{actor.name} is already holding {held.name}; end it first.",
+                    code="ability_busy")
+            swap = held
+
+        # 2. Requirements and the price, before anything is touched. A document may say
+        # its requirement in words ("only while raging"); the tag query is the rule and
+        # the sentence is what the player reads.
+        ca.ensure_pool(actor, doc)
+        if doc.get("requires_said") and any(
+                not actor.has_state(str(q)) for q in doc.get("requires") or ()):
+            return self._refuse(intent, f"Nothing takes hold. {name} works "
+                                        f"{doc['requires_said']}.", code="ability_refused")
+        refused = self._ability_refusal(actor, name, doc)
+        if refused:
+            return self._refuse(intent, f"Nothing takes hold. {refused}", code="ability_refused")
+
+        # 3. Who it reaches.
+        who, problem = self._class_ability_reach(intent, actor, doc, name)
+        if problem:
+            return self._refuse(intent, problem, code="ability_reach")
+        target = who[0] if (doc.get("affects") or "self") in ("target", "ally") and who \
+            else None
+        if target is not None and doc.get("undead") and target.has_state("type.undead"):
+            # Lay on hands turned on the undead: the same dice, as harm, on a touch.
+            u = doc["undead"]
+            doc = {**doc, "attack": u.get("attack"), "roll_as": u.get("as", "damage"),
+                   "damage_type": u.get("type"), "harmful": True, "removes": None}
+
+        # 4. The battle gate: first violence opens the fight and never resolves it.
+        foes = [a for a in who if self._against(actor, a)]
+        if doc.get("harmful") and foes:
+            gated = self._ability_gate(intent, actor, shown, foes)
+            if gated is not None:
+                return gated
+
+        # 5. The price, paid.
+        records: list[dict] = []
+        tells: list[str] = [_doc_tell(doc.get("tell"), actor) or f"{actor.name} uses {shown}."]
+        rolls: list[Roll] = []
+        cost = doc.get("cost") or {}
+        pool_start = None
+        if cost.get("pool"):
+            pool = actor.pool(str(cost["pool"]))
+            pool_start = pool.current if pool is not None else None
+            paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))
+            records.append({"ref": actor.ref, "kind": "resource", "pool": str(cost["pool"]),
+                            "spent": paid.get("spent", 0), "left": paid.get("current", 0),
+                            "origin": origin})
+        if swap is not None:
+            ended, said = self._end_class_stance(actor, swap)
+            records.extend(ended)
+            tells.extend(said)
+
+        # 6. What it does to whoever it reached: a touch attack, one roll shared, a save
+        # each, the heal or the harm, and the standing effect it lays on them.
+        if doc.get("evil_only") and target is not None and not _could_be_evil(target):
+            tells.append(f"{target.name} is not evil, and the {name} is wasted.")
+            return Outcome(intent_id=intent.id, op="use_ability", effects=records,
+                           tell=" ".join(tells), because=intent.because)
+        if doc.get("evil_only") and target is not None and not _printed_alignment(target):
+            tells.append(f"Nothing records {target.name}'s alignment; the {name} holds.")
+        hit_ok = True
+        if doc.get("attack") and target is not None:
+            hit_ok, roll, said = self._class_touch_attack(intent, actor, target, doc, shown)
+            rolls.append(roll)
+            tells.append(said)
+        landed: list[Actor] = []
+        hurt: list[str] = []
+        if hit_ok:
+            spec = doc.get("roll") or {}
+            notation = ca.dice(spec, actor) if spec else ""
+            flat = ca.amount(spec.get("flat"), actor) if spec else 0
+            total = None
+            if notation or flat:
+                total = flat
+                if notation:
+                    r = self.dice.roll(notation, label=shown, visibility="player")
+                    rolls.append(r)
+                    total += r.total
+                    tells.append(f"{notation}{f' + {flat}' if flat else ''} — {total}.")
+            saving = doc.get("save") or {}
+            dc = ca.amount(saving.get("dc"), actor) if saving else 0
+            for other in who:
+                share = total
+                if saving and other is not actor:
+                    sv = str(saving.get("save", "will"))
+                    sroll = self.dice.d20(other.save_modifiers(sv),
+                                          label=f"{SAVES.get(sv, sv)} save against {shown}",
+                                          visibility=intent.visibility or "player")
+                    rolls.append(sroll)
+                    made = d20_succeeds(sroll, dc)
+                    nat = natural_said(sroll, dc)
+                    tells.append(f"{other.name} {'makes' if made else 'fails'} the "
+                                 f"{SAVES.get(sv, sv)} save ({nat + ', ' if nat else ''}"
+                                 f"{sroll.total} against DC {dc}).")
+                    records.append({"kind": "save", "ref": other.ref, "save": sv,
+                                    "saved": bool(made), "dc": dc, "origin": origin})
+                    if made and saving.get("success", "negates") == "negates":
+                        continue
+                    if made and share is not None:
+                        share = share // 2
+                landed.append(other)
+                if share is not None:
+                    as_ = doc.get("roll_as") or spec.get("as") or "heal"
+                    if as_ == "heal":
+                        healed = other.heal(share)
+                        records.append({"ref": other.ref, "kind": "heal", "amount": healed,
+                                        "rolled": share, "hp_after": other.hp,
+                                        "hp_max": other.hp_max, "origin": origin})
+                        tells.append(f"{other.name} recovers {healed} hit points "
+                                     f"({other.hp}/{other.hp_max})." if healed else
+                                     f"{other.name} was already unhurt.")
+                        # Back above 0, the dying and the unconscious wake — the same
+                        # sweep the `heal` op makes, by the one family that says so.
+                        woke = other.clear_states("recovery.hit-points") if other.hp > 0 \
+                            else []
+                        if woke:
+                            records.append({"ref": other.ref, "kind": "condition_removed",
+                                            "conditions": woke, "origin": origin})
+                            tells.append(f"{other.name} is no longer "
+                                         f"{_and_list(woke)}.")
+                    else:
+                        hit = self._apply_damage(
+                            other, share,
+                            str(doc.get("damage_type") or spec.get("type") or "untyped"),
+                            traits=("area",) if doc.get("radius_ft") and len(who) > 1 else (),
+                            lethality=str(spec.get("lethality") or "lethal"))
+                        hit["origin"] = origin
+                        records.append(hit)
+                        hurt.append(other.ref)
+                        tells.append(
+                            f"{other.name} takes {hit['amount']} "
+                            + ("non-lethal " if hit.get("lethality") == "nonlethal" else "")
+                            + f"{hit['type']}"
+                            + (" energy" if hit["type"] in ("positive", "negative") else "")
+                            + (f" ({hit['note']})." if hit["note"] else "."))
+                records.extend(self._class_effect_on(actor, other, doc, origin, shown, tells))
+            removes = doc.get("removes") or {}
+            if removes:
+                lifts = _mercy_lifts(actor, removes, ca)
+                for other in landed:
+                    for cond in lifts:
+                        if other.has_condition(cond):
+                            other.remove_condition(cond)
+                            records.append({"ref": other.ref, "kind": "condition_removed",
+                                            "condition": cond, "origin": origin})
+                            tells.append(f"{other.name} is no longer {cond}.")
+        # A missed touch leaves the use spent and nothing else: the price was paid above.
+
+        # 7. What it lays on the user: a stance, a timed bonus, a mark, a charge.
+        if hit_ok or not doc.get("attack"):
+            mine = self._class_self_effect(actor, doc, origin, shown, key, target,
+                                           pool_start, [a.ref for a in landed
+                                                        if a is not actor])
+            if mine:
+                records.extend(mine["records"])
+                if mine["said"]:
+                    tells.append(mine["said"])
+
+        crossed = []
+        for ref in dict.fromkeys(hurt):
+            crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
+        records.append({"ref": actor.ref, "kind": "use_ability", "ability": name,
+                        "class": str(doc.get("class") or ""), "origin": origin,
+                        "reached": [a.ref for a in landed]})
+        if (doc.get("harmful") or hurt) and foes:
+            from . import attitude as attitude_mod
+
+            for other in foes:
+                felt = attitude_mod.harmed(self, other, actor, origin)
+                if felt:
+                    records.append(felt)
+                    line = attitude_mod.harm_said(felt, other.name)
+                    if line:
+                        tells.append(line)
+        for spec in doc.get("not_yet") or ():
+            records.append({"ref": actor.ref, "kind": "not_yet", "what": str(spec),
+                            "origin": origin})
+        return Outcome(
+            intent_id=intent.id, op="use_ability", rolls=rolls,
+            effects=records + crossed,
+            tell=" ".join(t for t in tells if t) + self._hp_state_tell(crossed),
+            because=intent.because)
+
+    def _class_ability_reach(self, intent: Intent, actor: Actor, doc: dict,
+                             name: str) -> tuple[list[Actor], str]:
+        """Who an ability reaches, or the sentence that says why it reaches nobody.
+
+        Distances are measured on the map when there is one (`Scene.distance_between`);
+        with no map, everyone here is within reach — theatre of the mind cannot measure
+        thirty feet, and refusing on a distance nobody can see would be a rule invented.
+        """
+        from . import class_abilities as ca
+
+        affects = doc.get("affects") or "self"
+        to = intent.params.get("to") or next(iter(intent.targets()), None)
+        here = [a for a in self.scene.actors.values() if not a.has_state("state.down.dead")]
+
+        def near(other: Actor, feet) -> bool:
+            if other is actor or not feet:
+                return True
+            gap = self.scene.distance_between(actor.ref, other.ref)
+            return gap is None or gap <= int(feet)
+
+        def fits(other: Actor) -> bool:
+            undead = other.has_state("type.undead")
+            if doc.get("undead_only") and not undead:
+                return False
+            if doc.get("living") and (undead or other.has_state("type.construct")):
+                return False
+            return True
+
+        if affects == "self":
+            return [actor], ""
+        if affects in ("target", "ally"):
+            other = self.scene.actors.get(str(to)) if to else None
+            if other is None and doc.get("aim") == "self" and affects == "target":
+                other = actor
+            if other is None:
+                return [], (f"{name} needs somebody to aim at: name them "
+                            f"(use_ability ability={name!r} to=<ref>).")
+            if affects == "ally" and (other is actor or self._against(actor, other)):
+                return [], f"{name} is for an ally other than {actor.name}, and " \
+                           f"{other.name} is not one."
+            if other.has_state("state.down.dead"):
+                return [], f"{other.name} is dead."
+            feet = doc.get("range_ft") or doc.get("reach_ft") or doc.get("radius_ft")
+            if not near(other, feet):
+                gap = self.scene.distance_between(actor.ref, other.ref)
+                return [], (f"{other.name} is {gap} ft away, and {name} reaches "
+                            f"{feet} ft.")
+            return [other], ""
+        radius = doc.get("radius_ft")
+        if affects == "allies":
+            pool = [a for a in here if not self._against(actor, a) and not a.is_down]
+        elif affects == "enemies":
+            pool = [a for a in here if self._against(actor, a) and not a.is_down]
+        else:
+            # "A cleric can choose whether or not to include herself in this effect" (CRB
+            # p.40). Nobody chooses to be in their own harmful burst: built without this,
+            # a negative channel to harm the living put the cleric unconscious and dying
+            # alongside the thug (2026-10-05). A burst that heals keeps her in it.
+            pool = [a for a in here if not (doc.get("harmful") and a is actor)]
+        pool = [a for a in pool if near(a, radius) and fits(a)]
+        count = ca.amount(doc.get("count"), actor) if doc.get("count") else 0
+        if count > 0:
+            # The named one first, then the nearest, which is how a table picks.
+            pool.sort(key=lambda a: (a.ref != to, a is not actor,
+                                     self.scene.distance_between(actor.ref, a.ref) or 0))
+            pool = pool[:count]
+        return pool, ""
+
+    def _ability_gate(self, intent: Intent, actor: Actor, shown: str,
+                      foes: list[Actor]) -> Outcome | None:
+        """The battle gate for an ability, exactly as `_cast_gate` keeps it for a spell:
+        a first harmful use outside a fight opens the encounter, spends nothing and rolls
+        nothing, and the player uses it on their own first turn."""
+        def on_a_side(ref: str) -> bool:
+            return any(ref in refs for refs in (self.scene.sides or {}).values())
+
+        opened = False
+        if not self.scene.in_encounter:
+            opened = self._ensure_encounter(actor.ref, foes[0].ref)
+        for other in foes:
+            if self.scene.in_encounter and not on_a_side(other.ref):
+                self.join_fight(other.ref)
+                self.rally(other.ref)
+        if not actor.is_pc or not (opened or self._battle_joined):
+            return None
+        self._battle_joined = True
+        for i, (ref, _) in enumerate(self.scene.initiative):
+            if ref == actor.ref:
+                self.scene.turn = i
+                self.scene.acted.add(actor.ref)
+                break
+        return Outcome(
+            intent_id=intent.id, op="use_ability",
+            effects=[{"ref": actor.ref, "kind": "battle_joined", "op": "use_ability",
+                      "target": foes[0].ref,
+                      "params": {"ability": str(intent.params.get("ability", "")),
+                                 "to": foes[0].ref}}],
+            tell=(f"Battle is joined: {actor.name} squares off against "
+                  f"{', '.join(f.name for f in foes)}. Nothing has been used yet — "
+                  f"{shown} is still to come."),
+            because=intent.because)
+
+    def _class_touch_attack(self, intent: Intent, actor: Actor, target: Actor, doc: dict,
+                            shown: str) -> tuple[bool, Roll, str]:
+        """A touch attack: base attack, Dexterity (ranged) or Strength (melee), size, and
+        whatever the funnel holds for an attack — against touch AC. 1e treats a ray or a
+        touch spell this way; the domain bolts and lay on hands on the undead are the same
+        roll."""
+        from .dice import stack
+        from .tables import SIZES
+
+        ranged = str(doc.get("attack")) == "ranged touch"
+        mods = [Modifier(actor.bab, "BAB")]
+        ab = "dex" if ranged else "str"
+        if actor.ability_mod(ab):
+            mods.append(Modifier(actor.ability_mod(ab), ab.title()))
+        size = SIZES.get(actor.size, SIZES["medium"])["attack_ac"]
+        if size:
+            mods.append(Modifier(size, f"{actor.size} size"))
+        mods.extend(actor._condition_mods("attack"))
+        if not ranged:
+            mods.extend(actor._condition_mods("melee_attack"))
+        ctx = {"weapon": {"key": "ray" if ranged else "touch",
+                          "category": "ranged" if ranged else "melee", "ranged": ranged,
+                          "hands": 0, "light": False, "finessable": False},
+               "target_actor": target}
+        mods.extend(actor._buff_mods("combat_mod", "attack", ctx))
+        mods = stack(mods)
+        ac = target.touch_ac(self._flat_footed(target), attacker=actor)
+        roll = self.dice.d20(mods, label=f"{shown}: {doc.get('attack')} attack",
+                             visibility="player")
+        made = d20_succeeds(roll, ac)
+        nat = natural_said(roll, ac)
+        said = (f"{actor.name}'s {doc.get('attack')} attack "
+                f"{'hits' if made else 'misses'} {target.name} "
+                f"({nat + ', ' if nat else ''}{roll.total} against touch AC {ac}).")
+        return made, roll, said
+
+    def _class_effect_on(self, actor: Actor, other: Actor, doc: dict, origin: str,
+                         shown: str, tells: list[str]) -> list[dict]:
+        """The standing effect a document lays on someone it reached (`effect`), through
+        the one applicator. Linked to the user's stance when there is one: the stance's
+        payload lists who holds a piece of it, and its end takes every piece back."""
+        from . import class_abilities as ca
+
+        spec = doc.get("effect") or {}
+        if not spec:
+            return []
+        out: list[dict] = []
+        source = f"{shown} ({actor.name})"
+        rounds = ca.amount(spec.get("rounds"), actor) if spec.get("rounds") else None
+        mods = ca.modifiers(spec.get("modifiers"), actor)
+        for m in spec.get("skill_modifiers") or ():
+            n = ca.amount(m, actor)
+            if n and doc.get("skill"):
+                mods.append({"kind": "skill_mod", "target": doc["skill"], "amount": n,
+                             "bonus_type": str(m.get("bonus_type") or "untyped")})
+        if mods or spec.get("tags"):
+            before = other.hp_max
+            other.apply_effect(ActiveEffect(
+                name=shown, kind="buff", source=source, origin=origin,
+                duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
+                tags=tuple(str(t) for t in spec.get("tags") or ()), modifiers=mods))
+            other._follow_con(before)
+            out.append({"ref": other.ref, "kind": "buff", "ability": shown,
+                        "modifiers": mods, "rounds": rounds, "origin": origin})
+            said = ", ".join(f"{m['amount']:+d} {m['target']}" for m in mods)
+            tells.append(f"{other.name} gains {said or shown}"
+                         + (f" for {rounds} round{'s' if rounds != 1 else ''}." if rounds
+                            else "."))
+        if spec.get("condition"):
+            cond = str(spec["condition"])
+            other.add_condition(cond, rounds, source=source, origin=origin)
+            out.append({"ref": other.ref, "kind": "condition", "condition": cond,
+                        "rounds": rounds, "from": shown, "origin": origin})
+            tells.append(_ward_tell(self.scene, {"kind": "condition", "ref": other.ref,
+                                                 "condition": cond, "from": shown}))
+        temp = spec.get("temp_hp") or {}
+        if temp.get("dice"):
+            r = self.dice.roll(str(temp["dice"]), label=f"{shown}: bonus Hit Dice",
+                               visibility="player")
+            amount = max(0, r.total + int(temp.get("con_per_die", 0) or 0)
+                         * other.ability_mod("con"))
+            got = other.gain_temp_hp(amount, source=source, origin=origin)
+            out.append({"ref": other.ref, "kind": "temp_hp", "temp_hp": other.temp_hp,
+                        **got, "origin": origin})
+            tells.append(f"{other.name} gains {amount} temporary hit points.")
+        return out
+
+    def _class_self_effect(self, actor: Actor, doc: dict, origin: str, shown: str,
+                           key: str, target: Actor | None, pool_start, linked: list[str]
+                           ) -> dict | None:
+        """The effect a document lays on its user — a stance (`toggle`), a timed bonus
+        (`self.rounds`), a mark on one foe (`self.vs_target`) or a charge for the next
+        blow (`charge`) — as ONE ActiveEffect, so removing it removes all of it."""
+        from . import class_abilities as ca
+        from .tables import SIZES
+
+        spec = doc.get("self") or {}
+        charge = doc.get("charge") or {}
+        if not spec and not key and not charge:
+            return None
+        mods = ca.modifiers(spec.get("modifiers"), actor)
+        weapons: list[dict] = []
+        said: list[str] = []
+        for add in doc.get("addons") or ():
+            if ca._norm(add.get("pick")) in ca.chosen(actor, add.get("choice", "")):
+                mods += ca.modifiers(add.get("modifiers"), actor)
+                weapons += [_sized_weapon(w, actor.size) for w in add.get("natural_weapons") or ()]
+                said.append(str(add.get("pick")).title())
+        form = doc.get("form")
+        if form:
+            size = str(form.get("size") or "medium").lower()
+            mods += ca.modifiers(((doc.get("choice") or {}).get("by_size") or {}).get(size),
+                                 actor)
+            # The size's own attack, AC and manoeuvre terms, relative to the body the
+            # druid had: a Medium druid as a Small cat is +1 to hit and +1 AC and -1 CMB.
+            mine = SIZES.get(actor.size, SIZES["medium"])
+            theirs = SIZES.get(size, SIZES["medium"])
+            d_hit = theirs["attack_ac"] - mine["attack_ac"]
+            d_cm = theirs["cmb_cmd"] - mine["cmb_cmd"]
+            for tgt, n in (("attack", d_hit), ("ac", d_hit), ("cmb", d_cm), ("cmd", d_cm)):
+                if n:
+                    mods.append({"kind": "combat_mod", "target": tgt, "amount": n,
+                                 "bonus_type": "untyped", "note": f"{size} form"})
+            for w in form.get("attacks") or ():
+                dice = (w.get("damage") or {}).get(size) or next(
+                    iter((w.get("damage") or {}).values()), "1d3")
+                weapons.append({"key": w.get("key"), "name": w.get("name") or w.get("key"),
+                                "type": w.get("type") or "bludgeoning",
+                                "count": int(w.get("count", 1) or 1),
+                                "damage": {str(actor.size or "medium").lower(): dice,
+                                           "medium": dice}})
+        if spec.get("vs_target") and target is not None:
+            for m in mods:
+                m["vs"] = target.ref
+        rounds = ca.amount(spec.get("rounds"), actor) if spec.get("rounds") else None
+        tags = tuple(states.tags_for(key)) if key else ()
+        tags += tuple(str(t) for t in spec.get("tags") or () if str(t) not in tags)
+        if form:
+            tags += (f"form.{ca._norm(form['key']).replace(' ', '-')}",)
+        payload: dict = {}
+        if weapons:
+            payload["natural_weapons"] = weapons
+        if doc.get("after"):
+            payload["after"] = dict(doc["after"])
+            payload["pool"] = str((doc.get("cost") or {}).get("pool") or "")
+            payload["pool_start"] = pool_start
+        if linked and key:
+            payload["linked"] = list(linked)
+            payload["linked_source"] = f"{shown} ({actor.name})"
+        if form:
+            payload["form"] = str(form["key"])
+        if charge:
+            payload["charge"] = self._resolve_charge(actor, doc, charge)
+            rounds = 1
+            tags += ("buff.charged",)
+        periodic = []
+        drain = doc.get("drain") or {}
+        if drain.get("pool") and key:
+            periodic.append({"spend_pool": str(drain["pool"]),
+                             "amount": int(drain.get("amount", 1) or 1), "or_ends": True})
+        if key:
+            kind, name, source = "condition", shown, str(doc.get("name"))
+        elif spec.get("vs_target") and target is not None:
+            kind, name, source = "buff", str(doc.get("name")), f"{doc.get('name')} on {target.name}"
+        else:
+            kind, name, source = "buff", shown, str(doc.get("name"))
+        if not key and any(states.matches(t, "recovery") for t in tags):
+            # An effect a recovery family must be able to end is a condition, because
+            # `Actor.clear_states` sweeps conditions: a smite lasts "until the paladin
+            # rests", and as a buff the night's sleep walked straight past it. Keyed by
+            # the document, sourced by the target, so two smites are two effects.
+            kind, held_key = "condition", ca._norm(doc.get("key") or doc.get("name"))
+        else:
+            held_key = key
+        before = actor.hp_max
+        actor.apply_effect(ActiveEffect(
+            name=name, kind=kind, key=held_key, source=source, origin=origin,
+            duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
+            tags=tags, modifiers=mods, payload=payload, periodic=periodic))
+        grew = actor._follow_con(before)
+        records = []
+        if key:
+            records.append({"ref": actor.ref, "kind": "toggle", "state": "on",
+                            "condition": key, "ability": shown, "origin": origin})
+        if mods:
+            records.append({"ref": actor.ref, "kind": "buff", "ability": shown,
+                            "modifiers": [dict(m) for m in mods], "rounds": rounds,
+                            "origin": origin,
+                            **({"vs": target.ref} if spec.get("vs_target") and target else {})})
+        bits = [f"{m['amount']:+d} {m['target']}"
+                + (f" against {target.name}" if m.get("vs") and target else "")
+                + (f" ({m['when']})" if m.get("when") else "")
+                for m in mods]
+        line = ""
+        if bits:
+            line = f"{actor.name}: " + ", ".join(bits)
+            if rounds and not key:
+                line += f" for {rounds} round{'s' if rounds != 1 else ''}"
+            line += "."
+        if grew:
+            line += f" {actor.name}'s hit points follow Constitution ({actor.hp}/{actor.hp_max})."
+        if weapons:
+            line += " Natural attacks: " + ", ".join(str(w["name"]) for w in weapons) + "."
+        if said:
+            line += " With " + ", ".join(said) + "."
+        if charge:
+            c = payload["charge"]
+            line += (f" The next {' or '.join(c['weapons'][:1])} hit this round: "
+                     f"{SAVES.get(c['save'], c['save'])} DC {c['dc']} or {c['condition']}.")
+        return {"records": records, "said": line.strip()}
+
+    def _resolve_charge(self, actor: Actor, doc: dict, charge: dict) -> dict:
+        """A charge's numbers, worked out when it is armed (the DC is the user's)."""
+        from . import class_abilities as ca
+
+        save = charge.get("save") or {}
+        return {"weapons": [str(w).lower() for w in charge.get("weapons") or ()],
+                "save": str(save.get("save", "fort")),
+                "dc": ca.amount(save.get("dc"), actor),
+                "condition": str(doc.get("charge_condition") or charge.get("condition")
+                                 or "stunned"),
+                "rounds": doc.get("charge_rounds"),
+                "rounds_dice": doc.get("charge_rounds_dice"),
+                "immune_types": list(charge.get("immune_types") or ()),
+                "immune_subtypes": list(charge.get("immune_subtypes") or ()),
+                "immune_crit": bool(charge.get("immune_crit"))}
+
+    def _deliver_charges(self, actor: Actor, defender: Actor, weapon_key: str,
+                         visibility: str = "player") -> list[dict]:
+        """Spend a charged blow on the hit that just landed — stunning fist's save.
+
+        Read off the effect's payload, not a name: any document that arms the next hit
+        with a save and a condition is delivered here. Returns effect/tell pairs, as
+        `_deliver_coating` does."""
+        from . import coup_de_grace as coup_mod
+
+        out: list[dict] = []
+        key = (weapon_key or "").strip().lower()
+        for e in list(actor.effects):
+            c = (e.payload or {}).get("charge") if isinstance(e.payload, dict) else None
+            if not c or (c.get("weapons") and key not in c["weapons"]):
+                continue
+            actor.remove_effects(match=lambda x, e=e: x is e)
+            immune = ""
+            for t in c.get("immune_types") or ():
+                if defender.has_state(f"type.{t}"):
+                    immune = f"{defender.name} is a {t}"
+            for t in c.get("immune_subtypes") or ():
+                if defender.has_state(f"subtype.{t}"):
+                    immune = f"{defender.name} is {t}"
+            if not immune and c.get("immune_crit"):
+                why = coup_mod.crit_immunity(defender)
+                immune = f"{defender.name} {why}" if why else ""
+            if immune:
+                out.append({"effect": {"ref": defender.ref, "kind": "charge_spent",
+                                       "what": e.name, "origin": e.origin},
+                            "tell": f"{immune}, and {e.name} finds nothing to stun."})
+                continue
+            roll = self.dice.d20(defender.save_modifiers(c["save"]),
+                                 label=f"{SAVES.get(c['save'], c['save'])} save against "
+                                       f"{e.name}", visibility=visibility)
+            made = d20_succeeds(roll, int(c["dc"]))
+            nat = natural_said(roll, int(c["dc"]))
+            line = (f"{defender.name} {'makes' if made else 'fails'} the "
+                    f"{SAVES.get(c['save'], c['save'])} save against {e.name} "
+                    f"({nat + ', ' if nat else ''}{roll.total} against DC {c['dc']})")
+            if made:
+                out.append({"effect": {"ref": defender.ref, "kind": "save",
+                                       "save": c["save"], "saved": True, "dc": c["dc"],
+                                       "origin": e.origin, "roll": roll.as_dict()},
+                            "tell": line + "."})
+                continue
+            rounds = c.get("rounds")
+            if c.get("rounds_dice"):
+                rounds = self.dice.roll(str(c["rounds_dice"]), label=f"{e.name}: rounds",
+                                        visibility=visibility).total
+            defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
+                                   source=e.name, origin=e.origin)
+            out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                   "condition": c["condition"], "rounds": rounds,
+                                   "from": e.name, "origin": e.origin,
+                                   "roll": roll.as_dict()},
+                        "tell": line + "; " + _ward_tell(self.scene, {
+                            "kind": "condition", "ref": defender.ref,
+                            "condition": c["condition"], "from": e.name})
+                        + (f" It lasts {rounds} round{'s' if rounds != 1 else ''}."
+                           if rounds else "")})
+        return out
+
+    def _end_class_stance(self, actor: Actor, eff: ActiveEffect) -> tuple[list[dict], list[str]]:
+        """End a stance a document put on: the effect, then what it left on others and
+        what it leaves behind (`Scene.stance_ended`)."""
+        before = actor.hp_max
+        actor.remove_effects(match=lambda e: e is eff)
+        if eff.source:
+            actor.clear_temp_hp(source=eff.source)
+        actor._follow_con(before)
+        return self.scene.stance_ended(actor, eff)
 
     def _op_blood_pool(self, intent: Intent, partial: dict) -> Outcome:
         """Put blood on the ground.
@@ -16736,13 +17550,64 @@ def survival_note(toll) -> str:
     if toll.nonlethal:
         bits.append(f"{toll.nonlethal} non-lethal")
     if toll.conditions:
-        bits.append(", ".join(toll.conditions))
-    if toll.collapsed:
-        bits.append("they went down where they stood")
+        bits.append(", ".join(c for c in toll.conditions if c != "asleep"))
+    # Three different endings since the sleep ladder (survival.py, 2026-10-05): a failed
+    # save stops the work, the third drops them asleep, and non-lethal past their hit
+    # points knocks them out. "They went down where they stood" was said for all three,
+    # and for the first it was false — they stop, fatigued, on their feet.
+    if toll.fell_asleep:
+        bits.append("they fell asleep where they stood")
+    elif toll.knocked_out:
+        bits.append("they collapsed, senseless")
+    elif toll.collapsed:
+        bits.append("they could not keep going")
     failed = sum(1 for c in toll.checks if not c["passed"])
     if failed and not bits:
         bits.append(f"{failed} failed check{'s' if failed != 1 else ''}")
     return ("; ".join(bits) + ".") if bits else "nothing they could not walk off."
+
+
+def _norm_word(text) -> str:
+    return " ".join(str(text or "").split()).strip().lower()
+
+
+def _printed_alignment(actor) -> str:
+    """The alignment a creature's stat block prints, or "" — the sheet has none (the
+    2026-09-19 ruling), so a person of the world has nothing to read."""
+    doc = actor._creature_doc() if hasattr(actor, "_creature_doc") else None
+    return str((doc or {}).get("alignment") or "").strip()
+
+
+def _could_be_evil(actor) -> bool:
+    """False only when a printed alignment says plainly that this creature is not evil.
+
+    "If the paladin targets a creature that is not evil, the smite is wasted" (CRB p.61).
+    An unprinted alignment cannot say so, and the app records none, so it is not
+    refused — the tell says nothing recorded it."""
+    said = _printed_alignment(actor).upper()
+    if not said:
+        return True
+    words = re.findall(r"[A-Z]+", said)
+    return "EVIL" in words or any(w in ("LE", "NE", "CE") for w in words) or "ANY" in words
+
+
+def _mercy_lifts(actor, removes: dict, ca) -> list[str]:
+    """The condition keys this character's chosen mercies lift, at their level."""
+    catalogue = {_norm_word(k): v for k, v in (removes.get("catalogue") or {}).items()}
+    out: list[str] = []
+    for pick in ca.chosen(actor, str(removes.get("choice") or "")):
+        row = catalogue.get(pick) or {}
+        if int(row.get("level", 1) or 1) <= ca.level_of(actor):
+            out.extend(str(c) for c in row.get("lifts") or ())
+    return list(dict.fromkeys(out))
+
+
+def _sized_weapon(w: dict, size: str) -> dict:
+    """A document's natural attack in the race documents' shape, its die keyed so the
+    sheet's natural-weapon reader finds it for this body (`Actor.natural_weapon`)."""
+    out = dict(w)
+    out["damage"] = dict(w.get("damage") or {})
+    return out
 
 
 def _doc_tell(template, actor) -> str:

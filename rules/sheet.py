@@ -2213,14 +2213,22 @@ class Actor:
         # because a body with no race reads as the default one.
         from . import animal_companion
 
-        doc = animal_companion.natural_weapon_doc(self) or self._race_doc()
-        if not doc:
-            return None
         want = " ".join(str(key or "").split()).lower()
         want = {"talon": "claws", "talons": "claws", "claw": "claws", "fangs": "bite",
                 "teeth": "bite", "horns": "gore", "horn": "gore", "tail": "tail slap",
                 "pincer": "pincers", "tentacles": "tentacle", "wing buffet": "wings",
                 "wing": "wings"}.get(want, want)
+        # A body an effect is holding — a wild shape's wolf, a rage's animal-fury bite —
+        # before the body the race document describes: the form is the body while it
+        # holds, and the effect's removal takes the jaws with it (law 2). The effect
+        # carries its attacks in the race documents' shape, damage keyed by size.
+        borrowed = [w for e in self.effects if isinstance(e.payload, dict)
+                    for w in (e.payload.get("natural_weapons") or ())]
+        doc = animal_companion.natural_weapon_doc(self) or self._race_doc() or {}
+        if borrowed:
+            doc = {**doc, "weapons": borrowed + list(doc.get("weapons") or ())}
+        if not doc:
+            return None
         for w in doc.get("weapons") or ():
             names = {str(w.get("key", "")).lower(), str(w.get("name", "")).lower()}
             if want not in names:
@@ -2513,7 +2521,8 @@ class Actor:
 
     # --- defence -----------------------------------------------------------------------
 
-    def ac_modifiers(self, against: str = "melee", flat_footed: bool = False) -> list[Modifier]:
+    def ac_modifiers(self, against: str = "melee", flat_footed: bool = False,
+                     attacker=None) -> list[Modifier]:
         mods = [Modifier(10, "base")]
         loses_dex = flat_footed or self.loses_dex_to_ac
 
@@ -2553,6 +2562,13 @@ class Actor:
         mods.extend(self._condition_mods("ac"))
         mods.extend(self._condition_mods(f"ac_{against}"))
         mods.extend(self._buff_mods("combat_mod", "ac"))
+        # The scoped terms, asked of THIS attacker and this kind of attack: a smite's
+        # deflection against the smitten, a dodge "against melee attacks". Only an
+        # effect's own scoped modifiers are added here — the unscoped ones arrived on the
+        # line above, and feats and gear keep the context-free read they always had.
+        if attacker is not None:
+            mods.extend(self._scoped_effect_mods(
+                "combat_mod", "ac", {"attacker_actor": attacker, "attack": against}))
         if loses_dex:
             # Denied Dex is denied dodge too — 1e: "any situation that denies you your
             # Dexterity bonus also denies you dodge bonuses". A negative Dex stays: a
@@ -2620,7 +2636,8 @@ class Actor:
     # inflating touch AC. 1e's rule is about the type, so the code asks about the type.
     _TOUCH_IGNORES = ("armour", "shield", "natural armour")
 
-    def touch_ac_modifiers(self, flat_footed: bool = False) -> list[Modifier]:
+    def touch_ac_modifiers(self, flat_footed: bool = False,
+                           attacker=None) -> list[Modifier]:
         """Armour class against a touch attack: everything except what you are wearing.
 
         This was `ac() - armour[ac] - shield[ac] - natural_armour`, three table lookups
@@ -2630,14 +2647,36 @@ class Actor:
         whose own notes read "worked into armour" were typed untyped and counted
         towards a number they have no business in.
         """
-        return [m for m in self.ac_modifiers("melee", flat_footed)
+        return [m for m in self.ac_modifiers("melee", flat_footed, attacker)
                 if (m.type or "") not in self._TOUCH_IGNORES] +             self._buff_mods("combat_mod", "touch_ac")
 
-    def touch_ac(self, flat_footed: bool = False) -> int:
-        return sum(m.value for m in self.touch_ac_modifiers(flat_footed))
+    def touch_ac(self, flat_footed: bool = False, attacker=None) -> int:
+        return sum(m.value for m in self.touch_ac_modifiers(flat_footed, attacker))
 
-    def ac(self, against: str = "melee", flat_footed: bool = False) -> int:
-        return sum(m.value for m in self.ac_modifiers(against, flat_footed))
+    def ac(self, against: str = "melee", flat_footed: bool = False, attacker=None) -> int:
+        return sum(m.value for m in self.ac_modifiers(against, flat_footed, attacker))
+
+    def _scoped_effect_mods(self, kind: str, target: str, ctx: dict) -> list[Modifier]:
+        """Only the effect modifiers that carry a scope (`vs`, `when`) and hold for ctx.
+
+        The other half of `_buff_mods`' scope check, for a builder whose ordinary read
+        has no context: the AC line. See `_effect_scope_holds`."""
+        want = str(target).lower()
+        held_off = self.has_state(MAGIC_SUPPRESSED)
+        out: list[Modifier] = []
+        for e in self.effects:
+            if held_off and is_magical(e):
+                continue
+            for m in e.modifiers:
+                amount = int(m.get("amount", 0) or 0)
+                if (m.get("vs") or m.get("when")) and m.get("kind") == kind \
+                        and str(m.get("target", "")).lower() == want and amount \
+                        and _effect_scope_holds(m, ctx):
+                    out.append(Modifier(amount, e.source or e.name or "a preparation",
+                                        _bonus_type(m.get("bonus_type"))))
+        if kind == "combat_mod" and want in ("ac", "touch_ac", "cmd") and self.loses_dex_to_ac:
+            out = [m for m in out if m.type != "dodge"]
+        return out
 
     # --- combat manoeuvres ---------------------------------------------------------
     #
@@ -3940,7 +3979,7 @@ class Actor:
             for m in e.modifiers:
                 amount = int(m.get("amount", 0) or 0)
                 if m.get("kind") == kind and str(m.get("target", "")).lower() == want \
-                        and amount:
+                        and amount and _effect_scope_holds(m, ctx):
                     out.append(Modifier(amount, e.source or e.name or "a preparation",
                                         _bonus_type(m.get("bonus_type"))))
         out += self._standing_mods(kind, target, ctx) + self._feat_mods(kind, target, ctx) \
@@ -4260,9 +4299,10 @@ class Actor:
             survival.AWAKE_GRACE_HOURS,
             f"past a day awake — Will save every active hour, "
             f"DC {survival.awake_dc(self.awake_checks)}",
-            "Past twenty-four hours awake: a Will save every hour spent working. "
-            "Failure deals non-lethal damage and fatigues, then exhausts — and the "
-            "hour you fail badly is the hour you fall where you stand."))
+            "Past twenty-four hours awake: a Will save every waking hour, one harder "
+            "each time. Failure deals non-lethal damage and fatigues, then exhausts — "
+            "and a failure while exhausted drops you asleep where you stand for eight "
+            "hours."))
         return out
 
     def summary(self) -> dict:
@@ -4993,6 +5033,36 @@ def _is_of_kind(actor, field_name: str, value) -> bool:
     bronze's "magical beast" or "monstrous humanoid") — by tag prefix (law 1)."""
     wanted = value if isinstance(value, (list, tuple)) else [value]
     return any(actor.has_state(f"{field_name}.{_kind_leaf(v)}") for v in wanted)
+
+
+def _effect_scope_holds(m: dict, ctx: dict | None) -> bool:
+    """Whether a scoped effect modifier counts on this roll. Unscoped ones always do.
+
+    The reader class abilities needed (docs/class-audit.md lane 4, 2026-10-05). Smite
+    evil's Charisma to hit, level to damage and deflection to AC are "against the target
+    of the smite" and nobody else; a rage power's dodge bonus is "against melee attacks".
+    An effect's modifiers were read unconditionally, so the only honest choice was to
+    leave those out. `vs` names a creature by ref — the defender of an attack or damage
+    roll (`target_actor`), or the attacker an AC is asked against (`attacker_actor`);
+    `when` is the feat documents' own clause vocabulary (`_when_holds`). A scoped term
+    with no context to answer it is dropped, as every unevaluable clause is: the sheet's
+    resting AC never shows a smite's deflection, which is the book.
+
+    Foundry's PF1 system has no target-scoped buff; the Roll Bonuses module adds exactly
+    this — "a buff that only gives a bonus when targeting specified tokens (e.g.
+    Paladin's Smite)" (foundryvtt.com/packages/ckl-roll-bonuses, read 2026-10-05).
+    """
+    vs = m.get("vs")
+    when = m.get("when")
+    if not vs and not when:
+        return True
+    if ctx is None:
+        return False
+    if vs:
+        refs = {getattr(ctx.get(k), "ref", None) for k in ("target_actor", "attacker_actor")}
+        if str(vs) not in refs:
+            return False
+    return _when_holds(when, ctx) if when else True
 
 
 def _when_holds(when, ctx: dict | None) -> bool:

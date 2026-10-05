@@ -129,7 +129,7 @@ the consuming application's job.
 
 | Key | Each entry |
 |---|---|
-| `settlements` | `{id, name, scale, sells, buys, tension, governed_by, parent_id}` |
+| `settlements` | `{id, name, scale, sells, buys, tension, governed_by, parent_id}`. *(proposed, read today)* `landforms`: `[{name, terrain, miles, words}]`, two to four named stretches of open ground within a short walk (a `crosses` terrain word, miles from the settlement's edge, the world's own clause). Given, it is the settlement's hinterland exactly; absent, the consumer derives one from the routes and the region's prose (docs/from-world-bible.md). |
 | `cast` | `{id, name, role, home_id, home}` |
 | `travel` | `{from_id, to_id, from, to, carrying, friction, by}` — a route is also a road between two places that demonstrably deal with each other. *(1.5)* `by` is `road`, `sea` or `river`, and it **outranks anything a consumer can work out**: a trade route is an economic relationship, and "Brackgate sells tempered steel to Ashwatch" was never a claim that you can walk there. Measured before it existed: 48 of Aurvantis's 48 legs crossed a continent boundary and every one of them was being walked. Aurvantis 1.5 says road 81, sea 38, river 13. |
 | `conflicts` | `{faction, wants, works_by, holds, undone_by}` — an aim plus a weakness is a plot with a way in and a way out. |
@@ -408,7 +408,15 @@ things to discover. A row that fails is reported, not guessed at.
 | `finishes` | treatments only: which gear it can be laid over (`weapon`, `armour`) | `[]` |
 | `not_on` | treatments only: material ids it may not be laid over (the book's alchemical silver is never put on adamantine, cold iron or mithral) | `[]` |
 | `assay_danger` | reactive metals only: what handling a sliver does to the assayer when its harm is not a carried effect. One type today, `suppress_magic` (noqual's, a house rule), with a `duration` and `"house": true` or `"book": true` | `null`: an assay is safe |
-| `price_gp`, `biomes`, `obtain` | what it costs at a market, where it is found, how (`mined`, `bought`, `harvested`) | none, `[]`, `""` |
+| `price_gp`, `biomes`, `obtain` | what it costs at a market, where it is found, how (`mined`, `bought`, `harvested`). **Required on a common `fuel`, `flux` or `quenchant`**: those are staples on every counter that sells the smith's supplies (`content/rules/stall-lines.json` `consumables`, 2026-10-05), and an unpriced one would be on none | none, `[]`, `""` |
+
+**Who sells a craft's supplies** (proposed, no reader yet). A `play.places[]` row may carry
+`"supplies": ["blacksmith"]` — the crafts whose consumables (fuel, flux, quench; solvents,
+salts, vials; bark, oil, wax, thread; ink, chalk, seal) its keeper always has, from
+`blacksmith`, `alchemist`, `leatherworker`, `enchanter`. Words only; the prices are the
+materials' own. Absent means the app's own table decides by the place's kind (the smithy,
+the tannery, the workshops); `[]` means the keeper sells none. Which materials a craft
+consumes is the app's (`consumables.kinds`), read off each row's `kind`, never its name.
 
 The app reads these through `rules/materials.py`; the forge's item build
 (`rules/forge_items.py`) computes everything else on read — a record of a forged item

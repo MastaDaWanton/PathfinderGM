@@ -39,14 +39,19 @@ def _by_name(world, name):
 def test_vormoor_land_is_farmland_then_mountain():
     """Measured 2026-09-28: `biomes.from_world` gave Vormoor `urban, desert, grassland,
     mountain`, and the grassland was "ash-fields" read as a field. Every road out of
-    Vormoor crosses farmland, then mountain. So: near is farmland and nothing else,
-    beyond begins with mountain, and grassland is nowhere."""
+    Vormoor crosses farmland, then mountain. So: near starts with farmland, beyond is the
+    mountain, and grassland is nowhere.
+
+    Since 2026-10-05 near also holds the land Vormoor sits in that no road puts further
+    out: Drossakar's "iron-rich badlands" and "volcanic ridgelines" (the hinterland,
+    docs/place-doors.md). Until then near was farmland alone, and the owner found nothing
+    outside the village but farmland."""
     world = load_cached(AURVANTIS)
     vormoor = _by_name(world, "Vormoor")
     assert "grassland" in biomes.from_world(world, vormoor)   # the defect, still in biomes
     land = geography.land_around(world, vormoor)
-    assert land.near == ("farmland",)
-    assert land.beyond[0] == "mountain"
+    assert land.near == ("farmland", "desert", "hills")
+    assert land.beyond == ("mountain",)
     assert "grassland" not in land.near + land.beyond
     assert "urban" not in land.near + land.beyond
     assert land.coast is False
@@ -113,14 +118,19 @@ def test_the_mileage_free_leg_invents_no_road_facts():
 
 def test_pangrella_falls_back_to_prose():
     """Design B §5: Pangrella's town has a single sea leg, so no road gives it near
-    ground; its Land comes from its nation's Region and its continent's prose."""
+    ground; its Land comes from its nation's Region and its continent's prose.
+
+    Since 2026-10-05 the continent's own grasslands and plateaus are near (the land the
+    town sits in, the hinterland); "Kyropticus deserts" are another people's, and stay
+    beyond with the lake."""
     world = load_cached(PANGRELLA)
     town = _by_name(world, "Pangrella")
     roads = geography.roads_out(world, town)
     assert [r.how for r in roads] == ["sea-after-road"]
     land = geography.land_around(world, town)
-    assert land.near == ()
-    assert {"grassland", "desert", "mountain"} <= set(land.beyond)
+    assert land.near == ("grassland", "mountain")
+    assert "desert" in land.beyond
+    assert {"grassland", "desert", "mountain"} <= set(land.near + land.beyond)
     assert land.source == "derived"
 
 
