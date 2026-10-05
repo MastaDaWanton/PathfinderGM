@@ -2214,8 +2214,13 @@ _SLEEPS = re.compile(
     r"\b(?:sleep|go to sleep|bed down|turn in|doze off|get some (?:sleep|rest)"
     r"|rest (?:for the night|until (?:morning|dawn|daybreak)|till (?:morning|dawn)))\b",
     re.I)
+# The refusals were missing until 2026-10-05: the survival lane's live run sent "refusing to
+# sleep" and the engine put the character to bed — `_SLEEPS` found "sleep" and nothing here
+# said no. Fighting it off, resisting it and keeping from it are the same refusal.
 _WONT_SLEEP = re.compile(r"\b(?:can't|cannot|won't|will not|don't|do not|no|never|without"
-                         r"|before I|rather than)\s+(?:\w+\s){0,2}?sleep", re.I)
+                         r"|before I|rather than|refus\w*|resist\w*|fight\w*(?: off)?"
+                         r"|stave off|ward off|keep from|keeping from|try not to"
+                         r"|trying not to|avoid\w*)\s+(?:\w+\s){0,3}?sleep", re.I)
 _EATS = re.compile(r"\b(?:eat|eats|eating|have (?:a|some) (?:meal|food|breakfast|supper"
                    r"|dinner)|chew|rations?)\b", re.I)
 _DRINKS = re.compile(r"\b(?:drink|drinks|drinking|waterskin)\b", re.I)

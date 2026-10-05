@@ -434,6 +434,21 @@ def test_a_refusal_to_sleep_is_not_sleeping(scene):
     assert "rest" not in [r["op"] for r in out]
 
 
+@pytest.mark.parametrize("line", [
+    "I keep walking, refusing to sleep.",
+    "I refuse to sleep until we reach the gate.",
+    "I fight off sleep and keep going.",
+    "I resist the urge to sleep.",
+    "I try not to fall asleep at the fire.",
+])
+def test_refusing_sleep_is_not_sleeping(scene, line):
+    """The survival lane's live run, 2026-10-05: "refusing to sleep" put the character to
+    bed — `_WONT_SLEEP` had no "refus" form, so `_SLEEPS` found "sleep" and a rest op was
+    injected on a line that said the opposite."""
+    out = judgement.inject_survival([{"op": "narrate_only"}], line, scene)
+    assert "rest" not in [r["op"] for r in out]
+
+
 def test_making_camp_alone_is_not_sleeping(scene):
     """The playtest's own player made camp and then scouted for an hour. Camp is where
     you sleep, not the sleeping."""
