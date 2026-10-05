@@ -1,0 +1,40 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live through the modifier funnel; nothing is stored",
+    "on a sheet. `number` is the number on the highest rung of the ladder reached, `rank`",
+    "the rungs climbed. Rules from the Core Rulebook barbarian, checked against",
+    "d20pfsrd.com/classes/core-classes/barbarian (fetched 2026-10-05)."
+  ],
+  "fast-movement": {
+    "name": "Fast movement",
+    "source": "CRB, Barbarian: \"A barbarian's land speed is faster than the norm for her race by +10 feet. This benefit applies only when he is wearing no armor, light armor, or medium armor, and not carrying a heavy load. Apply this bonus before modifying the barbarian's speed because of any load carried or armor worn.\"",
+    "modifiers": [
+      {
+        "type": "speed",
+        "target": "land_base",
+        "amount": 10,
+        "bonus_type": "untyped",
+        "when": {"bearer": {"armour": ["none", "light", "medium"], "load": ["light", "medium"]}}
+      }
+    ]
+  },
+  "damage-reduction": {
+    "name": "Damage reduction",
+    "source": "CRB, Barbarian: \"At 7th level, a barbarian gains damage reduction. Subtract 1 from the damage the barbarian takes each time she is dealt damage from a weapon or a natural attack. At 10th level, and every three barbarian levels thereafter (13th, 16th, and 19th level), this damage reduction rises by 1 point.\" The table's rungs carry the number (1/- ... 5/-).",
+    "dr": {"amount": "number", "bypass": "$rung"}
+  },
+  "trap-sense": {
+    "name": "Trap sense",
+    "source": "CRB, Barbarian: \"+1 bonus on Reflex saves made to avoid traps and a +1 dodge bonus to AC against attacks made by traps\", rising by 1 every three levels (the table's +1 ... +6).",
+    "modifiers": [
+      {"type": "save_mod", "target": "ref", "formula": "number", "bonus_type": "untyped",
+       "when": {"against": "trap"}},
+      {"type": "combat_mod", "target": "ac", "formula": "number", "bonus_type": "dodge",
+       "when": {"against": "trap"}}
+    ],
+    "not_yet": [
+      "against: trap — no save or attack roll says it comes from a trap yet (the hazard op's saves pass no descriptor), so both terms are dropped, never applied"
+    ]
+  }
+}

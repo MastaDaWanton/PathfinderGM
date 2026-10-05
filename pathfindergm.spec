@@ -47,6 +47,7 @@ CONTENT_DIRS = [
     "world-classes",
     "domains",     # the domains' granted powers (content/domains, rules/domains.py)
     "companions",  # the animal companion table and animals (rules/animal_companion.py)
+    "class-features",  # classes' passive numbers as documents (rules/classfeatures.py)
 ]
 
 datas = [(f"content/{name}", f"content/{name}") for name in CONTENT_DIRS]

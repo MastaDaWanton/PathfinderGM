@@ -1,0 +1,58 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Rules from the",
+    "Core Rulebook paladin, checked against d20pfsrd.com/classes/core-classes/paladin",
+    "(fetched 2026-10-05). The auras' ally halves (+4 morale to allies within 10 feet) wait",
+    "for a reader of who stands within 10 feet of whom and are said in each `not_yet`."
+  ],
+  "divine-grace": {
+    "name": "Divine grace",
+    "source": "CRB, Paladin: \"At 2nd level, a paladin gains a bonus equal to her Charisma bonus (if any) on all Saving Throws.\"",
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "formula": "max(0, cha_mod)", "bonus_type": "untyped"},
+      {"type": "save_mod", "target": "ref", "formula": "max(0, cha_mod)", "bonus_type": "untyped"},
+      {"type": "save_mod", "target": "will", "formula": "max(0, cha_mod)", "bonus_type": "untyped"}
+    ]
+  },
+  "aura-of-courage": {
+    "name": "Aura of courage",
+    "source": "CRB, Paladin: \"At 3rd level, a paladin is immune to fear (magical or otherwise). Each ally within 10 feet of her gains a +4 morale bonus on saving throws against fear effects.\"",
+    "immunities": ["fear"],
+    "not_yet": ["the allies' +4 morale bonus against fear within 10 feet"]
+  },
+  "divine-health": {
+    "name": "Divine health",
+    "source": "CRB, Paladin: \"At 3rd level, a paladin is immune to all diseases, including supernatural and magical diseases, including mummy rot.\"",
+    "immunities": ["disease"]
+  },
+  "aura-of-resolve": {
+    "name": "Aura of resolve",
+    "source": "CRB, Paladin: \"At 8th level, a paladin is immune to charm spells and spell-like abilities. Each ally within 10 feet of her gains a +4 morale bonus on saving throws against charm effects.\"",
+    "immunities": ["charm"],
+    "not_yet": ["the allies' +4 morale bonus against charm within 10 feet"]
+  },
+  "aura-of-faith": {
+    "name": "Aura of faith",
+    "source": "CRB, Paladin: \"At 14th level, a paladin's weapons are treated as good-aligned for the purposes of overcoming damage reduction.\"",
+    "weapon": {"applies_to": "all", "strikes_as": ["good"]},
+    "not_yet": ["\"Any attack made against an enemy within 10 feet of her is treated as good-aligned\" — allies' attacks"]
+  },
+  "aura-of-righteousness": {
+    "name": "Aura of righteousness",
+    "source": "CRB, Paladin: \"At 17th level, a paladin gains DR 5/evil and immunity to compulsion spells and spell-like abilities. Each ally within 10 feet of her gains a +4 morale bonus on saving throws against compulsion effects.\" The DR is the table's own \"damage reduction 5/evil\" row, read by `damage-reduction`.",
+    "immunities": ["compulsion"],
+    "not_yet": ["the allies' +4 morale bonus against compulsion within 10 feet"]
+  },
+  "damage-reduction": {
+    "name": "Damage reduction",
+    "source": "CRB, Paladin, Aura of Righteousness: \"At 17th level, a paladin gains DR 5/evil\" — the table's \"damage reduction 5/evil\" rung.",
+    "dr": {"amount": "number", "bypass": "$rung"}
+  },
+  "holy-champion": {
+    "name": "Holy champion",
+    "source": "CRB, Paladin: \"At 20th level, a paladin becomes a conduit for the power of her god. Her DR increases to 10/evil.\" Best-only against the 5/evil: DR never adds up.",
+    "dr": {"amount": 10, "bypass": "evil"},
+    "not_yet": ["smite evil's banishment of an evil outsider: smite is lane 4's ability document"]
+  }
+}

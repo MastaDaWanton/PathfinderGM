@@ -66,14 +66,16 @@
     "stunning fist",
     "unarmed strike (1d6)",
     "AC bonus (Wis)"
-   ]
+   ],
+   "fist": "1d6"
   },
   {
    "level": 2,
    "grants": [
     "bonus feat",
     "evasion"
-   ]
+   ],
+   "fist": "1d6"
   },
   {
    "level": 3,
@@ -81,122 +83,156 @@
     "fast movement +10 ft",
     "maneuver training",
     "still mind"
-   ]
+   ],
+   "fist": "1d6"
   },
   {
    "level": 4,
    "grants": [
     "ki pool",
     "slow fall 20 ft",
-    "unarmed strike 1d8"
-   ]
+    "unarmed strike 1d8",
+    "AC bonus +1",
+    "ki strike (magic)"
+   ],
+   "fist": "1d8"
   },
   {
    "level": 5,
    "grants": [
     "high jump",
     "purity of body"
-   ]
+   ],
+   "fist": "1d8"
   },
   {
    "level": 6,
    "grants": [
     "bonus feat",
-    "slow fall 30 ft"
-   ]
+    "slow fall 30 ft",
+    "fast movement +20 ft"
+   ],
+   "fist": "1d8"
   },
   {
    "level": 7,
    "grants": [
-    "wholeness of body"
-   ]
+    "wholeness of body",
+    "ki strike (cold iron/silver)"
+   ],
+   "fist": "1d8"
   },
   {
    "level": 8,
    "grants": [
-    "slow fall 40 ft"
-   ]
+    "slow fall 40 ft",
+    "unarmed strike 1d10",
+    "AC bonus +2"
+   ],
+   "fist": "1d10"
   },
   {
    "level": 9,
    "grants": [
-    "improved evasion"
-   ]
+    "improved evasion",
+    "fast movement +30 ft"
+   ],
+   "fist": "1d10"
   },
   {
    "level": 10,
    "grants": [
     "bonus feat",
-    "slow fall 50 ft"
-   ]
+    "slow fall 50 ft",
+    "ki strike (lawful)"
+   ],
+   "fist": "1d10"
   },
   {
    "level": 11,
    "grants": [
     "diamond body"
-   ]
+   ],
+   "fist": "1d10"
   },
   {
    "level": 12,
    "grants": [
     "abundant step",
     "unarmed strike 2d6",
-    "slow fall 60 ft"
-   ]
+    "slow fall 60 ft",
+    "AC bonus +3",
+    "fast movement +40 ft"
+   ],
+   "fist": "2d6"
   },
   {
    "level": 13,
    "grants": [
     "diamond soul"
-   ]
+   ],
+   "fist": "2d6"
   },
   {
    "level": 14,
    "grants": [
     "bonus feat",
     "slow fall 70 ft"
-   ]
+   ],
+   "fist": "2d6"
   },
   {
    "level": 15,
    "grants": [
-    "quivering palm"
-   ]
+    "quivering palm",
+    "fast movement +50 ft"
+   ],
+   "fist": "2d6"
   },
   {
    "level": 16,
    "grants": [
     "slow fall 80 ft",
-    "unarmed strike 2d8"
-   ]
+    "unarmed strike 2d8",
+    "AC bonus +4",
+    "ki strike (adamantine)"
+   ],
+   "fist": "2d8"
   },
   {
    "level": 17,
    "grants": [
     "timeless body",
     "tongue of the sun and moon"
-   ]
+   ],
+   "fist": "2d8"
   },
   {
    "level": 18,
    "grants": [
     "bonus feat",
-    "slow fall 90 ft"
-   ]
+    "slow fall 90 ft",
+    "fast movement +60 ft"
+   ],
+   "fist": "2d8"
   },
   {
    "level": 19,
    "grants": [
     "empty body"
-   ]
+   ],
+   "fist": "2d8"
   },
   {
    "level": 20,
    "grants": [
     "perfect self",
     "unarmed strike 2d10",
-    "slow fall any distance"
-   ]
+    "slow fall any distance",
+    "AC bonus +5"
+   ],
+   "fist": "2d10"
   }
- ]
+ ],
+ "_table_note": "Table rows checked against the Core Rulebook monk table (AoN ClassDisplay Monk and the d20pfsrd monk page, fetched 2026-10-05). Added 2026-10-05, class audit lane 3: the 1d10 unarmed die at 8th, the AC bonus ladder (+1 at 4th, +1 per four levels to +5 at 20th), fast movement +20/+30/+40/+50/+60 ft at 6th/9th/12th/15th/18th, ki strike's four rungs (magic 4th, cold iron/silver 7th, lawful 10th, adamantine 16th), and the `fist` column: the Medium unarmed die per level, which content/class-features/monk.json reads and rules/weapons.py:size_die scales for a Small or Large monk."
 }

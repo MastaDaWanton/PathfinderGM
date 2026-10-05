@@ -1,0 +1,36 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Rules from the",
+    "Core Rulebook rogue (d20pfsrd.com/classes/core-classes/rogue, checked 2026-09-20 for",
+    "docs/hollow-classes.md). Uncanny dodge, improved uncanny dodge and evasion are read by",
+    "their tags (rules/classfeatures.py: caught_flat_footed, cannot_be_flanked, evades)."
+  ],
+  "trapfinding": {
+    "name": "Trapfinding",
+    "source": "CRB, Rogue: \"A rogue adds 1/2 her level to Perception skill checks made to locate traps and to Disable Device skill checks (minimum +1).\"",
+    "modifiers": [
+      {"type": "skill_mod", "target": "disable device", "formula": "max(1, class_level // 2)",
+       "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "perception", "formula": "max(1, class_level // 2)",
+       "bonus_type": "untyped", "when": {"against": "trap"}}
+    ],
+    "not_yet": [
+      "the Perception half is \"to locate traps\": no skill roll says what it is looking for, so it is dropped, never applied",
+      "\"A rogue can use Disable Device to disarm magic traps\": no trap op distinguishes them"
+    ]
+  },
+  "trap-sense": {
+    "name": "Trap sense",
+    "source": "CRB, Rogue: \"At 3rd level, a rogue gains an intuitive sense that alerts her to danger from traps, giving her a +1 bonus on Reflex saves made to avoid traps and a +1 dodge bonus to AC against attacks made by traps. These bonuses rise to +2 when the rogue reaches 6th level, to +3 when she reaches 9th level, to +4 when she reaches 12th level, to +5 at 15th, and to +6 at 18th level.\"",
+    "modifiers": [
+      {"type": "save_mod", "target": "ref", "formula": "number", "bonus_type": "untyped",
+       "when": {"against": "trap"}},
+      {"type": "combat_mod", "target": "ac", "formula": "number", "bonus_type": "dodge",
+       "when": {"against": "trap"}}
+    ],
+    "not_yet": [
+      "against: trap — no save or attack roll says it comes from a trap yet, so both terms are dropped, never applied"
+    ]
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Rules from the",
+    "Core Rulebook ranger, checked against d20pfsrd.com/classes/core-classes/ranger (fetched",
+    "2026-10-05). The picks are lane 1's to write (docs/class-audit.md §8) and are read",
+    "through classfeatures.chosen; each pick may carry its own `bonus`, because which",
+    "earlier pick the book's \"+2 to one existing\" goes to is the player's choice."
+  ],
+  "favored-enemy": {
+    "name": "Favored enemy",
+    "source": "CRB, Ranger: \"At 1st level, a ranger selects a creature type from the ranger favored enemies table. He gains a +2 bonus on Bluff, Knowledge, Perception, Sense Motive, and Survival checks against creatures of his selected type. Likewise, he gets a +2 bonus on weapon attack and damage rolls against them ... At 5th level and every five levels thereafter (10th, 15th, and 20th level), the ranger may select an additional favored enemy. In addition, at each such interval, the bonus against any one favored enemy (including the one just selected, if so desired) increases by +2. If a specific creature falls into more than one category of favored enemy, the ranger's bonuses do not stack; he simply uses whichever bonus is higher.\" The bonus type is named so the funnel takes the higher.",
+    "choice": "favored enemy",
+    "pick_bonus": "2",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": "$bonus",
+       "bonus_type": "favored enemy", "when": {"target": "$pick"}},
+      {"type": "combat_mod", "target": "damage", "amount": "$bonus",
+       "bonus_type": "favored enemy", "when": {"target": "$pick"}},
+      {"type": "skill_mod", "target": "bluff", "amount": "$bonus",
+       "bonus_type": "favored enemy", "when": {"target": "$pick"}},
+      {"type": "skill_mod", "target": "perception", "amount": "$bonus",
+       "bonus_type": "favored enemy", "when": {"target": "$pick"}},
+      {"type": "skill_mod", "target": "sense motive", "amount": "$bonus",
+       "bonus_type": "favored enemy", "when": {"target": "$pick"}},
+      {"type": "skill_mod", "target": "survival", "amount": "$bonus",
+       "bonus_type": "favored enemy", "when": {"target": "$pick"}}
+    ],
+    "not_yet": [
+      "the skill terms: a skill roll carries no target, so they are dropped, never applied",
+      "Knowledge checks against them: which Knowledge skill identifies which type is not modelled"
+    ]
+  },
+  "favored-terrain": {
+    "name": "Favored terrain",
+    "source": "CRB, Ranger: \"At 3rd level, a ranger may select a type of terrain from the Favored Terrains table. The ranger gains a +2 bonus on initiative checks and Knowledge (geography), Perception, Stealth, and Survival skill checks when he is in this terrain ... At 8th level and every five levels thereafter, the ranger may select an additional favored terrain. In addition, at each such interval, the skill bonus and initiative bonus in any one favored terrain (including the one just selected, if so desired), increases by +2.\" The terrain is read off the ground word in the ranger's own place id (rules/classfeatures.py TERRAINS).",
+    "choice": "favored terrain",
+    "pick_bonus": "2",
+    "modifiers": [
+      {"type": "combat_mod", "target": "initiative", "amount": "$bonus",
+       "bonus_type": "favored terrain", "when": {"bearer": {"terrain": "$pick"}}},
+      {"type": "skill_mod", "target": "knowledge (geography)", "amount": "$bonus",
+       "bonus_type": "favored terrain", "when": {"bearer": {"terrain": "$pick"}}},
+      {"type": "skill_mod", "target": "perception", "amount": "$bonus",
+       "bonus_type": "favored terrain", "when": {"bearer": {"terrain": "$pick"}}},
+      {"type": "skill_mod", "target": "stealth", "amount": "$bonus",
+       "bonus_type": "favored terrain", "when": {"bearer": {"terrain": "$pick"}}},
+      {"type": "skill_mod", "target": "survival", "amount": "$bonus",
+       "bonus_type": "favored terrain", "when": {"bearer": {"terrain": "$pick"}}}
+    ],
+    "not_yet": ["\"A ranger traveling through his favored terrain normally leaves no trail\": no tracking op"]
+  },
+  "evasion": {
+    "name": "Evasion",
+    "source": "CRB, Ranger: \"This ability can only be used if the ranger is wearing light armor, medium armor, or no armor.\" (The rogue's and monk's is light or none.)",
+    "evasion": {"armour": ["light", "medium"]}
+  },
+  "improved-evasion": {
+    "name": "Improved evasion",
+    "source": "CRB, Ranger: improved evasion, under the same armour clause as the ranger's evasion.",
+    "evasion": {"armour": ["light", "medium"]}
+  }
+}

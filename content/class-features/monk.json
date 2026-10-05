@@ -1,0 +1,91 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of",
+    "the grant on the class table. Read live; nothing is stored on a sheet. Rules from the",
+    "Core Rulebook monk, checked row by row against aonprd.com/ClassDisplay.aspx?ItemName=Monk",
+    "and d20pfsrd.com/classes/core-classes/monk (fetched 2026-10-05). The monk's armour",
+    "clause is the book's: \"When wearing armor, using a shield, or carrying a medium or heavy",
+    "load, a monk loses his AC bonus, as well as his fast movement and flurry of blows.\""
+  ],
+  "unarmed-strike": {
+    "name": "Unarmed strike",
+    "source": "CRB, Monk: \"A monk also deals more damage with his unarmed strikes than a normal person would, as shown on Table: Monk\" (1d6 at 1st, 1d8 at 4th, 1d10 at 8th, 2d6 at 12th, 2d8 at 16th, 2d10 at 20th; Small and Large on Table: Small or Large Monk Unarmed Damage). The die is the table's `fist` column; rules/weapons.py:size_die scales it.",
+    "weapon": {"applies_to": "unarmed", "damage_column": "fist"}
+  },
+  "ac-bonus": {
+    "name": "AC bonus",
+    "source": "CRB, Monk: \"When unarmored and unencumbered, the monk adds his Wisdom bonus (if any) to his AC and his CMD. In addition, a monk gains a +1 bonus to AC and CMD at 4th level. This bonus increases by 1 for every four monk levels thereafter, up to a maximum of +5 at 20th level. These bonuses to AC apply even against touch attacks or when the monk is flat-footed. He loses these bonuses when he is immobilized or helpless, when he wears any armor, when he carries a shield, or when he carries a medium or heavy load.\" The +1 ... +5 is the table's AC bonus rungs.",
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "formula": "max(0, wis_mod) + number",
+       "bonus_type": "untyped",
+       "when": {"bearer": {"armour": ["none"], "shield": false, "load": ["light"],
+                           "helpless": false}}},
+      {"type": "combat_mod", "target": "cmd", "formula": "max(0, wis_mod) + number",
+       "bonus_type": "untyped",
+       "when": {"bearer": {"armour": ["none"], "shield": false, "load": ["light"],
+                           "helpless": false}}}
+    ]
+  },
+  "fast-movement": {
+    "name": "Fast movement",
+    "source": "CRB, Monk: \"At 3rd level, a monk gains an enhancement bonus to his land speed, as shown on Table: Monk. A monk in armor or carrying a medium or heavy load loses this extra speed.\" +10 ft at 3rd, +20 at 6th, +30 at 9th, +40 at 12th, +50 at 15th, +60 at 18th.",
+    "modifiers": [
+      {"type": "speed", "target": "land", "formula": "number", "bonus_type": "enhancement",
+       "when": {"bearer": {"armour": ["none"], "shield": false, "load": ["light"]}}}
+    ]
+  },
+  "maneuver-training": {
+    "name": "Maneuver training",
+    "source": "CRB, Monk: \"At 3rd level, a monk uses his monk level in place of his base attack bonus when calculating his Combat Maneuver Bonus.\" Written as the difference, so the popup shows BAB and this term side by side and the total is monk level.",
+    "modifiers": [
+      {"type": "combat_mod", "target": "cmb", "formula": "class_level - bab",
+       "bonus_type": "untyped"}
+    ]
+  },
+  "still-mind": {
+    "name": "Still mind",
+    "source": "CRB, Monk: \"A monk of 3rd level or higher gains a +2 bonus on saving throws against enchantment spells and effects.\"",
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "enchantment"}},
+      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "enchantment"}},
+      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "enchantment"}}
+    ],
+    "not_yet": [
+      "against: enchantment — spell saves pass only \"spell\", never the school, so the term is dropped, never applied"
+    ]
+  },
+  "ki-strike": {
+    "name": "Ki strike",
+    "source": "CRB, Monk, Ki Pool: \"As long as he has at least 1 point in his ki pool, he can make a ki strike. At 4th level, ki strike allows his unarmed attacks to be treated as magic weapons for the purpose of overcoming damage reduction. At 7th level, his unarmed attacks are also treated as cold iron and silver ... At 10th level, his unarmed attacks are also treated as lawful weapons ... At 16th level, his unarmed attacks are treated as adamantine weapons for the purpose of overcoming damage reduction and bypassing hardness.\" One rung each on the table.",
+    "weapon": {
+      "applies_to": "unarmed",
+      "strikes_as_by_rank": {"1": ["magic"], "2": ["cold_iron", "silver"], "3": ["lawful"],
+                             "4": ["adamantine"]},
+      "when": {"bearer": {"pool": "ki"}}
+    },
+    "not_yet": [
+      "adamantine's \"bypassing hardness\" when a fist strikes an object: sundering is a weapon's, not the fist's, in the manoeuvre table"
+    ]
+  },
+  "purity-of-body": {
+    "name": "Purity of body",
+    "source": "CRB, Monk: \"At 5th level, a monk gains immunity to all diseases, including supernatural and magical diseases.\"",
+    "immunities": ["disease"]
+  },
+  "diamond-body": {
+    "name": "Diamond body",
+    "source": "CRB, Monk: \"At 11th level, a monk gains immunity to poisons of all kinds.\"",
+    "immunities": ["poison"]
+  },
+  "perfect-self": {
+    "name": "Perfect self",
+    "source": "CRB, Monk: \"At 20th level, a monk ... gains damage reduction 10/chaotic, which allows him to ignore the first 10 points of damage from any attack made by a nonchaotic weapon.\"",
+    "dr": {"amount": 10, "bypass": "chaotic"},
+    "not_yet": [
+      "treated as an outsider rather than a humanoid for spells and magical effects: no spell targets by creature type yet"
+    ]
+  }
+}
