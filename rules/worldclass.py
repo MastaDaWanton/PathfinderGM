@@ -274,6 +274,8 @@ MANUAL_MP = 5               # an unread herbalism manual, once per manual
 HERBALISM_SCHEMA = 2
 # The stamp `migrate_blacksmith` writes (docs/blacksmithing-revamp-plan.md §14).
 BLACKSMITH_SCHEMA = 2
+# The stamp `migrate_enchanter` writes (docs/enchanting-revamp-plan.md §19).
+ENCHANTER_SCHEMA = 2
 
 
 def quality_name(index: int) -> str:
@@ -358,6 +360,11 @@ def perk_multipliers(progress: Progress) -> dict:
     }
     if track is not None and "hardening" in track.perks:
         out["hardening"] = round((1 - _perk_size(track, "hardening")) ** n["hardening"], 4)
+    # The Enchanter's Capacity perk (enchanting plan §5.2): +N to what an item holds, a
+    # count `magic_layer.capacity` adds, so it is said as one rather than a multiplier.
+    if track is not None and "capacity" in track.perks:
+        out["capacity"] = int(_perk_size(track, "capacity") * int(progress.perks.get(
+            "capacity", 0) or 0))
     return out
 
 
@@ -548,9 +555,28 @@ def migrate_blacksmith(progress: Progress) -> bool:
     return True
 
 
+def migrate_enchanter(progress: Progress) -> bool:
+    """Settle a pre-revamp Enchanter under the 2026-10-05 rules, once (enchanting plan §19).
+    True if it ran.
+
+    The Herbalist's and the Blacksmith's conversion: the unlocks stop at 3 and the bank is
+    counted from the level, so an old Enchanter 4 holds one pick-pair and an old 5 two,
+    waiting at the circle. Banked mastery is untouched; an old `legendary-binding` in
+    `milestones` is inert. Old recipes and enchanted items are lane H's (the plan's §19,
+    wave 2), read through `rules/enchanter.py`; this only stamps the progress.
+
+    Idempotent by the stamp, so running it on every load is safe.
+    """
+    if int(progress.schema) >= ENCHANTER_SCHEMA:
+        return False
+    progress.schema = ENCHANTER_SCHEMA
+    return True
+
+
 # Load-time migrations by track id. The one place a track is named in this module, and
 # only because a migration is by definition about one track's own history.
-MIGRATIONS = {"herbalist": migrate_herbalist, "blacksmith": migrate_blacksmith}
+MIGRATIONS = {"herbalist": migrate_herbalist, "blacksmith": migrate_blacksmith,
+              "enchanter": migrate_enchanter}
 
 
 def migrate(progress: Progress) -> bool:

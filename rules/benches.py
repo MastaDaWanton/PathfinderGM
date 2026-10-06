@@ -144,6 +144,14 @@ class MovedBench(UnknownBench):
 MOVED: dict[str, str] = {
     "herbalist": ("Herbalism works one step at a time at the table's bench now. "
                   "The chain bench no longer takes herbalism."),
+    # The enchanting revamp (docs/enchanting-revamp-plan.md, 2026-10-05): the circle is its
+    # own bench (play/enchant_views.py), prepare, attune and bind on a real vessel. The old
+    # chain's methods (scribe, seal, imbue, empower) are gone from the track, and the chain
+    # could never enchant from this page anyway: it sent the Shaping text as the item and
+    # refused every essence binding "not masterwork" (plan §1, measured on e028885). The
+    # "By the book" mode is a separate tab, left to the UI wave (U7) to retire.
+    "enchanter": ("Enchanting is worked at the circle at the table now, one step at a "
+                  "time: prepare, attune, bind. The chain bench no longer takes it."),
 }
 
 
@@ -246,9 +254,11 @@ METHOD_GLYPHS: dict[str, dict[str, str]] = {
         "react": "💥", "stabilize": "⚖️", "sublime": "☁️", "catalyze": "💠",
         "seal": "🧴",
     },
+    # The circle's eight (enchanting revamp, 2026-10-05). The new bench draws icon masks
+    # (UI plan §4); these serve only the old /craft/ page's station chips.
     "enchanter": {
-        "attune": "🧿", "scribe": "🖋️", "bind": "🔗", "seal": "📿", "focus": "💎",
-        "channel": "⚡", "imbue": "✨", "empower": "⭐", "awaken": "👁️",
+        "prepare": "🖋️", "attune": "🧿", "bind": "🔗", "refine": "⚗️", "unbind": "⛓️",
+        "cleanse": "☀️", "read": "👁️", "identify": "🔍",
     },
 }
 

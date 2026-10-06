@@ -1109,6 +1109,35 @@
    "color": "#7b6cf6"
   },
   {
+   "id": "arcane-residue",
+   "name": "Arcane Residue",
+   "kind": "essence",
+   "tier": "common",
+   "family": "arcane",
+   "obtain": "unbound",
+   "text": "What is left in the chalk when a layer is unpicked from an item: a grey sediment that still remembers being magic. One mote a pinch, it grants nothing of its own; seated beside a granting essence it pays toward the working. Unbinding returns a quarter of the layer's motes as residue (the owner's round 4 ruling); nobody sells it.",
+   "polarity": "any",
+   "grants": null,
+   "motes": 1,
+   "form": "phial",
+   "affinity": [
+    "mithral",
+    "gold",
+    "platinum"
+   ],
+   "house": [
+    {
+     "type": "skill_mod",
+     "target": "spellcraft",
+     "amount": 1,
+     "bonus_type": "competence",
+     "house": true
+    }
+   ],
+   "working": [],
+   "color": "#9c8fd0"
+  },
+  {
    "id": "warding-essence-i",
    "name": "Warding Essence I",
    "kind": "essence",

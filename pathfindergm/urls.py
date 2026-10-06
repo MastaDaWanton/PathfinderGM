@@ -33,7 +33,7 @@ from django.urls import path, re_path
 
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
-                  works_views)
+                  works_views, enchant_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -114,6 +114,22 @@ urlpatterns = [
     path("api/works", works_views.works, name="works"),
     path("api/works/collect", works_views.works_collect, name="works_collect"),
     path("api/works/cancel", works_views.works_cancel, name="works_cancel"),
+    # The enchanting bench (docs/enchanting-contracts.md §6). Lane E's block: every fixed
+    # name above the one pattern with a parameter, and all of it above the homebrew
+    # benches' `api/bench/<bench_id>` (the herb bench's route-order bug, test_bench_routes;
+    # tests/test_enchant_api.py pins it).
+    path("api/enchant/state", enchant_views.enchant_state, name="enchant_state"),
+    path("api/enchant/check", enchant_views.enchant_check, name="enchant_check"),
+    path("api/enchant/roll", enchant_views.enchant_roll, name="enchant_roll"),
+    path("api/enchant/finish", enchant_views.enchant_finish, name="enchant_finish"),
+    path("api/enchant/read", enchant_views.enchant_read, name="enchant_read"),
+    path("api/enchant/identify", enchant_views.enchant_identify, name="enchant_identify"),
+    path("api/enchant/wait", enchant_views.enchant_wait, name="enchant_wait"),
+    path("api/enchant/perks", enchant_views.enchant_perks, name="enchant_perks"),
+    path("api/enchant/ledger", enchant_views.enchant_ledger, name="enchant_ledger"),
+    path("api/enchant/recipes", enchant_views.enchant_recipes, name="enchant_recipes"),
+    path("api/enchant/essence/<str:essence_id>", enchant_views.enchant_essence,
+         name="enchant_essence"),
     # The herbalism bench (docs/herbalism-contracts.md §3), ABOVE the homebrew benches'
     # `api/bench/<bench_id>`: Django takes the first match, and below it "state" was read
     # as a homebrew bench id and answered 404 "no bench 'state'" (Lane D, 2026-10-02).

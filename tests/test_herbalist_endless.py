@@ -18,8 +18,10 @@ from rules import worldclass as wc
 from rules.sheet import from_dict, load_pc, to_dict
 
 # Blacksmith left this list with its own revamp (docs/blacksmithing-revamp-plan.md §4): it
-# is three levels then endless now, pinned by tests/test_forge_bench.py.
-OTHERS = ("alchemist", "leatherworker", "enchanter")
+# is three levels then endless now, pinned by tests/test_forge_bench.py. The Enchanter
+# left with its own (docs/enchanting-revamp-plan.md §5, 2026-10-05), pinned by
+# tests/test_enchanter.py.
+OTHERS = ("alchemist", "leatherworker")
 
 
 @pytest.fixture

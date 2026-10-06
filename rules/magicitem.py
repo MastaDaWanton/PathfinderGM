@@ -25,7 +25,17 @@ one bench, which is why this module carries the same public surface as a track m
 Everything else is the book's: enhancement +1 to +5, at least +1 before any property,
 enhancement + properties never past +10, market price N² × 2,000 gp for weapons and
 N² × 1,000 gp for armour, crafting at half market price, 8 hours per 1,000 gp, and
-**DC 5 + caster level**.
+**DC 5 + caster level, +5 for each prerequisite not met** (never a refusal: the owner's
+enchanting ruling of 2026-10-05).
+
+**After the enchanting revamp** (lane E, 2026-10-05) this module is two things. First, the
+catalogue reader the sheet, the equipment panel and the fence ask (`catalogue`,
+`worn_specs`, `market_price`): every entry's effects are now its CHECKED documents, a
+wondrous row's `book` (lane D) or a weapon or armour row's property in lane A's table,
+never the old `effects` (see `_book_effects`). Second, the old "By the book" tab, kept
+working until the UI wave retires the `/craft/` mode row (contracts §12, U7). The circle
+(`rules/enchanter.py`) is where enchanting is done now; this tab writes the old flat
+record and is not built on.
 """
 from __future__ import annotations
 
@@ -106,6 +116,9 @@ class Item:
     text: str = ""
     effects: list = field(default_factory=list)
     drawbacks: list = field(default_factory=list)
+    # The book's creator level where it differs from the item's caster level (a ring of
+    # protection is CL 5 and asks a maker of three times its bonus, lane D's fix).
+    creator_level: int | None = None
 
     @property
     def rank(self) -> int:
@@ -115,19 +128,50 @@ class Item:
         return {"id": self.id, "name": self.name, "kind": self.kind, "tier": self.tier,
                 "rank": self.rank, "plus": self.plus, "slot": self.slot,
                 "spell": self.spell, "caster_level": self.caster_level,
+                "creator_level": self.creator_level,
                 "price_gp": self.price_gp, "obtain": self.obtain, "text": self.text,
                 "effects": self.effects, "drawbacks": self.drawbacks}
 
 
+def _book_effects(d: dict) -> list:
+    """What the entry does, from the checked fields (enchanting lane D, the lead's note of
+    2026-10-05): a wondrous row's `book` (its numbers read by hand from AoN), a weapon or
+    armour row's property in lane A's table (`effectspec.from_alias`, bound with the choice
+    its old id implies). The old row's `effects` only when neither exists.
+
+    Measured before this: the Goggles of Minute Seeing gave +5 Perception (the old row)
+    where the book gives +5 Disable Device, and that number was live on every worn pair;
+    the old flaming row's fire was a `note` "on a hit" with no trigger, which no reader
+    could fire."""
+    if isinstance(d.get("book"), list) and d["book"]:
+        return [dict(e) for e in d["book"] if isinstance(e, dict)]
+    alias = effectspec.from_alias(str(d.get("id") or ""))
+    if alias:
+        pid, choice = alias
+        try:
+            return effectspec.bind(pid, choice or None)
+        except (ValueError, KeyError):
+            # Bane's old row never named its foe (`mi-bane` maps to {}): its fire would
+            # land on every foe, the note-only bug. Nothing rather than that.
+            return []
+    return list(d.get("effects") or [])
+
+
 def from_dict(d: dict) -> Item:
+    spells = d.get("spells")
+    first = ""
+    if isinstance(spells, list) and spells and isinstance(spells[0], list) and spells[0]:
+        first = str(spells[0][0])
     return Item(
         id=d["id"], name=d.get("name", d["id"]),
         kind=d.get("kind", "weapon_property"), tier=d.get("tier", "common"),
         plus=int(d.get("plus", 0) or 0), slot=d.get("slot"),
-        spell=str(d.get("spell") or ""), caster_level=int(d.get("caster_level", 1) or 1),
+        spell=str(d.get("spell") or first or ""),
+        caster_level=int(d.get("caster_level", 1) or 1),
         price_gp=int(d.get("price_gp", 0) or 0), obtain=d.get("obtain", "bought"),
         text=d.get("text", ""),
-        effects=list(d.get("effects") or []), drawbacks=list(d.get("drawbacks") or []))
+        effects=_book_effects(d), drawbacks=list(d.get("drawbacks") or []),
+        creator_level=int(d.get("creator_level") or 0) or None)
 
 
 _CATALOGUE: dict[str, Item] | None = None
@@ -350,14 +394,11 @@ def check_terms(actor, level: int) -> list[dict]:
     `rules/crafting.py`'s stated reason: "+9" says nothing, three named terms say which
     one to go and improve.
     """
-    track_level = max(0, int(level or 0))
-    char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor else 1
-    intel = int(actor.ability_mod("int")) if actor is not None else 0
-    return [
-        {"label": f"Enchanter {track_level}", "value": track_level},
-        {"label": f"half character level ({char_level})", "value": char_level // 2},
-        {"label": "Intelligence", "value": intel},
-    ]
+    # The circle's own, one copy: it reads the character's Intelligence without any item's
+    # bonus (rules/enchanter.check_terms, plan §4.5's no-feedback rule).
+    from . import enchanter
+
+    return enchanter.check_terms(actor, level)
 
 
 def check_bonus(actor, level: int) -> int:
@@ -453,6 +494,12 @@ def preview(level: int, chain: Chain, stock: dict | None = None, actor=None,
     wondrous = [e for e in entries if e.kind == "wondrous"]
     properties = [e for e in entries if e.kind != "wondrous"]
     enhancement = max(0, int(chain.enhancement or 0))
+    for e in properties:
+        if not e.effects:
+            # A property that asks a choice this tab cannot make (bane's foe): bound here it
+            # would carry nothing, or, read the old way, hit every foe.
+            problems.append(f"{e.name} needs a choice this tab cannot make (its foe or its "
+                            f"energy): bind it at the circle, where you choose it.")
 
     # A wondrous item is a whole item, not a property laid on one: it never mixes with
     # an enhancement bonus or a weapon property, and one working makes one of them.
@@ -525,6 +572,11 @@ def preview(level: int, chain: Chain, stock: dict | None = None, actor=None,
     stock = dict(stock or {})
     consumes: dict[str, int] = {}
     caster_level = max((e.caster_level for e in entries), default=1)
+    # Each prerequisite the maker lacks is +5 DC, never a refusal (the book's rule, and the
+    # owner's ruling of 2026-10-05: enchanting answers round 1 and round 4 point 4). Until
+    # then a missing spell refused the working outright here while the book only raised
+    # the DC.
+    missing = 0
 
     for entry in entries:
         if not entry.spell:
@@ -539,10 +591,17 @@ def preview(level: int, chain: Chain, stock: dict | None = None, actor=None,
             notes.append(f"{entry.name}: a potion of "
                          f"{_spell_name(entry.spell)} is consumed in the making.")
             continue
-        problems.append(
-            f"{entry.name} needs {_spell_name(entry.spell)}, and you neither know it "
-            f"nor carry a potion holding it. Brew or buy a potion of "
-            f"{_spell_name(entry.spell)} and it will be consumed in the making.")
+        missing += 1
+        notes.append(
+            f"{entry.name} asks for {_spell_name(entry.spell)}, and you neither know it "
+            f"nor carry a potion holding it: +5 to the DC. A potion of "
+            f"{_spell_name(entry.spell)} would be consumed in the making instead.")
+    need_level = max([e.creator_level or e.caster_level for e in entries]
+                     + ([3 * enhancement] if enhancement else []), default=0)
+    if int(level) < need_level:
+        missing += 1
+        notes.append(f"Enchanter {int(level)} is below the caster level {need_level} it "
+                     f"asks: +5 to the DC.")
 
     # Permanency, dropped. Said out loud on every working that the book would have
     # asked it of, so the house rule is visible at the bench and not only in the docs.
@@ -555,8 +614,8 @@ def preview(level: int, chain: Chain, stock: dict | None = None, actor=None,
     cost = craft_cost(price)
     hours = craft_hours(price)
     # Craft Magic Arms and Armor / Craft Wondrous Item: "the DC is 5 + the caster level
-    # of the item". The one number the whole book agrees on.
-    dc = 5 + caster_level
+    # of the item", +5 for each prerequisite not met (CRB, magic item creation).
+    dc = 5 + caster_level + 5 * missing
 
     rank = max([e.rank for e in entries]
                + ([min(len(wc.TIERS), max(1, (total_bonus + 1) // 2))]

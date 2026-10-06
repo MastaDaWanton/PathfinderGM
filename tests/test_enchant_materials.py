@@ -46,8 +46,11 @@ def test_the_shipped_shelf_loads_clean(shelf):
     """`essences()` validates on load and raises `BadEssences` on a shipped problem, so
     loading at all is the whole-shelf check. 92 essences: the 81 old ones and eleven new
     ones for the ring and wondrous bonuses no old essence granted (a Ring of Protection had
-    no essence it could be made from)."""
-    assert len(shelf) == 92
+    no essence it could be made from), and arcane residue (lane E, at the lead's ask): what
+    Unbind gives back, a quarter of the layer's motes, which no material carried until then
+    so the residue lane F's `knowledge.unbind` names went nowhere."""
+    assert len(shelf) == 93
+    assert shelf["arcane-residue"]["motes"] == 1 and shelf["arcane-residue"]["grants"] is None
     for new in ("deflecting-essence", "barkhide-essence", "mantling-essence",
                 "resistance-essence", "might-essence", "knack-essence"):
         assert new in shelf
