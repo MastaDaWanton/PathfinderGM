@@ -1244,8 +1244,10 @@ def _carried(pc) -> list[dict]:
     no drop op (a later batch, owner's ruling E6).
     """
     from rules import armour as armour_mod
+    from rules import forge_items as forge_items_mod
     from rules import gear as gear_mod
     from rules import goods, magicitem, weapons as weapons_mod
+    from rules import magic_layer as magic_layer_mod
     from rules.sheet import _stock_row
     from rules.tables import ARMOUR, SHIELDS, SLOTS
 
@@ -1285,7 +1287,10 @@ def _carried(pc) -> list[dict]:
         k = weapons_mod.key_for(w) or str(w or "").strip().lower()
         if k and k != "unarmed" and not weapons_mod.is_ammunition(k):
             counts[k] = counts.get(k, 0) + 1
-    if held and held != "unarmed" and held not in counts:
+    # A forged weapon in hand is its pack row's (the stock loop below gives it Put away);
+    # counted here too it came up twice, "+1 Flaming ... Longsword" and "iron-longsword"
+    # (seen live, enchanting lane U1, 2026-10-06).
+    if held and held != "unarmed" and held not in counts and pc.crafted_record(held) is None:
         counts[held] = 1
     # Whether a suit can change now (owner's ruling E2): only out of a fight. Asked of the
     # running campaign, and only when this sheet IS its character — a roster preview has
@@ -1465,13 +1470,39 @@ def _carried(pc) -> list[dict]:
             if usable and d.get(f"{how}able"):
                 acts.append({"label": label, "api": "/api/use",
                              "body": {"item": d["id"], "how": how}})
-        if slot and not on:
+        # A forged weapon is held, not worn (enchanting lane U1, seen live 2026-10-06): its
+        # record's slot is "hands", so this row offered Wear, which wrote the +1 flaming
+        # longsword into the gloves' slot as "worn" and left the rapier in hand; nothing on
+        # the tab could draw it. Wield runs the engine's `wear` op, whose crafted path
+        # (`_wear_crafted`) holds the record, the same door as every other Wield here.
+        forged = forge_items_mod.record_of(s)
+        held_weapon = forged is not None and str(forged.get("gear") or "weapon") == "weapon"
+        if held_weapon:
+            in_hand = str(pc.equipped or "").strip().lower() in {
+                str(forged.get("id") or "").lower(), str(d["id"]).lower()}
+            acts.append({"label": "Put away", "api": "/api/wear",
+                         "body": {"item": "unarmed", "op": "wield"}} if in_hand else
+                        {"label": "Wield", "api": "/api/wear",
+                         "body": {"item": d["id"], "op": "wield"}})
+        elif slot and not on:
             if d.get("wearable"):
                 acts.append({"label": "Wear", "api": "/api/wear",
                              "body": {"item": d["id"]}})
             else:
                 acts += by_name(d["name"], slot)
         effects = [str(x) for x in (d.get("effects") or []) if x]
+        # A magic layer is something the engine runs (lane U5's report, 2026-10-06: an
+        # enchanted sword read "for show, no effect in play"). Its line is the item card's,
+        # which says only what the owner knows (an unidentified item: "Magic, faint aura").
+        rec = forged if forged is not None else None
+        layered = bool(rec and magic_layer_mod.has_layer(rec)) or magic_layer_mod.has_layer(
+            {"magic": getattr(s, "magic", None)})
+        if layered and not effects:
+            from rules import enchanter as enchanter_mod
+
+            card = enchanter_mod.item_card(rec or {"magic": s.magic})
+            effects = [str(card.get("summary") or "")] if not card.get("identified") else \
+                [str(x) for x in (card.get("lines") or [])]
         # What a bought bedroll or tent does, from its gear row (content/rules/gear.json):
         # a counter's goods land here as jars with no specs, and every one of the owner's
         # nine read "for show, no effect in play" until 2026-10-01.
@@ -1493,10 +1524,10 @@ def _carried(pc) -> list[dict]:
             "shelf": "magic" if item and _shelf_of(s) == "gear" else _shelf_of(s),
             "fits": slot, "state": "worn" if on else "",
             "line": "; ".join(effects),
-            "known": bool(effects) or bool(s.specs) or bool(item) or bool(row),
+            "known": bool(effects) or bool(s.specs) or bool(item) or bool(row) or layered,
             "poisons": bool(d.get("poisons")),
             "acts": acts,
-            "note": slot_full(slot) if slot and not on and not any(
+            "note": slot_full(slot) if slot and not on and not held_weapon and not any(
                 a["label"] == "Wear" for a in acts) else _gear_note(row),
         })
 

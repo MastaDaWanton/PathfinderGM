@@ -122,17 +122,109 @@ def _works(c, pc) -> list[dict]:
                               craft=TRACK_ID)
 
 
+def _known_of(pc, essence_id: str) -> set[str]:
+    return set(en.known_traits(pc, str(essence_id or "")))
+
+
+def _masked_shelf(pc, shelf: dict) -> dict:
+    """The shelf with every essence trait the player has not learned taken out (lane U5's
+    report, 2026-10-06: the state sent each essence's raw phase, polarity, grant and
+    working traits whatever was known, so the page alone stood between the player and
+    traits a Read, a seating or a binding is meant to teach). What is known is lane F's
+    store (`Actor.herb_known`, `materials.essence_traits` keys); a hidden field is sent
+    empty, never guessed at, and `unknown` still counts what is left to learn."""
+    out = dict(shelf)
+    rows = []
+    for row in shelf.get("essences") or ():
+        row = dict(row)
+        known = _known_of(pc, row.get("id"))
+        if "grants" not in known:
+            row["grants"] = ""
+        if "phase" not in known:
+            row["phase"] = ""
+        if "polarity" not in known:
+            row["polarity"] = ""
+        row["traits"] = [t for t in row.get("traits") or () if f"working:{t}" in known]
+        rows.append(row)
+    out["essences"] = rows
+    return out
+
+
+def _vessel_rows(pc, shelf: dict, now: int) -> dict:
+    """Two things the shelf's vessel rows need that the bench's rows do not carry.
+
+    What an item ALREADY enchanted holds, as it was made (lane H's report, 2026-10-06): the
+    bench measures every vessel in this binder's hands, so an old +3 shield read "+3 of +2"
+    for an Enchanter 5. A row with a layer says what its own binding holds; the working's
+    check still measures a new binding in the binder's hands.
+
+    Each piece's colour, the forge's own swatch table (`forge_views.material_color`), so
+    lane U3's stage lays the vessel on the circle in its own metals and never guesses one."""
+    from rules import magic_layer
+
+    from .forge_views import material_color
+
+    records = {v.key: v.record for v in en.vessels(pc, now)}
+    out = dict(shelf)
+    for group in ("vessels", "intermediates", "cant_use"):
+        rows = []
+        for row in shelf.get(group) or ():
+            row = dict(row)
+            rec = records.get(row.get("key"))
+            if rec is not None and magic_layer.has_layer(rec):
+                row["holds"] = en._holds_view(magic_layer.capacity(rec))
+                row["holds_as"] = "made"
+            pieces = {}
+            for slot, p in (row.get("pieces") or {}).items():
+                p = dict(p) if isinstance(p, dict) else {"material": p}
+                if p.get("material"):
+                    p["color"] = material_color(str(p["material"]))
+                pieces[slot] = p
+            row["pieces"] = pieces
+            rows.append(row)
+        out[group] = rows
+    return out
+
+
+def _conversions(pc) -> list[dict]:
+    """Lane H's one-time notice of old enchanted items converted onto the layer, with their
+    open questions. [] on a tree without lane H (its functions are looked up, not
+    imported, so this lane's branch runs alone)."""
+    fn = getattr(en, "conversions", None)
+    return list(fn(pc) or []) if callable(fn) else []
+
+
+def _rolls(pc, level: int) -> dict:
+    """The terms the dice mat shows BEFORE a Read or an Identify is thrown (lane U1): the
+    page never adds them up, and Read and Identify have no check request to carry them.
+    Identify takes the better of the Enchanter check and Spellcraft, exactly as
+    `enchant_identify` will when the face comes back."""
+    terms = en.check_terms(pc, level)
+    bonus = sum(t["value"] for t in terms)
+    ident, ibonus = terms, bonus
+    sc = _spellcraft(pc)
+    if sc is not None and sc > bonus:
+        ident, ibonus = [{"label": "Spellcraft", "value": sc}], sc
+    return {"read": {"terms": terms, "bonus": bonus},
+            "identify": {"terms": ident, "bonus": ibonus}}
+
+
 def _state_body(c, pc) -> dict:
     track, progress = _progress(pc)
     now = _now(c)
-    where = en.where_here(c.scene, pc, _known(c))
+    where = dict(en.where_here(c.scene, pc, _known(c)))
+    # The biome underfoot, for lane U3's stage: a circle at camp is drawn on that ground, as
+    # the forge's field kit is (play/forge_views.py `_where`).
+    where.setdefault("biome", getattr(c, "biome", "") or "")
     return {
+        "rolls": _rolls(pc, int(progress.level)),
         "track": _track(track, progress),
         "level": int(progress.level),
         "ceiling": worldclass.ceiling_index(progress),
         "picks_banked": worldclass.perk_picks_banked(progress),
         "methods": en.methods_view(progress.level, where),
-        "shelf": en.shelf(pc, now),
+        "shelf": _vessel_rows(pc, _masked_shelf(pc, en.shelf(pc, now)), now),
+        "conversions": _conversions(pc),
         "works": _works(c, pc),
         "where": where,
         "seats": {g: en.seats_for(g) for g in (en.bench_rules().get("seats") or {})},
@@ -161,7 +253,7 @@ def _plan_from(c, pc, body):
     return plan, None
 
 
-def _seat_rows(plan) -> list[dict]:
+def _seat_rows(plan, pc=None) -> list[dict]:
     """The working's seats as the page draws them (UI plan §6.5): the sign of each, what is
     seated, and the choice it asks, listing only the engine's options."""
     v = plan.vessel
@@ -182,7 +274,7 @@ def _seat_rows(plan) -> list[dict]:
         if prop.get("scaled") and (ph.grants or {}).get("bonus") is None:
             row["bonus"] = {"options": list((prop.get("scaled") or {}).get("values") or []),
                             "chosen": (plan.choices.get(row["seat"]) or {}).get("bonus")}
-        row["grants"] = en._grant_words(ph.grants)
+        row["grants"] = en._grant_words(ph.grants) if "grants" in _known_of(pc, ph.id) else ""
         row["motes"] = ph.motes
     return rows
 
@@ -208,11 +300,19 @@ def _check_body(c, pc, plan) -> dict:
     now = _now(c)
     lp = plan.layer_plan
     hour = en._hour(plan.phase, now) if plan.phase else None
+    if hour is not None:
+        # Whether waiting for the phase outlasts the vessel's attunement (a day, owner round
+        # 4 point 9): Wait for it then asks first, and the page does no sum to know it.
+        att = ((plan.vessel.record.get("magic") or {}).get("circle") or {}).get("attuned") \
+            if plan.vessel is not None else None
+        until = int((att or {}).get("until", 0) or 0)
+        hour = dict(hour, lapses=bool(att) and not hour["inside"]
+                    and now + int(hour["minutes_until"]) >= until)
     return {
         "method": plan.method,
         "fits": en.fits_for(plan, pc, now),
         "vessel": plan.vessel.as_item(pc, now) if plan.vessel else None,
-        "seats": _seat_rows(plan),
+        "seats": _seat_rows(plan, pc),
         "problems": list(plan.problems),
         "can_roll": plan.can_roll,
         "info": list(plan.info),
@@ -487,7 +587,8 @@ def enchant_read(request):
         "danger": danger, "danger_text": effectspec.render(danger) if danger else "",
         "danger_applied": bool(applied), "stub": bool(got.get("stub")),
         "mastery": {"lines": lines, "total": progress.mp, "level": progress.level},
-        "clock": _clock(c), "shelf": en.shelf(pc, _now(c)),
+        "clock": _clock(c),
+        "shelf": _vessel_rows(pc, _masked_shelf(pc, en.shelf(pc, _now(c))), _now(c)),
     })
 
 
@@ -628,6 +729,85 @@ def enchant_perks(request):
     return JsonResponse(_track(track, progress))
 
 
+# --- old enchanted items, converted (lane H) ---------------------------------------------
+
+def _lane_h(name: str):
+    fn = getattr(en, name, None)
+    if not callable(fn):
+        return None, _err("Converted items are answered once lane H's conversion is in this "
+                          "build.", 501)
+    return fn, None
+
+
+@require_POST
+def enchant_answer(request):
+    """Answer a converted item's open question (lane H): `{key, property, answer}`, where
+    `answer` is the choice's own keys from the engine's options ({"foe": "undead"}, or
+    {"foe": {"subtype": "goblinoid"}} for a humanoid or outsider foe). A choice the property
+    would not bind is a 400 with the engine's sentence, and the question stays open."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    fn, refused = _lane_h("answer_question")
+    if refused:
+        return refused
+    body = read_body(request)
+    answer = body.get("answer")
+    if not isinstance(answer, dict):
+        return _err("`answer` must be the choice, as {key: value}.")
+    try:
+        got = dict(fn(pc, str(body.get("key") or ""), str(body.get("property") or ""),
+                      answer) or {})
+    except ValueError as exc:
+        return _err(str(exc))
+    c.save()
+    return JsonResponse(dict(got, state=_state_body(c, pc)))
+
+
+@require_POST
+def enchant_seen(request):
+    """The one-time notice of converted items was shown: `{key}` marks that item seen (its
+    open questions stay on its card until answered)."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    fn, refused = _lane_h("conversion_seen")
+    if refused:
+        return refused
+    try:
+        fn(pc, str(read_body(request).get("key") or ""))
+    except ValueError as exc:
+        return _err(str(exc))
+    c.save()
+    return JsonResponse({"ok": True, "conversions": _conversions(pc)})
+
+
+# --- the magic items carried ---------------------------------------------------------------
+
+@require_GET
+def enchant_items(request):
+    """Every magic item carried, with its card (lane U5's ask, 2026-10-06): the ledger and
+    the Identify door need the cards without a fresh GET of the state, which lets a pending
+    roll go (`enchant_state` clears `_PENDING`) and so cannot be asked while the bench is
+    open mid-step. Read only: nothing is cleared, nothing is advanced. The card says only
+    what the owner knows (`en.item_card`): an unidentified item is "Magic, faint aura"."""
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    from rules import magic_layer
+
+    now = _now(c)
+    out = []
+    for v in en.vessels(pc, now):
+        if not magic_layer.has_layer(v.record):
+            continue
+        item = v.as_item(pc, now)
+        out.append({"key": item["key"], "name": item["name"], "gear": item["gear"],
+                    "quality_name": item["quality_name"], "badges": item["badges"],
+                    "why_not": item["why_not"], "card": item.get("card")})
+    return JsonResponse({"items": out})
+
+
 # --- the ledger --------------------------------------------------------------------------
 
 def _essence_row(pc, doc: dict, carried: float) -> dict:
@@ -675,6 +855,10 @@ def enchant_essence(request, essence_id: str):
                  "volatile": any(w.get("trait") == "volatile" for w in doc.get("working") or ()),
                  "read_minutes": int((en.method_row("read") or {}).get("minutes", 10)),
                  "read_cost": "a tenth of a phial"})
+    # The favourable phase as the clock stands ("Noon, 42 minutes left"), for lane U5's card,
+    # only once the player knows which phase it is: the words name it.
+    if "phase" in set(en.known_traits(pc, doc["id"])) and doc.get("phase") in sky.PHASES:
+        card["phase_words"] = sky.words(_now(c), doc["phase"])
     return JsonResponse(card)
 
 

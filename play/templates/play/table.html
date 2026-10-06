@@ -3177,6 +3177,11 @@
 <!-- In progress (37-works.js), after bench.css: its rows reuse the bench's icons and
      skeleton bars, and inside a bench it sits in the bench's own popover host. -->
 <link rel="stylesheet" href="{% asset 'css/works.css' %}">
+<!-- The enchanting circle (docs/enchanting-ui-plan.md §12, lane U1), after bench.css and
+     forge.css: its layer is a bench and this sheet holds only what is the circle's own. The
+     games' sheet is lane U2's, named only once it is in the build, by the same "?v=" test. -->
+<link rel="stylesheet" href="{% asset 'css/enchant.css' %}">
+{% asset 'css/enchant-games.css' as enchant_games_css %}{% if '?v=' in enchant_games_css %}<link rel="stylesheet" href="{% asset 'css/enchant-games.css' %}">{% endif %}
 <script src="{% static 'js/dice3d.js' %}"></script>
 <!-- App-wide preferences and sound (Lane G), early and after the dice, so every later
      script can read them. Guarded the same way as bench-games.css above. -->
@@ -3473,6 +3478,11 @@
            docs/blacksmithing-ui-plan.md §5.1). -->
       <button type="button" class="v2-btn door" id="open-forge" data-forge-open
               aria-haspopup="dialog" aria-controls="forge">Smithing</button>
+      <!-- Enchanting opens the circle over the table the same way (45-enchant-shell.js,
+           docs/enchanting-ui-plan.md §5.1). In progress (37-works.js) puts its door after
+           the last craft door, so it follows this one. -->
+      <button type="button" class="v2-btn door" id="open-enchant" data-enchant-open
+              aria-haspopup="dialog" aria-controls="enchant">Enchanting</button>
       <a class="v2-btn door" href="/craft/">Crafting bench</a>
       <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
       <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
@@ -3773,6 +3783,61 @@
   <div class="vh" id="forge-say" role="status" aria-live="polite"></div>
 </div>
 
+<!-- The enchanting circle (docs/enchanting-ui-plan.md §5): the third bench, mounted on the
+     same core (29-bench-core.js) at the same z-index, so it carries the bench's classes and
+     its own ids. The shelf on the left (only what you carry), the circle in the middle with
+     the failure lines and the phase of the day under it, the working on the right (the
+     vessel, its seats and choices, what it holds and costs, the paper tag). 45 opens it; 46
+     fills the shelf, 48 the working; 47 (lane U3's stage) and 49 (lane U5's ledger) are
+     optional providers. -->
+<div id="enchant" class="bench enchant" role="dialog" aria-modal="true" aria-labelledby="enchant-title"
+     hidden>
+  <header class="bench-strip v2-card-leather">
+    <div class="bench-cap bench-strip-in">
+      <h2 class="bench-title" id="enchant-title">Enchanting</h2>
+      <div class="bench-methods" id="enchant-methods" role="radiogroup"
+           aria-label="Method"></div>
+      <button type="button" class="v2-btn is-quiet bench-close" id="enchant-close">Close</button>
+    </div>
+  </header>
+
+  <div class="bench-frame enchant-frame">
+    <section class="bench-panel bench-satchel enchant-shelf v2-framed v2-tooled-leather" id="enchant-shelf"
+             aria-label="Your shelf">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-satchel-in" id="enchant-shelf-in"></div>
+    </section>
+
+    <section class="bench-stage enchant-stage" id="enchant-stage" aria-label="The circle">
+      <div class="bench-tool" id="enchant-tool"></div>
+      <ul class="bench-chips" id="enchant-chips" aria-label="In the circle" hidden></ul>
+      <p class="bench-info" id="enchant-info"></p>
+      <ul class="en-lines" id="enchant-lines" aria-label="If the roll misses" hidden></ul>
+      <div class="en-hour" id="enchant-hour" hidden></div>
+      <div class="bench-rollrow">
+        <button type="button" class="v2-btn is-go bench-roll" id="enchant-roll" disabled
+                aria-describedby="enchant-why">Roll</button>
+        <span class="bench-why" id="enchant-why"></span>
+      </div>
+      <!-- Where the minigame rises (contracts §13, `mount`). -->
+      <div class="bench-gamebay" id="enchant-game" hidden></div>
+    </section>
+
+    <section class="bench-panel bench-tagcol enchant-working v2-framed v2-tooled-leather" id="enchant-working"
+             aria-label="The working">
+      <i class="v2-rim" aria-hidden="true"></i>
+      <div class="bench-tagcol-in" id="enchant-working-in"></div>
+    </section>
+  </div>
+
+  <footer class="bench-foot v2-card-leather" id="enchant-foot">
+    <div class="bench-cap bench-foot-in" id="enchant-foot-in"></div>
+  </footer>
+  <!-- The circle's own popovers: the confirms, the perk picker, lane U5's essence card. -->
+  <div class="bench-pops" id="enchant-pops"></div>
+  <div class="vh" id="enchant-say" role="status" aria-live="polite"></div>
+</div>
+
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
@@ -3888,6 +3953,15 @@ Named only once each file is in the build.{% endcomment %}
 {% asset 'js/forge-games/assemble.js' as fg_assemble %}{% if '?v=' in fg_assemble %}<script src="{% asset 'js/forge-games/assemble.js' %}"></script>{% endif %}
 {% asset 'js/forge-games/finish.js' as fg_finish %}{% if '?v=' in fg_finish %}<script src="{% asset 'js/forge-games/finish.js' %}"></script>{% endif %}
 {% asset 'js/forge-games/strengthen.js' as fg_strengthen %}{% if '?v=' in fg_strengthen %}<script src="{% asset 'js/forge-games/strengthen.js' %}"></script>{% endif %}
+{% comment %}The enchanting circle's games (lane U2, enchanting contracts §13), one file per
+ritual method, each registering on BenchGameDefs with track "enchant". Named only once in
+the build; 45-enchant-shell.js finishes a step flat without them.{% endcomment %}
+{% asset 'js/enchant-games/prepare.js' as eg_prepare %}{% if '?v=' in eg_prepare %}<script src="{% asset 'js/enchant-games/prepare.js' %}"></script>{% endif %}
+{% asset 'js/enchant-games/attune.js' as eg_attune %}{% if '?v=' in eg_attune %}<script src="{% asset 'js/enchant-games/attune.js' %}"></script>{% endif %}
+{% asset 'js/enchant-games/bind.js' as eg_bind %}{% if '?v=' in eg_bind %}<script src="{% asset 'js/enchant-games/bind.js' %}"></script>{% endif %}
+{% asset 'js/enchant-games/refine.js' as eg_refine %}{% if '?v=' in eg_refine %}<script src="{% asset 'js/enchant-games/refine.js' %}"></script>{% endif %}
+{% asset 'js/enchant-games/unbind.js' as eg_unbind %}{% if '?v=' in eg_unbind %}<script src="{% asset 'js/enchant-games/unbind.js' %}"></script>{% endif %}
+{% asset 'js/enchant-games/cleanse.js' as eg_cleanse %}{% if '?v=' in eg_cleanse %}<script src="{% asset 'js/enchant-games/cleanse.js' %}"></script>{% endif %}
 {% comment %}The stage's renderer (Lane F), in its own load order: maths, the GL layer,
 meshes, the procedural grounds, particles, props, then the nine tools. 32 below is its
 API. A comment block, not {# #}: Django's hash comment is one line only, and the two-line
@@ -3949,6 +4023,21 @@ window.FORGE_ICON_URLS = {
 {% asset 'js/table/42-forge-stage.js' as forge_stage_js %}{% if '?v=' in forge_stage_js %}<script src="{% asset 'js/table/42-forge-stage.js' %}"></script>{% endif %}
 <script src="{% asset 'js/table/43-forge-order.js' %}"></script>
 <script src="{% asset 'js/table/44-forge-ledger.js' %}"></script>
+{% comment %}The enchanting circle (enchanting contracts §12, §13): lane U3's stage parts
+(after the bench and forge stage kits they reuse), then 45 to 49 in number order. 45, 46
+and 48 are lane U1's and always named; 47 (lane U3's adapter, window.EnchantStage) and 49
+(lane U5's ledger, window.EnchantLedger) are optional providers named only once they are in
+the build, so the circle runs flat without them.{% endcomment %}
+{% asset 'js/enchant-stage/00-circle.js' as es_00_circle %}{% if '?v=' in es_00_circle %}<script src="{% asset 'js/enchant-stage/00-circle.js' %}"></script>{% endif %}
+{% asset 'js/enchant-stage/01-props.js' as es_01_props %}{% if '?v=' in es_01_props %}<script src="{% asset 'js/enchant-stage/01-props.js' %}"></script>{% endif %}
+{% asset 'js/enchant-stage/02-vessels.js' as es_02_vessels %}{% if '?v=' in es_02_vessels %}<script src="{% asset 'js/enchant-stage/02-vessels.js' %}"></script>{% endif %}
+{% asset 'js/enchant-stage/03-room.js' as es_03_room %}{% if '?v=' in es_03_room %}<script src="{% asset 'js/enchant-stage/03-room.js' %}"></script>{% endif %}
+{% asset 'js/enchant-stage/04-fx.js' as es_04_fx %}{% if '?v=' in es_04_fx %}<script src="{% asset 'js/enchant-stage/04-fx.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/45-enchant-shell.js' %}"></script>
+<script src="{% asset 'js/table/46-enchant-shelf.js' %}"></script>
+{% asset 'js/table/47-enchant-stage.js' as enchant_stage_js %}{% if '?v=' in enchant_stage_js %}<script src="{% asset 'js/table/47-enchant-stage.js' %}"></script>{% endif %}
+<script src="{% asset 'js/table/48-enchant-working.js' %}"></script>
+{% asset 'js/table/49-enchant-ledger.js' as enchant_ledger_js %}{% if '?v=' in enchant_ledger_js %}<script src="{% asset 'js/table/49-enchant-ledger.js' %}"></script>{% endif %}
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>
