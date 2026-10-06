@@ -477,7 +477,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # worn or wielded record, not a jar; the engine finds the power on the item's layer,
     # counts its uses for the day and runs it through the cast door at the item's caster
     # level. A name, never a number: what it does is the item's document.
-    "use_item": (("item",), ("how", "to", "weapon", "route", "power"), "player"),
+    #
+    # `spell` is the spell cast INTO a spell storing weapon (`power: spell-storing`, lane
+    # C2): the spell's id, as `cast` names it. The caster's slot pays and the blade holds
+    # it until it wounds somebody.
+    "use_item": (("item",), ("how", "to", "weapon", "route", "power", "spell"), "player"),
     # Selling something. There was no op for this at all, and the absence was not
     # theoretical: a player asked a stallholder to price a satchel holding a
     # potency-1,335 draught, haggled her up from ten gold to twenty-two, shook her hand

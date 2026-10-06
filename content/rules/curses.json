@@ -807,7 +807,7 @@
      99,
      99
     ],
-    "bars": "curse.bars-casting",
+    "bars": "curse.bars-casting.any",
     "words": "Drawback: while it is held or worn its bearer cannot cast any spell.",
     "d100": [
      100,

@@ -539,10 +539,13 @@ def test_wild_shape_was_a_counter_and_now_is_a_wolf():
     pc = _pc("druid", 4)
     _scene, e = _fight(pc)
     s, ac = pc.ability_score("str"), pc.ac()
+    # The suit melds into the wolf and its armour bonus ceases (CRB, Polymorph; lane C2,
+    # `Actor._melded_gear`): until 2026-10-06 the wolf kept the druid's leather.
+    worn = pc.armour_stats()["ac"] + pc.shield_stats()["ac"]
     assert pc.natural_weapon("bite") is None, "a human has no bite of their own"
     out = _use(e, "Wild Shape (wolf)")
     assert out.status != "refused", out.tell
-    assert pc.ability_score("str") == s + 2 and pc.ac() == ac + 2
+    assert pc.ability_score("str") == s + 2 and pc.ac() == ac + 2 - worn
     assert pc.weapon("bite")["damage"] == "1d6" and pc.weapon("bite")["natural"]
     assert pc.has_state("buff.form.wild-shape") and pc.has_state("form.wolf")
     _use(e, "Wild Shape")
@@ -556,10 +559,11 @@ def test_a_small_form_is_quicker_to_hit_and_harder_to_hit():
     pc = _pc("druid", 4)
     _scene, e = _fight(pc)
     dex, ac = pc.ability_score("dex"), pc.ac()
+    worn = pc.armour_stats()["ac"] + pc.shield_stats()["ac"]       # melds (lane C2)
     _use(e, "Wild Shape (small cat)")
     assert pc.ability_score("dex") == dex + 2
     dex_gain = (pc.ability_mod("dex") - ((dex - 10) // 2))
-    assert pc.ac() == ac + 1 + 1 + dex_gain
+    assert pc.ac() == ac + 1 + 1 + dex_gain - worn
 
 
 # --- domain powers as attacks ------------------------------------------------------------------

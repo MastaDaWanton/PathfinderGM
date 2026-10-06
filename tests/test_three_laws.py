@@ -414,6 +414,10 @@ _REACHES = {
     ("skill_mod", "stealth"):
         lambda a: sum(m.value for m in a.skill_modifiers("stealth")),
     ("speed", "land"): lambda a: a.speed_feet,
+    # Lane C built the roll to overcome it (the cast path's caster level check) and
+    # lane C2 the read of an authored bonus aimed here (`spell_resistance_rating`,
+    # best one applies): it left the inert list below on 2026-10-06.
+    ("combat_mod", "spell_resistance"): lambda a: a.spell_resistance_rating()[0],
 }
 
 # Authorable and inert. Each names the stage that closes it. The list may only get
@@ -425,8 +429,6 @@ _UNREACHED = {
     # from a finished total.
     "caster_level": "stage 9 — no reader consults it; casting has no check to spend "
                     "it on yet",
-    "spell_resistance": "stage 9 — no reader consults it; nothing in the app rolls "
-                        "to overcome SR (docs/spells.md 5.1)",
 }
 
 
