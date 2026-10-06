@@ -78,6 +78,28 @@ SLOTS = ("target", "object", "place", "time", "says")
 COMMITS = ("done", "tried", "intended", "asked")
 ACTING = frozenset({"done", "tried"})
 
+# By what MEANS each action is done (2026-10-05, gm/means.py). The owner: "whatever you do
+# must catch anything that is not within the players power to do not just psychic and
+# memory stuff". The regex door before this (`judgement.refuse_unnamed_power`) listed the
+# ways of reaching into a mind it knew, and the table found the ones it did not: "I make
+# the smith forget he saw me" became a Diplomacy check, and "I erase the apprentice's
+# memory of me" became the plan's guess at `cast charm-person`, which stood the door down.
+#
+# The answer every tradition gives is the same three-way split, and none of them is a
+# list of forbidden verbs:
+#   ordinary  what anybody can TRY — body, voice, skill, the things carried. "You write
+#             the attempt, they write the result" (play-by-post etiquette on autohitting);
+#             1e's skills and combat roll it.
+#   power     by a named document — a spell, a class or path ability, a racial trait, a
+#             feat, a magic item. Fate calls this a permission: an aspect or extra is what
+#             lets a character do what others cannot (Fate System Toolkit, "Extras").
+#   beyond    neither: nothing an ordinary person can do, and no power named for it.
+#             Apocalypse World's "fictional positioning" — without it the move does not
+#             trigger, whatever is said.
+# The reader answers which (an enum, enforced by the sampler); code then asks the SHEET
+# whether a power named is held (`means.held_power`) — a closed vocabulary, never English.
+MEANS = ("ordinary", "power", "beyond")
+
 
 def acting(a: dict) -> bool:
     """Whether this action of a reading is done or attempted now — the ones the engine
@@ -149,7 +171,13 @@ athletics climb, swim, jump
 gather    forage, gather, fill waterskins
 follow    follow somebody or a trail
 claim     assert who or what you are
-other     anything else"""
+other     anything else
+
+Each action also says by what MEANS it is done:
+ordinary  anything a person could try with their body, voice, skill and what they carry
+power     a spell, ability, trait, feat or magic item the sentence names; copy its name
+          into `power`
+beyond    something no ordinary person can do, with no power named for it"""
 
 _DEMOS = [
     ("I head down to the docks and ask a fisherman what he caught today.",
@@ -372,6 +400,73 @@ _DEMOS = [
           "says": "whether she would buy my furs", "act": "talk"},
          {"span": "whether she would buy my furs", "commit": "asked", "object": "my furs",
           "target": "the trader", "act": "sell"}]}),
+    # --- 2026-10-05: by what means (`MEANS`, gm/means.py) ------------------------------
+    # Every demonstration above is `ordinary`, by default, which is the ratio the table
+    # has. These are not in the means corpus (tests/means/gold.py). Paired on purpose: a
+    # mind worked on by will against the same mind worked on by words and a coin, and a
+    # result the player declared kept apart as a claim, never as a means.
+    ("I stare hard at the ferryman until he forgets what I look like.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "stare hard at the ferryman until he forgets what I look like",
+          "target": "the ferryman", "means": "beyond", "act": "other"}]}),
+    ("I tell the ferryman he never saw me and press a coin into his palm.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "tell the ferryman he never saw me", "target": "the ferryman",
+          "says": "he never saw me", "act": "talk"},
+         {"span": "press a coin into his palm", "target": "his palm", "object": "a coin",
+          "act": "give"}]}),
+    ("I lie to the reeve and he swallows it whole.",
+     {"question": False, "claims": ["he swallows it whole"], "actions": [
+         {"span": "lie to the reeve", "target": "the reeve", "act": "talk"}]}),
+    ("I peer at the fisherman's hands to see if he is hiding a knife.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "peer at the fisherman's hands", "object": "the fisherman's hands",
+          "act": "look"}]}),
+    ("I cast hold portal on the cellar door.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "cast hold portal on the cellar door", "object": "hold portal",
+          "target": "the cellar door", "power": "hold portal", "means": "power",
+          "act": "cast"}]}),
+    ("I use Stunning Fist on the boatman.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "use Stunning Fist on the boatman", "object": "Stunning Fist",
+          "target": "the boatman", "power": "Stunning Fist", "means": "power",
+          "act": "use"}]}),
+    ("I call up a gale to blow the fishing boats back to shore.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "call up a gale to blow the fishing boats back to shore",
+          "means": "beyond", "act": "other"}]}),
+    ("I vanish from the jetty and step out on the far bank.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "vanish from the jetty and step out on the far bank",
+          "place": "the far bank", "means": "beyond", "act": "other"}]}),
+    # Three from the means corpus's first pass (dev lines, docs/means-gate.md): a skill
+    # read as beyond twice — remembering, a disguise — and a result clause read as a deed
+    # of its own; and a lock opened by a touch read as a lock picked. None is a corpus line.
+    ("I try to remember the name of the ship's captain.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "try to remember the name of the ship's captain", "commit": "tried",
+          "object": "the name of the ship's captain", "act": "other"}]}),
+    ("I dress up as a priest to get past the doorman.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "dress up as a priest", "act": "other"},
+         {"span": "to get past the doorman", "commit": "intended",
+          "target": "the doorman", "act": "stealth"}]}),
+    ("I shout at the dog until it slinks off.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "shout at the dog until it slinks off", "target": "the dog",
+          "act": "other"}]}),
+    # Remembering is a deed, not a claim: on the regex gate's own corpus "I remember the
+    # road to the coast" came back with no action, only a claim, which the means gate
+    # refuses as saying-so (gm/means.py).
+    ("I remember the way to the old quarry.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "remember the way to the old quarry",
+          "object": "the way to the old quarry", "act": "other"}]}),
+    ("I make the shutters fly open by pointing at them.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "make the shutters fly open by pointing at them",
+          "object": "the shutters", "means": "beyond", "act": "other"}]}),
 ]
 
 
@@ -389,13 +484,15 @@ def schema() -> dict:
                     "properties": {"span": {"type": "string"},
                                    "commit": {"type": "string", "enum": list(COMMITS)},
                                    **{s: slot for s in SLOTS},
+                                   "power": slot,
+                                   "means": {"type": "string", "enum": list(MEANS)},
                                    "act": {"type": "string", "enum": list(ACTS)}},
                     # Every slot required (null allowed). Measured 2026-09-27 on the
                     # labelled set: with the slots optional, the constrained sampler
                     # wrote `span` and `act` and nothing else on 220 of 220 lines —
                     # slot recall 0.0 — because an optional property is one the grammar
                     # lets it skip. The commitment is required for the same reason.
-                    "required": ["span", "commit", *SLOTS, "act"],
+                    "required": ["span", "commit", *SLOTS, "power", "means", "act"],
                 },
             },
             "claims": {"type": "array", "items": {"type": "string"}, "maxItems": 3},
@@ -427,7 +524,13 @@ def per_act_schema() -> dict:
         props = {"span": {"type": "string"},
                  "commit": {"type": "string", "enum": list(COMMITS)},
                  "act": {"const": act},
-                 **{s: slot for s in ACT_SLOTS.get(act, ())}}
+                 **{s: slot for s in ACT_SLOTS.get(act, ())},
+                 # The means last, with the deed and its slots already written, and the
+                 # same in every alternative, so it chooses no act (gm/means.py). The
+                 # power's name before the verdict, so the verdict is written with its
+                 # evidence already chosen — the deed reader's order.
+                 "power": slot,
+                 "means": {"type": "string", "enum": list(MEANS)}}
         alts.append({"type": "object", "properties": props, "required": list(props),
                      "additionalProperties": False})
     out = schema()
@@ -445,12 +548,13 @@ def _demo_reply(frame: dict) -> str:
     acts = []
     for a in frame.get("actions") or []:
         commit = a.get("commit") or "done"
+        means = {"power": a.get("power"), "means": a.get("means") or "ordinary"}
         if SCHEMA != "per_act":
             acts.append({"span": a.get("span", ""), "commit": commit,
-                         **{s: a.get(s) for s in SLOTS}, "act": a["act"]})
+                         **{s: a.get(s) for s in SLOTS}, **means, "act": a["act"]})
             continue
         acts.append({"span": a.get("span", ""), "commit": commit, "act": a["act"],
-                     **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())}})
+                     **{s: a.get(s) for s in ACT_SLOTS.get(a["act"], ())}, **means})
     return json.dumps({"question": frame.get("question", False), "actions": acts,
                        "claims": frame.get("claims", [])})
 
@@ -536,6 +640,20 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             kept[s] = v
             used.add(low)
         _speech_is_not_a_target(kept, dropped)
+        # By what means (`MEANS`). Absent or outside the enum — a reading from before
+        # 2026-10-05, a remembered test frame — is ordinary: the reading the turn always
+        # acted on. A power's name is held to the sentence like every slot; one that is
+        # not the player's words is dropped and said, and the means stands without it
+        # (gm/means.py then asks the sheet about the deed's own words instead).
+        means = str(a.get("means") or "ordinary")
+        if means in MEANS and means != "ordinary":
+            kept["means"] = means
+        power = str(a.get("power") or "").strip()
+        if power and power.lower() not in _NULL_WORDS:
+            if _within(power, sentence):
+                kept["power"] = power
+            else:
+                dropped.append(f"{a['act']}.power={power!r}")
         # The action's own words, when they are the player's: what a targeted second
         # question is asked about (`confirm_sale`).
         if _within(a.get("span"), sentence):
@@ -573,10 +691,11 @@ def merge_repeats(actions: list[dict], dropped: list[str] | None = None) -> list
         prev = out[-1] if out else None
         if prev is not None and prev.get("act") == a.get("act") \
                 and prev.get("commit", "done") == a.get("commit", "done") \
+                and prev.get("means", "ordinary") == a.get("means", "ordinary") \
                 and any(a.get(s) for s in SLOTS) and not any(
                     prev.get(s) and a.get(s) and prev[s].lower() != a[s].lower()
                     for s in SLOTS):
-            for s in SLOTS:
+            for s in (*SLOTS, "power"):
                 if a.get(s) and not prev.get(s):
                     prev[s] = a[s]
             if dropped is not None:
