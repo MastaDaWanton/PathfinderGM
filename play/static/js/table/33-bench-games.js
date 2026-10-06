@@ -69,6 +69,24 @@
   //           {hit, miss, reheat, ...}; a game asks for one by key through `ctx.cue(key)`.
   // Every rule above holds for them unchanged: one loop, no release in Steady mode, no repeat.
 
+  // THE ENCHANTER'S GAMES (docs/enchanting-contracts.md §12-13, UI plan §6.4 and §9, added
+  // 2026-10-06). The six circle games under js/enchant-games/ register the same way, with
+  // `track: "enchant"`. Each reads what the server's roll sent: `opts.seq` (Prepare, Unbind,
+  // Cleanse: the glyph sequence) or `opts.seats` (Attune), falling back to the same names on
+  // `opts.tuning` (rules/enchanter.py tuning_for puts them there), handed on as `ctx.seq` and
+  // `ctx.seats`. A definition may also carry:
+  //   HOUR:   true, and the frame then owns the DAY-PHASE BAND (the owner's round 4 point 10:
+  //           phases of the day, never planets). It reads `opts.hour` (or `tuning.hour`), the
+  //           shape rules/enchanter.py `_hour` sends {phase, now, inside, minutes_left,
+  //           minutes_until, words, widen}, draws the day's seven windows across the foot of
+  //           the meter with the essence's phase hatched and notched and the phase it is now
+  //           outlined, and says the server's words over the hint, with whether the windows
+  //           are wider. It is shown, never computed: the widening itself is the game's, from
+  //           the server's numbers. `ctx.hour` is the normalised object, or null.
+  // Sounds go on the `enchant` bus through SOUNDS, as the forge's do, and carry `{phase}`
+  // when there is an hour (contracts §13: Sound.play("enchant.<event>", {phase})). A herb or
+  // forge game has no HOUR, so for them nothing here runs: no band, no phase in the voice.
+
   // Every method a game is registered for: the herb list first, in its fixed order, then any
   // other definition on the registry in the order it registered. Read at call time, so a game
   // file loaded after this one is still found (the registry is one shared object).
@@ -315,6 +333,83 @@
       g.beginPath(); g.moveTo(x - size * 0.6, y + 2); g.lineTo(x + size * 0.6, y + 2);
       g.strokeStyle = C.goldDim; g.stroke();
       g.restore();
+    },
+    // The circle's glyphs (enchant games): one line figure per kind the server names, so a
+    // piece reads by its SHAPE in greyscale, never by a colour. Sigils are runes from a fixed
+    // set (Elder Futhark shapes, public domain, UI plan §7.2), never drawn by the player: the
+    // owner ruled out freehand drawing. An unknown kind gets a plain ring, still a shape.
+    glyph: function (g, kind, x, y, s, colour, lw) {
+      g.save();
+      g.strokeStyle = colour; g.fillStyle = colour; g.lineWidth = lw || 1.5;
+      g.lineCap = "round"; g.lineJoin = "round";
+      g.beginPath();
+      if (kind === "chalk") {                      // a drawn ring with its quarter marks
+        g.arc(x, y, s * 0.7, 0, Math.PI * 2);
+        for (var q = 0; q < 4; q++) {
+          var a = q * Math.PI / 2;
+          g.moveTo(x + Math.cos(a) * s * 0.7, y + Math.sin(a) * s * 0.7);
+          g.lineTo(x + Math.cos(a) * s, y + Math.sin(a) * s);
+        }
+        g.stroke();
+      } else if (kind === "salt") {                // a ring of grains
+        for (var i = 0; i < 8; i++) {
+          var b = i * Math.PI / 4;
+          g.beginPath(); g.arc(x + Math.cos(b) * s * 0.7, y + Math.sin(b) * s * 0.7, Math.max(1, s * 0.13), 0, Math.PI * 2); g.fill();
+        }
+      } else if (kind === "ink") {                 // a drop
+        g.moveTo(x, y - s);
+        g.quadraticCurveTo(x + s * 0.75, y + s * 0.1, x, y + s * 0.8);
+        g.quadraticCurveTo(x - s * 0.75, y + s * 0.1, x, y - s);
+        g.stroke();
+      } else if (kind === "treatment") {           // a triangle, point down (a wash poured)
+        g.moveTo(x - s * 0.8, y - s * 0.6); g.lineTo(x + s * 0.8, y - s * 0.6); g.lineTo(x, y + s * 0.8);
+        g.closePath(); g.stroke();
+      } else if (kind === "focus") {               // a cut stone
+        g.moveTo(x, y - s); g.lineTo(x + s * 0.8, y - s * 0.2); g.lineTo(x, y + s);
+        g.lineTo(x - s * 0.8, y - s * 0.2); g.closePath();
+        g.moveTo(x - s * 0.8, y - s * 0.2); g.lineTo(x + s * 0.8, y - s * 0.2);
+        g.stroke();
+      } else if (kind === "catalyst") {            // a six-pointed star of lines
+        for (var j = 0; j < 3; j++) {
+          var c = j * Math.PI / 3;
+          g.moveTo(x + Math.cos(c) * s, y + Math.sin(c) * s); g.lineTo(x - Math.cos(c) * s, y - Math.sin(c) * s);
+        }
+        g.stroke();
+      } else if (kind === "bell") {                // the test step: a bell and its clapper
+        g.moveTo(x - s * 0.75, y + s * 0.55);
+        g.quadraticCurveTo(x - s * 0.6, y - s, x, y - s);
+        g.quadraticCurveTo(x + s * 0.6, y - s, x + s * 0.75, y + s * 0.55);
+        g.closePath(); g.stroke();
+        g.beginPath(); g.arc(x, y + s * 0.8, Math.max(1.2, s * 0.16), 0, Math.PI * 2); g.fill();
+      } else if (kind === "enhancement") {         // Tiwaz, the arrow rune
+        g.moveTo(x, y + s); g.lineTo(x, y - s);
+        g.moveTo(x - s * 0.6, y - s * 0.35); g.lineTo(x, y - s); g.lineTo(x + s * 0.6, y - s * 0.35);
+        g.stroke();
+      } else if (kind === "sigil") {               // Algiz
+        g.moveTo(x, y + s); g.lineTo(x, y - s);
+        g.moveTo(x - s * 0.65, y - s * 0.75); g.lineTo(x, y - s * 0.05); g.lineTo(x + s * 0.65, y - s * 0.75);
+        g.stroke();
+      } else if (kind === "quarter") {             // the circle's own mark: a short bar
+        g.moveTo(x - s * 0.6, y); g.lineTo(x + s * 0.6, y);
+        g.stroke();
+      } else {
+        g.arc(x, y, s * 0.6, 0, Math.PI * 2); g.stroke();
+      }
+      g.restore();
+    },
+    // The counted beat, for reduced motion (enchant games): instead of a light travelling to
+    // its crest, three marks light in turn on the beat and the fourth says "Now", so a crest
+    // is met by rhythm, as Rhythm Heaven's cues are heard rather than watched (its Night Mode
+    // plays on sound alone). `beat` is 1, 2, 3 as the count says "3", "2", "1", 4 at the
+    // crest ("Now"), and 0 before the count. Nothing moves: each mark is lit or it is not, so
+    // the time windows work unchanged.
+    counted: function (g, x, y, beat, C) {
+      for (var i = 0; i < 3; i++) {
+        var lit = beat > i;
+        KIT.diamond(g, x + i * 16, y, 5, lit ? C.gold : null, lit ? C.gold : C.ash, 1.2);
+      }
+      KIT.text(g, beat >= 4 ? "Now" : beat >= 1 ? String(4 - beat) : "", x + 52, y, C,
+        { size: 15, display: true, colour: beat >= 4 ? C.gold : C.dim });
     }
   };
 
@@ -425,6 +520,121 @@
     return live || r.def.hint(r.steady);
   }
 
+  // --- the day-phase band (enchant games with HOUR only) -----------------------------------
+  // One day's windows, as rules/sky.py `windows()` gives them (minutes of the day; an `ends`
+  // past 1440 wraps). Used only when the server's hour carries no `windows` of its own;
+  // tests/test_enchant_games.py holds this copy equal to sky.windows(), so the two cannot
+  // drift. Dawn 06:00 and dusk 18:00 are the engine's; each turning point holds the two hours
+  // centred on it, and morning, afternoon and night fill between (sky.py's docstring).
+  var PHASE_WINDOWS = [
+    { phase: "night", starts: 60, ends: 300 }, { phase: "dawn", starts: 300, ends: 420 },
+    { phase: "morning", starts: 420, ends: 660 }, { phase: "noon", starts: 660, ends: 780 },
+    { phase: "afternoon", starts: 780, ends: 1020 }, { phase: "dusk", starts: 1020, ends: 1140 },
+    { phase: "night", starts: 1140, ends: 1380 }, { phase: "midnight", starts: 1380, ends: 1500 }
+  ];
+  var PHASE_NAMES = { dawn: "Dawn", morning: "Morning", noon: "Noon", afternoon: "Afternoon",
+    dusk: "Dusk", night: "Night", midnight: "Midnight" };
+  var HOUR_H = 30;             // px the band takes from the foot of the meter
+
+  // The server's hour, normalised. Two shapes arrive: the check's and the roll's tuning
+  // (`_hour(phase, now)`: `phase` is the ESSENCE's phase and `now` the clock's) and the
+  // state's (`{phase, left, words, windows}`: `phase` is the clock's, no essence named). A
+  // shape with neither `now` nor `inside` is the state's. Anything unreadable is no band.
+  function readHour(h) {
+    if (!h || typeof h !== "object") return null;
+    var phase = String(h.phase || "");
+    if (!PHASE_NAMES[phase]) return null;
+    var stateShape = h.now === undefined && h.inside === undefined;
+    var now = stateShape ? phase : (PHASE_NAMES[h.now] ? h.now : (h.inside ? phase : null));
+    var widen = finite(+h.widen) && +h.widen > 0 ? +h.widen : 1;
+    var wins = Array.isArray(h.windows) && h.windows.length ? h.windows.filter(function (w) {
+      return w && PHASE_NAMES[w.phase] && finite(+w.starts) && finite(+w.ends) && +w.ends > +w.starts;
+    }) : [];
+    var minute = finite(+h.minute) ? ((+h.minute % 1440) + 1440) % 1440 : null;
+    return {
+      phase: stateShape ? null : phase, now: now,
+      inside: stateShape ? false : (h.inside === undefined ? now === phase : !!h.inside),
+      widen: widen, words: typeof h.words === "string" ? h.words : "",
+      minutes_left: finite(+h.minutes_left) ? +h.minutes_left : (finite(+h.left) ? +h.left : null),
+      minutes_until: finite(+h.minutes_until) ? +h.minutes_until : null,
+      windows: wins.length ? wins : PHASE_WINDOWS, minute: minute
+    };
+  }
+
+  // The words over the hint: the server's own ("Noon, 42 minutes left"), then whether the
+  // windows are wider, in words, because the band's hatching alone would leave a player to
+  // work out why the crest got easier. `widen` is the game's effective factor (Bind's own,
+  // which folds the server's eager trait in), passed by the game through `ctx.hourWiden`.
+  function hourWords(H, widen) {
+    if (!H) return "";
+    var w = widen != null ? widen : H.widen;
+    if (!H.phase) return H.words;
+    var more = H.inside && w > 1.0001
+      ? "In its hour: windows ×" + (Math.round(w * 100) / 100)
+      : "Not its hour: windows as usual";
+    return (H.words ? H.words + ". " : "") + more;
+  }
+
+  // The band (UI plan §6.4, "the hour band"): the day as one bar, 00:00 to 24:00, cut at every
+  // phase's edges. The essence's phase is hatched gold with a notch at each end (shape, not
+  // colour); the phase it is now is outlined in ink, and when the server sent the minute, an
+  // ink needle stands at it. Names under the bar, the essence's first, then now's; a name that
+  // would collide with one already drawn is left out, as the heat gauge does.
+  function drawHourBand(r, g, W, top) {
+    var H = r.hour, C = r.C, x0 = 10, x1 = W - 10;
+    if (!H || x1 - x0 < 80) return;
+    var X = function (m) { return x0 + (x1 - x0) * clamp(m / 1440, 0, 1); };
+    var by = top + 5, bh = 8, parts = [];
+    H.windows.forEach(function (w) {
+      var s = +w.starts, e = +w.ends;
+      if (e <= 1440) parts.push({ phase: w.phase, s: s, e: e });
+      else { parts.push({ phase: w.phase, s: s, e: 1440 }); parts.push({ phase: w.phase, s: 0, e: e - 1440 }); }
+    });
+    g.save();
+    g.strokeStyle = C.edge; g.lineWidth = 1;
+    g.strokeRect(x0 + 0.5, by + 0.5, x1 - x0 - 1, bh - 1);
+    g.fillStyle = C.ash;
+    parts.forEach(function (p) { g.fillRect(Math.round(X(p.s)), by, 1, bh); });
+    g.restore();
+    parts.forEach(function (p) {
+      if (p.phase !== H.phase) return;
+      KIT.barBand(g, X(p.s), by, Math.max(2, X(p.e) - X(p.s)), bh, C.gold, { gap: 4 });
+      KIT.notch(g, X(p.s), by - 1, Math.PI / 2, 4, C.gold);
+      KIT.notch(g, X(p.e), by - 1, Math.PI / 2, 4, C.gold);
+    });
+    parts.forEach(function (p) {
+      if (p.phase !== H.now) return;
+      g.save(); g.strokeStyle = C.ink; g.lineWidth = 1.5;
+      g.strokeRect(X(p.s), by - 3, Math.max(2, X(p.e) - X(p.s)), bh + 6);
+      g.restore();
+    });
+    if (H.minute != null) {
+      var nx = X(H.minute);
+      g.save(); g.lineCap = "round";
+      g.strokeStyle = C.sunk; g.lineWidth = 4; g.beginPath(); g.moveTo(nx, by - 4); g.lineTo(nx, by + bh + 3); g.stroke();
+      g.strokeStyle = C.ink; g.lineWidth = 2; g.beginPath(); g.moveTo(nx, by - 4); g.lineTo(nx, by + bh + 3); g.stroke();
+      g.restore();
+    }
+    g.save();
+    g.font = "12px " + C.body;
+    g.textBaseline = "middle";
+    var spans = [];
+    var order = parts.slice().sort(function (p, q) {
+      var rank = function (o) { return o.phase === H.phase ? 0 : o.phase === H.now ? 1 : 2; };
+      return rank(p) - rank(q) || p.s - q.s;
+    });
+    order.forEach(function (p) {
+      if (p.phase !== H.phase && p.phase !== H.now) return;
+      var name = PHASE_NAMES[p.phase], w = g.measureText(name).width;
+      var l = clamp((X(p.s) + X(p.e)) / 2 - w / 2, x0, x1 - w);
+      for (var k = 0; k < spans.length; k++) if (l < spans[k][1] + 6 && l + w > spans[k][0] - 6) return;
+      spans.push([l, l + w]);
+      g.fillStyle = p.phase === H.phase ? C.ink : C.dim;
+      g.fillText(name, l, by + bh + 10);
+    });
+    g.restore();
+  }
+
   function degrees(c) {
     var n = String(Math.round(c / 5) * 5);
     return n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + " °C";
@@ -498,7 +708,7 @@
   }
 
   // --- DOM ---------------------------------------------------------------------------------
-  function build(mount, def, steady) {
+  function build(mount, def, steady, hour) {
     var old = mount.querySelector(".bench-game");
     if (old && old.parentNode) old.parentNode.removeChild(old);
 
@@ -542,6 +752,18 @@
       }
     }
     if (def.track) root.classList.add("bench-game--" + def.track);
+    // An enchant game's day-phase band: the server's words above the hint (the band itself is
+    // drawn on the canvas), and the hint spoken when it changes, because an order game's hint
+    // is where it says which piece comes next. Only a definition with HOUR and an hour the
+    // server sent gets the words; every other game builds exactly as before.
+    var hourWordsEl = null;
+    if (def.HOUR && hour) {
+      root.classList.add("has-hour");
+      if (hour.inside) root.classList.add("is-in-hour");
+      hourWordsEl = el("p", "bench-game__hour", hourWords(hour));
+      hint.appendChild(hourWordsEl);
+    }
+    if (def.track === "enchant") hintText.setAttribute("aria-live", "polite");
     tools.appendChild(help);
     hint.appendChild(hintText);
     hint.appendChild(tools);
@@ -574,7 +796,8 @@
 
     return { root: root, thread: thread, meter: meter, canvas: canvas, hint: hint, tier: tier,
       hintText: hintText, tools: tools, help: help, word: word, band: band, live: live,
-      card: card, cardText: cardText, cardSub: cardSub, heatNum: heatNum, reheat: reheat };
+      card: card, cardText: cardText, cardSub: cardSub, heatNum: heatNum, reheat: reheat,
+      hour: hourWordsEl };
   }
 
   // --- the loop ---------------------------------------------------------------------------
@@ -594,10 +817,12 @@
     g.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
     g.clearRect(0, 0, r.W, r.H);
     if (r.W < 2 || r.H < 2) return;
-    // A heat game draws in the meter above the gauge; the gauge takes the foot.
-    var gh = r.heat ? GAUGE_H : 0;
+    // A heat game draws in the meter above the gauge; the gauge takes the foot. An enchant
+    // game with an hour does the same with the day-phase band (no game has both).
+    var gh = r.heat ? GAUGE_H : r.hour ? HOUR_H : 0;
     r.game.draw(g, r.W, r.H - gh);
     if (r.heat) drawGauge(r, g, r.W, r.H - gh);
+    else if (r.hour) drawHourBand(r, g, r.W, r.H - gh);
     if (r.particles.length) drawParticles(r, g);
     var p = r.game.progress ? r.game.progress(r.t) : r.t / r.game.duration;
     r.dom.thread.style.transform = "scaleX(" + clamp(p, 0, 1).toFixed(4) + ")";
@@ -774,7 +999,15 @@
     r.bandScale = bandScale;
     r.heat = r.def.HEAT ? makeHeat(r.def.HEAT, heatIn, steady, baseWin * bandScale, narrow) : null;
     var voice = { hardness: tuning.hardness, bath: tuning.bath };
+    // The enchanter's sound contract (contracts §13): enchant events carry the day phase.
+    // Only an hour adds it, and only an enchant game with HOUR has one.
+    if (r.hour) voice.phase = r.hour.phase || r.hour.now;
     return {
+      // The enchant games' inputs (contracts §13), the opts first, the server's tuning second:
+      // the glyph sequence for Prepare, Unbind and Cleanse, the seats for Attune, the hour.
+      seq: Array.isArray(opts.seq) ? opts.seq : Array.isArray(tuning.seq) ? tuning.seq : null,
+      seats: Array.isArray(opts.seats) ? opts.seats : Array.isArray(tuning.seats) ? tuning.seats : null,
+      hour: r.hour || null,
       method: r.def.id,
       // The forge's additions: the heat the frame owns (null for a game without one), the
       // band scale, and `band(steadyFactor)`, the window multiplier a forge game uses: the
@@ -1080,9 +1313,10 @@
       reduced = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     }
     var steady = !!opts.steady;
-    var dom = build(opts.mount, def, steady);
-    if (reduced) dom.root.classList.add("is-still");
     var tuning = opts.tuning || {};
+    var hour = def.HOUR ? readHour(opts.hour || tuning.hour) : null;
+    var dom = build(opts.mount, def, steady, hour);
+    if (reduced) dom.root.classList.add("is-still");
     var names = Array.isArray(tuning.names) && tuning.names.length ? tuning.names.slice() : null;
     var n = names ? names.length : 5;
     var bounds = Array.isArray(tuning.bands) && tuning.bands.length === n ? tuning.bands.slice()
@@ -1095,11 +1329,14 @@
         steady: steady, reduced: !!reduced, names: names, bounds: bounds, band: -1,
         lastScore: -1, t: 0, last: 0, raf: 0, phase: "card", cardTimer: 0, hits: 0, misses: 0,
         held: { keys: {}, pointer: false }, pointer: { x: -1, y: -1, inside: false, down: false },
-        particles: [], W: 0, H: 0, dpr: 1, resolve: resolve, rng: KIT.rng(7)
+        particles: [], W: 0, H: 0, dpr: 1, resolve: resolve, rng: KIT.rng(7), hour: hour
       };
       r.C = colours(dom.root);
       r.g = dom.canvas.getContext("2d");
       r.game = def.create(makeCtx(r, opts));
+      // The words say the game's own widening (Bind folds the server's eager trait in), when
+      // the game reports one.
+      if (dom.hour && finite(r.game.widen)) dom.hour.textContent = hourWords(hour, r.game.widen);
       if (r.game.button) {
         var b = el("button", "bench-game__act", r.game.button.label);
         b.type = "button";
@@ -1143,12 +1380,15 @@
     var r = {
       def: def, dom: null, stage: null, onScore: null, steady: !!opts.steady, reduced: true,
       t: 0, hits: 0, misses: 0, phase: "play", particles: [], rng: KIT.rng(7), C: C,
-      held: { keys: {}, pointer: false }, pointer: { x: -1, y: -1, inside: false, down: false }
+      held: { keys: {}, pointer: false }, pointer: { x: -1, y: -1, inside: false, down: false },
+      hour: def.HOUR ? readHour(opts.hour || (opts.tuning || {}).hour) : null
     };
     var ctx = makeCtx(r, opts);
     r.game = def.create(ctx);
     return {
-      game: r.game, heat: r.heat, ctx: ctx,
+      game: r.game, heat: r.heat, ctx: ctx, hour: r.hour,
+      // What the strip would say over the hint (the day-phase words), for the tests.
+      hourWords: function () { return r.hour ? hourWords(r.hour, finite(r.game.widen) ? r.game.widen : null) : ""; },
       t: function () { return r.t; },
       step: function (dt) { advance(r, dt); return !!(r.game.done() || r.t >= r.game.duration); },
       press: function (key) { if (!reheatKey(r, key)) r.game.down({ src: "key", key: key }); },
@@ -1186,6 +1426,8 @@
     },
     simulate: simulate,
     gauge: { names: HEAT_NAMES.map(function (b) { return b.name; }), degrees: degrees },
+    // The day-phase band's fallback windows and names (tests hold them to rules/sky.py).
+    dayPhases: { windows: PHASE_WINDOWS, names: PHASE_NAMES },
     running: function () { return !!run; },
     kit: KIT
   };
