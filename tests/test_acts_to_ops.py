@@ -456,7 +456,9 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
         act = alt["properties"]["act"]["const"]
         assert list(alt["properties"])[:3] == ["span", "commit", "act"]
         assert alt["properties"]["commit"]["enum"] == list(interpret.COMMITS)
-        assert set(alt["properties"]) == {"span", "commit", "act",
+        # And since 2026-10-05 the means and the power's name, last and the same in every
+        # alternative, so they choose no act either (gm/means.py; tests/test_means_gate.py).
+        assert set(alt["properties"]) == {"span", "commit", "act", "power", "means",
                                           *interpret.ACT_SLOTS[act]}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False

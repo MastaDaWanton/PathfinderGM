@@ -356,6 +356,28 @@ class GMAgent:
         if stop:
             return self._refused_plan({"text": stop, "code": "not_found", "fix": None},
                                       [], [f"the reading's table found nothing: {stop}"])
+        # By what means (gm/means.py): every deed the reading says is done by a power, or
+        # by no means an ordinary person has, is held against the sheet. A turn of nothing
+        # but such deeds is the refusal, printed, and no model is asked — the owner's
+        # "whatever you do must catch anything that is not within the players power"
+        # (2026-10-05). A deed found by no name is put to one enum question over the
+        # sheet's own list (`means.which_power`), so the asura's own wings still fly.
+        from . import means
+
+        self.judged = means.judge(read_ok, self.engine.scene,
+                                  ask=means.which_power if interpret.ENABLED else None,
+                                  claim_ask=means.claim_kind if interpret.ENABLED else None)
+        beyond = [j for j in self.judged if j.get("refused_name")]
+        if read_ok is not None and self.judged:
+            read_ok["means"] = [{k: j[k] for k in ("span", "means", "power", "held",
+                                                   "refused_name") if j.get(k)}
+                                for j in self.judged]
+        if beyond and means.all_refused(read_ok, beyond):
+            text = means.refusal_text(beyond, self.engine.scene)
+            return self._refused_plan(
+                {"text": text, "code": "beyond_means", "fix": None}, [],
+                [f"the reading's deeds are beyond the character's means: "
+                 f"{'; '.join(j['refused_name'] for j in beyond)}"])
         judgement.embody_sought(self.engine.scene, player_input, self.world)
         # The plan sees the situation cards — the GM's secret ones included — keyed
         # off the last few beats the view hands over (`self.recent`).
@@ -374,6 +396,10 @@ class GMAgent:
         if missing:
             brief += ("\n\nNOT HERE (fact — the turn says so, and nothing is made to fill "
                       "it): " + "; ".join(missing) + ".")
+        if beyond:
+            brief += ("\n\nBEYOND THEIR MEANS (fact — nothing on the sheet does it; no op "
+                      "for it, the engine prints the refusal): "
+                      + "; ".join(j["refused_name"] for j in beyond) + ".")
         # A fight is a different job, and gets a different prompt and a different floor.
         fighting = self.engine.scene.in_encounter
         build = (prompts.call_one_intents_only if self.intents_first
@@ -413,7 +439,12 @@ class GMAgent:
             # overruled op is kept on the record.
             declared, overruled = interpret.supported(detectors, self.reading)
             self.reading["overruled"] = overruled
-            declared = list(dict.fromkeys([*declared, *by_reading]))
+            # A held power the words reached for is the player's declaration as much as
+            # an act of the table is: its refusal ("did not prepare Charm Person today")
+            # is the player's to hear, never dropped as the plan's invention
+            # (`means.backed_ops`).
+            declared = list(dict.fromkeys([*declared, *by_reading,
+                                           *means.backed_ops(self.judged)]))
         else:
             # No reading: the plan alone. Only a chip the player attached declares (a
             # spell or a place picked from a list is not English), so the words are read
@@ -658,6 +689,12 @@ class GMAgent:
                 # narrator as ordinary prose and get written as working.
                 raw = judgement.refuse_unnamed_power(raw, player_input,
                                                      self.engine.scene)
+                # And every deed the reading says is done by means the sheet does not
+                # hold: the plan's guesses at it struck, the engine's ability door asked
+                # in the player's words (gm/means.py). Its own door, not this regex's:
+                # "I make the smith forget he saw me" matched no pattern above and was
+                # planned as Diplomacy (2026-10-05).
+                raw = means.strike(raw, self.judged, read_ok, self.engine.scene)
                 # And the thing summoned rather than the power claimed. The fiat
                 # phrasings never reach here — `play/player_input.py` hands those back
                 # before any model call — but "I summon a celestial dog" is a real
@@ -3394,10 +3431,11 @@ class GMAgent:
         self.last_added = narration_mod.added_sentences(before, text)
         # And the body's authored lines, which the truth pass's backstop put on inside the
         # groom (gm/checks/body_shown.py): ours, so never shown back as the model's (D4).
-        from .checks import body_shown, sleep_kept
+        from .checks import body_shown, power_unbacked, sleep_kept
 
         self.last_added += [s for s in (*body_shown.authored_in(text),
-                                        *sleep_kept.authored_in(text))
+                                        *sleep_kept.authored_in(text),
+                                        *power_unbacked.authored_in(text))
                             if s not in self.last_added]
         # And the deeds backstop's opening built from the player's own line
         # (`_show_declared`): ours too.
