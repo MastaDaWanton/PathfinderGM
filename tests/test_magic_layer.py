@@ -181,7 +181,7 @@ def test_the_record_stores_ids_and_choices_never_a_number_it_computed():
 @pytest.mark.parametrize("level,q,perks,expected", [
     (20, 3, 0, 10),          # the owner's example: Enchanter 20 = +10
     (30, 3, 0, 15),          # ... and Enchanter 30 = +15: no +10 ceiling
-    (1, 3, 0, 0),            # floor(1 / 2)
+    (1, 3, 0, 1),            # floor(1 / 2) is 0; the owner's round 7 minimum makes it +1
     (7, 3, 0, 3),
     (10, 4, 0, 6),           # Flawless: one step above Superior
     (10, 5, 0, 7),           # Flawless +1: two

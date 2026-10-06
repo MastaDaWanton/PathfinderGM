@@ -609,3 +609,10 @@ to fly the row.
 
 **Sound (U6 provides).** `Sound.play("enchant.<event>", {planet})` and `Sound.play("works.ready")`;
 unknown events are silent, so callers never guard.
+
+> **Lead's note, 2026-10-05 (after lanes B and D merged):** §5 as built differs from the
+> shape above: essence families name a `phase` from `sky.PHASES` (never a planet);
+> `grants` may carry a `choice` (the energy-resistance essences) and a `bonus`; a recipe
+> serves its checked effects as `book` (the old row's `effects` is read only when `book` is
+> absent — `magic_layer.layer` reads `book` first). See `rules/materials.py`'s docstring and
+> `docs/enchanting-review.md`.

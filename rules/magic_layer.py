@@ -385,7 +385,9 @@ def capacity(record, *, binder_level: int | None = None, binder_perks=None) -> d
                 "from_level": 0, "from_quality": 0, "from_perks": 0, "masterwork": False,
                 "why": (f"{quality_name(q)} is not masterwork: only a Superior or better "
                         f"{gear} can carry magic.")}
-    from_level = max(0, level) // CAPACITY_LEVELS_PER_BONUS
+    # Never less than +1 for an Enchanter of any level (owner, round 7): half of level 1
+    # rounds to +0, and a new Enchanter could bind nothing onto a Superior blade.
+    from_level = max(1, level // CAPACITY_LEVELS_PER_BONUS) if level >= 1 else 0
     from_quality = max(0, q - SUPERIOR) * CAPACITY_PER_QUALITY_STEP
     from_perks = perks * CAPACITY_PER_PERK
     bonus = from_level + from_quality + from_perks
@@ -862,7 +864,10 @@ def layer(record, *, believed: bool = False) -> dict:
         if r is None:
             problems.append(f"no recipe {rid!r}")
             continue
-        for d in r.get("effects") or ():
+        # Lane D serves a recipe's effects as `book` (checked against AoN); `effects` is the
+        # old row's field, still read when a recipe has no `book`. Read as `effects` only,
+        # every catalogue ring laid nothing once lane D merged (2026-10-05).
+        for d in (r.get("book") if r.get("book") is not None else r.get("effects")) or ():
             if isinstance(d, dict):
                 _bucket(out, dict(copy.deepcopy(d), origin=origin, source=f"recipe:{rid}"),
                         uses, rid)

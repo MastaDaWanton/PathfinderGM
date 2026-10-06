@@ -61,3 +61,10 @@ took, **the answer wins** and the plan section named must be built to it.
 |---|---|
 | Holy, unholy, axiomatic, anarchic | **Anyone, like smite.** With no alignment tracking, the +2d6 lands on any foe for now, and the property's text says it will narrow to the right alignment once alignment is added. Lane C's reader for `when.target.alignment` answers "yes" for every target until then. |
 | Skill competence items | **No cap.** Caster level by bonus as proposed; no +10 cap; the price formula (bonus² × 100 gp) keeps big bonuses expensive. |
+
+## Round 7: lane B's calls (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Enchanter 1 | **Minimum +1.** Capacity is half the Enchanter level, but never less than +1 for an Enchanter of any level. |
+| Rings and wondrous items | **Keep the price reading**: a ring or wondrous power takes the plus a weapon would carry at its price, ceil(sqrt(gp / 2000)); one budget for every item. |
