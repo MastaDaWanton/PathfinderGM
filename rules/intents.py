@@ -299,7 +299,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "lethality",
                     # A dirty trick's one condition, and where a reposition puts its
                     # target: the attacker's choices, which the rules leave to them.
-                    "trick", "square"), "player"),
+                    "trick", "square",
+                    # A defending weapon's per-turn choice (CRB, defending): how much of
+                    # its enhancement goes to AC this round. Written by the combat bar,
+                    # bounded by the engine against the weapon's own enhancement
+                    # (`Engine._defend_with`), and kept out of the list a model is shown
+                    # (CODE_ONLY_PARAMS) — the player's choice, never the model's number.
+                    "defending"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
@@ -465,7 +471,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # blade waits for the next hit. Before these an item was a paragraph in a satchel.
     # `apply` puts a product where `route` says (eyes, wound, skin, inhale) and only that
     # route's effects land (consumables.plan; the owner, 2026-10-02).
-    "use_item": (("item",), ("how", "to", "weapon", "route"), "player"),
+    #
+    # `power` names one of a magic item's powers (enchanting contracts §4, plan §8.5): the
+    # blinding shield's flash, etherealness, a ring's command word. The item is then a
+    # worn or wielded record, not a jar; the engine finds the power on the item's layer,
+    # counts its uses for the day and runs it through the cast door at the item's caster
+    # level. A name, never a number: what it does is the item's document.
+    "use_item": (("item",), ("how", "to", "weapon", "route", "power"), "player"),
     # Selling something. There was no op for this at all, and the absence was not
     # theoretical: a player asked a stallholder to price a satchel holding a
     # potency-1,335 draught, haggled her up from ten gold to twenty-two, shook her hand
@@ -630,7 +642,7 @@ PARAM_ALIASES = {
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
-CODE_ONLY_PARAMS = frozenset({"undecided", "not_here"})
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending"})
 
 ENGINE_OWNED_PARAMS = {
     "damage", "damage_type", "damage_roll", "damage_dice", "dice", "die",

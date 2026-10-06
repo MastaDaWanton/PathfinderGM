@@ -47,7 +47,7 @@ from . import hazards
 from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
-from .sheet import MAGIC_SUPPRESSED, Actor, attacker_traits
+from .sheet import MAGIC_SUPPRESSED, Actor, _when_holds, attacker_traits
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, MANEUVERS, SAVES, SIZE_ORDER, WEAPONS, maneuver_text,
@@ -2803,7 +2803,17 @@ class Engine:
             trouble = hazards.check(str(intent.params.get("rule", "")), intent.params)
             if trouble:
                 raise IntentError(f"hazard: {trouble}", "legality", index, code="hazard_rule")
-        if intent.op == "use_item" and intent.actor:
+        if intent.op == "use_item" and intent.actor and intent.params.get("power"):
+            # A magic item's power: refused here, with the powers it has and the uses
+            # left named, so the plan's retry can name a real one (`_power_of`).
+            actor = self.scene.get(intent.actor)
+            if actor is not None:
+                _, _, _, why = self._power_of(actor, str(intent.params.get("item") or ""),
+                                              str(intent.params.get("power") or ""))
+                if why:
+                    raise IntentError(f"use_item: {why}", "legality", index,
+                                      code="item_power")
+        elif intent.op == "use_item" and intent.actor:
             actor = self.scene.get(intent.actor)
             said = str(intent.params.get("item", "")).strip().lower()
             item_id, _fits = (consumables.resolve_stock(actor.stock, said)
@@ -5340,6 +5350,34 @@ class Engine:
         elif intent.params.get("manoeuvre"):
             return self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
 
+        # Defending (CRB): "allows the wielder to transfer some or all of the weapon's
+        # enhancement bonus to his AC as a bonus that stacks with all others ... at the
+        # start of his turn before using the weapon, and the effect lasts until his next
+        # turn". The amount is the player's choice on the combat bar (`defending`),
+        # checked here against the weapon's own enhancement — never a model's number —
+        # and moved through the one applicator: one effect taking it off this weapon's
+        # attack and damage and putting it on AC, untyped, for the round.
+        # Arrow catching (CRB shield ability): "ranged weapons fired at targets within 5
+        # feet of the shield's wearer are diverted to target the shield's bearer". Decided
+        # once, on the way in, and kept in the attack's state, so a resume from the dice
+        # popup rolls against the catcher and not the one first aimed at.
+        caught_said = ""
+        if weapon.get("category") == "ranged" and not coup:
+            if held is None:
+                catcher = self._catcher(actor, defender)
+                if catcher is not None:
+                    caught_said = (f"The shot at {defender.name} bends to "
+                                   f"{catcher.name}'s arrow-catching shield.")
+                    defender = catcher
+            elif held.get("diverted") in self.scene.actors:
+                defender = self.scene.actors[held["diverted"]]
+        defending_said = ""
+        if partial.get("attack_state") is None and intent.params.get("defending") is not None:
+            why, defending_said = self._defend_with(actor, weapon,
+                                                    intent.params.get("defending"))
+            if why:
+                return self._refuse(intent, why)
+
         flat_footed = self._flat_footed(defender)
         # A creature floundering in water is easier to hit and keeps no guard: the book
         # gives its opponents +2 and takes its Dexterity off its own AC. Both are facts
@@ -5353,8 +5391,22 @@ class Engine:
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders), attacker=actor)
-        worn_ac = target_ac
         ac_note = f"AC {target_ac}" + (" (flat-footed)" if flat_footed else "")
+        # Brilliant energy (CRB): "armor bonuses to AC (including any enhancement bonuses
+        # to that armor) do not count against it". Both shield and armour are dropped —
+        # the book's own example ("a brilliant energy weapon ignores ... shields") — and
+        # nothing else: natural armour, deflection and Dex stand. Read off the typed
+        # terms (`ac_modifiers`), which is why a stat block's AC was itemised into types.
+        passes = _layer_docs(weapon, "ignore_armour")
+        if passes:
+            kept = [m for m in defender.ac_modifiers(
+                        weapon["category"], flat_footed or bool(flounders), attacker=actor)
+                    if (m.type or "") not in ("armour", "shield")]
+            if sum(m.value for m in kept) < target_ac:
+                target_ac = sum(m.value for m in kept)
+                ac_note = (f"AC {target_ac}, armour and shield passed through"
+                           + (" (flat-footed)" if flat_footed else ""))
+        worn_ac = target_ac
         if wet_defender:
             against = water.bonus_against(wet_defender)
             if against:
@@ -5386,6 +5438,11 @@ class Engine:
         if held is None:
             state["seen"] = seen
             state["rolls"].extend(sniping)
+            if defending_said:
+                state["tells"].append(defending_said)
+            if caught_said:
+                state["diverted"] = defender.ref
+                state["tells"].append(caught_said)
         # (weapon, iteration) per swing. One weapon for a character; for a monster, the
         # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
         sequence = actor.attack_plan(weapon_key, full)
@@ -5492,6 +5549,19 @@ class Engine:
                                              attacker=actor) + footing
                 swing_note = (f"touch AC {swing_ac}"
                               + (" (flat-footed)" if flat_footed else ""))
+                # Ghost touch armour (CRB): "its enhancement bonus and armor bonus count
+                # against the touch attacks of incorporeal creatures" — asked of the
+                # defender's `property.ghost-touch-armour` tag (law 1), and only the
+                # armour and shield terms come back; natural armour stays out of a touch.
+                if (actor.has_state("subtype.incorporeal")
+                        and defender.has_state("property.ghost-touch-armour")):
+                    worn = sum(m.value for m in defender.ac_modifiers(
+                        weapon["category"], flat_footed or bool(flounders), attacker=actor)
+                        if (m.type or "") in ("armour", "shield"))
+                    if worn:
+                        swing_ac += worn
+                        swing_note = (f"touch AC {swing_ac}, the ghost touch armour "
+                                      f"counting" + (" (flat-footed)" if flat_footed else ""))
             # The defender rides in the roll context, so a term that is "against fey"
             # (cold iron's, contract §2) is asked of THIS defender and nobody else.
             atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
@@ -5531,6 +5601,9 @@ class Engine:
                 )
                 state["rolls"].append(atk.as_dict())
                 natural = atk.natural
+                # Kept for the swing: vorpal asks "upon a roll of natural 20 (followed by
+                # a successful roll to confirm)" at the damage stage, a popup later.
+                state["natural"] = natural
                 if natural == 1:
                     self._judge(atk, False)
                     state["tells"].append(
@@ -5566,6 +5639,18 @@ class Engine:
                 # suspension stage to every swing to ask for it would cost more than it
                 # is worth. The number is stated in the tell either way.
                 chance, why = defender.concealment()
+                # Seeking (CRB): "veers toward its target, negating any miss chances that
+                # would otherwise apply" — the `property.seeking` tag on the weapon's
+                # layer (law 1), on a ranged blow.
+                if chance and weapon.get("category") == "ranged" and any(
+                        states.matches(str(t), "property.seeking")
+                        for t in (weapon.get("magic") or {}).get("tags") or ()):
+                    if not state.get("seeking_said"):
+                        state["seeking_said"] = True
+                        state["tells"].append(
+                            f"The {weapon['name'].lower()} veers to {defender.name}: "
+                            f"{why} gives no miss chance against it.")
+                    chance = 0
                 if chance:
                     miss = self.dice.roll("1d100", label=f"miss chance ({why})",
                                           visibility="hidden")
@@ -5579,6 +5664,18 @@ class Engine:
                             f"chance ({miss.total}).")
                         state["tells"].extend(
                             self._charges_missed(actor, weapon_key, weapon))
+                        if counts_ammo:
+                            state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
+                        state["i"] += 1
+                        continue
+                # Arrow deflection (CRB shield ability): once a round the bearer may turn
+                # a ranged hit with a Reflex save (`_deflect`). Engine-rolled and shown,
+                # like the miss chance above: the defender's save, not the player's die.
+                if weapon.get("category") == "ranged":
+                    turned = self._deflect(actor, defender, weapon, state, flat_footed)
+                    if turned:
+                        self._judge(atk, False)
+                        state["tells"].append(turned)
                         if counts_ammo:
                             state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                         state["i"] += 1
@@ -5625,6 +5722,13 @@ class Engine:
                 continue
 
             if state["stage"] == "damage":
+                # Fortification, asked once per swing before anything is rolled for it:
+                # a confirmed critical or sneak attack dice against a fortified body
+                # (`_fortify`). On a success the blow is rolled as an ordinary one.
+                if "fortified" not in state:
+                    state["fortified"] = self._fortify(
+                        actor, defender, weapon, state,
+                        flat_footed=flat_footed or defender.loses_dex_to_ac, pulled=pulled)
                 mult = weapon["crit_mult"] if state.get("crit") else 1
                 dice_notation = _multiply_dice(weapon["damage"], mult)
                 dmg_mods = actor.damage_modifiers(weapon_key, power_attack=power,
@@ -5671,6 +5775,8 @@ class Engine:
                     actor, defender, weapon,
                     flat_footed=flat_footed or defender.loses_dex_to_ac,
                     pulled=pulled)
+                if sneak_dice and state.get("fortified"):
+                    sneak_dice, sneak_why = "", ""     # turned by the armour; said above
                 if sneak_dice:
                     if "sneak_total" not in state:
                         sneak_roll = self._roll_or_suspend_stage(
@@ -5708,6 +5814,26 @@ class Engine:
                             None, partial, state, extra["dice"])
                         state[f"extra_{n}"] = extra_roll.total
                         state["rolls"].append(extra_roll.as_dict())
+                # The enchanter's dice (enchanting contracts §4): flaming's 1d6 fire,
+                # a burst's 1d10 per multiplier step on a critical, bane's 2d6 against its
+                # foe — each the PLAYER's roll, each its own popup named for the property,
+                # rolled here before the main die for the reason the printed extras are.
+                # An energy packet lands apart (fire resistance meets only the fire); an
+                # untyped one (bane, vicious, merciful) joins the weapon's own damage as a
+                # term past the crit scaling — 1e's extra dice never multiply — so damage
+                # reduction meets it with the blade, as the book adds it to the blow.
+                magic_dice = self._magic_dice(actor, defender, weapon, weapon_key,
+                                              state, lethality)
+                for n, rider in enumerate(magic_dice):
+                    if f"magic_{n}" not in state:
+                        roll = self._roll_or_suspend_stage(
+                            intent, actor, [], rider["label"], None, partial, state,
+                            rider["dice"])
+                        state[f"magic_{n}"] = roll.total
+                        state["rolls"].append(roll.as_dict())
+                    if rider["joins"]:
+                        dmg_mods = dmg_mods + [Modifier(max(0, int(state[f"magic_{n}"])),
+                                                        rider["term"])]
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # A granted weapon's damage is several named things — Blood DMG +
@@ -5740,6 +5866,19 @@ class Engine:
                 # mattered — the DR that would have held and did not (law 3: the
                 # narrator is told why the wound is deeper, never left to guess).
                 struck_as = tuple(weapon.get("strikes_as") or ())
+                # The glossary's thresholds at the enhancement AS RAISED against this
+                # defender (enchanting plan §9; owner Q8: bane's +2 counts toward +3/+4/+5)
+                # — a +1 bane (undead) sword strikes a skeleton as a +3 weapon, cold iron
+                # and silver. Against anybody else it is the sword's own +1.
+                lay = weapon.get("magic")
+                if lay:
+                    from . import magic_layer
+
+                    ctx = actor._roll_context(weapon_key, defender=defender,
+                                              attacker_actor=actor)
+                    raised = magic_layer.strikes_as_against(
+                        lay, lambda when: _when_holds(when, ctx))
+                    struck_as = tuple(sorted(set(struck_as) | set(raised)))
                 if struck_as:
                     would = defender.damage_reduction(weapon["type"], (), lethality)
                     does = defender.damage_reduction(weapon["type"], struck_as, lethality)
@@ -5770,10 +5909,32 @@ class Engine:
                 # a ghost took a sword's full damage, so ghost salt had nothing to undo
                 # and lane C's data stood a +2 against undead in for it. Halved here,
                 # where the weapon and both bodies are known, never below one, as the
-                # water's half is. Not done: the book's "immune to all nonmagical attack
-                # forms" — the app has no magic-weapon channel to ask yet (stage 9).
-                if (defender.has_state("subtype.incorporeal")
-                        and not actor.has_state("subtype.incorporeal")):
+                # water's half is.
+                #
+                # And the clause before it, since the enchanting revamp gave the app a
+                # magic-weapon channel to ask (the `magic` trait, enchanting plan §9):
+                # incorporeal creatures are "immune to all nonmagical attack forms"
+                # (Bestiary, Incorporeal). Until 2026-10-05 a plain iron sword halved a
+                # ghost; now it passes through and does nothing, a `magic` blow (a +1
+                # sword, a monk's ki strike, anything that lends the trait) deals half,
+                # and ghost touch deals all of it.
+                incorporeal = (defender.has_state("subtype.incorporeal")
+                               and not actor.has_state("subtype.incorporeal"))
+                harmless = self._harmless_blow(actor, defender, weapon, struck_as,
+                                               incorporeal)
+                if harmless:
+                    state["tells"].append(harmless)
+                    state["effects"].append({"ref": defender.ref, "kind": "blow_harmless",
+                                             "weapon": str(weapon.get("name") or weapon_key),
+                                             "why": harmless})
+                    for key in [k for k in state if k.startswith(("magic_", "extra_"))]:
+                        state.pop(key, None)
+                    for key in ("rider_total", "sneak_total", "sneak_said", "fortified"):
+                        state.pop(key, None)
+                    state["i"] += 1
+                    state["stage"] = "attack"
+                    continue
+                if incorporeal:
                     if "ghost_touch" in struck_as:
                         state["tells"].append(
                             f"The ghost-touched {weapon['name'].lower()} bites "
@@ -5825,6 +5986,27 @@ class Engine:
                     state["tells"].append(
                         f"The {weapon['name']} adds {more['amount']} {more['type']}"
                         + (f" ({more['note']})." if more.get("note") else "."))
+                # The enchanter's energy packets, each through `_apply_damage` on its own
+                # so a skeleton's cold immunity meets only the frost; the untyped ones
+                # already rode in the blow above. Named for the property in the tell —
+                # "the flaming adds 4 fire" — never "the property:flaming".
+                for n, rider in enumerate(magic_dice):
+                    rolled = max(0, int(state.pop(f"magic_{n}", 0) or 0))
+                    if rider["joins"]:
+                        # Already in the blow's total above; said, so the narrator knows
+                        # the bane edge bit and why the wound is deeper (law 3).
+                        state["tells"].append(
+                            f"The {rider['what']} adds {rolled} to the blow.")
+                        continue
+                    more = self._apply_damage(defender, rolled, rider["type"],
+                                              lethality=rider["lethality"])
+                    more["weapon"] = hit["weapon"]
+                    more["origin"] = rider["origin"]
+                    more["property"] = rider["what"]
+                    state["effects"].append(more)
+                    state["tells"].append(
+                        f"The {rider['what']} adds {more['amount']} {more['type']}"
+                        + (f" ({more['note']})." if more.get("note") else "."))
                 # A coated blade delivers its dose on the first thing it cuts, and then it
                 # is gone. Spent on the hit rather than on the swing: a poison wiped off
                 # by a miss is a dose nobody got.
@@ -5841,6 +6023,14 @@ class Engine:
                 # of the day, viridium on the crit (plan §12.4).
                 for extra in self._item_riders(actor, defender, weapon,
                                                crit=bool(state.get("crit"))):
+                    state["effects"].append(extra["effect"])
+                    if extra["tell"]:
+                        state["tells"].append(extra["tell"])
+                # And the enchanter's riders that are not dice: wounding's bleed, a
+                # thundering crit's deafness, disruption's Will save, vorpal's severing,
+                # vicious's bite back at the wielder (`_magic_riders`).
+                for extra in self._magic_riders(actor, defender, weapon, weapon_key, state,
+                                                lethality):
                     state["effects"].append(extra["effect"])
                     if extra["tell"]:
                         state["tells"].append(extra["tell"])
@@ -5866,7 +6056,7 @@ class Engine:
                 # attack (4d6)" once, and added the same +13 to both damage rolls; the
                 # player was never asked for the second sneak die, and the opening was
                 # found once. Each hit rolls its own in 1e.
-                for key in ("rider_total", "sneak_total", "sneak_said"):
+                for key in ("rider_total", "sneak_total", "sneak_said", "fortified"):
                     state.pop(key, None)
                 state["i"] += 1
                 state["stage"] = "attack"
@@ -11669,6 +11859,393 @@ class Engine:
     # A day, in rounds: how long "the first wound it deals each day" stays spent.
     ROUNDS_PER_DAY = 24 * 60 * 10
 
+    # --- the enchanter's layer in a fight (enchanting contracts §4) -------------------------
+    #
+    # Lane B's layer (`magic_layer.layer`) rides on the weapon row as `weapon["magic"]`
+    # (`sheet._with_layer`). Its RIDERS are not merged into the forge build's `riders` on
+    # purpose — measured 2026-10-05: `_item_riders` turns a rider into intents through
+    # `consumables._spec_to_intents`, which never asks a `when`, so a merged bane rider put
+    # +2d6 on every foe and its tell read "the property:bane". These readers ask every
+    # rider's `when` of THIS defender (`_when_holds`, the clause grammar the forge and the
+    # feats use) and name the property the way the book does.
+
+    def _magic_rider_ok(self, rider: dict, actor: Actor, defender: Actor, weapon: dict,
+                        weapon_key: str, crit: bool, lethality: str) -> bool:
+        trigger = str(rider.get("trigger") or "")
+        if trigger not in ("hit", "crit") or (trigger == "crit" and not crit):
+            return False
+        # Merciful "on command, suppresses this ability": a blow declared lethal with a
+        # merciful weapon is the command, and its own 1d6 goes quiet with it.
+        if (weapon.get("suppressible") and lethality == "lethal"
+                and str(rider.get("source") or "") == weapon["suppressible"]):
+            return False
+        ctx = actor._roll_context(weapon_key, defender=defender, attacker_actor=actor)
+        return _when_holds(rider.get("when"), ctx)
+
+    def _magic_dice(self, actor: Actor, defender: Actor, weapon: dict, weapon_key: str,
+                    state: dict, lethality: str) -> list[dict]:
+        """The layer's damage dice for this swing: one row per rider that applies.
+
+        `per_multiplier` is the bursts' and thundering's "+1d10 points of fire damage on a
+        successful critical hit. If the weapon's critical multiplier is x3, add an extra
+        2d10 points ... instead, and if the multiplier is x4, add an extra 3d10" (CRB,
+        flaming burst): the dice times (multiplier − 1). `joins`: an untyped packet joins
+        the blow's own damage (and meets damage reduction with it); an energy one lands
+        apart. A rider aimed at the wielder (vicious) is not here — it is the engine's
+        roll, in `_magic_riders`.
+        """
+        riders = (weapon.get("magic") or {}).get("riders") or ()
+        out: list[dict] = []
+        crit = bool(state.get("crit"))
+        for r in riders:
+            if str(r.get("type") or "") != "damage" \
+                    or str(r.get("recipient") or "target") in ("self", "caster"):
+                continue
+            if not self._magic_rider_ok(r, actor, defender, weapon, weapon_key, crit,
+                                        lethality):
+                continue
+            dice = str(r.get("dice") or r.get("amount") or "").strip()
+            if not dice:
+                continue
+            if r.get("per_multiplier"):
+                steps = max(0, int(weapon.get("crit_mult", 2) or 2) - 1)
+                if not steps:
+                    continue
+                dice = _multiply_dice(dice, steps)
+            dtype = str(r.get("damage_type") or "untyped").strip().lower() or "untyped"
+            what = _property_word(r)
+            joins = dtype == "untyped"
+            out.append({"dice": dice, "type": dtype, "joins": joins, "what": what,
+                        "origin": str(r.get("origin") or ""),
+                        "lethality": str(r.get("lethality") or "lethal"),
+                        "label": (f"{what[:1].upper()}{what[1:]} ({dice}"
+                                  + ("" if joins else f" {dtype}") + ")"),
+                        "term": f"{what} ({dice})"})
+        return out
+
+    def _magic_riders(self, actor: Actor, defender: Actor, weapon: dict, weapon_key: str,
+                      state: dict, lethality: str) -> list[dict]:
+        """The layer's riders that are not the blow's dice, on the hit that just landed.
+
+        - `damage` with `recipient: self` — vicious's 1d6 "to the wielder" (CRB), the
+          engine's roll (the wielder did not choose it), through `_apply_damage`;
+        - `bleed` — wounding's 1 a round, an `ActiveEffect` the one periodic executor runs
+          (`Actor.run_periodic`, per round), the `bleed` condition's tags, stacking when
+          the document says `stacks` (the book: "multiple hits from a wounding weapon
+          increase the bleed");
+        - `save_gate` — thundering's Fortitude DC 14 or deafened on a critical,
+          disruption's Will DC 14 or destroyed against undead: the defender's save, the
+          engine's roll (a hidden save, as `_item_riders` rolls them), the branches
+          through the condition op or `Actor.die`;
+        - `slay` — vorpal, "upon a roll of natural 20 (followed by a successful roll to
+          confirm)", never against a type in `except` or a creature immune to critical
+          hits (`coup_de_grace.crit_immunity`, the reader the ledger said to reuse).
+
+        Each one returns a tell naming the property (law 3).
+        """
+        riders = (weapon.get("magic") or {}).get("riders") or ()
+        if not riders or defender.is_dead:
+            return []
+        out: list[dict] = []
+        crit = bool(state.get("crit"))
+        for r in riders:
+            kind = str(r.get("type") or "")
+            if kind == "damage" and str(r.get("recipient") or "target") not in ("self",
+                                                                                 "caster"):
+                continue                        # the blow's dice: `_magic_dice`
+            if not self._magic_rider_ok(r, actor, defender, weapon, weapon_key, crit,
+                                        lethality):
+                continue
+            what = _property_word(r)
+            origin = str(r.get("origin") or "")
+            # `recipient: "self"` lands on the wielder (vicious's bite back, and lane F's
+            # opposite curse, which puts the flame on the bearer); anything else on the
+            # one struck.
+            on_self = str(r.get("recipient") or "target") in ("self", "caster")
+            who = actor if on_self else defender
+            if kind == "apply_condition":
+                params = {"condition": str(r.get("target") or ""), "to": who.ref}
+                res = self.run(self.validate([{
+                    "op": "condition", "visibility": "hidden", "because": f"the {what}",
+                    "params": params}], origin=origin, origin_name=what))
+                for o in res.outcomes:
+                    out.extend({"effect": e_, "tell": ""} for e_ in o.effects or [])
+                    if o.tell:
+                        out.append({"effect": {"ref": who.ref, "kind": "item_rider_said"},
+                                    "tell": o.tell})
+                continue
+            if kind == "damage":
+                roll = self.dice.roll(str(r.get("dice") or r.get("amount") or "1"),
+                                      label=f"{what} (the wielder)", visibility="hidden")
+                state["rolls"].append(roll.as_dict())
+                got = self._apply_damage(actor, max(0, roll.total),
+                                         str(r.get("damage_type") or "untyped"))
+                got["origin"] = origin
+                got["property"] = what
+                out.append({"effect": got,
+                            "tell": f"The {what} bites back at {actor.name}: "
+                                    f"{got['amount']} {got['type']}."})
+            elif kind == "bleed":
+                if who.is_dead or who.has_state("immune.bleed") or \
+                        states.immunity_blocks(who.immunities, "bleed"):
+                    out.append({"effect": {"ref": who.ref, "kind": "rider_refused",
+                                           "property": what},
+                                "tell": f"{who.name} does not bleed; the {what} "
+                                        f"finds nothing to open."})
+                    continue
+                amount = int(r.get("amount", 1) or 1)
+                n = sum(1 for e in who.effects
+                        if e.key == "bleed" and e.origin == origin)
+                who.apply_effect(ActiveEffect(
+                    name="Bleed", kind="condition", key="bleed",
+                    source=f"{origin}#{n + 1}" if r.get("stacks") else origin,
+                    origin=origin, tags=states.tags_for("bleed"),
+                    stacking="stack" if r.get("stacks") else "refresh",
+                    payload={"stopped_by": str(r.get("stopped_by") or "")},
+                    periodic=[{"per": "round", "damage": amount,
+                               "damage_type": "untyped"}]))
+                total = sum(int(p.get("damage", 0) or 0) for e in who.effects
+                            if e.key == "bleed" for p in e.periodic)
+                out.append({"effect": {"ref": who.ref, "kind": "condition",
+                                       "condition": "bleed", "from": what,
+                                       "origin": origin, "per_round": total},
+                            "tell": f"The {what} opens a wound on {who.name}: "
+                                    f"{total} damage a round until it is stopped"
+                                    + (f" ({r['stopped_by']})." if r.get("stopped_by")
+                                       else ".")})
+            elif kind == "save_gate":
+                out.extend(self._magic_gate(actor, who, r, what, origin))
+            elif kind == "slay" and not on_self:
+                got = self._slay(defender, r, what, state)
+                if got:
+                    out.append(got)
+        return out
+
+    def _magic_gate(self, actor: Actor, defender: Actor, gate: dict, what: str,
+                    origin: str) -> list[dict]:
+        """One rider's saving throw and what failing it costs (thundering, disruption)."""
+        save = str(gate.get("target") or "fort").lower()[:4]
+        save = {"fortitude": "fort", "reflex": "ref"}.get(save, save)
+        if save not in SAVES:
+            return []
+        try:
+            dc = int(gate.get("dc"))
+        except (TypeError, ValueError):
+            return []
+        roll = self.dice.d20(defender.save_modifiers(save),
+                             label=f"{SAVES[save]} save against the {what}",
+                             visibility="hidden")
+        nat = natural_said(roll, dc)
+        said = f"{nat}, " if nat else ""
+        if d20_succeeds(roll, dc):
+            return [{"effect": {"ref": defender.ref, "kind": "save", "save": save,
+                                "saved": True, "origin": origin},
+                     "tell": f"{defender.name} makes the {SAVES[save]} save against the "
+                             f"{what} ({said}{roll.total} against DC {dc})."}]
+        out = [{"effect": {"ref": defender.ref, "kind": "save", "save": save,
+                           "saved": False, "origin": origin},
+                "tell": f"{defender.name} fails the {SAVES[save]} save against the {what} "
+                        f"({said}{roll.total} against DC {dc})."}]
+        for branch in gate.get("on_failure") or ():
+            if not isinstance(branch, dict):
+                continue
+            kind = str(branch.get("type") or "")
+            if kind == "slay":
+                got = self._slay(defender, branch, what, None)
+                if got:
+                    out.append(got)
+            elif kind == "apply_condition":
+                params = {"condition": str(branch.get("target") or ""), "to": defender.ref}
+                dur = branch.get("duration")
+                if isinstance(dur, dict) and dur.get("amount"):
+                    params["duration"] = {"amount": dur["amount"],
+                                          "unit": dur.get("unit", "round")}
+                res = self.run(self.validate([{
+                    "op": "condition", "visibility": "hidden", "because": f"the {what}",
+                    "params": params}], origin=origin, origin_name=what))
+                for o in res.outcomes:
+                    for e in o.effects or []:
+                        out.append({"effect": e, "tell": ""})
+                    if o.tell:
+                        out.append({"effect": {"ref": defender.ref,
+                                               "kind": "item_rider_said"},
+                                    "tell": o.tell})
+        return out
+
+    def _slay(self, defender: Actor, doc: dict, what: str, state: dict | None) -> dict | None:
+        """Vorpal's severing and disruption's destruction, through `Actor.die`."""
+        from . import coup_de_grace as coup_mod
+        from .sheet import _is_of_kind
+
+        if defender.is_dead:
+            return None
+        natural = doc.get("natural")
+        if natural is not None and state is not None \
+                and int(state.get("natural") or 0) < int(natural):
+            return None
+        spared = next((t for t in doc.get("except") or ()
+                       if t != "object" and _is_of_kind(defender, "type", t)), "")
+        if spared:
+            return {"effect": {"ref": defender.ref, "kind": "rider_refused",
+                               "property": what, "why": spared},
+                    "tell": f"The {what} finds nothing to sever in {defender.name}."}
+        if doc.get("natural") is not None:
+            immune = coup_mod.crit_immunity(defender)
+            if immune:
+                return {"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                   "property": what, "why": immune},
+                        "tell": f"The {what} finds no head to take: {defender.name} "
+                                f"{immune}."}
+        if not defender.die(f"the {what}"):
+            return None
+        verb = "takes the head of" if doc.get("natural") is not None else "destroys"
+        return {"effect": {"ref": defender.ref, "kind": "condition", "condition": "dead",
+                           "from": what},
+                "tell": f"The {what} {verb} {defender.name}."}
+
+    def _fortify(self, actor: Actor, defender: Actor, weapon: dict, state: dict, *,
+                 flat_footed: bool, pulled: bool) -> bool:
+        """Fortification (CRB): "When a critical hit or sneak attack is scored on the
+        wearer, there is a chance that the critical hit or sneak attack is negated and
+        damage is instead rolled normally" — 25, 50 or 75%. The engine's d%, shown either
+        way, like the miss chance: it is not an attack roll and not the player's. One
+        roll covers the blow, crit and sneak dice together. True when it turned them."""
+        pct, whose = defender.fortification()
+        if not pct:
+            return False
+        crit = bool(state.get("crit"))
+        sneak = self._sneak_for(actor, defender, weapon, flat_footed=flat_footed,
+                                pulled=pulled)[0]
+        if not crit and not sneak:
+            return False
+        what = " and ".join(w for w, on in (("critical hit", crit),
+                                              ("sneak attack", bool(sneak))) if on)
+        roll = self.dice.roll("1d100", label=f"fortification ({pct}%)", visibility="hidden")
+        state["rolls"].append(roll.as_dict())
+        if roll.total <= pct:
+            state["crit"] = False
+            state["tells"].append(
+                f"{defender.name}'s {whose} turns the {what} from a vital place "
+                f"({roll.total} against {pct}%): it lands as an ordinary blow.")
+            return True
+        state["tells"].append(f"{defender.name}'s {whose} does not turn the {what} "
+                              f"({roll.total} against {pct}%).")
+        return False
+
+    def _harmless_blow(self, actor: Actor, defender: Actor, weapon: dict,
+                       struck_as: tuple, incorporeal: bool) -> str:
+        """Why this blow does nothing at all, or "".
+
+        Brilliant energy "cannot harm undead, constructs, or objects" (CRB). An
+        incorporeal creature is "immune to all nonmagical attack forms" (Bestiary,
+        Incorporeal): a blow carrying neither `magic` nor `ghost_touch` passes through. A
+        creature whose own damage reduction is overcome by magic strikes as magic with
+        its natural weapons (Bestiary, Damage Reduction: "a creature's natural weapons
+        count as the type of weapon that overcomes its own DR"), so a wight's claw is
+        not a stick to a ghost.
+        """
+        from .sheet import _is_of_kind
+
+        name = str(weapon.get("name") or "weapon").lower()
+        for spec in _layer_docs(weapon, "ignore_armour"):
+            for kind in spec.get("cannot_harm") or ():
+                if kind != "object" and _is_of_kind(defender, "type", kind):
+                    return (f"The {name} passes through {defender.name} without harm: "
+                            f"brilliant energy cannot hurt the {kind}.")
+        if not incorporeal or {"magic", "ghost_touch"} & set(struck_as):
+            return ""
+        natural = bool(weapon.get("natural") or weapon.get("stat_block"))
+        if natural and any("magic" in str(r.bypass).lower() for r in actor.reductions):
+            return ""
+        return (f"The {name} passes clean through {defender.name}: it is not magic, and "
+                f"nothing else touches the incorporeal.")
+
+    def _catcher(self, actor: Actor, defender: Actor) -> Actor | None:
+        """Who an arrow-catching shield pulls this shot to, or None: a bearer other than
+        the shooter and the target, conscious, within the shield's `draws_ft` of the
+        target on the board. The target's own shield needs no diverting."""
+        for other in self.scene.actors.values():
+            if other is actor or other is defender or other.is_down:
+                continue
+            for spec, _, _ in other.worn_specs_of("deflect_ranged"):
+                reach = int(spec.get("draws_ft", 0) or 0)
+                gap = self._gap_ft(other, defender) if reach else None
+                if reach and gap is not None and gap <= reach:
+                    return other
+        return None
+
+    def _deflect(self, actor: Actor, defender: Actor, weapon: dict, state: dict,
+                 flat_footed: bool) -> str:
+        """Arrow deflection (CRB): "Once per round when he would normally be struck by a
+        ranged weapon, he can make a DC 20 Reflex save. If the ranged weapon has an
+        enhancement bonus, the DC increases by that amount. If he succeeds, the shield
+        deflects the weapon. He must be aware of the attack and not flat-footed." The
+        round's one use is an `item_spent` effect the round ticker expires (the forge's
+        first-wound shape), not a counter beside the store. The tell when it turned the
+        shot, else ""."""
+        if flat_footed or defender.loses_dex_to_ac or defender.is_down:
+            return ""
+        for spec, name, origin in defender.worn_specs_of("deflect_ranged"):
+            if not spec.get("save"):
+                continue
+            spent = f"deflect:{origin}"
+            if any(e.kind == "item_spent" and e.key == spent for e in defender.effects):
+                continue
+            save = str(spec.get("save") or "ref").lower()[:4]
+            save = {"reflex": "ref", "fortitude": "fort"}.get(save, save)
+            dc = int(spec.get("dc", 20) or 20)
+            if spec.get("dc_adds_enhancement"):
+                dc += int((weapon.get("magic") or {}).get("enhancement") or 0)
+            roll = self.dice.d20(defender.save_modifiers(save),
+                                 label=f"{SAVES.get(save, save)} save, {name}",
+                                 visibility="hidden")
+            state["rolls"].append(roll.as_dict())
+            defender.apply_effect(ActiveEffect(
+                name=f"{name}: deflection used this round", kind="item_spent", key=spent,
+                source=origin, origin=origin, duration="rounds", rounds_left=1))
+            if d20_succeeds(roll, dc):
+                return (f"{defender.name}'s {name} turns the shot aside ({roll.total} "
+                        f"against DC {dc}).")
+            state["tells"].append(f"{defender.name}'s {name} does not turn the shot "
+                                  f"({roll.total} against DC {dc}).")
+            return ""
+        return ""
+
+    def _defend_with(self, actor: Actor, weapon: dict, value) -> tuple[str, str]:
+        """(refusal, tell) for a defending weapon's per-turn choice (see `_op_attack`)."""
+        name = str(weapon.get("name") or "weapon")
+        if not _layer_docs(weapon, "enhancement_to_ac"):
+            return (f"The {name} is not a defending weapon: it has no enhancement to "
+                    f"move to armour class.", "")
+        try:
+            n = int(value)
+        except (TypeError, ValueError):
+            return (f"defending is how many points of the {name}'s enhancement go to "
+                    f"armour class. {value!r} is not a number.", "")
+        own = int((weapon.get("magic") or {}).get("enhancement") or 0)
+        if not 0 <= n <= own:
+            return (f"The {name}'s enhancement is +{own}: between 0 and {own} of it can "
+                    f"go to armour class, not {n}.", "")
+        rec = weapon.get("crafted_record") or {}
+        rec_id = str(rec.get("id") or rec.get("name") or name).strip().lower()
+        source = f"defending:{rec_id}"
+        actor.remove_effects(match=lambda e: e.source == source)
+        if not n:
+            return "", f"{actor.name} keeps the {name}'s whole enhancement on the blade."
+        scope = {"weapon": {"record": rec_id}}
+        actor.apply_effect(ActiveEffect(
+            name=f"defending ({name})", kind="buff", source=source,
+            origin=f"item:{rec_id}", duration="rounds", rounds_left=1,
+            modifiers=[{"kind": "combat_mod", "target": "attack", "amount": -n,
+                        "bonus_type": "", "when": scope, "note": "moved to AC"},
+                       {"kind": "combat_mod", "target": "damage", "amount": -n,
+                        "bonus_type": "", "when": scope, "note": "moved to AC"},
+                       {"kind": "combat_mod", "target": "ac", "amount": n,
+                        "bonus_type": "", "note": "defending"}]))
+        return "", (f"{actor.name} turns {n} of the {name}'s enhancement to guarding: "
+                    f"+{n} armour class until their next turn, and {n} less on its "
+                    f"attack and damage.")
+
     def _item_riders(self, actor: Actor, defender: Actor, weapon: dict,
                      crit: bool = False) -> list[dict]:
         """Fire a forged weapon's on-hit riders (plan §12.4) on the hit that just landed.
@@ -11733,6 +12310,183 @@ class Engine:
                                 "tell": o.tell})
         return out
 
+    # --- a magic item's powers (enchanting contracts §4, plan §8.5) -------------------------
+
+    def _power_of(self, actor: Actor, item_said: str, power_said: str):
+        """(record, layer, power row, refusal) for `use_item {item, power}`.
+
+        The item must be ON: worn in a slot (the suit, the shield, a ring) or the weapon
+        in hand — the book's "to use a magic item, it must be ... worn or wielded" — so a
+        blinding shield in the pack is refused with that sentence. The power by its row
+        key (`blinding`, `etherealness`, a recipe id), or the words its card uses.
+        """
+        from . import magic_layer
+        from .sheet import layer_of
+
+        def norm(s) -> str:
+            return " ".join(str(s or "").replace("-", " ").split()).lower()
+
+        want = norm(item_said)
+        on_names = {norm(w) for slot in actor.slots.values() for w in slot if w}
+        held = actor.wielded_record()
+        found, carried = None, None
+        for rec in actor.worn.values():
+            if not isinstance(rec, dict) or not magic_layer.has_layer(rec):
+                continue
+            names = {norm(rec.get("id")), norm(rec.get("name"))}
+            if want not in names:
+                continue
+            on = bool(names & on_names) or (held is not None and norm(held.get("id"))
+                                            in names)
+            if on:
+                found = rec
+                break
+            carried = rec
+        if found is None:
+            if carried is not None or actor.item_records(item_said):
+                return None, None, None, (f"The {item_said} must be worn or in hand to use "
+                                          f"its power. Nothing happens.")
+            return None, None, None, f"{actor.name} has no magic item called {item_said}."
+        lay = layer_of(found) or {}
+        rows = lay.get("powers") or []
+        name = str(found.get("name") or item_said)
+        if not rows:
+            return found, lay, None, f"The {name} has no power to use."
+        p = norm(power_said)
+        row = next((r for r in rows if p in {norm(r.get("key")),
+                                              norm(_property_word(r.get("spec") or {})),
+                                              norm((r.get("spec") or {}).get("spell"))}),
+                   None)
+        if row is None:
+            return found, lay, None, (
+                f"The {name} has no power called {power_said}: its powers are "
+                f"{', '.join(str(r.get('key')) for r in rows)}.")
+        count = _uses_per_day(row)
+        if count is not None and int(row.get("used", 0) or 0) >= count:
+            return found, lay, row, (
+                f"The {name}'s {_property_word(row.get('spec') or {})} is spent for today "
+                f"({count} of {count} used); it returns with the new day.")
+        return found, lay, row, ""
+
+    def _use_power(self, intent: Intent, partial: dict) -> Outcome:
+        """Use one power of a worn or wielded magic item: count the use, then run it.
+
+        Three shapes (effectspec `item_power`): a `spell` cast through the cast door
+        (`_op_cast`) at the item's caster level with the book's item DC (CRB, Magic Items,
+        Saving Throws: "10 + the level of the spell or ability + the ability modifier of
+        the minimum ability score needed to cast that level of spell"), no slot spent;
+        an `effect` — the blinding shield's Reflex save or blinded, over its burst —
+        through the same save and condition doors a weapon's riders use; or a `tell`,
+        a power that changes no number (glamered). Every number stamped `item:<id>`.
+        Uses are counted on every copy of the item's layer (`Actor.item_records`) and
+        come back at the day boundary (`Actor.run_periodic("day")`).
+        """
+        actor = self.scene.actors[intent.actor]
+        resuming = partial.get("cast_state") is not None
+        rec, lay, row, why = self._power_of(actor, str(intent.params.get("item") or ""),
+                                            str(intent.params.get("power") or ""))
+        if why and not resuming:
+            return self._refuse(intent, why, code="item_power")
+        rec_id = str(rec.get("id") or rec.get("name"))
+        name = str(rec.get("name") or rec_id)
+        origin = f"item:{rec_id}"
+        spec = dict(row.get("spec") or {})
+        what = _property_word(spec)
+        count = _uses_per_day(row)
+        left = None
+        if not resuming and count is not None:
+            used = int(row.get("used", 0) or 0) + 1
+            for holder in actor.item_records(rec_id):
+                holder["magic"].setdefault("uses", {})[str(row["key"])] = used
+            left = count - used
+        record = {"ref": actor.ref, "kind": "item_power", "item": rec_id,
+                  "power": str(row.get("key")), "origin": origin,
+                  **({"left": left} if left is not None else {})}
+        spent = (f" The {name} has {left} use{'s' if left != 1 else ''} of its {what} "
+                 f"left today." if left is not None else "")
+        cl = int(spec.get("caster_level") or (lay or {}).get("caster_level") or 1)
+
+        if spec.get("spell"):
+            try:
+                spell = spells_mod.get(str(spec["spell"]))
+            except KeyError:
+                return self._refuse(intent, f"The {name}'s power names a spell the Spells "
+                                            f"bench does not have ({spec['spell']}).")
+            level = min((int(v) for v in (spell.lists or {}).values()), default=0)
+            if not resuming:
+                partial["item_cast"] = {"cl": cl, "level": level,
+                                        "dc": 10 + level + level // 2,
+                                        "origin": origin, "name": name}
+            params = {"spell": spell.id}
+            if intent.params.get("to"):
+                params["at"] = intent.params["to"]
+            cast = Intent(op="cast", actor=actor.ref, target=intent.target,
+                          because=intent.because or f"the {name}", params=params,
+                          visibility=intent.visibility, id=intent.id,
+                          origin=origin, origin_name=name)
+            import dataclasses
+
+            out = self._op_cast(cast, partial)
+            return dataclasses.replace(
+                out, op="use_item", effects=[record] + list(out.effects or []),
+                tell=(out.tell + spent).strip() if spent else out.tell)
+
+        effects: list[dict] = [record]
+        tells: list[str] = []
+        if spec.get("tell"):
+            tells.append(f"{actor.name} uses the {name}'s {what}: {spec['tell']}")
+        docs = spec.get("effect") or []
+        docs = [docs] if isinstance(docs, dict) else list(docs)
+        if docs:
+            area = spec.get("area") or {}
+            if area.get("ft"):
+                # A burst on the bearer: everyone within it but the bearer ("all within
+                # 20 feet except the wielder", CRB blinding). Measured on the board the
+                # way every other distance is (`_gap_ft`).
+                # With no map there is no distance to measure, and everyone here is
+                # taken to be inside it — the scene is one room's worth of space.
+                targets = [a for a in self.scene.actors.values()
+                           if a is not actor and not a.is_dead
+                           and (self._gap_ft(actor, a) is None
+                                or self._gap_ft(actor, a) <= int(area["ft"]))]
+                tells.append(f"{actor.name} calls on the {name}'s {what}: a "
+                             f"{area['ft']}-foot {area.get('shape', 'burst')}"
+                             + (f" catching {_and_list([a.name for a in targets])}."
+                                if targets else ", and nobody is inside it."))
+            else:
+                ref = intent.params.get("to") or intent.target or actor.ref
+                ref = ref[0] if isinstance(ref, list) else ref
+                targets = [self.scene.actors[ref]] if ref in self.scene.actors else []
+                tells.append(f"{actor.name} calls on the {name}'s {what}.")
+            for doc in docs:
+                # `recipient: "self"` is the bearer whatever the power was aimed at — a
+                # cursed power's opposite effect (lane F) lands on whoever used it.
+                aimed = [actor] if str(doc.get("recipient") or "") in ("self", "caster") \
+                    else targets
+                for who in aimed:
+                    if str(doc.get("type") or "") == "save_gate":
+                        for got in self._magic_gate(actor, who, doc, what, origin):
+                            effects.append(got["effect"])
+                            if got["tell"]:
+                                tells.append(got["tell"])
+                        continue
+                    made = consumables._spec_to_intents(doc, who.ref, 1.0,
+                                                        f"the {name}")
+                    if not made:
+                        tells.append(effectspec.render(doc) + ".")
+                        continue
+                    for i in made:
+                        i["visibility"] = "hidden"
+                    res = self.run(self.validate(made, origin=origin, origin_name=name))
+                    for o in res.outcomes:
+                        effects.extend(o.effects or [])
+                        if o.tell:
+                            tells.append(o.tell)
+        if not tells:
+            tells.append(f"{actor.name} uses the {name}'s {what}.")
+        return Outcome(intent_id=intent.id, op="use_item", effects=effects,
+                       tell=" ".join(tells) + spent, because=intent.because)
+
     def _op_use_item(self, intent: Intent, partial: dict) -> Outcome:
         """Drink it, throw it, or put it on a blade.
 
@@ -11745,7 +12499,11 @@ class Engine:
         Throwing is a ranged touch attack in 1e. That attack is not emitted here: this op
         commits the dose and hands the effects back, and whether it hits is the `attack`
         op's business. Rolling it here would mean a second, hidden attack resolver.
+
+        With `power`, the item is a magic item's record, not a jar: `_use_power`.
         """
+        if intent.params.get("power"):
+            return self._use_power(intent, partial)
         actor = self.scene.actors[intent.actor]
         said = str(intent.params["item"]).strip().lower()
         how = str(intent.params.get("how", "drink")).strip().lower()
@@ -11894,6 +12652,13 @@ class Engine:
                 intent, f"{actor.name} is not carrying {item_id}. They have: "
                         f"{', '.join(carried) or 'nothing to sell'}.")
         count = min(count, held.count)
+        # Work In progress is not for sale until it is collected (lane G, contracts §8.2):
+        # a sword on the enchanter's circle, a jar still steeping.
+        from . import inprogress
+
+        busy = inprogress.held_back(held, int(getattr(self.scene, "clock_minutes", 0) or 0))
+        if busy:
+            return self._refuse(intent, f"The {held.name} is {busy}. Nothing is sold.")
 
         buyer = intent.params.get("to")
         if buyer and buyer not in self.scene.actors:
@@ -12204,18 +12969,28 @@ class Engine:
 
         actor = self.scene.actors[intent.actor]
         spell = spells_mod.get(str(intent.params["spell"]))
-        level = casting.spell_level_for(actor, spell)
+        # A magic item's power cast through this door (`_use_power`, enchanting contracts
+        # §4): the item's caster level and the book's item DC, no slot, no prepared copy,
+        # no arcane spell failure (the armour fouls a caster's gestures, not a command
+        # word). Carried in `partial`, which only engine code writes and which survives
+        # the dice popup, never in the intent's params, which a model can write.
+        item = (partial.get("item_cast")
+                or (partial.get("cast_state") or {}).get("item_cast") or None)
+        level = int(item["level"]) if item else casting.spell_level_for(actor, spell)
         # Which slot pays (`casting.cast_source`): the ordinary one, a domain slot or a
         # specialist's school slot, and two for an opposition-school spell. Decided once,
         # on the way in, and kept in the state, because on a resume the prepared copy is
         # already gone and the question can no longer be asked.
         state = partial.get("cast_state")
-        source = (state or {}).get("source") or casting.cast_source(actor, spell) or {
-            "pool": "" if casting.at_will(level) else casting.slot_pool(level),
-            "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
+        if item:
+            source = {"pool": "", "key": "", "cost": 0, "level": level}
+        else:
+            source = (state or {}).get("source") or casting.cast_source(actor, spell) or {
+                "pool": "" if casting.at_will(level) else casting.slot_pool(level),
+                "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
         level = int(source.get("level", level))
-        dc = casting.save_dc(actor, level)
-        cl = casting.caster_level(actor)
+        dc = int(item["dc"]) if item else casting.save_dc(actor, level)
+        cl = int(item["cl"]) if item else casting.caster_level(actor)
         plan = spells_mod.casting_plan(spell, cl)
         dice = plan["dice"]
 
@@ -12228,6 +13003,10 @@ class Engine:
         if state is None:
             state = {"stage": "dice", "i": 0, "rolls": [], "effects": [], "tells": [],
                      "source": source}
+            if item:
+                # Kept in the state: a suspension parks only the state (`_roll_or_suspend
+                # _stage`), so the item would be forgotten on the way back from a popup.
+                state["item_cast"] = item
             aim = self._cast_aim(intent, actor)
             if aim.kind == "object":
                 # Held by the thing's own name ("canopy"), the player's words kept for
@@ -12284,7 +13063,7 @@ class Engine:
             # Wizard/Cleric/Druid; "do not consume any slots", Sorcerer/Bard). Measured
             # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
             # went 4, 3, 2, 1, 0 and was then refused. Nothing is spent, nothing unprepared.
-            spent = {"ok": True} if casting.at_will(level) \
+            spent = {"ok": True} if casting.at_will(level) or item \
                 else actor.spend_pool(pool, max(1, int(source.get("cost", 1) or 1)))
             if not spent["ok"]:
                 # The mid-list case, measured: six casts in one list PASS validation
@@ -12300,7 +13079,8 @@ class Engine:
             # The prepared copy is spent with the slot — for every prepared caster, not
             # only the ones who prepare from a book (item 25).
             converted = ""
-            if casting.caster_data(actor).get("kind") == "prepared" and level > 0:
+            if casting.caster_data(actor).get("kind") == "prepared" and level > 0 \
+                    and not item:
                 if source.get("key") and casting.prepared_count(actor, source["key"]) > 0:
                     # The copy in the slot that paid: ordinary, domain or school.
                     casting.unprepare(actor, source["key"], 1)
@@ -12326,7 +13106,7 @@ class Engine:
             # engine, once, on first entry, and said either way.
             from . import armour as armour_mod
 
-            asf, fouled_by = armour_mod.spell_failure(actor, spell)
+            asf, fouled_by = armour_mod.spell_failure(actor, spell) if not item else (0, "")
             if asf:
                 roll = self.dice.roll("1d100", label=f"Arcane spell failure ({asf}%)",
                                       visibility="hidden")
@@ -12410,11 +13190,29 @@ class Engine:
             return Outcome(
                 intent_id=intent.id, op="cast", effects=[cast_effect] + lit,
                 rolls=[_roll_from_dict(r) for r in state["rolls"]],
-                tell=" ".join([f"{actor.name} casts {spell.name} ({'; '.join(bits)})."]
+                tell=" ".join([_cast_opener(actor, spell, bits, item)]
                               + where + lit_said),
                 because=intent.because,
             )
 
+        # Spell resistance, before anything lands (enchanting contracts §4; CRB, Spell
+        # Resistance: "the caster must make a caster level check (1d20 + caster level) at
+        # least equal to the creature's spell resistance"). Until 2026-10-05 nothing
+        # carried an SR number the engine could check against, so it was reported and
+        # never rolled (docs/spells.md §5.1); a stat block's printed SR and a suit of
+        # spell resistance are both read now (`Actor.spell_resistance`). The CASTER's
+        # roll, so a player rolls their own; once per target, kept in the state across
+        # the popups. A creature that resists is struck from `live`, so neither the
+        # damage nor a rider reaches it. "Harmless" spells are not checked: the book lets
+        # a creature lower its SR for them, and a cure resisted by an ally is no rule.
+        if spell.sr is True and "harmless" not in sr.lower():
+            for ref in live:
+                self._resists(intent, actor, self.scene.actors[ref], spell, cl, partial,
+                              state)
+            resisted = {r for r, beat in (state.get("sr") or {}).items() if not beat}
+            if resisted:
+                live = [r for r in live if r not in resisted]
+                cast_effect["resisted"] = sorted(resisted)
         if dice and live and state["stage"] == "dice":
             roll = self._roll_or_suspend_stage(
                 intent, actor, [],
@@ -12480,7 +13278,7 @@ class Engine:
                 state["effects"].append({
                     "ref": target.ref, "kind": "heal", "amount": healed,
                     "rolled": amount, "hp_after": target.hp, "hp_max": target.hp_max,
-                    "origin": f"spell:{spell.id}"})
+                    "origin": item["origin"] if item else f"spell:{spell.id}"})
                 state["tells"].append(
                     f"{target.name} recovers {healed} hit points.")
                 # Not even magic (CRB p.444): what thirst or hunger holds stays.
@@ -12502,7 +13300,7 @@ class Engine:
                 hit = self._apply_damage(target, amount, plan["damage_type"],
                                          traits=("area",) if plan.get("area") else (),
                                          lethality=plan["lethality"])
-                hit["origin"] = f"spell:{spell.id}"
+                hit["origin"] = item["origin"] if item else f"spell:{spell.id}"
                 state["effects"].append(hit)
                 # What the target actually lost, not what the die said: a 30-point
                 # fireball against fire resistance 10 is 20, and a GM told the first
@@ -12518,7 +13316,7 @@ class Engine:
             crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
         effects.extend(crossed)
 
-        tells = [f"{actor.name} casts {spell.name} ({'; '.join(bits)})."] + where
+        tells = [_cast_opener(actor, spell, bits, item)] + where
         if dice and "rolled" in state:
             tells.append(f"{dice} — {state.get('rolled', 0)}.")
         tells.extend(state["tells"])
@@ -12551,8 +13349,10 @@ class Engine:
         # everything else keeps the path it had, rendered for the GM. A bless's +1 is
         # still not applied, and that is a separate argument with its own test: applying
         # it needs a decision about stacking that this change is not making.
-        ran, said = self._run_specs(plan["riders"], self._cast_context(
-            actor, spell, cl, level, dc, live, plan, intent))
+        cast_ctx = self._cast_context(actor, spell, cl, level, dc, live, plan, intent)
+        if item:
+            cast_ctx["origin"] = item["origin"]
+        ran, said = self._run_specs(plan["riders"], cast_ctx)
         effects.extend(ran)
         tells.extend(said)
         for spec in plan["riders"]:
@@ -12566,6 +13366,42 @@ class Engine:
         )
 
     # --- where a cast went (rules/areas.py does the geometry) ---------------------------
+
+    def _resists(self, intent: Intent, actor: Actor, target: Actor, spell, cl: int,
+                 partial: dict, state: dict) -> bool:
+        """Whether `target`'s spell resistance stops this cast; the caster's level check
+        rolled once per target and kept in `state["sr"]` (see `_op_cast`). A caster's
+        own spell is never checked against themselves."""
+        done = state.setdefault("sr", {})
+        if target.ref in done:
+            return not done[target.ref]
+        if target is actor:
+            return False
+        sr, whose = target.spell_resistance_rating()
+        if sr <= 0:
+            return False
+        # The caster's own bonuses "on caster level checks to overcome spell resistance"
+        # (Spell Penetration's +2) are the vocabulary's `combat_mod` target
+        # `spell_resistance`, read through the one funnel; nothing read it before.
+        from .dice import stack as _stack
+
+        mods = _stack([Modifier(int(cl), "caster level")]
+                      + actor._buff_mods("combat_mod", "spell_resistance"))
+        roll = self._roll_or_suspend_stage(
+            intent, actor, mods,
+            f"Caster level check against {target.name}'s spell resistance", sr,
+            partial, state, "1d20", state_key="cast_state")
+        state["rolls"].append(roll.as_dict())
+        beat = roll.total >= sr
+        self._judge(roll, beat)
+        done[target.ref] = beat
+        held = "" if whose == "its own" else f", from {whose}"
+        state["tells"].append(
+            f"{spell.name} breaks through {target.name}'s spell resistance ({roll.total} "
+            f"against SR {sr}{held})." if beat else
+            f"{spell.name} breaks on {target.name}'s spell resistance ({roll.total} "
+            f"against SR {sr}{held}): it does not touch them.")
+        return not beat
 
     def _cast_aim(self, intent: Intent, actor: Actor):
         """The cast's aim: the `aim` param, else the legacy `at` or `square`, else the
@@ -12846,7 +13682,7 @@ class Engine:
     # family. Nothing that used to be narrated silently starts happening.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
-                 "choose_one", "bundle", "attitude")
+                 "choose_one", "bundle", "attitude", "spell_resistance")
 
     def _executes(self, spec: dict) -> bool:
         # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
@@ -12894,6 +13730,8 @@ class Engine:
             return self._object_damage(spec, ctx)
         if kind == "attitude":
             return self._attitude(spec, ctx)
+        if kind == "spell_resistance":
+            return self._grant_sr(spec, ctx)
         if _ac_grant(spec) is not None:
             return self._grant_ac(spec, ctx)
         return self._stand_by(spec, ctx)
@@ -12955,6 +13793,40 @@ class Engine:
                 f"{amount:+d} {word}, for {int(rounds)} rounds)." if after != before else
                 f"{who.name}'s armour class stays {before}: {source}'s {amount:+d} {word} "
                 f"does not stack with the {word} bonus already held.")
+        return effects, tells
+
+    def _grant_sr(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell's spell resistance — the spell resistance spell's "12 + caster level" —
+        landed as an `ActiveEffect` of kind `spell_resistance` for the spell's duration,
+        which `Actor.spell_resistance` reads beside a stat block's and a suit's. The type
+        was `engine: False` while the cast path rolled no check against SR; it rolls one
+        now (`_resists`), so a rating finally means something to somebody."""
+        raw = spec.get("amount")
+        try:
+            amount = (int(effectspec.evaluate(raw, ctx.get("vars") or {}))
+                      if effectspec.is_formula(raw) else int(raw))
+        except (TypeError, ValueError):
+            return [], [effectspec.render(spec) + "."]
+        rounds = ctx.get("rounds")
+        targets = [str(r) for r in (ctx.get("targets") or [])]
+        if not targets and ctx.get("self_ok"):
+            targets = [str(ctx.get("caster") or "")]
+        source = str(ctx.get("source") or "a spell")
+        effects, tells = [], []
+        for ref in targets:
+            who = self.scene.actors.get(ref)
+            if who is None or amount <= 0:
+                continue
+            who.apply_effect(ActiveEffect(
+                name=f"spell resistance {amount}", kind="spell_resistance", key="sr",
+                source=source, origin=str(ctx.get("origin") or ""), amount=amount,
+                duration="rounds" if rounds is not None else "until-dismissed",
+                rounds_left=int(rounds) if rounds is not None else None))
+            effects.append({"ref": who.ref, "kind": "spell_resistance", "amount": amount,
+                            "source": source, "origin": str(ctx.get("origin") or ""),
+                            "rounds_left": rounds})
+            tells.append(f"{who.name} has spell resistance {amount} ({source}"
+                         + (f", for {int(rounds)} rounds)." if rounds is not None else ")."))
         return effects, tells
 
     def _attitude(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
@@ -16392,6 +17264,12 @@ class Engine:
         # table keys only, so a thing made at the bench could be carried and never held.
         crafted = actor.crafted_record(item)
         if crafted is not None and _record_gear(crafted) in ("weapon", "armour", "shield"):
+            # A sword on the enchanter's circle is not in anybody's hand (contracts §8.2,
+            # lane G: "wear/sell doors must ask `inprogress.held_back`"): the binding in
+            # progress holds it until it is collected.
+            why = self._held_back(actor, crafted)
+            if why:
+                return no(f"The {crafted.get('name') or item} is {why}.")
             return self._wear_crafted(intent, actor, crafted, no)
 
         # The one key, by the two resolvers (E1). Compared key to key, so "leather
@@ -16496,6 +17374,29 @@ class Engine:
                   f"the {name}{took}.{moved}"),
             because=intent.because,
         )
+
+    def _held_back(self, actor: Actor, rec: dict) -> str:
+        """Why the shelf entry behind this record cannot be worn or sold yet (In progress,
+        `inprogress.held_back`), or "". The record's own `work` block is asked too: a
+        forged vessel keeps it on its record (lane G, contracts §8.2)."""
+        from . import forge_items
+        from . import inprogress
+
+        now = int(getattr(self.scene, "clock_minutes", 0) or 0)
+        want = {str(rec.get(k) or "").strip().lower() for k in ("id", "name")} - {""}
+        for sid, entry in actor.stock.items():
+            got = forge_items.record_of(entry) or {}
+            names = {str(sid).lower()} | {str(got.get(k) or "").strip().lower()
+                                          for k in ("id", "name")}
+            if want & names:
+                why = inprogress.held_back(entry, now)
+                if why:
+                    return why
+        if isinstance(rec.get("work"), dict):
+            from types import SimpleNamespace
+
+            return inprogress.held_back(SimpleNamespace(work=rec["work"]), now)
+        return ""
 
     def _wear_crafted(self, intent: Intent, actor: Actor, rec: dict, no) -> Outcome:
         """Draw a crafted weapon or put on a crafted suit (contract §5).
@@ -18263,6 +19164,8 @@ def _ward_tell(scene: Scene, e: dict) -> str:
                 f"no {e.get('pool', 'fuel')} left to hold it.")
     if kind == "carried":
         return f"{name} is carrying the {e.get('what', 'thing')}; it takes its toll each day."
+    if kind == "worn":
+        return f"The {e.get('what', 'thing')} {name} wears grants {e.get('grants', 'its power')}."
     if kind == "ward_due":
         return f"{source}: {e.get('line', '')} — for the GM to apply."
     return ""
@@ -18424,6 +19327,58 @@ def _ac_grant(spec: dict):
         return min(cap, base + max(0, cl - above) // step)
 
     return amount
+
+
+def _uses_per_day(row: dict) -> int | None:
+    """A power's uses a day, or None for one at will (effectspec `uses: "unlimited"`)."""
+    uses = str(row.get("uses") or "").strip().lower()
+    if uses in ("unlimited", "at_will", "at will", "continuous"):
+        return None
+    try:
+        return max(1, int(row.get("uses_count") or 1))
+    except (TypeError, ValueError):
+        return 1
+
+
+def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:
+    """The cast's first sentence: who cast what, or which item released it."""
+    if item:
+        return (f"{actor.name} calls on the {item['name']}: {spell.name} "
+                f"({'; '.join(bits)}).")
+    return f"{actor.name} casts {spell.name} ({'; '.join(bits)})."
+
+
+def _layer_docs(weapon: dict, kind: str) -> list[dict]:
+    """The weapon's magic layer's standing documents of one type (`sheet._with_layer`)."""
+    return [s for s in ((weapon or {}).get("magic") or {}).get("specs") or ()
+            if isinstance(s, dict) and str(s.get("type") or "") == kind]
+
+
+def _property_word(doc: dict) -> str:
+    """What a layer document is called in a tell: the property's own name ("flaming
+    burst", "bane"), an essence's or a recipe's — never its source id. Lane B measured
+    the defect this closes: a merged bane rider's tell read "The property:bane in ..."."""
+    source = str(doc.get("source") or "")
+    kind, _, ident = source.partition(":")
+    if kind == "property":
+        prop = effectspec.property(ident)
+        if prop:
+            return str(prop.get("name") or ident).lower()
+    if kind == "essence":
+        from . import materials as _materials
+
+        found = getattr(_materials, "get", None)
+        try:
+            doc_ = found(ident) if callable(found) else None
+        except Exception:  # noqa: BLE001 — an unknown essence is still named by its id
+            doc_ = None
+        return str((doc_ or {}).get("name") or ident.replace("-", " ")).lower()
+    if kind == "recipe":
+        from . import magic_layer
+
+        r = magic_layer.recipe(ident) or {}
+        return str(r.get("name") or ident.replace("-", " ")).lower()
+    return (ident or source or "enchantment").replace("-", " ").lower()
 
 
 def _multiply_dice(notation: str, mult: int) -> str:

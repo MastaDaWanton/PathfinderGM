@@ -151,7 +151,9 @@ def test_scaled_prices_are_the_printed_ones():
 # §5.1). Lane C builds it (contracts §4). The new types wait in `es.AWAITING_READER`.
 # When a reader lands and its type becomes executable, the last assertion below fails
 # until this ledger shrinks with it, so it cannot go stale in either direction.
-WAITING_OUTSIDE_THE_LEDGER = {"spell_resistance"}
+# Emptied by lane C (2026-10-05): `Engine._resists` rolls the caster level check against a
+# rating from a stat block, a worn item or a spell's grant, so spell resistance runs.
+WAITING_OUTSIDE_THE_LEDGER: set = set()
 
 NEW_TYPES = ["crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
              "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality", "slay",
@@ -359,8 +361,9 @@ def test_the_holy_family_carries_alignment_as_data_and_says_nothing_checks_it():
     """Alignment is not tracked (owner ruling 2026-10-05, round 4 Q7): holy and its kin
     neither check the maker's alignment nor give the wrong wielder a negative level. The
     clauses stay in the data for the day alignment arrives, and each property says out
-    loud that nothing reads them — including that the +2d6 'when target alignment evil'
-    has no reader in `_when_holds`, so it fires against nobody yet."""
+    loud that nothing reads them. The +2d6 'when target alignment evil' IS read since lane
+    C (2026-10-05) — `_when_holds` answers yes for every target by the owner's round 6
+    ruling — and the property says it narrows once alignment is added."""
     pairs = {"holy": ("good", "evil"), "unholy": ("evil", "good"),
              "axiomatic": ("lawful", "chaotic"), "anarchic": ("chaotic", "lawful")}
     for pid, (is_, hurts) in pairs.items():
@@ -373,12 +376,12 @@ def test_the_holy_family_carries_alignment_as_data_and_says_nothing_checks_it():
         assert any(d.get("when") == {"target": {"alignment": hurts}} for d in docs)
         waits = " ".join(p["not_yet"]).lower()
         assert "alignment is not tracked" in waits and "_when_holds" in waits
+        assert "narrows" in waits and "narrows" in p["text"]
         assert not any(d["type"] == "negative_level" for d in docs)
     # The validator holds every future entry to the same honesty.
     holy = dict(es.properties()["holy"], not_yet=[])
     problems = es.property_problems(holy)
     assert any("alignment is not tracked" in p for p in problems)
-    assert any("Say so in not_yet" in p for p in problems)
 
 
 # --- the shape rules ----------------------------------------------------------------------

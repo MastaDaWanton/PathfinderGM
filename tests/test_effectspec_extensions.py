@@ -660,6 +660,15 @@ def test_every_executable_type_has_something_that_executes_it():
         # `_apply_damage` (tests/test_forge_engine.py). `working` is the bench's (lane D):
         # the build keeps it out of every number on purpose (plan §5.5).
         "gear_mod", "strikes_as", "working",
+        # The enchanting revamp's ten (lane C, 2026-10-05; effectspec's comment above the
+        # emptied `AWAITING_READER` names each reader): a weapon's threat range, extra
+        # attack, raised enhancement and lethality on its row (`sheet._with_layer`,
+        # `_raised_specs`); defending, fortification, brilliant energy, the arrow
+        # shields, vorpal and disruption in `Engine._op_attack`'s helpers; an item's
+        # powers through `use_item {power}` (`Engine._use_power`).
+        "crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
+        "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality", "slay",
+        "item_power",
     }
     claimed = {t.id for c in fx.CATEGORIES for t in c.types if t.engine}
     assert claimed - runs - already == set(), \

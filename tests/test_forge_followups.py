@@ -306,7 +306,11 @@ def test_a_clause_nothing_can_evaluate_is_still_dropped_never_applied():
     s = Scene(location_id=None)
     who = instantiate("thug", scene=s, name="who")
     ctx = {"target_actor": who, "weapon": {"key": "longsword"}}
-    assert not _when_holds({"target": {"alignment": "evil"}}, ctx)
+    # `target.alignment` is READ since enchanting lane C (2026-10-05), and answers yes for
+    # every target by the owner's ruling (round 6: no alignment is tracked yet, holy's 2d6
+    # lands on any foe, as smite does). It left this list of unevaluable clauses then;
+    # the rest stay dropped.
+    assert _when_holds({"target": {"alignment": "evil"}}, ctx)
     assert not _when_holds({"phase_of_the_moon": "full"}, ctx)
     assert not _when_holds({"weapon": {"glows": True}}, ctx)
     assert not _when_holds({"attacker": {"type": "dragon"}}, ctx)
@@ -350,8 +354,30 @@ def test_ghost_salt_strikes_as_ghost_touch_and_an_incorporeal_foe_halves_the_res
              "params": {"sides": {"you": ["pc"], "them": [ghost.ref]}}}])
     face_to_face(s, b=ghost.ref)
 
+    # A plain iron blade is a nonmagical attack form, and since enchanting lane C
+    # (2026-10-05) the incorporeal are "immune to all nonmagical attack forms" (Bestiary):
+    # it passes through and does nothing. The half is for a magic one (a +1 rapier).
     wear(e, "plain-rapier")
-    out, hit = _hit(e, s, ghost.ref, "plain-rapier")
+    for _ in range(25):
+        s.turn = [r for r, _ in s.initiative].index("pc")
+        out = run(e, [{"op": "attack", "actor": "pc", "target": ghost.ref,
+                       "visibility": "hidden", "params": {"weapon": "plain-rapier"},
+                       "because": "test"}])[-1]
+        if any(x.get("kind") == "blow_harmless" for x in out.effects):
+            break
+    else:
+        pytest.fail("never landed")
+    assert not any(x.get("kind") == "damage" for x in out.effects), out.effects
+    assert "passes clean through the ghost: it is not magic" in out.tell
+    assert ghost.hp == 500
+
+    magic = blade("magic-rapier", "iron", base="rapier")
+    magic["magic"] = {"schema": 1, "enhancement": 1, "properties": [], "flat": [],
+                      "powers": []}
+    magic["quality_index"] = 3
+    pc.add_stock(forge_items.stock_item(magic))
+    wear(e, "magic-rapier")
+    out, hit = _hit(e, s, ghost.ref, "magic-rapier")
     rolled = next(r for r in out.rolls if str(r.label).startswith("Damage")).total
     assert hit["amount"] == max(1, max(1, rolled) // 2), (rolled, hit)
     assert "passes through the ghost's insubstantial form" in out.tell
