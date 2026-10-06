@@ -66,7 +66,14 @@ def test_the_lists_are_exactly_what_the_contract_names():
         "easily_worked", "flawless", "malleable", "pure", "slaggy", "sulfurous",
         "clean_heat", "quench_sensitive", "narrow_window", "forgiving", "reactive",
         "cleans_slag", "weld_aid", "brittle", "hot_short",
-        "night_only", "eager", "skittish", "heavy", "volatile"]
+        "night_only", "eager", "skittish", "heavy", "volatile",
+        # The alchemist's bench (alchemy lane B, contracts §2.4), appended; `volatile`
+        # and `pure` are shared and not repeated.
+        "stabilizer", "catalyst", "apparatus", "solid", "liquid", "combustible",
+        "slow_to_dissolve", "light_sensitive", "corrosive", "toxic_to_handle", "wild",
+        "drinkable", "shatters", "bursts", "struck", "stick", "fireproof", "warded",
+        "lead_lined", "solvent:water", "solvent:alcohol", "solvent:vinegar", "solvent:oil",
+        "solvent:acid"]
 
 
 # --- mithral, written as documents --------------------------------------------------------
