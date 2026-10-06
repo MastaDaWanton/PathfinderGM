@@ -1,151 +1,371 @@
 {
  "id": "enchanter",
  "name": "Enchanter",
- "summary": "A Universal World Class any character may take regardless of their class. It levels through active use — attuning, scribing and binding — unlocking ritual methods and higher tiers of essence, from elemental motes chalked into a practice circle to legendary bindings that wake an item into something with opinions.",
+ "summary": "A Universal World Class any character may take regardless of their class. An enchanter lays magic on top of an item the smith or the leatherworker made: a circle of chalk and ink, essences seated where they fit, and a binding timed to the light. Enchanter level stands in for caster level; essences are the cost.",
  "grantable_at_creation": true,
- "_thresholds_note": "Mastery to reach levels 2, 3, 4 and 5. Modelled on the Herbalist's curve rather than copied from it: a qualifying level-1 enchantment is worth about 5 MP (3 first-time, +2 for a second stage), and the early rituals are two- and three-stage chains by nature — attune, scribe, and later focus — so the same 25/65 openings hold. The top is flat at 100 for the same reason the Herbalist's is: the unlocks stop where the table stops and the price of a level does not climb past it.",
+ "_ruling_2026_10_05_note": "The owner's enchanting revamp (docs/enchanting-answers.md rounds 1-7, docs/enchanting-revamp-plan.md §4, §5, §10), 'same as the others'. Three unlock levels replace five: level 1 the whole ritual in miniature (prepare, attune, bind, read, identify, unbind) on common and uncommon essence; level 2 refine, rare and exotic essence, and more than one new property in one working; level 3 cleanse and legendary essence. Then endless levels with perks (potency, quality, yield, capacity). Scribe, focus, channel, seal, imbue, empower and awaken are gone, with the `legendary-binding` milestone and its deed (old recipes map through `old_methods`). Old Enchanter 4 and 5 keep their level, which now is their bank of perk picks, as the Herbalist's and the Blacksmith's did.",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's and the Blacksmith's numbers on purpose: the crafts pace the same.",
  "thresholds": [
   25,
-  65,
-  60,
-  100
+  65
  ],
- "milestones": {
-  "5": "legendary-binding"
- },
- "_deeds_note": "The deed for Enchanter 5 is binding a legendary essence — and read literally that gate could never open, which is the exact trap the Herbalist's deed note records: legendary essence is level-5 material, so the deed would require the level it gates. The Enchanter's ladder to it is `empower`, learned at 4: empowering an exotic binding raises the result one tier band, so an Enchanter 4 who empowers an exotic working produces a legendary-tier binding, at +5 DC, and that success is the deed. Same shape as the Herbalist reaching legendary through the concentration ladder.",
- "deeds": {
-  "legendary-binding": {
-   "min_tier": "legendary",
-   "note": "Any successful binding at legendary tier, however it was reached — an empowered exotic working counts."
+ "_endless_note": "Levels past the written table (plan §5.2, the owner's 'use the proposed numbers', round 4 point 9). Leaving level 3 costs `base` and each level after it `step` more. Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick is worth: potency adds that fraction to the house top-ups of everything you bind (book numbers never scale); quality raises the ceiling one step; yield is the chance per binding that one essence is not consumed (the engine rolls it and shows the roll); capacity is +1 to what an item you bind holds, with no ceiling (owner, round 4 point 1).",
+ "endless": {
+  "base": 50,
+  "step": 10,
+  "picks_per_level": 2,
+  "perks": {
+   "potency": 0.05,
+   "quality": 1,
+   "yield": 0.05,
+   "capacity": 1
   }
  },
- "_levels_note": "Bind and seal are level 1 on purpose, and the herbalist is why: a track whose only real craft sits at level 3 can never earn the mastery to reach level 3 — the deadlock the herbalist's own deed note records, one level down. The heart of the craft is learned first in its smallest form, a mote bound into a quartz in a quiet room, and the danger scales with the tier ceiling rather than being withheld as a verb.",
+ "_ceiling_note": "`ceiling` is the highest quality index a level's hands can reach (0 Crude, 1 Sound, 2 Fine, 3 Superior, 4 Flawless), plan §10.2. A binding's quality is also held under the circle it was laid in: Prepare's and Attune's quality + 1 (the bench block's `circle_lift`).",
  "levels": [
   {
    "level": 1,
    "tools": [
-    "chalk and a quiet room"
+    "chalk",
+    "salt",
+    "a pot of ink",
+    "a candle ring"
    ],
    "methods": [
+    "prepare",
     "attune",
-    "scribe",
     "bind",
-    "seal"
+    "read",
+    "identify",
+    "unbind"
    ],
-   "max_tier": "common",
-   "note": "The whole ritual in miniature: sense the essence, chalk the circle, bind a mote into a quartz, seal it. Small work — but complete work, which is how mastery is earned."
+   "max_tier": "uncommon",
+   "ceiling": 2,
+   "note": "The whole ritual in miniature: lay a circle round the item, seat the essences where they fit, bind them at the crest. One new property in a working. Common and uncommon essence; Fine work at best."
   },
   {
    "level": 2,
    "tools": [
     "inscription set",
-    "jeweller's loupe"
+    "jeweller's loupe",
+    "phials"
    ],
    "methods": [
-    "focus",
-    "channel"
+    "refine"
    ],
-   "max_tier": "uncommon",
-   "note": "Setting a gemstone properly as the vessel's anchor and pouring essence into it without spilling. First real properties: slick leathers, shadowed cloaks."
+   "max_tier": "exotic",
+   "ceiling": 3,
+   "note": "Refine (condense essences of one family into one fuller phial), more than one new property in one working, and rare and exotic essence. Superior work."
   },
   {
    "level": 3,
    "tools": [
-    "attunement circle"
+    "a silvered bell",
+    "a sanctum's quiet"
    ],
    "methods": [
-    "imbue"
-   ],
-   "max_tier": "rare",
-   "note": "The dangerous widening of the craft: imbue lets more than one essence share a working, which is where flaming +1 blades — and mishaps worth the name — begin."
-  },
-  {
-   "level": 4,
-   "tools": [
-    "binding braziers",
-    "silvered bell"
-   ],
-   "methods": [
-    "empower"
-   ],
-   "max_tier": "exotic",
-   "note": "Raising a finished binding one band beyond itself. This is the ladder to legendary work — and the way the level-5 deed is reached."
-  },
-  {
-   "level": 5,
-   "tools": [
-    "enchanter's sanctum"
-   ],
-   "methods": [
-    "awaken"
+    "cleanse"
    ],
    "max_tier": "legendary",
-   "note": "The sanctum station for intelligent and legendary work: dancing blades, vorpal edges, items that answer when spoken to."
+   "ceiling": 4,
+   "note": "Cleanse (lift a known curse and keep the rest of the layer) and legendary essence. Flawless work."
   }
  ],
  "method_descriptions": {
-  "attune": "Reads an essence and the vessel it is meant for: what the material wants, what it will refuse, and how the two sit together. Every ritual opens with it.",
-  "scribe": "Chalks and inks the working circle and the vessel's own sigils. The ink and the circle materials are consumed; the words remain in the metal.",
-  "focus": "Sets a gemstone into the working as the binding's anchor. The focus gates how much essence a single binding can hold — quartz takes a mote, a diamond takes anything.",
-  "channel": "Draws the essence out of its phial and through the circle into the focus, slowly enough that none of it grounds out through the enchanter.",
-  "bind": "Fixes the channelled essence to the vessel. The dangerous step: everything the essence is passes through the enchanter's hands on the way in, and a mishap here is what cracks foci.",
-  "seal": "Closes a binding so it holds. Always the last method in a chain — an unsealed binding bleeds away by morning, and nothing may follow the seal.",
-  "imbue": "Lets more than one essence share a single working. Without it a vessel takes one essence per ritual; with it, as many as the focus can hold — one per family, always.",
-  "empower": "Raises a binding one tier band beyond its essence, at +5 DC. An empowered exotic working is legendary-tier work, which is how the level-5 deed is reached at level 4.",
-  "awaken": "The sanctum ritual for legendary and intelligent work: bindings that move on their own, edges that end things, items that wake with a voice."
+  "prepare": "Lays the circle round a vessel and cuts its sigils: chalk or salt for the ring, ink for the signs, a focus set into a ring or amulet, a treatment if you have one. The vessel comes off the floor prepared.",
+  "attune": "Seats essences on a prepared vessel, one to each seat whose sign it answers. Choices are made here (bane's foe, a resistance's energy). An attuned vessel holds for a day; after that the essences drift back to the shelf unharmed.",
+  "bind": "The book's creation check on an attuned vessel: DC 5 + the item's caster level, +5 for each prerequisite you lack. Success puts the work into In progress for the book's time; a miss by 1 to 4 does not take and keeps the essences; a miss by 5 or more takes, flawed, with a hidden curse.",
+  "refine": "Condenses two or more phials of one essence family into one fuller phial, so a seat holds more motes. Each draw is paler than the last: a careless refine loses motes.",
+  "unbind": "Unpicks a magic item's layer, last sigil first. The smith's item stays; a quarter of the layer's motes come back as residue, and you learn what kind of magic it carried.",
+  "cleanse": "Lifts a curse you know of, sigil by sigil, and keeps the rest of the layer. DC 10 + the item's caster level, the book's remove curse.",
+  "read": "Tastes a pinch of an essence (a tenth of a phial) to learn one thing about it.",
+  "identify": "Studies an item for what it was made to do. Beat the DC by 10 to see a curse as well. Once per item per day."
  },
- "_method_help_note": "One entry per method, and the set must match method_descriptions exactly — a test asserts it, because a method that gains a tooltip and loses its description (or the reverse) is a bench that explains half of itself. `does` is the mechanical effect in numbers, `needs` is what must be in the circle for the method to be legal, and `for` is what a player reaches for it to accomplish. Three fields rather than one paragraph because the tooltip has three jobs and a player scanning for the DC should not have to read prose to find it.",
+ "_method_help_note": "One entry per method, and the set must match method_descriptions exactly (tests/test_enchanter.py). `does` is the mechanical effect in numbers, `needs` what must be in the circle, `for` what a player reaches for it to do.",
  "method_help": {
-  "attune": {
-   "does": "No DC change. Reads the essence and the vessel and reports the working's true DC before anything is spent.",
-   "needs": "An essence and the item on the bench. Always the first method in a chain.",
-   "for": "Seeing what the binding will cost — the off-type +5, a night restriction, a focus that is too small — while it is still free to change your mind."
+  "prepare": {
+   "does": "DC 5 + 5 for each rarity band of the rarest circle material. Spends the chalk or salt, the ink and any treatment; sets a ring or amulet's focus. The binding later can reach one quality step above the circle's.",
+   "needs": "A vessel from your pack (a Superior or better weapon, armour or shield, or a ring, amulet or wondrous blank), one chalk or salt, one ink.",
+   "for": "Starting any enchantment. A good circle is what lets a binding reach Superior and Flawless."
   },
-  "scribe": {
-   "does": "No DC change. Consumes one ink and one chalk or salt; without them the circle is not drawn and nothing else in the chain is legal.",
-   "needs": "Ink and circle material on the bench.",
-   "for": "Making the circle real. Every working passes through it, which is why circle materials are the errand an enchanter runs most."
+  "attune": {
+   "does": "DC 5 + 5 for each rarity band of the rarest essence seated. Nothing is spent: the essences sit in the vessel for a day. Each seated essence whose family suits a material in the vessel is -1 DC at Bind (at most -2).",
+   "needs": "A prepared vessel and an essence for each new property, plus enough motes between them to pay for the working.",
+   "for": "Choosing what the item will carry and paying for it in motes."
   },
   "bind": {
-   "does": "Sets the working's DC: 10 + 5 per tier rank of the rarest essence, +5 for each essence past the first. A failure here spends the essence and scorches the focus — or cracks it, if it is a diamond.",
-   "needs": "At least one essence and a focus. Refused without a focus: the essence has nowhere to live.",
-   "for": "The binding itself. Everything before it prepares and everything after it closes."
+   "does": "DC 5 + the item's caster level, +5 per spell you neither know nor carry, +5 if your Enchanter level is below the caster level it asks, +5 to hurry. A catalyst lowers it. Then the work waits In progress: 8 hours per 1,000 gp, as working days on the calendar.",
+   "needs": "An attuned vessel.",
+   "for": "Making the enchantment. Its essence family's time of day widens the binding's windows; Wait for it moves the clock there."
   },
-  "seal": {
-   "does": "No DC change. Without it the binding bleeds away by morning and the working is wasted.",
-   "needs": "A bind earlier in the same chain. Nothing may follow a seal.",
-   "for": "Making the enchantment permanent. It is the last method in every chain that has one."
+  "refine": {
+   "does": "DC 5 + 5 for each rarity band of the essence. Two or more phials of one family become one, its motes the sum times how cleanly you drew (Crude loses a fifth, Flawless nothing).",
+   "needs": "Enchanter 2, a sanctum, and two or more phials of one essence family.",
+   "for": "Fitting a costly working into the vessel's few seats."
   },
-  "focus": {
-   "does": "No DC change on its own; it is what lets the focus's full capacity be used — top essence rank and total ranks both.",
-   "needs": "A focus on the bench. Enchanter 2.",
-   "for": "Working with a stone larger than a quartz — an amethyst holding two motes, a sapphire holding a rare essence."
+  "unbind": {
+   "does": "DC 10 + the item's caster level. The layer comes off whole, curse and all; a quarter of its motes come back as arcane residue; you learn the kinds of property it carried, never their size.",
+   "needs": "A magic item from your pack.",
+   "for": "Learning what found magic does, recovering a cursed item, or starting a vessel over."
   },
-  "channel": {
-   "does": "No DC change. Required before bind for any essence above common: without it the essence grounds out through the enchanter instead of reaching the stone.",
-   "needs": "An essence and a focus. Enchanter 2.",
-   "for": "Handling anything stronger than a mote without wearing it yourself."
+  "cleanse": {
+   "does": "DC 10 + the item's caster level. The curse is lifted; the rest of the layer stays.",
+   "needs": "Enchanter 3, a sanctum, and an item whose curse you know.",
+   "for": "Keeping a flawed binding's magic without its curse."
   },
-  "imbue": {
-   "does": "No DC change of its own; it is what makes a second essence legal, and each essence past the first is already +5 DC through bind.",
-   "needs": "Two or more essences, of different families, within the focus's total capacity. Enchanter 3.",
-   "for": "Compound items — a flaming sword that is also +1, a cloak both shadowed and warded."
+  "read": {
+   "does": "10 minutes and a tenth of a phial: one trait of the essence. A volatile essence bites the one who reads it.",
+   "needs": "An essence in your pack.",
+   "for": "Finding out what an essence will do before you bind it."
   },
-  "empower": {
-   "does": "+5 DC, and raises the finished working one tier band above its essence: an exotic binding comes out legendary.",
-   "needs": "At least one essence in the chain. Enchanter 4.",
-   "for": "Legendary-tier work before legendary essence is within reach — and the way the Enchanter 5 deed is earned at Enchanter 4."
-  },
-  "awaken": {
-   "does": "No DC change. Permits legendary essences that will not sit in an ordinary circle — dancing, vorpal, etherealness.",
-   "needs": "The sanctum, a diamond focus, and a legendary essence. Enchanter 5.",
-   "for": "The items that have a name and, sometimes, a voice."
+  "identify": {
+   "does": "DC 15 + the item's caster level, the better of your Enchanter check and your Spellcraft. Beat it to learn what the item was made to do; beat it by 10 to see a curse too.",
+   "needs": "A magic item.",
+   "for": "Knowing what you carry, and whether it is cursed."
   }
  },
- "_fixed_tools_note": "Declared and deliberately unread. Ruled 2026-08-25: leave these alone until property ownership exists. An immovable installation only means anything once a character can own, buy and place one — at which point these become the things you purchase and site, and the bench asks where you are standing. Until then the workbench folds out wherever the character is, which is the recorded design call, and gating on a building nobody can own would only refuse work.",
+ "_bench_note": "The circle's rule rows (docs/enchanting-revamp-plan.md §6, §10, §14), read by rules/enchanter.py. Every number the plan marks proposed lives here so it tunes without a code change. `where`: `quiet` is anywhere out of a fight; `sanctum` needs one (a founded place of kind sanctum you hold, rules/places.py tags). `minutes` is the ritual's own time; a binding's countdown is the book's working days (8 hours of work to a calendar day, plan §6.8). Tuning is for the minigames: `seconds`, the base `difficulty`, and the band the strip draws; `phase_widen` (1.5, owner round 4 point 9) widens Bind's windows inside the essence family's phase of the day, `eager_widen` the eager trait's 10%.",
+ "bench": {
+  "order": [
+   "prepare",
+   "attune",
+   "bind",
+   "refine",
+   "unbind",
+   "cleanse",
+   "read",
+   "identify"
+  ],
+  "methods": {
+   "prepare": {
+    "name": "Prepare",
+    "where": "quiet",
+    "minutes": 60,
+    "takes": "a vessel, chalk or salt, ink, and a focus for a ring or amulet",
+    "makes": "a prepared vessel",
+    "tuning": {
+     "seconds": 7,
+     "difficulty": 0.4,
+     "band": "order"
+    }
+   },
+   "attune": {
+    "name": "Attune",
+    "where": "quiet",
+    "minutes": 30,
+    "takes": "a prepared vessel and essences",
+    "makes": "an attuned vessel",
+    "tuning": {
+     "seconds": 6,
+     "difficulty": 0.4,
+     "band": "matching"
+    }
+   },
+   "bind": {
+    "name": "Bind",
+    "where": "quiet",
+    "minutes": 60,
+    "takes": "an attuned vessel, and a catalyst if you have one",
+    "makes": "the item, into In progress",
+    "tuning": {
+     "seconds": 7,
+     "difficulty": 0.45,
+     "band": "crest"
+    }
+   },
+   "refine": {
+    "name": "Refine",
+    "where": "sanctum",
+    "minutes": 60,
+    "takes": "two or more phials of one essence family",
+    "makes": "one refined phial",
+    "tuning": {
+     "seconds": 7,
+     "difficulty": 0.45,
+     "band": "draw"
+    }
+   },
+   "unbind": {
+    "name": "Unbind",
+    "where": "quiet",
+    "minutes": 60,
+    "takes": "a magic item",
+    "makes": "the item without its layer, residue and knowledge",
+    "tuning": {
+     "seconds": 6,
+     "difficulty": 0.4,
+     "band": "unpick"
+    }
+   },
+   "cleanse": {
+    "name": "Cleanse",
+    "where": "sanctum",
+    "minutes": 60,
+    "takes": "an item whose curse you know",
+    "makes": "the item without its curse",
+    "tuning": {
+     "seconds": 6,
+     "difficulty": 0.45,
+     "band": "unpick"
+    }
+   },
+   "read": {
+    "name": "Read",
+    "where": "quiet",
+    "minutes": 10,
+    "takes": "a pinch of an essence",
+    "makes": "knowledge"
+   },
+   "identify": {
+    "name": "Identify",
+    "where": "quiet",
+    "minutes": 1,
+    "takes": "a magic item",
+    "makes": "knowledge"
+   }
+  },
+  "_seats_note": "The seats a vessel offers Attune, by what the book prices it as (rules/magic_layer.vessel_kind), each named for the piece it sits on (UI plan §6.5: a blade's point, edge and guard). `piece` is the record's piece the seat answers for an affinity; a seat with none answers only the vessel's polarity. The number of seats is how many phials one working can take.",
+  "seats": {
+   "weapon": [
+    {
+     "id": "point",
+     "name": "Point",
+     "piece": "head"
+    },
+    {
+     "id": "edge",
+     "name": "Edge",
+     "piece": "head"
+    },
+    {
+     "id": "guard",
+     "name": "Guard",
+     "piece": "fittings"
+    }
+   ],
+   "armour": [
+    {
+     "id": "breast",
+     "name": "Breast",
+     "piece": "body"
+    },
+    {
+     "id": "back",
+     "name": "Back",
+     "piece": "body"
+    },
+    {
+     "id": "shoulders",
+     "name": "Shoulders",
+     "piece": "fastenings"
+    }
+   ],
+   "shield": [
+    {
+     "id": "face",
+     "name": "Face",
+     "piece": "body"
+    },
+    {
+     "id": "rim",
+     "name": "Rim",
+     "piece": "fastenings"
+    }
+   ],
+   "ring": [
+    {
+     "id": "stone",
+     "name": "Stone",
+     "piece": "focus"
+    },
+    {
+     "id": "band",
+     "name": "Band",
+     "piece": ""
+    }
+   ],
+   "wondrous": [
+    {
+     "id": "clasp",
+     "name": "Clasp",
+     "piece": "focus"
+    },
+    {
+     "id": "hem",
+     "name": "Hem",
+     "piece": ""
+    }
+   ]
+  },
+  "_polarity_note": "Which essence polarities a vessel takes (materials.POLARITIES). An essence of another polarity is refused at Attune with the reason: an arcane essence is a weapon's +N priced at a weapon's rate, and on armour it would be the wrong price. `any` goes anywhere.",
+  "polarity": {
+   "weapon": [
+    "weapon",
+    "any"
+   ],
+   "armour": [
+    "armour",
+    "any"
+   ],
+   "shield": [
+    "armour",
+    "any"
+   ],
+   "ring": [
+    "ward",
+    "any"
+   ],
+   "wondrous": [
+    "ward",
+    "any",
+    "armour"
+   ]
+  },
+  "_numbers_note": "The owner's round 4 point 9 numbers: affinity -1 DC a matching seat, at most -2; Bind's windows x1.5 inside the family's phase; residue a quarter of the layer's motes; attuned vessels hold a day (1440 minutes); a binding's quality at most the circle's + 1 (plan §10.2, proposed). `step_dc` is the herb and forge benches' intermediate-step DC, 5 + 5 per rarity band (crafting `base_dc`). `refine_yield` is the fraction of motes kept at each quality index (Crude 0.8 ... Flawless 1.0, proposed; Cennini's 'each draw is paler').",
+  "affinity_dc": -1,
+  "affinity_max": -2,
+  "phase_widen": 1.5,
+  "eager_widen": 1.1,
+  "rarity_step": 0.05,
+  "attuned_hold_minutes": 1440,
+  "residue_fraction": 0.25,
+  "residue_id": "arcane-residue",
+  "circle_lift": 1,
+  "step_dc_base": 5,
+  "step_dc_per_rank": 5,
+  "unbind_dc_base": 10,
+  "cleanse_dc_base": 10,
+  "identify_dc_base": 15,
+  "read_pinch": 0.1,
+  "refine_yield": [
+   0.8,
+   0.85,
+   0.9,
+   0.95,
+   1.0
+  ],
+  "sanctum_tag": "place.sanctum",
+  "sanctum_rank": 5,
+  "night_phases": [
+   "dusk",
+   "night",
+   "midnight",
+   "dawn"
+  ],
+  "multi_property_level": 2
+ },
+ "_old_methods_note": "Methods removed 2026-10-05 and what an old recipe naming one maps onto (plan §19). Read by the migration (lane H); `imbue` became a level 2 permission, not a method; `empower` and `awaken` are dropped with a note.",
+ "old_methods": {
+  "scribe": "prepare",
+  "focus": "attune",
+  "channel": "attune",
+  "seal": "bind",
+  "imbue": "",
+  "empower": "",
+  "awaken": ""
+ },
+ "_fixed_tools_note": "Read now, as the forge's are. A sanctum is a place you found and own (rules/places.py, kind `sanctum`); Refine, Cleanse and legendary essence need one (plan §14).",
  "fixed_tools": [
-  "enchanter's sanctum",
-  "attunement circle"
+  "enchanter's sanctum"
  ]
 }

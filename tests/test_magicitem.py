@@ -162,9 +162,15 @@ def test_time_is_eight_hours_per_thousand_gp():
 
 def test_the_dc_is_five_plus_caster_level():
     """Craft Magic Arms and Armor's one number, and the highest caster level in the
-    working sets it — a chain is as hard as its hardest piece."""
-    result = mi.preview(5, chain(["mi-flaming"], plus=1), item=MW_SWORD)
+    working sets it — a chain is as hard as its hardest piece. An Enchanter below that
+    caster level is one more prerequisite unmet: +5, never a refusal (owner, enchanting
+    round 4 point 4)."""
+    held = {"p": potion("flame-blade")}
+    result = mi.preview(10, chain(["mi-flaming"], plus=1), stock=held, item=MW_SWORD)
     assert result.caster_level == 10 and result.dc == 15
+    low = mi.preview(5, chain(["mi-flaming"], plus=1), stock=held, item=MW_SWORD)
+    assert low.dc == 20 and not low.problems
+    assert any("below the caster level 10" in n for n in low.notes)
 
 
 # --- the vessel ---------------------------------------------------------------------------
@@ -217,15 +223,18 @@ def test_a_potion_stands_in_for_the_prerequisite_spell():
     assert any("is consumed in the making" in n for n in result.notes)
 
 
-def test_the_refusal_names_the_spell_and_both_ways_to_satisfy_it():
-    """A refusal that only says "you cannot" sends the player to the rulebook. This one
-    names the spell and both routes: know it, or carry a potion of it."""
-    result = mi.preview(5, chain(["mi-keen"], plus=1), item=MW_SWORD)
-    said = " ".join(result.problems)
-    assert "Keen Edge" in said
-    assert "neither know it nor carry a potion" in said
-    assert "Brew or buy a potion" in said
-    assert result.chance == 0, "a refused working must not offer odds"
+def test_a_missing_spell_is_five_dc_named_with_both_ways_to_satisfy_it():
+    """The owner's enchanting ruling (2026-10-05, round 1): a prerequisite spell neither
+    known nor carried is +5 DC, never a refusal; this tab refused the working outright
+    before. The note still names the spell and both routes, so the player knows what
+    would take the 5 off."""
+    with_potion = mi.preview(10, chain(["mi-keen"], plus=1),
+                             stock={"p": potion("keen-edge")}, item=MW_SWORD)
+    result = mi.preview(10, chain(["mi-keen"], plus=1), item=MW_SWORD)
+    assert result.problems == []
+    assert result.dc == with_potion.dc + 5
+    said = " ".join(result.notes)
+    assert "Keen Edge" in said and "neither know it nor carry a potion" in said
 
 
 def test_knowing_the_spell_also_satisfies_it():
@@ -244,20 +253,41 @@ def test_knowing_the_spell_also_satisfies_it():
     assert result.consumes == {}, "knowing the spell must not eat a potion"
     assert any("is known" in n for n in result.notes)
 
-    # And the same wizard without the spell in the book is refused, so the pass above
+    # And the same wizard without the spell in the book pays the +5, so the pass above
     # is the spellbook doing the work rather than the caster class alone.
     wizard.spellbook = []
-    refused = mi.preview(5, chain(["mi-keen"], plus=1), actor=wizard, item=MW_SWORD)
-    assert any("Keen Edge" in p for p in refused.problems)
+    harder = mi.preview(5, chain(["mi-keen"], plus=1), actor=wizard, item=MW_SWORD)
+    assert harder.dc == result.dc + 5
+    assert any("Keen Edge" in n for n in harder.notes)
 
 
 def test_a_potion_of_the_wrong_spell_does_not_satisfy_it():
     """The stand-in is per spell, not per potion. A shelf of cure light wounds does not
     make a keen blade."""
     held = {"potion-clw": potion("cure-light-wounds", count=9)}
-    result = mi.preview(5, chain(["mi-keen"], plus=1), stock=held, item=MW_SWORD)
-    assert any("Keen Edge" in p for p in result.problems)
+    result = mi.preview(10, chain(["mi-keen"], plus=1), stock=held, item=MW_SWORD)
+    bare = mi.preview(10, chain(["mi-keen"], plus=1), item=MW_SWORD)
+    assert result.dc == bare.dc and any("Keen Edge" in n for n in result.notes)
     assert result.consumes == {}
+
+
+def test_worn_items_read_the_checked_book_numbers_not_the_old_row():
+    """Lane D's data pass corrected the catalogue against AoN and served it as `book`; this
+    module kept reading the old `effects`, so the Goggles of Minute Seeing went on giving
+    +5 Perception (the old row) where the book gives +5 Disable Device."""
+    got = mi.worn_specs("Goggles of Minute Seeing")
+    assert [(s["type"], s["target"], s["amount"]) for s in got] == \
+        [("skill_mod", "disable device", 5)]
+    flaming = mi.get("mi-flaming").effects
+    assert flaming and flaming[0].get("trigger") == "hit"
+
+
+def test_a_property_that_needs_a_choice_is_refused_here(corpus):
+    """The old bane row never named its foe, so its +2d6 sat in a note and would have hit
+    every foe. Read through lane A's table it binds nothing without a foe, and this tab
+    cannot ask for one: it says to bind it at the circle."""
+    result = mi.preview(10, chain(["mi-bane"], plus=1), item=MW_SWORD)
+    assert any("bind it at the circle" in p for p in result.problems)
 
 
 def test_permanency_is_never_required():
@@ -321,9 +351,7 @@ def test_check_terms_match_the_other_mode():
 
     class Stub:
         level = 8
-
-        def ability_mod(self, which):
-            return 2 if which == "int" else 0
+        abilities = {"int": 14}
 
     assert mi.check_terms(Stub(), 3) == en.check_terms(Stub(), 3)
     assert mi.check_bonus(Stub(), 3) == 9

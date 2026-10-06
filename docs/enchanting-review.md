@@ -114,7 +114,7 @@ The owner's ruling (round 4 point 10, round 5): phases of the day from `rules/sk
 | bane | dusk | The hunter's hour: wolves, owls and the great cats are crepuscular, hunting at dusk and dawn. Cold iron against fey and silver against the shapechangers line up with the book's own materials. | cold-iron, silver | - | 1 |
 | warding | dusk | Curfew: the medieval evening bell (couvre-feu, cover-fire) at which hearths were covered and the house shut against the night (https://wordhistories.net/2016/08/22/curfew/). | steel, adamantine | heavy | 7 |
 | wounding | dusk | The sky's red hour. A house image, the weakest kind of reason; not sourced. | high-carbon-steel, viper-skin | eager | 1 |
-| arcane | night | The scholar's lamp: study by night, the midnight oil. A house reading; not sourced. | mithral, gold, platinum | - | 5 |
+| arcane | night | The scholar's lamp: study by night, the midnight oil. A house reading; not sourced. | mithral, gold, platinum | - | 6 |
 | dancing | night | The fairy revel, danced through the night until the cockcrow breaks it. Widespread in British fairy lore; not sourced in this pass. | singing-steel, silk-thread | skittish | 1 |
 | mind | night | The night owl and the scholar's lamp, as arcane: wisdom keeps the night hours. A house reading; not sourced. | gold, silver | pure | 3 |
 | shadow | night | Darkness itself: the hours with no sun. | shadow-silk, shadow-mastiff-hide, umbral-dragonhide, shadow-black | skittish | 4 |
@@ -127,11 +127,12 @@ The owner's ruling (round 4 point 10, round 5): phases of the day from `rules/sk
 
 ## The essences
 
-92 essences (11 new). Price is motes × 100 for a bought essence; a found one has none. "Was" is the tier before the pass, where it moved.
+93 essences (12 new). Price is motes × 100 for a bought essence; a found one has none. "Was" is the tier before the pass, where it moved.
 
 | Essence | Tier | Was | Family | Polarity | Grants | Motes | Price | House top-ups | How |
 |---|---|---|---|---|---|---|---|---|---|
 | Gale Mote | common |  | air | any | nothing (mote supply) | 2 | - | +1 Initiative | gathered |
+| Arcane Residue | common | new | arcane | any | nothing (mote supply) | 1 | - | +1 Spellcraft | unbound |
 | Frost Mote | common |  | cold | weapon | nothing (mote supply) | 2 | - | 1 cold damage, on a hit | gathered |
 | Stone Mote | common |  | earth | armour | nothing (mote supply) | 2 | - | +1 Armour class | mined |
 | Spark Mote | common |  | electricity | weapon | nothing (mote supply) | 2 | - | 1 electricity damage, on a hit | gathered |
