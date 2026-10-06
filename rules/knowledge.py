@@ -1,6 +1,7 @@
-"""What a character knows about each herb and each craft material
-(docs/herbalism-revamp-plan.md §8; docs/blacksmithing-revamp-plan.md §9; the API is
-docs/blacksmithing-contracts.md §6).
+"""What a character knows about each herb, each craft material, each essence and each
+magic item (docs/herbalism-revamp-plan.md §8; docs/blacksmithing-revamp-plan.md §9;
+docs/enchanting-revamp-plan.md §12-13; the APIs are docs/blacksmithing-contracts.md §6 and
+docs/enchanting-contracts.md §7 — the enchanter's half is the last section of this file).
 
 This is `rules/herbknowledge.py`'s machinery lifted off the ingredient corpus, so the
 smith's discovery is the herbalist's and not a second copy of it. `herbknowledge` keeps
