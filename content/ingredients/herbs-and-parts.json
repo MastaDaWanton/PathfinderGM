@@ -729,7 +729,7 @@
       "craft_dc": null,
       "source": "basilisk",
       "harvesting": "The eye must be removed with a precise incision using an obsidian knife within 1 hour of the basilisk’s death, avoiding direct eye contact to prevent petrification.",
-      "text": "Ground and worked into a paste with holy water, the eye is smeared on the lids: immunity to gaze attacks and a +3 alchemical bonus on Fortitude saves against petrification, for 6 hours. Vision blurs while it lasts, a -4 penalty on Perception checks.",
+      "text": "Ground and worked into a paste with holy water, the eye is smeared on the lids: immunity to gaze attacks and a +3 alchemical bonus on Fortitude saves against petrification, for 6 hours. Vision blurs while it lasts, a -4 penalty on Perception checks. At the alchemist's bench the petrifying humour is the point: worked into a product, it stiffens whoever it reaches, Fortitude DC 15 or staggered for 1d4 rounds.",
       "risky": true,
       "biomes_inferred": true,
       "biomes": [
@@ -770,6 +770,22 @@
             "unit": "hour"
           },
           "route": "eyes"
+        },
+        {
+          "type": "save_gate",
+          "target": "fort",
+          "dc": 15,
+          "on_failure": [
+            {
+              "type": "apply_condition",
+              "target": "staggered",
+              "duration": {
+                "amount": "1d4",
+                "unit": "round"
+              }
+            }
+          ],
+          "route": "external"
         }
       ],
       "effects_converted": true

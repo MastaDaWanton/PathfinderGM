@@ -1474,43 +1474,6 @@
       "market": "apothecary"
     },
     {
-      "id": "basilisk-eye",
-      "name": "Basilisk Eye",
-      "kind": "gland",
-      "tier": "rare",
-      "craft_dc": 20,
-      "text": "An intact eye of a basilisk, harvested blind-side first by somebody brave. The petrifying humour keeps: a distillate of it stiffens flesh toward stone one drop at a time, and a careless thumb over the vial pays the same price.",
-      "risky": true,
-      "volatile": false,
-      "effects": [
-        {
-          "type": "save_gate",
-          "target": "fort",
-          "dc": 15,
-          "on_failure": [
-            {
-              "type": "apply_condition",
-              "target": "staggered",
-              "duration": {
-                "amount": "1d4",
-                "unit": "round"
-              }
-            },
-            {
-              "type": "narrative",
-              "target": "the touched flesh greys and stiffens toward stone, one drop at a time"
-            }
-          ]
-        }
-      ],
-      "effects_converted": true,
-      "obtain": "harvested",
-      "from_creatures": [
-        "basilisk"
-      ],
-      "obtain_dc": 20
-    },
-    {
       "id": "cockatrice-wattle",
       "name": "Cockatrice Wattle",
       "kind": "gland",

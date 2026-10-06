@@ -10,8 +10,9 @@ Two ideas hold it together, both the owner's rulings (docs/blacksmithing-revamp-
 
 **One material, many shelves.** Mithral is one document. The leatherworker's mithral
 fittings, the enchanter's mithral filings and the alchemist's mithral dust are *forms* of
-it: each carries `"material": "mithral"` and keeps its own id (test_alchemist.py pins that
-no id is claimed twice, and a merge would have broken four benches). `material_of` walks
+it: each carries `"material": "mithral"` and keeps its own id (tests/test_alchemy_shelf.py
+pins that no id is claimed twice — by two catalogues, or by a catalogue and the herb
+corpus — and a merge would have broken four benches). `material_of` walks
 the link; the parent's `forms` lists every shelf it appears on, computed here rather than
 written into the parent, so a new form can never leave a stale list behind.
 
@@ -43,6 +44,18 @@ from pathfindergm import files
 CATALOGUES = ("blacksmith-materials", "alchemist-materials", "enchanter-materials",
               "leatherworker-materials")
 FORGE_CATALOGUE = "blacksmith-materials"
+# The alchemist's shelf (docs/alchemy-contracts.md §3, plan §5.7): its own catalogue plus
+# every hybrid herb, which is served through this door under the catalogue name
+# `HERB_CATALOGUE` — one document on two shelves, never a copy in this folder.
+ALCHEMY_CATALOGUE = "alchemist-materials"
+HERB_CATALOGUE = "ingredients"
+# The alchemist's eight kinds (plan §5.1: reagent 46, gland 23, solvent 16, vessel 13,
+# salt 11, treatment 11, essence 10, catalyst 9). Two are shared with other crafts'
+# kinds — the forge's `treatment`, the enchanter's `essence` — so a homebrew entry with no
+# catalogue is the alchemist's by kind only for the six that are nobody else's.
+ALCHEMY_KINDS = ("reagent", "gland", "solvent", "vessel", "salt", "treatment", "essence",
+                 "catalyst")
+_ALCHEMY_ONLY_KINDS = ("reagent", "gland", "solvent", "vessel", "salt", "catalyst")
 
 # The eight forge kinds. Fixed: tests/test_blacksmith.py pins them, and a typo'd kind
 # would load and then never count as fuel or metal anywhere.
@@ -191,7 +204,24 @@ def normalise(raw: dict, catalogue: str = "") -> dict:
         "polarity": str(raw.get("polarity") or ""),
         "affinity": [str(a).strip().lower() for a in _list(raw.get("affinity"))],
         "house": [dict(e) for e in _list(raw.get("house")) if isinstance(e, dict)],
-        "color": str(raw.get("color") or ""),
+        # The enchanter writes a colour as a CSS string ("#c8a2ff"); the alchemist as the
+        # [r, g, b] the stage draws its liquid in (alchemy contracts §3). Each shelf keeps
+        # its own shape: flattening the list to a string would hand the stage "[0.86, ...]".
+        "color": _colour(raw.get("color")),
+        # The alchemist's fields (docs/alchemy-contracts.md §3), defaulted on every entry
+        # for the reason the enchanter's are. `product` is what the material puts in a
+        # bottle; an alchemist entry written before the revamp has only `effects`, which is
+        # read as its product (`_legacy_product`), the forge normaliser's trick for its own
+        # legacy list. A forge or enchanter entry's `effects` is NOT a product: the
+        # blacksmith still reads that list as item effects, and folding it in would hand
+        # every metal a row of potion traits.
+        "product": _legacy_product(raw, catalogue, kind),
+        # What a fail by 5 or more does to the alchemist (a volatile material), and what
+        # working it unprotected does (a toxic-to-handle one): one effect document each,
+        # applied through the engine by the bench (plan §8). None when it has none.
+        "mishap": dict(raw["mishap"]) if isinstance(raw.get("mishap"), dict) else None,
+        "toxic": dict(raw["toxic"]) if isinstance(raw.get("toxic"), dict) else None,
+        "market": raw.get("market") or None,
         # A shelf entry kept loadable (old saves name it) but never offered: the vessel
         # entries, now that a vessel is a real record (enchanting plan §7.3).
         "retired": bool(raw.get("retired", False)),
@@ -210,6 +240,27 @@ def _int(value) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _colour(value):
+    """A colour as its shelf wrote it: three numbers stay a list (the alchemist's), any
+    other value is the enchanter's string, and nothing is ""."""
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        try:
+            return [float(v) for v in value]
+        except (TypeError, ValueError):
+            return ""
+    return str(value or "")
+
+
+def _legacy_product(raw: dict, catalogue: str, kind: str) -> list[dict]:
+    """An entry's product traits: `product` when written, else an alchemist entry's
+    pre-revamp `effects` (see `normalise`)."""
+    if isinstance(raw.get("product"), list):
+        return [dict(e) for e in raw["product"] if isinstance(e, dict)]
+    if catalogue == ALCHEMY_CATALOGUE or (catalogue == "" and kind in _ALCHEMY_ONLY_KINDS):
+        return [dict(e) for e in _list(raw.get("effects")) if isinstance(e, dict)]
+    return []
 
 
 # The cache is keyed on *which* homebrew it read and what that homebrew looked like, so it
@@ -1301,3 +1352,156 @@ def recipe_problems(doc: dict, *, essences: dict[str, dict] | None = None,
         else:
             say(f"essence need {need!r} names neither grants nor family.")
     return out
+
+
+# =============================================================================================
+# The alchemist's shelf: its catalogue and the hybrid herbs, through this one door
+# (docs/alchemy-contracts.md §3; alchemy plan §5.7; alchemy lane A, 2026-10-06).
+# =============================================================================================
+#
+# **The two-way door.** The owner's "one material, many shelves" (alchemy Q2.1): the alchemy
+# shelf is the alchemist's catalogue plus every ingredient marked `hybrid` (63 shipped). No
+# herb is copied into content/materials. A hybrid herb is served here as a document in
+# this module's shape, built from the herb corpus each time it is asked, with its effects
+# read as product traits, ALL routes included — the 49 `external` effects the herb bench
+# drops as "alchemy only" are exactly what this shelf is for.
+#
+# **The collision this door would have opened.** Before it, `basilisk-eye` was the id of a
+# herb (hybrid, rare) AND of an alchemist gland. Knowledge asked materials first, so the
+# herb's own card resolved to the gland; one `herb_known` entry stood for two documents;
+# and the moment hybrids joined this shelf the two would have sat on it under one id. The
+# gland was the same object (an intact basilisk eye), so it was merged into the herb as an
+# `external` product trait and its row deleted. tests/test_alchemy_shelf.py pins every
+# material id against every ingredient id, which the old test (catalogues against each
+# other only) could not see.
+#
+# Herb views are rebuilt on each call rather than cached: the herb corpus has its own
+# cache (`ingredients.all_ingredients`, dropped by tests/conftest.py when the campaign
+# directory moves), and a second cache here would be the stale copy CLAUDE.md warns of.
+
+def _ingredient_of(doc_or_id):
+    """The herb an id or a herb view names, or None."""
+    from . import ingredients
+
+    hid = doc_or_id if isinstance(doc_or_id, str) else (doc_or_id or {}).get("id")
+    try:
+        return ingredients.all_ingredients().get(str(hid or "").strip().lower())
+    except Exception:  # noqa: BLE001 - a corpus that cannot load has no herbs to serve
+        return None
+
+
+def _hybrids() -> dict:
+    from . import ingredients
+
+    try:
+        corpus = ingredients.all_ingredients()
+    except Exception:  # noqa: BLE001 - as above
+        return {}
+    return {k: ing for k, ing in corpus.items() if getattr(ing, "hybrid", False)}
+
+
+def herb_view(ing) -> dict:
+    """A hybrid herb as an alchemy document (contract §3's shape, every field defaulted).
+
+    Its product traits are its effects in the herb's own order, one for one with the
+    herb's property keys ("p0", "p1"...), so what was learned by tasting it is what the
+    alchemist knows of it and the other way round: one document, one store
+    (`knowledge` reads the same keys either way; the shelf test holds the two to it)."""
+    part = str(getattr(ing, "part", "") or "")
+    source = str(getattr(ing, "source", "") or "").strip().lower()
+    if getattr(ing, "kind", "") == "monster part":
+        obtain = "harvested"
+    elif getattr(ing, "forageable", False):
+        obtain = "gathered"
+    else:
+        obtain = ""
+    doc = normalise({
+        "id": ing.id, "name": ing.name, "kind": ing.kind, "tier": ing.tier,
+        "form": part or ing.kind, "text": ing.text, "biomes": list(ing.biomes),
+        "craft_dc": ing.craft_dc, "risky": ing.risky, "source": source,
+        "from_creatures": [source] if source and obtain == "harvested" else [],
+        "obtain": obtain,
+        # `pairs`, not `effects`: the same walk the herb's keys come from, so a homebrew
+        # herb whose effects are still parsed from its text keeps its keys aligned too.
+        "product": [copy.deepcopy(spec) for _, spec in ing.pairs],
+    }, HERB_CATALOGUE)
+    doc["forms"] = [doc["form"]]
+    doc["hybrid"] = True
+    doc["part"] = part
+    return doc
+
+
+def is_herb_view(doc) -> bool:
+    """A hybrid herb served on the alchemy shelf (`herb_view`)."""
+    return isinstance(doc, dict) and doc.get("catalogue") == HERB_CATALOGUE
+
+
+def is_alchemy(doc) -> bool:
+    """Whether a document belongs on the alchemist's shelf: the alchemist's catalogue, a
+    hybrid herb (as a view or as the herb itself), or homebrew with no catalogue that
+    writes `product` or is of one of the alchemist's own kinds."""
+    if doc is None:
+        return False
+    if not isinstance(doc, dict):
+        return bool(getattr(doc, "hybrid", False))
+    cat = doc.get("catalogue")
+    if cat in (ALCHEMY_CATALOGUE, HERB_CATALOGUE):
+        return True
+    if cat is None and doc.get("hybrid") and "effects" in doc:
+        return True                       # a raw herb row
+    if not cat:
+        return bool(doc.get("product")) or str(doc.get("kind") or "") in _ALCHEMY_ONLY_KINDS
+    return False
+
+
+def alchemy_shelf() -> dict[str, dict]:
+    """Every document on the alchemist's shelf, by id: the alchemist's catalogue (and
+    homebrew in its kinds), then every hybrid herb. Copies, as `all` gives.
+
+    Retired entries are left off, as every shelf leaves them. Shipped ids are pinned
+    disjoint; should a homebrew herb ever take a material's id, the material keeps it,
+    because `knowledge.resolve` asks materials first and the shelf must answer as it does.
+    """
+    out = {mid: copy.deepcopy(d) for mid, d in _cache().items()
+           if is_alchemy(d) and not d.get("retired")}
+    for hid, ing in _hybrids().items():
+        if hid not in out:
+            out[hid] = herb_view(ing)
+    return out
+
+
+def alchemy_doc(doc_id: str) -> dict | None:
+    """One document off the alchemy shelf, or None: a material of the alchemist's, or a
+    hybrid herb's view. Never another craft's material."""
+    mid = str(doc_id or "").strip().lower()
+    doc = get(mid)
+    if doc is not None:
+        return doc if is_alchemy(doc) and not doc.get("retired") else None
+    ing = _ingredient_of(mid)
+    return herb_view(ing) if ing is not None and getattr(ing, "hybrid", False) else None
+
+
+def product_traits(doc) -> list[dict]:
+    """What a document puts into a bottle, as effect documents (copies): its `product`,
+    or a pre-revamp alchemist entry's `effects`, or a hybrid herb's effects. A forge or
+    enchanter document has none. Takes a normalised or raw document, or the herb."""
+    if doc is None:
+        return []
+    if not isinstance(doc, dict):
+        if not getattr(doc, "hybrid", False):
+            return []
+        return [copy.deepcopy(spec) for _, spec in doc.pairs]
+    if isinstance(doc.get("product"), list):
+        return [copy.deepcopy(e) for e in doc["product"] if isinstance(e, dict)]
+    if doc.get("hybrid"):
+        return [copy.deepcopy(e) for e in _list(doc.get("effects")) if isinstance(e, dict)]
+    return [copy.deepcopy(e) for e in _legacy_product(doc, str(doc.get("catalogue") or ""),
+                                                      str(doc.get("kind") or ""))]
+
+
+def product_essences(doc) -> set[str]:
+    """The essences a document's product traits carry (`essence.<id>` without the
+    prefix). Contract §3 names this `essences(doc)`; that name was already the
+    enchanter's (`essences()`, every essence document on its shelf), and the enchanter's
+    name stands, so the alchemist's question is asked by this one."""
+    return {str(t["essence"]) for t in product_traits(doc) if t.get("essence")}
