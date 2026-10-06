@@ -1172,6 +1172,99 @@ class Scene:
         here = footprint(anchor, actor.size)
         return [m for m in self.manifests if m.covers(here)]
 
+    # --- light (alchemy plan §16.4) ------------------------------------------------------
+    #
+    # The CRB's four levels, darkest first (Vision and Light, legacy.aonprd.com/
+    # coreRulebook/additionalRules.html, read 2026-10-06): darkness ("an unlit dungeon
+    # chamber, most caverns"), dim ("outside at night with a moon in the sky, bright
+    # starlight, and the area between 20 and 40 feet from a torch"), normal ("within 20
+    # feet of a torch"), bright ("outside in direct sunshine"). There was no light model
+    # at all before this (reactions.py: "the map has no light level yet"), so a sunrod
+    # was written as a blade coating dealing 1d4 fire. Miss chance only, by the owner's
+    # ruling (open point 8): Stealth and Perception in the dark are NOT read yet.
+    LIGHT_LEVELS = ("dark", "dim", "normal", "bright")
+
+    def ambient_light(self) -> str:
+        """The light where nothing is lit: by the place and the clock.
+
+        - A place under the ground (`terrain_of == "underground"`) is dark — "most
+          caverns", and an unlit dungeon.
+        - A roofed place on the surface (a tavern, a house, a shop) is normal: its own
+          lamps, which the app does not count one by one. That is a reading, not the
+          book: the book lights a room by its sources.
+        - Under the sky, by day (`sky.DAWN_MINUTE` to `DUSK_MINUTE`, the engine's one
+          pair) bright; by night dim, the book's moonlit or starlit night. The app keeps
+          no moon and no cloud, so "a cloudy, moonless night" (darkness) is not chosen.
+        - A scene placed nowhere (`at` empty — every bare test scene, a sheet with no
+          world) is normal: nothing is known about the sky, and a guess would put a miss
+          chance on every blow.
+        """
+        from . import places as places_mod
+        from . import sky
+
+        at = str(getattr(self, "at", "") or "")
+        if not at:
+            return "normal"
+        if places_mod.terrain_of(at) == "underground":
+            return "dark"
+        try:
+            roofed = places_mod.is_indoors(at)
+        except Exception:
+            roofed = False
+        if roofed:
+            return "normal"
+        minute = int(getattr(self, "clock_minutes", 0) or 0) % sky.DAY
+        return "bright" if sky.DAWN_MINUTE <= minute < sky.DUSK_MINUTE else "dim"
+
+    def lights(self) -> list[tuple[tuple, int, int, str]]:
+        """Every light burning here: (square, normal radius ft, raised radius ft, name).
+
+        A `light` effect moves with whoever carries it (the sunrod struck in a hand, the
+        torch a tindertwig lit), so its square is the carrier's square, read live."""
+        out = []
+        for ref, actor in self.actors.items():
+            pos = self.positions.get(ref)
+            if pos is None:
+                continue
+            for e in actor.effects:
+                lit = (e.payload or {}).get("light")
+                if isinstance(lit, dict):
+                    out.append((tuple(pos[:2]), int(lit.get("radius_ft") or 0),
+                                int(lit.get("raised_ft") or 0), e.name or "a light"))
+        return out
+
+    def light_at(self, square, viewer=None) -> str:
+        """The light level at a square — "dark", "dim", "normal" or "bright" — as `viewer`
+        sees it.
+
+        The ambient level, then each light: "normal" within its radius, and its outer
+        ring raises the level "by one step" (CRB, the light source table: a torch's 20 ft
+        normal and 40 ft "increased"). Low-light vision doubles every radius ("Double the
+        effective radius of bright light, normal light, and dim light", CRB) and sees a
+        moonlit night as clearly as a lit room — the Bestiary's "can see twice as far as a
+        human in starlight, moonlight, torchlight ... It retains the ability to distinguish
+        color and detail under these conditions", which is this app's reading of what the
+        doubling means under an unbounded sky. Darkvision is the attack's to ask
+        (`Actor.concealment`), by distance.
+        """
+        levels = self.LIGHT_LEVELS
+        level = levels.index(self.ambient_light())
+        eyes = viewer.eyes() if viewer is not None and hasattr(viewer, "eyes") else {}
+        if eyes.get("low_light") and levels[level] == "dim":
+            level = levels.index("normal")
+        if square is None:
+            return levels[level]
+        mult = 2 if eyes.get("low_light") else 1
+        here = (int(square[0]), int(square[1]))
+        best = level
+        for spot, radius, raised, _ in self.lights():
+            feet = gridmod.distance(spot, here)
+            if radius and feet <= radius * mult:
+                best = max(best, levels.index("normal"))
+            elif raised and feet <= raised * mult:
+                best = max(best, min(level + 1, levels.index("normal")))
+        return levels[best]
+
     # Ten rounds to the minute, written once. Six sites multiplied their own way to get
     # here — `hours * 600`, `worked * MINUTES_PER_HOUR`, `days * 24 * 60`, `rounds // 10`
     # — and four of them then ticked nothing at all.
@@ -3781,6 +3874,17 @@ class Engine:
             # is fists, as a Skyrim brawl is (rules/provocation.py) — next in the queue.
             # It opens the fight from their side and `run` rolls it before the prose.
             # Called on, or broken in on: the party walks to the door, or in through it.
+            # A flask thrown (`use_item how=throw`): its attack is next, so it rolls,
+            # suspends for the thrower's d20 and is logged as the attack it is (alchemy
+            # contracts §7). Engine-written, straight into the queue: never parsed, so
+            # its `flask` and `mode` cannot be a model's.
+            if intent.op == "use_item" and outcome.status == "resolved":
+                thrown = next((e for e in (outcome.effects or [])
+                               if e.get("kind") == "thrown" and e.get("attack")), None)
+                if thrown is not None:
+                    # Taken off the record: the outcome is logged and read back, and
+                    # the attack's dice belong to the attack, not to the throw's tell.
+                    queue.insert(0, dict(thrown.pop("attack")))
             if intent.op in ("call_on", "break_in"):
                 went = next((e for e in (outcome.effects or [])
                              if e.get("kind") == "call_on" and e.get("go")), None)
@@ -3830,7 +3934,20 @@ class Engine:
                 continue
             kept.append(raw)
         still = any(raw.get("gated_by") == gate.gate for raw in kept)
-        if dropped and held == "success" and not still:
+        # Something of the same document still to land with no save in front of it —
+        # a tanglefoot bag's entangle beside the glue its Reflex save holds off — and
+        # "has no effect" would be a lie the next tell contradicts (measured live,
+        # alchemy lane C: "Tanglefoot Bag has no effect on Mott. Mott is entangled").
+        # Harm only: a jar's benefits riding along (hemlock's heal) are not the poison.
+        rest = any(raw.get("origin") == gate.origin and gate.origin
+                   and not raw.get("gated_by")
+                   and raw.get("op") in ("condition", "damage", "ability_damage", "burn",
+                                         "item_damage")
+                   and not (raw.get("params") or {}).get("ends") for raw in kept)
+        if dropped and held == "success" and not still and rest:
+            outcome.tell = (f"{outcome.tell} The save holds off the worst of "
+                            f"{gate.origin_name or 'it'}.").strip()
+        elif dropped and held == "success" and not still:
             # Said, so the narrator is not left to guess what a made save meant: a tell
             # is all it is fed (law 3), and "makes the save" over a poison invites the
             # prose to sicken somebody anyway.
@@ -5243,6 +5360,11 @@ class Engine:
         # A save a spell document called for is a save against a spell (the provenance
         # stamp, stage 8), which noqual's `when: {"against": "spell"}` asks.
         ctx = {"against": "spell"} if str(intent.origin or "").startswith("spell:") else None
+        # And a poison's own gate (`consumables._gate_intent`, label `poison-N`) is a save
+        # against poison — which antitoxin's +5 asks (`when: {"against": "poison"}`,
+        # alchemy plan §16.7). Unasked until alchemy lane C, so the clause had no reader.
+        if ctx is None and str(intent.gate or "").startswith("poison"):
+            ctx = {"against": "poison"}
         # An unreliable cloak or ring that lends this save its bonus is used by the save
         # (`_save_gutters`): rolled once, kept across the dice popup.
         gut = partial.get("save_gutter")
@@ -5372,6 +5494,11 @@ class Engine:
 
         The engine still owns every number: the player supplies faces, never modifiers.
         """
+        # A thrown flask (`use_item how=throw`, alchemy plan §16.2): a ranged touch attack
+        # with its own resolution — no weapon, no damage roll of the thrower's, a splash and
+        # a scatter. `mode` is engine-written only; `parse` refuses it from a model.
+        if intent.params.get("mode") == "splash":
+            return self._splash_attack(intent, partial)
         actor = self.scene.actors[intent.actor]
         targets = intent.targets()
         if not targets:
@@ -5948,7 +6075,7 @@ class Engine:
                 # finds a creature that is not quite where it looks. Adding a fourth
                 # suspension stage to every swing to ask for it would cost more than it
                 # is worth. The number is stated in the tell either way.
-                chance, why = defender.concealment()
+                chance, why = self._concealment_of(actor, defender)
                 # Seeking (CRB): "veers toward its target, negating any miss chances that
                 # would otherwise apply" — the `property.seeking` tag on the weapon's
                 # layer (law 1), on a ranged blow.
@@ -6739,6 +6866,10 @@ class Engine:
         on the attacker's first combat turn.
         """
         if raw.get("op") != "attack" or self._battle_joined:
+            return None
+        # A thrown flask is thrown from where the thrower stands: nobody walks up to
+        # throw a flask at arm's length.
+        if (raw.get("params") or {}).get("mode") == "splash":
             return None
         intent = _intent_from_dict(raw)
         actor = self.scene.actors.get(intent.actor or "")
@@ -7789,6 +7920,15 @@ class Engine:
         if not ref:
             return self._refuse(intent, "The damage names nobody to land on, so none lands.")
         target = self.scene.actors[ref]
+        # "Against X only" (alchemy plan §16.7): sunmetal filings and saint's tallow deal
+        # nothing to the living. Asked before the dice, so nothing is rolled for a blow
+        # that cannot land on this creature, and said so.
+        if self._when_spares(target, intent.params.get("when")):
+            return Outcome(
+                intent_id=intent.id, op="damage",
+                effects=[{"ref": target.ref, "kind": "spared", "origin": intent.origin}],
+                tell=f"It does nothing to {target.name}" + self._by(intent) + ".",
+                because=intent.because)
         amount = intent.params["amount"]
         roll = None
         if isinstance(amount, str):
@@ -7810,7 +7950,11 @@ class Engine:
         return Outcome(
             intent_id=intent.id, op="damage", rolls=[roll] if roll else [],
             effects=effects,
-            tell=self._damage_tell(hit) + self._by(intent, ".") + self._hp_state_tell(crossed),
+            # The document named inside the sentence: `_damage_tell` ends on its full
+            # stop, and `_by(intent, ".")` after it read "takes 3 fire damage.. from
+            # Alchemist's Fire" (measured on the first splash, alchemy lane C).
+            tell=self._damage_tell(hit).rstrip(".") + self._by(intent) + "."
+                 + self._hp_state_tell(crossed),
             because=intent.because,
         )
 
@@ -7965,10 +8109,12 @@ class Engine:
         rounds = None
         if isinstance(duration, dict) and duration.get("amount"):
             rounds = self._duration_rounds(duration, default_unit="hour")
+        when = intent.params.get("when")
         actor.add_buff(kind, target, amount, source=source, rounds=rounds,
                        note=str(intent.params.get("note", "")),
                        bonus_type=str(intent.params.get("bonus_type", "")),
-                       origin=intent.origin)
+                       origin=intent.origin,
+                       when=dict(when) if isinstance(when, dict) and when else None)
         span = ""
         if rounds:
             span = f" for {rounds // 600} hour(s)" if rounds >= 600 else \
@@ -8364,8 +8510,29 @@ class Engine:
         dtype = intent.params.get("type", "untyped")
 
         named = intent.params.get("item")
-        results = ([target.damage_item(str(named), amount, dtype)] if named
-                   else target.damage_all_gear(amount, dtype))
+        if str(named or "").strip().lower() == "metal":
+            # Gray ooze core, aqua regia (alchemy plan §16.11): the struck creature's
+            # METAL armour, shield and weapon in hand, asked of the material tag
+            # (`item_tags`), never of a name. A stat block's printed AC names no suit.
+            from . import armour as armour_mod
+            from . import item_tags
+            from .states import METAL
+
+            pieces: list[str] = []
+            if target.flat_ac is None:
+                for thing, key in zip(armour_mod.worn_things(target),
+                                      [k for k in (target.armour, target.shield)
+                                       if k and k != "none"]):
+                    if item_tags.has_material(thing, METAL):
+                        pieces.append(str(key))
+            wielded = target.wielded_record() or target.equipped
+            if target.equipped and item_tags.has_material(wielded, METAL):
+                pieces.append(str(target.equipped))
+            results = [target.damage_item(n, amount, dtype)
+                       for n in dict.fromkeys(pieces)]
+        else:
+            results = ([target.damage_item(str(named), amount, dtype)] if named
+                       else target.damage_all_gear(amount, dtype))
         # Only say something about the gear that actually changed. A list of eleven items
         # that all shrugged it off buries the one that did not.
         notable = [r for r in results if r["taken"]]
@@ -12080,6 +12247,10 @@ class Engine:
                       else f"{target.name} was not {named}."),
                 because=intent.because)
 
+        if self._when_spares(target, intent.params.get("when")):
+            return Outcome(
+                intent_id=intent.id, op="condition", effects=[],
+                tell=f"It takes no hold on {target.name}.", because=intent.because)
         duration = intent.params.get("duration")
         rounds = None
         if isinstance(duration, dict):
@@ -13615,11 +13786,32 @@ class Engine:
             return self._refuse(intent, f"The {held.base} is {why}. Nothing is opened.")
 
         route = str(intent.params.get("route") or "").strip().lower()
+        if how == "light":
+            target = intent.actor          # a sunrod lights the hand that strikes it
         use = consumables.plan(held, how=how, target=target, because=intent.because,
                                route=route)
         if not use.ok:
             return self._refuse(intent, f"{use.item} cannot be used that way: "
                                         f"{'; '.join(use.problems)}.")
+        aim_square = intent.params.get("square") if how == "throw" else None
+        if how == "throw":
+            # Asked before the flask leaves the hand: past five range increments, or
+            # behind a wall, nothing is thrown and nothing is spent.
+            from . import position as position_mod
+
+            struck = self.scene.actors[target] if target != intent.actor else None
+            if struck is None and aim_square is None:
+                return self._refuse(intent, f"Throw the {use.item} at somebody, or at a "
+                                            f"square: thrown at {actor.name}'s own feet it "
+                                            f"is a drink spilled.")
+            _, too_far = self._splash_reach(actor, struck, aim_square,
+                                            int((use.thrown or {}).get("range_ft") or 10))
+            if too_far:
+                return self._refuse(intent, too_far)
+            if struck is not None and position_mod.cover_of(
+                    self.scene, actor, struck) == "total":
+                return self._refuse(intent, f"{struck.name} is behind total cover: there "
+                                            f"is no line to throw along.")
 
         # The dose is spent whichever way it was used, and spent before the effects
         # resolve. A poison that kills the drinker mid-resolution has still been drunk.
@@ -13630,6 +13822,51 @@ class Engine:
         effects = [{"ref": actor.ref, "kind": "used_item", "item": use.item,
                     "how": how, "left": max(0, held.count),
                     **({"route": route, "to": target} if how == "apply" else {})}]
+
+        if how == "throw":
+            # Thrown, it is an attack (contracts §7): the `attack` op's splash mode, put
+            # next in the queue by `_drive` (the `throw` effect's `attack`), so it rolls,
+            # suspends for the player's d20 and is logged as the attack it is. What it
+            # carries is engine-written — the struck creature's intents, the splash, any
+            # cloud or bottled spell — and `parse` would refuse a model writing it.
+            load = dict(use.thrown or {})
+            load.update(name=use.item, origin=f"item:{item_id}",
+                        struck=[dict(i) for i in use.intents],
+                        narrate=list(use.narrate))
+            attack = {"op": "attack", "actor": actor.ref,
+                      "target": None if aim_square is not None else target,
+                      "because": intent.because or f"{use.item}, thrown",
+                      "visibility": "player" if actor.is_pc else "hidden",
+                      "origin": f"item:{item_id}", "origin_name": use.item,
+                      "params": {"mode": "splash", "item": use.item, "flask": load,
+                                 **({"at_square": list(aim_square)[:2]}
+                                    if aim_square is not None else {})}}
+            effects.append({"ref": actor.ref, "kind": "thrown", "item": use.item,
+                            "at": target if aim_square is None else list(aim_square),
+                            "attack": attack, "origin": f"item:{item_id}"})
+            at = (f" at {self.scene.actors[target].name}" if aim_square is None
+                  else " at the ground")
+            return Outcome(intent_id=intent.id, op="use_item", effects=effects,
+                           tell=f"{actor.name} throws {use.item}{at}.",
+                           because=intent.because)
+
+        if use.spell is not None:
+            # A spell potion with no documents of its own: the spell's (plan §11.3),
+            # `spells.effects_at` at the potion's caster level, the drinker its target —
+            # "The drinker of a potion is both the effective target and the caster of the
+            # effect" (CRB, potions); a potion of a harmful spell holds its drinker. Not
+            # the cast door: that door applies a spell's dice, its save and its AC, and
+            # tells the GM the rest (bless's +1, a potion of bull's strength's +4), where a
+            # potion's whole document must land.
+            try:
+                consumables.spell_intents(use.spell, target, intent.because
+                                          or f"{use.item}, drunk", self.dice, use=use)
+            except KeyError:
+                return self._refuse(intent, f"{use.item} holds a spell the Spells bench "
+                                            f"does not have ({use.spell.get('spell')}).")
+
+        cloud_tells = [self._lay_cloud(spec, self.scene.positions.get(actor.ref), actor,
+                                       use.item) for spec in use.clouds]
 
         if how == "coat":
             weapon = str(intent.params.get("weapon") or actor.equipped or "").lower()
@@ -13672,12 +13909,16 @@ class Engine:
             tell = (f"{actor.name} {verb} {use.item} on {whose} {part}." if part else
                     f"{actor.name} {verb} {use.item}"
                     + ("" if target == intent.actor else f" for {who}") + ".")
+        elif how == "light":
+            tell = f"{actor.name} strikes {use.item}."
         else:
             verb = "drinks" if how == "drink" else "throws"
             at = "" if target == intent.actor else f" at {who}"
             tell = f"{actor.name} {verb} {use.item}{at}."
         if resolution is not None:
             tell += " " + " ".join(o.tell for o in resolution.outcomes if o.tell)
+        if cloud_tells:
+            tell += " " + " ".join(cloud_tells)
         if use.narrate:
             tell += f" ({'; '.join(use.narrate)})"
 
@@ -15606,6 +15847,14 @@ class Engine:
                 because=intent.because,
             )
 
+        if square is not None and self.scene.has_grid \
+                and actor.has_state("state.held.glued") \
+                and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
+            # A tanglefoot bag's glue (CRB: "glued to the floor and unable to move"):
+            # asked of the tag, and the way out named.
+            return self._refuse(intent, f"{actor.name} is glued to the floor and cannot "
+                                        f"move until they break free (a DC 17 Strength "
+                                        f"check, or 15 slashing to the goo).")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
             refusal = self._cannot_leave_the_ground(actor, from_square, tuple(square))
@@ -16114,6 +16363,629 @@ class Engine:
             or not self.scene.initiative
             or not self._has_acted(defender.ref)
         )
+
+    # --- what a blow can see (alchemy lane C) --------------------------------------------
+
+    def _concealment_of(self, attacker, defender) -> tuple[int, str]:
+        """The miss chance this attacker must beat against this defender: the defender's
+        own (blur, invisibility), the light at the defender's square as the attacker sees
+        it (`Scene.light_at`), and smoke or fog between them (`_fog_chance`). One reader,
+        `Actor.concealment`, best source wins — the plan's "no second miss-chance path"."""
+        square = self.scene.positions.get(getattr(defender, "ref", ""))
+        light = self.scene.light_at(square, viewer=attacker)
+        return defender.concealment(attacker, light=light,
+                                    fog=self._fog_chance(attacker, defender),
+                                    light_ft=self._gap_ft(attacker, defender))
+
+    def _fog_chance(self, attacker, defender) -> int:
+        """An obscuring cloud's miss chance on this blow: 20 within 5 ft, 50 beyond.
+
+        CRB, fog cloud (the smokestick's "as fog cloud"): "A creature within 5 feet has
+        concealment (attacks have a 20% miss chance). Creatures farther away have total
+        concealment (50% miss chance, and the attacker can't use sight to locate the
+        target)." Either of them inside the cloud, or the only thing stopping sight
+        between them obscuring squares (a wall is cover, `position.cover_of`). Until alchemy
+        lane C the cloud's squares were counted as walls, so whoever stood in a fog cloud
+        was untargetable: total cover, not a miss chance."""
+        grid = getattr(self.scene, "grid", None)
+        if grid is None or not grid.obscuring:
+            return 0
+        here = self.scene.positions.get(getattr(attacker, "ref", ""))
+        there = self.scene.positions.get(getattr(defender, "ref", ""))
+        if here is None or there is None:
+            return 0
+        mine = gridmod.footprint((here[0], here[1]), attacker.size or "medium")
+        theirs = gridmod.footprint((there[0], there[1]), defender.size or "medium")
+        inside = any(s in grid.obscuring for s in mine + theirs)
+        if not inside:
+            seen = any(grid.line_of_sight(p, q) for p in mine for q in theirs)
+            through = any(grid.line_of_sight(p, q, solid_only=True)
+                          for p in mine for q in theirs)
+            if seen or not through:
+                return 0
+        gap = self._gap_ft(attacker, defender)
+        return 20 if gap is not None and gap <= 5 else 50
+
+    # --- the splash weapon (alchemy plan §16.2) -------------------------------------------
+    #
+    # CRB, Throw Splash Weapon (aonprd.com/Rules.aspx?Name=Throw%20Splash%20Weapon, read
+    # 2026-10-06): "make a ranged touch attack against the target. Thrown splash weapons
+    # require no weapon proficiency ... A hit deals direct hit damage to the target and
+    # splash damage to all creatures within 5 feet of the target ... You can instead
+    # target a specific grid intersection. Treat this as a ranged attack against AC 5 ...
+    # If you miss the target, roll 1d8 ... 1 falling short (off-target in a straight line
+    # toward the thrower), and 2 through 8 rotating around the target creature or grid
+    # intersection in a clockwise direction. Then, count a number of squares in the
+    # indicated direction equal to the range increment of the throw ... it deals splash
+    # damage to all creatures in that square and in all adjacent squares." And: "Splash
+    # weapons cannot deal precision-based damage (such as sneak attack)". The rule prints
+    # nothing about critical hits; none is rolled here, which is the reading most tables
+    # take and the one that keeps a flask's dice the flask's.
+    #
+    # Before this a thrown flask landed its effects on the target with no roll at all
+    # ("That attack is not emitted here", the use_item docstring) and `SPLASH_RADIUS_FT`
+    # was read nowhere.
+
+    # Clockwise from north: the d8's 2..8 walk round from wherever 1 (toward the thrower)
+    # points.
+    _CLOCKWISE = ((0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1))
+
+    def _splash_reach(self, actor, defender, point, inc: int) -> tuple[int | None, str]:
+        """(feet to the aim, a refusal past five increments or ""). A thrown weapon "has
+        a maximum range of five range increments" (CRB, Combat, Range)."""
+        if point is not None:
+            here = self.scene.positions.get(actor.ref)
+            feet = (gridmod.distance((here[0], here[1]), (int(point[0]), int(point[1])))
+                    if here is not None and self.scene.has_grid else None)
+        else:
+            feet = self._gap_ft(actor, defender)
+        if feet is not None and int(feet) > inc * 5:
+            who = defender.name if defender is not None else "that square"
+            return feet, (f"{who} is {int(feet)} ft away, past a thrown flask's reach: five "
+                          f"range increments of {inc} ft is {inc * 5} ft. Nothing is "
+                          f"thrown.")
+        return feet, ""
+
+    def _splash_gate(self, actor, defender) -> str:
+        """A throw at somebody not on the thrower's side opens the fight, as a first
+        swing does (alchemy plan §16.2, "Attitude and the battle gate") — but the throw
+        is not deferred: the flask has already left the hand (the dose is spent at the
+        use door), so the encounter forms, the thrower keeps the turn they took, and the
+        throw resolves in the same batch, the way `_their_first_blow` rolls a declared
+        blow now (owner, 2026-10-01)."""
+        if defender is None or defender is actor or not self._against(actor, defender):
+            return ""
+        if self.scene.in_encounter:
+            if not any(defender.ref in refs for refs in self.scene.sides.values()):
+                self.join_fight(defender.ref)
+                self.rally(defender.ref)
+            return ""
+        if not self._ensure_encounter(actor.ref, defender.ref):
+            return ""
+        for i, (ref, _) in enumerate(self.scene.initiative):
+            if ref == actor.ref:
+                self.scene.turn = i
+                self.scene.acted.add(actor.ref)
+                break
+        return f"Battle is joined: {actor.name} throws first at {defender.name}."
+
+    def _land_documents(self, raw: list[dict], origin: str,
+                        origin_name: str) -> tuple[list, list, list]:
+        """Document intents landed inside an op, through validate and the queue — the one
+        trusted path (`origin` stamped) — and never suspended: every die engine-rolled,
+        so a splash on the player's own square does not open a popup in the middle of
+        somebody else's attack. (effects, tells, rolls)."""
+        if not raw:
+            return [], [], []
+        for r in raw:
+            r["visibility"] = "hidden"
+        try:
+            made = self.validate(raw, origin=origin, origin_name=origin_name)
+        except IntentError as exc:
+            return [], [f"({origin_name or 'It'}: {exc})"], []
+        res = self._drive([i.as_dict() for i in made], [], {})
+        return ([e for o in res.outcomes for e in (o.effects or [])],
+                [o.tell for o in res.outcomes if o.tell],
+                [r for o in res.outcomes for r in (o.rolls or [])])
+
+    def _caught_by_splash(self, around: tuple[int, int] | None, defender=None,
+                          exclude=()) -> list[str]:
+        """Who a splash reaches: everyone within 5 ft of the struck creature (`defender`,
+        measured edge to edge as reach is), or everyone in the square a miss lands in and
+        the eight around it (`around`). The dead are not splashed; nobody is with no map."""
+        if not self.scene.has_grid:
+            return []
+        out: list[str] = []
+        for ref, other in self.scene.actors.items():
+            if ref in exclude or other.has_state("state.down.dead"):
+                continue
+            if defender is not None:
+                gap = self._gap_ft(defender, other)
+                if gap is not None and gap <= 5 and other is not defender:
+                    out.append(ref)
+                continue
+            pos = self.scene.positions.get(ref)
+            if pos is None or around is None:
+                continue
+            squares = gridmod.footprint((pos[0], pos[1]), other.size or "medium")
+            if any(abs(s[0] - around[0]) <= 1 and abs(s[1] - around[1]) <= 1
+                   for s in squares):
+                out.append(ref)
+        return out
+
+    def _scatter(self, actor, aim: tuple[int, int], feet, inc: int,
+                 rolls: list) -> tuple[tuple[int, int] | None, str]:
+        """Where a missed flask lands: the d8 for direction (1 short, toward the thrower;
+        2-8 clockwise), then one square per range increment of the throw."""
+        if not self.scene.has_grid:
+            return None, "and it shatters somewhere wide of everyone"
+        here = self.scene.positions.get(actor.ref)
+        d8 = self.dice.roll("1d8", label="where the flask lands", visibility="hidden")
+        rolls.append(d8.as_dict())
+        toward = (0, -1)
+        if here is not None:
+            dx, dy = here[0] - aim[0], here[1] - aim[1]
+            sx = (dx > 0) - (dx < 0)
+            sy = (dy > 0) - (dy < 0)
+            if sx or sy:
+                toward = (sx, sy)
+        start = self._CLOCKWISE.index(toward)
+        step = self._CLOCKWISE[(start + d8.total - 1) % 8]
+        n = max(1, (int(feet) - 1) // inc + 1) if feet else 1
+        land = (aim[0] + step[0] * n, aim[1] + step[1] * n)
+        grid = self.scene.grid
+        # Kept on the map: a flask does not land outside the room it was thrown in.
+        while n > 0 and grid is not None and not grid.inside(land):
+            n -= 1
+            land = (aim[0] + step[0] * n, aim[1] + step[1] * n)
+        words = ("short, toward the thrower" if d8.total == 1 else
+                 {(0, -1): "north", (1, -1): "north-east", (1, 0): "east",
+                  (1, 1): "south-east", (0, 1): "south", (-1, 1): "south-west",
+                  (-1, 0): "west", (-1, -1): "north-west"}[step])
+        return land, (f"and it breaks {n * 5} ft {words} of where it was aimed (d8 "
+                      f"{d8.total})")
+
+    def _lay_cloud(self, spec: dict, square, owner, name: str) -> str:
+        """A cloud a flask or a tool puts into the scene (alchemy plan §16.5): the
+        `manifest` document, laid as a burst from the square it breaks on — a smokestick
+        "as fog cloud". Its squares are obscuring terrain, read by `_fog_chance`."""
+        from . import areas
+
+        size = int(spec.get("size") or 10)
+        rounds = self._duration_rounds(spec.get("duration"), default_unit="round") \
+            if isinstance(spec.get("duration"), dict) else None
+        squares: list = []
+        if square is not None and self.scene.has_grid:
+            level = self.scene.grid.ground((int(square[0]), int(square[1])))
+            cells = areas.burst_cells((int(square[0]), int(square[1]), level), size,
+                                      self.scene)
+            squares = sorted({(c[0], c[1]) for c in cells
+                              if self.scene.grid.inside((c[0], c[1]))})
+        what = str(spec.get("what") or "smoke")
+        self.scene.place(Manifestation(
+            what=what, terrain=str(spec.get("terrain") or "obscuring"), squares=squares,
+            rounds_left=rounds, source=name, owner=getattr(owner, "ref", "")))
+        span = f" for {rounds} rounds" if rounds else ""
+        return (f"{what[:1].upper()}{what[1:]} rises from the {name}, {size} ft "
+                f"around{span}.")
+
+    def _splash_attack(self, intent: Intent, partial: dict) -> Outcome:
+        """A thrown flask, as the `attack` op's `splash` mode (contracts §7). Emitted by
+        `use_item how=throw` after the dose is spent; its `flask` param (engine-written,
+        never parsed — `parse` refuses it from a model) holds what the throw carries:
+        the struck creature's intents, the splash documents, clouds, a bottled spell and
+        the range increment (`consumables.thrown_load`)."""
+        actor = self.scene.actors[intent.actor]
+        p = intent.params
+        load = dict(p.get("flask") or {})
+        name = str(load.get("name") or p.get("item") or "the flask")
+        origin = str(intent.origin or load.get("origin") or "")
+        inc = int(load.get("range_ft") or consumables.SPLASH_RANGE_FT)
+        refs = [r for r in intent.targets() if r in self.scene.actors]
+        defender = self.scene.actors[refs[0]] if refs else None
+        point = tuple(p["at_square"][:2]) if p.get("at_square") is not None else None
+        state = partial.get("attack_state")
+        if state is None:
+            if actor.is_down or actor.blocking_key("attack"):
+                why = (actor.blocking_condition() or "down").lower()
+                return Outcome(
+                    intent_id=intent.id, op="attack", status="prevented",
+                    effects=[{"ref": actor.ref, "kind": "attack_stopped", "why": why}],
+                    tell=f"{actor.name} is {why}, and the {name} is never thrown.",
+                    because=intent.because)
+            state = {"stage": "attack", "rolls": [], "effects": [], "tells": [],
+                     "splash": True}
+            said = self._splash_gate(actor, defender)
+            if said:
+                state["tells"].append(said)
+            actor.remove_condition(states.BYSTANDER_KEY)
+            if defender is not None:
+                defender.remove_condition(states.BYSTANDER_KEY)
+        feet, _ = self._splash_reach(actor, defender, point, inc)
+        from . import position as position_mod
+
+        if point is not None:
+            ac, note = 5, "AC 5, a grid intersection"
+            mods = actor.splash_attack_modifiers()
+        else:
+            flat_footed = self._flat_footed(defender)
+            ac = defender.touch_ac(flat_footed, attacker=actor)
+            note = f"touch AC {ac}" + (" (flat-footed)" if flat_footed else "")
+            cover = position_mod.ac_mods(self.scene, actor, defender)
+            if cover:
+                ac += sum(m.value for m in cover)
+                note += " with " + ", ".join(m.source for m in cover)
+            mods = actor.splash_attack_modifiers(defender)
+        if feet and int(feet) > inc:
+            n = (int(feet) - 1) // inc
+            mods = mods + [Modifier(-2 * n, f"range ({int(feet)} ft: {n} increment"
+                                            f"{'s' if n != 1 else ''} of {inc} ft past the "
+                                            f"first)")]
+        atk = self._roll_or_suspend_stage(intent, actor, mods, f"Throw {name}", ac,
+                                          partial, state, "1d20")
+        state["rolls"].append(atk.as_dict())
+        rolls: list = []
+        tells = list(state["tells"])
+        hit = atk.natural != 1 and d20_succeeds(atk, ac)
+        aimed_at = defender.name if defender is not None else "the spot"
+        if hit and defender is not None:
+            chance, why = self._concealment_of(actor, defender)
+            if chance:
+                miss = self.dice.roll("1d100", label=f"miss chance ({why})",
+                                      visibility="hidden")
+                rolls.append(miss.as_dict())
+                if miss.total <= chance:
+                    hit = False
+                    tells.append(f"The {name} finds nothing there — {why}, {chance}% miss "
+                                 f"chance ({miss.total}).")
+        self._judge(atk, hit)
+        effects: list[dict] = [{"ref": actor.ref, "kind": "splash_throw", "item": name,
+                                "target": getattr(defender, "ref", None),
+                                "hit": hit, "origin": origin}]
+        why_ = intent.because or f"{name}, thrown"
+        potency = float(load.get("potency") or 1.0)
+        splashed: list[str] = []
+        land = None
+        if hit:
+            tells.append(f"{actor.name}'s {name} "
+                         + (f"breaks on {aimed_at}" if defender is not None
+                            else "breaks on the spot it was aimed at")
+                         + f" ({atk.total} against {note}).")
+            if defender is not None:
+                fx, said, rs = self._land_documents(
+                    [dict(r) for r in load.get("struck") or []], origin, name)
+                effects += fx
+                tells += said
+                if load.get("narrate"):
+                    # What the engine cannot run is the GM's to narrate, never dropped.
+                    tells.append(f"({'; '.join(load['narrate'])})")
+                rolls += [r.as_dict() if hasattr(r, "as_dict") else r for r in rs]
+                if load.get("spell"):
+                    # A harmful spell bottled in the flask, the struck creature its target
+                    # (owner's ruling, open point 5): its own documents, as a potion's.
+                    held = consumables.Use(item=name, how="throw")
+                    try:
+                        made = consumables.spell_intents(load["spell"], defender.ref, why_,
+                                                         self.dice, use=held)
+                    except KeyError:
+                        made = []
+                    fx, said, rs = self._land_documents(made, origin, name)
+                    effects += fx
+                    tells += said
+                    if held.narrate:
+                        tells.append(f"({'; '.join(held.narrate)})")
+                pos = self.scene.positions.get(defender.ref)
+                land = (pos[0], pos[1]) if pos is not None else None
+                splashed = self._caught_by_splash(None, defender=defender,
+                                                  exclude=(defender.ref,))
+            else:
+                land = point
+                # "Creatures in all adjacent squares are dealt splash damage, and the
+                # direct hit damage is not dealt to any creature" (the 3.5 SRD's line for
+                # an intersection, which the PF text above does not repeat — could not
+                # confirm PF's own wording): the four squares the intersection touches.
+                splashed = [r for r, a in self.scene.actors.items()
+                            if not a.has_state("state.down.dead")
+                            and self.scene.positions.get(r) is not None
+                            and any((s[0], s[1]) in {(point[0] - 1, point[1] - 1),
+                                                     (point[0], point[1] - 1),
+                                                     (point[0] - 1, point[1]),
+                                                     (point[0], point[1])}
+                                    for s in gridmod.footprint(
+                                        tuple(self.scene.positions[r][:2]), a.size))]
+        else:
+            face = "natural 1" if atk.natural == 1 else f"{atk.total} against {note}"
+            aim = point
+            if aim is None and defender is not None:
+                pos = self.scene.positions.get(defender.ref)
+                aim = (pos[0], pos[1]) if pos is not None else None
+            if aim is None:
+                land, where = None, "and it shatters somewhere wide of everyone"
+            else:
+                land, where = self._scatter(actor, aim, feet, inc, rolls)
+            tells.append(f"{actor.name}'s {name} misses {aimed_at} ({face}), {where}.")
+            if land is not None:
+                self.scene.place_prop(f"broken {name}", owner=actor.ref, state="broken",
+                                      square=land)
+                splashed = self._caught_by_splash(land)
+        if splashed:
+            names = []
+            for ref in splashed:
+                fx, said, rs = self._land_documents(
+                    consumables.splash_intents(load.get("splash") or [], ref, potency,
+                                               f"{why_}, the splash"), origin, name)
+                if fx or said:
+                    names.append(self.scene.actors[ref].name)
+                effects += fx
+                tells += said
+                rolls += [r.as_dict() if hasattr(r, "as_dict") else r for r in rs]
+            if names:
+                effects.append({"ref": actor.ref, "kind": "splash", "item": name,
+                                "caught": list(splashed), "origin": origin})
+        for spec in load.get("area") or []:
+            # A cloud's own documents (a thunderstone's bang) on everyone within its
+            # burst of where the flask broke — 10 ft unless the document says.
+            radius = int(spec.get("radius_ft") or 10)
+            if land is None or not self.scene.has_grid:
+                continue
+            for ref, other in self.scene.actors.items():
+                pos = self.scene.positions.get(ref)
+                if pos is None or other.has_state("state.down.dead"):
+                    continue
+                if gridmod.distance((pos[0], pos[1]), land) <= radius:
+                    fx, said, rs = self._land_documents(
+                        consumables.splash_intents([spec], ref, potency, why_), origin,
+                        name)
+                    effects += fx
+                    tells += said
+        for spec in load.get("clouds") or []:
+            tells.append(self._lay_cloud(spec, land, actor, name))
+        if defender is not None:
+            self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
+        return Outcome(
+            intent_id=intent.id, op="attack",
+            rolls=[_roll_from_dict(r) for r in state["rolls"]]
+                  + [_roll_from_dict(r) for r in rolls if isinstance(r, dict)],
+            effects=effects, tell=" ".join(t for t in tells if t),
+            because=intent.because)
+
+    # --- burning, glue and light (alchemy plan §16.4, §16.6, §16.8) -----------------------
+
+    def _when_spares(self, target, when) -> bool:
+        """Whether an "against X only" clause rules this creature out (plan §16.7):
+        saint's tallow's damage on the living, a holy flask on a man. Asked of the
+        creature the effect lands on, through the one `when` reader (`_when_holds`)."""
+        if not isinstance(when, dict) or not when:
+            return False
+        from .sheet import situation_of
+
+        ctx = {"target_actor": target}
+        sit = situation_of(target)
+        if sit is not None:
+            ctx["situation"] = sit
+        return not _when_holds(when, ctx)
+
+    _GRANT_PREFIXES = ("sense.", "light.", "permission.")
+
+    def _op_grant(self, intent: Intent, partial: dict) -> Outcome:
+        """A tag held for a duration, through the one applicator: a drunk sense, a
+        permission, a light carried. The tag is the vocabulary's (`effectspec.sense_tag`,
+        `permission_tag`); anything else is refused, never self-tagged."""
+        ref = intent.params.get("to") or intent.actor
+        target = self.scene.actors.get(ref or "")
+        if target is None:
+            return self._refuse(intent, self._elsewhere(ref) or f"There is no {ref} here.")
+        tag = str(intent.params.get("tag") or "").strip().lower()
+        known = {row["tag"] for row in effectspec.PERMISSIONS.values()} | {
+            "buff.fast-healing", "state.wound.bleeding"}
+        if not (tag.startswith(self._GRANT_PREFIXES) or tag in known):
+            return self._refuse(intent, f"{tag!r} is not a sense, a light or a permission "
+                                        f"the engine grants.")
+        per = intent.params.get("per_round") if isinstance(
+            intent.params.get("per_round"), dict) else {}
+        if tag == "state.wound.bleeding" or per:
+            return self._grant_periodic(intent, target, tag, per)
+        rounds = self._duration_rounds(intent.params.get("duration"), default_unit="hour") \
+            if isinstance(intent.params.get("duration"), dict) else None
+        name = str(intent.params.get("name") or tag)
+        light = intent.params.get("light") if isinstance(intent.params.get("light"),
+                                                         dict) else None
+        source = intent.origin_name or "a preparation"
+        target.apply_effect(ActiveEffect(
+            name=name, kind="effect", key=tag, source=source, origin=intent.origin,
+            duration="until-dismissed" if rounds is None else "rounds",
+            rounds_left=rounds, tags=(tag,),
+            payload={"light": {"radius_ft": int(light.get("radius_ft") or 0),
+                               "raised_ft": int(light.get("raised_ft") or 0)}}
+            if light else {}))
+        span = ("" if not rounds else f" for {rounds // 600} hour(s)" if rounds >= 600
+                else f" for {rounds // 10} minute(s)" if rounds >= 10
+                else f" for {rounds} round(s)")
+        if light:
+            r, rr = int(light.get("radius_ft") or 0), int(light.get("raised_ft") or 0)
+            tell = (f"Light blooms from {source} in {target.name}'s hand: lit to {r} ft"
+                    + (f", brighter to {rr} ft" if rr else "") + f"{span}.")
+        else:
+            tell = f"{target.name} gains {name}{span} ({source})."
+        return Outcome(
+            intent_id=intent.id, op="grant",
+            effects=[{"ref": target.ref, "kind": "grant", "tag": tag, "rounds": rounds,
+                      "origin": intent.origin, **({"light": light} if light else {})}],
+            tell=tell, because=intent.because)
+
+    def _grant_periodic(self, intent: Intent, target, tag: str, per: dict) -> Outcome:
+        """Fast healing from a draught (troll marrow) and a bleed a flask opens (demon
+        ichor): an effect whose `periodic` work the round's executor runs
+        (`Actor.run_periodic`). A bleed is the `bleed` condition as a wounding blade lays
+        it (`_item_riders`), so a Heal check or a cure stops it the same way."""
+        source = intent.origin_name or "a preparation"
+        if tag == "state.wound.bleeding":
+            if target.is_dead or target.has_state("immune.bleed") or \
+                    states.immunity_blocks(target.immunities, "bleed"):
+                return Outcome(intent_id=intent.id, op="grant", effects=[],
+                               tell=f"{target.name} does not bleed.",
+                               because=intent.because)
+            amount = max(1, int(per.get("damage") or 1))
+            target.apply_effect(ActiveEffect(
+                name="Bleed", kind="condition", key="bleed", source=intent.origin or source,
+                origin=intent.origin, tags=states.tags_for("bleed"),
+                periodic=[{"per": "round", "damage": amount, "damage_type": "untyped"}]))
+            return Outcome(
+                intent_id=intent.id, op="grant",
+                effects=[{"ref": target.ref, "kind": "condition", "condition": "bleed",
+                          "per_round": amount, "origin": intent.origin}],
+                tell=f"{source} opens a wound on {target.name}: {amount} damage a round "
+                     f"until it is stopped.", because=intent.because)
+        rounds = self._duration_rounds(intent.params.get("duration"), default_unit="hour") \
+            if isinstance(intent.params.get("duration"), dict) else None
+        heal = max(1, int(per.get("heal") or 1))
+        target.apply_effect(ActiveEffect(
+            name=str(intent.params.get("name") or "Fast healing"), kind="effect", key=tag,
+            source=source, origin=intent.origin, tags=(tag,),
+            duration="until-dismissed" if rounds is None else "rounds", rounds_left=rounds,
+            periodic=[{"per": "round", "heal": heal}]))
+        return Outcome(
+            intent_id=intent.id, op="grant",
+            effects=[{"ref": target.ref, "kind": "grant", "tag": tag, "rounds": rounds,
+                      "per_round": heal, "origin": intent.origin}],
+            tell=f"{target.name} heals {heal} a round" + (f" for {rounds} rounds"
+                                                         if rounds else "")
+                 + f" ({source}).", because=intent.because)
+
+    def _op_burn(self, intent: Intent, partial: dict) -> Outcome:
+        """Fire that clings (alchemist's fire, CRB): an effect granting `state.burning`
+        whose `periodic` damage fires at the top of the next round (`run_periodic`),
+        `rounds` times, unless `extinguish` puts it out first. Each hit is its own fire
+        (`stacking: stack`): two flasks, two next-round burns, as the book's two hits."""
+        ref = intent.params.get("to") or intent.actor
+        target = self.scene.actors.get(ref or "")
+        if target is None:
+            return self._refuse(intent, self._elsewhere(ref) or f"There is no {ref} here.")
+        if target.has_state("state.down.dead"):
+            return Outcome(intent_id=intent.id, op="burn", effects=[],
+                           tell="", because=intent.because)
+        dice = str(intent.params.get("dice") or "1d6")
+        dtype = str(intent.params.get("damage_type") or "fire")
+        rounds = max(1, int(intent.params.get("rounds") or 1))
+        dc = int(intent.params.get("put_out_dc") or 15)
+        save = str(intent.params.get("put_out_with") or "ref")
+        bonus = int(intent.params.get("smother_bonus")
+                    if intent.params.get("smother_bonus") is not None else 2)
+        source = intent.origin_name or "the fire"
+        target.apply_effect(ActiveEffect(
+            name="Burning", kind="effect", key="burning", source=source,
+            origin=intent.origin, tags=states.tags_for("burning"), stacking="stack",
+            payload={"burning": {"dc": dc, "save": save, "smother_bonus": bonus,
+                                 "dice": dice, "damage_type": dtype}},
+            periodic=[{"per": "round", "damage": dice, "damage_type": dtype,
+                       "times_left": rounds}]))
+        return Outcome(
+            intent_id=intent.id, op="burn",
+            effects=[{"ref": target.ref, "kind": "burning", "dice": dice, "rounds": rounds,
+                      "dc": dc, "origin": intent.origin}],
+            tell=(f"Fire clings to {target.name}: it will burn again next round unless "
+                  f"put out."),
+            because=intent.because)
+
+    def _op_extinguish(self, intent: Intent, partial: dict) -> Outcome:
+        """Putting out clinging fire (CRB, alchemist's fire): "a full-round action to
+        attempt to extinguish the flames before taking this additional damage.
+        Extinguishing the flames requires a DC 15 Reflex save. Rolling on the ground
+        provides the target a +2 bonus on the save. Leaping into a large body of water
+        ... automatically smothers the fire." The DC and the bonus are the fire's own
+        (its `burn` document). The full round is said, not budgeted: no op in the engine
+        enforces an action budget yet (the coup de grâce's ledger line)."""
+        actor = self.scene.actors[intent.actor]
+        fires = [e for e in actor.effects if "state.burning" in e.tags]
+        if not fires:
+            return self._refuse(intent, f"{actor.name} is not on fire; there is nothing to "
+                                        f"put out.")
+        if actor.water_row():
+            actor.remove_effects(match=lambda e: e in fires)
+            return Outcome(
+                intent_id=intent.id, op="extinguish",
+                effects=[{"ref": actor.ref, "kind": "extinguished", "how": "water"}],
+                tell=f"The water closes over the flames on {actor.name}; they are out.",
+                because=intent.because)
+        info = max((e.payload.get("burning") or {} for e in fires),
+                   key=lambda b: int(b.get("dc") or 15))
+        dc = int(info.get("dc") or 15)
+        save = str(info.get("save") or "ref")
+        mods = list(actor.save_modifiers(save))
+        rolling = bool(intent.params.get("roll"))
+        if rolling:
+            mods.append(Modifier(int(info.get("smother_bonus") or 2),
+                                 "rolling on the ground", "circumstance"))
+        roll = self._roll_or_suspend(intent, actor, mods, f"{SAVES.get(save, save)} save "
+                                     f"to put out the flames", dc, partial)
+        made = d20_succeeds(roll, dc)
+        self._judge(roll, made)
+        how = "rolls on the ground" if rolling else "beats at the flames"
+        if made:
+            actor.remove_effects(match=lambda e: "state.burning" in e.tags)
+            tell = (f"{actor.name} {how}; the flames go out ({roll.total} against DC "
+                    f"{dc}).")
+        else:
+            tell = (f"{actor.name} {how}, and the fire keeps its hold ({roll.total} "
+                    f"against DC {dc}).")
+        return Outcome(
+            intent_id=intent.id, op="extinguish", rolls=[roll],
+            verdict="success" if made else "failure",
+            effects=[{"ref": actor.ref, "kind": "extinguish", "made": made,
+                      "full_round": True}],
+            tell=tell, because=intent.because)
+
+    BREAK_FREE_DC = 17          # CRB, tanglefoot bag: "a DC 17 Strength check"
+    GOO_HP = 15                 # "or by dealing 15 points of slashing damage to the goo"
+
+    def _op_break_free(self, intent: Intent, partial: dict) -> Outcome:
+        """Tearing loose of a tanglefoot bag's goo (CRB): "A creature that is glued to the
+        floor ... can break free by making a DC 17 Strength check or by dealing 15 points
+        of slashing damage to the goo with a slashing weapon. A creature trying to scrape
+        goo off itself, or another creature assisting, does not need to make an attack
+        roll; hitting the goo is automatic, after which the creature that hit makes a
+        damage roll to see how much of the goo was scraped off. Once free, the creature
+        can move (including flying) at half speed." Half speed is the entangled the bag
+        also left; only the glue comes off here."""
+        actor = self.scene.actors[intent.actor]
+        glue = [e for e in actor.effects if "state.held.glued" in e.tags]
+        if not glue:
+            return self._refuse(intent, f"{actor.name} is not stuck to anything.")
+        how = str(intent.params.get("how") or "strength").strip().lower()
+        if how in ("slash", "slashing", "cut", "scrape"):
+            key = actor.wielded_key()
+            w = actor.weapon(key)
+            if "slashing" not in str(w.get("type") or "").lower():
+                return self._refuse(intent, f"The {w.get('name') or key} does not cut; "
+                                            f"the goo needs a slashing weapon, or a DC "
+                                            f"{self.BREAK_FREE_DC} Strength check.")
+            roll = self.dice.roll(actor.damage_dice(key), actor.damage_modifiers(key),
+                                  label="scraping the goo", visibility="hidden")
+            done = int(glue[0].payload.get("goo_damage") or 0) + max(0, roll.total)
+            for e in glue:
+                e.payload["goo_damage"] = done
+            made = done >= self.GOO_HP
+            said = (f"{actor.name} hacks at the goo with the {w.get('name') or key} "
+                    f"({max(0, roll.total)}, {min(done, self.GOO_HP)} of {self.GOO_HP})")
+        else:
+            mods = [Modifier(actor.ability_mod("str"), "Str")] \
+                + actor._condition_mods("ability_checks")
+            roll = self._roll_or_suspend(intent, actor, mods, "Strength check to break "
+                                         "free", self.BREAK_FREE_DC, partial)
+            made = roll.total >= self.BREAK_FREE_DC
+            self._judge(roll, made)
+            said = (f"{actor.name} heaves against the goo ({roll.total} against DC "
+                    f"{self.BREAK_FREE_DC})")
+        if made:
+            actor.remove_effects(match=lambda e: "state.held.glued" in e.tags)
+            tell = f"{said}, and tears free."
+        else:
+            tell = f"{said}; it holds."
+        return Outcome(
+            intent_id=intent.id, op="break_free", rolls=[roll],
+            verdict="success" if made else "failure",
+            effects=[{"ref": actor.ref, "kind": "break_free", "how": how, "made": made}],
+            tell=tell, because=intent.because)
 
     def _gap_ft(self, actor, defender) -> float | None:
         """Feet between two creatures on the grid, or None when either is off it.

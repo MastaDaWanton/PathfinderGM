@@ -1421,6 +1421,14 @@ class Actor:
                         out.append(rec)
                 elif "damage" in p:
                     dtype = str(p.get("damage_type") or p.get("type") or "untyped")
+                    # `times_left`: a burn that fires a counted number of times and then
+                    # goes out (alchemist's fire's "round following", `Engine._op_burn`).
+                    # Counted here rather than by the effect's clock because the round's
+                    # tick runs BEFORE this executor at the top of a round
+                    # (`Scene._next_able`): a one-round clock expired the fire before it
+                    # ever burned.
+                    if "times_left" in p:
+                        times = min(times, max(0, int(p.get("times_left") or 0)))
                     total = sum(_amount_of(p.get("damage"), dice) for _ in range(times))
                     if total > 0:
                         d = self.take_damage(total, dtype)
@@ -1429,6 +1437,13 @@ class Actor:
                                     "type": normalise_damage_type(dtype), "source": source,
                                     "origin": e.origin, "hp_after": self.hp,
                                     "hp_max": self.hp_max})
+                    if "times_left" in p:
+                        p["times_left"] = max(0, int(p.get("times_left") or 0) - times)
+                        if p["times_left"] <= 0 and self.remove_effects(
+                                match=lambda x, e=e: x is e):
+                            out.append({"kind": "effect_ended", "ref": self.ref,
+                                        "what": e.name or "the fire",
+                                        "origin": e.origin})
                 elif isinstance(p.get("effect"), dict):
                     for _ in range(times):
                         out.extend(self._periodic_effect(p["effect"], source, e.origin, dice))
@@ -2161,6 +2176,10 @@ class Actor:
         # tuple the three-laws ratchet could not see (2026-09-25).
         if self.has_state("state.slowed"):
             base //= 2
+        # Glued to the floor (a tanglefoot bag's failed Reflex save): "unable to move"
+        # (CRB). Asked of the tag, after everything else, so no boot or potion moves it.
+        if self.has_state("state.held.glued"):
+            base = 0
         # Rounded down to a whole square. A speed of 22 feet lets you cross four squares,
         # not four and a bit, and carrying the remainder makes the fifth square arrive one
         # move sooner than it should.
@@ -2293,7 +2312,8 @@ class Actor:
 
     # --- condition contributions --------------------------------------------------
 
-    def concealment(self) -> tuple[int, str]:
+    def concealment(self, attacker=None, *, light: str = "", fog: int = 0,
+                    light_ft: float | None = None) -> tuple[int, str]:
         """The miss chance an attack against this creature must beat, and where it is from.
 
         Displacement, blur, entropic shield and blurred movement are *entirely* this and
@@ -2303,12 +2323,40 @@ class Actor:
 
         The best source wins rather than adding up. Two 20% miss chances are not 40% in
         1e and they are not 36% either; concealment does not stack with concealment.
+
+        **What the attacker sees by** (alchemy lane C, plan §16.3-§16.5), when the attack
+        op says who is attacking:
+        - `light`, the level at this creature's square as the attacker sees it
+          (`Scene.light_at`, low-light vision already folded in): "dim" is 20%, "dark"
+          50% (CRB, Vision and Light: dim "Creatures within this area have concealment
+          (20% miss chance in combat)"; darkness, "creatures without darkvision are
+          effectively blinded", the 50% of total concealment). Darkvision within its range
+          (`light_ft`, the distance) sees both as if lit.
+        - `fog`, the miss chance of an obscuring cloud between them (20% within 5 ft, 50%
+          beyond, fog cloud's own rule), worked out by the engine from the map.
+        - see invisibility (`sense.see-invisible`, a stat block's printed line) ignores
+          invisibility's 50%: the creature is simply seen.
+        Called with no attacker, it answers as it always did — the sheet's own line.
         """
+        eyes = attacker.eyes() if attacker is not None and hasattr(attacker, "eyes") \
+            else {}
         best, why = 0, ""
         for c in self.conditions:
             got = c.data.get("concealment")
+            if eyes.get("see_invisible") and c.key == "invisible":
+                continue
             if isinstance(got, int) and got > best:
                 best, why = got, c.name.lower()
+        if attacker is not None:
+            dark_ft = int(eyes.get("darkvision") or 0)
+            sees_dark = dark_ft and (light_ft is None or light_ft <= dark_ft)
+            if light in ("dim", "dark") and not sees_dark:
+                got = 50 if light == "dark" else 20
+                if got > best:
+                    best, why = got, ("darkness" if light == "dark" else "dim light")
+            if fog and int(fog) > best:
+                best, why = int(fog), "obscuring smoke" if int(fog) < 50 else \
+                    "thick obscuring smoke"
         # Every effect and worn gear, not only conditions and the buff VIEW:
         # `self.buffs` filters to kind == "buff", so a stance or class ability
         # granting a miss chance was invisible here — the same shape of gap that
@@ -3027,6 +3075,37 @@ class Actor:
             # A bashing shield "acts as a +1 weapon when used to bash" (`shield_bash`).
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
                                  "enhancement"))
+        return stack(mods)
+
+    def splash_attack_modifiers(self, defender=None) -> list[Modifier]:
+        """The ranged touch attack a thrown flask is (CRB, Throw Splash Weapon: "make a
+        ranged touch attack against the target. Thrown splash weapons require no weapon
+        proficiency, so you don't take the –4 nonproficiency penalty").
+
+        Base attack, Dexterity and size — or a stat block's printed attack bonus where
+        there is no base attack to read — and everything a roll to hit already carries:
+        conditions, timed bonuses, what is worn. No weapon is in it (a flask has no
+        enhancement and no feat names it), and nothing melee-only. The engine adds the
+        range increments and the board (`Engine._splash`)."""
+        mods: list[Modifier] = []
+        if self.flat_attack is not None:
+            mods.append(Modifier(self.flat_attack, "attack bonus"))
+        else:
+            mods.append(Modifier(self.bab, "BAB"))
+            dex = self.ability_mod("dex")
+            if dex:
+                mods.append(Modifier(dex, "Dex"))
+            size_mod = SIZES.get(self.size, SIZES["medium"])["attack_ac"]
+            if size_mod:
+                mods.append(Modifier(size_mod, f"{self.size} size"))
+        mods.extend(self._condition_mods("attack"))
+        ctx = self._roll_context(None, defender=defender, thrown=True)
+        # The flask, not whatever is in the hand: a sword's own record scopes its own
+        # bonuses by `record`, and the flask is not that sword.
+        ctx["weapon"] = {"key": "splash", "category": "ranged", "ranged": True,
+                         "thrown": True, "splash": True, "hands": 1, "light": True,
+                         "finessable": False, "slashing_or_piercing": False}
+        mods.extend(self._buff_mods("combat_mod", "attack", ctx))
         return stack(mods)
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
@@ -4157,8 +4236,15 @@ class Actor:
 
     def add_buff(self, kind: str, target: str, amount: int, source: str = "",
                  rounds: int | None = None, note: str = "",
-                 bonus_type: str = "", origin: str = "") -> "Buff":
+                 bonus_type: str = "", origin: str = "",
+                 when: dict | None = None) -> "Buff":
         """Grant a timed bonus. Same source on the same roll reapplies, not stacks.
+
+        `when` is the bonus's "against X only" clause (alchemy plan §16.7: antitoxin's
+        +5 is against poison; a "+2 against undead" draught is against undead), kept on
+        the modifier, where `_effect_scope_holds` asks it of every roll's context. Timed
+        buffs ignored it until alchemy lane C, so a +2 against undead applied against
+        everything.
 
         `bonus_type` is 1e's channel — alchemical, morale, enhancement — and it used to
         be dropped on the floor between the author and the roll. `effectspec` has
@@ -4178,6 +4264,10 @@ class Actor:
             if (m.get("kind"), m.get("target")) == (kind, target):
                 m["amount"], m["note"] = int(amount), note
                 m["bonus_type"] = typed
+                if when:
+                    m["when"] = dict(when)
+                else:
+                    m.pop("when", None)
                 e.rounds_left = rounds
                 e.duration = "until-dismissed" if rounds is None else "rounds"
                 e.origin = origin or e.origin
@@ -4189,7 +4279,8 @@ class Actor:
             duration="until-dismissed" if rounds is None else "rounds",
             rounds_left=rounds,
             modifiers=[{"kind": kind, "target": target, "amount": int(amount),
-                        "bonus_type": typed, "note": note}]))
+                        "bonus_type": typed, "note": note,
+                        **({"when": dict(when)} if when else {})}]))
         return Buff(kind=kind, target=target, amount=int(amount), source=source,
                     rounds_left=rounds, note=note)
 
@@ -4320,9 +4411,14 @@ class Actor:
     def _worn_tags(self, walk: list | None = None) -> list[str]:
         out: list[str] = []
         for spec, _, _ in self.worn_specs_of("sense", walk=walk):
-            sense = str(spec.get("target") or "").strip().lower().replace(" ", "-")
-            if sense:
-                out.append(f"sense.{sense}")
+            # Spelled by the vocabulary's one writer (`effectspec.sense_tag`), as a race
+            # document spells it. This wrote `sense.<target>` with only spaces hyphenated
+            # until alchemy lane C: goggles of `low_light` granted `sense.low_light`, and
+            # `has_state("sense.low-light")` — the race's spelling — missed them.
+            if str(spec.get("target") or "").strip():
+                from .effectspec import sense_tag
+
+                out.append(sense_tag(spec.get("target"), spec.get("range")))
         on = [self.armour_record(), self.shield_record(), self.wielded_record()]
         seen = {id(r) for r in on if r is not None}
         # A cursed ring or cloak lays its drawback's `curse.*` tag on its wearer too
@@ -4476,7 +4572,77 @@ class Actor:
                 if mode == "land":
                     continue
                 out[mode] = max(out.get(mode, 0), int(feet))
+        # What a potion or a spell grants for its duration (alchemy lane C): fly, climb,
+        # swim and burrow `speed` modifiers through the one funnel, read here so the move
+        # op's permission (`can_move_vertically`) and the water rules (`speeds`) see a
+        # potion of fly or spider climb. Through `_buff_mods` and `stack`, untyped read as
+        # enhancement as land speed is (two flying potions are not 120 ft). A granted
+        # speed is a speed the creature now HAS ("you can fly at a speed of 60 feet",
+        # CRB, fly), so it stands beside a body's own and the better one is used — the
+        # rule this method already applies between a race and a stat block.
+        if not self.has_state("state.held.glued"):
+            for mode in ("fly", "climb", "swim", "burrow"):
+                got = [Modifier(m.value, m.source, m.type or "enhancement")
+                       for m in self._buff_mods("speed", mode)]
+                feet = sum(m.value for m in stack(got))
+                if feet > 0:
+                    out[mode] = max(out.get(mode, 0), int(feet))
+        else:
+            # Glued, nothing moves: "a flying creature ... must make a DC 15 Reflex save
+            # or be unable to fly" is the throw's to roll; until then no mode is open.
+            out = {"land": 0}
         return {m: f for m, f in out.items() if f > 0 or m == "land"}
+
+    def speeds(self) -> dict[str, int]:
+        """Every movement mode, as `rules/water.swim_speed` asks a body (`speeds()`), so a
+        potion's swim speed reaches the water rules through the same funnel as land. A
+        homebrew `move.<mode>.<feet>` tag on the body itself (`Actor.tags`) still counts —
+        the water rules read those before this door existed."""
+        out = dict(self.movement_modes())
+        for tag in getattr(self, "tags", None) or ():
+            bits = str(tag).split(".")
+            if len(bits) == 3 and bits[0] == "move" and bits[2].isdigit():
+                out[bits[1]] = max(out.get(bits[1], 0), int(bits[2]))
+        return out
+
+    def eyes(self) -> dict:
+        """What this creature sees by, for the light model (alchemy plan §16.4).
+
+        From the tag vocabulary (`sense.darkvision.60`, `sense.low-light`,
+        `sense.see-invisible` — a race's, a worn helm's, a drunk potion's alike) and, for
+        a stat block, its printed `senses` line ("darkvision 60 ft., low-light vision"),
+        which is not tagged. A darkvision with no range is the book's usual 60 ft.
+        """
+        dark = 0
+        low = see_invis = False
+        from . import states as _states
+
+        tags = [t for e in self.effects for t in e.tags] + list(self.standing_tags())
+        for t in tags:
+            t = str(t)
+            if _states.matches(t, "sense.darkvision"):
+                tail = t[len("sense.darkvision"):].strip(".")
+                dark = max(dark, int(tail) if tail.isdigit() else 60)
+            elif _states.matches(t, "sense.low-light"):
+                low = True
+            elif _states.matches(t, "sense.see-invisible") \
+                    or _states.matches(t, "sense.true-seeing"):
+                see_invis = True
+            elif _states.matches(t, "sense.blindsight"):
+                see_invis = True
+                dark = max(dark, int(t.rsplit(".", 1)[-1]) if t.rsplit(".", 1)[-1].isdigit()
+                           else 30)
+        doc = self._creature_doc() or {}
+        printed = str(doc.get("senses") or "").lower()
+        if printed:
+            m = re.search(r"darkvision\s+(\d+)", printed)
+            if m:
+                dark = max(dark, int(m.group(1)))
+            elif "darkvision" in printed:
+                dark = max(dark, 60)
+            low = low or "low-light" in printed
+            see_invis = see_invis or "see invisibility" in printed or "true seeing" in printed
+        return {"darkvision": dark, "low_light": low, "see_invisible": see_invis}
 
     def can_move_vertically(self) -> str:
         """How this creature gets off the ground, or "" if it cannot.
@@ -4827,6 +4993,13 @@ class Actor:
         # nothing while the suppressing effect holds and everything again when it ends —
         # the effect is not removed, its contribution is (law 2, read live).
         held_off = self.has_state(MAGIC_SUPPRESSED)
+        # Untyped bonuses "always stack, unless they are from the same source" (CRB,
+        # Common Terms). Between two separate effects with one source — the same jar's
+        # untyped bonus landed twice by two doors, a stacking effect reapplied — the better
+        # one stands (alchemy lane C; lane B found `dice.stack` added them whatever the
+        # source). Here and not in the funnel: here a source is an effect's identity, there
+        # it is a label one document splits into several terms (dice.stack says why).
+        untyped_best: dict[str, tuple[int, int]] = {}
         for e in self.effects:
             if held_off and is_magical(e):
                 continue
@@ -4834,8 +5007,20 @@ class Actor:
                 amount = int(m.get("amount", 0) or 0)
                 if m.get("kind") == kind and str(m.get("target", "")).lower() == want \
                         and amount and _effect_scope_holds(m, ctx):
-                    out.append(Modifier(amount, e.source or e.name or "a preparation",
-                                        _bonus_type(m.get("bonus_type"))))
+                    mod = Modifier(amount, e.source or e.name or "a preparation",
+                                   _bonus_type(m.get("bonus_type")))
+                    src = mod.source.strip().lower()
+                    if amount > 0 and (mod.type or "") in ("", "untyped") and e.source:
+                        at = untyped_best.get(src)
+                        # One effect's own terms are its own business; only a SECOND
+                        # effect from the same source is held to the better one.
+                        if at is not None and at[1] != id(e):
+                            if amount > out[at[0]].value:
+                                out[at[0]] = mod
+                            continue
+                        if at is None:
+                            untyped_best[src] = (len(out), id(e))
+                    out.append(mod)
         out += self._standing_mods(kind, target, ctx) + self._feat_mods(kind, target, ctx) \
             + self._race_mods(kind, target, ctx) + self._background_mods(kind, target) \
             + self._gear_mods(kind, target, ctx) + self._class_mods(kind, target, ctx)

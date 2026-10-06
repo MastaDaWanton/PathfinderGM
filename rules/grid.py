@@ -314,10 +314,13 @@ class Grid:
 
     # --- sight ---------------------------------------------------------------------------
 
-    def opaque(self, p: Point) -> bool:
-        return p in self.blocked or p in self.obscuring
+    def opaque(self, p: Point, solid_only: bool = False) -> bool:
+        """Whether this square stops a line. `solid_only` asks only what is SOLID — a
+        wall stops a blow, a bank of fog does not (alchemy plan §16.5: fog cloud gives
+        "concealment", never cover) — so cover is asked with it and sight without."""
+        return p in self.blocked or (not solid_only and p in self.obscuring)
 
-    def line_of_sight(self, a: Point, b: Point) -> bool:
+    def line_of_sight(self, a: Point, b: Point, solid_only: bool = False) -> bool:
         """1e draws a line from any corner of one square to any corner of the other and
         asks whether it is unobstructed. Any one clear line is enough.
 
@@ -329,11 +332,13 @@ class Grid:
             return True
         for ca in _corners(a):
             for cb in _corners(b):
-                if not self._crosses_opaque(ca, cb, ignore=(a, b)):
+                if not self._crosses_opaque(ca, cb, ignore=(a, b),
+                                            solid_only=solid_only):
                     return True
         return False
 
-    def cover_between(self, a: Point, a_size: str, b: Point, b_size: str) -> str:
+    def cover_between(self, a: Point, a_size: str, b: Point, b_size: str,
+                      solid_only: bool = False) -> str:
         """`"none"`, `"cover"` or `"total"` — what the terrain gives the target.
 
         1e's test, and it is the mirror image of `line_of_sight`: *"choose a corner of
@@ -374,7 +379,8 @@ class Grid:
         for corner in {c for p in here for c in _corners(p)}:
             hard = rail = through = False
             for target in {c for p in there for c in _corners(p)}:
-                if self._crosses_opaque(corner, target, ignore=ignore):
+                if self._crosses_opaque(corner, target, ignore=ignore,
+                                        solid_only=solid_only):
                     hard = True
                     continue
                 through = True
@@ -417,7 +423,7 @@ class Grid:
         return False
 
     def _crosses_opaque(self, a: tuple[float, float], b: tuple[float, float],
-                        ignore: tuple[Point, ...] = ()) -> bool:
+                        ignore: tuple[Point, ...] = (), solid_only: bool = False) -> bool:
         """Walk the segment and ask, at each point, whether it is inside anything solid.
 
         Per point rather than per square, because of the seam. A point sitting exactly on
@@ -432,7 +438,7 @@ class Grid:
             t = i / steps
             x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
             here = [s for s in _squares_at(x, y) if s not in ignore]
-            if here and all(self.opaque(s) for s in here):
+            if here and all(self.opaque(s, solid_only) for s in here):
                 return True
         return False
 

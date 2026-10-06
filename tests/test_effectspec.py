@@ -76,7 +76,10 @@ def test_a_type_the_engine_cannot_run_says_why():
             if not t.engine:
                 assert t.blocked, t.id
     assert not es.find("spell_effect")[1].engine
-    assert not es.find("permission")[1].engine
+    # `permission` runs since alchemy lane C (2026-10-06), as a tag grant only; a
+    # permission with no `tag` still grants nothing and `executable` says so per spec.
+    assert es.find("permission")[1].engine
+    assert not es.executable({"type": "permission", "target": "May feint as a swift action"})
 
 
 # --- validation ------------------------------------------------------------------------------

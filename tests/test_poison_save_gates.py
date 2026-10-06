@@ -67,9 +67,15 @@ def engine_faces(engine, *faces):
 
 
 def use(engine, item, **params):
-    return engine.run(engine.validate([
+    res = engine.run(engine.validate([
         {"op": "use_item", "actor": "pc", "because": "she uses it",
          "params": {"item": item, **params}}]))
+    # A throw is a ranged touch attack since alchemy lane C (plan §16.2): her d20 lands
+    # it (a 20, so the jar's save is what these tests are about), then the gates roll.
+    if res.status != "complete" and str((res.awaiting or {}).get("label", "")) \
+            .startswith("Throw"):
+        res = engine.resume(face=20)
+    return res
 
 
 def tells(res):
@@ -125,6 +131,9 @@ def test_two_poisons_in_one_compound_each_gate_their_own_body(board):
         s.add(instantiate("thug", scene=s, name="the beast"))
         pc.stock["brew#1"] = Stock(base="Witch's Brew", count=1, specs=list(specs))
         engine = Engine(s, Dice(seed=9))
+        # A throw at the beast opens the fight (alchemy lane C: it is an attack), and
+        # initiative is d20s too — rolled first, so the queued faces are the saves'.
+        engine._ensure_encounter("pc")
         engine_faces(engine, first, second)
         res = use(engine, "brew#1", how="throw", to="c1")
         beast = s.actors["c1"]

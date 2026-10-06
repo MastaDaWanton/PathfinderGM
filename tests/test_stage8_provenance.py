@@ -72,8 +72,10 @@ def test_a_number_with_no_document_behind_it_is_refused_naming_the_doors():
             engine.validate([{"op": op, "actor": "pc", "because": "t", "params": params}])
         assert "no document behind this number" in str(e.value), op
         assert "use_item item=<id>" in str(e.value), op
+    # Alchemy lane C (2026-10-06) added two engine-only doors with numbers in them: a
+    # granted sense's or light's feet and clock (`grant`), clinging fire's dice (`burn`).
     assert set(AMOUNT_OPS) == {"heal", "damage", "temp_hp", "buff", "defence",
-                               "ability_damage", "item_damage"}
+                               "ability_damage", "item_damage", "grant", "burn"}
 
 
 def test_a_trusted_stamp_lets_the_same_intent_through_and_records_it():

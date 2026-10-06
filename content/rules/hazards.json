@@ -28,7 +28,7 @@
     "dice_per_unit": "1d6",
     "type": "fire",
     "ward": {"save": "ref", "dc": 15, "dice": "1d6", "type": "fire", "lethality": "lethal"},
-    "not_yet": "The book's fire goes on burning a creature each round after it catches, until a Reflex save succeeds (+4 rolling on the ground, at once in water), even once it has stepped out. Here the risk is asked each round a creature stands in the burning squares, and ends when it leaves them: a ward cannot hold a per-creature fire."
+    "not_yet": "The book's fire goes on burning a creature each round after it catches, until a Reflex save succeeds (+4 rolling on the ground, at once in water), even once it has stepped out. A per-creature fire exists since alchemy lane C (2026-10-06): `state.burning` with its own per-round damage (Engine._op_burn) and the `extinguish` op (Reflex against the fire's DC, its rolling bonus, water smothers), which alchemist's fire lays. This row's ward does not lay it yet: here the risk is still asked each round a creature stands in the burning squares, and ends when it leaves them."
   },
   "smoke": {
     "name": "smoke",

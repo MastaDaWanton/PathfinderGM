@@ -306,14 +306,25 @@ def test_a_restorative_actually_heals(board):
 
 # --- throwing --------------------------------------------------------------------------------
 
+def _thrown(engine, face=20, **params):
+    """A throw is a ranged touch attack since alchemy lane C (plan §16.2): the use door
+    spends the dose and the attack op rolls the player's d20 (`face`), then lands what
+    the flask carries. Every test below was written when a throw landed with no roll."""
+    res = use(engine, how="throw", **params)
+    if res.status != "complete":
+        res = engine.resume(face=face)
+    return res
+
+
 def test_throwing_a_poison_lands_its_effects(board):
     """The turn from the screenshot, which produced narration and nothing else."""
     scene, engine = board
-    res = use(engine, how="throw", to="c1")
+    res = _thrown(engine, to="c1")
     beast = scene.actors["c1"]
     assert beast.ability_damage.get("con")
     assert beast.has_condition("nauseated")
-    assert "throws Dragon Flower Tincture at the beast" in res.outcomes[0].tell
+    assert "throws Dragon Flower Tincture at the beast" in " ".join(
+        o.tell for o in res.outcomes)
 
 
 def test_the_save_is_rolled_rather_than_printed(board):
@@ -321,7 +332,7 @@ def test_the_save_is_rolled_rather_than_printed(board):
     beside "1d6 Constitution damage" rather than wrapping it — so without stitching the
     two back together the save is a line on a card that nothing ever rolls."""
     scene, engine = board
-    assert "Fortitude save" in use(engine, how="throw", to="c1").outcomes[0].tell
+    assert "Fortitude save" in " ".join(o.tell for o in _thrown(engine, to="c1").outcomes)
 
 
 def test_you_cannot_throw_something_harmless(board):
@@ -345,7 +356,7 @@ def test_effects_the_engine_cannot_run_are_narrated_not_dropped(board, flower_sp
     scene, engine = board
     assert not effectspec.executable(flower_specs[0])  # the premise
     scene.pc().stock["tincture#1"].specs = flower_specs
-    assert "-2 actions" in use(engine, how="throw", to="c1").outcomes[0].tell
+    assert "-2 actions" in " ".join(o.tell for o in _thrown(engine, to="c1").outcomes)
 
 
 # --- coating a blade ---------------------------------------------------------------------------
@@ -407,7 +418,7 @@ def test_an_unknown_way_of_using_it_is_refused(board):
     scene, engine = board
     # "apply" joined the list on 2026-10-02 (a product is put where its route says);
     # "inhale" is a ROUTE of `apply`, not a way of using something on its own.
-    with pytest.raises(IntentError, match="drink, apply, throw or coat"):
+    with pytest.raises(IntentError, match="drink, apply, throw, coat or light"):
         engine.run(engine.validate([
             {"op": "use_item", "actor": "pc",
              "params": {"item": "tincture#1", "how": "inhale"}}]))
@@ -489,7 +500,10 @@ def test_a_backfilled_jar_can_actually_be_used():
         "from_ingredients": ["dragon-flower"], "effects": [],
     })
     engine = Engine(scene, Dice(seed=9))
-    engine.run(engine.validate([
+    res = engine.run(engine.validate([
         {"op": "use_item", "actor": "pc", "because": "she lobs the old vial",
          "params": {"item": "old#1", "how": "throw", "to": "c1"}}]))
+    # A ranged touch attack since alchemy lane C: her d20 decides whether it lands.
+    if res.status != "complete":
+        engine.resume(face=20)
     assert scene.actors["c1"].ability_damage.get("con")

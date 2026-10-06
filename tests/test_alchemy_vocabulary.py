@@ -195,11 +195,15 @@ def test_a_potion_of_longstrider_moves_the_drinker():
 
 
 def test_a_mode_movement_does_not_read_waits_per_spec():
-    """Nothing in movement reads a climb, swim, fly or burrow speed; a potion of fly that
-    claimed to run would be narrative wearing a costume."""
+    """Nothing in movement reads a burrow speed; a potion of burrowing that claimed to run
+    would be narrative wearing a costume. Climb, swim and fly got their readers in alchemy
+    lane C (`Actor.movement_modes`, read by `can_move_vertically` and `water.swim_speed`;
+    tests/test_alchemy_engine.py) and left the ledger."""
     assert es.executable({"type": "speed", "target": "land", "amount": 30})
     assert es.executable({"type": "speed", "amount": 30})          # absent is land
-    for mode in ("climb", "swim", "fly", "burrow"):
+    for mode in ("climb", "swim", "fly"):
+        assert es.executable({"type": "speed", "target": mode, "amount": 30}), mode
+    for mode in ("burrow",):
         assert not es.executable({"type": "speed", "target": mode, "amount": 30}), mode
         assert mode in es.TARGETS_AWAITING_READER["speed"]
     assert es.validate({"type": "speed", "target": "land", "amount": 30,
@@ -227,8 +231,11 @@ def test_a_sense_tag_is_spelled_as_a_race_spells_it():
 def test_what_waits_on_a_reader_says_which_and_does_not_run():
     """The honesty ratchet (tests/test_effectspec_extensions.py): a type may not claim the
     engine runs it when nothing does. Each waits in AWAITING_READER with its reader's
-    site, and the builder's warning says so."""
-    assert set(es.AWAITING_READER) == {"sense", "permission", "light", "burning"}
+    site, and the builder's warning says so. Alchemy lane C landed all four readers
+    (2026-10-06), so the ledger is empty and each now claims the engine runs it."""
+    assert set(es.AWAITING_READER) == set()
+    for t in ("sense", "permission", "light", "burning"):
+        assert es.find(t)[1].engine, t
     for t, where in es.AWAITING_READER.items():
         _, etype = es.find(t)
         assert not etype.engine and not es.executable({"type": t}), t

@@ -48,28 +48,76 @@ class Modifier:
 _SELF_STACKING = {"", "untyped", "dodge", "circumstance"}
 
 
-def stack(mods: list[Modifier]) -> list[Modifier]:
+def _house_stacking() -> bool:
+    """The table's `magic_stacking` switch (rules/houserules.py), read when a collision
+    needs it. A settings read that fails — no Django settings in a bare script, a
+    half-written file — is the book, which is `houserules.active`'s own fallback."""
+    try:
+        from . import houserules
+
+        return bool(houserules.magic_stacking())
+    except Exception:
+        return False
+
+
+def stack(mods: list[Modifier], *, magic_stacking: bool | None = None) -> list[Modifier]:
     """1e's stacking rule, applied to a finished modifier list.
 
     Two bonuses of the same named type do not add — the best applies and the rest are
     dropped from the list, so the popup's terms are the terms that are really in the
-    total. Penalties always stack, whatever their type; dodge, circumstance and
-    untyped stack; everything else collides on its type name.
+    total. Penalties always stack, whatever their type; dodge and circumstance stack;
+    everything else collides on its type name.
+
+    **Untyped bonuses from the same source** (CRB, Getting Started, Common Terms:
+    "Bonuses without a type always stack, unless they are from the same source") are NOT
+    collapsed here, though alchemy lane B asked for it. Tried first (alchemy lane C,
+    2026-10-06) and measured: the funnel's `source` is a label, and one document splits
+    one bonus into several terms under one label — Power Attack's damage and its
+    two-handed rung (13 became 10 for a level-8 greatsword), smite's damage on undead —
+    so collapsing by label broke three suites' worth of feats. The rule is applied where
+    a source IS an identity: between separate timed effects with one source
+    (`Actor._buff_mods`).
+
+    **The `magic_stacking` house rule** (rules/houserules.py; the owner's answer to the
+    alchemy plan's open point 2, 2026-10-06: "every typed bonus"). With it on, two bonuses
+    of one type from DIFFERENT sources add — enhancement, morale, alchemical and the
+    rest — and the same source still keeps the better, which is the house rule's own
+    "same source just reapplies". Off (the default) is the book. One switch, read here,
+    in the one funnel every total passes through, never a second alchemy-only path.
+    `magic_stacking` passed explicitly wins (a test, a caller holding the value); None
+    reads the table's setting, and only when a typed collision needs the answer — the
+    settings file is read fresh on every ask (houserules' own rule against stale
+    caches), so most stacks never touch it.
     """
-    best: dict[str, Modifier] = {}
+    house = magic_stacking
+    if house is None:
+        # Asked only when it could change the answer: two positive bonuses of one named
+        # type from different sources.
+        seen: dict[str, str] = {}
+        for m in mods:
+            t = (m.type or "").strip().lower()
+            if m.value <= 0 or t in _SELF_STACKING:
+                continue
+            src = (m.source or "").strip().lower()
+            if seen.setdefault(t, src) != src:
+                house = _house_stacking()
+                break
+    best: dict[tuple, Modifier] = {}
     out: list[Modifier] = []
     for m in mods:
         t = (m.type or "").strip().lower()
         if m.value <= 0 or t in _SELF_STACKING:
             out.append(m)
             continue
-        have = best.get(t)
+        src = (m.source or "").strip().lower()
+        key: tuple = (t, src) if house else (t,)
+        have = best.get(key)
         if have is None:
-            best[t] = m
+            best[key] = m
             out.append(m)
         elif m.value > have.value:
             out[out.index(have)] = m
-            best[t] = m
+            best[key] = m
     return out
 
 

@@ -236,12 +236,14 @@ def test_an_effect_type_that_a_potion_cannot_run_says_so():
         got = consumables._spec_to_intents(spec, "c1", "a potion", 1.0)
         assert got, f"{tid} still produces no intents — the dose would vanish"
 
-    # Sense is the one that genuinely runs nowhere: nothing in the engine asks what a
-    # creature can see, so light and concealment are still narrated.
+    # And the sixth since alchemy lane C (2026-10-06): a drunk sense is granted as its tag
+    # (`grant`), read by the light model and the attack's concealment (`Actor.eyes`).
     _, sense = effectspec.find("sense")
-    assert sense.blocked and sense.engine is False
-    assert consumables._spec_to_intents(
-        {"type": "sense", "target": "darkvision"}, "c1", "a potion", 1.0) == []
+    assert sense.blocked and sense.engine is True
+    got = consumables._spec_to_intents(
+        {"type": "sense", "target": "darkvision"}, "c1", 1.0, "a potion")
+    assert [i["op"] for i in got] == ["grant"]
+    assert got[0]["params"]["tag"] == "sense.darkvision"
 
 
 def test_the_builder_shows_the_note_even_when_the_engine_flag_is_true():

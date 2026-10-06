@@ -38,7 +38,10 @@ from .tables import SAVES
 # Effects that hurt whoever receives them. A thing made of these is a poison: it is worth
 # throwing, and it is worth putting on a blade. Anything else is a draught.
 HARMFUL = {"damage", "ability_damage", "ability_drain", "bleed", "apply_condition",
-           "save_gate"}
+           "save_gate",
+           # The alchemist's two (alchemy lane C): clinging fire, and acid that eats a
+           # creature's gear — aqua regia was refused as "nothing harmful" to throw.
+           "burning", "object_damage"}
 
 # What a splash weapon does to everyone around the square it lands in. 1e: "splash weapons
 # deal 1 point of splash damage to all creatures within 5 feet of the target".
@@ -58,6 +61,18 @@ class Use:
     # says "and the rest is up to you".
     narrate: list[str] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
+    # how=throw: what the attack op lands once the flask is thrown (alchemy plan §16.2).
+    # `intents` above are the STRUCK creature's, held until the ranged touch attack hits;
+    # this carries the rest — the splash documents for everyone within 5 ft (or around
+    # the square a miss lands in), the clouds laid where it breaks, a harmful spell the
+    # flask holds (the owner's ruling, open point 5) and the range increment.
+    thrown: dict | None = None
+    # A spell potion drunk (or a tool's spell): resolved through the cast door at the
+    # potion's caster level, the drinker caster and target (plan §11.3).
+    spell: dict | None = None
+    # how=light, or a cloud thrown: `manifest` documents the engine lays on a square
+    # (a smokestick at the user's feet, a cloud where a flask breaks).
+    clouds: list[dict] = field(default_factory=list)
 
     @property
     def ok(self) -> bool:
@@ -346,10 +361,130 @@ def scaled_bonus(amount, potency: float) -> int:
     return amount
 
 
+def _when(spec: dict) -> dict:
+    """The spec's `when` clause, forwarded to the op that lands it (alchemy plan §16.7).
+
+    `_spec_to_intents` never forwarded it, so a "+2 against undead" potion applied
+    against everything and saint's tallow's "undead only" damage burned the living. The
+    op reads it: damage and a condition against the creature they land on
+    (`Engine._when_spares`), a timed bonus against the roll it is asked on
+    (`sheet._effect_scope_holds`)."""
+    w = spec.get("when")
+    return {"when": dict(w)} if isinstance(w, dict) and w else {}
+
+
+def _named(spec: dict) -> str:
+    """The effect's card line without its duration, which the granting op says itself."""
+    return effectspec.render({k: v for k, v in spec.items()
+                              if k not in ("duration", "route", "essence", "grade")})
+
+
+def _duration_or_hour(spec: dict) -> dict:
+    return ({"duration": spec["duration"]} if isinstance(spec.get("duration"), dict)
+            else {"duration": {"amount": 1, "unit": "hour"}})
+
+
 def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> list[dict]:
     """One structured effect as engine intents, or [] if the engine cannot run it."""
     kind = str(spec.get("type", ""))
     dice = spec.get("dice") or spec.get("amount")
+
+    # The alchemist's four capability and presence types (alchemy plan §16.3, §16.4,
+    # §16.9), each one `grant` through the one applicator (`Engine._op_grant`): a tag for
+    # its duration, with a tell. Lane B's vocabulary spelled the tags (`sense_tag`,
+    # `permission_tag`); nothing here writes a tag's text itself.
+    if kind == "sense":
+        sense = str(spec.get("target") or "").strip()
+        if not sense:
+            return []
+        return [{"op": "grant", "actor": target, "because": because,
+                 "params": {"to": target, "tag": effectspec.sense_tag(sense, spec.get("range")),
+                            "name": _named(spec),
+                            **_duration_or_hour(spec)}}]
+    if kind == "permission":
+        tag = effectspec.permission_tag(str(spec.get("tag") or ""))
+        if not tag:
+            return []
+        return [{"op": "grant", "actor": target, "because": because,
+                 "params": {"to": target, "tag": tag,
+                            "name": str(spec.get("target") or tag),
+                            **_duration_or_hour(spec)}}]
+    if kind == "light":
+        try:
+            radius = int(spec.get("radius_ft") or 0)
+            raised = int(spec.get("raised_ft") or 0)
+        except (TypeError, ValueError):
+            return []
+        return [{"op": "grant", "actor": target, "because": because,
+                 "params": {"to": target, "tag": "light.carried",
+                            "name": _named(spec),
+                            "light": {"radius_ft": radius, "raised_ft": raised},
+                            **_duration_or_hour(spec)}}]
+    if kind == "burning":
+        return [{"op": "burn", "actor": target, "because": because,
+                 "params": {"to": target, "dice": scale(str(spec.get("dice") or "1d6"), potency),
+                            "damage_type": str(spec.get("damage_type") or "fire"),
+                            "rounds": int(spec.get("rounds") or 1),
+                            "put_out_with": str(spec.get("save") or "ref"),
+                            "put_out_dc": int(spec.get("dc") or 15),
+                            "smother_bonus": int(spec.get("smother_bonus")
+                                                 if spec.get("smother_bonus") is not None
+                                                 else 2)}}]
+    # Lane D's measurement through this door (2026-10-06): concealment, fast healing,
+    # bleed and a chosen form were engine-ready types with no branch here, so blur, troll
+    # marrow and demon ichor landed nothing.
+    if kind == "concealment":
+        # Read by `Actor.concealment` (`_buff_mods("concealment", "miss_chance")`), best
+        # source wins: blur's 20% beside a smoke's 50% is 50, never 70.
+        try:
+            chance = int(spec.get("miss_chance") or spec.get("amount") or 0)
+        except (TypeError, ValueError):
+            return []
+        if chance <= 0:
+            return []
+        return [{"op": "buff", "actor": target, "because": because,
+                 "params": {"type": "concealment", "target": "miss_chance",
+                            "amount": chance, "to": target,
+                            "source": effectspec.bonus_source(spec, "the preparation"),
+                            **_duration_or_hour(spec)}}]
+    if kind == "fast_healing":
+        return [{"op": "grant", "actor": target, "because": because,
+                 "params": {"to": target, "tag": "buff.fast-healing",
+                            "name": _named(spec),
+                            "per_round": {"heal": int(spec.get("amount") or 1)},
+                            **_duration_or_hour(spec)}}]
+    if kind == "bleed":
+        # The bleed condition with its own per-round damage, as a wounding blade lays it
+        # (`Engine._item_riders`): stopped by a DC 15 Heal check or any cure.
+        return [{"op": "grant", "actor": target, "because": because,
+                 "params": {"to": target, "tag": "state.wound.bleeding",
+                            "name": "Bleed",
+                            "per_round": {"damage": int(spec.get("amount") or 1)}}}]
+    if kind == "choose_one":
+        # A form the maker chose (`chosen`, counting from 1) is that form; one nobody
+        # chose applies none and is told — applying all of them is what the type exists
+        # to stop (effectspec), and the engine choosing for the drinker would be a guess.
+        try:
+            n = int(spec.get("chosen") or 0)
+        except (TypeError, ValueError):
+            n = 0
+        options = [o for o in spec.get("options") or [] if isinstance(o, dict)]
+        if not 1 <= n <= len(options):
+            return []
+        picked = options[n - 1]
+        inner = picked.get("effects") if picked.get("type") == "bundle" else [picked]
+        out = []
+        for o in inner or ():
+            out.extend(_spec_to_intents(dict(o), target, potency, because))
+        return out
+    if kind == "object_damage":
+        # Gray ooze core and aqua regia (alchemy plan §16.11, contracts §10.2): `item:
+        # "metal"` is every metal piece the struck creature wears or holds, asked of the
+        # metal tag (`rules/item_tags.py`) by `Engine._op_item_damage`, never of a name.
+        return [{"op": "item_damage", "actor": target, "because": because,
+                 "params": {"to": target, "amount": scale(str(dice), potency),
+                            "type": str(spec.get("damage_type") or "untyped"),
+                            **({"item": str(spec["item"])} if spec.get("item") else {})}}]
 
     if kind == "heal":
         # "Heals 4 non-lethal" cures the beating, not the wound. The spec says which
@@ -369,7 +504,8 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
     if kind == "damage":
         return [{"op": "damage", "actor": target, "because": because,
                  "params": {"to": target, "amount": scale(str(dice), potency),
-                            "type": spec.get("damage_type") or "untyped"}}]
+                            "type": spec.get("damage_type") or "untyped",
+                            **_when(spec)}}]
 
     if kind in ("ability_damage", "ability_drain"):
         return [{"op": "ability_damage", "actor": target, "because": because,
@@ -379,7 +515,7 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
 
     if kind == "apply_condition":
         params = {"condition": spec.get("target") or spec.get("condition") or "sickened",
-                  "to": target}
+                  "to": target, **_when(spec)}
         duration = spec.get("duration")
         if isinstance(duration, dict) and duration.get("amount"):
             params["duration"] = {"amount": duration.get("amount"),
@@ -391,7 +527,11 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
         out = [{"op": "buff", "actor": target, "because": because,
                 "params": {"type": kind, "target": spec.get("target", ""),
                            "amount": amount, "to": target,
-                           "source": spec.get("from") or "the preparation",
+                           # Who the bonus comes from, as the stacking funnel reads it
+                           # (`effectspec.bonus_source`): the effect's own identity, so
+                           # two antitoxins are one source and keep +5.
+                           "source": effectspec.bonus_source(spec, "the preparation"),
+                           **_when(spec),
                            # The channel the author already filled in. Dropped here
                            # for the life of the feature, so every brew stacked with
                            # every other brew of its own kind.
@@ -411,7 +551,8 @@ def _spec_to_intents(spec: dict, target: str, potency: float, because: str) -> l
                  "params": {"type": "speed",
                             "target": str(spec.get("target", "") or "land"),
                             "amount": int(spec.get("amount", 0) or 0), "to": target,
-                            "source": spec.get("from") or "the preparation",
+                            "source": effectspec.bonus_source(spec, "the preparation"),
+                            **_when(spec),
                             **({"bonus_type": spec["bonus_type"]}
                                if spec.get("bonus_type") else {}),
                             **({"duration": spec["duration"]}
@@ -592,6 +733,146 @@ def _on_route(specs: list[dict], route: str) -> list[dict]:
     return kept
 
 
+def spell_of(stock) -> dict | None:
+    """The spell a potion holds and resolves through, or None.
+
+    Only a potion with `holds_spell` and NO authored documents: the 44 shipped potions
+    (and every old one, plan §18) carry their own and keep them, which is the contract
+    `tests/test_magicitem.py` pins for the enchanter's stand-in. The caster level is the
+    stock's own (`caster_level`, written by the bench); missing, the engine uses the
+    book's minimum for the spell's level."""
+    sid = str(_field(stock, "holds_spell", "") or "").strip()
+    if not sid or _specs(stock):
+        return None
+    try:
+        cl = int(_field(stock, "caster_level", 0) or 0)
+    except (TypeError, ValueError):
+        cl = 0
+    return {"spell": sid, "cl": cl or None}
+
+
+def spell_specs(info: dict, dice=None) -> list[dict]:
+    """A bottled spell's own documents at the potion's caster level (alchemy plan §11.3):
+    `spells.effects_at` fills the dice, `spells.roll_duration` fixes how long, and every
+    document the spell lays on its target on being cast is kept — the drinker's (or, for
+    a flask, the struck creature's) to receive.
+
+    The book's item numbers fill what a caster would: the caster level is the potion's own,
+    or the floor for the spell's level (2 × level − 1, 1 for a cantrip — the plan's
+    proposed fallback until the formulae table, lane E, is asked); a save's DC that is a
+    caster's formula ("10 + spell level + casting ability modifier") becomes the book's
+    item DC, 10 + level + the modifier of the lowest score that casts it (CRB, Magic
+    Items, Saving Throws), as `Engine._use_power` sets it. Each document names the spell
+    as its `source`, so two potions of one spell are one source to the stacking funnel."""
+    from . import spells as spells_mod
+
+    spell = spells_mod.get(str(info.get("spell") or ""))
+    level = min((int(v) for v in (spell.lists or {}).values()), default=0)
+    cl = int(info.get("cl") or 0) or max(1, 2 * level - 1)
+    dc = 10 + level + level // 2
+    rounds = spells_mod.roll_duration(spell, cl, dice)
+
+    def fill(spec: dict) -> dict:
+        spec = dict(spec)
+        if spec.get("type") == "save_gate":
+            try:
+                int(spec.get("dc"))
+            except (TypeError, ValueError):
+                spec["dc"] = dc
+            for branch in ("on_failure", "on_success"):
+                if isinstance(spec.get(branch), list):
+                    spec[branch] = [fill(b) for b in spec[branch]]
+        if rounds and not isinstance(spec.get("duration"), dict):
+            spec["duration"] = {"amount": int(rounds), "unit": "round"}
+        spec.setdefault("source", spell.name)
+        return spec
+
+    return [fill(s) for s in spells_mod.effects_at(spell, cl)
+            if spells_mod._is_the_spells_own(s)]
+
+
+def spell_intents(info: dict, target: str, because: str, dice=None,
+                  use: "Use | None" = None) -> list[dict]:
+    """`spell_specs` as intents for one creature, each save before what it gates. What the
+    engine cannot run is added to `use.narrate` when a `Use` is given, never dropped."""
+    use = use if use is not None else Use(item="", how="drink")
+    start = len(use.intents)
+    _documents(spell_specs(info, dice), target, 1.0, because, use)
+    return use.intents[start:]
+
+
+# The routes a thrown flask does NOT deliver to the creature it strikes: its splash
+# (everyone around), its cloud (everyone inside) and what it costs whoever carries it.
+_NOT_STRUCK = ("splash", "area", "carried")
+# The book's splash weapons are thrown at a 10-ft range increment (CRB, Goods and
+# Services: "Alchemist's fire ... range increment 10 ft", acid, holy water, tanglefoot
+# bag alike). A product that states its own (`range_increment_ft`, lane F's build) wins.
+SPLASH_RANGE_FT = 10
+
+
+def thrown_load(stock, specs: list[dict] | None = None) -> dict:
+    """What a thrown flask carries, split by who it reaches (alchemy plan §16.2).
+
+    `struck`: the creature it hits (route `struck`, or no route — every jar made before
+    routes existed was thrown whole at its target). `splash`: `effectspec.splash_for`,
+    the flask's own `route: splash` documents or the book's one point of each damage type
+    it deals when it strikes — the owner's ruling (open point 3) that every thrown flask
+    splashes. `clouds`: `manifest` documents laid where it breaks. `spell`: a harmful
+    spell bottled in it, resolved on the struck creature (open point 5)."""
+    specs = _specs(stock) if specs is None else specs
+    struck = [s for s in specs if str(s.get("route") or "") not in _NOT_STRUCK
+              and str(s.get("type")) != "manifest"]
+    marked = [s if s.get("route") else dict(s, route="struck") for s in specs
+              if str(s.get("type")) != "manifest"]
+    try:
+        inc = int(_field(stock, "range_increment_ft", 0) or 0)
+    except (TypeError, ValueError):
+        inc = 0
+    return {"struck": struck,
+            "splash": effectspec.splash_for(marked),
+            "clouds": [dict(s) for s in specs if str(s.get("type")) == "manifest"],
+            # A burst's own documents (a thunderstone's bang, route `area`): on everyone
+            # within its radius of where the flask breaks (`radius_ft`, else 10 ft).
+            "area": [dict(s) for s in specs if str(s.get("route") or "") == "area"
+                     and str(s.get("type")) != "manifest"],
+            "spell": spell_of(stock),
+            "range_ft": inc or SPLASH_RANGE_FT,
+            "potency": float(_field(stock, "potency", 1.0) or 1.0)}
+
+
+def splash_intents(splash: list[dict], target: str, potency: float, because: str) -> list[dict]:
+    """The splash (or a burst's) documents as intents for one creature caught by them,
+    each save gate before what it gates. Never scaled by potency: the book's 1 point is
+    the book's, and an authored splash states its own number. `potency` is kept in the
+    signature for the caller that one day wants it."""
+    use = Use(item="", how="throw")
+    _documents([dict(s) for s in splash or ()], target, 1.0, because, use)
+    return use.intents
+
+
+def _light(stock, use: Use, specs: list[dict], target: str, potency: float,
+           because: str) -> Use:
+    """A tool struck or lit (alchemy plan §16.4, §16.5, contracts §7): its `light` on the
+    one who lights it — the sunrod's 30 ft, the tindertwig's torch — and its `manifest`
+    (a smokestick's smoke) laid at their feet. Nothing here is thrown, and nothing lands
+    on anybody else."""
+    name = use.item
+    lit = [s for s in specs if str(s.get("type")) in ("light", "manifest")]
+    if not lit:
+        use.problems.append(f"{name} gives no light and no smoke; there is nothing to "
+                            f"strike or light")
+        return use
+    if not _field(stock, "count", 1):
+        use.problems.append(f"no {name} left")
+        return use
+    for spec in lit:
+        if str(spec.get("type")) == "manifest":
+            use.clouds.append(dict(spec))
+        else:
+            _resolve(spec, target, potency, because, use)
+    return use
+
+
 def plan(stock, how: str = "drink", target: str = "pc",
          because: str = "", route: str = "") -> Use:
     """What using this item actually does, as intents the engine can validate.
@@ -608,10 +889,22 @@ def plan(stock, how: str = "drink", target: str = "pc",
     specs = _specs(stock)
     use = Use(item=str(name), how=how)
 
-    if how not in ("drink", "throw", "coat", "apply"):
+    if how not in ("drink", "throw", "coat", "apply", "light"):
         use.problems.append(f"{how!r} is not a way to use something; "
-                            f"drink, apply, throw or coat")
+                            f"drink, apply, throw, coat or light")
         return use
+    # A spell potion with no documents of its own (alchemy plan §11.3): the spell's own
+    # structured half resolves it, through the cast door, at the potion's caster level.
+    # The authored 44 carry their own documents and take the ordinary path below.
+    spell = spell_of(stock)
+    if spell is not None and how == "drink":
+        if not _field(stock, "count", 1):
+            use.problems.append(f"no {name} left")
+            return use
+        use.spell = spell
+        return use
+    if how == "light":
+        return _light(stock, use, specs, target, potency, because or f"{name}, lit")
     # A jar with no structured effects at all (a bought antitoxin, which the GM narrates)
     # drinks as it always did: there is nothing to sort by place, and refusing it made the
     # counter's potions undrinkable (caught by tests/test_sheet_pages.py at the change).
@@ -638,7 +931,10 @@ def plan(stock, how: str = "drink", target: str = "pc",
     # poisoning the target.
     declared = [str(x).lower() for x in (_field(stock, "how", []) or [])]
     benign_coat = how == "coat" and "coat" in declared
-    if how == "throw" and not is_harmful(stock):
+    # A cloud thrown (a thunderstone's burst, a smoke flask) and a flask holding a
+    # harmful spell (the owner's ruling, open point 5) are worth throwing too, though
+    # neither carries a harm document of its own on the struck creature.
+    if how == "throw" and not is_harmful(stock) and spell is None             and not any(str(s.get("type")) == "manifest" for s in specs):
         use.problems.append(
             f"{name} does nothing harmful, so there is nothing to throw at anybody")
         return use
@@ -651,15 +947,38 @@ def plan(stock, how: str = "drink", target: str = "pc",
         return use
 
     why = because or f"{name}, {how}"
+    if how == "throw":
+        # What lands on the struck creature, held until the attack hits; the rest
+        # rides `thrown` (see `Use.thrown`).
+        use.thrown = thrown_load(stock, specs)
+        use.clouds = list(use.thrown["clouds"])
+        specs = use.thrown["struck"]
     if benign_coat:
         # The oil is on your own weapon, so its bonuses are yours. Aimed at the wielder
         # rather than the target — the opposite of a poison, and the reason `coat` could
         # not simply be let through unchanged.
         target = "pc"
-    # Each poison's own save, rolled before the harm it gates. Grouped rather than "the
-    # first gate in the list", so a compound made of two poisonous ingredients rolls both
-    # saves; before, the second one's save was never rolled at all.
-    found = poisons(specs, source=str(name))
+    _documents(specs, target, potency, why, use, str(name))
+    return use
+
+
+def _documents(specs: list[dict], target: str, potency: float, why: str, use: Use,
+               name: str = "") -> None:
+    """Every document as intents for one creature, each save gate before what it gates.
+
+    Each poison's own save, rolled before the harm it gates. Grouped rather than "the
+    first gate in the list", so a compound made of two poisonous ingredients rolls both
+    saves; before, the second one's save was never rolled at all. One loop for the jar,
+    the struck creature, a splash and a burst (alchemy lane C), so a tanglefoot bag's
+    Reflex save gates its glue exactly as a poison's Fortitude gates its harm.
+
+    A document that names no source of its own (`source`, or the pipeline's `from`) is
+    the item's: its bonus's source is the jar's name, not "the preparation" every unnamed
+    jar shared — which made two different potions one source to the stacking funnel."""
+    if name:
+        specs = [s if (s.get("source") or s.get("from")) else dict(s, source=name)
+                 for s in specs]
+    found = poisons(specs, source=name)
     claimed = [s for p in found for s in p.effects] + [p.gate for p in found if p.gate]
     for n, poison in enumerate(found):
         label = f"poison-{n}"
@@ -674,7 +993,6 @@ def plan(stock, how: str = "drink", target: str = "pc",
         if str(spec.get("type")) == "save_gate" or any(spec is c for c in claimed):
             continue
         _resolve(spec, target, potency, why, use)
-    return use
 
 
 def _resolve(spec: dict, target: str, potency: float, because: str, use: Use) -> None:

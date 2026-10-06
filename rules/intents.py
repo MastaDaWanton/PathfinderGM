@@ -308,7 +308,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "defending"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
-    "damage": (("amount", "type"), ("to", "lethality"), "hidden"),
+    # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy
+    # plan §16.7) — saint's tallow hurts undead and nobody else. Asked of the creature it
+    # lands on (`Engine._when_spares`); only a stamped door writes it.
+    "damage": (("amount", "type"), ("to", "lethality", "when"), "hidden"),
     # Healing is not negative damage: it never restores temporary hit points and never
     # carries a character up from below zero the way `damage` carries them down.
     "heal": (("amount",), ("to", "nonlethal"), "hidden"),
@@ -333,8 +336,27 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "defence": (("kind",),
                 ("against", "amount", "bypass", "to", "duration", "source"), "hidden"),
     "buff": (("type", "target", "amount"),
-             ("to", "source", "duration", "note", "bonus_type"),
+             ("to", "source", "duration", "note", "bonus_type", "when"),
              "hidden"),
+    # A tag held for a duration, through the one applicator (alchemy lane C): a drunk
+    # sense (`sense.darkvision.60`), a permission (`breathes.water`), a carried light
+    # (`light.carried`, with `light`: {radius_ft, raised_ft}). Engine-written only — an
+    # amount op (AMOUNT_OPS), refused without a document behind it, since "I grant myself
+    # darkvision" is a number of feet nobody wrote down.
+    "grant": (("tag",), ("to", "name", "duration", "light", "per_round"), "hidden"),
+    # Fire that clings (alchemist's fire's next round, plan §16.6): `state.burning` with
+    # its own per-round damage, put out by `extinguish`. Engine-written only, as `grant`.
+    "burn": (("dice",), ("to", "damage_type", "rounds", "put_out_with", "put_out_dc",
+                       "smother_bonus"),
+             "hidden"),
+    # Putting the flames out: a full-round action by whoever is burning, a Reflex save
+    # against the fire's DC, +2 (the fire's own `smother_bonus`) when they roll on the
+    # ground — `roll` true, the player's words. Water they stand in smothers it outright.
+    "extinguish": ((), ("roll",), "player"),
+    # Tearing loose of a tanglefoot bag's goo: `how` is "strength" (a DC 17 Strength
+    # check) or "slash" (15 points of slashing damage dealt to the goo, which is hit
+    # automatically). The engine owns both numbers (CRB, Goods and Services).
+    "break_free": ((), ("how",), "player"),
     "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
     # `drain` for the permanent kind, which no amount of resting brings back.
@@ -444,7 +466,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # poison, a mind-affecting compulsion — which is what 1e attaches immunity to.
     # Without it the only question that can be asked is "are you immune to being
     # shaken", and the answer to that is not the rule.
-    "condition": (("condition",), ("duration", "to", "descriptors", "ends"), "hidden"),
+    "condition": (("condition",), ("duration", "to", "descriptors", "ends", "when"),
+                  "hidden"),
     # The engine owns the slot, the caster level and the save DC. It does *not* own what
     # the spell does — that lives in three thousand paragraphs of English, and a parser
     # guessing at it would produce confident wrong numbers. Anything mechanical the GM
@@ -481,7 +504,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `spell` is the spell cast INTO a spell storing weapon (`power: spell-storing`, lane
     # C2): the spell's id, as `cast` names it. The caster's slot pays and the blade holds
     # it until it wounds somebody.
-    "use_item": (("item",), ("how", "to", "weapon", "route", "power", "spell"), "player"),
+    #
+    # Alchemy lane C (2026-10-06): `how` also "light" (a sunrod struck, a smokestick lit:
+    # the tool's light on the user, its smoke at their feet), and `square` is a grid
+    # intersection a flask is thrown at instead of a creature — AC 5, the splash on the
+    # four squares it touches (CRB, Throw Splash Weapon). A throw is the attack op's
+    # `splash` mode, which the engine emits; the model never writes that mode.
+    "use_item": (("item",), ("how", "to", "weapon", "route", "power", "spell", "square"),
+                 "player"),
     # Selling something. There was no op for this at all, and the absence was not
     # theoretical: a player asked a stallholder to price a satchel holding a
     # potency-1,335 draught, haggled her up from ten gold to twenty-two, shook her hand
@@ -1527,7 +1557,10 @@ INTRODUCED_REFS: tuple[str, ...] = ("new1", "new2", "new3")
 
 
 AMOUNT_OPS: frozenset[str] = frozenset(
-    {"damage", "heal", "buff", "temp_hp", "defence", "ability_damage", "item_damage"})
+    {"damage", "heal", "buff", "temp_hp", "defence", "ability_damage", "item_damage",
+     # Alchemy lane C (2026-10-06): a granted sense, permission or light has a range in
+     # feet and a clock, and clinging fire has dice — each one is a document's to say.
+     "grant", "burn"})
 
 
 def parse_all(raw_intents: list) -> list[Intent]:
