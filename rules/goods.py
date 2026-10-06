@@ -664,25 +664,24 @@ def table_goods(table: str) -> list[Good]:
         return [g for g in (armour_good(k) for k in ARMOUR) if g is not None]
     if table == "shields":
         return [g for g in (shield_good(k) for k in SHIELDS) if g is not None]
-    if table == "herbal-manuals":
-        # The herbalism manuals (docs/herbalism-revamp-plan.md §8.4), carried like any book:
-        # `deliver` shelves one under its name, which is what `herbknowledge.holds_manual`
-        # looks for when the reader opens it.
-        from . import herbknowledge
-
-        return [Good(id=PREFIXES["manual"] + m["id"], name=str(m["name"]),
-                     price_gp=float(m["price_gp"]), kind="gear", key=str(m["id"]))
-                for m in herbknowledge.manuals().values()]
-    if table == "smithing-manuals":
-        # The smithing manuals (docs/blacksmithing-revamp-plan.md §9.3), the herbal ones'
-        # counterpart and shelved the same way, so `knowledge.holds_manual` finds a bought
-        # one under its name exactly as it finds a herbal one.
+    if table in MANUAL_TABLES:
+        # The crafts' manuals — herbal (docs/herbalism-revamp-plan.md §8.4), smithing
+        # (docs/blacksmithing-revamp-plan.md §9.3) and enchanting (docs/enchanting-revamp-
+        # plan.md §12.3) — carried like any book: `deliver` shelves one under its name,
+        # which is what `knowledge.holds_manual` looks for when the reader opens it. One
+        # builder for the three: they were two copies of one comprehension before the
+        # enchanting books would have made it three.
         from . import knowledge
 
         return [Good(id=PREFIXES["manual"] + m["id"], name=str(m["name"]),
                      price_gp=float(m["price_gp"]), kind="gear", key=str(m["id"]))
-                for m in knowledge.manuals(knowledge.BLACKSMITH).values()]
+                for m in knowledge.manuals(MANUAL_TABLES[table]).values()]
     return []
+
+
+# Which craft's manuals each counter table sells (content/rules/stall-lines.json `tables`).
+MANUAL_TABLES = {"herbal-manuals": "herbalist", "smithing-manuals": "blacksmith",
+                 "enchanting-manuals": "enchanter"}
 
 
 def catalogue_ids() -> set[str]:

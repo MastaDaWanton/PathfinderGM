@@ -1,6 +1,7 @@
-"""What a character knows about each herb and each craft material
-(docs/herbalism-revamp-plan.md §8; docs/blacksmithing-revamp-plan.md §9; the API is
-docs/blacksmithing-contracts.md §6).
+"""What a character knows about each herb, each craft material, each essence and each
+magic item (docs/herbalism-revamp-plan.md §8; docs/blacksmithing-revamp-plan.md §9;
+docs/enchanting-revamp-plan.md §12-13; the APIs are docs/blacksmithing-contracts.md §6 and
+docs/enchanting-contracts.md §7 — the enchanter's half is the last section of this file).
 
 This is `rules/herbknowledge.py`'s machinery lifted off the ingredient corpus, so the
 smith's discovery is the herbalist's and not a second copy of it. `herbknowledge` keeps
@@ -37,8 +38,10 @@ document's own spec.
 """
 from __future__ import annotations
 
+import copy
 import functools
 import importlib
+import math
 import json
 import re
 import sys
@@ -54,7 +57,7 @@ BENEFIT, DRAWBACK, NEUTRAL = "benefit", "drawback", "neutral"
 # written for a jar's Drawbacks panel and predates these three in the catalogue.
 _HARM_TYPES = frozenset({"vulnerability", "ability_drain", "bleed"})
 
-HERBALIST, BLACKSMITH = "herbalist", "blacksmith"
+HERBALIST, BLACKSMITH, ENCHANTER = "herbalist", "blacksmith", "enchanter"
 
 # A material's lists, in the order their properties are keyed and shown, with the prefix
 # each key carries. Herbs' "p" sorts first, so an ingredient's key order is untouched.
@@ -72,7 +75,21 @@ _LOWER_IS_BETTER = frozenset({"asf", "weight_pct", "category", "speed_penalty"})
 # Working traits that make the metal harder to work or worse when it is done (plan
 # §5.5). The rest help. `reactive` is the drawback that makes assaying dangerous.
 _BAD_TRAITS = frozenset({"slaggy", "sulfurous", "quench_sensitive", "narrow_window",
-                         "reactive", "brittle", "hot_short"})
+                         "reactive", "brittle", "hot_short",
+                         # The circle's (enchanting plan §7.3): a phial that binds only
+                         # by night, drifts in its seat, fades as it is refined, or is
+                         # dangerous to read. `eager` and `pure` help.
+                         "night_only", "skittish", "heavy", "volatile"})
+
+# An essence's discoverable traits (enchanting plan §7.2; lane D's
+# `materials.essence_traits`): what it binds, each house top-up, its phase, its polarity,
+# its affinity and each working trait. Keyed by NAME, not position ("grants", "house:0",
+# "working:eager"), because that is the key lane D's door hands out; the head of the key
+# orders them as a Read reveals them.
+ESSENCE_ORDER = ("grants", "house", "phase", "polarity", "affinity", "working")
+# The facts that are neither a benefit nor a drawback but what the essence is: where it
+# sits and what suits it. What it binds is its benefit.
+_ESSENCE_FACTS = ("grants", "phase", "polarity", "affinity")
 
 # A rider whose trigger is a blow lands on the struck foe (contract §2), so the harm it
 # does is the wielder's benefit: wyvern blood's first-wound poison is why you quench in
@@ -85,8 +102,10 @@ _FOE_TRIGGERS = frozenset({"hit", "crit", "first_wound_daily"})
 # Shipped content only, never a homebrew overlay, so an lru_cache is honest: nothing under
 # CAMPAIGN_DIR can change what these files say mid-run.
 
-_LORE_FILES = {HERBALIST: "herb-lore.json", BLACKSMITH: "smithing-lore.json"}
-_MANUAL_FILES = {HERBALIST: "herbal-manuals.json", BLACKSMITH: "smithing-manuals.json"}
+_LORE_FILES = {HERBALIST: "herb-lore.json", BLACKSMITH: "smithing-lore.json",
+               ENCHANTER: "enchanting-lore.json"}
+_MANUAL_FILES = {HERBALIST: "herbal-manuals.json", BLACKSMITH: "smithing-manuals.json",
+                 ENCHANTER: "enchanting-manuals.json"}
 
 
 def _content(name: str) -> dict:
@@ -102,10 +121,12 @@ def _rule_file(name: str) -> dict:
 
 
 def craft_of(doc_or_craft) -> str:
-    """Which craft's rule rows answer for a document: a material's are the smith's, a
-    herb's the herbalist's. A craft id passes through."""
+    """Which craft's rule rows answer for a document: an essence's are the enchanter's,
+    any other material's the smith's, a herb's the herbalist's. A craft id passes through."""
     if isinstance(doc_or_craft, str):
-        return BLACKSMITH if doc_or_craft == BLACKSMITH else HERBALIST
+        return doc_or_craft if doc_or_craft in (BLACKSMITH, ENCHANTER) else HERBALIST
+    if is_essence(doc_or_craft):
+        return ENCHANTER
     return BLACKSMITH if is_material(doc_or_craft) else HERBALIST
 
 
@@ -230,8 +251,63 @@ def doc_id(doc) -> str:
     return material_of(raw) if is_material(doc) else raw
 
 
+def is_essence(doc) -> bool:
+    """An enchanter's essence: a material document of kind `essence` on the enchanter's
+    shelf (lane D). The alchemist's catalogue also files camphor and oil of cloves under
+    `essence`, and those are an alchemist's reagents, not the circle's: they keep the
+    material keys they always had."""
+    return (isinstance(doc, dict) and str(doc.get("kind") or "") == "essence"
+            and str(doc.get("catalogue") or "enchanter-materials") == "enchanter-materials")
+
+
+def essence_keys(doc: dict) -> list[str]:
+    """An essence's trait keys, as lane D's door names them (`materials.essence_traits`),
+    asked of the door when it serves them so the two can never disagree; the same rule
+    here until it does (tests/test_enchant_knowledge.py holds the two to one answer)."""
+    door = _door()
+    fn = getattr(door, "essence_traits", None) if door is not None else None
+    if callable(fn):
+        try:
+            return [str(k) for k in fn(doc)]
+        except Exception:  # noqa: BLE001 - a door that cannot read it falls back
+            pass
+    out: list[str] = []
+    if doc.get("grants"):
+        out.append("grants")
+    out.extend(f"house:{i}" for i, _ in enumerate(doc.get("house") or []))
+    for fact in ("phase", "polarity", "affinity"):
+        if doc.get(fact):
+            out.append(fact)
+    out.extend(f"working:{w.get('trait')}" for w in doc.get("working") or []
+               if isinstance(w, dict))
+    return out
+
+
+def _essence_specs(doc: dict) -> list[tuple[str, dict, str]]:
+    """(key, spec, group) per essence trait. A plain fact (what it binds, its phase, its
+    polarity, its affinity) has no effect document, so it is carried as a small
+    `essence_fact` spec the card and the classifier read; a house top-up is its own
+    document and a working trait the circle's, as a metal's are the forge's."""
+    out: list[tuple[str, dict, str]] = []
+    house = [h for h in doc.get("house") or [] if isinstance(h, dict)]
+    for key in essence_keys(doc):
+        head, _, rest = key.partition(":")
+        if head == "house":
+            i = int(rest) if rest.isdigit() else -1
+            if 0 <= i < len(house):
+                out.append((key, house[i], "house"))
+        elif head == "working":
+            out.append((key, {"type": "working", "trait": rest}, "working"))
+        elif head in _ESSENCE_FACTS:
+            out.append((key, {"type": "essence_fact", "fact": head,
+                              "value": copy.deepcopy(doc.get(head))}, head))
+    return out
+
+
 def _material_specs(doc: dict) -> list[tuple[str, dict, str]]:
     """(key, spec, group) per property, in key order."""
+    if is_essence(doc):
+        return _essence_specs(doc)
     out: list[tuple[str, dict, str]] = []
     for group, prefix in MATERIAL_LISTS:
         raw = doc.get(group)
@@ -260,6 +336,11 @@ def key_order(key: str) -> tuple:
     """Sort order for keys of any document: by list, then by position. Every herb key is
     "p", so an ingredient's order is exactly `_key_index`'s, as it always was."""
     k = str(key)
+    head, sep, rest = k.partition(":")
+    if head in ESSENCE_ORDER and (sep or head in _ESSENCE_FACTS):
+        # An essence's keys, in the order a Read reveals them. Every key of one document
+        # is of one kind, so these tuples are never compared with a herb's.
+        return (10 + ESSENCE_ORDER.index(head), int(rest) if rest.isdigit() else 0)
     return (_PREFIX_ORDER.get(k[:1], 9), _key_index(k))
 
 
@@ -293,6 +374,10 @@ def classify(spec: dict) -> str:
 
     spec = spec or {}
     kind = str(spec.get("type", ""))
+    if kind == "essence_fact":
+        # What an essence binds is why you would bind it; where it sits and what suits
+        # it are what it is.
+        return BENEFIT if spec.get("fact") == "grants" else NEUTRAL
     if kind == "working":
         trait = str(spec.get("trait") or spec.get("target") or "")
         return DRAWBACK if trait in _BAD_TRAITS else BENEFIT
@@ -443,6 +528,8 @@ def line(spec: dict) -> str:
             return word
     if kind == "strikes_as":
         return f"Strikes as {str(spec.get('target', '')).replace('_', ' ')}"
+    if kind == "essence_fact":
+        return _fact_line(spec)
     if kind == "working":
         trait = str(spec.get("trait") or spec.get("target") or "")
         words = (lore(BLACKSMITH).get("working_words") or {}).get(trait)
@@ -474,7 +561,9 @@ def properties(actor, doc) -> list[dict]:
                    "drawback": is_drawback(spec), "how": str(how.get(key) or "")}
         else:
             row = {"key": key, "known": False, "text": None, "drawback": None, "how": None}
-        if is_material(doc):
+        if is_essence(doc):
+            row["group"] = key.partition(":")[0]
+        elif is_material(doc):
             row["group"] = GROUP_OF_PREFIX.get(key[:1], "")
         out.append(row)
     return out
@@ -681,8 +770,29 @@ def manual_keys(manual: dict) -> dict[str, list[str]]:
     nothing holds is skipped, never invented."""
     out: dict[str, list[str]] = {}
     for row in manual.get("teaches") or ():
-        if row.get("material"):
-            doc = material(str(row.get("material") or ""))
+        # An enchanting manual also teaches recipes (a catalogue item's making) and
+        # property types (what Unbind would teach), each one fact under its own id.
+        if row.get("recipe"):
+            from . import magic_layer
+
+            rid = str(row["recipe"])
+            if magic_layer.recipe(rid) is not None:
+                out.setdefault(rid, [])
+                if RECIPE_KEY not in out[rid]:
+                    out[rid].append(RECIPE_KEY)
+            continue
+        if row.get("property"):
+            from . import effectspec
+
+            pid = str(row["property"])
+            if pid == "enhancement" or effectspec.property(pid) is not None:
+                sid = property_store_id(pid)
+                out.setdefault(sid, [])
+                if TYPE_KEY not in out[sid]:
+                    out[sid].append(TYPE_KEY)
+            continue
+        if row.get("material") or row.get("essence"):
+            doc = material(str(row.get("material") or row.get("essence") or ""))
         else:
             doc = _ingredient(str(row.get("ingredient") or ""))
         if doc is None:
@@ -697,7 +807,8 @@ def manual_keys(manual: dict) -> dict[str, list[str]]:
         elif want == "drawbacks":
             keys = with_gates(doc, [k for k in a["keys"] if a["kinds"][k] == DRAWBACK])
         elif want == "working":
-            keys = [k for k in a["keys"] if k.startswith("t")]
+            keys = [k for k in a["keys"] if k.startswith("working:")
+                    or (k.startswith("t") and not is_essence(doc))]
         else:
             keys = [str(k) for k in (want or ()) if str(k) in a["keys"]]
         if keys:
@@ -997,3 +1108,436 @@ def ledger(actor) -> list[dict]:
         if doc is not None:
             rows.append(ledger_row(actor, doc))
     return sorted(rows, key=lambda r: (r["kind"], r["name"].lower()))
+
+
+# --- the enchanter: essences, items and unbinding (enchanting plan §12-13; contracts §7) -----
+#
+# Still one store. An essence's traits live under its own id, as a metal's do; a recipe (a
+# catalogue item's making) under its recipe id; a property TYPE (what Unbind teaches) under
+# "property:<id>" — a colon no material, herb or recipe id can carry (lowercase letters,
+# digits, hyphens), so the third id space cannot collide with the other two.
+#
+# What is known about one ITEM lives on the item (`magic.known`, lane B's field), not on
+# the character: two longswords off one rack are two items, and identifying one says
+# nothing about the other.
+
+RECIPE_KEY = "recipe"
+TYPE_KEY = "type"
+PROPERTY_PREFIX = "property:"
+
+
+def property_store_id(property_id: str) -> str:
+    """Where knowledge of a property type is kept in `Actor.herb_known`."""
+    return PROPERTY_PREFIX + str(property_id or "").strip().lower()
+
+
+def _knows(actor, store_id: str, key: str) -> bool:
+    entry = _entry(actor, store_id) or {}
+    return key in set(entry.get("keys") or ())
+
+
+def _learn(actor, store_id: str, key: str, how: str) -> bool:
+    """Record one fact; True when it was new. The herb store's own `reveal`, so the
+    Journal, the bench and the narrator read one answer."""
+    return bool(reveal(actor, store_id, [key], how))
+
+
+def knows_property(actor, property_id: str) -> bool:
+    """Whether the character knows this property type (Unbind, a manual, a teacher).
+    "enhancement" is a type too: unbinding a +2 sword teaches that a blade can take one,
+    never how much (Skyrim: "the magnitude is irrelevant", prior art §5.3)."""
+    return _knows(actor, property_store_id(property_id), TYPE_KEY)
+
+
+def learn_property(actor, property_id: str, how: str) -> bool:
+    return _learn(actor, property_store_id(property_id), TYPE_KEY, how)
+
+
+def known_properties(actor) -> list[str]:
+    """Every property type the character knows, sorted."""
+    out = []
+    for sid, entry in (getattr(actor, "herb_known", None) or {}).items():
+        if str(sid).startswith(PROPERTY_PREFIX) and TYPE_KEY in set(
+                (entry or {}).get("keys") or ()):
+            out.append(str(sid)[len(PROPERTY_PREFIX):])
+    return sorted(out)
+
+
+def knows_recipe(actor, recipe_id: str) -> bool:
+    return _knows(actor, str(recipe_id or ""), RECIPE_KEY)
+
+
+def learn_recipe(actor, recipe_id: str, how: str) -> bool:
+    return _learn(actor, str(recipe_id or ""), RECIPE_KEY, how)
+
+
+# --- essences --------------------------------------------------------------------------------
+
+_POLARITY_WORDS = {"weapon": "Seats in a weapon", "armour": "Seats in armour or a shield",
+                   "ward": "Seats in a ward: a ring, a cloak, a belt",
+                   "any": "Seats in any vessel"}
+
+
+def _fact_line(spec: dict) -> str:
+    """An essence fact as a card line, built from the documents (never authored prose)."""
+    fact = str(spec.get("fact") or "")
+    value = spec.get("value")
+    if fact == "grants":
+        g = value if isinstance(value, dict) else {}
+        if g.get("property"):
+            from . import effectspec
+
+            prop = effectspec.property(str(g["property"])) or {}
+            name = str(prop.get("name") or str(g["property"]).replace("-", " "))
+            if g.get("bonus") is not None:
+                name += f" +{g['bonus']}"
+            choice = g.get("choice") or {}
+            if choice:
+                name += " (" + ", ".join(str(v).replace("-", " ")
+                                         for v in choice.values()) + ")"
+            return f"Binds {name}"
+        if g.get("enhancement"):
+            return f"Binds a +{int(g['enhancement'])} enhancement"
+        if g.get("power"):
+            from . import magic_layer
+
+            r = magic_layer.recipe(str(g["power"])) or {}
+            return f"Binds the power of {r.get('name') or g['power']}"
+        return "Binds nothing of its own"
+    if fact == "phase":
+        return f"Favours {value}"
+    if fact == "polarity":
+        return _POLARITY_WORDS.get(str(value), f"Seats in {value}")
+    if fact == "affinity":
+        names = []
+        for mid in value or ():
+            doc = material(str(mid)) or {}
+            names.append(str(doc.get("name") or str(mid).replace("-", " ")))
+        return "Takes to " + ", ".join(names) if names else "Takes to nothing in particular"
+    return fact
+
+
+def essence(essence_id: str) -> dict | None:
+    """An essence's document through the one door, or None (and None for a material that
+    is not an essence)."""
+    doc = material(essence_id)
+    return doc if is_essence(doc) else None
+
+
+def essence_danger(doc) -> tuple[str, dict] | None:
+    """(key, effect) a Read of a volatile essence applies, or None (plan §7.3: "reading it
+    applies its house drawback for an hour, the forge's reactive-assay shape").
+
+    The essence's OWN first house drawback, never a hazard invented for the bench: a
+    volatile phial with no drawback is safe to read. Its trigger and bookkeeping do not
+    travel; the hour comes from content/rules/enchanting-lore.json."""
+    if not is_essence(doc):
+        return None
+    if not any(isinstance(w, dict) and w.get("trait") == "volatile"
+               for w in doc.get("working") or ()):
+        return None
+    for key, spec, group in _essence_specs(doc):
+        if group == "house" and is_drawback(spec):
+            effect = {k: v for k, v in spec.items()
+                      if k not in ("trigger", "house", "book", "when", "recipient")}
+            effect["duration"] = dict(lore(ENCHANTER)["read"]["danger_duration"])
+            return key, effect
+    return None
+
+
+def read(actor, essence_id: str, total: int, *, clock: int) -> dict:
+    """Read a pinch of an essence (plan §10, §12.3): the herb rule, one benefit and one
+    drawback where there is one, on a total already rolled (no natural 20: a skill check,
+    CRB p.180). The pinch and the ten minutes are spent either way (the bench takes them:
+    `cost`, `minutes`), and a volatile phial's danger lands whatever the roll — the
+    handling bites, not the reading — through `apply_danger`, which runs it through the
+    one applicator with its tell (laws 2 and 3). A miss teaches nothing and waits for no
+    rest: each try costs a pinch, which is its own limit (the assay's rule)."""
+    doc = essence(essence_id)
+    if doc is None:
+        raise KeyError(f"no essence called {essence_id!r}")
+    rules = lore(ENCHANTER)["read"]
+    eid = doc_id(doc)
+    dc = study_dc(doc)
+    margin = int(total) - dc
+    success = margin >= 0
+    found = essence_danger(doc)
+    meet(actor, eid)
+    revealed: list[str] = []
+    if success:
+        landed = {found[0]} if found else set()
+        revealed = reveal(actor, eid, reveal_picks(actor, doc, landed=landed),
+                          f"read, day {day_of(clock)}")
+    return {"essence": eid, "dc": dc, "total": int(total), "success": success,
+            "margin": margin, "revealed": revealed,
+            "cost": {"phial": float(rules["pinch"])}, "minutes": int(rules["minutes"]),
+            "danger": found[1] if found else None}
+
+
+def attuned(actor, essence_id: str, *, clock: int) -> list[str]:
+    """Seating an essence at Attune shows where it sits and when it favours (plan §12.3:
+    "an unknown essence's polarity and planet show when it is seated" — the planet is a
+    phase of the day now, owner round 4 point 10). Returns the keys that were new."""
+    doc = essence(essence_id)
+    if doc is None:
+        return []
+    keys = [k for k in property_keys(doc) if k in ("polarity", "phase")]
+    return reveal(actor, doc_id(doc), keys, f"attuned it, day {day_of(clock)}")
+
+
+def bound(actor, essence_id: str, *, clock: int) -> list[str]:
+    """Binding an essence shows what it binds (plan §12.3; ESO's translate-by-use, prior
+    art §5.3). Returns the keys that were new."""
+    doc = essence(essence_id)
+    if doc is None:
+        return []
+    keys = [k for k in property_keys(doc) if k == "grants"]
+    return reveal(actor, doc_id(doc), keys, f"bound it, day {day_of(clock)}")
+
+
+# --- items -----------------------------------------------------------------------------------
+
+def _item_record(item) -> dict | None:
+    """The record dict that holds `magic`: a record, or a forged shelf entry's record."""
+    if isinstance(item, dict):
+        return item
+    rec = getattr(item, "record", None)
+    return rec if isinstance(rec, dict) and rec else None
+
+
+def _live_magic(item) -> dict | None:
+    """The item's OWN `magic` dict (never a copy), so what is learned stays on the item:
+    a record's field, a forged entry's record's field, or a plain Stock's `magic`."""
+    rec = _item_record(item)
+    magic = rec.get("magic") if rec is not None else getattr(item, "magic", None)
+    return magic if isinstance(magic, dict) else None
+
+
+def _as_record(item) -> dict:
+    rec = _item_record(item)
+    if rec is not None:
+        return rec
+    return {"id": str(getattr(item, "id", "") or ""), "name": str(getattr(item, "name", "")
+                                                                    or ""),
+            "slot": getattr(item, "slot", None), "magic": getattr(item, "magic", None)}
+
+
+def find_item(actor, item_id: str):
+    """The shelf entry an id names: the shelf key, the entry's id, or its record's id."""
+    want = str(item_id or "")
+    for key, s in (getattr(actor, "stock", None) or {}).items():
+        rec = _item_record(s) or {}
+        if want in (str(key), str(getattr(s, "id", "") or ""), str(rec.get("id") or "")):
+            return s
+    return None
+
+
+def _resolve_item(actor, item):
+    if isinstance(item, str):
+        found = find_item(actor, item)
+        if found is None:
+            raise KeyError(f"no item called {item!r}")
+        return found
+    return item
+
+
+def identify_dc(item) -> int:
+    """DC 15 + the item's caster level (CRB Spellcraft), for the roll mat's terms."""
+    from . import magic_layer
+
+    rec = _as_record(item)
+    cl = magic_layer.caster_level(magic_layer.magic_of(rec), magic_layer.vessel_kind(rec))
+    return int(lore(ENCHANTER)["identify"]["dc_base"]) + int(cl)
+
+
+def identify(actor, item, total: int, *, day: int) -> dict:
+    """Identify an item on a total already rolled (contracts §7; plan §12.1).
+
+    The book, graded: fail, nothing ("try again tomorrow"); succeed, the INTENT — every
+    property, its plus, its powers — and a catalogue item's recipe joins what the
+    character knows; beat the DC by 10, the curse too ("unless the check made to identify
+    the item exceeds the DC by 10 or more, the curse is not detected", CRB). Once per item
+    per day: a second try that day returns the first answer ("additional attempts reveal
+    the same results", CRB Spellcraft) and learns nothing new.
+
+    Writes what was learned onto the item's own `magic.known` (in place: pass the stored
+    record or shelf entry) and the recipe into `Actor.herb_known`.
+
+    {"result": "fail" | "intent" | "curse", "learned": [...], "recipe": id | None,
+     "dc", "total", "margin", "again_on_day", "cursed": bool | None, "curse": words | None,
+     "repeat": bool}
+
+    `result: "curse"` means the curse check was passed: `cursed` then says whether there
+    is one and `curse` its words. Below that both are None, whatever the item carries —
+    this answer goes to the page. A plain item answers `result: "none"`.
+    """
+    from . import curses, magic_layer
+
+    item = _resolve_item(actor, item)
+    rec = _as_record(item)
+    magic = _live_magic(item)
+    day = int(day)
+    if magic is None or not magic_layer.has_layer(dict(rec, magic=magic)):
+        return {"result": "none", "learned": [], "recipe": None, "dc": 0,
+                "total": int(total), "margin": 0, "again_on_day": day, "cursed": None,
+                "curse": None, "repeat": False}
+    known = magic.setdefault("known", {})
+    tried = known.get("tried")
+    if isinstance(tried, dict) and tried.get("day") == day and isinstance(
+            tried.get("answer"), dict):
+        return dict(tried["answer"], learned=[], repeat=True)
+    rules = lore(ENCHANTER)["identify"]
+    dc = identify_dc(dict(rec, magic=magic))
+    margin = int(total) - dc
+    learned: list[str] = []
+    recipe = None
+    cursed = None
+    words = None
+    curse = curses.curse_of({"magic": magic})
+    how = f"identified, day {day}"
+    if margin < 0:
+        result = "fail"
+    else:
+        result = "intent"
+        if not known.get("intent"):
+            known["intent"] = True
+            learned.append("intent")
+        if not known.get("how"):
+            known["how"] = how
+        for p in magic.get("powers") or ():
+            rid = str((p or {}).get("recipe") or "")
+            if rid and learn_recipe(actor, rid, how) and recipe is None:
+                recipe = rid
+        if margin >= int(rules["curse_margin"]):
+            result = "curse"
+            if not known.get("curse"):
+                known["curse"] = True
+                if curse:
+                    learned.append("curse")
+            cursed = bool(curse)
+            words = curses.describe(curse) if curse else None
+    answer = {"result": result, "recipe": recipe, "dc": dc, "total": int(total),
+              "margin": margin, "again_on_day": day + 1, "cursed": cursed, "curse": words}
+    known["tried"] = {"day": day, "answer": dict(answer)}
+    return dict(answer, learned=learned, repeat=False)
+
+
+def learn_by_use(actor, item, key: str) -> bool:
+    """The hard way (plan §12.2): the first time a property fires in play it is known, and
+    the first time a curse's clause bites (a daily save, a gutter, a refusal to be put
+    down) the curse is known. `item` is the shelf entry, the record or its id; `key` is
+    "curse", "intent" or a property id. True when it was new — the caller's cue to tell
+    the moment with `curses.tell(..., known=True)`. The engine (lane C) calls this."""
+    item = find_item(actor, item) if isinstance(item, str) else item
+    magic = _live_magic(item) if item is not None else None
+    if magic is None:
+        return False
+    known = magic.setdefault("known", {})
+    if key == "curse":
+        if known.get("curse") or not (isinstance(magic.get("curse"), dict)
+                                       and magic["curse"].get("row")):
+            return False
+        known["curse"] = True
+        known["curse_how"] = "found the hard way"
+        return True
+    if key == "intent":
+        if known.get("intent"):
+            return False
+        known["intent"] = True
+        known.setdefault("how", "found by use")
+        return True
+    if known.get("intent"):
+        return False
+    props = known.setdefault("properties", [])
+    if key in props:
+        return False
+    props.append(str(key))
+    return True
+
+
+def unbind(actor, record, *, clock: int | None = None) -> dict:
+    """Unbind a magic item (plan §13; owner round 4 Q6): the layer comes off whole, the
+    smith's item stays, and the character learns the TYPES of property it carried — never
+    their size ("the magnitude is irrelevant", Skyrim) — and its recipe if it was one. A
+    quarter of the layer's motes come back as residue, rounded down. A curse goes with the
+    layer: the cheap cure, whose price is the layer.
+
+    Returns {"record": the stripped record, "learned": [new property types],
+             "types": [every type], "recipe": first new recipe | None, "recipes": [...],
+             "motes": the layer's motes, "residue": {"arcane-residue": n}}.
+    Pure on the record (the bench stores the one returned); the knowledge is written to
+    `Actor.herb_known`. Whether the unbinding succeeded is the bench's roll (lane E):
+    call this on a success."""
+    from . import magic_layer
+
+    rec = _as_record(record)
+    gear = magic_layer.vessel_kind(rec)
+    m = magic_layer.magic_of(rec)
+    stripped, _ = magic_layer.strip(rec)
+    rules = lore(ENCHANTER)["unbind"]
+    types: list[str] = []
+    if m["enhancement"] and gear in magic_layer.ARMS:
+        types.append("enhancement")
+    for e in m["properties"] + m["flat"]:
+        pid = str(e.get("id") or "")
+        if pid and pid not in types:
+            types.append(pid)
+    recipes = [str(p.get("recipe")) for p in m["powers"] if p.get("recipe")]
+    how = f"unbound, day {day_of(clock)}" if clock is not None else "unbound"
+    learned = [t for t in types if learn_property(actor, t, how)]
+    recipe = None
+    for rid in recipes:
+        if learn_recipe(actor, rid, how) and recipe is None:
+            recipe = rid
+    gp = magic_layer.market_price(m, gear, str(rec.get("slot") or ""))
+    motes = int(math.ceil(gp * magic_layer.MAKING_FRACTION / magic_layer.GP_PER_MOTE - 1e-9))
+    residue = int(math.floor(motes * float(rules["residue_fraction"]) + 1e-9))
+    return {"record": stripped, "learned": learned, "types": types, "recipe": recipe,
+            "recipes": recipes, "motes": motes, "residue": {str(rules["residue"]): residue}}
+
+
+def item_card(item) -> dict:
+    """What the item card may show of the layer (plan §12.4), and nothing it may not.
+
+    Unidentified: the aura's strength and schools (detect magic shows those before
+    anything is identified). Identified: what the maker intended — every property and
+    power, believed (`magic_layer.layer(..., believed=True)`), marked "as the maker
+    intended" until the curse check is passed. The curse's words only once it is known.
+    """
+    from . import curses, effectspec, magic_layer
+
+    rec = _as_record(item)
+    magic = _live_magic(item) or {}
+    whole = dict(rec, magic=magic)
+    if not magic_layer.has_layer(whole):
+        return {"magic": False}
+    m = magic_layer.magic_of(whole)
+    gear = magic_layer.vessel_kind(whole)
+    known = m.get("known") or {}
+    lay = magic_layer.layer(whole, believed=True)
+    out = {"magic": True, "aura": lay["aura"], "schools": list(lay["schools"]),
+           "identified": bool(known.get("intent")),
+           "flawed": bool(known.get("flawed")),
+           "curse": None, "clings": False}
+    if known.get("intent"):
+        lines = []
+        if m["enhancement"] and gear in magic_layer.ARMS:
+            lines.append(f"+{m['enhancement']} enhancement")
+        for e in m["properties"] + m["flat"]:
+            try:
+                lines.extend(effectspec.property_lines(str(e.get("id")), e.get("choice")))
+            except Exception:  # noqa: BLE001 - a property the table lost still shows its id
+                lines.append(str(e.get("id")))
+        for p in m["powers"]:
+            r = magic_layer.recipe(str(p.get("recipe") or "")) or {}
+            lines.append(str(r.get("name") or p.get("recipe")))
+        out["lines"] = lines
+        out["caster_level"] = lay["caster_level"]
+        out["as_intended"] = not known.get("curse")
+    else:
+        out["learned_by_use"] = [str(p) for p in known.get("properties") or ()]
+    if known.get("curse"):
+        c = curses.curse_of(whole)
+        out["curse"] = curses.describe(c) if c else "none"
+        out["clings"] = bool(c and curses.clings(whole))
+    return out
