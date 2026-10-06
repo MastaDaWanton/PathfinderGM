@@ -393,10 +393,11 @@ things to discover. A row that fails is reported, not guessed at.
 
 | Field | Meaning | Default |
 |---|---|---|
-| `kind` | `ore`, `metal`, `alloy`, `fuel`, `flux`, `quenchant`, `fitting`, `treatment` | `metal` |
+| `kind` | the forge's kinds: `ore`, `metal`, `alloy`, `fuel`, `flux`, `quenchant`, `fitting`, `treatment`; the other crafts' (`essence`, `focus`, `ink`, `chalk`, `catalyst`, `solvent`, `tannin`, `oil`, `wax`, `thread`...); and the substances a piece can be made of, `hide`, `leather`, `wood`, `bone`, `horn`, `cloth`, `stone`, `glass`. **`kind` is what the material tag reads** (see "What the material tag reads" below): `metal` and `alloy` are metal, `hide` and `leather` leather, `thread` cord, the rest themselves | `metal` |
 | `tier` | `common`, `uncommon`, `rare`, `exotic`, `legendary`: what the bench may work and the ceiling on any one house number | `common` |
 | `form` | the shelf it sits on: `ore`, `bar`, `alloy bar`, `haft`, `grip`, `guard`, `fuel`, `flux`, `quenchant`, `treatment`... | read from `kind` (a fitting's from its id) |
-| `material` | the id of the material this is a FORM of ("mithral fittings" is mithral; an ore points at its metal), so a prospected ore and a bought bar are one material | its own id |
+| `material` | the id of the material this is a FORM of ("mithral fittings" is mithral; an ore points at its metal), so a prospected ore and a bought bar are one material. **Required on a `fitting`** (and on any row whose `kind` is not a substance): a fitting's kind says only "fitting", and the material tag follows this link to learn what it is made of; without it the fitting is made of nothing the tag can name | its own id |
+| `enchant_surcharge_gp` | what enchanting an item made of it costs extra, once, the first time it is enchanted (the book's cold iron +2,000 gp on a weapon's main piece; noqual's +5,000 on any piece). The book's own materials only: a world's metal that should resist magic says so here, in gold, and the app turns it into motes | `0`: no surcharge |
 | `pieces` | which piece slots it fills, per gear: weapon `head`, `haft`, `fittings`; armour (and shield) `body`, `fastenings`, `lining`. The head and body count in full, every other piece at half | `{"weapon": [], "armour": []}`: fills nothing |
 | `weapon` | the effects it brings to a weapon, in the effect vocabulary (`rules/effectspec.py`): `combat_mod`, `gear_mod` (`acp`, `max_dex`, `asf`, `weight_pct`, `hardness`, `hp_per_inch`, `category`, `speed_penalty`), `strikes_as` (`cold_iron`, `silver`, `adamantine`, `ghost_touch`), riders with a `trigger` (`hit`, `crit`, `first_wound_daily`, `carried`) and conditions in `when` (`target`, `attacker`, `armour`, `weapon`, `against`) | `[]` |
 | `armour` | the same, for a suit or a shield (a forged shield reads the `armour` list) | `[]` |
@@ -410,12 +411,32 @@ things to discover. A row that fails is reported, not guessed at.
 | `assay_danger` | reactive metals only: what handling a sliver does to the assayer when its harm is not a carried effect. One type today, `suppress_magic` (noqual's, a house rule), with a `duration` and `"house": true` or `"book": true` | `null`: an assay is safe |
 | `price_gp`, `biomes`, `obtain` | what it costs at a market, where it is found, how (`mined`, `bought`, `harvested`). **Required on a common `fuel`, `flux` or `quenchant`**: those are staples on every counter that sells the smith's supplies (`content/rules/stall-lines.json` `consumables`, 2026-10-05), and an unpriced one would be on none. **Held to the price rule** (`rules/pricing.py`, `material_price_problems`, 2026-10-05): at least the rung's floor (common 1, uncommon 5, rare 25, exotic 125, legendary 625 gp), ×5 for an `essence`, `catalyst`, `ink`, `chalk`, `focus` or a row with `neutralizer`, × how far its `plus`, `capacity`, `neutralizer` or `dc_mod` runs above its rung; never cheaper than a commoner row of its kind in its file, and a stronger row costs strictly more than a weaker one. 1 cp is the "free" token, allowed only on a plain common row (water). Absent stays absent: an unpriced row is simply not sold | none, `[]`, `""` |
 
+### What the material tag reads (2026-10-05: the enchanting revamp, lane B)
+
+Spells that affect metal (heat metal, chill metal, shocking grasp against metal armour), the
+druid's no-metal rule and the enchanter's surcharges all ask one question of an item —
+*is it metal, and which metal* — through one set of tags: `material.metal`,
+`material.metal.<id>`, `material.main.<id>` (`rules/item_tags.py`). The answer is read
+from data, never from a name ("ironwood" is wood, "silver-clasps" are metal):
+
+1. the row's own `kind`, mapped to a substance by `content/rules/base-pieces.json`
+   `kinds` (`metal`, `alloy` → metal; `hide`, `leather` → leather; `thread` → cord; `wood`,
+   `bone`, `horn`, `cloth`, `stone`, `glass` as themselves);
+2. otherwise its `material` link, followed to the root (a world's "guild fittings" pointing
+   at `brass` are metal because brass is).
+
+So a world's own metal is metal the day it is exported with `kind: "metal"`, and a world's
+fitting must carry `material`. A row with neither answers nothing: it is never guessed.
+
 ### A world's essences (proposed, 2026-10-05: the enchanting revamp, lane D)
 
 A `play.materials[]` row with `kind` `essence` is a thing an enchanter binds, read through
 the same door (`materials.essences()`) and held to the same fences as the shipped shelf
 (`materials.essence_problems`, every refusal with its fix named). Nothing in it is
-world-specific except the words: the numbers are the app's rules.
+world-specific except the words: the numbers are the app's rules. Ids are forever: an item
+bound with an essence names it by id on its layer (`magic.properties[].essence`), and the
+essence's `house` top-ups are read live from that id, so a renamed id orphans the top-ups of
+every item that carries it.
 
 | Field | Meaning | Default |
 |---|---|---|
@@ -434,6 +455,55 @@ world-specific except the words: the numbers are the app's rules.
 A world's essence harvested from its own creature names the creature in `from_creature`,
 in the world's words, and the harvest tag reader is the leatherworker's (`harvest.essence.*`,
 not yet built).
+
+What a world never sends for enchanting: **a sky.** The favourable time is the essence
+family's phase of the day (owner, round 4 point 10: "this is not earth", named planets
+would not be world-agnostic), computed from the game clock with dawn at 06:00 and dusk at
+18:00 (`rules/sky.py`). No planets, no day length, no calendar of stars.
+
+### `play.magic_items[]` (proposed, 2026-10-06: the enchanting revamp, lane H; no reader yet)
+
+A world's own named magic item — the Wardens' Blade, the ring every Vormoor reeve wears — is
+a thing someone owns or a hoard holds, not a recipe. It is shaped exactly as the app stores
+an enchanted item, so the reader, when it is written, is `forge_items.record_for_base` plus
+the layer it already reads (`rules/magic_layer.py`): **ids and choices only, never a
+number.** What the item does, its price, its aura and its caster level are computed from the
+app's property table and recipes on every read, so a world cannot ship a +3 sword that hits
+like a +5.
+
+```json
+{
+  "id": "5bbd0c40345f~item:wardens-blade",
+  "name": "The Wardens' Blade",
+  "text": "Carried by every Warden-Captain of the Ashfold march since the burning.",
+  "base": "longsword",
+  "gear": "weapon",
+  "pieces": {"head": "5bbd0c40345f~material:dusk-iron"},
+  "magic": {
+    "enhancement": 1,
+    "properties": [{"id": "bane", "choice": {"foe": "undead"}},
+                   {"id": "flaming"}],
+    "powers": [],
+    "curse": null
+  },
+  "owner_id": "5bbd0c40345f~character:ysolde-marr"
+}
+```
+
+| Field | Meaning | Default |
+|---|---|---|
+| `base` | a weapon, armour or shield from the app's tables (`longsword`, `chain shirt`, `heavy steel shield`), or for a ring or wondrous item its slot (`ring`, `shoulders`, `neck`...) | required |
+| `gear` | `weapon`, `armour`, `shield`, `ring` or `wondrous` | read from `base` |
+| `pieces` | which material fills which piece (`head`, `haft`, `fittings`; `body`, `fastenings`, `lining`), the world's own `play.materials[]` ids or the shipped ones. A piece not named is the base's default (`content/rules/base-pieces.json`) | the defaults |
+| `magic.enhancement` | the +N, 1 to 5, arms and armour only (the book's limit, kept) | `0` |
+| `magic.properties[]` | `{"id": <content/rules/magic-properties.json id>, "choice": {...}}`. **A property that asks a choice must carry it** (bane's `foe`: a creature type, or `{"subtype": "<the world's own subtype>"}` for a humanoid or outsider; resistance's `energy`; skill competence's `skill` and `bonus`): an item that never named its foe is the very defect the app's old saves had, and the app would have to ask the player | `[]` |
+| `magic.powers[]` | `{"recipe": <a wondrous recipe id>}` from `content/materials/magic-items.json` | `[]` |
+| `magic.curse` | a curse from the book's table, `{"row": <content/rules/curses.json row>, ...}`, hidden until identified | `null` |
+| `owner_id` / `where_id` | who has it, or the place it lies in | absent: nowhere yet |
+
+A world's own *kind* of magic — a property the book does not print — is not expressible
+here, on purpose: what an enchantment does is the book's (the owner's round 2, "every book
+property works"), and the world chooses which of them its items carry and in what words.
 
 **Who sells a craft's supplies** (proposed, no reader yet). A `play.places[]` row may carry
 `"supplies": ["blacksmith"]` — the crafts whose consumables (fuel, flux, quench; solvents,
