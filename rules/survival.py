@@ -762,10 +762,13 @@ def _met(actor, need: str) -> int:
     a fatigue thirst left stays while hunger still holds damage too."""
     released = actor.release_nonlethal(need)
     if not actor.withheld_nonlethal():
-        mine = [c for c in actor.conditions
-                if c.key == "fatigued" and c.source in ("thirst", "hunger")]
-        if mine:
-            actor.remove_condition("fatigued")
+        # Asked of the tag (law 1), and lifted only where thirst or hunger laid it.
+        from .states import matches
+
+        actor.remove_effects(
+            kind="condition",
+            match=lambda e: e.source in ("thirst", "hunger")
+            and any(matches(t, "state.impaired.fatigued") for t in e.tags))
     return released
 
 
