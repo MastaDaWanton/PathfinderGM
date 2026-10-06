@@ -225,6 +225,7 @@
       load();
     },
     closing: function () {
+      stopAmbience();
       var st = E.stage();
       if (st && stageMounted) { try { st.unmount(); } catch (err) { /* */ } }
       stageMounted = false;
@@ -301,8 +302,36 @@
     syncWorks();
     renderFoot();
     stageScene();
+    ambience();
   }
   E.adopt = adopt;
+
+  // The room's sound while the circle is open (UI plan §11): `ambience.sanctum`, "a still
+  // room, a candle's hiss", at a sanctum (owned or hired), else the biome's own ground, as
+  // the forge plays the smithy or the field kit's ground. Lane U6 made the bed and nothing
+  // started it (the final pass, 2026-10-06). One bed at a time: a state that moves the
+  // circle (a wait that ends somewhere else, a sanctum hired) swaps it; the same place
+  // keeps the bed playing rather than restarting it on every check. Sound answers an
+  // unknown name with silence, so a biome without a bed costs nothing.
+  var bed = null, bedName = "";
+  function ambienceName() {
+    var w = E.state && E.state.where;
+    if (!w) return "";
+    return w.sanctum ? "sanctum" : String(w.biome || "");
+  }
+  function stopAmbience() {
+    if (bed) { try { bed.stop(); } catch (err) { /* */ } }
+    bed = null; bedName = "";
+  }
+  function ambience() {
+    var name = core.open ? ambienceName() : "";
+    if (name === bedName) return;
+    stopAmbience();
+    if (!name || !window.Sound || typeof Sound.loop !== "function") return;
+    try { bed = Sound.loop("ambience." + name) || null; } catch (err) { bed = null; }
+    bedName = bed ? name : "";
+  }
+  E.ambienceName = ambienceName;
 
   // --- old enchanted items, converted (lane H, owner round 3 "Old saves: convert") ---------
   // The first time the circle opens after the revamp, a notice lists every item the
@@ -359,7 +388,7 @@
     E.api("/api/enchant/answer", { key: f.dataset.key, property: f.dataset.property, answer: answer })
       .then(function (r) {
         var lines = (r.lines || []).join("; ");
-        E.say("Named. " + lines);
+        E.say(lines ? "Named. " + lines + "." : "Named.");
         if (r.state) adopt(r.state);
         var left = f.closest(".eq-item");
         f.outerHTML = '<p class="eq-done">' + esc(lines ? "Named: " + lines + "." : "Named.") + '</p>';
@@ -687,13 +716,20 @@
   // and pieces from the shelf row) and each seat with its essence and colour.
   function stageWork() {
     if (!stageMounted) return;
-    var v = E.vessel();
+    // Identify studies an item rather than laying a vessel, and the circle stood empty while
+    // it did (the final pass, 2026-10-06): the item studied lies at its heart the same way.
+    var v = E.vessel() || (E.order.method === "identify" && E.order.item ? E.item(E.order.item) : null);
+    // `family` is for the jewellery and wearable vessels only (a ring, an amulet): a forged
+    // weapon, suit or shield is built from its own pieces, and a family given for one makes
+    // the stage skip them. Passing the gear as the family drew the Superior longsword as a
+    // pair of gloves, read off its "hands" slot (the final pass, 2026-10-06).
+    var forged = v && (v.gear === "weapon" || v.gear === "armour" || v.gear === "shield");
     stageCall("setVessel", v ? { key: v.key, name: v.name, gear: v.gear, base: v.base, pieces: v.pieces || {},
-                                 family: v.gear, quality_index: v.quality_index, slot: v.slot } : null);
+                                 family: forged ? "" : v.gear, quality_index: v.quality_index, slot: v.slot } : null);
     var c = E.check || {};
     stageCall("setSeats", (c.seats || []).map(function (s) {
       var it = s.seated ? E.item(s.seated) : null;
-      return { seat: s.seat, essence: s.essence, color: s.color, phase: it ? it.phase : "",
+      return { seat: s.seat, essence: s.essence, color: s.color, phase: s.phase || (it ? it.phase : ""),
                seated: !!s.seated, lit: !!s.seated };
     }));
     if (c.hour) stageCall("hour", c.hour);
@@ -804,7 +840,7 @@
     // Bane Essence" was wrong for bane, a dusk essence (seen live, 2026-10-06).
     var lead = (c.seats || []).filter(function (s) {
       var it = s.seated ? E.item(s.seated) : null;
-      return s.essence && it && it.phase === phase;
+      return s.essence && (s.phase || (it && it.phase)) === phase;
     }).map(function (s) { return s.essence; });
     var name = phase.charAt(0).toUpperCase() + phase.slice(1);
     var line = h.inside
@@ -917,7 +953,6 @@
     var name = c.product && c.product.name ? c.product.name : (E.vessel() ? E.vessel().name : "the circle");
     var body = E.body();
     var order = JSON.parse(JSON.stringify(E.order));
-    var flawed = false;
     return C.rollD20({
       shown: { title: "Enchanting", why: (info ? info.name + ": " : "") + name,
                sides: 20, lo: 1, hi: 20, die: "1d20", terms: C.rollTerms(c) },
@@ -929,18 +964,16 @@
       // A step that takes is followed by its game: the clock face waits for it.
       landed: function (r) { tickClock(r.minutes, r.clock, !!r.token); },
       face: function (r) { return r.roll.face; },
-      // The engine's word, shown by the table's verdict once the die is at rest. An
+      // The engine's word, shown by the table's verdict once the die is at rest, FLAWED
+      // included (22's third word): the player reads it on the mat beside the margin. An
       // enchanting check has no naturals (a skill check, CRB p.180), so none is passed and a
-      // 20 never reads "natural 20". FLAWED is not a word the table's verdict knows: it is
-      // cast over the circle below, once the mat is closed.
+      // 20 never reads "natural 20". Which curse is never sent and never said.
       verdict: function (r) {
         var v = r.verdict || {};
-        flawed = v.verdict === "flawed";
-        return flawed ? null : { verdict: v.verdict, natural: null };
+        return { verdict: v.verdict, natural: null };
       },
     }).then(function (r) {
       E.busy = false;
-      if (flawed) flawedWord();
       if (r.token) {
         return Promise.resolve(play(r, order)).then(
           function (x) { C.releaseClock(); return x; },
@@ -962,21 +995,6 @@
     core.refocus(["enchant-roll", "#enchant-list .es-add[tabindex='0']", "enchant-close"]);
   }
   E.focusAfterRoll = focusAfterRoll;
-
-  // FLAWED (owner round 1 and round 4 point 2): the margin was shown on the mat and the
-  // word says something went wrong, never what. The brass word in its failing cast.
-  function flawedWord() {
-    E.sound("enchant.flawed");
-    var tool = document.querySelector("#enchant-tool .bicon") || $id("enchant-tool");
-    if (!tool || typeof verdictWord !== "function") return;
-    var r = tool.getBoundingClientRect();
-    var still = E.reduced();
-    try {
-      verdictWord({ good: false, word: "Flawed", text: "Flawed: it took, but something went wrong in the binding",
-                    sub: "", still: still, ms: still ? 1200 : 1300 },
-                  { x: r.left + r.width / 2, y: r.top + r.height / 2 }, Math.min(r.width, r.height));
-    } catch (err) { /* the word is a nicety; the result line says it too */ }
-  }
 
   function tickClock(minutes, clock, hold) {
     var s = E.state;
@@ -1138,9 +1156,14 @@
     if (st && stageMounted && typeof st.flourish === "function") {
       try { st.reducedMotion(E.reduced()); st.flourish(kind); staged = true; } catch (err) { staged = false; }
     }
-    // Read and Identify have their own sound already (played as the die was asked for);
-    // their flourish is the stage's eye over the phial or the item, and nothing more.
-    if (kind === "read" || kind === "identify") return;
+    // Read and Identify: the stage's eye over the phial or the item, which rings its own
+    // `enchant.read` / `enchant.identify`; the flat stand-in rings it here. Both used to
+    // play it as the die was thrown as well, so on a WebGL stage it sounded twice (the
+    // final pass, 2026-10-06, counted with a Sound.play spy).
+    if (kind === "read" || kind === "identify") {
+      if (!staged) E.sound("enchant." + kind);
+      return;
+    }
     if (!staged) E.sound("enchant." + (kind === "fail" ? "fail" : kind === "flawless" ? "flawless" :
                                        kind === "flawed" ? "flawed" : "land"));
     if (staged && kind !== "flawless") return;
@@ -1176,7 +1199,6 @@
       return C.rollD20({
         shown: shown,
         post: function (face) {
-          E.sound("enchant.read");
           return E.api("/api/enchant/read", { essence: it.key, face: face });
         },
         landed: function (r) { tickClock(r.minutes, r.clock); },
@@ -1215,7 +1237,6 @@
       shown: { title: "Enchanting", why: "Identify: " + it.name, sides: 20, lo: 1, hi: 20, die: "1d20",
                terms: C.rollTerms({ terms: t.terms || [], bonus: t.bonus }) },
       post: function (face) {
-        E.sound("enchant.identify");
         return E.api("/api/enchant/identify", { item: it.key, face: face });
       },
       landed: function (r) { tickClock(r.minutes, r.clock); },

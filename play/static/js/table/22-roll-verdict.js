@@ -52,6 +52,17 @@ const VERDICT_WORDS = {
 // gets the failure flourish, not a triumph.
 function verdictFlourish(v, still) {
   if (!v || typeof v !== "object") return null;
+  // FLAWED, the enchanter's third word (owner, enchanting round 1 and round 4 point 2: a
+  // Bind missed by 5 or more takes, carries a hidden curse, and the verdict says FLAWED,
+  // never which curse). Cast in the failing letter, since something went wrong, and said
+  // on the mat itself: the circle used to wait for the mat to close and cast it over the
+  // stage, so the mat the player was reading the margin on said nothing at all (the final
+  // pass, 2026-10-06). It is a skill check, so no natural ever scales it.
+  if (v.verdict === "flawed") {
+    return { kind: "flawed", good: false, still: !!still, word: "Flawed", sub: "",
+             text: "Flawed: it took, but something went wrong in the binding",
+             ms: still ? VERDICT_MS.still : VERDICT_MS.failure };
+  }
   if (v.verdict !== "success" && v.verdict !== "failure") return null;
   const good = v.verdict === "success";
   const kind = good ? (v.natural === 20 ? "triumph" : "success")
@@ -90,10 +101,14 @@ async function showVerdict(v, rest) {
                  : verdictOrigin();
   verdictWord(f, at, mat ? mat.width : 0);
   // The sting arrives with the word, in reduced motion too: Short keeps the sound.
-  window.Sound && Sound.play(f.good ? "verdict.success" : "verdict.failure",
+  // FLAWED rings the circle's bowl slightly off its note (`enchant.flawed`), not the
+  // table's failure sting: it is not a failure, and the stage's guttered candle rings it
+  // again only when the binding is finished.
+  window.Sound && Sound.play(f.kind === "flawed" ? "enchant.flawed"
+                             : f.good ? "verdict.success" : "verdict.failure",
                              { volume: f.sub ? 1 : 0.85 });
   if (!f.still) {
-    VerdictSparks.burst(f.kind, at.x, at.y, f.ms,
+    VerdictSparks.burst(f.kind === "flawed" ? "failure" : f.kind, at.x, at.y, f.ms,
                         mat ? Math.min(mat.width, mat.height) * 0.46 : 0);
   }
   return f;

@@ -906,6 +906,24 @@ def _step_dc(rank: int) -> int:
     return int(_n("step_dc_base", 5)) + int(_n("step_dc_per_rank", 5)) * max(1, int(rank))
 
 
+def _step_dc_terms(rank: int, what: str) -> list[dict]:
+    """The step DC's one term, in words that add up to its number.
+
+    The words used to read "5 + 5 for rare essence" beside a DC of 20, which is 5 + 5 × 3:
+    the 5 is per step of rarity and rare is the third (the final pass, 2026-10-06, read off
+    the working's DC line). The words are built from the same two numbers `_step_dc`
+    adds, so a retuned enchanter.json cannot leave them saying something else."""
+    rank = max(1, int(rank))
+    base, per = int(_n("step_dc_base", 5)), int(_n("step_dc_per_rank", 5))
+    tier = wc.TIERS[min(rank, len(wc.TIERS)) - 1]
+    steps = f"{per} for {tier} {what}" if rank == 1 else \
+        f"{per} × {rank} for {tier} {what} (the {_ORDINAL.get(rank, str(rank))} step of rarity)"
+    return [{"why": f"{base} + {steps}", "dc": _step_dc(rank)}]
+
+
+_ORDINAL = {2: "second", 3: "third", 4: "fourth", 5: "fifth"}
+
+
 def _choices_for(prop: dict) -> dict | None:
     ch = prop.get("choice")
     if not ch:
@@ -966,7 +984,11 @@ def adds_from_seats(record: dict, seats: dict, choices: dict, recipe: str = "") 
             top = max(top, int(g["enhancement"]))
         elif g.get("property"):
             choice, bad = _seat_choice(ph, (choices or {}).get(seat))
-            problems.extend(f"{ph.name}: {p}" for p in bad)
+            # Said for the essence the player seated, not the property's id: "Bane
+            # Essence: choose its foe ...", never "Bane Essence: bane: choose its foe".
+            pid = f"{g['property']}: "
+            problems.extend(f"{ph.name}: {p[len(pid):] if p.startswith(pid) else p}"
+                            for p in bad)
             pair = (str(g["property"]), choice)
             if pair in have:
                 continue
@@ -1279,8 +1301,7 @@ def _build_prepare(plan: StepPlan, actor, body, where, now) -> None:
     plan.focus = focus
     plan.rank = max((c.rank for c in used), default=1)
     plan.dc = _step_dc(plan.rank)
-    plan.dc_terms = [{"why": f"5 + 5 for {wc.TIERS[plan.rank - 1]} circle material",
-                      "dc": plan.dc}]
+    plan.dc_terms = _step_dc_terms(plan.rank, "circle material")
     plan.consumes = [(c.key, 1, c.name) for c in used]
     plan.lifts = [c.lifts for c in treat if c.lifts]
     plan.lead = {"id": (lines[0].id if lines else ""), "name": (lines[0].name if lines else ""),
@@ -1327,7 +1348,7 @@ def _build_attune(plan: StepPlan, actor, body, where, now) -> None:
     _plan_working(plan, actor, v, now)
     plan.rank = max((p.rank for p in seats.values()), default=1)
     plan.dc = _step_dc(plan.rank)
-    plan.dc_terms = [{"why": f"5 + 5 for {wc.TIERS[plan.rank - 1]} essence", "dc": plan.dc}]
+    plan.dc_terms = _step_dc_terms(plan.rank, "essence")
     lead = _lead(list(seats.values()))
     if lead is not None:
         plan.lead = {"id": lead.id, "name": lead.name, "rank": lead.rank}
@@ -1376,7 +1397,18 @@ def _plan_working(plan: StepPlan, actor, v: Vessel, now: int, *, hurry: bool = F
     lp = magic_layer.plan(v.record, adds, binder=binder, hurry=hurry, helps=helps)
     plan.layer_plan = lp
     plan.potions = potions
-    plan.problems += list(lp.get("problems") or ())
+    # The layer's plan asks every new property's choice again (`_entry_problems`), so an
+    # unchosen bane foe came up twice in the bench's problems list, once for the essence
+    # and once for the property (the final pass, 2026-10-06). A choice problem already said
+    # for a seat is not said again.
+    said = set()
+    for p in plan.problems:
+        said.add(p.split(": ", 1)[-1])
+    for p in lp.get("problems") or ():
+        bare = str(p).split(": ", 1)[-1]
+        if "choose its" in bare and bare in said:
+            continue
+        plan.problems.append(p)
     plan.notes += list(lp.get("notes") or ())
     have = sum(p.motes for p in seats.values())
     need = int(lp["price"]["motes"])
@@ -1512,7 +1544,7 @@ def _build_refine(plan: StepPlan, actor, body, where, now) -> None:
     lead = _lead([ph for ph, _ in picked])
     plan.rank = max((ph.rank for ph, _ in picked), default=1)
     plan.dc = _step_dc(plan.rank)
-    plan.dc_terms = [{"why": f"5 + 5 for {wc.TIERS[plan.rank - 1]} essence", "dc": plan.dc}]
+    plan.dc_terms = _step_dc_terms(plan.rank, "essence")
     plan.consumes = [(ph.key, n, ph.name) for ph, n in picked]
     if lead is not None:
         plan.lead = {"id": lead.id, "name": lead.name, "rank": lead.rank}
@@ -1785,7 +1817,13 @@ def seat_signs(v: Vessel, seats: dict | None = None) -> list[dict]:
                                 if mat else "")),
                     "seated": ph.key if ph else None,
                     "essence": ph.name if ph else None,
-                    "color": ph.color if ph else None})
+                    "color": ph.color if ph else None,
+                    # A seated essence shows its phase (knowledge.py: "an unknown essence's
+                    # polarity and phase show when it is seated"; the check's `hour` names
+                    # it already). At Bind the essences are held by the vessel and off the
+                    # shelf, so the page had no row to read it from and said "Noon favours
+                    # this essence" (the final pass, 2026-10-06).
+                    "phase": (ph.phase or None) if ph else None})
     return out
 
 
@@ -2919,7 +2957,8 @@ def answer_pending(record, property_id: str, answer: dict) -> dict:
         m.pop("pending")
     note = m.get("migrated")
     if isinstance(note, dict):
-        line = f"{prop['name']}: you named it — {'; '.join(effectspec.property_lines(prop, choice))}."
+        # Plain words, no dash (the final pass, 2026-10-06: "Bane: you named it — ...").
+        line = f"{prop['name']}, now named: {'; '.join(effectspec.property_lines(prop, choice))}."
         note["changes"] = [c for c in note.get("changes") or ()
                            if not str(c).startswith(f"{prop['name']}: waits")] + [line]
     # The binding still holds what the item now carries (it was made with this property).
@@ -3240,7 +3279,7 @@ KIND_GLYPH: dict[str, str] = {
 ACQUISITION: list[dict] = [
     {"id": "essence-hunt", "label": "Skim essence", "obtain": "gathered",
      "needs": {"biome": True},
-     "blurb": "Motes and residues are skimmed where the world runs thin — a forge's "
+     "blurb": "Motes and residues are skimmed where the world runs thin: a forge's "
               "heart, a storm's tail, the flagstones of a bad death. What is out "
               "depends on where you are standing and, for some of it, on the hour.",
      "yields_kind": "essence"},

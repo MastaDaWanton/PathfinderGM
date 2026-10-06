@@ -32,7 +32,7 @@
     KEYS: ["Space", "S"],
     HOLDS: [],
     HOLDS_STEADY: [],
-    SOUNDS: { hit: "enchant.draw", miss: "enchant.bind.miss" },
+    SOUNDS: { hit: "enchant.draw", miss: "enchant.miss" },
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C;
       var draws = Math.round(k.clamp(+ctx.tuning.draws || WORTH.length, 1, WORTH.length));

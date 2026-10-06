@@ -156,7 +156,7 @@
       ],
       "aliases": {"mi-holy": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#holy",
-      "text": "Good-aligned: it passes damage reduction that good passes, and deals an extra 2d6 damage to evil creatures — for now to any foe, since no alignment is tracked yet; it narrows to evil creatures once alignment is added."
+      "text": "Good-aligned: it passes damage reduction that good passes, and deals an extra 2d6 damage to evil creatures. For now that is any foe, since no alignment is tracked yet; it narrows to evil creatures once alignment is added."
     },
     {
       "id": "unholy", "name": "Unholy", "gear": ["weapon"], "plus": 2, "cl": 7,
@@ -174,7 +174,7 @@
       ],
       "aliases": {"mi-unholy": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#unholy",
-      "text": "Evil-aligned: it passes damage reduction that evil passes, and deals an extra 2d6 damage to good creatures — for now to any foe, since no alignment is tracked yet; it narrows to good creatures once alignment is added."
+      "text": "Evil-aligned: it passes damage reduction that evil passes, and deals an extra 2d6 damage to good creatures. For now that is any foe, since no alignment is tracked yet; it narrows to good creatures once alignment is added."
     },
     {
       "id": "axiomatic", "name": "Axiomatic", "gear": ["weapon"], "plus": 2, "cl": 7,
@@ -192,7 +192,7 @@
       ],
       "aliases": {"mi-axiomatic": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#axiomatic",
-      "text": "Lawful-aligned: it passes damage reduction that lawful passes, and deals an extra 2d6 damage to chaotic creatures — for now to any foe, since no alignment is tracked yet; it narrows to chaotic creatures once alignment is added."
+      "text": "Lawful-aligned: it passes damage reduction that lawful passes, and deals an extra 2d6 damage to chaotic creatures. For now that is any foe, since no alignment is tracked yet; it narrows to chaotic creatures once alignment is added."
     },
     {
       "id": "anarchic", "name": "Anarchic", "gear": ["weapon"], "plus": 2, "cl": 7,
@@ -210,7 +210,7 @@
       ],
       "aliases": {"mi-anarchic": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#anarchic",
-      "text": "Chaotic-aligned: it passes damage reduction that chaotic passes, and deals an extra 2d6 damage to lawful creatures — for now to any foe, since no alignment is tracked yet; it narrows to lawful creatures once alignment is added."
+      "text": "Chaotic-aligned: it passes damage reduction that chaotic passes, and deals an extra 2d6 damage to lawful creatures. For now that is any foe, since no alignment is tracked yet; it narrows to lawful creatures once alignment is added."
     },
     {
       "id": "ghost-touch", "name": "Ghost Touch", "gear": ["weapon"], "plus": 1, "cl": 9,
@@ -692,7 +692,7 @@
       "requires": {},
       "documents": [],
       "reads_tag": "The incorporeal attack path asks has_state('property.ghost-touch-armour') of the defender's armour and shield: their enhancement and armour bonuses count against an incorporeal creature's touch attacks; an incorporeal creature can wear it.",
-      "not_yet": ["Its first clause is read since lane C (2026-10-05): an incorporeal creature's touch attack meets the armour and shield bonuses. The second — an incorporeal creature can wear it — has no reader: nothing lets an incorporeal body put armour on."],
+      "not_yet": ["Its first clause is read since lane C (2026-10-05): an incorporeal creature's touch attack meets the armour and shield bonuses. The second (an incorporeal creature can wear it) has no reader: nothing lets an incorporeal body put armour on."],
       "aliases": {"mi-ghost-touch-armour": {}},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/armor.html#ghost-touch",
       "text": "Its armour and enhancement bonuses count against incorporeal creatures' touch attacks, and an incorporeal creature can wear it."

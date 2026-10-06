@@ -215,6 +215,32 @@ def _key(spec: dict) -> tuple:
 
 # --- the build -------------------------------------------------------------------------------
 
+def _parts_label(parts) -> str:
+    """The roll term's words for a summed row: which forged pieces it comes from, "forged
+    iron head" or "forged ash haft and brass guard".
+
+    Every summed spec used to reach a roll under the item's name alone, so a Superior iron
+    longsword's damage read "+4 Superior Iron Longsword" beside the Str term (the final
+    pass, 2026-10-06, read off `damage_modifiers` with the sword in hand). Measured, it is no
+    double count: it is the forge's own house number for the iron head, 2 x 1.5 for its one
+    strengthening pass x 1.5 for Superior = 4.5, toward zero 4, and the only damage term the
+    sword adds. It needed naming, not removing. The sheet's reader takes a spec's `label`
+    before the item's name (`Actor._standing_mods`)."""
+    words = []
+    for slot, mid in parts:
+        doc = material(mid) or {}
+        name = str(doc.get("name") or mid.replace("-", " ")).lower()
+        # "Ash Haft" and "Brass Guard" already say the piece; "Iron" does not.
+        piece = slot if not any(w in name.split() for w in
+                                ("haft", "guard", "grip", "pommel", "head", "blade", "body",
+                                 "lining", "fastenings", "buckle", "rivets", "straps")) else ""
+        words.append(f"{name} {piece}".strip())
+    if not words:
+        return ""
+    return "forged " + (words[0] if len(words) == 1
+                        else ", ".join(words[:-1]) + " and " + words[-1])
+
+
 def build(record: dict) -> dict:
     """Everything a forged item does, from its record (contract §4).
 
@@ -310,6 +336,8 @@ def build(record: dict) -> dict:
                 row["raw_bonus"] += weighted
             if mid not in row["sources"]:
                 row["sources"].append(mid)
+            if (slot, mid) not in row.setdefault("parts", []):
+                row["parts"].append((slot, mid))
 
     sums: list[dict] = []
     specs: list[dict] = []
@@ -331,7 +359,8 @@ def build(record: dict) -> dict:
             continue
         out = {"type": row["type"], "target": row["target"], "amount": final,
                "bonus_type": row["bonus_type"] or "material",
-               "origin": origin, "source": "+".join(row["sources"])}
+               "origin": origin, "source": "+".join(row["sources"]),
+               "label": _parts_label(row.get("parts") or ())}
         if row["bypass"]:
             out["bypass"] = row["bypass"]
         if row["when"]:

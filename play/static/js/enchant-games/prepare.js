@@ -36,7 +36,11 @@
     KEYS: ["1", "2", "3", "4", "5", "6", "ArrowLeft", "ArrowRight", "Space", "Enter"],
     HOLDS: [],
     HOLDS_STEADY: [],
-    SOUNDS: { hit: "enchant.chalk", miss: "enchant.bind.miss" },
+    // Each piece is heard as what it is (UI plan §11): chalk scrapes, salt patters, ink
+    // drips and the bell, the test step, rings. A treatment, focus or catalyst is laid with
+    // the chalk's stroke. The miss is the circle's one muffled bowl (`enchant.miss`).
+    SOUNDS: { hit: "enchant.chalk", chalk: "enchant.chalk", salt: "enchant.salt",
+              ink: "enchant.ink", bell: "enchant.bell", miss: "enchant.miss" },
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C, steady = ctx.steady;
       var seq = (ctx.seq || []).map(function (s) { return String(s || "").toLowerCase(); })
@@ -74,7 +78,7 @@
         if (kinds[idx] === seq[step]) {
           res[step] = Math.max(0, 1 - wrong[step] * cost) * pace(t - stepStart);
           shown[step] = true;
-          ctx.hit(res[step], slot.x, slot.y, "grit", step);
+          ctx.hit(res[step], slot.x, slot.y, "grit", step, seq[step]);
           advance();
         } else {
           wrong[step]++;

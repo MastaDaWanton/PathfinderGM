@@ -230,11 +230,13 @@ def test_the_working_draws_the_servers_numbers_and_never_sums_them():
 
 def test_flawed_is_a_word_and_never_the_curse():
     """Owner round 4 point 2: the d20 and the margin are shown and the verdict says FLAWED;
-    which curse stays hidden. The table's verdict knows only success and failure, so the
-    shell casts FLAWED itself in the failing cast, and no file of this lane reads a curse
-    record's fields: only the card's words, sent by the server once the curse is known."""
+    which curse stays hidden. The table's verdict (22) casts FLAWED on the mat itself in the
+    failing cast (the final pass moved it there from the circle, tests/test_enchant_polish.py),
+    and no file of this lane reads a curse record's fields: only the card's words, sent by the
+    server once the curse is known."""
     code = _code(_src(SHELL))
-    assert 'word: "Flawed"' in code and "good: false" in code
+    verdict = _code(_src(TABLE_JS / "22-roll-verdict.js"))
+    assert 'word: "Flawed"' in verdict and "good: false" in verdict
     for path in OURS:
         c = _code(_src(path))
         for field in ("d100", "curse.row", "curse.detail", "curse.tags", "curse_id"):
@@ -259,9 +261,11 @@ def test_a_redraw_after_a_finish_keeps_the_keyboard_on_next():
 def test_the_phase_line_names_only_the_essence_it_favours():
     """Seen live: with flaming (noon) and bane (dusk) seated, the line read "Noon favours
     Flaming Essence, Bane Essence". The phase belongs to the essence whose family names it,
-    read from its shelf row's `phase`, never every seated name."""
+    read from the seat's own `phase` (the server's, since the final pass: at Bind the essences
+    are held by the vessel and off the shelf, and the line fell back to "this essence") or
+    its shelf row's, never every seated name."""
     code = _code(_src(SHELL))
-    assert "it.phase === phase" in code
+    assert "(s.phase || (it && it.phase)) === phase" in code
 
 
 def test_a_forge_icon_is_drawn_as_art_not_a_letter():
@@ -447,16 +451,22 @@ def test_the_equipment_tab_wields_a_forged_weapon_and_reads_its_magic(circle):
     Equipment row offered Wear, which wrote it into the gloves' slot ("puts on +1 Flaming
     Superior Iron Longsword (hands)") and left the rapier in hand; nothing on the tab could
     draw it, and lane U5 found its line read "for show, no effect in play". The row offers
-    Wield through the engine's own `wear` op, and Put away once it is in hand, and its line
-    is the item card's."""
+    Wield through the engine's own `wear` op, and Put away once it is in hand. Its magic is
+    the item card's, which 18-tab-equipment draws under the row from `api/enchant/items`; the
+    row's own line is the weapon's facts (the final pass, 2026-10-06, found the card's lines
+    said twice, once in the line and once in the card)."""
     from play import views
 
     pc = cm.current().scene.pc()
     pc.add_stock(forge_items.stock_item(_layered()), 1)
+    cm.current().save()
     row = next(r for r in views._carried(pc) if r["key"] == "flame-sword")
     assert [a["label"] for a in row["acts"]] == ["Wield"]
     assert row["acts"][0]["body"] == {"item": "flame-sword", "op": "wield"}
-    assert row["known"] and "fire" in row["line"]
+    assert row["known"] and row["line"].startswith("1d8") and "fire" not in row["line"]
+    card = next(i for i in circle.get("/api/enchant/items").json()["items"]
+                if i["key"] == "stock:flame-sword")["card"]
+    assert any("fire" in x for x in (card.get("lines") or [])) or "aura" in str(card.get("aura"))
     pc.equipped = "flame-sword"
     rows = [r for r in views._carried(pc) if r["key"] == "flame-sword"]
     # Once in hand it is one row, not its pack row and a second "flame-sword" weapon row.
