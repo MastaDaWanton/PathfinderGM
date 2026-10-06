@@ -391,3 +391,19 @@ def test_one_store_and_no_second_settle():
         if "inprogress.settle(" in text or "settle_steeping(" in text:
             callers.append(path.name)
     assert callers == ["engine.py"], callers
+
+
+def test_the_enchanter_is_registered_whatever_was_imported_first():
+    """Lane E: a binding collected before anything imported rules.enchanter fell back to
+    a placeholder craft with no collect, lifted the block, and never wrote the layer —
+    import order decided whether the sword was made. The registry asks for it, as it
+    already asked for herbalism."""
+    import subprocess
+    import sys
+
+    code = ("import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', "
+            "'pathfindergm.settings'); django.setup(); "
+            "from rules import inprogress; print('enchanter' in inprogress._registry())")
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         stdin=subprocess.DEVNULL, timeout=120)
+    assert out.stdout.strip().endswith("True"), out.stderr[-500:]

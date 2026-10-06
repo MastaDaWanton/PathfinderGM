@@ -100,6 +100,12 @@ def _registry() -> dict[str, _Craft]:
     # reach `settle` before anything has imported crafting, so the section asks for it.
     if "herbalist" not in _CRAFTS:
         from . import crafting  # noqa: F401  — registers `herbalist`
+    # The same for the enchanter (lane E): a binding collected before anything imported
+    # rules.enchanter fell back to a placeholder with no collect, lifted the block, and the
+    # layer was never written. In the server the url import hides it; outside it, order
+    # decided whether a +1 sword was ever made.
+    if "enchanter" not in _CRAFTS:
+        from . import enchanter  # noqa: F401  — registers `enchanter`
     return _CRAFTS
 
 
