@@ -1,0 +1,300 @@
+{
+  "_note": "The authored formulae (alchemy plan §10.1, §5.4; contracts §5). Read by rules/formulae.py, which adds one derived row per corpus spell whose effects all execute; an authored row wins by id and by spell. A formula keys on ESSENCES (rules/effectspec.py), never on materials (owner Q4.2), and every authored signature — the family plus the set of essences — is unique, because the classics and the 44 are found by experiment (owner, open point 4) and experiment can only tell formulae apart by signature (tests/test_formulae.py pins it). Book numbers are typed by hand from the primary sources named in each row's `source` (Q1.4: the book's numbers win); no model wrote any of them. `book: true` on a core document marks a printed number, never scaled by grade; `house: true` marks a number the owner reviews.",
+  "version": 1,
+  "_starting_note": "What every alchemist knows from the start (owner Q5.4): the four book classics. formulae.grant_starting writes them.",
+  "starting": ["alchemists-fire", "acid-flask", "antitoxin", "tanglefoot-bag"],
+  "_awaiting_note": "Conditions a core may name before the engine lane adds them this wave (contracts §2.3). Validation treats them as present; formulae.get(id)['waiting'] names them, so nothing pretends. Delete a line when rules/states.py has the condition.",
+  "awaiting": {
+    "glued": "the glued condition and the break_free op (rules/states.py, rules/engine.py), alchemy lane C, contracts §2.3 and §7"
+  },
+  "_left_out": "Two of docs/alchemy.md's eighteen recipe-table items have no formula, on purpose. Bladeguard (UE p.101: a weapon immune to an ooze's or rust monster's corrosion for 24 hours) and vermin repellent (UE p.101: Fine vermin avoid you; swarms need DC 15 Fortitude to enter your square) say nothing a typed effect can carry today: no reader asks whether a held weapon resists object damage, and no reader asks a swarm to save before it moves. Typed as a prose `immunity` they would be granted and read by nobody — prose that pretends. They stay shop goods until a reader exists.",
+  "classics": [
+    {
+      "id": "acid-flask", "name": "Acid", "kind": "classic", "book": true,
+      "family": "splash", "families": ["splash"],
+      "requires": {"essences": {"acid": 1}},
+      "core": [
+        {"type": "damage", "dice": "1d6", "damage_type": "acid", "lethality": "lethal",
+         "route": "struck", "book": true}
+      ],
+      "splash": {"amount": 1, "damage_type": "acid"},
+      "range_increment_ft": 10,
+      "craft_dc": 15, "price_gp": 10, "level": 1, "tier": "common",
+      "source": "CRB, Goods and Services, Special Substances and Items (legacy.aonprd.com/coreRulebook/equipment.html)"
+    },
+    {
+      "id": "alchemists-fire", "name": "Alchemist's fire", "kind": "classic", "book": true,
+      "family": "splash", "families": ["splash"],
+      "requires": {"essences": {"fire": 1}},
+      "core": [
+        {"type": "damage", "dice": "1d6", "damage_type": "fire", "lethality": "lethal",
+         "route": "struck", "book": true},
+        {"type": "burning", "dice": "1d6", "damage_type": "fire", "rounds": 1,
+         "save": "ref", "dc": 15, "smother_bonus": 2, "route": "struck", "book": true,
+         "note": "the round following a direct hit; a full-round action to put out, and rolling on the ground is the +2"}
+      ],
+      "splash": {"amount": 1, "damage_type": "fire"},
+      "range_increment_ft": 10,
+      "craft_dc": 20, "price_gp": 20, "level": 1, "tier": "common",
+      "source": "CRB, Goods and Services; aonprd.com EquipmentMiscDisplay.aspx?ItemName=Alchemist's fire"
+    },
+    {
+      "id": "liquid-ice", "name": "Liquid ice", "kind": "classic", "book": true,
+      "family": "splash", "families": ["splash"],
+      "requires": {"essences": {"frost": 1}},
+      "core": [
+        {"type": "damage", "dice": "1d6", "damage_type": "cold", "lethality": "lethal",
+         "route": "struck", "book": true}
+      ],
+      "splash": {"amount": 1, "damage_type": "cold"},
+      "range_increment_ft": 10,
+      "craft_dc": 25, "price_gp": 40, "level": 1, "tier": "uncommon",
+      "source": "Ultimate Equipment p.107, APG p.184 (aonprd.com, Liquid ice, checked 2026-10-06). Freezing a liquid or icing an object is left to the GM; the thrown use is the book's splash weapon."
+    },
+    {
+      "id": "alkali-flask", "name": "Alkali flask", "kind": "classic", "book": true,
+      "family": "splash", "families": ["splash"],
+      "requires": {"essences": {"acid": 1, "purity": 1}},
+      "core": [
+        {"type": "damage", "dice": "1d6", "damage_type": "acid", "lethality": "lethal",
+         "route": "struck", "book": true},
+        {"type": "damage", "dice": "1d6", "damage_type": "acid", "lethality": "lethal",
+         "route": "struck", "book": true, "when": {"target": {"type": "ooze"}},
+         "note": "double damage against oozes"}
+      ],
+      "splash": {"amount": 1, "damage_type": "acid"},
+      "range_increment_ft": 10,
+      "craft_dc": 20, "price_gp": 15, "level": 1, "tier": "common",
+      "source": "Ultimate Equipment p.107, APG p.184 (aonprd.com, Alkali flask, checked 2026-10-06): a flask of acid, double damage against oozes"
+    },
+    {
+      "id": "tanglefoot-bag", "name": "Tanglefoot bag", "kind": "classic", "book": true,
+      "family": "splash", "families": ["splash"],
+      "requires": {"essences": {"binding": 1}},
+      "core": [
+        {"type": "apply_condition", "target": "entangled", "route": "struck", "book": true,
+         "duration": {"amount": "2d4", "unit": "round"},
+         "note": "until the goo goes brittle after 2d4 rounds; Huge and larger creatures are unaffected"},
+        {"type": "save_gate", "target": "ref", "dc": 15, "route": "struck", "book": true,
+         "on_failure": [
+           {"type": "apply_condition", "target": "glued", "book": true,
+            "duration": {"amount": "2d4", "unit": "round"},
+            "note": "glued to the floor (a flier falls); DC 17 Strength or 15 slashing damage to the goo breaks free"}
+         ]}
+      ],
+      "splash": null,
+      "range_increment_ft": 10,
+      "craft_dc": 25, "price_gp": 50, "level": 1, "tier": "uncommon",
+      "source": "CRB, Goods and Services; aonprd.com EquipmentMiscDisplay.aspx?ItemName=Tanglefoot bag"
+    },
+    {
+      "id": "itching-powder", "name": "Itching powder", "kind": "classic", "book": true,
+      "family": "splash", "families": ["splash"],
+      "requires": {"essences": {"decay": 1}},
+      "core": [
+        {"type": "save_gate", "target": "fort", "dc": 12, "route": "struck", "book": true,
+         "on_failure": [
+           {"type": "apply_condition", "target": "sickened", "house": true,
+            "duration": {"amount": 10, "unit": "minute"},
+            "note": "the book's itch is -2 on attack rolls, saves, skill and ability checks until washed off (a full round): sickened's penalties, which add -2 weapon damage; 10 minutes stands in for 'until washed off'"}
+         ]},
+        {"type": "save_gate", "target": "fort", "dc": 8, "route": "splash", "book": true,
+         "on_failure": [
+           {"type": "apply_condition", "target": "sickened", "house": true,
+            "duration": {"amount": 10, "unit": "minute"}}
+         ]}
+      ],
+      "splash": null,
+      "range_increment_ft": 10,
+      "craft_dc": 25, "price_gp": 60, "level": 1, "tier": "uncommon",
+      "source": "Ultimate Equipment p.107 (aonprd.com, Itching powder, checked 2026-10-06): DC 12 Fortitude on the square struck, DC 8 adjacent; a poison effect. The condition and its 10 minutes are house (owner reviews)."
+    },
+    {
+      "id": "thunderstone", "name": "Thunderstone", "kind": "classic", "book": true,
+      "family": "cloud", "families": ["cloud"],
+      "requires": {"essences": {"thunder": 1}},
+      "core": [
+        {"type": "save_gate", "target": "fort", "dc": 15, "route": "area", "book": true,
+         "on_failure": [
+           {"type": "apply_condition", "target": "deafened", "book": true,
+            "duration": {"amount": 1, "unit": "hour"}}
+         ]}
+      ],
+      "area": {"shape": "burst", "radius_ft": 10},
+      "aim": "square",
+      "range_increment_ft": 20,
+      "craft_dc": 25, "price_gp": 30, "level": 1, "tier": "uncommon",
+      "source": "CRB, Goods and Services: thrown at a square (AC 5), 10-ft-radius spread, DC 15 Fortitude or deafened 1 hour"
+    },
+    {
+      "id": "flash-powder", "name": "Flash powder", "kind": "classic", "book": true,
+      "family": "cloud", "families": ["cloud"],
+      "requires": {"essences": {"light": 1}},
+      "core": [
+        {"type": "save_gate", "target": "fort", "dc": 13, "route": "area", "book": true,
+         "on_failure": [
+           {"type": "apply_condition", "target": "blinded", "book": true,
+            "duration": {"amount": 1, "unit": "round"}}
+         ]}
+      ],
+      "area": {"shape": "burst", "radius_ft": 10},
+      "aim": "square",
+      "range_increment_ft": 10,
+      "craft_dc": 20, "price_gp": 50, "level": 1, "tier": "uncommon",
+      "source": "Ultimate Equipment p.107, APG p.184 (aonprd.com, Flash powder, checked 2026-10-06): thrown against the floor as a standard action, 10-ft-radius burst, blinded 1 round, Fortitude DC 13 negates. The 10-ft range increment is house: the book gives none."
+    },
+    {
+      "id": "antitoxin", "name": "Antitoxin", "kind": "classic", "book": true,
+      "family": "potion", "families": ["potion"],
+      "requires": {"essences": {"ward": 1, "decay": 1}},
+      "core": [
+        {"type": "save_mod", "amount": 5, "bonus_type": "alchemical", "target": "fort",
+         "when": {"against": "poison"}, "duration": {"amount": 1, "unit": "hour"},
+         "route": "ingest", "source": "antitoxin", "book": true}
+      ],
+      "craft_dc": 25, "price_gp": 50, "level": 1, "tier": "uncommon",
+      "source": "CRB, Goods and Services: +5 alchemical bonus on Fortitude saves against poison for 1 hour"
+    },
+    {
+      "id": "antiplague", "name": "Antiplague", "kind": "classic", "book": true,
+      "family": "potion", "families": ["potion"],
+      "requires": {"essences": {"ward": 1, "purity": 1}},
+      "core": [
+        {"type": "save_mod", "amount": 5, "bonus_type": "alchemical", "target": "fort",
+         "when": {"against": "disease"}, "duration": {"amount": 1, "unit": "hour"},
+         "route": "ingest", "source": "antiplague", "book": true,
+         "note": "already infected: the book also gives two saves that day without the bonus, keeping the better"}
+      ],
+      "craft_dc": 25, "price_gp": 50, "level": 1, "tier": "uncommon",
+      "source": "Ultimate Equipment p.101, APG p.184 (aonprd.com, Antiplague, checked 2026-10-06)"
+    },
+    {
+      "id": "smelling-salts", "name": "Smelling salts", "kind": "classic", "book": true,
+      "family": "potion", "families": ["potion"],
+      "requires": {"essences": {"mind": 1, "storm": 1}},
+      "core": [
+        {"type": "remove_condition", "target": "staggered", "route": "inhale", "house": true},
+        {"type": "remove_condition", "target": "unconscious", "route": "inhale", "house": true,
+         "note": "the book grants a NEW SAVE against what knocked you out or staggered you; dying, you wake staggered, and a strenuous act costs 1 hit point and drops you again. No typed effect can grant a re-save, so the waking is certain here: house, for the owner to review"}
+      ],
+      "craft_dc": 25, "price_gp": 25, "level": 1, "tier": "uncommon",
+      "source": "Ultimate Equipment p.101, APG p.184 (aonprd.com, Smelling salts, checked 2026-10-06); the core is house"
+    },
+    {
+      "id": "alchemical-grease", "name": "Alchemical grease", "kind": "classic", "book": true,
+      "family": "oil", "families": ["oil"],
+      "requires": {"essences": {"grace": 1}},
+      "core": [
+        {"type": "skill_mod", "amount": 5, "bonus_type": "alchemical", "target": "escape artist",
+         "duration": {"amount": 4, "unit": "hour"}, "route": "skin", "source": "alchemical grease", "book": true},
+        {"type": "combat_mod", "amount": 5, "bonus_type": "alchemical", "target": "cmb",
+         "when": {"maneuver": "grapple"}, "duration": {"amount": 4, "unit": "hour"},
+         "route": "skin", "source": "alchemical grease", "book": true,
+         "note": "to escape a grapple"},
+        {"type": "combat_mod", "amount": 5, "bonus_type": "alchemical", "target": "cmd",
+         "when": {"maneuver": "grapple"}, "duration": {"amount": 4, "unit": "hour"},
+         "route": "skin", "source": "alchemical grease", "book": true}
+      ],
+      "craft_dc": 15, "price_gp": 5, "level": 1, "tier": "common",
+      "source": "Ultimate Equipment p.101, APG p.183 (aonprd.com, Alchemical grease, checked 2026-10-06): 4 hours or until washed off"
+    },
+    {
+      "id": "holy-weapon-balm", "name": "Holy weapon balm", "kind": "classic", "book": false,
+      "family": "oil", "families": ["oil"],
+      "requires": {"essences": {"light": 1, "vigour": 1}},
+      "core": [
+        {"type": "damage", "dice": "1d4", "damage_type": "positive", "lethality": "lethal",
+         "trigger": "hit", "when": {"target": {"type": "undead"}},
+         "duration": {"amount": 1, "unit": "minute"}, "route": "external", "house": true,
+         "note": "the coated weapon's blows sear the undead"}
+      ],
+      "craft_dc": 20, "price_gp": 25, "level": 1, "tier": "uncommon",
+      "source": "house (docs/alchemy.md's recipe table); no printed item. Inside the uncommon dice ceiling (1d6, plan §5.6); the owner reviews."
+    },
+    {
+      "id": "sunrod", "name": "Sunrod", "kind": "classic", "book": true,
+      "family": "tool", "families": ["tool"],
+      "requires": {"essences": {"light": 1}},
+      "core": [
+        {"type": "light", "radius_ft": 30, "raised_ft": 60,
+         "duration": {"amount": 6, "unit": "hour"}, "book": true,
+         "note": "struck against a hard surface as a standard action"}
+      ],
+      "craft_dc": 25, "price_gp": 2, "level": 1, "tier": "common",
+      "source": "CRB, Goods and Services; CRB Vision and Light (the light source table: sunrod 30 ft, raised 60 ft)"
+    },
+    {
+      "id": "smokestick", "name": "Smokestick", "kind": "classic", "book": true,
+      "family": "tool", "families": ["tool"],
+      "requires": {"essences": {"shadow": 1}},
+      "core": [
+        {"type": "manifest", "what": "thick, opaque smoke", "terrain": "obscuring",
+         "shape": "square", "size": 10, "duration": {"amount": 1, "unit": "minute"},
+         "route": "area", "book": true,
+         "note": "treat as fog cloud; a moderate or stronger wind clears it in 1 round"}
+      ],
+      "craft_dc": 20, "price_gp": 20, "level": 1, "tier": "common",
+      "source": "CRB, Goods and Services: a 10-ft cube, as fog cloud, for 1 minute"
+    },
+    {
+      "id": "tindertwig", "name": "Tindertwig", "kind": "classic", "book": true,
+      "family": "tool", "families": ["tool"],
+      "requires": {"essences": {"fire": 1}},
+      "lights": "torch",
+      "core": [
+        {"type": "light", "radius_ft": 20, "raised_ft": 40,
+         "duration": {"amount": 1, "unit": "hour"}, "book": true,
+         "note": "the torch it lights, as a standard action rather than a full-round action (a torch burns 1 hour: CRB, the light source table)"}
+      ],
+      "craft_dc": 20, "price_gp": 1, "level": 1, "tier": "common",
+      "source": "CRB, Goods and Services; the torch's 20 ft and 40 ft from CRB Vision and Light"
+    }
+  ],
+  "_potions_note": "The 44 shipped spell potions as formulae. Everything but `requires` is the potion file's own (content/materials/alchemist-spell-potions.json: id, spell, spell level, caster level, tier, effects), kept exactly (owner Q10.2). The essences are hand-chosen: the derivation table gives most of these spells ONE essence (cure light, moderate and serious wounds are all vigour), and authored signatures must be unique, so a second essence tells siblings apart — chosen from what the spell does and from the key material its old recipe used, so that once the materials pass (lane D) gives those materials their essences, every old recipe still makes its potion (tests/test_formulae.py checks it as soon as the materials carry essences).",
+  "potions": [
+    {"id": "potion-of-cure-light-wounds", "requires": {"essences": {"vigour": 1}}},
+    {"id": "potion-of-cure-moderate-wounds", "requires": {"essences": {"vigour": 1, "purity": 1}}},
+    {"id": "potion-of-cure-serious-wounds", "requires": {"essences": {"vigour": 1, "ward": 1}}},
+    {"id": "potion-of-false-life", "requires": {"essences": {"vigour": 1, "decay": 1}}},
+    {"id": "potion-of-aid", "requires": {"essences": {"vigour": 1, "mind": 1}}},
+    {"id": "potion-of-bear-s-endurance", "requires": {"essences": {"vigour": 1, "might": 1}}},
+    {"id": "potion-of-neutralize-poison", "requires": {"essences": {"purity": 1}}},
+    {"id": "potion-of-delay-poison", "requires": {"essences": {"purity": 1, "decay": 1}}},
+    {"id": "potion-of-remove-fear", "requires": {"essences": {"purity": 1, "mind": 1}}},
+    {"id": "potion-of-remove-paralysis", "requires": {"essences": {"purity": 1, "binding": 1}}},
+    {"id": "potion-of-lesser-restoration", "requires": {"essences": {"purity": 1, "might": 1}}},
+    {"id": "potion-of-water-breathing", "requires": {"essences": {"purity": 1, "change": 1}}},
+    {"id": "potion-of-bull-s-strength", "requires": {"essences": {"might": 1}}},
+    {"id": "potion-of-enlarge-person", "requires": {"essences": {"might": 1, "change": 1}}},
+    {"id": "potion-of-heroism", "requires": {"essences": {"mind": 1, "might": 1}}},
+    {"id": "potion-of-cat-s-grace", "requires": {"essences": {"grace": 1}}},
+    {"id": "potion-of-reduce-person", "requires": {"essences": {"grace": 1, "change": 1}}},
+    {"id": "potion-of-expeditious-retreat", "requires": {"essences": {"grace": 1, "lightness": 1}}},
+    {"id": "potion-of-longstrider", "requires": {"essences": {"grace": 1, "might": 1}}},
+    {"id": "potion-of-haste", "requires": {"essences": {"grace": 1, "ward": 1}}},
+    {"id": "potion-of-fox-s-cunning", "requires": {"essences": {"mind": 1}}},
+    {"id": "potion-of-owl-s-wisdom", "requires": {"essences": {"mind": 1, "sight": 1}}},
+    {"id": "potion-of-eagle-s-splendor", "requires": {"essences": {"mind": 1, "lightness": 1}}},
+    {"id": "potion-of-comprehend-languages", "requires": {"essences": {"mind": 1, "shadow": 1}}},
+    {"id": "potion-of-jump", "requires": {"essences": {"lightness": 1, "might": 1}}},
+    {"id": "potion-of-spider-climb", "requires": {"essences": {"lightness": 1, "binding": 1}}},
+    {"id": "potion-of-fly", "requires": {"essences": {"lightness": 1}}},
+    {"id": "potion-of-gaseous-form", "requires": {"essences": {"lightness": 1, "change": 1}}},
+    {"id": "potion-of-pass-without-trace", "requires": {"essences": {"shadow": 1, "lightness": 1}}},
+    {"id": "potion-of-invisibility", "requires": {"essences": {"shadow": 1}}},
+    {"id": "potion-of-blur", "requires": {"essences": {"shadow": 1, "change": 1}}},
+    {"id": "potion-of-darkvision", "requires": {"essences": {"sight": 1}}},
+    {"id": "potion-of-see-invisibility", "requires": {"essences": {"sight": 1, "light": 1}}},
+    {"id": "potion-of-mage-armor", "requires": {"essences": {"ward": 1}}},
+    {"id": "potion-of-resist-energy", "requires": {"essences": {"ward": 1, "fire": 1}}},
+    {"id": "potion-of-protection-from-energy", "requires": {"essences": {"ward": 1, "frost": 1}}},
+    {"id": "potion-of-endure-elements", "requires": {"essences": {"ward": 1, "storm": 1}}},
+    {"id": "potion-of-protection-from-evil", "requires": {"essences": {"ward": 1, "light": 1}}},
+    {"id": "potion-of-shield-of-faith", "requires": {"essences": {"ward": 1, "mind": 1}}},
+    {"id": "potion-of-barkskin", "requires": {"essences": {"ward": 1, "change": 1}}},
+    {"id": "oil-of-magic-weapon", "requires": {"essences": {"might": 1}}},
+    {"id": "oil-of-magic-fang", "requires": {"essences": {"might": 1, "grace": 1}}},
+    {"id": "oil-of-align-weapon", "requires": {"essences": {"light": 1, "binding": 1}}},
+    {"id": "oil-of-keen-edge", "requires": {"essences": {"might": 1, "change": 1}}}
+  ]
+}

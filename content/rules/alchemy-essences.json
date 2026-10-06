@@ -1,0 +1,249 @@
+{
+  "_note": "The derivation table (alchemy plan §5.3, §10.3, §11; contracts §2.1, §5): how a spell's essences are read out of what the spell already states, so every corpus spell whose effects are executable becomes a formula with no hand-written row. Derived at load and never stored, as rules/spells.py derives range_value. The 18 essences themselves live in rules/effectspec.py ESSENCES (lane B: the materials pass validates against them before this file exists); every id named below is checked against that list on load and a row naming any other is refused (rules/formulae.py, essence_table_problems). Prior art: the Alchemy Manual's power components key a reagent to spells by school, subschool and descriptor (salt: necromancy; quicksilver: mind-affecting; phosphorus: light descriptor or teleportation subschool; gold: healing subschool) — aonprd.com/AlchemicalReagents.aspx — so the three columns here are Paizo's own keys, plus what the spell's typed effects do. Weights: a descriptor is a rules fact with mechanical consequences (rules/spells.py) and decides most; a subschool narrows the school; each effect document votes once; the school is the tie-breaker of last resort. The top `max_per_spell` essences are kept: a formula keyed on five essences could not be reached by experiment, and the plan's draft mapping measured the biggest bucket at two (binding and mind). Tuning lives here, never in code.",
+  "version": 1,
+  "max_per_spell": 2,
+  "min_secondary": 2,
+  "weights": {
+    "descriptor": 3,
+    "subschool": 2,
+    "effect": 1,
+    "school": 1
+  },
+  "descriptors": {
+    "fire": "fire",
+    "cold": "frost",
+    "acid": "acid",
+    "electricity": "storm",
+    "sonic": "thunder",
+    "light": "light",
+    "darkness": "shadow",
+    "shadow": "shadow",
+    "mind-affecting": "mind",
+    "emotion": "mind",
+    "fear": "mind",
+    "language-dependent": "mind",
+    "poison": "decay",
+    "disease": "decay",
+    "death": "decay",
+    "pain": "decay",
+    "curse": "decay",
+    "air": "lightness",
+    "earth": "might",
+    "water": "change",
+    "force": "ward",
+    "good": "light",
+    "evil": "shadow",
+    "lawful": "binding",
+    "chaotic": "change"
+  },
+  "subschools": {
+    "healing": "vigour",
+    "charm": "mind",
+    "compulsion": "binding",
+    "teleportation": "lightness",
+    "polymorph": "change",
+    "creation": "change",
+    "summoning": "change",
+    "calling": "change",
+    "scrying": "sight",
+    "glamer": "shadow",
+    "figment": "shadow",
+    "shadow": "shadow",
+    "pattern": "mind",
+    "phantasm": "mind"
+  },
+  "schools": {
+    "abjuration": "ward",
+    "conjuration": "change",
+    "divination": "sight",
+    "enchantment": "mind",
+    "evocation": "might",
+    "illusion": "shadow",
+    "necromancy": "decay",
+    "transmutation": "change",
+    "universal": "change"
+  },
+  "damage_types": {
+    "fire": "fire",
+    "cold": "frost",
+    "acid": "acid",
+    "electricity": "storm",
+    "sonic": "thunder",
+    "negative": "decay",
+    "poison": "decay",
+    "positive": "vigour",
+    "force": "might",
+    "bludgeoning": "might",
+    "piercing": "might",
+    "slashing": "might"
+  },
+  "effect_types": {
+    "heal": "vigour",
+    "temp_hp": "vigour",
+    "fast_healing": "vigour",
+    "ability_restore": "vigour",
+    "remove_condition": "purity",
+    "suppress_condition": "purity",
+    "resistance": "ward",
+    "damage_reduction": "ward",
+    "spell_resistance": "ward",
+    "immunity": "ward",
+    "save_mod": "ward",
+    "fortification": "ward",
+    "concealment": "shadow",
+    "sense": "sight",
+    "light": "light",
+    "burning": "fire",
+    "ability_damage": "decay",
+    "ability_drain": "decay",
+    "negative_level": "decay",
+    "vulnerability": "decay",
+    "bleed": "decay",
+    "attitude": "mind",
+    "summon": "change",
+    "object_damage": "acid"
+  },
+  "targets": {
+    "ability_mod": {
+      "str": "might",
+      "con": "might",
+      "dex": "grace",
+      "int": "mind",
+      "wis": "mind",
+      "cha": "mind"
+    },
+    "combat_mod": {
+      "attack": "might",
+      "damage": "might",
+      "cmb": "might",
+      "ac": "ward",
+      "touch_ac": "ward",
+      "cmd": "ward",
+      "initiative": "grace",
+      "caster_level": "mind",
+      "spell_resistance": "mind",
+      "hp_max": "vigour"
+    },
+    "speed": {
+      "land": "grace",
+      "fly": "lightness",
+      "climb": "lightness",
+      "swim": "lightness",
+      "burrow": "change",
+      "jump": "lightness"
+    },
+    "skill_mod": {
+      "acrobatics": "lightness",
+      "climb": "lightness",
+      "swim": "lightness",
+      "fly": "lightness",
+      "escape artist": "grace",
+      "sleight of hand": "grace",
+      "ride": "grace",
+      "stealth": "shadow",
+      "disguise": "shadow",
+      "perception": "sight",
+      "sense motive": "sight",
+      "survival": "sight",
+      "heal": "vigour",
+      "*": "mind"
+    },
+    "manifest": {
+      "obscuring": "shadow",
+      "difficult": "binding",
+      "blocked": "ward",
+      "none": "light"
+    },
+    "permission": {
+      "breathe_water": "change",
+      "endure_elements": "ward",
+      "comprehend_languages": "mind",
+      "pass_without_trace": "shadow",
+      "gaseous_form": "change",
+      "size_larger": "might",
+      "size_smaller": "grace",
+      "absorb_energy": "ward",
+      "ward_mind_control": "ward",
+      "ward_summoned_contact": "ward"
+    }
+  },
+  "_condition_note": "What laying a condition carries, asked of the condition's own tags by prefix (law 1: never by its name), first match wins: rules/states.py TAGS. Removing or holding off any condition is purity (effect_types).",
+  "condition_tags": [
+    [
+      "state.held",
+      "binding"
+    ],
+    [
+      "state.unable.paralyzed",
+      "binding"
+    ],
+    [
+      "state.unable.helpless",
+      "binding"
+    ],
+    [
+      "state.slowed",
+      "binding"
+    ],
+    [
+      "state.unable.stunned",
+      "thunder"
+    ],
+    [
+      "state.unable",
+      "mind"
+    ],
+    [
+      "state.fear",
+      "mind"
+    ],
+    [
+      "state.impaired.confused",
+      "mind"
+    ],
+    [
+      "state.impaired",
+      "decay"
+    ],
+    [
+      "state.senses.dazzled",
+      "light"
+    ],
+    [
+      "state.senses",
+      "sight"
+    ],
+    [
+      "state.hidden",
+      "shadow"
+    ],
+    [
+      "state.down.unconscious",
+      "mind"
+    ],
+    [
+      "state.down.petrified",
+      "change"
+    ],
+    [
+      "state.down",
+      "decay"
+    ],
+    [
+      "state.position.prone",
+      "might"
+    ],
+    [
+      "state.position",
+      "grace"
+    ],
+    [
+      "state.wound",
+      "decay"
+    ],
+    [
+      "attitude",
+      "mind"
+    ]
+  ]
+}
