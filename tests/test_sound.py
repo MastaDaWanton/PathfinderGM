@@ -398,6 +398,8 @@ def test_prefs_have_their_defaults_survive_broken_storage_and_tell_listeners(tmp
                                "sound.ui": 0.6, "sound.dice": 0.8, "sound.bench": 0.8,
                                # The Blacksmithing bench's bus (forge UI plan §6.8).
                                "sound.forge": 0.8,
+                               # The Enchanting circle's bus (enchanting UI plan §11).
+                               "sound.enchant": 0.8,
                                "sound.ambience": 0.4, "sound.combat": 0.7,
                                "sound.mute": False,
                                # The owner's soundtrack (music.js, 2026-10-02).
