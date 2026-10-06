@@ -401,7 +401,13 @@ VOCAB: dict[str, list[dict]] = {
     "skill": [{"id": k, "name": k.title()} for k in sorted(SKILLS)],
     "save": [{"id": k, "name": v} for k, v in SAVES.items()],
     "condition": [{"id": k, "name": v.get("name", k.title())}
-                  for k, v in sorted(CONDITIONS.items())],
+                  for k, v in sorted(CONDITIONS.items())]
+                 # Conditions the engine applies that the book's Appendix 2 does not print,
+                 # so they carry tags (rules/states.py) and no CONDITIONS row: the
+                 # tanglefoot bag's glued. Missing here, the tanglefoot formula was refused
+                 # as "'glued' is not a condition" the moment lane C's reader landed and
+                 # its `awaiting` note came off (2026-10-06).
+                 + [{"id": "glued", "name": "Glued"}],
     # Poison, negative and force are damage descriptors 1e uses and the corpus writes;
     # leaving them out sent Wyrmfang Venom's "1d8 poison damage" to the reject pile.
     # Subdual is deliberately absent: it is a *lethality*, not a type, and has its own

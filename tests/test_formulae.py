@@ -156,14 +156,15 @@ def test_the_book_classics_carry_the_books_numbers():
 def test_a_core_is_never_narrative():
     """The cross-craft rule: no narrative effects. A core written as words is refused
     with the fix named; a condition the engine lane adds this wave (glued) is allowed and
-    named in `waiting`, so nothing pretends."""
+    named in `waiting`, so nothing pretends. Once that reader landed (lane C, 2026-10-06)
+    the `awaiting` note came off and glued is an ordinary condition: the tanglefoot bag
+    waits on nothing."""
     problems = formulae.core_problems([{"type": "narrative", "target": "it glows"}], "core")
     assert problems and "narrative" in problems[0]
     assert formulae.core_problems([], "core")
     assert formulae.core_problems(
-        [{"type": "apply_condition", "target": "glued"}], "core",
-        awaiting=RAW["awaiting"]) == []
-    assert any("glued" in w for w in formulae.get("tanglefoot-bag")["waiting"])
+        [{"type": "apply_condition", "target": "glued"}], "core") == []
+    assert not any("glued" in w for w in formulae.get("tanglefoot-bag")["waiting"])
 
 
 def test_a_potion_still_written_in_words_is_not_brewed():
