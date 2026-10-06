@@ -401,3 +401,13 @@ def test_closing_the_conversion_notice_returns_to_the_method_strip_not_close():
     src = SHELL.read_text(encoding="utf-8")
     body = _fn(src, "function showConversions(")
     assert 'back.id === "enchant-close") core.focusFirst();' in body
+
+
+def test_the_combat_card_prints_the_thrown_to_hit():
+    """The leftovers lane put the thrown to-hit on the sheet's row, but the Combat card
+    (05-sheet.js) still printed "thrown to-hit not known" for every thrown weapon. It
+    now prints the row's own number and terms, and the old words only when absent."""
+    from pathlib import Path
+
+    js = Path("play/static/js/table/05-sheet.js").read_text(encoding="utf-8")
+    assert "a.thrown_attack" in js and "termLine(a.thrown_attack)" in js

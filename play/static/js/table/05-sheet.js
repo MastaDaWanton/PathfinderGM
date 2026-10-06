@@ -82,7 +82,9 @@ function combatCard(s) {
       <td data-label="Range">${a.range_ft ? `${a.range_ft} ft${thrown ? ", thrown" : ""}`
         : a.category === "melee" ? `<span class="why">melee</span>`
         : a.launcher ? NOT_KNOWN : `<span class="why">not printed</span>`}${
-        thrown ? `<span class="why"><span class="unknown">thrown to-hit not known</span></span>` : ""}</td>
+        thrown ? (a.thrown_attack
+          ? `<span class="why">thrown ${sign(a.thrown_attack.total)} (${esc(termLine(a.thrown_attack))})</span>`
+          : `<span class="why"><span class="unknown">thrown to-hit not known</span></span>`) : ""}</td>
       <td class="wide" data-label="Notes"><span class="why">${esc(notes.join(", "))}</span></td>
     </tr>`;
   }).join("");
