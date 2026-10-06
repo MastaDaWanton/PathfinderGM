@@ -1,7 +1,8 @@
 /* The app's sound: `window.Sound` (docs/herbalism-contracts.md §5.3, revamp plan §11).
  *
  *   Sound.play(name, {volume, rate, delay})   one-shot; unknown names are a silent no-op
- *                                             (forge sounds also read {hardness, bath})
+ *                                             (forge sounds also read {hardness, bath},
+ *                                             enchant sounds {phase})
  *   Sound.loop(name)                          -> {stop()}, for the ambience beds
  *   Sound.unlock()                            resume the context on a user gesture
  *
@@ -13,7 +14,8 @@
  * took for its clack ("a dozen lines of Web Audio and no asset in the installer").
  *
  * NAMES are `<bus>.<what>[.<which>]`; the first segment picks the bus. Buses (ui, dice,
- * bench, forge, ambience, combat, verdict) feed one master gain, then a gentle limiter, then the
+ * bench, forge, enchant, works, ambience, combat, verdict) feed one master gain, then a
+ * makeup gain, then a gentle limiter, then the
  * speakers. Each bus gain follows its PGMPrefs volume live, so a Settings slider moved in
  * another window changes this one's mix too. `verdict` has no slider of its own in the
  * contract's key list; it rides on `sound.dice`, because a verdict only ever follows a die.
@@ -39,13 +41,19 @@
 
   // `forge` is the Blacksmithing bench's own bus (blacksmithing UI plan §11, §6.8), beside
   // the herb bench's, so a player can hear the anvil louder or quieter than the mortar.
-  var BUSES = ["ui", "dice", "bench", "forge", "ambience", "combat", "verdict"];
+  // `enchant` is the Enchanting circle's (enchanting UI plan §11), for the same reason.
+  // `works` is the shared In progress panel (37-works.js), which every bench opens; it has
+  // no slider of its own and rides on `sound.ui`, as `verdict` rides on `sound.dice`: a
+  // player who turns the circle down has not asked for a quieter "your work is ready".
+  var BUSES = ["ui", "dice", "bench", "forge", "enchant", "works", "ambience", "combat",
+               "verdict"];
   var BUS_PREF = {
     ui: "sound.ui", dice: "sound.dice", bench: "sound.bench", forge: "sound.forge",
+    enchant: "sound.enchant", works: "sound.ui",
     ambience: "sound.ambience", combat: "sound.combat", verdict: "sound.dice",
   };
-  var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, forge: 0.8, ambience: 0.4, combat: 0.7,
-                      verdict: 0.8 };
+  var BUS_DEFAULT = { ui: 0.6, dice: 0.8, bench: 0.8, forge: 0.8, enchant: 0.8, works: 0.6,
+                      ambience: 0.4, combat: 0.7, verdict: 0.8 };
   // Simultaneous one-shots allowed before new ones are dropped. A grind game at full tilt
   // plus a verdict plus ambience events is well under this; a runaway caller is not.
   var MAX_VOICES = 28;
@@ -214,8 +222,17 @@
   // A gain envelope: silence, a ramp to `peak` in `a`, an optional hold, a decay of `d`.
   // Exponential ramps from 0.0001 rather than linear from 0: a linear ramp from silence
   // clicks at the start, and an exponential one cannot reach zero.
+  //
+  // The gain starts at 0.0001 BEFORE the first event, too. A new GainNode's value is 1 until
+  // its first automation event, and a buffer source started at the same (sub-sample) time
+  // can render its first sample in the quantum before that event lands: one sample of raw
+  // noise at full gain, times the makeup x6. Measured 2026-10-06, rendered offline in Chrome
+  // with every slider at its top: forge.flawless peaked at 2.4-5.7 of full scale (a hard
+  // clip at the speakers) at exactly its shimmer's start, 0.105 s, and 0.53 without it; the
+  // highpassed noise passes that step whole where a lowpass would have smeared it.
   function env(g, t, peak, a, d, hold) {
     var top = Math.max(0.0002, peak);
+    g.gain.value = 0.0001;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(top, t + a);
     if (hold) g.gain.setValueAtTime(top, t + a + hold);
@@ -985,6 +1002,271 @@
     return bell(c, { at: 0.22, f: k(c, [2640, 2790, 2490]), peak: 0.02, d: 0.3 });
   });
 
+  /* --- enchant: the Enchanting circle (enchanting UI plan §11, contracts §13) --------- *
+   * `Sound.play("enchant.<event>", {phase})`. The plan wrote "pitch by planet"; the owner
+   * ruled there are no planets ("this is not earth"), so the favourable time is the essence
+   * family's DAY PHASE (rules/sky.py PHASES) and that is what keys the pitch. Grounded in
+   * how the real things sound:
+   *
+   * THE BOWL. The circle's bells are singing bowls, not church bells. Wang, Tsai and Wu
+   * measured a struck bowl's ring modes ("Vibration Modes and Sound Characteristic Analysis
+   * for Different Sizes of Singing Bowls", MATEC 2018; experimental modes 121.1, 361.7,
+   * 700.0/712.5 and 1123.4/1135.2 Hz): partials near 1, 2.99, 5.8 times the fundamental, and
+   * every mode a DOUBLET split by 1-2%, which is the slow beating a bowl is known for. So
+   * bowl() below is two close sines per mode, the upper modes quieter and shorter (their
+   * soft-tipped stick excites the low modes most). A bell "slightly off its note" (flawed)
+   * is the same bowl with its doublets pulled wide and its second mode flat: the beat goes
+   * from a slow swell to a rough flutter, which the ear hears as wrong without being told.
+   * A muffled bell (a miss) is the bowl with a hand on it: the ring stops at once.
+   *
+   * PITCH BY PHASE, ON A PENTATONIC. Seven phases, seven degrees of a major pentatonic
+   * (0 2 4 7 9 12 14 semitones), ordered by the sun's height: midnight lowest, then night,
+   * dusk, dawn, afternoon, morning, noon highest (the rising half a step above the falling
+   * half). Pentatonic because wind chimes are tuned that way for this exact reason: chimes
+   * sound in any order and together, and a scale with no semitones has no pair that
+   * clashes (en.wikipedia.org "Wind chime"; leehite.org "Chime Design and Build"). Seats
+   * of different phases rung one after another always make a chord. With no phase given
+   * the pitch is dawn's, the middle of the seven.
+   *
+   * THE CHALK. Reuter and Oehler's psychoacoustics of chalkboard squeaking (exploresound.org
+   * "Psychoacoustics of chalkboard squeaking") found the 2000-4000 Hz band carries most of
+   * the unpleasantness, and attenuating it made the sounds far more pleasant. A sigil is
+   * drawn hundreds of times a session, so the chalk is a dry scrape kept under 2 kHz: the
+   * grit of chalk on stone, never the squeal.
+   *
+   * LEVELS. Measured against the forge's equivalents after the makeup gain and the limiter
+   * (the owner, 2026-10-05: "i can barely hear them"), rendered offline in Chrome with every
+   * slider at its top, median of eight renders: a game's hit (chalk 0.26, seat 0.32, bowl
+   * 0.32, draw 0.29, unpick 0.24) beside a forge strike (0.30); a miss 0.25 beside the
+   * forge's dead thud (0.25); tier up 0.43 against 0.41, flawless 0.73 against 0.69, fail
+   * 0.79 against 0.79; the methods within a fifth of the forge's. Flawed (0.58) sits under
+   * fail on purpose, and works.ready (0.36) is a chime from the next room, not an alarm.
+   * Every peak literal stays under combat.hit's body (0.24), as the forge's do. */
+
+  // The day phases' pentatonic degrees (semitones above midnight). Dawn, the middle, is
+  // the reference pitch; a missing or unknown phase is heard as dawn.
+  var PHASE_STEP = { midnight: 0, night: 2, dusk: 4, dawn: 7, afternoon: 9, morning: 12,
+                     noon: 14 };
+  function phaseMul(c) {
+    try {
+      var p = String((c.o || {}).phase || "").trim().toLowerCase();
+      return PHASE_STEP[p] == null ? 1 : Math.pow(2, (PHASE_STEP[p] - 7) / 12);
+    } catch (e) { return 1; }
+  }
+
+  // A struck singing bowl (see the header): each mode a doublet `split` apart, the second
+  // mode at 2.99 (times `flat` for an off-note bowl), the third at 5.8. `damp` < 1 is a
+  // hand on the rim, shortening every mode. Returns when the fundamental has died.
+  function bowl(c, o) {
+    var at = o.at || 0, f = o.f, p = o.peak, d = (o.d || 1.2) * (o.damp || 1);
+    var s = o.split == null ? 0.015 : o.split, r2 = 2.99 * (o.flat || 1);
+    tone(c, { at: at, f: f * (1 + s), peak: p * 0.4, a: 0.003, d: d * 0.9 });
+    tone(c, { at: at, f: f * r2, peak: p * 0.3, a: 0.002, d: d * 0.6 });
+    tone(c, { at: at, f: f * r2 * (1 + s * 0.6), peak: p * 0.2, a: 0.002, d: d * 0.55 });
+    tone(c, { at: at, f: f * 5.8, peak: p * 0.12, a: 0.002, d: d * 0.3 });
+    return tone(c, { at: at, f: f, peak: p * 0.6, a: 0.003, d: d });
+  }
+
+  // A hand on the bowl: the mallet's thump, and the ring choked to a tenth of a second.
+  // The one miss sound for every circle game (the frame plays a game's `SOUNDS.miss`).
+  function muffled(c) {
+    knock(c, { f: k(c, [150, 140, 160, 145]), peak: 0.1, lp: 500, d: 0.06, wave: "sine" });
+    noise(c, { src: "pink", type: "lowpass", f: 700, q: 0.7, peak: 0.05, a: 0.004, d: 0.06 });
+    return bowl(c, { at: 0.004, f: 392 * phaseMul(c), peak: 0.035, d: 1.2, damp: 0.1 });
+  }
+
+  def("enchant.open", 3, function (c) {
+    // The candles lit: a match struck and flaring, then the bowl answering faintly.
+    noise(c, { f: k(c, [1500, 1650, 1400]), f2: 900, q: 1, peak: 0.1, a: 0.003, d: 0.06 });
+    noise(c, { at: 0.05, src: "pink", type: "lowpass", f: 600, f2: 1200, q: 0.7, peak: 0.09,
+               a: 0.04, d: 0.3 });
+    return bowl(c, { at: 0.3, f: 392 * phaseMul(c), peak: 0.025, d: 1.0 });
+  });
+
+  // Choosing a method: the tool taken up (UI plan §11, `enchant.method.<name>` over
+  // rules/enchanter.py's six methods).
+  var ENCHANT_METHOD = {
+    prepare: function (c) {      // the chalk box opened, a stick taken out
+      knock(c, { f: k(c, [300, 280, 320]), peak: 0.09, lp: 1600, d: 0.035 });
+      return noise(c, { at: 0.08, f: 1100, q: 2, peak: 0.05, d: 0.02 });
+    },
+    attune: function (c) {       // two phials touched together
+      bell(c, { f: k(c, [2400, 2550, 2280]), peak: 0.016, d: 0.25 });
+      return bell(c, { at: 0.09, f: k(c, [2400, 2550, 2280]) * 1.1225, peak: 0.013, d: 0.3 });
+    },
+    bind: function (c) {         // the striker lifted against the bowl's lip
+      knock(c, { f: 260, peak: 0.04, lp: 1200, d: 0.03 });
+      return bowl(c, { at: 0.01, f: 392 * phaseMul(c) * k(c, [1, 1.004, 0.996]), peak: 0.03,
+                       d: 0.6 });
+    },
+    refine: function (c) {       // a glass rod in a phial: two clinks and a swirl
+      bell(c, { f: k(c, [3000, 3150, 2850]), peak: 0.014, d: 0.12 });
+      bell(c, { at: 0.1, f: k(c, [3000, 3150, 2850]) * 0.94, peak: 0.011, d: 0.12 });
+      return noise(c, { at: 0.05, src: "pink", f: 700, f2: 1100, q: 1.4, peak: 0.035,
+                        a: 0.06, d: 0.14 });
+    },
+    unbind: function (c) {       // the unpicking needle drawn: a thin rising shing
+      noise(c, { type: "highpass", f: 3500, f2: 5500, q: 1, peak: 0.03, a: 0.04, d: 0.1 });
+      return tone(c, { at: 0.1, f: k(c, [3600, 3800, 3400]), peak: 0.01, d: 0.2 });
+    },
+    cleanse: function (c) {      // salt sprinkled, and the drop that carries it
+      grains(c, { n: 8, span: 0.2, f: 4800, q: 1, type: "highpass", peak: 0.01, d: 0.005 });
+      return drop(c, { at: 0.18, f: k(c, [650, 700, 610]), peak: 0.018 });
+    },
+  };
+  Object.keys(ENCHANT_METHOD).forEach(function (m) {
+    def("enchant.method." + m, 3, ENCHANT_METHOD[m]);
+  });
+
+  def("enchant.roll", 3, function (c) {        // the step's d20, rattled in a horn cup
+    knock(c, { f: 280, peak: 0.045, lp: 1000, d: 0.04 });
+    return rattle(c, k(c, [2200, 2500, 2350]), k(c, [6, 7, 8]), 0.12);
+  });
+
+  // --- the circle's materials (Prepare's pieces and the test step).
+  def("enchant.chalk", 4, function (c) {
+    // One stroke of a sigil: the stick touching stone, a dry scrape, its grit. Under 2 kHz
+    // throughout (see the header: the squeak band is what makes chalk unbearable).
+    knock(c, { f: k(c, [420, 380, 460, 400]), peak: 0.06, lp: 1500, d: 0.02, wave: "sine" });
+    noise(c, { f: k(c, [900, 1050, 820, 980]), f2: k(c, [1300, 1400, 1200, 1350]), q: 1.1,
+               peak: 0.23, a: 0.02, d: 0.12 });
+    return grains(c, { n: k(c, [6, 7, 5, 6]), span: 0.12, f: 1500, q: 1.4, peak: 0.11,
+                       d: 0.006 });
+  });
+  def("enchant.salt", 3, function (c) {
+    // A line of salt poured: a fine, even patter of grains over a whisper.
+    noise(c, { type: "highpass", f: 6000, q: 0.6, peak: 0.01, a: 0.05, d: 0.3 });
+    return grains(c, { n: k(c, [16, 18, 14]), span: 0.35, f: 5200, q: 0.8, type: "highpass",
+                       peak: 0.028, d: 0.004, even: true });
+  });
+  def("enchant.ink", 3, function (c) {
+    // The quill dipped (a small drop) and drawn on the floor-cloth (a soft scratch, kept
+    // under the squeak band like the chalk).
+    drop(c, { f: k(c, [600, 640, 560]), peak: 0.032 });
+    return noise(c, { at: 0.12, f: 1400, f2: 1700, q: 2, peak: 0.05, a: 0.02, d: 0.14 });
+  });
+  def("enchant.bell", 3, function (c) {
+    // The test step: a small hand-bowl tapped once, clear, in the phase's key.
+    noise(c, { type: "highpass", f: 3200, q: 0.7, peak: 0.03, a: 0.001, d: 0.01 });
+    return bowl(c, { f: 880 * phaseMul(c) * k(c, [1, 1.003, 0.997]), peak: 0.06, d: 0.9 });
+  });
+
+  // --- Attune: a phial set in its seat, at the pitch of its essence's phase.
+  def("enchant.seat", 4, function (c) {
+    bell(c, { f: k(c, [2900, 3100, 2750, 3000]), peak: 0.025, d: 0.08 });
+    return bowl(c, { at: 0.006, f: 523.25 * phaseMul(c), peak: 0.07, d: 0.9 });
+  });
+  def("enchant.unseat", 3, function (c) {
+    // Lifted out again: a short glass slide upward, no ring.
+    noise(c, { type: "highpass", f: 3000, f2: 4500, q: 1, peak: 0.03, a: 0.02, d: 0.07 });
+    return tone(c, { f: k(c, [1800, 1900, 1700]), f2: 2400, peak: 0.014, d: 0.06 });
+  });
+
+  // --- Bind: the bowl struck in time, or muffled.
+  def("enchant.bind.hit", 4, function (c) {
+    knock(c, { f: k(c, [220, 205, 235, 215]), peak: 0.05, lp: 900, d: 0.03 });
+    return bowl(c, { at: 0.003, f: 392 * phaseMul(c) * k(c, [1, 1.003, 0.997, 1.002]),
+                     peak: 0.06, d: 1.4 });
+  });
+  def("enchant.bind.miss", 4, muffled);
+  // The same muffled bowl under a name that says what it is for: every circle game's miss
+  // (lane U2 names `enchant.bind.miss` in all six games' SOUNDS; either name plays this).
+  def("enchant.miss", 4, muffled);
+
+  // --- Refine, Unbind and Cleanse's good strokes.
+  def("enchant.draw", 3, function (c) {
+    // Essence drawn up out of the phial: a liquid "thwip" rising, a breath, a glass tink.
+    drop(c, { f: k(c, [420, 450, 390]), rise: 2.2, peak: 0.1, d: 0.06 });
+    noise(c, { type: "highpass", f: 5500, q: 0.7, peak: 0.03, a: 0.03, d: 0.12 });
+    return bell(c, { at: 0.07, f: k(c, [2200, 2330, 2080]), peak: 0.03, d: 0.2 });
+  });
+  def("enchant.unpick", 3, function (c) {
+    // A thread of the old working picked loose: a tight little pluck and its tick.
+    noise(c, { type: "highpass", f: 4000, q: 0.8, peak: 0.09, a: 0.001, d: 0.006 });
+    noise(c, { f: 2500, f2: 1500, q: 1.5, peak: 0.07, a: 0.01, d: 0.06 });
+    return tone(c, { type: "triangle", f: k(c, [1300, 1450, 1200]), f2: k(c, [1270, 1420, 1175]),
+                     lp: 3000, peak: 0.12, d: 0.07 });
+  });
+
+  // --- the verdicts (lane U3's stage), each in the phase's key.
+  def("enchant.tier.up", 3, function (c) {     // two rising bowls
+    var root = k(c, [659, 698, 622]) * phaseMul(c);
+    bowl(c, { f: root, peak: 0.035, d: 0.5 });
+    return bowl(c, { at: 0.09, f: root * 1.4983, peak: 0.038, d: 0.7 });
+  });
+  def("enchant.flawless", 3, function (c) {
+    // The circle rung on purpose: a pentatonic stack of bowls, then the gilt shimmer.
+    var root = k(c, [523, 554, 494]) * phaseMul(c);
+    var steps = [1, 1.1225, 1.2599, 1.4983, 2], end = c.t;
+    for (var i = 0; i < steps.length; i++) {
+      end = Math.max(end, bowl(c, { at: i * 0.07, f: root * steps[i], peak: 0.035,
+                                    d: 1.4 + i * 0.15 }));
+    }
+    noise(c, { at: 0.1, type: "highpass", f: 7500, q: 0.5, peak: 0.012, a: 0.12, d: 0.7 });
+    return end;
+  });
+  def("enchant.flawed", 3, function (c) {
+    // A bowl slightly off its note (UI plan §11): doublets pulled wide, the second mode
+    // flat, the note sagging; and a candle guttering. It never says which curse.
+    var root = k(c, [523, 554, 494]) * phaseMul(c);
+    noise(c, { src: "pink", f: 900, f2: 300, q: 0.8, peak: 0.05, a: 0.01, d: 0.25 });
+    tone(c, { at: 0.02, f: root, f2: root * 0.97, glide: 0.8, peak: 0.03, a: 0.003, d: 0.9 });
+    return bowl(c, { at: 0.02, f: root, peak: 0.09, d: 1.0, split: 0.045, flat: 0.95 });
+  });
+  def("enchant.fail", 3, function (c) {
+    // The glow falls away: the candles snuffed, a dull thud, dust settling.
+    noise(c, { src: "pink", f: 800, f2: 250, q: 0.8, peak: 0.06, a: 0.005, d: 0.2 });
+    knock(c, { at: 0.04, f: k(c, [70, 64, 76]), peak: 0.18, lp: 300, d: 0.14, drop: 0.6,
+               wave: "sine" });
+    noise(c, { at: 0.08, src: "pink", type: "lowpass", f: 800, f2: 200, q: 0.7, peak: 0.05,
+               a: 0.05, d: 0.6 });
+    return grains(c, { at: 0.12, n: 5, span: 0.25, f: 1800, q: 1.5, peak: 0.035, d: 0.01 });
+  });
+  def("enchant.land", 3, function (c) {
+    // Wrapped in its cloth and set on the shelf: a rustle, a soft wooden thump, the faint
+    // clink of the work inside.
+    noise(c, { src: "pink", f: k(c, [1800, 2000, 1650]), f2: 900, q: 0.7, peak: 0.018,
+               a: 0.03, d: 0.15 });
+    knock(c, { at: 0.14, f: k(c, [190, 175, 205]), peak: 0.025, lp: 800, d: 0.05 });
+    return bell(c, { at: 0.15, f: k(c, [2600, 2750, 2450]), peak: 0.006, d: 0.15 });
+  });
+  def("enchant.read", 3, function (c) {
+    // The essence answers from its phial: a rubbed glass rim swelling and fading (a slow
+    // attack, a near-pure tone and its slow beat) over a breath of air.
+    var f = k(c, [1046, 1108, 988]) * phaseMul(c);
+    tone(c, { f: f * 1.004, peak: 0.011, a: 0.25, hold: 0.2, d: 0.7 });
+    noise(c, { type: "highpass", f: 5000, q: 0.6, peak: 0.005, a: 0.2, d: 0.5 });
+    return tone(c, { f: f, peak: 0.018, a: 0.25, hold: 0.2, d: 0.7 });
+  });
+  def("enchant.identify", 3, function (c) {
+    // The item's sigils show and fade: three quick glass notes up the pentatonic, and a
+    // whisper as they go.
+    var root = k(c, [1318, 1397, 1245]) * phaseMul(c), steps = [1, 1.1225, 1.4983], end = c.t;
+    for (var i = 0; i < steps.length; i++) {
+      end = Math.max(end, bell(c, { at: i * 0.07, f: root * steps[i], peak: 0.015, d: 0.4 }));
+    }
+    noise(c, { at: 0.05, type: "highpass", f: 4000, f2: 6000, q: 0.7, peak: 0.008, a: 0.1,
+               d: 0.4 });
+    return end;
+  });
+
+  /* --- works: the shared In progress panel (37-works.js), every bench's ------------- */
+  def("works.ready", 3, function (c) {
+    // Work has become ready while you were away: a soft two-note chime, a shop-door bell
+    // heard from the next room, never an alarm.
+    var root = k(c, [1568, 1661, 1480]);
+    bell(c, { f: root, peak: 0.03, d: 0.6 });
+    return bell(c, { at: 0.12, f: root * 1.2599, peak: 0.026, d: 0.7 });
+  });
+  def("works.collect", 3, function (c) {
+    // The finished work lifted from the shelf into the pack: cloth, then leather.
+    noise(c, { src: "pink", f: k(c, [1600, 1750, 1450]), f2: 900, q: 0.7, peak: 0.02,
+               a: 0.02, d: 0.12 });
+    noise(c, { at: 0.1, src: "pink", type: "lowpass", f: k(c, [600, 520, 680]), q: 0.7,
+               peak: 0.03, a: 0.006, d: 0.1 });
+    return tone(c, { at: 0.1, f: 190, f2: 140, glide: 0.1, peak: 0.015, d: 0.1 });
+  });
+
   /* --- ambience: beds that loop ----------------------------------------------------- *
    * A bed is continuous noise through a filter whose level breathes on a slow LFO (wind
    * gusts), plus scheduled one-shots (a bird, a cricket's chirp, a crackle, a drip) at
@@ -1072,6 +1354,10 @@
       grains(c, { n: 3 + (Math.random() * 3 | 0), span: 0.25, f: 2000, q: 3,
                   peak: 0.014, d: 0.015 });
     },
+    sputter: function (c) {      // a candle wick spitting: two or three tiny wet ticks
+      grains(c, { n: 2 + (Math.random() * 2 | 0), span: 0.08, f: 2600, q: 1.4,
+                  peak: 0.012, d: 0.006 });
+    },
   };
 
   // Each ambience: its beds and its events ([name, min seconds, max seconds] apart).
@@ -1123,6 +1409,14 @@
                      { f: 420, q: 0.9, level: 0.022, gust: 0.8, gustDepth: 0.5 },
                      { type: "highpass", f: 3500, level: 0.003, gust: 0.2 }],
               events: [["crackle", 0.4, 1.6], ["pop", 3, 9], ["coals", 6, 15]] },
+    // The enchanter's sanctum (enchanting UI plan §11): "a still room, a candle's hiss".
+    // The room is a low, nearly silent tone; the candles a quiet band of pink noise
+    // fluttering a few times a second, as a flame does in still air; a thread of hiss; a
+    // wick spitting now and then and the rare creak of the room. On the ambience bus.
+    sanctum: { beds: [{ src: "brown", type: "lowpass", f: 160, level: 0.04 },
+                      { f: 420, q: 1.2, level: 0.012, gust: 3.1, gustDepth: 0.6 },
+                      { src: "white", type: "highpass", f: 6500, level: 0.0025, gust: 0.4 }],
+               events: [["sputter", 4, 12], ["creak", 20, 50]] },
   };
   // The app's canonical biomes (rules/biomes.py BIOMES) onto the nearest bed, so
   // `ambience.<biome>` for any ground the bench reports is never silent by accident.
@@ -1202,7 +1496,8 @@
       out.gain.value = vol;
       out.connect(bus);
       // `o` is the caller's options as given: the forge's sounds read `hardness` and
-      // `bath` from it (contracts §11), everything else ignores it.
+      // `bath` from it (contracts §11), the enchant sounds `phase` (enchanting contracts
+      // §13), everything else ignores it.
       var c = { x: x, out: out, t: x.currentTime + 0.005 + delay,
                 p: rate * (0.95 + Math.random() * 0.1), v: pickTake(name, s.n), o: opts };
       var end = s.fn(c);
