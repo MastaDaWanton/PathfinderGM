@@ -1011,9 +1011,10 @@ CATEGORIES: list[Category] = [
                       required=False,
                       hint="Empty is enhancement, as 1e's magical speed bonuses are: "
                            "haste and a pair of boots give +30, not +60."),
-            ], blocked="Land speed changes for its duration, read by every move. Climb, "
-                       "swim, fly and burrow speeds are recorded and shown to the GM: "
-                       "nothing in movement reads them yet."),
+            ], blocked="Land speed changes for its duration, read by every move. A fly or "
+                       "climb speed lets the body leave the ground; a swim speed is read "
+                       "by the water rules. A burrow speed is recorded and shown to the "
+                       "GM: nothing in movement reads it yet."),
             # `target` stays the words the card prints (295 shipped documents
             # write a sentence there); `tag` is the machine half, one of PERMISSIONS, and
             # a permission with no tag can never run — it has nothing to grant
@@ -1413,29 +1414,33 @@ CATEGORIES: list[Category] = [
 # Refilled by alchemy lane B (2026-10-06) with the alchemist's types, each waiting on alchemy
 # lane C (contracts §7). Lane C deletes a line when its reader lands and lists the type in
 # tests/test_effectspec_extensions.py's `already`.
-AWAITING_READER: dict[str, str] = {
-    "sense": "a drunk sense granted as `sense_tag` through the one applicator "
-             "(consumables._spec_to_intents, alchemy lane C); see invisible read by "
-             "Actor.concealment, darkvision and low-light by Scene.light_at",
-    "permission": "the tag grant (consumables._spec_to_intents granting `permission_tag` "
-                  "through the one applicator, alchemy lane C)",
-    "light": "Scene.light_at and the light miss chance in Actor.concealment "
-             "(alchemy lane C)",
-    "burning": "an ActiveEffect granting state.burning with a periodic damage, and the "
-               "extinguish op (alchemy lane C)",
-}
+#
+# Emptied by alchemy lane C (2026-10-06). Where each reader landed:
+#   sense       consumables._spec_to_intents -> Engine._op_grant (`sense_tag` through the
+#               one applicator); read by Actor.eyes: darkvision and low-light by
+#               Scene.light_at and Actor.concealment, see invisible by Actor.concealment
+#   permission  consumables._spec_to_intents -> Engine._op_grant (`permission_tag`); each
+#               tag's own reader is PERMISSIONS' `reader` ("" where none asks yet)
+#   light       consumables._spec_to_intents -> Engine._op_grant (`light.carried` with its
+#               radii); read by Scene.light_at, and so by Actor.concealment's miss chance
+#   burning     Engine._op_burn (state.burning, a periodic fire counted by `times_left`
+#               in Actor.run_periodic) and Engine._op_extinguish
+AWAITING_READER: dict[str, str] = {}
 # A type whose reader runs some targets and not others (contracts §2.2: speed "targets land,
 # climb, swim, fly, jump. Lane C wires the readers"). `executable` asks per spec, so a
 # potion of longstrider runs and a potion of fly is narrated with the reason named. Lane C
 # deletes a target's line when movement reads it. `jump` is not here: 1e's jump is an
 # Acrobatics check, not a movement mode, so a jumping bonus is a `skill_mod` on
 # acrobatics with the note "to jump".
+#
+# Alchemy lane C (2026-10-06) gave three of the four a reader: `Actor.movement_modes` takes
+# a granted climb, swim or fly speed through the funnel, and the move op's permission to
+# leave the ground (`can_move_vertically`) and the water rules (`water.swim_speed`, through
+# `Actor.speeds`) read it. Nothing in the app moves a body through earth, so burrow waits.
 TARGETS_AWAITING_READER: dict[str, dict[str, str]] = {
     "speed": {
-        "climb": "a climb speed read by movement (alchemy lane C)",
-        "swim": "a swim speed read by movement (alchemy lane C)",
-        "fly": "a fly speed read by movement (alchemy lane C)",
-        "burrow": "a burrow speed read by movement (alchemy lane C)",
+        "burrow": "a burrow speed read by movement (nothing moves a body through earth "
+                  "yet)",
     },
 }
 for _cat in CATEGORIES:

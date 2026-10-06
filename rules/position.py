@@ -185,7 +185,13 @@ def cover_of(scene, actor, defender) -> str:
     # was written, which was harmless while cover was flat and became the thing that
     # silently defeated height-aware cover the day it landed: the geometry grew a third
     # axis and the caller went on handing it squares.
-    hard = grid.cover_between(tuple(here), actor.size, tuple(there), defender.size)
+    # Solid things only. Fog and smoke were counted as walls here until alchemy lane C
+    # (2026-10-06): a smokestick, and the fog cloud spell itself, made whoever stood in
+    # them untargetable as TOTAL cover, where the book gives "concealment (attacks have a
+    # 20% miss chance)" within 5 ft and 50% beyond (CRB, fog cloud). The miss chance is
+    # the attack's (`Engine._fog_chance`, read through `Actor.concealment`).
+    hard = grid.cover_between(tuple(here), actor.size, tuple(there), defender.size,
+                              solid_only=True)
     if hard == "total":
         return "total"
     if hard == "cover":
@@ -236,7 +242,7 @@ def reflex_mods(scene, source_at, defender) -> list[Modifier]:
     if grid is None or there is None or source_at is None:
         return []
     if grid.cover_between(tuple(source_at), "medium",
-                          tuple(there), defender.size) == "cover":
+                          tuple(there), defender.size, solid_only=True) == "cover":
         return [Modifier(COVER_REFLEX, "cover", "cover")]
     return []
 

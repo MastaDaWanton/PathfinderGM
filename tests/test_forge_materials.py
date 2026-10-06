@@ -511,7 +511,10 @@ CASES = [
      "sharpness"),
     ("unknown parent", lambda d: d.__setitem__("material", "unobtainium"),
      "no material has that id"),
-    ("not executable", lambda d: d["weapon"].append({"type": "sense", "target": "darkvision"}),
+    # `sense` was the example until alchemy lane C gave it a reader (2026-10-06); a
+    # burrow speed still has none.
+    ("not executable", lambda d: d["weapon"].append({"type": "speed", "target": "burrow",
+                                                     "amount": 10}),
      "not executable"),
 ]
 

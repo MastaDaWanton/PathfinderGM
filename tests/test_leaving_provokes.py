@@ -39,6 +39,9 @@ def board(pc_at=(5, 5), thug_at=(6, 5), fighting=True, seed=7):
     s.add(load_pc("fixtures/pc-kesst.json"), at=pc_at)
     s.add(instantiate("thug", scene=s, name="the thug"), at=thug_at)
     stand_on(s, "urban")
+    # By day: a street at the default midnight is dim since the light model (alchemy
+    # lane C), and the swings here are about who swings, not about seeing.
+    s.clock_minutes = 12 * 60
     s.sides = {"us": ["pc"], "them": ["c1"]}
     if fighting:
         s.initiative = [("pc", 20), ("c1", 10)]
@@ -184,6 +187,9 @@ def _road_fight(hp=500):
     s.add(pc)
     e = Engine(s, Dice(seed=7), world=AURVANTIS)
     e.place_party("")
+    # By day: a road at the scene's default midnight is dim since the light model
+    # (alchemy lane C), and a 20% miss chance on the swing is not what these test.
+    s.clock_minutes = 12 * 60
     s.grid = Grid(20, 20)
     s.positions["pc"] = (5, 5)
     ogre = instantiate("thug", scene=s, name="the thug")

@@ -304,6 +304,23 @@ TAGS: dict[str, tuple[str, ...]] = {
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),
     "entangled":   ("state.held.entangled", "recovery.rest", "state.slowed"),
+    # The tanglefoot bag's second half (CRB, Goods and Services): "the target is glued to
+    # the floor and unable to move" on a failed DC 15 Reflex save, until it breaks free
+    # (`Engine._op_break_free`: DC 17 Strength, or 15 slashing to the goo) or the goo
+    # "becomes brittle and fragile after 2d4 rounds" (the duration). Under `state.held`
+    # with grappled and pinned; speed 0 is asked of the tag by `Actor.speed_feet` and the
+    # move op, never by the key. Not an Appendix 2 condition, so it has no row in
+    # `tables.CONDITIONS` (tests/test_reference.py refuses a condition the book does not
+    # print) and needs none: the entangled it comes with carries the -2 and -4, and glued
+    # adds only "cannot move". No `recovery.rest`: a night's sleep does not unstick it.
+    "glued":       ("state.held.glued",),
+    # Alchemist's fire's next round (CRB): "On the round following a direct hit, the
+    # target takes an additional 1d6 points of damage ... a full-round action to attempt
+    # to extinguish the flames". The effect carries its own `periodic` fire
+    # (`Engine._burn`), and the `extinguish` op asks this tag. Not a condition of the
+    # book's either (the hazard row "catching on fire" is the same state), so it lives
+    # here alone, as `holding ground` does.
+    "burning":     ("state.burning",),
     # The stances play has already minted. Buffs, not states: they are worn by choice.
     "blood armament": ("buff.stance.blood-armament",),
     "blood rage":     ("buff.stance.blood-rage",),
