@@ -14,10 +14,12 @@ percentage without a rounding rule is a bug waiting for a report:
 """
 from __future__ import annotations
 
+import copy as _copy
 from dataclasses import dataclass, field
 
 from . import consumables as con
 from . import effectspec
+from . import inprogress
 from . import ingredients as ing_mod
 from . import worldclass as wc
 
@@ -151,6 +153,19 @@ class Stock:
     # `state` can only remember the latest.
     worked: list[str] = field(default_factory=list)
 
+    # --- the shared sections (docs/enchanting-contracts.md §8.1) ----------------------------
+    #
+    # Both default to None and are written by `as_dict` only when set, so every save from
+    # before them reads back byte for byte. Neither is part of `id`: a thing going into or
+    # out of progress, or taking a magic layer, must not re-key the entry it sits under.
+    #
+    # `work`: the In-progress block (rules/inprogress.py is its one door). Present while
+    # the thing is in progress, working or ready; lifted when it is collected.
+    work: dict | None = None
+    # `magic`: the layer on a stock-kept vessel, read and written through
+    # rules/magic_layer.py (lane B). Carried here untouched.
+    magic: dict | None = None
+
     @property
     def stepped(self) -> bool:
         """Made at the step bench, rather than by the old chain or by another craft."""
@@ -235,6 +250,10 @@ class Stock:
             d["mults"] = {k: round(float(v), 4) for k, v in self.mults.items()}
         if self.worked:
             d["worked"] = list(self.worked)
+        if self.work:
+            d["work"] = _copy.deepcopy(self.work)
+        if self.magic:
+            d["magic"] = _copy.deepcopy(self.magic)
         return d
 
 
@@ -412,6 +431,12 @@ def from_stock_dict(d: dict) -> Stock:
         mults=({str(k): float(v) for k, v in (d.get("mults") or {}).items()}
                if stepped and isinstance(d.get("mults"), dict) else {}),
         worked=([str(m) for m in (d.get("worked") or [])] if stepped else []),
+        # Every craft's, not herbalism's alone: a binding or a hide in the vat is in
+        # progress the same way a jar is.
+        work=(_copy.deepcopy(d["work"]) if isinstance(d.get("work"), dict) and d["work"]
+              else None),
+        magic=(_copy.deepcopy(d["magic"]) if isinstance(d.get("magic"), dict) and d["magic"]
+               else None),
     )
 
 
@@ -1570,6 +1595,10 @@ class Material:
     spoils_in: int | None = None
     spoiled: bool = False
     ready_minute: int | None = None
+    # In progress (rules/inprogress.py): "working", "ready" (done, not yet collected) or
+    # None. Read off the clock when the satchel was built, so the fit check can say which.
+    work_state: str | None = None
+    ready_at: int | None = None
     old: str = ""
     worked: list[str] = field(default_factory=list)
     concentration: int = 0              # concentration steps this line has had
@@ -1691,10 +1720,11 @@ class Material:
         else:
             unknown = herbknowledge.unknown_count(actor, self.ingredient) \
                 if actor is not None and self.ingredient is not None else 0
-        ready_at = None
-        if self.ready_minute is not None and now_minute is not None \
-                and self.ready_minute > now_minute:
-            ready_at = int(self.ready_minute)
+        # Set while the thing is In progress, working OR ready: a jar whose day has come
+        # stays in the satchel's Steeping group ("ready now") until it is collected, the
+        # owner's rule (rules/inprogress.py), rather than dropping silently into the shelf.
+        ready_at = int(self.ready_at) if self.work_state is not None \
+            and self.ready_at is not None else None
         d = {"key": self.key, "name": self.name, "ingredient_id": self.ingredient_id,
              "kind": self.kind, "part": self.part, "tier": self.tier,
              "state": self.state, "form": self.form,
@@ -1705,8 +1735,9 @@ class Material:
              "spoils_in": self.spoils_in, "ready_at": ready_at,
              "crafted": self.crafted}
         if ready_at is not None:
-            d["ready_in"] = ready_at - int(now_minute)
+            d["ready_in"] = max(0, ready_at - int(now_minute or 0))
             d["ready_day"] = ready_at // 1440 + 1
+            d["work_state"] = self.work_state
         if self.old:
             d["old_method"] = self.old
         return d
@@ -1851,6 +1882,8 @@ def satchel(actor, now_minute: int | None = None,
             tier=item.tier, count=count, state=item.state, form=item.form,
             quality=item.quality, crafted=True, stock=item,
             spoils_in=spoils_in, spoiled=spoiled, ready_minute=item.ready_minute,
+            work_state=inprogress.state_of(item, now_minute),
+            ready_at=inprogress.end_of(item, now_minute),
             old=old, worked=list(item.worked),
             concentration=max(0, int(item.concentration or 1) - 1) if item.stepped else 0,
             base_specs=[dict(s) for s in item.base_specs], mults=dict(item.mults),
@@ -1858,21 +1891,21 @@ def satchel(actor, now_minute: int | None = None,
     return out
 
 
-def settle_steeping(actor, now_minute: int) -> list[str]:
-    """Jars whose day has come stop being jars. Returns the names that became ready.
+# `settle_steeping` lived here until 2026-10-05: every bench request lifted the jars whose
+# day had come, silently, and the satchel showed them as tinctures from then on. The owner's
+# In-progress ruling ("all the crafts sit before they can be collected") retired it: the
+# clock's own door turns a jar READY and tells it (`Scene.advance` -> `inprogress.settle`),
+# and the jar stays in the section until the player collects it. One store, one door; a
+# second settle here would have swallowed the tell the clock owes.
 
-    A steeping jar is declared `how: ["steeping"]` so the sheet offers no way to use it;
-    when its minute passes, the declaration is lifted and it is the tincture or acetum it
-    always was. Asked by every bench request, which is the only place a jar is reached for
-    by the bench; the engine's own use door does not ask yet (reported to the lead).
-    """
-    ready = []
-    for item in (getattr(actor, "stock", {}) or {}).values():
-        if item.ready_minute is not None and "steeping" in (item.how or []) \
-                and int(item.ready_minute) <= int(now_minute):
-            item.how = []
-            ready.append(item.name)
-    return ready
+
+def _collect_jar(item, actor) -> dict:
+    """Collecting a steeped jar: it is the tincture or acetum it always was, so nothing is
+    done beyond the section's own lift."""
+    return {"said": f"You take the {item.name} out of its steep."}
+
+
+inprogress.register("herbalist", collect=_collect_jar, icon="steeping")
 
 
 # --- levels, rarity and the check --------------------------------------------------------
@@ -1951,9 +1984,14 @@ def fit_reason(method: str, m: Material, pot: list[Material], level: int) -> str
     need = int(row.get("level", 1))
     if need > int(level):
         return f"{row['name']} is learned at Herbalist {need}"
-    if m.ready_minute is not None and m.stock is not None \
-            and "steeping" in (m.stock.how or []):
-        return f"still steeping: ready on day {int(m.ready_minute) // 1440 + 1}"
+    # In progress (rules/inprogress.py): a jar still steeping, or steeped and waiting to be
+    # collected, is not on the shelf yet. The second is new with the owner's ruling that
+    # finished work sits in the section until it is collected.
+    if m.work_state == "working":
+        end = m.ready_at if m.ready_at is not None else (m.ready_minute or 0)
+        return f"still steeping: ready on day {int(end) // 1440 + 1}"
+    if m.work_state == "ready":
+        return "ready to collect: take it out of In progress first"
     if m.spoiled:
         return "it has spoiled"
     if m.old:
@@ -2485,7 +2523,7 @@ def make(plan: StepPlan, tier: int, now_minute: int) -> Stock:
     ready = (int(now_minute) + int(plan.ready_minutes)) if plan.ready_minutes else None
     start = ready if ready is not None else int(now_minute)
     kind = prow.get("kind", "product")
-    how = ["steeping"] if ready is not None else (
+    how = ["in_progress"] if ready is not None else (
         ["ingredient"] if kind == "intermediate" or plan.form is None else [])
     return Stock(
         base=plan.name, concentration=plan.concentration + 1, tier=plan.tier,
@@ -2499,6 +2537,11 @@ def make(plan: StepPlan, tier: int, now_minute: int) -> Stock:
         base_specs=[dict(x) for x in plan.base_specs],
         mults={k: round(v, 6) for k, v in s.items()},
         worked=list(plan.worked),
+        # A steep goes straight into In progress (rules/inprogress.py): made now, ready on
+        # its day, and waiting there until it is collected.
+        work=(inprogress.block(craft=TRACK_ID, label="Steeping", doing="steeping",
+                               started=int(now_minute), minutes=int(plan.ready_minutes))
+              if ready is not None else None),
     )
 
 

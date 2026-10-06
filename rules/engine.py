@@ -486,6 +486,12 @@ class Scene:
     # damage on the sheet, where the panel still shows them. Inside `snapshot`, so a
     # refused turn takes back its tells with its dice.
     _body_said: list = field(default_factory=list)
+    # Work In progress the clock's door turned ready (`inprogress.settle`), waiting to be
+    # told at the end of the batch (`Engine._works_settles`), for `_body_said`'s reason: a
+    # journey, a bench and a forge move the clock and drop `advance`'s `ended` list, and a
+    # two-week steep finishes on the road more often than in a wait. Not saved: a ready row
+    # whose line a restart lost is still READY in the section, where the player sees it.
+    _works_said: list = field(default_factory=list)
 
     def snapshot(self) -> dict:
         """Everything the scene is, deep-copied, so a refused turn can be undone.
@@ -1298,7 +1304,28 @@ class Scene:
             what = record.get("what") or record.get("kind")
             if what:
                 ended.append(str(what))
-        return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body}
+        # Work In progress whose minute this stretch passed turns ready, here and only here
+        # (docs/enchanting-contracts.md §8; rules/inprogress.py): the section has no ticker
+        # of its own, so the countdowns move exactly when this door moves the clock. Told
+        # through `_works_said`, not `ended`, so `advance_time` (which tells `ended`) does
+        # not say it twice.
+        ready: list[dict] = []
+        if minutes:
+            from . import inprogress
+
+            for a in self.people.values():
+                for name in inprogress.settle(a, self.clock_minutes):
+                    record = {"ref": a.ref, "what": name,
+                              "said": f"{a.name}'s {name} is ready to collect."}
+                    ready.append(record)
+                    self._works_said.append(record)
+        return {"minutes": minutes, "rounds": rounds, "ended": ended, "body": body,
+                "ready": ready}
+
+    def take_works_said(self) -> list[dict]:
+        """Work turned ready since it was last told, emptied as it is handed over."""
+        out, self._works_said = list(self._works_said), []
+        return out
 
     def take_body_said(self) -> list[dict]:
         """The body's tolls since they were last told, emptied as they are handed over.
@@ -3149,6 +3176,8 @@ class Engine:
         # `_drive`; what is left here is the clock moved outside an op — a bench or a
         # forge view before this batch, or anything the settles below were handed.
         resolution.outcomes.extend(self._body_settles())
+        # Work In progress the clock turned ready, the same way (`_works_settles`).
+        resolution.outcomes.extend(self._works_settles())
         # An ability's effect that a state ends: a rage when its barbarian falls, a smite
         # when its mark dies (`_ability_ends_settle`).
         resolution.outcomes.extend(self._ability_ends_settle())
@@ -3316,6 +3345,24 @@ class Engine:
                     intent_id="", op="effect_ended", effects=records,
                     tell=" ".join([f"{why}, and {actor.name}'s {e.name} ends."] + said),
                     because="")))
+        return out
+
+    def _works_settles(self) -> list:
+        """Work In progress the clock turned ready, told (law 3; rules/inprogress.py).
+
+        Beside `_body_settles` and for its reason: the clock moves through a dozen doors,
+        and most of them drop `Scene.advance`'s return. One outcome per actor, every piece
+        of their work in it, so a fortnight's wait that finishes three jars is one line."""
+        by_ref: dict[str, list[dict]] = {}
+        for record in self.scene.take_works_said():
+            by_ref.setdefault(str(record.get("ref") or ""), []).append(record)
+        out = []
+        for ref, rows in by_ref.items():
+            fx = [{"kind": "work_ready", "ref": ref, "what": r.get("what"),
+                   "origin": "rule:in-progress"} for r in rows]
+            out.append(self._articled(Outcome(
+                intent_id="", op="works", effects=fx,
+                tell=" ".join(str(r.get("said") or "") for r in rows), because="")))
         return out
 
     def _body_settles(self) -> list:
@@ -3491,6 +3538,7 @@ class Engine:
             # `rest` the same plan ran next — "Sammy rests for 8 hours" and then "falls
             # asleep where they stand" (measured live on the owner's save, 2026-10-05).
             outcomes.extend(self._body_settles())
+            outcomes.extend(self._works_settles())
             # A single-roll check, save or manoeuvre decided on the player's own d20:
             # its outcome's verdict IS that roll's answer. Anything that judged the roll
             # at its own stage already has (`_judge` keeps the first).
@@ -11725,13 +11773,15 @@ class Engine:
         # A jar still steeping is not a tincture yet (docs/herbalism-revamp-plan.md §6): the
         # bench refuses it, and so must the narrated door, or "I drink my tincture" on day 3
         # of a two-week steep would be the one way round the clock (Lane B2's note at merge).
-        ready = int(getattr(held, "ready_minute", 0) or 0)
+        # Since 2026-10-05 the question is In progress's (rules/inprogress.py), which also
+        # holds back a jar that is READY but not yet collected: the owner's rule is that
+        # finished work sits in the section until it is taken out.
+        from . import inprogress
+
         now = int(getattr(self.scene, "clock_minutes", 0) or 0)
-        if ready and now < ready:
-            days = max(1, -(-(ready - now) // 1440))
-            return self._refuse(
-                intent, f"The {held.base} is still steeping; it is ready in {days} "
-                        f"day{'s' if days != 1 else ''}. Nothing is opened.")
+        why = inprogress.held_back(held, now)
+        if why:
+            return self._refuse(intent, f"The {held.base} is {why}. Nothing is opened.")
 
         route = str(intent.params.get("route") or "").strip().lower()
         use = consumables.plan(held, how=how, target=target, because=intent.because,
