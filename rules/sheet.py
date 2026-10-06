@@ -5617,8 +5617,18 @@ def full_sheet(actor: Actor) -> dict:
 
     glossary = glossary_mod.build(actor)
 
+    # What each skill does in this game, for the hover on a skill's name on the Skills
+    # card and the level-up rank picker (`rules/skillhelp.py`). Help text, never a gate.
+    try:
+        from . import skillhelp
+
+        skill_help = skillhelp.for_page()
+    except Exception:      # noqa: BLE001 - a broken help file costs the hover only
+        skill_help = {"general": "", "skills": {}}
+
     return {
         "glossary": glossary,
+        "skill_help": skill_help,
         "identity": {
             "name": actor.name,
             "class": f"{cls.get('name', '')} {actor.level}".strip(),

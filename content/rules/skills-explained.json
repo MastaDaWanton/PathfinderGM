@@ -1,0 +1,331 @@
+{
+  "_about": [
+    "What each skill does in THIS game, for the hover on a skill's name in the character",
+    "creator and the level-up rank picker (the owner, 2026-10-06). Read by",
+    "rules/skillhelp.py.",
+    "",
+    "book: one line of what the Core Rulebook says the skill is, paraphrased.",
+    "uses: what the engine and the GM actually do with it. Each names the file that does it",
+    "and a literal piece of that file (`find`); tests/test_skill_help.py reads every one",
+    "back, so a sentence here fails the suite the day its code moves or goes, instead of",
+    "lying on the page. The page is sent the words only, never the anchors.",
+    "not_yet: what the book offers that this game does not do yet, said plainly rather than",
+    "left for the player to assume.",
+    "",
+    "Mapped 2026-10-06 by grepping rules/, gm/, play/ and content/ for every skill id. A",
+    "skill that only appears as a bonus on gear, herbs or spells has no `uses`: a bonus to a",
+    "roll nothing makes is not a use. Modifier sources are the sheet's job (its Skills card",
+    "itemises them)."
+  ],
+  "general": "Any skill can also be called for by the GM when you try something it covers: the engine rolls d20 plus your bonus against a difficulty.",
+  "skills": {
+    "acrobatics": {
+      "name": "Acrobatics",
+      "book": "Keep your footing on narrow or slippery ground, jump, and tumble past enemies without giving them a free swing.",
+      "uses": [
+        {"text": "Say you leap, vault, tumble or jump across something and the engine rolls Acrobatics.",
+         "file": "gm/judgement.py", "find": "(\"acrobatics\", r\"leap|jump"},
+        {"text": "Still usable while raging, when most Dexterity skills are not.",
+         "file": "content/class-abilities/barbarian.json", "find": "\"except\": [\"acrobatics\", \"fly\", \"intimidate\", \"ride\"]"}
+      ],
+      "not_yet": "Tumbling through an enemy's reach without provoking, softening a fall, and jump distances."
+    },
+    "appraise": {
+      "name": "Appraise",
+      "book": "Judge what an object, gem or work of art is worth.",
+      "uses": [],
+      "not_yet": "Shops price everything from their own tables, so Appraise never changes what you pay or are paid. Valuing loot and spotting the best piece in a hoard are not rolled either."
+    },
+    "bluff": {
+      "name": "Bluff",
+      "book": "Make someone believe something untrue, feint in a fight, or slip a hidden meaning into what you say.",
+      "uses": [
+        {"text": "A lie is your Bluff against the listener's Sense Motive. A far-fetched lie is at -10, an impossible one at -20.",
+         "file": "rules/bluff.py", "find": "\"far_fetched\": -10,"},
+        {"text": "Claim to be something your sheet says you are not, and the engine rolls Bluff against whoever is listening. With nobody listening, nothing is rolled.",
+         "file": "gm/judgement.py", "find": "def inject_false_claim(raw_intents, player_text: str, scene, reading=None) -> list:"},
+        {"text": "Get caught and they think less of you and remember it: your next lies to them are at -10.",
+         "file": "rules/engine.py", "find": "mods = [*mods, Modifier(bluff_mod.WARY_PENALTY,"},
+        {"text": "A believed claim about who you are can change how they feel about you, depending on who they are.",
+         "file": "rules/engine.py", "find": "swing, why = bluff_mod.reaction(kind, listener, self.scene)"}
+      ],
+      "not_yet": "Feinting in a fight, and passing secret messages."
+    },
+    "climb": {
+      "name": "Climb",
+      "book": "Scale walls, cliffs, ropes and trees.",
+      "uses": [
+        {"text": "Say you climb, clamber or scale something and the engine rolls Climb.",
+         "file": "gm/judgement.py", "find": "(\"climb\", r\"climb|"}
+      ],
+      "not_yet": "Climbing is not yet a way of moving. Going up on the battle map needs a climb or fly speed, not this skill, and a failed climb does not drop you."
+    },
+    "craft": {
+      "name": "Craft",
+      "book": "Make things in one trade (weapons, armour, bows, alchemy and the like), mend them, and earn a living by it.",
+      "uses": [
+        {"text": "Mending a construct: the better of your Craft and your Knowledge (Engineering). It takes ten minutes and restores 1d6 per Hit Die.",
+         "file": "rules/repair.py", "find": "has neither Craft nor Knowledge (engineering) to mend it"}
+      ],
+      "not_yet": "This game has one Craft with no trade named. The crafting benches (herbalism, smithing, alchemy, leatherwork, enchanting) use their own levels, not Craft ranks. Making items by the week, mending gear, valuing goods of your trade and earning a wage are not in play yet."
+    },
+    "diplomacy": {
+      "name": "Diplomacy",
+      "book": "Change how someone feels about you, ask a favour, or gather rumours in a town.",
+      "uses": [
+        {"text": "Talking someone round: the difficulty comes from how they feel about you (hostile 25 down to helpful 0), plus their Charisma. The GM never sets it.",
+         "file": "rules/attitude.py", "find": "INFLUENCE_DC = {\"hostile\": 25, \"unfriendly\": 20, \"indifferent\": 15,"},
+        {"text": "Success moves them one step friendlier, two if you beat it by 5. Fail by 5 or more and they cool a step.",
+         "file": "rules/attitude.py", "find": "def steps_for(margin: int) -> int:"},
+        {"text": "One try per person a day, and a failed try counts.",
+         "file": "rules/engine.py", "find": "has heard {actor.name} out once today"},
+        {"text": "Asking around for where someone lives takes 1d4 hours and uses your Diplomacy.",
+         "file": "rules/engine.py", "find": "bonus = sum(m.value for m in stack(pc.skill_modifiers(\"diplomacy\")))"},
+        {"text": "It is the way past a merchant who will not trade with you.",
+         "file": "play/views.py", "find": "the engine rolls your Diplomacy against how "}
+      ],
+      "not_yet": "Asking a favour by the book's table, and gathering rumours beyond where somebody lives."
+    },
+    "disable device": {
+      "name": "Disable Device",
+      "book": "Open locks and disarm or jam traps and mechanisms.",
+      "uses": [
+        {"text": "Picking the lock of a house: DC 25, or 35 without thieves' tools. Whoever is home may hear you.",
+         "file": "rules/engine.py", "find": "label = (f\"Disable Device — picking the lock of {house.name}\""},
+        {"text": "Winning a construct's loyalty: the better of Disable Device and Knowledge (Engineering). Fail by 5 and it turns on you.",
+         "file": "content/rules/repairs.json", "find": "\"skills\": [\"knowledge (engineering)\", \"disable device\"],"}
+      ],
+      "not_yet": "Traps, and locks other than a house door (chests, gates, manacles)."
+    },
+    "disguise": {
+      "name": "Disguise",
+      "book": "Change your look to pass as somebody else, or as nobody in particular.",
+      "uses": [
+        {"text": "Say you disguise yourself, pose as someone or pass yourself off, and the engine rolls Disguise.",
+         "file": "gm/judgement.py", "find": "(\"disguise\", r\"disguise"}
+      ],
+      "not_yet": "A disguise does not stay on you afterwards, and the people you meet do not roll to see through it."
+    },
+    "escape artist": {
+      "name": "Escape Artist",
+      "book": "Slip ropes and manacles, wriggle out of a grapple, squeeze through tight spaces.",
+      "uses": [
+        {"text": "Say you slip your bonds or wriggle free, and the engine rolls Escape Artist.",
+         "file": "gm/judgement.py", "find": "(\"escape artist\", r\"slip"}
+      ],
+      "not_yet": "Escaping a grapple: a grapple holds you until it ends, whatever your Escape Artist."
+    },
+    "fly": {
+      "name": "Fly",
+      "book": "Manoeuvre in the air when you have a way to fly: hover, turn sharply, keep control in wind.",
+      "uses": [],
+      "not_yet": "Flying is a speed, not a roll: there are no checks to hover, turn or fight the wind yet."
+    },
+    "handle animal": {
+      "name": "Handle Animal",
+      "book": "Make an animal do as you ask, teach it tricks, and train it for a purpose.",
+      "uses": [],
+      "not_yet": "An animal companion does its tricks without a roll, and teaching new tricks, rearing or pushing an animal are not in play yet."
+    },
+    "heal": {
+      "name": "Heal",
+      "book": "First aid for the dying, treating wounds, poison and disease, and long-term care.",
+      "uses": [
+        {"text": "First aid: a Heal check on someone dying, DC 15. Make it and they stop dying.",
+         "file": "rules/firstaid.py", "find": "patient.add_condition(\"stable\", source=\"first aid\")"}
+      ],
+      "not_yet": "Stopping bleeding, long-term care while resting, and treating poison or disease."
+    },
+    "intimidate": {
+      "name": "Intimidate",
+      "book": "Frighten someone into doing what you want for a while, or shake a foe's nerve in a fight.",
+      "uses": [
+        {"text": "Out of a fight, threatening a named person: DC 10 + their Hit Dice + their Wisdom.",
+         "file": "rules/attitude.py", "find": "def intimidate_dc(target) -> int:"},
+        {"text": "Success makes them friendly for 1d6 × 10 minutes, but they resent it.",
+         "file": "rules/attitude.py", "find": "INTIMIDATE_DICE = \"1d6\""},
+        {"text": "Still usable while raging.",
+         "file": "content/class-abilities/barbarian.json", "find": "\"except\": [\"acrobatics\", \"fly\", \"intimidate\", \"ride\"]"}
+      ],
+      "not_yet": "Demoralising a foe in a fight (shaken), and a cowed person reporting you afterwards."
+    },
+    "knowledge (arcana)": {
+      "name": "Knowledge (Arcana)",
+      "book": "Magic, spells, magic items, dragons and magical beasts.",
+      "uses": [],
+      "not_yet": "Recognising a creature, a spell or a magic effect is not rolled yet."
+    },
+    "knowledge (dungeoneering)": {
+      "name": "Knowledge (Dungeoneering)",
+      "book": "Caves and the world below, and the things that live there: aberrations, oozes.",
+      "uses": [],
+      "not_yet": "Recognising aberrations, oozes and other things from below is not rolled yet."
+    },
+    "knowledge (engineering)": {
+      "name": "Knowledge (Engineering)",
+      "book": "Buildings, bridges, fortifications, siege engines and how things are built.",
+      "uses": [
+        {"text": "Mending a construct: the better of this and your Craft. It takes ten minutes and restores 1d6 per Hit Die.",
+         "file": "content/rules/repairs.json", "find": "\"skills\": [\"craft\", \"knowledge (engineering)\"],"},
+        {"text": "Winning a construct's loyalty: the better of this and Disable Device. Fail by 5 and it turns on you.",
+         "file": "rules/engine.py", "find": "f\"{skill.title()} check (claim)\""}
+      ],
+      "not_yet": "Judging buildings, bridges and siege works."
+    },
+    "knowledge (geography)": {
+      "name": "Knowledge (Geography)",
+      "book": "Lands, terrain, climate and where peoples live.",
+      "uses": [],
+      "not_yet": "Journeys have no getting-lost or finding-the-way roll yet."
+    },
+    "knowledge (history)": {
+      "name": "Knowledge (History)",
+      "book": "Wars, past rulers, the founding of places and what happened long ago.",
+      "uses": [],
+      "not_yet": "Recalling history is not rolled on its own yet."
+    },
+    "knowledge (local)": {
+      "name": "Knowledge (Local)",
+      "book": "A place's people, customs, laws, legends and rumours.",
+      "uses": [
+        {"text": "When you ask the GM about a place, one secret roll per place (DC 15) decides whether its street rumours reach the answer. It is never rerolled.",
+         "file": "play/views.py", "find": "said_mem[key] = bool(roll.total >= 15)"}
+      ],
+      "not_yet": "Recognising people and humanoid creatures. Asking around town is Diplomacy."
+    },
+    "knowledge (nature)": {
+      "name": "Knowledge (Nature)",
+      "book": "Animals, plants, weather, seasons and the fey.",
+      "uses": [
+        {"text": "Studying a herb at the herbarium: the better of this and Profession, DC 10 + 5 per rarity. Every 5 you beat it by teaches another property.",
+         "file": "rules/herbknowledge.py", "find": "def study_skill(actor, dc: int) -> tuple[str, list]:"}
+      ],
+      "not_yet": "Recognising animals, plant creatures and the fey, and reading the weather."
+    },
+    "knowledge (nobility)": {
+      "name": "Knowledge (Nobility)",
+      "book": "Lineages, heraldry, royalty and the manners of courts.",
+      "uses": [],
+      "not_yet": "Heraldry, lineages and court manners are not rolled yet."
+    },
+    "knowledge (planes)": {
+      "name": "Knowledge (Planes)",
+      "book": "The other planes and what comes from them: outsiders and elementals.",
+      "uses": [],
+      "not_yet": "Recognising outsiders and planar matters is not rolled yet."
+    },
+    "knowledge (religion)": {
+      "name": "Knowledge (Religion)",
+      "book": "Gods, rites, holy symbols, and the undead.",
+      "uses": [],
+      "not_yet": "Recognising gods' symbols and the undead is not rolled yet."
+    },
+    "linguistics": {
+      "name": "Linguistics",
+      "book": "Learn a new language with each rank, read old or foreign writing, and make or spot forgeries.",
+      "uses": [],
+      "not_yet": "Ranks do not teach languages yet, and there are no forgeries or old scripts to read."
+    },
+    "perception": {
+      "name": "Perception",
+      "book": "Notice things: a hidden foe, a trap, a sound, a detail out of place.",
+      "uses": [
+        {"text": "Say you search, eavesdrop or listen at a door, and the engine rolls Perception.",
+         "file": "gm/judgement.py", "find": "(\"perception\", r\"search"},
+        {"text": "On the road, a cutpurse has to beat your Perception, rolled in secret, to lift your coin.",
+         "file": "rules/engine.py", "find": "spot = self.dice.d20(pc.skill_modifiers(\"perception\"),"},
+        {"text": "It is what other people roll against your Stealth. Their number is never shown.",
+         "file": "gm/judgement.py", "find": "return {\"ref\": max(pool, key=lambda r: _perception(actors[r])), \"skill\": \"perception\"}"}
+      ],
+      "not_yet": "Spotting an ambush before a fight, finding traps, and noticing things without asking."
+    },
+    "perform": {
+      "name": "Perform",
+      "book": "Entertain an audience (song, dance, oratory, an instrument) and earn coin by it.",
+      "uses": [],
+      "not_yet": "Performing for coin, a bard's countersong, and Perform standing in for other skills."
+    },
+    "profession": {
+      "name": "Profession",
+      "book": "Work a trade such as sailor, merchant, soldier or innkeeper: know its ways and earn a weekly wage.",
+      "uses": [
+        {"text": "Studying a herb at the herbarium: the better of your Profession and Knowledge (Nature), whatever your trade.",
+         "file": "content/rules/herb-lore.json", "find": "\"skills\": [\"knowledge (nature)\", \"profession\"],"},
+        {"text": "At sea, ramming another ship is a Profession check at the helm against her AC. With no ranks, you cannot ram.",
+         "file": "rules/engine.py", "find": "is no sailor. Ramming is a Profession (sailor) "}
+      ],
+      "not_yet": "This game has one Profession with no trade named. Earning a wage, your trade's know-how, and anything a sailor, merchant or soldier would know are not in play yet."
+    },
+    "ride": {
+      "name": "Ride",
+      "book": "Stay in the saddle, guide a mount with your knees, and fight from horseback.",
+      "uses": [],
+      "not_yet": "Riding is a travel pace (twice as fast as walking), not a roll. Staying in the saddle and fighting mounted are not in play yet."
+    },
+    "sense motive": {
+      "name": "Sense Motive",
+      "book": "Tell when someone is lying to you, get a hunch about a situation, or notice someone is under a spell.",
+      "uses": [],
+      "not_yet": "Your own Sense Motive is not rolled yet: catching a lie, a hunch, noticing a charm. The people you lie to do roll theirs."
+    },
+    "sleight of hand": {
+      "name": "Sleight of Hand",
+      "book": "Pick pockets, palm small things, and hide a weapon on your body.",
+      "uses": [
+        {"text": "Say you pick a pocket, palm something or filch it, and the engine rolls Sleight of Hand.",
+         "file": "gm/judgement.py", "find": "(\"sleight of hand\", r\"pick"}
+      ],
+      "not_yet": "The roll does not move what you took into your pack by itself, and hiding a weapon from a search is not rolled."
+    },
+    "spellcraft": {
+      "name": "Spellcraft",
+      "book": "Identify a spell as it is cast or a magic item's powers, and make magic items.",
+      "uses": [
+        {"text": "Identifying a magic item: the better of your Enchanter check and your Spellcraft, against 15 + the item's caster level. Beat it by 10 and you also find a curse.",
+         "file": "play/enchant_views.py", "find": "return sum(m.value for m in stack(pc.skill_modifiers(\"spellcraft\")))"}
+      ],
+      "not_yet": "Identifying a spell as it is cast. Making magic items uses your Enchanter level, not Spellcraft."
+    },
+    "stealth": {
+      "name": "Stealth",
+      "book": "Move without being seen or heard.",
+      "uses": [
+        {"text": "Say you sneak, creep, hide or slip past, and the engine rolls Stealth against the sharpest eyes in the scene. With nobody there to notice, nothing is rolled.",
+         "file": "gm/judgement.py", "find": "def stealth_opposed(scene) -> dict | None:"},
+        {"text": "Leave by an exit quietly and Stealth is rolled before you go.",
+         "file": "play/views.py", "find": "intents = engine.validate([*judgement.manner_checks(text, c.scene), op])"},
+        {"text": "Strike from hiding at range and you roll Stealth at -20 to keep them from knowing who did it.",
+         "file": "rules/attitude.py", "find": "[Modifier(-20, \"sniping, to stay hidden\")]"}
+      ],
+      "not_yet": "A good Stealth roll does not yet leave you hidden for what comes next."
+    },
+    "survival": {
+      "name": "Survival",
+      "book": "Live off the land, follow tracks, keep from getting lost, and read the weather.",
+      "uses": [
+        {"text": "Foraging: each hour is a Survival check against the land's difficulty, with your Herbalist level added. The better the roll, the more you find.",
+         "file": "rules/foraging.py", "find": "mods = list(actor.skill_modifiers(\"survival\"))"},
+        {"text": "Prospecting for ore uses the same roll, with your Blacksmith level added.",
+         "file": "rules/engine.py", "find": "level = actor.track(\"blacksmith\").level if hasattr(actor, \"track\") else 1"},
+        {"text": "Say you track someone or follow a trail, and the engine rolls Survival.",
+         "file": "gm/judgement.py", "find": "(\"survival\", r\"track"}
+      ],
+      "not_yet": "Getting lost, reading the weather, and feeding others. Hunger and thirst are Constitution rolls."
+    },
+    "swim": {
+      "name": "Swim",
+      "book": "Swim, and keep your head above rough water.",
+      "uses": [
+        {"text": "Say you swim, and the engine rolls Swim.",
+         "file": "gm/judgement.py", "find": "(\"swim\", r\"swim"}
+      ],
+      "not_yet": "The roll does not change how you move in water yet, and drowning is a Constitution roll."
+    },
+    "use magic device": {
+      "name": "Use Magic Device",
+      "book": "Make a wand, scroll or magic item work for you when it was not made for your kind.",
+      "uses": [],
+      "not_yet": "There are no wands or scrolls to activate yet, so nothing calls for it."
+    }
+  }
+}
