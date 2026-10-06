@@ -23,6 +23,10 @@ import re
 from dataclasses import dataclass, field
 
 from .biomes import BIOMES
+# The herb corpus's routes, read rather than copied (alchemy lane B): a second list here would
+# drift from the herb bench's, which keys its tables on them. `ingredients` imports nothing
+# of this module at load, so there is no cycle.
+from .ingredients import ROUTES as HERB_ROUTES
 from .tables import (
     ABILITY_FULL, ARMOUR, CONDITIONS, DC_BANDS, ENERGY_DAMAGE, PHYSICAL_DAMAGE, SAVES,
     SKILLS,
@@ -132,7 +136,191 @@ WORKING_TRAITS: list[str] = [
     # its seat, a heavy one fades fast, a volatile one bites whoever reads it. `pure` is the
     # forge's, and means the same at the circle: the check rolled twice, the better kept.
     "night_only", "eager", "skittish", "heavy", "volatile",
+    # The alchemist's bench (alchemy plan §5.5, contracts §2.4), appended below; see
+    # ALCHEMY_WORKING_TRAITS for what each one means at the bench.
 ]
+
+# --- the alchemist's words (alchemy lane B: contracts §2, plan §5.3, §5.5, §16) --------------
+#
+# Measured before any of it (alchemy plan §5.1, inv §3): 75 of the 139 alchemist materials
+# carried nothing executable, 5 were narrative only, none carried three properties, and
+# there was no way to say how a reagent behaves at the bench, which essence a trait
+# carries, or which route it reaches a body by. A formula could only key on material
+# names. These are the words the materials pass (lane D), the formulae (lane E), the
+# bench (lane F) and the engine readers (lane C) share.
+#
+# **Working traits** (plan §5.5). `volatile` and `pure` were already here (the enchanting
+# circle's) and mean the same at the alchemist's bench — something that bites when worked,
+# and a check rolled twice — so they are reused, not respelled. The vessel traits decide a
+# product's family (owner, Q7.3) and never touch its numbers. `solvent:<kind>` is a
+# parametrised trait (Dissolve needs one, and some solids dissolve in one kind only); the
+# five kinds are listed whole so the dropdown and the validator offer exactly them.
+SOLVENT_KINDS: tuple[str, ...] = ("water", "alcohol", "vinegar", "oil", "acid")
+VESSEL_TRAITS: tuple[str, ...] = ("drinkable", "shatters", "bursts", "struck", "stick",
+                                  "fireproof", "warded", "lead_lined")
+ALCHEMY_WORKING_TRAITS: tuple[str, ...] = (
+    "volatile", "pure",
+    "stabilizer", "catalyst", "apparatus", "solid", "liquid", "combustible",
+    "slow_to_dissolve", "light_sensitive", "corrosive", "toxic_to_handle", "wild",
+) + VESSEL_TRAITS + tuple(f"solvent:{k}" for k in SOLVENT_KINDS)
+WORKING_TRAITS.extend(t for t in ALCHEMY_WORKING_TRAITS if t not in WORKING_TRAITS)
+
+# **Essences** (plan §5.3; the owner kept the 18, open point 1, 2026-10-06): the tags a
+# formula keys on, one per product trait, asked by prefix as `essence.<id>` (law 1). Noita's
+# tag-keyed reactions and the Witcher's substances, where any carrier serves (prior art
+# §3, §4). Small on purpose, after the Angry GM's advice to keep descriptors few.
+#
+# The vocabulary lives HERE, beside STRIKES_AS and WORKING_TRAITS, not in lane E's
+# content/rules/alchemy-essences.json as contracts §2.1 first wrote: the materials pass
+# validates against it before that file exists, and two lists of the same ids is how they
+# come to disagree. Lane E's file holds the derivation table (a spell's essences from its
+# descriptors, effect types and school) keyed on these ids, and refuses one not here.
+ESSENCES: dict[str, str] = {
+    "fire": "fire", "frost": "cold", "acid": "acid", "storm": "electricity",
+    "thunder": "sonic",
+    "light": "illumination", "shadow": "darkness, concealment and invisibility",
+    "vigour": "healing, temporary hit points, fast healing",
+    "purity": "removing or holding off conditions, poison and disease",
+    "ward": "resistance, damage reduction, saves and armour class",
+    "might": "Strength and Constitution, attack and damage",
+    "grace": "Dexterity and land speed",
+    "mind": "Intelligence, Wisdom, Charisma and emotion",
+    "lightness": "flight, climbing, jumping and falling softly",
+    "sight": "senses and divination",
+    "binding": "entangling, gluing, holding and compulsion",
+    "decay": "poison, necromancy and sickness",
+    "change": "transmutation of form, size and substance",
+}
+
+# **Routes** (plan §5.3): how a trait reaches whoever it reaches. The herb corpus's six,
+# plus the alchemist's own:
+#   struck   what a thrown flask does to the creature it hits
+#   splash   what it does to everyone within 5 ft of where it lands — the struck creature
+#            excepted on a hit (CRB, splash weapons). The owner's ruling of 2026-10-06
+#            (open point 3): ALL thrown flasks splash, not only the book's named splash
+#            weapons, so splash is a property any flask can carry. A flask that authors no
+#            splash document gets the book's (`splash_for`).
+#   area     what a cloud does to everyone inside it
+#   carried  a cost that lands on whoever carries the product
+# The engine reader for the four is lane C's throw and cloud path (contracts §7).
+ALCHEMY_ROUTES: tuple[str, ...] = ("struck", "splash", "area", "carried")
+ROUTES: tuple[str, ...] = tuple(HERB_ROUTES) + ALCHEMY_ROUTES
+
+# **Permissions as tag grants** (plan §16.9, contracts §2.2). A `permission` effect's
+# `target` stays the words a card prints — 295 shipped documents write it as a
+# sentence ("Breathe water freely.") — and its `tag` names one of these. Closed, as
+# STRIKES_AS is: a tag spelled any other way would be granted and asked by nobody.
+#
+# Each entry says the tag it grants and the reader that asks it, or "" when none does yet:
+# a tag nothing reads is honest, prose that pretends is not (plan §16.9), and the report
+# lists every empty reader. Where a reader already asks a tag of its own, the permission
+# grants THAT tag: water breathing grants `breathes.water`, which `water.breathes_water`
+# has asked since the drowning rules — the contract's `permission.breathe_water` would have
+# been a second spelling the drowning check never sees.
+PERMISSIONS: dict[str, dict] = {
+    "breathe_water": {"name": "Breathes water", "tag": "breathes.water",
+                      "reader": "water.breathes_water (drowning)"},
+    "endure_elements": {"name": "Comfortable in heat and cold",
+                        "tag": "permission.endure_elements", "reader": ""},
+    "comprehend_languages": {"name": "Understands any language",
+                             "tag": "permission.comprehend_languages", "reader": ""},
+    "pass_without_trace": {"name": "Leaves no trail",
+                           "tag": "permission.pass_without_trace", "reader": ""},
+    "gaseous_form": {"name": "Gaseous form", "tag": "permission.gaseous_form",
+                     "reader": ""},
+    "size_larger": {"name": "One size larger", "tag": "permission.size_larger",
+                    "reader": ""},
+    "size_smaller": {"name": "One size smaller", "tag": "permission.size_smaller",
+                     "reader": ""},
+    "absorb_energy": {"name": "Absorbs energy damage", "tag": "permission.absorb_energy",
+                      "reader": ""},
+    "ward_mind_control": {"name": "Shielded from mind control",
+                          "tag": "permission.ward_mind_control", "reader": ""},
+    "ward_summoned_contact": {"name": "Shielded from summoned creatures' touch",
+                              "tag": "permission.ward_summoned_contact", "reader": ""},
+}
+
+
+def essence_tag(essence: str) -> str:
+    """`essence.fire` — the one writer of an essence's tag text (law 1)."""
+    return f"essence.{str(essence).strip().lower()}"
+
+
+def working_tag(trait: str) -> str:
+    """`working.volatile`, `working.solvent.water` — the one writer of a working trait's
+    tag (plan §17: working traits are `working.*`). The colon of a parametrised trait
+    becomes a dot, so `has_state("working.solvent")` asks for any solvent."""
+    return "working." + str(trait).strip().lower().replace(":", ".")
+
+
+def sense_tag(sense: str, range_ft=None) -> str:
+    """`sense.darkvision.60`, `sense.low-light` — the tag a `sense` effect grants.
+
+    Spelled as a race document spells it (`rules/races.py`: `sense.low-light`,
+    `sense.darkvision.60`), so one prefix question answers for a race's eyes and a
+    potion's alike. Measured on build/alchemy: the worn reader (`Actor._worn_tags`) writes
+    `sense.<target>` with only spaces hyphenated, so goggles of `low_light` grant
+    `sense.low_light` and `has_state("sense.low-light")` misses them. This is the one
+    writer the readers should ask for the text.
+    """
+    leaf = str(sense or "").strip().lower().replace("_", "-").replace(" ", "-")
+    tag = f"sense.{leaf}"
+    try:
+        n = int(range_ft) if range_ft not in (None, "") else 0
+    except (TypeError, ValueError):
+        n = 0
+    return f"{tag}.{n}" if n > 0 else tag
+
+
+def permission_tag(permission: str) -> str:
+    """The tag a permission grants (`PERMISSIONS`), or "" for an id that is not one."""
+    row = PERMISSIONS.get(str(permission or "").strip().lower())
+    return row["tag"] if row else ""
+
+
+def bonus_source(spec: dict, default: str = "") -> str:
+    """Who a bonus comes from, as the stacking funnel reads it (`Modifier.source`).
+
+    1e: "Bonuses without a type always stack, unless they are from the same source", and
+    two bonuses of one type do not stack "even if they come from different spells"
+    (CRB, Magic, Combining Magic Effects). The owner's `magic_stacking` switch (open point
+    2, 2026-10-06) lifts the second half for every typed bonus and keeps the first: the
+    same source keeps the better. So `source` names the effect's OWN identity — the
+    spell, the product, the property — never the jar it came in: two antitoxins are one
+    source (+5, not +10) and antitoxin beside another alchemical +2 are two (+7, switch
+    on).
+
+    `source` wins (a bound property's `property:<id>`, a curse's, a product's); then the
+    crafting pipeline's `from`, which `consumables` has always passed as the buff's
+    source; then `default`.
+    """
+    for key in ("source", "from"):
+        v = str((spec or {}).get(key) or "").strip()
+        if v:
+            return v
+    return default
+
+
+def splash_for(specs: list[dict]) -> list[dict]:
+    """A thrown flask's splash: its own `route: splash` documents, or the book's.
+
+    The book gives every splash weapon one point of its own energy on everyone within 5 ft
+    (alchemist's fire 1 fire, acid 1 acid, holy water 1 — CRB, Goods and Services), and the
+    owner's ruling makes every thrown flask one. So a flask that authored no splash gets
+    one point of each damage type its struck documents deal; a flask that deals no damage
+    when it strikes (a tanglefoot bag) splashes nothing.
+    """
+    own = [dict(s) for s in specs or () if str(s.get("route") or "") == "splash"]
+    if own:
+        return own
+    seen: list[str] = []
+    for s in specs or ():
+        if s.get("type") == "damage" and str(s.get("route") or "") == "struck":
+            kind = str(s.get("damage_type") or "untyped")
+            if kind not in seen:
+                seen.append(kind)
+    return [{"type": "damage", "dice": "1", "damage_type": k, "route": "splash"}
+            for k in seen]
 
 # Triggers that belong to an *item* rather than to a spell's lifetime: a blade's venom on
 # the hit, viridium's leprosy on the crit, wyvern blood on the first wound each day,
@@ -181,8 +369,13 @@ _STANDING_TYPES = ("gear_mod", "strikes_as", "working",
 #                   ordinarily does not stack
 #   suppressible    merciful's "on command, the weapon suppresses this ability"
 #   dc_adds_enhancement  arrow deflection's DC 20 "+ the enhancement bonus of the weapon"
+#   drawback        a cost to whoever uses the product (alchemy contracts §2.1).
+#                   `is_drawback` decides direction for a signed number; an alchemy trait
+#                   says it outright, because "1d6 fire, struck" and "1d6 fire to the
+#                   handler" are the same document and only the route and this flag
+#                   tell them apart (`knowledge` classifies by both)
 _BOOLEAN_KEYS: tuple[str, ...] = ("book", "house", "per_multiplier", "stacks",
-                                  "suppressible", "dc_adds_enhancement")
+                                  "suppressible", "dc_adds_enhancement", "drawback")
 
 # The thirteen creature types of 1e (bane's table, CRB), and the things that are not
 # creatures but can be struck — `object`, for brilliant energy's "cannot harm undead,
@@ -359,7 +552,21 @@ VOCAB: dict[str, list[dict]] = {
     "per": [{"id": "round", "name": "Once a round"}],
     "creature_or_object": [{"id": k, "name": k.replace("-", " ").title()}
                            for k in _STRIKE_TARGETS],
+
+    # --- the alchemist's (alchemy lane B) ----------------------------------------------
+    "essence": [{"id": k, "name": f"{k.title()}: {v}"} for k, v in ESSENCES.items()],
+    "route": [{"id": k, "name": n} for k, n in (
+        ("ingest", "Swallowed"), ("skin", "On the skin"), ("eyes", "In the eyes"),
+        ("wound", "Into a wound"), ("inhale", "Breathed in"),
+        ("external", "Outside the body"),
+        ("struck", "On whoever a thrown flask hits"),
+        ("splash", "On everyone within 5 ft of where it lands"),
+        ("area", "On everyone in the cloud"),
+        ("carried", "On whoever carries it"))],
+    "permission": [{"id": k, "name": v["name"]} for k, v in PERMISSIONS.items()],
 }
+# The route dropdown's ids are the herb corpus's plus the alchemist's, in that order; a
+# route added to `ingredients.ROUTES` without a name here fails tests/test_alchemy_vocabulary.
 
 
 @dataclass
@@ -411,6 +618,19 @@ COMMON = [
           hint="With a use limit: how many times."),
     Field("note", "Note", "text", required=False,
           hint="Anything the fields above cannot hold."),
+    # The alchemist's three (contracts §2.1). Optional everywhere, so all 6,476 existing
+    # specs are untouched; the materials pass (lane D) requires `essence` and `route` on a
+    # product trait (`product_trait_problems`). `drawback` is a boolean and so, like
+    # `book`, has no field on the form (`_BOOLEAN_KEYS`); `when` and `source` are checked
+    # by `validate` (`_when_shape_problems`, `bonus_source`) and have no widget either.
+    Field("essence", "Essence", "choice", vocab="essence", required=False,
+          hint="What an alchemy formula reads this trait as. Product traits only."),
+    Field("grade", "Grade", "int", required=False,
+          hint="How strong this trait is in a bottle, 1 and up. Same-named traits add "
+               "their grades at the bench."),
+    Field("route", "Reaches by", "choice", vocab="route", required=False,
+          hint="Empty means swallowed. Struck, splash and area are a thrown flask's or a "
+               "cloud's; carried lands on whoever holds it."),
 ]
 
 
@@ -530,6 +750,32 @@ CATEGORIES: list[Category] = [
                 Field("stopped_by", "Stopped by", "text", required=False,
                       default="DC 15 Heal check"),
             ]),
+            # Alchemist's fire's second round (alchemy plan §16.6): "On the round
+            # following a direct hit, the target takes an additional 1d6 points of
+            # damage ... a full-round action to attempt to extinguish the flames ...
+            # DC 15 Reflex save. Rolling on the ground provides the target a +2 bonus"
+            # (CRB, Goods and Services). Bleed's sibling, and PF2e's persistent damage is
+            # the shape (prior art §2.1) with the book's numbers: the state rides on the
+            # creature, not on a spell's lifetime, so `trigger: each_round` (a caster's
+            # ward) is the wrong door — it cannot be put out. The save is written as
+            # arrow deflection's is (`save`, `dc`), flat fields the form can render, not
+            # the contract's nested `{type, dc}`.
+            EffectType("burning", "Burning", "Burns for 1d6 fire next round unless put out", [
+                Field("dice", "Each round", "dice", hint="1d6 for alchemist's fire."),
+                Field("damage_type", "Damage type", "choice", vocab="damage_type",
+                      default="fire"),
+                Field("rounds", "Rounds", "int", default=1,
+                      hint="How many rounds it burns after the hit. 1 for alchemist's "
+                           "fire: the round following."),
+                Field("save", "Put out with", "choice", vocab="save", default="ref",
+                      required=False, hint="The save that puts it out, as a full-round "
+                                           "action."),
+                Field("dc", "DC to put out", "int", default=15, required=False),
+                Field("smother_bonus", "Bonus for rolling on the ground", "int",
+                      default=2, required=False),
+            ], blocked="Lands as state.burning with a per-round damage the periodic "
+                       "executor runs; the extinguish op puts it out on the save, and "
+                       "water smothers it outright."),
             # Enervation, energy drain, the resurrection of a dead character. Thirty-one
             # spells state it and none could say it: written as an `ability_damage` it
             # damages the wrong thing, and written as a `narrative` the GM gets a
@@ -734,24 +980,55 @@ CATEGORIES: list[Category] = [
             # returns nothing for either, and no check in the app asks whether an actor can
             # see in the dark — so a potion of darkvision was drunk and did nothing, with
             # no error to say why. The engine flag now matches the code.
+            # A sense lands as a tag for its duration (contracts §2.2): `sense_tag`
+            # spells it as a race document does, so `has_state("sense.darkvision")` asks
+            # a potion's eyes and an elf's the same way. Worn senses already work (the
+            # helm's, read live by `Actor._worn_tags`); a drunk one waits on its grant
+            # (`AWAITING_READER`).
             EffectType("sense", "Sense", "Low-light vision for 1 hour", [
                 Field("target", "Sense", "choice", vocab="sense"),
                 Field("range", "Range in feet", "int", required=False),
-            ], engine=False,
-                blocked="Recorded and shown to the GM. Nothing in the engine asks what a "
-                        "creature can see yet, so light and concealment are narrated."),
+            ], blocked="Grants the sense as a tag for its duration. Worn, it is read "
+                       "while worn. See invisible is read by the attack's concealment, "
+                       "darkvision and low-light vision by the light model."),
+            # Executable since alchemy lane B (2026-10-06), for LAND speed: the
+            # consumable branch (`consumables._spec_to_intents`, since stage 2) and the
+            # funnel (`Actor.speed_feet`, `_buff_mods("speed", "land")`) both existed,
+            # and only this flag sent a potion of longstrider to narration — measured
+            # with the fixture PC: 30 ft before the drink and 30 after; 40 after with the
+            # flag on. Climb, swim, fly and burrow have no reader in movement yet, so
+            # those targets wait (`TARGETS_AWAITING_READER`) and `executable` says so per
+            # spec.
+            #
+            # `bonus_type` is optional and absent from every shipped speed spec; the funnel
+            # reads an untyped speed bonus as enhancement (1e's magical speed bonuses
+            # are), so writing it is only for a bonus that is NOT enhancement. Named here
+            # so the stacking switch (contracts §7) sees a type it can stack by.
             EffectType("speed", "Movement", "+20 ft land speed for 1 round", [
                 Field("target", "Mode", "choice", vocab="movement", default="land"),
                 Field("amount", "Feet", "signed"),
-            ], engine=False,
-                blocked="Recorded and shown to the GM. The grid reads the creature's own "
-                        "speed; nothing applies a temporary change to it yet."),
+                Field("bonus_type", "Bonus type", "choice", vocab="bonus_type",
+                      required=False,
+                      hint="Empty is enhancement, as 1e's magical speed bonuses are: "
+                           "haste and a pair of boots give +30, not +60."),
+            ], blocked="Land speed changes for its duration, read by every move. Climb, "
+                       "swim, fly and burrow speeds are recorded and shown to the GM: "
+                       "nothing in movement reads them yet."),
+            # `target` stays the words the card prints (295 shipped documents
+            # write a sentence there); `tag` is the machine half, one of PERMISSIONS, and
+            # a permission with no tag can never run — it has nothing to grant
+            # (`executable` asks per spec). Contracts §2.2 wrote `target` as the tag id;
+            # that would have refused every one of the 295.
             EffectType(
                 "permission", "Permission", "May feint as a swift action",
-                [Field("target", "What it allows", "text")],
-                engine=False,
-                blocked="Permissions relax a named legality check. The registry of checks "
-                        "is specified in docs/homebrew-rules.md §4.5 and not built yet."),
+                [Field("target", "What it allows", "text"),
+                 Field("tag", "Tag it grants", "choice", vocab="permission", required=False,
+                       hint="The rule it relaxes, as the engine names it. Empty: the "
+                            "words are shown to the GM and nothing is granted.")],
+                blocked="Granted as its tag for the duration, through the one applicator, "
+                        "with a tell. A permission with no tag is shown to the GM and "
+                        "grants nothing; a tag no rule asks yet is granted and honest "
+                        "about it (PERMISSIONS names each reader)."),
         ]),
 
     Category(
@@ -822,6 +1099,28 @@ CATEGORIES: list[Category] = [
                 blocked="Its squares are written onto the map and cleared when it "
                         "expires. On a scene with no grid it is recorded and narrated — "
                         "there is nowhere to put squares."),
+            # A light that moves with whoever carries it — a sunrod struck, a torch lit
+            # (alchemy plan §16.4). There was no light model ("the map has no light level
+            # yet", reactions.py), so the sunrod became a blade coating dealing 1d4 fire.
+            # The two radii are the CRB's own columns (Vision and Light, the light source
+            # table: torch 20 ft / 40 ft, sunrod 30 / 60, candle n/a / 5): normal light
+            # out to `radius_ft`, and "an area outside the lit radius in which the light
+            # level is increased by one step" out to `raised_ft`. `raised_ft` is the
+            # OUTER radius, as the table prints it, never "a further" distance added on.
+            # A light laid on a square rather than carried is a `manifest`'s job.
+            EffectType(
+                "light", "Light", "Normal light 30 ft, raised 60 ft, for 6 hours", [
+                    Field("radius_ft", "Lit radius (feet)", "int",
+                          hint="Normal light out to here: 20 for a torch, 30 for a "
+                               "sunrod, 0 for a candle."),
+                    Field("raised_ft", "Raised one step to (feet)", "int",
+                          required=False,
+                          hint="The outer radius of the step-brighter ring: 40 for a "
+                               "torch, 60 for a sunrod. Empty: no ring."),
+                ],
+                blocked="Read by the light model (Scene.light_at) wherever its carrier "
+                        "stands, and so by the attack's miss chance: dim light is 20%, "
+                        "darkness 50%, unless the attacker's eyes say otherwise."),
             # Routed to the same `bestiary.instantiate` the `spawn` op uses rather than
             # given a creature system of its own. That is the whole design: a summoning
             # spell and a GM saying "two thugs step out of the dark" are the same event.
@@ -1110,14 +1409,41 @@ CATEGORIES: list[Category] = [
 #                      weapons.lethality_of; suppressed by a declared lethal blow)
 #   slay               Engine._slay (vorpal on a natural 20 crit; disruption's gate)
 #   item_power         Engine._use_power, the use_item op's `power`
-AWAITING_READER: dict[str, str] = {}
+#
+# Refilled by alchemy lane B (2026-10-06) with the alchemist's types, each waiting on alchemy
+# lane C (contracts §7). Lane C deletes a line when its reader lands and lists the type in
+# tests/test_effectspec_extensions.py's `already`.
+AWAITING_READER: dict[str, str] = {
+    "sense": "a drunk sense granted as `sense_tag` through the one applicator "
+             "(consumables._spec_to_intents, alchemy lane C); see invisible read by "
+             "Actor.concealment, darkvision and low-light by Scene.light_at",
+    "permission": "the tag grant (consumables._spec_to_intents granting `permission_tag` "
+                  "through the one applicator, alchemy lane C)",
+    "light": "Scene.light_at and the light miss chance in Actor.concealment "
+             "(alchemy lane C)",
+    "burning": "an ActiveEffect granting state.burning with a periodic damage, and the "
+               "extinguish op (alchemy lane C)",
+}
+# A type whose reader runs some targets and not others (contracts §2.2: speed "targets land,
+# climb, swim, fly, jump. Lane C wires the readers"). `executable` asks per spec, so a
+# potion of longstrider runs and a potion of fly is narrated with the reason named. Lane C
+# deletes a target's line when movement reads it. `jump` is not here: 1e's jump is an
+# Acrobatics check, not a movement mode, so a jumping bonus is a `skill_mod` on
+# acrobatics with the note "to jump".
+TARGETS_AWAITING_READER: dict[str, dict[str, str]] = {
+    "speed": {
+        "climb": "a climb speed read by movement (alchemy lane C)",
+        "swim": "a swim speed read by movement (alchemy lane C)",
+        "fly": "a fly speed read by movement (alchemy lane C)",
+        "burrow": "a burrow speed read by movement (alchemy lane C)",
+    },
+}
 for _cat in CATEGORIES:
     for _t in _cat.types:
         if _t.id in AWAITING_READER:
             _t.engine = False
-            _t.blocked = (f"Not run yet: its reader, {AWAITING_READER[_t.id]}, is enchanting "
-                          f"lane C's. When it lands — {_t.blocked[:1].lower()}"
-                          f"{_t.blocked[1:]}")
+            _t.blocked = (f"Not run yet: its reader, {AWAITING_READER[_t.id]}, is not built. "
+                          f"When it lands: {_t.blocked[:1].lower()}{_t.blocked[1:]}")
 
 
 def catalogue() -> dict:
@@ -1466,6 +1792,9 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
 
     problems.extend(_choice_ref_problems(spec, path))
     problems.extend(_magic_item_problems(spec, type_id, path))
+    problems.extend(_alchemy_problems(spec, type_id, path))
+    if spec.get("when") is not None:
+        problems.extend(when_problems(spec["when"], f"{path}: when"))
 
     if type_id == "gear_mod":
         problems.extend(_gear_problems(spec, path))
@@ -1636,6 +1965,177 @@ def _magic_item_problems(spec: dict, type_id: str, path: str) -> list[str]:
 _TELL_NUMBER = re.compile(r"\d")
 
 
+def _alchemy_problems(spec: dict, type_id: str, path: str) -> list[str]:
+    """The limits the alchemist's words have that a dropdown and an int cannot say."""
+    def number(key):
+        v = spec.get(key)
+        if v is None or isinstance(v, bool):
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    out: list[str] = []
+    if "grade" in spec and spec["grade"] is not None:
+        g = number("grade")
+        if g is None or g < 1:
+            out.append(f"{path}: grade is a whole number, 1 or more (1 is the weakest a "
+                       f"trait can be).")
+    # A carried cost reaches its holder through the carried door (`Actor.sync_carried`),
+    # which runs CARRIED_TYPES and nothing else — the same rule the `carried` trigger is
+    # held to, for the same reason: carrying a thing can sicken you or eat at a score, and
+    # a route the door cannot deliver would be a drawback that never lands.
+    if str(spec.get("route") or "") == "carried" and type_id not in CARRIED_TYPES:
+        out.append(f"{path}: a carried cost can only be {', '.join(CARRIED_TYPES)}, what "
+                   f"carrying a thing can do to whoever holds it. Use one of those, or "
+                   f"another route.")
+    if "source" in spec and spec["source"] is not None \
+            and not isinstance(spec["source"], str):
+        out.append(f"{path}: source is the name of what the effect comes from, in words: "
+                   f"\"antitoxin\", \"property:bane\". The stacking rule reads it.")
+    if type_id == "light":
+        r, raised = number("radius_ft"), number("raised_ft")
+        if r is not None and r < 0:
+            out.append(f"{path}: the lit radius is 0 feet or more (0 for a candle).")
+        if raised is not None and r is not None and raised <= r:
+            out.append(f"{path}: raised_ft is the OUTER radius of the brighter ring, so it "
+                       f"is more than the lit radius: a sunrod is 30 and 60, a torch 20 "
+                       f"and 40.")
+        if (r or 0) <= 0 and (raised or 0) <= 0 and r is not None:
+            out.append(f"{path}: a light with no lit radius and no ring lights nothing. A "
+                       f"candle is radius 0, raised 5.")
+    elif type_id == "burning":
+        rounds = number("rounds")
+        if "rounds" in spec and (rounds is None or rounds < 1):
+            out.append(f"{path}: a fire burns for 1 round or more (alchemist's fire: 1, "
+                       f"the round following).")
+        if spec.get("save") and spec.get("dc") in (None, ""):
+            out.append(f"{path}: putting it out with a save needs the save's DC "
+                       f"(alchemist's fire: Reflex 15).")
+        sb = number("smother_bonus")
+        if "smother_bonus" in spec and (sb is None or sb < 0):
+            out.append(f"{path}: smother_bonus is a bonus, 0 or more (the book's is 2).")
+    return out
+
+
+# The keys a `when` may ask, each with what reads it. One grammar with several readers:
+# the roll context (`sheet._when_holds`), the bearer (`classfeatures.holds`), the build
+# (`forge_items` answers `armour.weight` before play) and the scene (`sheet.SITUATION_KEYS`,
+# answered off the moment of the roll). Measured over content/ on build/alchemy: these are
+# every key any shipped document uses. `when` had no check at all (it was not in COMMON),
+# and a key no reader asks is an unevaluable clause, which is dropped: the term applies to
+# nobody, with nothing anywhere saying why — the alchemist's "+2 against undead" written
+# as `{"undead": true}` would have been exactly that. Contracts §2.1 made it validated.
+WHEN_KEYS: dict[str, str] = {
+    "target": "the creature the roll is made against, by type, subtype, armour_metal, "
+              "alignment or a property's choice (sheet._when_holds)",
+    "attacker": "whoever made the blow, by type or subtype (sheet._when_holds)",
+    "weapon": "the weapon's own fields: category, hands, light, finessable, key, ranged, "
+              "slashing_or_piercing (sheet._when_holds)",
+    "choice": "an attack option the player declared, such as power_attack",
+    "against": "what the save or resistance is against: spell, poison, fear, trap, cold",
+    "attack": "the kind of attack: melee or ranged",
+    "maneuver": "the combat manoeuvre being made or resisted",
+    "resting": "a save made while resting (a bedroll's cold)",
+    "range_ft": "the attack's range, compared: {\"lte\": 30}",
+    "armour": "the armour's weight class, answered at the forge (forge_items)",
+    "bearer": "the bearer's armour, load, shield, terrain or pool (classfeatures.holds)",
+    "weapon_group": "the held weapon's group, or the class pick (classfeatures.holds)",
+    "daylight": "whether it is day where the roll is made (sheet.SITUATION_KEYS)",
+    "underground": "whether the roll is made underground",
+    "near": "a kind of creature within 10 ft: {\"type\": \"undead\"}",
+    "wielder_casts": "whether the item is in a caster's hands",
+    "day_phase": "the phase of the day (rules/sky.py)",
+}
+_WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice"),
+                       "attacker": ("type", "subtype")}
+_WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
+_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting")
+
+
+def when_problems(when, where: str = "when") -> list[str]:
+    """Everything wrong with a `when` clause, named with the fix.
+
+    Structural, and no narrower than the readers: every clause a shipped document carries
+    validates (tests/test_alchemy_vocabulary pins that over content/). What it refuses is
+    what no reader can answer — a key nobody asks, a creature type that is not one, an
+    operator the comparison does not know, a phase of the day the sky does not have.
+    `"$pick"` is a class document's placeholder, filled by the class's choice
+    (`classfeatures`), and is let through wherever it stands.
+    """
+    if not isinstance(when, dict) or not when:
+        return [f"{where} is an object of clauses: {{\"target\": {{\"type\": \"undead\"}}}}."]
+    out: list[str] = []
+    unknown = sorted(set(when) - set(WHEN_KEYS))
+    if unknown:
+        out.append(f"{where}: no reader asks {', '.join(unknown)}, so the clause would "
+                   f"hold for nobody. Known: {', '.join(WHEN_KEYS)}.")
+    for key, want in when.items():
+        if key not in WHEN_KEYS or want == "$pick":
+            continue
+        if key in _WHEN_CREATURE_KEYS:
+            if not isinstance(want, dict) or not want:
+                out.append(f"{where}.{key} is {{\"type\": \"undead\"}}, by type, subtype"
+                           + (", alignment or a choice" if key == "target" else "") + ".")
+                continue
+            bad = sorted(set(want) - set(_WHEN_CREATURE_KEYS[key]))
+            if bad:
+                out.append(f"{where}.{key} has no key {', '.join(bad)}. Known: "
+                           f"{', '.join(_WHEN_CREATURE_KEYS[key])}.")
+            types = want.get("type")
+            if types is not None and types != "$pick":
+                listed = types if isinstance(types, list) else [types]
+                # The forge's data writes "magical beast" with a space and the reader
+                # leafs it (`sheet._kind_leaf`), so a space is the same word as a hyphen.
+                wrong = [t for t in listed
+                         if str(t).strip().lower().replace(" ", "-") not in CREATURE_TYPES]
+                if wrong:
+                    out.append(f"{where}.{key}.type: {', '.join(map(str, wrong))} is not a "
+                               f"creature type. One of: {', '.join(CREATURE_TYPES)}.")
+            if "alignment" in want and want["alignment"] not in ALIGNMENTS:
+                out.append(f"{where}.{key}.alignment is one of {', '.join(ALIGNMENTS)}.")
+        elif key in ("weapon", "armour", "bearer", "near"):
+            if not isinstance(want, dict) or not want:
+                out.append(f"{where}.{key} is an object of the fields it asks.")
+        elif key in _WHEN_BOOLS:
+            if not isinstance(want, bool):
+                out.append(f"{where}.{key} is true or false.")
+        elif key == "day_phase":
+            from .sky import PHASES
+
+            if want not in PHASES:
+                out.append(f"{where}.day_phase is one of {', '.join(PHASES)}.")
+        elif isinstance(want, dict):
+            bad = sorted(set(want) - set(_WHEN_COMPARE))
+            if bad or not want:
+                out.append(f"{where}.{key}: compare with {', '.join(_WHEN_COMPARE)}: "
+                           f"{{\"lte\": 30}}.")
+    return out
+
+
+def product_trait_problems(spec: dict, path: str = "trait") -> list[str]:
+    """What a product trait on an alchemy material must carry beyond a valid effect
+    (contracts §2.1, plan §5.6): an essence a formula can key on, a route a product can
+    deliver it by, and nothing narrative — narrative stays legal in the vocabulary and is
+    refused here, in the alchemist's own validator (lane D calls this beside `validate`).
+
+    Measured before the pass: 75 of 139 materials carried nothing executable and 5 were
+    narrative only (plan §5.1), so a formula keyed on essences would have had nothing to
+    match.
+    """
+    out = list(validate(spec, path))
+    if str(spec.get("type") or "") == "narrative":
+        out.append(f"{path}: a product trait is never narrative. Write it as a typed effect "
+                   f"the engine runs, or leave it out.")
+    if not spec.get("essence"):
+        out.append(f"{path}: a product trait names its essence, one of "
+                   f"{', '.join(ESSENCES)}.")
+    if not spec.get("route"):
+        out.append(f"{path}: a product trait names its route, one of {', '.join(ROUTES)}.")
+    return out
+
+
 def is_drawback(spec: dict) -> bool:
     """Whether this effect leaves its holder worse off.
 
@@ -1697,9 +2197,22 @@ def _is_dice(s: str) -> bool:
 
 
 def executable(spec: dict) -> bool:
-    """Whether the engine can resolve this today."""
-    found = find(str(spec.get("type", "")))
-    return bool(found and found[1].engine)
+    """Whether the engine can resolve this today.
+
+    Per spec, not only per type, where the type alone cannot say: a speed whose mode no
+    reader moves (`TARGETS_AWAITING_READER`), and a permission with no `tag`, which has
+    nothing to grant however its type is marked.
+    """
+    t = str(spec.get("type", ""))
+    found = find(t)
+    if not (found and found[1].engine):
+        return False
+    waiting = TARGETS_AWAITING_READER.get(t)
+    if waiting and str(spec.get("target") or "") in waiting:
+        return False
+    if t == "permission" and not permission_tag(spec.get("tag")):
+        return False
+    return True
 
 
 # --- rendering ------------------------------------------------------------------------------
@@ -1867,6 +2380,24 @@ def render(spec: dict, *, against: bool = False) -> str:
         body = body[:1].upper() + body[1:]
     elif t in _MAGIC_RENDER:
         body = _MAGIC_RENDER[t](spec)
+    elif t == "light":
+        bits = []
+        if spec.get("radius_ft"):
+            bits.append(f"Normal light {spec['radius_ft']} ft")
+        if spec.get("raised_ft"):
+            bits.append(f"one step brighter out to {spec['raised_ft']} ft")
+        body = ", ".join(bits) or "Light"
+        body = body[:1].upper() + body[1:]
+    elif t == "burning":
+        n = str(spec.get("rounds") or 1)
+        body = (f"Burns for {dice} {spec.get('damage_type') or 'fire'} a round for {n} "
+                f"round{'' if n == '1' else 's'}")
+        if spec.get("save"):
+            body += (f" unless put out ({_vocab_name('save', spec['save'])} DC "
+                     f"{spec.get('dc', '?')}")
+            if spec.get("smother_bonus"):
+                body += f", {_signed(spec['smother_bonus'])} rolling on the ground"
+            body += ")"
     else:
         body = str(target or spec.get("note") or etype.name)
         body = body[:1].upper() + body[1:]
@@ -1984,7 +2515,34 @@ _WORKING_PHRASE = {
     "eager": "eager: the binding's windows are wider",
     "skittish": "skittish: it drifts in its seat while it is matched",
     "heavy": "heavy: its draws fade fast when it is refined",
-    "volatile": "volatile: reading it is dangerous",
+    # Shared by the circle and the alchemist's bench: reading it, or a badly failed step
+    # with it, goes wrong on the one working it (alchemy plan §8).
+    "volatile": "volatile: reading it is dangerous, and a badly failed step flares",
+    # The alchemist's (alchemy plan §5.5). Plain words; the band sizes are still proposed.
+    "stabilizer": "a stabilizer: it calms one volatile input in the same step",
+    "catalyst": "a catalyst: never used up, it eases the step it is in",
+    "apparatus": "apparatus: never used up, it eases one method's work",
+    "solid": "a solid: it can be calcined or sublimed",
+    "liquid": "a liquid: it can be distilled",
+    "combustible": "combustible: it burns away rather than calcining",
+    "slow_to_dissolve": "slow to dissolve: the stirring takes longer",
+    "light_sensitive": "light-sensitive: left unsealed, it weakens a little each day",
+    "corrosive": "corrosive: it eats through a metal vessel",
+    "toxic_to_handle": "toxic to handle: it harms whoever works it unprotected",
+    "wild": "wild: it takes on a trait of whatever it is worked with",
+    "drinkable": "a vessel to drink from",
+    "shatters": "a vessel that shatters where it is thrown",
+    "bursts": "a vessel that bursts open where it lands",
+    "struck": "a casing that goes off when it is struck",
+    "stick": "a stick or rod, lit or struck in the hand",
+    "fireproof": "fireproof: it holds what burns",
+    "warded": "warded: it holds what would eat through a plain vessel",
+    "lead_lined": "lead-lined: it holds what must be kept from the light",
+    "solvent:water": "a solvent: dissolves what water dissolves",
+    "solvent:alcohol": "a solvent: dissolves what spirits dissolve",
+    "solvent:vinegar": "a solvent: dissolves what vinegar dissolves",
+    "solvent:oil": "a solvent: dissolves what oil dissolves",
+    "solvent:acid": "a solvent: dissolves what acid dissolves",
 }
 
 

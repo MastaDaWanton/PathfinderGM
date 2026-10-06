@@ -669,6 +669,12 @@ def test_every_executable_type_has_something_that_executes_it():
         "crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
         "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality", "slay",
         "item_power",
+        # Land speed (alchemy lane B, 2026-10-06): `consumables._spec_to_intents`' speed
+        # branch into `Actor.speed_feet` through `_buff_mods("speed", "land")`. Measured:
+        # a +10 land potion left the fixture PC at 30 ft with the flag off and 40 with it
+        # on. The modes movement does not read wait per spec
+        # (`effectspec.TARGETS_AWAITING_READER`).
+        "speed",
     }
     claimed = {t.id for c in fx.CATEGORIES for t in c.types if t.engine}
     assert claimed - runs - already == set(), \

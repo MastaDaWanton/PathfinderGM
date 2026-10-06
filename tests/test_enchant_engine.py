@@ -441,9 +441,11 @@ def test_the_alignment_clause_holds_against_any_foe_for_now():
 
 def test_nothing_waits_on_a_reader_any_more():
     """Lane A's ledger of types the vocabulary could say and nothing ran. Every line had
-    a reader to delete it; the ten are executable now."""
-    assert effectspec.AWAITING_READER == {}
-    for t in ("crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
-              "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality",
-              "slay", "item_power", "spell_resistance"):
+    a reader to delete it; the ten are executable now. (The ledger itself refilled with the
+    alchemist's types, alchemy lane B 2026-10-06; none of the enchanting ten is in it.)"""
+    ten = ("crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
+           "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality",
+           "slay", "item_power", "spell_resistance")
+    assert not set(effectspec.AWAITING_READER) & set(ten)
+    for t in ten:
         assert effectspec.executable({"type": t}), t

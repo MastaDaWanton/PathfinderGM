@@ -158,6 +158,8 @@ WAITING_OUTSIDE_THE_LEDGER: set = set()
 NEW_TYPES = ["crit_range", "extra_attack", "enhancement_raise", "enhancement_to_ac",
              "fortification", "ignore_armour", "deflect_ranged", "weapon_lethality", "slay",
              "item_power"]
+# The alchemist's types waiting on alchemy lane C (rules/effectspec.py AWAITING_READER).
+ALCHEMY_WAITING = {"sense", "permission", "light", "burning"}
 
 
 def test_every_property_document_is_executable_or_waits_on_a_named_reader():
@@ -191,7 +193,9 @@ def test_the_new_types_are_in_the_catalogue_and_honest_about_what_runs_them():
     in `AWAITING_READER` with its reader's site, and the builder's warning says it waits.
     Lane C deletes a line when its reader lands."""
     ids = [t["id"] for c in es.catalogue()["categories"] for t in c["types"]]
-    assert set(es.AWAITING_READER) <= set(NEW_TYPES)
+    # The ledger is shared with the alchemist's types since alchemy lane B (2026-10-06);
+    # what is asked of it here is that nothing else hides in it.
+    assert set(es.AWAITING_READER) <= set(NEW_TYPES) | ALCHEMY_WAITING
     for t in NEW_TYPES:
         assert ids.count(t) == 1, t
         _, etype = es.find(t)
