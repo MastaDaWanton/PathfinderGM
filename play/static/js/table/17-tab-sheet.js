@@ -34,6 +34,56 @@ function sheetOutOf() {
 }
 
 Shell.tab("sheet", {
-  enter() { sheetInto("sheet"); },
+  enter() {
+    sheetInto("sheet");
+    magicRead();
+  },
   leave() { sheetOutOf("sheet"); },
 });
+
+// --- Magic carried (docs/enchanting-ui-plan.md §6.6, lane U5) ------------------------------
+// The Sheet tab's card for the things in the pack with a magic layer: each one's section
+// as the Equipment tab draws it (49-enchant-ledger.js `itemSection`, one renderer) with its
+// Identify button in it. Added after each draw of the Sheet's cards, after Defence, the way
+// 21 adds the herbarium, because 05-sheet.js draws the page and this file does not own it;
+// a pack with no magic, or a page without 49, adds no card at all. The cards and the
+// Identify handler are 18-tab-equipment.js's (`EQ_MAGIC`, `magicIdentify`), so the two
+// tabs cannot disagree about an item.
+function magicCardHtml() {
+  const L = window.EnchantLedger;
+  const list = Object.values(EQ_MAGIC || {}).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  if (!L || !list.length) return "";
+  return sheetCard("sh-magic", "Magic carried", `<ul class="el-magic-list">${list.map(it => `<li>
+      <b>${esc(it.name)}</b>${L.itemSection(it.card, { key: it.key, name: it.name, button: true,
+        busy: !!EQ_MAGIC_BUSY, msg: EQ_MAGIC_SAY[it.key] || "" })}</li>`).join("")}</ul>`, "sh-magic");
+}
+
+function magicCardDraw() {
+  if (SHEET_TAB !== "sheet") return;
+  const cards = document.querySelector("#sheetbody .sheetcards");
+  if (!cards) return;
+  const old = document.getElementById("sh-magic");
+  const html = magicCardHtml();
+  const was = old && old.closest("section");
+  if (!html) { if (was) was.remove(); return; }
+  const host = document.createElement("div");
+  host.innerHTML = html;
+  const card = host.firstElementChild;
+  if (was) { was.replaceWith(card); return; }
+  const defence = cards.children[1];
+  if (defence) defence.insertAdjacentElement("afterend", card);
+  else cards.appendChild(card);
+}
+
+async function magicRead() {
+  if (!window.EnchantLedger) return;
+  EQ_MAGIC = await window.EnchantLedger.items();
+  magicCardDraw();
+}
+
+(function watchTheSheet() {
+  const body = document.getElementById("sheetbody");
+  if (!body || typeof MutationObserver !== "function") return;
+  new MutationObserver(() => { if (!document.getElementById("sh-magic")) magicCardDraw(); })
+    .observe(body, { childList: true });
+})();

@@ -178,10 +178,37 @@ function ledgerMount() {
   window.ForgeLedger.journal(document.getElementById("jr-ledger-list"));
 }
 
+// --- Essences and recipes (docs/enchanting-ui-plan.md §6.8) ------------------------------
+// Every essence met or carried, what is known of each and how, "still unknown" counts as
+// the server sends them, and the recipes known, beside the herbarium and the smith's
+// ledger. 49-enchant-ledger.js draws it (`EnchantLedger.journal`, contracts §13) from
+// `/api/enchant/ledger`, the same renderer as the bench's essence card. 49 loads after
+// this file, so it is looked up at mount time; a page without it draws no section. The
+// list's id is "jr-essences-list", never the heading's "jr-essences".
+function essencesMount() {
+  const body = document.getElementById("sheetbody");
+  const journal = body && body.querySelector(".journal");
+  if (!journal || document.getElementById("jr-essences")) return;
+  if (!window.EnchantLedger || typeof window.EnchantLedger.journal !== "function") return;
+  const host = document.createElement("div");
+  host.innerHTML = sheetCard("jr-essences", "Essences and recipes", `<div id="jr-essences-list"></div>`, "jr-essences");
+  const card = host.firstElementChild;
+  card.style.gridColumn = "1 / -1";
+  const smith = document.getElementById("jr-ledger");
+  const herbs = document.getElementById("jr-herbarium");
+  const beside = (smith && smith.closest("section")) || (herbs && herbs.closest("section"));
+  const history = document.getElementById("jr-history");
+  const before = history && history.closest("section");
+  if (beside && beside.parentElement === journal) beside.insertAdjacentElement("afterend", card);
+  else if (before && before.parentElement === journal) before.insertAdjacentElement("beforebegin", card);
+  else journal.appendChild(card);
+  window.EnchantLedger.journal(document.getElementById("jr-essences-list"));
+}
+
 (function watchTheJournal() {
   const body = document.getElementById("sheetbody");
   if (!body || typeof MutationObserver !== "function") return;
-  new MutationObserver(() => { herbariumMount(); ledgerMount(); }).observe(body, { childList: true });
+  new MutationObserver(() => { herbariumMount(); ledgerMount(); essencesMount(); }).observe(body, { childList: true });
 })();
 
 document.addEventListener("click", e => {
