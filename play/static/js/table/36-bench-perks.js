@@ -57,6 +57,21 @@
       ],
       icon: { potency: "anvil", hardening: "quench", quality: "hone", yield: "ingot" },
     },
+    // The enchanter's four (enchanting answers round 2, "Levels": potency, quality, yield
+    // and capacity, the enchanter's own). What each next pick does is lane E's
+    // `perk_info[id].next` with its numbers ("+1 to what every item you bind holds, total
+    // +2"); these words are only the fallback and carry no number, so the page never
+    // states a size the server did not.
+    enchanter: {
+      prefix: "enchant", title: "Enchanter", route: "/api/enchant/perks",
+      perks: [
+        { id: "potency", name: "Potency", words: "The house top-ups of everything you bind are stronger." },
+        { id: "quality", name: "Quality", words: "Your ceiling rises one rung." },
+        { id: "yield", name: "Extra yield", words: "A chance that a binding does not spend one of its essences." },
+        { id: "capacity", name: "Capacity", words: "Every item you bind holds more." },
+      ],
+      icon: { potency: "essence", quality: "prepare", yield: "phial", capacity: "bind" },
+    },
   };
 
   var escHtml = function (s) {
@@ -67,7 +82,8 @@
   var noop = function () {};
   var openNow = null;            // one picker on the page at a time
 
-  // BenchPerks.open(o) opens the picker for `o.track` ("herbalist" or "blacksmith"):
+  // BenchPerks.open(o) opens the picker for `o.track` ("herbalist", "blacksmith" or
+  // "enchanter"; the enchanting bench, lane U1, calls it with its own pops and Esc stack):
   //   state      the track summary from the server: level, perks, picks_banked, perk_info
   //   pops       where the modal goes: inside the bench's own layer, so its trap holds it
   //   pushEsc / dropEsc   the bench's Esc stack (29-bench-core.js), one layer at a time
