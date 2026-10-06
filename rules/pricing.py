@@ -143,6 +143,11 @@ def _open_worth(item) -> float:
             return max(0.0, float(authored))
         except (TypeError, ValueError):
             pass
+    # An alchemical product is worth its book price (owner Q4.4, alchemy plan §12.4), never
+    # the tier ladder: a potion of haste sold for 60 gp against the book's 750 before this.
+    book = alchemy_worth(item)
+    if book is not None:
+        return book
 
     potency = _as_float(_field(item, "potency"), 1.0)
     # A step-bench thing carries `potency` 1.0, because its strength is baked into the
@@ -458,3 +463,305 @@ def as_text(gold: float) -> str:
     if c["cp"]:
         parts.append(f"{c['cp']} cp")
     return " ".join(parts) or "0 cp"
+
+
+# --- alchemy: what a product is worth, and what making one costs (alchemy plan §12.4, §5.9) ---
+#
+# **Worth.** The owner's Q4.4: book prices for book items, the tier ladder for house
+# products. A classic (acid, alchemist's fire, antitoxin ...) is its formula row's printed
+# price times the quality ladder's price column (Crude x0.5 .. Flawless x3,
+# herbal-quality.json); a spell potion is the CRB's 50 gp x spell level x caster level
+# (`formulae.potion_price`), and quality reaches it ONLY through caster level (owner, open
+# point 6) — so the potion's own `caster_level` is read and nothing else multiplies. A house
+# compound (no formula) keeps the ladder above. The shop pays half of either
+# (`what_a_shop_pays`, unchanged).
+#
+# **The making cost.** Measured 2026-10-06 (lane H, tests/test_alchemy_prices.py), once
+# formulae keyed on essences rather than materials (lane E): the cheapest legal set of
+# BOUGHT inputs for a potion of haste is natron (1 gp), olive oil (1 gp) and a glass vial
+# (1 gp) — 3 gp for a 750 gp potion that a shop buys back at 375. Every one of the 44 shipped
+# potions but one came in at 2 to 32 gp, against the book's making cost of 25, 150 or 375.
+# The "inputs over the fraction" lane D listed (rectified spirits at 25 gp, azoth at 1,500)
+# were the OLD recipe sets; the formula table no longer asks for either.
+#
+# That is the failure the traditions document. Skyrim prices ingredients and nothing else,
+# and its alchemy is the best-known money machine in the series ("ingredients are cheap to
+# purchase while the resulting potions sell for substantially more": UESP, Skyrim:Making
+# Money). Every tabletop tradition prices the raw materials as a FRACTION OF THE PRODUCT,
+# in coin, whatever the materials are: PF1e Craft "pay 1/3 of the item's price for the raw
+# material cost" and Brew Potion "raw materials ... one half this base price" (CRB); PF2e
+# "raw materials worth at least half of the item's Price ... in a settlement, you can
+# usually spend currency to get the raw materials" (Core, Craft); D&D 2024, materials cost
+# half. Raising reagent prices instead was rejected: the essences a 750 gp potion keys on
+# ride on 1 gp staples (natron, olive oil, quicklime) that a 2 gp antitoxin and every
+# herbal tincture also use, so no reagent price could hold both ends.
+#
+# So the bench charges the book's making cost in coin at Bottle, LESS what the spent inputs
+# are worth (`coin_to_make`): the reagents the formula names are part of what the coin
+# buys, and a rare input the alchemist chose to spend counts toward it. The whole input bill
+# of a formula product then lands at the book's fraction — never under it — however cheap
+# the essences were to find. A house compound has no formula, sells on the ladder, and pays
+# nothing extra. The bench (lane F) reads these; nothing here spends a coin.
+CRAFT_FRACTION = 1 / 3       # CRB, Craft: "Pay 1/3 of the item's price for the raw material cost"
+BREW_FRACTION = 1 / 2        # CRB, Brew Potion: raw materials cost "one half this base price"
+ALCHEMY_CRAFT = "alchemist"  # rules/alchemist.py TRACK_ID: what a product of the bench is filed under
+
+_CLASSIC_BY_NAME: dict[str, str] = {}
+
+
+def _formula(row_or_fid):
+    """A formula row from a row or an id; None for anything that is not one."""
+    from . import formulae
+
+    if isinstance(row_or_fid, dict):
+        return row_or_fid if row_or_fid.get("kind") in formulae.KINDS else None
+    return formulae.get(str(row_or_fid or "")) if row_or_fid else None
+
+
+def _quality_index(item):
+    """The quality ladder index of a product: `quality` on a Stock, `quality_index` on the
+    bench's record (plan §12.2, where `quality` is the word). None when it has none."""
+    for name in ("quality_index", "quality"):
+        q = _field(item, name)
+        if q is None or isinstance(q, bool):
+            continue
+        try:
+            return int(q)
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def book_price(row_or_fid, *, caster_level: int | None = None,
+               quality_index: int | None = None) -> float | None:
+    """A formula product's book price, in gold: a classic's printed price times the quality
+    ladder's price column (Sound when none is given); a spell potion's 50 x spell level x
+    caster level, at the row's own caster level unless one is given, with NO quality
+    multiplier (open point 6: quality is already in the caster level)."""
+    from . import formulae
+
+    row = _formula(row_or_fid)
+    if row is None:
+        return None
+    if row.get("kind") == "spell":
+        cl = int(caster_level or row.get("caster_level") or 1)
+        return round(formulae.potion_price(int(row.get("spell_level") or 0), cl), 2)
+    try:
+        price = float(row.get("price_gp") or 0)
+    except (TypeError, ValueError):
+        return None
+    if quality_index is not None:
+        from . import crafting
+
+        price *= crafting.quality_mult("price", int(quality_index))
+    return round(price, 2)
+
+
+def _classic_named(name: str) -> str | None:
+    """The classic formula a product is called after (bought acid is "Acid", the formula's
+    own name), for a product whose record names no formula: an old save's bought jar, or a
+    Stock, which has no `formula` field yet (lane F's record carries one, and it wins)."""
+    from . import formulae
+
+    if not _CLASSIC_BY_NAME:
+        for fid, row in formulae.all().items():
+            if row.get("kind") == "classic":
+                _CLASSIC_BY_NAME[str(row.get("name") or "").strip().lower()] = fid
+    return _CLASSIC_BY_NAME.get(" ".join(str(name or "").split()).lower())
+
+
+def alchemy_worth(item) -> float | None:
+    """What an alchemist's product is worth on an open counter, by the book; None for
+    anything that is not one (a house compound, a herbal jar, a sword), which keeps the
+    tier ladder. Read by `worth` and `what_a_shop_pays`, so the shelf and the sell-back are
+    one answer.
+
+    A product is the alchemist's (`craft`), or an old save's bought classic that no craft
+    was ever written on — the counter sold it for 20 gp and the ladder bought it back for
+    two silver."""
+    from . import formulae
+
+    craft = str(_field(item, "craft") or "")
+    if craft not in (ALCHEMY_CRAFT, ""):
+        return None
+    sid = str(_field(item, "holds_spell") or "")
+    if sid:
+        if craft != ALCHEMY_CRAFT:
+            return None     # a scroll or a wand holds a spell too, and is no potion
+        row = formulae.for_spell(sid)
+        if row is not None:
+            level = int(row.get("spell_level") or 0)
+        else:
+            from . import spells
+
+            try:
+                sp = spells.get(sid)
+            except KeyError:
+                return None
+            if sp.min_level is None:
+                return None
+            level = int(sp.min_level)
+        try:
+            cl = int(_field(item, "caster_level") or 0)
+        except (TypeError, ValueError):
+            cl = 0
+        if cl <= 0:
+            cl = int((row or {}).get("caster_level") or 0) or formulae.min_caster_level(sid, level)
+        return round(formulae.potion_price(level, cl), 2)
+    fid = str(_field(item, "formula") or "") or _classic_named(
+        _field(item, "base") or _field(item, "name"))
+    row = _formula(fid) if fid else None
+    if row is None:
+        return None
+    if row.get("kind") == "spell":
+        return book_price(row, caster_level=_field(item, "caster_level"))
+    return book_price(row, quality_index=_quality_index(item))
+
+
+def making_fraction(row_or_fid) -> float:
+    """The book's raw-material fraction: half for a potion or oil holding a spell (Brew
+    Potion), a third for a classic (Craft)."""
+    row = _formula(row_or_fid)
+    return BREW_FRACTION if (row or {}).get("kind") == "spell" else CRAFT_FRACTION
+
+
+def making_cost(row_or_fid, *, caster_level: int | None = None) -> float:
+    """What the raw materials of one formula product cost by the book, in gold: the
+    fraction of its Sound price (a spell potion's at the caster level it is brewed at, so
+    a Fine potion, one caster level up, costs what its higher price says). Quality above
+    Sound raises what a classic is WORTH, not what it costs: the skill is the alchemist's."""
+    row = _formula(row_or_fid)
+    if row is None:
+        return 0.0
+    return round((book_price(row, caster_level=caster_level) or 0.0) * making_fraction(row), 2)
+
+
+def spent_worth(spent) -> float:
+    """What the inputs a step used up are worth, in gold: {material id: units}. A found or
+    harvested material that no counter sells (no `price_gp`) is still worth its rung on the
+    ladder (`worth`), so gathering saves a little; a catalyst or apparatus is never spent,
+    and the caller leaves it out."""
+    from . import materials
+
+    total = 0.0
+    for mid, n in dict(spent or {}).items():
+        doc = materials.alchemy_doc(str(mid))
+        if doc is None:
+            continue
+        total += worth(doc) * max(0.0, float(n or 0))
+    return round(total, 2)
+
+
+def coin_to_make(row_or_fid, spent_gp: float = 0.0, *, caster_level: int | None = None) -> float:
+    """The coin Bottle takes for a formula product, in gold: the book's making cost less
+    what the spent inputs are worth, never below nothing. A house compound (no formula)
+    takes none."""
+    return round(max(0.0, making_cost(row_or_fid, caster_level=caster_level)
+                     - max(0.0, float(spent_gp or 0))), 2)
+
+
+# What a family is bottled with (owner Q7.3: the vessel decides the family) and whether it
+# needs a liquid to carry its essences: a drink, an oil and a splash flask are liquids, so a
+# mix of solids needs a solvent dissolved into it (plan §7, Dissolve); a cloud's powder and
+# a tool's stick do not. THIS LANE'S READING for the measurement below, not a bench rule:
+# lane F's Bottle is the authority on what a mix must hold.
+_LIQUID_FAMILIES = frozenset({"potion", "oil", "splash"})
+
+
+def _working(doc: dict) -> set[str]:
+    return {str(w.get("trait") if isinstance(w, dict) else w) for w in doc.get("working") or ()}
+
+
+def _bought(doc: dict) -> float | None:
+    p = doc.get("price_gp")
+    try:
+        return float(p) if p not in (None, "", 0) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _carries(doc: dict) -> set[str]:
+    return {str(t["essence"]) for t in doc.get("product") or ()
+            if t.get("essence") and not t.get("drawback")}
+
+
+def input_bill(row_or_fid, shelf: dict | None = None) -> dict:
+    """The cheapest legal set of BOUGHT inputs for one formula product (plan §5.9): one unit
+    of each material, enough carriers for every essence the formula requires at its grade,
+    the cheapest vessel of its family, and the cheapest solvent when the family is a liquid
+    and no chosen input pours. Catalysts and apparatus are never spent, so never counted; a
+    material with no `price_gp` is found, never bought, and is left out.
+
+    {"gp": float | None, "materials": [ids], "vessel": id | None, "medium": id | None,
+     "unbuyable": [essences no priced material carries], "allowance": float,
+     "book_gp": float, "over": bool}"""
+    import itertools
+
+    from . import formulae
+    from . import materials as materials_mod
+
+    row = _formula(row_or_fid)
+    if row is None:
+        return {}
+    shelf = shelf if shelf is not None else materials_mod.alchemy_shelf()
+    need = {str(e): int(g or 1) for e, g in
+            (((row.get("requires") or {}).get("essences")) or {}).items()}
+    family = str(row.get("family") or "")
+    vessel_traits = set(formulae.VESSEL_FAMILIES)
+    vessels, carriers, solvents = [], [], []
+    for mid, doc in shelf.items():
+        price = _bought(doc)
+        if price is None:
+            continue
+        w = _working(doc)
+        if w & {"catalyst", "apparatus"}:
+            continue
+        if w & vessel_traits:
+            if any(family in formulae.VESSEL_FAMILIES[t] for t in w & vessel_traits):
+                vessels.append((price, mid))
+            continue
+        if any(t.startswith("solvent:") for t in w):
+            solvents.append((price, mid))
+        if _carries(doc) & set(need):
+            carriers.append((price, mid))
+    vessels.sort()
+    solvents.sort()
+    carriers.sort()
+    # Every essence's cheapest few carriers: a cover of k essences never needs more than k
+    # materials, and the k cheapest of each are enough to find the cheapest cover.
+    pool: list[tuple[float, str]] = []
+    for e, g in need.items():
+        for c in [c for c in carriers if e in _carries(shelf[c[1]])][: max(4, g + 2)]:
+            if c not in pool:
+                pool.append(c)
+    unbuyable = sorted(e for e in need
+                       if not any(e in _carries(shelf[m]) for _, m in carriers))
+    book = book_price(row) or 0.0
+    out = {"gp": None, "materials": [], "vessel": vessels[0][1] if vessels else None,
+           "medium": None, "unbuyable": unbuyable, "book_gp": book,
+           "allowance": round(book * making_fraction(row), 2), "over": False}
+    if unbuyable:
+        return out
+    best = None
+    for k in range(1, sum(need.values()) + 1):
+        for combo in itertools.combinations(pool, k):
+            have: dict[str, int] = {}
+            for _, mid in combo:
+                for e in _carries(shelf[mid]):
+                    have[e] = have.get(e, 0) + 1
+            if any(have.get(e, 0) < g for e, g in need.items()):
+                continue
+            cost = sum(p for p, _ in combo)
+            medium = None
+            if family in _LIQUID_FAMILIES and solvents and not any(
+                    "liquid" in _working(shelf[m]) for _, m in combo):
+                medium = solvents[0][1]
+                cost += solvents[0][0]
+            if best is None or cost < best[0]:
+                best = (cost, [m for _, m in combo], medium)
+    if best is None:
+        return out
+    gp = best[0] + (vessels[0][0] if vessels else 0.0)
+    out.update(gp=round(gp, 2), materials=best[1], medium=best[2],
+               over=gp > out["allowance"] + 1e-9)
+    return out

@@ -18,7 +18,13 @@
     "  writes     writing a note or drawing a map needs it in the pack",
     "  not_yet    what the book or the owner says it does that nothing reads yet",
     "",
-    "The `camp` section holds the rule rows a night's rest reads (Engine._op_rest)."
+    "The `camp` section holds the rule rows a night's rest reads (Engine._op_rest).",
+    "",
+    "The alchemist's goods have no row here (alchemy plan §12.5, 2026-10-06): a sunrod, a",
+    "tindertwig, an antitoxin and the rest of the CRB's eight are the bench's own products,",
+    "whose documents are their formula's core (content/rules/alchemy-formulae.json,",
+    "rules/goods.py CLASSIC_GEAR). The tindertwig left the flint-and-steel row's names then:",
+    "struck, it lights its torch through the light model, as a used-up tool."
   ],
   "items": {
     "trail rations": {
@@ -113,7 +119,7 @@
       "writes": true
     },
     "flint and steel": {
-      "names": ["flint and steel", "tindertwig", "tinderbox"],
+      "names": ["flint and steel", "tinderbox"],
       "does": "Lights a torch in a full round; any other fire takes at least as long.",
       "source": "CRB p.158: 'Lighting a torch with a flint and steel is a full-round action. Lighting any other fire with them takes at least that long.'",
       "tags": ["gear.fire-lighting"],

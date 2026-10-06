@@ -583,6 +583,9 @@ def draw_of(kind: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+POTION_DRAW = "potions"
+
+
 def priced_from(tracks) -> list:
     """Every material the named benches sell, once each (`everything_priced`, narrowed)."""
     global _POOLS
@@ -594,6 +597,16 @@ def priced_from(tracks) -> list:
 
         seen: dict[str, object] = {}
         for track in key:
+            # The alchemist's spell potions are drawn like materials (alchemy plan §12.5):
+            # under the rarity quota and inside the till, never always there. Named in a
+            # counter's `draw` (stall-lines.json) as POTION_DRAW; `goods.potion_goods` is
+            # the one list.
+            if track == POTION_DRAW:
+                from . import goods as goods_mod
+
+                for g in goods_mod.potion_goods():
+                    seen.setdefault(g.id, g)
+                continue
             try:
                 found = benches.obtainable(track, "bought")
             except Exception:

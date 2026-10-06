@@ -102,10 +102,12 @@
      "tables": ["weapons"]},
     {"id": "alchemist", "label": "the alchemist", "title": "the alchemist",
      "words": ["alchemist", "apothecary", "herbalist"], "smallest": "town",
-     "gear": ["alchemist's fire", "antitoxin", "sunrod"],
-     "tables": ["herbal-manuals"],
-     "draw": ["alchemist", "herbalist"],
-     "consumables": ["alchemist"]}
+     "gear": ["alchemist's fire", "acid", "antitoxin", "sunrod", "tanglefoot bag",
+              "smokestick", "tindertwig", "thunderstone"],
+     "tables": ["herbal-manuals", "alchemy-manuals", "alchemy-classics"],
+     "draw": ["alchemist", "herbalist", "potions"],
+     "consumables": ["alchemist"],
+     "_alchemy": "The alchemy plan §12.5 (lane H, 2026-10-06): the CRB's eight alchemical goods and the alchemy-classics table (the other classics) are the bench's own products at Sound quality and the book price (rules/goods.py CLASSIC_GEAR, alchemy_stock); the alchemy manuals are sold here and nowhere else; `potions` draws the spell potions under the rarity quota and inside the till (rules/goods.py potion_goods)."}
   ],
   "stalls": [
     {"id": "provisions", "noun": "provisions", "says": "bread, cheese and meat",

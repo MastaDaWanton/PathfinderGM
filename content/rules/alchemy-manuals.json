@@ -1,0 +1,156 @@
+{
+  "_about": [
+    "Alchemy manuals and formularies (alchemy plan §10.4, §13.3; contracts §1 row H): the",
+    "herbal, smithing and enchanting manuals' counterpart (content/rules/herbal-manuals.json,",
+    "smithing-manuals.json, enchanting-manuals.json). Read by rules/knowledge.py",
+    "(`manuals('alchemist')`, `manual_keys`); sold at the alchemist's shop through",
+    "rules/goods.py `table_goods('alchemy-manuals')` (content/rules/stall-lines.json), and",
+    "nowhere else: the 0.2.4 defect was a craft's manuals on no counter at all.",
+    "",
+    "Original writing for Pathfinder GM (2026-10-06).",
+    "",
+    "Two kinds of book. A MANUAL teaches what reagents do: `teaches` rows name a `material` by",
+    "its alchemy-shelf id, with which of its properties the book holds (\"all\", \"benefits\",",
+    "\"drawbacks\", \"working\", or a list of keys), exactly as the smithing manuals do; an id",
+    "nothing holds is skipped, never invented. A FORMULARY teaches formulae: `formulae`",
+    "names formula ids (content/rules/alchemy-formulae.json and the derived spell rows,",
+    "rules/formulae.py), learned by the bench's `formulary` route (rules/formulae.py",
+    "LEARN_ROUTES: no check, the book is never spent).",
+    "",
+    "Prices. A manual's is PROPOSED, in the other crafts' range (6 to 15 gp), dearer as the",
+    "knowledge is rarer; the owner tunes it in play. A formulary's is the BOOK'S, derived and",
+    "pinned by tests/test_alchemy_prices.py: Ultimate Equipment's blank formula book (15 gp,",
+    "'the alchemist equivalent of a spellbook'), plus the CRB's cost of writing each formula",
+    "into it (rules/formulae.py copy_cost_gp: 5 gp for a classic, 10 x spell level squared",
+    "for a spell), the APG alchemist adding formulae 'using the same costs, pages, and time",
+    "requirements' as a wizard's spellbook. `hours` is one an entry, the formulary route's",
+    "hour (rules/formulae.py learn_route)."
+  ],
+  "manuals": [
+    {
+      "id": "the-bench-primer",
+      "name": "The Bench Primer",
+      "price_gp": 10,
+      "hours": 4,
+      "about": "An apprentice's first book: the common stuff of the trade, what each does in a flask, and what each does to the hands that work it.",
+      "teaches": [
+        {"material": "brimstone", "keys": "all"},
+        {"material": "saltpetre", "keys": "all"},
+        {"material": "green-vitriol", "keys": "all"},
+        {"material": "blue-vitriol", "keys": "all"},
+        {"material": "pine-pitch", "keys": "all"},
+        {"material": "birch-tar", "keys": "all"},
+        {"material": "lamp-black", "keys": "all"},
+        {"material": "gum-arabic", "keys": "all"},
+        {"material": "quicklime", "keys": "all"},
+        {"material": "natron", "keys": "all"},
+        {"material": "alum", "keys": "all"},
+        {"material": "distilled-water", "keys": "all"},
+        {"material": "strong-spirits", "keys": "all"}
+      ]
+    },
+    {
+      "id": "salts-spirits-and-sharp-waters",
+      "name": "Salts, Spirits and Sharp Waters",
+      "price_gp": 14,
+      "hours": 6,
+      "about": "A distiller's notebook on the waters that bite and the salts that wake: which solvent takes which solid, and which fumes to keep the face away from.",
+      "teaches": [
+        {"material": "oil-of-vitriol", "keys": "all"},
+        {"material": "aqua-fortis", "keys": "all"},
+        {"material": "rectified-spirits", "keys": "all"},
+        {"material": "font-water", "keys": "all"},
+        {"material": "sal-ammoniac", "keys": "all"},
+        {"material": "sal-volatile", "keys": "all"},
+        {"material": "silver-salt", "keys": "all"},
+        {"material": "quicksilver", "keys": "all"},
+        {"material": "phosphorus", "keys": "all"},
+        {"material": "verdigris", "keys": "all"}
+      ]
+    },
+    {
+      "id": "of-glands-and-venoms",
+      "name": "Of Glands and Venoms",
+      "price_gp": 15,
+      "hours": 6,
+      "about": "Drawn from the dissecting table: what the sacs and glands of dangerous beasts keep, and what they do to whoever cuts them out carelessly.",
+      "teaches": [
+        {"material": "ankheg-acid-sac", "keys": "all"},
+        {"material": "shocker-lizard-node", "keys": "all"},
+        {"material": "giant-frog-mucus", "keys": "all"},
+        {"material": "adder-venom-gland", "keys": "all"},
+        {"material": "slick-jelly", "keys": "all"},
+        {"material": "cockatrice-wattle", "keys": "all"},
+        {"material": "dragon-bile", "keys": "all"},
+        {"material": "frostworm-chill-gland", "keys": "all"},
+        {"material": "gray-ooze-core", "keys": "all"},
+        {"material": "wyvern-venom-gland", "keys": "all"}
+      ]
+    },
+    {
+      "id": "the-flask-makers-formulary",
+      "name": "The Flask-Maker's Formulary",
+      "price_gp": 35,
+      "hours": 4,
+      "about": "The rest of the street alchemist's stock, past the four every apprentice is taught: the rod that burns bright, the stick that smokes, the twig that lights at a stroke and the stone that bangs.",
+      "formulae": ["sunrod", "smokestick", "tindertwig", "thunderstone"]
+    },
+    {
+      "id": "remedies-and-ruinous-powders",
+      "name": "Remedies and Ruinous Powders",
+      "price_gp": 55,
+      "hours": 8,
+      "about": "A travelling apothecary's collected recipes: cold in a jar, a flask for oozes, an itch, a flash, a grease, a guard against plague, salts to wake the fallen, and a balm for blades that meet the dead.",
+      "formulae": ["liquid-ice", "alkali-flask", "itching-powder", "flash-powder",
+                   "alchemical-grease", "antiplague", "smelling-salts", "holy-weapon-balm"]
+    },
+    {
+      "id": "a-first-book-of-draughts",
+      "name": "A First Book of Draughts",
+      "price_gp": 165,
+      "hours": 15,
+      "about": "The first spells a brewer learns to stopper: small mendings, small wards, longer strides and a weapon's edge for a minute.",
+      "formulae": ["potion-of-cure-light-wounds", "potion-of-mage-armor",
+                   "potion-of-shield-of-faith", "potion-of-protection-from-evil",
+                   "potion-of-remove-fear", "potion-of-endure-elements",
+                   "potion-of-enlarge-person", "potion-of-reduce-person", "potion-of-jump",
+                   "potion-of-longstrider", "potion-of-expeditious-retreat",
+                   "potion-of-comprehend-languages", "potion-of-pass-without-trace",
+                   "oil-of-magic-weapon", "oil-of-magic-fang"]
+    },
+    {
+      "id": "strengths-of-the-beasts",
+      "name": "Strengths of the Beasts",
+      "price_gp": 295,
+      "hours": 7,
+      "about": "Seven draughts that lend the drinker a beast's gift for an hour or two: the bull's back, the cat's feet, the bear's hide, the eagle's bearing, the fox's wit, the owl's eyes and the oak's bark.",
+      "formulae": ["potion-of-bull-s-strength", "potion-of-cat-s-grace",
+                   "potion-of-bear-s-endurance", "potion-of-eagle-s-splendor",
+                   "potion-of-fox-s-cunning", "potion-of-owl-s-wisdom", "potion-of-barkskin"]
+    },
+    {
+      "id": "the-physicians-second-book",
+      "name": "The Physician's Second Book",
+      "price_gp": 535,
+      "hours": 13,
+      "about": "Deeper mendings and the draughts that hide, blur, climb and see: a field surgeon's and a spy's book in one binding.",
+      "formulae": ["potion-of-cure-moderate-wounds", "potion-of-lesser-restoration",
+                   "potion-of-delay-poison", "potion-of-remove-paralysis", "potion-of-aid",
+                   "potion-of-false-life", "potion-of-resist-energy",
+                   "potion-of-invisibility", "potion-of-blur", "potion-of-darkvision",
+                   "potion-of-see-invisibility", "potion-of-spider-climb",
+                   "oil-of-align-weapon"]
+    },
+    {
+      "id": "the-third-distillation",
+      "name": "The Third Distillation",
+      "price_gp": 825,
+      "hours": 9,
+      "about": "A master's book, bound in brass: flight, speed, the body made smoke or able to breathe water, poison undone, wounds closed that would kill, and an edge that finds the gap.",
+      "formulae": ["potion-of-cure-serious-wounds", "potion-of-fly", "potion-of-haste",
+                   "potion-of-heroism", "potion-of-water-breathing",
+                   "potion-of-gaseous-form", "potion-of-neutralize-poison",
+                   "potion-of-protection-from-energy", "oil-of-keen-edge"]
+    }
+  ]
+}
