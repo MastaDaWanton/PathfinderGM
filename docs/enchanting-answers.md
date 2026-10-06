@@ -54,3 +54,10 @@ took, **the answer wins** and the plan section named must be built to it.
 |---|---|
 | Day phases | **Add "afternoon"** (13:00–17:00), so no hour is called noon that the narrator's hour check would flag. Seven phases: dawn, morning, noon, afternoon, dusk, night, midnight. |
 | Stopping a steep | **No: a steep must finish.** It is collected when ready; there is no Stop for jars. |
+
+## Round 6: lane A's calls (2026-10-05)
+
+| Question | Owner's answer |
+|---|---|
+| Holy, unholy, axiomatic, anarchic | **Anyone, like smite.** With no alignment tracking, the +2d6 lands on any foe for now, and the property's text says it will narrow to the right alignment once alignment is added. Lane C's reader for `when.target.alignment` answers "yes" for every target until then. |
+| Skill competence items | **No cap.** Caster level by bonus as proposed; no +10 cap; the price formula (bonus² × 100 gp) keeps big bonuses expensive. |
